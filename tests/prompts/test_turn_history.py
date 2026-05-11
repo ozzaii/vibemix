@@ -119,16 +119,21 @@ def test_turn_history_08_overflow_drops_oldest_pair() -> None:
 
 
 def test_turn_history_09_overflow_at_default_12() -> None:
-    """Push 14 pairs → only the last 12 remain (default cap)."""
+    """Push 14 pairs → only the last 12 remain (default cap).
+
+    Use full <user>uN</user> framing for substring checks so 'u1' doesn't
+    spuriously match 'u10' / 'u11' / etc.
+    """
     th = TurnHistory()
     for i in range(14):
         th.push_user(f"u{i}")
         th.push_model(f"m{i}")
     out = th.as_text()
-    assert "u0" not in out
-    assert "u1" not in out
-    assert "u2" in out  # 2..13 = 12 pairs retained
-    assert "u13" in out
+    # u0, u1 evicted; u2..u13 retained (12 pairs).
+    assert "<user>u0</user>" not in out
+    assert "<user>u1</user>" not in out
+    assert "<user>u2</user>" in out
+    assert "<user>u13</user>" in out
     # Sanity: ring contents are exactly 12 pairs (24 entries).
     assert out.count("<user>") == 12
     assert out.count("<model>") == 12
