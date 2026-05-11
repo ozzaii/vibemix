@@ -327,6 +327,4 @@ def test_prompt_01_coach_mode_includes_feedback_bias(skill: str) -> None:
     body = build_system_instruction(skill, "coach")
     # At least one of these honest-feedback markers must be present.
     markers = ["coach", "feedback", "improve", "honest"]
-    assert any(m in body.lower() for m in markers), (
-        f"coach({skill}) missing feedback-bias signal"
-    )
+    assert any(m in body.lower() for m in markers), f"coach({skill}) missing feedback-bias signal"
