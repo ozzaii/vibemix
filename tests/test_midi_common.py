@@ -30,7 +30,6 @@ import pytest
 from vibemix.midi import load_profile
 from vibemix.platform import _midi_common
 
-
 # ---------- Fake mido module (test injection seam) ----------
 
 
@@ -364,8 +363,7 @@ def test_listener_emits_deprecation_warning_on_str_port_hint(monkeypatch):
         t.join(timeout=1.0)
 
     assert any(
-        issubclass(w.category, DeprecationWarning) and "port_hint" in str(w.message)
-        for w in caught
+        issubclass(w.category, DeprecationWarning) and "port_hint" in str(w.message) for w in caught
     )
     assert cs.connected_to == "DDJ-FLX4 USB MIDI"
 

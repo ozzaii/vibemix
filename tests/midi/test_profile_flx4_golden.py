@@ -18,7 +18,6 @@ from types import SimpleNamespace
 
 from vibemix.midi import ControllerState, load_profile
 
-
 # v4 maps — re-stated locally so this test breaks if either v4 OR the JSON
 # drifts. Comparing against the loaded profile's internal lookup tables.
 _V4_CC_MAP = {
