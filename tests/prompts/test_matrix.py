@@ -311,7 +311,7 @@ def test_prompt_01_hype_intermediate_carries_equivalent_substrate() -> None:
     assert "KAAN_SPOKE" in HYPE_INTERMEDIATE
     assert "MANUAL" in HYPE_INTERMEDIATE
     # v4 equivalent of describe-before-infer
-    assert "react to what you HEAR" in HYPE_INTERMEDIATE
+    assert "React to what you HEAR" in HYPE_INTERMEDIATE
     # v4 equivalent of <silence/> instruction
     assert "reply with silence" in HYPE_INTERMEDIATE
 
