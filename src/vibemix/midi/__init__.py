@@ -33,6 +33,7 @@ from vibemix.midi.profile import (
     list_profiles,
     load_profile,
 )
+from vibemix.midi.registry import find_mapping
 from vibemix.midi.state import ControllerState, MidiEvent
 
 __all__ = [
@@ -41,6 +42,7 @@ __all__ = [
     "ControllerProfile",
     "ControllerState",
     "MidiEvent",
+    "find_mapping",
     "list_profiles",
     "load_profile",
 ]

@@ -123,12 +123,14 @@ class MidiMacOS:
     def start_listener_thread(self, stop_event: threading.Event) -> threading.Thread:
         """Spawn the v4 daemon thread. Retries every 2s on disconnect.
 
-        Port hint: ``"DDJ-FLX4"`` (case-insensitive substring match).
-
         Phase 7 Wave 1: the listener body lives in
         ``vibemix.platform._midi_common.midi_listener_thread``; this method
-        injects the macOS ``mido`` module and the DDJ-FLX4 port hint.
-        Task 3 of Phase 9 Wave 1 swaps to a ControllerProfile.
+        injects the macOS ``mido`` module + the FLX4 ControllerProfile
+        (Phase 9 Wave 1 Task 3 — port hints derive from
+        ``profile.port_name_hints``: ``("DDJ-FLX4", "FLX4")``).
+
+        Wave 2 swaps the static FLX4 profile for dynamic ``find_mapping(
+        port_name)`` resolution once the hot-plug watcher fires.
         """
         if not _HAS_MIDO:
             print("-> mido not installed, MIDI controller disabled", file=sys.stderr)
@@ -140,4 +142,9 @@ class MidiMacOS:
         # ``__init__.py`` re-entry cycle.
         from vibemix.platform import _midi_common
 
-        return _midi_common.spawn_listener(self.controller_state, stop_event, "DDJ-FLX4", mido)
+        return _midi_common.spawn_listener(
+            self.controller_state,
+            stop_event,
+            load_profile("pioneer_ddj_flx4"),
+            mido,
+        )
