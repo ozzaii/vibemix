@@ -55,28 +55,39 @@ def test_selector_does_not_import_windows_only_modules_on_macos():
     """After ``import vibemix.platform`` on darwin, ``sys.modules`` must NOT
     contain any Windows-specific module — proves the elif win32 branch was
     not evaluated and lazy import discipline holds."""
-    # Force a fresh import: drop vibemix.platform from sys.modules and
-    # re-import.
-    for key in list(sys.modules):
-        if key == "vibemix.platform" or key.startswith("vibemix.platform."):
-            del sys.modules[key]
+    # Snapshot + drop the existing vibemix.platform modules so the import
+    # is fresh. Restore them in finally so subsequent tests retain the same
+    # module identities (otherwise monkeypatch.setattr by string path crashes).
+    saved = {
+        k: sys.modules[k]
+        for k in list(sys.modules)
+        if k == "vibemix.platform" or k.startswith("vibemix.platform.")
+    }
+    for key in saved:
+        del sys.modules[key]
+    try:
+        importlib.import_module("vibemix.platform")
 
-    importlib.import_module("vibemix.platform")
-
-    forbidden_exact = {"pyaudiowpatch", "winsdk"}
-    for mod in forbidden_exact:
-        assert mod not in sys.modules, f"{mod} leaked into sys.modules"
-    # win32* covers pywin32 surface (win32api, win32gui, win32con, ...).
-    win32_leaks = [m for m in sys.modules if m.startswith("win32")]
-    assert win32_leaks == [], f"win32* leaked: {win32_leaks}"
-    # Concrete Windows impls also must NOT have been imported.
-    for win_impl in (
-        "vibemix.platform._audio_windows",
-        "vibemix.platform._screen_windows",
-        "vibemix.platform._midi_windows",
-        "vibemix.platform._track_windows",
-    ):
-        assert win_impl not in sys.modules, f"{win_impl} leaked into sys.modules"
+        forbidden_exact = {"pyaudiowpatch", "winsdk"}
+        for mod in forbidden_exact:
+            assert mod not in sys.modules, f"{mod} leaked into sys.modules"
+        # win32* covers pywin32 surface (win32api, win32gui, win32con, ...).
+        win32_leaks = [m for m in sys.modules if m.startswith("win32")]
+        assert win32_leaks == [], f"win32* leaked: {win32_leaks}"
+        # Concrete Windows impls also must NOT have been imported.
+        for win_impl in (
+            "vibemix.platform._audio_windows",
+            "vibemix.platform._screen_windows",
+            "vibemix.platform._midi_windows",
+            "vibemix.platform._track_windows",
+        ):
+            assert win_impl not in sys.modules, f"{win_impl} leaked into sys.modules"
+    finally:
+        # Restore the pre-test module identities.
+        for key in list(sys.modules):
+            if key == "vibemix.platform" or key.startswith("vibemix.platform."):
+                del sys.modules[key]
+        sys.modules.update(saved)
 
 
 # ---------- Selector raises on unsupported platforms ----------
@@ -87,17 +98,34 @@ def test_selector_raises_on_unsupported_platform(monkeypatch):
     selector ``else`` branch — Linux is explicitly out of v1 scope."""
     monkeypatch.setattr(sys, "platform", "linux")
     # Force a fresh import so the selector re-evaluates against the patched
-    # platform.
-    for key in list(sys.modules):
-        if key == "vibemix.platform" or key.startswith("vibemix.platform."):
-            del sys.modules[key]
+    # platform. Snapshot the pre-test set of vibemix.platform.* modules so we
+    # can restore them after the test — otherwise the failed import leaves
+    # vibemix.platform missing and downstream tests that do
+    # ``monkeypatch.setattr("vibemix.platform._midi_macos.time.time", ...)``
+    # crash with AttributeError because pytest's `monkeypatch` resolves the
+    # path against a stale sys.modules entry.
+    saved = {
+        k: sys.modules[k]
+        for k in list(sys.modules)
+        if k == "vibemix.platform" or k.startswith("vibemix.platform.")
+    }
+    for key in saved:
+        del sys.modules[key]
+    try:
+        with pytest.raises(RuntimeError) as exc_info:
+            importlib.import_module("vibemix.platform")
 
-    with pytest.raises(RuntimeError) as exc_info:
-        importlib.import_module("vibemix.platform")
-
-    msg = str(exc_info.value)
-    assert "Unsupported platform" in msg
-    assert "macOS and Windows" in msg
+        msg = str(exc_info.value)
+        assert "Unsupported platform" in msg
+        assert "macOS and Windows" in msg
+    finally:
+        # Drop any partial import left by the raised selector branch, then
+        # restore the originals so subsequent tests see the same module
+        # identities they were patched against.
+        for key in list(sys.modules):
+            if key == "vibemix.platform" or key.startswith("vibemix.platform."):
+                del sys.modules[key]
+        sys.modules.update(saved)
 
 
 # ---------- pyproject.toml — Windows-only dep markers ----------
