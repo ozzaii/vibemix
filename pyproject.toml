@@ -60,6 +60,10 @@ dev = [
     "pytest-mock>=3.15.1",
 ]
 
+# Hatchling includes non-Python files inside a package directory by default
+# (unlike setuptools), so ``src/vibemix/state/genre/profiles/*.json`` ships
+# with the wheel automatically (Phase 6 Wave 1). No explicit ``force-include``
+# needed; verified via ``uv build`` + ``unzip -l dist/*.whl | grep .json``.
 [tool.hatch.build.targets.wheel]
 packages = ["src/vibemix"]
 

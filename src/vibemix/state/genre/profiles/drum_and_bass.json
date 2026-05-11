@@ -1,0 +1,21 @@
+{
+  "name": "drum_and_bass",
+  "label": "Drum & Bass / Jungle / Neurofunk",
+  "bpm_range": [165, 180],
+  "absolute_thresholds": {
+    "silent_rms": 0.012,
+    "low_rms": 0.045,
+    "peak_rms": 0.115
+  },
+  "expected_crest_factor": [3.5, 5.5],
+  "band_signature": {
+    "sub":  [0.30, 0.50],
+    "low":  [0.15, 0.25],
+    "mid":  [0.10, 0.20],
+    "high": [0.15, 0.25]
+  },
+  "vocal_likelihood": "occasional",
+  "build_climb_threshold": 0.030,
+  "breakdown_ratio": 0.35,
+  "drop_jump_threshold": 0.070
+}

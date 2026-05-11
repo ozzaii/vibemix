@@ -1,0 +1,21 @@
+{
+  "name": "house",
+  "label": "House / Tech House / Deep House",
+  "bpm_range": [118, 130],
+  "absolute_thresholds": {
+    "silent_rms": 0.012,
+    "low_rms": 0.035,
+    "peak_rms": 0.100
+  },
+  "expected_crest_factor": [4.0, 7.0],
+  "band_signature": {
+    "sub":  [0.20, 0.35],
+    "low":  [0.20, 0.30],
+    "mid":  [0.20, 0.35],
+    "high": [0.10, 0.20]
+  },
+  "vocal_likelihood": "occasional",
+  "build_climb_threshold": 0.020,
+  "breakdown_ratio": 0.4,
+  "drop_jump_threshold": 0.050
+}
