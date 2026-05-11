@@ -145,8 +145,8 @@ Plans:
 **Plans:** 5 plans
 Plans:
 - [x] 07-01-PLAN.md — Platform selector dispatch + _midi_common.py refactor (shared listener) + Windows-only deps in pyproject (pyaudiowpatch / pywin32 / winsdk markers)
-- [ ] 07-02-PLAN.md — AudioWindows (PyAudioWPatch WASAPI loopback default-playback-device capture + sample-rate sanity guard + standard PyAudio output/mic streams)
-- [ ] 07-03-PLAN.md — ScreenWindows (mss + pywin32 EnumWindows + 5-app DJ hint list) + TrackWindows (winsdk SMTC via asyncio.run executor bridge + graceful fallback)
+- [x] 07-02-PLAN.md — AudioWindows (PyAudioWPatch WASAPI loopback default-playback-device capture + sample-rate sanity guard + standard PyAudio output/mic streams)
+- [x] 07-03-PLAN.md — ScreenWindows (mss + pywin32 EnumWindows + 5-app DJ hint list) + TrackWindows (winsdk SMTC via asyncio.run executor bridge + graceful fallback)
 - [ ] 07-04-PLAN.md — MidiWindows (thin wrapper on _midi_common + ControllerState reuse) + cross-platform integration test (selector + lazy-import contract verified on macOS CI)
 - [ ] 07-05-PLAN.md — docs/windows-setup.md + 10-gate verification + 07-SUMMARY + STATE/ROADMAP advance to Phase 8
 
