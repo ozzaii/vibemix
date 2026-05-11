@@ -67,3 +67,22 @@ def test_find_mapping_first_match_wins_when_multiple_hints_could_match():
     result = find_mapping("My DDJ-FLX4 with XYZ in name")
     assert result is not None
     assert result.id == "pioneer_ddj_flx4"
+
+
+# ---------- Phase 9 Wave 2 — find_mapping_or_generic ----------
+
+
+def test_find_mapping_or_generic_returns_real_profile_when_match():
+    from vibemix.midi import find_mapping_or_generic
+
+    result = find_mapping_or_generic("My DDJ-FLX4 USB")
+    assert result is not None
+    assert result.id == "pioneer_ddj_flx4"
+
+
+def test_find_mapping_or_generic_returns_generic_when_no_match():
+    from vibemix.midi import find_mapping_or_generic
+
+    result = find_mapping_or_generic("Bose Speaker")
+    assert result is not None
+    assert result.id == "generic_midi"
