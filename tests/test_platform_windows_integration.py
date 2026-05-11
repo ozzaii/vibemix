@@ -336,13 +336,17 @@ def test_phase_3_midi_golden_after_refactor():
 
     Feeds the v4 DDJ-FLX4 message sequence through ``handle_msg`` and asserts
     ``deck_snapshot()`` matches the v4-canonical expected state. Pre/post
-    Wave 1's ``_midi_common`` extraction the decoder must remain
-    byte-identical — this is the load-bearing IP from cohost_v4.py:618-727
-    and Kaan's 2026-05-11 real-DJ-session tuning.
+    Wave 1's ``_midi_common`` extraction AND Phase 9 Wave 1's
+    profile-parameterization the decoder must remain byte-identical — this is
+    the load-bearing IP from cohost_v4.py:618-727 and Kaan's 2026-05-11
+    real-DJ-session tuning.
     """
+    from vibemix.midi import load_profile
     from vibemix.platform._midi_macos import ControllerState
 
-    cs = ControllerState()
+    flx4 = load_profile("pioneer_ddj_flx4")
+    assert flx4 is not None
+    cs = ControllerState(profile=flx4)
     # Sequence: deck A vol 0→127 (up big), eq_low killed (flat→killed),
     # play toggle (False→True).
     cs.handle_msg(SimpleNamespace(type="control_change", channel=0, control=0x13, value=127))

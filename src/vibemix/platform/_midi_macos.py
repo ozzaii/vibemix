@@ -1,42 +1,50 @@
 # SPDX-License-Identifier: Apache-2.0
 """MidiMacOS — MidiBackend implementation for macOS via ``mido`` + python-rtmidi.
 
-Verbatim port of cohost_v4.py:580-757 (DDJ-FLX4 CC/Note maps + ControllerState
-+ midi_listener_thread).
+Phase 9 Wave 1 extraction: the v4 ``_CC_MAP`` / ``_NOTE_MAP`` constants and
+the ``ControllerState`` / ``_knob_label`` / ``_xfader_label`` decoder body
+have moved to ``vibemix.midi.state`` (canonical source of truth) and
+``vibemix.midi.profiles/pioneer_ddj_flx4.json`` (declarative mapping). This
+file is now a thin wrapper that:
 
-Phase 7 Wave 1 refactor: the listener-thread body moved to ``_midi_common.py``
-so Wave 4's ``_midi_windows.py`` can call the same helper. ``MidiMacOS`` is now
-a thin wrapper around ``mido`` + the v4 CC/Note maps + the v4 ``ControllerState``;
-``start_listener_thread`` delegates to ``_midi_common.spawn_listener``. Behavior
-is byte-identical (pinned by ``test_midi_macos_golden_unchanged_behavior_after_refactor``).
+1. Re-exports ``ControllerState`` / ``MidiEvent`` / ``_knob_label`` /
+   ``_xfader_label`` from ``vibemix.midi.state`` so legacy imports
+   (``from vibemix.platform._midi_macos import ControllerState``) keep working
+   for Phase 7 downstream tests + state_refresh_loop call sites.
+2. Instantiates ``MidiMacOS().controller_state = ControllerState(profile=
+   load_profile('pioneer_ddj_flx4'))`` — Wave 2 makes this dynamic via
+   ``find_mapping(port_name)`` once the hot-plug watcher fires (Wave 3).
+3. Hosts the ``_MidoPortAdapter`` Phase-1 MidiPort wrapper (cross-OS — also
+   imported by ``_midi_windows`` for the same reason).
 
-KNOWN ISSUE (Phase 9): Pioneer DDJ-FLX4 play-state propagation
------------------------------------------------------------------
-The _NOTE_MAP DOES map note ``0x0B`` → ``'play'``. ``ControllerState.handle_msg``
-DOES toggle ``deck[deck]['play']`` on ``note_on``. BUT when djay Pro is the
-active controlling app, the FLX4 firmware sometimes consumes play presses
-locally without forwarding ``note_on`` to other listeners. Result:
-``deck['play']`` stays at boot-default ``False`` → ``derive_audible_deck``
-returns ``"none"`` → ``derive_audible_track`` confidence capped at ``0.3`` →
-``TRACK_CHANGE`` event (which requires ``audible_track_confidence >=
-TRACK_CHANGE_MIN_CONFIDENCE = 0.5``) never fires.
+KNOWN ISSUE (still — Phase 9 docket): Pioneer DDJ-FLX4 play-state
+propagation. When djay Pro is the active controlling app, the FLX4 firmware
+sometimes consumes play presses locally without forwarding ``note_on`` to
+other listeners. ``deck['play']`` stays at boot-default ``False`` →
+``derive_audible_deck`` returns ``"none"`` → ``derive_audible_track``
+confidence capped at ``0.3`` → ``TRACK_CHANGE`` event never fires. Tracked
+for Phase 9 follow-up — likely cross-reference with nowplaying-cli's
+playback-state, IAC port if available, or audio-side "deck has signal energy"
+fallback.
 
-Phase 3 reproduces v4 verbatim. Phase 9 fix is the docket — likely cross-
-reference with nowplaying-cli's playback-state, IAC port if available, or
-audio-side "deck has signal energy" fallback.
-
-Phase 9 also: curated 10-controller library (Pioneer DDJ-400/FLX4/FLX6/FLX10/
-1000/SX3 + XDJ-RX3 + Numark Party Mix Live + Hercules Inpulse 300/500) +
-generic positional fallback + hot-plug rescan. Phase 3 ships the DDJ-FLX4
-maps only and enumerates the port once at listener-thread start (with retry-
-every-2s on disconnect).
+Phase 7 Wave 1: the listener-thread body lives in
+``vibemix.platform._midi_common``; ``start_listener_thread`` delegates to
+``_midi_common.spawn_listener``. (Task 3 of Wave 1 swaps the third arg from
+the legacy ``port_hint: str`` to a ``ControllerProfile`` — this method's
+internal call is updated in Task 3.)
 """
 
 from __future__ import annotations
 
 import sys
 import threading
-import time
+import time  # noqa: F401 — re-exported for backward compat: Phase 7's golden
+
+# test (tests/test_midi_common.py::test_midi_macos_golden_unchanged_behavior_after_refactor)
+# patches "vibemix.platform._midi_macos.time.time" to pin the moves_since
+# timestamps. Keeping `time` importable from this module preserves that mock
+# target. The actual decoder body lives in vibemix.midi.state and patches
+# there via "vibemix.midi.state.time.time".
 
 try:
     import mido
@@ -46,6 +54,17 @@ except ImportError:
     mido = None  # type: ignore[assignment]
     _HAS_MIDO = False
 
+from vibemix.midi import load_profile
+
+# Re-export shim — Phase 9 Wave 1 moved ControllerState + MidiEvent + the v4
+# label helpers to vibemix.midi.state. The legacy import path stays a shim so
+# Phase 7 downstream tests + state_refresh_loop call sites keep working.
+from vibemix.midi.state import (  # noqa: F401  (re-export)
+    ControllerState,
+    MidiEvent,
+    _knob_label,
+    _xfader_label,
+)
 from vibemix.platform.midi import MidiMessage, MidiPort
 
 # NOTE: ``_midi_common`` is imported lazily inside ``start_listener_thread``
@@ -53,219 +72,14 @@ from vibemix.platform.midi import MidiMessage, MidiPort
 # the package ``__init__.py`` (which imports ``_midi_macos`` itself) and risk a
 # circular-import deadlock. Lazy import sidesteps the cycle entirely.
 
-# ---- DDJ-FLX4 controller maps (verbatim from cohost_v4.py:582-598) ----
-# (midi_channel, cc_number) → (deck, field). Channels 0/1 = decks A/B,
-# channel 6 = master section (filter knobs + xfader). All values 0..127.
-_CC_MAP = {
-    (0, 0x13): ("A", "vol"),
-    (1, 0x13): ("B", "vol"),
-    (0, 0x07): ("A", "eq_hi"),
-    (1, 0x07): ("B", "eq_hi"),
-    (0, 0x0B): ("A", "eq_mid"),
-    (1, 0x0B): ("B", "eq_mid"),
-    (0, 0x0F): ("A", "eq_low"),
-    (1, 0x0F): ("B", "eq_low"),
-    (0, 0x00): ("A", "tempo"),
-    (1, 0x00): ("B", "tempo"),
-    (6, 0x17): ("A", "filter"),
-    (6, 0x18): ("B", "filter"),
-    (6, 0x1F): ("M", "xfader"),
-}
-_NOTE_MAP = {
-    (0, 0x0B): ("A", "play"),
-    (1, 0x0B): ("B", "play"),
-    (0, 0x0C): ("A", "cue"),
-    (1, 0x0C): ("B", "cue"),
-    (0, 0x60): ("A", "sync"),
-    (1, 0x60): ("B", "sync"),
-    (0, 0x36): ("A", "jog_touch"),
-    (1, 0x36): ("B", "jog_touch"),
-    (0, 0x10): ("A", "loop_in"),
-    (1, 0x10): ("B", "loop_in"),
-    (0, 0x11): ("A", "loop_out"),
-    (1, 0x11): ("B", "loop_out"),
-}
-
-
-def _knob_label(v: int) -> str:
-    """6-tier EQ/filter knob mapping (v4:601-607 verbatim)."""
-    if v < 8:
-        return "killed"
-    if v < 30:
-        return "deep-cut"
-    if v < 55:
-        return "cut"
-    if v <= 73:
-        return "flat"
-    if v <= 100:
-        return "boost"
-    return "max"
-
-
-def _xfader_label(v: int) -> str:
-    """5-tier xfader mapping (v4:610-615 verbatim)."""
-    if v < 16:
-        return "full-A"
-    if v < 48:
-        return "A-side"
-    if v <= 80:
-        return "center"
-    if v <= 112:
-        return "B-side"
-    return "full-B"
-
-
-class ControllerState:
-    """Live decoded DDJ-FLX4 state. Lock-protected. Tracks recent moves only —
-    the AI sees deltas, never static positions (those are background context).
-
-    Verbatim port of cohost_v4.py:618-727.
-    """
-
-    def __init__(self):
-        self._lock = threading.Lock()
-        self.deck = {
-            "A": {
-                "vol": 0,
-                "eq_low": 64,
-                "eq_mid": 64,
-                "eq_hi": 64,
-                "filter": 64,
-                "tempo": 64,
-                "play": False,
-                "cue": False,
-                "jog_touched": False,
-            },
-            "B": {
-                "vol": 0,
-                "eq_low": 64,
-                "eq_mid": 64,
-                "eq_hi": 64,
-                "filter": 64,
-                "tempo": 64,
-                "play": False,
-                "cue": False,
-                "jog_touched": False,
-            },
-        }
-        self.xfader = 64
-        self._moves: list[tuple[float, str]] = []
-        self._connected = False
-        self.port_name = ""
-
-    def mark_connected(self, port_name: str):
-        with self._lock:
-            self._connected = True
-            self.port_name = port_name
-
-    def is_connected(self) -> bool:
-        with self._lock:
-            return self._connected
-
-    def _record_move(self, label: str, now: float):
-        # Dedupe: same label within 0.4s collapses (prevents jog-wheel spam).
-        if self._moves and (now - self._moves[-1][0] < 0.4) and self._moves[-1][1] == label:
-            return
-        self._moves.append((now, label))
-        cutoff = now - 12.0
-        while self._moves and self._moves[0][0] < cutoff:
-            self._moves.pop(0)
-
-    def handle_msg(self, msg) -> None:
-        now = time.time()
-        try:
-            if msg.type == "control_change":
-                key = (msg.channel, msg.control)
-                if key not in _CC_MAP:
-                    return
-                deck, field = _CC_MAP[key]
-                v = msg.value
-                with self._lock:
-                    if deck == "M":
-                        prev = self.xfader
-                        self.xfader = v
-                        if _xfader_label(prev) != _xfader_label(v):
-                            self._record_move(f"xfader→{_xfader_label(v)}", now)
-                    else:
-                        prev = self.deck[deck][field]
-                        self.deck[deck][field] = v
-                        abs_d = abs(v - prev)
-                        mag = "small" if abs_d < 15 else ("medium" if abs_d < 40 else "big")
-                        if field in ("vol", "tempo"):
-                            if abs_d > 15:
-                                direction = "up" if v > prev else "down"
-                                self._record_move(f"{deck}_{field} {direction} ({mag})", now)
-                        elif field in ("eq_low", "eq_mid", "eq_hi", "filter"):
-                            if _knob_label(prev) != _knob_label(v):
-                                self._record_move(
-                                    f"{deck}_{field.replace('eq_', '')}: "
-                                    f"{_knob_label(prev)}→{_knob_label(v)} ({mag} twist)",
-                                    now,
-                                )
-            elif msg.type == "note_on":
-                key = (msg.channel, msg.note)
-                if key not in _NOTE_MAP:
-                    return
-                deck, field = _NOTE_MAP[key]
-                with self._lock:
-                    if field == "play":
-                        # KNOWN ISSUE (Phase 9): the FLX4 firmware sometimes
-                        # doesn't emit note_on for play while djay Pro is in
-                        # focus → play flag stays at boot default False. See
-                        # module docstring.
-                        self.deck[deck]["play"] = not self.deck[deck]["play"]
-                        self._record_move(
-                            f"{deck}_play→{'ON' if self.deck[deck]['play'] else 'OFF'}", now
-                        )
-                    elif field == "cue":
-                        self._record_move(f"{deck}_cue_hit", now)
-                    elif field == "sync":
-                        self._record_move(f"{deck}_sync_hit", now)
-                    elif field == "jog_touch":
-                        self.deck[deck]["jog_touched"] = msg.velocity > 0
-                    elif field == "loop_in":
-                        # Workaround — loop_in implicitly starts play.
-                        self.deck[deck]["play"] = True
-                        self._record_move(f"{deck}_loop_in_hit (play=ON)", now)
-                    elif field == "loop_out":
-                        self._record_move(f"{deck}_loop_out_hit", now)
-            elif msg.type == "note_off":
-                key = (msg.channel, msg.note)
-                if key in _NOTE_MAP:
-                    deck, field = _NOTE_MAP[key]
-                    if field == "jog_touch":
-                        with self._lock:
-                            self.deck[deck]["jog_touched"] = False
-        except Exception as e:
-            print(f"[midi handle err] {e}", file=sys.stderr)
-
-    def deck_snapshot(self) -> dict:
-        """Static snapshot — used by MusicState to compute audible deck weights.
-
-        Returns a fresh dict with copies of deck A and B (caller cannot mutate
-        listener-thread state through the returned dict)."""
-        with self._lock:
-            return {
-                "A": dict(self.deck["A"]),
-                "B": dict(self.deck["B"]),
-                "xfader": self.xfader,
-                "connected": self._connected,
-            }
-
-    def moves_since(self, t: float) -> list[tuple[float, str]]:
-        """Returns ``[(seconds_ago_rounded_to_0.1, label), ...]`` — note the
-        time-relative conversion (v4:724-727)."""
-        with self._lock:
-            now = time.time()
-            return [(round(now - mt, 1), label) for mt, label in self._moves if mt > t]
-
 
 class _MidoPortAdapter:
     """Wraps ``mido.IOPort`` to satisfy the Phase 1 ``MidiPort`` Protocol.
 
     Phase 1 Protocol requires: ``name: str``, ``poll() -> MidiMessage | None``,
     ``close() -> None``. mido provides ``poll`` and ``close`` directly; we just
-    pin ``name`` as an attribute.
+    pin ``name`` as an attribute. Cross-OS — ``_midi_windows`` imports this
+    class verbatim (mido is itself cross-OS).
     """
 
     def __init__(self, port, name: str):
@@ -280,19 +94,20 @@ class _MidoPortAdapter:
 
 
 class MidiMacOS:
-    """MidiBackend impl wrapping ``mido`` + the v4 ControllerState.
+    """MidiBackend impl wrapping ``mido`` + the canonical ControllerState
+    (now hosted in ``vibemix.midi.state``).
 
     Exposes:
-    - ``controller_state`` (the v4 ControllerState instance) so state_refresh_loop
-      can call ``.deck_snapshot()`` + ``.moves_since(t)`` directly.
-    - ``list_input_ports()`` / ``open_input(name)`` (Phase 1 Protocol surface).
-    - ``start_listener_thread(stop_event)`` — spawns the v4:730-756 daemon
-      thread for the DDJ-FLX4 polling loop. Returns the Thread object so
-      callers can join on shutdown.
+    - ``controller_state`` — ``ControllerState`` instance (FLX4 profile by
+      default; Wave 2 makes selection dynamic). state_refresh_loop reads via
+      ``.deck_snapshot()`` and ``.moves_since(t)`` directly.
+    - ``list_input_ports()`` / ``open_input(name)`` — Phase 1 Protocol surface.
+    - ``start_listener_thread(stop_event)`` — spawns the v4 daemon thread for
+      DDJ-FLX4 polling. Returns the Thread for ``join()`` on shutdown.
     """
 
     def __init__(self):
-        self.controller_state = ControllerState()
+        self.controller_state = ControllerState(profile=load_profile("pioneer_ddj_flx4"))
 
     def list_input_ports(self) -> list[str]:
         if not _HAS_MIDO:
@@ -306,19 +121,17 @@ class MidiMacOS:
         return _MidoPortAdapter(port, port_name)
 
     def start_listener_thread(self, stop_event: threading.Event) -> threading.Thread:
-        """Spawn the v4:730-756 daemon thread. Retries every 2s on disconnect.
+        """Spawn the v4 daemon thread. Retries every 2s on disconnect.
 
         Port hint: ``"DDJ-FLX4"`` (case-insensitive substring match).
 
-        Phase 7 Wave 1: the listener body now lives in
-        ``vibemix.platform._midi_common.midi_listener_thread``; this method is a
-        thin wrapper that injects the macOS ``mido`` module and the
-        DDJ-FLX4 port hint.
+        Phase 7 Wave 1: the listener body lives in
+        ``vibemix.platform._midi_common.midi_listener_thread``; this method
+        injects the macOS ``mido`` module and the DDJ-FLX4 port hint.
+        Task 3 of Phase 9 Wave 1 swaps to a ControllerProfile.
         """
         if not _HAS_MIDO:
             print("-> mido not installed, MIDI controller disabled", file=sys.stderr)
-            # Return an inert thread so callers can ``.join()`` without
-            # special-casing the no-mido path.
             t = threading.Thread(target=lambda: None, name="midi-listener-noop", daemon=True)
             t.start()
             return t

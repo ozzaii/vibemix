@@ -54,11 +54,13 @@ except ImportError:
     mido = None  # type: ignore[assignment]
     _HAS_MIDO = False
 
-# Reuse the v4 DDJ-FLX4 decoder + Phase 1 MidiPort adapter verbatim from the
-# macOS file — see module docstring for the rationale. Phase 9 may move these
-# into a shared controller-profile module without changing this file's
-# behavior.
-from vibemix.platform._midi_macos import ControllerState, _MidoPortAdapter
+# Phase 9 Wave 1: ControllerState now hosted in ``vibemix.midi.state`` — the
+# OS-agnostic decoder + magnitude-aware MidiEvent emission. ``_MidoPortAdapter``
+# still lives in ``_midi_macos`` (the cross-file import is harmless; the adapter
+# is OS-agnostic).
+from vibemix.midi import load_profile
+from vibemix.midi.state import ControllerState
+from vibemix.platform._midi_macos import _MidoPortAdapter
 from vibemix.platform.midi import MidiPort
 
 # NOTE: ``_midi_common`` is imported lazily inside ``start_listener_thread``
@@ -93,7 +95,7 @@ class MidiWindows:
     _PORT_HINT = "DDJ-FLX4"
 
     def __init__(self) -> None:
-        self.controller_state = ControllerState()
+        self.controller_state = ControllerState(profile=load_profile("pioneer_ddj_flx4"))
 
     def list_input_ports(self) -> list[str]:
         if not _HAS_MIDO:

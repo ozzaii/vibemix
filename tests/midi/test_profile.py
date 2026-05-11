@@ -22,9 +22,8 @@ import dataclasses
 
 import pytest
 
-from vibemix.midi import ControllerProfile, list_profiles, load_profile
+from vibemix.midi import list_profiles, load_profile
 from vibemix.midi.profile import _parse_profile
-
 
 # v4 maps — re-stated here so test breaks if either v4 OR JSON drifts.
 _V4_CC_MAP = {

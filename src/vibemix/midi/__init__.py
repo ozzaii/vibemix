@@ -33,11 +33,14 @@ from vibemix.midi.profile import (
     list_profiles,
     load_profile,
 )
+from vibemix.midi.state import ControllerState, MidiEvent
 
 __all__ = [
     "ButtonBinding",
     "ControlBinding",
     "ControllerProfile",
+    "ControllerState",
+    "MidiEvent",
     "list_profiles",
     "load_profile",
 ]
