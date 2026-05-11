@@ -12,7 +12,7 @@
 
 - [x] **Phase 1: Platform Protocol Firewall** - `platform/` Protocol classes + package skeleton + dependency lockfile + SignPath OSS application filed (day-1, 3-week lead time). _**Complete 2026-05-11.** SignPath form submission Kaan-side pending (reCAPTCHA)._
 - [x] **Phase 2: Audio Core Port + Ring Buffer Fix** - Port `AudioBuffer`/`MicBuffer`/`Levels`/`PlaybackQueue` from POC into pre-allocated ring buffers (fixes `np.concatenate` callback regression). _**Complete 2026-05-11.**_
-- [ ] **Phase 3: Sensing & State Port** - Port `MusicState` 10Hz writer + `EventDetector` + `AICoach` + `audible-deck` detection + screen/track sense from POC.
+- [x] **Phase 3: Sensing & State Port** - Port `MusicState` 10Hz writer + `EventDetector` + `AICoach` + `audible-deck` detection + screen/track sense from POC. _**Complete 2026-05-11.**_
 - [ ] **Phase 4: LiveKit Cascade Agent Pivot** - Replace `RealtimeModel` with `AgentSession` cascade (`stt=None`, `vad=None`, `llm=google.LLM`, `tts=google.beta.gemini_tts.TTS`) + `DJCoHostAgent.llm_node()` override + bundled local `livekit-server --dev`.
 - [ ] **Phase 5: FastAPI Proxy + Install-UUID JWT** - `api.altidus.world` Gemini proxy with slowapi rate limit + Redis quota + OS-keychain JWT storage (parallelizes with Phases 1-4).
 - [ ] **Phase 6: Genre-Aware Phase Detection** - Percentile-based phase detector + 5-genre profile JSON + crest-factor compression detect + BPM half/double validator + vocal-section detector.
@@ -76,11 +76,11 @@ Plans:
   4. Set-timeline awareness is encoded in the evidence packet — `evidence_line()` includes "you are at MM:SS; last phase at MM:SS" and reads correctly across a 30-minute replay.
 **Plans:** 5 plans
 Plans:
-- [ ] 03-01-PLAN.md — MusicState + classify_phase + audible-deck/track resolvers (v4 verbatim)
-- [ ] 03-02-PLAN.md — Event + EventDetector (constants imported, no class-attrs)
-- [ ] 03-03-PLAN.md — AICoach (evidence_line + task_for_event + build_prompt)
-- [ ] 03-04-PLAN.md — state_refresh_loop + macOS Screen/MIDI/Track backends
-- [ ] 03-05-PLAN.md — 11-gate verification + phase SUMMARY + ROADMAP/STATE advance
+- [x] 03-01-PLAN.md — MusicState + classify_phase + audible-deck/track resolvers (v4 verbatim)
+- [x] 03-02-PLAN.md — Event + EventDetector (constants imported, no class-attrs)
+- [x] 03-03-PLAN.md — AICoach (evidence_line + task_for_event + build_prompt)
+- [x] 03-04-PLAN.md — state_refresh_loop + macOS Screen/MIDI/Track backends
+- [x] 03-05-PLAN.md — 11-gate verification + phase SUMMARY + ROADMAP/STATE advance
 
 ### Phase 4: LiveKit Cascade Agent Pivot
 **Goal**: The brain swap from `RealtimeModel` to the cascade `AgentSession` (Gemini 3 Flash multimodal + Gemini TTS streaming) is operational end-to-end on macOS. `DJCoHostAgent.llm_node()` override consumes evidence packets and yields token streams that `tts_node()` synthesizes.

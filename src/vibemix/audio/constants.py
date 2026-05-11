@@ -42,7 +42,9 @@ LOW_RMS = 0.040  # v4:128 — filtered breakdown / pre-drop / verse (v4 raised f
 PEAK_RMS = 0.110  # v4:129 — drop / chorus / full mix (v4 raised from 0.055)
 AUDIBLE_DEBOUNCE_SEC = 0.6  # v4:130 — debounce silent→audible
 SILENCE_DEBOUNCE_SEC = 1.2  # v4:131 — debounce audible→silent
-EVENT_GLOBAL_MIN_GAP = 10.0  # v4:132 — global cooldown ("let the music breathe", retuned post-chat-log)
+EVENT_GLOBAL_MIN_GAP = (
+    10.0  # v4:132 — global cooldown ("let the music breathe", retuned post-chat-log)
+)
 HEARTBEAT_SEC = 70.0  # v4:133 — heartbeat event cadence (retuned post-chat-log)
 
 MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142
