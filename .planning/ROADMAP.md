@@ -15,7 +15,7 @@
 - [x] **Phase 3: Sensing & State Port** - Port `MusicState` 10Hz writer + `EventDetector` + `AICoach` + `audible-deck` detection + screen/track sense from POC. _**Complete 2026-05-11.**_
 - [x] **Phase 4: LiveKit Cascade Agent Pivot** (completed 2026-05-11) - Replace `RealtimeModel` with `AgentSession` cascade (`stt=None`, `vad=None`, `llm=google.LLM`, `tts=FallbackAdapter[OpenRouter Gemini TTS + Gemini native]`) + `DJCoHostAgent.llm_node()` multimodal override + headless session (no LiveKit Room — ARCH-06 re-mapped). 346 tests green; 12/12 acceptance gates PASS.
 - [x] **Phase 5: FastAPI Proxy + Install-UUID JWT** - `api.altidus.world` Gemini proxy with slowapi rate limit + Redis quota + OS-keychain JWT storage (parallelizes with Phases 1-4).
-- [ ] **Phase 6: Genre-Aware Phase Detection** - Percentile-based phase detector + 5-genre profile JSON + crest-factor compression detect + BPM half/double validator + vocal-section detector.
+- [x] **Phase 6: Genre-Aware Phase Detection** - Percentile-based phase detector + 5-genre profile JSON + crest-factor compression detect + BPM half/double validator + vocal-section detector. _**Complete 2026-05-11.**_
 - [ ] **Phase 7: Windows Port (Audio + Screen)** - `PyAudioWPatch` WASAPI loopback + `mss` + `pywin32` window enum + Windows sample-rate sanity test (parallelizes with Phase 6).
 - [ ] **Phase 8: macOS ScreenCaptureKit Migration** - Replace deprecated Quartz `CGWindowListCreateImageFromArray` with `pyobjc-framework-ScreenCaptureKit` (parallelizes with Phases 6-7).
 - [ ] **Phase 9: MIDI Controller Library (10 + Generic Fallback)** - Curated mappings for DDJ-FLX4/400/FLX6/FLX10/1000/SX3, XDJ-RX3, Numark Party Mix Live, Hercules Inpulse 300/500 + generic positional fallback + hot-plug re-enumeration (parallelizes with Phases 6-8).
@@ -127,11 +127,11 @@ Plans:
   4. BPM half/double validator stabilizes within 3 seconds of a track change (no 70 / 140 oscillation when track is steady-state 140 BPM).
 **Plans:** 5 plans
 Plans:
-- [ ] 06-01-PLAN.md — Genre profile system + 5 JSON profiles (techno / house / D&B / disco / pop) + active-profile singleton
-- [ ] 06-02-PLAN.md — Crest factor (peak/RMS + EMA smoother) + BPM half/double validator + VocalDetector hysteresis (1.5s in / 2.5s out)
-- [ ] 06-03-PLAN.md — Percentile phase detector + MusicState +4 fields + state_refresh_loop wiring + Phase 3 golden equivalence pinned
-- [ ] 06-04-PLAN.md — EventDetector LAYER_ARRIVAL vocal gate + VIBEMIX_GENRE_PROFILE env + vibemix.state re-exports
-- [ ] 06-05-PLAN.md — 10-gate verification + 06-SUMMARY (with v4-vs-Phase-6 phase-diff) + STATE/ROADMAP advance
+- [x] 06-01-PLAN.md — Genre profile system + 5 JSON profiles (techno / house / D&B / disco / pop) + active-profile singleton
+- [x] 06-02-PLAN.md — Crest factor (peak/RMS + EMA smoother) + BPM half/double validator + VocalDetector hysteresis (1.5s in / 2.5s out)
+- [x] 06-03-PLAN.md — Percentile phase detector + MusicState +4 fields + state_refresh_loop wiring + Phase 3 golden equivalence pinned
+- [x] 06-04-PLAN.md — EventDetector LAYER_ARRIVAL vocal gate + VIBEMIX_GENRE_PROFILE env + vibemix.state re-exports
+- [x] 06-05-PLAN.md — 10-gate verification + 06-SUMMARY (with v4-vs-Phase-6 phase-diff) + STATE/ROADMAP advance
 
 ### Phase 7: Windows Port (Audio + Screen)
 **Goal**: Windows feature parity for audio capture (PyAudioWPatch WASAPI loopback — no virtual cable needed) and screen capture (`mss` + `pywin32` EnumWindows). Sample-rate sanity test catches BlackHole-Sonoma-like rate halving on both OSes. (Parallelizable with Phase 6 — independent platform implementations once Phase 1 protocols are pinned.)
@@ -312,7 +312,7 @@ Plans:
 | 3. Sensing & State Port | 0/? | Not started | - |
 | 4. LiveKit Cascade Agent Pivot | 5/5 | Complete | 2026-05-11 |
 | 5. FastAPI Proxy + Install-UUID JWT | 0/? | Not started | - |
-| 6. Genre-Aware Phase Detection | 0/? | Not started | - |
+| 6. Genre-Aware Phase Detection | 5/5 | Complete | 2026-05-11 |
 | 7. Windows Port (Audio + Screen) | 0/? | Not started | - |
 | 8. macOS ScreenCaptureKit Migration | 0/? | Not started | - |
 | 9. MIDI Controller Library (10 + Generic Fallback) | 0/? | Not started | - |
