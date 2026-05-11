@@ -1,27 +1,43 @@
 # SPDX-License-Identifier: Apache-2.0
-"""DJCoHostAgent — verbatim port of cohost_v4.py:1441-1593.
+"""DJCoHostAgent — Phase 10 cascade with prompt-matrix dispatch + anti-slop.
 
 Hijacks ``llm_node`` to bypass LiveKit's text-only cascade and call
 ``google.genai`` directly with the last INVOKE_AUDIO_SECONDS of audio attached
 as a multimodal Part. The LLM literally hears the music.
 
-ONE STRUCTURAL ADJUSTMENT FROM V4: Phase 2 promoted ``snapshot_wav`` from an
-``AudioBuffer`` method to a free function in ``vibemix.audio.features``. The
-v4:1489 call site ``self._clean_audio_buf.snapshot_wav(INVOKE_AUDIO_SECONDS)``
-becomes ``snapshot_wav(self._clean_audio_buf, INVOKE_AUDIO_SECONDS)`` — same
-return bytes, same peak-normalize behavior.
+PHASE 10 ADDITIONS (on top of the Phase 4 v4-port):
 
-Every other line is byte-for-byte v4 — including the load-bearing comment at
-v4:1502 (``# Single-modality: audio only. Screen + MIDI metadata caused
-hallucination.``) and the ``screen_jpeg = None`` deliberate single-modality
-gate (v4:1503). The ``if screen_jpeg:`` conditional include path is kept as
-dead code per CONTEXT.md so the v4 shape is preserved; Phase 10 may revisit.
+1. **Env-var prompt dispatch** — ``__init__`` reads ``VIBEMIX_SKILL_LEVEL``
+   and ``VIBEMIX_MODE`` (defaults: ``intermediate`` / ``hype``) and selects the
+   right cell from ``vibemix.prompts.matrix.build_system_instruction(...)``.
+   Default = HYPE_INTERMEDIATE = byte-identical v4 SYSTEM_INSTRUCTION.
+
+2. **<silence/> short-circuit** — ``llm_node`` accumulates the LLM stream into
+   a buffer; if the stripped output is exactly ``<silence/>`` (or starts with
+   it), the entire turn is suppressed (no chunks yielded → no TTS → no
+   playback) and a ``silence_short_circuit`` event is logged.
+
+3. **Slop filter (post-hoc)** — after silence check, the accumulated text is
+   passed through ``filter_for_slop``; if any banned phrase matches, the turn
+   is suppressed and a ``slop_suppressed`` event is logged with the matched
+   phrases. Otherwise chunks are yielded in their original order.
+
+   Streaming behavior change vs Phase 4: chunks are now buffered until the
+   stream completes, then yielded in one batch (after the silence + slop
+   gate). Adds ~1 LLM-stream-duration of latency to the TTS path (~1-2s for
+   short replies) — acceptable for v1; Phase 14 may revisit with progressive
+   streaming if the latency cost shows in Coach feedback.
+
+Other lines remain byte-for-byte v4 — the v4:1502 anti-hallucination comment
+stays at its load-bearing position; ``screen_jpeg = None`` deliberate
+single-modality gate is preserved.
 """
 
 from __future__ import annotations
 
 import collections
 import json
+import os
 import sys
 import time
 from collections.abc import AsyncGenerator
@@ -33,15 +49,47 @@ from livekit.agents import llm as agents_llm
 from livekit.agents import tts as agents_tts
 
 from vibemix.agent.config import LLM_MODEL
-from vibemix.agent.persona import SYSTEM_INSTRUCTION
 from vibemix.audio import INVOKE_AUDIO_SECONDS, AudioBuffer, VoiceRecorder, snapshot_wav
+from vibemix.prompts import build_system_instruction, filter_for_slop
 from vibemix.state import AICoach, Event, MusicState
+
+# Sentinel suppression-token the LLM emits when nothing's worth reacting to.
+# The cascade swallows it. See ``vibemix.prompts.matrix`` for the prompt-side
+# instruction.
+SILENCE_TOKEN = "<silence/>"
+
+# Env-var names — public contract, surfaced in CLI / Settings UI in Phase 11/12.
+ENV_SKILL_LEVEL = "VIBEMIX_SKILL_LEVEL"
+ENV_MODE = "VIBEMIX_MODE"
+
+# Defaults — preserve Phase 4 v4 behavior for callers that don't set env vars.
+DEFAULT_SKILL_LEVEL = "intermediate"
+DEFAULT_MODE = "hype"
+
+
+def _resolve_prompt_cell() -> str:
+    """Read the env vars and dispatch to the right matrix cell.
+
+    Re-evaluated per ``DJCoHostAgent`` instantiation (no module-level
+    caching) so unit tests can monkeypatch and Settings UI can hot-swap
+    by re-instantiating the agent (Phase 11/12).
+
+    Raises ``ValueError`` on unknown skill or mode (fail loud — silent
+    fallback would mask env-var typos).
+    """
+    skill = os.environ.get(ENV_SKILL_LEVEL, DEFAULT_SKILL_LEVEL)
+    mode = os.environ.get(ENV_MODE, DEFAULT_MODE)
+    return build_system_instruction(skill, mode)
 
 
 class DJCoHostAgent(Agent):
     """Hijacks llm_node to bypass LiveKit's text-only cascade and call
     google.genai directly with the last 10s of audio + the latest screen
-    frame attached as multimodal Parts. The LLM literally hears the music."""
+    frame attached as multimodal Parts. The LLM literally hears the music.
+
+    Phase 10: env-var dispatch over the 6-cell prompt matrix +
+    ``<silence/>`` short-circuit + post-hoc slop filter.
+    """
 
     def __init__(
         self,
@@ -54,8 +102,12 @@ class DJCoHostAgent(Agent):
         llm_inst: agents_llm.LLM,
         tts_inst: agents_tts.TTS,
     ):
+        # Resolve which prompt cell to use BEFORE super().__init__ — the
+        # parent Agent constructor stores ``instructions`` for LiveKit's
+        # text-only fallback path. We pass the matrix-resolved cell here.
+        prompt_body = _resolve_prompt_cell()
         super().__init__(
-            instructions=SYSTEM_INSTRUCTION,
+            instructions=prompt_body,
             llm=llm_inst,
             tts=tts_inst,
             allow_interruptions=False,
@@ -67,8 +119,10 @@ class DJCoHostAgent(Agent):
         self._recorder = recorder
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
+        # Both the LiveKit-side ``instructions`` AND the google.genai-side
+        # ``GenerateContentConfig.system_instruction`` use the same cell.
         self._gen_cfg = types.GenerateContentConfig(
-            system_instruction=SYSTEM_INSTRUCTION,
+            system_instruction=prompt_body,
             thinking_config=types.ThinkingConfig(thinking_level="minimal"),
             temperature=1.0,
             max_output_tokens=220,
@@ -158,7 +212,11 @@ class DJCoHostAgent(Agent):
             f"screen={'yes' if screen_jpeg else 'no'} dump={invoke_dir.name}"
         )
 
+        # Phase 10: BUFFER chunks until the stream completes, then run the
+        # silence + slop gate. Yield chunks only if both gates pass.
+        # See module docstring for the latency-vs-correctness rationale.
         full_text = ""
+        buffered_chunks: list[str] = []
         t_start = time.time()
         llm_err: str | None = None
         try:
@@ -173,44 +231,83 @@ class DJCoHostAgent(Agent):
                     continue
                 print(txt, end="", flush=True)
                 full_text += txt
-                yield txt
+                buffered_chunks.append(txt)
         except Exception as e:
             llm_err = repr(e)
             print(f"\n[llm err] {e}", file=sys.stderr)
-        finally:
-            print()
-            elapsed = time.time() - t_start
-            stripped = full_text.strip()
+
+        print()
+        elapsed = time.time() - t_start
+        stripped = full_text.strip()
+
+        # ---- Silence + slop gate (Phase 10) ----
+        suppression: str | None = None
+        slop_matches: list[str] = []
+        if stripped == SILENCE_TOKEN or stripped.startswith(SILENCE_TOKEN):
+            suppression = "silence"
+        else:
+            # Run filter_for_slop on the FULL accumulated text; suppress turn
+            # if any banned phrase matches.
+            _filtered, slop_matches = filter_for_slop(full_text)
+            if slop_matches:
+                suppression = "slop"
+
+        if suppression == "silence":
+            self._recorder.log_event(
+                "silence_short_circuit",
+                event=ev_tag,
+                response_chars=len(full_text),
+                latency_s=round(elapsed, 2),
+            )
+            print("[ai_text] <silence/> (suppressed)", flush=True)
+        elif suppression == "slop":
+            self._recorder.log_event(
+                "slop_suppressed",
+                event=ev_tag,
+                matches=slop_matches,
+                response_chars=len(full_text),
+                latency_s=round(elapsed, 2),
+            )
+            print(f"[ai_text] <slop suppressed: {slop_matches}>", flush=True)
+        else:
+            # Clean turn — yield the buffered chunks in their original order
+            # and run the v4 ai_text logging path (history append + log event).
+            for txt in buffered_chunks:
+                yield txt
             if stripped:
                 print(f"[ai_text] {stripped!r}", flush=True)
                 self._recorder.log_event("ai_text", text=full_text, latency_s=round(elapsed, 2))
                 self._ai_text_history.append(stripped[:140])
             else:
                 print("[ai_text] <empty> (skip TTS)", flush=True)
-            try:
-                (invoke_dir / "response.txt").write_text(full_text)
-                (invoke_dir / "meta.json").write_text(
-                    json.dumps(
-                        {
-                            "event": ev_tag,
-                            "ts": invoke_ts,
-                            "invoke_n": invoke_n,
-                            "audible": self._state.audible,
-                            "deck": self._state.audible_deck,
-                            "track": self._state.audible_track,
-                            "track_confidence": round(self._state.audible_track_confidence, 2),
-                            "phase": self._state.phase,
-                            "rms": round(self._state.rms, 4),
-                            "bpm": round(self._state.bpm, 1),
-                            "audio_bytes": len(audio_wav),
-                            "audio_seconds": INVOKE_AUDIO_SECONDS,
-                            "llm_latency_s": round(elapsed, 2),
-                            "llm_error": llm_err,
-                            "response_chars": len(full_text),
-                        },
-                        indent=2,
-                        ensure_ascii=False,
-                    )
+
+        # ---- Per-invocation dump (always written, even on suppression) ----
+        try:
+            (invoke_dir / "response.txt").write_text(full_text)
+            (invoke_dir / "meta.json").write_text(
+                json.dumps(
+                    {
+                        "event": ev_tag,
+                        "ts": invoke_ts,
+                        "invoke_n": invoke_n,
+                        "audible": self._state.audible,
+                        "deck": self._state.audible_deck,
+                        "track": self._state.audible_track,
+                        "track_confidence": round(self._state.audible_track_confidence, 2),
+                        "phase": self._state.phase,
+                        "rms": round(self._state.rms, 4),
+                        "bpm": round(self._state.bpm, 1),
+                        "audio_bytes": len(audio_wav),
+                        "audio_seconds": INVOKE_AUDIO_SECONDS,
+                        "llm_latency_s": round(elapsed, 2),
+                        "llm_error": llm_err,
+                        "response_chars": len(full_text),
+                        "suppression": suppression,
+                        "slop_matches": slop_matches,
+                    },
+                    indent=2,
+                    ensure_ascii=False,
                 )
-            except Exception:
-                pass
+            )
+        except Exception:
+            pass
