@@ -198,11 +198,131 @@
 
 ## Traceability
 
-*Populated by `gsd-roadmapper` — each REQ-ID gets mapped to its phase below.*
+*Populated by `gsd-roadmapper` 2026-05-11 — each v1 REQ-ID maps to exactly one phase.*
 
 | REQ-ID | Phase | Notes |
 |--------|-------|-------|
-| (pending) | — | — |
+| ARCH-01 | Phase 1 | Consolidate 3 POC variants; canonical entry `python -m vibemix` (Tauri shell aspects in Phase 11). |
+| ARCH-02 | Phase 1 | `platform/` protocol firewall. |
+| ARCH-03 | Phase 4 | LiveKit cascade pivot. |
+| ARCH-04 | Phase 4 | `DJCoHostAgent.llm_node()` multimodal override. |
+| ARCH-05 | Phase 4 | Gemini TTS streaming via `beta.gemini_tts.TTS`. |
+| ARCH-06 | Phase 4 | Bundled local `livekit-server --dev`. |
+| ARCH-07 | Phase 2 | Pre-allocated ring buffer fixes POC dropout regression. |
+| ARCH-08 | Phase 5 | FastAPI proxy on `api.altidus.world`. |
+| ARCH-09 | Phase 5 | Install-UUID JWT in OS keychain. |
+| ARCH-10 | Phase 5 | slowapi + Redis rate limiting. |
+| AUDIO-01 | Phase 2 | macOS sounddevice loopback (with BlackHole auto-detect). |
+| AUDIO-02 | Phase 7 | Windows WASAPI loopback via PyAudioWPatch. |
+| AUDIO-03 | Phase 7 | Cross-platform master output auto-detect. |
+| AUDIO-04 | Phase 7 | 1kHz sample-rate sanity test (catches Sonoma BlackHole bug). |
+| AUDIO-05 | Phase 7 | Headphones/speakers picker + mic gating policy. |
+| AUDIO-06 | Phase 2 | Master-output-only; no cue input. |
+| AUDIO-07 | Phase 2 | Mic gating during AI talk (port from POC). |
+| AUDIO-08 | Phase 2 | 24kHz TTS playback. |
+| AUDIO-09 | Phase 2 | Voice-aware mic resumption + buffer flush. |
+| SCREEN-01 | Phase 8 | macOS ScreenCaptureKit migration. |
+| SCREEN-02 | Phase 7 | Windows mss + pywin32 enum. |
+| SCREEN-03 | Phase 3 | Window-picker privacy gate (initial macOS path); Phase 11 adds Tauri UI. |
+| SCREEN-04 | Phase 3 | 1Hz JPEG capture into Gemini multimodal. |
+| SCREEN-05 | Phase 3 | macOS nowplaying-cli track metadata. |
+| SCREEN-06 | Phase 7 | Windows GSMTC track title (defer to v1.1 if ergonomics block). |
+| MIDI-01 | Phase 9 | mido + python-rtmidi + 2s hot-plug re-enum. |
+| MIDI-02 | Phase 9 | Controller auto-detect via name matching. |
+| MIDI-03 | Phase 9 | DDJ-FLX4 mapping (port from POC). |
+| MIDI-04 | Phase 9 | DDJ-400. |
+| MIDI-05 | Phase 9 | DDJ-FLX6. |
+| MIDI-06 | Phase 9 | DDJ-FLX10. |
+| MIDI-07 | Phase 9 | DDJ-1000. |
+| MIDI-08 | Phase 9 | DDJ-SX3. |
+| MIDI-09 | Phase 9 | XDJ-RX3. |
+| MIDI-10 | Phase 9 | Numark Party Mix Live. |
+| MIDI-11 | Phase 9 | Hercules Inpulse 300. |
+| MIDI-12 | Phase 9 | Hercules Inpulse 500. |
+| MIDI-13 | Phase 9 | Generic MIDI fallback + positional inference. |
+| MIDI-14 | Phase 9 | Magnitude-aware EQ/fader delta events. |
+| SENSE-01 | Phase 3 | `MusicState` 10Hz writer (port from POC). |
+| SENSE-02 | Phase 3 | `EventDetector` 6-type taxonomy. |
+| SENSE-03 | Phase 6 | Percentile-based phase detector. |
+| SENSE-04 | Phase 6 | 5-genre profile JSON. |
+| SENSE-05 | Phase 3 | Audible-deck detection (port from POC). |
+| SENSE-06 | Phase 6 | Crest-factor compression detection. |
+| SENSE-07 | Phase 6 | BPM half/double validation. |
+| SENSE-08 | Phase 6 | Vocal-section detector (hard etiquette gate). |
+| SENSE-09 | Phase 3 | Set-timeline awareness in evidence packet. |
+| SENSE-10 | Phase 6 | Per-genre replay validation harness. |
+| PROMPT-01 | Phase 10 | 6 prompt templates (skill × interaction matrix). |
+| PROMPT-02 | Phase 10 | Describe-before-infer anchoring. |
+| PROMPT-03 | Phase 10 | Negative-dictionary hard bans. |
+| PROMPT-04 | Phase 10 | `TurnHistory` anti-repetition ring (port from POC). |
+| PROMPT-05 | Phase 10 | `<silence/>` short-circuit token. |
+| PROMPT-06 | Phase 10 | Past-tense framing. |
+| PROMPT-07 | Phase 10 | Reaction throttle + cooldown + vocal-gate. |
+| PROMPT-08 | Phase 10 | Coach scorecard (qualitative bands only). |
+| UX-01 | Phase 11 | Calibration wizard (3-step) on first run. |
+| UX-02 | Phase 10 | Voice picker (Gemini TTS curated to ~6). |
+| UX-03 | Phase 6 | Genre picker (calibrates phase thresholds). |
+| UX-04 | Phase 10 | Mode picker (Beginner/Intermediate/Pro). |
+| UX-05 | Phase 10 | Interaction picker (Hype-man/Coach). |
+| UX-06 | Phase 12 | Output destination picker (headphones/speakers). |
+| UX-07 | Phase 12 | Push-to-mute hotkey. |
+| UX-08 | Phase 12 | Live session UI (meters, phase tape, AI transcript, drop countdown, MIDI ribbon). |
+| UX-09 | Phase 12 | Settings panel — mid-session changes. |
+| UX-10 | Phase 12 | Recording retention policy in Settings (storage UX in Phase 15). |
+| UX-11 | Phase 11 | Status badges (LiveKit/Gemini/MIDI/screen) — initial wiring in shell; Phase 12 surfaces them in live UI. |
+| MASCOT-01 | Phase 13 | SVG mascot + named pose vocabulary. |
+| MASCOT-02 | Phase 13 | Idle animation (breathing/blink/sway/ear-wiggle). |
+| MASCOT-03 | Phase 13 | Reactive pose dispatch (MIDI-triggered + magnitude-aware). |
+| MASCOT-04 | Phase 13 | Mouth animation synced to TTS RMS. |
+| MASCOT-05 | Phase 13 | Eye-tracking follows last-touched control. |
+| MASCOT-06 | Phase 13 | Beat-sync bounce on kick. |
+| MASCOT-07 | Phase 13 | Mascot in session UI + larger in calibration wizard. |
+| DIST-01 | Phase 18 | PyInstaller `--onedir` (avoids `--onefile` AV false-positives). |
+| DIST-02 | Phase 18 | macOS signed + notarized DMG. |
+| DIST-03 | Phase 18 | Windows MSI via SignPath OSS cert + Inno Setup 6. |
+| DIST-04 | Phase 1 | SignPath OSS application filed day 1 (3-week lead time). |
+| DIST-05 | Phase 11 | Tauri 2.x shell wrapping Python sidecar. |
+| DIST-06 | Phase 18 | Tauri auto-update with signed manifest. |
+| DIST-07 | Phase 20 | Fresh-machine install rehearsal before release. |
+| DIST-08 | Phase 20 | GitHub Actions CI matrix (macos-14 + windows-latest). |
+| VERIFY-01 | Phase 16 | 30-session offline hallucination suite ≥95% grounded. |
+| VERIFY-02 | Phase 17 | Hand-graded reaction reel ≥4.0 with zero 1-2 ratings. |
+| VERIFY-03 | Phase 16 | 60-min soak test zero `session_error`. |
+| VERIFY-04 | Phase 18 | Binary attack verification (`strings` + `pyinstxtractor` for `AIza`). |
+| VERIFY-05 | Phase 16 | Per-genre phase-detection ≥85% F1. |
+| VERIFY-06 | Phase 16 | Critique → execute → critique → execute loop per phase. |
+| POLISH-01 | Phase 14 | Dedicated polish phase — critique → execute loop. |
+| POLISH-02 | Phase 14 | Knob/fader physics matching pro-audio software. |
+| POLISH-03 | Phase 14 | Mascot pose vocabulary refined to character-design quality. |
+| POLISH-04 | Phase 14 | Zero web-app residue (no Tailwind defaults, no Inter, no purple gradients). |
+| POLISH-05 | Phase 14 | All copy passes `frontend-enforcement` skill filter. |
+| POLISH-06 | Phase 14 | `gsd-ui-checker` + `gsd-ui-auditor` green before phase completes. |
+| GH-01 | Phase 19 | Repo at `github.com/bravoh/vibemix`. |
+| GH-02 | Phase 19 | README hero banner. |
+| GH-03 | Phase 19 | Hero demo video/GIF. |
+| GH-04 | Phase 19 | Install buttons + GIFs. |
+| GH-05 | Phase 19 | Feature matrix table. |
+| GH-06 | Phase 19 | Supported controllers grid. |
+| GH-07 | Phase 19 | Screenshots gallery. |
+| GH-08 | Phase 19 | Branded architecture diagram. |
+| GH-09 | Phase 19 | FAQ (8-12 questions). |
+| GH-10 | Phase 19 | Built-by-Bravoh footer → waitlist. |
+| GH-11 | Phase 19 | Badges row. |
+| GH-12 | Phase 19 | Custom OG/social-preview image. |
+| GH-13 | Phase 19 | CONTRIBUTING.md + DCO. |
+| GH-14 | Phase 19 | CODE_OF_CONDUCT/SECURITY/NOTICE/TRADEMARKS/Apache 2.0 LICENSE. |
+| GH-15 | Phase 19 | Issue templates. |
+| GH-16 | Phase 19 | Releases with hand-written changelogs. |
+| GH-17 | Phase 19 | Repo description + topic tags. |
+| GH-18 | Phase 19 | Repo hygiene scrub (no `.bak`, no `_test_*.py`, no `.env`, no large binaries). |
+| REC-01 | Phase 15 | Per-session directory naming. |
+| REC-02 | Phase 15 | `input.wav` 16kHz mono int16. |
+| REC-03 | Phase 15 | `voice.wav` 24kHz mono int16. |
+| REC-04 | Phase 15 | `events.jsonl` timeline. |
+| REC-05 | Phase 15 | Recording browser UI. |
+| REC-06 | Phase 15 | Retention policy enforcement. |
+
+**Coverage:** 128 / 128 v1 requirements mapped. No orphans. No duplicates.
 
 ---
-*Last updated: 2026-05-11 after research synthesis*
+*Last updated: 2026-05-11 after roadmap synthesis (gsd-roadmapper traceability pass)*
