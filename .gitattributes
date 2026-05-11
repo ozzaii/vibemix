@@ -1,0 +1,5 @@
+*.glb !text !filter !merge !diff
+*.wav !text !filter !merge !diff
+*.npy !text !filter !merge !diff
+*.json !text !filter !merge !diff
+.gitkeep !text !filter !merge !diff
