@@ -87,8 +87,9 @@ def test_list_profiles_includes_flx4():
     names = list_profiles()
     assert names == sorted(names), "list_profiles() must return sorted names"
     assert "pioneer_ddj_flx4" in names
-    # Wave 1 ships only FLX4; Wave 2 adds the other 9.
-    assert names == ["pioneer_ddj_flx4"]
+    # Wave 2 ships the full 10-controller library (CONTEXT.md §Locked Decisions).
+    # Per-controller pins live in tests/midi/test_profiles_all_controllers.py.
+    assert len(names) == 10
 
 
 # ---------- Schema validator: required-field + range checks ----------

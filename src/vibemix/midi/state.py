@@ -43,6 +43,7 @@ import threading
 import time
 from dataclasses import dataclass
 
+from vibemix.midi.generic import GENERIC_MIDI_ID
 from vibemix.midi.profile import ButtonBinding, ControlBinding, ControllerProfile
 
 
@@ -180,6 +181,13 @@ class ControllerState:
             self._connected = True
             self.port_name = port_name
 
+    def mark_disconnected(self) -> None:
+        """Symmetric to ``mark_connected`` — clears the connected flag (used
+        by the Phase 9 Wave 2 ``handle_port_change`` callback when the bound
+        port disappears mid-session)."""
+        with self._lock:
+            self._connected = False
+
     def is_connected(self) -> bool:
         with self._lock:
             return self._connected
@@ -244,7 +252,17 @@ class ControllerState:
     def handle_msg(self, msg) -> None:
         """Decode a single MIDI message — verbatim v4 control flow with
         per-instance lookup tables instead of module globals, plus additive
-        MidiEvent emission."""
+        MidiEvent emission.
+
+        Phase 9 Wave 2: when the bound profile is the synthesized
+        GENERIC_MIDI fallback (id == 'generic_midi'), dispatch goes to
+        ``_handle_generic`` which decodes any CC into a positional event
+        + move label (no semantic deck/field assignment). Keeps the v4
+        byte-equivalent path strictly separate from the generic path so
+        the FLX4 golden tests stay immutable.
+        """
+        if self._profile.id == GENERIC_MIDI_ID:
+            return self._handle_generic(msg)
         now = time.time()
         try:
             if msg.type == "control_change":
@@ -375,6 +393,62 @@ class ControllerState:
         """
         with self._lock:
             return [ev for ev in self._events if ev.at > t]
+
+    def _handle_generic(self, msg) -> None:
+        """Generic-MIDI decode path (Phase 9 Wave 2).
+
+        Emits positional events for every CC + note_on (velocity > 0)
+        without consulting profile.controls / profile.buttons (both empty
+        for the generic profile). Field names encode channel + cc/note so
+        Phase 10's prompt rendering can disambiguate the moves even
+        without semantic deck/field assignment.
+
+        Silent / no-op for: note_off, note_on velocity=0, any other
+        message type (pitchwheel, program_change, aftertouch, sysex).
+        Graceful degradation is the whole point of the generic fallback.
+        """
+        now = time.time()
+        try:
+            mtype = getattr(msg, "type", None)
+            if mtype == "control_change":
+                ch = msg.channel
+                cc = msg.control
+                v = msg.value
+                field = f"cc_{ch}_{cc}"
+                magnitude = v / 127.0
+                pct = int(magnitude * 100)
+                label = f"{field}→{v} ({pct}%)"
+                with self._lock:
+                    self._record_move(label, now)
+                    self._record_event(
+                        kind="generic_cc",
+                        deck=None,
+                        field=field,
+                        value_raw=v,
+                        magnitude=magnitude,
+                        now=now,
+                    )
+            elif mtype == "note_on":
+                if getattr(msg, "velocity", 0) <= 0:
+                    return  # note_on velocity=0 == note_off alias
+                ch = msg.channel
+                n = msg.note
+                v = msg.velocity
+                field = f"note_{ch}_{n}"
+                label = f"{field}_pressed"
+                with self._lock:
+                    self._record_move(label, now)
+                    self._record_event(
+                        kind="generic_note",
+                        deck=None,
+                        field=field,
+                        value_raw=v,
+                        magnitude=None,
+                        now=now,
+                    )
+            # note_off + every other message type: silent.
+        except Exception as e:
+            print(f"[midi handle err] {e}", file=sys.stderr)
 
 
 __all__ = ["ControllerState", "MidiEvent", "_knob_label", "_xfader_label"]

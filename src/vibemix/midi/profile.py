@@ -116,6 +116,11 @@ class ControllerProfile:
     Frozen at the top level: ``profile.id = 'x'`` raises FrozenInstanceError.
     Inner ``controls`` / ``buttons`` dicts are read-only by convention; do
     NOT mutate them (matches Phase 6 ``GenreProfile.band_signature``).
+
+    Phase 9 Wave 2 additive: ``notes`` (optional, default None). The 9 Wave 2
+    profiles ship "verified by JSON only" — Kaan only physically owns the
+    DDJ-FLX4 (Wave 1). Phase 16 + 20 + community PRs handle live verification.
+    The notes field carries this status string per profile.
     """
 
     id: str
@@ -124,6 +129,7 @@ class ControllerProfile:
     decks: tuple[str, ...]
     controls: dict[str, ControlBinding]
     buttons: dict[str, ButtonBinding]
+    notes: str | None = None
 
 
 def _require_str(payload: dict, key: str, *, profile_name: str | None = None) -> str:
@@ -315,6 +321,20 @@ def _parse_profile(payload: dict) -> ControllerProfile:
             binding_name, binding_payload, profile_name=profile_id
         )
 
+    # Optional Wave 2 additive — `notes` carries the unverified-status flag for
+    # the 9 Wave 2 profiles. FLX4 (Wave 1) has no notes; loads with notes=None.
+    notes_val: str | None = None
+    if "notes" in payload:
+        raw = payload["notes"]
+        if raw is None:
+            notes_val = None
+        elif isinstance(raw, str):
+            notes_val = raw
+        else:
+            raise ValueError(
+                f"profile {profile_id}: field 'notes' must be a str or null, got {raw!r}"
+            )
+
     return ControllerProfile(
         id=profile_id,
         display_name=display_name,
@@ -322,6 +342,7 @@ def _parse_profile(payload: dict) -> ControllerProfile:
         decks=decks,
         controls=controls,
         buttons=buttons,
+        notes=notes_val,
     )
 
 

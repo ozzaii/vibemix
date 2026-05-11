@@ -30,6 +30,8 @@ import sys
 import threading
 import time
 import warnings
+from dataclasses import dataclass
+from typing import Any
 
 from vibemix.midi.profile import ControllerProfile
 
@@ -157,3 +159,94 @@ def spawn_listener(controller_state, stop_event, profile, mido_module) -> thread
     )
     t.start()
     return t
+
+
+# ---------- Phase 9 Wave 2 Task 3 — hot-plug listener-restart wiring ----------
+
+
+@dataclass
+class ListenerHolder:
+    """Mutable holder for the currently-active listener thread + ControllerState.
+
+    The watcher's on_change callback (``handle_port_change``) mutates this on
+    hot-plug events:
+        - On ``('connected', port, profile)``: rebuild ``controller_state``
+          from the new profile, stop the old listener, spawn a new one.
+        - On ``('disconnected', port)``: stop the listener, mark the
+          ControllerState disconnected.
+
+    Production wiring (Phase 4 ``__main__.py`` / Phase 9 Wave 2 platform
+    layer): a single ListenerHolder is allocated at boot; the watcher's
+    callback is ``functools.partial(handle_port_change, holder)``.
+    """
+
+    controller_state: Any  # vibemix.midi.state.ControllerState
+    listener_thread: threading.Thread | None
+    listener_stop: threading.Event | None
+    mido_module: Any
+    bound_port: str | None = None
+
+
+def handle_port_change(holder: ListenerHolder, event: tuple) -> None:
+    """Production on_change callback for ``port_watcher_task``.
+
+    Args:
+        holder: ListenerHolder owning the current ControllerState +
+            listener thread.
+        event: tuple from the watcher — either
+            ``('connected', port_name, profile)`` or
+            ``('disconnected', port_name)``.
+
+    On ``('connected', port, profile)``:
+        - If ``port == holder.bound_port`` (already bound to this port),
+          no-op.
+        - Otherwise: stop the existing listener (set its stop_event +
+          join with a 1.0s timeout); build a fresh ControllerState from
+          the new profile; spawn a new listener bound to the new port +
+          profile; update holder.bound_port.
+
+    On ``('disconnected', port)``:
+        - If ``port == holder.bound_port``: stop the listener + call
+          ``holder.controller_state.mark_disconnected()`` + clear
+          ``holder.bound_port``.
+        - Otherwise: no-op (some other unrelated device disconnected).
+
+    Implementation choice (CONTEXT §Specific Ideas §3): we REBUILD a fresh
+    ControllerState on connect rather than swap the profile in-place. The
+    "swap in-place under lock" approach was the alternative; rebuilding is
+    simpler — a new controller has a different binding shape (different
+    deck count, different cc_lookup), so the cleanest invariant is a fresh
+    ControllerState. The cost is one allocation per hot-plug event; hot-plug
+    events are rare (user actions, not high-frequency), so the cost is fine.
+    """
+    # Lazy imports — avoid forcing the vibemix.midi modules at platform-package
+    # import time (mirrors the spawn_listener lazy-import pattern).
+    from vibemix.midi.state import ControllerState
+
+    kind = event[0]
+    if kind == "connected":
+        _, port, profile = event
+        if holder.bound_port == port:
+            return  # already bound
+        # Stop existing listener if any.
+        if holder.listener_stop is not None:
+            holder.listener_stop.set()
+        if holder.listener_thread is not None:
+            holder.listener_thread.join(timeout=1.0)
+        # Build fresh ControllerState — new profile may have different deck
+        # count / binding shape, so the cleanest invariant is a brand-new
+        # state object.
+        holder.controller_state = ControllerState(profile=profile)
+        # Spawn fresh listener.
+        holder.listener_stop = threading.Event()
+        holder.listener_thread = spawn_listener(
+            holder.controller_state, holder.listener_stop, profile, holder.mido_module
+        )
+        holder.bound_port = port
+    elif kind == "disconnected":
+        _, port = event
+        if holder.bound_port == port:
+            if holder.listener_stop is not None:
+                holder.listener_stop.set()
+            holder.controller_state.mark_disconnected()
+            holder.bound_port = None

@@ -1,0 +1,38 @@
+{
+  "id": "numark_party_mix_live",
+  "display_name": "Numark Party Mix Live",
+  "port_name_hints": ["Party Mix Live"],
+  "decks": ["A", "B"],
+  "notes": "Wave 2 — JSON-only verified from Numark Mixtrack-family MIDI documentation (Serato Lite default mapping) + Mixxx controller-mappings repo cross-reference. Hardware verification deferred to Phase 16 + 20 + community PRs. Numark convention diverges from Pioneer: vol on CC 28, eq_hi/mid/low on CC 7/11/15 (matches Pioneer accidentally), tempo on CC 9. Channels 0/1 per deck. Light pad set (4 hotcues per deck).",
+  "controls": {
+    "vol_a":     {"kind": "cc", "channel": 0, "cc": 28, "axis": "unipolar", "deck": "A", "field": "vol"},
+    "vol_b":     {"kind": "cc", "channel": 1, "cc": 28, "axis": "unipolar", "deck": "B", "field": "vol"},
+    "eq_hi_a":   {"kind": "cc", "channel": 0, "cc": 7,  "axis": "unipolar", "deck": "A", "field": "eq_hi"},
+    "eq_hi_b":   {"kind": "cc", "channel": 1, "cc": 7,  "axis": "unipolar", "deck": "B", "field": "eq_hi"},
+    "eq_mid_a":  {"kind": "cc", "channel": 0, "cc": 11, "axis": "unipolar", "deck": "A", "field": "eq_mid"},
+    "eq_mid_b":  {"kind": "cc", "channel": 1, "cc": 11, "axis": "unipolar", "deck": "B", "field": "eq_mid"},
+    "eq_low_a":  {"kind": "cc", "channel": 0, "cc": 15, "axis": "unipolar", "deck": "A", "field": "eq_low"},
+    "eq_low_b":  {"kind": "cc", "channel": 1, "cc": 15, "axis": "unipolar", "deck": "B", "field": "eq_low"},
+    "tempo_a":   {"kind": "cc", "channel": 0, "cc": 9,  "axis": "bipolar",  "deck": "A", "field": "tempo"},
+    "tempo_b":   {"kind": "cc", "channel": 1, "cc": 9,  "axis": "bipolar",  "deck": "B", "field": "tempo"},
+    "filter_a":  {"kind": "cc", "channel": 0, "cc": 26, "axis": "bipolar",  "deck": "A", "field": "filter"},
+    "filter_b":  {"kind": "cc", "channel": 1, "cc": 26, "axis": "bipolar",  "deck": "B", "field": "filter"},
+    "xfader":    {"kind": "cc", "channel": 6, "cc": 8,  "axis": "bipolar",  "deck": null, "field": "xfader"}
+  },
+  "buttons": {
+    "play_a":      {"kind": "play",      "channel": 0, "note": 0,  "deck": "A"},
+    "play_b":      {"kind": "play",      "channel": 1, "note": 0,  "deck": "B"},
+    "cue_a":       {"kind": "cue",       "channel": 0, "note": 1,  "deck": "A"},
+    "cue_b":       {"kind": "cue",       "channel": 1, "note": 1,  "deck": "B"},
+    "sync_a":      {"kind": "sync",      "channel": 0, "note": 2,  "deck": "A"},
+    "sync_b":      {"kind": "sync",      "channel": 1, "note": 2,  "deck": "B"},
+    "hotcue_1_a":  {"kind": "hotcue",    "channel": 0, "note": 20, "deck": "A"},
+    "hotcue_2_a":  {"kind": "hotcue",    "channel": 0, "note": 21, "deck": "A"},
+    "hotcue_3_a":  {"kind": "hotcue",    "channel": 0, "note": 22, "deck": "A"},
+    "hotcue_4_a":  {"kind": "hotcue",    "channel": 0, "note": 23, "deck": "A"},
+    "hotcue_1_b":  {"kind": "hotcue",    "channel": 1, "note": 20, "deck": "B"},
+    "hotcue_2_b":  {"kind": "hotcue",    "channel": 1, "note": 21, "deck": "B"},
+    "hotcue_3_b":  {"kind": "hotcue",    "channel": 1, "note": 22, "deck": "B"},
+    "hotcue_4_b":  {"kind": "hotcue",    "channel": 1, "note": 23, "deck": "B"}
+  }
+}

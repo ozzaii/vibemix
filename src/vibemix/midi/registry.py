@@ -16,6 +16,7 @@ Locked decisions (09-CONTEXT.md §Auto-detection):
 
 from __future__ import annotations
 
+from vibemix.midi.generic import make_generic_profile
 from vibemix.midi.profile import ControllerProfile, list_profiles, load_profile
 
 
@@ -39,3 +40,21 @@ def find_mapping(port_name: str) -> ControllerProfile | None:
             if hint.lower() in port_lower:
                 return profile
     return None
+
+
+def find_mapping_or_generic(port_name: str) -> ControllerProfile:
+    """Like ``find_mapping`` but never returns None — falls back to the
+    synthesized ``GENERIC_MIDI`` profile when no curated mapping matches.
+
+    Used by the port watcher when binding to an unknown port. The Coach
+    prompt context (Phase 10) will surface "controller is unmapped —
+    magnitude semantics not available; reactions limited to track audio
+    + screen" when the bound profile is ``generic_midi``.
+
+    Always returns a ControllerProfile (never None). Empty / non-str
+    ``port_name`` -> generic profile.
+    """
+    match = find_mapping(port_name)
+    if match is not None:
+        return match
+    return make_generic_profile()

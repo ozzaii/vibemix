@@ -402,3 +402,156 @@ def test_listener_tries_second_port_hint_when_first_misses(monkeypatch):
 
 # Pinned for ruff stability — pytest used via warnings.catch_warnings.
 _ = pytest
+
+
+# ---------- Phase 9 Wave 2 Task 3 — handle_port_change (production hot-plug callback) ----------
+
+
+def _make_holder(profile_id: str = "pioneer_ddj_flx4", *, mido_module=None):
+    """Build a ListenerHolder for handle_port_change tests.
+
+    Mirrors the production wiring: a fresh ControllerState bound to the
+    initial profile, no listener thread spawned yet, and an injected
+    fake mido for spawn_listener calls.
+    """
+    from vibemix.midi import load_profile
+    from vibemix.midi.state import ControllerState
+    from vibemix.platform._midi_common import ListenerHolder
+
+    profile = load_profile(profile_id)
+    cs = ControllerState(profile=profile)
+    return ListenerHolder(
+        controller_state=cs,
+        listener_thread=None,
+        listener_stop=None,
+        mido_module=mido_module if mido_module is not None else _make_fake_mido([]),
+    )
+
+
+def test_handle_port_change_swaps_to_known_controller(monkeypatch):
+    """A connected event for a known controller (FLX4) builds a fresh
+    ControllerState bound to that profile and spawns a new listener."""
+    from vibemix.midi import load_profile
+    from vibemix.platform._midi_common import handle_port_change
+
+    holder = _make_holder()
+    # Sanity — initial holder is on FLX4 already.
+    assert holder.controller_state._profile.id == "pioneer_ddj_flx4"
+    # Simulate prior listener being non-None (so we can verify it gets stopped).
+    prior_stop = threading.Event()
+    holder.listener_stop = prior_stop
+    holder.bound_port = None  # not yet bound to a port
+
+    # Avoid sleeping in the spawned listener.
+    monkeypatch.setattr(_midi_common.time, "sleep", lambda _s: None)
+
+    flx4 = load_profile("pioneer_ddj_flx4")
+    handle_port_change(holder, ("connected", "DDJ-FLX4 USB MIDI", flx4))
+
+    assert holder.controller_state._profile.id == "pioneer_ddj_flx4"
+    assert holder.bound_port == "DDJ-FLX4 USB MIDI"
+    assert holder.listener_stop is not None
+    assert holder.listener_stop is not prior_stop  # fresh stop event for new listener
+    assert prior_stop.is_set()  # old listener was signaled to stop
+    assert holder.listener_thread is not None
+    # Cleanup — set the new listener's stop so its thread exits.
+    holder.listener_stop.set()
+    if holder.listener_thread is not None:
+        holder.listener_thread.join(timeout=1.0)
+
+
+def test_handle_port_change_swaps_to_generic_for_unknown_controller(monkeypatch):
+    """A connected event with the generic profile rebinds ControllerState
+    to the generic profile."""
+    from vibemix.midi import make_generic_profile
+    from vibemix.platform._midi_common import handle_port_change
+
+    holder = _make_holder()
+    monkeypatch.setattr(_midi_common.time, "sleep", lambda _s: None)
+
+    generic = make_generic_profile()
+    handle_port_change(holder, ("connected", "Bose Speaker", generic))
+
+    assert holder.controller_state._profile.id == "generic_midi"
+    assert holder.bound_port == "Bose Speaker"
+    # Cleanup.
+    if holder.listener_stop is not None:
+        holder.listener_stop.set()
+    if holder.listener_thread is not None:
+        holder.listener_thread.join(timeout=1.0)
+
+
+def test_handle_port_change_marks_disconnected_on_disconnect_event(monkeypatch):
+    """A disconnected event for the currently-bound port stops the listener
+    and marks the ControllerState disconnected."""
+    from vibemix.midi import load_profile
+    from vibemix.platform._midi_common import handle_port_change
+
+    monkeypatch.setattr(_midi_common.time, "sleep", lambda _s: None)
+    holder = _make_holder()
+
+    # First wire up a connected listener via handle_port_change so disconnect
+    # has something to tear down.
+    flx4 = load_profile("pioneer_ddj_flx4")
+    handle_port_change(holder, ("connected", "DDJ-FLX4 USB MIDI", flx4))
+    holder.controller_state.mark_connected("DDJ-FLX4 USB MIDI")
+    assert holder.controller_state.is_connected() is True
+    listener_stop = holder.listener_stop
+    assert listener_stop is not None
+
+    handle_port_change(holder, ("disconnected", "DDJ-FLX4 USB MIDI"))
+
+    assert holder.controller_state.is_connected() is False
+    assert holder.bound_port is None
+    assert listener_stop.is_set()
+    if holder.listener_thread is not None:
+        holder.listener_thread.join(timeout=1.0)
+
+
+def test_handle_port_change_disconnect_for_other_port_is_noop(monkeypatch):
+    """Disconnecting a port we are NOT bound to is a no-op (don't tear
+    down our listener for some other device's disconnect)."""
+    from vibemix.midi import load_profile
+    from vibemix.platform._midi_common import handle_port_change
+
+    monkeypatch.setattr(_midi_common.time, "sleep", lambda _s: None)
+    holder = _make_holder()
+    flx4 = load_profile("pioneer_ddj_flx4")
+    handle_port_change(holder, ("connected", "DDJ-FLX4 USB MIDI", flx4))
+    holder.controller_state.mark_connected("DDJ-FLX4 USB MIDI")
+
+    handle_port_change(holder, ("disconnected", "Some Other Device"))
+
+    # Still bound; still connected.
+    assert holder.bound_port == "DDJ-FLX4 USB MIDI"
+    assert holder.controller_state.is_connected() is True
+    # Cleanup.
+    if holder.listener_stop is not None:
+        holder.listener_stop.set()
+    if holder.listener_thread is not None:
+        holder.listener_thread.join(timeout=1.0)
+
+
+def test_handle_port_change_repeat_connect_to_same_port_is_noop(monkeypatch):
+    """If the port is already bound, a second connected event for the same
+    port must not tear down + respawn the listener."""
+    from vibemix.midi import load_profile
+    from vibemix.platform._midi_common import handle_port_change
+
+    monkeypatch.setattr(_midi_common.time, "sleep", lambda _s: None)
+    holder = _make_holder()
+    flx4 = load_profile("pioneer_ddj_flx4")
+    handle_port_change(holder, ("connected", "DDJ-FLX4 USB MIDI", flx4))
+    first_stop = holder.listener_stop
+    first_thread = holder.listener_thread
+
+    handle_port_change(holder, ("connected", "DDJ-FLX4 USB MIDI", flx4))
+
+    # Same listener objects — no respawn.
+    assert holder.listener_stop is first_stop
+    assert holder.listener_thread is first_thread
+    # Cleanup.
+    if holder.listener_stop is not None:
+        holder.listener_stop.set()
+    if holder.listener_thread is not None:
+        holder.listener_thread.join(timeout=1.0)
