@@ -46,6 +46,18 @@ dependencies = [
     "pyobjc-core>=12.1 ; sys_platform == 'darwin'",
     "pyobjc-framework-Cocoa>=12.1 ; sys_platform == 'darwin'",
     "pyobjc-framework-Quartz>=12.1 ; sys_platform == 'darwin'",
+    # Phase 7 Wave 1: Windows-only deps. PyAudioWPatch is the maintained
+    # WASAPI-loopback PyAudio fork (Wave 2). pywin32 powers EnumWindows /
+    # SMTC FFI (Wave 3). winsdk is Microsoft's official Python winrt
+    # bindings (replaces deprecated `winrt`) for SMTC reads (Wave 3).
+    # All three are gated on win32 → uv sync skips them on macOS; PyInstaller
+    # picks them up automatically on Windows.
+    "pyaudiowpatch>=0.2.12 ; sys_platform == 'win32'",
+    "pywin32>=308 ; sys_platform == 'win32'",
+    # winsdk ships only beta releases on PyPI as of 2026-05 (latest 1.0.0b10).
+    # Pin to >=1.0.0b10 so resolver accepts the published beta; production
+    # tracks the latest beta until Microsoft graduates to 1.0.0.
+    "winsdk>=1.0.0b10 ; sys_platform == 'win32'",
 ]
 
 [project.urls]
