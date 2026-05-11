@@ -22,10 +22,13 @@ from __future__ import annotations
 
 import threading
 import time
+import warnings
 from types import SimpleNamespace
 
-from vibemix.platform import _midi_common
+import pytest
 
+from vibemix.midi import load_profile
+from vibemix.platform import _midi_common
 
 # ---------- Fake mido module (test injection seam) ----------
 
@@ -307,3 +310,95 @@ def test_midi_macos_golden_unchanged_behavior_after_refactor(monkeypatch):
         f"  direct:   {direct_labels}\n"
         f"  listener: {listener_labels}"
     )
+
+
+# ---------- Phase 9 Wave 1 Task 3 — ControllerProfile parameter ----------
+
+
+def test_listener_accepts_profile_finds_first_hint(monkeypatch):
+    """midi_listener_thread accepts a ControllerProfile (new signature). The
+    port-hint substring is derived from profile.port_name_hints[0]; same
+    enumerate-open-poll behavior as Phase 7."""
+    profile = load_profile("pioneer_ddj_flx4")
+    assert profile is not None
+    msg = SimpleNamespace(type="control_change", channel=0, control=0x13, value=100)
+    port = _FakePort([msg])
+    fake_mido = _make_fake_mido(["Foo", "DDJ-FLX4 USB MIDI"], port=port)
+    cs = _RecordingControllerState()
+    stop_event = threading.Event()
+    monkeypatch.setattr(_midi_common.time, "sleep", lambda _s: None)
+
+    t = _midi_common.spawn_listener(cs, stop_event, profile, fake_mido)
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        if cs.handled:
+            break
+        time.sleep(0.005)
+    stop_event.set()
+    t.join(timeout=1.0)
+
+    assert cs.connected_to == "DDJ-FLX4 USB MIDI"
+    assert len(cs.handled) == 1
+
+
+def test_listener_emits_deprecation_warning_on_str_port_hint(monkeypatch):
+    """Passing a str third-arg (legacy Phase 7 signature) fires
+    DeprecationWarning and still works via internal profile-shim."""
+    msg = SimpleNamespace(type="control_change", channel=0, control=0x13, value=100)
+    port = _FakePort([msg])
+    fake_mido = _make_fake_mido(["DDJ-FLX4 USB MIDI"], port=port)
+    cs = _RecordingControllerState()
+    stop_event = threading.Event()
+    monkeypatch.setattr(_midi_common.time, "sleep", lambda _s: None)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        t = _midi_common.spawn_listener(cs, stop_event, "DDJ-FLX4", fake_mido)
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            if cs.handled:
+                break
+            time.sleep(0.005)
+        stop_event.set()
+        t.join(timeout=1.0)
+
+    assert any(
+        issubclass(w.category, DeprecationWarning) and "port_hint" in str(w.message) for w in caught
+    )
+    assert cs.connected_to == "DDJ-FLX4 USB MIDI"
+
+
+def test_listener_tries_second_port_hint_when_first_misses(monkeypatch):
+    """When profile.port_name_hints=('Pioneer-DDJ-FLX4', 'FLX4') and only
+    'My FLX4 USB MIDI' is enumerated, listener tries the second hint and
+    binds to it."""
+    from vibemix.midi.profile import ControllerProfile
+
+    profile = ControllerProfile(
+        id="test_two_hints",
+        display_name="Test Two Hints",
+        port_name_hints=("Pioneer-DDJ-FLX4", "FLX4"),
+        decks=("A", "B"),
+        controls={},
+        buttons={},
+    )
+    port = _FakePort([])  # no messages — we only verify port match
+    fake_mido = _make_fake_mido(["My FLX4 USB MIDI"], port=port)
+    cs = _RecordingControllerState()
+    stop_event = threading.Event()
+
+    def _record_sleep(seconds):
+        # Once the inner poll loop's first 0.005s sleep fires, signal shutdown.
+        if seconds < 0.01:
+            stop_event.set()
+
+    monkeypatch.setattr(_midi_common.time, "sleep", _record_sleep)
+    t = _midi_common.spawn_listener(cs, stop_event, profile, fake_mido)
+    t.join(timeout=1.0)
+
+    # The listener matched on the *second* hint 'FLX4' against 'My FLX4 USB MIDI'.
+    assert cs.connected_to == "My FLX4 USB MIDI"
+
+
+# Pinned for ruff stability — pytest used via warnings.catch_warnings.
+_ = pytest

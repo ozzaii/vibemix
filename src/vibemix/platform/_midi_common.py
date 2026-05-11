@@ -1,27 +1,25 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Cross-platform MIDI listener thread — extracted from _midi_macos.py.
+"""Cross-platform MIDI listener thread — parameterized by ControllerProfile.
 
-Phase 7 Wave 1 lifts the device-enumeration + open-input + poll-loop body out of
-``MidiMacOS.start_listener_thread`` so Wave 4's ``_midi_windows.py`` can reuse
-it verbatim. The listener body is platform-agnostic: ``mido`` works on both
-macOS (CoreMIDI) and Windows (winmm) once ``python-rtmidi`` is installed.
+Phase 7 Wave 1 lifted the device-enumerate + open-input + poll-loop body out
+of ``MidiMacOS.start_listener_thread`` so Wave 4's ``_midi_windows.py`` could
+reuse it. Phase 9 Wave 1 Task 3 swaps the third positional from a single
+``port_hint: str`` to a full ``ControllerProfile`` so the listener can:
 
-Design:
-- ``midi_listener_thread`` is a top-level function (NOT a method) — it accepts
-  ``controller_state`` (any object with ``mark_connected(name)`` +
-  ``handle_msg(msg)`` methods, satisfied by Phase 3's ``ControllerState``) and a
-  ``mido_module`` parameter so unit tests inject a fake mido without
-  monkeypatching the real one.
-- ``spawn_listener`` is the convenience helper: wraps the function in a daemon
-  ``threading.Thread``, calls ``.start()``, returns the Thread for ``join()``
-  on shutdown.
-- The retry-every-2s-on-exception pattern, the substring-case-insensitive port
-  match, and the 5ms inner-loop sleep are all carried over verbatim from v4
-  (cohost_v4.py:730-756 / Phase 3 _midi_macos.py:302-327) — those tuning values
-  were validated in Kaan's real DJ session 2026-05-11 and stay unchanged.
+1. Iterate ``profile.port_name_hints`` (in order) on every enumeration sweep —
+   so a controller exposing itself as either ``"DDJ-FLX4 USB MIDI"`` OR
+   ``"FLX4 USB MIDI"`` (depending on firmware revision) binds without the
+   caller knowing which hint will hit.
+2. Carry profile metadata (id, display_name) into log lines / future
+   diagnostic surfaces without an out-of-band ``find_mapping`` call.
 
-Test injection seam: ``mido_module`` is the third positional parameter so tests
-can pass a ``types.SimpleNamespace`` with ``get_input_names()`` and
+Backward compatibility:
+    For one release boundary (Phase 9 → Phase 10), a ``str`` third positional
+    is accepted and wrapped as a synthetic single-hint ControllerProfile +
+    a ``DeprecationWarning``. Phase 10 drops the shim entirely.
+
+Test injection seam: ``mido_module`` is the fourth positional parameter so
+tests can pass a ``types.SimpleNamespace`` with ``get_input_names()`` and
 ``open_input(name)`` callables, exercising the loop deterministically without
 a physical MIDI device.
 """
@@ -31,19 +29,69 @@ from __future__ import annotations
 import sys
 import threading
 import time
+import warnings
+
+from vibemix.midi.profile import ControllerProfile
 
 
-def midi_listener_thread(controller_state, stop_event, port_hint, mido_module):
+def _coerce_profile_arg(profile_or_hint) -> ControllerProfile:
+    """Accept a ControllerProfile OR (legacy) a str port-hint.
+
+    Phase 9 Wave 1 Task 3 — backward-compat shim. A str third-arg fires a
+    ``DeprecationWarning`` and is wrapped as a synthetic single-hint profile
+    so Phase 7 tests stay green. Phase 10 deletes this shim.
+    """
+    if isinstance(profile_or_hint, ControllerProfile):
+        return profile_or_hint
+    if isinstance(profile_or_hint, str):
+        warnings.warn(
+            "midi_listener_thread/spawn_listener: passing a str port_hint is "
+            "deprecated; pass a ControllerProfile instead (e.g. "
+            "load_profile('pioneer_ddj_flx4')). Shim removed in Phase 10.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return ControllerProfile(
+            id="_legacy",
+            display_name="_legacy",
+            port_name_hints=(profile_or_hint,),
+            decks=("A", "B"),
+            controls={},
+            buttons={},
+        )
+    raise TypeError(
+        "midi_listener_thread/spawn_listener: third arg must be ControllerProfile "
+        f"(or str — deprecated), got {type(profile_or_hint).__name__}"
+    )
+
+
+def _find_first_port_match(port_names: list[str], port_name_hints: tuple[str, ...]) -> str | None:
+    """Search every hint (in order) against the port list (case-insensitive
+    substring). Returns the first matching port name, or None if no hint
+    matches any port.
+    """
+    for hint in port_name_hints:
+        needle = hint.lower()
+        for p in port_names:
+            if needle in p.lower():
+                return p
+    return None
+
+
+def midi_listener_thread(controller_state, stop_event, profile, mido_module):
     """Run the MIDI device enumerate-open-poll loop until ``stop_event`` is set.
 
-    Lifted verbatim from ``_midi_macos.py::MidiMacOS.start_listener_thread._run``
-    (Phase 3) which was a verbatim port of cohost_v4.py:730-756. Behavior:
+    Phase 9 Wave 1 Task 3: third positional is now a ``ControllerProfile``
+    (with a one-release ``str`` shim — see ``_coerce_profile_arg``).
+
+    Behavior:
 
     1. Enumerate input ports via ``mido_module.get_input_names()``.
-    2. Find first port whose name contains ``port_hint`` (case-insensitive).
-    3. If no match: sleep 2s, retry. If stop_event was set during the sleep,
-       exit.
-    4. If match: ``open_input(match)`` (context-managed), call
+    2. For each hint in ``profile.port_name_hints`` (in order), find the first
+       port whose name contains the hint (case-insensitive).
+    3. If no hint matches any port: sleep 2s, retry. If stop_event was set
+       during the sleep, exit.
+    4. If a match: ``open_input(match)`` (context-managed), call
        ``controller_state.mark_connected(match)``, then enter the inner poll
        loop.
     5. Inner loop: ``port.poll()``; if None sleep 5ms and re-check
@@ -54,23 +102,26 @@ def midi_listener_thread(controller_state, stop_event, port_hint, mido_module):
     Args:
         controller_state: anything with ``mark_connected(str)`` and
             ``handle_msg(msg)`` — typically ``ControllerState`` from
-            ``_midi_macos.py``.
+            ``vibemix.midi.state``.
         stop_event: ``threading.Event`` cooperative shutdown signal.
-        port_hint: substring matched case-insensitively against port names.
-            Production callers pass ``"DDJ-FLX4"`` for both macOS and Windows.
+        profile: ``ControllerProfile`` whose ``port_name_hints`` drive the
+            substring match. Legacy ``str`` accepted with DeprecationWarning.
         mido_module: the ``mido`` module (or a test fake exposing the same
             ``get_input_names`` + ``open_input`` surface).
     """
+    profile_obj = _coerce_profile_arg(profile)
+    hints = profile_obj.port_name_hints
+
     while not stop_event.is_set():
         try:
-            ports = mido_module.get_input_names()
-            match = next((p for p in ports if port_hint.lower() in p.lower()), None)
+            ports = list(mido_module.get_input_names())
+            match = _find_first_port_match(ports, hints)
             if not match:
                 time.sleep(2.0)
                 continue
             with mido_module.open_input(match) as port:
                 controller_state.mark_connected(match)
-                print(f"-> MIDI controller in: {match!r}")
+                print(f"-> MIDI controller in: {match!r} (profile={profile_obj.id})")
                 while not stop_event.is_set():
                     msg = port.poll()
                     if msg is None:
@@ -82,7 +133,7 @@ def midi_listener_thread(controller_state, stop_event, port_hint, mido_module):
             time.sleep(2.0)
 
 
-def spawn_listener(controller_state, stop_event, port_hint, mido_module) -> threading.Thread:
+def spawn_listener(controller_state, stop_event, profile, mido_module) -> threading.Thread:
     """Spawn ``midi_listener_thread`` as a daemon thread and return it.
 
     Daemon=True matches the v4 / Phase 3 contract: the listener never blocks
@@ -91,7 +142,7 @@ def spawn_listener(controller_state, stop_event, port_hint, mido_module) -> thre
     Args:
         controller_state: see ``midi_listener_thread``.
         stop_event: see ``midi_listener_thread``.
-        port_hint: see ``midi_listener_thread``.
+        profile: ``ControllerProfile`` (or legacy ``str`` — deprecated).
         mido_module: see ``midi_listener_thread``.
 
     Returns:
@@ -100,7 +151,7 @@ def spawn_listener(controller_state, stop_event, port_hint, mido_module) -> thre
     """
     t = threading.Thread(
         target=midi_listener_thread,
-        args=(controller_state, stop_event, port_hint, mido_module),
+        args=(controller_state, stop_event, profile, mido_module),
         name="midi-listener",
         daemon=True,
     )
