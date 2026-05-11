@@ -2,32 +2,32 @@
 """state_refresh_loop — the 10Hz single writer to MusicState.
 
 Verbatim port of cohost_v4.py:1647-1751 with **ONE structural deviation** from
-v4: the four audio-related calls that v4 made as METHODS on ``AudioBuffer`` are
-rewritten here as FREE FUNCTION calls per Phase 2's refactor (Phase 2 SUMMARY
-rationale: testability without standing up the whole audio package).
+v4 (Phase 3): the four audio-related calls that v4 made as METHODS on
+``AudioBuffer`` are rewritten here as FREE FUNCTION calls per Phase 2's
+refactor.
 
-The rewrites (every other line is byte-for-byte v4):
-    v4: audio_buf.snapshot_features(seconds=4.0)
-    P3: snapshot_features(audio_buf, seconds=4.0)
+**Phase 6 additions** (this commit):
+- Per-tick crest_factor + EMA smoothing.
+- Per-tick BPM half/double validation against active genre profile.
+- Per-tick VocalDetector with 1.5s/2.5s hysteresis.
+- Per-tick dispatch into classify_phase (percentile path when profile active,
+  v4 absolute-threshold path when no profile).
+- Writes 4 new MusicState fields: crest_factor, vocal_active, bpm_corrected,
+  genre_profile_name.
 
-    v4: audio_buf.energy_curve(seconds=12.0, hop=1.0)
-    P3: energy_curve(audio_buf, seconds=12.0, hop=1.0)
-
-    v4: audio_buf.estimate_bpm(seconds=6.0)
-    P3: estimate_bpm(audio_buf, seconds=6.0)
-
-    v4: audio_buf.long_arc_curve(seconds=120.0, hop=10.0)
-    P3: long_arc_curve(audio_buf, seconds=120.0, hop=10.0)
+The genre-aware state (EmaSmoother / VocalDetector / HysteresisState /
+feature_history deque) lives in the loop's LOCAL scope (NOT in MusicState —
+Critical Constraint 7: MusicState holds consumer-readable evidence;
+hysteresis machinery is internal detector state). Loop-local state is
+threaded through `_tick_once` via kwargs.
 
 Single-writer contract: this is the ONLY function in the codebase that writes
 to MusicState fields. EventDetector and AICoach are read-only. The write
 batch is wrapped in ``with state._lock:`` so multi-field consistent snapshots
-are achievable by readers that opt in (most readers don't bother — single-tick
-read tearing is acceptable at 10Hz cadence).
+are achievable by readers that opt in.
 
 Error wrap: the entire per-tick body is ``try / except Exception``; the loop
-NEVER exits on exception (verbatim v4 behavior — keep running even if one
-feature snapshot throws).
+NEVER exits on exception (verbatim v4 behavior).
 """
 
 from __future__ import annotations
@@ -35,6 +35,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import time
+from collections import deque
 from typing import TYPE_CHECKING
 
 from vibemix.audio import (
@@ -46,6 +47,14 @@ from vibemix.audio import (
     estimate_bpm,
     long_arc_curve,
     snapshot_features,
+)
+from vibemix.state.genre import (
+    EmaSmoother,
+    HysteresisState,
+    VocalDetector,
+    crest_factor,
+    get_active_profile,
+    validate_bpm,
 )
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
@@ -67,6 +76,10 @@ def _tick_once(
     last_audible_low: float,
     bpm_cache: float,
     last_bpm_at: float,
+    crest_smoother: EmaSmoother | None = None,
+    vocal_detector: VocalDetector | None = None,
+    hysteresis_state: HysteresisState | None = None,
+    feature_history: deque[dict] | None = None,
 ) -> tuple[float, float, float, float]:
     """One iteration of the state_refresh_loop body. Extracted so tests can
     drive single ticks deterministically with fake time and fake snapshots.
@@ -74,19 +87,56 @@ def _tick_once(
     Returns the updated (last_audible_high, last_audible_low, bpm_cache,
     last_bpm_at) tuple for the caller to thread through the next tick.
 
-    The body is v4:1660-1751 verbatim except for the four free-function
-    rewrites described in the module docstring.
+    Phase 6 additions: crest factor, BPM validation, vocal detection, phase
+    dispatch — all gated on the active genre profile.
     """
+    # Lazy-default Phase 6 loop-local state for tests that omit them.
+    if crest_smoother is None:
+        crest_smoother = EmaSmoother(alpha=0.3)
+    if vocal_detector is None:
+        vocal_detector = VocalDetector()
+    if hysteresis_state is None:
+        hysteresis_state = HysteresisState()
+    if feature_history is None:
+        feature_history = deque(maxlen=5)
+
+    # Re-read active profile per tick — Phase 12 UI may flip mid-session.
+    active_profile = get_active_profile()
+    profile_name = active_profile.name if active_profile is not None else "unknown"
+
     # Audio features (cheap — ~5-10ms)
     feats = snapshot_features(audio_buf, seconds=4.0)
     curve = energy_curve(audio_buf, seconds=12.0, hop=1.0)
     rms = feats.get("rms", 0.0)
     currently_loud = rms > SILENT_RMS
 
+    # Phase 6: crest factor over the same 4s window.
+    pcm_for_crest = audio_buf.snapshot(int(audio_buf._sr * 4.0))
+    raw_crest = crest_factor(pcm_for_crest)
+    # Don't smooth on silence — keep last-known value to prevent EMA decay
+    # during track gaps.
+    if raw_crest > 0:
+        smoothed_crest = crest_smoother.update(raw_crest)
+    else:
+        smoothed_crest = crest_smoother.value
+
     # BPM updated every 3s — autocorr is heavier
     if now - last_bpm_at > 3.0 and currently_loud:
         bpm_cache = estimate_bpm(audio_buf, seconds=6.0)
         last_bpm_at = now
+
+    # Phase 6: BPM half/double validation against active profile.
+    if active_profile is not None and bpm_cache > 0:
+        normalized_bpm, was_corrected = validate_bpm(bpm_cache, active_profile)
+        bpm_cache = normalized_bpm
+    else:
+        was_corrected = False
+
+    # Phase 6: vocal-section detection. Compute BEFORE appending feats so
+    # `recent_features` excludes the current snapshot.
+    recent_for_vocal = list(feature_history)
+    vocal_active = vocal_detector.is_vocal_section(feats, recent_for_vocal, now=now)
+    feature_history.append(feats)
 
     # Audible debouncing — both directions sustained
     if currently_loud:
@@ -117,8 +167,24 @@ def _tick_once(
         state.bpm = bpm_cache
         state.energy_curve = curve
 
-        # Phase
-        new_phase = classify_phase(curve, state.audible)
+        # Phase 6: write the 4 new fields.
+        state.crest_factor = round(smoothed_crest, 2)
+        state.vocal_active = vocal_active
+        state.bpm_corrected = was_corrected
+        state.genre_profile_name = profile_name
+
+        # Phase — dispatch on active profile.
+        if active_profile is None:
+            new_phase = classify_phase(curve, state.audible)
+        else:
+            new_phase, _ = classify_phase(
+                curve,
+                state.audible,
+                profile=active_profile,
+                features=feats,
+                hysteresis_state=hysteresis_state,
+            )
+
         if new_phase != state.phase:
             state.phase_history.append((now, state.phase, new_phase))
             if len(state.phase_history) > 6:
@@ -143,9 +209,6 @@ def _tick_once(
         tt, tc = derive_audible_track(
             tsnap.get("title") or None, aud_deck, deck_conf, state.audible
         )
-        # Record audibly-confirmed track flips into track_history (only when
-        # confidence is decent — prevents jittery deck inference from polluting
-        # the history with phantom transitions).
         if tt and tc >= 0.5:
             last_title = state.track_history[-1][1] if state.track_history else None
             if tt != last_title:
@@ -177,11 +240,23 @@ async def state_refresh_loop(
     direction so a brief dip doesn't yank the AI into 'silent' mid-track.
 
     10Hz cadence (v4:1659 — ``await asyncio.sleep(0.1)`` at top of loop).
+
+    Phase 6: maintains EmaSmoother / VocalDetector / HysteresisState /
+    feature_history deque as loop-local state, threaded through _tick_once.
+    These are NOT in MusicState — they're internal detector machinery, not
+    consumer evidence.
     """
     last_audible_high = 0.0
     last_audible_low = 0.0
     bpm_cache = 0.0
     last_bpm_at = 0.0
+
+    # Phase 6 loop-local state — created once per session.
+    crest_smoother = EmaSmoother(alpha=0.3)
+    active_profile_at_start = get_active_profile()
+    vocal_detector = VocalDetector(profile=active_profile_at_start)
+    hysteresis_state = HysteresisState()
+    feature_history: deque[dict] = deque(maxlen=5)
 
     while not stop_event.is_set():
         await asyncio.sleep(0.1)
@@ -197,6 +272,10 @@ async def state_refresh_loop(
                 last_audible_low=last_audible_low,
                 bpm_cache=bpm_cache,
                 last_bpm_at=last_bpm_at,
+                crest_smoother=crest_smoother,
+                vocal_detector=vocal_detector,
+                hysteresis_state=hysteresis_state,
+                feature_history=feature_history,
             )
         except Exception as e:
             print(f"[state refresh err] {e}", file=sys.stderr)

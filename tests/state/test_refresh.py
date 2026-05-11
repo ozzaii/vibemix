@@ -523,6 +523,173 @@ def test_state_refresh_loop_sleeps_at_10hz(mocker):
     assert calls[0] == 0.1
 
 
+# =============================================================================
+# Phase 6 — genre-aware MusicState fields written each tick
+# =============================================================================
+
+
+def test_tick_writes_crest_factor_field():
+    """Crest factor is computed from a 4s pcm snapshot and EMA-smoothed."""
+    from vibemix.state.genre import EmaSmoother
+
+    state = MusicState()
+    buf = _audible_buf()
+    smoother = EmaSmoother(alpha=0.3)
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+        crest_smoother=smoother,
+    )
+    # Pure sine has crest ≈ √2 ≈ 1.41 (rounded to 2 places by state.write).
+    assert state.crest_factor > 0.0
+    assert state.crest_factor < 2.0  # Sine should be ~1.41
+
+
+def test_tick_writes_bpm_corrected_field_when_profile_active(mocker):
+    """active profile=techno + bpm_cache=250 → halved to 125, bpm_corrected=True."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile("techno")
+    try:
+        state = MusicState()
+        buf = _audible_buf()
+        # bpm_cache=250 will be halved to 125 (in techno 125-175 range).
+        # last_bpm_at=now means estimate_bpm gate is skipped → bpm_cache preserved
+        # then validated.
+        _tick_once(
+            state,
+            buf,
+            _ctrl_mock(),
+            _track_mock(),
+            now=1000.0,
+            last_audible_high=0.0,
+            last_audible_low=0.0,
+            bpm_cache=250.0,
+            last_bpm_at=1000.0,  # block estimate_bpm so bpm_cache stays at 250
+        )
+        assert state.bpm == 125.0
+        assert state.bpm_corrected is True
+    finally:
+        set_active_profile(None)
+
+
+def test_tick_writes_bpm_corrected_false_when_no_profile():
+    """No active profile → validate_bpm not called → bpm_corrected=False."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+    state = MusicState()
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=250.0,
+        last_bpm_at=1000.0,
+    )
+    # Raw 250 passed through unchanged.
+    assert state.bpm == 250.0
+    assert state.bpm_corrected is False
+
+
+def test_tick_writes_genre_profile_name_unknown_when_no_active_profile():
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+    state = MusicState()
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+    )
+    assert state.genre_profile_name == "unknown"
+
+
+def test_tick_writes_genre_profile_name_techno_when_active():
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile("techno")
+    try:
+        state = MusicState()
+        buf = _audible_buf()
+        _tick_once(
+            state,
+            buf,
+            _ctrl_mock(),
+            _track_mock(),
+            now=1000.0,
+            last_audible_high=0.0,
+            last_audible_low=0.0,
+            bpm_cache=0.0,
+            last_bpm_at=0.0,
+        )
+        assert state.genre_profile_name == "techno"
+    finally:
+        set_active_profile(None)
+
+
+def test_tick_writes_vocal_active_default_false():
+    """Cold start with no recent_features history → vocal_active stays False."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+    state = MusicState()
+    buf = _audible_buf()  # 440Hz sine — not a vocal signal
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+    )
+    assert state.vocal_active is False
+
+
+def test_tick_falls_back_to_v4_classify_when_no_profile():
+    """No profile → state_refresh uses Phase 3 absolute-threshold classify."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+    state = MusicState()
+    state.audible = True
+    buf = _silent_buf()  # empty curve → 'silent'
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.0,
+    )
+    # Empty curve via Phase 3 classify_phase → 'silent'.
+    assert state.phase == "silent"
+
+
 def test_state_refresh_loop_swallows_tick_exceptions(mocker, capsys):
     """v4:1750-1751 — error wrap. Loop continues after exception, error
     written to stderr with the v4 prefix."""

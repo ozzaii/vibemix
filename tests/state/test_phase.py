@@ -9,8 +9,11 @@ Constants from vibemix.audio.constants (v4 verbatim):
 
 from __future__ import annotations
 
+import pytest
+
 import vibemix.state.phase as phase_mod
 from vibemix.state import classify_phase
+from vibemix.state.genre import HysteresisState, load_profile
 
 
 def test_empty_curve_returns_silent():
@@ -88,3 +91,75 @@ def test_constants_imported_not_inlined():
     assert phase_mod.SILENT_RMS == 0.012
     assert phase_mod.LOW_RMS == 0.040
     assert phase_mod.PEAK_RMS == 0.110
+
+
+# =============================================================================
+# Phase 6 — classify_phase dispatch (profile= keyword + golden equivalence)
+# =============================================================================
+
+# Curves exercised across the Phase 3 test set above — the SAME inputs go
+# through the new dispatch to confirm profile=None is byte-equivalent.
+_PHASE_3_PARAMS = [
+    ([], True, "silent"),
+    ([0.1, 0.1, 0.1], False, "silent"),
+    ([0.005], True, "silent"),
+    ([0.020], True, "low"),
+    ([0.05, 0.05, 0.05], True, "groove"),
+    ([0.02, 0.04, 0.06, 0.08, 0.10, 0.12], True, "build"),
+    ([0.05, 0.05, 0.05, 0.02, 0.05, 0.12], True, "drop"),
+    ([0.10] * 5 + [0.07, 0.06, 0.05, 0.045, 0.041], True, "breakdown"),
+    ([0.05] * 10, True, "peak"),
+    ([0.05, 0.05, 0.05, 0.04, 0.045, 0.043, 0.044], True, "groove"),
+]
+
+
+@pytest.mark.parametrize("curve,audible,expected", _PHASE_3_PARAMS)
+def test_profile_none_equals_phase_3_behavior_for_all_existing_inputs(
+    curve: list, audible: bool, expected: str
+):
+    """Golden-equivalence: classify_phase(curve, audible) MUST equal
+    classify_phase(curve, audible, profile=None). Critical Constraint 3."""
+    result_legacy = classify_phase(curve, audible)
+    result_new = classify_phase(curve, audible, profile=None)
+    assert result_legacy == result_new == expected
+    assert isinstance(result_legacy, str)
+    assert isinstance(result_new, str)
+
+
+def test_profile_none_returns_str_not_tuple():
+    """Positional or profile=None path returns a plain str (Phase 3 contract)."""
+    result = classify_phase([0.05] * 10, True, profile=None)
+    assert isinstance(result, str)
+
+
+def test_with_profile_returns_tuple():
+    """Phase 6 percentile path returns (label, HysteresisState) tuple."""
+    prof = load_profile("techno")
+    result = classify_phase([0.05] * 40, True, profile=prof)
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert isinstance(result[0], str)
+    assert isinstance(result[1], HysteresisState)
+
+
+def test_with_profile_audible_false_commits_silent():
+    """profile path: audible=False short-circuits to 'silent' and commits."""
+    prof = load_profile("techno")
+    h = HysteresisState(current_label="peak")
+    label, h2 = classify_phase([0.05] * 40, False, profile=prof, hysteresis_state=h)
+    assert label == "silent"
+    assert h2.current_label == "silent"
+
+
+def test_with_profile_empty_curve_returns_silent_tuple():
+    """profile path: empty curve also short-circuits to 'silent'."""
+    prof = load_profile("techno")
+    label, _ = classify_phase([], True, profile=prof)
+    assert label == "silent"
+
+
+def test_positional_call_still_works():
+    """Existing call sites that use positional classify_phase(curve, audible)
+    keep returning a plain str — backward-compat for state_refresh_loop."""
+    assert classify_phase([0.005], True) == "silent"
+    assert classify_phase([0.05] * 10, True) == "peak"

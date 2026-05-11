@@ -1,24 +1,42 @@
 # SPDX-License-Identifier: Apache-2.0
-"""classify_phase — verbatim port of cohost_v4.py:1065-1090.
+"""classify_phase — dispatching entry point.
 
-Free function (not a method) so Phase 6 can swap in a percentile-per-genre
-detector without touching MusicState or EventDetector. Constants SILENT_RMS,
-LOW_RMS, PEAK_RMS are IMPORTED from ``vibemix.audio.constants`` so retuning
-happens in one place (and Phase 6's override mechanism can monkey-patch the
-import).
+Phase 3: ``classify_phase(curve, audible) -> str`` was the v4-verbatim
+absolute-threshold port.
 
-Returns one of seven labels: silent / low / groove / build / drop / peak /
-breakdown. ``audible=False`` short-circuits to ``silent`` (anti-hallucination
-gate — RMS thresholds are only meaningful when sustained music is playing).
+Phase 6 (this file): ``classify_phase`` becomes a DISPATCH function. When
+called without a profile (positional, or ``profile=None``), the original v4
+body executes and returns a plain ``str`` — byte-equivalent to Phase 3
+(pinned via golden test).
+
+When called with a profile (and optionally features + hysteresis_state), the
+percentile-per-genre path executes and returns a ``(label, HysteresisState)``
+tuple.
+
+This conditional-return shape preserves backward compatibility — existing
+callers (``state_refresh_loop`` Phase 3 path, tests in
+``tests/state/test_phase.py``) keep working unchanged.
+
+Constants SILENT_RMS / LOW_RMS / PEAK_RMS are imported from
+``vibemix.audio.constants`` for the v4 path. Phase 6's percentile path uses
+the active profile's per-genre overrides instead.
 """
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from vibemix.audio.constants import LOW_RMS, PEAK_RMS, SILENT_RMS
 
+if TYPE_CHECKING:
+    from vibemix.state.genre.detector import HysteresisState
+    from vibemix.state.genre.profile import GenreProfile
 
-def classify_phase(curve: list, audible: bool) -> str:
-    """Phase tag from energy curve. Returns 'silent' if not audible."""
+
+def _classify_phase_v4(curve: list, audible: bool) -> str:
+    """Phase 3 v4-verbatim path. Kept as the fallback when no genre profile is
+    active. Body byte-equivalent to the original phase.py classify_phase from
+    commit 8106a16/8e04dfc — golden-equivalent pinned via test_phase.py."""
     if not audible or not curve:
         return "silent"
     last = curve[-1]
@@ -43,3 +61,39 @@ def classify_phase(curve: list, audible: bool) -> str:
     if all(v >= 0.045 for v in recent):
         return "peak"
     return "groove"
+
+
+def classify_phase(
+    curve: list,
+    audible: bool,
+    *,
+    profile: GenreProfile | None = None,
+    features: dict | None = None,
+    hysteresis_state: HysteresisState | None = None,
+):
+    """Phase classification with optional genre-aware percentile dispatch.
+
+    - ``profile=None`` (default, Phase 3 path): returns plain ``str`` — the v4
+      absolute-threshold body. Backward-compatible with all existing call sites.
+    - ``profile=<GenreProfile>`` (Phase 6 path): returns
+      ``(label, HysteresisState)`` tuple. Caller threads the state through
+      subsequent calls. ``audible=False`` short-circuits to ``'silent'`` and
+      commits the hysteresis state immediately (anti-hallucination).
+    """
+    if profile is None:
+        return _classify_phase_v4(curve, audible)
+
+    # Percentile-per-genre path. Lazy-import to avoid cycles.
+    from vibemix.state.genre.detector import HysteresisState as _HS
+    from vibemix.state.genre.detector import classify_phase_percentile
+
+    if hysteresis_state is None:
+        hysteresis_state = _HS()
+
+    if not audible or not curve:
+        hysteresis_state.current_label = "silent"
+        hysteresis_state.pending_label = None
+        hysteresis_state.pending_ticks = 0
+        return ("silent", hysteresis_state)
+
+    return classify_phase_percentile(curve, features, profile, hysteresis_state)
