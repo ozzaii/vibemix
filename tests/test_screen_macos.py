@@ -306,9 +306,7 @@ def _install_fake_sckit(monkeypatch, *, sample_buffer: _FakeCMSampleBuffer | Non
             self._delegate = delegate
             return self
 
-        def addStreamOutput_type_sampleHandlerQueue_error_(
-            self, output, type_, queue, error_ptr
-        ):
+        def addStreamOutput_type_sampleHandlerQueue_error_(self, output, type_, queue, error_ptr):
             self._output_delegate = output
             self._output_type = type_
             return True
@@ -588,9 +586,7 @@ def test_no_full_screen_fallback_in_source():
     outside of comments. Privacy gate, Success Criterion 4, P13 prevention."""
     source = SCREEN_MACOS_PATH.read_text()
     # Strip comment lines so we don't false-positive on doc references.
-    non_comment_lines = [
-        line for line in source.splitlines() if not line.lstrip().startswith("#")
-    ]
+    non_comment_lines = [line for line in source.splitlines() if not line.lstrip().startswith("#")]
     body = "\n".join(non_comment_lines)
     # The display-wide constructor name — never appear in code.
     assert "initWithDisplay_excludingWindows_" not in body, (
@@ -656,8 +652,10 @@ def test_screen_macos_module_imports_screencapturekit_lazily():
     # from sys.modules, and confirm the import does not fail.
     saved = {}
     for k in list(sys.modules):
-        if k.startswith("ScreenCaptureKit") or k.startswith("CoreMedia") or k.startswith(
-            "CoreVideo"
+        if (
+            k.startswith("ScreenCaptureKit")
+            or k.startswith("CoreMedia")
+            or k.startswith("CoreVideo")
         ):
             saved[k] = sys.modules.pop(k)
     try:
