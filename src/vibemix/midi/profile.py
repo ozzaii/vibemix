@@ -90,7 +90,9 @@ class ControlBinding:
     cc: int  # 0..127 CC number
     axis: str  # 'unipolar' (knob) | 'bipolar' (tempo/filter/xfader, center=64)
     deck: str | None  # 'A'/'B'/'C'/'D' or None for master-section (xfader)
-    field: str  # semantic field name: 'vol', 'eq_hi', 'eq_mid', 'eq_low', 'tempo', 'filter', 'xfader'
+    field: (
+        str  # semantic field name: 'vol', 'eq_hi', 'eq_mid', 'eq_low', 'tempo', 'filter', 'xfader'
+    )
 
 
 @dataclass(frozen=True)
@@ -219,9 +221,7 @@ def _parse_control_binding(
     )
 
 
-def _parse_button_binding(
-    binding_name: str, payload: dict, *, profile_name: str
-) -> ButtonBinding:
+def _parse_button_binding(binding_name: str, payload: dict, *, profile_name: str) -> ButtonBinding:
     """Validate a single button-binding dict. Raises ValueError."""
     if not isinstance(payload, dict):
         raise ValueError(
@@ -262,9 +262,7 @@ def _parse_profile(payload: dict) -> ControllerProfile:
     explicitly prohibited (CONTEXT §Locked).
     """
     if not isinstance(payload, dict):
-        raise ValueError(
-            f"profile payload must be a dict, got {type(payload).__name__}"
-        )
+        raise ValueError(f"profile payload must be a dict, got {type(payload).__name__}")
 
     # id + display_name first so subsequent errors carry the profile name.
     profile_id = _require_str(payload, "id")
