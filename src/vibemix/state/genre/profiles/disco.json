@@ -1,0 +1,21 @@
+{
+  "name": "disco",
+  "label": "Disco / Nu-Disco / Funk",
+  "bpm_range": [110, 125],
+  "absolute_thresholds": {
+    "silent_rms": 0.012,
+    "low_rms": 0.030,
+    "peak_rms": 0.090
+  },
+  "expected_crest_factor": [5.0, 9.0],
+  "band_signature": {
+    "sub":  [0.10, 0.25],
+    "low":  [0.20, 0.30],
+    "mid":  [0.25, 0.40],
+    "high": [0.15, 0.30]
+  },
+  "vocal_likelihood": "frequent",
+  "build_climb_threshold": 0.020,
+  "breakdown_ratio": 0.45,
+  "drop_jump_threshold": 0.045
+}

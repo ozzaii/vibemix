@@ -1,0 +1,21 @@
+{
+  "name": "pop",
+  "label": "Pop / Mainstream / Top 40",
+  "bpm_range": [95, 130],
+  "absolute_thresholds": {
+    "silent_rms": 0.014,
+    "low_rms": 0.040,
+    "peak_rms": 0.105
+  },
+  "expected_crest_factor": [3.0, 5.0],
+  "band_signature": {
+    "sub":  [0.15, 0.30],
+    "low":  [0.20, 0.30],
+    "mid":  [0.25, 0.40],
+    "high": [0.15, 0.25]
+  },
+  "vocal_likelihood": "very_frequent",
+  "build_climb_threshold": 0.018,
+  "breakdown_ratio": 0.45,
+  "drop_jump_threshold": 0.040
+}
