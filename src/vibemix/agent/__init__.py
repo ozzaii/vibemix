@@ -25,8 +25,10 @@ from vibemix.agent.config import (
     TTS_MODEL,
     VOICE,
 )
+from vibemix.agent.dj_cohost import DJCoHostAgent
 from vibemix.agent.llm_factory import build_llm
 from vibemix.agent.persona import SYSTEM_INSTRUCTION
+from vibemix.agent.playback_sink import PlaybackQueueAudioOutput
 from vibemix.agent.tts_chain import build_tts_chain
 
 __all__ = [
@@ -39,6 +41,8 @@ __all__ = [
     "TTS_FALLBACK_MODEL",
     "TTS_MODEL",
     "VOICE",
+    "DJCoHostAgent",
+    "PlaybackQueueAudioOutput",
     "build_llm",
     "build_tts_chain",
 ]
