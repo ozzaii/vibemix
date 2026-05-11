@@ -14,7 +14,7 @@
 - [x] **Phase 2: Audio Core Port + Ring Buffer Fix** - Port `AudioBuffer`/`MicBuffer`/`Levels`/`PlaybackQueue` from POC into pre-allocated ring buffers (fixes `np.concatenate` callback regression). _**Complete 2026-05-11.**_
 - [x] **Phase 3: Sensing & State Port** - Port `MusicState` 10Hz writer + `EventDetector` + `AICoach` + `audible-deck` detection + screen/track sense from POC. _**Complete 2026-05-11.**_
 - [x] **Phase 4: LiveKit Cascade Agent Pivot** (completed 2026-05-11) - Replace `RealtimeModel` with `AgentSession` cascade (`stt=None`, `vad=None`, `llm=google.LLM`, `tts=FallbackAdapter[OpenRouter Gemini TTS + Gemini native]`) + `DJCoHostAgent.llm_node()` multimodal override + headless session (no LiveKit Room — ARCH-06 re-mapped). 346 tests green; 12/12 acceptance gates PASS.
-- [ ] **Phase 5: FastAPI Proxy + Install-UUID JWT** - `api.altidus.world` Gemini proxy with slowapi rate limit + Redis quota + OS-keychain JWT storage (parallelizes with Phases 1-4).
+- [x] **Phase 5: FastAPI Proxy + Install-UUID JWT** - `api.altidus.world` Gemini proxy with slowapi rate limit + Redis quota + OS-keychain JWT storage (parallelizes with Phases 1-4).
 - [ ] **Phase 6: Genre-Aware Phase Detection** - Percentile-based phase detector + 5-genre profile JSON + crest-factor compression detect + BPM half/double validator + vocal-section detector.
 - [ ] **Phase 7: Windows Port (Audio + Screen)** - `PyAudioWPatch` WASAPI loopback + `mss` + `pywin32` window enum + Windows sample-rate sanity test (parallelizes with Phase 6).
 - [ ] **Phase 8: macOS ScreenCaptureKit Migration** - Replace deprecated Quartz `CGWindowListCreateImageFromArray` with `pyobjc-framework-ScreenCaptureKit` (parallelizes with Phases 6-7).
@@ -104,17 +104,17 @@ Plans:
 **Depends on**: Nothing (parallel track; integrate with Phase 4 once routes are deployed).
 **Requirements**: ARCH-08, ARCH-09, ARCH-10.
 **Success Criteria** (what must be TRUE):
-  1. `POST /vibemix/v1/auth/token` issues an install-UUID JWT (15-30 min TTL) on first launch and the client stores it in macOS Keychain / Windows CredLocker via `keyring`.
-  2. `POST /vibemix/v1/gemini/generate-content` (SSE) and `POST /vibemix/v1/gemini/tts` (chunked PCM) pass-through Gemini calls with the real `GEMINI_API_KEY` resolved server-side from environment; the client never sees an `AIza` string.
-  3. Rate limit kicks in at 60 rpm / 2000 rpd per install-UUID, enforced via slowapi + Redis token bucket; a load test exceeding the cap returns HTTP 429 and the client surfaces a clear "rate limited" status pill.
-  4. Server-side cost dashboard logs every request (timestamp, client-UUID, IP, model, prompt size, response size); a daily aggregate alert fires if any UUID exceeds 3σ of baseline.
+  1. [x] `POST /api/vibemix/v1/register` issues an install-UUID JWT (90-day TTL with 7-day-from-expiry refresh; supersedes stale "15-30 min" text) on first launch and the client stores it in macOS Keychain / Windows CredLocker via `keyring` (with file fallback at `~/Library/Application Support/vibemix/install_uuid` or `%APPDATA%/vibemix/install_uuid` when keyring backend is null per Pitfall 6).
+  2. [x] `POST /v1beta/models/{model}:streamGenerateContent` (SSE) + sibling `:generateContent` (non-streaming) and `POST /v1/audio/speech` (chunked PCM, OpenAI-compatible) pass-through Gemini / OpenRouter calls with the real `GEMINI_API_KEY` and `OPENROUTER_API_KEY` resolved server-side from environment; the client never sees an `AIza` string (paths mirror genai SDK URL builder + livekit-plugins-openai TTS — verified RESEARCH Q1). CI gate `test_g3_zero_aiza_in_client` pins the invariant.
+  3. [x] Rate limit kicks in at 60 rpm / 2000 rpd per install-UUID, enforced via slowapi + Redis `INCR + EXPIRE NX` (Redis 7.0+ required); load tests pass — 4th request from same UUID at rate=3 returns HTTP 429 with Retry-After. /register is IP-keyed (anti-register-spam, NOT install_uuid-keyed). Daily quota returns 429 + `Retry-After: <seconds-to-midnight-UTC>` when exceeded.
+  4. [ ] Server-side structured logging logs every request (timestamp, install_uuid, route, status, latency_ms); daily-aggregate 3σ alert dashboard deferred to Phase 20 (Day-Zero Ops). Phase 5 ships minimal structured logging; metrics dashboard + alerting is post-launch ops.
 **Plans:** 5 plans
 Plans:
-- [ ] 05-01-PLAN.md — proxy scaffold (FastAPI + healthz + pydantic-settings + Redis quota + Dockerfile + compose)
-- [ ] 05-02-PLAN.md — JWT auth (HS256 only) + /register + slowapi limiter wiring
-- [ ] 05-03-PLAN.md — LLM SSE + TTS PCM proxy routes (gemini-native paths, circuit breaker, secret sanitization)
-- [ ] 05-04-PLAN.md — client install_uuid + JWT cache + proxy-mode factory dispatch (no silent fallback)
-- [ ] 05-05-PLAN.md — deployment runbook + 8-gate verification + phase close
+- [x] 05-01-PLAN.md — proxy scaffold (FastAPI + healthz + pydantic-settings + Redis quota + Dockerfile + compose)
+- [x] 05-02-PLAN.md — JWT auth (HS256 only, alg=none blocked) + /register IP-keyed + slowapi limiter wiring
+- [x] 05-03-PLAN.md — LLM SSE + TTS PCM proxy routes (gemini-native paths, circuit breaker, upstream-secret sanitization)
+- [x] 05-04-PLAN.md — client install_uuid + JWT cache + proxy-mode factory dispatch (no silent fallback)
+- [x] 05-05-PLAN.md — deployment runbook + 8-gate verification + phase close
 
 ### Phase 6: Genre-Aware Phase Detection
 **Goal**: Per-genre profile JSON (techno / house / D&B / disco / pop) drives a percentile-based phase detector that replaces absolute RMS thresholds. Crest-factor compression detection, BPM half/double validator, and vocal-section gating land here.
