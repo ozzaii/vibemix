@@ -31,7 +31,6 @@ import pytest
 from vibemix.platform import ScreenBackend, WindowBounds
 from vibemix.platform._screen_windows import _DJ_HINTS, ScreenWindows
 
-
 # ---------- Module import discipline ----------
 
 
@@ -229,8 +228,11 @@ def test_find_dj_window_returns_none_when_no_dj_app_present(monkeypatch):
 # ---------- capture() ----------
 
 
-def test_capture_no_bounds_produces_jpeg(mocker):
-    """Mock mss + PIL to verify the capture pipeline produces JPEG bytes."""
+def test_capture_no_bounds_produces_jpeg(mocker, monkeypatch):
+    """Mock mss + PIL + win32gui to verify the capture pipeline produces JPEG."""
+    # win32gui must be in sys.modules so is_available() passes the pywin32
+    # check (otherwise capture() raises RuntimeError).
+    monkeypatch.setitem(sys.modules, "win32gui", MagicMock())
     fake_raw = MagicMock()
     fake_raw.size = (1920, 1080)
     fake_raw.bgra = bytes(1920 * 1080 * 4)
@@ -254,8 +256,9 @@ def test_capture_no_bounds_produces_jpeg(mocker):
     assert frame.jpeg.startswith(b"\xff\xd8")
 
 
-def test_capture_with_bounds_invokes_crop(mocker):
+def test_capture_with_bounds_invokes_crop(mocker, monkeypatch):
     """When bounds is supplied AND scaled crop > 200x200, Image.crop is called."""
+    monkeypatch.setitem(sys.modules, "win32gui", MagicMock())
     # Build a fake mss grab pipeline.
     fake_raw = MagicMock()
     fake_raw.size = (1920, 1080)
