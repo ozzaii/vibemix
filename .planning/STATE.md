@@ -14,7 +14,7 @@ progress:
 
 # vibemix — State
 
-**Last updated:** 2026-05-12 (Phase 9 ✅ complete)
+**Last updated:** 2026-05-12 (Phase 10 ✅ complete)
 
 ---
 
@@ -22,7 +22,7 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 10 — Prompt Template Matrix (next).
+- **Current focus:** Phase 11 — Tauri Shell + Calibration Wizard (next).
 - **Milestone:** v1 (Bravoh-wedge drop) — target ship ~3-4 weeks (~early June 2026, before Bravoh public launch).
 - **Project mode:** standard.
 - **Granularity:** fine (20 phases).
@@ -32,18 +32,18 @@ progress:
 
 ## Current Position
 
-Phase 9 ✅ complete — MIDI Controller Library shipped: `vibemix.midi/` package with profile loader + hand-validator + registry + ControllerState (extracted from `_midi_macos.py`) + 10 controller JSONs + generic fallback + 2-second hot-plug watcher. FLX4 is live-verified; 9 other mappings JSON-only (Mixxx-derived) pending Phase 16/20 + community PRs. 839 tests green; 4/4 ROADMAP success criteria PASS.
+Phase 10 ✅ complete — Prompt Template Matrix shipped: `vibemix.prompts/` package with 6-cell matrix (skill × mode), 40-phrase negative dictionary + post-hoc filter, TurnHistory ring (capacity 12), `<silence/>` short-circuit suppressing TTS turns, Coach scorecard with qualitative bands. `dj_cohost.py` env var dispatch (VIBEMIX_SKILL_LEVEL / VIBEMIX_MODE). 978 tests green; 5/5 ROADMAP success criteria PASS structurally; Phase 16+17 own live verification.
 
-Phase: 10 (Prompt Template Matrix) — NEXT
-Plan: None yet.
+Phase: 11 (Tauri Shell + Calibration Wizard) — NEXT
+Plan: None yet — LARGEST remaining phase (Tauri Rust + Python sidecar + IPC + 3-step wizard UI).
 
-- **Phase:** 10 — 6 prompt templates (Beginner/Intermediate/Pro × Hype-man/Coach) + full anti-slop stack (negative dictionary + TurnHistory + silence token + describe-before-infer + past tense + throttle + scorecard).
+- **Phase:** 11 — Tauri 2.x shell wraps Python sidecar (PyInstaller --onedir) + 3-step calibration wizard.
 - **Plan:** None active.
-- **Status:** Phase 9 closed; Phase 10 not yet started.
-- **Progress:** 9/20 phases complete.
+- **Status:** Phase 10 closed; Phase 11 not yet started.
+- **Progress:** 10/20 phases complete (50%).
 
 ```
-[█████████           ] 45% (9/20 phases)
+[██████████          ] 50% (10/20 phases)
 ```
 
 ---
@@ -54,7 +54,7 @@ Plan: None yet.
 
 | Metric | Value |
 |--------|-------|
-| Phases complete | 9 / 20 |
+| Phases complete | 10 / 20 |
 | v1 requirements mapped | 128 / 128 |
 | v1 requirements complete | 22 / 128 |
 | Critical pitfalls mitigated | 0 / 9 |
@@ -124,6 +124,7 @@ None yet — all dependencies are pinned and verified.
 
 - 2026-05-11 — Phase 2 (Audio Core Port + Ring Buffer Fix) shipped end-to-end: 4 wave commits (`bb63774` skeleton+constants+Levels, `59fdb62` ring-buffer rewrite fixes np.concatenate at v4:300+v4:462, `54e6432` features.py DSP + VoiceRecorder, `62413e9` AudioMacOS impl + sample-rate guard) + verification gate (8/8 pass) + phase SUMMARY. tracemalloc tests pin zero-alloc invariant on both buffer push paths. AudioMacOS satisfies @runtime_checkable AudioBackend Protocol via isinstance. SampleRateMismatchError raises with Audio MIDI Setup actionable message on both pre-open and post-open paths. Phase 1 firewall test relaxed to skip underscore-prefixed concrete impls (planned amendment per Plan 04 critical constraint). 78 tests green (10 Phase 1 + 14 W1 + 21 W2 + 20 W3 + 13 W4). 2 live BlackHole smoke tests collected under macos_audio marker.
 - 2026-05-11 — Phase 3 (Sensing & State Port) shipped end-to-end: 4 wave commits (`c923025` MusicState + classify_phase + audible-deck/track resolvers v4 verbatim, `8106a16` Event + EventDetector with class-attrs removed/imported from vibemix.audio.constants, `9104052` AICoach static-method-only with phase= omitted per v4:1350-1351 anti-hallucination invariant, `8e04dfc` state_refresh_loop 10Hz single writer + macOS Screen/MIDI/Track backends satisfying Phase 1 Protocols structurally). 270 tests green (78 from Phase 2 + 192 new). All 11 acceptance gates PASS. DDJ-FLX4 _CC_MAP/_NOTE_MAP byte-identical to v4:582-598 (asserted by equality test). AICoach task strings byte-for-byte from v4:1391-1427 (golden-string tests). MUSIC_PRESENCE_MIN_SECONDS / BPM_VALID_MIN / BPM_VALID_MAX lifted from EventDetector class-attrs to vibemix.audio.constants module scope. Pioneer DDJ-FLX4 play-state limitation reproduced verbatim from v4 (Phase 9 fix docketed in _midi_macos.py docstring). macOS ScreenCaptureKit migration docketed for Phase 8. POC files untouched (v4 still runnable via run_v4.sh throughout the entire phase).
+- 2026-05-12 — Phase 10 (Prompt Template Matrix) shipped end-to-end: 2-wave structure (Wave 1: 95e6703 6-cell matrix + 40-phrase negative-dict + filter, a885a58 TurnHistory + Coach scorecard, c46a3f7 dj_cohost dispatch + silence/slop short-circuit; Wave 2: this commit — docs + SUMMARY). 978 tests green (839 Phase 9 baseline + 139 new across 7 new test files in tests/prompts/ + 2 in tests/agent/). All 5 ROADMAP success criteria PASS structurally; live verification of <silence/> probe-rate + vocal-gate suppression deferred to Phase 16. New `vibemix.prompts/` package: matrix.py (HYPE_BEGINNER/INTERMEDIATE/PRO + COACH_BEGINNER/INTERMEDIATE/PRO with build_system_instruction dispatcher; HYPE_INTERMEDIATE byte-identical to v4 for backward compat), negative_dict.py (40 phrases × 3 buckets — Generic AI tells / Empty hype / Slop framings — with word-boundary regex), filter.py (filter_for_slop returns ('<silence/>', matches) on banned-phrase hit), turn_history.py (deque maxlen=12 + <recent_turns> block format byte-matches POC), scorecard.py (summarize_session returns one of clean/decent/abrupt/train-wreck — never numeric, regex-pinned). dj_cohost.py reads VIBEMIX_SKILL_LEVEL + VIBEMIX_MODE env vars (defaults intermediate/hype = v4 backward compat); llm_node accumulates streaming output, runs filter, suppresses turn on <silence/> token or filter match (logs silence_short_circuit / slop_suppressed events to events.jsonl). Anti-slop strategy: 3-layer enforcement (prompt-level enumeration + post-hoc filter + per-cell golden tests). docs/prompt-templates.md user reference (6-cell table with anchor phrases, anti-slop stack explanation, TurnHistory format, silence semantics, scorecard bands, throttle). POC files diff-untouched.
 - 2026-05-12 — Phase 9 (MIDI Controller Library) shipped end-to-end: 3-wave structure (`abec1b1` Wave 1 — registry + ControllerState extraction to vibemix.midi.state + listener parameterized by ControllerProfile + FLX4 byte-equivalent golden, `cfd6a2c` Wave 2 — 9 additional controller JSONs (Pioneer DDJ-400/FLX6/FLX10/1000/SX3, XDJ-RX3, Numark Party Mix Live, Hercules Inpulse 300/500) + generic-MIDI fallback (`find_mapping_or_generic` never None) + 2-second `port_watcher_task` hot-plug detector + `handle_port_change` listener-restart, + final Wave 3 docs commit closing phase). 839 tests green (625 Phase 8 baseline + 214 new across 7 new test files). All 4 ROADMAP success criteria PASS. New `vibemix.midi/` package: `profile.py` (hand-validated JSON loader, no pydantic), `state.py` (ControllerState + magnitude-aware `MidiEvent(kind, field, magnitude)` ring; bipolar [-1.0, 1.0] EQ + unipolar [0.0, 1.0] volume), `registry.py` (case-insensitive port-name substring match), `generic.py` (positional fallback), `watcher.py` (2s async poll on `mido.get_input_names()`), 10 controller JSONs. `_midi_macos.py` and `_midi_windows.py` updated to import ControllerState from `vibemix.midi.state` (Phase 7's "Claude's Discretion" deferral closed). FLX4 byte-equivalent golden replay preserved (`test_pioneer_flx4_full_message_replay_byte_equivalent`). 9 controller JSONs ship "verified by JSON only" with `notes` flag — Kaan owns FLX4 only; Mixxx-mapping basis + manufacturer charts; live verification deferred to Phase 16/20/community PRs. `docs/midi-controllers.md` user reference (10-controller table with verification status, magnitude rendering thresholds, generic fallback contract, hot-plug behavior, add-a-controller recipe). POC files diff-untouched.
 - 2026-05-11 — Phase 8 (macOS ScreenCaptureKit Migration) shipped end-to-end: 4 commits (`d2d403f` Wave 1 RED — failing ScreenCaptureKit-shape tests, `0535c16` Wave 1 GREEN — SCStream + Objective-C delegate on private dispatch queue + SCContentFilter for window-targeted capture, `00f8037` Wave 1 regression — lazy-import contract pin + full-suite green, + final Wave 2 docs commit closing phase). 625 tests green (614 Phase 7 baseline + 11 new across 9 SCKit-shape tests + 2 lazy-import contract tests). All 4 ROADMAP success criteria PASS via mocked tests; Phase 16 + Phase 20 own live verification on real macOS 15. `_screen_macos.py` rewritten (~494 lines) around SCStream delegate-on-dispatch-queue, single-slot thread-safe ring (existing `_ScreenBuffer` from Phase 3) feeds asyncio via `latest()` at 1Hz. Privacy gate enforced: `capture(bounds=None)` raises (no full-screen fallback in shipping code; P13 prevention grep-asserted in tests). `Quartz.CGWindowListCopyWindowInfo` retained for window enumeration (NOT deprecated; lighter than SCShareableContent for synchronous list-windows). `pyobjc-framework-ScreenCaptureKit>=12.1` added with darwin marker; `mss` re-scoped from cross-platform to `sys_platform == 'win32'` (ScreenWindows still uses it on Windows). macOS minimum bumped to 12.3 (matches PROJECT.md and ScreenCaptureKit's framework minimum). docs/macos-screencapturekit.md user-facing reference (one-page; 12.3+ requirement, Screen & System Audio Recording permission flow, troubleshooting, Phase 11/16 handoffs). POC files diff-untouched. Async bridge mirrors Phase 7 winsdk pattern (loop.run_in_executor for synchronous SCKit start/stop helpers).
 - 2026-05-11 — Phase 7 (Windows Port — Audio + Screen) shipped end-to-end: 5 wave commits (`76d3065` Wave 1 — platform selector + `_midi_common` extraction + Windows-only deps in pyproject with `sys_platform == 'win32'` markers, `6ebd5e5` Wave 2 plan 07-02 — AudioWindows WASAPI loopback impl + sample-rate guard, `84586ec` Wave 2 plan 07-03 — ScreenWindows + TrackWindows via winsdk SMTC + asyncio.run executor bridge, `df97dd3` Wave 3 — MidiWindows + cross-platform integration test, + final Wave 4 docs commit closing the phase). 614 tests green (531 Phase 6 baseline + 83 new across 5 mocked + 1 integration + 1 _midi_common test file + 4 live stubs gated on windows_only). All 10 acceptance gates PASS with 2 documented pre-existing items (test_audio_macos_live HEADPHONEMG env mismatch from Wave 1 baseline + ruff I001 in test_midi_common.py from Wave 1 — both in deferred-items.md). Selector + lazy-import contract pinned: `pyaudiowpatch` / `win32*` / `winsdk` never reach sys.modules on macOS, verified by integration test. winsdk async API bridged via `asyncio.run` inside `loop.run_in_executor` — mirrors macOS subprocess pattern (Phase 8 ScreenCaptureKit will adopt same pattern). Windows-only deps via `sys_platform == 'win32'` markers in `[project] dependencies` (chosen over `[project.optional-dependencies]` group — simpler for both `uv sync` and PyInstaller). DJ-app hint list expanded from macOS's djay-only to `("djay", "serato", "traktor", "rekordbox", "virtualdj")` — Windows is where Serato/Traktor/rekordbox/VirtualDJ users live. `docs/windows-setup.md` (92 lines, 8 sections) covers Phase 20 fresh-machine rehearsal + early Windows DJ-friend testers. ControllerState cross-imported from `_midi_macos` into `_midi_windows` — extraction to `_midi_common.py` deferred to Phase 9. POC files diff-untouched throughout (verified by Gate 10). Optional Kaan-verify checkpoint skipped — Kaan doesn't have Windows handy; Phase 20 CI matrix on `windows-latest` is the authoritative live gate.
@@ -133,7 +134,7 @@ None yet — all dependencies are pinned and verified.
 
 ### Next Session
 
-- Continue from Phase 10 (Prompt Template Matrix — 6 prompt templates × full anti-slop stack: negative dictionary hard bans, `TurnHistory` per-session anti-repetition ring, `<silence/>` short-circuit, describe-before-infer anchoring, past-tense framing, reaction throttle, Coach scorecard at session end).
+- Continue from Phase 11 (Tauri Shell + Calibration Wizard) — LARGEST remaining phase: Tauri 2.x Rust shell wraps Python sidecar (PyInstaller --onedir) + IPC contract + 3-step calibration wizard (permissions → output device + sample-rate test → controller probe). Multi-session work likely.
 - Kaan-side outstanding: SignPath OSS application (Phase 1 carry-forward, ~1 week SLA). Optional live smoke verification of `python -m vibemix` vs `./run_v4.sh` on his rig. **Phase 5 carry-over**: deploy `proxy/` to `api.altidus.world` when ready. **Phase 6 + 7 carry-over**: collect 30-min recorded sets per genre (techno / house / D&B / disco / pop) for Phase 16; arrange Windows test access for Phase 20 fresh-machine rehearsal. **Phase 7 deferred items** (in `.planning/phases/07-windows-port-audio-screen/deferred-items.md`): test_audio_macos_live HEADPHONEMG env mismatch (broaden substring or mark macos_audio opt-in) + ruff I001 in test_midi_common.py (one-line `ruff check --fix`).
 
 ---
