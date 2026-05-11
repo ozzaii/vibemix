@@ -283,3 +283,14 @@ def test_controller_state_lookup_tables_built_from_profile():
     note_binding = cs._note_lookup[(0, 11)]
     assert isinstance(note_binding, ButtonBinding)
     assert note_binding.kind == "play" and note_binding.deck == "A"
+
+
+# ---------- Phase 9 Wave 2 — mark_disconnected (symmetric to mark_connected) ----------
+
+
+def test_mark_disconnected_clears_connected_flag():
+    cs = ControllerState(profile=_flx4())
+    cs.mark_connected("DDJ-FLX4 USB MIDI")
+    assert cs.is_connected() is True
+    cs.mark_disconnected()
+    assert cs.is_connected() is False

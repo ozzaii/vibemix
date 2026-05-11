@@ -26,6 +26,11 @@ Tasks 2 + 3 of Wave 1 land:
 
 from __future__ import annotations
 
+from vibemix.midi.generic import (
+    GENERIC_MIDI_DISPLAY,
+    GENERIC_MIDI_ID,
+    make_generic_profile,
+)
 from vibemix.midi.profile import (
     ButtonBinding,
     ControlBinding,
@@ -33,16 +38,22 @@ from vibemix.midi.profile import (
     list_profiles,
     load_profile,
 )
-from vibemix.midi.registry import find_mapping
+from vibemix.midi.registry import find_mapping, find_mapping_or_generic
 from vibemix.midi.state import ControllerState, MidiEvent
+from vibemix.midi.watcher import port_watcher_task
 
 __all__ = [
+    "GENERIC_MIDI_DISPLAY",
+    "GENERIC_MIDI_ID",
     "ButtonBinding",
     "ControlBinding",
     "ControllerProfile",
     "ControllerState",
     "MidiEvent",
     "find_mapping",
+    "find_mapping_or_generic",
     "list_profiles",
     "load_profile",
+    "make_generic_profile",
+    "port_watcher_task",
 ]

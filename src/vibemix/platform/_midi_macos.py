@@ -127,7 +127,7 @@ class MidiMacOS:
         ``vibemix.platform._midi_common.midi_listener_thread``; this method
         injects the macOS ``mido`` module + the FLX4 ControllerProfile
         (Phase 9 Wave 1 Task 3 — port hints derive from
-        ``profile.port_name_hints``: ``("DDJ-FLX4", "FLX4")``).
+        ``profile.port_name_hints``: ``("DDJ-FLX4",)``).
 
         Wave 2 swaps the static FLX4 profile for dynamic ``find_mapping(
         port_name)`` resolution once the hot-plug watcher fires.
@@ -147,4 +147,60 @@ class MidiMacOS:
             stop_event,
             load_profile("pioneer_ddj_flx4"),
             mido,
+        )
+
+    def start_port_watcher(
+        self,
+        stop_event,
+        on_change=None,
+        *,
+        poll_seconds: float = 2.0,
+    ):
+        """Spawn the asyncio port_watcher_task as a background task on the
+        running event loop.
+
+        Phase 9 Wave 2 Task 3 — exposes hot-plug detection on macOS. Polls
+        ``mido.get_input_names()`` every ``poll_seconds`` seconds; emits
+        connected / disconnected events to ``on_change`` (default:
+        ``functools.partial(handle_port_change, holder)`` wired by Phase 4
+        ``__main__.py`` — the production callback restarts the listener
+        thread on hot-plug). For unit tests + lower-level callers, pass any
+        callable accepting a ``(kind, port, profile)`` / ``(kind, port)``
+        tuple.
+
+        Args:
+            stop_event: ``asyncio.Event`` cooperative shutdown signal.
+            on_change: callback for the watcher. If None, builds a default
+                production callback bound to a ListenerHolder seeded from
+                the current ``self.controller_state``.
+            poll_seconds: sweep cadence (default 2.0 per CONTEXT).
+
+        Returns:
+            The ``asyncio.Task`` running the watcher coroutine.
+        """
+        # Lazy imports — see top-of-file note about avoiding cycles.
+        import asyncio
+        import functools
+
+        from vibemix.midi.watcher import port_watcher_task
+        from vibemix.platform import _midi_common
+
+        if on_change is None:
+            holder = _midi_common.ListenerHolder(
+                controller_state=self.controller_state,
+                listener_thread=None,
+                listener_stop=None,
+                mido_module=mido,
+                bound_port=None,
+            )
+            on_change = functools.partial(_midi_common.handle_port_change, holder)
+            self._watcher_holder = holder  # retain so callers can introspect
+
+        return asyncio.get_event_loop().create_task(
+            port_watcher_task(
+                stop_event,
+                on_change,
+                mido,
+                poll_seconds=poll_seconds,
+            )
         )
