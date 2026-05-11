@@ -74,7 +74,13 @@ Plans:
   2. `EventDetector.detect()` emits the 6-type event taxonomy (TRACK_CHANGE / PHASE / LAYER_ARRIVAL / MIX_MOVE / HEARTBEAT / KAAN_SPOKE) with evidence bundled per event, matching the POC's `cohost_v2.py` semantics.
   3. Audible-deck detection (A / B / mix / none) classifies correctly on a recorded FLX4 session compared to ground-truth MIDI deck activity (≥90% agreement on a 10-minute clip).
   4. Set-timeline awareness is encoded in the evidence packet — `evidence_line()` includes "you are at MM:SS; last phase at MM:SS" and reads correctly across a 30-minute replay.
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 03-01-PLAN.md — MusicState + classify_phase + audible-deck/track resolvers (v4 verbatim)
+- [ ] 03-02-PLAN.md — Event + EventDetector (constants imported, no class-attrs)
+- [ ] 03-03-PLAN.md — AICoach (evidence_line + task_for_event + build_prompt)
+- [ ] 03-04-PLAN.md — state_refresh_loop + macOS Screen/MIDI/Track backends
+- [ ] 03-05-PLAN.md — 11-gate verification + phase SUMMARY + ROADMAP/STATE advance
 
 ### Phase 4: LiveKit Cascade Agent Pivot
 **Goal**: The brain swap from `RealtimeModel` to the cascade `AgentSession` (Gemini 3 Flash multimodal + Gemini TTS streaming) is operational end-to-end on macOS. `DJCoHostAgent.llm_node()` override consumes evidence packets and yields token streams that `tts_node()` synthesizes.
