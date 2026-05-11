@@ -82,6 +82,8 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 - [ ] Free for end users — Bravoh-managed Gemini API key in environment, no key entry required
 - [ ] API-usage abuse protection (rate-limit, quota cap per anonymous client) so we don't get drained
 - [ ] Polished UI/UX inside the app — calibration wizard, mode/voice/genre pickers, no AI-slop aesthetics
+- [ ] **Reactive mascot (Avery) — first-class feature, not decoration.** Lives on screen, reacts physically to MIDI events: covers ears on bass-kill, squints on high-EQ slam, leans with crossfader, puffs up on bass-push, freezes on pause, bounces on the beat, zips mouth shut during vocal sections, punches air on hot-cue. Inspired by OpenAI Pets / Tamagotchi — a live indicator of what the system actually saw, so the user feels the system *listening*. Pose vocabulary documented and named (idle/alert/speaking/squint/cover-ears/puff-up/wavy/lean/punch/freeze/bounce/zipped/shocked/dancing/sleeping/winking).
+- [ ] **Dedicated polish phase — FL-Studio-quality UI bar.** Not a final-week sweep; an explicit phase that lifts every surface to pro-audio-software realism (think FL Studio, Ableton, Bitwig, Native Instruments). Knob/fader physics, controller-grade hierarchy, dense data without overwhelm, no "looks like a web app" residue. Critique → execute → critique → execute loop within the phase, with `gsd-ui-checker` + `gsd-ui-auditor` runs between iterations until the bar is hit.
 
 **GitHub Presence — "Maximum Sexification"**
 
@@ -166,6 +168,8 @@ The GitHub repo is the front door for 100% of organic discovery. It must read li
 | **Genre picker at session start** | Phase-detection (drop/build/breakdown) thresholds depend heavily on genre; "auto-detect genre" is research-grade and would block shipping | — Pending |
 | **Open-source as Bravoh's first OSS** | Marketing wedge ahead of Bravoh public launch; gets attention, builds trust, funnels to waitlist | — Pending |
 | **Workflow profile: Fine granularity, all Opus, all checkpoints on** | Kaan's directive: "do your deep research, don't go blind into coding, all checkpoints will be every agent will be Opus". Enforced via `models.*=opus` (all 6 phase types) + `model_overrides.<agent>=opus` (33 agents) in `.planning/config.json` — belt-and-braces, no agent can fall back to a smaller model. | — Pending |
+| **Critique → execute → critique → execute loop per phase** | Kaan's directive: every phase runs a quality loop, not a one-shot. plan-checker before execute, verifier after execute, ui-checker/ui-auditor between polish iterations, code-reviewer on output. Continue iterating until the gate passes. Enforced via `workflow.plan_check=true`, `workflow.verifier=true`, `workflow.code_review=true`, `workflow.ui_safety_gate=true` already in config. | — Pending |
+| **Reactive mascot as v1 feature, dedicated polish phase** | The mascot isn't just brand decoration — it's the visual feedback loop that telegraphs back what the system saw. Inspired by OpenAI Pets, lives in-app, reacts to MIDI/audio in real time. Polish to FL-Studio UI quality is its own phase, not a final-week sweep — a critique→execute loop runs until the realism bar is hit. | — Pending |
 
 ## Evolution
 
