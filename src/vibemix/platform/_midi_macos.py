@@ -4,6 +4,12 @@
 Verbatim port of cohost_v4.py:580-757 (DDJ-FLX4 CC/Note maps + ControllerState
 + midi_listener_thread).
 
+Phase 7 Wave 1 refactor: the listener-thread body moved to ``_midi_common.py``
+so Wave 4's ``_midi_windows.py`` can call the same helper. ``MidiMacOS`` is now
+a thin wrapper around ``mido`` + the v4 CC/Note maps + the v4 ``ControllerState``;
+``start_listener_thread`` delegates to ``_midi_common.spawn_listener``. Behavior
+is byte-identical (pinned by ``test_midi_macos_golden_unchanged_behavior_after_refactor``).
+
 KNOWN ISSUE (Phase 9): Pioneer DDJ-FLX4 play-state propagation
 -----------------------------------------------------------------
 The _NOTE_MAP DOES map note ``0x0B`` → ``'play'``. ``ControllerState.handle_msg``
@@ -41,6 +47,11 @@ except ImportError:
     _HAS_MIDO = False
 
 from vibemix.platform.midi import MidiMessage, MidiPort
+
+# NOTE: ``_midi_common`` is imported lazily inside ``start_listener_thread``
+# below — top-level ``from vibemix.platform import _midi_common`` would re-enter
+# the package ``__init__.py`` (which imports ``_midi_macos`` itself) and risk a
+# circular-import deadlock. Lazy import sidesteps the cycle entirely.
 
 # ---- DDJ-FLX4 controller maps (verbatim from cohost_v4.py:582-598) ----
 # (midi_channel, cc_number) → (deck, field). Channels 0/1 = decks A/B,
@@ -298,34 +309,22 @@ class MidiMacOS:
         """Spawn the v4:730-756 daemon thread. Retries every 2s on disconnect.
 
         Port hint: ``"DDJ-FLX4"`` (case-insensitive substring match).
+
+        Phase 7 Wave 1: the listener body now lives in
+        ``vibemix.platform._midi_common.midi_listener_thread``; this method is a
+        thin wrapper that injects the macOS ``mido`` module and the
+        DDJ-FLX4 port hint.
         """
+        if not _HAS_MIDO:
+            print("-> mido not installed, MIDI controller disabled", file=sys.stderr)
+            # Return an inert thread so callers can ``.join()`` without
+            # special-casing the no-mido path.
+            t = threading.Thread(target=lambda: None, name="midi-listener-noop", daemon=True)
+            t.start()
+            return t
 
-        def _run():
-            if not _HAS_MIDO:
-                print("-> mido not installed, MIDI controller disabled", file=sys.stderr)
-                return
+        # Lazy import — see top-of-file note about avoiding the package
+        # ``__init__.py`` re-entry cycle.
+        from vibemix.platform import _midi_common
 
-            port_hint = "DDJ-FLX4"
-            while not stop_event.is_set():
-                try:
-                    ports = mido.get_input_names()
-                    match = next((p for p in ports if port_hint.lower() in p.lower()), None)
-                    if not match:
-                        time.sleep(2.0)
-                        continue
-                    with mido.open_input(match) as port:
-                        self.controller_state.mark_connected(match)
-                        print(f"-> MIDI controller in: {match!r}")
-                        while not stop_event.is_set():
-                            msg = port.poll()
-                            if msg is None:
-                                time.sleep(0.005)
-                                continue
-                            self.controller_state.handle_msg(msg)
-                except Exception as e:
-                    print(f"[midi listener err] {e} — retrying in 2s", file=sys.stderr)
-                    time.sleep(2.0)
-
-        t = threading.Thread(target=_run, name="midi-listener", daemon=True)
-        t.start()
-        return t
+        return _midi_common.spawn_listener(self.controller_state, stop_event, "DDJ-FLX4", mido)

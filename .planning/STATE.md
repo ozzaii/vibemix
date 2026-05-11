@@ -1,3 +1,17 @@
+---
+gsd_state_version: 1.0
+milestone: v0.1.0
+milestone_name: milestone
+status: executing
+last_updated: "2026-05-11T19:07:48.690Z"
+progress:
+  total_phases: 20
+  completed_phases: 2
+  total_plans: 31
+  completed_plans: 13
+  percent: 42
+---
+
 # vibemix — State
 
 **Last updated:** 2026-05-11 (Phase 6 complete)
@@ -8,7 +22,7 @@
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Roadmap defined. Awaiting kickoff for Phase 1 (Platform Protocol Firewall).
+- **Current focus:** Phase 07 — windows-port-audio-screen
 - **Milestone:** v1 (Bravoh-wedge drop) — target ship ~3-4 weeks (~early June 2026, before Bravoh public launch).
 - **Project mode:** standard.
 - **Granularity:** fine (20 phases).
@@ -18,9 +32,12 @@
 
 ## Current Position
 
+Phase: 07 (windows-port-audio-screen) — EXECUTING
+Plan: 1 of 5
+
 - **Phase:** 07 — Windows Port (Audio + Screen) (next).
 - **Plan:** None active.
-- **Status:** Phase 6 ✅ complete (wave commits `11d358a` / `1c4e264` / `01ff963` / `84b6978` / +final docs). Five hand-tuned genre profile JSONs ship in `src/vibemix/state/genre/profiles/` (techno / house / drum_and_bass / disco / pop) — loaded via `importlib.resources`, schema-validated at load time, with `set_active_profile(None)` as a first-class call disabling genre mode (Critical Constraint 8). Three companion DSP guards land alongside: `crest_factor` (peak/RMS, float64-safe) + `EmaSmoother(alpha=0.3)`, `validate_bpm` (half/double snap to `profile.bpm_range` + defensive zero/negative short-circuit), `VocalDetector` class (2-of-3 heuristic rules + 1.5s in / 2.5s out hysteresis). `classify_phase_percentile` (the heart of Phase 6) implements 30/70/95 percentile mapping over the rolling 120s curve + build (≥4 climbs, stricter than v4's 3) + breakdown (`< breakdown_ratio * recent_peak`) + drop (p95 + jump > threshold) + 3-tick hysteresis (`silent` commits immediately, anti-hallucination). `classify_phase` becomes a DISPATCH entry point — `profile=None` returns plain `str` (Phase 3 byte-equivalent, golden-equivalence pinned across 10 parametric curves); `profile=<GenreProfile>` returns `(label, HysteresisState)` tuple. `state_refresh_loop._tick_once` writes 4 new MusicState fields (`crest_factor`, `vocal_active`, `bpm_corrected`, `genre_profile_name`) per tick; hysteresis + EMA + VocalDetector + feature_history live as loop-local state (NOT in MusicState — Critical Constraint 7). EventDetector.LAYER_ARRIVAL gated on `and not state.vocal_active` (single 1-line change; other 5 event types byte-identical to v4; baseline-still-updates pinned via test). `VIBEMIX_GENRE_PROFILE` env (default `'techno'`, case-insensitive + whitespace-stripped, `none`/`unknown`/`''` → Phase 3 fallback, invalid → `sys.exit` listing valid choices) honored at startup via `apply_genre_env()` helper. `vibemix.state` top-level re-exports 11 genre symbols. 531 tests green (385 Phase 5 baseline + 146 Phase 6 new). All 10 acceptance gates PASS. JSONs ship in wheel via hatchling default package-data inclusion (verified). No new heavy DSP deps (Critical Constraint 6). POC files diff-untouched (`cohost_v4.py` + `run_v4.sh` continue to function unchanged).
+- **Status:** Executing Phase 07
 - **Progress:** 6/20 phases complete.
 
 ```
