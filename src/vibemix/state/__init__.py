@@ -25,6 +25,7 @@ from vibemix.state.event import Event
 from vibemix.state.event_detector import EventDetector
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
+from vibemix.state.refresh import state_refresh_loop
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
 
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
     "classify_phase",
     "derive_audible_deck",
     "derive_audible_track",
+    "state_refresh_loop",
 ]
