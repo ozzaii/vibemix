@@ -18,7 +18,7 @@ from httpx import ASGITransport, AsyncClient
 def _set_test_env(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-or-key")
-    monkeypatch.setenv("JWT_SECRET", "test-jwt-secret-do-not-use-in-prod")
+    monkeypatch.setenv("JWT_SECRET", "test-jwt-secret-do-not-use-in-prod-padded-to-32-bytes")
     # `memory://` keeps slowapi storage pure-Python (no real Redis needed).
     monkeypatch.setenv("REDIS_URL", "memory://")
     # Reset cached settings so each test sees fresh env
