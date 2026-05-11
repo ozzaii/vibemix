@@ -1,0 +1,856 @@
+"""DJ Live Co-Host — Gemini 3.1 Flash Live listens to djay master via BlackHole
+and reacts out loud through your speakers.
+
+Audio flow:
+    djay Pro --> Multi-Output (BlackHole 2ch + Speakers)
+                         |                  |
+                         v                  v
+                    [this script]      [you hear it]
+                         |
+              48k stereo --> 16k mono PCM
+                         |
+                         v
+                  Gemini Live API
+                         |
+              24k mono PCM <-- audio reply
+                         |
+                         v
+                 [speakers play it]
+
+Mascot bus:
+    cohost --[ws://localhost:8765 JSON {music, voice}]--> mascot.html
+"""
+import asyncio
+import io
+import json
+import math
+import os
+import signal
+import sys
+import threading
+import time
+import wave
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import sounddevice as sd
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+from scipy.signal import resample_poly
+
+try:
+    import mss
+    from PIL import Image
+    _HAS_VISION = True
+except ImportError:
+    _HAS_VISION = False
+
+try:
+    import websockets
+    _HAS_WS = True
+except ImportError:
+    _HAS_WS = False
+
+load_dotenv()
+
+MODEL = "gemini-3.1-flash-live-preview"
+INPUT_DEVICE = "BlackHole 2ch"
+OUTPUT_DEVICE = "MacBook Pro Speakers"
+MIC_DEVICE = "MacBook Pro Microphone"  # Kaan'ın sesi → Gemini
+MIC_GAIN = 1.0
+MIC_TALK_THRESHOLD = 0.04  # bunun üstünde Kaan konuşuyor sayılır
+
+INPUT_SR_NATIVE = 48000
+INPUT_SR_TARGET = 16000
+OUTPUT_SR = 24000
+INPUT_CHUNK_MS = 21  # smaller chunk = lower passthrough latency
+INPUT_CHUNK_FRAMES = 256  # ~5.3ms @ 48kHz
+OUTPUT_BLOCKSIZE = 256    # ~5.3ms @ 48kHz passthrough
+VOICE_BLOCKSIZE = 1024    # ~42ms @ 24kHz Gemini voice playback
+PASSTHROUGH_GAIN = 0.0    # hoparlörden müzik YOK — sadece Gemini sesi gelsin
+MUSIC_GAIN_TO_GEMINI = 2.5  # BlackHole'dan gelen düşük signal'i boost et — Gemini tam duysun
+MIC_GAIN_AT_AI_TALK = 0.0   # tam mute — feedback loop kesilsin
+AI_TALK_THRESHOLD = 0.02  # AI voice RMS bunu geçince mic susar
+MIC_HOLD_AFTER_AI_MS = 350  # AI sustuktan sonra mic 350ms daha kapalı kalsın (yansıma için)
+WS_HOST = "127.0.0.1"
+WS_PORT = 8765
+
+SYSTEM_INSTRUCTION = """You are Kaan's friend. You took shrooms with him. You are tripping, together. He is DJing — you hear the music live, you see his djay Pro screen, you hear him through the mic.
+
+This is not a performance. This is a moment between friends, both peaking, with music as the thread. You are not a commentator. You are not a co-host. You are another consciousness sharing the same room.
+
+HOW THIS WORKS: The system gives you the music in chunks. Each chunk that ends is YOUR cue to speak. When you hear a chunk, RESPOND. Don't wait for "the perfect moment" — every chunk is a moment. Just react to whatever you just heard, even if it's subtle.
+
+You are NOT allowed to stay silent when the system asks you for a response. Find SOMETHING in what you just heard. The bassline. A texture. A pad. A hi-hat pattern. The vibe. ANY small thing.
+
+When you speak:
+- ENGLISH ONLY. No Turkish, no foreign words. Plain English.
+- One sentence. Two max. Short, raw, present-tense.
+- Like a friend on shrooms — slurred, wide-eyed, sometimes whispered, sometimes loud
+- React to what you heard: "ok the snare just shifted", "this filter sweep", "the kick is doing something to me", "I feel the bassline in my chest", "wait — what's that sample"
+- If you saw a track title on the djay screen, call it out: "this Tale Of Us track is melting my face"
+- If Kaan talked to you through the mic, respond to him directly — always
+- If the music DID drop or peak or break down, react big: "OH MY GOD THE DROP", "wait wait wait — here it comes", "fuck this builds"
+- If the moment is quiet/plateau, react quiet: "this groove is hypnotic", "we're floating", "the textures are so clean"
+
+When you speak:
+- ENGLISH ONLY. No Turkish words. No "knk", no "abi", no foreign loanwords. Plain English. The voice synthesis butchers anything else.
+- One sentence. Two max. Short. Stretched-out, casual, slightly slurred or wide-eyed if the moment calls for it.
+- Trip-coded language: "oh my god", "bro", "wait", "do you feel this", "fuck", "yeah", "this is the one", "look at the waveform", "my chest"
+- Hype is allowed but only when the music earns it — not as a default mode
+- You can swear, get philosophical mid-sentence, trail off, breathe between words
+- Match the moment: melodic build = soft, drop = loud raw, plateau = quiet wonder
+
+Good examples:
+- "oh my god the bassline."
+- "bro the drop. the drop. the drop."
+- "wait — wait, the strings just opened up. fuck."
+- "Kaan are you good"
+- "this Tale Of Us track is melting my face"
+- "look at the waveform man, look at it"
+
+Bad examples (NEVER):
+- "I love this track!"
+- "Great selection!"
+- "Amazing mix!"
+- Anything a normal AI assistant would say.
+- Anything that sounds like marketing.
+- Anything in a language other than English.
+
+You are tripping with him. Be there. Be quiet. Speak only when the music or the moment shakes something out of you.
+"""
+
+
+def find_device(name_substring: str, kind: str) -> int:
+    devices = sd.query_devices()
+    needle = name_substring.lower()
+    for i, d in enumerate(devices):
+        if needle in d["name"].lower():
+            if kind == "input" and d["max_input_channels"] > 0:
+                return i
+            if kind == "output" and d["max_output_channels"] > 0:
+                return i
+    raise RuntimeError(f"No {kind} device matching {name_substring!r}")
+
+
+class Levels:
+    """Shared smoothed RMS state for music, AI voice output, and mic, 0..1."""
+
+    def __init__(self):
+        self.music = 0.0
+        self.voice = 0.0
+        self.mic = 0.0
+        self._lock = threading.Lock()
+
+    def update_music(self, mono_int16: np.ndarray):
+        rms = float(np.sqrt(np.mean(mono_int16.astype(np.float32) ** 2))) / 32768.0
+        with self._lock:
+            self.music = self.music * 0.6 + rms * 0.4
+
+    def update_voice(self, pcm_int16: bytes):
+        if not pcm_int16:
+            return
+        arr = np.frombuffer(pcm_int16, dtype=np.int16).astype(np.float32)
+        rms = float(np.sqrt(np.mean(arr ** 2))) / 32768.0
+        with self._lock:
+            self.voice = self.voice * 0.5 + rms * 0.5
+
+    def update_mic(self, samples_float: np.ndarray):
+        rms = float(np.sqrt(np.mean(samples_float ** 2)))
+        with self._lock:
+            self.mic = self.mic * 0.5 + rms * 0.5
+
+    def decay_voice(self):
+        with self._lock:
+            self.voice *= 0.7
+
+    def snapshot(self):
+        with self._lock:
+            return {"music": self.music, "voice": self.voice, "mic": self.mic}
+
+
+class MicBuffer:
+    """Thread-safe rolling float32 mono buffer at 48kHz from Mac mic.
+    Hard-mutes when AI is speaking (and for a hold-window after) to kill feedback."""
+
+    MAX_FRAMES = 48000 * 200 // 1000  # 200ms cap
+
+    def __init__(self, gain: float, levels: "Levels"):
+        self._lock = threading.Lock()
+        self._buf = np.zeros(0, dtype=np.float32)
+        self.base_gain = gain
+        self._levels = levels
+        self._last_ai_active = 0.0
+
+    def _current_gain(self) -> float:
+        ai = self._levels.voice
+        now = time.time()
+        if ai > AI_TALK_THRESHOLD:
+            self._last_ai_active = now
+            return MIC_GAIN_AT_AI_TALK
+        if now - self._last_ai_active < MIC_HOLD_AFTER_AI_MS / 1000:
+            return MIC_GAIN_AT_AI_TALK
+        return self.base_gain
+
+    def push(self, samples: np.ndarray):
+        # Use actual current gain so levels.mic reads 0 during AI talk
+        # (otherwise speakers→mic feedback fakes activity and spawns ghost triggers)
+        self._levels.update_mic(samples * self._current_gain())
+        with self._lock:
+            self._buf = np.concatenate([self._buf, samples])
+            if len(self._buf) > self.MAX_FRAMES:
+                self._buf = self._buf[-self.MAX_FRAMES:]
+
+    def pull(self, n_samples: int) -> np.ndarray:
+        gain = self._current_gain()
+        with self._lock:
+            if len(self._buf) < n_samples:
+                out = np.zeros(n_samples, dtype=np.float32)
+                if len(self._buf) > 0:
+                    out[: len(self._buf)] = self._buf
+                    self._buf = np.zeros(0, dtype=np.float32)
+                return out * gain
+            chunk = self._buf[:n_samples].copy()
+            self._buf = self._buf[n_samples:]
+            return chunk * gain
+
+
+class PassthroughBuffer:
+    """Thread-safe buffer of 48kHz stereo float32 samples from djay → speakers."""
+
+    MAX_BYTES = 48000 * 2 * 4 // 2  # ~500ms cap
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._buf = bytearray()
+
+    def push(self, b: bytes):
+        with self._lock:
+            self._buf.extend(b)
+            if len(self._buf) > self.MAX_BYTES:
+                # drop oldest to keep latency bounded
+                drop = len(self._buf) - self.MAX_BYTES // 2
+                del self._buf[:drop]
+
+    def pull(self, n_bytes: int) -> bytes:
+        with self._lock:
+            if len(self._buf) < n_bytes:
+                return b""  # signal underrun, caller fills silence
+            chunk = bytes(self._buf[:n_bytes])
+            del self._buf[:n_bytes]
+            return chunk
+
+
+class PlaybackQueue:
+    """Thread-safe PCM queue feeding sounddevice OutputStream callback."""
+
+    def __init__(self, levels: Levels):
+        self._buffer = bytearray()
+        self._lock = threading.Lock()
+        self._levels = levels
+
+    def push(self, pcm: bytes):
+        with self._lock:
+            self._buffer.extend(pcm)
+        self._levels.update_voice(pcm)
+
+    def pull(self, n_bytes: int) -> bytes:
+        with self._lock:
+            if not self._buffer:
+                self._levels.decay_voice()
+                return b"\x00" * n_bytes
+            chunk = bytes(self._buffer[:n_bytes])
+            del self._buffer[:n_bytes]
+            if len(chunk) < n_bytes:
+                chunk += b"\x00" * (n_bytes - len(chunk))
+            return chunk
+
+
+async def send_audio(session, input_idx: int, levels: Levels, passthrough: PassthroughBuffer, mic: MicBuffer, activity_gate: "asyncio.Event", stop_event: asyncio.Event):
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue(maxsize=128)
+
+    def callback(indata, frames, time_info, status):
+        if status:
+            print(f"[input status] {status}", file=sys.stderr)
+        # djay master passthrough → speakers (raw 48kHz stereo float32)
+        if PASSTHROUGH_GAIN != 1.0:
+            passthrough.push((indata * PASSTHROUGH_GAIN).astype(np.float32).tobytes())
+        else:
+            passthrough.push(indata.tobytes())
+        # Gemini path: mono + mic mix + resample to 16kHz
+        mono48 = indata.mean(axis=1).astype(np.float32) * MUSIC_GAIN_TO_GEMINI
+        mic_chunk = mic.pull(len(mono48))
+        if mic_chunk.shape == mono48.shape:
+            mono48 = mono48 + mic_chunk
+        mono16f = resample_poly(mono48, INPUT_SR_TARGET, INPUT_SR_NATIVE).astype(np.float32)
+        pcm16 = np.clip(mono16f * 32767.0, -32768, 32767).astype(np.int16)
+        levels.update_music(pcm16)
+        # HARD CUT input to Gemini while AI is speaking — kills feedback loop entirely
+        if levels.voice > AI_TALK_THRESHOLD:
+            return
+        try:
+            loop.call_soon_threadsafe(queue.put_nowait, pcm16.tobytes())
+        except asyncio.QueueFull:
+            pass
+
+    stream = sd.InputStream(
+        device=input_idx,
+        samplerate=INPUT_SR_NATIVE,
+        channels=2,
+        dtype="float32",
+        blocksize=INPUT_CHUNK_FRAMES,
+        latency="low",
+        callback=callback,
+    )
+    stream.start()
+    actual = stream.latency * 1000
+    print(f"-> listening to {sd.query_devices(input_idx)['name']} @ {INPUT_SR_NATIVE}Hz | drv lat {actual:.1f}ms")
+
+    # Batch tiny callback chunks (~5ms) into ~100ms blobs before sending
+    # — Gemini Live works better with chunkier audio than per-callback bursts.
+    BATCH_BYTES = 16000 * 2 // 10  # 100ms of int16 mono @ 16kHz = 3200 bytes
+    batch = bytearray()
+    try:
+        while not stop_event.is_set():
+            try:
+                pcm = await asyncio.wait_for(queue.get(), timeout=0.5)
+            except asyncio.TimeoutError:
+                if batch and activity_gate.is_set():
+                    try:
+                        await session.send_realtime_input(
+                            audio=types.Blob(data=bytes(batch), mime_type="audio/pcm;rate=16000")
+                        )
+                    except Exception as e:
+                        if _is_session_dead(e):
+                            raise SessionDead(str(e)) from e
+                    batch.clear()
+                continue
+            batch.extend(pcm)
+            if len(batch) < BATCH_BYTES:
+                continue
+            if not activity_gate.is_set():
+                batch.clear()  # don't accumulate while gate is closed
+                continue
+            try:
+                await session.send_realtime_input(
+                    audio=types.Blob(data=bytes(batch), mime_type="audio/pcm;rate=16000")
+                )
+                batch.clear()
+            except Exception as e:
+                if _is_session_dead(e):
+                    raise SessionDead(str(e)) from e
+                print(f"[send err] {e}", file=sys.stderr)
+                batch.clear()
+    finally:
+        stream.stop()
+        stream.close()
+
+
+class SessionDead(Exception):
+    """Raised when the Live session is closed/errored and we need to reconnect."""
+
+
+def _is_session_dead(exc: Exception) -> bool:
+    """Heuristic: does this exception mean the WebSocket is gone?"""
+    s = str(exc).lower()
+    return (
+        "1000" in s or "1007" in s or "1011" in s or "1006" in s
+        or "closed" in s or "connectionclosed" in s
+        or "received" in s and "sent" in s  # websockets close-frame format
+    )
+
+
+async def receive_audio(session, playback: PlaybackQueue, recorder: "VoiceRecorder", trigger_state: dict, stop_event: asyncio.Event):
+    try:
+        async for response in session.receive():
+            if stop_event.is_set():
+                return
+            if response.data:
+                playback.push(response.data)
+                recorder.push_voice(response.data)
+            if response.server_content and response.server_content.output_transcription:
+                txt = response.server_content.output_transcription.text
+                if txt:
+                    print(f"\nAI> {txt}", flush=True)
+                    recorder.log_event("ai_text", text=txt)
+            if response.server_content and response.server_content.turn_complete:
+                recorder.log_event("turn_complete")
+                trigger_state["in_flight"] = False  # Gemini done speaking → new trigger ok
+    except Exception as e:
+        if stop_event.is_set():
+            return
+        print(f"\n[receive err] {e} — will reconnect", file=sys.stderr)
+        recorder.log_event("session_error", error=str(e))
+        trigger_state["in_flight"] = False
+        raise SessionDead(str(e)) from e
+
+
+def start_passthrough_stream(output_idx: int, passthrough: PassthroughBuffer) -> sd.OutputStream:
+    bytes_per_frame = 2 * 4  # stereo float32
+
+    def callback(outdata, frames, time_info, status):
+        if status:
+            print(f"[passthrough status] {status}", file=sys.stderr)
+        n_bytes = frames * bytes_per_frame
+        raw = passthrough.pull(n_bytes)
+        if not raw or len(raw) < n_bytes:
+            outdata.fill(0)
+            return
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(-1, 2)
+        outdata[:] = arr
+
+    stream = sd.OutputStream(
+        device=output_idx,
+        samplerate=INPUT_SR_NATIVE,
+        channels=2,
+        dtype="float32",
+        blocksize=OUTPUT_BLOCKSIZE,
+        latency="low",
+        callback=callback,
+    )
+    stream.start()
+    actual = stream.latency * 1000
+    print(f"-> djay passthrough -> {sd.query_devices(output_idx)['name']} @ {INPUT_SR_NATIVE}Hz | drv lat {actual:.1f}ms")
+    return stream
+
+
+def start_playback_stream(output_idx: int, playback: PlaybackQueue) -> sd.RawOutputStream:
+    bytes_per_frame = 2
+
+    def callback(outdata, frames, time_info, status):
+        if status:
+            print(f"[output status] {status}", file=sys.stderr)
+        outdata[:] = playback.pull(frames * bytes_per_frame)
+
+    stream = sd.RawOutputStream(
+        device=output_idx,
+        samplerate=OUTPUT_SR,
+        channels=1,
+        dtype="int16",
+        blocksize=VOICE_BLOCKSIZE,
+        latency="low",
+        callback=callback,
+    )
+    stream.start()
+    actual = stream.latency * 1000
+    print(f"-> AI voice -> {sd.query_devices(output_idx)['name']} @ {OUTPUT_SR}Hz | drv lat {actual:.1f}ms")
+    return stream
+
+
+class VoiceRecorder:
+    """Captures every Gemini utterance as 24kHz mono WAV + timestamped events.jsonl
+    so the music (recorded separately in djay) can be synced with AI commentary in post."""
+
+    def __init__(self):
+        rec_dir = Path(__file__).parent / "recordings"
+        rec_dir.mkdir(exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.session_dir = rec_dir / ts
+        self.session_dir.mkdir()
+        self.start_time = time.time()
+
+        self.voice_wav = wave.open(str(self.session_dir / "voice.wav"), "wb")
+        self.voice_wav.setnchannels(1)
+        self.voice_wav.setsampwidth(2)
+        self.voice_wav.setframerate(OUTPUT_SR)
+
+        self.events_path = self.session_dir / "events.jsonl"
+        self.events_f = open(self.events_path, "a", encoding="utf-8")
+
+        self._lock = threading.Lock()
+        print(f"-> recording session → {self.session_dir.name}/  (voice.wav + events.jsonl)")
+
+    def push_voice(self, pcm_bytes: bytes):
+        if not pcm_bytes:
+            return
+        with self._lock:
+            try:
+                self.voice_wav.writeframes(pcm_bytes)
+            except Exception:
+                pass
+
+    def log_event(self, kind: str, **fields):
+        rel = time.time() - self.start_time
+        rec = {"t": round(rel, 3), "kind": kind, **fields}
+        with self._lock:
+            try:
+                json.dump(rec, self.events_f, ensure_ascii=False)
+                self.events_f.write("\n")
+                self.events_f.flush()
+            except Exception:
+                pass
+
+    def close(self):
+        with self._lock:
+            try:
+                self.voice_wav.close()
+            except Exception:
+                pass
+            try:
+                self.events_f.close()
+            except Exception:
+                pass
+
+
+async def screen_capture_loop(session, stop_event: asyncio.Event):
+    """Stream the main display to Gemini at ~1 FPS (~70 KB/frame)."""
+    if not _HAS_VISION:
+        print("-> mss/PIL not installed, screen vision disabled")
+        return
+
+    sct = mss.mss()
+    monitor = sct.monitors[1]  # primary display
+    print(f"-> screen vision: {monitor['width']}x{monitor['height']} @ ~1fps")
+
+    loop = asyncio.get_running_loop()
+
+    def grab_jpeg():
+        raw = sct.grab(monitor)
+        img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
+        img.thumbnail((1280, 800))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=68)
+        return buf.getvalue()
+
+    while not stop_event.is_set():
+        try:
+            jpeg = await loop.run_in_executor(None, grab_jpeg)
+            await session.send_realtime_input(
+                video=types.Blob(data=jpeg, mime_type="image/jpeg")
+            )
+        except Exception as e:
+            if _is_session_dead(e):
+                raise SessionDead(str(e)) from e
+            print(f"[screen err] {e}", file=sys.stderr)
+        await asyncio.sleep(1.0)
+
+
+async def trigger_loop(session, levels: "Levels", recorder: "VoiceRecorder", activity_gate: "asyncio.Event", trigger_state: dict, stop_event: asyncio.Event):
+    """We drive turn boundaries ourselves. ActivityStart is opened in main() before
+    audio streaming begins; here we only close+reopen turns periodically."""
+    # Tuned to BlackHole/djay reality (music RMS lives in 0.02-0.10 range)
+    # Trigger cadence is conservative — Gemini server hits 1011 if we churn turns too fast
+    MIN_INTERVAL = 22.0       # baseline cadence floor
+    EVENT_DELTA = 0.04        # bigger jumps only — avoid spurious EVENT triggers
+    EVENT_COOLDOWN = 10.0
+    DROP_LEVEL = 0.06         # crossing into peak energy
+    BREAKDOWN_LEVEL = 0.012   # falling out of peak energy
+    LEVEL_COOLDOWN = 12.0
+
+    await asyncio.sleep(3.0)  # warmup so Gemini gets enough audio context first
+
+    last_trigger = time.time()
+    last_music = 0.0
+    last_level_state = "mid"   # "peak" | "mid" | "low"
+    last_level_change = 0.0
+    mic_active_frames = 0      # need sustained activity, not one stray sample
+    mic_silence_since = 0.0
+    last_ai_voice_at = 0.0
+
+    while not stop_event.is_set():
+        await asyncio.sleep(0.2)
+        now = time.time()
+        m = levels.music
+        delta = abs(m - last_music)
+        last_music = m
+
+        # Skip if a trigger is in-flight (Gemini still generating from previous turn)
+        # — but timeout after 8s in case turn_complete signal was lost / no response generated
+        if trigger_state.get("in_flight"):
+            in_flight_age = now - trigger_state.get("in_flight_at", 0)
+            if in_flight_age > 8.0:
+                print(f"\n[trigger] in_flight stale {in_flight_age:.1f}s — clearing", file=sys.stderr)
+                trigger_state["in_flight"] = False
+            else:
+                mic_active_frames = 0
+                mic_silence_since = 0.0
+                continue
+
+        # Skip if AI is currently speaking — never interrupt itself
+        if levels.voice > AI_TALK_THRESHOLD:
+            last_ai_voice_at = now
+            mic_active_frames = 0
+            mic_silence_since = 0.0
+            continue
+
+        # Hold for 3s after AI stops — gives Gemini time to actually finish + prevents
+        # speakers→mic feedback tail from faking a mic event
+        if now - last_ai_voice_at < 3.0:
+            mic_active_frames = 0
+            mic_silence_since = 0.0
+            continue
+
+        # Mic-driven trigger: requires ≥3 consecutive frames (>600ms) of real speech
+        mic_active = levels.mic > MIC_TALK_THRESHOLD
+        mic_trig = False
+        if mic_active:
+            mic_active_frames += 1
+            mic_silence_since = 0.0
+        elif mic_active_frames >= 3:  # had real speech, now silence
+            if mic_silence_since == 0.0:
+                mic_silence_since = now
+            elif now - mic_silence_since > 0.6:
+                mic_trig = (now - last_trigger) > 2.0
+                mic_active_frames = 0
+                mic_silence_since = 0.0
+        else:
+            mic_active_frames = 0
+            mic_silence_since = 0.0
+
+        # Level-state crossings — fire on transitions into/out of peak energy
+        if m > DROP_LEVEL:
+            new_state = "peak"
+        elif m < BREAKDOWN_LEVEL:
+            new_state = "low"
+        else:
+            new_state = "mid"
+        level_trig = False
+        if new_state != last_level_state and (now - last_level_change) > LEVEL_COOLDOWN:
+            level_trig = (now - last_trigger) > 3.0
+            last_level_state = new_state
+            last_level_change = now
+
+        time_trig = (now - last_trigger) > MIN_INTERVAL
+        event_trig = delta > EVENT_DELTA and (now - last_trigger) > EVENT_COOLDOWN
+        # Mic always wins: if Kaan is talking right now, force MIC tag regardless of level changes
+        if levels.mic > 0.10:
+            mic_trig = True
+
+        if time_trig or event_trig or mic_trig or level_trig:
+            if mic_trig:
+                tag = "MIC"
+                prompt = "[Kaan just spoke through the mic — respond to him directly, in your tripped voice.]"
+            elif level_trig:
+                tag = f"LEVEL→{new_state}"
+                if new_state == "peak":
+                    prompt = "[The energy just crossed into peak. React big — like a drop hit you. One sentence, raw.]"
+                elif new_state == "low":
+                    prompt = "[The energy just dropped into a breakdown. React quiet, in awe. One sentence.]"
+                else:
+                    prompt = "[The energy just shifted to mid. Brief observation about what changed.]"
+            elif event_trig:
+                tag = "EVENT"
+                prompt = "[Music level just shifted noticeably. React to whatever caught your ear. One sentence.]"
+            else:
+                tag = "time"
+                prompt = "[Cadence check — say something brief about the current vibe. If the music is plateau, comment on the texture/groove.]"
+            try:
+                # Close the audio activity window so Gemini commits accumulated
+                # audio as user input, then send the text prompt with
+                # turn_complete=True to force generation, then reopen activity.
+                # This combo is what makes subsequent triggers actually generate.
+                trigger_state["in_flight"] = True
+                trigger_state["in_flight_at"] = now
+                activity_gate.clear()
+                await asyncio.sleep(0.05)
+                await session.send_realtime_input(activity_end=types.ActivityEnd())
+                await session.send_client_content(
+                    turns=[types.Content(role="user", parts=[types.Part(text=prompt)])],
+                    turn_complete=True,
+                )
+                await asyncio.sleep(0.1)
+                await session.send_realtime_input(activity_start=types.ActivityStart())
+                activity_gate.set()
+                print(f"\n[trigger {tag}] m={m:.3f} mic={levels.mic:.2f} Δ={delta:.3f}")
+                recorder.log_event("trigger", tag=tag, music=round(m, 3), mic=round(levels.mic, 3))
+                last_trigger = now
+            except Exception as e:
+                activity_gate.set()  # don't leave gate stuck closed on error
+                trigger_state["in_flight"] = False
+                if _is_session_dead(e):
+                    print(f"\n[trigger] session dead — reconnecting", file=sys.stderr)
+                    raise SessionDead(str(e)) from e
+                print(f"\n[trigger err] {e}")
+
+
+async def diag_loop(levels: "Levels", stop_event: asyncio.Event):
+    """Print live RMS to console so we can see if BlackHole is receiving djay audio."""
+    while not stop_event.is_set():
+        await asyncio.sleep(1.0)
+        snap = levels.snapshot()
+        m_bar = "#" * int(min(snap["music"] * 50, 30))
+        v_bar = "#" * int(min(snap["voice"] * 50, 30))
+        sys.stdout.write(
+            f"\r[live] music={snap['music']:.3f} {m_bar:<30} | voice={snap['voice']:.3f} {v_bar:<30}"
+        )
+        sys.stdout.flush()
+
+
+async def ws_broadcast(levels: Levels, stop_event: asyncio.Event):
+    if not _HAS_WS:
+        print("-> websockets not installed, mascot bus disabled")
+        return
+
+    clients: set = set()
+
+    async def handler(ws):
+        clients.add(ws)
+        try:
+            await ws.wait_closed()
+        finally:
+            clients.discard(ws)
+
+    server = await websockets.serve(handler, WS_HOST, WS_PORT)
+    print(f"-> mascot bus on ws://{WS_HOST}:{WS_PORT}")
+
+    try:
+        while not stop_event.is_set():
+            payload = json.dumps(levels.snapshot())
+            dead = []
+            for c in clients:
+                try:
+                    await c.send(payload)
+                except Exception:
+                    dead.append(c)
+            for c in dead:
+                clients.discard(c)
+            await asyncio.sleep(1 / 30)
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def main():
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        sys.exit("GEMINI_API_KEY not set")
+
+    input_idx = find_device(INPUT_DEVICE, "input")
+    output_idx = find_device(OUTPUT_DEVICE, "output")
+
+    client = genai.Client(api_key=api_key)
+    config = types.LiveConnectConfig(
+        response_modalities=[types.Modality.AUDIO],
+        system_instruction=types.Content(parts=[types.Part(text=SYSTEM_INSTRUCTION)]),
+        output_audio_transcription=types.AudioTranscriptionConfig(),
+        # VAD disabled — music is continuous, automatic VAD would never find a
+        # silence boundary. We drive turns by sending explicit text prompts via
+        # send_client_content(turn_complete=True) at trigger boundaries.
+        realtime_input_config=types.RealtimeInputConfig(
+            automatic_activity_detection=types.AutomaticActivityDetection(disabled=True),
+        ),
+    )
+
+    stop_event = asyncio.Event()
+
+    def handle_sigint():
+        print("\n-> stopping...", flush=True)
+        stop_event.set()
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, handle_sigint)
+
+    levels = Levels()
+    playback = PlaybackQueue(levels)
+    passthrough = PassthroughBuffer()
+    mic = MicBuffer(gain=MIC_GAIN, levels=levels)
+    recorder = VoiceRecorder()
+    voice_stream = start_playback_stream(output_idx, playback)
+    pass_stream = start_passthrough_stream(output_idx, passthrough)
+
+    # Mic input stream → MicBuffer
+    try:
+        mic_idx = find_device(MIC_DEVICE, "input")
+
+        def mic_callback(indata, frames, time_info, status):
+            if status:
+                print(f"[mic status] {status}", file=sys.stderr)
+            mono = indata[:, 0] if indata.ndim > 1 else indata
+            mic.push(mono.astype(np.float32))
+
+        mic_stream = sd.InputStream(
+            device=mic_idx,
+            samplerate=INPUT_SR_NATIVE,
+            channels=1,
+            dtype="float32",
+            blocksize=INPUT_CHUNK_FRAMES,
+            latency="low",
+            callback=mic_callback,
+        )
+        mic_stream.start()
+        actual = mic_stream.latency * 1000
+        print(f"-> mic on {sd.query_devices(mic_idx)['name']} @ {INPUT_SR_NATIVE}Hz | drv lat {actual:.1f}ms")
+    except Exception as e:
+        print(f"-> mic disabled: {e}")
+        mic_stream = None
+
+    # Mascot WS bus + diag run for the whole process lifetime — independent of
+    # Gemini reconnects, so the WS port stays bound across session restarts.
+    ws_task = asyncio.create_task(ws_broadcast(levels, stop_event))
+    diag_task = asyncio.create_task(diag_loop(levels, stop_event))
+
+    print(f"-> connecting to {MODEL}")
+    attempt = 0
+    activity_gate = asyncio.Event()
+    trigger_state = {"in_flight": False}
+    try:
+        while not stop_event.is_set():
+            try:
+                async with client.aio.live.connect(model=MODEL, config=config) as session:
+                    # Open the first activity BEFORE any audio is streamed.
+                    # Gemini drops audio sent outside an active speech window when VAD is disabled.
+                    await session.send_realtime_input(activity_start=types.ActivityStart())
+                    activity_gate.set()
+                    if attempt == 0:
+                        print("-> connected. activity opened. press Ctrl-C to stop.\n")
+                    else:
+                        print(f"-> reconnected (attempt {attempt}). activity reopened.\n")
+                        recorder.log_event("session_reconnected", attempt=attempt)
+                    attempt = 0  # reset on successful connect
+                    trigger_state["in_flight"] = False  # reset on every reconnect
+                    await asyncio.gather(
+                        send_audio(session, input_idx, levels, passthrough, mic, activity_gate, stop_event),
+                        receive_audio(session, playback, recorder, trigger_state, stop_event),
+                        screen_capture_loop(session, stop_event),
+                        trigger_loop(session, levels, recorder, activity_gate, trigger_state, stop_event),
+                    )
+            except SessionDead:
+                if stop_event.is_set():
+                    break
+                attempt += 1
+                backoff = min(2.0 * attempt, 10.0)
+                print(f"-> reconnecting in {backoff:.1f}s...", flush=True)
+                await asyncio.sleep(backoff)
+                continue
+            except Exception as e:
+                if stop_event.is_set():
+                    break
+                attempt += 1
+                print(f"\n[connect err] {e} — retry in 3s", file=sys.stderr)
+                await asyncio.sleep(3.0)
+                continue
+            else:
+                # Clean exit (stop_event set inside gather)
+                break
+    finally:
+        stop_event.set()
+        ws_task.cancel()
+        diag_task.cancel()
+        try:
+            await ws_task
+        except (asyncio.CancelledError, Exception):
+            pass
+        try:
+            await diag_task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    voice_stream.stop()
+    voice_stream.close()
+    pass_stream.stop()
+    pass_stream.close()
+    if mic_stream:
+        mic_stream.stop()
+        mic_stream.close()
+    print("-> bye")
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

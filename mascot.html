@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>DJ AI Co-Host</title>
+<style>
+  :root {
+    --cyan: #00f0ff;
+    --magenta: #ff00d4;
+    --purple: #8b00ff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    background: transparent;
+    overflow: hidden;
+    cursor: none;
+    font-family: -apple-system, BlinkMacSystemFont, monospace;
+  }
+
+  #overlay {
+    position: fixed;
+    top: 2vh;
+    right: 2vh;
+    width: 26vmin;
+    height: 26vmin;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    will-change: transform;
+  }
+
+  #aura, #aura-voice {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+  #aura {
+    width: 140%; height: 140%;
+    background: radial-gradient(circle,
+      rgba(139, 0, 255, 0.55) 0%,
+      rgba(0, 240, 255, 0.30) 35%,
+      transparent 70%);
+    filter: blur(30px);
+    transform: scale(var(--music-scale, 1));
+  }
+  #aura-voice {
+    width: 110%; height: 110%;
+    background: radial-gradient(circle,
+      rgba(0, 255, 255, 0.7) 0%,
+      rgba(255, 0, 212, 0.35) 40%,
+      transparent 70%);
+    filter: blur(25px);
+    transform: scale(var(--voice-scale, 0.9));
+    opacity: var(--voice-opacity, 0.0);
+    mix-blend-mode: screen;
+  }
+
+  /* Single sprite — uses canvas for max perf */
+  #sprite-canvas {
+    position: relative;
+    width: 100%; height: 100%;
+    z-index: 5;
+    image-rendering: -webkit-optimize-contrast;
+    filter:
+      drop-shadow(0 0 10px rgba(139, 0, 255, 0.6))
+      drop-shadow(0 0 calc(8px + var(--voice-glow, 0px)) rgba(0, 240, 255, var(--voice-alpha, 0.4)));
+    transform: translateY(var(--bot-y, 0)) scale(var(--bat-scale, 1));
+    will-change: transform, filter;
+  }
+
+  #status {
+    position: fixed; bottom: 2vh; right: 2vh;
+    color: rgba(255,255,255,0.55);
+    font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase;
+    z-index: 10;
+    background: rgba(0,0,0,0.4);
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+  #status .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #f55; margin-right: 6px; vertical-align: middle;
+  }
+  #status.live .dot { background: #5f5; box-shadow: 0 0 6px #5f5; }
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="aura"></div>
+  <div id="aura-voice"></div>
+  <canvas id="sprite-canvas" width="512" height="512"></canvas>
+</div>
+<div id="status"><span class="dot"></span><span id="status-text">connecting</span></div>
+
+<script>
+  const SHEETS = [
+    { src: 'sprite-1.png', cellW: 250, cellH: 277 },
+    { src: 'sprite-2.png', cellW: 249, cellH: 270 },
+    { src: 'sprite-3.png', cellW: 249, cellH: 270 },
+  ];
+  const COLS = 6, FRAMES = 36;
+
+  const root = document.documentElement;
+  const status = document.getElementById('status');
+  const statusText = document.getElementById('status-text');
+  const canvas = document.getElementById('sprite-canvas');
+  const ctx = canvas.getContext('2d', { alpha: true });
+
+  // Preload sprite images
+  const sprites = SHEETS.map(s => {
+    const img = new Image();
+    img.src = s.src;
+    return { ...s, img };
+  });
+
+  let frameIdx = 0;
+  let lastFrameAt = 0;
+  let smoothMusic = 0, smoothVoice = 0;
+  let currentTier = 0;
+
+  function fpsForMusic(m) {
+    return 14 + Math.min(m * 30, 16);  // 14fps idle, up to 30fps peak
+  }
+  function tierForMusic(m) {
+    // any music at all → mid tier; loud → peak. silence only on dead air.
+    return m < 0.04 ? 0 : m < 0.18 ? 1 : 2;
+  }
+
+  function drawFrame() {
+    const s = sprites[currentTier];
+    if (!s.img.complete || !s.img.naturalWidth) return;
+    const col = frameIdx % COLS;
+    const row = Math.floor(frameIdx / COLS);
+    const sx = col * s.cellW;
+    const sy = row * s.cellH;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Fit cell into canvas while preserving aspect
+    const aspect = s.cellW / s.cellH;
+    const cw = canvas.width;
+    const ch = canvas.height;
+    let dw, dh;
+    if (aspect >= 1) { dw = cw; dh = cw / aspect; } else { dh = ch; dw = ch * aspect; }
+    const dx = (cw - dw) / 2;
+    const dy = (ch - dh) / 2;
+    ctx.drawImage(s.img, sx, sy, s.cellW, s.cellH, dx, dy, dw, dh);
+  }
+
+  function tick(now) {
+    const interval = 1000 / fpsForMusic(smoothMusic);
+    let dirty = false;
+    const elapsed = now - lastFrameAt;
+    if (elapsed > interval) {
+      frameIdx = (frameIdx + 1) % FRAMES;
+      lastFrameAt = now;
+      dirty = true;
+    }
+    const newTier = tierForMusic(smoothMusic);
+    if (newTier !== currentTier) {
+      currentTier = newTier;
+      dirty = true;
+    }
+    if (dirty) drawFrame();
+
+    // Hover via sin
+    const hoverY = Math.sin(now / 800) * 6;
+
+    const musicScale = 1 + smoothMusic * 0.7;
+    const batScale = 1 + smoothMusic * 0.05 + smoothVoice * 0.03;
+    const voiceScale = 0.9 + smoothVoice * 0.5;
+    const voiceOpacity = Math.min(smoothVoice * 4, 0.85);
+    const voiceGlow = smoothVoice * 40;
+    const voiceAlpha = 0.3 + Math.min(smoothVoice * 3, 0.6);
+
+    root.style.setProperty('--music-scale', musicScale.toFixed(3));
+    root.style.setProperty('--bat-scale', batScale.toFixed(3));
+    root.style.setProperty('--bot-y', hoverY.toFixed(1) + 'px');
+    root.style.setProperty('--voice-scale', voiceScale.toFixed(3));
+    root.style.setProperty('--voice-opacity', voiceOpacity.toFixed(3));
+    root.style.setProperty('--voice-glow', voiceGlow.toFixed(1) + 'px');
+    root.style.setProperty('--voice-alpha', voiceAlpha.toFixed(3));
+
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // Wait for first sprite to load before drawing
+  sprites[0].img.addEventListener('load', () => drawFrame());
+
+  function connect() {
+    const ws = new WebSocket('ws://127.0.0.1:8765');
+    ws.onopen = () => {
+      status.classList.add('live');
+      statusText.textContent = 'live';
+    };
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        smoothMusic = smoothMusic * 0.55 + (d.music || 0) * 0.45;
+        smoothVoice = smoothVoice * 0.4 + (d.voice || 0) * 0.6;
+      } catch {}
+    };
+    ws.onclose = () => {
+      status.classList.remove('live');
+      statusText.textContent = 'reconnecting';
+      setTimeout(connect, 1000);
+    };
+    ws.onerror = () => ws.close();
+  }
+  connect();
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'f' && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    }
+    if (e.key === 'Escape' && document.fullscreenElement) {
+      document.exitFullscreen();
+    }
+  });
+</script>
+</body>
+</html>
