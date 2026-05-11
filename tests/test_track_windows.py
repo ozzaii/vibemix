@@ -28,11 +28,8 @@ import sys
 import types
 from unittest.mock import MagicMock
 
-import pytest
-
 from vibemix.platform import NowPlayingSnapshot, TrackInfoBackend
 from vibemix.platform._track_windows import TrackWindows
-
 
 # ---------- Module import discipline ----------
 
@@ -144,14 +141,22 @@ def test_poll_returns_none_when_no_current_session(monkeypatch):
 def test_poll_returns_none_when_winsdk_raises(monkeypatch, capsys):
     """If ``request_async`` raises (SMTC unavailable on the box), poll() must
     return None — graceful fallback, no exception propagates. Logs ONCE."""
+    # Use a distinctive inner-exception message that does NOT collide with the
+    # impl's "-> SMTC unavailable:" prefix substring — otherwise a single log
+    # line would count as 2 occurrences when we substring-search.
     _install_fake_winsdk(monkeypatch, session_or_none=None, raise_on_request=True)
     t = TrackWindows()
     assert t.poll() is None
     # Second call must also return None and must NOT log again (log-once flag).
     assert t.poll() is None
     captured = capsys.readouterr()
-    # The "SMTC unavailable" message must appear at most once across the two calls.
-    assert captured.err.count("SMTC unavailable") <= 1
+    # The "-> SMTC unavailable:" prefix is emitted at most once across two calls
+    # — using a startswith-anchored counter avoids substring-overlap with the
+    # inner exception text. We assert exactly one log line on err.
+    log_lines = [
+        line for line in captured.err.splitlines() if line.startswith("-> SMTC unavailable")
+    ]
+    assert len(log_lines) == 1, f"expected 1 log line, got {log_lines!r}"
 
 
 def test_poll_returns_artist_only_when_title_empty(monkeypatch):
@@ -252,8 +257,16 @@ def test_track_info_records_prev_on_change(monkeypatch):
 
 def test_run_poll_loop_offloads_via_executor_and_stops_on_event(monkeypatch):
     """run_poll_loop wraps the sync _poll_smtc_sync via run_in_executor at
-    1Hz. When stop_event is set, the loop exits cleanly. We verify by
-    running one iteration with a very short sleep monkeypatch."""
+    1Hz. When stop_event is set, the loop exits cleanly.
+
+    Approach: wrap the loop in a short asyncio.wait_for with a tight timeout,
+    pre-setting stop_event so the body runs once + exits. The first iteration
+    sleeps for 1s after the poll — we cap with wait_for(timeout=2.0) so even
+    if the sleep waits the full 1s we still finish well under the test
+    timeout. We avoid monkeypatching asyncio.sleep itself because pytest's
+    string-path monkeypatch.setattr breaks when other tests in the run have
+    deleted + reimported the ``vibemix.platform`` package (the attribute
+    walk fails). This direct-event approach is order-independent."""
     session = _make_session_with_props("A", "B")
     _install_fake_winsdk(monkeypatch, session_or_none=session)
 
@@ -261,21 +274,18 @@ def test_run_poll_loop_offloads_via_executor_and_stops_on_event(monkeypatch):
         t = TrackWindows()
         stop = asyncio.Event()
 
-        # Patch the loop sleep so the test doesn't wait 1s per iteration.
-        original_sleep = asyncio.sleep
-
-        async def _short_sleep(_secs):
-            await original_sleep(0)
-
-        monkeypatch.setattr("vibemix.platform._track_windows.asyncio.sleep", _short_sleep)
-
-        # Schedule a stop after a tiny delay so the loop body runs at least once.
+        # Schedule the stop very early — after the first poll + before the
+        # 1Hz sleep completes. The loop checks stop_event.is_set() at the
+        # top of each iteration AND we have a tight asyncio.wait_for above.
         async def _set_stop():
-            await asyncio.sleep(0)
-            await asyncio.sleep(0)
+            # Let run_poll_loop start + do one poll body.
+            await asyncio.sleep(0.05)
             stop.set()
 
-        await asyncio.gather(t.run_poll_loop(stop), _set_stop())
+        await asyncio.gather(
+            asyncio.wait_for(t.run_poll_loop(stop), timeout=3.0),
+            _set_stop(),
+        )
         return t
 
     t = asyncio.run(_runner())
