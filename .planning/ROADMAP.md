@@ -57,7 +57,13 @@ Plans:
   2. A 60-minute macOS capture session emits zero PortAudio `input_overflow` or `output_underflow` status flags in logs.
   3. Mic gating (`MicBuffer._current_gain()`) mutes during AI TTS playback and resumes 350ms after AI finishes, verified by inspecting `voice.wav` boundaries against `input.wav` mic-level windows.
   4. TTS PCM playback at 24kHz routes to the user-selected output device via cross-platform `sounddevice.OutputStream`; sample-rate mismatch never causes chipmunk/molasses artifacts.
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 02-01-PLAN.md — Audio package skeleton + 14 v4 tuning constants + Levels (verbatim) + SampleRateMismatchError + pytest-mock dev dep + macos_audio pytest marker
+- [ ] 02-02-PLAN.md — Pre-allocated ring buffers (AudioBuffer/MicBuffer/PassthroughBuffer/PlaybackQueue + BufferRegistry) — fixes np.concatenate at v4:300 + v4:462
+- [ ] 02-03-PLAN.md — features.py DSP math (FFT/RMS/BPM/peak-normalize) + VoiceRecorder (0o700 sessions + configurable root)
+- [ ] 02-04-PLAN.md — AudioMacOS impl (Phase 1 AudioBackend Protocol) + sample-rate sanity guard (pre + post-open) + mocked sounddevice tests + opt-in live smoke
+- [ ] 02-05-PLAN.md — 8-gate verification + phase SUMMARY + ROADMAP/STATE advance to Phase 3
 
 ### Phase 3: Sensing & State Port
 **Goal**: `MusicState` is the single source of truth at 10Hz, written by `state_refresh_loop` and read by `EventDetector` and `AICoach`. Audible-deck detection, screen capture, and track-info plumbing work on macOS, ported verbatim from `cohost_v2.py`.
