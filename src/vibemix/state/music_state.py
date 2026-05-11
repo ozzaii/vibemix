@@ -36,6 +36,12 @@ class MusicState:
     phase: str = "silent"  # silent / low / groove / build / drop / peak / breakdown
     phase_started_at: float = 0.0
 
+    # Genre-aware (Phase 6) — written by state_refresh_loop only.
+    crest_factor: float = 0.0
+    vocal_active: bool = False
+    bpm_corrected: bool = False
+    genre_profile_name: str = "unknown"
+
     # Controller (snapshot from MIDI thread)
     deck_a: dict = field(default_factory=dict)
     deck_b: dict = field(default_factory=dict)
