@@ -38,7 +38,6 @@ from vibemix.platform import MidiBackend
 from vibemix.platform._midi_macos import ControllerState, _MidoPortAdapter
 from vibemix.platform._midi_windows import MidiWindows
 
-
 # ---------- Module import discipline ----------
 
 
@@ -117,7 +116,7 @@ def test_start_listener_thread_calls_spawn_listener(monkeypatch):
 
     assert result is fake_thread
     spy.assert_called_once()
-    args, kwargs = spy.call_args
+    args, _kwargs = spy.call_args
     # spawn_listener(controller_state, stop_event, port_hint, mido_module)
     assert args[0] is backend.controller_state
     assert args[1] is stop_event
@@ -263,7 +262,5 @@ def test_byte_identical_to_macos_for_same_messages():
     mac_labels = [label for _, label in mac.controller_state.moves_since(0.0)]
     win_labels = [label for _, label in win.controller_state.moves_since(0.0)]
     assert mac_labels == win_labels, (
-        f"moves_since labels diverged:\n"
-        f"  macOS:   {mac_labels}\n"
-        f"  Windows: {win_labels}"
+        f"moves_since labels diverged:\n  macOS:   {mac_labels}\n  Windows: {win_labels}"
     )

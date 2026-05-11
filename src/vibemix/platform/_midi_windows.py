@@ -138,9 +138,7 @@ class MidiWindows:
         # ``threading.Thread`` and starts it.
         from vibemix.platform import _midi_common
 
-        return _midi_common.spawn_listener(
-            self.controller_state, stop_event, self._PORT_HINT, mido
-        )
+        return _midi_common.spawn_listener(self.controller_state, stop_event, self._PORT_HINT, mido)
 
 
 __all__ = ["MidiWindows"]
