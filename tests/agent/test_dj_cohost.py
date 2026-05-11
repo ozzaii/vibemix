@@ -1,0 +1,478 @@
+# SPDX-License-Identifier: Apache-2.0
+"""DJCoHostAgent — AGENT-01..04 + LLM-NODE-01..11 + PKG-03.
+
+Pins the multimodal llm_node hijack as a v4-verbatim port: pending event
+flow, AICoach prompt construction, per-invocation dump folder, anti-history
+clause, deque maxlen + 140-char truncation, recorder log events, exception
+handling.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import collections
+import json
+from pathlib import Path
+from typing import Any
+
+from google.genai import types
+from livekit.agents import Agent
+
+from vibemix.agent import DJCoHostAgent
+from vibemix.state import AICoach, Event, MusicState
+
+# ---------- helpers ----------
+
+
+def _async_iter(chunks):
+    """Build an async iterable yielding objects with a .text attribute."""
+
+    async def gen():
+        for c in chunks:
+            yield type("Chunk", (), {"text": c})()
+
+    return gen()
+
+
+def _async_iter_raise(exc):
+    """Async iterable that raises immediately."""
+
+    async def gen():
+        raise exc
+        yield  # pragma: no cover
+
+    return gen()
+
+
+class _FakeRecorder:
+    """Minimal recorder stub — no 0o700 dir creation, no real wav writers."""
+
+    def __init__(self, session_dir: Path):
+        self.session_dir = session_dir
+        self.events: list[tuple[str, dict]] = []
+
+    def log_event(self, kind: str, **fields: Any) -> None:
+        self.events.append((kind, fields))
+
+    def push_voice(self, pcm: bytes) -> None:
+        pass
+
+
+def _build_state() -> MusicState:
+    s = MusicState()
+    s.audible = True
+    s.audible_deck = "A"
+    s.audible_track = "Daft Punk - Around the World"
+    s.audible_track_confidence = 0.8
+    s.phase = "peak"
+    s.rms = 0.05
+    s.bpm = 128.0
+    return s
+
+
+def _build_agent(mocker, tmp_path: Path) -> tuple[DJCoHostAgent, Any, _FakeRecorder, MusicState]:
+    """Construct a DJCoHostAgent with the parent ``Agent.__init__`` mocked
+    and a fake recorder pointing at tmp_path."""
+    mocker.patch.object(Agent, "__init__", return_value=None)
+    state = _build_state()
+    recorder = _FakeRecorder(tmp_path)
+    genai_client = mocker.MagicMock()
+    screen_buf = mocker.MagicMock()
+    agent = DJCoHostAgent(
+        genai_client=genai_client,
+        clean_audio_buf=mocker.MagicMock(),
+        screen_buf=screen_buf,
+        state=state,
+        recorder=recorder,
+        llm_inst=mocker.MagicMock(),
+        tts_inst=mocker.MagicMock(),
+    )
+    return agent, genai_client, recorder, state
+
+
+def _drive_llm_node(agent: DJCoHostAgent) -> list[str]:
+    """Run llm_node to completion and return the list of yielded chunks."""
+
+    async def _go() -> list[str]:
+        chunks: list[str] = []
+        async for txt in agent.llm_node(chat_ctx=None, tools=[], model_settings=None):
+            chunks.append(txt)
+        return chunks
+
+    return asyncio.run(_go())
+
+
+# ---------- AGENT-01..04 ----------
+
+
+def test_agent_01_subclass_of_livekit_agent() -> None:
+    """AGENT-01: DJCoHostAgent is a subclass of livekit.agents.Agent."""
+    assert issubclass(DJCoHostAgent, Agent)
+
+
+def test_agent_02_super_init_kwargs(mocker, tmp_path) -> None:
+    """AGENT-02: super().__init__ called with instructions, llm, tts,
+    allow_interruptions=False."""
+    from vibemix.agent.persona import SYSTEM_INSTRUCTION
+
+    mocker.patch.object(Agent, "__init__", return_value=None)
+    state = _build_state()
+    recorder = _FakeRecorder(tmp_path)
+    llm = mocker.MagicMock()
+    tts = mocker.MagicMock()
+    DJCoHostAgent(
+        genai_client=mocker.MagicMock(),
+        clean_audio_buf=mocker.MagicMock(),
+        screen_buf=mocker.MagicMock(),
+        state=state,
+        recorder=recorder,
+        llm_inst=llm,
+        tts_inst=tts,
+    )
+    kw = Agent.__init__.call_args.kwargs
+    assert kw["instructions"] == SYSTEM_INSTRUCTION
+    assert kw["llm"] is llm
+    assert kw["tts"] is tts
+    assert kw["allow_interruptions"] is False
+
+
+def test_agent_03_initial_state(mocker, tmp_path) -> None:
+    """AGENT-03: pending event None, history empty deque maxlen 10, gen cfg."""
+    from vibemix.agent.persona import SYSTEM_INSTRUCTION
+
+    agent, _, _, _ = _build_agent(mocker, tmp_path)
+    assert agent._pending_event is None
+    assert isinstance(agent._ai_text_history, collections.deque)
+    assert len(agent._ai_text_history) == 0
+    assert agent._ai_text_history.maxlen == 10
+
+    assert isinstance(agent._gen_cfg, types.GenerateContentConfig)
+    # GenerateContentConfig is a pydantic model — direct field access works
+    assert agent._gen_cfg.system_instruction == SYSTEM_INSTRUCTION
+    assert agent._gen_cfg.temperature == 1.0
+    assert agent._gen_cfg.max_output_tokens == 220
+    level = agent._gen_cfg.thinking_config.thinking_level
+    assert str(getattr(level, "value", level)).lower() == "minimal"
+
+
+def test_agent_04_set_next_event(mocker, tmp_path) -> None:
+    """AGENT-04: set_next_event(ev) mutates _pending_event."""
+    agent, _, _, state = _build_agent(mocker, tmp_path)
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    assert agent._pending_event is ev
+
+
+# ---------- LLM-NODE-01..11 ----------
+
+
+def test_llm_node_01_yields_chunks_in_order(mocker, tmp_path) -> None:
+    """LLM-NODE-01: yields each non-empty text chunk in order."""
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: rms=0.05")
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["hello ", "world"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+
+    chunks = _drive_llm_node(agent)
+    assert chunks == ["hello ", "world"]
+    AICoach.build_prompt.assert_called_once_with(ev)
+    # pending event was consumed
+    assert agent._pending_event is None
+
+
+def test_llm_node_02_fallback_to_manual_when_no_event(mocker, tmp_path) -> None:
+    """LLM-NODE-02: when _pending_event is None, falls back to MANUAL Event."""
+    agent, gen_client, _, _state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["ok"])
+    )
+
+    _drive_llm_node(agent)
+
+    AICoach.build_prompt.assert_called_once()
+    called_with = AICoach.build_prompt.call_args.args[0]
+    assert isinstance(called_with, Event)
+    assert called_with.type == "MANUAL"
+    assert called_with.state is agent._state
+    assert called_with.extra == {}
+
+
+def test_llm_node_03_screen_jpeg_none_unconditional(mocker, tmp_path) -> None:
+    """LLM-NODE-03: screen_jpeg=None unconditionally; v4:1502 comment present."""
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    # Even if screen_buf would return a real image, llm_node should set None.
+    agent._screen_buf.latest.return_value = (b"REAL_JPEG", (1920, 1080))
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["ok"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    contents = gen_client.aio.models.generate_content_stream.call_args.kwargs["contents"]
+    # 2 entries — text + audio Part. NO image Part.
+    assert len(contents) == 2
+
+    # Source file contains the literal v4:1502 anti-hallucination comment
+    src = Path("src/vibemix/agent/dj_cohost.py").read_text()
+    assert "# Single-modality: audio only. Screen + MIDI metadata caused hallucination." in src
+
+
+def test_llm_node_04_per_invocation_dump_folder(mocker, tmp_path) -> None:
+    """LLM-NODE-04: writes <session>/invocations/NNNN_TS_EVENT/{audio,prompt,
+    response,meta} + <session>/last_gemini_audio.wav."""
+    agent, gen_client, _recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["hello ", "world"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    invocations = list((tmp_path / "invocations").iterdir())
+    assert len(invocations) == 1
+    invoke_dir = invocations[0]
+    assert invoke_dir.name.startswith("0001_")
+    assert invoke_dir.name.endswith("_HEARTBEAT")
+
+    assert (invoke_dir / "audio.wav").read_bytes() == b"FAKEWAV"
+    assert (tmp_path / "last_gemini_audio.wav").read_bytes() == b"FAKEWAV"
+    assert (invoke_dir / "response.txt").read_text() == "hello world"
+    assert (invoke_dir / "prompt.txt").exists()
+
+    meta = json.loads((invoke_dir / "meta.json").read_text())
+    expected_keys = {
+        "event",
+        "ts",
+        "invoke_n",
+        "audible",
+        "deck",
+        "track",
+        "track_confidence",
+        "phase",
+        "rms",
+        "bpm",
+        "audio_bytes",
+        "audio_seconds",
+        "llm_latency_s",
+        "llm_error",
+        "response_chars",
+    }
+    assert expected_keys.issubset(set(meta.keys()))
+    assert meta["event"] == "HEARTBEAT"
+    assert meta["invoke_n"] == 1
+    assert meta["audible"] is True
+    assert meta["deck"] == "A"
+    assert meta["track"] == "Daft Punk - Around the World"
+    assert meta["phase"] == "peak"
+    assert meta["audio_bytes"] == len(b"FAKEWAV")
+    assert meta["response_chars"] == len("hello world")
+    assert meta["llm_error"] is None
+
+
+def test_llm_node_05_invoke_counter_advances(mocker, tmp_path) -> None:
+    """LLM-NODE-05: second invocation gets 0002_ prefix, counter is 2."""
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    def _stream(*_a, **_kw):
+        return _async_iter(["chunk"])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(side_effect=_stream)
+
+    for _ in range(2):
+        ev = Event(type="HEARTBEAT", state=state, extra={})
+        agent.set_next_event(ev)
+        _drive_llm_node(agent)
+
+    invocations = sorted((tmp_path / "invocations").iterdir(), key=lambda p: p.name)
+    assert len(invocations) == 2
+    assert invocations[0].name.startswith("0001_")
+    assert invocations[1].name.startswith("0002_")
+    assert agent._invoke_counter == 2
+
+
+def test_llm_node_06_history_clause_shape(mocker, tmp_path) -> None:
+    """LLM-NODE-06: second invocation prompt contains the anti-repetition
+    history clause referencing the first invocation's text."""
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    def _stream(*_a, **_kw):
+        return _async_iter(["first_reply "])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(side_effect=_stream)
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    first_contents = gen_client.aio.models.generate_content_stream.call_args.kwargs["contents"]
+    first_prompt_text = first_contents[0]
+    assert "RECENT THINGS YOU JUST SAID" not in first_prompt_text
+
+    # Now drive a second invocation
+    def _stream2(*_a, **_kw):
+        return _async_iter(["second_reply"])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(side_effect=_stream2)
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    second_contents = gen_client.aio.models.generate_content_stream.call_args.kwargs["contents"]
+    second_prompt_text = second_contents[0]
+    assert "RECENT THINGS YOU JUST SAID (do NOT repeat or rephrase" in second_prompt_text
+    assert "first_reply" in second_prompt_text
+
+
+def test_llm_node_07_history_truncation_to_140_chars(mocker, tmp_path) -> None:
+    """LLM-NODE-07: stripped text truncated to 140 chars before deque append."""
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="x")
+
+    long_chunk = "A" * 300
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter([long_chunk])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    assert len(agent._ai_text_history) == 1
+    assert len(agent._ai_text_history[0]) == 140
+
+
+def test_llm_node_08_history_maxlen_10(mocker, tmp_path) -> None:
+    """LLM-NODE-08: after 12 successful invocations, deque holds exactly 10."""
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="x")
+
+    counter = {"n": 0}
+
+    def _stream(*_a, **_kw):
+        counter["n"] += 1
+        return _async_iter([f"reply_{counter['n']}"])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(side_effect=_stream)
+
+    for _ in range(12):
+        ev = Event(type="HEARTBEAT", state=state, extra={})
+        agent.set_next_event(ev)
+        _drive_llm_node(agent)
+
+    assert len(agent._ai_text_history) == 10
+
+
+def test_llm_node_09_recorder_log_events(mocker, tmp_path) -> None:
+    """LLM-NODE-09: llm_invoke logged before stream, ai_text after non-empty."""
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["hello"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    kinds = [k for k, _ in recorder.events]
+    assert "llm_invoke" in kinds
+    assert "ai_text" in kinds
+    # llm_invoke first
+    assert kinds.index("llm_invoke") < kinds.index("ai_text")
+
+    invoke_kw = dict(recorder.events[kinds.index("llm_invoke")][1])
+    assert set(
+        [
+            "event",
+            "audible",
+            "deck",
+            "track",
+            "phase",
+            "audio_bytes",
+            "has_screen",
+            "prompt",
+            "invoke_dir",
+        ]
+    ).issubset(invoke_kw.keys())
+
+    ai_kw = dict(recorder.events[kinds.index("ai_text")][1])
+    assert set(["text", "latency_s"]).issubset(ai_kw.keys())
+
+
+def test_llm_node_10_empty_completion_skips_ai_text_log(mocker, tmp_path) -> None:
+    """LLM-NODE-10: empty completion → no ai_text log, no deque append,
+    meta.json still has response_chars=0."""
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["   ", ""])  # whitespace only — strip yields empty
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    kinds = [k for k, _ in recorder.events]
+    assert "ai_text" not in kinds
+    assert len(agent._ai_text_history) == 0
+
+    invoke_dirs = list((tmp_path / "invocations").iterdir())
+    assert len(invoke_dirs) == 1
+    meta = json.loads((invoke_dirs[0] / "meta.json").read_text())
+    assert meta["response_chars"] == 3  # the three whitespace chars yielded
+
+
+def test_llm_node_11_exception_does_not_propagate(mocker, tmp_path) -> None:
+    """LLM-NODE-11: stream raises → caught, llm_error set in meta.json."""
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="x")
+
+    async def _raise(*_a, **_kw):
+        raise RuntimeError("boom")
+
+    gen_client.aio.models.generate_content_stream = _raise
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    # Should NOT raise
+    chunks = _drive_llm_node(agent)
+    assert chunks == []
+
+    invoke_dirs = list((tmp_path / "invocations").iterdir())
+    meta = json.loads((invoke_dirs[0] / "meta.json").read_text())
+    assert meta["llm_error"] is not None
+    assert "boom" in meta["llm_error"]
+
+
+# ---------- PKG-03 ----------
+
+
+def test_pkg_03_dj_cohost_agent_exported() -> None:
+    """PKG-03: DJCoHostAgent resolves from vibemix.agent and is in __all__."""
+    import vibemix.agent as vagent
+
+    assert "DJCoHostAgent" in vagent.__all__
