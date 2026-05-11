@@ -125,7 +125,13 @@ Plans:
   2. Per-genre replay validation harness scores ≥85% event-timing F1 (drop/build/breakdown detected within ±2 seconds of ground-truth) on the held-out validation set for all 5 genres.
   3. Vocal-section detector correctly gates AI talk over lyrics on a 10-minute pop/D&B mixed clip — zero AI utterances start during a vocal segment (verified by overlaying `events.jsonl` AI text events on a manual vocal-segment annotation).
   4. BPM half/double validator stabilizes within 3 seconds of a track change (no 70 / 140 oscillation when track is steady-state 140 BPM).
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 06-01-PLAN.md — Genre profile system + 5 JSON profiles (techno / house / D&B / disco / pop) + active-profile singleton
+- [ ] 06-02-PLAN.md — Crest factor (peak/RMS + EMA smoother) + BPM half/double validator + VocalDetector hysteresis (1.5s in / 2.5s out)
+- [ ] 06-03-PLAN.md — Percentile phase detector + MusicState +4 fields + state_refresh_loop wiring + Phase 3 golden equivalence pinned
+- [ ] 06-04-PLAN.md — EventDetector LAYER_ARRIVAL vocal gate + VIBEMIX_GENRE_PROFILE env + vibemix.state re-exports
+- [ ] 06-05-PLAN.md — 10-gate verification + 06-SUMMARY (with v4-vs-Phase-6 phase-diff) + STATE/ROADMAP advance
 
 ### Phase 7: Windows Port (Audio + Screen)
 **Goal**: Windows feature parity for audio capture (PyAudioWPatch WASAPI loopback — no virtual cable needed) and screen capture (`mss` + `pywin32` EnumWindows). Sample-rate sanity test catches BlackHole-Sonoma-like rate halving on both OSes. (Parallelizable with Phase 6 — independent platform implementations once Phase 1 protocols are pinned.)
