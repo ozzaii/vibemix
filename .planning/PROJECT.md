@@ -81,10 +81,40 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 - [ ] One-click installer — macOS notarized DMG (Apple Developer account exists) + Windows signed installer
 - [ ] Free for end users — Bravoh-managed Gemini API key in environment, no key entry required
 - [ ] API-usage abuse protection (rate-limit, quota cap per anonymous client) so we don't get drained
-- [ ] Polished UI/UX — calibration wizard, mode/voice/genre pickers, no AI-slop aesthetics
-- [ ] Marketing-ready demo: cinematic recorded set with on-screen reactions, install GIF, README hero video
+- [ ] Polished UI/UX inside the app — calibration wizard, mode/voice/genre pickers, no AI-slop aesthetics
+
+**GitHub Presence — "Maximum Sexification"**
+
+The GitHub repo is the front door for 100% of organic discovery. It must read like a real product launch, not a code dump.
+
+- [ ] Branded hero banner at top of README (custom artwork — vibemix wordmark + tagline + screen of the app in action; not a generic logo placeholder)
+- [ ] One-paragraph value prop above the fold (clear, no jargon, hooks DJ at "co-host that actually reacts to your set")
+- [ ] Hero demo video / GIF — 30-45s cinematic edit: real DJ playing → AI reacting in real-time over headphones (subtitled), drop/build/transition reactions visible on screen
+- [ ] Installation section — one-click download buttons for macOS + Windows, install GIFs, "from clone to running in <60s" promise
+- [ ] Feature matrix — beginner/intermediate/pro × hype-man/coach, with example reactions per cell
+- [ ] Supported controllers grid — logos/photos of all 10 mapped controllers + "calibrate any other" callout
+- [ ] Screenshots gallery — calibration wizard, mode picker, voice picker, in-session UI, recording browser
+- [ ] "How it works" diagram — clean architecture sketch (audio in → events → Gemini → voice out), not Mermaid-default ugly
+- [ ] FAQ — 8-12 questions: privacy, what data leaves your machine, cost, why no Linux, why no Gemini Live, etc.
+- [ ] "Built by Bravoh" footer + link to the Bravoh waitlist (the funnel)
+- [ ] Badges row — build status, latest release, license, platform, stars, Discord (optional)
+- [ ] CONTRIBUTING.md — controller-mapping contribution path (the most likely external PR), prompt-template contribution path
+- [ ] CODE_OF_CONDUCT.md, SECURITY.md, LICENSE — table-stakes OSS hygiene
+- [ ] Issue templates — bug / feature / new-controller-request
+- [ ] Releases page — every binary cut tagged with a real changelog, not auto-generated noise
+- [ ] Social preview image — custom OG image that looks slick when shared on X/Discord/Slack
+- [ ] Repo description + topics tags optimised for search (`dj`, `livekit`, `gemini`, `ai-assistant`, `audio`, `midi`, `pioneer-ddj`, `realtime-ai`)
+- [ ] No "rough edges" visible in the public repo — no `_test_*.py` scratch files, no `.bak` files, no committed `.env`, no large binaries (mascot sprites move to release assets or get rebuilt cleanly)
+
+**Launch Funnel**
+
+- [ ] Marketing-ready demo cinematic (Kaan + Francesco DJ session, edited; vibemix doing transitions feedback; Gemini speaking over)
 - [ ] Open-source release on `github.com/bravoh/vibemix` (GitHub Enterprise under bravoh org)
-- [ ] Pre-launch seed: 15+ stars from friends/dev network, then organic content push (Instagram/X/TikTok), then 50-100 € IG ads
+- [ ] Pre-launch seed: 15+ stars from friends/dev network on day 1 (Kaan, Francesco, Momo + dev contacts + ARRAY community)
+- [ ] Organic content push (Instagram/X/TikTok reels — Francesco's cinematic shoot + Kaan's controller demos)
+- [ ] 50-100 € IG/TikTok ads → drive to repo download
+- [ ] Outreach to DJ network (Francesco's connections — alignment, label contacts) + DJ-software vendors (e.g. Algoriddim/djay Pro team)
+- [ ] Email collector on download (Instagram lead magnet pattern: comment → DM with link → email capture → routes into Bravoh waitlist at public launch)
 
 ### Out of Scope
 
@@ -106,7 +136,7 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 
 **Why open-source now.** Bravoh (the AI Artist Operating System) ships its public launch ~3-4 weeks out from today (2026-05-11). Bravoh has a 140k-view real on the project's Instagram account and a Closed Beta running since March 1, 2026. The DJ co-host is a fast-shipping, narrowly-scoped, demo-able artefact that lives downstream of Bravoh's positioning ("we build cool AI for musicians, here's a free taste") — it is the marketing wedge that turns "interested" into "watching the Bravoh waitlist".
 
-**Existing user.** Kaan, primarily. Francis Tural is a beta tester. The open-source release expands to "any DJ with a controller + a DJ software running on mac or windows" — beginner curiosity to pro feedback-loop.
+**Existing user.** Kaan, primarily — the codebase started as his Friday-night experiment. The open-source release expands to "any DJ with a controller + a DJ software running on mac or windows" — beginner curiosity to pro feedback-loop.
 
 **Stack baseline.** Python 3.12+ (current `.venv` is 3.14), LiveKit Agents framework, `google-genai`, `sounddevice` (mac) / WASAPI bindings (Windows), `mido` + `python-rtmidi`, `numpy` + `scipy` for DSP, `mss` / Quartz / win32 for screen capture. Heavy reliance on Gemini 3 family (Flash for inference, TTS for voice).
 
@@ -117,7 +147,7 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 - **Budget**: 150-200 € launch marketing (IG ads, paid posts), ~50 €/month ongoing Gemini API for end-user requests. Reassess if usage scales.
 - **Tech stack**: Locked on LiveKit pipeline + Gemini 3 Flash + Gemini TTS streaming. No other LLM providers (Bravoh is Gemini-only).
 - **Platforms**: macOS + Windows in v1. Linux explicitly excluded.
-- **Headcount**: Kaan (owner, primary dev), with Musa (senior, part-time) and Yasin (part-time) able to help if needed. Bravoh main product takes priority — vibemix runs alongside.
+- **Team**: Kaan (engineering + product), Francesco (cofounder — product/marketing/DJ network for outreach), Momo (Bravoh team). Bravoh main product takes priority — vibemix runs alongside.
 - **Open-source license**: TBD (likely MIT or Apache 2.0). Must allow Bravoh to use the same code internally if needed.
 - **Security**: API key embedded in distributed binary is the API-key-protection problem of the year — solve via Bravoh-side proxy with per-client rate limit, not by shipping a raw key.
 - **Hallucination grounding**: No release until verification phase confirms reactions are tied to real events. This is a hard gate.
@@ -135,7 +165,7 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 | **Bravoh-managed API key**, free for end users | Friction kills virality; we treat cost as marketing spend | — Pending |
 | **Genre picker at session start** | Phase-detection (drop/build/breakdown) thresholds depend heavily on genre; "auto-detect genre" is research-grade and would block shipping | — Pending |
 | **Open-source as Bravoh's first OSS** | Marketing wedge ahead of Bravoh public launch; gets attention, builds trust, funnels to waitlist | — Pending |
-| **Workflow profile: Fine granularity, all Opus, all checkpoints on** | Kaan's directive: "do your deep research, don't go blind into coding, all checkpoints will be every agent will be Opus" | — Pending |
+| **Workflow profile: Fine granularity, all Opus, all checkpoints on** | Kaan's directive: "do your deep research, don't go blind into coding, all checkpoints will be every agent will be Opus". Enforced via `models.*=opus` (all 6 phase types) + `model_overrides.<agent>=opus` (33 agents) in `.planning/config.json` — belt-and-braces, no agent can fall back to a smaller model. | — Pending |
 
 ## Evolution
 
