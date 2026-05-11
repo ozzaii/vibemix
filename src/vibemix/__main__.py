@@ -36,6 +36,7 @@ import signal
 import sys
 import threading
 
+import httpx
 import numpy as np
 from dotenv import load_dotenv
 from google import genai
@@ -55,7 +56,10 @@ from vibemix.agent import (
     DJCoHostAgent,
     PlaybackQueueAudioOutput,
     build_llm,
+    build_proxy_genai_client,
     build_tts_chain,
+    get_or_create_install_uuid,
+    get_or_refresh_jwt,
 )
 from vibemix.audio import (
     INPUT_CHUNK_FRAMES,
@@ -192,12 +196,45 @@ def _mic_callback_factory(mic: MicBuffer):
 
 
 async def main() -> None:
-    """Verbatim port of cohost_v4.py:1925-2080 with package-aware imports."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        sys.exit("GEMINI_API_KEY not set")
+    """Verbatim port of cohost_v4.py:1925-2080 with package-aware imports.
 
-    or_key = os.environ.get("OPENROUTER_API_KEY")  # optional
+    Phase 5 adds env-driven mode dispatch:
+      VIBEMIX_LLM_MODE       = 'direct' (default) | 'proxy'
+      VIBEMIX_PROXY_BASE_URL = 'https://api.altidus.world' (default)
+      VIBEMIX_CLIENT_VERSION = vibemix.__version__ (default)
+    """
+    # ----- Phase 5 mode dispatch -----
+    mode = os.environ.get("VIBEMIX_LLM_MODE", "direct").lower()
+    proxy_base_url = os.environ.get("VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world")
+    client_version = os.environ.get("VIBEMIX_CLIENT_VERSION", __version__)
+
+    if mode not in ("direct", "proxy"):
+        sys.exit(f"VIBEMIX_LLM_MODE must be 'direct' or 'proxy', got {mode!r}")
+
+    api_key: str | None = None
+    or_key: str | None = None
+    jwt: str | None = None
+    install_uuid: str | None = None
+
+    if mode == "direct":
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            sys.exit(
+                "GEMINI_API_KEY not set (mode=direct). Set VIBEMIX_LLM_MODE=proxy to use the proxy."
+            )
+        or_key = os.environ.get("OPENROUTER_API_KEY")  # optional
+    else:  # mode == "proxy"
+        try:
+            install_uuid = get_or_create_install_uuid()
+            jwt = await get_or_refresh_jwt(install_uuid, proxy_base_url, client_version)
+        except RuntimeError as e:
+            sys.exit(f"Proxy mode setup failed: {e}. Check VIBEMIX_PROXY_BASE_URL and network.")
+        except httpx.HTTPError as e:
+            sys.exit(
+                f"Proxy /register network error: {e.__class__.__name__}: {e}. "
+                f"Check VIBEMIX_PROXY_BASE_URL and connectivity."
+            )
+        print(f"-> mode: proxy (install_uuid={install_uuid[:8]}..., jwt cached)")
 
     # --- Phase 2 audio primitives ---
     import time as _time  # local import so the test suite can mock time.time without import-time side effects
@@ -275,17 +312,27 @@ async def main() -> None:
         mic_stream = None
 
     # --- LLM + TTS chain ---
-    print(f"-> brain: {LLM_MODEL} (thinking=minimal, temp=1.0)")
-    genai_client = genai.Client(api_key=api_key)
-    llm_inst = build_llm(api_key)
-    tts_inst = build_tts_chain(gemini_api_key=api_key, openrouter_api_key=or_key or None)
-    if or_key:
-        print(f"-> tts:   openrouter/{OPENROUTER_TTS_MODEL} (voice={VOICE}) [primary]")
-    else:
-        print(
-            f"-> tts:   {TTS_MODEL} → {TTS_FALLBACK_MODEL} (voice={VOICE}) "
-            "[no OPENROUTER_API_KEY in .env]"
+    if mode == "direct":
+        print("-> mode:  direct (GEMINI_API_KEY from .env)")
+        print(f"-> brain: {LLM_MODEL} (thinking=minimal, temp=1.0)")
+        genai_client = genai.Client(api_key=api_key)
+        llm_inst = build_llm(api_key, mode="direct")
+        tts_inst = build_tts_chain(
+            gemini_api_key=api_key, openrouter_api_key=or_key or None, mode="direct"
         )
+        if or_key:
+            print(f"-> tts:   openrouter/{OPENROUTER_TTS_MODEL} (voice={VOICE}) [primary]")
+        else:
+            print(
+                f"-> tts:   {TTS_MODEL} → {TTS_FALLBACK_MODEL} (voice={VOICE}) "
+                "[no OPENROUTER_API_KEY in .env]"
+            )
+    else:  # mode == "proxy"
+        print(f"-> brain: {LLM_MODEL} via proxy at {proxy_base_url}")
+        genai_client = build_proxy_genai_client(jwt, proxy_base_url)
+        llm_inst = build_llm(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
+        tts_inst = build_tts_chain(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
+        print(f"-> tts:   {OPENROUTER_TTS_MODEL} via proxy (voice={VOICE})")
 
     agent = DJCoHostAgent(
         genai_client=genai_client,

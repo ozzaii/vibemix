@@ -152,3 +152,102 @@ def test_pyproject_01_livekit_plugins_openai_explicit() -> None:
     assert '"livekit-plugins-openai>=' in text or "'livekit-plugins-openai>=" in text, (
         "livekit-plugins-openai must be an explicit dep in pyproject.toml"
     )
+
+
+# ----------------------------------------------------------------------------
+# Phase 5 — TTS-MODE-01..03 + ERR-05 — mode dispatch
+# ----------------------------------------------------------------------------
+
+
+def test_tts_mode_01_direct_default_preserves_phase4(mocker) -> None:
+    """TTS-MODE-01: build_tts_chain(gemini_api_key='g') == Phase 4 (2 entries)."""
+    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
+    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
+    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
+
+    from vibemix.agent.tts_chain import build_tts_chain
+
+    build_tts_chain(gemini_api_key="g")  # no mode → default direct, no OR
+
+    kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
+    chain = kwargs["tts"]
+    assert len(chain) == 2
+    assert openai_plugin.TTS.__init__.call_count == 0
+
+
+def test_tts_mode_02_direct_with_openrouter(mocker) -> None:
+    """TTS-MODE-02: direct mode with openrouter still gives 3 entries (Phase 4 verbatim)."""
+    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
+    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
+    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
+
+    from vibemix.agent.tts_chain import build_tts_chain
+
+    build_tts_chain(gemini_api_key="g", openrouter_api_key="or", mode="direct")
+
+    kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
+    chain = kwargs["tts"]
+    assert len(chain) == 3
+
+
+def test_tts_mode_03_proxy_single_entry(mocker) -> None:
+    """TTS-MODE-03: proxy mode returns 1-entry chain pointed at proxy/v1."""
+    import pytest
+
+    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
+    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
+    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
+
+    from vibemix.agent.tts_chain import build_tts_chain
+
+    build_tts_chain(
+        mode="proxy",
+        proxy_base_url="https://api.altidus.world",
+        jwt="jwt-x",
+    )
+
+    kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
+    chain = kwargs["tts"]
+    assert len(chain) == 1
+    assert kwargs["max_retry_per_tts"] == 1
+
+    or_kw = openai_plugin.TTS.__init__.call_args.kwargs
+    assert or_kw["base_url"] == "https://api.altidus.world/v1"
+    assert or_kw["api_key"] == "jwt-x"
+    assert or_kw["model"] == "google/gemini-3.1-flash-tts-preview"
+    assert or_kw["response_format"] == "pcm"
+
+    # No gemini_native_tts entries in proxy mode
+    assert gemini_native_tts.TTS.__init__.call_count == 0
+
+    # Avoid the unused-pytest import warning
+    _ = pytest
+
+
+def test_err_05_direct_without_gemini_key_raises():
+    import pytest
+
+    from vibemix.agent.tts_chain import build_tts_chain
+
+    with pytest.raises(ValueError, match="direct mode requires gemini_api_key"):
+        build_tts_chain()
+
+
+def test_err_05_proxy_without_args_raises():
+    import pytest
+
+    from vibemix.agent.tts_chain import build_tts_chain
+
+    with pytest.raises(ValueError) as exc:
+        build_tts_chain(mode="proxy")
+    msg = str(exc.value)
+    assert "proxy_base_url" in msg and "jwt" in msg
+
+
+def test_err_05_unknown_mode_raises():
+    import pytest
+
+    from vibemix.agent.tts_chain import build_tts_chain
+
+    with pytest.raises(ValueError, match="unknown mode"):
+        build_tts_chain(mode="garbage")  # type: ignore[arg-type]
