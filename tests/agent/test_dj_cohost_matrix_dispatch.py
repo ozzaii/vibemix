@@ -85,9 +85,7 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 # ---------- defaults (no env vars) ----------------------------------------
 
 
-def test_dispatch_01_defaults_to_intermediate_hype(
-    mocker, tmp_path, _clean_env
-) -> None:
+def test_dispatch_01_defaults_to_intermediate_hype(mocker, tmp_path, _clean_env) -> None:
     """Unset env vars → HYPE_INTERMEDIATE (= v4 SYSTEM_INSTRUCTION = backward
     compat with Phase 4)."""
     instructions = _instructions_kw_for_env(mocker, tmp_path)
@@ -213,9 +211,7 @@ def test_dispatch_08_invalid_mode_raises(mocker, tmp_path, monkeypatch) -> None:
 # ---------- CLAUDE.md privacy check: env vars don't get logged ------------
 
 
-def test_dispatch_09_env_var_values_not_logged_to_recorder(
-    mocker, tmp_path, monkeypatch
-) -> None:
+def test_dispatch_09_env_var_values_not_logged_to_recorder(mocker, tmp_path, monkeypatch) -> None:
     """Sanity: VIBEMIX_SKILL_LEVEL / VIBEMIX_MODE are not echoed into
     recorder events (they're config, not session state)."""
     monkeypatch.setenv("VIBEMIX_SKILL_LEVEL", "pro")

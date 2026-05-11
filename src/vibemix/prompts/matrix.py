@@ -366,9 +366,7 @@ def build_system_instruction(skill: str = "intermediate", mode: str = "hype") ->
     skill_norm = skill.lower().strip()
     mode_norm = mode.lower().strip()
     if skill_norm not in _VALID_SKILLS:
-        raise ValueError(
-            f"unknown skill {skill!r} — must be one of {sorted(_VALID_SKILLS)}"
-        )
+        raise ValueError(f"unknown skill {skill!r} — must be one of {sorted(_VALID_SKILLS)}")
     if mode_norm not in _VALID_MODES:
         raise ValueError(f"unknown mode {mode!r} — must be one of {sorted(_VALID_MODES)}")
     return _CELLS[(skill_norm, mode_norm)]
