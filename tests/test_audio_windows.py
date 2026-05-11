@@ -425,3 +425,205 @@ def test_open_capture_stream_handle_satisfies_audio_stream_protocol(
     # Bonus: AudioStream protocol structural check (it's NOT runtime_checkable
     # but we duck-type-verify the interface above; this is documentation).
     _ = AudioStream  # imported above for reference
+
+
+# ===== Task 2: voice / passthrough / mic stream factories =====
+
+
+# ---------- AW-11: open_voice_output (int16 mono @ 24kHz) ----------
+
+
+def test_open_voice_output_int16_24khz_mono(monkeypatch, make_registry_recorder):
+    """``open_voice_output(device_index=3, sample_rate=24000, block_size=480, callback=cb)``
+    calls ``PyAudio().open(format=paInt16, channels=1, rate=24000, output=True,
+    output_device_index=3, frames_per_buffer=480, stream_callback=cb)``. Handle
+    satisfies AudioStream.
+    """
+    fake = _make_fake_pa()
+    monkeypatch.setitem(sys.modules, "pyaudiowpatch", fake.module)
+
+    from vibemix.platform._audio_windows import AudioWindows
+
+    reg, rec = make_registry_recorder()
+    backend = AudioWindows(reg, rec)
+
+    def cb(*_a, **_kw):  # pragma: no cover — not called in mock
+        return None
+
+    handle = backend.open_voice_output(3, sample_rate=24000, block_size=480, callback=cb)
+
+    fake.instance.open.assert_called_once()
+    kwargs = fake.instance.open.call_args.kwargs
+    assert kwargs["format"] == fake.module.paInt16
+    assert kwargs["channels"] == 1
+    assert kwargs["rate"] == 24000
+    assert kwargs["output"] is True
+    assert kwargs["output_device_index"] == 3
+    assert kwargs["frames_per_buffer"] == 480
+    assert kwargs["stream_callback"] is cb
+
+    # AudioStream Protocol duck-type check.
+    assert callable(handle.start)
+    assert callable(handle.stop)
+    assert callable(handle.close)
+    assert isinstance(handle.latency_ms, float)
+
+
+# ---------- AW-12: open_passthrough_output (float32 stereo @ 48kHz) ----------
+
+
+def test_open_passthrough_output_float32_48khz_stereo(monkeypatch, make_registry_recorder):
+    """``open_passthrough_output(device_index=5, sample_rate=48000, channels=2,
+    block_size=256, callback=cb)`` calls ``open(format=paFloat32, channels=2,
+    rate=48000, output=True, output_device_index=5, frames_per_buffer=256,
+    stream_callback=cb)``.
+    """
+    fake = _make_fake_pa()
+    monkeypatch.setitem(sys.modules, "pyaudiowpatch", fake.module)
+
+    from vibemix.platform._audio_windows import AudioWindows
+
+    reg, rec = make_registry_recorder()
+    backend = AudioWindows(reg, rec)
+
+    def cb(*_a, **_kw):  # pragma: no cover
+        return None
+
+    backend.open_passthrough_output(5, sample_rate=48000, channels=2, block_size=256, callback=cb)
+
+    kwargs = fake.instance.open.call_args.kwargs
+    assert kwargs["format"] == fake.module.paFloat32
+    assert kwargs["channels"] == 2
+    assert kwargs["rate"] == 48000
+    assert kwargs["output"] is True
+    assert kwargs["output_device_index"] == 5
+    assert kwargs["frames_per_buffer"] == 256
+    assert kwargs["stream_callback"] is cb
+
+
+# ---------- AW-13: open_mic_capture (float32 mono @ 48kHz) ----------
+
+
+def test_open_mic_capture_float32_48khz_mono(monkeypatch, make_registry_recorder):
+    """``open_mic_capture(device_index=2, sample_rate=48000, block_size=480,
+    callback=cb)`` calls ``open(format=paFloat32, channels=1, rate=48000,
+    input=True, input_device_index=2, frames_per_buffer=480,
+    stream_callback=cb)``.
+    """
+    fake = _make_fake_pa()
+    monkeypatch.setitem(sys.modules, "pyaudiowpatch", fake.module)
+
+    from vibemix.platform._audio_windows import AudioWindows
+
+    reg, rec = make_registry_recorder()
+    backend = AudioWindows(reg, rec)
+
+    def cb(*_a, **_kw):  # pragma: no cover
+        return None
+
+    backend.open_mic_capture(2, sample_rate=48000, block_size=480, callback=cb)
+
+    kwargs = fake.instance.open.call_args.kwargs
+    assert kwargs["format"] == fake.module.paFloat32
+    assert kwargs["channels"] == 1
+    assert kwargs["rate"] == 48000
+    assert kwargs["input"] is True
+    assert kwargs["input_device_index"] == 2
+    assert kwargs["frames_per_buffer"] == 480
+    assert kwargs["stream_callback"] is cb
+
+
+# ---------- AW-14: each open_* creates its own PyAudio instance ----------
+
+
+def test_streams_share_single_pyaudio_instance_per_call(monkeypatch, make_registry_recorder):
+    """Each ``open_*`` method instantiates its OWN ``pa.PyAudio()`` instance
+    and stores it on the returned handle for the eventual ``terminate()`` on
+    close — matches macOS ``sd.Stream`` lifecycle where each stream owns a
+    PortAudio handle.
+
+    With three open_* calls, ``pa.PyAudio()`` should be called 3 times (the
+    fake returns the same MagicMock instance each time, but the call_count
+    on the constructor confirms three separate instantiations).
+    """
+    fake = _make_fake_pa()
+    monkeypatch.setitem(sys.modules, "pyaudiowpatch", fake.module)
+
+    from vibemix.platform._audio_windows import AudioWindows
+
+    reg, rec = make_registry_recorder()
+    backend = AudioWindows(reg, rec)
+
+    def cb(*_a, **_kw):  # pragma: no cover
+        return None
+
+    backend.open_voice_output(3, sample_rate=24000, block_size=480, callback=cb)
+    backend.open_passthrough_output(5, sample_rate=48000, channels=2, block_size=256, callback=cb)
+    backend.open_mic_capture(2, sample_rate=48000, block_size=480, callback=cb)
+
+    # 3 separate PyAudio() constructions for the three open_* calls.
+    assert fake.module.PyAudio.call_count == 3
+
+
+# ---------- AW-15: handle.close() terminates the parent PyAudio ----------
+
+
+def test_stream_handle_close_terminates_pyaudio(monkeypatch, make_registry_recorder):
+    """``handle.close()`` calls ``stream.close()`` AND
+    ``pyaudio_instance.terminate()`` exactly once each (assert via mock
+    call_count). Run on a voice_output stream so no rate guard runs first
+    (the open_capture path's rate guard would inflate terminate's call_count).
+    """
+    fake = _make_fake_pa()
+    monkeypatch.setitem(sys.modules, "pyaudiowpatch", fake.module)
+
+    from vibemix.platform._audio_windows import AudioWindows
+
+    reg, rec = make_registry_recorder()
+    backend = AudioWindows(reg, rec)
+
+    handle = backend.open_voice_output(
+        3, sample_rate=24000, block_size=480, callback=lambda *a: None
+    )
+
+    # Before close: stream NOT closed, PyAudio NOT terminated.
+    assert fake.stream.close.call_count == 0
+    assert fake.instance.terminate.call_count == 0
+
+    handle.close()
+
+    fake.stream.close.assert_called_once()
+    fake.instance.terminate.assert_called_once()
+
+
+# ---------- AW-16: callback signature compatible with PyAudio's expected shape ----------
+
+
+def test_callback_signature_compatible_with_pyaudio_shape(monkeypatch, make_registry_recorder):
+    """Provide a callback shaped per PyAudio's expected signature
+    ``(in_data, frame_count, time_info, status)`` and smoke-call the captured
+    ``stream_callback`` with realistic args — no exception.
+    """
+    fake = _make_fake_pa()
+    monkeypatch.setitem(sys.modules, "pyaudiowpatch", fake.module)
+
+    from vibemix.platform._audio_windows import AudioWindows
+
+    reg, rec = make_registry_recorder()
+    backend = AudioWindows(reg, rec)
+
+    called = []
+
+    def cb(in_data, frame_count, time_info, status):
+        called.append((len(in_data) if in_data else 0, frame_count, status))
+        # PyAudio expects (None, paContinue) tuple return — we just need
+        # something tuple-shaped for the smoke call to not crash.
+        return (None, 0)
+
+    backend.open_capture(0, sample_rate=48000, channels=2, block_size=480, callback=cb)
+
+    captured_cb = fake.instance.open.call_args.kwargs["stream_callback"]
+    # 480 frames * 2 channels * 2 bytes (int16) = 1920 bytes per chunk.
+    result = captured_cb(b"\x00" * 1920, 480, {}, 0)
+    assert called == [(1920, 480, 0)]
+    assert result == (None, 0)
