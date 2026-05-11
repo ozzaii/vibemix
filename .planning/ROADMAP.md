@@ -13,7 +13,7 @@
 - [x] **Phase 1: Platform Protocol Firewall** - `platform/` Protocol classes + package skeleton + dependency lockfile + SignPath OSS application filed (day-1, 3-week lead time). _**Complete 2026-05-11.** SignPath form submission Kaan-side pending (reCAPTCHA)._
 - [x] **Phase 2: Audio Core Port + Ring Buffer Fix** - Port `AudioBuffer`/`MicBuffer`/`Levels`/`PlaybackQueue` from POC into pre-allocated ring buffers (fixes `np.concatenate` callback regression). _**Complete 2026-05-11.**_
 - [x] **Phase 3: Sensing & State Port** - Port `MusicState` 10Hz writer + `EventDetector` + `AICoach` + `audible-deck` detection + screen/track sense from POC. _**Complete 2026-05-11.**_
-- [ ] **Phase 4: LiveKit Cascade Agent Pivot** - Replace `RealtimeModel` with `AgentSession` cascade (`stt=None`, `vad=None`, `llm=google.LLM`, `tts=google.beta.gemini_tts.TTS`) + `DJCoHostAgent.llm_node()` override + bundled local `livekit-server --dev`.
+- [x] **Phase 4: LiveKit Cascade Agent Pivot** (completed 2026-05-11) - Replace `RealtimeModel` with `AgentSession` cascade (`stt=None`, `vad=None`, `llm=google.LLM`, `tts=FallbackAdapter[OpenRouter Gemini TTS + Gemini native]`) + `DJCoHostAgent.llm_node()` multimodal override + headless session (no LiveKit Room — ARCH-06 re-mapped). 346 tests green; 12/12 acceptance gates PASS.
 - [ ] **Phase 5: FastAPI Proxy + Install-UUID JWT** - `api.altidus.world` Gemini proxy with slowapi rate limit + Redis quota + OS-keychain JWT storage (parallelizes with Phases 1-4).
 - [ ] **Phase 6: Genre-Aware Phase Detection** - Percentile-based phase detector + 5-genre profile JSON + crest-factor compression detect + BPM half/double validator + vocal-section detector.
 - [ ] **Phase 7: Windows Port (Audio + Screen)** - `PyAudioWPatch` WASAPI loopback + `mss` + `pywin32` window enum + Windows sample-rate sanity test (parallelizes with Phase 6).
@@ -93,11 +93,11 @@ Plans:
   4. Reconnect-on-error works: a manually-killed Gemini call retries up to 3 times within 6 seconds and logs `session_error` in `events.jsonl` if all retries fail. _(FallbackAdapter `max_retry_per_tts=1` handles TTS-side retries; LLM-side retries are inside `generate_content_stream` exception handling and don't auto-retry — log + skip turn matches v4 behavior. Reconnect semantics revisit in Phase 16 (verification gate) if soak tests reveal a gap.)_
 **Plans:** 5 plans
 Plans:
-- [ ] 04-01-PLAN.md — agent persona + config + LLM factory + TTS chain (OpenRouter monkey-patch)
-- [ ] 04-02-PLAN.md — DJCoHostAgent + PlaybackQueueAudioOutput (multimodal llm_node + TTS sink)
-- [ ] 04-03-PLAN.md — runtime loops (coach event pump + diag meter + WS mascot bus)
-- [ ] 04-04-PLAN.md — __main__ orchestrator + CI integration smoke
-- [ ] 04-05-PLAN.md — 12-gate verification + phase SUMMARY + ROADMAP/STATE advance
+- [x] 04-01-PLAN.md — agent persona + config + LLM factory + TTS chain (OpenRouter monkey-patch)
+- [x] 04-02-PLAN.md — DJCoHostAgent + PlaybackQueueAudioOutput (multimodal llm_node + TTS sink)
+- [x] 04-03-PLAN.md — runtime loops (coach event pump + diag meter + WS mascot bus)
+- [x] 04-04-PLAN.md — __main__ orchestrator + CI integration smoke
+- [x] 04-05-PLAN.md — 12-gate verification + phase SUMMARY + ROADMAP/STATE advance
 
 ### Phase 5: FastAPI Proxy + Install-UUID JWT
 **Goal**: `api.altidus.world` hosts the Gemini proxy with install-UUID JWTs, slowapi rate limiting, and Redis quotas. The client never holds a raw Gemini key. (Parallelizable with Phases 1-4 — proxy work is independent FastAPI route work on existing Bravoh infrastructure.)
@@ -298,7 +298,7 @@ Plans:
 | 1. Platform Protocol Firewall | 0/? | Not started | - |
 | 2. Audio Core Port + Ring Buffer Fix | 0/? | Not started | - |
 | 3. Sensing & State Port | 0/? | Not started | - |
-| 4. LiveKit Cascade Agent Pivot | 0/? | Not started | - |
+| 4. LiveKit Cascade Agent Pivot | 5/5 | Complete | 2026-05-11 |
 | 5. FastAPI Proxy + Install-UUID JWT | 0/? | Not started | - |
 | 6. Genre-Aware Phase Detection | 0/? | Not started | - |
 | 7. Windows Port (Audio + Screen) | 0/? | Not started | - |
