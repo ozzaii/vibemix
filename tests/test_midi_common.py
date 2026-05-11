@@ -53,8 +53,11 @@ class _FakePort:
         return self._scripted.pop(0)
 
 
-def _make_fake_mido(input_names: list[str], port: _FakePort | None = None,
-                    open_input_raises: Exception | None = None):
+def _make_fake_mido(
+    input_names: list[str],
+    port: _FakePort | None = None,
+    open_input_raises: Exception | None = None,
+):
     """Builds a SimpleNamespace mimicking the mido module surface used by
     `midi_listener_thread`: ``get_input_names()`` and ``open_input(name)``."""
     open_calls: list[str] = []
