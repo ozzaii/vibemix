@@ -35,7 +35,6 @@ from vibemix.midi import (
     MidiEvent,
 )
 
-
 # ---------- Helpers ----------
 
 
