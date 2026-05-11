@@ -53,6 +53,7 @@ Issues = "https://github.com/ozzaii/vibemix/issues"
 dev = [
     "ruff>=0.7",
     "pytest>=8.0",
+    "pytest-mock>=3.15.1",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -81,3 +82,6 @@ docstring-code-format = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = [
+    "macos_audio: requires BlackHole 2ch present (opt-in smoke test, Plan 05)",
+]
