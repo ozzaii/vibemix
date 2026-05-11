@@ -1,12 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
 """EventDetector — verbatim port of cohost_v4.py:1169-1325.
 
-ONE STRUCTURAL DEVIATION FROM V4: v4:1182-1186 had three class-level constants
-(MUSIC_PRESENCE_MIN_SECONDS, BPM_VALID_MIN, BPM_VALID_MAX). 02-PATTERNS.md +
-03-CONTEXT.md lifted them OUT to ``vibemix.audio.constants`` so all tuning
-lives in one place. EventDetector imports them at module scope here; the
-class no longer defines them as attributes. Every other line of the v4 body
-is byte-for-byte identical.
+TWO STRUCTURAL DEVIATIONS FROM V4:
+  1. (Phase 3) v4:1182-1186 had three class-level constants
+     (MUSIC_PRESENCE_MIN_SECONDS, BPM_VALID_MIN, BPM_VALID_MAX). 02-PATTERNS.md
+     + 03-CONTEXT.md lifted them OUT to ``vibemix.audio.constants`` so all
+     tuning lives in one place. EventDetector imports them at module scope
+     here; the class no longer defines them as attributes.
+  2. (Phase 6) LAYER_ARRIVAL is now gated on ``not state.vocal_active`` —
+     vocal-arrival band jumps are suppressed when the vocal-section detector
+     (Phase 6 Wave 2) has flagged active vocals (06-CONTEXT.md §EventDetector).
+     The baseline ``self.last_band_signature = sig`` line is preserved so a
+     non-vocal post-vocal jump doesn't false-fire against a stale baseline.
+     Every other gate + cooldown is v4 byte-identical.
 
 The three cardinal rules (from v4:1170-1180):
     1. KAAN_SPOKE + MANUAL always bypass the music-presence gate.
@@ -158,7 +164,11 @@ class EventDetector:
         if self.last_band_signature is not None and self._cooldown_ok("LAYER_ARRIVAL", now):
             mid_jump = sig[0] - self.last_band_signature[0]
             high_jump = sig[1] - self.last_band_signature[1]
-            if (mid_jump > 0.15 or high_jump > 0.10) and state.rms > LOW_RMS:
+            if (
+                (mid_jump > 0.15 or high_jump > 0.10)
+                and state.rms > LOW_RMS
+                and not state.vocal_active
+            ):
                 ev = Event(
                     "LAYER_ARRIVAL",
                     state,

@@ -44,6 +44,7 @@ from livekit.agents import AgentSession
 from scipy.signal import resample_poly
 
 from vibemix import __version__
+from vibemix._main_helpers import apply_genre_env
 from vibemix.agent import (
     INPUT_DEVICE,
     LLM_MODEL,
@@ -235,6 +236,13 @@ async def main() -> None:
                 f"Check VIBEMIX_PROXY_BASE_URL and connectivity."
             )
         print(f"-> mode: proxy (install_uuid={install_uuid[:8]}..., jwt cached)")
+
+    # ----- Phase 6 genre profile dispatch -----
+    applied_genre = apply_genre_env()
+    if applied_genre is None:
+        print("-> genre profile: none (Phase 3 absolute-threshold fallback)")
+    else:
+        print(f"-> genre profile: {applied_genre}")
 
     # --- Phase 2 audio primitives ---
     import time as _time  # local import so the test suite can mock time.time without import-time side effects
