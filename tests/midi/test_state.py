@@ -31,7 +31,6 @@ import pytest
 from vibemix.midi import ControllerProfile, ControllerState, MidiEvent, load_profile
 from vibemix.midi.profile import ButtonBinding, ControlBinding
 
-
 # ---------- Helpers ----------
 
 
