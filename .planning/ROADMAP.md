@@ -16,7 +16,7 @@
 - [x] **Phase 4: LiveKit Cascade Agent Pivot** (completed 2026-05-11) - Replace `RealtimeModel` with `AgentSession` cascade (`stt=None`, `vad=None`, `llm=google.LLM`, `tts=FallbackAdapter[OpenRouter Gemini TTS + Gemini native]`) + `DJCoHostAgent.llm_node()` multimodal override + headless session (no LiveKit Room — ARCH-06 re-mapped). 346 tests green; 12/12 acceptance gates PASS.
 - [x] **Phase 5: FastAPI Proxy + Install-UUID JWT** - `api.altidus.world` Gemini proxy with slowapi rate limit + Redis quota + OS-keychain JWT storage (parallelizes with Phases 1-4).
 - [x] **Phase 6: Genre-Aware Phase Detection** - Percentile-based phase detector + 5-genre profile JSON + crest-factor compression detect + BPM half/double validator + vocal-section detector. _**Complete 2026-05-11.**_
-- [ ] **Phase 7: Windows Port (Audio + Screen)** - `PyAudioWPatch` WASAPI loopback + `mss` + `pywin32` window enum + Windows sample-rate sanity test (parallelizes with Phase 6).
+- [ ] **Phase 7: Windows Port (Audio + Screen)** - `PyAudioWPatch` WASAPI loopback + `mss` + `pywin32` window enum + Windows sample-rate sanity test (parallelizes with Phase 6). _**Planned 2026-05-11** — 5 plans across 5 waves; mocked tests run on macOS CI, live windows_only tests collected for Phase 20._
 - [ ] **Phase 8: macOS ScreenCaptureKit Migration** - Replace deprecated Quartz `CGWindowListCreateImageFromArray` with `pyobjc-framework-ScreenCaptureKit` (parallelizes with Phases 6-7).
 - [ ] **Phase 9: MIDI Controller Library (10 + Generic Fallback)** - Curated mappings for DDJ-FLX4/400/FLX6/FLX10/1000/SX3, XDJ-RX3, Numark Party Mix Live, Hercules Inpulse 300/500 + generic positional fallback + hot-plug re-enumeration (parallelizes with Phases 6-8).
 - [ ] **Phase 10: Prompt Template Matrix (6 cells + Anti-Slop)** - 6 prompt templates (3 skill × 2 mode) + negative dictionary + `TurnHistory` anti-repetition + `<silence/>` short-circuit + describe-before-infer + past-tense framing.
@@ -136,13 +136,19 @@ Plans:
 ### Phase 7: Windows Port (Audio + Screen)
 **Goal**: Windows feature parity for audio capture (PyAudioWPatch WASAPI loopback — no virtual cable needed) and screen capture (`mss` + `pywin32` EnumWindows). Sample-rate sanity test catches BlackHole-Sonoma-like rate halving on both OSes. (Parallelizable with Phase 6 — independent platform implementations once Phase 1 protocols are pinned.)
 **Depends on**: Phase 1 (protocols), Phase 2 (audio-core port).
-**Requirements**: AUDIO-02, AUDIO-03, AUDIO-04, AUDIO-05, SCREEN-02, SCREEN-06.
+**Requirements**: AUDIO-02, AUDIO-03, AUDIO-04, AUDIO-05, SCREEN-02, SCREEN-06, ARCH-02.
 **Success Criteria** (what must be TRUE):
   1. On a fresh Windows 11 machine with no virtual cable installed, vibemix captures system audio via WASAPI loopback (`get_default_wasapi_loopback()`) without user-driver install.
   2. Master output device auto-detect picks the correct default playback device on both OSes — verified on macOS with built-in speakers, USB DAC, and AirPods + on Windows with built-in speakers, USB DAC, and Bluetooth headphones.
   3. 1kHz sample-rate sanity tone test at startup detects mis-rated loopbacks (peak not at 1kHz ± 5%) and surfaces a recalibration prompt — catches BlackHole Sonoma half-rate bug on macOS and WASAPI sample-rate mismatch on Windows.
   4. Output destination picker disables mic capture in speakers mode (P12 feedback-loop prevention) — verified on Windows speakers test that no `KAAN_SPOKE` events fire during AI TTS playback.
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 07-01-PLAN.md — Platform selector dispatch + _midi_common.py refactor (shared listener) + Windows-only deps in pyproject (pyaudiowpatch / pywin32 / winsdk markers)
+- [ ] 07-02-PLAN.md — AudioWindows (PyAudioWPatch WASAPI loopback default-playback-device capture + sample-rate sanity guard + standard PyAudio output/mic streams)
+- [ ] 07-03-PLAN.md — ScreenWindows (mss + pywin32 EnumWindows + 5-app DJ hint list) + TrackWindows (winsdk SMTC via asyncio.run executor bridge + graceful fallback)
+- [ ] 07-04-PLAN.md — MidiWindows (thin wrapper on _midi_common + ControllerState reuse) + cross-platform integration test (selector + lazy-import contract verified on macOS CI)
+- [ ] 07-05-PLAN.md — docs/windows-setup.md + 10-gate verification + 07-SUMMARY + STATE/ROADMAP advance to Phase 8
 
 ### Phase 8: macOS ScreenCaptureKit Migration
 **Goal**: Replace deprecated `Quartz.CGWindowListCreateImageFromArray` (obsoleted in macOS 15.0) with `pyobjc-framework-ScreenCaptureKit` for forward-compat to macOS 16+. Keep `Quartz.CGWindowListCopyWindowInfo` for window enumeration. (Parallelizable with Phases 6-7.)
