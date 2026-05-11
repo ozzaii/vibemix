@@ -1,0 +1,27 @@
+# vibemix proxy — LOCAL DEV ONLY.
+# Production on Bravoh's server uses an external Redis (already running
+# for bravoh-api/bravoh-celery). See proxy/README.md (plan 05-05) for
+# production deployment.
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: vibemix-proxy-redis-dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  proxy:
+    build: .
+    container_name: vibemix-proxy-dev
+    ports:
+      - "8788:8788"
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy

@@ -60,3 +60,7 @@ $RECYCLE.BIN/
 recordings/
 *.wav
 *.jsonl
+
+# vibemix proxy (independent Python project under proxy/)
+proxy/.env
+proxy/.venv/
