@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v0.1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-11T19:07:48.690Z"
+last_updated: "2026-05-11T20:00:00.000Z"
 progress:
   total_phases: 20
-  completed_phases: 2
-  total_plans: 31
-  completed_plans: 13
-  percent: 42
+  completed_phases: 7
+  total_plans: 36
+  completed_plans: 18
+  percent: 35
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-11 (Phase 6 complete)
+**Last updated:** 2026-05-11 (Phase 7 ✅ complete)
 
 ---
 
@@ -22,7 +22,7 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 07 — windows-port-audio-screen
+- **Current focus:** Phase 08 — macOS ScreenCaptureKit Migration (next).
 - **Milestone:** v1 (Bravoh-wedge drop) — target ship ~3-4 weeks (~early June 2026, before Bravoh public launch).
 - **Project mode:** standard.
 - **Granularity:** fine (20 phases).
@@ -32,16 +32,18 @@ progress:
 
 ## Current Position
 
-Phase: 07 (windows-port-audio-screen) — EXECUTING
-Plan: 1 of 5
+Phase 7 ✅ complete — Windows Port (Audio + Screen) shipped: four Windows backends + selector + `_midi_common` refactor + windows-setup.md doc. Mocked-test verified on macOS; Phase 20 CI runs windows_only live tests on `windows-latest`.
 
-- **Phase:** 07 — Windows Port (Audio + Screen) (next).
+Phase: 08 (macOS ScreenCaptureKit Migration) — NEXT
+Plan: None yet — needs `/gsd-discuss-phase 08`.
+
+- **Phase:** 08 — macOS ScreenCaptureKit Migration (replaces deprecated `Quartz.CGWindowListCreateImageFromArray`; parallelizes with Phase 9).
 - **Plan:** None active.
-- **Status:** Executing Phase 07
-- **Progress:** 6/20 phases complete.
+- **Status:** Phase 7 closed; Phase 8 not yet started.
+- **Progress:** 7/20 phases complete.
 
 ```
-[██████              ] 30% (6/20 phases)
+[███████             ] 35% (7/20 phases)
 ```
 
 ---
@@ -52,7 +54,7 @@ Plan: 1 of 5
 
 | Metric | Value |
 |--------|-------|
-| Phases complete | 6 / 20 |
+| Phases complete | 7 / 20 |
 | v1 requirements mapped | 128 / 128 |
 | v1 requirements complete | 22 / 128 |
 | Critical pitfalls mitigated | 0 / 9 |
@@ -122,15 +124,16 @@ None yet — all dependencies are pinned and verified.
 
 - 2026-05-11 — Phase 2 (Audio Core Port + Ring Buffer Fix) shipped end-to-end: 4 wave commits (`bb63774` skeleton+constants+Levels, `59fdb62` ring-buffer rewrite fixes np.concatenate at v4:300+v4:462, `54e6432` features.py DSP + VoiceRecorder, `62413e9` AudioMacOS impl + sample-rate guard) + verification gate (8/8 pass) + phase SUMMARY. tracemalloc tests pin zero-alloc invariant on both buffer push paths. AudioMacOS satisfies @runtime_checkable AudioBackend Protocol via isinstance. SampleRateMismatchError raises with Audio MIDI Setup actionable message on both pre-open and post-open paths. Phase 1 firewall test relaxed to skip underscore-prefixed concrete impls (planned amendment per Plan 04 critical constraint). 78 tests green (10 Phase 1 + 14 W1 + 21 W2 + 20 W3 + 13 W4). 2 live BlackHole smoke tests collected under macos_audio marker.
 - 2026-05-11 — Phase 3 (Sensing & State Port) shipped end-to-end: 4 wave commits (`c923025` MusicState + classify_phase + audible-deck/track resolvers v4 verbatim, `8106a16` Event + EventDetector with class-attrs removed/imported from vibemix.audio.constants, `9104052` AICoach static-method-only with phase= omitted per v4:1350-1351 anti-hallucination invariant, `8e04dfc` state_refresh_loop 10Hz single writer + macOS Screen/MIDI/Track backends satisfying Phase 1 Protocols structurally). 270 tests green (78 from Phase 2 + 192 new). All 11 acceptance gates PASS. DDJ-FLX4 _CC_MAP/_NOTE_MAP byte-identical to v4:582-598 (asserted by equality test). AICoach task strings byte-for-byte from v4:1391-1427 (golden-string tests). MUSIC_PRESENCE_MIN_SECONDS / BPM_VALID_MIN / BPM_VALID_MAX lifted from EventDetector class-attrs to vibemix.audio.constants module scope. Pioneer DDJ-FLX4 play-state limitation reproduced verbatim from v4 (Phase 9 fix docketed in _midi_macos.py docstring). macOS ScreenCaptureKit migration docketed for Phase 8. POC files untouched (v4 still runnable via run_v4.sh throughout the entire phase).
+- 2026-05-11 — Phase 7 (Windows Port — Audio + Screen) shipped end-to-end: 5 wave commits (`76d3065` Wave 1 — platform selector + `_midi_common` extraction + Windows-only deps in pyproject with `sys_platform == 'win32'` markers, `6ebd5e5` Wave 2 plan 07-02 — AudioWindows WASAPI loopback impl + sample-rate guard, `84586ec` Wave 2 plan 07-03 — ScreenWindows + TrackWindows via winsdk SMTC + asyncio.run executor bridge, `df97dd3` Wave 3 — MidiWindows + cross-platform integration test, + final Wave 4 docs commit closing the phase). 614 tests green (531 Phase 6 baseline + 83 new across 5 mocked + 1 integration + 1 _midi_common test file + 4 live stubs gated on windows_only). All 10 acceptance gates PASS with 2 documented pre-existing items (test_audio_macos_live HEADPHONEMG env mismatch from Wave 1 baseline + ruff I001 in test_midi_common.py from Wave 1 — both in deferred-items.md). Selector + lazy-import contract pinned: `pyaudiowpatch` / `win32*` / `winsdk` never reach sys.modules on macOS, verified by integration test. winsdk async API bridged via `asyncio.run` inside `loop.run_in_executor` — mirrors macOS subprocess pattern (Phase 8 ScreenCaptureKit will adopt same pattern). Windows-only deps via `sys_platform == 'win32'` markers in `[project] dependencies` (chosen over `[project.optional-dependencies]` group — simpler for both `uv sync` and PyInstaller). DJ-app hint list expanded from macOS's djay-only to `("djay", "serato", "traktor", "rekordbox", "virtualdj")` — Windows is where Serato/Traktor/rekordbox/VirtualDJ users live. `docs/windows-setup.md` (92 lines, 8 sections) covers Phase 20 fresh-machine rehearsal + early Windows DJ-friend testers. ControllerState cross-imported from `_midi_macos` into `_midi_windows` — extraction to `_midi_common.py` deferred to Phase 9. POC files diff-untouched throughout (verified by Gate 10). Optional Kaan-verify checkpoint skipped — Kaan doesn't have Windows handy; Phase 20 CI matrix on `windows-latest` is the authoritative live gate.
 - 2026-05-11 — Phase 6 (Genre-Aware Phase Detection) shipped end-to-end: 4 wave commits (`11d358a` genre profile system + 5 JSON profiles + active-profile singleton + hand-written schema validator, `1c4e264` crest factor + EMA smoother + BPM half/double validator + VocalDetector with 1.5s/2.5s hysteresis, `01ff963` percentile phase detector + MusicState +4 fields + state_refresh_loop wiring + Phase 3 golden equivalence pinned, `84b6978` EventDetector LAYER_ARRIVAL vocal gate + VIBEMIX_GENRE_PROFILE env + vibemix.state re-exports) + final docs commit closing the phase. 531 tests green (385 Phase 5 baseline + 146 new). All 10 acceptance gates PASS. 5 hand-tuned genre profile JSONs (techno / house / drum_and_bass / disco / pop) ship in the wheel via hatchling default package-data inclusion (verified via `uv build --wheel` + `unzip -l`). Phase 3 golden equivalence pinned across 10 parametric curves — `classify_phase(curve, audible, profile=None)` returns the SAME string as the original v4 body for the SAME inputs. MusicState gains 4 new fields (`crest_factor`, `vocal_active`, `bpm_corrected`, `genre_profile_name`) with backward-compat defaults — Phase 3's `test_music_state.py` passes unchanged. Hysteresis state in `state_refresh_loop` local scope, NOT MusicState (Critical Constraint 7). LAYER_ARRIVAL gate is the ONLY EventDetector change — other 5 event types byte-identical to v4. POC files diff-untouched (`cohost_v4.py` + `run_v4.sh` continue to function unchanged throughout the entire phase). SENSE-10's 30-min per-genre validation harness deferred to Phase 16 per CONTEXT out-of-scope clause. Open To-do: collect 30-min recorded sets per genre — can begin now in parallel with Phase 7.
 - 2026-05-11 — Phase 5 (FastAPI Proxy + Install-UUID JWT) shipped end-to-end: 5 wave commits (`c04b403` proxy scaffold — FastAPI app + healthz + pydantic-settings + Redis quota helper + Dockerfile + compose, `1549130` JWT auth HS256-only with alg=none blocked + /register IP-keyed + slowapi limiter wiring, `ba8a013` LLM SSE + TTS PCM routes — Gemini-native paths verified vs SDK URL builder + circuit breaker + upstream-secret sanitization with zero-AIza leakage test, `3a3bc4c` client install_uuid + JWT cache + factory mode dispatch with NO silent fallback, + final docs commit). 385 vibemix tests green (346 baseline + 39 client-side) + 79 proxy tests green. All 8 acceptance gates PASS — G3 (zero AIza in src/vibemix/) and G6 (alg=none blocked) are the phase-level invariants. `proxy/` is an independent Python project with own pyproject.toml + uv.lock + .venv. Routes mirror genai SDK URL shape (`/v1beta/models/{model}:streamGenerateContent` + sibling + `/v1/audio/speech` OpenAI-compat); CONTEXT's `/api/vibemix/v1/llm/generate` superseded by RESEARCH Q1. JWT TTL 90 days (locked); ROADMAP's `15-30 min` reconciled. slowapi via @limiter.limit() decorator NOT SlowAPIMiddleware (RESEARCH Q2). google_plugin.LLM accepts http_options directly (verified at livekit/plugins/google/llm.py:117). Client-side install_uuid keyring + file fallback handles Pitfall 6 (null backend detection). NO silent fallback proxy → direct — setup failures sys.exit non-zero. POC files diff-untouched against Phase 4 close. Deployment runbook in proxy/README.md covers Docker + nginx + PM2 + Pitfalls 2/4/6; actual deployment to api.altidus.world pending Kaan's operational schedule (does NOT block phase close).
 - 2026-05-11 — Phase 4 (LiveKit Cascade Agent Pivot) shipped end-to-end: 4 wave commits (`28f5f09` agent persona + config + LLM factory + TTS chain with OpenRouter monkey-patch, `1fa021a` DJCoHostAgent llm_node override + PlaybackQueueAudioOutput sink, `2b7ea9b` runtime loops — coach event pump + diag meter + WS mascot bus, `ede9e59` __main__ orchestrator + CI integration smoke). 346 tests green (270 from Phase 3 + 76 new across agent/runtime/smoke). All 12 acceptance gates PASS. SYSTEM_INSTRUCTION byte-identical to v4:150-213. OpenRouter monkey-patch active at module load (TTS-01 pins invariant). DJCoHostAgent.llm_node bypasses LiveKit's text-only cascade and calls `google.genai.aio.models.generate_content_stream` directly with last 18s of audio attached as multimodal Part. Single-modality `screen_jpeg = None` preserved (v4:1502-1503 anti-hallucination). Per-invocation dump folder structure preserved verbatim for live-debug parity. Twin AudioBuffer instances in main() (140s state + INVOKE_AUDIO_SECONDS+5.0 clean). session.output.audio assigned BEFORE session.start (v4:2030-2033 invariant). _HAS_WS feature flag dropped (Phase 2 anti-pattern fix). WS_HOST/WS_PORT centralized in vibemix.audio.constants. Integration smoke test runs in CI without devices via mocked AudioMacOS + LiveKit + Gemini. ARCH-06 re-mapped — cascade runs headless (no Room) per v4:2031, no bundled livekit-server binary needed; documented in 04-SUMMARY.md Deviations. POC files untouched throughout (v4 still runnable via run_v4.sh).
 
 ### Next Session
 
-- Continue from Phase 7 (Windows Port — Audio + Screen — AUDIO-02, AUDIO-03, AUDIO-04, AUDIO-05, SCREEN-02, SCREEN-06). `PyAudioWPatch` WASAPI loopback + `mss` + `pywin32` window enum + sample-rate sanity test. Parallelizes with Phases 8 (macOS ScreenCaptureKit migration) and 9 (MIDI controller library).
-- Kaan-side outstanding: SignPath OSS application (Phase 1 carry-forward, ~1 week SLA). Optional live smoke verification of `python -m vibemix` vs `./run_v4.sh` on his rig (run `VIBEMIX_LIVE_SMOKE=1 uv run pytest -m macos_audio tests/test_main_live.py`). **Phase 5 carry-over**: deploy `proxy/` to `api.altidus.world` per `proxy/README.md` Production deployment when ready. **Phase 6 carry-over**: collect 30-min recorded sets per genre (techno / house / D&B / disco / pop) — Phase 16 inputs, Francesco's DJ network is the obvious source. Collection can run in parallel with Phase 7 development.
+- Continue from Phase 8 (macOS ScreenCaptureKit Migration — ARCH-02 macOS-side hardening). Replace deprecated `Quartz.CGWindowListCreateImageFromArray` with `pyobjc-framework-ScreenCaptureKit`. Keep `Quartz.CGWindowListCopyWindowInfo` for window enumeration. Parallelizes with Phase 9 (MIDI controller library).
+- Kaan-side outstanding: SignPath OSS application (Phase 1 carry-forward, ~1 week SLA). Optional live smoke verification of `python -m vibemix` vs `./run_v4.sh` on his rig. **Phase 5 carry-over**: deploy `proxy/` to `api.altidus.world` when ready. **Phase 6 + 7 carry-over**: collect 30-min recorded sets per genre (techno / house / D&B / disco / pop) for Phase 16; arrange Windows test access for Phase 20 fresh-machine rehearsal. **Phase 7 deferred items** (in `.planning/phases/07-windows-port-audio-screen/deferred-items.md`): test_audio_macos_live HEADPHONEMG env mismatch (broaden substring or mark macos_audio opt-in) + ruff I001 in test_midi_common.py (one-line `ruff check --fix`).
 
 ---
 
-*State managed by gsd-roadmapper at 2026-05-11; updated by /gsd-autonomous on 2026-05-11 (Phase 4 complete).*
+*State managed by gsd-roadmapper at 2026-05-11; updated by /gsd-autonomous on 2026-05-11 (Phase 7 complete).*
