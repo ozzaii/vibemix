@@ -20,11 +20,15 @@ Wave layout:
 
 from __future__ import annotations
 
+from vibemix.state.event import Event
+from vibemix.state.event_detector import EventDetector
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
 
 __all__ = [
+    "Event",
+    "EventDetector",
     "MusicState",
     "classify_phase",
     "derive_audible_deck",
