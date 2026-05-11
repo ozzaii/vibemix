@@ -32,7 +32,7 @@ Stand up the unified `vibemix` Python package skeleton with the `platform/` Prot
 ### Package Identity & SignPath
 - **PyPI publication:** NOT publishing to PyPI. vibemix ships as a signed installer (Phase 18), not `pip install vibemix`. Avoids name-squatting concerns and the Bravoh-internal-use complication.
 - **License files this phase:** `LICENSE` (Apache 2.0 text) at repo root + SPDX header `# SPDX-License-Identifier: Apache-2.0` in `src/vibemix/__init__.py`. `NOTICE`, `CONTRIBUTING`, `SECURITY`, `CODE_OF_CONDUCT` defer to Phase 19.
-- **GitHub repo:** create public repo `github.com/bravoh/vibemix` **during this phase**, before SignPath application. Public-but-minimal is acceptable. Required because SignPath OSS approval needs a public repo URL.
+- **GitHub repo:** create public repo `github.com/ozzaii/vibemix` (Kaan's personal account) **during this phase**, before SignPath application. Public-but-minimal is acceptable. Required because SignPath OSS approval needs a public repo URL. Bravoh Enterprise exists but has zero orgs and a billing flag — the repo lives under Kaan's personal account for now and can be transferred via `gh repo transfer` once a proper `bravoh` org is stood up; SignPath survives a rename without re-approval.
 - **SignPath OSS application workflow:** Phase 1 produces a prefilled checklist `.planning/signpath-application.md` with all required fields (repo URL, maintainer name/email, build system, project description, OSS license confirmation, expected build artifacts). **Kaan files the form himself** at signpath.org/foundation — Claude cannot submit forms with personal/business info.
 
 ### Claude's Discretion
@@ -68,7 +68,7 @@ Stand up the unified `vibemix` Python package skeleton with the `platform/` Prot
 <specifics>
 ## Specific Ideas
 
-- Repo URL for SignPath checklist: `https://github.com/bravoh/vibemix`.
+- Repo URL for SignPath checklist: `https://github.com/ozzaii/vibemix` (Kaan's personal account; transfer to bravoh-org later when org exists).
 - Maintainer email for SignPath: oozzxaaii@gmail.com (Kaan's email per memory).
 - Expected build artifacts for SignPath checklist: Windows MSI (Inno Setup wrapping PyInstaller `--onedir` payload), eventually `vibemix-setup-{version}.msi`.
 - pyproject.toml `[project]` name = `vibemix`, version = `0.1.0-dev0` (PEP 440 pre-release).
