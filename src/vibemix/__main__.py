@@ -1,0 +1,399 @@
+# SPDX-License-Identifier: Apache-2.0
+"""vibemix — async main() orchestrator. Entry point for ``python -m vibemix``.
+
+Verbatim port of ``cohost_v4.py:1925-2080`` with three structural adjustments
+demanded by the new package layout:
+
+1. **AudioMacOS as the firewall.** v4's inline ``sd.InputStream`` /
+   ``start_input_to_session`` / ``start_playback_stream`` /
+   ``start_passthrough_stream`` are replaced by ``AudioMacOS.open_capture``
+   / ``open_voice_output`` / ``open_passthrough_output`` /
+   ``open_mic_capture``. The v4 callback bodies live in 4 small factory
+   functions in this module.
+2. **Phase 2/3 backends.** ``ScreenMacOS`` / ``MidiMacOS`` / ``TrackMacOS``
+   wrap the v4 inner instances (``screen_buf`` / ``controller_state`` /
+   ``track_info``) and expose them as attributes for ``state_refresh_loop``
+   to consume unchanged.
+3. **All imports are ``vibemix.*``.** No reference to cohost_v4 at runtime.
+
+Critical ordering invariants preserved from v4:
+- ``session.output.audio = PlaybackQueueAudioOutput(...)`` is assigned BEFORE
+  ``await session.start(agent)`` (v4:2030-2033).
+- Two ``AudioBuffer`` instances: 140s gain-boosted state buffer +
+  ``INVOKE_AUDIO_SECONDS + 5.0`` natural-level clean buffer (v4:1948-1949).
+- MIDI listener thread spawned AFTER ``session.start`` (v4:2039-2043).
+- Input stream opened AFTER the 6 asyncio tasks are created
+  (state_refresh_loop must be running before audio starts pushing).
+- SIGINT/SIGTERM handlers via ``loop.add_signal_handler``.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import os
+import signal
+import sys
+import threading
+
+import numpy as np
+from dotenv import load_dotenv
+from google import genai
+from livekit.agents import AgentSession
+from scipy.signal import resample_poly
+
+from vibemix import __version__
+from vibemix.agent import (
+    INPUT_DEVICE,
+    LLM_MODEL,
+    MIC_DEVICE,
+    OPENROUTER_TTS_MODEL,
+    OUTPUT_DEVICE,
+    TTS_FALLBACK_MODEL,
+    TTS_MODEL,
+    VOICE,
+    DJCoHostAgent,
+    PlaybackQueueAudioOutput,
+    build_llm,
+    build_tts_chain,
+)
+from vibemix.audio import (
+    INPUT_CHUNK_FRAMES,
+    INPUT_SR_NATIVE,
+    INPUT_SR_TARGET,
+    INVOKE_AUDIO_SECONDS,
+    MIC_GAIN,
+    MUSIC_GAIN_TO_GEMINI,
+    OUTPUT_BLOCKSIZE,
+    OUTPUT_SR,
+    PASSTHROUGH_GAIN,
+    VOICE_BLOCKSIZE,
+    AudioBuffer,
+    BufferRegistry,
+    Levels,
+    MicBuffer,
+    PassthroughBuffer,
+    PlaybackQueue,
+    VoiceRecorder,
+)
+from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
+from vibemix.runtime import coach_loop, diag_loop, ws_broadcast
+from vibemix.state import EventDetector, MusicState, state_refresh_loop
+
+load_dotenv()
+
+
+# =============================================================================
+# CLI argument parsing
+# =============================================================================
+
+
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse CLI args. ``--version`` short-circuits via argparse's action."""
+    parser = argparse.ArgumentParser(prog="vibemix", description="Open-source AI DJ co-host.")
+    parser.add_argument("--version", action="version", version=f"vibemix {__version__}")
+    return parser.parse_args(argv)
+
+
+# =============================================================================
+# 4 callback factories — match v4 callback bodies verbatim
+# =============================================================================
+
+
+def _input_callback_factory(
+    levels: Levels,
+    passthrough: PassthroughBuffer,
+    mic: MicBuffer,
+    audio_buf: AudioBuffer,
+    clean_audio_buf: AudioBuffer,
+    recorder: VoiceRecorder,
+):
+    """Verbatim port of cohost_v4.py:912-945 input stream callback."""
+
+    def callback(indata, frames, time_info, status):
+        if status:
+            print(f"[input status] {status}", file=sys.stderr)
+        if PASSTHROUGH_GAIN != 1.0:
+            passthrough.push((indata * PASSTHROUGH_GAIN).astype(np.float32).tobytes())
+        else:
+            passthrough.push(indata.tobytes())
+
+        music48 = indata.mean(axis=1).astype(np.float32)
+        # Mic is captured on a SEPARATE stream (mic_buf) for KAAN_SPOKE
+        # detection via levels.mic; NEVER mix it into the music buffers —
+        # otherwise Gemini hears Kaan's voice as "vocals" in the track.
+        mic.pull(len(music48))  # keep cadence aligned, discard samples
+
+        state48 = music48 * MUSIC_GAIN_TO_GEMINI
+        state_pcm_48k = np.clip(state48 * 32767.0, -32768, 32767).astype(np.int16)
+        clean48 = music48
+
+        try:
+            state16f = resample_poly(state48, INPUT_SR_TARGET, INPUT_SR_NATIVE).astype(np.float32)
+            state_pcm_16k = np.clip(state16f * 32767.0, -32768, 32767).astype(np.int16)
+            audio_buf.push(state_pcm_16k)
+            recorder.push_input(state_pcm_16k.tobytes())
+
+            clean16f = resample_poly(clean48, INPUT_SR_TARGET, INPUT_SR_NATIVE).astype(np.float32)
+            clean_pcm_16k = np.clip(clean16f * 32767.0, -32768, 32767).astype(np.int16)
+            clean_audio_buf.push(clean_pcm_16k)
+        except Exception as e:
+            print(f"[buf push err] {e}", file=sys.stderr)
+
+        levels.update_music(state_pcm_48k)
+
+    return callback
+
+
+def _voice_callback_factory(playback: PlaybackQueue):
+    """Verbatim port of cohost_v4.py:885-888 voice output callback."""
+
+    def callback(outdata, frames, time_info, status):
+        if status:
+            print(f"[output status] {status}", file=sys.stderr)
+        outdata[:] = playback.pull(frames * 2)
+
+    return callback
+
+
+def _passthrough_callback_factory(passthrough: PassthroughBuffer):
+    """Verbatim port of cohost_v4.py:864-873 passthrough output callback."""
+    bytes_per_frame = 2 * 4  # stereo float32 = 8 bytes/frame
+
+    def callback(outdata, frames, time_info, status):
+        if status:
+            print(f"[passthrough status] {status}", file=sys.stderr)
+        n_bytes = frames * bytes_per_frame
+        raw = passthrough.pull(n_bytes)
+        if not raw or len(raw) < n_bytes:
+            outdata.fill(0)
+            return
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(-1, 2)
+        outdata[:] = arr
+
+    return callback
+
+
+def _mic_callback_factory(mic: MicBuffer):
+    """Verbatim port of cohost_v4.py:1965-1969 mic stream callback."""
+
+    def callback(indata, frames, time_info, status):
+        if status:
+            print(f"[mic status] {status}", file=sys.stderr)
+        mono = indata[:, 0] if indata.ndim > 1 else indata
+        mic.push(mono.astype(np.float32))
+
+    return callback
+
+
+# =============================================================================
+# main — async orchestrator
+# =============================================================================
+
+
+async def main() -> None:
+    """Verbatim port of cohost_v4.py:1925-2080 with package-aware imports."""
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        sys.exit("GEMINI_API_KEY not set")
+
+    or_key = os.environ.get("OPENROUTER_API_KEY")  # optional
+
+    # --- Phase 2 audio primitives ---
+    import time as _time  # local import so the test suite can mock time.time without import-time side effects
+
+    levels = Levels()
+    playback = PlaybackQueue(levels)
+    passthrough = PassthroughBuffer()
+    mic = MicBuffer(gain=MIC_GAIN, levels=levels)
+    audio_buf = AudioBuffer(seconds=140.0, sr=INPUT_SR_TARGET)
+    clean_audio_buf = AudioBuffer(seconds=INVOKE_AUDIO_SECONDS + 5.0, sr=INPUT_SR_TARGET)
+    recorder = VoiceRecorder()
+
+    registry = BufferRegistry(
+        audio=audio_buf,
+        clean_audio=clean_audio_buf,
+        mic=mic,
+        passthrough=passthrough,
+        playback=playback,
+        levels=levels,
+    )
+
+    # --- Phase 3 sensing/state backends ---
+    screen_macos = ScreenMacOS()
+    midi_macos = MidiMacOS()
+    track_macos = TrackMacOS()
+    state = MusicState()
+    state.set_start_at = _time.time()
+    state.phase_started_at = _time.time()
+    event_detector = EventDetector()
+
+    # --- Audio I/O via AudioMacOS firewall ---
+    audio_backend = AudioMacOS(registry, recorder)
+    input_idx = audio_backend.find_device(INPUT_DEVICE, "input")
+    output_idx = audio_backend.find_device(OUTPUT_DEVICE, "output")
+
+    stop_event = asyncio.Event()
+
+    def handle_sigint():
+        print("\n-> stopping...", flush=True)
+        stop_event.set()
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, handle_sigint)
+
+    voice_stream = audio_backend.open_voice_output(
+        output_idx,
+        sample_rate=OUTPUT_SR,
+        block_size=VOICE_BLOCKSIZE,
+        callback=_voice_callback_factory(playback),
+    )
+    print(f"-> AI voice -> {OUTPUT_DEVICE} @ {OUTPUT_SR}Hz")
+
+    pass_stream = audio_backend.open_passthrough_output(
+        output_idx,
+        sample_rate=INPUT_SR_NATIVE,
+        channels=2,
+        block_size=OUTPUT_BLOCKSIZE,
+        callback=_passthrough_callback_factory(passthrough),
+    )
+    print(f"-> djay passthrough -> {OUTPUT_DEVICE} @ {INPUT_SR_NATIVE}Hz")
+
+    # Mic stream is optional — gracefully degrade if not found (v4:1962-1979)
+    try:
+        mic_idx = audio_backend.find_device(MIC_DEVICE, "input")
+        mic_stream = audio_backend.open_mic_capture(
+            mic_idx,
+            sample_rate=INPUT_SR_NATIVE,
+            block_size=INPUT_CHUNK_FRAMES,
+            callback=_mic_callback_factory(mic),
+        )
+        print(f"-> mic on {MIC_DEVICE} @ {INPUT_SR_NATIVE}Hz")
+    except Exception as e:
+        print(f"-> mic disabled: {e}")
+        mic_stream = None
+
+    # --- LLM + TTS chain ---
+    print(f"-> brain: {LLM_MODEL} (thinking=minimal, temp=1.0)")
+    genai_client = genai.Client(api_key=api_key)
+    llm_inst = build_llm(api_key)
+    tts_inst = build_tts_chain(gemini_api_key=api_key, openrouter_api_key=or_key or None)
+    if or_key:
+        print(f"-> tts:   openrouter/{OPENROUTER_TTS_MODEL} (voice={VOICE}) [primary]")
+    else:
+        print(
+            f"-> tts:   {TTS_MODEL} → {TTS_FALLBACK_MODEL} (voice={VOICE}) "
+            "[no OPENROUTER_API_KEY in .env]"
+        )
+
+    agent = DJCoHostAgent(
+        genai_client=genai_client,
+        clean_audio_buf=clean_audio_buf,
+        screen_buf=screen_macos,
+        state=state,
+        recorder=recorder,
+        llm_inst=llm_inst,
+        tts_inst=tts_inst,
+    )
+
+    session = AgentSession(llm=llm_inst, tts=tts_inst)
+    session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
+    print(f"-> AgentSession headless (no Room); audio out → PlaybackQueue @ {OUTPUT_SR}Hz")
+
+    await session.start(agent)
+    print("-> agent started.")
+
+    trigger_state: dict = {"in_flight": False}
+    manual_trigger = asyncio.Event()
+
+    # --- MIDI daemon thread (Phase 3) ---
+    midi_stop = threading.Event()
+    midi_thread = midi_macos.start_listener_thread(midi_stop)  # noqa: F841 — daemon thread
+
+    # --- Asyncio tasks (6) ---
+    ws_task = asyncio.create_task(ws_broadcast(levels, state, manual_trigger, stop_event))
+    diag_task = asyncio.create_task(diag_loop(levels, state, stop_event))
+    screen_task = asyncio.create_task(screen_macos.run_capture_loop(state, stop_event))
+    track_task = asyncio.create_task(track_macos.run_poll_loop(stop_event))
+    refresh_task = asyncio.create_task(
+        state_refresh_loop(
+            state, audio_buf, midi_macos.controller_state, track_macos.track_info, stop_event
+        )
+    )
+    coach_task = asyncio.create_task(
+        coach_loop(
+            session,
+            agent,
+            state,
+            levels,
+            event_detector,
+            recorder,
+            manual_trigger,
+            trigger_state,
+            stop_event,
+        )
+    )
+
+    # --- Input stream — last because state must be ready ---
+    input_stream = audio_backend.open_capture(
+        input_idx,
+        sample_rate=INPUT_SR_NATIVE,
+        channels=2,
+        block_size=INPUT_CHUNK_FRAMES,
+        callback=_input_callback_factory(
+            levels, passthrough, mic, audio_buf, clean_audio_buf, recorder
+        ),
+    )
+    print(f"-> listening to {INPUT_DEVICE} @ {INPUT_SR_NATIVE}Hz -> audio_buf + clean_audio_buf")
+
+    try:
+        await stop_event.wait()
+    finally:
+        midi_stop.set()
+        for t in (coach_task, refresh_task, screen_task, ws_task, diag_task, track_task):
+            t.cancel()
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
+        try:
+            await session.aclose()
+        except Exception as e:
+            print(f"[close session err] {e}", file=sys.stderr)
+        for stream in (voice_stream, pass_stream, input_stream):
+            try:
+                stream.stop()
+                stream.close()
+            except Exception as e:
+                print(f"[close stream err] {e}", file=sys.stderr)
+        if mic_stream is not None:
+            try:
+                mic_stream.stop()
+                mic_stream.close()
+            except Exception as e:
+                print(f"[close mic err] {e}", file=sys.stderr)
+        try:
+            recorder.close()
+        except Exception as e:
+            print(f"[close recorder err] {e}", file=sys.stderr)
+        print("-> bye")
+
+
+# =============================================================================
+# Entry point
+# =============================================================================
+
+
+def cli_entry(argv: list[str] | None = None) -> None:
+    """Synchronous CLI entry. Parses args (``--version`` short-circuits via
+    argparse's ``action="version"``), then runs ``main()``."""
+    _parse_args(argv)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    cli_entry()
