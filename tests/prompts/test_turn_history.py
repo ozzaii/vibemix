@@ -21,7 +21,6 @@ import pytest
 
 from vibemix.prompts.turn_history import TurnHistory
 
-
 # ---------------------------------------------------------------------------
 # Construction + defaults
 # ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """vibemix.prompts — Phase 10 prompt-template-matrix layer.
 
-Six prompt cells (3 skill levels × 2 modes) + the anti-slop substrate:
+Six prompt cells (3 skill levels x 2 modes) + the anti-slop substrate:
 negative dictionary regex bans, post-hoc filter, TurnHistory ring,
 <silence/> short-circuit, Coach scorecard.
 

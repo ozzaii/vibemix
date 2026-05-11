@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Six prompt cells (3 skill levels × 2 modes) + dispatcher.
+"""Six prompt cells (3 skill levels x 2 modes) + dispatcher.
 
 Cells:
 - HYPE_BEGINNER       — Beginner-Hype: high-energy, casual, "yo / damn / sick".

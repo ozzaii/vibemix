@@ -7,7 +7,7 @@ the original Phase 4 v4 port (``cohost_v4.py:150-213``). The single source of
 truth lives in ``vibemix.prompts.matrix.HYPE_INTERMEDIATE``.
 
 Phase 10 broke the single SYSTEM_INSTRUCTION constant into a 6-cell matrix
-under ``vibemix.prompts.matrix`` (3 skill levels × 2 modes). Existing callers
+under ``vibemix.prompts.matrix`` (3 skill levels x 2 modes). Existing callers
 that import ``SYSTEM_INSTRUCTION`` from this module continue to work; new
 callers should reach for ``vibemix.prompts.build_system_instruction(skill, mode)``
 directly.
