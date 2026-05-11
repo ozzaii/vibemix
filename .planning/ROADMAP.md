@@ -88,10 +88,16 @@ Plans:
 **Requirements**: ARCH-03, ARCH-04, ARCH-05, ARCH-06.
 **Success Criteria** (what must be TRUE):
   1. End-to-end macOS demo: user plays a track, MIDI move detected → `session.generate_reply(instructions=...)` → Gemini Flash multimodal → streaming TTS → audible voice in headphones within 1.5s of event (latency-budget-compliant per ARCHITECTURE.md).
-  2. Bundled `livekit-server --dev` binary launches on `127.0.0.1:7880` from a PyInstaller bundle path (not a `brew` dependency).
-  3. The `llm_node()` override receives the right `chat_ctx` last-message contents (the EventDetector-built prompt) and reads `MusicState.evidence_line()` / `AudioBuffer.snapshot_bytes(7s)` / `ScreenBuffer.latest_jpeg()` for grounding.
-  4. Reconnect-on-error works: a manually-killed Gemini call retries up to 3 times within 6 seconds and logs `session_error` in `events.jsonl` if all retries fail.
-**Plans**: TBD
+  2. Bundled `livekit-server --dev` binary launches on `127.0.0.1:7880` from a PyInstaller bundle path (not a `brew` dependency). _(**Re-mapped during planning** — cascade AgentSession runs headless (no Room) per v4:2031. No livekit-server binary needed for the cascade path. See `04-CONTEXT.md` and the eventual `04-SUMMARY.md` Deviations section. If Phase 11 reveals a Room-based protocol need, ARCH-06 returns there.)_
+  3. The `llm_node()` override receives the right `chat_ctx` last-message contents (the EventDetector-built prompt) and reads `MusicState.evidence_line()` / `AudioBuffer.snapshot_bytes(7s)` for grounding. _(Screen JPEG attachment is deliberately disabled per v4:1502-1503 — "Single-modality: audio only. Screen + MIDI metadata caused hallucination." — and ported verbatim.)_
+  4. Reconnect-on-error works: a manually-killed Gemini call retries up to 3 times within 6 seconds and logs `session_error` in `events.jsonl` if all retries fail. _(FallbackAdapter `max_retry_per_tts=1` handles TTS-side retries; LLM-side retries are inside `generate_content_stream` exception handling and don't auto-retry — log + skip turn matches v4 behavior. Reconnect semantics revisit in Phase 16 (verification gate) if soak tests reveal a gap.)_
+**Plans:** 5 plans
+Plans:
+- [ ] 04-01-PLAN.md — agent persona + config + LLM factory + TTS chain (OpenRouter monkey-patch)
+- [ ] 04-02-PLAN.md — DJCoHostAgent + PlaybackQueueAudioOutput (multimodal llm_node + TTS sink)
+- [ ] 04-03-PLAN.md — runtime loops (coach event pump + diag meter + WS mascot bus)
+- [ ] 04-04-PLAN.md — __main__ orchestrator + CI integration smoke
+- [ ] 04-05-PLAN.md — 12-gate verification + phase SUMMARY + ROADMAP/STATE advance
 
 ### Phase 5: FastAPI Proxy + Install-UUID JWT
 **Goal**: `api.altidus.world` hosts the Gemini proxy with install-UUID JWTs, slowapi rate limiting, and Redis quotas. The client never holds a raw Gemini key. (Parallelizable with Phases 1-4 — proxy work is independent FastAPI route work on existing Bravoh infrastructure.)
