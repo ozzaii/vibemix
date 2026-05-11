@@ -27,12 +27,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pytest
 from livekit.agents import Agent
 
 from vibemix.agent import DJCoHostAgent
 from vibemix.state import AICoach, Event, MusicState
-
 
 # ---------- shared minimal stubs (mirror tests/agent/test_dj_cohost.py) ----
 

@@ -37,13 +37,13 @@ class TurnHistory:
     measured in pairs, so the underlying deque maxlen is ``max_pairs * 2``.
     """
 
-    __slots__ = ("max_pairs", "_entries", "_lock")
+    __slots__ = ("_entries", "_lock", "max_pairs")
 
     def __init__(self, max_pairs: int = DEFAULT_MAX_PAIRS) -> None:
         if max_pairs < 1:
             raise ValueError(f"max_pairs must be ≥ 1, got {max_pairs}")
         self.max_pairs = max_pairs
-        # Each entry = ("user"|"model", text). Capacity = pairs × 2.
+        # Each entry = ("user"|"model", text). Capacity = pairs x 2.
         self._entries: deque[tuple[str, str]] = deque(maxlen=max_pairs * 2)
         self._lock = threading.Lock()
 

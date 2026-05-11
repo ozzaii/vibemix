@@ -24,7 +24,6 @@ import pytest
 
 from vibemix.prompts.scorecard import summarize_session
 
-
 VALID_BANDS = {"clean", "decent", "abrupt", "train-wreck"}
 
 

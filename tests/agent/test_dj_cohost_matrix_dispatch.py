@@ -8,7 +8,6 @@ Defaults (no env vars set) → ``("intermediate", "hype")`` = HYPE_INTERMEDIATE
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -34,7 +33,7 @@ class _FakeRecorder:
         self.session_dir = session_dir
         self.events: list[tuple[str, dict]] = []
 
-    def log_event(self, kind: str, **fields) -> None:  # noqa: D401
+    def log_event(self, kind: str, **fields) -> None:
         self.events.append((kind, fields))
 
     def push_voice(self, pcm: bytes) -> None:

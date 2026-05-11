@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""PROMPT-01: 6-cell skill × mode matrix.
+"""PROMPT-01: 6-cell skill x mode matrix.
 
 Each cell must contain:
 - The negative-dict ban list (so the LLM is told what NOT to say).
