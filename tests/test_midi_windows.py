@@ -73,14 +73,23 @@ def test_controller_state_is_imported_from_midi_macos():
     """The IMPORT IDENTITY check — MidiWindows must reuse the exact
     ControllerState class object from _midi_macos (not subclass, not duplicate).
 
-    This pins that any future Phase-9 refactor that moves ControllerState into
-    a shared module (e.g. _midi_common or vibemix.controllers) updates BOTH
-    backends in lock-step; if the import drifts, this test fails.
+    Phase 9 Wave 1: ControllerState is now hosted in vibemix.midi.state; both
+    _midi_macos and _midi_windows re-export it as a shim. The identity check
+    must hold against the canonical source, AND the cross-OS shim chain.
     """
+    from vibemix.midi.state import ControllerState as CanonicalControllerState
     from vibemix.platform._midi_macos import ControllerState as MacControllerState
     from vibemix.platform._midi_windows import ControllerState as WinControllerState
 
     assert MacControllerState is WinControllerState
+    assert MacControllerState is CanonicalControllerState
+
+
+def test_midi_windows_uses_flx4_profile_by_default():
+    """MidiWindows instantiates ControllerState with the bundled FLX4 profile,
+    matching MidiMacOS. Wave 2 makes profile selection dynamic."""
+    backend = MidiWindows()
+    assert backend.controller_state._profile.id == "pioneer_ddj_flx4"
 
 
 # ---------- _PORT_HINT locked ----------
