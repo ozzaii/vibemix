@@ -104,5 +104,5 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 markers = [
     "macos_audio: requires BlackHole 2ch present (opt-in smoke test, Plan 05)",
-    "windows_only: marks tests that require Windows runtime (Phase 7 — Phase 20 CI matrix runs these on windows-latest)",
+    "windows_only: requires sys.platform == 'win32' — live tests for the Windows port (Phase 7 Wave 3+, executed in Phase 20 CI matrix)",
 ]
