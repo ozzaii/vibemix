@@ -34,7 +34,38 @@
   },
   "project_code": null,
   "phase_naming": "sequential",
-  "agent_skills": {},
+  "agent_skills": {
+    "gsd-ui-researcher": [
+      ".claude/skills/frontend-enforcement"
+    ],
+    "gsd-ui-checker": [
+      ".claude/skills/frontend-enforcement"
+    ],
+    "gsd-ui-auditor": [
+      ".claude/skills/frontend-enforcement"
+    ],
+    "gsd-executor": [
+      ".claude/skills/frontend-enforcement"
+    ],
+    "gsd-planner": [
+      ".claude/skills/frontend-enforcement"
+    ],
+    "gsd-code-reviewer": [
+      ".claude/skills/frontend-enforcement"
+    ],
+    "gsd-code-fixer": [
+      ".claude/skills/frontend-enforcement"
+    ],
+    "gsd-pattern-mapper": [
+      ".claude/skills/frontend-enforcement"
+    ],
+    "gsd-roadmapper": [
+      ".claude/skills/frontend-enforcement"
+    ],
+    "gsd-phase-researcher": [
+      ".claude/skills/frontend-enforcement"
+    ]
+  },
   "features": {},
   "mode": "yolo",
   "granularity": "fine",
