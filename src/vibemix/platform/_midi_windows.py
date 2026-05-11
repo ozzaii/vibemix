@@ -54,11 +54,13 @@ except ImportError:
     mido = None  # type: ignore[assignment]
     _HAS_MIDO = False
 
-# Reuse the v4 DDJ-FLX4 decoder + Phase 1 MidiPort adapter verbatim from the
-# macOS file — see module docstring for the rationale. Phase 9 may move these
-# into a shared controller-profile module without changing this file's
-# behavior.
-from vibemix.platform._midi_macos import ControllerState, _MidoPortAdapter
+# Phase 9 Wave 1: ControllerState now hosted in ``vibemix.midi.state`` — the
+# OS-agnostic decoder + magnitude-aware MidiEvent emission. ``_MidoPortAdapter``
+# still lives in ``_midi_macos`` (the cross-file import is harmless; the adapter
+# is OS-agnostic).
+from vibemix.midi import load_profile
+from vibemix.midi.state import ControllerState
+from vibemix.platform._midi_macos import _MidoPortAdapter
 from vibemix.platform.midi import MidiPort
 
 # NOTE: ``_midi_common`` is imported lazily inside ``start_listener_thread``
@@ -84,16 +86,15 @@ class MidiWindows:
       module-top ``mido``. Returns the started daemon thread so callers can
       ``.join(timeout=...)`` on shutdown.
 
-    Class attributes:
-    - ``_PORT_HINT = "DDJ-FLX4"`` — case-insensitive substring matched against
-      MIDI input port names by ``_midi_common.midi_listener_thread``. Locked
-      per CONTEXT Decisions §MidiWindows; Phase 9 expands the curated library.
+    Phase 9 Wave 1 Task 3: the ``_PORT_HINT`` class attribute was removed —
+    port hints now derive from the bound ControllerProfile's
+    ``port_name_hints`` tuple (``("DDJ-FLX4", "FLX4")`` for the default FLX4
+    profile). Wave 2 makes profile selection dynamic via
+    ``find_mapping(port_name)`` once the hot-plug watcher fires.
     """
 
-    _PORT_HINT = "DDJ-FLX4"
-
     def __init__(self) -> None:
-        self.controller_state = ControllerState()
+        self.controller_state = ControllerState(profile=load_profile("pioneer_ddj_flx4"))
 
     def list_input_ports(self) -> list[str]:
         if not _HAS_MIDO:
@@ -109,11 +110,13 @@ class MidiWindows:
     def start_listener_thread(self, stop_event: threading.Event) -> threading.Thread:
         """Spawn the DDJ-FLX4 listener via ``_midi_common.spawn_listener``.
 
-        Wave 4 contract: zero new listener code in this file. The full
+        Phase 7 Wave 4 contract: zero new listener code in this file. The full
         device-enumerate + open-input + poll-loop body lives in
-        ``vibemix.platform._midi_common.midi_listener_thread`` (extracted in
-        Wave 1 from the macOS impl). This method just injects the
-        Windows-side ``mido`` module + the DDJ-FLX4 port hint.
+        ``vibemix.platform._midi_common.midi_listener_thread`` (Phase 7 Wave 1
+        extracted from the macOS impl). This method injects the
+        Windows-side ``mido`` module + the FLX4 ControllerProfile (Phase 9
+        Wave 1 Task 3 — port hints derive from
+        ``profile.port_name_hints = ("DDJ-FLX4", "FLX4")``).
 
         Returns:
             The started ``threading.Thread`` (daemon=True). Callers may
@@ -138,7 +141,12 @@ class MidiWindows:
         # ``threading.Thread`` and starts it.
         from vibemix.platform import _midi_common
 
-        return _midi_common.spawn_listener(self.controller_state, stop_event, self._PORT_HINT, mido)
+        return _midi_common.spawn_listener(
+            self.controller_state,
+            stop_event,
+            load_profile("pioneer_ddj_flx4"),
+            mido,
+        )
 
 
 __all__ = ["MidiWindows"]

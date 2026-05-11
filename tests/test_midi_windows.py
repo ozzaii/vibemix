@@ -73,26 +73,36 @@ def test_controller_state_is_imported_from_midi_macos():
     """The IMPORT IDENTITY check — MidiWindows must reuse the exact
     ControllerState class object from _midi_macos (not subclass, not duplicate).
 
-    This pins that any future Phase-9 refactor that moves ControllerState into
-    a shared module (e.g. _midi_common or vibemix.controllers) updates BOTH
-    backends in lock-step; if the import drifts, this test fails.
+    Phase 9 Wave 1: ControllerState is now hosted in vibemix.midi.state; both
+    _midi_macos and _midi_windows re-export it as a shim. The identity check
+    must hold against the canonical source, AND the cross-OS shim chain.
     """
+    from vibemix.midi.state import ControllerState as CanonicalControllerState
     from vibemix.platform._midi_macos import ControllerState as MacControllerState
     from vibemix.platform._midi_windows import ControllerState as WinControllerState
 
     assert MacControllerState is WinControllerState
+    assert MacControllerState is CanonicalControllerState
 
 
-# ---------- _PORT_HINT locked ----------
+def test_midi_windows_uses_flx4_profile_by_default():
+    """MidiWindows instantiates ControllerState with the bundled FLX4 profile,
+    matching MidiMacOS. Wave 2 makes profile selection dynamic."""
+    backend = MidiWindows()
+    assert backend.controller_state._profile.id == "pioneer_ddj_flx4"
 
 
-def test_midi_windows_default_port_hint_is_ddj_flx4():
-    """Locked per CONTEXT Decisions §MidiWindows — DDJ-FLX4 is the v1
-    baseline on both OSes. Phase 9 expands the controller library."""
-    assert MidiWindows._PORT_HINT == "DDJ-FLX4"
-    # Class attribute (not instance) so Phase 9 subclasses / instantiation
-    # variants can override without mutating instances.
-    assert isinstance(MidiWindows._PORT_HINT, str)
+# ---------- Profile-driven port hints (Phase 9 Wave 1 Task 3) ----------
+
+
+def test_midi_windows_default_profile_port_hints_include_ddj_flx4():
+    """Phase 9 Wave 1 Task 3 removed the static _PORT_HINT class attribute.
+    Port hints now derive from the bound FLX4 profile's port_name_hints
+    tuple — ``("DDJ-FLX4", "FLX4")``. DDJ-FLX4 is still the v1 baseline on
+    both OSes; Phase 9 Wave 2 expands the controller library."""
+    backend = MidiWindows()
+    assert "DDJ-FLX4" in backend.controller_state._profile.port_name_hints
+    assert "FLX4" in backend.controller_state._profile.port_name_hints
 
 
 # ---------- start_listener_thread delegates to _midi_common.spawn_listener ----------
@@ -100,10 +110,12 @@ def test_midi_windows_default_port_hint_is_ddj_flx4():
 
 def test_start_listener_thread_calls_spawn_listener(monkeypatch):
     """``MidiWindows.start_listener_thread`` MUST call
-    ``_midi_common.spawn_listener(controller_state, stop_event, "DDJ-FLX4", mido)``
-    exactly once and return its result. Wave 4 contract: zero new listener
-    code in _midi_windows; full delegation to the cross-platform Wave 1
-    helper."""
+    ``_midi_common.spawn_listener(controller_state, stop_event, <FLX4 profile>, mido)``
+    exactly once and return its result. Phase 7 Wave 4 contract: zero new
+    listener code in _midi_windows; full delegation to the cross-platform
+    Wave 1 helper. Phase 9 Wave 1 Task 3 swapped the third arg from
+    ``"DDJ-FLX4"`` (str) to a ControllerProfile."""
+    from vibemix.midi.profile import ControllerProfile
     from vibemix.platform import _midi_common, _midi_windows
 
     fake_thread = MagicMock(spec=threading.Thread)
@@ -117,10 +129,11 @@ def test_start_listener_thread_calls_spawn_listener(monkeypatch):
     assert result is fake_thread
     spy.assert_called_once()
     args, _kwargs = spy.call_args
-    # spawn_listener(controller_state, stop_event, port_hint, mido_module)
+    # spawn_listener(controller_state, stop_event, profile, mido_module)
     assert args[0] is backend.controller_state
     assert args[1] is stop_event
-    assert args[2] == "DDJ-FLX4"
+    assert isinstance(args[2], ControllerProfile)
+    assert args[2].id == "pioneer_ddj_flx4"
     # The 4th positional must be the mido module the impl imported at top.
     assert args[3] is _midi_windows.mido
 
