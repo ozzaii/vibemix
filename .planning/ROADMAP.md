@@ -322,7 +322,7 @@ Plans:
 | 7. Windows Port (Audio + Screen) | 0/? | Not started | - |
 | 8. macOS ScreenCaptureKit Migration | 0/? | Not started | - |
 | 9. MIDI Controller Library (10 + Generic Fallback) | 0/? | Not started | - |
-| 10. Prompt Template Matrix (6 cells + Anti-Slop) | 1/2 | In Progress|  |
+| 10. Prompt Template Matrix (6 cells + Anti-Slop) | 2/2 | Complete   | 2026-05-11 |
 | 11. Tauri Shell + Calibration Wizard | 0/? | Not started | - |
 | 12. Live Session UI + Settings Panel | 0/? | Not started | - |
 | 13. Reactive Mascot (Avery) | 0/? | Not started | - |
