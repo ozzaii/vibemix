@@ -48,8 +48,8 @@ def test_engine_constants_match_v4() -> None:
     assert PEAK_RMS == 0.110
     assert AUDIBLE_DEBOUNCE_SEC == 0.6
     assert SILENCE_DEBOUNCE_SEC == 1.2
-    assert EVENT_GLOBAL_MIN_GAP == 7.0
-    assert HEARTBEAT_SEC == 45.0
+    assert EVENT_GLOBAL_MIN_GAP == 10.0  # retuned post-2026-05-11 — "let the music breathe"
+    assert HEARTBEAT_SEC == 70.0  # retuned post-2026-05-11
 
 
 def test_io_constants_match_v4() -> None:
@@ -85,11 +85,11 @@ def test_event_gap_dict_shape_and_values() -> None:
         "MIC",
         "MANUAL",
     }
-    assert MIN_EVENT_GAP_PER_TYPE["TRACK_CHANGE"] == 5.0
-    assert MIN_EVENT_GAP_PER_TYPE["PHASE"] == 10.0
-    assert MIN_EVENT_GAP_PER_TYPE["LAYER_ARRIVAL"] == 10.0
-    assert MIN_EVENT_GAP_PER_TYPE["MIX_MOVE"] == 14.0
-    assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == 45.0
+    assert MIN_EVENT_GAP_PER_TYPE["TRACK_CHANGE"] == 6.0
+    assert MIN_EVENT_GAP_PER_TYPE["PHASE"] == 18.0
+    assert MIN_EVENT_GAP_PER_TYPE["LAYER_ARRIVAL"] == 16.0
+    assert MIN_EVENT_GAP_PER_TYPE["MIX_MOVE"] == 20.0
+    assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == 70.0
     assert MIN_EVENT_GAP_PER_TYPE["MIC"] == 3.0
     assert MIN_EVENT_GAP_PER_TYPE["MANUAL"] == 1.5
     # HEARTBEAT key should reference the HEARTBEAT_SEC module-level constant
