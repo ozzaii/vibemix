@@ -1,0 +1,1455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix — 45s cinematic storyboard</title>
+<meta name="viewport" content="width=1280" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Workbench&family=DM+Mono:wght@300;400;500&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+@font-face{
+  font-family:"DSEG7-Classic";
+  src:url("https://cdn.jsdelivr.net/gh/keshikan/DSEG@v0.46/fonts/DSEG7-Classic/DSEG7Classic-Bold.woff2") format("woff2");
+  font-display:swap;
+}
+
+/* ─── tokens (same DNA as app UI mock) ─────────────────────────────────── */
+:root{
+  --bg:           #0a0b0e;
+  --panel:        #15181e;
+  --panel-lift:  #1d2128;
+  --panel-deep:  #0a0b0e;
+  --groove:       #07080a;
+  --bezel-1:      #1a1e25;
+  --bezel-2:      #2a2f38;
+  --bezel-3:      #3a4150;
+  --brushed-hi:   rgba(255,255,255,.04);
+  --ink:          #c8cdd6;
+  --ink-dim:      #6b7280;
+  --ink-deep:     #3d424c;
+  --ink-engraved: #1f242c;
+
+  --phosphor:        #ffa12e;
+  --phosphor-warm:   #ff8a1a;
+  --phosphor-dim:    #6e4815;
+  --phosphor-soft:   rgba(255,161,46,.18);
+  --phosphor-glow:   0 0 14px rgba(255,161,46,.5);
+  --phosphor-halo:   0 0 36px rgba(255,161,46,.22);
+
+  --rec: #ff3553;
+  --cue: #4dc4ff;
+  --ok:  #5dcf7c;
+  --paper: #f3ead7;
+  --paper-deep: #ece2c8;
+  --paper-ink: #2a1f15;
+  --paper-grain: #5a4a30;
+
+  --ff-mark: "Workbench", "Courier New", monospace;
+  --ff-mono: "DM Mono", ui-monospace, monospace;
+  --ff-lcd:  "DSEG7-Classic", "DM Mono", monospace;
+  --ff-hand: "Caveat", "Marker Felt", cursive;
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{
+  margin:0; padding:0;
+  background:
+    radial-gradient(1200px 800px at 50% -10%, #14171c 0%, transparent 60%),
+    radial-gradient(900px 600px at 90% 110%, #1a1e25 0%, transparent 50%),
+    var(--bg);
+  color:var(--ink);
+  font-family:var(--ff-mono);
+  font-size:13px;
+  line-height:1.4;
+  letter-spacing:.01em;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+
+/* film grain + scanlines — atmospheric texture */
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .35 0'/></filter><rect width='200' height='200' filter='url(%23n)' opacity='.6'/></svg>");
+  mix-blend-mode:overlay; opacity:.06;
+}
+body::after{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:9998;
+  background:repeating-linear-gradient(to bottom, transparent 0, transparent 2px, rgba(0,0,0,.18) 2px, rgba(0,0,0,.18) 3px);
+  mix-blend-mode:multiply; opacity:.4;
+}
+
+/* ─── shell ───────────────────────────────────────────────────────────── */
+.doc{
+  max-width:1240px;
+  margin:32px auto 96px;
+  border-radius:14px;
+  background:linear-gradient(180deg, #1a1e25 0%, #14171c 4%, #14171c 96%, #0e1014 100%);
+  box-shadow:
+    0 0 0 1px var(--bezel-3),
+    0 0 0 2px var(--bezel-1),
+    0 30px 80px -20px rgba(0,0,0,.8),
+    0 8px 24px -8px rgba(0,0,0,.6),
+    inset 0 1px 0 rgba(255,255,255,.06),
+    inset 0 -1px 0 rgba(0,0,0,.6);
+  overflow:hidden;
+  position:relative;
+}
+
+/* corner screws — recurring brand affordance */
+.screw{
+  position:absolute; width:14px; height:14px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #5a606c 0%, #2a2f38 50%, #0a0b0e 90%);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.15), inset 0 -1px 2px rgba(0,0,0,.6), 0 1px 0 rgba(0,0,0,.7);
+}
+.screw::before{ content:""; position:absolute; inset:3px; border-radius:50%; background:linear-gradient(135deg, #1a1e25, #0a0b0e); }
+.screw::after{ content:""; position:absolute; top:50%; left:50%; width:8px; height:1px; background:#0a0b0e; box-shadow:0 0 0 .5px rgba(0,0,0,.8); transform:translate(-50%,-50%) rotate(45deg); }
+.screw--tl{ top:14px; left:14px; }  .screw--tr{ top:14px; right:14px; }
+.screw--bl{ bottom:14px; left:14px; }  .screw--br{ bottom:14px; right:14px; transform:rotate(20deg); }
+.screw--br::after{ transform:translate(-50%,-50%) rotate(70deg); }
+
+/* ─── doc header ──────────────────────────────────────────────────────── */
+.head{
+  display:grid;
+  grid-template-columns: 1fr auto;
+  align-items:end;
+  gap:24px;
+  padding:36px 48px 28px;
+  border-bottom:1px solid var(--bezel-1);
+  background:linear-gradient(180deg, #1f242c 0%, #161a20 100%);
+  position:relative;
+}
+.head::after{
+  content:""; position:absolute; left:0; right:0; bottom:-1px;
+  height:1px; background:linear-gradient(90deg, transparent, var(--bezel-3) 30%, var(--bezel-3) 70%, transparent); opacity:.5;
+}
+.title-block{
+  display:flex; flex-direction:column; gap:6px;
+}
+.kicker{
+  font-size:10px; letter-spacing:.4em; color:var(--ink-dim); text-transform:uppercase;
+  display:flex; align-items:center; gap:10px;
+}
+.kicker .led{ width:7px; height:7px; border-radius:50%; background:var(--phosphor); box-shadow:0 0 6px var(--phosphor); animation:pulse 1.4s ease-in-out infinite; }
+@keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.55;} }
+.wordmark{
+  font-family:var(--ff-mark);
+  font-size:60px;
+  color:var(--phosphor);
+  text-shadow:var(--phosphor-halo), 0 0 6px var(--phosphor);
+  letter-spacing:.02em;
+  line-height:1;
+}
+.subtitle{
+  font-family:var(--ff-mono);
+  font-size:14px;
+  color:var(--ink);
+  letter-spacing:.01em;
+  margin-top:4px;
+}
+.subtitle b{ color:var(--phosphor); font-weight:400; }
+
+.head-meta{
+  display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end;
+}
+.meta-card{
+  background:linear-gradient(180deg, var(--panel-lift), var(--panel));
+  border:1px solid var(--bezel-2); border-radius:5px;
+  padding:8px 12px 9px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 0 rgba(0,0,0,.4);
+  min-width:118px;
+}
+.meta-card .lbl{
+  font-size:8.5px; letter-spacing:.28em; color:var(--ink-dim); text-transform:uppercase;
+}
+.meta-card .val{
+  font-family:var(--ff-lcd);
+  font-size:18px; color:var(--phosphor);
+  text-shadow:0 0 6px rgba(255,161,46,.5);
+  letter-spacing:.04em;
+  margin-top:2px;
+  position:relative;
+}
+.meta-card .val::before{
+  content:attr(data-ghost);
+  position:absolute; inset:0;
+  color:rgba(255,161,46,.06);
+}
+.meta-card .val.text{
+  font-family:var(--ff-mono); font-size:12px; color:var(--ink); text-shadow:none; letter-spacing:.12em;
+}
+.meta-card .val.text::before{ display:none; }
+
+/* ─── director's brief strip ─────────────────────────────────────────── */
+.brief{
+  display:grid;
+  grid-template-columns:1fr 1.2fr 1fr;
+  gap:0;
+  border-bottom:1px solid var(--bezel-1);
+  background:linear-gradient(180deg, #14171c 0%, #0e1014 100%);
+}
+.brief-cell{
+  padding:22px 28px 26px;
+  position:relative;
+}
+.brief-cell + .brief-cell{
+  border-left:1px solid var(--bezel-1);
+  box-shadow:inset 1px 0 0 rgba(255,255,255,.03);
+}
+.brief-h{
+  font-family:var(--ff-mark);
+  font-size:10px; letter-spacing:.34em; color:var(--ink-dim); text-transform:uppercase;
+  margin-bottom:10px;
+  display:flex; align-items:center; gap:8px;
+}
+.brief-h .num{
+  font-family:var(--ff-lcd); font-size:14px; color:var(--phosphor);
+  text-shadow:0 0 6px rgba(255,161,46,.4); letter-spacing:.04em;
+}
+.brief-cell p{
+  margin:0; font-size:13px; color:var(--ink); line-height:1.55;
+}
+.brief-cell p em{
+  font-family:var(--ff-hand); font-style:normal; font-size:18px; color:var(--phosphor);
+}
+.brief-cell ul{ margin:0; padding-left:14px; }
+.brief-cell li{ margin-bottom:5px; }
+.brief-cell li::marker{ color:var(--phosphor); }
+
+/* ─── frame grid ──────────────────────────────────────────────────────── */
+.frames{
+  padding:36px 36px 36px;
+  display:grid;
+  grid-template-columns:1fr;
+  gap:22px;
+}
+
+.frame{
+  display:grid;
+  grid-template-columns: 28px 480px 1fr;
+  gap:0;
+  background:linear-gradient(180deg, var(--panel-lift) 0%, var(--panel) 100%);
+  border:1px solid var(--bezel-1);
+  border-radius:10px;
+  overflow:hidden;
+  position:relative;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.05),
+    inset 0 -1px 0 rgba(0,0,0,.4),
+    0 1px 0 rgba(0,0,0,.5),
+    0 8px 24px -10px rgba(0,0,0,.7);
+}
+
+/* ── frame number gutter (left edge LED strip) ── */
+.frame-num{
+  background:linear-gradient(180deg, var(--panel-deep) 0%, var(--groove) 100%);
+  border-right:1px solid var(--bezel-1);
+  display:flex; flex-direction:column; align-items:center; justify-content:space-between;
+  padding:14px 0;
+  position:relative;
+}
+.frame-num .n{
+  font-family:var(--ff-lcd);
+  font-size:24px; color:var(--phosphor);
+  writing-mode:vertical-rl; transform:rotate(180deg);
+  text-shadow:0 0 8px rgba(255,161,46,.5); letter-spacing:.04em;
+  position:relative;
+}
+.frame-num .n::before{
+  content:attr(data-ghost);
+  position:absolute; inset:0;
+  color:rgba(255,161,46,.06);
+}
+.frame-num .dot{
+  width:6px; height:6px; border-radius:50%; background:var(--phosphor);
+  box-shadow:0 0 6px var(--phosphor);
+}
+
+/* ── shot preview canvas ── */
+.shot{
+  height:280px; position:relative;
+  background:#050608;
+  border-right:1px solid var(--bezel-1);
+  overflow:hidden;
+}
+.shot svg{
+  position:absolute; inset:0; width:100%; height:100%;
+}
+.shot::after{
+  /* very faint vignette */
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(ellipse at 50% 60%, transparent 0%, rgba(0,0,0,.55) 100%);
+}
+.shot .tc{
+  position:absolute; bottom:10px; left:12px;
+  font-family:var(--ff-lcd); font-size:14px; color:var(--phosphor);
+  text-shadow:0 0 6px rgba(255,161,46,.7); letter-spacing:.04em;
+  z-index:2;
+  background:rgba(0,0,0,.45);
+  padding:3px 7px; border-radius:2px;
+  border:1px solid rgba(255,161,46,.3);
+}
+.shot .duration{
+  position:absolute; bottom:10px; right:12px;
+  font-family:var(--ff-mono); font-size:10px;
+  letter-spacing:.2em; color:var(--ink); text-transform:uppercase;
+  background:rgba(0,0,0,.5); padding:4px 8px; border-radius:2px;
+  border:1px solid var(--bezel-2);
+  z-index:2;
+}
+
+/* on-screen UI overlays inside frames — to show the app appearing in the cut */
+.shot .overlay-chip{
+  position:absolute;
+  background:linear-gradient(180deg, rgba(20,23,28,.92), rgba(10,11,14,.92));
+  border:1px solid var(--phosphor-dim);
+  border-radius:4px;
+  padding:5px 10px;
+  font-family:var(--ff-mark); font-size:9px;
+  color:var(--phosphor);
+  text-shadow:0 0 4px rgba(255,161,46,.5);
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  display:flex; align-items:center; gap:6px;
+  box-shadow:0 0 18px rgba(255,161,46,.4);
+  z-index:3;
+  white-space:nowrap;
+}
+.shot .overlay-chip .ld{
+  width:6px; height:6px; border-radius:50%; background:var(--phosphor);
+  box-shadow:0 0 5px var(--phosphor);
+}
+.shot .overlay-tc{
+  position:absolute;
+  font-family:var(--ff-lcd); font-size:26px; color:var(--phosphor);
+  text-shadow:0 0 12px var(--phosphor), 0 0 24px rgba(255,161,46,.5);
+  letter-spacing:.04em;
+  z-index:3;
+}
+
+/* speech bubble for AI lines on top of frames */
+.shot .speech{
+  position:absolute;
+  background:var(--paper);
+  color:var(--paper-ink);
+  font-family:var(--ff-mono);
+  font-size:11px;
+  padding:8px 11px;
+  max-width:240px;
+  line-height:1.4;
+  border:1px solid #2a2118;
+  border-radius:6px;
+  box-shadow:
+    2px 3px 6px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.5);
+  z-index:3;
+  letter-spacing:.005em;
+}
+.shot .speech::before{
+  content:"›";
+  display:inline-block; margin-right:4px;
+  color:var(--phosphor-warm); font-weight:700;
+  font-family:var(--ff-mark);
+}
+.shot .speech em{
+  font-family:var(--ff-hand); font-style:normal; font-size:14px; color:#a8540a; font-weight:700;
+}
+.shot .speech::after{
+  content:""; position:absolute;
+  width:0; height:0;
+  border:6px solid transparent;
+  border-top-color:var(--paper);
+  bottom:-12px; left:14px;
+  filter:drop-shadow(0 2px 1px rgba(0,0,0,.3));
+}
+
+/* ── frame info column ── */
+.info{
+  padding:18px 22px 18px;
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+  position:relative;
+}
+.info::before{
+  /* brushed-metal vertical streaks — texture, not flat */
+  content:""; position:absolute; inset:0;
+  background:repeating-linear-gradient(90deg, transparent 0, transparent 2px, var(--brushed-hi) 2px, var(--brushed-hi) 3px, transparent 3px, transparent 7px);
+  opacity:.5; pointer-events:none;
+}
+.info-head{
+  display:flex; align-items:flex-start; gap:10px;
+  position:relative; z-index:1;
+}
+.info-h{
+  font-family:var(--ff-mark);
+  font-size:18px;
+  color:var(--phosphor);
+  letter-spacing:.03em;
+  line-height:1.1;
+  text-shadow:0 0 8px rgba(255,161,46,.35);
+}
+.info-tag{
+  margin-left:auto;
+  font-size:9px; letter-spacing:.22em; color:var(--ink-dim); text-transform:uppercase;
+  padding:3px 7px;
+  border:1px solid var(--bezel-2); border-radius:3px;
+  background:var(--panel-deep);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.5);
+}
+
+.info-row{
+  display:grid;
+  grid-template-columns: 86px 1fr;
+  gap:14px;
+  align-items:start;
+  font-size:12px;
+  position:relative; z-index:1;
+  padding:4px 0;
+  border-top:1px dashed var(--bezel-2);
+}
+.info-row:first-of-type{ border-top:0; }
+.info-row .k{
+  font-family:var(--ff-mark);
+  font-size:9px;
+  letter-spacing:.28em; color:var(--ink-dim);
+  text-transform:uppercase;
+  padding-top:2px;
+}
+.info-row .v{ color:var(--ink); line-height:1.5; }
+.info-row .v b{ color:var(--phosphor); font-weight:400; }
+.info-row .v em{
+  font-family:var(--ff-hand); font-style:normal; font-size:15px;
+  color:#ffd28a;
+  letter-spacing:.005em;
+}
+
+.vo-row .v{
+  background:var(--paper);
+  color:var(--paper-ink);
+  font-family:var(--ff-mono);
+  font-size:12.5px;
+  line-height:1.5;
+  padding:8px 11px 10px;
+  border:1px solid #2a2118;
+  border-radius:4px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 1px 2px 4px rgba(0,0,0,.4);
+  position:relative;
+}
+.vo-row .v::before{
+  content:""; position:absolute; inset:0;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='1'/><feColorMatrix values='0 0 0 0 .4  0 0 0 0 .32  0 0 0 0 .2  0 0 0 .2 0'/></filter><rect width='160' height='160' filter='url(%23p)'/></svg>");
+  mix-blend-mode:multiply; opacity:.5; pointer-events:none; border-radius:4px;
+}
+.vo-row .v::after{
+  content:"›";
+  position:absolute; top:6px; left:-12px;
+  color:var(--phosphor); font-family:var(--ff-mark); font-size:14px;
+  text-shadow:0 0 5px rgba(255,161,46,.6);
+}
+.vo-row .v em{
+  font-family:var(--ff-hand); font-style:normal; font-size:16px; color:#a8540a; font-weight:700;
+}
+
+/* stamp for "scene complete" / energy markers */
+.stamp{
+  position:absolute;
+  right:18px; bottom:14px;
+  transform:rotate(-7deg);
+  font-family:var(--ff-mark);
+  font-size:9px;
+  letter-spacing:.28em;
+  color:var(--phosphor);
+  border:1.5px solid var(--phosphor);
+  border-radius:3px;
+  padding:5px 9px 6px;
+  background:transparent;
+  text-shadow:0 0 4px rgba(255,161,46,.6);
+  box-shadow:0 0 0 1px rgba(255,161,46,.15);
+  opacity:.75;
+  text-transform:uppercase;
+  z-index:2;
+  user-select:none;
+}
+
+/* energy badge (per-frame intensity) — minimal LED ladder */
+.energy{
+  display:inline-flex; gap:3px;
+  vertical-align:1px;
+  margin-left:6px;
+}
+.energy span{
+  width:8px; height:6px; border-radius:1px;
+  background:var(--ink-engraved);
+  border:1px solid var(--bezel-2);
+}
+.energy span.on{
+  background:var(--phosphor);
+  box-shadow:0 0 4px var(--phosphor);
+  border-color:var(--phosphor-warm);
+}
+
+/* ─── timeline strip at the bottom (the actual cut sheet) ─────────────── */
+.cutsheet{
+  margin:18px 36px 0;
+  background:var(--paper);
+  border:1px solid #2a2118;
+  border-radius:6px;
+  padding:18px 22px 24px;
+  position:relative;
+  color:var(--paper-ink);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 3px 10px rgba(0,0,0,.4);
+  font-family:var(--ff-mono);
+}
+.cutsheet::before{
+  content:""; position:absolute; inset:0;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='2'/><feColorMatrix values='0 0 0 0 .4  0 0 0 0 .32  0 0 0 0 .2  0 0 0 .22 0'/></filter><rect width='160' height='160' filter='url(%23p)'/></svg>");
+  mix-blend-mode:multiply; opacity:.5; pointer-events:none; border-radius:6px;
+}
+.cutsheet-h{
+  font-family:var(--ff-mark);
+  font-size:11px; letter-spacing:.32em;
+  color:#5a4a30;
+  margin-bottom:14px;
+  text-transform:uppercase;
+  display:flex; align-items:center; gap:10px;
+  position:relative; z-index:1;
+}
+.cutsheet-h::before{
+  content:""; flex:0 0 26px; height:2px; background:var(--paper-ink);
+}
+.cutsheet-h::after{
+  content:""; flex:1; height:1px; background:var(--paper-grain);
+}
+
+.timeline{
+  display:flex; align-items:stretch;
+  height:62px;
+  border:1.5px solid var(--paper-ink);
+  border-radius:3px;
+  overflow:hidden;
+  position:relative; z-index:1;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5);
+}
+.tline-seg{
+  position:relative;
+  border-right:1px solid rgba(0,0,0,.3);
+  display:flex; flex-direction:column; align-items:center; justify-content:space-between;
+  padding:4px 2px 3px;
+  font-family:var(--ff-mark); font-size:8px; letter-spacing:.22em; text-transform:uppercase;
+  color:#1a1408;
+  cursor:default;
+}
+.tline-seg:last-child{ border-right:0; }
+.tline-seg .num{
+  background:#1a1408; color:var(--paper);
+  font-family:var(--ff-lcd); font-size:11px; line-height:1;
+  padding:2px 4px; border-radius:2px; letter-spacing:.04em;
+}
+.tline-seg .ttl{
+  text-align:center; line-height:1.1;
+  font-weight:700;
+}
+.tline-seg.cold     { background:rgba(15,12,8,.85); color:#f3ead7; flex:.5; }
+.tline-seg.problem  { background:rgba(50,30,10,.55); flex:1; }
+.tline-seg.reveal   { background:rgba(255,161,46,.22); flex:.6; }
+.tline-seg.follow   { background:rgba(255,161,46,.32); flex:.8; }
+.tline-seg.establish{ background:rgba(255,161,46,.5); flex:1.4; }
+.tline-seg.flip     { background:rgba(255,107,30,.55); flex:1; }
+.tline-seg.coexist  { background:rgba(255,161,46,.32); flex:.9; }
+.tline-seg.product  { background:rgba(255,161,46,.7); color:#1a1408; flex:.8; }
+.tline-seg.cta      { background:rgba(255,161,46,.45); flex:.8; }
+.tline-seg.tag      { background:rgba(15,12,8,.85); color:#f3ead7; flex:.4; }
+
+.timeline-ruler{
+  display:flex; justify-content:space-between;
+  margin-top:8px;
+  font-family:var(--ff-mono);
+  font-size:9px; letter-spacing:.18em; color:#5a4a30; text-transform:uppercase;
+  position:relative; z-index:1;
+}
+
+/* ─── footer strip ────────────────────────────────────────────────────── */
+.footer{
+  border-top:1px solid var(--bezel-1);
+  margin-top:24px;
+  padding:14px 36px 22px;
+  background:linear-gradient(180deg, #161a20 0%, #0e1014 100%);
+  display:flex; align-items:center; gap:24px;
+  font-size:10px;
+  letter-spacing:.2em;
+  color:var(--ink-dim);
+  text-transform:uppercase;
+}
+.footer .right{
+  margin-left:auto;
+  font-family:var(--ff-hand);
+  font-size:16px;
+  color:var(--phosphor);
+  letter-spacing:0;
+  text-transform:none;
+  text-shadow:0 0 8px rgba(255,161,46,.4);
+}
+
+/* ─── responsive ──────────────────────────────────────────────────────── */
+@media (max-width:1024px){
+  .frame{ grid-template-columns: 28px 1fr; }
+  .info{ grid-column:span 2; border-top:1px solid var(--bezel-1); }
+  .shot{ border-right:0; border-bottom:1px solid var(--bezel-1); }
+}
+</style>
+</head>
+<body>
+
+<main class="doc">
+  <span class="screw screw--tl" aria-hidden="true"></span>
+  <span class="screw screw--tr" aria-hidden="true"></span>
+  <span class="screw screw--bl" aria-hidden="true"></span>
+  <span class="screw screw--br" aria-hidden="true"></span>
+
+  <!-- ─── header ─── -->
+  <header class="head">
+    <div class="title-block">
+      <span class="kicker">
+        <span class="led"></span> cinematic · v0.1 · production blueprint
+      </span>
+      <span class="wordmark">vibemix</span>
+      <span class="subtitle">
+        the <b>45-second hero cut</b> — 10 frames, one mascot, zero shortcuts
+      </span>
+    </div>
+
+    <div class="head-meta">
+      <div class="meta-card">
+        <div class="lbl">runtime</div>
+        <div class="val" data-ghost="88:88">00:45</div>
+      </div>
+      <div class="meta-card">
+        <div class="lbl">frames</div>
+        <div class="val" data-ghost="88">10</div>
+      </div>
+      <div class="meta-card">
+        <div class="lbl">director</div>
+        <div class="val text">francesco</div>
+      </div>
+      <div class="meta-card">
+        <div class="lbl">date</div>
+        <div class="val text">2026-05-11</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── brief strip ─── -->
+  <section class="brief">
+    <div class="brief-cell">
+      <div class="brief-h"><span class="num">01</span> the promise</div>
+      <p>
+        a real DJ struggles with a transition. an AI voice cuts in, calm and useful.
+        the DJ trusts it. the drop lands. <em>that's the whole movie.</em>
+      </p>
+    </div>
+
+    <div class="brief-cell">
+      <div class="brief-h"><span class="num">02</span> aesthetic intent</div>
+      <ul>
+        <li>shoot in dark — clubs, studios, blacked-out rooms. <b>backlit, never flat-lit.</b></li>
+        <li>vibemix UI appears as a real chip floating in frame — not a cutaway, a layer.</li>
+        <li>mascot Avery cameos in 3 frames. it watches. it reacts. it never speaks on camera.</li>
+        <li>no AI-slop. no purple gradients. no "futuristic synthwave grid." just amber on charcoal, and one DJ.</li>
+      </ul>
+    </div>
+
+    <div class="brief-cell">
+      <div class="brief-h"><span class="num">03</span> sound brief</div>
+      <p>
+        original techno bed (commissioned, not licensed — Kaan provides).
+        140 bpm. F minor. builds at 0:31, drops at 0:48.
+        Avery TTS over the music — clean, off-axis, like a friend leaning into your ear.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─── frames ─── -->
+  <section class="frames">
+
+    <!-- FRAME 01 ─────────────────────────────────────────────────────── -->
+    <article class="frame">
+      <aside class="frame-num">
+        <span class="dot"></span>
+        <span class="n" data-ghost="88">01</span>
+        <span class="dot"></span>
+      </aside>
+
+      <div class="shot">
+        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
+          <!-- dark room — silhouette of headphones in moonlight -->
+          <defs>
+            <radialGradient id="rg1" cx="50%" cy="40%" r="60%">
+              <stop offset="0%" stop-color="#1a1e25"/>
+              <stop offset="100%" stop-color="#050608"/>
+            </radialGradient>
+          </defs>
+          <rect width="480" height="280" fill="url(#rg1)"/>
+          <!-- soft single light source from top-right -->
+          <ellipse cx="380" cy="40" rx="160" ry="60" fill="#1a2230" opacity=".5"/>
+          <!-- headphones silhouette on a table -->
+          <g transform="translate(180,100)">
+            <path d="M0 60 Q60 -20 120 60" stroke="#3a4150" stroke-width="6" fill="none" stroke-linecap="round"/>
+            <ellipse cx="0"   cy="80" rx="22" ry="28" fill="#0a0b0e" stroke="#2a2f38" stroke-width="2"/>
+            <ellipse cx="120" cy="80" rx="22" ry="28" fill="#0a0b0e" stroke="#2a2f38" stroke-width="2"/>
+            <ellipse cx="0"   cy="80" rx="14" ry="18" fill="#15181e"/>
+            <ellipse cx="120" cy="80" rx="14" ry="18" fill="#15181e"/>
+          </g>
+          <!-- a hand entering from bottom-right -->
+          <g transform="translate(330,180) rotate(-20)" opacity=".85">
+            <ellipse cx="0" cy="0" rx="22" ry="14" fill="#5a4a3e"/>
+            <rect x="-2" y="-6" width="50" height="12" rx="6" fill="#5a4a3e"/>
+          </g>
+          <!-- a faint table surface line -->
+          <line x1="0" y1="200" x2="480" y2="200" stroke="#15181e" stroke-width="1"/>
+        </svg>
+        <span class="tc">00:00</span>
+        <span class="duration">03 s</span>
+      </div>
+
+      <div class="info">
+        <div class="info-head">
+          <div class="info-h">cold open · "the hand"</div>
+          <span class="info-tag">no voiceover</span>
+        </div>
+
+        <div class="info-row">
+          <div class="k">composition</div>
+          <div class="v">close-up. headphones on a dark table. one hand reaches in from the bottom-right. <b>shallow DoF</b>, headphones in focus.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">camera</div>
+          <div class="v">35mm · static · slight breath. push in <em>just barely</em> as the hand touches the headphones.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">sound</div>
+          <div class="v">silence + sub-bass hum building underneath. amber EQ-rumble like the room is about to wake up.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">lighting</div>
+          <div class="v">single warm key from camera-right at 30°. everything else black. <b>20/80 = paper-thin highlight, charcoal everywhere else.</b></div>
+        </div>
+        <div class="info-row">
+          <div class="k">energy <span class="energy"><span class="on"></span><span></span><span></span><span></span><span></span></span></div>
+          <div class="v">low. patient. promises something.</div>
+        </div>
+
+        <div class="stamp">frame 01 / 10</div>
+      </div>
+    </article>
+
+    <!-- FRAME 02 ─────────────────────────────────────────────────────── -->
+    <article class="frame">
+      <aside class="frame-num">
+        <span class="dot"></span>
+        <span class="n" data-ghost="88">02</span>
+        <span class="dot"></span>
+      </aside>
+
+      <div class="shot">
+        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="rg2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#15181e"/>
+              <stop offset="100%" stop-color="#05060a"/>
+            </linearGradient>
+          </defs>
+          <rect width="480" height="280" fill="url(#rg2)"/>
+          <!-- DDJ controller from above — geometric -->
+          <g transform="translate(60,140)">
+            <rect x="0" y="0" width="360" height="120" rx="10" fill="#0e1014" stroke="#2a2f38" stroke-width="1.5"/>
+            <!-- 2 jog wheels -->
+            <circle cx="80" cy="60" r="42" fill="#15181e" stroke="#3a4150" stroke-width="1.5"/>
+            <circle cx="80" cy="60" r="18" fill="#0a0b0e" stroke="#2a2f38"/>
+            <circle cx="280" cy="60" r="42" fill="#15181e" stroke="#3a4150" stroke-width="1.5"/>
+            <circle cx="280" cy="60" r="18" fill="#0a0b0e" stroke="#2a2f38"/>
+            <!-- crossfader -->
+            <rect x="155" y="78" width="50" height="6" rx="3" fill="#15181e" stroke="#3a4150"/>
+            <rect x="175" y="74" width="14" height="14" rx="2" fill="#3a4150"/>
+            <!-- 4 EQ knobs cluster -->
+            <g fill="#15181e" stroke="#3a4150">
+              <circle cx="155" cy="22" r="7"/><circle cx="172" cy="22" r="7"/>
+              <circle cx="189" cy="22" r="7"/><circle cx="206" cy="22" r="7"/>
+            </g>
+          </g>
+          <!-- DJ silhouette hands -->
+          <g opacity=".85">
+            <ellipse cx="120" cy="195" rx="40" ry="22" fill="#15181e"/>
+            <rect x="100" y="190" width="60" height="40" fill="#15181e"/>
+            <ellipse cx="320" cy="195" rx="40" ry="22" fill="#15181e"/>
+            <rect x="300" y="190" width="60" height="40" fill="#15181e"/>
+          </g>
+          <!-- annotation: red X over the bad transition spot -->
+          <g transform="translate(165,135)" opacity=".9">
+            <line x1="-10" y1="-10" x2="10" y2="10" stroke="#ff3553" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="10"  y1="-10" x2="-10" y2="10" stroke="#ff3553" stroke-width="2.5" stroke-linecap="round"/>
+          </g>
+        </svg>
+        <span class="tc">00:03</span>
+        <span class="duration">04 s</span>
+      </div>
+
+      <div class="info">
+        <div class="info-head">
+          <div class="info-h">the friction · "almost there"</div>
+          <span class="info-tag">no voiceover</span>
+        </div>
+        <div class="info-row">
+          <div class="k">composition</div>
+          <div class="v">overhead of the controller. only the DJ's hands visible. crossfader stalls mid-transition. <b>two beats of held silence on the cut.</b></div>
+        </div>
+        <div class="info-row">
+          <div class="k">camera</div>
+          <div class="v">top-down · 50mm equivalent · locked.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">sound</div>
+          <div class="v">the music dips — wrong moment, wrong EQ. a tiny audible <em>oh no</em> moment.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">cast</div>
+          <div class="v">hands only. <b>Francesco's hands</b> — clean, ringless, on the DDJ-FLX4.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span></span><span></span><span></span></span></div>
+          <div class="v">tension. the audience leans in.</div>
+        </div>
+
+        <div class="stamp">frame 02 / 10</div>
+      </div>
+    </article>
+
+    <!-- FRAME 03 ─────────────────────────────────────────────────────── -->
+    <article class="frame">
+      <aside class="frame-num">
+        <span class="dot"></span>
+        <span class="n" data-ghost="88">03</span>
+        <span class="dot"></span>
+      </aside>
+
+      <div class="shot">
+        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <radialGradient id="rg3" cx="30%" cy="50%" r="80%">
+              <stop offset="0%" stop-color="#241a08"/>
+              <stop offset="50%" stop-color="#0e0a05"/>
+              <stop offset="100%" stop-color="#020203"/>
+            </radialGradient>
+          </defs>
+          <rect width="480" height="280" fill="url(#rg3)"/>
+          <!-- close on DJ's ear with headphone -->
+          <g transform="translate(60,40)">
+            <ellipse cx="180" cy="120" rx="120" ry="140" fill="#15181e"/> <!-- silhouette head -->
+            <ellipse cx="80"  cy="120" rx="44" ry="56" fill="#0a0b0e" stroke="#2a2f38" stroke-width="2"/> <!-- headphone cup -->
+            <ellipse cx="80"  cy="120" rx="30" ry="40" fill="#15181e"/>
+            <path d="M80 64 Q180 -20 280 64" stroke="#3a4150" stroke-width="6" fill="none"/>
+            <!-- glow emanating from headphone -->
+            <ellipse cx="80" cy="120" rx="70" ry="80" fill="url(#glowG)" opacity=".7"/>
+          </g>
+          <radialGradient id="glowG"><stop offset="0%" stop-color="#ffa12e" stop-opacity=".7"/><stop offset="100%" stop-color="#ffa12e" stop-opacity="0"/></radialGradient>
+        </svg>
+        <!-- the live pill appears -->
+        <span class="overlay-chip" style="top:32px; left:32px;">
+          <span class="ld"></span> live
+        </span>
+        <span class="overlay-tc" style="top:30px; right:28px;">00:03</span>
+        <!-- speech bubble — Avery's first line -->
+        <div class="speech" style="top:90px; right:24px;">
+          yo. that bass swap was clean — bring the hats up <em>just</em> a touch before the drop.
+        </div>
+        <span class="tc">00:07</span>
+        <span class="duration">03 s</span>
+      </div>
+
+      <div class="info">
+        <div class="info-head">
+          <div class="info-h">the reveal · "yo"</div>
+          <span class="info-tag">avery vo</span>
+        </div>
+        <div class="info-row">
+          <div class="k">composition</div>
+          <div class="v">extreme close on the DJ's ear + headphone cup. amber glow blooms from inside the cup. <b>the LIVE pill flickers on</b> as text-overlay, top-left.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">camera</div>
+          <div class="v">85mm · macro · static. the focus pull lands exactly when Avery's first syllable plays.</div>
+        </div>
+        <div class="info-row vo-row">
+          <div class="k">avery vo</div>
+          <div class="v">yo. that bass swap was clean — bring the hats up <em>just</em> a touch before the drop.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">timing</div>
+          <div class="v"><b>voice enters at 00:03.2</b>. the cut to this frame syncs to the syllable "yo".</div>
+        </div>
+        <div class="info-row">
+          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span></span></div>
+          <div class="v">the reveal. the audience says "wait, what just talked."</div>
+        </div>
+
+        <div class="stamp">frame 03 / 10</div>
+      </div>
+    </article>
+
+    <!-- FRAME 04 ─────────────────────────────────────────────────────── -->
+    <article class="frame">
+      <aside class="frame-num">
+        <span class="dot"></span>
+        <span class="n" data-ghost="88">04</span>
+        <span class="dot"></span>
+      </aside>
+
+      <div class="shot">
+        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="rg4" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#1a1e25"/>
+              <stop offset="100%" stop-color="#05060a"/>
+            </linearGradient>
+          </defs>
+          <rect width="480" height="280" fill="url(#rg4)"/>
+          <!-- a single hand on a fader, pushing up -->
+          <g transform="translate(180,60)">
+            <rect x="40" y="20" width="40" height="180" rx="4" fill="#0a0b0e" stroke="#3a4150"/>
+            <line x1="60" y1="20" x2="60" y2="200" stroke="#2a2f38"/>
+            <rect x="32" y="60" width="56" height="22" rx="3" fill="#3a4150"/>
+            <rect x="32" y="60" width="56" height="6" rx="2" fill="#5a606c"/>
+            <!-- amber LED rim on the fader cap -->
+            <line x1="32" y1="60" x2="88" y2="60" stroke="#ffa12e" stroke-width="2"/>
+            <!-- motion arrow up -->
+            <g transform="translate(110,80)">
+              <line x1="0" y1="40" x2="0" y2="0" stroke="#ffa12e" stroke-width="3" stroke-linecap="round"/>
+              <path d="M-8 8 L0 0 L8 8" stroke="#ffa12e" stroke-width="3" stroke-linecap="round" fill="none"/>
+            </g>
+            <!-- finger on the fader cap -->
+            <ellipse cx="60" cy="55" rx="18" ry="10" fill="#5a4a3e"/>
+            <ellipse cx="60" cy="50" rx="14" ry="8" fill="#7a6452"/>
+          </g>
+          <!-- live light leak -->
+          <ellipse cx="430" cy="60" rx="80" ry="40" fill="#ffa12e" opacity=".18"/>
+        </svg>
+        <span class="tc">00:10</span>
+        <span class="duration">04 s</span>
+      </div>
+
+      <div class="info">
+        <div class="info-head">
+          <div class="info-h">the follow · "trust"</div>
+          <span class="info-tag">music swells</span>
+        </div>
+        <div class="info-row">
+          <div class="k">composition</div>
+          <div class="v">macro on the hi-hat fader. finger pushes it up. <b>amber LED rim catches as it crosses the unity mark.</b></div>
+        </div>
+        <div class="info-row">
+          <div class="k">camera</div>
+          <div class="v">100mm macro · slight handheld breath · grain visible at the edges.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">sound</div>
+          <div class="v">hats lift in the mix. the build kicks. <em>the room knows.</em></div>
+        </div>
+        <div class="info-row">
+          <div class="k">edit</div>
+          <div class="v">cut on the click of the fader cap moving past the detent. <b>04 frames of audio pre-roll.</b></div>
+        </div>
+        <div class="info-row">
+          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span></span></div>
+          <div class="v">rising. tension converting to anticipation.</div>
+        </div>
+
+        <div class="stamp">frame 04 / 10</div>
+      </div>
+    </article>
+
+    <!-- FRAME 05 ─────────────────────────────────────────────────────── -->
+    <article class="frame">
+      <aside class="frame-num">
+        <span class="dot"></span>
+        <span class="n" data-ghost="88">05</span>
+        <span class="dot"></span>
+      </aside>
+
+      <div class="shot">
+        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <radialGradient id="rg5" cx="50%" cy="40%" r="80%">
+              <stop offset="0%" stop-color="#241a08"/>
+              <stop offset="60%" stop-color="#0e0a05"/>
+              <stop offset="100%" stop-color="#020203"/>
+            </radialGradient>
+          </defs>
+          <rect width="480" height="280" fill="url(#rg5)"/>
+          <!-- overhead — controller + laptop + mascot small in the corner -->
+          <g transform="translate(40,40)">
+            <rect x="0" y="0" width="200" height="120" rx="6" fill="#0e1014" stroke="#3a4150"/>
+            <text x="100" y="65" text-anchor="middle" font-family="DM Mono" font-size="11" fill="#6b7280" letter-spacing="2">LAPTOP · vibemix</text>
+            <!-- mock app strip on the laptop -->
+            <rect x="10" y="10" width="180" height="28" rx="2" fill="#15181e"/>
+            <circle cx="20" cy="24" r="4" fill="#ffa12e"/>
+            <circle cx="32" cy="24" r="4" fill="#ff3553"/>
+            <rect x="46" y="18" width="60" height="12" rx="2" fill="#1d2128"/>
+            <!-- timecode -->
+            <rect x="120" y="14" width="60" height="20" rx="2" fill="#050608" stroke="#2a2f38"/>
+            <text x="150" y="29" text-anchor="middle" font-family="DM Mono" font-weight="700" font-size="11" fill="#ffa12e">02:44:31</text>
+            <!-- meters -->
+            <g transform="translate(10,46)">
+              <rect width="180" height="60" rx="3" fill="#0a0b0e"/>
+              <!-- segmented LEDs row -->
+              <g fill="#ffa12e">
+                <rect x="6" y="6" width="6" height="44" rx="1"/>
+                <rect x="14" y="6" width="6" height="44" rx="1"/>
+                <rect x="22" y="6" width="6" height="44" rx="1"/>
+                <rect x="30" y="12" width="6" height="38" rx="1" opacity=".7"/>
+                <rect x="38" y="20" width="6" height="30" rx="1" opacity=".5"/>
+              </g>
+            </g>
+            <!-- mascot peeks corner -->
+            <g transform="translate(170,85)">
+              <circle cx="0" cy="0" r="12" fill="#ffa12e" stroke="#a86c10" stroke-width=".7"/>
+              <circle cx="-3" cy="-1" r="1.6" fill="#1a1408"/>
+              <circle cx="3"  cy="-1" r="1.6" fill="#1a1408"/>
+              <path d="M-3 4 Q0 6 3 4" stroke="#1a1408" stroke-width="1" fill="none"/>
+            </g>
+          </g>
+          <!-- controller next to it -->
+          <g transform="translate(260,80)">
+            <rect width="200" height="70" rx="8" fill="#0a0b0e" stroke="#2a2f38" stroke-width="1.5"/>
+            <circle cx="40" cy="35" r="22" fill="#15181e" stroke="#3a4150"/>
+            <circle cx="160" cy="35" r="22" fill="#15181e" stroke="#3a4150"/>
+            <rect x="90" y="50" width="20" height="6" fill="#3a4150"/>
+          </g>
+        </svg>
+        <!-- overlays — the actual app UI peeks through -->
+        <span class="overlay-chip" style="top:24px; right:24px;">
+          <span class="ld"></span> coach · pro
+        </span>
+        <span class="tc">00:14</span>
+        <span class="duration">06 s</span>
+      </div>
+
+      <div class="info">
+        <div class="info-head">
+          <div class="info-h">the product · "this is it"</div>
+          <span class="info-tag">app on screen</span>
+        </div>
+        <div class="info-row">
+          <div class="k">composition</div>
+          <div class="v">overhead. laptop screen <b>shows the actual vibemix UI</b> animating in real-time (use the live HTML mock as the screen recording). DDJ controller beside it. mascot Avery peeks from the laptop bezel.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">camera</div>
+          <div class="v">overhead · tilt 90° · slow downward push so the UI fills more of the frame each beat.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">sound</div>
+          <div class="v">the build continues. Avery is silent here — let the product speak.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">screen content</div>
+          <div class="v">UI shows: <b>coach · pro</b>, timecode 02:44, build phase tape, hi-hat knob lit amber, "trust the build" line on the transcript.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span></span></div>
+          <div class="v">crescendo. the audience says "oh — there it is."</div>
+        </div>
+
+        <div class="stamp">frame 05 / 10</div>
+      </div>
+    </article>
+
+    <!-- FRAME 06 ─────────────────────────────────────────────────────── -->
+    <article class="frame">
+      <aside class="frame-num">
+        <span class="dot"></span>
+        <span class="n" data-ghost="88">06</span>
+        <span class="dot"></span>
+      </aside>
+
+      <div class="shot">
+        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="rg6" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#1a0e05"/>
+              <stop offset="100%" stop-color="#000"/>
+            </linearGradient>
+          </defs>
+          <rect width="480" height="280" fill="url(#rg6)"/>
+          <!-- crowd silhouettes with hands up, lit from below by amber strobes -->
+          <g opacity=".85">
+            <ellipse cx="50"  cy="240" rx="40" ry="30" fill="#0a0b0e"/>
+            <ellipse cx="130" cy="240" rx="40" ry="30" fill="#0a0b0e"/>
+            <ellipse cx="220" cy="240" rx="40" ry="30" fill="#0a0b0e"/>
+            <ellipse cx="310" cy="240" rx="40" ry="30" fill="#0a0b0e"/>
+            <ellipse cx="400" cy="240" rx="40" ry="30" fill="#0a0b0e"/>
+            <!-- raised arms -->
+            <rect x="42"  y="160" width="14" height="80" rx="6" fill="#0a0b0e"/>
+            <rect x="124" y="140" width="14" height="100" rx="6" fill="#0a0b0e"/>
+            <rect x="214" y="130" width="14" height="110" rx="6" fill="#0a0b0e"/>
+            <rect x="304" y="150" width="14" height="90" rx="6" fill="#0a0b0e"/>
+            <rect x="394" y="120" width="14" height="120" rx="6" fill="#0a0b0e"/>
+          </g>
+          <!-- amber strobe rays from below -->
+          <g opacity=".55">
+            <polygon points="100,280 240,40 380,280" fill="#ffa12e"/>
+            <polygon points="60,280 240,100 420,280" fill="#ff8a1a" opacity=".5"/>
+          </g>
+          <!-- volumetric haze -->
+          <ellipse cx="240" cy="190" rx="280" ry="60" fill="#ffa12e" opacity=".1"/>
+        </svg>
+        <span class="overlay-chip" style="top:24px; right:24px; border-color:var(--phosphor-warm); background:linear-gradient(180deg, rgba(255,138,26,.25), rgba(255,138,26,.1));">
+          <span class="ld"></span> hype · let's go
+        </span>
+        <div class="speech" style="top:36px; left:30px;">
+          okay <em>LET'S GO</em>. you cooked it. ride it out.
+        </div>
+        <span class="tc">00:20</span>
+        <span class="duration">05 s</span>
+      </div>
+
+      <div class="info">
+        <div class="info-head">
+          <div class="info-h">the flip · "let's go"</div>
+          <span class="info-tag">mode toggle</span>
+        </div>
+        <div class="info-row">
+          <div class="k">composition</div>
+          <div class="v">crowd from behind, arms up. <b>drop has just hit.</b> amber strobes sweep up from the booth. mode chip flips coach → hype on overlay.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">camera</div>
+          <div class="v">wide · 24mm · handheld · the camera bounces with the kick drum (carefully — once per bar, not vlog-shaky).</div>
+        </div>
+        <div class="info-row vo-row">
+          <div class="k">avery vo</div>
+          <div class="v">okay <em>LET'S GO</em>. you cooked it. ride it out.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">direction</div>
+          <div class="v">cast 8 dancers minimum. wardrobe black + one amber piece each (subtle 20/80 brand consistency in the crowd itself).</div>
+        </div>
+        <div class="info-row">
+          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span></div>
+          <div class="v">peak. this is the money shot.</div>
+        </div>
+
+        <div class="stamp">frame 06 / 10</div>
+      </div>
+    </article>
+
+    <!-- FRAME 07 ─────────────────────────────────────────────────────── -->
+    <article class="frame">
+      <aside class="frame-num">
+        <span class="dot"></span>
+        <span class="n" data-ghost="88">07</span>
+        <span class="dot"></span>
+      </aside>
+
+      <div class="shot">
+        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <radialGradient id="rg7" cx="50%" cy="50%" r="80%">
+              <stop offset="0%" stop-color="#2a1e08"/>
+              <stop offset="100%" stop-color="#000"/>
+            </radialGradient>
+          </defs>
+          <rect width="480" height="280" fill="url(#rg7)"/>
+          <!-- DJ profile + laptop screen with mascot reacting -->
+          <g transform="translate(0,40)">
+            <!-- DJ silhouette half-frame -->
+            <path d="M0 220 L0 40 Q60 0 140 30 L160 60 L150 100 L150 160 L170 220 Z" fill="#0a0b0e"/>
+            <!-- amber rim light on the DJ -->
+            <path d="M140 30 L160 60 L150 100" stroke="#ffa12e" stroke-width="2" fill="none" opacity=".8"/>
+            <!-- laptop in front -->
+            <rect x="200" y="120" width="240" height="120" rx="6" fill="#0e1014" stroke="#3a4150"/>
+            <!-- mascot big on screen -->
+            <g transform="translate(290,170)">
+              <circle cx="0" cy="0" r="34" fill="#ffa12e" stroke="#a86c10" stroke-width="1"/>
+              <!-- headphones over -->
+              <ellipse cx="-30" cy="-8" rx="8" ry="11" fill="#0a0b0e" stroke="#3a4150"/>
+              <ellipse cx="30" cy="-8" rx="8" ry="11" fill="#0a0b0e" stroke="#3a4150"/>
+              <path d="M-26 -16 Q0 -40 26 -16" stroke="#3a4150" stroke-width="2" fill="none"/>
+              <!-- eyes (wide & happy) -->
+              <ellipse cx="-10" cy="-4" rx="4" ry="5.5" fill="#1a1408"/>
+              <ellipse cx="10"  cy="-4" rx="4" ry="5.5" fill="#1a1408"/>
+              <ellipse cx="-9"  cy="-6" rx="1.2" ry="1.6" fill="#fff"/>
+              <ellipse cx="11"  cy="-6" rx="1.2" ry="1.6" fill="#fff"/>
+              <!-- big happy mouth -->
+              <path d="M-10 6 Q0 16 10 6" stroke="#1a1408" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <!-- blush -->
+              <circle cx="-18" cy="3" r="3" fill="#ff7050" opacity=".5"/>
+              <circle cx="18" cy="3" r="3" fill="#ff7050" opacity=".5"/>
+              <!-- bouncing music notes -->
+              <text x="-60" y="-30" font-family="DM Mono" font-size="20" fill="#ffa12e">♪</text>
+              <text x="55" y="-20" font-family="DM Mono" font-size="14" fill="#ffa12e">♫</text>
+            </g>
+          </g>
+        </svg>
+        <span class="tc">00:25</span>
+        <span class="duration">07 s</span>
+      </div>
+
+      <div class="info">
+        <div class="info-head">
+          <div class="info-h">coexistence · "the mascot watches"</div>
+          <span class="info-tag">mascot moment</span>
+        </div>
+        <div class="info-row">
+          <div class="k">composition</div>
+          <div class="v">DJ in profile on the left, laptop on the right. <b>mascot Avery fills the laptop screen</b>, beaming, eyes wide, music notes bouncing. the fun moment.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">camera</div>
+          <div class="v">medium · 50mm · slow dolly left-to-right · rack focus from DJ to laptop screen mid-shot.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">sound</div>
+          <div class="v">music continues. one Avery breath/laugh sample under the kick — barely audible, subliminal warmth.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">why it's here</div>
+          <div class="v">this is the <em>brand</em> moment. people remember mascots. give Avery time to be a character, not just a UI label.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span></span></div>
+          <div class="v">warmth. the audience smiles.</div>
+        </div>
+
+        <div class="stamp">frame 07 / 10</div>
+      </div>
+    </article>
+
+    <!-- FRAME 08 ─────────────────────────────────────────────────────── -->
+    <article class="frame">
+      <aside class="frame-num">
+        <span class="dot"></span>
+        <span class="n" data-ghost="88">08</span>
+        <span class="dot"></span>
+      </aside>
+
+      <div class="shot">
+        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
+          <rect width="480" height="280" fill="#050608"/>
+          <!-- giant wordmark center, glowing -->
+          <g transform="translate(240,140)">
+            <text text-anchor="middle" font-family="Workbench" font-size="74" fill="#ffa12e" filter="url(#glow)" letter-spacing="2">vibemix</text>
+          </g>
+          <defs>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="3" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <!-- subtitle -->
+          <text x="240" y="200" text-anchor="middle" font-family="DM Mono" font-size="13" fill="#c8cdd6" letter-spacing="4">THE AI DJ CO-HOST</text>
+          <!-- faint scanlines -->
+          <g opacity=".15">
+            <line x1="0" y1="40" x2="480" y2="40" stroke="#ffa12e"/>
+            <line x1="0" y1="240" x2="480" y2="240" stroke="#ffa12e"/>
+          </g>
+          <!-- glow halo -->
+          <ellipse cx="240" cy="140" rx="280" ry="60" fill="#ffa12e" opacity=".12"/>
+        </svg>
+        <span class="tc">00:32</span>
+        <span class="duration">06 s</span>
+      </div>
+
+      <div class="info">
+        <div class="info-head">
+          <div class="info-h">the brand · "vibemix"</div>
+          <span class="info-tag">title card</span>
+        </div>
+        <div class="info-row">
+          <div class="k">composition</div>
+          <div class="v">black field. wordmark in Workbench, phosphor amber, <b>glowing</b>. subtitle in DM Mono, "THE AI DJ CO-HOST".</div>
+        </div>
+        <div class="info-row">
+          <div class="k">camera</div>
+          <div class="v">no camera — pure type. <b>2D motion design.</b> wordmark types in letter-by-letter on the beat. subtitle reveals on the snare.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">sound</div>
+          <div class="v">music subtly ducks — the wordmark gets a tiny synth-stab to land it.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">edit</div>
+          <div class="v">hold 1.5s on full reveal. then dissolve to frame 09 on a downbeat.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span></span><span></span><span></span></span></div>
+          <div class="v">declarative. confident. quiet.</div>
+        </div>
+
+        <div class="stamp">frame 08 / 10</div>
+      </div>
+    </article>
+
+    <!-- FRAME 09 ─────────────────────────────────────────────────────── -->
+    <article class="frame">
+      <aside class="frame-num">
+        <span class="dot"></span>
+        <span class="n" data-ghost="88">09</span>
+        <span class="dot"></span>
+      </aside>
+
+      <div class="shot">
+        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
+          <rect width="480" height="280" fill="#0a0b0e"/>
+          <!-- mascot waves -->
+          <g transform="translate(240,130)">
+            <circle cx="0" cy="0" r="58" fill="#ffa12e" stroke="#a86c10" stroke-width=".8"/>
+            <ellipse cx="-50" cy="-10" rx="14" ry="18" fill="#0a0b0e" stroke="#3a4150"/>
+            <ellipse cx="50" cy="-10" rx="14" ry="18" fill="#0a0b0e" stroke="#3a4150"/>
+            <path d="M-42 -22 Q0 -60 42 -22" stroke="#3a4150" stroke-width="2.5" fill="none"/>
+            <ellipse cx="-18" cy="-5" rx="7" ry="9" fill="#1a1408"/>
+            <ellipse cx="18" cy="-5" rx="7" ry="9" fill="#1a1408"/>
+            <ellipse cx="-16" cy="-9" rx="2" ry="2.6" fill="#fff"/>
+            <ellipse cx="20" cy="-9" rx="2" ry="2.6" fill="#fff"/>
+            <path d="M-15 10 Q0 22 15 10" stroke="#1a1408" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <circle cx="-32" cy="6" r="5" fill="#ff7050" opacity=".5"/>
+            <circle cx="32" cy="6" r="5" fill="#ff7050" opacity=".5"/>
+            <!-- waving hand -->
+            <g transform="translate(70,-5) rotate(20)">
+              <ellipse cx="0" cy="0" rx="14" ry="10" fill="#ffa12e" stroke="#a86c10"/>
+              <line x1="6" y1="-6" x2="14" y2="-14" stroke="#a86c10" stroke-width=".5"/>
+            </g>
+          </g>
+          <!-- repo URL at the bottom -->
+          <rect x="80" y="220" width="320" height="38" rx="6" fill="#15181e" stroke="#ffa12e" stroke-width="1"/>
+          <text x="240" y="244" text-anchor="middle" font-family="DM Mono" font-size="14" fill="#ffa12e" letter-spacing="2">github.com / bravoh / vibemix</text>
+        </svg>
+        <span class="tc">00:38</span>
+        <span class="duration">04 s</span>
+      </div>
+
+      <div class="info">
+        <div class="info-head">
+          <div class="info-h">the cta · "go get it"</div>
+          <span class="info-tag">repo link</span>
+        </div>
+        <div class="info-row">
+          <div class="k">composition</div>
+          <div class="v">mascot Avery waves at the camera. <b>repo URL fills the lower third.</b> "free for mac + windows" sub-line beneath.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">camera</div>
+          <div class="v">no camera — 2D animation. mascot has a 4-frame wave loop. repo URL reveals letter-by-letter.</div>
+        </div>
+        <div class="info-row vo-row">
+          <div class="k">avery vo</div>
+          <div class="v">free. mac, windows. come find me.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">copy variants</div>
+          <div class="v">A/B test: <em>"come find me"</em> vs <em>"come play"</em> vs <em>"see you soon"</em>. ship 3 cuts, pick by engagement.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span></span></div>
+          <div class="v">warm goodbye. friendly invitation.</div>
+        </div>
+
+        <div class="stamp">frame 09 / 10</div>
+      </div>
+    </article>
+
+    <!-- FRAME 10 ─────────────────────────────────────────────────────── -->
+    <article class="frame">
+      <aside class="frame-num">
+        <span class="dot"></span>
+        <span class="n" data-ghost="88">10</span>
+        <span class="dot"></span>
+      </aside>
+
+      <div class="shot">
+        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
+          <rect width="480" height="280" fill="#000"/>
+          <text x="240" y="160" text-anchor="middle" font-family="Caveat" font-weight="700" font-size="34" fill="#ffa12e" filter="url(#glow2)">
+            made by bravoh · with love
+          </text>
+          <defs>
+            <filter id="glow2" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <!-- tiny mascot in the corner -->
+          <g transform="translate(440,250)" opacity=".75">
+            <circle cx="0" cy="0" r="12" fill="#ffa12e"/>
+            <circle cx="-3" cy="-1" r="1.4" fill="#1a1408"/>
+            <circle cx="3"  cy="-1" r="1.4" fill="#1a1408"/>
+            <path d="M-3 4 Q0 6 3 4" stroke="#1a1408" stroke-width="1" fill="none"/>
+          </g>
+        </svg>
+        <span class="tc">00:42</span>
+        <span class="duration">03 s</span>
+      </div>
+
+      <div class="info">
+        <div class="info-head">
+          <div class="info-h">the tag · "with love"</div>
+          <span class="info-tag">brand mark</span>
+        </div>
+        <div class="info-row">
+          <div class="k">composition</div>
+          <div class="v">pure black. <b>Caveat handwriting</b> in phosphor amber: "made by bravoh · with love". tiny mascot waves goodbye from the bottom-right.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">camera</div>
+          <div class="v">2D animation. handwriting reveals like it's being written in real time, ~1.2s draw-on.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">sound</div>
+          <div class="v">last kick of the loop. tail of reverb. silence. <em>cut.</em></div>
+        </div>
+        <div class="info-row">
+          <div class="k">edit</div>
+          <div class="v">hold 1.5s after writing completes. fade to black. no logos. no URLs again. nothing else.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">energy <span class="energy"><span class="on"></span><span></span><span></span><span></span><span></span></span></div>
+          <div class="v">quiet. signed. the cinema lights come up.</div>
+        </div>
+
+        <div class="stamp">scene complete</div>
+      </div>
+    </article>
+
+  </section>
+
+  <!-- ─── cut sheet ─── -->
+  <section class="cutsheet" aria-label="cut sheet">
+    <div class="cutsheet-h">cut sheet · 45 s · 10 frames</div>
+
+    <div class="timeline" role="img" aria-label="full timeline strip">
+      <div class="tline-seg cold">     <span class="num">01</span><span class="ttl">cold</span> </div>
+      <div class="tline-seg problem">  <span class="num">02</span><span class="ttl">friction</span> </div>
+      <div class="tline-seg reveal">   <span class="num">03</span><span class="ttl">yo</span> </div>
+      <div class="tline-seg follow">   <span class="num">04</span><span class="ttl">trust</span> </div>
+      <div class="tline-seg establish"><span class="num">05</span><span class="ttl">this is it</span></div>
+      <div class="tline-seg flip">     <span class="num">06</span><span class="ttl">let's go</span></div>
+      <div class="tline-seg coexist">  <span class="num">07</span><span class="ttl">mascot</span></div>
+      <div class="tline-seg product">  <span class="num">08</span><span class="ttl">vibemix</span></div>
+      <div class="tline-seg cta">      <span class="num">09</span><span class="ttl">go get it</span></div>
+      <div class="tline-seg tag">      <span class="num">10</span><span class="ttl">love</span></div>
+    </div>
+    <div class="timeline-ruler" aria-hidden="true">
+      <span>0:00</span><span>0:05</span><span>0:10</span><span>0:15</span><span>0:20</span><span>0:25</span><span>0:30</span><span>0:35</span><span>0:40</span><span>0:45</span>
+    </div>
+  </section>
+
+  <!-- ─── footer ─── -->
+  <footer class="footer">
+    <span>v0.1 · production blueprint</span>
+    <span>·</span>
+    <span>shot list ready · awaiting set + cast</span>
+    <span class="right">made by bravoh · with love</span>
+  </footer>
+
+</main>
+</body>
+</html>
