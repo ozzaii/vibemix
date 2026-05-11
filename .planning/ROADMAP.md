@@ -44,7 +44,9 @@
   2. Three POC variants (`cohost.py` / `cohost_v2.py` / `cohost_lk.py`) are archived under `archive/poc/` and the canonical entry point is `python -m vibemix`.
   3. `pyproject.toml` + `requirements.lock` exist with verified version pins (Python 3.12, livekit-agents 1.5.8, google-genai 2.0.1, etc.); `uv pip install -e .` succeeds on a clean macOS Python 3.12 venv.
   4. SignPath Foundation OSS application is submitted and confirmation email is in Kaan's inbox; tracking ticket exists in the planning notes with the expected approval window.
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 01-01-PLAN.md — Package skeleton + four typing.Protocol firewall surfaces + uv lockfile + Apache 2.0 LICENSE + SignPath OSS application checklist (Kaan-only submit) + public repo creation at github.com/ozzaii/vibemix (Kaan-only)
 
 ### Phase 2: Audio Core Port + Ring Buffer Fix
 **Goal**: Pre-allocated audio ring buffers replace the POC's `np.concatenate`-per-callback pattern, killing the dropout regression flagged in CONCERNS.md / PITFALLS.md P5. macOS audio I/O works end-to-end via `platform/_audio_macos.py`.
