@@ -14,9 +14,11 @@ Pins:
   scale-factor → thumbnail to (1280, 800) → JPEG quality 82.
 
 Patched surfaces:
-- ``vibemix.platform._screen_windows.mss.mss`` (mss module is imported at
-  module top — cross-platform — so we patch the attribute directly).
-- ``vibemix.platform._screen_windows.Image`` (PIL Image, same — module top).
+- ``vibemix.platform._screen_windows.mss`` (Phase 8: mss is win32-only in
+  pyproject; on macOS dev boxes it isn't installed and ``_HAS_MSS`` is
+  False, so capture tests must restore ``_HAS_MSS=True`` and inject a
+  fake ``mss`` module attribute via ``mocker.patch``).
+- ``vibemix.platform._screen_windows.Image`` (PIL Image — module top).
 - ``win32gui`` via ``monkeypatch.setitem(sys.modules, "win32gui", fake)`` so
   the lazy-import inside method bodies resolves to the fake.
 """
@@ -229,10 +231,22 @@ def test_find_dj_window_returns_none_when_no_dj_app_present(monkeypatch):
 
 
 def test_capture_no_bounds_produces_jpeg(mocker, monkeypatch):
-    """Mock mss + PIL + win32gui to verify the capture pipeline produces JPEG."""
+    """Mock mss + PIL + win32gui to verify the capture pipeline produces JPEG.
+
+    Phase 8: mss is win32-only in pyproject; on a macOS dev box mss is no
+    longer installed, so the module-top ``import mss`` block falls into the
+    ImportError branch (``_HAS_MSS=False``). Tests that exercise the capture
+    pipeline must restore ``_HAS_MSS=True`` AND patch the ``mss`` attribute
+    on the module to a fake — without those, ``is_available()`` returns
+    False and ``capture()`` raises before reaching the mss call.
+    """
     # win32gui must be in sys.modules so is_available() passes the pywin32
     # check (otherwise capture() raises RuntimeError).
     monkeypatch.setitem(sys.modules, "win32gui", MagicMock())
+    # Phase 8 compat: restore the _HAS_MSS gate + bind a fake mss attribute.
+    fake_mss_module = MagicMock()
+    mocker.patch("vibemix.platform._screen_windows._HAS_MSS", True)
+    mocker.patch("vibemix.platform._screen_windows.mss", fake_mss_module)
     fake_raw = MagicMock()
     fake_raw.size = (1920, 1080)
     fake_raw.bgra = bytes(1920 * 1080 * 4)
@@ -241,10 +255,7 @@ def test_capture_no_bounds_produces_jpeg(mocker, monkeypatch):
     fake_sct.grab.return_value = fake_raw
     fake_sct.__enter__.return_value = fake_sct
     fake_sct.__exit__.return_value = False
-    mocker.patch(
-        "vibemix.platform._screen_windows.mss.mss",
-        return_value=fake_sct,
-    )
+    fake_mss_module.mss.return_value = fake_sct
 
     s = ScreenWindows()
     frame = s.capture(bounds=None, max_width=1280, max_height=800, jpeg_quality=82)
@@ -257,8 +268,18 @@ def test_capture_no_bounds_produces_jpeg(mocker, monkeypatch):
 
 
 def test_capture_with_bounds_invokes_crop(mocker, monkeypatch):
-    """When bounds is supplied AND scaled crop > 200x200, Image.crop is called."""
+    """When bounds is supplied AND scaled crop > 200x200, Image.crop is called.
+
+    Phase 8 compat: same pattern as ``test_capture_no_bounds_produces_jpeg``
+    — restore ``_HAS_MSS=True`` and bind a fake mss module attribute, since
+    mss is no longer installed on macOS dev boxes after the win32-only
+    marker landed.
+    """
     monkeypatch.setitem(sys.modules, "win32gui", MagicMock())
+    # Phase 8 compat: restore the _HAS_MSS gate + bind a fake mss attribute.
+    fake_mss_module = MagicMock()
+    mocker.patch("vibemix.platform._screen_windows._HAS_MSS", True)
+    mocker.patch("vibemix.platform._screen_windows.mss", fake_mss_module)
     # Build a fake mss grab pipeline.
     fake_raw = MagicMock()
     fake_raw.size = (1920, 1080)
@@ -268,10 +289,7 @@ def test_capture_with_bounds_invokes_crop(mocker, monkeypatch):
     fake_sct.grab.return_value = fake_raw
     fake_sct.__enter__.return_value = fake_sct
     fake_sct.__exit__.return_value = False
-    mocker.patch(
-        "vibemix.platform._screen_windows.mss.mss",
-        return_value=fake_sct,
-    )
+    fake_mss_module.mss.return_value = fake_sct
 
     # Mock PIL.Image so we can spy on .crop().
     fake_img = MagicMock()
@@ -313,12 +331,16 @@ def test_capture_raises_when_unavailable(mocker):
 # ---------- is_available() ----------
 
 
-def test_is_available_true_when_all_mocked(monkeypatch):
+def test_is_available_true_when_all_mocked(monkeypatch, mocker):
     """is_available() returns True iff mss + PIL + win32gui all import
-    successfully. mss + PIL already import on macOS dev box; we mock
-    win32gui to be present."""
+    successfully. PIL + win32gui can be mocked directly; mss is win32-only
+    in pyproject (Phase 8) so on macOS dev boxes the module-top
+    ``_HAS_MSS`` is False — restore it to True for this test to exercise
+    the all-deps-present path."""
     fake_win32gui = MagicMock()
     monkeypatch.setitem(sys.modules, "win32gui", fake_win32gui)
+    # Phase 8 compat: restore _HAS_MSS to True (mss is uninstalled on macOS).
+    mocker.patch("vibemix.platform._screen_windows._HAS_MSS", True)
     assert ScreenWindows().is_available() is True
 
 
