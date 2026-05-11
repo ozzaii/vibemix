@@ -16,7 +16,7 @@
 - [x] **Phase 4: LiveKit Cascade Agent Pivot** (completed 2026-05-11) - Replace `RealtimeModel` with `AgentSession` cascade (`stt=None`, `vad=None`, `llm=google.LLM`, `tts=FallbackAdapter[OpenRouter Gemini TTS + Gemini native]`) + `DJCoHostAgent.llm_node()` multimodal override + headless session (no LiveKit Room — ARCH-06 re-mapped). 346 tests green; 12/12 acceptance gates PASS.
 - [x] **Phase 5: FastAPI Proxy + Install-UUID JWT** - `api.altidus.world` Gemini proxy with slowapi rate limit + Redis quota + OS-keychain JWT storage (parallelizes with Phases 1-4).
 - [x] **Phase 6: Genre-Aware Phase Detection** - Percentile-based phase detector + 5-genre profile JSON + crest-factor compression detect + BPM half/double validator + vocal-section detector. _**Complete 2026-05-11.**_
-- [ ] **Phase 7: Windows Port (Audio + Screen)** - `PyAudioWPatch` WASAPI loopback + `mss` + `pywin32` window enum + Windows sample-rate sanity test (parallelizes with Phase 6). _**Planned 2026-05-11** — 5 plans across 5 waves; mocked tests run on macOS CI, live windows_only tests collected for Phase 20._
+- [x] **Phase 7: Windows Port (Audio + Screen)** - `PyAudioWPatch` WASAPI loopback + `mss` + `pywin32` window enum + Windows sample-rate sanity test (parallelizes with Phase 6). _**Complete 2026-05-11.**_ Four Windows backends + selector + `_midi_common` refactor + `docs/windows-setup.md`. Mocked tests on macOS verify lazy-import contract + Protocol satisfaction; Phase 20 CI runs windows_only live tests on `windows-latest`. 614 tests green; 10/10 acceptance gates PASS.
 - [ ] **Phase 8: macOS ScreenCaptureKit Migration** - Replace deprecated Quartz `CGWindowListCreateImageFromArray` with `pyobjc-framework-ScreenCaptureKit` (parallelizes with Phases 6-7).
 - [ ] **Phase 9: MIDI Controller Library (10 + Generic Fallback)** - Curated mappings for DDJ-FLX4/400/FLX6/FLX10/1000/SX3, XDJ-RX3, Numark Party Mix Live, Hercules Inpulse 300/500 + generic positional fallback + hot-plug re-enumeration (parallelizes with Phases 6-8).
 - [ ] **Phase 10: Prompt Template Matrix (6 cells + Anti-Slop)** - 6 prompt templates (3 skill × 2 mode) + negative dictionary + `TurnHistory` anti-repetition + `<silence/>` short-circuit + describe-before-infer + past-tense framing.
@@ -148,7 +148,7 @@ Plans:
 - [x] 07-02-PLAN.md — AudioWindows (PyAudioWPatch WASAPI loopback default-playback-device capture + sample-rate sanity guard + standard PyAudio output/mic streams)
 - [x] 07-03-PLAN.md — ScreenWindows (mss + pywin32 EnumWindows + 5-app DJ hint list) + TrackWindows (winsdk SMTC via asyncio.run executor bridge + graceful fallback)
 - [x] 07-04-PLAN.md — MidiWindows (thin wrapper on _midi_common + ControllerState reuse) + cross-platform integration test (selector + lazy-import contract verified on macOS CI)
-- [ ] 07-05-PLAN.md — docs/windows-setup.md + 10-gate verification + 07-SUMMARY + STATE/ROADMAP advance to Phase 8
+- [x] 07-05-PLAN.md — docs/windows-setup.md + 10-gate verification + 07-SUMMARY + STATE/ROADMAP advance to Phase 8
 
 ### Phase 8: macOS ScreenCaptureKit Migration
 **Goal**: Replace deprecated `Quartz.CGWindowListCreateImageFromArray` (obsoleted in macOS 15.0) with `pyobjc-framework-ScreenCaptureKit` for forward-compat to macOS 16+. Keep `Quartz.CGWindowListCopyWindowInfo` for window enumeration. (Parallelizable with Phases 6-7.)
