@@ -40,18 +40,20 @@ from vibemix.midi.profile import (
 )
 from vibemix.midi.registry import find_mapping, find_mapping_or_generic
 from vibemix.midi.state import ControllerState, MidiEvent
+from vibemix.midi.watcher import port_watcher_task
 
 __all__ = [
+    "GENERIC_MIDI_DISPLAY",
+    "GENERIC_MIDI_ID",
     "ButtonBinding",
     "ControlBinding",
     "ControllerProfile",
     "ControllerState",
-    "GENERIC_MIDI_DISPLAY",
-    "GENERIC_MIDI_ID",
     "MidiEvent",
     "find_mapping",
     "find_mapping_or_generic",
     "list_profiles",
     "load_profile",
     "make_generic_profile",
+    "port_watcher_task",
 ]

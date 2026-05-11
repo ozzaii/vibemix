@@ -72,7 +72,7 @@ def make_generic_profile() -> ControllerProfile:
 
 
 __all__ = [
-    "GENERIC_MIDI_ID",
     "GENERIC_MIDI_DISPLAY",
+    "GENERIC_MIDI_ID",
     "make_generic_profile",
 ]

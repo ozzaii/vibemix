@@ -189,8 +189,7 @@ def test_no_two_profiles_share_an_exact_port_name_hint():
         for hint in profile.port_name_hints:
             if hint in seen:
                 pytest.fail(
-                    f"exact hint {hint!r} appears in both {seen[hint]!r} and "
-                    f"{controller_id!r}"
+                    f"exact hint {hint!r} appears in both {seen[hint]!r} and {controller_id!r}"
                 )
             seen[hint] = controller_id
 
@@ -263,6 +262,4 @@ def test_no_profile_pair_shares_an_exact_hint(id_a, id_b):
     b = load_profile(id_b)
     assert a is not None and b is not None
     overlap = set(a.port_name_hints) & set(b.port_name_hints)
-    assert not overlap, (
-        f"profiles {id_a!r} and {id_b!r} share exact hints: {sorted(overlap)}"
-    )
+    assert not overlap, f"profiles {id_a!r} and {id_b!r} share exact hints: {sorted(overlap)}"

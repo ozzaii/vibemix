@@ -22,11 +22,9 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-
 from types import SimpleNamespace
 
 from vibemix.midi.watcher import port_watcher_task
-
 
 _REAL_SLEEP = asyncio.sleep
 
@@ -82,7 +80,7 @@ def _patch_watcher_sleep(mocker, on_each):
         # stop_event not set" — raise it here unless on_each instructs
         # otherwise via state["raise"].
         if state.get("raise") is None or state["raise"]:
-            raise asyncio.TimeoutError
+            raise TimeoutError
 
     mocker.patch("vibemix.midi.watcher.asyncio.wait_for", side_effect=fake_wait_for)
     return state
@@ -146,7 +144,7 @@ def test_port_watcher_emits_disconnected_when_port_disappears(mocker):
     kinds = [e[0] for e in events]
     assert "connected" in kinds
     assert "disconnected" in kinds
-    disc = [e for e in events if e[0] == "disconnected"][0]
+    disc = next(e for e in events if e[0] == "disconnected")
     assert disc[1] == "DDJ-FLX4 USB"
     # Disconnected event has no profile arg.
     assert len(disc) == 2

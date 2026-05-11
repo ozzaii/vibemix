@@ -181,6 +181,13 @@ class ControllerState:
             self._connected = True
             self.port_name = port_name
 
+    def mark_disconnected(self) -> None:
+        """Symmetric to ``mark_connected`` — clears the connected flag (used
+        by the Phase 9 Wave 2 ``handle_port_change`` callback when the bound
+        port disappears mid-session)."""
+        with self._lock:
+            self._connected = False
+
     def is_connected(self) -> bool:
         with self._lock:
             return self._connected
