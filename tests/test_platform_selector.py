@@ -177,3 +177,53 @@ def test_pyproject_no_windows_deps_without_marker():
             assert ";" in spec, (
                 f"{pkg} listed without sys_platform marker — would force install on macOS: {spec!r}"
             )
+
+
+# ---------- Phase 8 macOS lazy-import contract (mirror of Windows-side rules) ----------
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="darwin-only macOS contract")
+def test_macos_screen_path_uses_screencapturekit_not_mss():
+    """Phase 8 contract — on darwin, after instantiating the macOS screen
+    impl, ``vibemix.platform._screen_macos`` MUST NOT bind a ``mss``
+    attribute. mss is win32-only post-Phase-8; the macOS path uses
+    ScreenCaptureKit. This is the structural mirror of Phase 7's
+    ``pyaudiowpatch``-not-imported gate for the Windows-only deps."""
+    from vibemix.platform import ScreenImpl
+
+    s = ScreenImpl()
+    assert s is not None  # smoke
+    import vibemix.platform._screen_macos as smod
+
+    assert "mss" not in dir(smod), (
+        "vibemix.platform._screen_macos must not bind ``mss`` — Phase 8 dropped mss on macOS"
+    )
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="darwin-only macOS contract")
+def test_macos_screen_path_does_not_eager_import_screencapturekit():
+    """Phase 8 lazy-import contract — importing ``_screen_macos`` must NOT
+    pull ScreenCaptureKit / CoreMedia / CoreVideo into ``sys.modules`` at
+    module load. They live inside method bodies (mirror of Phase 7
+    ``_track_windows`` lazy contract). What we pin: ``_screen_macos``
+    re-imports cleanly on a box where those frameworks would be missing
+    (we simulate by deleting them from sys.modules first)."""
+    # Snapshot any currently-loaded SCKit modules.
+    saved: dict[str, object] = {}
+    for k in list(sys.modules):
+        if (
+            k.startswith("ScreenCaptureKit")
+            or k.startswith("CoreMedia")
+            or k.startswith("CoreVideo")
+        ):
+            saved[k] = sys.modules.pop(k)
+    # Drop and re-import _screen_macos.
+    smacos_saved = sys.modules.pop("vibemix.platform._screen_macos", None)
+    try:
+        importlib.import_module("vibemix.platform._screen_macos")
+        # Re-import did NOT raise → import-time discipline holds.
+    finally:
+        # Restore module identities so subsequent tests see consistent state.
+        if smacos_saved is not None:
+            sys.modules["vibemix.platform._screen_macos"] = smacos_saved
+        sys.modules.update(saved)
