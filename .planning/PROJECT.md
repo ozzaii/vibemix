@@ -1,4 +1,4 @@
-# vbemix — AI DJ Co-Host
+# vibemix — AI DJ Co-Host
 
 ## What This Is
 
@@ -37,7 +37,7 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 
 **Architecture & Audio I/O**
 
-- [ ] Consolidate three cohost variants into one shipping product (`cohost.py` / `cohost_v2.py` / `cohost_lk.py` → `vbemix`)
+- [ ] Consolidate three cohost variants into one shipping product (`cohost.py` / `cohost_v2.py` / `cohost_lk.py` → `vibemix`)
 - [ ] LiveKit-pipelined architecture (rooms/agents/tracks) with **Gemini 3 Flash multimodal in + Gemini TTS streaming out** as the AI path (NOT Gemini Live Native Audio)
 - [ ] Auto-detect master output device cross-platform (no hardcoded BlackHole assumption)
 - [ ] Output destination picker — headphones (in-ear) or speakers
@@ -83,7 +83,7 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 - [ ] API-usage abuse protection (rate-limit, quota cap per anonymous client) so we don't get drained
 - [ ] Polished UI/UX — calibration wizard, mode/voice/genre pickers, no AI-slop aesthetics
 - [ ] Marketing-ready demo: cinematic recorded set with on-screen reactions, install GIF, README hero video
-- [ ] Open-source release on `github.com/bravoh/vbemix` (GitHub Enterprise under bravoh org)
+- [ ] Open-source release on `github.com/bravoh/vibemix` (GitHub Enterprise under bravoh org)
 - [ ] Pre-launch seed: 15+ stars from friends/dev network, then organic content push (Instagram/X/TikTok), then 50-100 € IG ads
 
 ### Out of Scope
@@ -112,12 +112,12 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 
 ## Constraints
 
-- **Timeline**: Drop before Bravoh's public launch (~3-4 weeks out, ~early June 2026). Marketing momentum requires vbemix in the wild ahead of Bravoh's wave.
+- **Timeline**: Drop before Bravoh's public launch (~3-4 weeks out, ~early June 2026). Marketing momentum requires vibemix in the wild ahead of Bravoh's wave.
 - **Quality bar**: "Real DJ friend in your ear, no AI slop" — Kaan will block release if reactions feel scripted, late, hallucinated, or generic.
 - **Budget**: 150-200 € launch marketing (IG ads, paid posts), ~50 €/month ongoing Gemini API for end-user requests. Reassess if usage scales.
 - **Tech stack**: Locked on LiveKit pipeline + Gemini 3 Flash + Gemini TTS streaming. No other LLM providers (Bravoh is Gemini-only).
 - **Platforms**: macOS + Windows in v1. Linux explicitly excluded.
-- **Headcount**: Kaan (owner, primary dev), with Musa (senior, part-time) and Yasin (part-time) able to help if needed. Bravoh main product takes priority — vbemix runs alongside.
+- **Headcount**: Kaan (owner, primary dev), with Musa (senior, part-time) and Yasin (part-time) able to help if needed. Bravoh main product takes priority — vibemix runs alongside.
 - **Open-source license**: TBD (likely MIT or Apache 2.0). Must allow Bravoh to use the same code internally if needed.
 - **Security**: API key embedded in distributed binary is the API-key-protection problem of the year — solve via Bravoh-side proxy with per-client rate limit, not by shipping a raw key.
 - **Hallucination grounding**: No release until verification phase confirms reactions are tied to real events. This is a hard gate.
@@ -126,7 +126,7 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Product name = **vbemix**, repo = `bravoh/vbemix` | Distinct enough to be its own thing, "mix" hooks the DJ semantic, GitHub Enterprise being set up under bravoh org | — Pending |
+| Product name = **vibemix**, repo = `bravoh/vibemix` | Distinct enough to be its own thing, "mix" hooks the DJ semantic, GitHub Enterprise being set up under bravoh org | — Pending |
 | **macOS + Windows in v1**, no Linux | Doubles addressable market vs mac-only; Linux is small DJ audience and tripled platform-engineering cost | — Pending |
 | **LiveKit pipeline + Gemini 3 Flash + Gemini TTS streaming** as default AI path | Kaan tested Gemini Live Native Audio (`cohost_v2.py`) — grounding was worse than explicit Flash + TTS (`cohost.py`) despite more plumbing. LiveKit architecture (rooms/agents/tracks/streaming) is loved; only the brain swaps. | — Pending |
 | **Curated 10-controller MIDI library** + generic fallback | Covers the ~80% of mid-tier DJs (Pioneer DDJ family + Numark + Hercules) without forcing every user through a calibration wizard | — Pending |
