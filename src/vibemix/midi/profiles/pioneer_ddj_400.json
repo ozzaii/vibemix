@@ -1,0 +1,34 @@
+{
+  "id": "pioneer_ddj_400",
+  "display_name": "Pioneer DDJ-400",
+  "port_name_hints": ["DDJ-400"],
+  "decks": ["A", "B"],
+  "notes": "Wave 2 — JSON-only verified from public Pioneer rekordbox DDJ-400 MIDI documentation + Mixxx controller-mappings repo cross-reference. Hardware verification deferred to Phase 16 + 20 + community PRs. CC layout follows the FLX4-family Pioneer convention (channel 0 for deck A, channel 1 for deck B; vol=CC 19, eq_hi=7, eq_mid=11, eq_low=15, tempo=0; xfader on channel 6 CC 31). The DDJ-400 ships no per-deck filter knob, so filter bindings are omitted.",
+  "controls": {
+    "vol_a":     {"kind": "cc", "channel": 0, "cc": 19, "axis": "unipolar", "deck": "A", "field": "vol"},
+    "vol_b":     {"kind": "cc", "channel": 1, "cc": 19, "axis": "unipolar", "deck": "B", "field": "vol"},
+    "eq_hi_a":   {"kind": "cc", "channel": 0, "cc": 7,  "axis": "unipolar", "deck": "A", "field": "eq_hi"},
+    "eq_hi_b":   {"kind": "cc", "channel": 1, "cc": 7,  "axis": "unipolar", "deck": "B", "field": "eq_hi"},
+    "eq_mid_a":  {"kind": "cc", "channel": 0, "cc": 11, "axis": "unipolar", "deck": "A", "field": "eq_mid"},
+    "eq_mid_b":  {"kind": "cc", "channel": 1, "cc": 11, "axis": "unipolar", "deck": "B", "field": "eq_mid"},
+    "eq_low_a":  {"kind": "cc", "channel": 0, "cc": 15, "axis": "unipolar", "deck": "A", "field": "eq_low"},
+    "eq_low_b":  {"kind": "cc", "channel": 1, "cc": 15, "axis": "unipolar", "deck": "B", "field": "eq_low"},
+    "tempo_a":   {"kind": "cc", "channel": 0, "cc": 0,  "axis": "bipolar",  "deck": "A", "field": "tempo"},
+    "tempo_b":   {"kind": "cc", "channel": 1, "cc": 0,  "axis": "bipolar",  "deck": "B", "field": "tempo"},
+    "xfader":    {"kind": "cc", "channel": 6, "cc": 31, "axis": "bipolar",  "deck": null, "field": "xfader"}
+  },
+  "buttons": {
+    "play_a":     {"kind": "play",      "channel": 0, "note": 11, "deck": "A"},
+    "play_b":     {"kind": "play",      "channel": 1, "note": 11, "deck": "B"},
+    "cue_a":      {"kind": "cue",       "channel": 0, "note": 12, "deck": "A"},
+    "cue_b":      {"kind": "cue",       "channel": 1, "note": 12, "deck": "B"},
+    "sync_a":     {"kind": "sync",      "channel": 0, "note": 88, "deck": "A"},
+    "sync_b":     {"kind": "sync",      "channel": 1, "note": 88, "deck": "B"},
+    "jog_a":      {"kind": "jog_touch", "channel": 0, "note": 54, "deck": "A"},
+    "jog_b":      {"kind": "jog_touch", "channel": 1, "note": 54, "deck": "B"},
+    "loop_in_a":  {"kind": "loop_in",   "channel": 0, "note": 16, "deck": "A"},
+    "loop_in_b":  {"kind": "loop_in",   "channel": 1, "note": 16, "deck": "B"},
+    "loop_out_a": {"kind": "loop_out",  "channel": 0, "note": 17, "deck": "A"},
+    "loop_out_b": {"kind": "loop_out",  "channel": 1, "note": 17, "deck": "B"}
+  }
+}
