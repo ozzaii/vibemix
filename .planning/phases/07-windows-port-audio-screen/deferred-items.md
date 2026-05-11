@@ -22,3 +22,10 @@ None caused by Wave 1 changes; logged here per scope-boundary rule (do not fix).
 - **Cause:** Environmental — Kaan's CoreAudio device list has "HEADPHONEMG", not "Headphones". The test hardcodes "Headphones" as the substring.
 - **Why ignored:** Pre-existing on the worktree base commit; not introduced by Wave 1.
 - **Real fix:** broaden the substring (e.g., "Headphone" with capital H) OR mark the test `@pytest.mark.macos_audio` opt-in like the BlackHole smoke tests.
+
+## 4. `tests/test_midi_common.py` — ruff I001 import-block-unsorted (Wave 1)
+
+- **Issue:** `ruff check` reports `I001 [*] Import block is un-sorted or un-formatted` at lines 21–27 of `tests/test_midi_common.py`.
+- **Cause:** Pre-existing in the file as committed by Wave 1 (`2a872f0`/`31314d7`). Not introduced by Wave 4.
+- **Why ignored:** Out of scope per executor scope-boundary rule — Wave 4 only touches MidiWindows + integration test; `tests/test_midi_common.py` is unmodified.
+- **Real fix:** one-line `ruff check --fix tests/test_midi_common.py` in a follow-up cleanup commit (Wave 5 close-out is a candidate).
