@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-11T20:00:00.000Z"
+last_updated: "2026-05-11T20:03:38.326Z"
 progress:
   total_phases: 20
-  completed_phases: 7
-  total_plans: 36
+  completed_phases: 3
+  total_plans: 33
   completed_plans: 18
-  percent: 35
+  percent: 55
 ---
 
 # vibemix — State
@@ -22,7 +22,7 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 08 — macOS ScreenCaptureKit Migration (next).
+- **Current focus:** Phase 08 — macos-screencapturekit-migration
 - **Milestone:** v1 (Bravoh-wedge drop) — target ship ~3-4 weeks (~early June 2026, before Bravoh public launch).
 - **Project mode:** standard.
 - **Granularity:** fine (20 phases).
@@ -34,12 +34,12 @@ progress:
 
 Phase 7 ✅ complete — Windows Port (Audio + Screen) shipped: four Windows backends + selector + `_midi_common` refactor + windows-setup.md doc. Mocked-test verified on macOS; Phase 20 CI runs windows_only live tests on `windows-latest`.
 
-Phase: 08 (macOS ScreenCaptureKit Migration) — NEXT
-Plan: None yet — needs `/gsd-discuss-phase 08`.
+Phase: 08 (macos-screencapturekit-migration) — EXECUTING
+Plan: 1 of 2
 
 - **Phase:** 08 — macOS ScreenCaptureKit Migration (replaces deprecated `Quartz.CGWindowListCreateImageFromArray`; parallelizes with Phase 9).
 - **Plan:** None active.
-- **Status:** Phase 7 closed; Phase 8 not yet started.
+- **Status:** Executing Phase 08
 - **Progress:** 7/20 phases complete.
 
 ```
