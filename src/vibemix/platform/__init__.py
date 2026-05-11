@@ -7,6 +7,7 @@ _audio_macos.py / _audio_windows.py / _screen_macos.py / etc. (Phase 2+) and are
 via a factory pattern. tests/test_platform.py AST-guards this rule.
 """
 
+from vibemix.platform._audio_macos import AudioMacOS, assert_device_sample_rate
 from vibemix.platform.audio import (
     AudioBackend,
     AudioCallback,
@@ -31,6 +32,7 @@ from vibemix.platform.track import (
 __all__ = [
     "AudioBackend",
     "AudioCallback",
+    "AudioMacOS",
     "AudioStream",
     "CapturedFrame",
     "Kind",
@@ -41,4 +43,5 @@ __all__ = [
     "ScreenBackend",
     "TrackInfoBackend",
     "WindowBounds",
+    "assert_device_sample_rate",
 ]

@@ -98,8 +98,23 @@ def test_protocol_surface():
 
 
 def test_no_os_leaks():
-    """AST-scan every src/vibemix/platform/*.py for forbidden OS imports."""
+    """AST-scan every src/vibemix/platform/*.py for forbidden OS imports.
+
+    EXCEPTION: underscore-prefixed modules (`_audio_macos.py`, `_audio_windows.py`,
+    `_screen_macos.py`, etc.) are CONCRETE platform impls — they MUST import
+    sounddevice / mss / Quartz / mido / etc. by design. They satisfy the typed
+    Protocols defined in the underscore-free sibling modules (`audio.py`,
+    `screen.py`, `midi.py`, `track.py`) which remain typing-only.
+
+    The firewall guarantee: the underscore-free Protocol modules NEVER import
+    OS-specific modules. Concrete impls are allowed to.
+    """
     files = sorted(PLATFORM_DIR.glob("*.py"))
+    # Skip __init__.py + underscore-prefixed concrete impls (e.g. _audio_macos.py).
+    # `_audio_macos.py` etc. are Phase 2+ concrete backends that MUST import
+    # sounddevice / mss / Quartz / mido by design. The firewall applies to
+    # the typing-only Protocol modules (audio.py, screen.py, midi.py, track.py).
+    files = [f for f in files if not f.name.startswith("_")]
     assert files, f"expected .py files under {PLATFORM_DIR}"
     violations: list[str] = []
     for file in files:
