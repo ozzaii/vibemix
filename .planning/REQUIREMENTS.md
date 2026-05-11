@@ -16,22 +16,22 @@
 - [ ] **ARCH-04**: `DJCoHostAgent(Agent)` with `llm_node()` override using Gemini 3 Flash multimodal (audio bytes + screen JPEG + history)
 - [ ] **ARCH-05**: Gemini TTS streaming output via `livekit-plugins-google.beta.gemini_tts.TTS` chunked HTTP
 - [ ] **ARCH-06**: Bundled local `livekit-server --dev` binary on `127.0.0.1:7880` as the audio room transport
-- [ ] **ARCH-07**: Pre-allocated audio ring buffer — no `np.concatenate` in the sounddevice callback (fixes the POC dropout regression)
+- [x] **ARCH-07**: Pre-allocated audio ring buffer — no `np.concatenate` in the sounddevice callback (fixes the POC dropout regression) _(Phase 2 — 62413e9)_
 - [ ] **ARCH-08**: All Gemini calls routed via FastAPI proxy on `api.altidus.world` — client never holds a raw Gemini key
 - [ ] **ARCH-09**: Install-UUID JWT issued on first launch, stored in OS keychain (Keychain on macOS, CredLocker on Windows)
 - [ ] **ARCH-10**: Per-IP + per-install-UUID rate limiting (slowapi + Redis): 60 rpm, 2000 rpd per UUID
 
 ### Audio I/O — Cross-Platform
 
-- [ ] **AUDIO-01**: macOS audio capture via `sounddevice` from system loopback (auto-detect BlackHole / virtual cable)
+- [x] **AUDIO-01**: macOS audio capture via `sounddevice` from system loopback (auto-detect BlackHole / virtual cable) _(Phase 2 — 62413e9)_
 - [ ] **AUDIO-02**: Windows audio capture via `PyAudioWPatch` (WASAPI loopback) — no virtual-cable requirement on Windows
 - [ ] **AUDIO-03**: Auto-detect master output device cross-platform (no hardcoded device names)
 - [ ] **AUDIO-04**: Sample-rate sanity tone test (1kHz round-trip) at startup — catches BlackHole Sonoma half-rate bug
 - [ ] **AUDIO-05**: Output destination picker — headphones (in-ear) vs speakers (mic disabled in speakers mode)
-- [ ] **AUDIO-06**: Master-output-only listening — headphone cue input is NOT consumed (intentional)
-- [ ] **AUDIO-07**: Mic gating during AI talk (mute mic while Avery speaks — port from POC)
-- [ ] **AUDIO-08**: TTS playback at 24kHz to user-selected output (sounddevice cross-platform output)
-- [ ] **AUDIO-09**: Voice-aware mic resumption + buffer flush after AI finishes
+- [x] **AUDIO-06**: Master-output-only listening — headphone cue input is NOT consumed (intentional) _(Phase 2 — 62413e9)_
+- [x] **AUDIO-07**: Mic gating during AI talk (mute mic while Avery speaks — port from POC) _(Phase 2 — 59fdb62)_
+- [x] **AUDIO-08**: TTS playback at 24kHz to user-selected output (sounddevice cross-platform output) _(Phase 2 — 62413e9)_
+- [x] **AUDIO-09**: Voice-aware mic resumption + buffer flush after AI finishes _(Phase 2 — 59fdb62)_
 
 ### Screen Capture & Track Detection
 

@@ -11,7 +11,7 @@
 ## Phases
 
 - [x] **Phase 1: Platform Protocol Firewall** - `platform/` Protocol classes + package skeleton + dependency lockfile + SignPath OSS application filed (day-1, 3-week lead time). _**Complete 2026-05-11.** SignPath form submission Kaan-side pending (reCAPTCHA)._
-- [ ] **Phase 2: Audio Core Port + Ring Buffer Fix** - Port `AudioBuffer`/`MicBuffer`/`Levels`/`PlaybackQueue` from POC into pre-allocated ring buffers (fixes `np.concatenate` callback regression).
+- [x] **Phase 2: Audio Core Port + Ring Buffer Fix** - Port `AudioBuffer`/`MicBuffer`/`Levels`/`PlaybackQueue` from POC into pre-allocated ring buffers (fixes `np.concatenate` callback regression). _**Complete 2026-05-11.**_
 - [ ] **Phase 3: Sensing & State Port** - Port `MusicState` 10Hz writer + `EventDetector` + `AICoach` + `audible-deck` detection + screen/track sense from POC.
 - [ ] **Phase 4: LiveKit Cascade Agent Pivot** - Replace `RealtimeModel` with `AgentSession` cascade (`stt=None`, `vad=None`, `llm=google.LLM`, `tts=google.beta.gemini_tts.TTS`) + `DJCoHostAgent.llm_node()` override + bundled local `livekit-server --dev`.
 - [ ] **Phase 5: FastAPI Proxy + Install-UUID JWT** - `api.altidus.world` Gemini proxy with slowapi rate limit + Redis quota + OS-keychain JWT storage (parallelizes with Phases 1-4).
@@ -59,11 +59,11 @@ Plans:
   4. TTS PCM playback at 24kHz routes to the user-selected output device via cross-platform `sounddevice.OutputStream`; sample-rate mismatch never causes chipmunk/molasses artifacts.
 **Plans:** 5 plans
 Plans:
-- [ ] 02-01-PLAN.md — Audio package skeleton + 14 v4 tuning constants + Levels (verbatim) + SampleRateMismatchError + pytest-mock dev dep + macos_audio pytest marker
-- [ ] 02-02-PLAN.md — Pre-allocated ring buffers (AudioBuffer/MicBuffer/PassthroughBuffer/PlaybackQueue + BufferRegistry) — fixes np.concatenate at v4:300 + v4:462
-- [ ] 02-03-PLAN.md — features.py DSP math (FFT/RMS/BPM/peak-normalize) + VoiceRecorder (0o700 sessions + configurable root)
-- [ ] 02-04-PLAN.md — AudioMacOS impl (Phase 1 AudioBackend Protocol) + sample-rate sanity guard (pre + post-open) + mocked sounddevice tests + opt-in live smoke
-- [ ] 02-05-PLAN.md — 8-gate verification + phase SUMMARY + ROADMAP/STATE advance to Phase 3
+- [x] 02-01-PLAN.md — Audio package skeleton + 14 v4 tuning constants + Levels (verbatim) + SampleRateMismatchError + pytest-mock dev dep + macos_audio pytest marker
+- [x] 02-02-PLAN.md — Pre-allocated ring buffers (AudioBuffer/MicBuffer/PassthroughBuffer/PlaybackQueue + BufferRegistry) — fixes np.concatenate at v4:300 + v4:462
+- [x] 02-03-PLAN.md — features.py DSP math (FFT/RMS/BPM/peak-normalize) + VoiceRecorder (0o700 sessions + configurable root)
+- [x] 02-04-PLAN.md — AudioMacOS impl (Phase 1 AudioBackend Protocol) + sample-rate sanity guard (pre + post-open) + mocked sounddevice tests + opt-in live smoke
+- [x] 02-05-PLAN.md — 8-gate verification + phase SUMMARY + ROADMAP/STATE advance to Phase 3
 
 ### Phase 3: Sensing & State Port
 **Goal**: `MusicState` is the single source of truth at 10Hz, written by `state_refresh_loop` and read by `EventDetector` and `AICoach`. Audible-deck detection, screen capture, and track-info plumbing work on macOS, ported verbatim from `cohost_v2.py`.
