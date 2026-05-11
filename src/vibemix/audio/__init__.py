@@ -41,6 +41,8 @@ from vibemix.audio.constants import (
     SILENT_RMS,
     TRACK_CHANGE_MIN_CONFIDENCE,
     VOICE_BLOCKSIZE,
+    WS_HOST,
+    WS_PORT,
 )
 from vibemix.audio.errors import SampleRateMismatchError
 from vibemix.audio.features import (
@@ -81,6 +83,8 @@ __all__ = [
     "SILENT_RMS",
     "TRACK_CHANGE_MIN_CONFIDENCE",
     "VOICE_BLOCKSIZE",
+    "WS_HOST",
+    "WS_PORT",
     "AudioBuffer",
     "BufferRegistry",
     "Levels",

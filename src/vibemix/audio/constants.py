@@ -36,6 +36,10 @@ MIC_GAIN_AT_AI_TALK = 0.0  # v4:118 — mic mute level while AI talks
 MIC_HOLD_AFTER_AI_MS = 350  # v4:119 — hold window after AI silence
 AI_TALK_THRESHOLD = 0.02  # v4:120 — levels.voice threshold to flip AI-active
 
+# ---- WS bus (mascot + Phase 12 Live UI) ----
+WS_HOST: str = "127.0.0.1"  # v4:123
+WS_PORT: int = 8765  # v4:124
+
 # ---- Engine tuning — French Touch / Daft Punk / Digitalism profile (125-128 BPM) ----
 SILENT_RMS = 0.012  # v4:127 — real silence between tracks (v4 raised from 0.008)
 LOW_RMS = 0.040  # v4:128 — filtered breakdown / pre-drop / verse (v4 raised from 0.025)
