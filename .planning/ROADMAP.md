@@ -108,7 +108,13 @@ Plans:
   2. `POST /vibemix/v1/gemini/generate-content` (SSE) and `POST /vibemix/v1/gemini/tts` (chunked PCM) pass-through Gemini calls with the real `GEMINI_API_KEY` resolved server-side from environment; the client never sees an `AIza` string.
   3. Rate limit kicks in at 60 rpm / 2000 rpd per install-UUID, enforced via slowapi + Redis token bucket; a load test exceeding the cap returns HTTP 429 and the client surfaces a clear "rate limited" status pill.
   4. Server-side cost dashboard logs every request (timestamp, client-UUID, IP, model, prompt size, response size); a daily aggregate alert fires if any UUID exceeds 3σ of baseline.
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 05-01-PLAN.md — proxy scaffold (FastAPI + healthz + pydantic-settings + Redis quota + Dockerfile + compose)
+- [ ] 05-02-PLAN.md — JWT auth (HS256 only) + /register + slowapi limiter wiring
+- [ ] 05-03-PLAN.md — LLM SSE + TTS PCM proxy routes (gemini-native paths, circuit breaker, secret sanitization)
+- [ ] 05-04-PLAN.md — client install_uuid + JWT cache + proxy-mode factory dispatch (no silent fallback)
+- [ ] 05-05-PLAN.md — deployment runbook + 8-gate verification + phase close
 
 ### Phase 6: Genre-Aware Phase Detection
 **Goal**: Per-genre profile JSON (techno / house / D&B / disco / pop) drives a percentile-based phase detector that replaces absolute RMS thresholds. Crest-factor compression detection, BPM half/double validator, and vocal-section gating land here.
