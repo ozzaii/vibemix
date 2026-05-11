@@ -1,0 +1,1547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibemix — in-session UI mock</title>
+<meta name="viewport" content="width=1280" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<!-- Workbench: hardware LED-display feel for wordmark/section heads.
+     DM Mono: industrial monospace for labels & data (not JetBrains/IBM Plex — kept fresh).
+     Caveat: handwritten marker for playful sticker labels — the "fun" amid the metal.  -->
+<link href="https://fonts.googleapis.com/css2?family=Workbench&family=DM+Mono:wght@300;400;500&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+<!-- DSEG7 Classic: authentic 7-segment LCD numerals for timecode + dB. -->
+<style>
+@font-face{
+  font-family:"DSEG7-Classic";
+  src:url("https://cdn.jsdelivr.net/gh/keshikan/DSEG@v0.46/fonts/DSEG7-Classic/DSEG7Classic-Bold.woff2") format("woff2");
+  font-display:swap;
+}
+
+/* ─── tokens ───────────────────────────────────────────────────────────── */
+:root{
+  /* 80% dominant — anodised charcoal family */
+  --bg:           #0a0b0e;
+  --panel:        #15181e;
+  --panel-lift:  #1d2128;
+  --panel-deep:  #0a0b0e;
+  --groove:       #07080a;
+  --bezel-1:      #1a1e25;
+  --bezel-2:      #2a2f38;
+  --bezel-3:      #3a4150;
+  --brushed-hi:   rgba(255,255,255,.04);
+  --brushed-lo:   rgba(0,0,0,.5);
+  --ink:          #c8cdd6;
+  --ink-dim:      #6b7280;
+  --ink-deep:     #3d424c;
+  --ink-engraved: #1f242c;
+
+  /* 20% accent — phosphor amber. ONE colour does ALL the lifting. */
+  --phosphor:        #ffa12e;
+  --phosphor-warm:   #ff8a1a;
+  --phosphor-dim:    #6e4815;
+  --phosphor-soft:   rgba(255,161,46,.18);
+  --phosphor-glow:   0 0 14px rgba(255,161,46,.5);
+  --phosphor-halo:   0 0 36px rgba(255,161,46,.22);
+
+  /* status-only accents — used in tiny dots, never as panels of colour */
+  --rec:        #ff3553;
+  --cue:        #4dc4ff;
+  --ok:         #5dcf7c;
+
+  /* type */
+  --ff-mark:    "Workbench", "Courier New", monospace;
+  --ff-mono:    "DM Mono", ui-monospace, monospace;
+  --ff-lcd:     "DSEG7-Classic", "DM Mono", monospace;
+  --ff-hand:    "Caveat", "Marker Felt", cursive;
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+
+html,body{
+  margin:0; padding:0;
+  background:
+    radial-gradient(1200px 800px at 50% -10%, #14171c 0%, transparent 60%),
+    radial-gradient(900px 600px at 90% 110%, #1a1e25 0%, transparent 50%),
+    var(--bg);
+  color:var(--ink);
+  font-family:var(--ff-mono);
+  font-size:13px;
+  line-height:1.35;
+  min-height:100vh;
+  letter-spacing:.01em;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+/* Global film grain — atmospheric noise across the entire scene */
+body::before{
+  content:"";
+  position:fixed; inset:0;
+  pointer-events:none;
+  z-index:9999;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .35 0'/></filter><rect width='200' height='200' filter='url(%23n)' opacity='.6'/></svg>");
+  mix-blend-mode:overlay;
+  opacity:.06;
+}
+
+/* Faint scanline overlay — vintage CRT/LCD feel */
+body::after{
+  content:"";
+  position:fixed; inset:0;
+  pointer-events:none;
+  z-index:9998;
+  background:repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2px,
+    rgba(0,0,0,.18) 2px,
+    rgba(0,0,0,.18) 3px
+  );
+  mix-blend-mode:multiply;
+  opacity:.4;
+}
+
+/* ─── window shell ─────────────────────────────────────────────────────── */
+.shell{
+  max-width:1240px;
+  margin:32px auto 80px;
+  border-radius:14px;
+  background:
+    linear-gradient(180deg, #1a1e25 0%, #14171c 4%, #14171c 96%, #0e1014 100%),
+    var(--panel);
+  box-shadow:
+    0 0 0 1px var(--bezel-3),
+    0 0 0 2px var(--bezel-1),
+    0 30px 80px -20px rgba(0,0,0,.8),
+    0 8px 24px -8px rgba(0,0,0,.6),
+    inset 0 1px 0 rgba(255,255,255,.06),
+    inset 0 -1px 0 rgba(0,0,0,.6);
+  overflow:hidden;
+  position:relative;
+}
+
+/* corner panel screws — hardware affordance */
+.screw{
+  position:absolute;
+  width:14px; height:14px;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 35% 30%, #5a606c 0%, #2a2f38 50%, #0a0b0e 90%);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.15),
+    inset 0 -1px 2px rgba(0,0,0,.6),
+    0 1px 0 rgba(0,0,0,.7);
+}
+.screw::before{
+  content:"";
+  position:absolute; inset:3px;
+  border-radius:50%;
+  background:linear-gradient(135deg, #1a1e25, #0a0b0e);
+}
+.screw::after{
+  content:"";
+  position:absolute;
+  top:50%; left:50%;
+  width:8px; height:1px;
+  background:#0a0b0e;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.8);
+  transform:translate(-50%,-50%) rotate(45deg);
+}
+.screw--tl{ top:14px; left:14px; }
+.screw--tr{ top:14px; right:14px; }
+.screw--bl{ bottom:14px; left:14px; }
+.screw--br{ bottom:14px; right:14px; transform:rotate(20deg); }
+.screw--br::after{ transform:translate(-50%,-50%) rotate(70deg); }
+
+/* ─── title bar ────────────────────────────────────────────────────────── */
+.titlebar{
+  display:flex; align-items:center; gap:18px;
+  padding:14px 24px 14px 56px;
+  background:
+    linear-gradient(180deg, #1f242c 0%, #161a20 100%);
+  border-bottom:1px solid var(--bezel-1);
+  box-shadow:inset 0 -1px 0 rgba(255,255,255,.04);
+  position:relative;
+}
+.titlebar::after{
+  /* brushed-metal sheen line right under the title */
+  content:"";
+  position:absolute;
+  inset:auto 0 -2px;
+  height:1px;
+  background:linear-gradient(90deg, transparent, var(--bezel-3) 30%, var(--bezel-3) 70%, transparent);
+  opacity:.5;
+}
+.traffic{
+  display:flex; gap:7px;
+  position:absolute; left:18px; top:50%;
+  transform:translateY(-50%);
+}
+.traffic span{
+  width:11px; height:11px;
+  border-radius:50%;
+  background:linear-gradient(180deg, #36393f, #25282d);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1), inset 0 -1px 0 rgba(0,0,0,.5);
+}
+
+.wordmark{
+  font-family:var(--ff-mark);
+  font-size:22px;
+  font-weight:400;
+  color:var(--phosphor);
+  text-shadow:var(--phosphor-glow);
+  letter-spacing:.04em;
+  user-select:none;
+  position:relative;
+  padding-right:18px;
+}
+.wordmark::after{
+  /* blinking cursor like the unit is alive */
+  content:"_";
+  margin-left:2px;
+  animation:blink 1.2s steps(1) infinite;
+}
+@keyframes blink{ 50%{opacity:0;} }
+
+.title-meta{
+  display:flex; gap:14px;
+  margin-left:auto;
+  align-items:center;
+  font-size:11px;
+  color:var(--ink-dim);
+  text-transform:uppercase;
+  letter-spacing:.14em;
+}
+.title-meta .pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:5px 10px;
+  border:1px solid var(--bezel-2);
+  border-radius:3px;
+  background:linear-gradient(180deg, var(--panel-lift), var(--panel));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 0 rgba(0,0,0,.4);
+}
+.led{
+  width:8px; height:8px;
+  border-radius:50%;
+  background:var(--ink-deep);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.5);
+}
+.led--live{
+  background:var(--phosphor);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,180,80,.5),
+    0 0 6px var(--phosphor),
+    0 0 14px rgba(255,161,46,.6);
+  animation:pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{ opacity:1; }
+  50%   { opacity:.55; }
+}
+.led--rec{
+  background:var(--rec);
+  box-shadow:0 0 6px var(--rec), 0 0 14px rgba(255,53,83,.5);
+}
+.led--ok{
+  background:var(--ok);
+  box-shadow:0 0 4px var(--ok);
+}
+
+.timecode-mini{
+  font-family:var(--ff-lcd);
+  font-size:18px;
+  color:var(--phosphor);
+  text-shadow:var(--phosphor-glow);
+  letter-spacing:.06em;
+  padding:6px 12px;
+  background:
+    linear-gradient(180deg, #0a0b0e 0%, #050608 100%);
+  border:1px solid var(--bezel-2);
+  border-radius:4px;
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,.8),
+    inset 0 0 0 1px rgba(255,161,46,.06);
+  position:relative;
+}
+.timecode-mini::before{
+  /* "off-state" 7-seg ghost shapes faintly behind the lit ones */
+  content:"88:88:88";
+  position:absolute; inset:6px 12px;
+  color:rgba(255,161,46,.05);
+  pointer-events:none;
+}
+
+/* ─── grid ─────────────────────────────────────────────────────────────── */
+.grid{
+  display:grid;
+  grid-template-columns:300px 1fr 360px;
+  gap:0;
+  min-height:560px;
+}
+
+.col{
+  padding:24px;
+  display:flex; flex-direction:column;
+  gap:18px;
+  position:relative;
+}
+.col + .col{
+  border-left:1px solid var(--bezel-1);
+  box-shadow:inset 1px 0 0 rgba(255,255,255,.03);
+}
+
+/* ─── module panel ─────────────────────────────────────────────────────── */
+.panel{
+  background:
+    linear-gradient(180deg, var(--panel-lift) 0%, var(--panel) 100%);
+  border:1px solid var(--bezel-1);
+  border-radius:8px;
+  padding:16px 16px 18px;
+  position:relative;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.05),
+    inset 0 -1px 0 rgba(0,0,0,.4),
+    0 1px 0 rgba(0,0,0,.5);
+}
+.panel::before{
+  /* brushed-metal vertical streaks — texture, not flat */
+  content:"";
+  position:absolute; inset:0;
+  border-radius:8px;
+  background:repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 2px,
+    var(--brushed-hi) 2px,
+    var(--brushed-hi) 3px,
+    transparent 3px,
+    transparent 7px
+  );
+  opacity:.6;
+  pointer-events:none;
+}
+.panel-h{
+  display:flex; align-items:center; gap:8px;
+  font-family:var(--ff-mark);
+  font-size:9px;
+  letter-spacing:.32em;
+  color:var(--ink-dim);
+  text-transform:uppercase;
+  padding-bottom:10px;
+  margin-bottom:12px;
+  border-bottom:1px dashed var(--bezel-2);
+  position:relative; z-index:1;
+}
+.panel-h::after{
+  content:""; flex:1;
+}
+.panel-h .badge{
+  font-family:var(--ff-mono);
+  font-size:9px;
+  letter-spacing:.16em;
+  color:var(--phosphor);
+  padding:2px 6px;
+  background:var(--phosphor-soft);
+  border:1px solid var(--phosphor-dim);
+  border-radius:2px;
+}
+
+/* ─── persona panel ────────────────────────────────────────────────────── */
+.mode-rocker{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  background:var(--panel-deep);
+  border:1px solid var(--bezel-1);
+  border-radius:5px;
+  padding:3px;
+  position:relative; z-index:1;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.6);
+}
+.mode-rocker button{
+  appearance:none;
+  background:transparent;
+  border:0;
+  font-family:var(--ff-mark);
+  font-size:10px;
+  letter-spacing:.22em;
+  color:var(--ink-dim);
+  padding:9px 4px;
+  cursor:pointer;
+  border-radius:3px;
+  transition:color .15s, background .15s;
+}
+.mode-rocker button:hover{ color:var(--ink); }
+.mode-rocker button[aria-pressed="true"]{
+  color:var(--phosphor);
+  background:linear-gradient(180deg, #1d2128, #131720);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 -1px 0 rgba(0,0,0,.5),
+    var(--phosphor-glow);
+  text-shadow:var(--phosphor-glow);
+}
+
+.interaction{
+  display:flex; gap:0;
+  margin-top:14px;
+  background:var(--panel-deep);
+  border:1px solid var(--bezel-1);
+  border-radius:5px;
+  padding:3px;
+  position:relative; z-index:1;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.6);
+}
+.interaction button{
+  flex:1;
+  appearance:none;
+  background:transparent;
+  border:0;
+  font-family:var(--ff-mark);
+  font-size:11px;
+  letter-spacing:.2em;
+  color:var(--ink-dim);
+  padding:10px 4px;
+  cursor:pointer;
+  border-radius:3px;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  transition:color .15s, background .15s;
+}
+.interaction button[aria-pressed="true"]{
+  color:var(--phosphor);
+  background:linear-gradient(180deg, #1d2128, #131720);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), var(--phosphor-glow);
+  text-shadow:var(--phosphor-glow);
+}
+.interaction .led{ width:6px; height:6px; }
+.interaction button[aria-pressed="true"] .led{
+  background:var(--phosphor);
+  box-shadow:0 0 6px var(--phosphor);
+}
+
+.persona-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:14px;
+  position:relative; z-index:1;
+}
+.persona-cell{
+  background:var(--panel-deep);
+  border:1px solid var(--bezel-1);
+  border-radius:5px;
+  padding:10px 11px 11px;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.5);
+}
+.persona-cell .lbl{
+  font-size:8.5px;
+  letter-spacing:.28em;
+  color:var(--ink-dim);
+  text-transform:uppercase;
+  margin-bottom:6px;
+}
+.voice-pick{
+  display:flex; align-items:center; gap:8px;
+}
+.voice-avatar{
+  width:24px; height:24px;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 30% 30%, #ffd28a 0%, var(--phosphor) 40%, var(--phosphor-warm) 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.4),
+    var(--phosphor-glow);
+  flex-shrink:0;
+  position:relative;
+}
+.voice-avatar::after{
+  /* tiny eye + smile dots — fun */
+  content:"";
+  position:absolute; inset:7px 6px 10px 6px;
+  background:
+    radial-gradient(circle at 25% 20%, #2a1a05 1.2px, transparent 1.6px),
+    radial-gradient(circle at 75% 20%, #2a1a05 1.2px, transparent 1.6px),
+    radial-gradient(ellipse at 50% 70%, transparent 1px, #2a1a05 1.2px, transparent 1.6px);
+}
+.voice-pick .name{
+  font-family:var(--ff-mono);
+  font-size:13px;
+  font-weight:500;
+  color:var(--ink);
+}
+.voice-pick .pickaxis{
+  margin-left:auto;
+  color:var(--ink-dim);
+  font-size:10px;
+  letter-spacing:.16em;
+}
+
+.genre-dial{
+  display:flex; align-items:center; gap:10px;
+}
+.dial{
+  position:relative;
+  width:34px; height:34px;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 35%, #2c313a 0%, #15181e 70%, #0a0b0e 100%);
+  border:1px solid var(--bezel-3);
+  box-shadow:
+    inset 0 -2px 4px rgba(0,0,0,.6),
+    inset 0 1px 1px rgba(255,255,255,.08),
+    0 1px 0 rgba(0,0,0,.6);
+}
+.dial::before{
+  /* knurled edge — concentric tick texture */
+  content:"";
+  position:absolute; inset:-1px;
+  border-radius:50%;
+  background:repeating-conic-gradient(
+    from 0deg,
+    rgba(255,255,255,.08) 0deg,
+    rgba(255,255,255,.08) 3deg,
+    transparent 3deg,
+    transparent 6deg
+  );
+  -webkit-mask:radial-gradient(circle, transparent 14px, #000 14.5px, #000 16.5px, transparent 17px);
+          mask:radial-gradient(circle, transparent 14px, #000 14.5px, #000 16.5px, transparent 17px);
+}
+.dial::after{
+  /* pointer indicator — the phosphor-glowing line */
+  content:"";
+  position:absolute;
+  top:3px; left:50%;
+  width:2px; height:11px;
+  background:var(--phosphor);
+  border-radius:1px;
+  transform-origin:50% 14px;
+  box-shadow:0 0 4px var(--phosphor);
+  transform:translateX(-50%) rotate(34deg);
+}
+.genre-dial .lbl-stack{
+  display:flex; flex-direction:column;
+}
+.genre-dial .selected{
+  font-family:var(--ff-mono);
+  font-size:13px;
+  color:var(--ink);
+  font-weight:500;
+  letter-spacing:.04em;
+}
+.genre-dial .sub{
+  font-size:9px;
+  color:var(--ink-dim);
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+
+/* ─── audio meter panel ────────────────────────────────────────────────── */
+.audio-grid{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:18px;
+  align-items:start;
+  position:relative; z-index:1;
+}
+.meter{
+  display:flex; gap:3px;
+  height:172px;
+}
+.meter-bar{
+  display:flex; flex-direction:column-reverse;
+  gap:2px;
+  width:11px;
+  padding:2px;
+  background:var(--panel-deep);
+  border:1px solid var(--bezel-1);
+  border-radius:2px;
+  box-shadow:inset 0 0 4px rgba(0,0,0,.6);
+}
+.meter-seg{
+  flex:1;
+  background:var(--ink-engraved);
+  border-radius:1px;
+  transition:background .07s, box-shadow .07s;
+  min-height:3px;
+}
+.meter-seg.on{
+  background:var(--phosphor);
+  box-shadow:0 0 4px var(--phosphor);
+}
+.meter-seg.peak{
+  background:var(--rec);
+  box-shadow:0 0 5px var(--rec);
+}
+.meter-side{
+  flex:1;
+  display:flex; flex-direction:column;
+  gap:8px;
+}
+.master-readout{
+  display:flex; align-items:baseline; gap:8px;
+}
+.master-readout .dB{
+  font-family:var(--ff-lcd);
+  font-size:34px;
+  color:var(--phosphor);
+  text-shadow:var(--phosphor-glow);
+  letter-spacing:.04em;
+  position:relative;
+}
+.master-readout .dB::before{
+  content:"-88.8"; /* phantom unlit segments */
+  position:absolute; inset:0;
+  color:rgba(255,161,46,.06);
+  pointer-events:none;
+}
+.master-readout .unit{
+  font-size:11px;
+  color:var(--ink-dim);
+  letter-spacing:.2em;
+  text-transform:uppercase;
+}
+.meter-row{
+  display:flex; justify-content:space-between;
+  font-size:9px;
+  color:var(--ink-dim);
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.meter-row span:last-child{
+  color:var(--phosphor);
+  text-shadow:0 0 4px rgba(255,161,46,.4);
+}
+.cue-line{
+  display:flex; align-items:center; gap:9px;
+  padding:8px 0 2px;
+  border-top:1px dashed var(--bezel-2);
+  margin-top:4px;
+  font-size:10px;
+  color:var(--ink-deep);
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.cue-line .led{ background:var(--ink-engraved); }
+.cue-line .strike{
+  flex:1;
+  height:1px;
+  background:repeating-linear-gradient(90deg, var(--ink-deep) 0 4px, transparent 4px 8px);
+}
+
+/* ─── midi panel ───────────────────────────────────────────────────────── */
+.midi-grid{
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:10px;
+  position:relative; z-index:1;
+}
+.mini-knob{
+  display:flex; flex-direction:column; align-items:center; gap:5px;
+  padding:8px 2px 4px;
+  background:linear-gradient(180deg, var(--panel-lift) 0%, var(--panel) 100%);
+  border:1px solid var(--bezel-1);
+  border-radius:5px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.mini-knob .knob{
+  width:24px; height:24px;
+  border-radius:50%;
+  background:radial-gradient(circle at 50% 35%, #2c313a, #15181e 70%, #0a0b0e);
+  border:1px solid var(--bezel-3);
+  box-shadow:inset 0 -2px 3px rgba(0,0,0,.6), inset 0 1px 1px rgba(255,255,255,.08);
+  position:relative;
+}
+.mini-knob .knob::after{
+  content:"";
+  position:absolute;
+  top:2px; left:50%;
+  width:2px; height:8px;
+  background:var(--phosphor-dim);
+  transform-origin:50% 10px;
+  transform:translateX(-50%) rotate(var(--rot, -120deg));
+  border-radius:1px;
+}
+.mini-knob.active .knob::after{
+  background:var(--phosphor);
+  box-shadow:0 0 4px var(--phosphor);
+}
+.mini-knob .ttl{
+  font-size:8px;
+  letter-spacing:.18em;
+  color:var(--ink-dim);
+  text-transform:uppercase;
+}
+.mini-knob.active .ttl{
+  color:var(--phosphor);
+  text-shadow:0 0 6px rgba(255,161,46,.5);
+}
+
+.event-strip{
+  display:flex; gap:6px;
+  margin-top:14px;
+  padding:9px 8px;
+  background:var(--panel-deep);
+  border:1px solid var(--bezel-1);
+  border-radius:5px;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.6);
+  overflow:hidden;
+  position:relative; z-index:1;
+}
+.evt{
+  font-size:9px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  padding:4px 7px;
+  border-radius:3px;
+  white-space:nowrap;
+  border:1px solid transparent;
+}
+.evt.dim{ color:var(--ink-deep); border-color:var(--bezel-1); }
+.evt.warm{
+  color:var(--phosphor);
+  border-color:var(--phosphor-dim);
+  background:var(--phosphor-soft);
+  text-shadow:0 0 4px rgba(255,161,46,.4);
+}
+
+/* ─── center column — timeline & phase ─────────────────────────────────── */
+.timecode-block{
+  background:linear-gradient(180deg, #0a0b0e 0%, #050608 100%);
+  border:1px solid var(--bezel-2);
+  border-radius:8px;
+  padding:22px 24px 18px;
+  position:relative;
+  box-shadow:
+    inset 0 2px 6px rgba(0,0,0,.9),
+    inset 0 0 0 1px rgba(255,161,46,.04),
+    0 1px 0 rgba(255,255,255,.04);
+  overflow:hidden;
+}
+.timecode-block::after{
+  /* very faint LCD backlight glow */
+  content:"";
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse at 50% 60%, rgba(255,161,46,.05), transparent 60%);
+  pointer-events:none;
+}
+.timecode-block .lbl{
+  font-size:9px;
+  letter-spacing:.32em;
+  color:var(--ink-dim);
+  text-transform:uppercase;
+  margin-bottom:8px;
+  display:flex; align-items:center; gap:8px;
+}
+.timecode-big{
+  font-family:var(--ff-lcd);
+  font-size:88px;
+  line-height:1;
+  color:var(--phosphor);
+  text-shadow:var(--phosphor-halo), 0 0 4px var(--phosphor);
+  letter-spacing:.04em;
+  position:relative;
+  user-select:none;
+}
+.timecode-big::before{
+  content:"88:88";
+  position:absolute; inset:0;
+  color:rgba(255,161,46,.06);
+}
+.timecode-meta{
+  display:flex; gap:16px;
+  margin-top:12px;
+  font-size:10px;
+  color:var(--ink-dim);
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.timecode-meta b{
+  color:var(--ink);
+  font-weight:400;
+}
+
+/* phase tape — like reel-to-reel paper */
+.phase-tape{
+  margin-top:18px;
+  position:relative;
+  height:96px;
+  background:linear-gradient(180deg, #f3ead7 0%, #ebe0c6 100%);
+  border:1px solid #2a2118;
+  border-radius:4px;
+  padding:8px 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.6),
+    inset 0 -2px 4px rgba(0,0,0,.15),
+    0 2px 6px rgba(0,0,0,.5);
+  overflow:hidden;
+  font-family:var(--ff-mono);
+  color:#2a1f15;
+}
+.phase-tape::before{
+  /* paper grain */
+  content:"";
+  position:absolute; inset:0;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='1'/><feColorMatrix values='0 0 0 0 .4  0 0 0 0 .32  0 0 0 0 .2  0 0 0 .2 0'/></filter><rect width='160' height='160' filter='url(%23p)'/></svg>");
+  mix-blend-mode:multiply;
+  opacity:.5;
+  pointer-events:none;
+}
+.phase-tape::after{
+  /* perforated edge */
+  content:"";
+  position:absolute;
+  left:0; right:0; bottom:0;
+  height:6px;
+  background:
+    radial-gradient(circle at 8px 3px, var(--bg) 1.5px, transparent 2px) repeat-x;
+  background-size:16px 6px;
+}
+.phase-tape .lbl{
+  position:absolute; top:6px; left:12px;
+  font-size:7.5px;
+  letter-spacing:.32em;
+  color:#5a4a30;
+  text-transform:uppercase;
+}
+.phase-tape .row{
+  display:flex; align-items:center; gap:4px;
+  margin-top:18px;
+  height:42px;
+}
+.phase-chunk{
+  height:100%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:9px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  border-right:1px solid rgba(0,0,0,.25);
+  position:relative;
+  font-weight:500;
+}
+.phase-chunk.silent{ flex:.5; color:#8a7c5e; background:rgba(0,0,0,.04); }
+.phase-chunk.groove{ flex:1.8; color:#5a4a30; background:rgba(255,161,46,.18); }
+.phase-chunk.build{
+  flex:1.2;
+  color:#1a1408;
+  background:repeating-linear-gradient(45deg, rgba(255,161,46,.42) 0 6px, rgba(255,161,46,.55) 6px 12px);
+  font-weight:700;
+  position:relative;
+}
+.phase-chunk.build::after{
+  content:"⟶";
+  position:absolute;
+  right:6px;
+  font-size:14px;
+  color:#1a1408;
+  animation:slide-right 1.6s ease-in-out infinite;
+}
+@keyframes slide-right{
+  0%,100%{ transform:translateX(0); opacity:.6; }
+  50%   { transform:translateX(3px); opacity:1; }
+}
+.phase-chunk.drop-ghost{
+  flex:.6;
+  border:1.5px dashed #c8901a;
+  background:rgba(255,161,46,.05);
+  color:#a87010;
+  font-style:italic;
+  font-family:var(--ff-hand);
+  font-size:13px;
+  letter-spacing:0;
+}
+.phase-marker-now{
+  position:absolute;
+  top:0; bottom:0;
+  width:2px;
+  background:var(--rec);
+  box-shadow:0 0 6px var(--rec);
+  z-index:2;
+}
+.phase-marker-now::before{
+  content:"NOW";
+  position:absolute;
+  top:-2px; left:4px;
+  font-size:8px;
+  letter-spacing:.2em;
+  color:var(--rec);
+  font-weight:700;
+  text-shadow:0 1px 0 rgba(255,255,255,.6);
+}
+
+/* drop countdown chip — the FUN moment */
+.drop-chip{
+  margin-top:16px;
+  display:inline-flex; align-items:center; gap:12px;
+  padding:10px 16px;
+  background:
+    linear-gradient(180deg, #1a1e25 0%, #0e1014 100%);
+  border:1px solid var(--phosphor-dim);
+  border-radius:6px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    var(--phosphor-glow);
+  position:relative;
+}
+.drop-chip::before{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  border-radius:7px;
+  background:linear-gradient(180deg, transparent 30%, var(--phosphor-soft));
+  z-index:-1;
+  filter:blur(8px);
+}
+.drop-chip .arrow{
+  font-family:var(--ff-lcd);
+  color:var(--phosphor);
+  font-size:14px;
+}
+.drop-chip .countdown{
+  font-family:var(--ff-lcd);
+  font-size:22px;
+  color:var(--phosphor);
+  text-shadow:var(--phosphor-glow);
+}
+.drop-chip .lbl{
+  font-size:9px;
+  letter-spacing:.28em;
+  color:var(--ink-dim);
+  text-transform:uppercase;
+}
+
+/* event ribbon */
+.event-ribbon{
+  margin-top:auto;
+  display:flex; gap:6px;
+  padding:10px;
+  background:var(--panel-deep);
+  border:1px solid var(--bezel-1);
+  border-radius:5px;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.6);
+  overflow:hidden;
+  font-size:9px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--ink-deep);
+}
+.event-ribbon .evt-now{ color:var(--phosphor); text-shadow:0 0 4px var(--phosphor); }
+.event-ribbon .gap{ color:var(--ink-deep); }
+
+/* sticker — the playful "fun" element */
+.sticker{
+  position:absolute;
+  right:18px; bottom:18px;
+  transform:rotate(-3deg);
+  background:#f3ead7;
+  color:#2a1f15;
+  font-family:var(--ff-hand);
+  font-size:14px;
+  font-weight:700;
+  padding:6px 14px 8px;
+  border:1px dashed #5a4a30;
+  border-radius:2px;
+  box-shadow:
+    2px 3px 6px rgba(0,0,0,.4),
+    inset 0 0 0 1px rgba(255,255,255,.5);
+  letter-spacing:.02em;
+  line-height:1.1;
+  z-index:3;
+  user-select:none;
+}
+.sticker small{
+  display:block;
+  font-size:10px;
+  font-weight:500;
+  color:#5a4a30;
+  letter-spacing:.1em;
+  margin-top:1px;
+}
+
+/* ─── right column — AI transcript ─────────────────────────────────────── */
+.cohost-panel{
+  flex:1;
+  display:flex; flex-direction:column;
+  background:
+    linear-gradient(180deg, var(--panel-lift) 0%, var(--panel) 100%);
+  border:1px solid var(--bezel-1);
+  border-radius:8px;
+  position:relative;
+  overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+}
+.cohost-header{
+  padding:14px 16px;
+  display:flex; align-items:center; gap:12px;
+  border-bottom:1px solid var(--bezel-1);
+  background:linear-gradient(180deg, #1d2128 0%, #161a20 100%);
+  position:relative;
+}
+.cohost-header .mascot{
+  width:42px; height:42px;
+  flex-shrink:0;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 35%, #2c313a, #15181e 70%, #0a0b0e);
+  border:1px solid var(--bezel-3);
+  box-shadow:inset 0 -2px 4px rgba(0,0,0,.5), inset 0 1px 1px rgba(255,255,255,.1);
+  position:relative;
+  overflow:visible;
+}
+.cohost-header .mascot svg{
+  position:absolute; inset:5px;
+  width:32px; height:32px;
+}
+.cohost-meta{
+  flex:1;
+  display:flex; flex-direction:column;
+  gap:3px;
+}
+.cohost-meta .name{
+  font-family:var(--ff-mark);
+  font-size:13px;
+  color:var(--phosphor);
+  letter-spacing:.08em;
+  text-shadow:var(--phosphor-glow);
+}
+.cohost-meta .status{
+  font-size:9px;
+  color:var(--ink-dim);
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  display:flex; align-items:center; gap:5px;
+}
+.cohost-meta .status .led{ width:6px; height:6px; }
+
+.transcript{
+  flex:1;
+  padding:18px 18px 24px;
+  background:
+    linear-gradient(180deg, #f3ead7 0%, #ece2c8 100%);
+  border:0;
+  color:#1a1408;
+  font-family:var(--ff-mono);
+  font-size:13.5px;
+  line-height:1.55;
+  position:relative;
+  overflow:hidden;
+}
+.transcript::before{
+  content:"";
+  position:absolute; inset:0;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2'/><feColorMatrix values='0 0 0 0 .4  0 0 0 0 .32  0 0 0 0 .2  0 0 0 .24 0'/></filter><rect width='180' height='180' filter='url(%23p)'/></svg>");
+  mix-blend-mode:multiply;
+  opacity:.55;
+  pointer-events:none;
+}
+.transcript::after{
+  /* receipt-paper torn-bottom illusion */
+  content:"";
+  position:absolute;
+  left:0; right:0; bottom:0;
+  height:18px;
+  background:
+    linear-gradient(180deg, transparent, rgba(40,28,15,.18)),
+    radial-gradient(circle at 9px 18px, transparent 4px, #ece2c8 4.5px) repeat-x;
+  background-size:auto, 18px 18px;
+  pointer-events:none;
+}
+.msg{
+  margin-bottom:14px;
+  padding-left:20px;
+  position:relative;
+  letter-spacing:.005em;
+}
+.msg::before{
+  content:"›";
+  position:absolute; left:0; top:0;
+  color:var(--phosphor-warm);
+  font-weight:700;
+  font-family:var(--ff-mark);
+}
+.msg.faded{ color:#5a4a30; }
+.msg.old   { color:#7a6749; opacity:.7; }
+.msg.now   { color:#1a1408; }
+.msg.now::after{
+  content:"▍";
+  display:inline;
+  margin-left:2px;
+  color:var(--phosphor-warm);
+  animation:blink 1s steps(1) infinite;
+}
+.msg .ts{
+  display:inline-block;
+  font-family:var(--ff-mono);
+  font-size:9px;
+  letter-spacing:.18em;
+  color:#8a7c5e;
+  background:rgba(40,28,15,.06);
+  padding:1px 5px;
+  border-radius:2px;
+  margin-right:6px;
+  vertical-align:1px;
+}
+.msg em{
+  font-family:var(--ff-hand);
+  font-size:17px;
+  font-style:normal;
+  color:#a8540a;
+  font-weight:700;
+}
+
+/* response footer */
+.cohost-foot{
+  padding:10px 16px;
+  background:linear-gradient(180deg, #1d2128 0%, #161a20 100%);
+  border-top:1px solid var(--bezel-1);
+  display:flex; align-items:center; gap:10px;
+  font-size:9.5px;
+  letter-spacing:.18em;
+  color:var(--ink-dim);
+  text-transform:uppercase;
+}
+.cohost-foot .led{ width:6px; height:6px; }
+.cohost-foot .right{
+  margin-left:auto;
+  font-family:var(--ff-lcd);
+  font-size:13px;
+  color:var(--phosphor);
+  text-shadow:0 0 4px rgba(255,161,46,.4);
+  letter-spacing:.06em;
+}
+
+/* ─── footer status strip ──────────────────────────────────────────────── */
+.statusbar{
+  border-top:1px solid var(--bezel-1);
+  padding:10px 24px;
+  background:linear-gradient(180deg, #161a20 0%, #0e1014 100%);
+  display:flex; align-items:center; gap:18px;
+  font-size:9.5px;
+  letter-spacing:.2em;
+  color:var(--ink-dim);
+  text-transform:uppercase;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+}
+.statusbar .group{
+  display:flex; align-items:center; gap:7px;
+}
+.statusbar .right{ margin-left:auto; }
+.poweredby{
+  font-family:var(--ff-hand);
+  font-size:14px;
+  color:var(--phosphor);
+  letter-spacing:0;
+  text-transform:none;
+  text-shadow:0 0 8px rgba(255,161,46,.4);
+}
+
+/* ─── responsive (small viewport — stack panels) ──────────────────────── */
+@media (max-width: 1100px){
+  .grid{ grid-template-columns: 1fr; }
+  .col + .col{ border-left:0; border-top:1px solid var(--bezel-1); }
+  .timecode-big{ font-size:64px; }
+}
+</style>
+</head>
+<body>
+
+<main class="shell" role="application" aria-label="vibemix live session">
+
+  <!-- panel screws — pure ornament, sells the hardware fiction -->
+  <span class="screw screw--tl" aria-hidden="true"></span>
+  <span class="screw screw--tr" aria-hidden="true"></span>
+  <span class="screw screw--bl" aria-hidden="true"></span>
+  <span class="screw screw--br" aria-hidden="true"></span>
+
+  <!-- ─── title bar ─── -->
+  <header class="titlebar">
+    <span class="traffic" aria-hidden="true">
+      <span></span><span></span><span></span>
+    </span>
+    <span class="wordmark" aria-label="vibemix">vibemix</span>
+
+    <span class="title-meta">
+      <span class="pill"><span class="led led--live"></span> live</span>
+      <span class="pill"><span class="led led--rec"></span> rec</span>
+      <span class="pill" title="livekit + gemini + midi">
+        <span class="led led--ok"></span> sys
+      </span>
+      <span class="timecode-mini" id="mini-clock">02:44:31</span>
+    </span>
+  </header>
+
+  <!-- ─── main grid ─── -->
+  <div class="grid">
+
+    <!-- LEFT COLUMN ───────────────────────────────── -->
+    <section class="col" aria-label="controls">
+
+      <!-- persona panel -->
+      <div class="panel">
+        <div class="panel-h">
+          persona
+          <span class="badge">cfg</span>
+        </div>
+
+        <div class="mode-rocker" role="radiogroup" aria-label="skill mode">
+          <button role="radio" aria-pressed="false">beg</button>
+          <button role="radio" aria-pressed="false">int</button>
+          <button role="radio" aria-pressed="true">pro</button>
+        </div>
+
+        <div class="interaction" role="radiogroup" aria-label="interaction mode">
+          <button role="radio" aria-pressed="false">
+            <span class="led"></span> hype
+          </button>
+          <button role="radio" aria-pressed="true">
+            <span class="led"></span> coach
+          </button>
+        </div>
+
+        <div class="persona-row">
+          <div class="persona-cell">
+            <div class="lbl">voice</div>
+            <div class="voice-pick">
+              <span class="voice-avatar" aria-hidden="true"></span>
+              <span class="name">avery</span>
+              <span class="pickaxis">▾</span>
+            </div>
+          </div>
+          <div class="persona-cell">
+            <div class="lbl">genre</div>
+            <div class="genre-dial">
+              <span class="dial" aria-hidden="true"></span>
+              <div class="lbl-stack">
+                <span class="selected">techno</span>
+                <span class="sub">140 bpm</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- audio meter -->
+      <div class="panel">
+        <div class="panel-h">audio in <span class="badge">master</span></div>
+
+        <div class="audio-grid">
+          <div class="meter" id="meter" aria-label="master level meter">
+            <div class="meter-bar" data-ch="L"></div>
+            <div class="meter-bar" data-ch="R"></div>
+          </div>
+
+          <div class="meter-side">
+            <div class="master-readout">
+              <span class="dB" id="db-readout">-8.2</span>
+              <span class="unit">dBFS</span>
+            </div>
+            <div class="meter-row">
+              <span>peak hold</span>
+              <span id="peak-readout">-3.4 dB</span>
+            </div>
+            <div class="meter-row">
+              <span>rms 250 ms</span>
+              <span>-12.7 dB</span>
+            </div>
+            <div class="cue-line">
+              <span class="led"></span>
+              <span>cue</span>
+              <span class="strike"></span>
+              <span>off</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- midi panel -->
+      <div class="panel">
+        <div class="panel-h">midi <span class="badge">ddj-flx4</span></div>
+
+        <div class="midi-grid">
+          <div class="mini-knob"><span class="knob" style="--rot:-110deg"></span><span class="ttl">low a</span></div>
+          <div class="mini-knob"><span class="knob" style="--rot:-30deg"></span><span class="ttl">mid a</span></div>
+          <div class="mini-knob active"><span class="knob" style="--rot:80deg"></span><span class="ttl">hi a</span></div>
+          <div class="mini-knob"><span class="knob" style="--rot:-100deg"></span><span class="ttl">fil a</span></div>
+          <div class="mini-knob active"><span class="knob" style="--rot:-50deg"></span><span class="ttl">low b</span></div>
+          <div class="mini-knob"><span class="knob" style="--rot:20deg"></span><span class="ttl">mid b</span></div>
+          <div class="mini-knob"><span class="knob" style="--rot:0deg"></span><span class="ttl">hi b</span></div>
+          <div class="mini-knob"><span class="knob" style="--rot:-60deg"></span><span class="ttl">fil b</span></div>
+        </div>
+
+        <div class="event-strip" aria-label="recent midi events">
+          <span class="evt warm">eq hi a +14</span>
+          <span class="evt dim">cross +0.3</span>
+          <span class="evt dim">pad b cue</span>
+          <span class="evt dim">eq lo b -22</span>
+          <span class="evt dim">play b</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CENTER COLUMN ──────────────────────────────── -->
+    <section class="col" aria-label="timeline">
+
+      <div class="timecode-block">
+        <div class="lbl">set timecode <span class="led led--live"></span></div>
+        <div class="timecode-big" id="big-clock">02:44</div>
+        <div class="timecode-meta">
+          <span>track <b>03 / 09</b></span>
+          <span>tempo <b>140 bpm</b></span>
+          <span>key <b>F min</b></span>
+          <span>latency <b>48 ms</b></span>
+        </div>
+      </div>
+
+      <div class="phase-tape" aria-label="phase tape">
+        <span class="lbl">phase tape · last 90s</span>
+        <div class="row">
+          <div class="phase-chunk silent">silent</div>
+          <div class="phase-chunk groove">groove</div>
+          <div class="phase-chunk build">
+            build
+          </div>
+          <div class="phase-chunk drop-ghost">drop ~2:48</div>
+          <span class="phase-marker-now" style="left:62%"></span>
+        </div>
+      </div>
+
+      <div class="drop-chip" role="status" aria-live="polite">
+        <span class="arrow">▶</span>
+        <span class="lbl">drop in</span>
+        <span class="countdown" id="drop-countdown">00:04</span>
+        <span class="lbl" style="margin-left:6px; color:var(--phosphor); opacity:.85;">conf 78%</span>
+      </div>
+
+      <div class="event-ribbon" aria-label="recent timeline events">
+        <span>2:13 layer arrival</span>
+        <span class="gap">·</span>
+        <span>2:31 build start</span>
+        <span class="gap">·</span>
+        <span class="evt-now">2:44 ▶ now</span>
+        <span class="gap">·</span>
+        <span>~2:48 drop est</span>
+      </div>
+
+      <!-- the playful sticker — fun moment, masking-tape vibe -->
+      <div class="sticker" aria-hidden="true">
+        v0.1 · playground unit
+        <small>handle with care · made tonight</small>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN ───────────────────────────────── -->
+    <section class="col" aria-label="ai co-host">
+      <div class="cohost-panel">
+
+        <header class="cohost-header">
+          <div class="mascot" aria-hidden="true">
+            <!-- inline SVG mascot — little cycloptic creature in headphones.
+                 Pure SVG, no asset deps. Reacts to volume via JS. -->
+            <svg viewBox="0 0 32 32">
+              <!-- headphone cups -->
+              <ellipse cx="4" cy="14" rx="3.5" ry="4.5" fill="#0a0b0e" stroke="#3a4150" stroke-width=".6"/>
+              <ellipse cx="28" cy="14" rx="3.5" ry="4.5" fill="#0a0b0e" stroke="#3a4150" stroke-width=".6"/>
+              <!-- headband -->
+              <path d="M5 11 Q16 4 27 11" stroke="#3a4150" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+              <!-- head -->
+              <ellipse cx="16" cy="17" rx="9" ry="8" fill="#ffa12e" stroke="#a86c10" stroke-width=".5"/>
+              <!-- eyes -->
+              <g id="mascot-eyes">
+                <ellipse cx="12.5" cy="16" rx="1.8" ry="2.2" fill="#1a1408"/>
+                <ellipse cx="19.5" cy="16" rx="1.8" ry="2.2" fill="#1a1408"/>
+                <ellipse cx="12.7" cy="15.4" rx=".5" ry=".7" fill="#fff"/>
+                <ellipse cx="19.7" cy="15.4" rx=".5" ry=".7" fill="#fff"/>
+              </g>
+              <!-- happy mouth -->
+              <path id="mascot-mouth" d="M13 20 Q16 22 19 20" stroke="#1a1408" stroke-width="1" fill="none" stroke-linecap="round"/>
+              <!-- cheeks blush -->
+              <circle cx="10" cy="19" r="1.2" fill="#ff7050" opacity=".5"/>
+              <circle cx="22" cy="19" r="1.2" fill="#ff7050" opacity=".5"/>
+            </svg>
+          </div>
+          <div class="cohost-meta">
+            <span class="name">co-host · avery</span>
+            <span class="status">
+              <span class="led led--live"></span> coaching · listening
+            </span>
+          </div>
+        </header>
+
+        <div class="transcript" id="transcript">
+          <div class="msg old">
+            <span class="ts">2:08</span>
+            nice. you found the groove. let the high-hats breathe — don't crowd them yet.
+          </div>
+          <div class="msg faded">
+            <span class="ts">2:13</span>
+            new layer's in. clean. the kick on b is sitting <em>just</em> under yours — bring it up two clicks.
+          </div>
+          <div class="msg faded">
+            <span class="ts">2:31</span>
+            you're in a build. don't get cute. let it ride.
+          </div>
+          <div class="msg now">
+            <span class="ts">2:44</span>
+            clean cut on the bass swap. bring the hats up a touch before the drop — you're holding too long. trust the build, <em>it's almost there</em>.
+          </div>
+        </div>
+
+        <div class="cohost-foot">
+          <span class="led led--ok"></span>
+          gemini · 3 flash
+          <span class="right" id="latency-mini">48 ms</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ─── status strip ─── -->
+  <footer class="statusbar">
+    <span class="group"><span class="led led--ok"></span> livekit room</span>
+    <span class="group"><span class="led led--ok"></span> gemini 3 flash</span>
+    <span class="group"><span class="led led--ok"></span> gemini tts · avery</span>
+    <span class="group"><span class="led led--ok"></span> screen · djay pro</span>
+    <span class="group"><span class="led led--ok"></span> midi · ddj-flx4</span>
+    <span class="right poweredby">made by bravoh · with love</span>
+  </footer>
+
+</main>
+
+<script>
+/* ─── synthetic life — animates meters, dB readout, clock, mascot ─────── */
+(() => {
+  // Build meter segments
+  const segCount = 22;
+  document.querySelectorAll('.meter-bar').forEach(bar => {
+    for (let i = 0; i < segCount; i++){
+      const s = document.createElement('span');
+      s.className = 'meter-seg';
+      bar.appendChild(s);
+    }
+  });
+
+  const bars = document.querySelectorAll('.meter-bar');
+  const dbEl = document.getElementById('db-readout');
+  const peakEl = document.getElementById('peak-readout');
+  const bigClock = document.getElementById('big-clock');
+  const miniClock = document.getElementById('mini-clock');
+  const dropEl = document.getElementById('drop-countdown');
+  const latencyEl = document.getElementById('latency-mini');
+  const mascotEyes = document.getElementById('mascot-eyes');
+  const mascotMouth = document.getElementById('mascot-mouth');
+
+  // synthetic master level — ramps during build, peaks at drop
+  let t = 0;
+  let setSeconds = 2*60 + 44;       // 2:44
+  let dropTarget  = 2*60 + 48;      // 2:48
+  let peakDb = -8.2;
+
+  function fmtClock(s){
+    const m = Math.floor(s/60);
+    const r = Math.floor(s%60);
+    return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`;
+  }
+  function fmtMini(s){
+    const m = Math.floor(s/60), r = Math.floor(s%60);
+    const cs = Math.floor((s % 1)*100);
+    return `00:${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`.slice(0); // hh:mm:ss
+  }
+
+  function step(now){
+    t += 1/60;
+    setSeconds += 1/60;
+
+    // base ramp from -22 dB up to ~-2 dB as we approach drop, then settle to peak
+    const distance = Math.max(0, dropTarget - setSeconds);
+    let base;
+    if (distance > 0){
+      // build-up: louder as we approach drop
+      base = -18 + (4 - Math.min(4, distance)) * 4; // -18 → -2 as distance→0
+    } else {
+      // post-drop: hover loud
+      base = -3 + Math.sin(t*2.6) * 1.5;
+    }
+    const wobble = Math.sin(t*8.2) * .9 + Math.sin(t*3.1) * 1.2;
+    const dbNow = Math.min(-.2, base + wobble);
+    dbEl.textContent = dbNow.toFixed(1);
+    peakDb = Math.max(peakDb - .02, dbNow + 2.5);
+    peakEl.textContent = `${peakDb.toFixed(1)} dB`;
+
+    // meter fill — map dBFS [-40, 0] to segment count
+    const segLit = Math.round(((dbNow + 40) / 40) * segCount);
+    bars.forEach((bar, idx) => {
+      const drift = Math.sin(t*7 + idx*1.7) * 1.6;
+      const litHere = Math.max(0, Math.min(segCount, Math.round(segLit + drift)));
+      bar.querySelectorAll('.meter-seg').forEach((seg, i) => {
+        seg.classList.remove('on', 'peak');
+        if (i < litHere){
+          seg.classList.add('on');
+          if (i >= segCount - 3) seg.classList.add('peak');
+        }
+      });
+    });
+
+    // clocks
+    bigClock.textContent = fmtClock(setSeconds);
+    const hms = (() => {
+      const total = Math.floor(setSeconds);
+      const h = Math.floor(total/3600);
+      const m = Math.floor((total%3600)/60);
+      const s = total%60;
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    })();
+    miniClock.textContent = hms;
+    const remain = Math.max(0, dropTarget - setSeconds);
+    dropEl.textContent = `00:${String(Math.floor(remain)).padStart(2,'0')}`;
+
+    // latency jitter
+    if (Math.random() < .02){
+      latencyEl.textContent = `${Math.floor(40 + Math.random()*14)} ms`;
+    }
+
+    // mascot — eyes drift, mouth opens slightly with louder audio
+    if (mascotEyes){
+      const eyeDx = Math.sin(t*1.4) * .8;
+      const eyeDy = Math.sin(t*.9 + 1.2) * .5;
+      mascotEyes.setAttribute('transform', `translate(${eyeDx},${eyeDy})`);
+    }
+    if (mascotMouth){
+      const open = Math.max(0, (dbNow + 30)/30);                 // 0..1
+      const lift = open * 1.8;
+      mascotMouth.setAttribute('d', `M13 ${20 - lift*.4} Q16 ${22 + lift} 19 ${20 - lift*.4}`);
+    }
+
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+
+  // ─── interactive: rocker + interaction switches ──────────────────────
+  function wireRocker(scope){
+    scope.querySelectorAll('button[role="radio"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        scope.querySelectorAll('button[role="radio"]').forEach(b =>
+          b.setAttribute('aria-pressed', String(b === btn)));
+      });
+    });
+  }
+  document.querySelectorAll('.mode-rocker, .interaction').forEach(wireRocker);
+
+  // ─── easter egg: click mascot, eyes go wide for a beat ───────────────
+  const mascotBox = document.querySelector('.cohost-header .mascot');
+  if (mascotBox){
+    mascotBox.style.cursor = 'pointer';
+    mascotBox.title = 'hey there';
+    mascotBox.addEventListener('click', () => {
+      mascotEyes.style.transition = 'transform .15s';
+      mascotEyes.setAttribute('transform','scale(1.25) translate(-3.5,-3.5)');
+      mascotMouth.setAttribute('d','M13 21 Q16 24 19 21');
+      setTimeout(() => {
+        mascotEyes.removeAttribute('transform');
+        mascotEyes.style.transition = '';
+      }, 350);
+    });
+  }
+})();
+</script>
+</body>
+</html>
