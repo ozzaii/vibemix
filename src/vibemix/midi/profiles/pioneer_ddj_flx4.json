@@ -1,0 +1,35 @@
+{
+  "id": "pioneer_ddj_flx4",
+  "display_name": "Pioneer DDJ-FLX4",
+  "port_name_hints": ["DDJ-FLX4", "FLX4"],
+  "decks": ["A", "B"],
+  "controls": {
+    "vol_a":     {"kind": "cc", "channel": 0, "cc": 19, "axis": "unipolar", "deck": "A", "field": "vol"},
+    "vol_b":     {"kind": "cc", "channel": 1, "cc": 19, "axis": "unipolar", "deck": "B", "field": "vol"},
+    "eq_hi_a":   {"kind": "cc", "channel": 0, "cc": 7,  "axis": "unipolar", "deck": "A", "field": "eq_hi"},
+    "eq_hi_b":   {"kind": "cc", "channel": 1, "cc": 7,  "axis": "unipolar", "deck": "B", "field": "eq_hi"},
+    "eq_mid_a":  {"kind": "cc", "channel": 0, "cc": 11, "axis": "unipolar", "deck": "A", "field": "eq_mid"},
+    "eq_mid_b":  {"kind": "cc", "channel": 1, "cc": 11, "axis": "unipolar", "deck": "B", "field": "eq_mid"},
+    "eq_low_a":  {"kind": "cc", "channel": 0, "cc": 15, "axis": "unipolar", "deck": "A", "field": "eq_low"},
+    "eq_low_b":  {"kind": "cc", "channel": 1, "cc": 15, "axis": "unipolar", "deck": "B", "field": "eq_low"},
+    "tempo_a":   {"kind": "cc", "channel": 0, "cc": 0,  "axis": "bipolar",  "deck": "A", "field": "tempo"},
+    "tempo_b":   {"kind": "cc", "channel": 1, "cc": 0,  "axis": "bipolar",  "deck": "B", "field": "tempo"},
+    "filter_a":  {"kind": "cc", "channel": 6, "cc": 23, "axis": "bipolar",  "deck": "A", "field": "filter"},
+    "filter_b":  {"kind": "cc", "channel": 6, "cc": 24, "axis": "bipolar",  "deck": "B", "field": "filter"},
+    "xfader":    {"kind": "cc", "channel": 6, "cc": 31, "axis": "bipolar",  "deck": null, "field": "xfader"}
+  },
+  "buttons": {
+    "play_a":     {"kind": "play",      "channel": 0, "note": 11, "deck": "A"},
+    "play_b":     {"kind": "play",      "channel": 1, "note": 11, "deck": "B"},
+    "cue_a":      {"kind": "cue",       "channel": 0, "note": 12, "deck": "A"},
+    "cue_b":      {"kind": "cue",       "channel": 1, "note": 12, "deck": "B"},
+    "sync_a":     {"kind": "sync",      "channel": 0, "note": 96, "deck": "A"},
+    "sync_b":     {"kind": "sync",      "channel": 1, "note": 96, "deck": "B"},
+    "jog_a":      {"kind": "jog_touch", "channel": 0, "note": 54, "deck": "A"},
+    "jog_b":      {"kind": "jog_touch", "channel": 1, "note": 54, "deck": "B"},
+    "loop_in_a":  {"kind": "loop_in",   "channel": 0, "note": 16, "deck": "A"},
+    "loop_in_b":  {"kind": "loop_in",   "channel": 1, "note": 16, "deck": "B"},
+    "loop_out_a": {"kind": "loop_out",  "channel": 0, "note": 17, "deck": "A"},
+    "loop_out_b": {"kind": "loop_out",  "channel": 1, "note": 17, "deck": "B"}
+  }
+}
