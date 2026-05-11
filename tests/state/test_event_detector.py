@@ -478,3 +478,72 @@ def test_returns_event_type_object():
     ms = _state(audible=False, bpm=0.0)
     ev = d.detect(ms, kaan_just_spoke=True, manual=False)
     assert isinstance(ev, Event)
+
+
+# =============================================================================
+# Phase 6 — LAYER_ARRIVAL vocal-active gate
+# =============================================================================
+
+
+def test_layer_arrival_suppressed_when_vocal_active(mocker):
+    """LAYER_ARRIVAL band-jump suppressed when state.vocal_active=True. Per
+    06-CONTEXT.md §EventDetector: vocal arrival isn't a 'new sonic layer' in
+    the sense the event was designed to surface."""
+    d = EventDetector()
+    ms = _state(bands={"sub": 0.4, "low": 0.4, "mid": 0.3, "high": 0.3})
+    t = _prime_music_playing(d, ms, mocker)
+    # Prime: one tick at sustained-audible time, sets sig=(0.30, 0.30); does NOT fire.
+    d.detect(ms, kaan_just_spoke=False, manual=False)
+    # Move forward past cooldowns:
+    t.return_value = 1030.0
+    # Spike mid (> 0.15 threshold) AND set vocal_active=True
+    ms.bands = {"sub": 0.2, "low": 0.2, "mid": 0.5, "high": 0.3}
+    ms.rms = 0.06
+    ms.vocal_active = True
+    ev = d.detect(ms, kaan_just_spoke=False, manual=False)
+    # Either no event (heartbeat may also be blocked by cooldown) OR not a LAYER_ARRIVAL.
+    assert ev is None or ev.type != "LAYER_ARRIVAL"
+
+
+def test_layer_arrival_fires_when_vocal_not_active(mocker):
+    """Regression — same setup but vocal_active=False → LAYER_ARRIVAL fires."""
+    d = EventDetector()
+    ms = _state(bands={"sub": 0.4, "low": 0.4, "mid": 0.3, "high": 0.3})
+    t = _prime_music_playing(d, ms, mocker)
+    d.detect(ms, kaan_just_spoke=False, manual=False)
+    t.return_value = 1030.0
+    ms.bands = {"sub": 0.2, "low": 0.2, "mid": 0.5, "high": 0.3}
+    ms.rms = 0.06
+    ms.vocal_active = False
+    ev = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert ev is not None
+    assert ev.type == "LAYER_ARRIVAL"
+
+
+def test_layer_arrival_baseline_still_updates_when_vocal_active(mocker):
+    """When the gate suppresses LAYER_ARRIVAL, last_band_signature still gets
+    updated to the new sig — so a non-vocal post-vocal jump doesn't false-fire
+    against a stale baseline."""
+    d = EventDetector()
+    ms = _state(bands={"sub": 0.4, "low": 0.4, "mid": 0.3, "high": 0.3})
+    t = _prime_music_playing(d, ms, mocker)
+    d.detect(ms, kaan_just_spoke=False, manual=False)
+    t.return_value = 1030.0
+    ms.bands = {"sub": 0.2, "low": 0.2, "mid": 0.5, "high": 0.3}
+    ms.rms = 0.06
+    ms.vocal_active = True
+    d.detect(ms, kaan_just_spoke=False, manual=False)
+    # Baseline updated to the new sig.
+    assert d.last_band_signature == (0.5, 0.3)
+
+
+def test_phase_event_still_fires_when_vocal_active(mocker):
+    """PHASE transitions are NOT gated on vocal_active — only LAYER_ARRIVAL is."""
+    d = EventDetector()
+    ms = _state(phase="drop")
+    _prime_music_playing(d, ms, mocker, sync_phase=False)
+    d.last_phase = "groove"
+    ms.vocal_active = True  # would-be gate, but PHASE ignores it
+    ev = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert ev is not None
+    assert ev.type == "PHASE"

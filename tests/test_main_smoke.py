@@ -614,3 +614,120 @@ def test_main_07_unknown_mode_exits(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         asyncio.run(main())
     assert "VIBEMIX_LLM_MODE" in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 — VIBEMIX_GENRE_PROFILE env dispatch via apply_genre_env() helper
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _reset_active_profile_for_genre_tests():
+    """Wipe the active-profile singleton before and after the genre-env tests
+    so cross-test pollution can't leak."""
+    from vibemix.state.genre import profile as _mod
+
+    _mod._ACTIVE_PROFILE = None
+    yield
+    _mod._ACTIVE_PROFILE = None
+
+
+def test_main_genre_default_is_techno(monkeypatch):
+    """Default VIBEMIX_GENRE_PROFILE → 'techno' (CONTEXT D-LOCKED)."""
+    monkeypatch.delenv("VIBEMIX_GENRE_PROFILE", raising=False)
+    from vibemix._main_helpers import apply_genre_env
+    from vibemix.state import get_active_profile
+
+    applied = apply_genre_env()
+    assert applied == "techno"
+    assert get_active_profile().name == "techno"
+
+
+def test_main_genre_pop(monkeypatch):
+    monkeypatch.setenv("VIBEMIX_GENRE_PROFILE", "pop")
+    from vibemix._main_helpers import apply_genre_env
+    from vibemix.state import get_active_profile
+
+    applied = apply_genre_env()
+    assert applied == "pop"
+    assert get_active_profile().name == "pop"
+
+
+def test_main_genre_drum_and_bass(monkeypatch):
+    monkeypatch.setenv("VIBEMIX_GENRE_PROFILE", "drum_and_bass")
+    from vibemix._main_helpers import apply_genre_env
+    from vibemix.state import get_active_profile
+
+    applied = apply_genre_env()
+    assert applied == "drum_and_bass"
+    assert get_active_profile().name == "drum_and_bass"
+
+
+def test_main_genre_none_disables_active_profile(monkeypatch):
+    """VIBEMIX_GENRE_PROFILE=none → Phase 3 absolute-threshold fallback."""
+    monkeypatch.setenv("VIBEMIX_GENRE_PROFILE", "none")
+    from vibemix._main_helpers import apply_genre_env
+    from vibemix.state import get_active_profile
+
+    applied = apply_genre_env()
+    assert applied is None
+    assert get_active_profile() is None
+
+
+def test_main_genre_unknown_alias_disables(monkeypatch):
+    """'unknown' is also an explicit alias for None."""
+    monkeypatch.setenv("VIBEMIX_GENRE_PROFILE", "unknown")
+    from vibemix._main_helpers import apply_genre_env
+    from vibemix.state import get_active_profile
+
+    applied = apply_genre_env()
+    assert applied is None
+    assert get_active_profile() is None
+
+
+def test_main_genre_empty_string_disables(monkeypatch):
+    """Empty string is treated as 'none' (defensive)."""
+    monkeypatch.setenv("VIBEMIX_GENRE_PROFILE", "")
+    from vibemix._main_helpers import apply_genre_env
+    from vibemix.state import get_active_profile
+
+    # Default kicks in for empty string since os.environ.get returns "" → strip → "" → into alias.
+    applied = apply_genre_env()
+    assert applied is None
+    assert get_active_profile() is None
+
+
+def test_main_genre_case_insensitive(monkeypatch):
+    """Env value is .strip().lower()-ed before lookup."""
+    monkeypatch.setenv("VIBEMIX_GENRE_PROFILE", "TECHNO")
+    from vibemix._main_helpers import apply_genre_env
+    from vibemix.state import get_active_profile
+
+    applied = apply_genre_env()
+    assert applied == "techno"
+    assert get_active_profile().name == "techno"
+
+
+def test_main_genre_whitespace_stripped(monkeypatch):
+    monkeypatch.setenv("VIBEMIX_GENRE_PROFILE", "  house  ")
+    from vibemix._main_helpers import apply_genre_env
+    from vibemix.state import get_active_profile
+
+    applied = apply_genre_env()
+    assert applied == "house"
+    assert get_active_profile().name == "house"
+
+
+def test_main_genre_unknown_sys_exits(monkeypatch):
+    """Unknown profile name → sys.exit with clear message listing valid choices."""
+    monkeypatch.setenv("VIBEMIX_GENRE_PROFILE", "reggaeton")
+    from vibemix._main_helpers import apply_genre_env
+
+    with pytest.raises(SystemExit) as exc:
+        apply_genre_env()
+    msg = str(exc.value)
+    assert "VIBEMIX_GENRE_PROFILE" in msg
+    assert "reggaeton" in msg
+    # Valid choices listed:
+    assert "techno" in msg
+    assert "none" in msg
