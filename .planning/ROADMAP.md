@@ -10,7 +10,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Platform Protocol Firewall** - `platform/` Protocol classes + package skeleton + dependency lockfile + SignPath OSS application filed (day-1, 3-week lead time).
+- [x] **Phase 1: Platform Protocol Firewall** - `platform/` Protocol classes + package skeleton + dependency lockfile + SignPath OSS application filed (day-1, 3-week lead time). _**Complete 2026-05-11.** SignPath form submission Kaan-side pending (reCAPTCHA)._
 - [ ] **Phase 2: Audio Core Port + Ring Buffer Fix** - Port `AudioBuffer`/`MicBuffer`/`Levels`/`PlaybackQueue` from POC into pre-allocated ring buffers (fixes `np.concatenate` callback regression).
 - [ ] **Phase 3: Sensing & State Port** - Port `MusicState` 10Hz writer + `EventDetector` + `AICoach` + `audible-deck` detection + screen/track sense from POC.
 - [ ] **Phase 4: LiveKit Cascade Agent Pivot** - Replace `RealtimeModel` with `AgentSession` cascade (`stt=None`, `vad=None`, `llm=google.LLM`, `tts=google.beta.gemini_tts.TTS`) + `DJCoHostAgent.llm_node()` override + bundled local `livekit-server --dev`.
