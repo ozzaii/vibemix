@@ -1,6 +1,6 @@
 # vibemix — State
 
-**Last updated:** 2026-05-11 (Phase 2 complete)
+**Last updated:** 2026-05-11 (Phase 3 complete)
 
 ---
 
@@ -18,13 +18,13 @@
 
 ## Current Position
 
-- **Phase:** 03 — Sensing & State Port (next).
+- **Phase:** 04 — LiveKit Cascade Agent Pivot (next).
 - **Plan:** None active.
-- **Status:** Phase 2 ✅ complete (wave commits `bb63774` / `59fdb62` / `54e6432` / `62413e9`). np.concatenate-per-callback regression closed (v4:300 + v4:462). AudioMacOS satisfies Phase 1 AudioBackend Protocol. Sample-rate sanity guard active pre-open + post-open (catches the BlackHole 44100/48000 trap Kaan hit live on 2026-05-11). 14 LOAD-BEARING v4 constants importable at vibemix.audio.constants. POC files untouched. Full suite 78 green; 2 live smoke tests opt-in under macos_audio marker. SignPath OSS submission still pending Kaan-side.
-- **Progress:** 2/20 phases complete.
+- **Status:** Phase 3 ✅ complete (wave commits `c923025` / `8106a16` / `9104052` / `8e04dfc`). Six v4 sensing/state primitives ported verbatim into `vibemix.state` and `vibemix.platform`: MusicState (22-field single source of truth + threading.Lock), Event + EventDetector (7-event taxonomy + MUSIC_PRESENCE anti-hallucination gate + DDJ-FLX4 maps byte-identical to v4), AICoach (static-method-only, `phase=` omitted per v4:1350-1351), state_refresh_loop (10Hz single writer, lock-protected), and three macOS backends satisfying Phase 1 Protocols (ScreenMacOS via mss+Quartz, MidiMacOS via mido daemon thread, TrackMacOS via nowplaying-cli subprocess). Pioneer DDJ-FLX4 play-state limitation reproduced verbatim from v4; Phase 9 fix docketed. macOS ScreenCaptureKit migration docketed for Phase 8. POC files untouched (v4 still runnable via run_v4.sh). Full suite 270 green.
+- **Progress:** 3/20 phases complete.
 
 ```
-[██                  ] 10% (2/20 phases)
+[███                 ] 15% (3/20 phases)
 ```
 
 ---
@@ -35,7 +35,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Phases complete | 2 / 20 |
+| Phases complete | 3 / 20 |
 | v1 requirements mapped | 128 / 128 |
 | v1 requirements complete | 9 / 128 |
 | Critical pitfalls mitigated | 0 / 9 |
@@ -87,13 +87,14 @@ None yet — all dependencies are pinned and verified.
 ### Last Session
 
 - 2026-05-11 — Phase 2 (Audio Core Port + Ring Buffer Fix) shipped end-to-end: 4 wave commits (`bb63774` skeleton+constants+Levels, `59fdb62` ring-buffer rewrite fixes np.concatenate at v4:300+v4:462, `54e6432` features.py DSP + VoiceRecorder, `62413e9` AudioMacOS impl + sample-rate guard) + verification gate (8/8 pass) + phase SUMMARY. tracemalloc tests pin zero-alloc invariant on both buffer push paths. AudioMacOS satisfies @runtime_checkable AudioBackend Protocol via isinstance. SampleRateMismatchError raises with Audio MIDI Setup actionable message on both pre-open and post-open paths. Phase 1 firewall test relaxed to skip underscore-prefixed concrete impls (planned amendment per Plan 04 critical constraint). 78 tests green (10 Phase 1 + 14 W1 + 21 W2 + 20 W3 + 13 W4). 2 live BlackHole smoke tests collected under macos_audio marker.
+- 2026-05-11 — Phase 3 (Sensing & State Port) shipped end-to-end: 4 wave commits (`c923025` MusicState + classify_phase + audible-deck/track resolvers v4 verbatim, `8106a16` Event + EventDetector with class-attrs removed/imported from vibemix.audio.constants, `9104052` AICoach static-method-only with phase= omitted per v4:1350-1351 anti-hallucination invariant, `8e04dfc` state_refresh_loop 10Hz single writer + macOS Screen/MIDI/Track backends satisfying Phase 1 Protocols structurally). 270 tests green (78 from Phase 2 + 192 new). All 11 acceptance gates PASS. DDJ-FLX4 _CC_MAP/_NOTE_MAP byte-identical to v4:582-598 (asserted by equality test). AICoach task strings byte-for-byte from v4:1391-1427 (golden-string tests). MUSIC_PRESENCE_MIN_SECONDS / BPM_VALID_MIN / BPM_VALID_MAX lifted from EventDetector class-attrs to vibemix.audio.constants module scope. Pioneer DDJ-FLX4 play-state limitation reproduced verbatim from v4 (Phase 9 fix docketed in _midi_macos.py docstring). macOS ScreenCaptureKit migration docketed for Phase 8. POC files untouched (v4 still runnable via run_v4.sh throughout the entire phase).
 
 ### Next Session
 
-- Continue from Phase 3 (Sensing & State Port).
-- Phase 3 will import `vibemix.audio.{AudioBuffer, snapshot_features, energy_curve, long_arc_curve, estimate_bpm, Levels, BufferRegistry, MIN_EVENT_GAP_PER_TYPE, SILENT_RMS, LOW_RMS, PEAK_RMS, MUSIC_PRESENCE_MIN_SECONDS, BPM_VALID_MIN, BPM_VALID_MAX}` directly — no scavenger hunt.
+- Continue from Phase 4 (LiveKit Cascade Agent Pivot). Imports `from vibemix.state import MusicState, Event, EventDetector, AICoach, state_refresh_loop` and `from vibemix.platform import ScreenMacOS, MidiMacOS, TrackMacOS` directly — no scavenger hunt.
+- Phase 4 wires `DJCoHostAgent.llm_node` override + AgentSession cascade (stt=None, vad=None, llm=google.LLM, tts=google.beta.gemini_tts.TTS), feeds `AICoach.build_prompt(event)` output into Gemini Flash multimodal, and produces the first true end-to-end audible smoke test.
 - Kaan-side outstanding: SignPath OSS application (Phase 1 carry-forward). ~1 week SLA.
 
 ---
 
-*State managed by gsd-roadmapper at 2026-05-11; updated by /gsd-autonomous on 2026-05-11 (Phase 2 complete).*
+*State managed by gsd-roadmapper at 2026-05-11; updated by /gsd-autonomous on 2026-05-11 (Phase 3 complete).*
