@@ -13,6 +13,7 @@ add genre-aware overrides on top. See constants.py for the full set + v4 line an
 
 from __future__ import annotations
 
+from vibemix.audio.buffers import AudioBuffer, MicBuffer, PassthroughBuffer, PlaybackQueue
 from vibemix.audio.constants import (
     AI_TALK_THRESHOLD,
     AUDIBLE_DEBOUNCE_SEC,
@@ -43,6 +44,7 @@ from vibemix.audio.constants import (
 )
 from vibemix.audio.errors import SampleRateMismatchError
 from vibemix.audio.levels import Levels
+from vibemix.audio.registry import BufferRegistry
 
 __all__ = [
     "AI_TALK_THRESHOLD",
@@ -71,6 +73,11 @@ __all__ = [
     "SILENT_RMS",
     "TRACK_CHANGE_MIN_CONFIDENCE",
     "VOICE_BLOCKSIZE",
+    "AudioBuffer",
+    "BufferRegistry",
     "Levels",
+    "MicBuffer",
+    "PassthroughBuffer",
+    "PlaybackQueue",
     "SampleRateMismatchError",
 ]
