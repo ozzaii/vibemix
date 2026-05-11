@@ -43,7 +43,15 @@ from vibemix.audio.constants import (
     VOICE_BLOCKSIZE,
 )
 from vibemix.audio.errors import SampleRateMismatchError
+from vibemix.audio.features import (
+    energy_curve,
+    estimate_bpm,
+    long_arc_curve,
+    snapshot_features,
+    snapshot_wav,
+)
 from vibemix.audio.levels import Levels
+from vibemix.audio.recorder import VoiceRecorder
 from vibemix.audio.registry import BufferRegistry
 
 __all__ = [
@@ -80,4 +88,10 @@ __all__ = [
     "PassthroughBuffer",
     "PlaybackQueue",
     "SampleRateMismatchError",
+    "VoiceRecorder",
+    "energy_curve",
+    "estimate_bpm",
+    "long_arc_curve",
+    "snapshot_features",
+    "snapshot_wav",
 ]
