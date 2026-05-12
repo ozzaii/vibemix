@@ -210,7 +210,9 @@ function populateRow(row: HTMLElement, chunks: PhaseChunk[]): void {
     const div = document.createElement("div");
     div.className = "vmx-phase-chunk";
     div.dataset.kind = chunk.kind;
-    div.style.flex = String(Math.max(0.01, chunk.weight));
+    div.style.flexGrow = String(Math.max(0.01, chunk.weight));
+    div.style.flexShrink = "1";
+    div.style.flexBasis = "0";
     div.textContent = chunk.label;
     row.append(div);
   }
@@ -235,7 +237,7 @@ export function setPhaseTape(el: HTMLElement, props: PhaseTapeProps): void {
     const c = props.chunks[i];
     return c != null
       && seg.dataset.kind === c.kind
-      && seg.style.flex === String(Math.max(0.01, c.weight))
+      && seg.style.flexGrow === String(Math.max(0.01, c.weight))
       && seg.textContent === c.label;
   });
   if (!same) {
