@@ -64,3 +64,8 @@ recordings/
 # vibemix proxy (independent Python project under proxy/)
 proxy/.env
 proxy/.venv/
+
+# vibemix Tauri shell (Phase 11+ — Node project under tauri/ui/)
+tauri/ui/node_modules/
+tauri/ui/dist/
+tauri/ui/.vite/
