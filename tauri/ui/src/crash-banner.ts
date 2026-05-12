@@ -41,18 +41,18 @@ export function initCrashBanner(): void {
 
   listen<CrashPayload>("sidecar-crashed", (event) => {
     errLine.textContent = event.payload.last_error || "(no error line captured)";
-    banner.classList.add("visible");
+    banner.hidden = false;
   });
 
   listen<StatePayload>("sidecar-state", (event) => {
     if (event.payload.state === "running") {
-      banner.classList.remove("visible");
+      banner.hidden = true;
     }
   });
 
   restartBtn.addEventListener("click", async () => {
     restartBtn.disabled = true;
-    const originalLabel = restartBtn.textContent ?? "Restart";
+    const originalLabel = restartBtn.textContent ?? "[ Restart ]";
     restartBtn.textContent = "WORKING…";
     try {
       await invoke("restart_sidecar");
