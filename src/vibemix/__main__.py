@@ -94,10 +94,39 @@ load_dotenv()
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse CLI args. ``--version`` short-circuits via argparse's action."""
+    """Parse CLI args. ``--version`` short-circuits via argparse's action.
+
+    Phase 11 Wave 1 adds ``--wizard``: routes to a stub that exits cleanly
+    after logging "wizard mode not yet implemented" to stderr. Wave 4 fills
+    in the actual ``WizardLoop`` runtime; this wave only verifies the flag
+    plumbing so the PyInstaller-built ``vibemix-core`` binary can be spawned
+    by Tauri with ``--wizard`` and not crash.
+    """
     parser = argparse.ArgumentParser(prog="vibemix", description="Open-source AI DJ co-host.")
     parser.add_argument("--version", action="version", version=f"vibemix {__version__}")
+    parser.add_argument(
+        "--wizard",
+        action="store_true",
+        help="Run first-run calibration wizard (Phase 11 — Wave 4 fills the runtime).",
+    )
     return parser.parse_args(argv)
+
+
+# =============================================================================
+# Wizard stub (Phase 11 Wave 1) — Wave 4 replaces this with WizardLoop
+# =============================================================================
+
+
+async def _run_wizard_stub() -> None:
+    """Phase 11 Wave 1 placeholder for the calibration wizard runtime.
+
+    Wave 4 (Plan 11-05) replaces this with the real ``WizardLoop`` that emits
+    ``ipc.boot`` + ``ipc.status.tick`` + ``ipc.calibration.*`` messages on
+    the WS bus and drives the 3-step wizard UI. For now, this stub keeps the
+    ``--wizard`` flag wired so Wave 2 can build a Tauri shell that spawns
+    ``vibemix-core --wizard`` without the sidecar crashing.
+    """
+    print("[wizard] mode not yet implemented; Wave 4 fills this in", file=sys.stderr)
 
 
 # =============================================================================
@@ -442,10 +471,15 @@ async def main() -> None:
 
 def cli_entry(argv: list[str] | None = None) -> None:
     """Synchronous CLI entry. Parses args (``--version`` short-circuits via
-    argparse's ``action="version"``), then runs ``main()``."""
-    _parse_args(argv)
+    argparse's ``action="version"``), then runs ``main()`` — unless
+    ``--wizard`` is set, in which case the Phase 11 Wave 1 wizard stub runs
+    (Wave 4 replaces it with the real ``WizardLoop``)."""
+    args = _parse_args(argv)
     try:
-        asyncio.run(main())
+        if args.wizard:
+            asyncio.run(_run_wizard_stub())
+        else:
+            asyncio.run(main())
     except KeyboardInterrupt:
         pass
 

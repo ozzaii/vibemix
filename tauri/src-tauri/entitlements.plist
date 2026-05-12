@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  vibemix — macOS Hardened Runtime entitlements
+  Bundle ID: world.bravoh.vibemix (LOCKED — see 11-RESEARCH.md A8)
+
+  [VERIFIED: 11-RESEARCH.md §Phase 11 specific security checklist (lines 1415-1425)]
+  [VERIFIED: Apple Hardened Runtime docs — https://developer.apple.com/documentation/security/hardened_runtime]
+
+  Phase 11 Wave 1 — authored alongside the PyInstaller spec so the wave's
+  packaging story is complete in one place. Phase 18 codesigns the final
+  bundle WITH this entitlements file via:
+      codesign --force --options runtime --entitlements tauri/src-tauri/entitlements.plist ...
+
+  WHY each entitlement is required:
+
+  - audio-input + microphone: the wizard's Step 1 prompts mic permission;
+    the live session listens to BlackHole loopback + Kaan's mic for the
+    KAAN_SPOKE detector.
+  - allow-unsigned-executable-memory: PyInstaller bootloader runs C
+    extensions (scipy, numpy, sounddevice native libs) that allocate
+    executable memory pages outside the bundle's signed code segment.
+    Without this, Hardened Runtime kills the process on first audio frame.
+  - disable-library-validation: livekit-rtc + google-genai + sounddevice
+    dynamically load .dylib files from PyInstaller's onedir tree. Those
+    .dylibs are signed by their upstreams, not by Bravoh. Hardened Runtime
+    refuses to load them unless this entitlement is set. This is the
+    accepted PyInstaller-on-macOS pattern (Tauri docs §macOS distribution +
+    PyInstaller GH discussions).
+
+  WHAT IS DELIBERATELY NOT INCLUDED:
+
+  - allow-jit: we don't run a JIT. Python bytecode is interpreted; numpy /
+    scipy use AOT-compiled C — no JIT entitlement needed.
+  - allow-arbitrary-loads: we have a strict allowlist (Phase 5 proxy at
+    api.altidus.world + GitHub for autoupdate). Anything else is rejected
+    by the Tauri capability config in Wave 2.
+  - camera / address-book / location / get-task-allow: zero use cases.
+
+  THREAT MODEL (per 11-02-PLAN.md):
+  T-11-W1-03 (Spoofing — localhost binding): accepted; localhost
+  single-user. Codesigning with this entitlements list pins the bundle
+  identity so the OS can detect tampering.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Audio capture: BlackHole loopback (master) + Kaan's mic -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <key>com.apple.security.device.microphone</key>
+    <true/>
+
+    <!-- PyInstaller bootloader + C-ext native libs need writable+executable
+         memory pages outside the signed code segment. -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!-- LiveKit / Gemini / sounddevice load third-party .dylibs that are
+         signed by their upstreams but not by Bravoh's identity. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>
