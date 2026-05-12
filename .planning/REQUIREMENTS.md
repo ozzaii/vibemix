@@ -85,7 +85,7 @@
 
 ### UX — Calibration, Pickers, Session UI
 
-- [ ] **UX-01**: Calibration wizard on first run — 3-step fast path: permissions → output device + sample-rate test → controller detect + smoke test
+- [x] **UX-01**: Calibration wizard on first run — 3-step fast path: permissions → output device + sample-rate test → controller detect + smoke test
 - [ ] **UX-02**: Voice picker — male / female + named character (Gemini TTS 30 prebuilt voices, curated to ~6 in-app)
 - [ ] **UX-03**: Genre picker at session start — techno / house / D&B / disco / pop
 - [ ] **UX-04**: Mode picker — Beginner / Intermediate / Pro
