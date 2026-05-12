@@ -33,3 +33,26 @@ Plan 13-04 / 13-06 lands the real wiring.
    under a dedicated chore commit; or
 2. Comment out / dynamic-skip the `main.ts:104` mock-router branch behind a
    build-time flag until the real session UI lands.
+
+---
+
+### tests/agent/test_persona.py::test_persona_02_byte_identical_to_v4
+
+**Discovered during:** test sweep after Plan 13-05 Task 3 changes.
+
+**Symptom:** `FileNotFoundError: [Errno 2] No such file or directory: 'cohost_v4.py'`
+
+**Root cause:** `tests/agent/conftest.py::v4_persona_string()` reads
+`cohost_v4.py` from CWD (the project root). The file is untracked in the
+main repo (`?? cohost_v4.py` in git status at spawn time) — and therefore
+missing in the worktree, where untracked files are not propagated.
+
+**Pre-existing:** YES. Independent of Plan 13-05 changes.
+
+**Suggested fix path:**
+1. Track `cohost_v4.py` in the repo (it's the canonical baseline per
+   CLAUDE.md "POC = Reference, Devour It"), OR
+2. Update the test to skip gracefully when `cohost_v4.py` is absent (the
+   byte-identical check is a load-bearing invariant when run in the main
+   repo, but worktree runs are routine).
+
