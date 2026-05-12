@@ -1,0 +1,4 @@
+/* Cylindrical microphone glyph for the Microphone permission card. The
+ * cylinder + stand + base mirror a hardware capsule mic — not the rounded
+ * "voice memo" cartoon shape seen in default UI kits. UI-SPEC §6. */
+export const MICROPHONE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/><path d="M8.5 21h7"/></svg>`;
