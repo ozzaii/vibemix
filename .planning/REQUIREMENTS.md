@@ -10,7 +10,7 @@
 
 ### Architecture & AI Pipeline
 
-- [ ] **ARCH-01**: Consolidate three POC variants (`cohost.py` / `cohost_v2.py` / `cohost_lk.py`) into a single shipping `vibemix` Python package
+- [x] **ARCH-01**: Consolidate three POC variants (`cohost.py` / `cohost_v2.py` / `cohost_lk.py`) into a single shipping `vibemix` Python package
 - [ ] **ARCH-02**: `platform/` protocol firewall — no OS-specific imports leak past the abstraction boundary
 - [ ] **ARCH-03**: LiveKit `AgentSession` cascade pipeline (`stt=None`, `vad=None`, `llm=google.LLM(...)`, `tts=google.beta.gemini_tts.TTS(...)`) replacing the POC's `RealtimeModel` path
 - [ ] **ARCH-04**: `DJCoHostAgent(Agent)` with `llm_node()` override using Gemini 3 Flash multimodal (audio bytes + screen JPEG + history)
@@ -95,7 +95,7 @@
 - [ ] **UX-08**: Live session UI — meters, phase tape, AI transcript, drop countdown, MIDI event ribbon (per the `mocks/vibemix-app-ui.html` design contract)
 - [ ] **UX-09**: Settings panel — change voice / mode / genre / output mid-session (some settings require restart)
 - [ ] **UX-10**: Settings — recording retention policy (default 7d, configurable)
-- [ ] **UX-11**: Status badges — LiveKit ok / Gemini ok / MIDI ok / screen ok (visible failure indicators)
+- [x] **UX-11**: Status badges — LiveKit ok / Gemini ok / MIDI ok / screen ok (visible failure indicators)
 
 ### Reactive Mascot (Avery)
 
@@ -113,7 +113,7 @@
 - [ ] **DIST-02**: macOS signed + notarized DMG via Apple Developer ID + `notarytool` + Hardened Runtime + entitlements
 - [ ] **DIST-03**: Windows OV-signed MSI via SignPath Foundation (free OSS cert) + Inno Setup 6
 - [ ] **DIST-04**: SignPath Foundation OSS application filed on day 1 of Phase 1 (3-week lead time)
-- [ ] **DIST-05**: Tauri 2.x desktop shell wrapping the Python sidecar (10× smaller than Electron)
+- [x] **DIST-05**: Tauri 2.x desktop shell wrapping the Python sidecar (10× smaller than Electron)
 - [ ] **DIST-06**: Auto-update via Tauri updater (signed manifest, opt-out in settings)
 - [ ] **DIST-07**: Fresh-machine install tested on non-dev macOS + Windows before each release
 - [ ] **DIST-08**: GitHub Actions CI matrix (macos-14 + windows-latest) building signed binaries on tag push

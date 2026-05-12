@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v0.1.0
 milestone_name: milestone
-status: executing
-last_updated: "2026-05-11T20:03:38.326Z"
+status: completed
+last_updated: "2026-05-12T09:04:03.721Z"
 progress:
   total_phases: 20
-  completed_phases: 3
-  total_plans: 33
-  completed_plans: 18
-  percent: 55
+  completed_phases: 6
+  total_plans: 43
+  completed_plans: 26
+  percent: 60
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-12 (Phase 10 ✅ complete)
+**Last updated:** 2026-05-12 (Phase 11 Wave 0 ✅ complete — IPC schema gate)
 
 ---
 
@@ -32,18 +32,18 @@ progress:
 
 ## Current Position
 
-Phase 10 ✅ complete — Prompt Template Matrix shipped: `vibemix.prompts/` package with 6-cell matrix (skill × mode), 40-phrase negative dictionary + post-hoc filter, TurnHistory ring (capacity 12), `<silence/>` short-circuit suppressing TTS turns, Coach scorecard with qualitative bands. `dj_cohost.py` env var dispatch (VIBEMIX_SKILL_LEVEL / VIBEMIX_MODE). 978 tests green; 5/5 ROADMAP success criteria PASS structurally; Phase 16+17 own live verification.
+Phase 11 Wave 0 ✅ complete — IPC schema source-of-truth + dual-language validation gate. `tauri/ui/src/ipc/messages.schema.json` (Draft-07, 19 ipc.* messages, closed payloads) is the single source-of-truth; `src/vibemix/ui_bus/` mirrors it with 19 frozen `@dataclass(slots=True)` wrappers + jsonschema runtime guard (no pydantic per Phase 6 / D-Area-4.4). `tauri/ui/` Node scaffold (vite + vitest + ajv + json-schema-to-typescript + @tauri-apps plugins) wires the TS side; `scripts/check_ipc_schema.py` (per-dataclass roundtrip + oneOf/wrapper count parity) and `npm run check:ipc` (codegen + tsc --noEmit) are the dual CI gates. 1013 tests green (978 baseline + 35 new ui_bus tests) + 13 vitest cases.
 
-Phase: 11 (Tauri Shell + Calibration Wizard) — NEXT
-Plan: None yet — LARGEST remaining phase (Tauri Rust + Python sidecar + IPC + 3-step wizard UI).
+Phase: 11 (Tauri Shell + Calibration Wizard) — IN PROGRESS
+Plan: 11-01 (Wave 0) ✅ complete; Waves 1-4 next.
 
 - **Phase:** 11 — Tauri 2.x shell wraps Python sidecar (PyInstaller --onedir) + 3-step calibration wizard.
-- **Plan:** None active.
-- **Status:** Phase 10 closed; Phase 11 not yet started.
-- **Progress:** 10/20 phases complete (50%).
+- **Plan:** 11-01 closed; Waves 1-4 (sidecar packaging, Tauri Rust shell, wizard UI, WizardLoop handler) queued.
+- **Status:** Phase 11 Wave 0 (IPC schema gate) complete; Waves 1-4 next.
+- **Progress:** [██████░░░░] 60%
 
 ```
-[██████████          ] 50% (10/20 phases)
+[██████████          ] 50% (10/20 phases — Phase 11 in progress)
 ```
 
 ---
@@ -56,7 +56,7 @@ Plan: None yet — LARGEST remaining phase (Tauri Rust + Python sidecar + IPC + 
 |--------|-------|
 | Phases complete | 10 / 20 |
 | v1 requirements mapped | 128 / 128 |
-| v1 requirements complete | 22 / 128 |
+| v1 requirements complete | 25 / 128 |
 | Critical pitfalls mitigated | 0 / 9 |
 | High-severity pitfalls mitigated | 0 / 7 |
 | Hallucination verification (≥95% grounded) | Not yet measured |
@@ -97,6 +97,11 @@ Plan: None yet — LARGEST remaining phase (Tauri Rust + Python sidecar + IPC + 
 - **Phase 6 — BPM validator**: half→double order, zero/negative short-circuit. Out-of-range pass-through (downstream `BPM_VALID_MIN/MAX` filter handles it).
 - **Phase 6 — VocalDetector**: 2-of-3 heuristic rules + 1.5s in / 2.5s out hysteresis. Profile parameter accepted but unused in v1 — reserved for future per-genre threshold tuning.
 - **Phase 6 — EventDetector LAYER_ARRIVAL gated on `not state.vocal_active`**; other 5 event types byte-identical to v4. Baseline `last_band_signature` still updates inside gated branch so post-vocal jumps don't false-fire.
+- **Phase 11 W0 — IPC namespace = `ipc.*` over the existing ws_bus on 127.0.0.1:8765** (D-Area-1.1) — no separate port, no new transport. Tauri shell connects as a WS client.
+- **Phase 11 W0 — Single JSON Schema source-of-truth at `tauri/ui/src/ipc/messages.schema.json`** (D-Area-1.3) — Python and TS both validate against the same file. Codegen output is committed alongside; CI regenerates and diffs.
+- **Phase 11 W0 — No pydantic in `src/vibemix/ui_bus/`** (D-Area-4.4 / Phase 6 carry-over) — hand-written `@dataclass(frozen=True, slots=True)` + `jsonschema.Draft7Validator`. Enforced by per-package import grep test.
+- **Phase 11 W0 — Wrapper-dataclass count == schema `oneOf` count == 19** — the load-bearing drift detector in `scripts/check_ipc_schema.py`. Wrapper detection via `__dataclass_fields__` introspection (any dataclass with a `type` field).
+- **Phase 11 W0 — Codegen wrapped through `tauri/ui/scripts/codegen-ipc.mjs`** rather than the json2ts CLI (CLI lacks `--bannerComment`). The AUTO-GENERATED banner on line 1 of `messages.ts` is part of the drift contract.
 
 ### Open To-dos
 
@@ -131,12 +136,13 @@ None yet — all dependencies are pinned and verified.
 - 2026-05-11 — Phase 6 (Genre-Aware Phase Detection) shipped end-to-end: 4 wave commits (`11d358a` genre profile system + 5 JSON profiles + active-profile singleton + hand-written schema validator, `1c4e264` crest factor + EMA smoother + BPM half/double validator + VocalDetector with 1.5s/2.5s hysteresis, `01ff963` percentile phase detector + MusicState +4 fields + state_refresh_loop wiring + Phase 3 golden equivalence pinned, `84b6978` EventDetector LAYER_ARRIVAL vocal gate + VIBEMIX_GENRE_PROFILE env + vibemix.state re-exports) + final docs commit closing the phase. 531 tests green (385 Phase 5 baseline + 146 new). All 10 acceptance gates PASS. 5 hand-tuned genre profile JSONs (techno / house / drum_and_bass / disco / pop) ship in the wheel via hatchling default package-data inclusion (verified via `uv build --wheel` + `unzip -l`). Phase 3 golden equivalence pinned across 10 parametric curves — `classify_phase(curve, audible, profile=None)` returns the SAME string as the original v4 body for the SAME inputs. MusicState gains 4 new fields (`crest_factor`, `vocal_active`, `bpm_corrected`, `genre_profile_name`) with backward-compat defaults — Phase 3's `test_music_state.py` passes unchanged. Hysteresis state in `state_refresh_loop` local scope, NOT MusicState (Critical Constraint 7). LAYER_ARRIVAL gate is the ONLY EventDetector change — other 5 event types byte-identical to v4. POC files diff-untouched (`cohost_v4.py` + `run_v4.sh` continue to function unchanged throughout the entire phase). SENSE-10's 30-min per-genre validation harness deferred to Phase 16 per CONTEXT out-of-scope clause. Open To-do: collect 30-min recorded sets per genre — can begin now in parallel with Phase 7.
 - 2026-05-11 — Phase 5 (FastAPI Proxy + Install-UUID JWT) shipped end-to-end: 5 wave commits (`c04b403` proxy scaffold — FastAPI app + healthz + pydantic-settings + Redis quota helper + Dockerfile + compose, `1549130` JWT auth HS256-only with alg=none blocked + /register IP-keyed + slowapi limiter wiring, `ba8a013` LLM SSE + TTS PCM routes — Gemini-native paths verified vs SDK URL builder + circuit breaker + upstream-secret sanitization with zero-AIza leakage test, `3a3bc4c` client install_uuid + JWT cache + factory mode dispatch with NO silent fallback, + final docs commit). 385 vibemix tests green (346 baseline + 39 client-side) + 79 proxy tests green. All 8 acceptance gates PASS — G3 (zero AIza in src/vibemix/) and G6 (alg=none blocked) are the phase-level invariants. `proxy/` is an independent Python project with own pyproject.toml + uv.lock + .venv. Routes mirror genai SDK URL shape (`/v1beta/models/{model}:streamGenerateContent` + sibling + `/v1/audio/speech` OpenAI-compat); CONTEXT's `/api/vibemix/v1/llm/generate` superseded by RESEARCH Q1. JWT TTL 90 days (locked); ROADMAP's `15-30 min` reconciled. slowapi via @limiter.limit() decorator NOT SlowAPIMiddleware (RESEARCH Q2). google_plugin.LLM accepts http_options directly (verified at livekit/plugins/google/llm.py:117). Client-side install_uuid keyring + file fallback handles Pitfall 6 (null backend detection). NO silent fallback proxy → direct — setup failures sys.exit non-zero. POC files diff-untouched against Phase 4 close. Deployment runbook in proxy/README.md covers Docker + nginx + PM2 + Pitfalls 2/4/6; actual deployment to api.altidus.world pending Kaan's operational schedule (does NOT block phase close).
 - 2026-05-11 — Phase 4 (LiveKit Cascade Agent Pivot) shipped end-to-end: 4 wave commits (`28f5f09` agent persona + config + LLM factory + TTS chain with OpenRouter monkey-patch, `1fa021a` DJCoHostAgent llm_node override + PlaybackQueueAudioOutput sink, `2b7ea9b` runtime loops — coach event pump + diag meter + WS mascot bus, `ede9e59` __main__ orchestrator + CI integration smoke). 346 tests green (270 from Phase 3 + 76 new across agent/runtime/smoke). All 12 acceptance gates PASS. SYSTEM_INSTRUCTION byte-identical to v4:150-213. OpenRouter monkey-patch active at module load (TTS-01 pins invariant). DJCoHostAgent.llm_node bypasses LiveKit's text-only cascade and calls `google.genai.aio.models.generate_content_stream` directly with last 18s of audio attached as multimodal Part. Single-modality `screen_jpeg = None` preserved (v4:1502-1503 anti-hallucination). Per-invocation dump folder structure preserved verbatim for live-debug parity. Twin AudioBuffer instances in main() (140s state + INVOKE_AUDIO_SECONDS+5.0 clean). session.output.audio assigned BEFORE session.start (v4:2030-2033 invariant). _HAS_WS feature flag dropped (Phase 2 anti-pattern fix). WS_HOST/WS_PORT centralized in vibemix.audio.constants. Integration smoke test runs in CI without devices via mocked AudioMacOS + LiveKit + Gemini. ARCH-06 re-mapped — cascade runs headless (no Room) per v4:2031, no bundled livekit-server binary needed; documented in 04-SUMMARY.md Deviations. POC files untouched throughout (v4 still runnable via run_v4.sh).
+- 2026-05-12 — Phase 11 Wave 0 (IPC schema source-of-truth + dual-language validation gate) shipped end-to-end: 2 task commits (`4f1d879` feat — messages.schema.json (Draft-07, 19 ipc.* messages, closed payloads, $id `vibemix.ipc.messages`) + `src/vibemix/ui_bus/` Python package (19 frozen `@dataclass(slots=True)` wrappers + 19 payload structs + 2 array-element structs + `parse_message`/`validate_message` runtime guards, no pydantic per Phase 6 / D-Area-4.4) + `tests/ui_bus/` (35 tests: parametrized roundtrip × 19 + status_tick edge cases × 12 + 4 sentinels — count match, schema valid, oneOf=19, no-pydantic-grep); `11f3eb7` chore — `tauri/ui/` Node scaffold (package.json + tsconfig.json + vitest.config.ts pinned at major.minor for vite ^6 / vitest ^2 / ajv ^8 / ajv-formats ^3 / json-schema-to-typescript ^15 / typescript ^5.7 / @tauri-apps/api ^2.11 / @tauri-apps/plugin-shell ^2.3 / @tauri-apps/plugin-store ^2.4) + `tauri/ui/scripts/codegen-ipc.mjs` (programmatic json2ts wrapper with AUTO-GENERATED banner; CLI lacks --bannerComment) + `tauri/ui/src/ipc/validator.ts` (compile-once ajv with ajv-formats, parseIpcMessage + isIpcMessage) + `tauri/ui/src/ipc/messages.ts` (codegen output committed alongside schema; discriminated union `VibemixIPCMessages`) + `tauri/ui/src/ipc/validator.spec.ts` (13 vitest cases mirroring Python status_tick asserts) + `scripts/check_ipc_schema.py` (per-dataclass roundtrip + load-bearing count-parity assertion: oneOf entries vs `__dataclass_fields__["type"]` wrapper count)). 1013 tests green (978 baseline + 35 new ui_bus) + 13 vitest. Both CI gates run in <10s: `npm run check:ipc` (codegen + tsc --noEmit) catches schema-vs-codegen drift; `python scripts/check_ipc_schema.py` catches schema-vs-wrapper drift. Three auto-fixes documented: (1) json2ts CLI binary name `json2ts` not `json-schema-to-typescript`, and CLI lacks --bannerComment — wrote programmatic wrapper [Rule 3]; (2) dataclasses.asdict preserves tuples but jsonschema's Draft-07 type checker rejects tuples for type:array — added recursive `_tuples_to_lists` in `_serialize` [Rule 1]; (3) json2ts PascalCases `$id` to `VibemixIPCMessages` (not `VibemixIpcMessages`) — updated validator.ts import [Rule 1]. POC files untouched. T-11-W0-01 / T-11-W0-04 (Tampering + DoS via malformed inbound frame) mitigated.
 
 ### Next Session
 
-- Continue from Phase 11 (Tauri Shell + Calibration Wizard) — LARGEST remaining phase: Tauri 2.x Rust shell wraps Python sidecar (PyInstaller --onedir) + IPC contract + 3-step calibration wizard (permissions → output device + sample-rate test → controller probe). Multi-session work likely.
+- Continue with Phase 11 Waves 1-4 — Wave 1: PyInstaller `--onedir` sidecar packaging (consumes `ipc.boot` envelope shape). Wave 2: Tauri Rust shell + `externalBin` spawning (reads `ipc.status.tick` over the existing ws_bus on 127.0.0.1:8765). Wave 3: wizard UI components in `tauri/ui/src/wizard/` (lifts mocks/vibemix-app-ui.html tokens per UI-SPEC; charcoal/amber/DSEG7/WORKBENCH/grain). Wave 4: WizardLoop sidecar handler — calls `vibemix.ui_bus.validator.parse_message` on every inbound frame, emits `StatusTick.make(...).to_json()` outbound.
 - Kaan-side outstanding: SignPath OSS application (Phase 1 carry-forward, ~1 week SLA). Optional live smoke verification of `python -m vibemix` vs `./run_v4.sh` on his rig. **Phase 5 carry-over**: deploy `proxy/` to `api.altidus.world` when ready. **Phase 6 + 7 carry-over**: collect 30-min recorded sets per genre (techno / house / D&B / disco / pop) for Phase 16; arrange Windows test access for Phase 20 fresh-machine rehearsal. **Phase 7 deferred items** (in `.planning/phases/07-windows-port-audio-screen/deferred-items.md`): test_audio_macos_live HEADPHONEMG env mismatch (broaden substring or mark macos_audio opt-in) + ruff I001 in test_midi_common.py (one-line `ruff check --fix`).
 
 ---
 
-*State managed by gsd-roadmapper at 2026-05-11; updated by /gsd-autonomous on 2026-05-11 (Phase 7 complete).*
+*State managed by gsd-roadmapper at 2026-05-11; updated by /gsd-execute-phase on 2026-05-12 (Phase 11 Wave 0 complete).*
