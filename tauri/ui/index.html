@@ -5,90 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>vibemix</title>
     <!--
-      Phase 11 Wave 2 — intentionally bare visual surface.
+      Phase 11 Wave 3 — wizard UI surfaces.
 
-      Wave 3 lifts the UI-SPEC token system from `mocks/vibemix-app-ui.html`
-      (anodised charcoal + phosphor amber + DSEG7 + Workbench + film grain).
-      This file ships only the crash banner + placeholder so the wave's
-      ship-bar — "tauri dev launches, watchdog works, banner appears on
-      4th kill" — is provable end-to-end without dragging the wizard styling
-      forward.
+      Token system lifted verbatim from .planning/phases/11-tauri-shell-calibration-wizard/11-UI-SPEC.md
+      via tokens.css. 11 components + 5 step modules render the 3-step
+      calibration wizard with the anodised charcoal + phosphor amber
+      retro-futurist-hardware aesthetic from mocks/vibemix-app-ui.html.
 
-      Anti-pattern guard (per plan): no tokens.css, no Workbench font, no
-      mascot corner, no step indicator. Wave 3 owns those.
+      Wave 4 wires the ipc.* requests + replaces window.__vibemixDev mocks
+      with real device probes / MIDI listens.
     -->
-    <style>
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        background: #0a0b0e;
-        color: #c8cdd6;
-        font-family: system-ui, sans-serif; /* Wave 3 replaces with Workbench */
-      }
-      #wave2-placeholder {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        font-size: 14px;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        opacity: 0.6;
-      }
-      #crash-banner {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        padding: 16px 24px;
-        background: linear-gradient(180deg, #25181c, #1a1014);
-        border-top: 1px solid #ff3553;
-        border-bottom: 1px solid #ff3553;
-        z-index: 9000;
-      }
-      #crash-banner.visible {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-      }
-      #crash-banner .icon {
-        color: #ff3553;
-        font-size: 24px;
-      }
-      #crash-banner .heading {
-        font-size: 11px;
-        letter-spacing: 0.22em;
-        text-transform: uppercase;
-      }
-      #crash-banner .body {
-        font-size: 11px;
-        opacity: 0.7;
-        flex: 1;
-      }
-      #crash-banner button {
-        padding: 8px 16px;
-        background: transparent;
-        border: 1px solid #ffa12e;
-        color: #ffa12e;
-        font-size: 11px;
-        letter-spacing: 0.22em;
-        text-transform: uppercase;
-        cursor: pointer;
-      }
-    </style>
+    <link rel="stylesheet" href="/src/tokens.css" />
   </head>
   <body>
-    <div id="wave2-placeholder">wizard ui arrives in wave 3</div>
-    <div id="crash-banner">
-      <span class="icon">⚠</span>
-      <div>
-        <div class="heading">vibemix-core stopped</div>
-        <div class="body" id="crash-error-line"></div>
+    <div id="wizard-app" class="wizard-app">
+      <header class="titlebar">
+        <div class="traffic-spacer" aria-hidden="true"></div>
+        <div class="wordmark">vibemix</div>
+        <div class="clock" id="wizard-clock" aria-hidden="true">00:00</div>
+      </header>
+      <main class="wizard-content">
+        <div id="wizard-step-strip"></div>
+        <div class="wizard-grid">
+          <section id="wizard-primary" class="primary-panel-mount"></section>
+          <aside id="mascot-corner"></aside>
+        </div>
+        <div id="wizard-cta-row" class="cta-row"></div>
+      </main>
+      <footer id="status-bar" class="status-bar"></footer>
+      <div id="crash-banner" hidden>
+        <span class="icon" aria-hidden="true">⚠</span>
+        <div class="crash-text">
+          <div class="heading">VIBEMIX-CORE STOPPED</div>
+          <div class="body" id="crash-error-line"></div>
+        </div>
+        <button id="crash-restart" type="button">[ Restart ]</button>
       </div>
-      <button id="crash-restart">Restart</button>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

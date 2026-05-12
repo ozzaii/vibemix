@@ -1,0 +1,365 @@
+/* tokens.css — design system source-of-truth.
+ *
+ * Lifted VERBATIM from .planning/phases/11-tauri-shell-calibration-wizard/11-UI-SPEC.md
+ * §Color / §Spacing / §Typography / §Grid / §Atmospheric Layers.
+ *
+ * DO NOT diverge from UI-SPEC. The visual handoff to Phase 12 (live session UI)
+ * depends on these tokens being stable — every subsequent UI phase consumes
+ * this file. The mock at mocks/vibemix-app-ui.html is the source for Phase 12;
+ * tokens here must stay 1:1 with that mock's :root{} block.
+ *
+ * Anti-pattern guard: components MUST NOT declare hex colors. They read
+ * var(--token) exclusively. Only this file is allowed to contain `#xxxxxx`.
+ */
+
+/* === Font face declarations ============================================ */
+/* All five fonts vendored locally per UI-SPEC §Asset Pipeline — no
+ * CDN fetch at runtime. SHA-256 of every WOFF2 is recorded in
+ * tauri/ui/LICENSE-3RD-PARTY.md so Phase 18 codesigning can attest.
+ *
+ * font-display: swap on every face per §Asset Pipeline — avoids FOIT
+ * during cold-start. */
+
+@font-face {
+  font-family: "Workbench";
+  src: url("/fonts/Workbench-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DM Mono";
+  src: url("/fonts/DMMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DM Mono";
+  src: url("/fonts/DMMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DSEG7";
+  src: url("/fonts/DSEG7Classic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  /* RESERVED for Phase 12 stickers — UI-SPEC §Typography forbids
+   * Caveat in any Phase 11 wizard surface. Bundled here so the file
+   * is on disk when Phase 12 needs it. */
+  font-family: "Caveat";
+  src: url("/fonts/Caveat-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* === Design tokens (UI-SPEC verbatim) ================================== */
+:root {
+  /* --- Charcoal family (80% dominant) — UI-SPEC §Color --- */
+  --bg: #0a0b0e;
+  --panel: #15181e;
+  --panel-lift: #1d2128;
+  --panel-deep: #0a0b0e;
+  --groove: #07080a;
+  --bezel-1: #1a1e25;
+  --bezel-2: #2a2f38;
+  --bezel-3: #3a4150;
+  --brushed-hi: rgba(255, 255, 255, 0.04);
+  --brushed-lo: rgba(0, 0, 0, 0.5);
+
+  /* --- Ink (text on charcoal) --- */
+  --ink: #c8cdd6;
+  --ink-dim: #6b7280;
+  --ink-deep: #3d424c;
+  --ink-engraved: #1f242c;
+
+  /* --- Phosphor amber (20% accent — ONE colour does ALL the lifting) --- */
+  --phosphor: #ffa12e;
+  --phosphor-warm: #ff8a1a;
+  --phosphor-dim: #6e4815;
+  --phosphor-soft: rgba(255, 161, 46, 0.18);
+  --phosphor-glow: 0 0 14px rgba(255, 161, 46, 0.5);
+  --phosphor-halo: 0 0 36px rgba(255, 161, 46, 0.22);
+
+  /* --- Status-only dots (NEVER panel fills) --- */
+  --rec: #ff3553;
+  --cue: #4dc4ff; /* Reserved — UI-SPEC §Color forbids use in Phase 11 */
+  --ok: #5dcf7c;
+
+  /* --- Crash banner background tint (UI-SPEC §13) --- */
+  --crash-grad-top: #25181c;
+  --crash-grad-bottom: #1a1014;
+
+  /* --- Spacing scale (UI-SPEC §Spacing — 8-point grid) --- */
+  --sp-xs: 4px;
+  --sp-sm: 8px;
+  --sp-md: 16px;
+  --sp-lg: 24px;
+  --sp-xl: 32px;
+  --sp-2xl: 48px;
+  --sp-3xl: 64px;
+
+  /* --- Layout & Grid (UI-SPEC §Grid Tokens) --- */
+  --container-max: 896px;
+  --col-primary: 560px;
+  --col-mascot: 256px;
+  --gap-col: 32px;
+  --titlebar-h: 56px;
+  --stepstrip-h: 64px;
+  --statusbar-h: 40px;
+  --cta-margin-bottom: 24px;
+
+  /* --- Motion Budget (UI-SPEC §Motion Budget) --- */
+  --motion-snap: 150ms;          /* button state transitions */
+  --motion-transition: 200ms;    /* step strip node fill, BlackHole banner */
+  --motion-step: 250ms;          /* step transition (CAP — never longer) */
+  --motion-led-pulse: 1400ms;    /* active step + listening LEDs */
+  --motion-rings-audio: 1500ms;  /* matches sine duration */
+  --motion-rings-listen: 2000ms; /* slower, ambient — controller probe */
+  --motion-dseg-tick: 1000ms;    /* DSEG7 countdown tick */
+}
+
+/* === Reset that respects retro hardware ================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "DM Mono", monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  /* Body radial gradients (UI-SPEC §Backgrounds & Atmospheric Layers) */
+  background:
+    radial-gradient(1200px 800px at 50% -10%, #14171c 0%, transparent 60%),
+    radial-gradient(900px 600px at 90% 110%, #1a1e25 0%, transparent 50%),
+    var(--bg);
+}
+
+/* Global film grain — atmospheric SVG noise, mix-blend overlay.
+ * UI-SPEC §Atmospheric Layers — MUST be present on every wizard screen. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .35 0'/></filter><rect width='200' height='200' filter='url(%23n)' opacity='.6'/></svg>");
+  mix-blend-mode: overlay;
+  opacity: 0.06;
+}
+
+/* Faint scanline overlay — vintage CRT/LCD feel.
+ * UI-SPEC §Atmospheric Layers — also mandatory on every screen. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2px,
+    rgba(0, 0, 0, 0.18) 2px,
+    rgba(0, 0, 0, 0.18) 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.4;
+}
+
+/* Default focus ring (UI-SPEC §Focus Order) — phosphor, with halo on visible */
+*:focus {
+  outline: none;
+}
+*:focus-visible {
+  outline: 2px solid var(--phosphor);
+  outline-offset: 2px;
+  box-shadow: var(--phosphor-glow);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+}
+
+button[disabled] {
+  cursor: not-allowed;
+}
+
+/* === Wizard frame layout (UI-SPEC §Layout & Grid) ====================== */
+.wizard-app {
+  display: grid;
+  grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
+  height: 100vh;
+  position: relative;
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-lg);
+  background: linear-gradient(180deg, #1a1e25 0%, #14171c 50%, var(--panel) 100%);
+  border-bottom: 1px solid var(--bezel-1);
+  -webkit-app-region: drag; /* Tauri custom titlebar drag region */
+  user-select: none;
+}
+
+.titlebar .wordmark {
+  font-family: "Workbench", "Courier New", monospace;
+  font-size: 28px;
+  letter-spacing: 0.04em;
+  color: var(--phosphor);
+  text-shadow: var(--phosphor-glow);
+  line-height: 1;
+}
+
+.titlebar .traffic-spacer {
+  /* macOS native traffic-light buttons render here when decorations:false */
+  width: 72px;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar .clock {
+  font-family: "DSEG7", "DM Mono", monospace;
+  font-size: 14px;
+  color: var(--ink-dim);
+  letter-spacing: 0.06em;
+}
+
+.wizard-content {
+  display: grid;
+  grid-template-rows: var(--stepstrip-h) 1fr auto;
+  padding: 0 var(--sp-xl) var(--cta-margin-bottom);
+  overflow: hidden;
+}
+
+.wizard-grid {
+  display: grid;
+  grid-template-columns: var(--col-primary) var(--col-mascot);
+  gap: var(--gap-col);
+  align-items: start;
+  padding-top: var(--sp-lg);
+  overflow: hidden;
+}
+
+.cta-row {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--sp-md);
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-lg);
+  background: linear-gradient(180deg, var(--panel) 0%, #0e1014 100%);
+  border-top: 1px solid var(--bezel-1);
+}
+
+/* === Crash banner (UI-SPEC §13) ======================================== */
+/* Displaces the step indicator strip when sidecar dies. Faintly --rec-tinted
+ * but stays in the charcoal family — never a panel of solid red. */
+#crash-banner[hidden] {
+  display: none !important;
+}
+#crash-banner {
+  position: absolute;
+  top: var(--titlebar-h);
+  left: 0;
+  right: 0;
+  z-index: 8000;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  padding: var(--sp-md) var(--sp-lg);
+  background: linear-gradient(180deg, var(--crash-grad-top), var(--crash-grad-bottom));
+  border-top: 1px solid var(--rec);
+  border-bottom: 1px solid var(--rec);
+  animation: crash-enter var(--motion-snap) ease-out;
+}
+#crash-banner .icon {
+  color: var(--rec);
+  font-size: 24px;
+  line-height: 1;
+}
+#crash-banner .crash-text {
+  flex: 1;
+  min-width: 0;
+}
+#crash-banner .heading {
+  font-family: "Workbench", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+#crash-banner .body {
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#crash-banner button#crash-restart {
+  font-family: "Workbench", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 12px 24px;
+  border: 1px solid var(--phosphor-dim);
+  border-radius: 4px;
+  color: var(--phosphor);
+  background: linear-gradient(180deg, var(--panel-lift), var(--panel));
+  box-shadow: var(--phosphor-glow);
+  cursor: pointer;
+  min-width: 144px;
+}
+#crash-banner button#crash-restart:hover {
+  border-color: var(--phosphor);
+  background: linear-gradient(180deg, #25292f, var(--panel-lift));
+}
+
+@keyframes crash-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
