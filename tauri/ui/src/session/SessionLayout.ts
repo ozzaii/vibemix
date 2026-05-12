@@ -89,7 +89,7 @@ export interface SessionState {
   };
 }
 
-interface Mounted {
+export interface Mounted {
   root: HTMLElement;
   titlebar: HTMLElement;
   meters: {
@@ -105,6 +105,10 @@ interface Mounted {
   statusBar: HTMLElement;
   bannerSlot: HTMLElement;
   current: SessionState;
+  /** Sticky-bottom flag for the transcript. Toggled by a scroll
+   *  listener wired during mount — true means new lines auto-scroll;
+   *  false means the user has scrolled up and we preserve position. */
+  userScrolledUp: boolean;
 }
 
 const LAYOUT_CSS = `
@@ -281,7 +285,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   setMeterLevels(meterVoice, state.meters.voice);
   setMeterLevels(meterMic, state.meters.mic);
 
-  return {
+  const mounted: Mounted = {
     root,
     titlebar,
     meters: { music: meterMusic, voice: meterVoice, mic: meterMic },
@@ -293,8 +297,43 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
     statusBar,
     bannerSlot,
     current: state,
+    userScrolledUp: false,
   };
+
+  // Wire transcript scroll listener — UI-SPEC §sticky-bottom: a user
+  // who scrolls more than `SCROLL_THRESHOLD_PX` from the bottom flips
+  // userScrolledUp=true and we stop auto-scrolling. Scrolling back into
+  // the bottom band resets the flag. The hot-path render path reads
+  // `mounted.userScrolledUp` to decide whether to call `setCohost`
+  // (which respects `data-sticky`).
+  const transcriptEl =
+    cohost.querySelector<HTMLElement>(".vmx-cohost__transcript");
+  if (transcriptEl) {
+    transcriptEl.addEventListener(
+      "scroll",
+      () => {
+        const distFromBottom =
+          transcriptEl.scrollHeight -
+          (transcriptEl.scrollTop + transcriptEl.clientHeight);
+        const isUp = distFromBottom > SCROLL_THRESHOLD_PX;
+        if (isUp !== mounted.userScrolledUp) {
+          mounted.userScrolledUp = isUp;
+          // Mirror the flag onto the data-sticky attr that cohost.setCohost
+          // reads. true=auto-scroll on next render, false=preserve position.
+          transcriptEl.dataset.sticky = isUp ? "false" : "true";
+        }
+      },
+      { passive: true },
+    );
+  }
+
+  return mounted;
 }
+
+/** Distance from the bottom (in px) below which the transcript stays
+ *  "sticky" — auto-scroll on new lines. Above the threshold the user
+ *  has scrolled up; preserve position. Plan §1 — 40px. */
+const SCROLL_THRESHOLD_PX = 40;
 
 function buildPersonaPanelBody(state: SessionState): HTMLElement {
   const wrap = document.createElement("div");
@@ -396,8 +435,40 @@ function buildOutputPanelBody(state: SessionState): HTMLElement {
 }
 
 /** Idempotent hot-update. Walks the diff between mounted.current and the
- *  new state, applying minimal mutations. */
+ *  new state, applying minimal mutations. Hot paths poke CSS custom
+ *  properties on the root element — components read them via var() so
+ *  the browser composites without recomputing layout. Transcript /
+ *  event-ribbon / phase-tape only rebuild when their array refs change. */
 export function renderSessionFrame(mounted: Mounted, next: SessionState): void {
+  // === Hot path (every frame) — CSS variable pokes on the root =============
+  // These are the only writes that happen at 30Hz. var() reads in the
+  // component stylesheets cascade them into the relevant nodes without
+  // any innerHTML / className thrash.
+  const rootStyle = mounted.root.style;
+  rootStyle.setProperty(
+    "--meter-music-rms",
+    String(clamp01(next.meters.music.rms)),
+  );
+  rootStyle.setProperty(
+    "--meter-voice-rms",
+    String(clamp01(next.meters.voice.rms)),
+  );
+  rootStyle.setProperty(
+    "--meter-mic-rms",
+    String(clamp01(next.meters.mic.rms)),
+  );
+  rootStyle.setProperty(
+    "--phase-now-pct",
+    String(clamp01(next.phase.nowPct)),
+  );
+  if (next.drop.bpmPeriodMs != null) {
+    rootStyle.setProperty(
+      "--bpm-period-ms",
+      `${Math.max(1, Math.round(next.drop.bpmPeriodMs))}ms`,
+    );
+  }
+  rootStyle.setProperty("--clock-text", JSON.stringify(next.titlebar.clock));
+
   // Titlebar — clock textContent + pill data-state only.
   if (mounted.current.titlebar.clock !== next.titlebar.clock) {
     setTitlebarClock(mounted.titlebar, next.titlebar.clock);
@@ -412,16 +483,25 @@ export function renderSessionFrame(mounted: Mounted, next: SessionState): void {
     setTitlebarPill(mounted.titlebar, "sys", next.titlebar.sys);
   }
 
-  // Meters
+  // Meters — the LED count + peak needle are data-attribute pokes, but
+  // setMeterLevels is also responsible for clamping + diffing. Every frame.
   setMeterLevels(mounted.meters.music, next.meters.music);
   setMeterLevels(mounted.meters.voice, next.meters.voice);
   setMeterLevels(mounted.meters.mic, next.meters.mic);
 
-  // Timecode
+  // Timecode — DSEG7 hero clock + meta cells. setTimecode internally
+  // diffs textContent so unchanged digits don't repaint.
   setTimecode(mounted.timecode, next.timecode);
 
-  // Phase tape
-  setPhaseTape(mounted.phaseTape, next.phase);
+  // === Rebuild-on-ref-change paths ========================================
+  // These bodies are heavier (DOM rebuild) so we gate them on array ref
+  // identity (===) — the bridge only allocates a new array when the
+  // underlying state actually changed, so an unchanged 30Hz tick is a
+  // no-op here.
+
+  if (mounted.current.phase.chunks !== next.phase.chunks) {
+    setPhaseTape(mounted.phaseTape, next.phase);
+  }
 
   // Drop chip — mount/unmount based on bars.
   const dropChanged =
@@ -433,18 +513,43 @@ export function renderSessionFrame(mounted: Mounted, next: SessionState): void {
     if (chip) mounted.dropSlot.append(chip);
   }
 
-  // Event ribbon
-  setEventRibbon(mounted.eventRibbon, { events: next.events });
+  // Event ribbon — array-ref check; only rebuild when state.midiEvents
+  // actually changed (append-helper returns a new array on append).
+  if (mounted.current.events !== next.events) {
+    setEventRibbon(mounted.eventRibbon, { events: next.events });
+  }
 
-  // Cohost
-  setCohost(mounted.cohost, next.cohost);
+  // Cohost — array-ref check on transcript; status/grounded/latency
+  // mutations are cheap and rebuilt unconditionally inside setCohost.
+  const cohostTranscriptChanged =
+    mounted.current.cohost.transcript !== next.cohost.transcript;
+  const cohostStatusChanged =
+    mounted.current.cohost.status !== next.cohost.status ||
+    mounted.current.cohost.grounded !== next.cohost.grounded ||
+    mounted.current.cohost.latencyMs !== next.cohost.latencyMs;
+  if (cohostTranscriptChanged || cohostStatusChanged) {
+    // Sync data-sticky onto the transcript so setCohost auto-scrolls
+    // only when the user hasn't scrolled up. Plan §1 — sticky-bottom
+    // unless user scrolled >40px from bottom.
+    const trEl = mounted.cohost.querySelector<HTMLElement>(
+      ".vmx-cohost__transcript",
+    );
+    if (trEl) {
+      trEl.dataset.sticky = mounted.userScrolledUp ? "false" : "true";
+    }
+    setCohost(mounted.cohost, next.cohost);
+  }
 
   // Muted banner mount/unmount
-  if (mounted.current.status.muted !== next.status.muted ||
-      mounted.current.status.hotkey !== next.status.hotkey) {
+  if (
+    mounted.current.status.muted !== next.status.muted ||
+    mounted.current.status.hotkey !== next.status.hotkey
+  ) {
     mounted.bannerSlot.replaceChildren();
     if (next.status.muted) {
-      mounted.bannerSlot.append(renderMutedBanner({ hotkey: next.status.hotkey }));
+      mounted.bannerSlot.append(
+        renderMutedBanner({ hotkey: next.status.hotkey }),
+      );
     }
   }
 
@@ -472,6 +577,13 @@ export function renderSessionFrame(mounted: Mounted, next: SessionState): void {
   }
 
   mounted.current = next;
+}
+
+function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
 }
 
 /** Mock-friendly default state for `?dev=session-mock` and tests. */
