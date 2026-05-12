@@ -23,7 +23,7 @@
 - [x] **Phase 11: Tauri Shell + Calibration Wizard** - Tauri 2.x scaffold + Python sidecar wiring + IPC contract + 3-step calibration wizard UI (permissions → output/sample-rate → controller probe). _**Complete 2026-05-12 — structural gate** (code shipped, tests green, builds succeed, CI gates pass, AIza leak gate clean, capability allowlist intact, 19-message schema parity, wizard end-to-end works on Kaan's rig). Fresh-machine <90s timing → Phase 16 (Hallucination Verification Gate) + Phase 20 (Day-Zero Operations fresh-VM rehearsal)._
 - [x] **Phase 12: Live Session UI + Settings Panel** - Meters + phase tape + AI transcript + drop countdown + MIDI event ribbon + voice/mode/genre/output pickers + push-to-mute hotkey + status badges + recording retention policy. _**Code-complete 2026-05-12** across 4 waves (~10k LOC, ~62 files). IPC families 19 → 26. vitest 13 → 141, pytest 35 → 1171, cargo 4 → 13. 7 hardware UAT scenarios deferred to Kaan's rig — see `12-VERIFICATION.md` status `human_needed`._
 - [x] **Phase 13: 3D Mascot Screen Overlay** - Single 3D rigged mascot (Meshy-generated GLB) in always-on-top transparent overlay window, Three.js + AnimationMixer crossfade state machine, beat-locked clip entry, mood swap (hype-man/teacher/coach) on same rig. (completed 2026-05-12)
-- [ ] **Phase 14: FL-Studio Polish Phase (Critique → Execute Loop)** - Dedicated polish pass with `gsd-ui-checker` + `gsd-ui-auditor` iterations until retro-futurist-hardware bar passes (20/80 rule, textured materials, no web-app residue).
+- [ ] **Phase 14: CDJ Whisper v5 Migration + Polish** - Component-level audit of the pre-Phase-14 v5 token-swap prototype (commit `0615344`); critique → execute loop with `gsd-ui-checker` + `gsd-ui-auditor` until the CDJ Whisper v5 contract (`mocks/vibemix-direction-final.html`) is met on every surface — glass alpha, amber accent (`#ff8a3d`), animated border sweep, night-rave ambient body, no FL-Studio tactile residue (`--bezel-*` / `--brushed-*` / `--phosphor` aliases removed from components).
 - [ ] **Phase 15: Recording & Session Capture Finalization** - Per-session dir + `input.wav`/`voice.wav`/`events.jsonl` + recording browser UI + retention enforcement (carries POC; lock UX).
 - [ ] **Phase 16: Hallucination Verification Gate** - 30-session offline replay suite ≥95% grounded + per-genre phase-detection ≥85% F1 + 60-min soak test zero `session_error`.
 - [ ] **Phase 17: Reaction-Reel Slop Grading Gate** - Hand-graded 30-min reaction reel blind-rated 1-5 by Kaan + Francesco + 2 DJ network friends; pass requires ≥4.0 average with zero 1-2 ratings.
@@ -233,17 +233,18 @@ Plans:
 - [x] 13-07-PLAN.md — Mood profile system + particle puff effect + mood-driven lighting + animation-pool selection
 - [x] 13-08-PLAN.md — Verification fixtures + dispatch-latency pytest + 30-item manual smoke checklist
 
-### Phase 14: FL-Studio Polish Phase (Critique → Execute Loop)
-**Goal**: Every UI surface is lifted to pro-audio-software realism (FL Studio / Ableton / Bitwig / Native Instruments hierarchy). Critique → execute → critique → execute loop runs inside this phase with `gsd-ui-checker` + `gsd-ui-auditor` between iterations until the retro-futurist-hardware bar passes. This is NOT a final-week sweep — it is an explicit phase that gates Phase 16's verification.
-**Depends on**: Phase 12 (live session UI), Phase 13 (mascot).
+### Phase 14: CDJ Whisper v5 Migration + Polish
+**Goal**: Every UI surface is migrated to the **CDJ Whisper v5** visual contract (`mocks/vibemix-direction-final.html`) — Pioneer-grade dark hardware in library mode, glass primitives over warm blacks, amber accent (`#ff8a3d`), slow animated border sweep, night-rave ambient body. Replaces the prior FL-Studio retro-tactile direction (rejected as "too generic / no character"). A pre-formalization v5 token-swap prototype is on disk (commit `0615344`) with the backward-compat shim mapping legacy `--phosphor` / `--brushed-*` / `--bezel-*` aliases onto v5 primitives so Phase 11/12 components inherit the new aesthetic via cascade; this phase audits + refactors at the component level, deletes the shim, and runs the critique → execute → critique → execute loop with `gsd-ui-checker` + `gsd-ui-auditor` until the contract holds on every surface. Explicit gate before Phase 16's verification — NOT a final-week sweep.
+**Depends on**: Phase 12 (live session UI), Phase 13 (mascot overlay surface).
 **Requirements**: POLISH-01, POLISH-02, POLISH-03, POLISH-04, POLISH-05, POLISH-06.
 **Success Criteria** (what must be TRUE):
-  1. `gsd-ui-checker` passes with zero findings on a fresh capture of every surface (calibration wizard, live session UI, settings panel, recording browser, mascot frames).
-  2. `gsd-ui-auditor` passes the 20/80 rule audit (single dominant tone + minority accent — phosphor amber on anodised charcoal), the textured-material audit (no flat #1a1a1a fills), and the typography pairing audit (distinctive display font + intentional body pairing, no Inter / no system-ui).
-  3. Knob/fader physics have momentum + detent feel + magnitude-mapped visual response matching pro-audio-software conventions; a side-by-side comparison screenshot against an FL Studio EQ knob is plausibly the same product family.
-  4. Mascot pose vocabulary visually refined to character-design-document quality — every pose has deliberate silhouette, no procedural rigidity, no in-between frames that look broken.
-  5. All copy passes the "no AI slop" filter per `frontend-enforcement` skill — no purple gradients, no Tailwind defaults, no rounded-2xl shadow-lg cards, no "amazing" / "awesome" / "let me know" microcopy anywhere in the chrome.
-  6. Iteration loop is documented in `events.jsonl`-equivalent polish log: each `ui-checker` → fix → `ui-auditor` cycle is captured until both gates green.
+  1. Side-by-side parity: a screenshot of every shipping surface (calibration wizard, live session UI, settings drawer, mascot overlay window, recording browser if it exists by then) is visually indistinguishable in vocabulary from `mocks/vibemix-direction-final.html` — same glass alphas, same amber tone, same animated border sweep, same night-rave ambient body wash.
+  2. Backward-compat shim removed: `--phosphor*`, `--brushed-*`, `--bezel-*`, `--col-mascot`, and other Phase 11/12 aliases are deleted from `tokens.css`; every component references v5 primitives (`--void-*`, `--glass-*`, `--silk-*`, `--amber*`, `--rave-*`, `--glow-*`) directly.
+  3. `gsd-ui-checker` passes with zero findings on a fresh capture of every surface, with the CDJ Whisper baseline as the visual reference (NOT FL-Studio).
+  4. `gsd-ui-auditor` passes the 20/80 rule audit (warm-black dominant + single amber accent in four intensities), the no-faux-3D-bevel audit (glass + glow only, no skeuomorphic bezels), and the typography pairing audit (Geist for chrome + Fraunces for headlines, no Inter / no system-ui).
+  5. Mascot overlay window (Phase 13) renders inside the v5 chrome with the animated-border surround applied to its frame — mood swap (hype-man / teacher / coach) visibly composes with the CDJ Whisper palette, not against it.
+  6. All copy passes the "no AI slop" filter per `frontend-enforcement` skill — and explicitly: no FL-Studio tactile residue ("knob/fader physics" framing, "brushed aluminum", "anodised charcoal", "retro-futurist hardware" microcopy purged from chrome + tooltips + transcripts).
+  7. Iteration loop documented in a polish log: each `ui-checker` → fix → `ui-auditor` cycle captured until both gates green. Backdrop-filter perf verified on a non-dev machine (`blur(32px) saturate(140%)` fallback to `blur(16px)` documented if measured stutter).
 **UI hint**: yes
 **Plans**: TBD
 
@@ -337,7 +338,7 @@ Plans:
 | 11. Tauri Shell + Calibration Wizard | 5/5 | Complete   | 2026-05-12 |
 | 12. Live Session UI + Settings Panel | 0/? | Not started | - |
 | 13. 3D Mascot Screen Overlay | 8/8 | Complete   | 2026-05-12 |
-| 14. FL-Studio Polish Phase (Critique → Execute Loop) | 0/? | Not started | - |
+| 14. CDJ Whisper v5 Migration + Polish | 0/? | Prototype on disk (commit `0615344`); awaiting GSD planning | - |
 | 15. Recording & Session Capture Finalization | 0/? | Not started | - |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
 | 17. Reaction-Reel Slop Grading Gate | 0/? | Not started | - |
