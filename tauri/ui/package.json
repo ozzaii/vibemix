@@ -1,0 +1,25 @@
+{
+  "name": "vibemix-ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "vibemix Tauri shell webview — Phase 11 Wave 0 ships only the IPC schema gate; wizard UI lands in Waves 2-4.",
+  "scripts": {
+    "codegen:ipc": "node scripts/codegen-ipc.mjs",
+    "check:ipc": "npm run codegen:ipc && tsc --noEmit",
+    "test": "vitest run --reporter=dot",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build"
+  },
+  "devDependencies": {
+    "@tauri-apps/api": "^2.11",
+    "@tauri-apps/plugin-shell": "^2.3",
+    "@tauri-apps/plugin-store": "^2.4",
+    "ajv": "^8.20",
+    "ajv-formats": "^3.0",
+    "json-schema-to-typescript": "^15.0",
+    "typescript": "^5.7",
+    "vite": "^6.0",
+    "vitest": "^2.1"
+  }
+}
