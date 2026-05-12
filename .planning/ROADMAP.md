@@ -21,8 +21,8 @@
 - [x] **Phase 9: MIDI Controller Library (10 + Generic Fallback)** - Curated mappings for DDJ-FLX4/400/FLX6/FLX10/1000/SX3, XDJ-RX3, Numark Party Mix Live, Hercules Inpulse 300/500 + generic positional fallback + hot-plug re-enumeration. _**Complete 2026-05-12.**_ 839 tests green; 4/4 success criteria PASS. FLX4 live-verified; 9 others JSON-only (Mixxx basis) pending Phase 16/20 + community PRs.
 - [x] **Phase 10: Prompt Template Matrix (6 cells + Anti-Slop)** - 6 prompt templates (3 skill × 2 mode) + negative dictionary + `TurnHistory` anti-repetition + `<silence/>` short-circuit + describe-before-infer + past-tense framing. _**Complete 2026-05-12.**_ 978 tests green; 5/5 success criteria PASS structurally; Phase 16+17 own live verification.
 - [x] **Phase 11: Tauri Shell + Calibration Wizard** - Tauri 2.x scaffold + Python sidecar wiring + IPC contract + 3-step calibration wizard UI (permissions → output/sample-rate → controller probe). _**Complete 2026-05-12 — structural gate** (code shipped, tests green, builds succeed, CI gates pass, AIza leak gate clean, capability allowlist intact, 19-message schema parity, wizard end-to-end works on Kaan's rig). Fresh-machine <90s timing → Phase 16 (Hallucination Verification Gate) + Phase 20 (Day-Zero Operations fresh-VM rehearsal)._
-- [ ] **Phase 12: Live Session UI + Settings Panel** - Meters + phase tape + AI transcript + drop countdown + MIDI event ribbon + voice/mode/genre/output pickers + push-to-mute hotkey + status badges + recording retention policy.
-- [ ] **Phase 13: Reactive Mascot (Avery)** - SVG mascot with named pose vocabulary + idle animation + magnitude-aware MIDI pose dispatch + TTS-synced mouth + eye-tracking + beat-sync bounce.
+- [x] **Phase 12: Live Session UI + Settings Panel** - Meters + phase tape + AI transcript + drop countdown + MIDI event ribbon + voice/mode/genre/output pickers + push-to-mute hotkey + status badges + recording retention policy. _**Code-complete 2026-05-12** across 4 waves (~10k LOC, ~62 files). IPC families 19 → 26. vitest 13 → 141, pytest 35 → 1171, cargo 4 → 13. 7 hardware UAT scenarios deferred to Kaan's rig — see `12-VERIFICATION.md` status `human_needed`._
+- [ ] **Phase 13: 3D Mascot Screen Overlay** - Single 3D rigged mascot (Meshy-generated GLB) in always-on-top transparent overlay window, Three.js + AnimationMixer crossfade state machine, beat-locked clip entry, mood swap (hype-man/teacher/coach) on same rig.
 - [ ] **Phase 14: FL-Studio Polish Phase (Critique → Execute Loop)** - Dedicated polish pass with `gsd-ui-checker` + `gsd-ui-auditor` iterations until retro-futurist-hardware bar passes (20/80 rule, textured materials, no web-app residue).
 - [ ] **Phase 15: Recording & Session Capture Finalization** - Per-session dir + `input.wav`/`voice.wav`/`events.jsonl` + recording browser UI + retention enforcement (carries POC; lock UX).
 - [ ] **Phase 16: Hallucination Verification Gate** - 30-session offline replay suite ≥95% grounded + per-genre phase-detection ≥85% F1 + 60-min soak test zero `session_error`.
@@ -209,16 +209,18 @@ Plans:
 **UI hint**: yes
 **Plans**: TBD
 
-### Phase 13: Reactive Mascot (Avery)
-**Goal**: Avery the SVG mascot is a first-class feature, not decoration. Lives in the main session UI corner + larger render in the calibration wizard. Reacts physically to MIDI events with magnitude-aware intensity, syncs mouth to TTS audio level, eye-tracks the most-recent control the user touched, and beat-syncs subtle bounce on the kick.
-**Depends on**: Phase 12 (UI shell + WS event bus).
-**Requirements**: MASCOT-01, MASCOT-02, MASCOT-03, MASCOT-04, MASCOT-05, MASCOT-06, MASCOT-07.
+### Phase 13: 3D Mascot Screen Overlay
+**Goal**: A single 3D rigged mascot character (generated via Meshy AI, normalized via Blender MCP, rendered via Three.js) floats on top of the user's screen as a Clippy-meets-Codex-Pets desktop companion. Always-on-top transparent overlay window, drag-repositionable anywhere on screen, NOT embedded in the session-UI corner. Reacts to live music + AI events through a state machine of crossfaded animation clips (`idle_breathe`, `idle_bop_to_beat`, `dance_a/b/hard`, `talk_loop`, `react_yes/no/surprised`, `point_explain`). Beat-locked entry on detected BPM + downbeat. Mood variation (hype-man / teacher / coach) swaps the active Gemini TTS voice + animation clip pool + prompt vocabulary on the **same rig**, NOT separate characters. Visible body of the grounded Gemini brain — NOT inside the audio signal loop.
+**Depends on**: Phase 12 (WS event bus + Settings panel surfaces mood selector + click-through toggle).
+**Requirements**: MASCOT-01, MASCOT-02, MASCOT-03, MASCOT-04, MASCOT-05, MASCOT-06, MASCOT-07, MASCOT-08, MASCOT-09.
 **Success Criteria** (what must be TRUE):
-  1. Avery's full pose vocabulary renders distinctly and on-character (idle / alert / speaking / squint / cover-ears / puff-up / wavy / lean-left / lean-right / punch-up / freeze / bounce / zipped / shocked / dancing / sleeping / winking) — every pose deliberate, no procedurally-rigid limb interpolation.
-  2. MIDI events trigger named poses with magnitude-aware intensity within 150ms: bass-kill triggers cover-ears, high-EQ slam triggers squint, crossfader sweep triggers lean (left/right per direction), bass-push triggers puff-up.
-  3. Mouth animation tracks live TTS audio RMS at ≥30Hz during AI utterances; mouth is closed (idle/zipped pose) when AI is silent.
-  4. Eye-tracking visibly follows the most recent control the user touched on the controller — a knob move on Deck B pulls Avery's gaze right; a fader move on Deck A pulls it left.
-  5. Beat-sync subtle bounce activates during groove/peak/drop phases at the detected BPM and pauses during silent/low/breakdown.
+  1. A single rigged 3D mascot (GLB) renders in a Superwhisper-style sticky overlay window via Three.js — transparent background, always-on-top, **persistent across macOS Spaces / Windows virtual desktops**, drag-repositionable on screen, resizable within bounds; click-through option toggleable in Settings.
+  2. The mascot's full animation library renders distinctly and on-character — every named clip deliberate, no T-pose snaps between states, no rigging artifacts visible in 30 random transition samples.
+  3. Animation state transitions use Three.js `AnimationMixer.crossFadeTo` with 200-400ms blend duration; pose-pops are visibly absent in side-by-side comparison; no hard cuts except where explicitly designed (e.g., particle-masked mood swap).
+  4. Beat-locked entry: when transitioning into an idle/dance state, the new clip begins on bar boundary 1 (using BPM + downbeat phase from `MusicState`); audible misalignment is undetectable in 30 random trials.
+  5. AI event → animation state mapping covers: `track_change` → `react_surprised` → `idle_bop_to_beat`; `drop` → `dance_hard`; `ai_generating_reply` → `talk_loop` (interrupt-class); `ai_reply_done` → `react_yes` → prior idle; `manual_fire` → `react_yes`; `phase_change` to "silent" → `idle_breathe`.
+  6. Mood swap (hype-man ↔ teacher ↔ coach) hot-swaps the active Gemini TTS voice + animation clip pool + prompt vocabulary on the same rig within 500ms; transition masked by particle/puff effect.
+  7. Menu-bar (macOS NSStatusItem) / system-tray (Windows notification area) icon is persistently visible while vibemix is running — left-click toggles overlay visibility, right-click popover surfaces mood selector + mute + open session UI + settings + quit; icon state reflects session status (idle / live / ai_thinking / error); closing main session UI does NOT quit the app.
 **UI hint**: yes
 **Plans**: TBD
 
@@ -325,7 +327,7 @@ Plans:
 | 10. Prompt Template Matrix (6 cells + Anti-Slop) | 2/2 | Complete   | 2026-05-11 |
 | 11. Tauri Shell + Calibration Wizard | 5/5 | Complete   | 2026-05-12 |
 | 12. Live Session UI + Settings Panel | 0/? | Not started | - |
-| 13. Reactive Mascot (Avery) | 0/? | Not started | - |
+| 13. 3D Mascot Screen Overlay | 0/? | Not started | - |
 | 14. FL-Studio Polish Phase (Critique → Execute Loop) | 0/? | Not started | - |
 | 15. Recording & Session Capture Finalization | 0/? | Not started | - |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |

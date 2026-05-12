@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v0.1.0
 milestone_name: milestone
 status: completed
-last_updated: "2026-05-12T11:02:12.856Z"
+last_updated: "2026-05-12T22:30:00.000Z"
 progress:
   total_phases: 20
-  completed_phases: 7
-  total_plans: 43
-  completed_plans: 31
-  percent: 72
+  completed_phases: 12
+  total_plans: 48
+  completed_plans: 36
+  percent: 75
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-12 (Phase 11 ✅ complete; Phase 12 partial — Wave 1 shipped, Waves 2–5 deferred)
+**Last updated:** 2026-05-12 (Phase 12 ✅ code-complete across all 4 waves; UAT pending — Phase 13 next)
 
 ---
 
@@ -22,7 +22,7 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 12 — Live Session UI + Settings Panel (Wave 1 ✅ IPC contract; Waves 2–5 ready for follow-up execute).
+- **Current focus:** Phase 12 ✅ code-complete (Waves 1-4 shipped; 7 hardware UAT scenarios deferred to Kaan's rig). Phase 13 (Reactive Mascot Avery) is next.
 - **Milestone:** v1 (Bravoh-wedge drop) — target ship ~3-4 weeks (~early June 2026, before Bravoh public launch).
 - **Project mode:** standard.
 - **Granularity:** fine (20 phases).
@@ -38,21 +38,32 @@ progress:
 
 **Phase 11 close metrics:** 5 waves, 13 task commits, 95+ files created cumulative, **1066 Python tests pass** (978 Phase 10 baseline + 88 new across Wave 0-4) + 13 vitest + 4 cargo test = 1083 total. 1 known pre-existing failure (`test_g5_poc_files_untouched` — mascot.html stale-baseline since post-Phase-5 commit `398f788`); out of scope per CLAUDE.md scope-boundary rule. POC files (cohost*.py / mascot.html / mocks/) diff-untouched against the Phase 11 plan-docs commit (`7e08966`).
 
-Phase: 12 (Live Session UI + Settings Panel) — IN PROGRESS (Wave 1 of 5 shipped)
+Phase: 12 (Live Session UI + Settings Panel) — ✅ CODE-COMPLETE (all 4 waves shipped; UAT pending)
 
-**Phase 12 Wave 1 (12-01 IPC schema) ✅ shipped.** Extends Phase 11's `messages.schema.json` with 7 new ipc.* families (SessionSnapshot 30Hz, SessionMute toggle/ack, SettingsSet/Get/State, StatusRecheck, IpcError). Schema count 19 → 26; definitions 19 → 27 (LevelPair shared helper $ref'd from SessionSnapshot.meters). All payloads `additionalProperties: false`. Python dataclasses mirror with hand-written `@dataclass(frozen=True, slots=True)` per anti-pydantic convention. Asymmetric `SessionMute` payload pattern: `make_toggle()` emits `{toggle: true}` only, `make_ack(muted=...)` emits `{muted: bool}` only — None fields stripped on serialize. `IpcError.original_type` optional, omitted when None. Tests: 31 vitest (was 13) + 68 pytest (42 ui_bus + 26 new ipc — was 35). `scripts/check_ipc_schema.py` green at count 26 == 26.
+**Phase 12 ✅ shipped across 4 waves.** ~10,000 LOC across ~62 files. IPC families 19 → 26 (+7). Tests: vitest 13 → 141 (+128); pytest 35 → 1171 (+1136); cargo 4 → 13 (+9). All gates green: typecheck, `npm run check:ipc`, `cargo check`, `cargo test`, pytest. POC files diff-untouched.
 
-**Phase 12 Waves 2–5 (sidecar SessionLoop + components + render loop + Settings drawer) deferred** to a follow-up `gsd-execute-phase 12 --wave 2..5` session with subagent dispatch. Plans 12-02 through 12-05 are authoritative and locked. UI-SPEC.md is the executable design contract — every component referenced by file path against the mocks/vibemix-app-ui.html visual reference.
+- **Wave 1 (12-01)** — IPC schema: 7 new ipc.* families (`session.snapshot` 30Hz, `session.mute` toggle/ack, `settings.set/get/state`, `status.recheck`, `error`). Hand-written `@dataclass(frozen=True, slots=True)` mirrors; codegen → TS unions; drift gate count parity 26 == 26.
+- **Wave 2 (12-02 + 12-03 parallel)** — Sidecar: `SessionLoop` + `SettingsApplier` + `ConfigStore` at `src/vibemix/runtime/`; 30Hz snapshot emit from MusicState + EventDetector + transcript ring + ControllerState; per-field dispatch matrix; OS-aware config dirs; atomic writes; transient `muted` state. Presentation: 12 components + 5 inline SVG icons + `SessionLayout` composer at `tauri/ui/src/session/`; pure-function pattern + `registerStyle()` singleton + zero hardcoded hex; jsdom vitest harness added.
+- **Wave 3 (12-04)** — Glue: `SessionState` singleton + `ws-bridge` IPC subscribers + single `rAF` render-loop (CSS-variable hot updates + transcript sticky-bottom) + Phase 11 `router.session()` + `main.ts` boot decision (`first_run_completed` → session, else wizard). Push-to-mute via `tauri-plugin-global-shortcut` with reserved-combo rejection + window-focus gate; `PlaybackQueue.clear()` lands; `rebind_hotkey` Tauri command exposed.
+- **Wave 4 (12-05)** — Settings drawer slide-over (z-50, live session keeps rendering behind backdrop): PERSONA / OUTPUT / HOTKEY / RECORDING / CALIBRATION groups, hotkey-capture state machine, 6-stop knurled retention slider, confirm-dialog modal, gear button wires `openSettings()`. ∞ retention encoded as `36500` sentinel. `12-VERIFICATION.md` status: `human_needed` — 7 hardware UAT scenarios deferred to Kaan's rig.
 
-Plan: 11-01 + 11-02 + 11-03 + 11-04 + 11-05 ✅ complete; 12-01 ✅ shipped; 12-02 + 12-03 + 12-04 + 12-05 plans authored, deferred.
+**Phase 12 deferred items (UAT pending — `human_needed`):**
+1. Live UI sustained ≥30 fps on Retina during 60-min session
+2. Mid-session voice/mode/output/profile hot-reload effect verified end-to-end
+3. Push-to-mute drains PlaybackQueue mid-utterance
+4. MIDI hot-unplug flips badge red within 2s
+5. Genre change overlay + profile reload confirmed
+6. Hotkey rebind round-trip with reserved-combo rejection visible
+7. Re-run calibration tears down session + remounts wizard
 
-- **Phase 11:** ✅ Tauri 2.x shell wraps Python sidecar (PyInstaller --onedir) + 3-step calibration wizard — structural gate.
-- **Plan:** 11-01 + 11-02 + 11-03 + 11-04 + 11-05 closed.
-- **Status:** Phase 11 complete (structural gate); fresh-machine <90s timing → Phase 16/20.
-- **Progress:** [███████░░░] 72%
+Plan: 11-* + 12-01/02/03/04/05 ✅ complete.
+
+- **Phase 12:** ✅ code-complete. UAT deferred to Kaan's rig session.
+- **Status:** Ready for Phase 13 (Reactive Mascot — Avery).
+- **Progress:** [████████░░] 75%
 
 ```
-[███████░░░░░░░░░░░░░] 55% (11/20 phases — Phase 11 ✅ complete; Phase 12 next)
+[████████░░░░░░░░░░░░] 60% (12/20 phases — Phase 12 ✅ code-complete; Phase 13 next)
 ```
 
 ---
