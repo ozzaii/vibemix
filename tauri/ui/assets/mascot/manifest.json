@@ -1,0 +1,152 @@
+{
+  "character": "character.glb",
+  "animations": [
+    {
+      "file": "animations/sleep_normally.glb",
+      "clip": "Sleep_Normally",
+      "states": [
+        "idle_breathe_slow",
+        "sleep"
+      ]
+    },
+    {
+      "file": "animations/indoor_swing.glb",
+      "clip": "Indoor_Swing",
+      "states": [
+        "idle_bop_to_beat_mellow",
+        "talk_loop_calm"
+      ]
+    },
+    {
+      "file": "animations/bass_beats.glb",
+      "clip": "Bass_Beats",
+      "states": [
+        "idle_bop_to_beat_energetic",
+        "talk_loop_energetic"
+      ]
+    },
+    {
+      "file": "animations/funny_dancing_01.glb",
+      "clip": "FunnyDancing_01",
+      "states": [
+        "dance_a"
+      ]
+    },
+    {
+      "file": "animations/funny_dancing_03.glb",
+      "clip": "FunnyDancing_03",
+      "states": [
+        "dance_alt2"
+      ]
+    },
+    {
+      "file": "animations/omg_groove.glb",
+      "clip": "OMG_Groove",
+      "states": [
+        "dance_b"
+      ]
+    },
+    {
+      "file": "animations/all_night_dance.glb",
+      "clip": "All_Night_Dance",
+      "states": [
+        "dance_hard"
+      ]
+    },
+    {
+      "file": "animations/hip_hop_dance_3.glb",
+      "clip": "Hip_Hop_Dance_3",
+      "states": [
+        "dance_alt"
+      ]
+    },
+    {
+      "file": "animations/magic_genie.glb",
+      "clip": "Magic_Genie",
+      "states": [
+        "talk_loop"
+      ]
+    },
+    {
+      "file": "animations/cheer_both_hands.glb",
+      "clip": "Cheer_with_Both_Hands",
+      "states": [
+        "react_yes",
+        "celebrate"
+      ]
+    },
+    {
+      "file": "animations/shrug.glb",
+      "clip": "Shrug",
+      "states": [
+        "react_no"
+      ]
+    },
+    {
+      "file": "animations/not_your_mom.glb",
+      "clip": "Not_Your_Mom",
+      "states": [
+        "react_no_alt"
+      ]
+    },
+    {
+      "file": "animations/alert_quick_turn.glb",
+      "clip": "Alert_Quick_Turn_Right",
+      "states": [
+        "react_surprised"
+      ]
+    },
+    {
+      "file": "animations/handbag_walk.glb",
+      "clip": "Handbag_Walk",
+      "states": [
+        "point_explain"
+      ]
+    },
+    {
+      "file": "animations/big_wave_hello.glb",
+      "clip": "Big_Wave_Hello",
+      "states": [
+        "gesture_wide"
+      ]
+    },
+    {
+      "file": "animations/wave_for_help.glb",
+      "clip": "Wave_for_Help_4",
+      "states": [
+        "gesture_wide_alt"
+      ]
+    },
+    {
+      "file": "animations/fast_lightning.glb",
+      "clip": "Fast_Lightning",
+      "states": [
+        "react_drop"
+      ]
+    },
+    {
+      "file": "animations/angry_stomp.glb",
+      "clip": "Angry_Ground_Stomp",
+      "states": [
+        "react_glitch"
+      ]
+    },
+    {
+      "file": "animations/walking.glb",
+      "clip": "Walking",
+      "states": [
+        "locomotion_walk"
+      ]
+    },
+    {
+      "file": "animations/running.glb",
+      "clip": "Running",
+      "states": [
+        "locomotion_run"
+      ]
+    }
+  ],
+  "bundle_bytes_target": 26214400,
+  "source_origin": "Meshy AI — Neon Rebel biped",
+  "license": "see LICENSE-3RD-PARTY.md"
+}
