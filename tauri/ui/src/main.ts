@@ -1,19 +1,30 @@
-/* Phase 11 Wave 3 — webview entry point.
+/* Phase 11 Wave 4 — webview entry point.
  *
- * Mounts the calibration wizard (router.ts → step1 / step2 / step3 /
- * smoke-test). Keeps the Wave 2 crash banner + ipc.* event subscribers
- * for DevTools visibility during Wave 4 dev.
+ * Boot order:
+ *   1. Mount the wizard frame DOM (renderCurrentStep — initially Step 1).
+ *   2. Subscribe to ipc.status.tick so the 4 LED dots in the status bar
+ *      stay live as the sidecar's heartbeat probes report.
+ *   3. Wait for the sidecar's ipc.boot event (proves the WS bus is alive).
+ *      If it doesn't arrive within 5s, surface the crash banner via the
+ *      sidecar-error channel.
+ *   4. Strip ``window.__vibemixDev`` from production builds via
+ *      ``import.meta.env.DEV`` (threat T-11-W3-02 mitigation).
  *
- * Wave 3 drives every wizard state via MOCK data + a window.__vibemixDev
- * debug surface. Wave 4 strips the dev surface from production builds via
- * `import.meta.env.DEV` and wires the real ipc.* request flow.
+ * The Wave 3 console-log subscribers (ipc.boot, ipc.status.tick, ws-state,
+ * sidecar-error, ipc:parse-error) are kept for DevTools visibility during
+ * the structural-gate manual checkpoint.
  */
 
 import { listen } from "@tauri-apps/api/event";
 
 import { initCrashBanner } from "./crash-banner.js";
 import { isIpcMessage, parseIpcMessage } from "./ipc/validator.js";
-import { consumeUrlParam, getDevSurface, renderCurrentStep } from "./wizard/router.js";
+import {
+  consumeUrlParam,
+  getDevSurface,
+  renderCurrentStep,
+  subscribeStatusBar,
+} from "./wizard/router.js";
 import type { DevSurface } from "./wizard/router.js";
 
 declare global {
@@ -22,59 +33,56 @@ declare global {
   }
 }
 
-// === IPC subscribers ====================================================
-// Wave 2 ipc:* logging — every event surfaces in DevTools so Kaan can
-// confirm the WS bus pipe is alive during the watchdog smoke test.
+// === DevTools diagnostic subscribers (Wave 2 + Wave 4 logging) ===========
 const IPC_EVENTS = ["ipc:ipc.boot", "ipc:ipc.status.tick"] as const;
 
 for (const channel of IPC_EVENTS) {
-  listen<unknown>(channel, (event) => {
+  void listen<unknown>(channel, (event) => {
     try {
       const msg = parseIpcMessage(event.payload);
       // eslint-disable-next-line no-console
       console.log(`[${channel}]`, msg);
     } catch (err) {
-      // Schema drift — log loudly. The frame is dropped, not auto-fixed.
       // eslint-disable-next-line no-console
       console.warn(`[${channel}] schema violation:`, err);
     }
   });
 }
 
-// Generic parse-error channel emitted by the Rust ws_client when text
-// isn't JSON. Useful diagnostic during dev.
-listen<string>("ipc:parse-error", (event) => {
+void listen<string>("ipc:parse-error", (event) => {
   // eslint-disable-next-line no-console
   console.warn("[ipc:parse-error] non-JSON frame:", event.payload);
 });
 
-// Connect / reconnect state from the WS client.
-listen<string>("ws-state", (event) => {
+void listen<string>("ws-state", (event) => {
   // eslint-disable-next-line no-console
   console.log("[ws-state]", event.payload);
 });
 
-// One-shot error events from the sidecar process channel.
-listen<string>("sidecar-error", (event) => {
+void listen<string>("sidecar-error", (event) => {
   // eslint-disable-next-line no-console
   console.warn("[sidecar-error]", event.payload);
 });
 
-// === Wizard boot ========================================================
+// === Wizard boot =========================================================
 function boot(): void {
   consumeUrlParam();
   renderCurrentStep();
   initCrashBanner();
 
-  // Wave 3 dev surface — register window.__vibemixDev. Wave 4 wraps
-  // this in `if (import.meta.env.DEV) { ... }` so production builds
-  // strip the surface (threat T-11-W3-02 mitigation).
-  window.__vibemixDev = getDevSurface();
-  // eslint-disable-next-line no-console
-  console.log(
-    "[boot] wizard ready — drive state via window.__vibemixDev:",
-    "advanceTo / currentStep / getState / setState / fakeMidiEvent / setStatusBar"
-  );
+  // Wire the status bar to ipc.status.tick (1Hz heartbeat).
+  void subscribeStatusBar();
+
+  // Wave 4: only expose the dev surface in dev builds. Production
+  // bundles strip __vibemixDev entirely (threat T-11-W3-02 mitigation).
+  if (import.meta.env.DEV) {
+    window.__vibemixDev = getDevSurface();
+    // eslint-disable-next-line no-console
+    console.log(
+      "[boot] DEV mode — window.__vibemixDev exposed:",
+      "advanceTo / currentStep / getState / setState / fakeMidiEvent / setStatusBar",
+    );
+  }
 }
 
 if (document.readyState === "loading") {
@@ -84,6 +92,5 @@ if (document.readyState === "loading") {
 }
 
 // Pin the validator import so tree-shaking doesn't drop the schema check
-// in production builds. Wave 4 deletes this when wizard handlers consume
-// the validator directly.
+// in production builds.
 export const _wave2KeepAlive = isIpcMessage;

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Phase 11 wizard capability for the main window — sidecar exec + 3 URL opens + scoped fs + 7 app commands the webview is permitted to invoke",
+  "description": "Phase 11 wizard capability for the main window — sidecar exec + 3 URL opens + scoped fs. Tauri 2.x auto-allows webview→app-command invocation by default for the 7 app commands registered via invoke_handler in main.rs: forward_ipc_to_sidecar, restart_sidecar, read_first_run_state, write_first_run_state, open_screen_recording_settings, open_microphone_settings, request_microphone_permission. The 'app:allow-<command>' identifier namespace is reserved for Tauri's built-in core-app plugin (allow-name/allow-version/etc), NOT user #[tauri::command] entries — enumerating them would fail the build with 'permission identifier not found'. Warning #4: window-picker enumeration goes over the WS bus via ipc.calibration.list_windows; NO window-enum Tauri command exists.",
   "windows": ["main"],
   "permissions": [
     "core:default",

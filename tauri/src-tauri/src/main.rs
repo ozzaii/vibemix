@@ -27,6 +27,7 @@ use std::fs;
 use tauri::Manager;
 
 use crate::sidecar::SidecarHandle;
+use crate::ws_client::WsClientHandle;
 
 fn main() {
     tauri::Builder::default()
@@ -50,6 +51,7 @@ fn main() {
             permissions::request_microphone_permission,
         ])
         .manage(SidecarHandle::default())
+        .manage(WsClientHandle::default())
         .setup(|app| {
             let app_handle = app.handle().clone();
 
