@@ -129,14 +129,16 @@
 - [ ] **VERIFY-05**: Per-genre phase-detection accuracy validation (≥85% event-timing F1 on the validation harness)
 - [ ] **VERIFY-06**: Critique → execute → critique → execute loop per phase — every phase passes plan-check before execute and verifier after; UI phases run ui-checker between polish iterations
 
-### Polish — FL-Studio UI Quality Phase
+### Polish — CDJ Whisper v5 UI Quality Phase
 
-- [ ] **POLISH-01**: Dedicated polish phase (NOT a final-week sweep) — explicit phase with critique → execute loop until the bar passes
-- [ ] **POLISH-02**: Knob/fader physics — momentum, detent feel, magnitude-mapped visual response (match pro-audio software hierarchy: FL Studio / Ableton / Bitwig / Native Instruments)
-- [ ] **POLISH-03**: Mascot animation library visually refined to character-design-document quality (every clip deliberate, smooth crossfades, no rigging artifacts, no T-pose snaps, no in-between frames that look broken)
-- [ ] **POLISH-04**: No "web app residue" anywhere — no default Tailwind shadows, no rounded-2xl-p-6 cards, no Inter, no purple gradients
-- [ ] **POLISH-05**: All copy passes the "no AI slop" filter (per `frontend-enforcement` skill)
-- [ ] **POLISH-06**: `gsd-ui-checker` + `gsd-ui-auditor` runs between iterations; phase only completes when both pass
+> **Visual contract baseline:** `mocks/vibemix-direction-final.html` (CDJ Whisper v5). Supersedes the prior FL-Studio retro-tactile direction (rejected as "too generic / no character"). v5 spec captured in `[[project_visual_direction_cdj_whisper]]` memory and `.planning/HANDOFF-cdj-whisper-v5-ui-migration.md`.
+
+- [ ] **POLISH-01**: Dedicated polish phase (NOT a final-week sweep) — explicit phase with critique → execute loop until the CDJ Whisper v5 contract passes on every surface
+- [ ] **POLISH-02**: Component-level audit removes the backward-compat shim — `--phosphor*`, `--brushed-*`, `--bezel-*`, `--col-mascot` aliases deleted from `tokens.css`; every component references v5 primitives (`--void-*`, `--glass-*`, `--silk-*`, `--amber*`, `--rave-*`, `--glow-*`) directly
+- [ ] **POLISH-03**: Mascot overlay window (Phase 13) renders inside the v5 chrome with the animated-border sweep applied to its frame; mood swap (hype-man / teacher / coach) visibly composes with the CDJ Whisper palette, not against it
+- [ ] **POLISH-04**: No FL-Studio tactile residue anywhere — no `--brushed-aluminum` / `--bezel` / skeuomorphic 3D bevel shadows; no Tailwind shadow-lg / rounded-2xl-p-6 cards; no Inter / no system-ui (Geist for chrome + Fraunces for headlines); no purple gradients on chrome (rave ambient washes are body-only)
+- [ ] **POLISH-05**: All copy passes the "no AI slop" filter (per `frontend-enforcement` skill) — and explicitly: "knob/fader physics", "brushed aluminum", "anodised charcoal", "retro-futurist hardware" microcopy purged from chrome + tooltips + transcripts
+- [ ] **POLISH-06**: `gsd-ui-checker` + `gsd-ui-auditor` runs between iterations with the CDJ Whisper baseline as visual reference; phase only completes when both pass on every surface (calibration wizard, live session UI, settings drawer, mascot overlay window, recording browser if it exists by then). Backdrop-filter perf verified on a non-dev machine (`blur(32px) saturate(140%)` fallback to `blur(16px)` documented if measured stutter)
 
 ### GitHub Launch Presence
 
@@ -295,12 +297,12 @@
 | VERIFY-04 | Phase 18 | Binary attack verification (`strings` + `pyinstxtractor` for `AIza`). |
 | VERIFY-05 | Phase 16 | Per-genre phase-detection ≥85% F1. |
 | VERIFY-06 | Phase 16 | Critique → execute → critique → execute loop per phase. |
-| POLISH-01 | Phase 14 | Dedicated polish phase — critique → execute loop. |
-| POLISH-02 | Phase 14 | Knob/fader physics matching pro-audio software. |
-| POLISH-03 | Phase 14 | Mascot animation library refined to character-design quality (clips, crossfades, no rigging artifacts). |
-| POLISH-04 | Phase 14 | Zero web-app residue (no Tailwind defaults, no Inter, no purple gradients). |
-| POLISH-05 | Phase 14 | All copy passes `frontend-enforcement` skill filter. |
-| POLISH-06 | Phase 14 | `gsd-ui-checker` + `gsd-ui-auditor` green before phase completes. |
+| POLISH-01 | Phase 14 | Dedicated polish phase — critique → execute loop against CDJ Whisper v5 contract. |
+| POLISH-02 | Phase 14 | Backward-compat shim removed; components reference v5 primitives (`--void-*` / `--glass-*` / `--silk-*` / `--amber*` / `--rave-*` / `--glow-*`) directly. |
+| POLISH-03 | Phase 14 | Mascot overlay (Phase 13) composes with v5 chrome — animated-border sweep on its frame, mood swap visibly fits palette. |
+| POLISH-04 | Phase 14 | Zero FL-Studio tactile residue + zero web-app residue (no bezels/brushed-metal, no Tailwind defaults, Geist + Fraunces only). |
+| POLISH-05 | Phase 14 | All copy passes `frontend-enforcement` skill filter + FL-Studio vocabulary purged. |
+| POLISH-06 | Phase 14 | `gsd-ui-checker` + `gsd-ui-auditor` green against CDJ Whisper baseline before phase completes; backdrop-filter perf verified on non-dev machine. |
 | GH-01 | Phase 19 | Repo at `github.com/bravoh/vibemix`. |
 | GH-02 | Phase 19 | README hero banner. |
 | GH-03 | Phase 19 | Hero demo video/GIF. |
