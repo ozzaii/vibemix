@@ -420,7 +420,7 @@ pub fn install_tray_state_listener(app: &AppHandle) {
     {
         let state = state.clone();
         let app_clone = app.clone();
-        app.listen("ipc:ipc.session.snapshot", move |event| {
+        app.listen("ipc-session-snapshot", move |event| {
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(event.payload()) {
                 let cohost = value
                     .get("payload")
@@ -443,7 +443,7 @@ pub fn install_tray_state_listener(app: &AppHandle) {
     {
         let state = state.clone();
         let app_clone = app.clone();
-        app.listen("ipc:ipc.status.tick", move |event| {
+        app.listen("ipc-status-tick", move |event| {
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(event.payload()) {
                 let payload = value.get("payload");
                 let gemini = payload
@@ -482,7 +482,7 @@ pub fn install_tray_state_listener(app: &AppHandle) {
     // can also observe (used by tests today).
     {
         let app_clone = app.clone();
-        app.listen("ipc:ipc.mascot.mood_change", move |event| {
+        app.listen("ipc-mascot-mood_change", move |event| {
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(event.payload()) {
                 let mood = value
                     .get("payload")
