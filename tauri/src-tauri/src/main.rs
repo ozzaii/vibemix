@@ -140,6 +140,13 @@ fn main() {
                 tracing::error!("tray init failed: {e}");
             }
 
+            // Phase 13 Plan 06 — install tray-state listener. Subscribes to
+            // ipc:ipc.session.snapshot + ipc:ipc.status.tick (forwarded by
+            // ws_client.rs from the Python bus) + ipc:ipc.mascot.mood_change
+            // and re-derives tray icon state with a 2 Hz throttle. Listener
+            // lives for the process lifetime — no uninstall needed.
+            tray::install_tray_state_listener(&app_handle);
+
             Ok(())
         })
         .run(tauri::generate_context!())
