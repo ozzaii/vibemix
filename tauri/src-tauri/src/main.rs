@@ -18,6 +18,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
+mod hotkey;
 mod permissions;
 mod sidecar;
 mod ws_client;
@@ -26,6 +27,7 @@ use std::fs;
 
 use tauri::Manager;
 
+use crate::hotkey::HotkeyHandle;
 use crate::sidecar::SidecarHandle;
 use crate::ws_client::WsClientHandle;
 
@@ -40,7 +42,9 @@ fn main() {
         // Updater plugin is stubbed at the config layer (endpoints: [], pubkey: "").
         // Phase 18 ships real signed manifests.
         .plugin(tauri_plugin_updater::Builder::new().build())
-        // Seven webview-callable commands (capability allowlist mirrors).
+        // Phase 12 Wave 3 — push-to-mute global shortcut.
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        // Eight webview-callable commands (capability allowlist mirrors).
         .invoke_handler(tauri::generate_handler![
             ws_client::forward_ipc_to_sidecar,
             sidecar::restart_sidecar,
@@ -49,9 +53,11 @@ fn main() {
             permissions::open_screen_recording_settings,
             permissions::open_microphone_settings,
             permissions::request_microphone_permission,
+            hotkey::rebind_hotkey,
         ])
         .manage(SidecarHandle::default())
         .manage(WsClientHandle::default())
+        .manage(HotkeyHandle::default())
         .setup(|app| {
             let app_handle = app.handle().clone();
 
@@ -85,6 +91,10 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 ws_client::run_ws_client(ws_app).await;
             });
+
+            // Phase 12 Wave 3 — register the default push-to-mute hotkey.
+            // Fires on platform default (Cmd+Shift+M / Ctrl+Shift+M).
+            hotkey::register_default(&app_handle);
 
             Ok(())
         })

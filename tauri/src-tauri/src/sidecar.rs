@@ -77,8 +77,13 @@ pub async fn spawn_sidecar_with_watchdog(
             .shell()
             .sidecar("vibemix-core")
             .map_err(|e| format!("sidecar lookup failed: {e}"))?;
+        // Phase 12 Wave 3 — post-wizard launches spawn the sidecar with
+        // `--session` so SessionLoop registers its ipc.session.* handlers.
+        // Wizard launches keep `--wizard` (Phase 11 wave 4 behaviour).
         if wizard_mode {
             cmd = cmd.args(["--wizard"]);
+        } else {
+            cmd = cmd.args(["--session"]);
         }
 
         let (mut rx, child) = cmd
