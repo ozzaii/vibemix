@@ -19,6 +19,7 @@
 
 mod config;
 mod hotkey;
+mod mascot_window;
 mod permissions;
 mod sidecar;
 mod ws_client;
@@ -102,6 +103,24 @@ fn main() {
             // Phase 12 Wave 3 — register the default push-to-mute hotkey.
             // Fires on platform default (Cmd+Shift+M / Ctrl+Shift+M).
             hotkey::register_default(&app_handle);
+
+            // Phase 13 Plan 02 — spawn the mascot overlay window.
+            // Honours persisted visibility (visible=false → no window built;
+            // tray left-click can wake it on next launch). Logs but does
+            // NOT bail setup on failure — the main session UI must still
+            // come up even if the mascot fails to build (e.g. an unusual
+            // multi-monitor topology).
+            match mascot_window::create_mascot_window(&app_handle) {
+                Ok(Some(_)) => {
+                    tracing::info!("mascot overlay window built");
+                }
+                Ok(None) => {
+                    tracing::info!("mascot overlay hidden (user preference)");
+                }
+                Err(e) => {
+                    tracing::error!("mascot window build failed: {e}");
+                }
+            }
 
             Ok(())
         })

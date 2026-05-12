@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>vibemix mascot</title>
+    <!--
+      Phase 13 Plan 02 — mascot overlay webview entry.
+
+      This file is the second Tauri webview, loaded into the "mascot"
+      window built by `mascot_window::create_mascot_window` in main.rs.
+      The window itself is `transparent: true` + `always_on_top: true`
+      + `decorations: false` + `visible_on_all_workspaces: true` per
+      13-CONTEXT Area 2.
+
+      Plan 13-04 (Three.js renderer) replaces the placeholder script
+      below with a proper AnimationMixer pipeline driving a rigged GLB
+      character. Plan 13-06 (event dispatch) wires WS:8765 events from
+      the Python sidecar into the state machine.
+
+      Wave 1 (this plan) ships ONLY:
+        - HTML shell with a transparent body (no opaque background)
+        - <canvas> element the renderer will mount into
+        - placeholder index.ts that logs to confirm the window booted
+
+      Hard rules honoured (frontend-enforcement skill):
+        - No external CDNs, no inline scripts beyond the module import.
+        - Transparent background is inline so the runtime CSP allowlist
+          ("style-src 'self' 'unsafe-inline'") is satisfied without
+          pulling in tokens.css here (which would force the session-UI
+          dark surface into the overlay).
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        overflow: hidden;
+        /* The window decorations are off; nothing here should produce
+           a visible chrome rectangle. */
+        width: 100vw;
+        height: 100vh;
+      }
+      #mascot-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="mascot-canvas" aria-hidden="true"></canvas>
+    <script type="module" src="/src/mascot/index.ts"></script>
+  </body>
+</html>
