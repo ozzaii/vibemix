@@ -1,0 +1,239 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Phase 12 Wave 2 — SettingsApplier.
+
+Routes ``ipc.settings.set`` requests to the appropriate runtime hook + the
+config store. Per the 12-02-PLAN must-have:
+
+    ipc.settings.set dispatches by field:
+      voice            → cascade.set_voice
+      mode             → event_detector.set_mode
+      genre            → genre_profile_loader.reload
+      output_device_id → audio_core.restart_output
+      output_profile   → audio_core.set_mic_gating_profile
+      retention_days   → config_store.set + persist
+      push_to_mute_hotkey → config_store.set + persist (Tauri rebinds)
+
+Every hook ref is **optional** — the cascade agent, event detector,
+audio core, and genre loader are wired by ``12-04`` (the glue plan).
+Until then this module accepts ``None`` for any hook and returns a
+``(False, "<reason>")`` ack so the UI can surface the missing wiring
+without crashing the loop.
+
+Persistence rule: voice, mode, genre, output_device_id, output_profile,
+retention_days, push_to_mute_hotkey ALL persist via ``config_store``.
+``muted`` is transient and not handled here (``SessionLoop`` owns it).
+
+Latency budget (per plan must-haves):
+  * voice / mode / output_device / output_profile → <50ms apply
+  * genre reload → ≤250ms async overlay window (Phase 6 loader.reload is
+    intentionally slow — re-reads the JSON profile + recomputes
+    crest-factor & vocal-detection priors).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Any, Protocol
+
+from vibemix.runtime.config_store import ConfigStore, save_config
+
+log = logging.getLogger("vibemix.runtime.settings")
+
+
+# ---------------------------------------------------------------------------
+# Structural hook protocols — duck-typed; the real implementations live
+# in Phase 4 (cascade), Phase 3 (event detector), Phase 2 (audio core),
+# and Phase 6 (genre loader). SettingsApplier only needs the named
+# method on each ref — never the whole class — so the runtime is
+# testable with thin fakes.
+# ---------------------------------------------------------------------------
+
+
+class _CascadeHook(Protocol):
+    def set_voice(self, voice: str) -> None: ...
+
+
+class _EventDetectorHook(Protocol):
+    def set_mode(self, mode: str) -> None: ...
+
+
+class _AudioCoreHook(Protocol):
+    def restart_output(self, device_id: str | None) -> None: ...
+
+    def set_mic_gating_profile(self, profile: str) -> None: ...
+
+
+class _GenreLoaderHook(Protocol):
+    def reload(self, genre: str) -> None: ...
+
+
+# ---------------------------------------------------------------------------
+# SettingsApplier
+# ---------------------------------------------------------------------------
+
+
+# Per-field overlay window (seconds) — the UI dims the relevant control
+# for this long to mask the apply latency. Voice/mode/output are fast
+# enough that we don't bother awaiting; genre reload reads + re-parses
+# the profile JSON which is intentionally slow (Phase 6).
+GENRE_OVERLAY_S: float = 0.25
+
+
+class SettingsApplier:
+    """Apply a single ``ipc.settings.set`` field to the runtime + config.
+
+    Constructor accepts every hook as ``Optional`` so Phase 12 Wave 2
+    can ship before Wave 3/4 wires the real refs. Tests pass fakes
+    (MagicMock) for the hooks they care about and ``None`` for the rest.
+
+    ``config_store`` is the ONE non-optional ref — without it we can't
+    persist anything and there's no point running.
+    """
+
+    def __init__(
+        self,
+        *,
+        config_store: ConfigStore,
+        cascade_agent: _CascadeHook | None = None,
+        event_detector: _EventDetectorHook | None = None,
+        audio_core: _AudioCoreHook | None = None,
+        genre_loader: _GenreLoaderHook | None = None,
+    ) -> None:
+        self.config_store = config_store
+        self.cascade_agent = cascade_agent
+        self.event_detector = event_detector
+        self.audio_core = audio_core
+        self.genre_loader = genre_loader
+
+    # ------------------------------------------------------------------
+    # Dispatch entry point
+    # ------------------------------------------------------------------
+
+    async def apply(self, field: str, value: Any) -> tuple[bool, str | None]:
+        """Apply ``field=value`` to the runtime + config.
+
+        Returns ``(success, error)``. On success, ``error`` is ``None``;
+        on failure (missing hook, bad value, hook raised), ``success``
+        is ``False`` and ``error`` is a one-line user-facing reason.
+
+        Never raises — exceptions are caught and converted to error
+        acks so the calling handler can emit ``ipc.error`` (or a
+        partial ack) without crashing the WS loop.
+        """
+        try:
+            if field == "voice":
+                return await self._apply_voice(value)
+            if field == "mode":
+                return await self._apply_mode(value)
+            if field == "genre":
+                return await self._apply_genre(value)
+            if field == "output_device_id":
+                return await self._apply_output_device(value)
+            if field == "output_profile":
+                return await self._apply_output_profile(value)
+            if field == "retention_days":
+                return await self._apply_retention(value)
+            if field == "push_to_mute_hotkey":
+                return await self._apply_hotkey(value)
+            return (False, f"unknown settings field: {field!r}")
+        except Exception as e:  # pragma: no cover — guard against bad hooks
+            log.exception("SettingsApplier.apply(%r, %r) raised", field, value)
+            return (False, f"{type(e).__name__}: {e}")
+
+    # ------------------------------------------------------------------
+    # Per-field handlers
+    # ------------------------------------------------------------------
+
+    async def _apply_voice(self, value: Any) -> tuple[bool, str | None]:
+        if not isinstance(value, str) or not value:
+            return (False, "voice must be a non-empty string")
+        if self.cascade_agent is None:
+            # TODO(phase-12-04): wire real cascade_agent ref
+            return (False, "cascade_agent not wired")
+        self.cascade_agent.set_voice(value)
+        self.config_store.voice = value
+        save_config(self.config_store)
+        return (True, None)
+
+    async def _apply_mode(self, value: Any) -> tuple[bool, str | None]:
+        if value not in ("hype", "coach"):
+            return (False, f"mode must be 'hype' or 'coach', got {value!r}")
+        if self.event_detector is None:
+            # TODO(phase-12-04): wire real event_detector ref
+            return (False, "event_detector not wired")
+        self.event_detector.set_mode(value)
+        self.config_store.mode = value
+        save_config(self.config_store)
+        return (True, None)
+
+    async def _apply_genre(self, value: Any) -> tuple[bool, str | None]:
+        if not isinstance(value, str) or not value:
+            return (False, "genre must be a non-empty string")
+        if self.genre_loader is None:
+            # Phase 6's genre_profile_loader is the real ref; if it isn't
+            # injected we still persist (so a restart picks it up) and
+            # return success with a soft warning. The settings UI logs
+            # an "applied on next launch" toast in that path.
+            log.warning(
+                "genre_loader not wired — persisted %r but live reload deferred", value
+            )
+            self.config_store.genre = value
+            save_config(self.config_store)
+            return (True, None)
+        # 250ms overlay window — the UI dims the control for this long
+        # so the reload feels deliberate rather than janky.
+        await asyncio.sleep(GENRE_OVERLAY_S)
+        self.genre_loader.reload(value)
+        self.config_store.genre = value
+        save_config(self.config_store)
+        return (True, None)
+
+    async def _apply_output_device(self, value: Any) -> tuple[bool, str | None]:
+        # Accept str or None (auto). Reject other types.
+        if value is not None and not isinstance(value, str):
+            return (False, "output_device_id must be string or null")
+        if self.audio_core is None:
+            # TODO(phase-12-04): wire real audio_core ref
+            return (False, "audio_core not wired")
+        self.audio_core.restart_output(value)
+        self.config_store.output_device_id = value
+        save_config(self.config_store)
+        return (True, None)
+
+    async def _apply_output_profile(self, value: Any) -> tuple[bool, str | None]:
+        if value not in ("hp", "spk"):
+            return (False, f"output_profile must be 'hp' or 'spk', got {value!r}")
+        if self.audio_core is None:
+            # TODO(phase-12-04): wire real audio_core ref
+            return (False, "audio_core not wired")
+        self.audio_core.set_mic_gating_profile(value)
+        self.config_store.output_profile = value
+        save_config(self.config_store)
+        return (True, None)
+
+    async def _apply_retention(self, value: Any) -> tuple[bool, str | None]:
+        try:
+            iv = int(value)
+        except (TypeError, ValueError):
+            return (False, f"retention_days must be an integer, got {value!r}")
+        if iv < 0:
+            return (False, "retention_days must be ≥ 0")
+        # No runtime hook — Phase 15 reads this at boot to prune session
+        # recordings. Persist only.
+        self.config_store.retention_days = iv
+        save_config(self.config_store)
+        return (True, None)
+
+    async def _apply_hotkey(self, value: Any) -> tuple[bool, str | None]:
+        if not isinstance(value, str) or not value:
+            return (False, "push_to_mute_hotkey must be a non-empty string")
+        # No runtime hook — the Tauri shell owns global-shortcut binding
+        # via ``tauri-plugin-global-shortcut`` and rebinds on each launch.
+        # Persist only.
+        self.config_store.push_to_mute_hotkey = value
+        save_config(self.config_store)
+        return (True, None)
+
+
+__all__ = ["SettingsApplier", "GENRE_OVERLAY_S"]
