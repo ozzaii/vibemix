@@ -74,7 +74,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // @ts-expect-error — restore the original WebSocket.
   globalThis.WebSocket = originalWebSocket;
   vi.useRealTimers();
 });
