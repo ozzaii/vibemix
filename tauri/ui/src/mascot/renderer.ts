@@ -30,6 +30,7 @@ import {
   AnimationAction,
   AnimationMixer,
   Box3,
+  Color,
   DirectionalLight,
   Object3D,
   PerspectiveCamera,
@@ -39,6 +40,11 @@ import {
 } from "three";
 
 import type { LoadedAssets } from "./asset-loader.js";
+import type { MoodProfile } from "./mood.js";
+import {
+  spawnParticlePuff,
+  type ParticlePuffController,
+} from "./particle-puff.js";
 import type { MascotState } from "./types.js";
 
 // ── Tuning constants (CONTEXT Area 2) ─────────────────────────────────────
@@ -87,6 +93,18 @@ export class MascotRenderer {
   private currentAction: AnimationAction | null = null;
   private disposed = false;
 
+  // ── Plan 13-07 — mood + particle state ────────────────────────────────
+  /** AmbientLight reference — Plan 13-07 setMoodLighting updates intensity. */
+  private readonly ambientLight: AmbientLight;
+  /** DirectionalLight reference — Plan 13-07 setMoodLighting updates intensity. */
+  private readonly directionalLight: DirectionalLight;
+  /** Character root — Plan 13-07 uses for head-position lookup. */
+  private readonly characterRoot: Object3D;
+  /** Cached head/torso position — computed lazily on first puff. */
+  private cachedHeadPosition: Vector3 | null = null;
+  /** Live ParticlePuff controllers; ticked each frame, filtered when dead. */
+  private puffs: ParticlePuffController[] = [];
+
   constructor(canvas: HTMLCanvasElement, assets: LoadedAssets) {
     this.assets = assets;
 
@@ -107,16 +125,21 @@ export class MascotRenderer {
 
     // ── Scene + lights ────────────────────────────────────────────────────
     this.scene = new Scene();
-    this.scene.add(new AmbientLight(0xffffff, AMBIENT_INTENSITY));
-    const dir = new DirectionalLight(0xffffff, DIRECTIONAL_INTENSITY);
-    dir.position.set(...DIRECTIONAL_POSITION);
+    this.ambientLight = new AmbientLight(0xffffff, AMBIENT_INTENSITY);
+    this.scene.add(this.ambientLight);
+    this.directionalLight = new DirectionalLight(
+      0xffffff,
+      DIRECTIONAL_INTENSITY,
+    );
+    this.directionalLight.position.set(...DIRECTIONAL_POSITION);
     // No shadows: the canvas is transparent + we have no ground plane to
     // catch a shadow. castShadow off keeps the GPU cost flat.
-    dir.castShadow = false;
-    this.scene.add(dir);
+    this.directionalLight.castShadow = false;
+    this.scene.add(this.directionalLight);
 
     // ── Character + mixer ────────────────────────────────────────────────
     const characterRoot = assets.character.scene;
+    this.characterRoot = characterRoot;
     this.scene.add(characterRoot);
 
     const skinnedMesh = findSkinnedMesh(characterRoot);
@@ -218,14 +241,94 @@ export class MascotRenderer {
   }
 
   /**
-   * Called from the rAF loop in index.ts. Advances the AnimationMixer and
-   * draws the scene. `deltaSeconds` comes from `clock.getDelta()` so the
-   * caller controls the wall-clock source.
+   * Called from the rAF loop in index.ts. Advances the AnimationMixer,
+   * progresses live particle puffs, and draws the scene. `deltaSeconds`
+   * comes from `clock.getDelta()` so the caller controls the wall-clock
+   * source.
    */
   tick(deltaSeconds: number): void {
     if (this.disposed) return;
     this.mixer.update(deltaSeconds);
+
+    // ── Plan 13-07 — advance + GC puffs ────────────────────────────────
+    if (this.puffs.length > 0) {
+      for (const puff of this.puffs) puff.update(deltaSeconds);
+      this.puffs = this.puffs.filter((p) => p.alive);
+    }
+
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // ── Plan 13-07 — public mood + puff API ──────────────────────────────
+
+  /**
+   * Compute (and cache) the head/torso anchor used as the puff origin.
+   * Strategy: walk the character skeleton for a bone named `Head` or
+   * `mixamorigHead`; if found, return its world-position. Else fall back
+   * to the bounding-box top of the character root.
+   *
+   * Lazy: computed once on first puff, then cached for the renderer's
+   * lifetime. The character root doesn't move at runtime — only the
+   * skeleton bones do — so a stale head position would only be wrong by
+   * the character's animation amplitude (~10cm), which the puff hides
+   * anyway. Worth the perf savings.
+   */
+  private getHeadPosition(): Vector3 {
+    if (this.cachedHeadPosition) return this.cachedHeadPosition.clone();
+
+    // Prefer a "Head"-named bone in the skeleton.
+    let found: Object3D | null = null;
+    this.characterRoot.traverse((node) => {
+      if (found) return;
+      const name = (node.name ?? "").toLowerCase();
+      if (name === "head" || name === "mixamorighead") {
+        found = node;
+      }
+    });
+
+    const out = new Vector3();
+    if (found !== null) {
+      (found as Object3D).getWorldPosition(out);
+    } else {
+      // Fallback: bounding-box top, slightly below for torso framing.
+      const box = new Box3().setFromObject(this.characterRoot);
+      box.getCenter(out);
+      const size = new Vector3();
+      box.getSize(size);
+      out.y = (box.max.y - size.y * 0.3);
+    }
+
+    this.cachedHeadPosition = out.clone();
+    return out;
+  }
+
+  /**
+   * Spawn a particle puff at the head/torso anchor with the given colour.
+   * Caller (index.ts) passes a THREE.Color derived from the destination
+   * mood's accent CSS variable; this method does not know about moods.
+   *
+   * Each puff is independently controlled — multiple concurrent puffs
+   * are allowed (e.g. user hammering the mood selector). T-13-07-02
+   * threat is bounded by the 50-particles × 500ms lifetime + per-frame
+   * GC in tick().
+   */
+  playParticlePuff(color: Color): void {
+    if (this.disposed) return;
+    const origin = this.getHeadPosition();
+    const ctrl = spawnParticlePuff(this.scene, origin, color);
+    this.puffs.push(ctrl);
+  }
+
+  /**
+   * Update ambient + directional light intensities to match the given
+   * mood profile. Called when a `mood_change` bus event arrives — the
+   * lighting shift, combined with the puff and the animation-pool swap,
+   * makes the persona feel different on the same rig.
+   */
+  setMoodLighting(profile: MoodProfile): void {
+    if (this.disposed) return;
+    this.ambientLight.intensity = profile.ambient_intensity;
+    this.directionalLight.intensity = profile.key_intensity;
   }
 
   /**
@@ -247,6 +350,15 @@ export class MascotRenderer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    // Plan 13-07 — end any live puffs (per-puff geometry/material dispose).
+    for (const puff of this.puffs) {
+      try {
+        puff.end();
+      } catch {
+        // best-effort cleanup
+      }
+    }
+    this.puffs = [];
     // Stop the mixer's actions.
     this.mixer.stopAllAction();
     // Walk the scene, dispose any geometry/material we own.

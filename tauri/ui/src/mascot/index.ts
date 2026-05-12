@@ -28,10 +28,15 @@
  *      bpm=128/confidence=0.85 and a ramping downbeat_phase.
  */
 
-import { Clock } from "three";
+import { Clock, Color } from "three";
 
 import { loadMascotAssets } from "./asset-loader.js";
 import { dispatchEvent, type SnapshotSlice } from "./event-dispatcher.js";
+import {
+  MOOD_PROFILES,
+  getCurrentMood,
+  setCurrentMood,
+} from "./mood.js";
 import { MascotRenderer } from "./renderer.js";
 import {
   applyTransition,
@@ -42,6 +47,8 @@ import {
 } from "./state-machine.js";
 import type { MascotState, StateRequest, StateTrigger } from "./types.js";
 import { connectMascotBus, type MascotBusClient } from "./ws-client.js";
+
+type MoodName = "hype-man" | "teacher" | "coach";
 
 const TAG = "[mascot]";
 
@@ -64,6 +71,14 @@ const MOCK_BPM_CONFIDENCE = 0.85;
 interface MascotDevHandle {
   requestState: (state: MascotState, opts?: Partial<StateRequest>) => void;
   getMachine: () => Readonly<MachineState>;
+  /**
+   * Plan 13-07 — drive a mood swap (puff + lighting + idle_default
+   * transition). Plan 13-06 will call the same handler from the WS bus
+   * `ipc.mascot.mood_change` message handler.
+   */
+  setMood: (mood: MoodName) => void;
+  /** Current cached mood (mirror of canonical sidecar mood). */
+  getMood: () => MoodName;
 }
 
 declare global {
@@ -328,7 +343,88 @@ async function boot(): Promise<void> {
     if (mockTimer !== null) clearInterval(mockTimer);
   });
 
-  // ── DEV-only public API ─────────────────────────────────────────────────
+  // ── Plan 13-07 — mood-change handler ─────────────────────────────────
+  // Plan 13-06 will route ipc.mascot.mood_change → handleMoodChange(); for
+  // now this is exposed via the DEV global only. The handler is the single
+  // authoritative entry point for the four-step mood swap:
+  //   1. setCurrentMood (local cache update)
+  //   2. compute accent THREE.Color from --accent CSS var
+  //   3. renderer.playParticlePuff (visual mask)
+  //   4. renderer.setMoodLighting (ambient/key intensity shift)
+  // The state machine independently transitions to `puff_particle` (Plan
+  // 13-06 dispatcher), then to MOOD_PROFILES[mood].idle_default (the
+  // mood-aware boot/return state) — we drive that here in step 5.
+
+  /**
+   * Resolve a CSS variable to a THREE.Color. Falls back to phosphor amber
+   * if the var is missing/empty (the variable may not be present in the
+   * mascot window's reduced stylesheet at boot).
+   *
+   * The fallback amber hex is the canonical --phosphor token VALUE
+   * (#ffa12e) from tokens.css — duplicated here only as a literal-string
+   * default for THREE.Color when CSS resolution fails. tokens.css remains
+   * the single source-of-truth for accent paint at the CSS layer.
+   */
+  function resolveCssColor(varName: string, fallback: string): Color {
+    try {
+      const root = document.documentElement;
+      const raw = getComputedStyle(root).getPropertyValue(varName).trim();
+      const value = raw.length > 0 ? raw : fallback;
+      return new Color(value);
+    } catch {
+      return new Color(fallback);
+    }
+  }
+
+  function handleMoodChange(mood: MoodName): void {
+    // Step 1 — update local cache (throws on unknown; bus-side validator
+    // catches it first, this is belt-and-braces).
+    setCurrentMood(mood);
+    const profile = MOOD_PROFILES[mood];
+
+    // Step 2 — pick destination-mood tint.
+    //   hype-man → phosphor amber (warm) — --phosphor
+    //   teacher  → cream — falls back to phosphor-warm if no --ink-paper
+    //   coach    → slate — falls back to ink-deep
+    let color: Color;
+    if (mood === "hype-man") {
+      color = resolveCssColor("--phosphor", "#ffa12e");
+    } else if (mood === "teacher") {
+      // tokens.css doesn't carry a cream var; the cream literal here is
+      // a deliberate, plan-authorised fallback (PLAN.md Task 2 step 2b).
+      color = resolveCssColor("--phosphor-soft", "#efe6d6");
+    } else {
+      // coach — slate; --ink-deep is charcoal-grey from tokens.css.
+      color = resolveCssColor("--ink-deep", "#3d424c");
+    }
+
+    // Steps 3 + 4 — fire visual.
+    renderer.playParticlePuff(color);
+    renderer.setMoodLighting(profile);
+
+    // Step 5 — independently schedule the idle_default return. The
+    // state-machine's normal `puff_particle` → idle handling lives in
+    // Plan 13-06's dispatcher (which subscribes to mood_change too);
+    // here we ensure that even without the dispatcher, the mascot ends
+    // up in the new mood's idle_default after the puff. We request the
+    // mood-aware idle state immediately — the puff effect masks the
+    // crossfade visually.
+    const now = performance.now();
+    const request: StateRequest = {
+      state: profile.idle_default,
+      trigger: "mood_swap",
+    };
+    const plan = planTransition(machine, request, now);
+    machine = applyTransition(machine, plan, now);
+    if (plan.action === "switch_now" && plan.target) {
+      renderer.crossFadeTo(plan.target, plan.blendMs);
+    }
+    console.log(`${TAG} mood change → ${mood} (idle_default=${profile.idle_default})`);
+  }
+
+  // ── DEV-only public API ───────────────────────────────────────────────
+  // `import.meta.env.DEV` is replaced at build time by Vite — production
+  // bundles see `false` and tree-shake the entire branch out.
   if (import.meta.env.DEV) {
     const handle: MascotDevHandle = {
       requestState(state, opts) {
@@ -353,11 +449,17 @@ async function boot(): Promise<void> {
       getMachine() {
         return machine;
       },
+      setMood(mood) {
+        handleMoodChange(mood);
+      },
+      getMood() {
+        return getCurrentMood();
+      },
     };
     window.__mascot = handle;
     // eslint-disable-next-line no-console
     console.log(
-      `${TAG} DEV mode — window.__mascot exposed: requestState(state, opts), getMachine(); mockMode=${String(mockMode)}`,
+      `${TAG} DEV mode — window.__mascot exposed: requestState, getMachine, setMood, getMood; mockMode=${String(mockMode)}`,
     );
   }
 
