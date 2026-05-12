@@ -9,14 +9,17 @@
     "check:ipc": "npm run codegen:ipc && tsc --noEmit",
     "test": "vitest run --reporter=dot",
     "dev": "vite",
-    "build": "tsc --noEmit && vite build"
+    "build": "tsc --noEmit && vite build",
+    "build:mascot": "node scripts/build-mascot-bundle.mjs"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.0.0",
     "@tauri-apps/api": "^2.11",
     "@tauri-apps/plugin-shell": "^2.3",
     "@tauri-apps/plugin-store": "^2.4",
     "ajv": "^8.20",
     "ajv-formats": "^3.0",
+    "gltf-pipeline": "^4.1.0",
     "jsdom": "^29.1.1",
     "json-schema-to-typescript": "^15.0",
     "typescript": "^5.7",
