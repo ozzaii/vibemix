@@ -44,12 +44,19 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Phase 12 Wave 3 — push-to-mute global shortcut.
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        // Eight webview-callable commands (capability allowlist mirrors).
+        // Twelve webview-callable commands (capability allowlist mirrors).
+        // Phase 13 Plan 02 adds 4 mascot commands:
+        //   read_mascot_window_state, write_mascot_window_state,
+        //   set_mascot_visible, set_mascot_click_through
         .invoke_handler(tauri::generate_handler![
             ws_client::forward_ipc_to_sidecar,
             sidecar::restart_sidecar,
             config::read_first_run_state,
             config::write_first_run_state,
+            config::read_mascot_window_state,
+            config::write_mascot_window_state,
+            config::set_mascot_visible,
+            config::set_mascot_click_through,
             permissions::open_screen_recording_settings,
             permissions::open_microphone_settings,
             permissions::request_microphone_permission,
