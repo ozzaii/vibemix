@@ -1,36 +1,79 @@
-//! Phase 11 Wave 2 — WS bus client.
+//! Phase 11 Wave 2 + Wave 4 — WS bus client.
 //!
-//! Connects to `ws://127.0.0.1:8765` (the Python sidecar's existing
-//! `vibemix.runtime.ws_bus` from Phase 4) and forwards every inbound
-//! `Message::Text` payload to the webview as `ipc:<type>` via
-//! `tauri::Emitter`. Webview never opens its own socket — RESEARCH
-//! anti-pattern §"Webview hardcoded localhost".
+//! Connects to `ws://127.0.0.1:8765` (the Python sidecar's
+//! `vibemix.runtime.ws_bus` from Phase 4 / wizard bus from Wave 4) and
+//! forwards every inbound `Message::Text` payload to the webview as
+//! `ipc:<type>` via `tauri::Emitter`. Webview never opens its own
+//! socket — RESEARCH anti-pattern §"Webview hardcoded localhost".
 //!
 //! Reconnects with exponential backoff 250 ms → 5000 ms cap.
+//!
+//! Wave 4 adds the outbound half: `forward_ipc_to_sidecar` is a
+//! `#[tauri::command]` the webview invokes to send an ipc.* envelope
+//! to the sidecar. The active WebSocket `SplitSink` is parked behind
+//! a `WsClientHandle` (managed Tauri state); the command grabs the
+//! lock, serializes the JSON, and sends it. Disconnected → returns
+//! a structured error which the TS client surfaces.
 //!
 //! Validation rule (per plan): we do NOT validate the schema here —
 //! Python validates on serialize, webview validates on receive via ajv
 //! (Wave 0). Double validation in Rust adds latency without value.
 
+use std::sync::Arc;
 use std::time::Duration;
 
-use futures_util::StreamExt;
-use tauri::{AppHandle, Emitter};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use futures_util::stream::SplitSink;
+use futures_util::{SinkExt, StreamExt};
+use tauri::{AppHandle, Emitter, Manager};
+use tokio::net::TcpStream;
+use tokio::sync::Mutex;
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::Message,
+    MaybeTlsStream,
+    WebSocketStream,
+};
 
 const WS_URL: &str = "ws://127.0.0.1:8765";
 const BACKOFF_START_MS: u64 = 250;
 const BACKOFF_CAP_MS: u64 = 5000;
 
+type WsSink = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
+
+/// Managed state holding the outbound `SplitSink` of the active WS
+/// connection. Wave 4 `forward_ipc_to_sidecar` reads this — None while
+/// disconnected, Some(sink) while the run loop holds an open socket.
+///
+/// Wrapped in `Arc<Mutex<Option<...>>>` so:
+///   * Cloning the handle hands out cheap pointer-copies to async tasks.
+///   * The run loop can swap the sink on reconnect.
+///   * `#[tauri::command]` body can `lock().await` to send without
+///     awaiting the whole loop.
+#[derive(Default, Clone)]
+pub struct WsClientHandle {
+    pub tx: Arc<Mutex<Option<WsSink>>>,
+}
+
+/// Run the WS bus client forever. Reconnects with exponential backoff
+/// 250 → 5000ms cap. On every connect, parks the SplitSink into the
+/// managed `WsClientHandle` so the outbound command works.
 pub async fn run_ws_client(app: AppHandle) {
+    let handle = app.state::<WsClientHandle>().inner().clone();
     let mut backoff_ms: u64 = BACKOFF_START_MS;
     loop {
         match connect_async(WS_URL).await {
-            Ok((mut ws, _resp)) => {
+            Ok((ws, _resp)) => {
                 backoff_ms = BACKOFF_START_MS;
                 app.emit("ws-state", "connected").ok();
 
-                while let Some(msg) = ws.next().await {
+                let (sink, mut stream) = ws.split();
+                // Park the outbound sink so forward_ipc_to_sidecar can use it.
+                {
+                    let mut guard = handle.tx.lock().await;
+                    *guard = Some(sink);
+                }
+
+                while let Some(msg) = stream.next().await {
                     match msg {
                         Ok(Message::Text(text)) => {
                             // Parse to extract envelope `type`; if parse fails
@@ -53,6 +96,14 @@ pub async fn run_ws_client(app: AppHandle) {
                         _ => {}
                     }
                 }
+
+                // Connection ended — drop the sink so subsequent calls
+                // surface "WS not connected" instead of writing to a
+                // dead socket.
+                {
+                    let mut guard = handle.tx.lock().await;
+                    *guard = None;
+                }
             }
             Err(_e) => {
                 // Sidecar not up yet, or bus crashed — fall through to backoff.
@@ -65,11 +116,24 @@ pub async fn run_ws_client(app: AppHandle) {
     }
 }
 
-/// Webview-callable forward: send an arbitrary ipc.* envelope back to the
-/// sidecar. Wave 4 wires the body (needs a managed WsClientHandle with the
-/// outbound `SinkExt` half held in the run loop). Wave 2 publishes the
-/// command so the capability allowlist locks at this wave.
+/// Webview-callable forward: send an arbitrary ipc.* envelope to the
+/// sidecar. Wave 4 wires the body — pulls the SplitSink from managed
+/// state, serializes the JSON, sends.
+///
+/// Returns an error string if the WS is not connected (forwarded to the
+/// TS client which surfaces it via Promise.reject + DevTools warning).
 #[tauri::command]
-pub async fn forward_ipc_to_sidecar(_message: serde_json::Value) -> Result<(), String> {
-    Err("forward_ipc_to_sidecar: not yet wired (Wave 4)".into())
+pub async fn forward_ipc_to_sidecar(
+    message: serde_json::Value,
+    state: tauri::State<'_, WsClientHandle>,
+) -> Result<(), String> {
+    let mut guard = state.tx.lock().await;
+    let Some(sink) = guard.as_mut() else {
+        return Err("forward_ipc_to_sidecar: WS not connected".into());
+    };
+    let text = serde_json::to_string(&message).map_err(|e| e.to_string())?;
+    sink.send(Message::Text(text.into()))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
