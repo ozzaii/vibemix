@@ -46,6 +46,7 @@ from vibemix.audio.constants import (
 )
 from vibemix.audio.errors import SampleRateMismatchError
 from vibemix.audio.features import (
+    compute_downbeat_phase,
     energy_curve,
     estimate_bpm,
     long_arc_curve,
@@ -93,6 +94,7 @@ __all__ = [
     "PlaybackQueue",
     "SampleRateMismatchError",
     "VoiceRecorder",
+    "compute_downbeat_phase",
     "energy_curve",
     "estimate_bpm",
     "long_arc_curve",
