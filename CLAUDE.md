@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
@@ -311,3 +315,53 @@ Do not make direct repo edits outside a GSD workflow unless the user explicitly 
 > Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
 > This section is managed by `generate-claude-profile` -- do not edit manually.
 <!-- GSD:profile-end -->
+
+## Commands
+
+This repo is pre-package: no `pyproject.toml`, no lockfile, no test runner wired. Phase 1 of the roadmap is what introduces the unified `vibemix` package + lockfile.
+
+**Run a POC variant** (each launches the mascot overlay first, then the Python script):
+
+```bash
+./run.sh       # cohost.py     — stateless HTTP cascade (Gemini 3 Flash + TTS)
+./run_v2.sh    # cohost_v2.py  — LiveKit + MusicState (most evolved)
+./run_lk.sh    # cohost_lk.py  — LiveKit + heuristic triggers
+```
+
+Each script does `source .venv/bin/activate && exec python3 <variant>.py`. The `.venv/` is Python 3.14; deps were installed ad-hoc via `pip install` (no `requirements.txt` — see CONCERNS.md).
+
+**Smoke tests** (single-file, no runner — invoke directly):
+
+```bash
+python3 test_voice.py          # TTS round-trip
+python3 _test_tts.py           # TTS API smoke test
+python3 _test_multimodal.py    # multimodal LLM — edit hardcoded recording path at line 14 first
+```
+
+**Mascot overlay only** (no Python needed; the overlay is standalone HTML):
+
+```bash
+open "file://$(pwd)/mascot.html"
+```
+
+**Required environment:** `.env` at repo root with `GEMINI_API_KEY=...`. Read via `python-dotenv`.
+
+**macOS prerequisites:** BlackHole 2ch (system audio driver, `brew install blackhole-2ch`), `nowplaying-cli` (`brew install nowplaying-cli`), djay Pro running as the audio source, Pioneer DDJ-FLX4 over USB (optional, graceful fallback).
+
+## Planning Home
+
+`.planning/` is the GSD source of truth — `ROADMAP.md`, `REQUIREMENTS.md`, `PROJECT.md`, `STATE.md`, plus `codebase/*.md` (codebase maps) and `research/*.md` (pre-roadmap research). The codebase maps in `.planning/codebase/` feed the GSD-managed sections of this file. The roadmap is 20 phases; v1 ships before Bravoh's public launch.
+
+When a phase is active, its planning artifacts live under `.planning/phases/<NN>-<slug>/` (CONTEXT.md, RESEARCH.md, PLAN.md, etc.). Read those before touching code on that phase.
+
+## POC = Reference, Devour It
+
+`cohost.py`, `cohost_v2.py`, `cohost_lk.py`, and `cohost.streaming.py.bak` are **trusted intuition to port wholesale**, not legacy to preserve. Kaan iterated on them over real DJ sessions — the encoded decisions (mic gating, evidence-packet shape, event taxonomy, audible-deck heuristics, MIDI maps) are load-bearing IP. Phase 2-13 lift logic out of these into the new package shape.
+
+Default canonical baseline = `cohost_v2.py` (most evolved: `MusicState` + `EventDetector` + audible-deck). Cherry-pick `cohost.py` for `TurnHistory` + the stateless `run_one_turn` cascade pattern. Cherry-pick `cohost_lk.py` for controller-aware triggers + band-shift detection. Tuning constants (e.g. `SILENT_RMS`, `MIC_HOLD_AFTER_AI_MS`, `MUSIC_GAIN_TO_GEMINI`, `MIN_EVENT_GAP_PER_TYPE`) diverge across variants — pick one when porting, document why, don't paper over.
+
+Don't redesign primitives unless `.planning/codebase/CONCERNS.md` or `.planning/research/PITFALLS.md` flags a real bug (e.g., the `np.concatenate`-per-callback regression is genuine — pre-allocate the ring).
+
+## UI Mocks
+
+`mocks/` holds the design contracts referenced by UI phases — notably `vibemix-app-ui.html` (live session UI shape) and `vibemix-cinematic-storyboard.html` (hero demo storyboard). When working on Phases 11–14, treat these as the visual reference, lifted by the `frontend-enforcement` skill.
