@@ -238,4 +238,11 @@ def validate_message(msg: dict) -> None:
     _v(msg)
 
 
-__all__ = ["IpcHandler", "WizardBus", "validate_message", "ws_broadcast"]
+# Phase 12 — ``IpcBus`` is the neutral alias for ``WizardBus`` used by
+# ``SessionLoop``. The bus is mutually exclusive with the wizard at
+# runtime (Tauri spawns one process at a time) and the dispatch surface
+# is identical — so we share the class instead of forking it.
+IpcBus = WizardBus
+
+
+__all__ = ["IpcBus", "IpcHandler", "WizardBus", "validate_message", "ws_broadcast"]

@@ -426,8 +426,22 @@ def test_ws_09_has_ws_flag_dropped():
 
 def test_pkg_05_runtime_package_surface():
     """PKG-05: from vibemix.runtime import coach_loop, diag_loop, ws_broadcast
-    resolves, and __all__ matches."""
+    resolves, and __all__ matches.
+
+    Phase 12 W2 extends the surface with SessionLoop/run_session and
+    re-exports WizardLoop/run_wizard alongside the Phase 4 surface so
+    ``from vibemix.runtime import ...`` is the single import point.
+    """
     import vibemix.runtime as runtime_pkg
     from vibemix.runtime import coach_loop, diag_loop, ws_broadcast  # noqa: F401
+    from vibemix.runtime import SessionLoop, WizardLoop, run_session, run_wizard  # noqa: F401
 
-    assert set(runtime_pkg.__all__) == {"coach_loop", "diag_loop", "ws_broadcast"}
+    assert set(runtime_pkg.__all__) == {
+        "SessionLoop",
+        "WizardLoop",
+        "coach_loop",
+        "diag_loop",
+        "run_session",
+        "run_wizard",
+        "ws_broadcast",
+    }

@@ -109,6 +109,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Run first-run calibration wizard (Phase 11 — Wave 4 fills the runtime).",
     )
+    # Phase 12 W2 — standalone session-loop runtime for sidecar-only IPC.
+    # The full live runtime (audio + cascade) is the default (no flag) and
+    # remains the post-wizard entry; ``--session`` is the structural surface
+    # 12-03/12-04 glue against. Phase 12-04 unifies the two paths.
+    parser.add_argument(
+        "--session",
+        action="store_true",
+        help="Run the standalone session IPC loop (no cascade graph; Phase 12 W2).",
+    )
     return parser.parse_args(argv)
 
 
@@ -464,9 +473,20 @@ async def main() -> None:
 
 def cli_entry(argv: list[str] | None = None) -> None:
     """Synchronous CLI entry. Parses args (``--version`` short-circuits via
-    argparse's ``action="version"``), then runs ``main()`` — unless
-    ``--wizard`` is set, in which case Phase 11 Wave 4's ``run_wizard``
-    boots the calibration wizard runtime."""
+    argparse's ``action="version"``), then routes to one of three runtimes:
+
+    * ``--wizard``           → Phase 11 W4 ``run_wizard`` (calibration flow)
+    * ``--session``          → Phase 12 W2 ``run_session`` (sidecar-only;
+                                no cascade graph — used by 12-03/12-04
+                                glue tests + Tauri shell pre-cascade boot)
+    * (default, both unset)  → Phase 5 ``main()`` (full live runtime —
+                                cascade agent + audio I/O + ws_broadcast)
+
+    The Tauri shell currently spawns ``vibemix --wizard`` on first run
+    and ``vibemix`` (no flag — full runtime) thereafter. Phase 12-04
+    will flip the post-wizard spawn to ``vibemix --session`` once the
+    session loop owns the snapshot path the renderer drives off.
+    """
     args = _parse_args(argv)
     try:
         if args.wizard:
@@ -475,6 +495,14 @@ def cli_entry(argv: list[str] | None = None) -> None:
             from vibemix.runtime.wizard import run_wizard
 
             asyncio.run(run_wizard())
+        elif args.session:
+            # Phase 12 W2 — sidecar-only session loop. The full cascade
+            # graph joins via 12-04; until then this runs the ipc.session.*
+            # + ipc.settings.* surface standalone so the renderer can be
+            # built + tested against a real Python WS bus.
+            from vibemix.runtime.session_loop import run_session
+
+            asyncio.run(run_session())
         else:
             asyncio.run(main())
     except KeyboardInterrupt:
