@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.1.0
 milestone_name: milestone
-status: completed
-last_updated: "2026-05-12T22:30:00.000Z"
+status: executing
+last_updated: "2026-05-12T16:46:43.215Z"
 progress:
   total_phases: 20
-  completed_phases: 12
-  total_plans: 48
-  completed_plans: 36
-  percent: 75
+  completed_phases: 8
+  total_plans: 56
+  completed_plans: 37
+  percent: 66
 ---
 
 # vibemix — State
@@ -22,7 +22,7 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 12 ✅ code-complete (Waves 1-4 shipped; 7 hardware UAT scenarios deferred to Kaan's rig). Phase 13 (Reactive Mascot Avery) is next.
+- **Current focus:** Phase 13 — 3D Mascot Screen Overlay
 - **Milestone:** v1 (Bravoh-wedge drop) — target ship ~3-4 weeks (~early June 2026, before Bravoh public launch).
 - **Project mode:** standard.
 - **Granularity:** fine (20 phases).
@@ -38,7 +38,7 @@ progress:
 
 **Phase 11 close metrics:** 5 waves, 13 task commits, 95+ files created cumulative, **1066 Python tests pass** (978 Phase 10 baseline + 88 new across Wave 0-4) + 13 vitest + 4 cargo test = 1083 total. 1 known pre-existing failure (`test_g5_poc_files_untouched` — mascot.html stale-baseline since post-Phase-5 commit `398f788`); out of scope per CLAUDE.md scope-boundary rule. POC files (cohost*.py / mascot.html / mocks/) diff-untouched against the Phase 11 plan-docs commit (`7e08966`).
 
-Phase: 12 (Live Session UI + Settings Panel) — ✅ CODE-COMPLETE (all 4 waves shipped; UAT pending)
+Phase: 13 (3D Mascot Screen Overlay) — EXECUTING
 
 **Phase 12 ✅ shipped across 4 waves.** ~10,000 LOC across ~62 files. IPC families 19 → 26 (+7). Tests: vitest 13 → 141 (+128); pytest 35 → 1171 (+1136); cargo 4 → 13 (+9). All gates green: typecheck, `npm run check:ipc`, `cargo check`, `cargo test`, pytest. POC files diff-untouched.
 
@@ -48,6 +48,7 @@ Phase: 12 (Live Session UI + Settings Panel) — ✅ CODE-COMPLETE (all 4 waves 
 - **Wave 4 (12-05)** — Settings drawer slide-over (z-50, live session keeps rendering behind backdrop): PERSONA / OUTPUT / HOTKEY / RECORDING / CALIBRATION groups, hotkey-capture state machine, 6-stop knurled retention slider, confirm-dialog modal, gear button wires `openSettings()`. ∞ retention encoded as `36500` sentinel. `12-VERIFICATION.md` status: `human_needed` — 7 hardware UAT scenarios deferred to Kaan's rig.
 
 **Phase 12 deferred items (UAT pending — `human_needed`):**
+
 1. Live UI sustained ≥30 fps on Retina during 60-min session
 2. Mid-session voice/mode/output/profile hot-reload effect verified end-to-end
 3. Push-to-mute drains PlaybackQueue mid-utterance
@@ -56,10 +57,10 @@ Phase: 12 (Live Session UI + Settings Panel) — ✅ CODE-COMPLETE (all 4 waves 
 6. Hotkey rebind round-trip with reserved-combo rejection visible
 7. Re-run calibration tears down session + remounts wizard
 
-Plan: 11-* + 12-01/02/03/04/05 ✅ complete.
+Plan: 1 of 8
 
 - **Phase 12:** ✅ code-complete. UAT deferred to Kaan's rig session.
-- **Status:** Ready for Phase 13 (Reactive Mascot — Avery).
+- **Status:** Executing Phase 13
 - **Progress:** [████████░░] 75%
 
 ```
