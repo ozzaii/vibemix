@@ -22,7 +22,18 @@ from vibemix.prompts.matrix import (
     HYPE_BEGINNER,
     HYPE_INTERMEDIATE,
     HYPE_PRO,
+    MOOD_PERSONAS,
 )
+
+
+def _coach_rendered(template: str, mood: str = "hype-man") -> str:
+    """Apply the Phase 13-05 mood-persona substitution to a COACH_* template.
+
+    The default mood ('hype-man') is what _resolve_prompt_cell picks when
+    VIBEMIX_MOOD is unset (which matches the env state of the Phase 10
+    dispatch tests below — they never set VIBEMIX_MOOD).
+    """
+    return template.replace("{mood_persona}", MOOD_PERSONAS[mood])
 from vibemix.state import MusicState
 
 # ---------- shared minimal stubs (mirror tests/agent/test_dj_cohost.py) ----
@@ -113,9 +124,11 @@ def test_dispatch_02_default_equals_persona_system_instruction(
         ("beginner", "hype", HYPE_BEGINNER),
         ("intermediate", "hype", HYPE_INTERMEDIATE),
         ("pro", "hype", HYPE_PRO),
-        ("beginner", "coach", COACH_BEGINNER),
-        ("intermediate", "coach", COACH_INTERMEDIATE),
-        ("pro", "coach", COACH_PRO),
+        # COACH_* templates carry a {mood_persona} placeholder (Phase 13-05).
+        # The default mood ('hype-man') is substituted at dispatch time.
+        ("beginner", "coach", _coach_rendered(COACH_BEGINNER)),
+        ("intermediate", "coach", _coach_rendered(COACH_INTERMEDIATE)),
+        ("pro", "coach", _coach_rendered(COACH_PRO)),
     ],
 )
 def test_dispatch_03_each_cell_selectable_via_env(
@@ -133,7 +146,9 @@ def test_dispatch_04_pro_coach_via_env(mocker, tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("VIBEMIX_SKILL_LEVEL", "pro")
     monkeypatch.setenv("VIBEMIX_MODE", "coach")
     instructions = _instructions_kw_for_env(mocker, tmp_path)
-    assert instructions == COACH_PRO
+    # Phase 13-05: COACH templates are rendered with the mood persona; the
+    # default mood ('hype-man') is picked when VIBEMIX_MOOD is unset.
+    assert instructions == _coach_rendered(COACH_PRO)
     assert "phrase ended on the 3" in instructions  # COACH_PRO anchor
 
 
@@ -142,7 +157,7 @@ def test_dispatch_05_case_insensitive_via_env(mocker, tmp_path, monkeypatch) -> 
     monkeypatch.setenv("VIBEMIX_SKILL_LEVEL", "PRO")
     monkeypatch.setenv("VIBEMIX_MODE", "COACH")
     instructions = _instructions_kw_for_env(mocker, tmp_path)
-    assert instructions == COACH_PRO
+    assert instructions == _coach_rendered(COACH_PRO)
 
 
 # ---------- gen_cfg.system_instruction also picks up the dispatch ---------
@@ -168,7 +183,8 @@ def test_dispatch_06_gen_cfg_system_instruction_matches_dispatch(
         llm_inst=mocker.MagicMock(),
         tts_inst=mocker.MagicMock(),
     )
-    assert agent._gen_cfg.system_instruction == COACH_BEGINNER
+    # Phase 13-05: mood-persona substitution applies to COACH cells.
+    assert agent._gen_cfg.system_instruction == _coach_rendered(COACH_BEGINNER)
 
 
 # ---------- invalid env values fail loudly --------------------------------
@@ -246,4 +262,4 @@ def test_dispatch_10_re_reading_env_per_instantiation(mocker, tmp_path, monkeypa
     monkeypatch.setenv("VIBEMIX_SKILL_LEVEL", "beginner")
     monkeypatch.setenv("VIBEMIX_MODE", "coach")
     inst2 = _instructions_kw_for_env(mocker, tmp_path)
-    assert inst2 == COACH_BEGINNER
+    assert inst2 == _coach_rendered(COACH_BEGINNER)

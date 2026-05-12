@@ -63,6 +63,9 @@ from vibemix.ui_bus.messages import (
     IpcError,
     IpcErrorPayload,
     LevelPair,
+    # Phase 13 wrappers
+    MascotMoodChange,
+    MascotMoodChangePayload,
     MetersTriple,
     MidiEventEntry,
     PhaseChunk,
@@ -128,6 +131,9 @@ __all__ = [
     "IpcError",
     "IpcErrorPayload",
     "LevelPair",
+    # Phase 13
+    "MascotMoodChange",
+    "MascotMoodChangePayload",
     "MetersTriple",
     "MidiEventEntry",
     "PhaseChunk",
