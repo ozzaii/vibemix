@@ -156,7 +156,9 @@ def test_apply_mood_writes_music_state_and_config_and_emits(
     success, error = _apply(applier, "mood", "teacher")
     assert (success, error) == (True, None)
     assert music_state.mood == "teacher"
-    assert store.mood == "teacher"
+    # mood is persisted via ConfigStore.extra (Phase 13-05 deliberate
+    # choice — keeps the typed Phase-12 ConfigStore surface untouched).
+    assert store.extra.get("mood") == "teacher"
     # Exactly one emit call carrying a valid ipc.mascot.mood_change frame.
     assert ws_bus_spy.emit.await_count == 1
     sent = ws_bus_spy.emit.await_args.args[0]

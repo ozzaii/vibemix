@@ -57,12 +57,21 @@ async def ws_broadcast(
 
     try:
         while not stop_event.is_set():
+            # Phase 13-05 — extend the 30Hz snapshot with mood +
+            # bpm_confidence + downbeat_phase so the mascot renderer
+            # (Plan 13-04) can subscribe to a single stream. Anti-
+            # hallucination: bpm_confidence < 0.6 → renderer skips
+            # beat-locked entry; mood drives clip-pool + voice swap.
             payload = json.dumps(
                 {
                     **levels.snapshot(),
                     "audible": state.audible,
                     "deck": state.audible_deck,
                     "phase": state.phase,
+                    "bpm": state.bpm,
+                    "mood": state.mood,
+                    "bpm_confidence": state.bpm_confidence,
+                    "downbeat_phase": state.downbeat_phase,
                 }
             )
             dead = []

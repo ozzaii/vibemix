@@ -46,6 +46,7 @@ from vibemix.ui_bus import (
     IpcBoot,
     IpcError,
     LevelPair,
+    MascotMoodChange,
     MetersTriple,
     PermissionCheck,
     PermissionState,
@@ -182,6 +183,11 @@ def _minimal_examples() -> list[tuple[str, object]]:
         ),
         ("StatusRecheck", StatusRecheck.make(component="midi")),
         ("IpcError", IpcError.make(reason="invalid payload", original_type="ipc.settings.set")),
+        # Phase 13 wrappers
+        (
+            "MascotMoodChange",
+            MascotMoodChange.make(mood="teacher", previous_mood="hype-man", at=1234.56),
+        ),
     ]
 
 
