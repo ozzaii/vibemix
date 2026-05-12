@@ -14,7 +14,7 @@ progress:
 
 # vibemix — State
 
-**Last updated:** 2026-05-12 (Phase 11 ✅ complete — structural gate; Phase 12 next)
+**Last updated:** 2026-05-12 (Phase 11 ✅ complete; Phase 12 partial — Wave 1 shipped, Waves 2–5 deferred)
 
 ---
 
@@ -22,7 +22,7 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 12 — Live Session UI + Settings Panel (next; Phase 11 ✅ structural gate complete).
+- **Current focus:** Phase 12 — Live Session UI + Settings Panel (Wave 1 ✅ IPC contract; Waves 2–5 ready for follow-up execute).
 - **Milestone:** v1 (Bravoh-wedge drop) — target ship ~3-4 weeks (~early June 2026, before Bravoh public launch).
 - **Project mode:** standard.
 - **Granularity:** fine (20 phases).
@@ -38,8 +38,13 @@ progress:
 
 **Phase 11 close metrics:** 5 waves, 13 task commits, 95+ files created cumulative, **1066 Python tests pass** (978 Phase 10 baseline + 88 new across Wave 0-4) + 13 vitest + 4 cargo test = 1083 total. 1 known pre-existing failure (`test_g5_poc_files_untouched` — mascot.html stale-baseline since post-Phase-5 commit `398f788`); out of scope per CLAUDE.md scope-boundary rule. POC files (cohost*.py / mascot.html / mocks/) diff-untouched against the Phase 11 plan-docs commit (`7e08966`).
 
-Phase: 12 (Live Session UI + Settings Panel) — NEXT
-Plan: 11-01 + 11-02 + 11-03 + 11-04 + 11-05 ✅ complete; Phase 12 plans TBD.
+Phase: 12 (Live Session UI + Settings Panel) — IN PROGRESS (Wave 1 of 5 shipped)
+
+**Phase 12 Wave 1 (12-01 IPC schema) ✅ shipped.** Extends Phase 11's `messages.schema.json` with 7 new ipc.* families (SessionSnapshot 30Hz, SessionMute toggle/ack, SettingsSet/Get/State, StatusRecheck, IpcError). Schema count 19 → 26; definitions 19 → 27 (LevelPair shared helper $ref'd from SessionSnapshot.meters). All payloads `additionalProperties: false`. Python dataclasses mirror with hand-written `@dataclass(frozen=True, slots=True)` per anti-pydantic convention. Asymmetric `SessionMute` payload pattern: `make_toggle()` emits `{toggle: true}` only, `make_ack(muted=...)` emits `{muted: bool}` only — None fields stripped on serialize. `IpcError.original_type` optional, omitted when None. Tests: 31 vitest (was 13) + 68 pytest (42 ui_bus + 26 new ipc — was 35). `scripts/check_ipc_schema.py` green at count 26 == 26.
+
+**Phase 12 Waves 2–5 (sidecar SessionLoop + components + render loop + Settings drawer) deferred** to a follow-up `gsd-execute-phase 12 --wave 2..5` session with subagent dispatch. Plans 12-02 through 12-05 are authoritative and locked. UI-SPEC.md is the executable design contract — every component referenced by file path against the mocks/vibemix-app-ui.html visual reference.
+
+Plan: 11-01 + 11-02 + 11-03 + 11-04 + 11-05 ✅ complete; 12-01 ✅ shipped; 12-02 + 12-03 + 12-04 + 12-05 plans authored, deferred.
 
 - **Phase 11:** ✅ Tauri 2.x shell wraps Python sidecar (PyInstaller --onedir) + 3-step calibration wizard — structural gate.
 - **Plan:** 11-01 + 11-02 + 11-03 + 11-04 + 11-05 closed.
