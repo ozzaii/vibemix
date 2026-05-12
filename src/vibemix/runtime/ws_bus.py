@@ -77,3 +77,165 @@ async def ws_broadcast(
     finally:
         server.close()
         await server.wait_closed()
+
+
+# ---------------------------------------------------------------------------
+# Phase 11 Wave 4 — WizardBus: handler-registration + ipc.* dispatch.
+# ---------------------------------------------------------------------------
+#
+# The WizardBus runs ONLY in ``--wizard`` mode (the live-runtime ``main()``
+# uses ``ws_broadcast`` above which has a different lifecycle and is
+# mascot-only). Both bind ``127.0.0.1:8765`` — they never run at the same
+# time because the Tauri shell spawns ``vibemix --wizard`` first, waits for
+# ``ipc.wizard.done``, then respawns ``vibemix`` without the flag.
+#
+# Inbound message dispatch:
+#   1. Parse JSON → dict.
+#   2. ``vibemix.ui_bus.validator.validate_message(dict)`` — drop frame on
+#      ValidationError; do NOT close the socket (T-11-W4-04 mitigation).
+#   3. Route to a handler registered for ``msg["type"]``; if none, log + drop.
+#
+# Outbound: ``emit(dict)`` validates the schema before broadcasting (catches
+# Python-side schema drift at runtime — RESEARCH Pitfall 10).
+#
+# The mascot.html broadcast contract is NOT extended here. The wizard does
+# not broadcast levels/state — those are computed by the live-runtime
+# ``state_refresh_loop`` which only exists in the non-wizard process.
+
+
+from collections.abc import Awaitable, Callable
+import sys as _sys
+
+import jsonschema as _jsonschema
+
+from vibemix.audio import WS_HOST, WS_PORT
+from vibemix.ui_bus.validator import validate_message as _validate_outbound
+
+IpcHandler = Callable[[dict], Awaitable[None]]
+
+
+class WizardBus:
+    """ipc.* WS bus for the calibration wizard (Phase 11 Wave 4).
+
+    Wraps ``websockets.serve(127.0.0.1:8765)`` with a per-message-type
+    handler dispatch table. Handlers are registered via ``register_handler``
+    and invoked when an inbound frame matches their ``type``. Outbound
+    broadcasts via ``emit`` validate the schema before send.
+
+    Single-writer assumption: this class is constructed once per wizard
+    process. ``start()`` opens the server; ``stop()`` closes it. The
+    sidecar exits cleanly when the WizardLoop sets its stop event after
+    receiving ``ipc.wizard.done``.
+    """
+
+    def __init__(self) -> None:
+        self._clients: set = set()
+        self._handlers: dict[str, IpcHandler] = {}
+        self._server: object | None = None
+
+    def register_handler(self, message_type: str, handler: IpcHandler) -> None:
+        """Register an async handler for a given ipc.* message type.
+
+        Multiple registrations for the same type overwrite — last-write
+        wins. The WizardLoop registers all 8 handlers up front, so this
+        case shouldn't fire in production.
+        """
+        self._handlers[message_type] = handler
+
+    async def start(self) -> None:
+        """Open the WS server on 127.0.0.1:8765. Idempotent — second
+        call is a no-op if already running."""
+        if self._server is not None:
+            return
+        self._server = await websockets.serve(self._handler, WS_HOST, WS_PORT)
+        print(
+            f"-> wizard bus on ws://{WS_HOST}:{WS_PORT} "
+            f"(handlers: {len(self._handlers)})"
+        )
+
+    async def stop(self) -> None:
+        """Close the server. Safe to call multiple times."""
+        if self._server is None:
+            return
+        self._server.close()  # type: ignore[attr-defined]
+        await self._server.wait_closed()  # type: ignore[attr-defined]
+        self._server = None
+        self._clients.clear()
+
+    async def emit(self, msg: dict) -> None:
+        """Broadcast an ipc.* message to all connected clients.
+
+        Validates against the schema first — Python-side schema drift
+        surfaces here at runtime (NOT just at codegen / CI). Validation
+        failure raises; the WizardLoop wraps emits in try/except so a
+        bad outbound frame doesn't crash the wizard.
+        """
+        _validate_outbound(msg)
+        payload = json.dumps(msg, separators=(",", ":"))
+        dead = []
+        for c in self._clients:
+            try:
+                await c.send(payload)
+            except Exception:
+                dead.append(c)
+        for c in dead:
+            self._clients.discard(c)
+
+    async def _handler(self, ws) -> None:
+        """Per-connection inbound loop. Accepts ipc.* frames, dispatches
+        to the registered handler, drops invalid frames without closing
+        the socket (T-11-W4-04)."""
+        self._clients.add(ws)
+        try:
+            async for raw in ws:
+                if not isinstance(raw, str):
+                    # Binary frames are not part of the ipc.* contract; ignore.
+                    continue
+                try:
+                    msg = json.loads(raw)
+                except json.JSONDecodeError as e:
+                    print(f"[wizard bus] non-JSON frame: {e}", file=_sys.stderr)
+                    continue
+                if not isinstance(msg, dict):
+                    print(
+                        f"[wizard bus] top-level not object: {type(msg).__name__}",
+                        file=_sys.stderr,
+                    )
+                    continue
+                try:
+                    validate_message(msg)
+                except _jsonschema.ValidationError as e:
+                    print(f"[wizard bus] schema violation: {e.message}", file=_sys.stderr)
+                    continue
+                msg_type = msg.get("type", "")
+                handler = self._handlers.get(msg_type)
+                if handler is None:
+                    print(
+                        f"[wizard bus] no handler for {msg_type}",
+                        file=_sys.stderr,
+                    )
+                    continue
+                try:
+                    await handler(msg)
+                except Exception as e:
+                    # Handler-internal failure must not close the WS.
+                    print(
+                        f"[wizard bus] handler {msg_type} failed: {e}",
+                        file=_sys.stderr,
+                    )
+        except Exception:
+            pass
+        finally:
+            self._clients.discard(ws)
+
+
+def validate_message(msg: dict) -> None:
+    """Thin re-export of ``vibemix.ui_bus.validator.validate_message`` for
+    internal use. Exposed at this scope so ``WizardBus`` can be tested
+    with monkey-patched validation without reaching into ``ui_bus``.
+    """
+    from vibemix.ui_bus.validator import validate_message as _v
+    _v(msg)
+
+
+__all__ = ["IpcHandler", "WizardBus", "validate_message", "ws_broadcast"]
