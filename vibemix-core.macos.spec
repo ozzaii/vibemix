@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# vibemix.spec.macos — PyInstaller --onedir spec for the macOS sidecar.
+# vibemix-core.macos.spec — PyInstaller --onedir spec for the macOS sidecar.
 #
 # [VERIFIED: PyInstaller Context7 /pyinstaller/pyinstaller]
 # [VERIFIED: 11-RESEARCH.md §Pitfall 2 — hidden-import misses]
@@ -15,7 +15,7 @@
 # false positives). NEVER set ``console=True`` (Tauri spawns this headless;
 # we don't want a stray terminal window during normal user runs).
 #
-# Run via: ``uv run pyinstaller vibemix.spec.macos --clean --noconfirm``.
+# Run via: ``uv run pyinstaller vibemix-core.macos.spec --clean --noconfirm``.
 
 # ruff: noqa: F821  # PyInstaller injects Analysis / PYZ / EXE / COLLECT at
 # spec-file exec time; the linter doesn't know about them.
@@ -112,7 +112,7 @@ datas += collect_data_files(
 _IPC_SCHEMA = Path("tauri/ui/src/ipc/messages.schema.json")
 if not _IPC_SCHEMA.exists():
     raise RuntimeError(
-        f"vibemix.spec.macos: expected IPC schema at {_IPC_SCHEMA} — "
+        f"vibemix-core.macos.spec: expected IPC schema at {_IPC_SCHEMA} — "
         "Phase 11 Wave 0 should have created it."
     )
 datas += [(str(_IPC_SCHEMA), "tauri/ui/src/ipc")]
@@ -122,12 +122,12 @@ datas += [(str(_IPC_SCHEMA), "tauri/ui/src/ipc")]
 # them explicitly so a missing-file regression fails the build loudly.
 _MIDI_PROFILES = Path("src/vibemix/midi/profiles")
 if not _MIDI_PROFILES.is_dir():
-    raise RuntimeError(f"vibemix.spec.macos: missing {_MIDI_PROFILES}")
+    raise RuntimeError(f"vibemix-core.macos.spec: missing {_MIDI_PROFILES}")
 
 # Phase 6 genre profiles (5 JSONs) — same defensive check.
 _GENRE_PROFILES = Path("src/vibemix/state/genre/profiles")
 if not _GENRE_PROFILES.is_dir():
-    raise RuntimeError(f"vibemix.spec.macos: missing {_GENRE_PROFILES}")
+    raise RuntimeError(f"vibemix-core.macos.spec: missing {_GENRE_PROFILES}")
 
 # ---------------------------------------------------------------------------
 # Binaries — bundled native executables.
@@ -143,7 +143,7 @@ _NOWPLAYING_CANDIDATES = (
 _nowplaying = next((p for p in _NOWPLAYING_CANDIDATES if p.exists()), None)
 if _nowplaying is None:
     raise RuntimeError(
-        "vibemix.spec.macos: nowplaying-cli not found at /opt/homebrew/bin/ or "
+        "vibemix-core.macos.spec: nowplaying-cli not found at /opt/homebrew/bin/ or "
         "/usr/local/bin/. Install via: `brew install nowplaying-cli` "
         "(documented in CLAUDE.md Platform Requirements)."
     )

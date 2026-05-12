@@ -3,7 +3,7 @@
 
 End-to-end PyInstaller build pipeline for the ``vibemix-core`` Tauri
 sidecar. Detects the host's Rust target triple via ``rustc -vV``, runs
-PyInstaller against ``vibemix.spec.macos`` or ``vibemix.spec.windows``,
+PyInstaller against ``vibemix-core.macos.spec`` or ``vibemix-core.windows.spec``,
 and then copies + renames the resulting ``dist/vibemix-core/`` onedir
 into ``tauri/src-tauri/binaries/vibemix-core-<triple>/`` with the inner
 executable renamed to ``vibemix-core-<triple>{exe_suffix}`` — that's the
@@ -16,10 +16,10 @@ the build with a non-zero exit code — that's the Phase 5 invariant
 applied at packaging time (RESEARCH Pitfall 5; ARCH-01 / DIST-05).
 
 Usage on macOS (Apple Silicon):
-    uv run python scripts/build_sidecar.py --spec vibemix.spec.macos
+    uv run python scripts/build_sidecar.py --spec vibemix-core.macos.spec
 
 Usage on Windows:
-    uv run python scripts/build_sidecar.py --spec vibemix.spec.windows
+    uv run python scripts/build_sidecar.py --spec vibemix-core.windows.spec
 
 Output: tauri/src-tauri/binaries/vibemix-core-<triple>/vibemix-core-<triple>[.exe]
 
@@ -219,17 +219,26 @@ def _scan_file_for_aiza(path: Path) -> list[str]:
     # Try the system ``strings`` first — fastest + handles binary files
     # cleanly. ``strings`` is GNU binutils-flavored on macOS/Linux; on
     # Windows there's no built-in equivalent, hence the fallback.
+    #
+    # NOTE: ``strings`` on macOS can emit non-UTF8 bytes (older Mach-O
+    # sections with Latin-1 string-table content; pyc magic-byte runs).
+    # We capture raw bytes + match the byte regex; text decode happens
+    # only for human-readable error logs, not for matching.
     use_strings = shutil.which("strings") is not None
     if use_strings:
         try:
             proc = subprocess.run(
                 ["strings", "-a", str(path)],
                 capture_output=True,
-                text=True,
                 timeout=120,
                 check=False,
             )
-            matches.extend(AIZA_PATTERN_TEXT.findall(proc.stdout))
+            # AIza is pure ASCII; match against raw bytes to avoid the
+            # UTF-8 decode crashing on a single non-ASCII byte upstream.
+            matches.extend(
+                m.decode("ascii", errors="replace")
+                for m in AIZA_PATTERN.findall(proc.stdout)
+            )
         except subprocess.TimeoutExpired:
             print(f"[build_sidecar] strings timed out on {path}; falling back to byte scan", file=sys.stderr)
             use_strings = False  # fall through to byte read
@@ -355,7 +364,7 @@ def main(argv: list[str] | None = None) -> int:
         "--spec",
         required=True,
         help=(
-            "Path to .spec file — vibemix.spec.macos or vibemix.spec.windows. "
+            "Path to .spec file — vibemix-core.macos.spec or vibemix-core.windows.spec. "
             "Cross-compilation is rare and must be explicit."
         ),
     )
