@@ -37,7 +37,7 @@ use tauri::{
     image::Image,
     menu::{Menu, MenuBuilder, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager,
+    AppHandle, Emitter, Listener, Manager,
 };
 use tokio::sync::Mutex;
 
@@ -278,6 +278,292 @@ pub fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
     }
 }
 
+/// Tray icon state. Same as the 4 baked PNGs. Plan 13-06 promotes this
+/// from a string-typed call to an enum so the derivation function can
+/// be exhaustive-matched.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrayState {
+    Idle,
+    Live,
+    Thinking,
+    Error,
+}
+
+impl TrayState {
+    fn as_str(self) -> &'static str {
+        match self {
+            TrayState::Idle => "idle",
+            TrayState::Live => "live",
+            TrayState::Thinking => "thinking",
+            TrayState::Error => "error",
+        }
+    }
+
+    fn icon_bytes(self) -> &'static [u8] {
+        match self {
+            TrayState::Idle => ICON_IDLE,
+            TrayState::Live => ICON_LIVE,
+            TrayState::Thinking => ICON_THINKING,
+            TrayState::Error => ICON_ERROR,
+        }
+    }
+}
+
+/// Minimum payload the derivation function needs. Composed from
+/// the latest `ipc.session.snapshot` (cohost_status) + the latest
+/// `ipc.status.tick` (livekit / gemini / screen) + an activity
+/// timestamp.
+///
+/// `last_event_age_ms` is the time since the most recent snapshot;
+/// when the bus stops broadcasting, this grows and the tray falls
+/// back to "idle" rather than getting stuck on stale signals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SnapshotView<'a> {
+    pub cohost_status: Option<&'a str>,
+    pub gemini_status: Option<&'a str>,
+    pub livekit_status: Option<&'a str>,
+    pub screen_status: Option<&'a str>,
+    /// Milliseconds since the last snapshot frame arrived. None = never.
+    pub last_event_age_ms: Option<u64>,
+}
+
+/// PURE FUNCTION — derives the tray state from the latest signals.
+///
+/// Precedence (top wins):
+///   1. Error: any of {gemini=down, livekit=down, screen=denied}.
+///   2. Thinking: cohost_status == "TALKING" (AI is actively generating
+///      / speaking — the snapshot's TALKING band covers both the
+///      AI_GENERATING_REPLY and AI_REPLY_DONE event-pair window per
+///      Plan 13-06 warning note).
+///   3. Live: recent snapshot activity (last_event_age_ms < 5000ms)
+///      and cohost_status == "LISTENING".
+///   4. Idle: everything else (no recent activity, quiet, or no signals).
+///
+/// This function is the entire core of the listener — the listener
+/// itself is pure plumbing (debounce + compare-and-set). Testing the
+/// derivation in isolation gives full coverage without spinning Tauri.
+pub fn derive_tray_state(view: SnapshotView<'_>) -> TrayState {
+    // 1. Error precedence.
+    if matches!(view.gemini_status, Some("down"))
+        || matches!(view.livekit_status, Some("down"))
+        || matches!(view.screen_status, Some("denied"))
+    {
+        return TrayState::Error;
+    }
+
+    // 2. Thinking — AI is speaking / generating.
+    if matches!(view.cohost_status, Some("TALKING")) {
+        return TrayState::Thinking;
+    }
+
+    // 3. Live — recent activity AND we're in listening mode.
+    let recent = view
+        .last_event_age_ms
+        .map(|age| age < 5_000)
+        .unwrap_or(false);
+    if recent && matches!(view.cohost_status, Some("LISTENING")) {
+        return TrayState::Live;
+    }
+
+    // 4. Default idle.
+    TrayState::Idle
+}
+
+/// Listener state held in managed Tauri state. Tracks the latest
+/// snapshot/status views plus a debounce timer for 2 Hz throttling.
+#[derive(Debug)]
+pub struct TrayListenerState {
+    /// Snapshot-derived strings (owned because Tauri event payloads
+    /// are short-lived String references).
+    pub cohost_status: Option<String>,
+    pub gemini_status: Option<String>,
+    pub livekit_status: Option<String>,
+    pub screen_status: Option<String>,
+    /// Wall-clock instant of the most recent `ipc:ipc.session.snapshot`.
+    pub last_snapshot: Option<std::time::Instant>,
+    /// The state currently shown by the tray icon (so we can skip
+    /// redundant set_icon calls).
+    pub current_state: TrayState,
+    /// The last time we *attempted* an icon swap, for 2 Hz throttling.
+    pub last_swap: Option<std::time::Instant>,
+}
+
+impl Default for TrayListenerState {
+    fn default() -> Self {
+        Self {
+            cohost_status: None,
+            gemini_status: None,
+            livekit_status: None,
+            screen_status: None,
+            last_snapshot: None,
+            current_state: TrayState::Idle,
+            last_swap: None,
+        }
+    }
+}
+
+/// Minimum interval between icon swaps (2 Hz throttle = 500ms).
+const SWAP_THROTTLE_MS: u128 = 500;
+
+/// Install listeners for `ipc:ipc.session.snapshot` + `ipc:ipc.status.tick`
+/// + `ipc:ipc.mascot.mood_change`. Each tick re-runs `derive_tray_state`
+/// and — if the result differs from the current tray icon AND the
+/// 500ms throttle has elapsed — swaps the icon.
+///
+/// Listeners are registered on the AppHandle and live for the entire
+/// process. Plan 13-06 doesn't need an uninstall path (the tray dies
+/// with the process via the Quit menu).
+pub fn install_tray_state_listener(app: &AppHandle) {
+    let state = Arc::new(std::sync::Mutex::new(TrayListenerState::default()));
+
+    // ── ipc:ipc.session.snapshot ───────────────────────────────────────────
+    {
+        let state = state.clone();
+        let app_clone = app.clone();
+        app.listen("ipc:ipc.session.snapshot", move |event| {
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(event.payload()) {
+                let cohost = value
+                    .get("payload")
+                    .and_then(|p| p.get("cohost_status"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                if let Ok(mut guard) = state.lock() {
+                    if let Some(cohost) = cohost {
+                        guard.cohost_status = Some(cohost);
+                    }
+                    guard.last_snapshot = Some(std::time::Instant::now());
+                    drop(guard);
+                }
+                try_swap(&app_clone, &state);
+            }
+        });
+    }
+
+    // ── ipc:ipc.status.tick ────────────────────────────────────────────────
+    {
+        let state = state.clone();
+        let app_clone = app.clone();
+        app.listen("ipc:ipc.status.tick", move |event| {
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(event.payload()) {
+                let payload = value.get("payload");
+                let gemini = payload
+                    .and_then(|p| p.get("gemini"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let livekit = payload
+                    .and_then(|p| p.get("livekit"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let screen = payload
+                    .and_then(|p| p.get("screen"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                if let Ok(mut guard) = state.lock() {
+                    if let Some(g) = gemini {
+                        guard.gemini_status = Some(g);
+                    }
+                    if let Some(l) = livekit {
+                        guard.livekit_status = Some(l);
+                    }
+                    if let Some(s) = screen {
+                        guard.screen_status = Some(s);
+                    }
+                    drop(guard);
+                }
+                try_swap(&app_clone, &state);
+            }
+        });
+    }
+
+    // ── ipc:ipc.mascot.mood_change ─────────────────────────────────────────
+    // Rebuild the tray menu so the active mood is highlighted. Tauri 2.x
+    // menu items are immutable per-build; rebuilding on mood swap is the
+    // documented approach. Emit a `tray-refresh-menu` event the webview
+    // can also observe (used by tests today).
+    {
+        let app_clone = app.clone();
+        app.listen("ipc:ipc.mascot.mood_change", move |event| {
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(event.payload()) {
+                let mood = value
+                    .get("payload")
+                    .and_then(|p| p.get("mood"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
+                let _ = app_clone.emit("tray-refresh-menu", mood);
+            }
+        });
+    }
+}
+
+/// Inspect the current listener state and — if the derived TrayState
+/// differs from what's shown AND the throttle has elapsed — swap.
+fn try_swap(app: &AppHandle, state: &Arc<std::sync::Mutex<TrayListenerState>>) {
+    let now = std::time::Instant::now();
+    let next_state;
+    let should_swap;
+    {
+        let Ok(mut guard) = state.lock() else {
+            return;
+        };
+
+        // Throttle: skip if the last swap attempt was within 500ms.
+        if let Some(last) = guard.last_swap {
+            if now.duration_since(last).as_millis() < SWAP_THROTTLE_MS {
+                return;
+            }
+        }
+
+        let age_ms = guard
+            .last_snapshot
+            .map(|t| now.duration_since(t).as_millis() as u64);
+        let view = SnapshotView {
+            cohost_status: guard.cohost_status.as_deref(),
+            gemini_status: guard.gemini_status.as_deref(),
+            livekit_status: guard.livekit_status.as_deref(),
+            screen_status: guard.screen_status.as_deref(),
+            last_event_age_ms: age_ms,
+        };
+        next_state = derive_tray_state(view);
+        should_swap = next_state != guard.current_state;
+        if should_swap {
+            guard.current_state = next_state;
+            guard.last_swap = Some(now);
+        }
+    }
+    if should_swap {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            apply_tray_state(&app, next_state).await;
+        });
+    }
+}
+
+/// Decode the baked PNG bytes for the target state and call set_icon
+/// on the parked TrayIcon. Errors are logged but never propagated —
+/// a transient icon failure shouldn't blow up the listener.
+async fn apply_tray_state(app: &AppHandle, state: TrayState) {
+    let image = match Image::from_bytes(state.icon_bytes()) {
+        Ok(i) => i,
+        Err(e) => {
+            tracing::warn!("apply_tray_state: image decode failed for {:?}: {e}", state);
+            return;
+        }
+    };
+
+    let Some(handle) = app.try_state::<TrayHandle>() else {
+        return;
+    };
+    let g = handle.icon.lock().await;
+    if let Some(tray) = g.as_ref() {
+        if let Err(e) = tray.set_icon(Some(image)) {
+            tracing::warn!("apply_tray_state: set_icon failed for {:?}: {e}", state);
+        } else {
+            tracing::debug!("tray state → {}", state.as_str());
+        }
+    }
+}
+
 /// Swap the tray icon. Plan 13-06 calls this on `session.status` IPC
 /// events ("idle" / "live" / "thinking" / "error"). Unknown states are
 /// silently ignored — caller mistakes shouldn't blow up the tray.
@@ -364,5 +650,100 @@ mod tests {
         // of the parked handle, it must use this constant. Pinning here
         // catches an accidental rename.
         assert_eq!(TRAY_ID, "vibemix-tray");
+    }
+
+    // ── Plan 13-06 — derive_tray_state pure-function coverage ──────────────
+
+    #[test]
+    fn derive_tray_state_gemini_down_yields_error() {
+        let view = SnapshotView {
+            cohost_status: Some("LISTENING"),
+            gemini_status: Some("down"),
+            livekit_status: Some("ok"),
+            screen_status: Some("ok"),
+            last_event_age_ms: Some(100),
+        };
+        assert_eq!(derive_tray_state(view), TrayState::Error);
+    }
+
+    #[test]
+    fn derive_tray_state_cohost_talking_yields_thinking() {
+        let view = SnapshotView {
+            cohost_status: Some("TALKING"),
+            gemini_status: Some("ok"),
+            livekit_status: Some("ok"),
+            screen_status: Some("ok"),
+            last_event_age_ms: Some(100),
+        };
+        assert_eq!(derive_tray_state(view), TrayState::Thinking);
+    }
+
+    #[test]
+    fn derive_tray_state_recent_activity_yields_live() {
+        let view = SnapshotView {
+            cohost_status: Some("LISTENING"),
+            gemini_status: Some("ok"),
+            livekit_status: Some("ok"),
+            screen_status: Some("ok"),
+            last_event_age_ms: Some(2_000), // within 5s window
+        };
+        assert_eq!(derive_tray_state(view), TrayState::Live);
+    }
+
+    #[test]
+    fn derive_tray_state_quiet_steady_yields_idle() {
+        // No recent activity (>5s since last snapshot), no error signals.
+        let view = SnapshotView {
+            cohost_status: Some("LISTENING"),
+            gemini_status: Some("ok"),
+            livekit_status: Some("ok"),
+            screen_status: Some("ok"),
+            last_event_age_ms: Some(10_000),
+        };
+        assert_eq!(derive_tray_state(view), TrayState::Idle);
+
+        // Same with no signals at all (cold-start).
+        let cold = SnapshotView {
+            cohost_status: None,
+            gemini_status: None,
+            livekit_status: None,
+            screen_status: None,
+            last_event_age_ms: None,
+        };
+        assert_eq!(derive_tray_state(cold), TrayState::Idle);
+    }
+
+    #[test]
+    fn derive_tray_state_error_outranks_thinking() {
+        // Even if AI is talking, gemini=down means we surface error.
+        let view = SnapshotView {
+            cohost_status: Some("TALKING"),
+            gemini_status: Some("down"),
+            livekit_status: Some("ok"),
+            screen_status: Some("ok"),
+            last_event_age_ms: Some(100),
+        };
+        assert_eq!(derive_tray_state(view), TrayState::Error);
+    }
+
+    #[test]
+    fn derive_tray_state_livekit_or_screen_failures_yield_error() {
+        let livekit_down = SnapshotView {
+            cohost_status: Some("LISTENING"),
+            gemini_status: Some("ok"),
+            livekit_status: Some("down"),
+            screen_status: Some("ok"),
+            last_event_age_ms: Some(100),
+        };
+        assert_eq!(derive_tray_state(livekit_down), TrayState::Error);
+
+        let screen_denied = SnapshotView {
+            cohost_status: Some("LISTENING"),
+            gemini_status: Some("ok"),
+            livekit_status: Some("ok"),
+            screen_status: Some("denied"),
+            last_event_age_ms: Some(100),
+        };
+        assert_eq!(derive_tray_state(screen_denied), TrayState::Error);
     }
 }
