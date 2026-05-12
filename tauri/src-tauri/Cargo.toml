@@ -33,6 +33,7 @@ tauri-plugin-fs = "2.5"                                          # verified 2026
 tauri-plugin-positioner = "2.3"                                  # verified 2026-05-12 — centre wizard window
 tauri-plugin-updater = "2.10"                                    # verified 2026-05-12 — STUBBED in Phase 11 (no real endpoints/pubkey; Phase 18 wires)
 tauri-plugin-process = "2.3"                                     # verified 2026-05-12 — exit/relaunch helpers
+tauri-plugin-global-shortcut = "2.3"                             # verified 2026-05-12 — Phase 12 push-to-mute global hotkey
 
 # Async runtime + WS client (single conduit per CONTEXT — Rust client to Python ws_bus).
 tokio = { version = "1", features = ["full"] }                   # verified 2026-05-12
