@@ -18,16 +18,16 @@
  * on `mascot.html` at runtime.
  *
  * Phase 13 Plan 04 — Three.js renderer asset wiring:
- *   - assetsInclude: `**/*.glb` so rollup leaves the asset bytes alone
- *     (we serve them as static files, not as imported modules).
+ *   - assetsInclude: star-star/star-dot-glb so rollup leaves the asset
+ *     bytes alone (we serve them as static files, not as imported modules).
  *   - viteStaticCopy:
- *       1. Mascot bundle (`assets/mascot/**`) → both dev-served and
- *          emitted to `dist/assets/mascot/**`. Plan 13-01 committed
- *          the compressed bundle at `tauri/ui/assets/mascot/`; the
- *          renderer fetches via `/assets/mascot/manifest.json`.
- *       2. Three.js Draco WASM decoder (`node_modules/three/examples/
- *          jsm/libs/draco/*`) → `/draco/`. The renderer constructs a
- *          DRACOLoader with `setDecoderPath("/draco/")`; the character
+ *       1. Mascot bundle (assets/mascot/star-star) → both dev-served and
+ *          emitted to dist/assets/mascot/star-star. Plan 13-01 committed
+ *          the compressed bundle at tauri/ui/assets/mascot/; the
+ *          renderer fetches via /assets/mascot/manifest.json.
+ *       2. Three.js Draco WASM decoder (node_modules/three/examples/
+ *          jsm/libs/draco/*) -> /draco/. The renderer constructs a
+ *          DRACOLoader with setDecoderPath("/draco/"); the character
  *          GLB is Draco-compressed (Plan 13-01), so this MUST resolve
  *          in both dev and prod.
  */
@@ -60,12 +60,18 @@ export default defineConfig({
         // Plan 13-01 committed under tauri/ui/assets/mascot/; vite serves
         // the dev path via the static-copy plugin's dev middleware and
         // emits the same tree into dist/assets/mascot/ on build.
+        //
+        // Glob trailing slash + dest=assets keeps the "mascot/" folder
+        // structure intact (character.glb + manifest.json + animations/
+        // subdir preserved). Plain "assets/mascot/star-star" with
+        // dest=assets/mascot has a known flatten bug in vite-plugin-static
+        // -copy 2.x that double-emits files at the root.
         {
-          src: resolve(projectRoot, "assets/mascot/**/*"),
-          dest: "assets/mascot",
+          src: resolve(projectRoot, "assets/mascot") + "/",
+          dest: "assets",
         },
         // Three.js DRACO WASM decoder. Plan 13-04 renderer points
-        // DRACOLoader at `/draco/`; the character GLB is Draco-compressed.
+        // DRACOLoader at /draco/; the character GLB is Draco-compressed.
         {
           src: resolve(
             projectRoot,

@@ -36,7 +36,7 @@ import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
-import { SkeletonUtils } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { retargetClip } from "three/examples/jsm/utils/SkeletonUtils.js";
 
 import type { MascotState } from "./types.js";
 
@@ -257,7 +257,7 @@ export async function loadMascotAssets(
     const sourceMesh = findSkinnedSource(animGltf.scene);
     if (sourceMesh) {
       try {
-        retargetedClip = SkeletonUtils.retargetClip(
+        retargetedClip = retargetClip(
           findSkinnedSource(character.scene) ?? character.scene,
           sourceMesh,
           sourceClip,
