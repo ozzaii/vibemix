@@ -22,7 +22,7 @@
 - [x] **Phase 10: Prompt Template Matrix (6 cells + Anti-Slop)** - 6 prompt templates (3 skill × 2 mode) + negative dictionary + `TurnHistory` anti-repetition + `<silence/>` short-circuit + describe-before-infer + past-tense framing. _**Complete 2026-05-12.**_ 978 tests green; 5/5 success criteria PASS structurally; Phase 16+17 own live verification.
 - [x] **Phase 11: Tauri Shell + Calibration Wizard** - Tauri 2.x scaffold + Python sidecar wiring + IPC contract + 3-step calibration wizard UI (permissions → output/sample-rate → controller probe). _**Complete 2026-05-12 — structural gate** (code shipped, tests green, builds succeed, CI gates pass, AIza leak gate clean, capability allowlist intact, 19-message schema parity, wizard end-to-end works on Kaan's rig). Fresh-machine <90s timing → Phase 16 (Hallucination Verification Gate) + Phase 20 (Day-Zero Operations fresh-VM rehearsal)._
 - [x] **Phase 12: Live Session UI + Settings Panel** - Meters + phase tape + AI transcript + drop countdown + MIDI event ribbon + voice/mode/genre/output pickers + push-to-mute hotkey + status badges + recording retention policy. _**Code-complete 2026-05-12** across 4 waves (~10k LOC, ~62 files). IPC families 19 → 26. vitest 13 → 141, pytest 35 → 1171, cargo 4 → 13. 7 hardware UAT scenarios deferred to Kaan's rig — see `12-VERIFICATION.md` status `human_needed`._
-- [ ] **Phase 13: 3D Mascot Screen Overlay** - Single 3D rigged mascot (Meshy-generated GLB) in always-on-top transparent overlay window, Three.js + AnimationMixer crossfade state machine, beat-locked clip entry, mood swap (hype-man/teacher/coach) on same rig.
+- [x] **Phase 13: 3D Mascot Screen Overlay** - Single 3D rigged mascot (Meshy-generated GLB) in always-on-top transparent overlay window, Three.js + AnimationMixer crossfade state machine, beat-locked clip entry, mood swap (hype-man/teacher/coach) on same rig. (completed 2026-05-12)
 - [ ] **Phase 14: FL-Studio Polish Phase (Critique → Execute Loop)** - Dedicated polish pass with `gsd-ui-checker` + `gsd-ui-auditor` iterations until retro-futurist-hardware bar passes (20/80 rule, textured materials, no web-app residue).
 - [ ] **Phase 15: Recording & Session Capture Finalization** - Per-session dir + `input.wav`/`voice.wav`/`events.jsonl` + recording browser UI + retention enforcement (carries POC; lock UX).
 - [ ] **Phase 16: Hallucination Verification Gate** - 30-session offline replay suite ≥95% grounded + per-genre phase-detection ≥85% F1 + 60-min soak test zero `session_error`.
@@ -222,7 +222,7 @@ Plans:
   6. Mood swap (hype-man ↔ teacher ↔ coach) hot-swaps the active Gemini TTS voice + animation clip pool + prompt vocabulary on the same rig within 500ms; transition masked by particle/puff effect.
   7. Menu-bar (macOS NSStatusItem) / system-tray (Windows notification area) icon is persistently visible while vibemix is running — left-click toggles overlay visibility, right-click popover surfaces mood selector + mute + open session UI + settings + quit; icon state reflects session status (idle / live / ai_thinking / error); closing main session UI does NOT quit the app.
 **UI hint**: yes
-**Plans:** 7/8 plans executed
+**Plans:** 8/8 plans complete
 Plans:
 - [x] 13-01-PLAN.md — Meshy GLB asset bundle pipeline (Draco compress + strip; <=25 MB target; manifest.json)
 - [x] 13-02-PLAN.md — Tauri overlay window + system tray (transparent, always-on-top, cross-Space; 4-state tray icon; tray-Quit lifecycle)
@@ -231,7 +231,7 @@ Plans:
 - [x] 13-05-PLAN.md — MusicState extension (mood/bpm_confidence/downbeat_phase) + ipc.mascot.mood_change envelope + Coach prompt {mood}
 - [x] 13-06-PLAN.md — WS-bus subscription + event dispatcher + tray-state listener (full AI-event taxonomy)
 - [x] 13-07-PLAN.md — Mood profile system + particle puff effect + mood-driven lighting + animation-pool selection
-- [ ] 13-08-PLAN.md — Verification fixtures + dispatch-latency pytest + 30-item manual smoke checklist
+- [x] 13-08-PLAN.md — Verification fixtures + dispatch-latency pytest + 30-item manual smoke checklist
 
 ### Phase 14: FL-Studio Polish Phase (Critique → Execute Loop)
 **Goal**: Every UI surface is lifted to pro-audio-software realism (FL Studio / Ableton / Bitwig / Native Instruments hierarchy). Critique → execute → critique → execute loop runs inside this phase with `gsd-ui-checker` + `gsd-ui-auditor` between iterations until the retro-futurist-hardware bar passes. This is NOT a final-week sweep — it is an explicit phase that gates Phase 16's verification.
@@ -336,7 +336,7 @@ Plans:
 | 10. Prompt Template Matrix (6 cells + Anti-Slop) | 2/2 | Complete   | 2026-05-11 |
 | 11. Tauri Shell + Calibration Wizard | 5/5 | Complete   | 2026-05-12 |
 | 12. Live Session UI + Settings Panel | 0/? | Not started | - |
-| 13. 3D Mascot Screen Overlay | 7/8 | In Progress|  |
+| 13. 3D Mascot Screen Overlay | 8/8 | Complete   | 2026-05-12 |
 | 14. FL-Studio Polish Phase (Critique → Execute Loop) | 0/? | Not started | - |
 | 15. Recording & Session Capture Finalization | 0/? | Not started | - |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
