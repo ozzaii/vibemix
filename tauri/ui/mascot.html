@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background: transparent; margin: 0; padding: 0;">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>vibemix mascot</title>
     <!--
-      Phase 13 Plan 02 — mascot overlay webview entry.
+      Phase 13 Plan 02 — mascot overlay webview entry; Plan 13-04 wires the
+      Three.js renderer + state machine.
 
       This file is the second Tauri webview, loaded into the "mascot"
       window built by `mascot_window::create_mascot_window` in main.rs.
@@ -13,22 +14,22 @@
       + `decorations: false` + `visible_on_all_workspaces: true` per
       13-CONTEXT Area 2.
 
-      Plan 13-04 (Three.js renderer) replaces the placeholder script
-      below with a proper AnimationMixer pipeline driving a rigged GLB
-      character. Plan 13-06 (event dispatch) wires WS:8765 events from
-      the Python sidecar into the state machine.
-
-      Wave 1 (this plan) ships ONLY:
-        - HTML shell with a transparent body (no opaque background)
-        - <canvas> element the renderer will mount into
-        - placeholder index.ts that logs to confirm the window booted
+      Plan 13-04 (this plan):
+        - /src/mascot/index.ts boots a Three.js WebGLRenderer against the
+          canvas below, loads /assets/mascot/manifest.json + 21 GLBs, and
+          drives state transitions through a pure-function state machine.
+        - Plan 13-06 (event dispatch) replaces the DEV window.__mascot
+          handle with a WS:8765 subscription that translates ipc.* envelopes
+          to state requests.
 
       Hard rules honoured (frontend-enforcement skill):
         - No external CDNs, no inline scripts beyond the module import.
-        - Transparent background is inline so the runtime CSP allowlist
-          ("style-src 'self' 'unsafe-inline'") is satisfied without
-          pulling in tokens.css here (which would force the session-UI
-          dark surface into the overlay).
+        - Transparent root chain — `html` + `body` are explicitly
+          background: transparent so the Tauri transparent flag composites
+          the WebGL canvas straight over the desktop. Inline styles keep
+          this self-contained from any token.css surface (the mascot lives
+          outside the session-UI dark surface).
+        - PixelRatio capped + transparent clear are owned by renderer.ts.
     -->
     <style>
       html,
@@ -44,12 +45,12 @@
       }
       #mascot-canvas {
         display: block;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
       }
     </style>
   </head>
-  <body>
+  <body style="background: transparent; margin: 0; padding: 0; overflow: hidden;">
     <canvas id="mascot-canvas" aria-hidden="true"></canvas>
     <script type="module" src="/src/mascot/index.ts"></script>
   </body>

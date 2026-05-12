@@ -12,12 +12,16 @@
     "build": "tsc --noEmit && vite build",
     "build:mascot": "node scripts/build-mascot-bundle.mjs"
   },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
   "devDependencies": {
     "@gltf-transform/cli": "^4.0.0",
     "@gltf-transform/core": "^4.0.0",
     "@tauri-apps/api": "^2.11",
     "@tauri-apps/plugin-shell": "^2.3",
     "@tauri-apps/plugin-store": "^2.4",
+    "@types/three": "^0.170.0",
     "ajv": "^8.20",
     "ajv-formats": "^3.0",
     "gltf-pipeline": "^4.1.0",
@@ -25,6 +29,7 @@
     "json-schema-to-typescript": "^15.0",
     "typescript": "^5.7",
     "vite": "^6.0",
+    "vite-plugin-static-copy": "^2.2.0",
     "vitest": "^2.1"
   }
 }
