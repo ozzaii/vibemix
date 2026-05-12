@@ -1,0 +1,395 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "vibemix.ipc.messages",
+  "title": "vibemix IPC messages",
+  "description": "Source-of-truth JSON Schema for ipc.* messages exchanged between the Tauri shell (TypeScript webview) and the Python sidecar over the existing 127.0.0.1:8765 ws_bus (Phase 4). Phase 11 Wave 0 freezes this contract before any sidecar packaging, Tauri shell, or wizard UI work begins. Drift between Python (jsonschema) and TS (ajv) is caught by scripts/check_ipc_schema.py (count parity + per-dataclass roundtrip) and tauri/ui's `npm run check:ipc` (codegen + tsc --noEmit). Honors D-Area-1.3 (schema sync) and D-Area-1.1 (ipc.* namespace on existing ws_bus port 8765). Closed payloads (additionalProperties: false) on every definition per RESEARCH Pitfall 10.",
+  "oneOf": [
+    {"$ref": "#/definitions/IpcBoot"},
+    {"$ref": "#/definitions/StatusTick"},
+    {"$ref": "#/definitions/PermissionCheck"},
+    {"$ref": "#/definitions/PermissionState"},
+    {"$ref": "#/definitions/CalibrationListDevices"},
+    {"$ref": "#/definitions/CalibrationDeviceList"},
+    {"$ref": "#/definitions/CalibrationProbeAudio"},
+    {"$ref": "#/definitions/CalibrationAudioResult"},
+    {"$ref": "#/definitions/CalibrationUserHeardTone"},
+    {"$ref": "#/definitions/CalibrationStartMidiListen"},
+    {"$ref": "#/definitions/CalibrationMidiEvent"},
+    {"$ref": "#/definitions/CalibrationMidiTimeout"},
+    {"$ref": "#/definitions/CalibrationListWindows"},
+    {"$ref": "#/definitions/CalibrationWindowList"},
+    {"$ref": "#/definitions/CalibrationSmokeTest"},
+    {"$ref": "#/definitions/CalibrationSmokeTestStarted"},
+    {"$ref": "#/definitions/CalibrationSmokeTestDone"},
+    {"$ref": "#/definitions/WizardStart"},
+    {"$ref": "#/definitions/WizardDone"}
+  ],
+  "definitions": {
+    "IpcBoot": {
+      "$comment": "Sidecar → shell. First message after the sidecar opens its ws_bus listener. RESEARCH §IPC Schema. D-Area-1.1.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.boot"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ready"],
+          "properties": {
+            "ready": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "StatusTick": {
+      "$comment": "Sidecar → shell @ ~1Hz. Status-bar badges for the live UI surface. D-Area-4.3 locks the four-field payload — no extra fields tolerated; tests assert additionalProperties: false blocks any drift. UX-11 requirement.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.status.tick"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["livekit", "gemini", "midi", "screen"],
+          "properties": {
+            "livekit": {"type": "string", "enum": ["ok", "connecting", "down"]},
+            "gemini": {"type": "string", "enum": ["ok", "down"]},
+            "midi": {"type": ["integer", "null"], "minimum": 0},
+            "screen": {"type": "string", "enum": ["ok", "denied"]}
+          }
+        }
+      }
+    },
+    "PermissionCheck": {
+      "$comment": "Shell → sidecar. Requests current OS permission state for a given capability. D-Area-2.1 (Step 1 permissions).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.permission.check"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {"type": "string", "enum": ["screen_recording", "microphone"]}
+          }
+        }
+      }
+    },
+    "PermissionState": {
+      "$comment": "Sidecar → shell. Resolved OS permission state for the queried capability. D-Area-2.1 — drives the auto-advance behavior after the user returns from Settings.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.permission.state"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "status"],
+          "properties": {
+            "kind": {"type": "string", "enum": ["screen_recording", "microphone"]},
+            "status": {"type": "string", "enum": ["authorized", "denied", "notDetermined", "restricted"]}
+          }
+        }
+      }
+    },
+    "CalibrationListDevices": {
+      "$comment": "Shell → sidecar. Wizard Step 2 entry — request a fresh sounddevice.query_devices() snapshot. D-Area-2.2.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.list_devices"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "CalibrationDeviceList": {
+      "$comment": "Sidecar → shell. Output device enumeration + BlackHole presence flag. D-Area-4.1 (BlackHole detection accepts 2ch / 16ch / 64ch variants).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.device_list"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["devices", "blackhole_present"],
+          "properties": {
+            "devices": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "name", "is_blackhole", "variant"],
+                "properties": {
+                  "id": {"type": "string"},
+                  "name": {"type": "string"},
+                  "is_blackhole": {"type": "boolean"},
+                  "variant": {"type": ["string", "null"]}
+                }
+              }
+            },
+            "blackhole_present": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "CalibrationProbeAudio": {
+      "$comment": "Shell → sidecar. Auto-play 1kHz sine + programmatic sample-rate assertion. D-Area-2.2 — both audible-confirmed and programmatic-pass must hold to advance the wizard.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.probe_audio"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["output_device_id", "expected_rate"],
+          "properties": {
+            "output_device_id": {"type": "string"},
+            "expected_rate": {"type": "integer", "enum": [44100, 48000]}
+          }
+        }
+      }
+    },
+    "CalibrationAudioResult": {
+      "$comment": "Sidecar → shell. Probe outcome: playback + sample-rate + actual rate + error. D-Area-2.2. actual_rate is nullable so the sidecar can report null on error paths (e.g. device-open failure before sample-rate negotiation).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.audio_result"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["playback_ok", "audible_confirmed", "programmatic_pass", "actual_rate", "error"],
+          "properties": {
+            "playback_ok": {"type": "boolean"},
+            "audible_confirmed": {"type": "boolean"},
+            "programmatic_pass": {"type": "boolean"},
+            "actual_rate": {"type": ["integer", "null"], "minimum": 0},
+            "error": {"type": ["string", "null"]}
+          }
+        }
+      }
+    },
+    "CalibrationUserHeardTone": {
+      "$comment": "Shell → sidecar. The user's Yes/Retry response to the 1kHz tone playback. D-Area-2.2.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.user_heard_tone"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["heard"],
+          "properties": {
+            "heard": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "CalibrationStartMidiListen": {
+      "$comment": "Shell → sidecar. Begin controller-probe MIDI listener with a countdown timeout (Step 3). D-Area-2.3.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.start_midi_listen"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["timeout_s"],
+          "properties": {
+            "timeout_s": {"type": "number", "minimum": 0}
+          }
+        }
+      }
+    },
+    "CalibrationMidiEvent": {
+      "$comment": "Sidecar → shell. First MIDI message decoded by the controller-probe listener. control_label is the human-readable mapping label (e.g. 'Deck A Play') or the raw bytes when no mapping matches. D-Area-2.3.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.midi_event"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["control_label", "raw"],
+          "properties": {
+            "control_label": {"type": "string"},
+            "raw": {"type": "string"}
+          }
+        }
+      }
+    },
+    "CalibrationMidiTimeout": {
+      "$comment": "Sidecar → shell. 10-second listen window expired without input — shell falls back to generic-mapping path. D-Area-2.3.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.midi_timeout"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "CalibrationListWindows": {
+      "$comment": "Shell → sidecar. Wave-4 window-picker entry — request running windows for DJ-app hint matching. OS-specific enumeration lives in the Python platform layer (Quartz on macOS / EnumWindows on Windows per Phase 3+7+8 surfaces). D-Area-3.2.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.list_windows"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "CalibrationWindowList": {
+      "$comment": "Sidecar → shell. Enumerated windows with DJ-app hint resolution (djay, rekordbox, serato, traktor, virtualdj, or null when no match). D-Area-3.2 — non-DJ apps are warned-then-allowed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.window_list"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["windows"],
+          "properties": {
+            "windows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "app_name", "title", "dj_app_hint"],
+                "properties": {
+                  "id": {"type": "string"},
+                  "app_name": {"type": "string"},
+                  "title": {"type": "string"},
+                  "dj_app_hint": {"type": ["string", "null"]}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "CalibrationSmokeTest": {
+      "$comment": "Shell → sidecar. Wizard-exit smoke test — single AI greeting through the cascade (LLM → TTS → audio). Verifies the entire chain end-to-end. D-Area-2.4 (wizard exit).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.smoke_test"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["template"],
+          "properties": {
+            "template": {"type": "string", "enum": ["HYPE_BEGINNER"]}
+          }
+        }
+      }
+    },
+    "CalibrationSmokeTestStarted": {
+      "$comment": "Sidecar → shell. Smoke-test generation started (LLM call kicked off). UI shows a transient 'speaking…' indicator.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.smoke_test_started"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "CalibrationSmokeTestDone": {
+      "$comment": "Sidecar → shell. Smoke-test completion + transcript (for verifier visibility per Phase 16). D-Area-2.4.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.calibration.smoke_test_done"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["transcript"],
+          "properties": {
+            "transcript": {"type": "string"}
+          }
+        }
+      }
+    },
+    "WizardStart": {
+      "$comment": "Shell → sidecar. Re-runnable wizard entry point — Settings panel (Phase 12) wires this. D-Area-3.4.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.wizard.start"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "WizardDone": {
+      "$comment": "Shell → sidecar. Wizard completion — final state passed to first_run_completed write. D-Area-3.1.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.wizard.done"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["output_device_id", "controller_profile", "target_window_id"],
+          "properties": {
+            "output_device_id": {"type": "string"},
+            "controller_profile": {"type": "string"},
+            "target_window_id": {"type": ["string", "null"]}
+          }
+        }
+      }
+    }
+  }
+}

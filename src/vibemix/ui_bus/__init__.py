@@ -1,0 +1,108 @@
+# SPDX-License-Identifier: Apache-2.0
+"""vibemix.ui_bus — ipc.* schema bridge for the Tauri shell.
+
+Phase 11 Wave 0. The source-of-truth schema is the JSON file at
+``tauri/ui/src/ipc/messages.schema.json``. This package mirrors it on the
+Python side via hand-written ``@dataclass(frozen=True, slots=True)`` wrappers
++ a single ``jsonschema.Draft7Validator`` compiled at module import.
+
+The Wave 4 WizardLoop will:
+  * Construct outbound messages via ``StatusTick.make(...).to_json()``.
+  * Validate inbound shell→sidecar frames via ``validator.parse_message``.
+
+Wave 0 ships no WebSocket wiring — only the schema, dataclasses, validator,
+and the CI gate ``scripts/check_ipc_schema.py``.
+"""
+
+from __future__ import annotations
+
+from vibemix.ui_bus.messages import (
+    # Wrapper dataclasses — one per schema oneOf entry (19 total)
+    CalibrationAudioResult,
+    # Payload-only structs (re-exported for type hints in downstream code)
+    CalibrationAudioResultPayload,
+    CalibrationDeviceList,
+    CalibrationDeviceListPayload,
+    CalibrationListDevices,
+    CalibrationListDevicesPayload,
+    CalibrationListWindows,
+    CalibrationListWindowsPayload,
+    CalibrationMidiEvent,
+    CalibrationMidiEventPayload,
+    CalibrationMidiTimeout,
+    CalibrationMidiTimeoutPayload,
+    CalibrationProbeAudio,
+    CalibrationProbeAudioPayload,
+    CalibrationSmokeTest,
+    CalibrationSmokeTestDone,
+    CalibrationSmokeTestDonePayload,
+    CalibrationSmokeTestPayload,
+    CalibrationSmokeTestStarted,
+    CalibrationSmokeTestStartedPayload,
+    CalibrationStartMidiListen,
+    CalibrationStartMidiListenPayload,
+    CalibrationUserHeardTone,
+    CalibrationUserHeardTonePayload,
+    CalibrationWindowList,
+    CalibrationWindowListPayload,
+    DeviceInfo,
+    IpcBoot,
+    IpcBootPayload,
+    PermissionCheck,
+    PermissionCheckPayload,
+    PermissionState,
+    PermissionStatePayload,
+    StatusTick,
+    StatusTickPayload,
+    WindowInfo,
+    WizardDone,
+    WizardDonePayload,
+    WizardStart,
+    WizardStartPayload,
+)
+from vibemix.ui_bus.validator import parse_message, validate_message
+
+__all__ = [
+    "CalibrationAudioResult",
+    "CalibrationAudioResultPayload",
+    "CalibrationDeviceList",
+    "CalibrationDeviceListPayload",
+    "CalibrationListDevices",
+    "CalibrationListDevicesPayload",
+    "CalibrationListWindows",
+    "CalibrationListWindowsPayload",
+    "CalibrationMidiEvent",
+    "CalibrationMidiEventPayload",
+    "CalibrationMidiTimeout",
+    "CalibrationMidiTimeoutPayload",
+    "CalibrationProbeAudio",
+    "CalibrationProbeAudioPayload",
+    "CalibrationSmokeTest",
+    "CalibrationSmokeTestDone",
+    "CalibrationSmokeTestDonePayload",
+    "CalibrationSmokeTestPayload",
+    "CalibrationSmokeTestStarted",
+    "CalibrationSmokeTestStartedPayload",
+    "CalibrationStartMidiListen",
+    "CalibrationStartMidiListenPayload",
+    "CalibrationUserHeardTone",
+    "CalibrationUserHeardTonePayload",
+    "CalibrationWindowList",
+    "CalibrationWindowListPayload",
+    "DeviceInfo",
+    "IpcBoot",
+    "IpcBootPayload",
+    "PermissionCheck",
+    "PermissionCheckPayload",
+    "PermissionState",
+    "PermissionStatePayload",
+    "StatusTick",
+    "StatusTickPayload",
+    "WindowInfo",
+    "WizardDone",
+    "WizardDonePayload",
+    "WizardStart",
+    "WizardStartPayload",
+    "parse_message",
+    "validate_message",
+]
