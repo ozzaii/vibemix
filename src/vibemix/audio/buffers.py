@@ -301,3 +301,12 @@ class PlaybackQueue:
             if len(chunk) < n_bytes:
                 chunk += b"\x00" * (n_bytes - len(chunk))
             return chunk
+
+    def clear(self) -> None:
+        """Drain the queue immediately. Called by SessionLoop's mute handler
+        (Phase 12-02 handoff) so the in-flight TTS line stops mid-utterance
+        instead of finishing. Decay voice level on the same tick so the
+        mic-gate releases promptly."""
+        with self._lock:
+            self._buffer = bytearray()
+        self._levels.decay_voice()
