@@ -22,7 +22,14 @@
     {"$ref": "#/definitions/CalibrationSmokeTestStarted"},
     {"$ref": "#/definitions/CalibrationSmokeTestDone"},
     {"$ref": "#/definitions/WizardStart"},
-    {"$ref": "#/definitions/WizardDone"}
+    {"$ref": "#/definitions/WizardDone"},
+    {"$ref": "#/definitions/SessionSnapshot"},
+    {"$ref": "#/definitions/SessionMute"},
+    {"$ref": "#/definitions/SettingsSet"},
+    {"$ref": "#/definitions/SettingsGet"},
+    {"$ref": "#/definitions/SettingsState"},
+    {"$ref": "#/definitions/StatusRecheck"},
+    {"$ref": "#/definitions/IpcError"}
   ],
   "definitions": {
     "IpcBoot": {
@@ -387,6 +394,222 @@
             "output_device_id": {"type": "string"},
             "controller_profile": {"type": "string"},
             "target_window_id": {"type": ["string", "null"]}
+          }
+        }
+      }
+    },
+    "SessionSnapshot": {
+      "$comment": "Phase 12 — Sidecar → shell @ 30Hz. Live session state snapshot driving meters, transcript, phase tape, drop chip, MIDI event ribbon. UX-08.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.session.snapshot"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["meters", "phase", "phase_now_pct", "bpm", "drop_pred_bars", "transcript_delta", "midi_events", "track", "cohost_status", "latency_ms", "grounded"],
+          "properties": {
+            "meters": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["music", "voice", "mic"],
+              "properties": {
+                "music": {"$ref": "#/definitions/LevelPair"},
+                "voice": {"$ref": "#/definitions/LevelPair"},
+                "mic": {"$ref": "#/definitions/LevelPair"}
+              }
+            },
+            "phase": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "weight", "label"],
+                "properties": {
+                  "kind": {"type": "string", "enum": ["silent", "groove", "build", "drop-ghost"]},
+                  "weight": {"type": "number", "minimum": 0},
+                  "label": {"type": "string"}
+                }
+              }
+            },
+            "phase_now_pct": {"type": "number", "minimum": 0, "maximum": 100},
+            "bpm": {"type": ["number", "null"]},
+            "drop_pred_bars": {"type": ["integer", "null"], "minimum": 0},
+            "transcript_delta": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["role", "text", "ts"],
+                "properties": {
+                  "role": {"type": "string", "enum": ["ai", "user", "system"]},
+                  "text": {"type": "string"},
+                  "ts": {"type": "string", "format": "date-time"}
+                }
+              }
+            },
+            "midi_events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["control", "value", "ts"],
+                "properties": {
+                  "control": {"type": "string"},
+                  "value": {"type": ["number", "string", "null"]},
+                  "ts": {"type": "string", "format": "date-time"}
+                }
+              }
+            },
+            "track": {
+              "anyOf": [
+                {"type": "null"},
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["title"],
+                  "properties": {
+                    "title": {"type": "string"},
+                    "artist": {"type": ["string", "null"]},
+                    "deck": {"type": ["string", "null"]}
+                  }
+                }
+              ]
+            },
+            "cohost_status": {"type": "string", "enum": ["LISTENING", "TALKING", "IDLE"]},
+            "latency_ms": {"type": ["number", "null"], "minimum": 0},
+            "grounded": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "LevelPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rms", "peak"],
+      "properties": {
+        "rms": {"type": "number", "minimum": 0, "maximum": 1},
+        "peak": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "SessionMute": {
+      "$comment": "Phase 12 — Bidirectional. Shell sends {toggle: true} to mute mid-utterance (drains PlaybackQueue). Sidecar acks with {muted: <newState>}. Same type, asymmetric payloads. UX-07.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.session.mute"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "toggle": {"type": "boolean"},
+            "muted": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "SettingsSet": {
+      "$comment": "Phase 12 — Shell → sidecar. Hot-reload a single setting. UX-06, UX-09, UX-10.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.settings.set"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["field", "value"],
+          "properties": {
+            "field": {"type": "string", "enum": ["voice", "mode", "genre", "output_device_id", "output_profile", "retention_days", "push_to_mute_hotkey"]},
+            "value": {
+              "anyOf": [
+                {"type": "string"},
+                {"type": "integer", "minimum": 0},
+                {"type": "null"}
+              ]
+            }
+          }
+        }
+      }
+    },
+    "SettingsGet": {
+      "$comment": "Phase 12 — Shell → sidecar. Request full settings snapshot.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.settings.get"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "SettingsState": {
+      "$comment": "Phase 12 — Sidecar → shell. Full settings snapshot — emitted on boot, on ipc.settings.get, and after any ipc.settings.set ack.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.settings.state"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["voice", "mode", "genre", "output_device_id", "output_profile", "retention_days", "push_to_mute_hotkey", "muted"],
+          "properties": {
+            "voice": {"type": "string"},
+            "mode": {"type": "string", "enum": ["hype", "coach"]},
+            "genre": {"type": "string"},
+            "output_device_id": {"type": ["string", "null"]},
+            "output_profile": {"type": "string", "enum": ["hp", "spk"]},
+            "retention_days": {"type": "integer", "minimum": 0},
+            "push_to_mute_hotkey": {"type": "string"},
+            "muted": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "StatusRecheck": {
+      "$comment": "Phase 12 — Shell → sidecar. One-shot recheck of a component's health; sidecar then emits a fresh ipc.status.tick. UX-11.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.status.recheck"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["component"],
+          "properties": {
+            "component": {"type": "string", "enum": ["livekit", "gemini", "midi", "screen"]}
+          }
+        }
+      }
+    },
+    "IpcError": {
+      "$comment": "Phase 12 — Sidecar → shell. Emitted when an inbound message fails schema validation or a handler raises. Never crashes the loop. UX-08 reliability.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.error"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reason"],
+          "properties": {
+            "reason": {"type": "string"},
+            "original_type": {"type": ["string", "null"]}
           }
         }
       }

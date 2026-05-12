@@ -22,7 +22,14 @@ export type VibemixIPCMessages =
   | CalibrationSmokeTestStarted
   | CalibrationSmokeTestDone
   | WizardStart
-  | WizardDone;
+  | WizardDone
+  | SessionSnapshot
+  | SessionMute
+  | SettingsSet
+  | SettingsGet
+  | SettingsState
+  | StatusRecheck
+  | IpcError;
 
 export interface IpcBoot {
   type: "ipc.boot";
@@ -168,5 +175,103 @@ export interface WizardDone {
     output_device_id: string;
     controller_profile: string;
     target_window_id: string | null;
+  };
+}
+export interface SessionSnapshot {
+  type: "ipc.session.snapshot";
+  ts: string;
+  payload: {
+    meters: {
+      music: LevelPair;
+      voice: LevelPair;
+      mic: LevelPair;
+    };
+    phase: {
+      kind: "silent" | "groove" | "build" | "drop-ghost";
+      weight: number;
+      label: string;
+    }[];
+    phase_now_pct: number;
+    bpm: number | null;
+    drop_pred_bars: number | null;
+    transcript_delta: {
+      role: "ai" | "user" | "system";
+      text: string;
+      ts: string;
+    }[];
+    midi_events: {
+      control: string;
+      value: number | string | null;
+      ts: string;
+    }[];
+    track: null | {
+      title: string;
+      artist?: string | null;
+      deck?: string | null;
+    };
+    cohost_status: "LISTENING" | "TALKING" | "IDLE";
+    latency_ms: number | null;
+    grounded: boolean;
+  };
+}
+export interface LevelPair {
+  rms: number;
+  peak: number;
+}
+export interface SessionMute {
+  type: "ipc.session.mute";
+  ts: string;
+  payload: {
+    toggle?: boolean;
+    muted?: boolean;
+  };
+}
+export interface SettingsSet {
+  type: "ipc.settings.set";
+  ts: string;
+  payload: {
+    field:
+      | "voice"
+      | "mode"
+      | "genre"
+      | "output_device_id"
+      | "output_profile"
+      | "retention_days"
+      | "push_to_mute_hotkey";
+    value: string | number | null;
+  };
+}
+export interface SettingsGet {
+  type: "ipc.settings.get";
+  ts: string;
+  payload: {};
+}
+export interface SettingsState {
+  type: "ipc.settings.state";
+  ts: string;
+  payload: {
+    voice: string;
+    mode: "hype" | "coach";
+    genre: string;
+    output_device_id: string | null;
+    output_profile: "hp" | "spk";
+    retention_days: number;
+    push_to_mute_hotkey: string;
+    muted: boolean;
+  };
+}
+export interface StatusRecheck {
+  type: "ipc.status.recheck";
+  ts: string;
+  payload: {
+    component: "livekit" | "gemini" | "midi" | "screen";
+  };
+}
+export interface IpcError {
+  type: "ipc.error";
+  ts: string;
+  payload: {
+    reason: string;
+    original_type?: string | null;
   };
 }
