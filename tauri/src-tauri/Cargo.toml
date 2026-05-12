@@ -1,0 +1,67 @@
+# vibemix — Tauri 2.x Rust shell crate
+#
+# Phase 11 Wave 2: stand up the shell, sidecar lifecycle, WS client, crash banner.
+# Bundle ID world.bravoh.vibemix is LOCKED (see entitlements.plist + tauri.conf.json5).
+# Versions resolved by `cargo search` on 2026-05-12 (per plan instruction).
+
+[package]
+name = "vibemix"
+version = "0.0.1"
+description = "vibemix — AI DJ co-host"
+edition = "2021"
+rust-version = "1.77"
+publish = false
+
+# Desktop-only binary. CONTEXT explicitly excludes Linux and mobile from Phase 11 —
+# no lib/cdylib needed for Android/iOS surface. Phase 11 ships exactly one bin.
+[[bin]]
+name = "vibemix"
+path = "src/main.rs"
+
+[build-dependencies]
+# config-json5 enables parsing of `tauri.conf.json5` (we want JSON5 for
+# readability — comments + trailing commas + the locked-bundle-id comment).
+tauri-build = { version = "2.6", features = ["config-json5"] }  # verified 2026-05-12
+
+[dependencies]
+# Tauri core + plugins — every crossover is locked behind the capability allowlist.
+# config-json5 mirrors tauri-build's feature so runtime config also parses JSON5.
+tauri = { version = "2.11", features = ["macos-private-api", "config-json5"] }   # verified 2026-05-12
+tauri-plugin-shell = "2.3"                                       # verified 2026-05-12 — sidecar spawn + shell.open
+tauri-plugin-store = "2.4"                                       # verified 2026-05-12 — config.json persistence
+tauri-plugin-fs = "2.5"                                          # verified 2026-05-12 — scoped log read for crash banner
+tauri-plugin-positioner = "2.3"                                  # verified 2026-05-12 — centre wizard window
+tauri-plugin-updater = "2.10"                                    # verified 2026-05-12 — STUBBED in Phase 11 (no real endpoints/pubkey; Phase 18 wires)
+tauri-plugin-process = "2.3"                                     # verified 2026-05-12 — exit/relaunch helpers
+
+# Async runtime + WS client (single conduit per CONTEXT — Rust client to Python ws_bus).
+tokio = { version = "1", features = ["full"] }                   # verified 2026-05-12
+tokio-tungstenite = "0.29"                                       # verified 2026-05-12 — Pattern 2 reference
+futures-util = "0.3"                                             # verified 2026-05-12 — StreamExt/SinkExt traits
+
+# Serialization
+serde = { version = "1", features = ["derive"] }                 # verified 2026-05-12
+serde_json = "1"                                                 # verified 2026-05-12
+
+# Tracing + log rotation
+tracing = "0.1"                                                  # verified 2026-05-12
+file-rotate = "0.8"                                              # verified 2026-05-12 — 10MB × 5 per CONTEXT
+
+# Filesystem helpers
+dirs-next = "2"                                                  # verified 2026-05-12
+
+[dev-dependencies]
+tempfile = "3"                                                   # verified 2026-05-12 — watchdog log-tail tests
+
+[features]
+# Required by Tauri's custom protocol scheme registration.
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+# Size-optimised distribution profile (Phase 18 codesigns this output).
+[profile.release]
+codegen-units = 1
+lto = true
+panic = "abort"
+strip = true
+opt-level = "s"

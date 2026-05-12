@@ -1,0 +1,79 @@
+// vibemix — Tauri 2.x app configuration (Phase 11 Wave 2)
+//
+// LOCKED VALUES (do NOT change after Phase 11):
+//   - identifier: world.bravoh.vibemix  (D-Area-1 + entitlements.plist; permissions reset on change)
+//   - bundle.externalBin: binaries/vibemix-core  (Wave 1 build_sidecar.py output path)
+//   - app.windows[0]: 960×680, decorations:false (UI-SPEC §Window Dimensions)
+//
+// Phase 18 takes over signing/notarization with the hardenedRuntime + entitlements.plist.
+// Tauri 2 supports JSON5 here (comments + trailing commas allowed).
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "vibemix",
+  "version": "0.0.1",
+  "identifier": "world.bravoh.vibemix",
+  "build": {
+    "frontendDist": "../ui/dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "vibemix",
+        "width": 960,
+        "height": 680,
+        "minWidth": 960,
+        "minHeight": 680,
+        "maxWidth": 960,
+        "maxHeight": 680,
+        "resizable": false,
+        "decorations": false,
+        "transparent": false,
+        "fullscreen": false,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
+        "center": true,
+        "visible": true
+      }
+    ],
+    "security": {
+      // Tight CSP — webview never opens its own WebSocket (Rust does). No external connect-src.
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self'"
+    },
+    "macOSPrivateApi": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    // externalBin path is RELATIVE to src-tauri/. Tauri appends the target-triple suffix
+    // automatically; the Wave 1 build script lays out binaries/vibemix-core-<triple>/<binary>.
+    "externalBin": ["binaries/vibemix-core"],
+    "icon": ["icons/icon.png"],
+    "macOS": {
+      "minimumSystemVersion": "12.3",
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.plist",
+      "exceptionDomain": "",
+      "providerShortName": null,
+      // No frameworks bundled at the Tauri layer; PyInstaller ships everything inside the sidecar bundle.
+      "frameworks": []
+    }
+  },
+  "plugins": {
+    "updater": {
+      // Phase 11 STUB — no real endpoints, no real pubkey. Phase 18 replaces.
+      // Per RESEARCH Open Question 1 + A2: empty pubkey is accepted by the plugin builder
+      // when endpoints[] is empty (no fetch happens). REPLACED IN PHASE 18.
+      "active": false,
+      "endpoints": [],
+      "pubkey": "",
+      "dialog": false
+    },
+    "fs": {
+      "requireLiteralLeadingDot": false
+    }
+  }
+}
