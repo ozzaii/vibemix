@@ -40,9 +40,10 @@ import type {
 import {
   appendMidiEvents,
   appendTranscript,
+  getSessionState,
   setSessionState,
 } from "./state.js";
-import type { LevelPair, MetersTriple } from "./state.js";
+import type { LevelPair, MascotMood, MetersTriple } from "./state.js";
 import type { PhaseChunk } from "./components/phase-tape.js";
 import type { MidiEvent } from "./components/event-ribbon.js";
 
@@ -99,6 +100,13 @@ interface WireSettingsStatePayload {
   retention_days: number;
   push_to_mute_hotkey: string;
   muted: boolean;
+  // --- Phase 13 (mascot overlay) additions — sidecar wires these in Plan
+  //     13-05; until then they arrive as undefined and we keep the
+  //     SessionState defaults. Narrowed defensively in applySettingsState
+  //     so a stray string from a future-out-of-sync sidecar can't poison
+  //     the union (T-13-03-01 mitigation).
+  mood?: MascotMood | string;
+  click_through?: boolean;
 }
 
 interface WireMutePayload {
@@ -266,7 +274,23 @@ export function applyStatusTick(p: WireStatusTickPayload): void {
   });
 }
 
+/** Whitelist of valid mascot moods — anything else from the wire is
+ *  dropped (T-13-03-01 tampering mitigation). Keep this in lockstep with
+ *  the `MascotMood` literal in state.ts. */
+const VALID_MOODS: readonly MascotMood[] = ["hype-man", "teacher", "coach"];
+
+function narrowMood(value: unknown, fallback: MascotMood): MascotMood {
+  if (typeof value !== "string") return fallback;
+  return (VALID_MOODS as readonly string[]).includes(value)
+    ? (value as MascotMood)
+    : fallback;
+}
+
 export function applySettingsState(p: WireSettingsStatePayload): void {
+  // Preserve current Phase 13 fields if the sidecar hasn't sent them yet
+  // (Plan 13-05 extends the sidecar payload). Defensive narrowing keeps a
+  // rogue future-string from poisoning the MascotMood union.
+  const current = getSessionState().settings;
   setSessionState({
     settings: {
       voice: p.voice,
@@ -276,6 +300,11 @@ export function applySettingsState(p: WireSettingsStatePayload): void {
       output_profile: p.output_profile,
       retention_days: p.retention_days,
       push_to_mute_hotkey: p.push_to_mute_hotkey,
+      mood: narrowMood(p.mood, current.mood),
+      click_through:
+        typeof p.click_through === "boolean"
+          ? p.click_through
+          : current.click_through,
     },
     muted: p.muted,
   });

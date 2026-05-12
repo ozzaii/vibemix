@@ -286,6 +286,24 @@ describe("renderCohostPanel", () => {
       "WARMING UP",
     );
   });
+
+  // Phase 13-03 — the 42×42 mascot placeholder bubble was dropped from the
+  // transcript header (CONTEXT.md Open Q 2). This assertion pins the
+  // deletion so a future revert can't silently reintroduce the corner.
+  it("header has NO mascot placeholder bubble (Phase 13 drop)", () => {
+    const panel = renderCohostPanel({
+      status: "LISTENING",
+      transcript: [],
+      latencyMs: null,
+      grounded: true,
+    });
+    host().append(panel);
+    expect(panel.querySelector(".vmx-cohost__mascot")).toBeNull();
+    // The header still mounts and carries the AVERY chip + status.
+    const header = panel.querySelector<HTMLElement>(".vmx-cohost__header");
+    expect(header).toBeTruthy();
+    expect(panel.querySelector(".vmx-cohost__name")?.textContent).toBe("AVERY");
+  });
 });
 
 // === StatusBar tooltip =======================================================
