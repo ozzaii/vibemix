@@ -51,6 +51,8 @@ export interface SessionState {
     bpm: number | null;
     key: string | null;
     deck: string | null;
+    track: { title: string; artist?: string | null } | null;
+    genre: string | null;
   };
   phase: {
     chunks: PhaseChunk[];
@@ -79,7 +81,12 @@ export interface SessionState {
   /** Persona panel state — Wave 3 (12-04) will wire onChange callbacks. */
   persona: {
     skill: "BEG" | "INT" | "PRO";
+    /** Legacy 2-state — retained for back-compat with existing tests / wires. */
     interaction: "HYPE" | "COACH";
+    /** 3-state mood (the v5 mood-block). Mapped from settings.mood by the
+     *  render-loop projection. The persona panel renders this; settings
+     *  drawer's mascot group is the authoritative write surface. */
+    mood: "HYPE" | "TEACH" | "COACH";
     voice: string;
     genre: string;
   };
@@ -212,12 +219,14 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const personaPanel = renderPanel({
     header: "PERSONA",
     badge: "CFG",
+    spec: "GEMINI · TTS",
     children: buildPersonaPanelBody(state),
   });
   leftCol.append(personaPanel);
 
   const outputPanel = renderPanel({
     header: "OUTPUT",
+    spec: "24-BIT · 48K",
     children: buildOutputPanelBody(state),
   });
   leftCol.append(outputPanel);
@@ -232,6 +241,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const meterPanel = renderPanel({
     header: "AUDIO IN",
     badge: "MASTER",
+    spec: "16-BIT · 48K",
     children: meterStrip,
   });
   leftCol.append(meterPanel);
@@ -360,12 +370,13 @@ function buildPersonaPanelBody(state: SessionState): HTMLElement {
 
   wrap.append(
     renderRocker({
-      ariaLabel: "interaction mode",
+      ariaLabel: "mood",
       options: [
         { id: "HYPE", label: "HYPE" },
+        { id: "TEACH", label: "TEACH" },
         { id: "COACH", label: "COACH" },
       ],
-      active: state.persona.interaction,
+      active: state.persona.mood,
       variant: "interaction",
     }),
   );
@@ -600,7 +611,7 @@ export function defaultState(): SessionState {
       voice: { rms: 0, peak: 0 },
       mic: { rms: 0, peak: 0 },
     },
-    timecode: { clock: "00:00:00", bpm: null, key: null, deck: null },
+    timecode: { clock: "00:00:00", bpm: null, key: null, deck: null, track: null, genre: null },
     phase: { chunks: [], nowPct: 0 },
     drop: { bars: null },
     events: [],
@@ -619,7 +630,7 @@ export function defaultState(): SessionState {
       hotkey: "⌘⇧M",
       errors: {},
     },
-    persona: { skill: "INT", interaction: "HYPE", voice: "avery", genre: "techno" },
+    persona: { skill: "INT", interaction: "HYPE", mood: "HYPE", voice: "avery", genre: "techno" },
     output: { device: "MacBook Pro Speakers", profile: "HP" },
   };
 }

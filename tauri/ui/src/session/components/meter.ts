@@ -42,10 +42,13 @@ const CSS = `
     position: relative;
     width: 56px;
     height: 200px;
-    background: var(--panel-deep);
-    border: 1px solid var(--bezel-1);
-    border-radius: 4px;
-    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
+    background: var(--glass-3);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    box-shadow:
+      inset 0 2px 6px rgba(0, 0, 0, 0.85),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.022);
     padding: 4px;
     display: flex;
     flex-direction: column-reverse;
@@ -55,40 +58,92 @@ const CSS = `
   .vmx-meter__seg {
     flex: 1;
     width: 100%;
-    border-radius: 1.5px;
-    background: var(--ink-engraved);
+    border-radius: 1px;
+    position: relative;
+    /* At rest each segment shows a faint silk hairline + thin centre
+     * highlight — the ladder is felt at idle, not invisible. Lit
+     * segments override these with the zoned amber treatment. */
+    background:
+      linear-gradient(90deg,
+        rgba(214, 207, 199, 0.025) 0%,
+        rgba(214, 207, 199, 0.06) 50%,
+        rgba(214, 207, 199, 0.025) 100%);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.018);
     transition: background var(--motion-snap) ease-out,
                 box-shadow var(--motion-snap) ease-out,
                 opacity var(--motion-snap) ease-out;
-    opacity: 0.45;
+    opacity: 0.85;
   }
-  /* Lit colour mapping by segment index (1=bottom, 16=top).
-   * Bottom 5: --ok (safe headroom)
-   * Middle 8: --phosphor-warm
-   * Top 3:    --phosphor (clip warning) */
-  .vmx-meter__seg[data-zone="safe"][data-lit="true"] {
-    background: var(--ok);
-    box-shadow: 0 0 4px var(--ok);
+  /* v5 ladder — Pioneer-CDJ style. Amber gradient from deep at the top
+   * (clip) to mid in the body to pale near the bottom (safe). A single
+   * green hairline marks the safe/warm boundary (segment 5). */
+  .vmx-meter__seg[data-lit="true"] {
     opacity: 1;
+    box-shadow: none;
+  }
+  .vmx-meter__seg[data-zone="safe"][data-lit="true"] {
+    background: linear-gradient(180deg, var(--amber-pale), rgba(255, 184, 138, 0.7));
+    box-shadow:
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.15),
+      0 0 3px var(--amber-22);
   }
   .vmx-meter__seg[data-zone="warm"][data-lit="true"] {
-    background: var(--phosphor-warm);
-    box-shadow: 0 0 4px var(--phosphor-warm);
-    opacity: 1;
+    background: linear-gradient(180deg, var(--amber), rgba(255, 138, 61, 0.78));
+    box-shadow:
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.12),
+      0 0 4px var(--amber-40);
   }
   .vmx-meter__seg[data-zone="clip"][data-lit="true"] {
-    background: var(--phosphor);
-    box-shadow: var(--phosphor-glow);
-    opacity: 1;
+    background: linear-gradient(180deg, var(--amber-deep), rgba(255, 90, 26, 0.85));
+    box-shadow:
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+      var(--glow-soft);
   }
+  /* Green hairline marker at segment 5 — the safe/warm boundary */
+  .vmx-meter__seg[data-index="5"]::after {
+    content: '';
+    position: absolute;
+    left: -1px;
+    right: -1px;
+    bottom: -2px;
+    height: 1px;
+    background: var(--led-ok);
+    box-shadow: 0 0 3px var(--led-ok);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  /* Faint scale tick on every third inactive segment — reads as
+   * machined detail on the bezel, never competes with lit segments. */
+  .vmx-meter__seg[data-index="4"]::before,
+  .vmx-meter__seg[data-index="8"]::before,
+  .vmx-meter__seg[data-index="12"]::before,
+  .vmx-meter__seg[data-index="16"]::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 50%;
+    width: 2px;
+    height: 1px;
+    background: var(--silk-22);
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  /* Peak needle — a 2px amber-pale floater that hangs above the
+   * current RMS. Bottom-up: at peak=1 it sits at the very top of the
+   * frame. The shadow + inset highlight give it dimension; the
+   * opacity transition is a 1.2s fade so peaks linger as the meter
+   * recoils — pure CSS, no JS holds. */
   .vmx-meter__peak {
     position: absolute;
-    left: 4px;
-    right: 4px;
-    height: 3px;
-    border-radius: 1.5px;
-    background: var(--phosphor);
-    box-shadow: var(--phosphor-glow);
+    left: 3px;
+    right: 3px;
+    height: 2px;
+    border-radius: 1px;
+    background: linear-gradient(180deg, var(--amber-pale), var(--amber));
+    box-shadow:
+      0 0 4px var(--amber-65),
+      0 0 8px var(--amber-22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35);
     bottom: calc(var(--meter-peak-pct, 0) * (100% - 8px));
     opacity: var(--meter-peak-shown, 0);
     transition: bottom 80ms ease-out,
@@ -96,12 +151,14 @@ const CSS = `
     pointer-events: none;
   }
   .vmx-meter__label {
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
     font-size: 9px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--ink-dim);
+    color: var(--silk-40);
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
 `;
 

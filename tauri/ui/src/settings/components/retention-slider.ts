@@ -77,21 +77,31 @@ const CSS = `
   .vmx-retention {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-sm);
+    gap: var(--sp-3);
   }
+  /* Readout — recessed glass display window, JetBrains Mono tabular.
+   * Matches the timecode hero clock treatment so the drawer feels of
+   * the same instrument. */
   .vmx-retention__readout {
     align-self: flex-start;
-    font-family: "DSEG7", "DM Mono", monospace;
-    font-size: 22px;
-    letter-spacing: 0.06em;
-    color: var(--phosphor);
-    text-shadow: var(--phosphor-glow);
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 18px;
+    letter-spacing: 0.04em;
+    color: var(--silk);
     line-height: 1;
-    padding: var(--sp-xs) var(--sp-sm);
-    background: var(--panel-deep);
-    border: 1px solid var(--bezel-2);
-    border-radius: 3px;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+    padding: 8px 12px 10px;
+    background: var(--glass-3);
+    backdrop-filter: var(--blur-glass-display);
+    -webkit-backdrop-filter: var(--blur-glass-display);
+    border: 1px solid rgba(0, 0, 0, 0.55);
+    border-radius: var(--rad-sm);
+    box-shadow:
+      inset 0 2px 6px rgba(0, 0, 0, 0.9),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+      inset 0 0 14px rgba(255, 138, 61, 0.04),
+      0 0 0 1px rgba(255, 255, 255, 0.02);
+    text-shadow: 0 0 6px rgba(255, 138, 61, 0.20);
     user-select: none;
   }
   .vmx-retention__track-wrap {
@@ -100,27 +110,35 @@ const CSS = `
     display: flex;
     align-items: center;
   }
+  /* Track — faint silk hairline so the path is felt at idle. Lit
+   * portion is amber-22 glow gradient. */
   .vmx-retention__track {
     position: absolute;
     left: 8px;
     right: 8px;
     top: 50%;
     height: 2px;
-    background: var(--bezel-1);
+    background:
+      linear-gradient(90deg,
+        rgba(214, 207, 199, 0.07) 0%,
+        rgba(214, 207, 199, 0.18) 50%,
+        rgba(214, 207, 199, 0.07) 100%);
     transform: translateY(-50%);
     pointer-events: none;
+    border-radius: 1px;
   }
   .vmx-retention__track-lit {
     position: absolute;
     left: 8px;
     top: 50%;
-    height: 4px;
-    background: var(--phosphor-soft);
+    height: 3px;
+    background: linear-gradient(90deg, var(--amber-deep), var(--amber) 70%, var(--amber-pale));
     transform: translateY(-50%);
     pointer-events: none;
     width: var(--vmx-retention-lit, 0%);
     transition: width var(--motion-snap) ease-out;
     border-radius: 2px;
+    box-shadow: 0 0 4px var(--amber-22);
   }
   .vmx-retention__stops {
     position: relative;
@@ -129,56 +147,59 @@ const CSS = `
     width: 100%;
     z-index: 1;
   }
+  /* Stops — small glass-edge dome knobs. Active knob fills with amber
+   * (no halation halo; the lit track does the position signal). */
   .vmx-retention__knob {
     position: relative;
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    background: var(--panel-deep);
-    border: 1px solid var(--phosphor-dim);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
-                inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+    background: var(--void-2);
+    border: 1px solid var(--glass-edge);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(0, 0, 0, 0.45);
     cursor: pointer;
     padding: 0;
-    transition: box-shadow var(--motion-snap) ease-out,
-                background var(--motion-snap) ease-out;
-  }
-  .vmx-retention__knob::after {
-    /* Knurl detail — a faint cross-hatch via inset shadow. Phase 14 may
-     * deepen this; v1 ships the suggestion. */
-    content: "";
-    position: absolute;
-    inset: 3px;
-    border-radius: 50%;
-    background:
-      repeating-linear-gradient(
-        90deg,
-        transparent 0 1px,
-        rgba(255, 255, 255, 0.04) 1px 2px
-      );
-    pointer-events: none;
+    transition: background var(--motion-snap) ease-out,
+                border-color var(--motion-snap) ease-out,
+                box-shadow var(--motion-snap) ease-out,
+                transform var(--motion-snap) ease-out;
   }
   .vmx-retention__knob:hover {
-    box-shadow: var(--phosphor-glow);
+    border-color: var(--amber-40);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+      0 0 6px var(--amber-22);
+    transform: scale(1.08);
   }
   .vmx-retention__knob[data-active="true"] {
-    background: var(--phosphor);
-    border-color: var(--phosphor);
-    box-shadow: var(--phosphor-glow);
+    background: var(--amber);
+    border-color: var(--amber-pale);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      inset 0 -0.5px 0 rgba(0, 0, 0, 0.4),
+      0 0 4px var(--amber-65),
+      0 0 9px var(--amber-22);
   }
   .vmx-retention__labels {
     display: flex;
     justify-content: space-between;
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
     font-size: 9px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--ink-dim);
+    color: var(--silk-40);
     line-height: 1;
-    padding: 0 4px;
+    padding: 0 2px;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .vmx-retention__lbl[data-active="true"] {
-    color: var(--phosphor);
+    color: var(--amber);
+    text-shadow: 0 0 4px var(--amber-22);
   }
 `;
 

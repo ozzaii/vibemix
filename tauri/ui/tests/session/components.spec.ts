@@ -499,10 +499,20 @@ describe("renderPanel", () => {
 });
 
 describe("renderTimecode", () => {
-  it("renders hero clock + meta cells", () => {
-    const t = renderTimecode({ clock: "02:44:31", bpm: 140, key: "Am", deck: "A" });
+  it("renders hero clock + track title + meta cells", () => {
+    const t = renderTimecode({
+      clock: "02:44:31",
+      bpm: 140,
+      key: "Am",
+      deck: "A",
+      track: { title: "Strobe", artist: "Deadmau5" },
+      genre: "techno",
+    });
     host().append(t);
-    expect(t.querySelector(".vmx-timecode__hero")?.textContent).toBe("02:44:31");
+    expect(t.querySelector(".vmx-timecode__hero-clock")?.textContent).toBe("02:44:31");
+    expect(t.querySelector<HTMLElement>(".vmx-timecode__title")?.dataset.empty).toBe("false");
+    expect(t.querySelector(".vmx-timecode__title")?.textContent).toContain("Strobe");
+    expect(t.querySelector(".vmx-timecode__title .sub")?.textContent).toBe("Deadmau5");
     const cells = t.querySelectorAll<HTMLElement>(".vmx-timecode__meta-cell");
     expect(cells).toHaveLength(3);
     expect(cells[0]?.querySelector("b")?.textContent).toBe("140");
@@ -510,12 +520,20 @@ describe("renderTimecode", () => {
     expect(cells[2]?.querySelector("b")?.textContent).toBe("A");
   });
 
-  it("handles null bpm/key/deck with em-dash", () => {
-    const t = renderTimecode({ clock: "00:00:00", bpm: null, key: null, deck: null });
+  it("handles null bpm/key/deck/track with em-dash and empty state", () => {
+    const t = renderTimecode({
+      clock: "00:00:00",
+      bpm: null,
+      key: null,
+      deck: null,
+      track: null,
+      genre: null,
+    });
     host().append(t);
     const dashes = Array.from(t.querySelectorAll<HTMLElement>(".vmx-timecode__meta-cell b"))
       .map((b) => b.textContent);
     expect(dashes).toEqual(["—", "—", "—"]);
+    expect(t.querySelector<HTMLElement>(".vmx-timecode__title")?.dataset.empty).toBe("true");
   });
 });
 
@@ -593,7 +611,7 @@ describe("hex grep guard", () => {
     void renderRocker({ options: [{ id: "x", label: "x" }], active: "x" });
     void renderPicker({ label: "X", value: "x", options: [] });
     void renderMeter({ label: "music" });
-    void renderTimecode({ clock: "00:00", bpm: null, key: null, deck: null });
+    void renderTimecode({ clock: "00:00", bpm: null, key: null, deck: null, track: null, genre: null });
     void renderPhaseTape({ chunks: [], nowPct: 0 });
     void renderDropChip({ bars: 4 });
     void renderEventRibbon({ events: [] });

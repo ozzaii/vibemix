@@ -1,25 +1,40 @@
 /* tokens.css — design system source-of-truth.
  *
- * Lifted VERBATIM from .planning/phases/11-tauri-shell-calibration-wizard/11-UI-SPEC.md
- * §Color / §Spacing / §Typography / §Grid / §Atmospheric Layers.
+ * v5 CDJ WHISPER direction (2026-05-12). Replaces the prior
+ * FL-Studio retro-tactile direction. The mock at
+ * `mocks/vibemix-direction-final.html` is the visual contract.
+ * Migration plan: `.planning/HANDOFF-cdj-whisper-v5-ui-migration.md`.
  *
- * DO NOT diverge from UI-SPEC. The visual handoff to Phase 12 (live session UI)
- * depends on these tokens being stable — every subsequent UI phase consumes
- * this file. The mock at mocks/vibemix-app-ui.html is the source for Phase 12;
- * tokens here must stay 1:1 with that mock's :root{} block.
+ * Structure of this file:
+ *   1. @import Google Fonts (Saira, JetBrains Mono) — prototype-phase
+ *      remote fetch; Phase 14 audit must vendor as WOFF2.
+ *   2. Legacy @font-face declarations (Workbench, DM Mono, DSEG7,
+ *      Caveat) retained so any component that still hardcodes those
+ *      family names by string keeps rendering during the migration.
+ *      Removed component-by-component during Phase 14 audit.
+ *   3. :root — v5 design tokens, then a backward-compat shim mapping
+ *      old Phase 11/12 token names to v5 values. The shim lets the
+ *      cascade flip most components without touching their CSS.
+ *      Phase 14 audit deletes the shim and migrates references.
+ *   4. Reset + v5 body background (cinematic vignette + restrained
+ *      rave washes + multi-layer film grain).
+ *   5. `.border-anim` utility — the slow amber light traveling around
+ *      panel perimeters. Drop as first child of any glass panel.
+ *   6. Wizard frame layout (structural — kept verbatim from Phase 11,
+ *      just retoned to v5 glass).
  *
- * Anti-pattern guard: components MUST NOT declare hex colors. They read
- * var(--token) exclusively. Only this file is allowed to contain `#xxxxxx`.
+ * Anti-pattern guard: components MUST NOT declare hex colors. They
+ * read var(--token) exclusively. Only this file is allowed to
+ * contain `#xxxxxx`.
  */
 
-/* === Font face declarations ============================================ */
-/* All five fonts vendored locally per UI-SPEC §Asset Pipeline — no
- * CDN fetch at runtime. SHA-256 of every WOFF2 is recorded in
- * tauri/ui/LICENSE-3RD-PARTY.md so Phase 18 codesigning can attest.
- *
- * font-display: swap on every face per §Asset Pipeline — avoids FOIT
- * during cold-start. */
+/* === v5 type — Saira + JetBrains Mono ================================== */
+/* Loaded via Google Fonts for prototype iteration. Phase 14 audit
+ * vendors these as WOFF2 alongside the existing fonts and updates
+ * tauri/ui/LICENSE-3RD-PARTY.md with SHA-256 attestations. */
+@import url('https://fonts.googleapis.com/css2?family=Saira:wdth,wght@75..125,300..800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
+/* === Legacy @font-face — retained during migration ===================== */
 @font-face {
   font-family: "Workbench";
   src: url("/fonts/Workbench-Regular.woff2") format("woff2");
@@ -53,9 +68,6 @@
 }
 
 @font-face {
-  /* RESERVED for Phase 12 stickers — UI-SPEC §Typography forbids
-   * Caveat in any Phase 11 wizard surface. Bundled here so the file
-   * is on disk when Phase 12 needs it. */
   font-family: "Caveat";
   src: url("/fonts/Caveat-Bold.woff2") format("woff2");
   font-weight: 700;
@@ -63,77 +75,162 @@
   font-display: swap;
 }
 
-/* === Design tokens (UI-SPEC verbatim) ================================== */
+/* === v5 design tokens (CDJ Whisper) ==================================== */
 :root {
-  /* --- Charcoal family (80% dominant) — UI-SPEC §Color --- */
-  --bg: #0a0b0e;
-  --panel: #15181e;
-  --panel-lift: #1d2128;
-  --panel-deep: #0a0b0e;
-  --groove: #07080a;
-  --bezel-1: #1a1e25;
-  --bezel-2: #2a2f38;
-  --bezel-3: #3a4150;
-  --brushed-hi: rgba(255, 255, 255, 0.04);
-  --brushed-lo: rgba(0, 0, 0, 0.5);
+  /* --- Void stack — five cool blacks, slight blue undertone --- */
+  --void:    #000000;
+  --void-1:  #020205;
+  --void-2:  #05070b;
+  --void-3:  #0a0c12;
+  --void-4:  #11141c;
 
-  /* --- Ink (text on charcoal) --- */
-  --ink: #c8cdd6;
-  --ink-dim: #6b7280;
-  --ink-deep: #3d424c;
-  --ink-engraved: #1f242c;
+  /* --- Glass surfaces — darker than v4 (deck dominates, glass seals) --- */
+  --glass-1:       rgba(8, 10, 16, 0.78);    /* primary panel */
+  --glass-2:       rgba(12, 14, 22, 0.62);   /* secondary panel */
+  --glass-3:       rgba(2, 3, 6, 0.88);      /* recessed (display window, mood track) */
+  --glass-edge:    rgba(255, 255, 255, 0.065);
+  --glass-edge-up: rgba(255, 255, 255, 0.110);
+  --glass-top:     rgba(255, 255, 255, 0.055);
 
-  /* --- Phosphor amber (20% accent — ONE colour does ALL the lifting) --- */
-  --phosphor: #ffa12e;
-  --phosphor-warm: #ff8a1a;
-  --phosphor-dim: #6e4815;
-  --phosphor-soft: rgba(255, 161, 46, 0.18);
-  --phosphor-glow: 0 0 14px rgba(255, 161, 46, 0.5);
-  --phosphor-halo: 0 0 36px rgba(255, 161, 46, 0.22);
+  /* --- Silk text --- */
+  --silk:    #d6cfc7;
+  --silk-65: rgba(214, 207, 199, 0.65);
+  --silk-40: rgba(214, 207, 199, 0.40);
+  --silk-22: rgba(214, 207, 199, 0.22);
+  --silk-12: rgba(214, 207, 199, 0.12);
 
-  /* --- Status-only dots (NEVER panel fills) --- */
-  --rec: #ff3553;
-  --cue: #4dc4ff; /* Reserved — UI-SPEC §Color forbids use in Phase 11 */
-  --ok: #5dcf7c;
+  /* --- Amber accent — primary deck-light --- */
+  --amber:      #ff8a3d;
+  --amber-deep: #ff5a1a;
+  --amber-pale: #ffb88a;
+  --amber-22:   rgba(255, 138, 61, 0.22);
+  --amber-40:   rgba(255, 138, 61, 0.40);
+  --amber-65:   rgba(255, 138, 61, 0.65);
 
-  /* --- Crash banner background tint (UI-SPEC §13) --- */
-  --crash-grad-top: #25181c;
-  --crash-grad-bottom: #1a1014;
+  /* --- Night-rave ambient body washes (atmospheric only, never on chrome) --- */
+  --rave-magenta: rgba(192, 56, 224, 0.055);
+  --rave-pink:    rgba(255, 92, 188, 0.038);
+  --rave-cyan:    rgba(72, 152, 255, 0.042);
+  --rave-purple:  rgba(118, 56, 224, 0.030);
+  --rave-teal:    rgba(64, 220, 200, 0.022);
 
-  /* --- Button hover/pressed gradient stops (UI-SPEC §3 verbatim) --- */
-  --panel-hover-top: #25292f;
-  --panel-pressed-bottom: #0e1014;
+  /* --- Status LEDs --- */
+  --led-ok:    #6dd44a;
+  --led-warn:  #f4c542;
+  --led-fault: #d4413a;
 
-  /* --- Spacing scale (UI-SPEC §Spacing — 8-point grid) --- */
-  --sp-xs: 4px;
-  --sp-sm: 8px;
-  --sp-md: 16px;
-  --sp-lg: 24px;
-  --sp-xl: 32px;
-  --sp-2xl: 48px;
-  --sp-3xl: 64px;
+  /* --- Glass blurs --- */
+  --blur-glass:         blur(32px) saturate(140%);
+  --blur-glass-light:   blur(16px) saturate(120%);
+  --blur-glass-display: blur(6px)  saturate(105%);
 
-  /* --- Layout & Grid (UI-SPEC §Grid Tokens) --- */
+  /* --- Glow — restrained (v5 cut ~40% from v4) --- */
+  --glow-faint:  0 0 5px var(--amber-22);
+  --glow-soft:   0 0 6px var(--amber-40), 0 0 14px var(--amber-22);
+  --glow-strong: 0 0 8px var(--amber-65), 0 0 18px var(--amber-22);
+
+  /* --- Type --- */
+  --type-display: 'Saira', system-ui, sans-serif;
+  --type-body:    'Saira', system-ui, sans-serif;
+  --type-mono:    'JetBrains Mono', 'DM Mono', ui-monospace, monospace;
+
+  /* --- Radius --- */
+  --rad-sm: 2px;
+  --rad-md: 6px;
+  --rad-lg: 10px;
+
+  /* --- Spacing scale (v5: 4 → 96 in 8 steps) --- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 40px;
+  --sp-7: 64px;
+  --sp-8: 96px;
+
+  /* --- Layout & Grid (retained from Phase 11) --- */
   --container-max: 896px;
   --col-primary: 560px;
-  --col-mascot: 256px;
+  --col-mascot:  256px;      /* v5 says reclaim this, but Phase 11 wizard-grid still
+                                              * assumes two columns. Leaving the reserved width in
+                                              * place so the wizard renders correctly during the
+                                              * migration; Phase 14 audit collapses to single-column. */
   --gap-col: 32px;
   --titlebar-h: 56px;
   --stepstrip-h: 64px;
   --statusbar-h: 40px;
   --cta-margin-bottom: 24px;
 
-  /* --- Motion Budget (UI-SPEC §Motion Budget) --- */
-  --motion-snap: 150ms;          /* button state transitions */
-  --motion-transition: 200ms;    /* step strip node fill, BlackHole banner */
-  --motion-step: 250ms;          /* step transition (CAP — never longer) */
-  --motion-led-pulse: 1400ms;    /* active step + listening LEDs */
-  --motion-rings-audio: 1500ms;  /* matches sine duration */
-  --motion-rings-listen: 2000ms; /* slower, ambient — controller probe */
-  --motion-dseg-tick: 1000ms;    /* DSEG7 countdown tick */
+  /* --- Motion budget (retained from Phase 11 + v5 border sweep) --- */
+  --motion-snap: 150ms;
+  --motion-transition: 200ms;
+  --motion-step: 250ms;
+  --motion-led-pulse: 1400ms;
+  --motion-rings-audio: 1500ms;
+  --motion-rings-listen: 2000ms;
+  --motion-dseg-tick: 1000ms;
+  --motion-border-sweep: 22s;   /* slow amber light around panel perimeter */
+
+  /* === Backward-compat shim ===========================================
+   * Old Phase 11/12 token names → v5 values. Lets existing components
+   * cascade-flip without code changes. Phase 14 audit migrates each
+   * component to consume v5 tokens directly, then deletes the shim.
+   * Do NOT introduce new references to these names. */
+
+  /* Charcoal family → void / glass */
+  --bg:           var(--void-1);
+  --panel:        var(--glass-1);
+  --panel-lift:   var(--glass-2);
+  --panel-deep:   var(--void-2);
+  --groove:       var(--glass-3);
+  --bezel-1:      transparent;        /* no 3D bevels in v5 — borders are glass-edge */
+  --bezel-2:      transparent;
+  --bezel-3:      transparent;
+  --brushed-hi:   var(--glass-top);
+  --brushed-lo:   rgba(0, 0, 0, 0.5);
+
+  /* Ink → silk */
+  --ink:          var(--silk);
+  --ink-dim:      rgba(214, 207, 199, 0.55);
+  --ink-deep:     rgba(214, 207, 199, 0.30);
+  --ink-engraved: rgba(214, 207, 199, 0.15);
+
+  /* Phosphor → amber (deliberate hue shift: #ffa12e → #ff8a3d) */
+  --phosphor:      var(--amber);
+  --phosphor-warm: var(--amber-deep);
+  --phosphor-dim:  var(--amber-22);    /* used as border in Phase 11 crash button */
+  --phosphor-soft: var(--amber-22);
+  --phosphor-glow: var(--glow-soft);
+  --phosphor-halo: 0 0 22px var(--amber-22);
+
+  /* Status dots — distinct hues retained (semantic, not theme) */
+  --rec: var(--led-fault);
+  --cue: #4dc4ff;                      /* reserved — Phase 11 forbade use */
+  --ok:  var(--led-ok);
+
+  /* Crash banner — glass-toned now, structure unchanged */
+  --crash-grad-top:    rgba(37, 24, 28, 0.7);
+  --crash-grad-bottom: rgba(26, 16, 20, 0.7);
+
+  /* Button gradient stops — old hover/pressed pair → glass equivalents */
+  --panel-hover-top:      var(--glass-2);
+  --panel-pressed-bottom: var(--void-2);
+
+  /* Spacing aliases — old --sp-xs … --sp-3xl → v5 scale.
+   * --sp-xl (32) and --sp-2xl (48) have no v5 equivalent so they
+   * remain literal; new code should use --sp-4 / --sp-5 / --sp-6
+   * (16 / 24 / 40) from the v5 scale instead. */
+  --sp-xs:  var(--sp-1);   /* 4 */
+  --sp-sm:  var(--sp-2);   /* 8 */
+  --sp-md:  var(--sp-4);   /* 16 */
+  --sp-lg:  var(--sp-5);   /* 24 */
+  --sp-xl:  32px;
+  --sp-2xl: 48px;
+  --sp-3xl: var(--sp-7);   /* 64 */
 }
 
-/* === Reset that respects retro hardware ================================ */
+/* === Reset ============================================================= */
 *,
 *::before,
 *::after {
@@ -145,65 +242,131 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: "DM Mono", monospace;
+  color: var(--silk);
+  font-family: var(--type-body);
+  font-weight: 400;
+  font-variation-settings: "wdth" 100, "wght" 400;
   font-size: 14px;
-  line-height: 1.5;
-  letter-spacing: 0.01em;
+  line-height: 1.45;
+  letter-spacing: 0;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* v5 body background — cinematic vignette + restrained rave washes +
+ * deep cold base. Replaces the FL-Studio charcoal radial gradients. */
 body {
-  /* Body radial gradients (UI-SPEC §Backgrounds & Atmospheric Layers) */
-  background:
-    radial-gradient(1200px 800px at 50% -10%, #14171c 0%, transparent 60%),
-    radial-gradient(900px 600px at 90% 110%, #1a1e25 0%, transparent 50%),
-    var(--bg);
+  background-color: var(--void);
+  background-image:
+    radial-gradient(ellipse 92% 78% at 50% 45%, transparent 0%, rgba(0, 0, 0, 0.5) 75%, rgba(0, 0, 0, 0.9) 100%),
+    radial-gradient(ellipse 55% 38% at 18% 22%, var(--rave-magenta), transparent 60%),
+    radial-gradient(ellipse 48% 36% at 84% 78%, var(--rave-cyan),    transparent 55%),
+    radial-gradient(ellipse 60% 42% at 55% 105%, var(--rave-pink),   transparent 60%),
+    radial-gradient(ellipse 35% 28% at 92% 12%, var(--rave-purple),  transparent 55%),
+    radial-gradient(ellipse 28% 22% at 5% 88%,  var(--rave-teal),    transparent 55%),
+    linear-gradient(180deg, #02030a 0%, #000000 55%, #030208 100%);
+  background-attachment: fixed;
 }
 
-/* Global film grain — atmospheric SVG noise, mix-blend overlay.
- * UI-SPEC §Atmospheric Layers — MUST be present on every wizard screen. */
+/* v5 multi-layer film grain — coarser dust + fine grain, overlay-blended.
+ * v4 scanlines are gone; v5 read is glass + film, not CRT. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 9999;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .35 0'/></filter><rect width='200' height='200' filter='url(%23n)' opacity='.6'/></svg>");
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='420' height='420'><filter id='d'><feTurbulence type='fractalNoise' baseFrequency='0.42' numOctaves='3' seed='9'/></filter><rect width='100%25' height='100%25' filter='url(%23d)' opacity='0.022'/></svg>"),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' seed='5'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.028'/></svg>");
   mix-blend-mode: overlay;
-  opacity: 0.06;
+  opacity: 1;
 }
 
-/* Faint scanline overlay — vintage CRT/LCD feel.
- * UI-SPEC §Atmospheric Layers — also mandatory on every screen. */
-body::after {
-  content: "";
-  position: fixed;
+/* === Animated border utility =========================================== */
+/* A slow amber light traveling around the panel perimeter — like the
+ * gentle pulse on the front of a real CDJ-3000 sitting idle. Drop as
+ * the first child of any glass panel:
+ *   <div class="border-anim"></div>
+ * Modifiers:
+ *   .slow → 32s (use on secondary panels)
+ *   .rev  → reverse direction (pair with adjacent panels so they
+ *           don't sync visually)
+ * The panel needs `position: relative` and `overflow: hidden`. */
+@keyframes borderSweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.border-anim {
+  position: absolute;
   inset: 0;
-  pointer-events: none;
-  z-index: 9998;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 2px,
-    rgba(0, 0, 0, 0.18) 2px,
-    rgba(0, 0, 0, 0.18) 3px
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0%,
+    transparent 30%,
+    rgba(255, 138, 61, 0.28) 45%,
+    rgba(255, 220, 180, 0.42) 50%,
+    rgba(255, 138, 61, 0.28) 55%,
+    transparent 70%,
+    transparent 100%
   );
-  mix-blend-mode: multiply;
-  opacity: 0.4;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+          mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  padding: 1px;
+  pointer-events: none;
+  z-index: 4;
+  animation: borderSweep var(--motion-border-sweep) linear infinite;
+  opacity: 0.95;
+}
+.border-anim.slow { animation-duration: 32s; }
+.border-anim.rev  { animation-direction: reverse; }
+
+/* === Glass-streak utility ============================================== *
+ * A faint diagonal glass-fingerprint sheen that drifts across the panel
+ * face. Lifted from the v5 mock `.session::after` — promoted to a
+ * shared utility so any glass surface can opt-in by dropping a
+ * `<span class="vmx-glass-streak" aria-hidden="true"></span>` as a child
+ * (parent must be `position: relative` + `overflow: hidden`).
+ * Sits beneath component content at z-index 0; the panel body should
+ * position its children at z-index 1+. */
+.vmx-glass-streak {
+  content: "";
+  position: absolute;
+  top: 24%;
+  right: -10%;
+  width: 55%;
+  height: 200px;
+  background: linear-gradient(45deg,
+    transparent,
+    rgba(255, 255, 255, 0.012),
+    transparent);
+  transform: rotate(-12deg);
+  pointer-events: none;
+  z-index: 0;
+}
+.vmx-glass-streak.bottom {
+  top: auto;
+  bottom: -8%;
+  left: -10%;
+  right: auto;
+  transform: rotate(8deg);
 }
 
-/* Default focus ring (UI-SPEC §Focus Order) — phosphor, with halo on visible */
-*:focus {
-  outline: none;
-}
+/* === Focus ring (v5 amber) ============================================= */
+*:focus { outline: none; }
 *:focus-visible {
-  outline: 2px solid var(--phosphor);
+  outline: 2px solid var(--amber);
   outline-offset: 2px;
-  box-shadow: var(--phosphor-glow);
+  box-shadow: var(--glow-soft);
 }
 
 button {
@@ -215,11 +378,9 @@ button {
   padding: 0;
 }
 
-button[disabled] {
-  cursor: not-allowed;
-}
+button[disabled] { cursor: not-allowed; }
 
-/* === Wizard frame layout (UI-SPEC §Layout & Grid) ====================== */
+/* === Wizard frame layout (structural — retoned to v5 glass) ============ */
 .wizard-app {
   display: grid;
   grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
@@ -232,18 +393,21 @@ button[disabled] {
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--sp-lg);
-  background: linear-gradient(180deg, #1a1e25 0%, #14171c 50%, var(--panel) 100%);
-  border-bottom: 1px solid var(--bezel-1);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border-bottom: 1px solid var(--glass-edge);
   -webkit-app-region: drag; /* Tauri custom titlebar drag region */
   user-select: none;
 }
 
 .titlebar .wordmark {
-  font-family: "Workbench", "Courier New", monospace;
-  font-size: 28px;
-  letter-spacing: 0.04em;
-  color: var(--phosphor);
-  text-shadow: var(--phosphor-glow);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 700;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--silk);
   line-height: 1;
 }
 
@@ -255,10 +419,10 @@ button[disabled] {
 }
 
 .titlebar .clock {
-  font-family: "DSEG7", "DM Mono", monospace;
-  font-size: 14px;
-  color: var(--ink-dim);
-  letter-spacing: 0.06em;
+  font-family: var(--type-mono);
+  font-size: 11px;
+  color: var(--silk-40);
+  letter-spacing: 0.08em;
 }
 
 .wizard-content {
@@ -268,6 +432,10 @@ button[disabled] {
   overflow: hidden;
 }
 
+/* v5 reclaims the embedded mascot corner via --col-mascot: 0. Surfaces
+ * that need a second column can override --col-mascot inline on
+ * .wizard-grid until Phase 14 component audit removes the legacy
+ * two-column assumption entirely. */
 .wizard-grid {
   display: grid;
   grid-template-columns: var(--col-primary) var(--col-mascot);
@@ -288,16 +456,14 @@ button[disabled] {
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--sp-lg);
-  background: linear-gradient(180deg, var(--panel) 0%, #0e1014 100%);
-  border-top: 1px solid var(--bezel-1);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border-top: 1px solid var(--glass-edge);
 }
 
-/* === Crash banner (UI-SPEC §13) ======================================== */
-/* Displaces the step indicator strip when sidecar dies. Faintly --rec-tinted
- * but stays in the charcoal family — never a panel of solid red. */
-#crash-banner[hidden] {
-  display: none !important;
-}
+/* === Crash banner (UI-SPEC §13) — retoned to v5 glass ================== */
+#crash-banner[hidden] { display: none !important; }
 #crash-banner {
   position: absolute;
   top: var(--titlebar-h);
@@ -309,6 +475,8 @@ button[disabled] {
   gap: var(--sp-md);
   padding: var(--sp-md) var(--sp-lg);
   background: linear-gradient(180deg, var(--crash-grad-top), var(--crash-grad-bottom));
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
   border-top: 1px solid var(--rec);
   border-bottom: 1px solid var(--rec);
   animation: crash-enter var(--motion-snap) ease-out;
@@ -318,52 +486,50 @@ button[disabled] {
   font-size: 24px;
   line-height: 1;
 }
-#crash-banner .crash-text {
-  flex: 1;
-  min-width: 0;
-}
+#crash-banner .crash-text { flex: 1; min-width: 0; }
 #crash-banner .heading {
-  font-family: "Workbench", "Courier New", monospace;
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
   font-size: 11px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--ink);
+  color: var(--silk);
 }
 #crash-banner .body {
-  font-family: "DM Mono", monospace;
+  font-family: var(--type-mono);
   font-size: 11px;
-  color: var(--ink-dim);
+  color: var(--silk-65);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 #crash-banner button#crash-restart {
-  font-family: "Workbench", "Courier New", monospace;
-  font-size: 11px;
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 10px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  padding: 12px 24px;
-  border: 1px solid var(--phosphor-dim);
-  border-radius: 4px;
-  color: var(--phosphor);
-  background: linear-gradient(180deg, var(--panel-lift), var(--panel));
-  box-shadow: var(--phosphor-glow);
+  padding: 9px 24px;
+  border: 1px solid var(--amber-40);
+  border-radius: var(--rad-sm);
+  color: var(--amber);
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 var(--amber-40),
+    inset 0 0 14px var(--amber-22),
+    0 0 0 1px rgba(255, 138, 61, 0.14);
+  text-shadow: 0 0 4px var(--amber-65);
   cursor: pointer;
   min-width: 144px;
 }
 #crash-banner button#crash-restart:hover {
-  border-color: var(--phosphor);
-  background: linear-gradient(180deg, #25292f, var(--panel-lift));
+  border-color: var(--amber);
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.14) 0%, rgba(255, 138, 61, 0.04) 100%);
 }
 
 @keyframes crash-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

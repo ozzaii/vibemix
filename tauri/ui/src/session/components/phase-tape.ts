@@ -39,105 +39,120 @@ export interface PhaseTapeProps {
 
 const CSS = `
   .vmx-phase-tape {
-    --paper-tape-top: #f3ead7;
-    --paper-tape-bot: #ebe0c6;
-    --paper-tape-ink: #2a1f15;
-    --paper-tape-edge: #2a2118;
-    --paper-tape-label: #5a4a30;
-    --paper-tape-chunk-silent: #8a7c5e;
-    --paper-tape-chunk-groove: #5a4a30;
-    --paper-tape-chunk-build: #1a1408;
-    --paper-tape-chunk-drop-ghost: #a87010;
-    --paper-tape-drop-border: #c8901a;
     margin-top: 18px;
     position: relative;
-    height: 96px;
-    background: linear-gradient(180deg, var(--paper-tape-top) 0%, var(--paper-tape-bot) 100%);
-    border: 1px solid var(--paper-tape-edge);
-    border-radius: 4px;
-    padding: 8px 12px;
+    height: 108px;
+    background: var(--glass-3);
+    backdrop-filter: var(--blur-glass-display);
+    -webkit-backdrop-filter: var(--blur-glass-display);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    padding: 26px 12px 12px;
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.6),
-      inset 0 -2px 4px rgba(0, 0, 0, 0.15),
-      0 2px 6px rgba(0, 0, 0, 0.5);
+      inset 0 2px 6px rgba(0, 0, 0, 0.85),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+      inset 0 0 18px rgba(255, 138, 61, 0.025),
+      0 0 0 1px rgba(255, 255, 255, 0.018);
     overflow: hidden;
-    font-family: "DM Mono", monospace;
-    color: var(--paper-tape-ink);
+    font-family: var(--type-mono);
+    color: var(--silk-65);
   }
+  /* Recessed label strip — sits above the chunks row, not over it */
   .vmx-phase-tape::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 22px;
+    background: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+  }
+  .vmx-phase-tape::after {
+    /* Subtle top-edge highlight + bottom amber bleed — the "display window" feel */
     content: "";
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='1'/><feColorMatrix values='0 0 0 0 .4  0 0 0 0 .32  0 0 0 0 .2  0 0 0 .2 0'/></filter><rect width='160' height='160' filter='url(%23p)'/></svg>");
-    mix-blend-mode: multiply;
-    opacity: 0.5;
-  }
-  .vmx-phase-tape::after {
-    content: "";
-    position: absolute;
-    left: 0; right: 0; bottom: 0;
-    height: 6px;
-    background:
-      radial-gradient(circle at 8px 3px, var(--bg) 1.5px, transparent 2px) repeat-x;
-    background-size: 16px 6px;
-    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, transparent 28%, transparent 82%, rgba(255, 138, 61, 0.022) 100%);
   }
   .vmx-phase-tape__lbl {
     position: absolute;
-    top: 6px;
+    top: 7px;
     left: 12px;
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 7.5px;
-    letter-spacing: 0.32em;
-    color: var(--paper-tape-label);
+    right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
+    font-size: 8px;
+    letter-spacing: 0.28em;
+    color: var(--silk-40);
     text-transform: uppercase;
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    z-index: 3;
+  }
+  .vmx-phase-tape__lbl-right {
+    color: var(--silk-22);
+    font-variation-settings: "wdth" 85, "wght" 400;
+    letter-spacing: 0.22em;
   }
   .vmx-phase-tape__row {
     display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: 18px;
-    height: 42px;
+    align-items: stretch;
+    gap: 3px;
+    height: 100%;
     position: relative;
+    z-index: 1;
   }
   .vmx-phase-chunk {
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
     font-size: 9px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    border-right: 1px solid rgba(0, 0, 0, 0.25);
+    border-radius: 1px;
     position: relative;
-    font-weight: 500;
+    overflow: hidden;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .vmx-phase-chunk[data-kind="silent"] {
-    color: var(--paper-tape-chunk-silent);
-    background: rgba(0, 0, 0, 0.04);
+    color: var(--silk-22);
+    background: rgba(255, 255, 255, 0.018);
   }
   .vmx-phase-chunk[data-kind="groove"] {
-    color: var(--paper-tape-chunk-groove);
-    background: var(--phosphor-soft);
+    color: var(--silk-65);
+    background:
+      linear-gradient(180deg, rgba(255, 138, 61, 0.045), rgba(255, 138, 61, 0.012)),
+      rgba(255, 255, 255, 0.025);
+    box-shadow: inset 0 0 0 1px rgba(255, 138, 61, 0.10);
   }
   .vmx-phase-chunk[data-kind="build"] {
-    color: var(--paper-tape-chunk-build);
-    background: repeating-linear-gradient(
-      45deg,
-      rgba(255, 161, 46, 0.42) 0 6px,
-      rgba(255, 161, 46, 0.55) 6px 12px
-    );
-    font-weight: 700;
+    color: var(--amber-pale);
+    background:
+      repeating-linear-gradient(
+        45deg,
+        rgba(255, 138, 61, 0.18) 0 6px,
+        rgba(255, 138, 61, 0.28) 6px 12px
+      );
+    box-shadow:
+      inset 0 0 0 1px var(--amber-40),
+      inset 0 0 12px var(--amber-22);
+    font-variation-settings: "wdth" 85, "wght" 700;
+    text-shadow: 0 0 4px var(--amber-65), 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .vmx-phase-chunk[data-kind="build"]::after {
     content: "⟶";
     position: absolute;
     right: 6px;
     font-size: 14px;
-    color: var(--paper-tape-chunk-build);
+    color: var(--amber);
+    text-shadow: 0 0 6px var(--amber-65);
     animation: vmx-phase-arrow 1600ms ease-in-out infinite;
   }
   @keyframes vmx-phase-arrow {
@@ -145,37 +160,70 @@ const CSS = `
     50% { transform: translateX(3px); opacity: 1; }
   }
   .vmx-phase-chunk[data-kind="drop-ghost"] {
-    border: 1.5px dashed var(--paper-tape-drop-border);
-    background: rgba(255, 161, 46, 0.05);
-    color: var(--paper-tape-chunk-drop-ghost);
-    font-family: "Caveat", "DM Mono", monospace;
+    border: 1px dashed var(--amber-40);
+    background: rgba(255, 138, 61, 0.04);
+    color: var(--amber-pale);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 100, "wght" 600;
     font-style: italic;
-    font-size: 13px;
-    letter-spacing: 0;
-    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 4px var(--amber-22);
   }
+  /* NOW marker — 1px amber needle riding the timeline + a tiny play-head
+   * cap at the top so the eye lands without ambiguity. The cap is a
+   * small filled triangle (pseudo-element) reading as a CDJ jog cue. */
   .vmx-phase-tape__marker {
     position: absolute;
     top: 0;
     bottom: 0;
     left: var(--phase-now-pct, 50%);
-    width: 2px;
-    background: var(--rec);
-    box-shadow: 0 0 6px var(--rec);
-    z-index: 2;
+    width: 1px;
+    background: var(--amber);
+    box-shadow:
+      0 0 4px var(--amber-65),
+      0 0 10px var(--amber-22);
+    z-index: 3;
     pointer-events: none;
   }
+  /* Play-head cap — small inverted triangle anchored to the strip top */
   .vmx-phase-tape__marker::before {
+    content: "";
+    position: absolute;
+    top: 22px;
+    left: 50%;
+    width: 0;
+    height: 0;
+    transform: translateX(-50%);
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--amber);
+    filter: drop-shadow(0 0 3px var(--amber-65)) drop-shadow(0 0 6px var(--amber-22));
+  }
+  /* NOW chip — sealed glass time tag riding on the marker. Sits above
+   * the strip so it never collides with chunk labels below. */
+  .vmx-phase-tape__marker::after {
     content: "NOW";
     position: absolute;
-    top: -2px;
-    left: 4px;
-    font-family: "Workbench", "Courier New", monospace;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2px 6px 3px;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 700;
     font-size: 8px;
-    letter-spacing: 0.2em;
-    color: var(--rec);
-    font-weight: 700;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+    letter-spacing: 0.22em;
+    color: var(--amber);
+    background: var(--glass-3);
+    border: 1px solid var(--amber-22);
+    border-radius: 1px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 0 8px var(--amber-22),
+      0 0 4px var(--amber-22);
+    text-shadow: 0 0 4px var(--amber-65);
+    line-height: 1;
+    white-space: nowrap;
   }
 `;
 
@@ -186,9 +234,14 @@ export function renderPhaseTape(props: PhaseTapeProps): HTMLElement {
   root.className = "vmx-phase-tape";
   root.setAttribute("aria-label", "phase tape");
 
-  const lbl = document.createElement("span");
+  const lbl = document.createElement("div");
   lbl.className = "vmx-phase-tape__lbl";
-  lbl.textContent = "PHASE TAPE · LAST 90s";
+  const lblLeft = document.createElement("span");
+  lblLeft.textContent = "PHASE TAPE";
+  const lblRight = document.createElement("span");
+  lblRight.className = "vmx-phase-tape__lbl-right";
+  lblRight.textContent = "LAST 90s";
+  lbl.append(lblLeft, lblRight);
   root.append(lbl);
 
   const row = document.createElement("div");

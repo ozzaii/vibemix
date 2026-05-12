@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vibemix · CDJ Whisper · v5 — Refined Glass · 2026-05-12</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@75..125,300..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ──────────────────────────────────────────────────────────────────────────
+   CDJ WHISPER · v5 — DEEPER, DARKER, BORDERS BREATHE
+   Less glow. More void. The deck is mostly black; only the active
+   indicators cut through. A faint amber light travels around the panel
+   perimeter — a sign of life, not a flashlight.
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Void stack — cooler, deeper than v4 */
+  --void:    #000000;
+  --void-1:  #020205;
+  --void-2:  #05070b;
+  --void-3:  #0a0c12;
+  --void-4:  #11141c;
+
+  /* Glass surfaces — DARKER, more opaque (deck dominates, glass just seals) */
+  --glass-1:  rgba(8, 10, 16, 0.78);    /* primary panel */
+  --glass-2:  rgba(12, 14, 22, 0.62);   /* secondary panel */
+  --glass-3:  rgba(2, 3, 6, 0.88);      /* recessed glass — near-solid */
+  --glass-edge:     rgba(255, 255, 255, 0.065);
+  --glass-edge-up:  rgba(255, 255, 255, 0.11);
+  --glass-top:      rgba(255, 255, 255, 0.055);
+
+  /* Silk text */
+  --silk:     #d6cfc7;
+  --silk-65:  rgba(214, 207, 199, 0.65);
+  --silk-40:  rgba(214, 207, 199, 0.40);
+  --silk-22:  rgba(214, 207, 199, 0.22);
+  --silk-12:  rgba(214, 207, 199, 0.12);
+
+  /* Amber — primary deck-light accent */
+  --amber:       #ff8a3d;
+  --amber-deep:  #ff5a1a;
+  --amber-pale:  #ffb88a;
+  --amber-22:    rgba(255, 138, 61, 0.22);
+  --amber-40:    rgba(255, 138, 61, 0.40);
+  --amber-65:    rgba(255, 138, 61, 0.65);
+
+  /* Night-rave ambients — body atmospheric only, even more pulled back than v4 */
+  --rave-magenta: rgba(192, 56, 224, 0.055);
+  --rave-pink:    rgba(255, 92, 188, 0.038);
+  --rave-cyan:    rgba(72, 152, 255, 0.042);
+  --rave-purple:  rgba(118, 56, 224, 0.030);
+  --rave-teal:    rgba(64, 220, 200, 0.022);
+
+  /* Status LEDs */
+  --led-ok:    #6dd44a;
+  --led-warn:  #f4c542;
+  --led-fault: #d4413a;
+
+  /* Glass blurs */
+  --blur-glass:        blur(32px) saturate(140%);
+  --blur-glass-light:  blur(16px) saturate(120%);
+  --blur-glass-display:blur(6px)  saturate(105%);
+
+  /* Glow — RESTRAINED (v5 reduction) */
+  --glow-faint:  0 0 5px var(--amber-22);
+  --glow-soft:   0 0 6px var(--amber-40), 0 0 14px var(--amber-22);
+  --glow-strong: 0 0 8px var(--amber-65), 0 0 18px var(--amber-22);
+
+  /* Type */
+  --type-display: 'Saira', system-ui, sans-serif;
+  --type-body:    'Saira', system-ui, sans-serif;
+  --type-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  /* Spacing */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 40px; --sp-7: 64px; --sp-8: 96px;
+
+  --rad-sm: 2px;
+  --rad-md: 6px;
+  --rad-lg: 10px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #000;
+  color: var(--silk);
+  font-family: var(--type-body);
+  font-weight: 400;
+  font-size: 14px;
+  font-variation-settings: "wdth" 100, "wght" 400;
+  line-height: 1.45;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* REFINED BG · cinematic vignette + restrained rave washes + deep blue undertone */
+body {
+  background-image:
+    /* central focus vignette — keeps eye in the middle, edges fall to absolute black */
+    radial-gradient(ellipse 92% 78% at 50% 45%, transparent 0%, rgba(0,0,0,0.5) 75%, rgba(0,0,0,0.9) 100%),
+    /* rave ambient washes — more refined positions, lower alpha */
+    radial-gradient(ellipse 55% 38% at 18% 22%, var(--rave-magenta), transparent 60%),
+    radial-gradient(ellipse 48% 36% at 84% 78%, var(--rave-cyan),    transparent 55%),
+    radial-gradient(ellipse 60% 42% at 55% 105%, var(--rave-pink),   transparent 60%),
+    radial-gradient(ellipse 35% 28% at 92% 12%, var(--rave-purple),  transparent 55%),
+    radial-gradient(ellipse 28% 22% at 5% 88%,  var(--rave-teal),    transparent 55%),
+    /* deep cinematic cold base */
+    linear-gradient(180deg, #02030a 0%, #000000 55%, #030208 100%);
+  background-attachment: fixed;
+}
+
+/* MULTI-LAYER TEXTURE — coarser dust + fine grain (richer than v4) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    /* coarser dust — adds depth */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='420' height='420'><filter id='d'><feTurbulence type='fractalNoise' baseFrequency='0.42' numOctaves='3' seed='9'/></filter><rect width='100%25' height='100%25' filter='url(%23d)' opacity='0.022'/></svg>"),
+    /* very fine grain — film texture */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' seed='5'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.028'/></svg>");
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: overlay;
+}
+
+main { position: relative; z-index: 2; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ANIMATED BORDER · slow amber light travels around panel perimeter
+   ────────────────────────────────────────────────────────────────────────── */
+@keyframes borderSweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.border-anim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    conic-gradient(
+      from 0deg at 50% 50%,
+      transparent 0%,
+      transparent 30%,
+      rgba(255, 138, 61, 0.28) 45%,
+      rgba(255, 220, 180, 0.42) 50%,
+      rgba(255, 138, 61, 0.28) 55%,
+      transparent 70%,
+      transparent 100%
+    );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+          mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  padding: 1px;
+  pointer-events: none;
+  z-index: 4;
+  animation: borderSweep 22s linear infinite;
+  opacity: 0.95;
+}
+.border-anim.slow  { animation-duration: 32s; }
+.border-anim.rev   { animation-direction: reverse; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   UNIVERSAL LABEL
+   ────────────────────────────────────────────────────────────────────────── */
+.label {
+  font-family: var(--type-body);
+  font-weight: 500;
+  font-variation-settings: "wdth" 90, "wght" 500;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--silk-65);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+.label.amber { color: var(--amber); text-shadow: 0 0 4px var(--amber-22); }
+.label.dim   { color: var(--silk-40); }
+
+.num { font-family: var(--type-mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   META BAR
+   ────────────────────────────────────────────────────────────────────────── */
+.meta-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-4) var(--sp-6);
+  border-bottom: 1px solid var(--glass-edge);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  position: relative;
+  z-index: 3;
+}
+.meta-bar .brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-family: var(--type-body);
+  font-weight: 700;
+  font-variation-settings: "wdth" 85, "wght" 700;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.meta-bar .brand::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  background: var(--amber);
+  border-radius: 50%;
+  box-shadow: 0 0 4px var(--amber), 0 0 8px var(--amber-40);
+  animation: brandPulse 5s ease-in-out infinite;
+}
+.meta-bar .brand .tag {
+  font-weight: 400;
+  font-variation-settings: "wdth" 100, "wght" 400;
+  color: var(--silk-65);
+  margin-left: var(--sp-2);
+  letter-spacing: 0.18em;
+}
+@keyframes brandPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+.meta-bar .versions {
+  display: flex;
+  gap: var(--sp-5);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  color: var(--silk-40);
+  letter-spacing: 0.08em;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   BRIEF
+   ────────────────────────────────────────────────────────────────────────── */
+.brief {
+  padding: var(--sp-8) var(--sp-6) var(--sp-7);
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: var(--sp-7);
+  border-bottom: 1px solid var(--glass-edge);
+  align-items: end;
+}
+.brief .h0 {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 82, "wght" 700;
+  font-size: 96px;
+  line-height: 0.88;
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
+}
+.brief .h0 .deck {
+  color: var(--amber);
+  text-shadow: 0 0 10px var(--amber-40), 0 0 22px var(--amber-22);
+  display: block;
+  font-variation-settings: "wdth" 82, "wght" 800;
+}
+.brief .lede {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--silk-65);
+  max-width: 50ch;
+}
+.brief .lede strong { color: var(--silk); font-weight: 600; }
+.brief .lede em { color: var(--amber); font-style: normal; font-weight: 600; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   SECTION
+   ────────────────────────────────────────────────────────────────────────── */
+.section {
+  padding: var(--sp-7) var(--sp-6);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-7);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.section-head .num-idx {
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--amber);
+}
+.section-head h2 {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 24px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.section-head .right-note {
+  margin-left: auto;
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--silk-40);
+  text-transform: uppercase;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   §01 · SESSION SURFACE
+   ────────────────────────────────────────────────────────────────────────── */
+.surface-grid {
+  display: grid;
+  grid-template-columns: minmax(520px, 1.55fr) minmax(340px, 1fr);
+  gap: var(--sp-6);
+  align-items: start;
+}
+
+.session {
+  background: var(--glass-1);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.65),
+    0 36px 80px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 255, 255, 0.018);
+  min-height: 620px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle diagonal glass-fingerprint streak — barely there character */
+.session::after {
+  content: '';
+  position: absolute;
+  top: 28%;
+  right: -10%;
+  width: 50%;
+  height: 200px;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.012), transparent);
+  transform: rotate(-12deg);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.session > * { position: relative; z-index: 1; }
+.session > .border-anim { z-index: 4; }
+
+/* TOP STRIP */
+.top-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-5);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.top-strip .live-tag {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.top-strip .live-tag::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: var(--glow-strong);
+  animation: liveBlink 1.4s ease-in-out infinite;
+}
+@keyframes liveBlink {
+  0%, 70% { opacity: 1; }
+  85%     { opacity: 0.3; }
+  100%    { opacity: 1; }
+}
+.top-strip .session-num {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  color: var(--silk-40);
+  letter-spacing: 0.1em;
+}
+
+/* CENTER */
+.center {
+  position: relative;
+  padding: var(--sp-7) var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-6);
+}
+
+.track-display {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--sp-5);
+}
+.track-display .title-block { display: flex; flex-direction: column; gap: var(--sp-3); }
+.track-display .track-meta {
+  font-family: var(--type-body);
+  font-weight: 500;
+  font-variation-settings: "wdth" 90, "wght" 500;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--silk-65);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.track-display .track-meta .dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--silk-40);
+}
+.track-display .track-title {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 82, "wght" 700;
+  font-size: 64px;
+  line-height: 0.92;
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
+}
+.track-display .track-title .sub {
+  display: block;
+  font-variation-settings: "wdth" 100, "wght" 400;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--silk-65);
+  margin-top: var(--sp-2);
+  text-shadow: none;
+}
+
+/* Recessed glass display window for the time hero — DARKER */
+.display-window {
+  background: var(--glass-3);
+  backdrop-filter: var(--blur-glass-display);
+  -webkit-backdrop-filter: var(--blur-glass-display);
+  padding: 14px 22px 16px;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    inset 0 0 18px rgba(255, 138, 61, 0.035),
+    0 0 0 1px rgba(255, 255, 255, 0.022);
+  position: relative;
+  overflow: hidden;
+}
+.display-window::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 30%, transparent 80%, rgba(255, 138, 61, 0.025) 100%);
+}
+.time-hero {
+  font-family: var(--type-mono);
+  font-weight: 500;
+  font-size: 64px;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--silk);
+  text-shadow: 0 0 6px rgba(255, 138, 61, 0.18);
+  display: block;
+}
+.time-hero .ms { color: var(--silk-40); font-weight: 400; font-size: 36px; }
+
+/* METERS */
+.meter-cluster {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-5);
+  padding: var(--sp-4) 0;
+  border-top: 1px solid var(--glass-edge);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.m-row { display: flex; flex-direction: column; gap: 6px; }
+.m-head { display: flex; justify-content: space-between; align-items: baseline; }
+.m-head .name {
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+.m-head .val {
+  font-family: var(--type-mono);
+  font-size: 11px;
+  color: var(--silk);
+  font-variant-numeric: tabular-nums;
+}
+.m-bar {
+  position: relative;
+  height: 5px;
+  background: var(--glass-3);
+  border-radius: 1px;
+  box-shadow:
+    inset 0 1.5px 3px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.m-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--amber-deep), var(--amber) 65%, var(--amber-pale));
+  width: var(--w, 60%);
+  animation: mBreathe 2s ease-in-out infinite alternate;
+  box-shadow: 0 0 4px rgba(255, 138, 61, 0.22);
+}
+.m-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0, transparent 4px, rgba(0, 0, 0, 0.65) 4px, rgba(0, 0, 0, 0.65) 5px);
+  pointer-events: none;
+}
+@keyframes mBreathe {
+  0%   { transform: scaleX(0.92); transform-origin: left; }
+  100% { transform: scaleX(1); transform-origin: left; }
+}
+
+/* CONDITIONAL */
+.conditional {
+  padding-top: var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+}
+.conditional .countdown-wrap { display: flex; flex-direction: column; gap: var(--sp-1); }
+.conditional .countdown {
+  font-family: var(--type-mono);
+  font-weight: 500;
+  font-size: 40px;
+  letter-spacing: -0.03em;
+  color: var(--amber);
+  text-shadow: 0 0 7px var(--amber-40), 0 0 14px var(--amber-22);
+  font-variant-numeric: tabular-nums;
+  line-height: 0.9;
+}
+.conditional .ai-line {
+  flex: 1;
+  font-family: var(--type-body);
+  font-size: 14px;
+  color: var(--silk);
+  line-height: 1.5;
+  border-left: 1px solid var(--amber-22);
+  padding-left: var(--sp-4);
+}
+.conditional .ai-line .who {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 6px;
+  text-shadow: 0 0 4px var(--amber-22);
+}
+.conditional .ai-line .who::before {
+  content: '';
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: var(--glow-soft);
+  animation: liveBlink 0.9s infinite;
+}
+
+/* BOTTOM */
+.bottom-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-5);
+  border-top: 1px solid var(--glass-edge);
+}
+.mood-block {
+  display: flex;
+  background: var(--glass-3);
+  backdrop-filter: var(--blur-glass-display);
+  -webkit-backdrop-filter: var(--blur-glass-display);
+  border-radius: var(--rad-sm);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.88),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.028);
+  padding: 3px;
+  gap: 0;
+}
+.mood-btn {
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--silk-40);
+  cursor: pointer;
+  border-radius: var(--rad-sm);
+  transition: all 180ms ease-out;
+}
+.mood-btn:hover { color: var(--silk); }
+.mood-btn.on {
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+  color: var(--amber);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 var(--amber-40),
+    inset 0 0 14px var(--amber-22),
+    0 0 0 1px rgba(255, 138, 61, 0.14);
+  text-shadow: 0 0 4px var(--amber-65);
+}
+
+.status-strip {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+}
+.led {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+.led::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--led-ok);
+  box-shadow:
+    0 0 3px var(--led-ok),
+    0 0 6px rgba(109, 212, 74, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
+}
+.led.warn::before {
+  background: var(--led-warn);
+  box-shadow:
+    0 0 3px var(--led-warn),
+    0 0 6px rgba(244, 197, 66, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
+}
+.led.fault::before {
+  background: var(--led-fault);
+  box-shadow:
+    0 0 3px var(--led-fault),
+    0 0 6px rgba(212, 65, 58, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
+}
+.led.off::before {
+  background: rgba(15, 18, 24, 0.85);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RIGHT COL — MASCOT + TRAY
+   ────────────────────────────────────────────────────────────────────────── */
+.right-col { display: flex; flex-direction: column; gap: var(--sp-5); }
+
+.mascot-window {
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border: 1px solid var(--glass-edge);
+  border-radius: 8px;
+  aspect-ratio: 3/4;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(255, 138, 61, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.018),
+    0 32px 64px rgba(0, 0, 0, 0.85);
+}
+.mascot-window > .border-anim { z-index: 4; }
+.mascot-window::before {
+  content: 'OVERLAY · STICKY · ALL SPACES · 320×420';
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--silk-40);
+  z-index: 3;
+}
+.mascot-window::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 25%, transparent 78%, rgba(0, 0, 0, 0.32) 100%);
+  border-radius: 8px;
+  z-index: 0;
+}
+.mascot-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 60%, rgba(255, 138, 61, 0.085), transparent 55%),
+    radial-gradient(circle at 25% 95%, rgba(192, 56, 224, 0.045), transparent 60%),
+    radial-gradient(circle at 85% 22%, rgba(72, 152, 255, 0.032), transparent 60%);
+  z-index: 1;
+}
+.mascot-svg {
+  width: 68%;
+  max-width: 230px;
+  animation: mascotBob 5s ease-in-out infinite;
+}
+@keyframes mascotBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+.mascot-svg .silhouette { fill: var(--void); }
+.mascot-svg .body { fill: #020203; }
+.mascot-svg .edge { stroke: var(--amber); stroke-width: 0.7; fill: none; opacity: 0.7; filter: drop-shadow(0 0 2px var(--amber-65)); }
+.mascot-svg .eye {
+  fill: var(--amber);
+  filter: drop-shadow(0 0 2px var(--amber)) drop-shadow(0 0 6px var(--amber-65));
+  animation: eyeFlicker 7s ease-in-out infinite;
+}
+@keyframes eyeFlicker {
+  0%, 94%, 100% { opacity: 1; }
+  95%           { opacity: 0.45; }
+  96%           { opacity: 1; }
+  97%           { opacity: 0.7; }
+  98%           { opacity: 1; }
+}
+.mascot-state {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--silk-40);
+  text-transform: uppercase;
+  z-index: 3;
+}
+
+/* TRAY */
+.tray-row {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: var(--sp-4);
+  align-items: start;
+}
+.tray-mac {
+  height: 28px;
+  background: var(--glass-1);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.tray-mac::after {
+  content: 'MENU BAR';
+  position: absolute;
+  bottom: -16px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--type-mono);
+  font-size: 9px;
+  color: var(--silk-40);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.tray-mac svg { width: 16px; height: 16px; }
+.tray-mac svg path { stroke: var(--silk); stroke-width: 1.4; fill: none; }
+.tray-mac .tray-live-dot {
+  position: absolute;
+  bottom: 3px;
+  right: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 4px var(--amber), 0 0 6px var(--amber-40);
+}
+
+.tray-popover {
+  background: var(--glass-1);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    0 16px 40px rgba(0, 0, 0, 0.8),
+    0 4px 16px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.tray-popover .pop-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px var(--sp-3);
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 95, "wght" 500;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--silk);
+}
+.tray-popover .pop-row + .pop-row { border-top: 1px solid var(--glass-edge); }
+.tray-popover .pop-row.section {
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  background: rgba(0, 0, 0, 0.4);
+  padding: 7px var(--sp-3);
+  border-top: 1px solid var(--glass-edge);
+  border-bottom: 1px solid var(--glass-edge);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+.tray-popover .pop-row.on { background: rgba(255, 138, 61, 0.08); color: var(--amber); text-shadow: 0 0 4px var(--amber-22); }
+.tray-popover .pop-row.on::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: var(--glow-faint);
+  margin-right: -6px;
+}
+.tray-popover .k {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--silk-40);
+}
+.tray-popover .pop-row.muted { color: var(--silk-65); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   §02 · TACTILITY
+   ────────────────────────────────────────────────────────────────────────── */
+.spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-6); }
+
+.spec-panel {
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    0 16px 36px rgba(0, 0, 0, 0.55);
+  padding: var(--sp-5) var(--sp-6);
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+.spec-panel .spec-head { display: flex; justify-content: space-between; align-items: baseline; }
+.spec-panel .spec-name {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 18px;
+  text-transform: uppercase;
+}
+.spec-panel .spec-meta {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--silk-40);
+  text-transform: uppercase;
+}
+.spec-panel .demo-row { display: flex; gap: var(--sp-4); flex-wrap: wrap; align-items: center; }
+.spec-panel .demo-note {
+  margin-top: auto;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--glass-edge);
+  font-family: var(--type-body);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--silk-65);
+}
+.spec-panel .demo-note strong { color: var(--silk); font-weight: 600; }
+
+.btn {
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 9px 16px;
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-display);
+  -webkit-backdrop-filter: var(--blur-glass-display);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-sm);
+  color: var(--silk-65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: all 180ms ease-out;
+}
+.btn:hover { color: var(--silk); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 8px var(--amber-22); }
+.btn.on {
+  color: var(--amber);
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 var(--amber-40),
+    inset 0 0 14px var(--amber-22),
+    0 0 0 1px rgba(255, 138, 61, 0.14);
+  text-shadow: 0 0 4px var(--amber-65);
+}
+.btn.pressed { box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.75); color: var(--silk-40); }
+
+/* LED specimen */
+.led-bench {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: var(--sp-5);
+  align-items: center;
+  justify-content: start;
+}
+.led-cell { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); }
+.led-disc { width: 9px; height: 9px; border-radius: 50%; }
+.led-disc.ok {
+  background: var(--led-ok);
+  box-shadow:
+    0 0 4px var(--led-ok),
+    0 0 10px rgba(109, 212, 74, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+.led-disc.amber {
+  background: var(--amber);
+  box-shadow: var(--glow-strong),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+.led-disc.dim {
+  background: rgba(15, 18, 24, 0.85);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.led-disc.fault {
+  background: var(--led-fault);
+  box-shadow:
+    0 0 4px var(--led-fault),
+    0 0 9px rgba(212, 65, 58, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+.led-cell .name {
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   §03 · TYPE + PALETTE
+   ────────────────────────────────────────────────────────────────────────── */
+.type-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--sp-6); }
+.type-panel, .pal-panel {
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    0 16px 36px rgba(0, 0, 0, 0.55);
+  padding: var(--sp-6);
+}
+.type-panel .specimen-row { display: flex; flex-direction: column; gap: var(--sp-4); }
+.type-panel .t-display {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 82, "wght" 700;
+  font-size: 80px;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+.type-panel .t-display .acc { color: var(--amber); text-shadow: 0 0 8px var(--amber-40), 0 0 18px var(--amber-22); }
+.type-panel .t-mid {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 100, "wght" 500;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  color: var(--silk);
+}
+.type-panel .t-body {
+  font-family: var(--type-body);
+  font-weight: 400;
+  font-variation-settings: "wdth" 100, "wght" 400;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--silk-65);
+  max-width: 56ch;
+}
+.type-panel .t-mono { font-family: var(--type-mono); font-size: 13px; color: var(--silk); }
+.type-panel .stack {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 24px;
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--glass-edge);
+}
+.type-panel .stack dt {
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+.type-panel .stack dd { font-family: var(--type-mono); font-size: 11px; color: var(--silk); }
+
+.pal-panel { display: flex; flex-direction: column; gap: var(--sp-4); }
+.pal-row { display: flex; flex-direction: column; gap: var(--sp-2); }
+.pal-row .pal-label {
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+.pal-stack { display: flex; gap: 3px; height: 48px; }
+.pal-chip {
+  flex: 1;
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6px 8px;
+  font-family: var(--type-mono);
+  font-size: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+.pal-chip .hex { opacity: 0.55; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   §04 · 20/80
+   ────────────────────────────────────────────────────────────────────────── */
+.rule80 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-6); }
+.rule80-panel {
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    0 16px 36px rgba(0, 0, 0, 0.55);
+  padding: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.rule80-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.rule80-head .ratio {
+  font-family: var(--type-mono);
+  font-size: 32px;
+  letter-spacing: -0.02em;
+  color: var(--amber);
+  text-shadow: 0 0 8px var(--amber-22);
+  font-variant-numeric: tabular-nums;
+}
+.rule80-head .ratio-label {
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rule80 ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--silk-65);
+}
+.rule80 li { padding-left: var(--sp-4); position: relative; }
+.rule80 li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 6px;
+  height: 1px;
+  background: var(--amber);
+  box-shadow: 0 0 3px var(--amber-65);
+}
+.rule80 li strong { color: var(--silk); font-weight: 600; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   FOOTER
+   ────────────────────────────────────────────────────────────────────────── */
+footer {
+  padding: var(--sp-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--silk-40);
+}
+footer a { color: var(--amber); text-decoration: none; }
+footer .right { text-align: right; line-height: 1.7; }
+</style>
+</head>
+
+<body>
+<main>
+
+<!-- META BAR -->
+<div class="meta-bar">
+  <div class="brand">
+    vibemix
+    <span class="tag">CDJ WHISPER · V5</span>
+  </div>
+  <div class="versions">
+    <span>2026-05-12</span>
+    <span>refined bg · animated borders · darker deck</span>
+    <span>saira · jetbrains mono</span>
+  </div>
+</div>
+
+<!-- BRIEF -->
+<div class="brief">
+  <h1 class="h0">
+    PIONEER DECK<br>
+    AT 2 AM<br>
+    <span class="deck">— A SIGN OF LIFE —</span>
+  </h1>
+  <div class="lede">
+    <p>v5 darkens the deck, refines the air. <strong>Glass goes more opaque</strong> (78%, was 55%) so the panels read as deck material with a sealed glass front — not as windows. <strong>Less glow everywhere</strong> — halos cut roughly in half. Amber concentrates only on what's actually changing.</p>
+    <p style="margin-top: 16px;">The character moment: a <em>slow amber light travels around the panel perimeter</em> every 22 seconds — a sign of life, like the gentle pulse on the front of a real CDJ-3000 sitting idle. Background gains a <strong>cinematic center-vignette</strong> and multi-layer film grain — the room is darker than v4, but the light that's there has more depth.</p>
+  </div>
+</div>
+
+<!-- §01 SESSION SURFACE -->
+<section class="section">
+  <div class="section-head">
+    <span class="num-idx">§ 01</span>
+    <h2>Session Surface</h2>
+    <span class="right-note">darker glass · breathing border · cinematic bg</span>
+  </div>
+
+  <div class="surface-grid">
+
+    <!-- LEFT: SESSION GLASS PANEL -->
+    <div class="session">
+      <div class="border-anim"></div>
+
+      <!-- TOP STRIP -->
+      <div class="top-strip">
+        <span class="label live-tag amber">live · deck B · tech-house</span>
+        <span class="session-num">VBMX · session 047 · 00:38:12</span>
+      </div>
+
+      <!-- CENTER -->
+      <div class="center">
+
+        <div class="track-display">
+          <div class="title-block">
+            <span class="track-meta">
+              now playing
+              <span class="dot"></span>
+              128 BPM
+              <span class="dot"></span>
+              A min
+            </span>
+            <span class="track-title">JACKED<span class="sub">Toman remix</span></span>
+          </div>
+          <div class="display-window">
+            <span class="time-hero">38:12<span class="ms">.04</span></span>
+          </div>
+        </div>
+
+        <div class="meter-cluster">
+          <div class="m-row">
+            <div class="m-head"><span class="name">low</span><span class="val">−6.8</span></div>
+            <div class="m-bar"><div class="m-fill" style="--w:82%"></div></div>
+          </div>
+          <div class="m-row">
+            <div class="m-head"><span class="name">mid</span><span class="val">−9.2</span></div>
+            <div class="m-bar"><div class="m-fill" style="--w:64%"></div></div>
+          </div>
+          <div class="m-row">
+            <div class="m-head"><span class="name">high</span><span class="val">−13.4</span></div>
+            <div class="m-bar"><div class="m-fill" style="--w:46%"></div></div>
+          </div>
+        </div>
+
+        <div class="conditional">
+          <div class="countdown-wrap">
+            <span class="countdown">16</span>
+            <span class="label" style="color:var(--silk-65); font-size:9px;">bars · ~7.5s</span>
+          </div>
+          <div class="ai-line">
+            <div class="who">ai · hype-man · talking</div>
+            Hold the line, don't sweep yet — drop on the 32-bar boundary.
+          </div>
+        </div>
+
+      </div>
+
+      <!-- BOTTOM STRIP -->
+      <div class="bottom-strip">
+        <div class="mood-block">
+          <button class="mood-btn on">hype</button>
+          <button class="mood-btn">teach</button>
+          <button class="mood-btn">coach</button>
+        </div>
+        <div class="status-strip">
+          <span class="led">livekit</span>
+          <span class="led">gemini</span>
+          <span class="led warn">midi</span>
+          <span class="led">screen</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: MASCOT + TRAY -->
+    <div class="right-col">
+
+      <div class="mascot-window">
+        <div class="border-anim slow rev"></div>
+        <div class="mascot-stage">
+          <svg class="mascot-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <path class="silhouette" d="M100 100 L42 64 L34 88 L58 102 L34 108 L70 122 L100 118 Z"/>
+            <path class="silhouette" d="M100 100 L158 64 L166 88 L142 102 L166 108 L130 122 L100 118 Z"/>
+            <ellipse class="body" cx="100" cy="112" rx="24" ry="32"/>
+            <path class="silhouette" d="M84 80 L78 60 L96 76 Z"/>
+            <path class="silhouette" d="M116 80 L122 60 L104 76 Z"/>
+            <path class="edge" d="M70 84 Q100 60 130 84"/>
+            <circle class="body" cx="68" cy="88" r="8"/>
+            <circle class="body" cx="132" cy="88" r="8"/>
+            <circle class="edge" cx="68" cy="88" r="8"/>
+            <circle class="edge" cx="132" cy="88" r="8"/>
+            <circle class="eye" cx="91" cy="106" r="2.2"/>
+            <circle class="eye" cx="109" cy="106" r="2.2"/>
+            <path class="edge" d="M96 124 Q100 127 104 124" stroke-width="0.6"/>
+          </svg>
+        </div>
+        <div class="mascot-state">idle · bop-to-beat</div>
+      </div>
+
+      <div class="tray-row">
+        <div class="tray-mac">
+          <svg viewBox="0 0 24 24"><path d="M12 6L4 4 L6 12 L4 20 L12 18 L20 20 L18 12 L20 4 Z" stroke-linejoin="round"/></svg>
+          <div class="tray-live-dot"></div>
+        </div>
+        <div class="tray-popover">
+          <div class="pop-row section">vibemix · 00:38:12</div>
+          <div class="pop-row on"><span>hype-man</span><span class="k">⌃M</span></div>
+          <div class="pop-row muted"><span>teacher</span><span class="k"></span></div>
+          <div class="pop-row muted"><span>coach</span><span class="k"></span></div>
+          <div class="pop-row section">controls</div>
+          <div class="pop-row"><span>mute mic</span><span class="k">⌘⇧M</span></div>
+          <div class="pop-row muted"><span>open session</span><span class="k">⌘1</span></div>
+          <div class="pop-row muted"><span>quit</span><span class="k">⌘Q</span></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+<!-- §02 TACTILITY -->
+<section class="section">
+  <div class="section-head">
+    <span class="num-idx">§ 02</span>
+    <h2>Tactility on Dark Glass</h2>
+    <span class="right-note">restrained light · state earns its glow</span>
+  </div>
+
+  <div class="spec-grid">
+
+    <div class="spec-panel">
+      <div class="spec-head">
+        <span class="spec-name">Buttons · 4 states</span>
+        <span class="spec-meta">180ms ease-out</span>
+      </div>
+      <div class="demo-row">
+        <button class="btn">idle</button>
+        <button class="btn" style="color:var(--silk); box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 8px var(--amber-22);">hover</button>
+        <button class="btn on">active</button>
+        <button class="btn pressed">pressed</button>
+      </div>
+      <p class="demo-note">Buttons sit as dark glass tiles. Idle reads as panel material. Hover gets a <strong>faint outer halo</strong>. Active fills with <strong>internal amber backlight</strong> — light diffused through frosted surface — and a 1px amber edge. Pressed sinks into a recessed shadow. Glow is <strong>half of v4</strong> — earned, not sprinkled.</p>
+    </div>
+
+    <div class="spec-panel">
+      <div class="spec-head">
+        <span class="spec-name">LED status</span>
+        <span class="spec-meta">5-9px max</span>
+      </div>
+      <div class="led-bench">
+        <div class="led-cell"><div class="led-disc ok"></div><span class="name">ok</span></div>
+        <div class="led-cell"><div class="led-disc amber"></div><span class="name">live</span></div>
+        <div class="led-cell"><div class="led-disc dim"></div><span class="name">off</span></div>
+        <div class="led-cell"><div class="led-disc fault"></div><span class="name">fault</span></div>
+      </div>
+      <p class="demo-note">Tiny dome LEDs — top-edge specular highlight (caught by glass), tight outer halo (~4-9px). Halos cut <strong>~40% from v4</strong>. Amber for active vibemix state, green for ok, red for fault. Only the actively-changing indicator pulses.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- §03 TYPE + PALETTE -->
+<section class="section">
+  <div class="section-head">
+    <span class="num-idx">§ 03</span>
+    <h2>Type &amp; Palette</h2>
+    <span class="right-note">saira condensed · jetbrains mono · cooler voids</span>
+  </div>
+
+  <div class="type-grid">
+
+    <div class="type-panel">
+      <div class="specimen-row">
+        <div class="t-display">DROP IN<br><span class="acc">16 BARS</span></div>
+        <div class="t-mid">Hold the line — the energy curve hands you a 32-bar boundary.</div>
+        <div class="t-body">Saira does all the talking — variable width + weight axes let it flex from condensed-heavy headline ("DROP IN") down to slightly-condensed body without swapping families. Geometric, slightly tall, technical. Reads like a Pioneer screen label seen through frosted glass at 2 AM.</div>
+        <div class="t-mono">128.00 BPM · A min · 00:38:12.04 · −6.8 dB · 16 BARS</div>
+      </div>
+      <dl class="stack">
+        <dt>display</dt>          <dd>Saira · wdth 82 · wght 700 · UPPERCASE</dd>
+        <dt>headline</dt>         <dd>Saira · wdth 85 · wght 600 · UPPERCASE</dd>
+        <dt>body</dt>             <dd>Saira · wdth 100 · wght 400</dd>
+        <dt>silkscreen label</dt> <dd>Saira · wdth 85-90 · wght 500 · 9-10px · 0.18em tracking · UPPERCASE</dd>
+        <dt>data · numerics</dt>  <dd>JetBrains Mono · tabular-nums · 11-64px range</dd>
+      </dl>
+    </div>
+
+    <div class="pal-panel">
+      <div class="pal-row">
+        <span class="pal-label">void stack · five cool blacks (v5: cooler than v4)</span>
+        <div class="pal-stack">
+          <div class="pal-chip" style="background:var(--void); color:var(--silk);">void <span class="hex">#000</span></div>
+          <div class="pal-chip" style="background:var(--void-1); color:var(--silk);">v-1 <span class="hex">#020205</span></div>
+          <div class="pal-chip" style="background:var(--void-2); color:var(--silk);">v-2 <span class="hex">#05070b</span></div>
+          <div class="pal-chip" style="background:var(--void-3); color:var(--silk);">v-3 <span class="hex">#0a0c12</span></div>
+          <div class="pal-chip" style="background:var(--void-4); color:var(--silk);">v-4 <span class="hex">#11141c</span></div>
+        </div>
+      </div>
+      <div class="pal-row">
+        <span class="pal-label">amber accent · four intensities · restrained use</span>
+        <div class="pal-stack">
+          <div class="pal-chip" style="background:var(--amber-deep); color:var(--void);">deep <span class="hex">#ff5a1a</span></div>
+          <div class="pal-chip" style="background:var(--amber); color:var(--void);">amber <span class="hex">#ff8a3d</span></div>
+          <div class="pal-chip" style="background:var(--amber-pale); color:var(--void);">pale <span class="hex">#ffb88a</span></div>
+          <div class="pal-chip" style="background:var(--amber-22); color:var(--silk);">22%α <span class="hex">glow</span></div>
+        </div>
+      </div>
+      <div class="pal-row">
+        <span class="pal-label">night-rave ambient · v5 pulled back further</span>
+        <div class="pal-stack">
+          <div class="pal-chip" style="background:rgba(192, 56, 224, 0.7); color:var(--silk);">magenta <span class="hex">5.5%α</span></div>
+          <div class="pal-chip" style="background:rgba(72, 152, 255, 0.7); color:var(--silk);">cyan <span class="hex">4.2%α</span></div>
+          <div class="pal-chip" style="background:rgba(255, 92, 188, 0.7); color:var(--silk);">pink <span class="hex">3.8%α</span></div>
+          <div class="pal-chip" style="background:rgba(118, 56, 224, 0.7); color:var(--silk);">purple <span class="hex">3.0%α</span></div>
+          <div class="pal-chip" style="background:rgba(64, 220, 200, 0.7); color:var(--silk);">teal <span class="hex">2.2%α</span></div>
+        </div>
+      </div>
+      <div class="pal-row">
+        <span class="pal-label">silk · four alphas</span>
+        <div class="pal-stack">
+          <div class="pal-chip" style="background:var(--silk); color:var(--void);">silk <span class="hex">#d6cfc7</span></div>
+          <div class="pal-chip" style="background:var(--silk-65); color:var(--void);">65%α</div>
+          <div class="pal-chip" style="background:var(--silk-40); color:var(--silk);">40%α</div>
+          <div class="pal-chip" style="background:var(--silk-22); color:var(--silk);">22%α</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- §04 20/80 -->
+<section class="section">
+  <div class="section-head">
+    <span class="num-idx">§ 04</span>
+    <h2>20/80 · v5 · darker recessive, sharper expressive</h2>
+    <span class="right-note">borders breathe · deck dominates</span>
+  </div>
+
+  <div class="rule80">
+
+    <div class="rule80-panel">
+      <div class="rule80-head">
+        <span class="ratio">80%</span>
+        <span class="ratio-label">recessive · the deep quiet</span>
+      </div>
+      <ul>
+        <li><strong>Cinematic center-vignette</strong> — eye stays in the middle, edges fall to absolute black. Background pulls the room inward.</li>
+        <li><strong>Multi-layer film grain</strong> — coarser dust (0.42 freq) + fine grain (0.92 freq) blended at overlay. Texture has depth, not flatness.</li>
+        <li><strong>Darker glass</strong> — primary panel 78% opaque (was 55%), recessed 88% opaque. Deck reads as material, not window.</li>
+        <li><strong>Reduced glow</strong> — every shadow/halo distance cut ~40%. Restraint signals quality.</li>
+        <li><strong>Cool void stack</strong> — five tints from #000 to #11141c. Slight blue undertone for the "icy" read.</li>
+        <li><strong>Restrained rave washes</strong> — 5 colored gradients at 2-5% alpha. Bleed through glass via backdrop-saturate. Barely there.</li>
+      </ul>
+    </div>
+
+    <div class="rule80-panel">
+      <div class="rule80-head">
+        <span class="ratio">20%</span>
+        <span class="ratio-label">expressive · with movement</span>
+      </div>
+      <ul>
+        <li><strong>Animated amber border</strong> — slow conic-gradient sweep around the session panel every 22s (mascot window goes 32s, reverse direction). A sign of life.</li>
+        <li><strong>The hero readout</strong> — track title (Saira 64px UPPERCASE) + time (Mono 64px tabular in glass LCD). One per screen.</li>
+        <li><strong>Amber accent</strong> — only active mood, live-dot, AI-talk indicator, meter fills, countdown digits, mascot eyes. Concentrated.</li>
+        <li><strong>Internal amber bleed</strong> — active mood pad has light visible through frost. No external halo.</li>
+        <li><strong>Live-dot pulse</strong> + <strong>AI-talking dot pulse</strong> — only at faster rates, the things actually changing.</li>
+        <li><strong>Mascot eyes</strong> — two tight amber points. Brightest pixels on screen, smallest physical area.</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>v5 · refined bg · animated borders · less glow · darker deck</div>
+  <div class="right">
+    next &middot; <a href="#">/gsd-discuss-phase 13</a> · <a href="#">/gsd-ui-phase 13</a><br>
+    informs &middot; UI-SPEC.md baseline &middot; frontend-enforcement bar
+  </div>
+</footer>
+
+</main>
+</body>
+</html>

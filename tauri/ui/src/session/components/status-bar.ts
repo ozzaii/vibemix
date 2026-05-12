@@ -29,107 +29,165 @@ export interface StatusBarProps {
 type BadgeKey = "livekit" | "gemini" | "midi" | "screen";
 
 const CSS = `
+  /* v5 status strip — translucent dark glass shelf matching the
+   * titlebar's treatment so the session window's top and bottom edges
+   * read as the same sealed material. Dome LEDs (mock .led) replace the
+   * flat coloured dots. */
   .vmx-statusbar {
     display: flex;
     align-items: center;
-    gap: 18px;
+    gap: var(--sp-5);
     height: var(--statusbar-h);
-    padding: 0 var(--sp-lg);
-    background: linear-gradient(180deg, var(--panel-lift) 0%, var(--panel-pressed-bottom) 100%);
-    border-top: 1px solid var(--bezel-1);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 9.5px;
-    letter-spacing: 0.2em;
+    padding: 0 var(--sp-5);
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: var(--blur-glass-light);
+    -webkit-backdrop-filter: var(--blur-glass-light);
+    border-top: 1px solid var(--glass-edge);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
+    font-size: 9px;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--ink-dim);
+    color: var(--silk-40);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    line-height: 1;
     position: relative;
+    z-index: 3;
   }
   .vmx-statusbar__badge {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: 8px;
     border: none;
     background: transparent;
-    color: var(--ink-dim);
-    font-family: inherit;
-    font-size: inherit;
+    color: var(--silk-40);
+    font: inherit;
     letter-spacing: inherit;
     text-transform: inherit;
+    text-shadow: inherit;
     line-height: 1;
     cursor: default;
-    padding: 4px 6px;
-    border-radius: 3px;
+    padding: 6px 4px;
+    border-radius: var(--rad-sm);
     position: relative;
+    transition: color var(--motion-snap) ease-out;
   }
-  .vmx-statusbar__badge[data-clickable="true"] {
-    cursor: pointer;
-  }
+  .vmx-statusbar__badge[data-clickable="true"] { cursor: pointer; }
+  .vmx-statusbar__badge[data-clickable="true"]:hover { color: var(--silk-65); }
   .vmx-statusbar__led {
     display: inline-block;
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--ink-engraved);
-    box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.5);
+    background: rgba(15, 18, 24, 0.85);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.7),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    flex-shrink: 0;
   }
+  /* OK — green dome, inset top-highlight + outer halo (mock .led) */
   .vmx-statusbar__badge[data-state="ok"] .vmx-statusbar__led {
-    background: var(--ok);
-    box-shadow: 0 0 6px var(--ok);
+    background: var(--led-ok);
+    box-shadow:
+      0 0 3px var(--led-ok),
+      0 0 6px rgba(109, 212, 74, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
   }
-  .vmx-statusbar__badge[data-state="ok"] { color: var(--ink); }
+  .vmx-statusbar__badge[data-state="ok"] { color: var(--silk); }
+  /* CONNECTING — amber dome, pulsing (mock .led + brandPulse cadence) */
   .vmx-statusbar__badge[data-state="connecting"] .vmx-statusbar__led {
-    background: var(--phosphor);
-    box-shadow: var(--phosphor-glow);
+    background: var(--amber);
+    box-shadow:
+      0 0 3px var(--amber),
+      0 0 6px rgba(255, 138, 61, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
     animation: vmx-statusbar-pulse var(--motion-led-pulse) ease-in-out infinite;
   }
-  .vmx-statusbar__badge[data-state="connecting"] { color: var(--phosphor); }
+  .vmx-statusbar__badge[data-state="connecting"] {
+    color: var(--amber);
+    text-shadow: 0 0 4px var(--amber-22);
+  }
+  /* DOWN / DENIED — red dome */
   .vmx-statusbar__badge[data-state="down"] .vmx-statusbar__led,
   .vmx-statusbar__badge[data-state="denied"] .vmx-statusbar__led {
-    background: var(--rec);
-    box-shadow: 0 0 6px var(--rec);
+    background: var(--led-fault);
+    box-shadow:
+      0 0 3px var(--led-fault),
+      0 0 6px rgba(212, 65, 58, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
   }
   .vmx-statusbar__badge[data-state="down"],
-  .vmx-statusbar__badge[data-state="denied"] { color: var(--rec); }
+  .vmx-statusbar__badge[data-state="denied"] {
+    color: var(--led-fault);
+    text-shadow: 0 0 4px rgba(212, 65, 58, 0.28);
+  }
+  /* Muted indicator */
   .vmx-statusbar__muted {
     margin-left: auto;
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    color: var(--rec);
+    gap: 8px;
+    color: var(--led-fault);
+    text-shadow: 0 0 4px rgba(212, 65, 58, 0.28);
   }
   .vmx-statusbar__muted .vmx-statusbar__led {
-    background: var(--rec);
-    box-shadow: 0 0 6px var(--rec);
+    background: var(--led-fault);
+    box-shadow:
+      0 0 3px var(--led-fault),
+      0 0 6px rgba(212, 65, 58, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
+    animation: vmx-statusbar-rec-blink 1400ms ease-in-out infinite;
   }
   .vmx-statusbar__muted[hidden] { display: none; }
+  @keyframes vmx-statusbar-rec-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  /* Signature — Saira italic at very low alpha so brand chrome is
+   * present but does not compete with active state indicators. The
+   * earlier Caveat treatment fought the Pioneer aesthetic; v5 makes the
+   * mark sit quietly in the corner. */
   .vmx-statusbar__sig {
-    font-family: "Caveat", "DM Mono", monospace;
-    font-size: 14px;
-    color: var(--phosphor);
-    letter-spacing: 0;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
+    font-style: italic;
+    font-size: 11px;
+    color: var(--silk-40);
+    letter-spacing: 0.06em;
     text-transform: none;
-    text-shadow: 0 0 8px var(--phosphor-soft);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
     line-height: 1;
   }
   .vmx-statusbar__sig:not(.has-muted) { margin-left: auto; }
-  /* === Tooltip === */
+  .vmx-statusbar__sig::before {
+    content: '·';
+    margin-right: 6px;
+    color: var(--silk-22);
+  }
+  /* === Tooltip — recessed glass popover with fault-tinted hairline ==== */
   .vmx-statusbar__tooltip {
     position: absolute;
     bottom: calc(100% + 8px);
     left: 0;
     z-index: 60;
-    min-width: 220px;
-    background: linear-gradient(180deg, var(--panel-lift), var(--panel));
-    border: 1px solid var(--rec);
-    border-radius: 5px;
+    min-width: 240px;
+    background: var(--glass-1);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    border: 1px solid rgba(212, 65, 58, 0.35);
+    border-radius: var(--rad-sm);
     box-shadow:
-      0 8px 16px rgba(0, 0, 0, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    padding: var(--sp-sm) var(--sp-md);
+      inset 0 1px 0 var(--glass-top),
+      0 16px 40px rgba(0, 0, 0, 0.7),
+      0 0 0 1px rgba(212, 65, 58, 0.10);
+    padding: var(--sp-3) var(--sp-4);
     display: flex;
     flex-direction: column;
-    gap: var(--sp-sm);
+    gap: var(--sp-3);
     opacity: 0;
     transform: translateY(4px);
     pointer-events: none;
@@ -142,34 +200,47 @@ const CSS = `
     pointer-events: auto;
   }
   .vmx-statusbar__tooltip-msg {
-    font-family: "DM Mono", monospace;
-    font-size: 11px;
-    color: var(--ink);
-    letter-spacing: 0.01em;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
+    font-size: 12px;
+    color: var(--silk);
+    letter-spacing: 0;
     text-transform: none;
-    line-height: 1.4;
+    line-height: 1.5;
+    text-shadow: none;
   }
   .vmx-statusbar__tooltip-btn {
     align-self: flex-start;
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 11px;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 10px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    padding: 6px 12px;
-    border: 1px solid var(--phosphor-dim);
-    border-radius: 3px;
-    color: var(--phosphor);
-    background: linear-gradient(180deg, var(--panel-lift), var(--panel));
+    padding: 8px 14px;
+    border: 1px solid var(--amber-40);
+    border-radius: var(--rad-sm);
+    color: var(--amber);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 var(--amber-40),
+      inset 0 0 12px var(--amber-22);
     cursor: pointer;
     line-height: 1;
+    text-shadow: 0 0 4px var(--amber-65);
+    transition: border-color var(--motion-snap) ease-out,
+                box-shadow var(--motion-snap) ease-out;
   }
   .vmx-statusbar__tooltip-btn:hover {
-    border-color: var(--phosphor);
-    box-shadow: var(--phosphor-glow);
+    border-color: var(--amber);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 var(--amber-65),
+      inset 0 0 18px var(--amber-40);
   }
   @keyframes vmx-statusbar-pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    50% { opacity: 0.45; }
   }
 `;
 

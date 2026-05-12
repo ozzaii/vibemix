@@ -32,13 +32,14 @@ const CSS = `
     display: inline-flex;
     align-items: stretch;
     gap: 0;
-    background: var(--panel-deep);
-    border: 1px solid var(--bezel-2);
-    border-radius: 6px;
-    padding: 2px;
+    background: var(--glass-3);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    padding: 3px;
     box-shadow:
-      inset 0 2px 4px rgba(0, 0, 0, 0.5),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.02);
+      inset 0 2px 5px rgba(0, 0, 0, 0.85),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.028);
     height: 32px;
     width: 100%;
   }
@@ -48,51 +49,55 @@ const CSS = `
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 0 var(--sp-sm);
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 11px;
-    letter-spacing: 0.22em;
+    padding: 0 var(--sp-2);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 10px;
+    letter-spacing: 0.20em;
     text-transform: uppercase;
     line-height: 1;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--rad-sm);
     background: transparent;
-    color: var(--ink-dim);
+    color: var(--silk-40);
     cursor: pointer;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
     transition: background var(--motion-snap) ease-out,
                 color var(--motion-snap) ease-out,
-                box-shadow var(--motion-snap) ease-out;
+                box-shadow var(--motion-snap) ease-out,
+                text-shadow var(--motion-snap) ease-out;
   }
-  .vmx-rocker__seg:hover {
-    color: var(--ink);
-  }
+  .vmx-rocker__seg:hover { color: var(--silk); }
+  /* --- rocker variant — solid amber tile when active (used for BEG/INT/PRO etc.) --- */
   .vmx-rocker[data-variant="rocker"] .vmx-rocker__seg[data-active="true"] {
-    background: var(--phosphor);
-    color: var(--panel-deep);
+    color: var(--amber);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.12) 0%, rgba(255, 138, 61, 0.035) 100%);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.2),
-      var(--phosphor-glow);
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 var(--amber-40),
+      inset 0 0 14px var(--amber-22),
+      0 0 0 1px rgba(255, 138, 61, 0.18);
+    text-shadow: 0 0 4px var(--amber-65);
   }
-  /* --- interaction variant — LED-prefixed --- */
+  /* --- interaction variant — mood block (HYPE / TEACH / COACH).
+   * Same amber-bleed-through-frost active state. The LED ornament from
+   * the prior FL-Studio variant is dropped; v5 says concentrated amber
+   * on the active tile is enough — no extra dot competing. --- */
   .vmx-rocker[data-variant="interaction"] .vmx-rocker__seg[data-active="true"] {
-    background: var(--phosphor-soft);
-    color: var(--phosphor);
+    color: var(--amber);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      var(--phosphor-glow);
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 var(--amber-40),
+      inset 0 0 14px var(--amber-22),
+      0 0 0 1px rgba(255, 138, 61, 0.14);
+    text-shadow: 0 0 4px var(--amber-65);
   }
-  .vmx-rocker__led {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--ink-engraved);
-    box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.5);
-  }
-  .vmx-rocker__seg[data-active="true"] .vmx-rocker__led {
-    background: var(--phosphor);
-    box-shadow: var(--phosphor-glow);
-  }
+  /* Legacy LED prefix kept rendering for backward-compat with the
+   * existing renderRocker(variant="interaction") signature, but visually
+   * suppressed — v5 mood-block uses concentrated text-glow, not a
+   * separate LED ornament. */
+  .vmx-rocker__led { display: none; }
 `;
 
 registerStyle("vmx-rocker", CSS);

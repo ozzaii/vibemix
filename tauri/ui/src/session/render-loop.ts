@@ -105,6 +105,8 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       bpm: s.bpm,
       key: null,
       deck: s.track?.deck ?? null,
+      track: s.track ? { title: s.track.title, artist: s.track.artist ?? null } : null,
+      genre: s.settings.genre || null,
     },
     phase: {
       chunks: s.phase,
@@ -133,9 +135,10 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
     persona: {
       // Phase 12-05 (settings drawer) wires the rocker callbacks — the
       // session window itself only consumes these as initial-render
-      // defaults. Skill/interaction live in the drawer.
+      // defaults. Skill/interaction/mood live in the drawer.
       skill: "INT",
       interaction: s.settings.mode === "coach" ? "COACH" : "HYPE",
+      mood: moodFromSettings(s.settings.mood),
       voice: s.settings.voice,
       genre: s.settings.genre,
     },
@@ -168,6 +171,23 @@ function recFromMuted(
   if (muted) return "off";
   if (midi === 0) return "down";
   return "ok";
+}
+
+/** Map the wire-level mood enum ("hype-man" | "teacher" | "coach") onto
+ *  the persona-panel's UPPERCASE 3-state vocabulary. The settings drawer
+ *  is the authoritative write surface; the session panel is read-only. */
+function moodFromSettings(
+  mood: BridgeSessionState["settings"]["mood"],
+): "HYPE" | "TEACH" | "COACH" {
+  switch (mood) {
+    case "teacher":
+      return "TEACH";
+    case "coach":
+      return "COACH";
+    case "hype-man":
+    default:
+      return "HYPE";
+  }
 }
 
 function sysFromStatuses(
