@@ -59,6 +59,11 @@ dependencies = [
     # pyobjc-framework-ScreenCaptureKit ships at the same 12.1 version
     # baseline as the rest of the pyobjc family (verified on PyPI 2026-05).
     "pyobjc-framework-ScreenCaptureKit>=12.1 ; sys_platform == 'darwin'",
+    # Phase 11 Wave 4: AVFoundation is required for the calibration wizard's
+    # microphone-permission probe (AVCaptureDevice.authorizationStatusForMediaType_
+    # + AVCaptureDevice.requestAccessForMediaType_completionHandler_). Same 12.1
+    # baseline as the rest of the pyobjc family.
+    "pyobjc-framework-AVFoundation>=12.1 ; sys_platform == 'darwin'",
     # Phase 7 Wave 1: Windows-only deps. PyAudioWPatch is the maintained
     # WASAPI-loopback PyAudio fork (Wave 2). pywin32 powers EnumWindows /
     # SMTC FFI (Wave 3). winsdk is Microsoft's official Python winrt

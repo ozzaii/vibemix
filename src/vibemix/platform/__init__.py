@@ -66,6 +66,12 @@ else:
         f"Unsupported platform: {_sys.platform}. vibemix supports macOS and Windows only."
     )
 
+# Phase 11 Wave 4 — wizard-time selectors (permissions + window enumeration).
+# Imported lazily by callers as ``from vibemix.platform import permissions``
+# or ``from vibemix.platform import windows`` — NOT eagerly here so that
+# test runs and the live-runtime path (which doesn't need either) skip the
+# pyobjc-framework-AVFoundation import on darwin.
+
 __all__ = [
     "AudioBackend",
     "AudioCallback",

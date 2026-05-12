@@ -113,20 +113,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 # =============================================================================
-# Wizard stub (Phase 11 Wave 1) — Wave 4 replaces this with WizardLoop
+# Wizard entrypoint — Phase 11 Wave 4 wires the real WizardLoop runtime.
 # =============================================================================
-
-
-async def _run_wizard_stub() -> None:
-    """Phase 11 Wave 1 placeholder for the calibration wizard runtime.
-
-    Wave 4 (Plan 11-05) replaces this with the real ``WizardLoop`` that emits
-    ``ipc.boot`` + ``ipc.status.tick`` + ``ipc.calibration.*`` messages on
-    the WS bus and drives the 3-step wizard UI. For now, this stub keeps the
-    ``--wizard`` flag wired so Wave 2 can build a Tauri shell that spawns
-    ``vibemix-core --wizard`` without the sidecar crashing.
-    """
-    print("[wizard] mode not yet implemented; Wave 4 fills this in", file=sys.stderr)
+#
+# Wave 1 shipped a stub that printed "mode not yet implemented". Wave 4
+# replaces it with ``vibemix.runtime.wizard.run_wizard`` which opens the
+# WS bus, registers all 8 ipc.* handlers, drives the 3-step calibration
+# flow + smoke test, and exits cleanly on ``ipc.wizard.done``.
 
 
 # =============================================================================
@@ -472,12 +465,16 @@ async def main() -> None:
 def cli_entry(argv: list[str] | None = None) -> None:
     """Synchronous CLI entry. Parses args (``--version`` short-circuits via
     argparse's ``action="version"``), then runs ``main()`` — unless
-    ``--wizard`` is set, in which case the Phase 11 Wave 1 wizard stub runs
-    (Wave 4 replaces it with the real ``WizardLoop``)."""
+    ``--wizard`` is set, in which case Phase 11 Wave 4's ``run_wizard``
+    boots the calibration wizard runtime."""
     args = _parse_args(argv)
     try:
         if args.wizard:
-            asyncio.run(_run_wizard_stub())
+            # Deferred import — the live-runtime path doesn't need the
+            # wizard module loaded.
+            from vibemix.runtime.wizard import run_wizard
+
+            asyncio.run(run_wizard())
         else:
             asyncio.run(main())
     except KeyboardInterrupt:

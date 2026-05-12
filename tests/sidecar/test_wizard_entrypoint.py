@@ -1,22 +1,26 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 11 Wave 1 — pin the ``--wizard`` CLI flag plumbing.
+"""Pin the ``--wizard`` CLI flag plumbing.
 
-Wave 4 replaces ``_run_wizard_stub`` with the real ``WizardLoop`` that
-emits ``ipc.boot`` + ``ipc.status.tick``. Until then, this test pins:
+Phase 11 Wave 1 stubbed ``_run_wizard_stub`` and asserted "not yet
+implemented" on stderr. Phase 11 Wave 4 replaces the stub with the real
+``vibemix.runtime.wizard.run_wizard`` which opens the WS bus on
+``127.0.0.1:8765`` and runs until SIGTERM. Consequently:
 
-1. ``--wizard`` appears in ``python -m vibemix --help`` so Wave 2's Tauri
-   shell can confidently spawn ``vibemix-core --wizard``.
-2. ``python -m vibemix --wizard`` exits cleanly within a short timeout
-   with the "not yet implemented" stderr line.
+* ``--help`` and ``--version`` MUST still exit 0 instantly — argparse's
+  ``action="version"`` short-circuits before the wizard is touched.
+* ``--wizard`` now runs forever. We launch it, confirm the "wizard boot"
+  stderr banner appears, then SIGTERM it so the test finishes deterministically.
 
-Both invariants are necessary preconditions for the PyInstaller-built
-binary to be useful to Wave 2.
+These invariants survive Wave 4 with the new runtime semantics.
 """
 
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -37,32 +41,10 @@ def _run_module(args: list[str], *, timeout: float = 10.0) -> subprocess.Complet
 
 
 def test_help_advertises_wizard_flag() -> None:
-    """``python -m vibemix --help`` MUST advertise ``--wizard``.
-
-    Wave 2's Tauri shell reads this to confirm the sidecar binary is the
-    right version before spawning ``--wizard``. If the flag disappears,
-    the wizard never launches.
-    """
+    """``python -m vibemix --help`` MUST advertise ``--wizard``."""
     proc = _run_module(["--help"])
     assert proc.returncode == 0, f"--help exited {proc.returncode}: {proc.stderr}"
     assert "--wizard" in proc.stdout, f"--wizard missing from help output:\n{proc.stdout}"
-
-
-def test_wizard_stub_exits_cleanly() -> None:
-    """``python -m vibemix --wizard`` MUST exit 0 within 5s with the
-    "not yet implemented" placeholder line on stderr.
-
-    Wave 4 tightens this assertion to check for ``ipc.boot`` emission.
-    """
-    proc = _run_module(["--wizard"], timeout=10.0)
-    assert proc.returncode == 0, (
-        f"--wizard exited {proc.returncode}\n"
-        f"stdout: {proc.stdout}\n"
-        f"stderr: {proc.stderr}"
-    )
-    assert "mode not yet implemented" in proc.stderr, (
-        f"expected stub message on stderr, got:\n{proc.stderr}"
-    )
 
 
 def test_help_exit_code_is_zero() -> None:
@@ -74,19 +56,70 @@ def test_help_exit_code_is_zero() -> None:
 
 
 def test_version_flag_still_works() -> None:
-    """Phase 1's ``--version`` was the original CLI surface; ensure adding
-    ``--wizard`` didn't break it (regression guard).
-    """
+    """``--version`` was the original CLI surface; adding ``--wizard``
+    must not break it (regression guard)."""
     proc = _run_module(["--version"])
     assert proc.returncode == 0
     assert "vibemix" in proc.stdout.lower(), f"--version stdout: {proc.stdout}"
 
 
-@pytest.mark.parametrize("args", [["--help"], ["--wizard"], ["--version"]])
+@pytest.mark.parametrize("args", [["--help"], ["--version"]])
 def test_short_running_flags_never_hang(args: list[str]) -> None:
-    """All three flags MUST return within the short timeout — never block
-    on stdin/network. This is what makes them safe to use as CI gates and
-    Wave 2 spawn smoke-tests.
-    """
+    """``--help`` and ``--version`` MUST return within the short timeout
+    — they short-circuit argparse before the wizard runtime is even
+    imported."""
     proc = _run_module(args, timeout=10.0)
     assert proc.returncode == 0, f"flag {args!r} exited {proc.returncode}"
+
+
+@pytest.mark.macos_audio
+def test_wizard_starts_and_terminates_cleanly() -> None:
+    """``python -m vibemix --wizard`` opens the WS bus, then exits cleanly
+    on SIGTERM.
+
+    Marked ``macos_audio`` because it binds port 8765 (live integration
+    test, not a CI gate). On CI the test_wizard_loop_ipc.py covers the
+    handler dispatch path without standing up the real WS server.
+    """
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "vibemix", "--wizard"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=_REPO_ROOT,
+        text=True,
+    )
+    try:
+        # Wait for the boot banner — wizard prints "-> wizard boot" once.
+        deadline = time.monotonic() + 5.0
+        boot_seen = False
+        while time.monotonic() < deadline:
+            # Non-blocking poll. We can't readline because the wizard is
+            # still running; instead we poll until the process has emitted
+            # the banner via a quick check.
+            if proc.stderr is None:
+                break
+            line = proc.stderr.readline()
+            if not line:
+                time.sleep(0.05)
+                continue
+            if "wizard boot" in line:
+                boot_seen = True
+                break
+        assert boot_seen, "wizard banner not seen within 5s"
+    finally:
+        # Deliver SIGTERM so the wizard exits cleanly.
+        try:
+            os.kill(proc.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            proc.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5.0)
+    # Acceptable exit: 0 (clean asyncio shutdown via signal handler) or
+    # -15 (SIGTERM delivered before the asyncio loop could process it —
+    # equivalent for our purposes; the wizard never crashed unexpectedly).
+    assert proc.returncode in (0, -signal.SIGTERM), (
+        f"--wizard exited {proc.returncode} (expected 0 or -SIGTERM)"
+    )
