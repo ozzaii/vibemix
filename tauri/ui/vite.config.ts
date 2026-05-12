@@ -16,11 +16,26 @@
  * HTML page so `vite build` emits both to `dist/`. Without this, vite
  * would only emit `dist/index.html` and the mascot window would 404
  * on `mascot.html` at runtime.
+ *
+ * Phase 13 Plan 04 — Three.js renderer asset wiring:
+ *   - assetsInclude: `**/*.glb` so rollup leaves the asset bytes alone
+ *     (we serve them as static files, not as imported modules).
+ *   - viteStaticCopy:
+ *       1. Mascot bundle (`assets/mascot/**`) → both dev-served and
+ *          emitted to `dist/assets/mascot/**`. Plan 13-01 committed
+ *          the compressed bundle at `tauri/ui/assets/mascot/`; the
+ *          renderer fetches via `/assets/mascot/manifest.json`.
+ *       2. Three.js Draco WASM decoder (`node_modules/three/examples/
+ *          jsm/libs/draco/*`) → `/draco/`. The renderer constructs a
+ *          DRACOLoader with `setDecoderPath("/draco/")`; the character
+ *          GLB is Draco-compressed (Plan 13-01), so this MUST resolve
+ *          in both dev and prod.
  */
 
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
@@ -29,8 +44,38 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    fs: {
+      // Allow Vite's dev server to read from the repo's tauri/ui/assets
+      // directory (sits next to the project root, not under public/).
+      allow: [projectRoot],
+    },
   },
   envPrefix: ["VITE_", "TAURI_"],
+  // GLBs are binary assets we fetch ourselves; do not try to inline / parse.
+  assetsInclude: ["**/*.glb"],
+  plugins: [
+    viteStaticCopy({
+      targets: [
+        // Mascot bundle — manifest.json + character.glb + animations/*.glb.
+        // Plan 13-01 committed under tauri/ui/assets/mascot/; vite serves
+        // the dev path via the static-copy plugin's dev middleware and
+        // emits the same tree into dist/assets/mascot/ on build.
+        {
+          src: resolve(projectRoot, "assets/mascot/**/*"),
+          dest: "assets/mascot",
+        },
+        // Three.js DRACO WASM decoder. Plan 13-04 renderer points
+        // DRACOLoader at `/draco/`; the character GLB is Draco-compressed.
+        {
+          src: resolve(
+            projectRoot,
+            "node_modules/three/examples/jsm/libs/draco/*",
+          ),
+          dest: "draco",
+        },
+      ],
+    }),
+  ],
   build: {
     target: "es2022",
     minify: "esbuild",
