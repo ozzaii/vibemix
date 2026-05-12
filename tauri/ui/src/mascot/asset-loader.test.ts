@@ -107,18 +107,16 @@ vi.mock("three/examples/jsm/loaders/DRACOLoader.js", () => {
 // the retarget branch is skipped — but keep the import path resolvable.
 vi.mock("three/examples/jsm/utils/SkeletonUtils.js", () => {
   return {
-    SkeletonUtils: {
-      retargetClip: (
-        _target: unknown,
-        _source: unknown,
-        clip: AnimationClip,
-      ) => clip,
-    },
+    retargetClip: (
+      _target: unknown,
+      _source: unknown,
+      clip: AnimationClip,
+    ) => clip,
   };
 });
 
 // Mock fetch — controlled per-test below.
-const fetchMock = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>();
+const fetchMock = vi.fn<(...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>>();
 beforeEach(() => {
   fetchMock.mockReset();
   failingUrls.clear();
