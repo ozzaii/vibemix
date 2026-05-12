@@ -1,5 +1,5 @@
-/* cohost.ts — full right column: mascot header + receipt-paper transcript
- * + foot status (UI-SPEC §§9-11).
+/* cohost.ts — full right column: transcript header + receipt-paper
+ * transcript + foot status (UI-SPEC §§9-11).
  *
  * The transcript is the second "paper" surface — locally-scoped
  * `--paper-receipt-*` CSS custom properties carry the only non-charcoal,
@@ -10,9 +10,15 @@
  * Lifted verbatim from mocks/vibemix-app-ui.html `.cohost-panel`,
  * `.cohost-header`, `.transcript`, `.cohost-foot` (lines 956-1112).
  *
+ * Phase 13-03: the 42×42 mascot placeholder bubble was removed from the
+ * transcript header — the mascot lives ONLY as the Phase 13 always-on-top
+ * overlay window (see 13-CONTEXT.md Open Q 2: "corner dropped entirely").
+ * The freed vertical space gives the meters + transcript more breathing
+ * room.
+ *
  * Components:
- *   - 42×42 mascot placeholder circle (Phase 13 swaps to Avery)
  *   - "AVERY" Workbench 13px name + LISTENING/TALKING/IDLE status row
+ *     (single horizontal row, left-aligned, no leading bubble)
  *   - Receipt-paper transcript with `.now / .faded / .old` line classes
  *   - Foot strip: GROUNDED / WARMING UP indicator + DSEG7 latency readout
  *
@@ -22,7 +28,6 @@
  * (Wave 3) sets it false when the user manually scrolls. */
 
 import { registerStyle } from "./_style-registry.js";
-import { MASCOT_PLACEHOLDER_SVG } from "../icons/mascot-placeholder.svg.js";
 
 export type CohostStatus = "LISTENING" | "TALKING" | "IDLE";
 
@@ -62,25 +67,6 @@ const CSS = `
     border-bottom: 1px solid var(--bezel-1);
     background: linear-gradient(180deg, var(--panel-lift) 0%, var(--panel) 100%);
     position: relative;
-  }
-  .vmx-cohost__mascot {
-    width: 42px;
-    height: 42px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: radial-gradient(circle at 50% 35%, var(--bezel-3), var(--panel) 70%, var(--panel-deep));
-    border: 1px solid var(--bezel-3);
-    box-shadow:
-      inset 0 -2px 4px rgba(0, 0, 0, 0.5),
-      inset 0 1px 1px rgba(255, 255, 255, 0.1);
-    position: relative;
-    color: var(--phosphor-dim);
-  }
-  .vmx-cohost__mascot svg {
-    position: absolute;
-    inset: 5px;
-    width: 32px;
-    height: 32px;
   }
   .vmx-cohost__meta {
     flex: 1;
@@ -278,12 +264,8 @@ function buildHeader(status: CohostStatus): HTMLElement {
   const head = document.createElement("header");
   head.className = "vmx-cohost__header";
 
-  const mascot = document.createElement("div");
-  mascot.className = "vmx-cohost__mascot";
-  mascot.setAttribute("aria-hidden", "true");
-  mascot.innerHTML = MASCOT_PLACEHOLDER_SVG;
-  head.append(mascot);
-
+  // Phase 13-03: mascot bubble dropped — the AVERY chip is the only header
+  // content now. The mascot lives in the always-on-top overlay window.
   const meta = document.createElement("div");
   meta.className = "vmx-cohost__meta";
   const name = document.createElement("span");
