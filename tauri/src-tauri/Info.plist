@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  vibemix — macOS Info.plist (Phase 11 Wave 2)
+
+  TCC usage description strings are required for any process that touches
+  microphone or ScreenCaptureKit. Without these, macOS refuses to surface
+  the permission prompt and the wizard's Step 1 deep-link path is unreachable.
+
+  Copy strings honor UI-SPEC §Copywriting Contract:
+    - lowercase prose
+    - no "Welcome", no "Setup wizard", no marketing hype
+    - terse DJ-friend tone matching HYPE_BEGINNER
+
+  LSMinimumSystemVersion=12.3 mirrors tauri.conf.json5 bundle.macOS.minimumSystemVersion.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>vibemix watches your DJ software window to detect cues and reactions</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>vibemix listens for your voice so you can talk back to avery</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.3</string>
+</dict>
+</plist>

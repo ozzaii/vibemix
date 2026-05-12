@@ -1,0 +1,36 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Phase 11 wizard capability for the main window — sidecar exec + 3 URL opens + scoped fs + 7 app commands the webview is permitted to invoke",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:webview:default",
+    "core:event:default",
+    "core:path:default",
+    "core:app:default",
+    "store:default",
+    "positioner:default",
+    "process:default",
+    "updater:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        { "name": "binaries/vibemix-core", "sidecar": true, "args": [{ "validator": "^--wizard$" }] }
+      ]
+    },
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        { "url": "https://existential.audio/blackhole" },
+        { "url": "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture" },
+        { "url": "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [{ "path": "$APPLOCALDATA/vibemix/logs/sidecar.log" }]
+    }
+  ]
+}
