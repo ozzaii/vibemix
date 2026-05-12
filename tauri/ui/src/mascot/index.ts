@@ -119,6 +119,18 @@ async function boot(): Promise<void> {
 
   const renderer = new MascotRenderer(canvas, assets);
 
+  // TEMP 2026-05-12 — write renderer debug snapshot to the diag overlay
+  // so we can see camera framing + material binding without devtools.
+  const diag = document.getElementById("mascot-diag");
+  if (diag) {
+    try {
+      diag.textContent =
+        `clips=${assets.clips.size} ${renderer.getDebugSnapshot()}`;
+    } catch (err) {
+      diag.textContent = `getDebugSnapshot threw: ${String(err)}`;
+    }
+  }
+
   let machine: MachineState = initialMachineState(performance.now());
   renderer.crossFadeTo("idle_breathe", 0);
 

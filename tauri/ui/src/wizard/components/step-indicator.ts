@@ -41,14 +41,20 @@ const CSS = `
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--sp-xs);
+    gap: 6px;
   }
+  /* Step node — v5 dome LED. Pending = empty disc with hairline border.
+   * Active = amber dome with halo + breathing pulse. Complete = green
+   * dome with inset highlight + tick mark. */
   .cmp-step-indicator__node {
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    border: 1.5px solid var(--bezel-2);
-    background: var(--panel-deep);
+    border: 1px solid var(--glass-edge);
+    background: rgba(15, 18, 24, 0.85);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.7),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -57,53 +63,69 @@ const CSS = `
                 box-shadow var(--motion-transition) ease-in-out;
   }
   .cmp-step-indicator__node[data-state="active"] {
-    border-color: var(--phosphor);
-    background: var(--phosphor-soft);
-    box-shadow: var(--phosphor-glow);
+    background: var(--amber);
+    border-color: var(--amber-pale);
+    box-shadow:
+      0 0 3px var(--amber),
+      0 0 6px var(--amber-40),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
     animation: cmp-step-pulse var(--motion-led-pulse) ease-in-out infinite;
   }
   .cmp-step-indicator__node[data-state="complete"] {
-    border-color: var(--ok);
-    background: var(--ok);
+    background: var(--led-ok);
+    border-color: rgba(109, 212, 74, 0.7);
+    box-shadow:
+      0 0 3px var(--led-ok),
+      0 0 6px rgba(109, 212, 74, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
   }
   .cmp-step-indicator__node[data-state="complete"]::after {
-    content: "✓";
-    color: var(--panel-deep);
-    font-size: 9px;
-    font-weight: 700;
-    line-height: 1;
+    content: "";
+    width: 5px;
+    height: 2.5px;
+    border-left: 1.5px solid var(--void);
+    border-bottom: 1.5px solid var(--void);
+    transform: rotate(-45deg) translate(0, -1px);
   }
   .cmp-step-indicator__label {
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 11px;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
+    font-size: 10px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
     line-height: 1;
-    color: var(--ink-dim);
-    transition: color var(--motion-transition) ease-in-out;
+    color: var(--silk-40);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    transition: color var(--motion-transition) ease-in-out,
+                text-shadow var(--motion-transition) ease-in-out;
   }
-  .cmp-step-indicator__node[data-state="active"] ~ .cmp-step-indicator__label,
   .cmp-step-indicator__node-wrap[data-state="active"] .cmp-step-indicator__label {
-    color: var(--phosphor);
+    color: var(--amber);
+    text-shadow: 0 0 4px var(--amber-22);
   }
   .cmp-step-indicator__node-wrap[data-state="complete"] .cmp-step-indicator__label {
-    color: var(--ok);
+    color: var(--silk-65);
   }
+  /* Connector — faint silk hairline at idle, amber when the path is
+   * active (prev complete + here active/complete). Solid, not dashed. */
   .cmp-step-indicator__connector {
     flex: 0 0 64px;
     height: 1px;
-    margin: 0 var(--sp-md);
+    margin: 0 var(--sp-3);
     margin-bottom: 18px;  /* align with circle vertical center, not labels */
-    border-top: 1px dashed var(--bezel-2);
-    transition: border-top-color var(--motion-transition) ease-in-out,
-                border-top-style var(--motion-transition) ease-in-out;
+    background: var(--silk-12);
+    transition: background var(--motion-transition) ease-in-out,
+                box-shadow var(--motion-transition) ease-in-out;
   }
   .cmp-step-indicator__connector[data-active="true"] {
-    border-top: 1px solid var(--phosphor);
+    background: var(--amber);
+    box-shadow: 0 0 4px var(--amber-22);
   }
   @keyframes cmp-step-pulse {
-    0%, 100% { box-shadow: var(--phosphor-glow); }
-    50%      { box-shadow: var(--phosphor-halo); }
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.6; }
   }
 `;
 

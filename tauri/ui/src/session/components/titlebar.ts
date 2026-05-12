@@ -28,14 +28,17 @@ const CSS = `
   .vmx-titlebar {
     display: flex;
     align-items: center;
-    gap: var(--sp-md);
+    gap: var(--sp-4);
     height: var(--titlebar-h);
-    padding: 0 var(--sp-lg);
-    background: linear-gradient(180deg, var(--bezel-1) 0%, var(--panel) 50%, var(--panel) 100%);
-    border-bottom: 1px solid var(--bezel-1);
+    padding: 0 var(--sp-5);
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: var(--blur-glass-light);
+    -webkit-backdrop-filter: var(--blur-glass-light);
+    border-bottom: 1px solid var(--glass-edge);
     -webkit-app-region: drag;
     user-select: none;
     position: relative;
+    z-index: 3;
   }
   .vmx-titlebar__traffic {
     width: 72px;
@@ -44,83 +47,110 @@ const CSS = `
     -webkit-app-region: no-drag;
   }
   .vmx-titlebar__wordmark {
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 28px;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 78, "wght" 800;
+    font-size: 20px;
     letter-spacing: 0.04em;
-    color: var(--phosphor);
-    text-shadow: var(--phosphor-glow);
+    text-transform: uppercase;
+    color: var(--silk);
     line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .vmx-titlebar__wordmark::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 4px var(--amber), 0 0 10px var(--amber-40);
+    animation: vmx-brand-pulse 5s ease-in-out infinite;
+  }
+  @keyframes vmx-brand-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.45; }
   }
   .vmx-titlebar__pills {
     display: flex;
     align-items: center;
-    gap: var(--sp-sm);
-    margin-left: var(--sp-lg);
+    gap: var(--sp-2);
+    margin-left: var(--sp-5);
   }
   .vmx-titlebar__pill {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 4px 10px;
-    background: var(--panel-deep);
-    border: 1px solid var(--bezel-2);
-    border-radius: 4px;
-    font-family: "Workbench", "Courier New", monospace;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
     font-size: 9px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--ink-dim);
+    color: var(--silk-40);
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .vmx-titlebar__pill-led {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--ink-engraved);
-    box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.5);
+    background: rgba(15, 18, 24, 0.85);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
   .vmx-titlebar__pill[data-state="ok"] .vmx-titlebar__pill-led {
-    background: var(--ok);
-    box-shadow: 0 0 6px var(--ok);
+    background: var(--led-ok);
+    box-shadow:
+      0 0 3px var(--led-ok),
+      0 0 6px rgba(109, 212, 74, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
-  .vmx-titlebar__pill[data-state="ok"] { color: var(--ink); }
+  .vmx-titlebar__pill[data-state="ok"] { color: var(--silk); border-color: var(--silk-22); }
   .vmx-titlebar__pill[data-key="rec"][data-state="ok"] .vmx-titlebar__pill-led {
     background: var(--rec);
-    box-shadow: 0 0 6px var(--rec);
+    box-shadow:
+      0 0 3px var(--rec),
+      0 0 6px rgba(212, 65, 58, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
     animation: vmx-rec-blink 1400ms ease-in-out infinite;
   }
-  .vmx-titlebar__pill[data-key="rec"][data-state="ok"] { color: var(--rec); }
+  .vmx-titlebar__pill[data-key="rec"][data-state="ok"] { color: var(--rec); border-color: rgba(212, 65, 58, 0.35); }
   .vmx-titlebar__pill[data-state="down"] .vmx-titlebar__pill-led {
     background: var(--rec);
-    box-shadow: 0 0 6px var(--rec);
+    box-shadow: 0 0 3px var(--rec), 0 0 6px rgba(212, 65, 58, 0.28);
   }
-  .vmx-titlebar__pill[data-state="down"] { color: var(--rec); }
+  .vmx-titlebar__pill[data-state="down"] { color: var(--rec); border-color: rgba(212, 65, 58, 0.35); }
   @keyframes vmx-rec-blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.35; }
   }
   .vmx-titlebar__clock {
     margin-left: auto;
-    font-family: "DSEG7", "DM Mono", monospace;
-    font-size: 22px;
-    color: var(--phosphor);
-    text-shadow: var(--phosphor-glow);
-    letter-spacing: 0.06em;
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    font-size: 18px;
+    color: var(--silk);
+    text-shadow: 0 0 6px rgba(255, 138, 61, 0.18);
+    letter-spacing: -0.01em;
     line-height: 1;
     -webkit-app-region: no-drag;
   }
   .vmx-titlebar__settings {
     -webkit-app-region: no-drag;
-    margin-left: var(--sp-md);
+    margin-left: var(--sp-4);
     width: 32px;
     height: 32px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: var(--rad-sm);
     border: 1px solid transparent;
     background: transparent;
-    color: var(--ink-dim);
+    color: var(--silk-40);
     cursor: pointer;
     transition: color var(--motion-snap) ease-out,
                 background var(--motion-snap) ease-out,
@@ -129,10 +159,13 @@ const CSS = `
   }
   .vmx-titlebar__settings:hover,
   .vmx-titlebar__settings[data-active="true"] {
-    color: var(--phosphor);
-    background: var(--phosphor-soft);
-    border-color: var(--phosphor-dim);
-    box-shadow: var(--phosphor-glow);
+    color: var(--amber);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    border-color: var(--amber-40);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 var(--amber-40),
+      inset 0 0 12px var(--amber-22);
   }
   .vmx-titlebar__settings .sr-only {
     position: absolute;

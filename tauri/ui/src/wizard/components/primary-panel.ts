@@ -18,58 +18,53 @@ export interface PrimaryPanelProps {
 const CSS = `
   .cmp-primary-panel {
     position: relative;
-    background: linear-gradient(180deg, var(--panel-lift) 0%, var(--panel) 100%);
-    border: 1px solid var(--bezel-1);
-    border-radius: 8px;
+    background: var(--glass-2);
+    backdrop-filter: var(--blur-glass-light);
+    -webkit-backdrop-filter: var(--blur-glass-light);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-md);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+      inset 0 1px 0 var(--glass-top),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+      0 16px 36px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.018);
     overflow: hidden;
   }
-  /* Brushed-metal vertical streak — left highlight, right shadow */
-  .cmp-primary-panel::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image: linear-gradient(
-      90deg,
-      var(--brushed-hi) 0%,
-      transparent 12%,
-      transparent 88%,
-      var(--brushed-lo) 100%
-    );
-    mix-blend-mode: overlay;
-    opacity: 0.6;
-  }
+  .cmp-primary-panel > * { position: relative; z-index: 1; }
   .cmp-primary-panel__header {
-    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--sp-md);
-    padding: var(--sp-md) var(--sp-lg);
-    border-bottom: 1px dashed var(--bezel-2);
-    font-family: "Workbench", "Courier New", monospace;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-5);
+    border-bottom: 1px solid var(--glass-edge);
+    background: rgba(0, 0, 0, 0.22);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 9px;
-    letter-spacing: 0.32em;
+    letter-spacing: 0.28em;
     text-transform: uppercase;
-    color: var(--ink);
+    color: var(--silk);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    line-height: 1;
+    z-index: 2;
   }
   .cmp-primary-panel__badge {
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-mono);
     font-size: 9px;
-    letter-spacing: 0.32em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    padding: var(--sp-xs) var(--sp-sm);
-    border-radius: 3px;
-    background: var(--phosphor-soft);
-    color: var(--phosphor);
+    padding: 2px var(--sp-2);
+    border-radius: var(--rad-sm);
+    background: rgba(255, 138, 61, 0.08);
+    border: 1px solid var(--amber-22);
+    color: var(--amber);
     line-height: 1;
+    text-shadow: 0 0 4px var(--amber-22);
   }
   .cmp-primary-panel__body {
     position: relative;
-    padding: var(--sp-lg);
+    padding: var(--sp-5);
   }
 `;
 
@@ -78,6 +73,14 @@ registerStyle("cmp-primary-panel", CSS);
 export function PrimaryPanel(props: PrimaryPanelProps): HTMLElement {
   const root = document.createElement("section");
   root.className = "cmp-primary-panel";
+
+  // Shared glass-fingerprint streak — unifies wizard surfaces with the
+  // session deck panels.
+  const streak = document.createElement("span");
+  streak.className = "vmx-glass-streak";
+  streak.setAttribute("aria-hidden", "true");
+  root.append(streak);
+
   if (props.header) {
     const head = document.createElement("div");
     head.className = "cmp-primary-panel__header";

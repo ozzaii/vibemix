@@ -68,53 +68,61 @@ const CSS = `
     gap: var(--sp-sm);
   }
   [data-component="mascot-group"] .vmx-mascot-row__label {
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 11px;
-    letter-spacing: 0.18em;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
+    font-size: 10px;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--ink-dim);
+    color: var(--silk-40);
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   [data-component="mascot-group"] .vmx-mascot-moods {
     display: flex;
-    gap: var(--sp-sm);
+    gap: 0;
     align-items: stretch;
+    background: var(--glass-3);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    padding: 3px;
+    box-shadow:
+      inset 0 2px 5px rgba(0, 0, 0, 0.85),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.028);
   }
   [data-component="mascot-group"] .vmx-mascot-pill {
     flex: 1;
-    font-family: "DM Mono", monospace;
-    font-size: 11px;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 10px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    padding: var(--sp-sm) var(--sp-md);
+    padding: 8px var(--sp-3);
     background: transparent;
-    color: var(--ink-dim);
-    border: 1px solid var(--bezel-2);
-    border-radius: 999px;
+    color: var(--silk-40);
+    border: none;
+    border-radius: var(--rad-sm);
     cursor: pointer;
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
     transition: color var(--motion-snap) ease-out,
-                border-color var(--motion-snap) ease-out,
                 background var(--motion-snap) ease-out,
-                box-shadow var(--motion-snap) ease-out;
+                box-shadow var(--motion-snap) ease-out,
+                text-shadow var(--motion-snap) ease-out;
   }
-  [data-component="mascot-group"] .vmx-mascot-pill:hover {
-    color: var(--ink);
-    border-color: var(--bezel-3);
-  }
+  [data-component="mascot-group"] .vmx-mascot-pill:hover { color: var(--silk); }
   [data-component="mascot-group"] .vmx-mascot-pill[data-active="true"] {
-    background: var(--phosphor-soft);
-    color: var(--phosphor);
-    border-color: var(--phosphor-dim);
-    /* Material recess: inset shadow uses rgba-on-zero, not a brand color
-     * (matches the same pattern as .vmx-cohost__status-led). The grep
-     * guard tolerates rgba() — only literal #xxxxxx are forbidden. */
+    color: var(--amber);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
     box-shadow:
-      inset 0 1px 3px rgba(0, 0, 0, 0.4),
-      var(--phosphor-glow);
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 var(--amber-40),
+      inset 0 0 14px var(--amber-22),
+      0 0 0 1px rgba(255, 138, 61, 0.14);
+    text-shadow: 0 0 4px var(--amber-65);
   }
   [data-component="mascot-group"] .vmx-mascot-pill:focus-visible {
-    outline: 1px solid var(--phosphor);
+    outline: 1px solid var(--amber);
     outline-offset: 1px;
   }
 `;

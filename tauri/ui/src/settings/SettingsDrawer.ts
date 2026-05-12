@@ -63,7 +63,9 @@ const CSS = `
   .vmx-settings-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.55);
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
     z-index: 49;
     opacity: 0;
     pointer-events: none;
@@ -82,94 +84,89 @@ const CSS = `
     max-width: 100vw;
     z-index: 50;
     transform: translateX(100%);
-    background: linear-gradient(180deg, var(--panel-lift) 0%, var(--panel) 100%);
-    border-left: 1px solid var(--bezel-3);
+    background: var(--glass-1);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    border-left: 1px solid var(--glass-edge);
     box-shadow:
-      inset 1px 0 0 rgba(0, 0, 0, 0.5),
-      inset 2px 0 6px rgba(0, 0, 0, 0.4),
-      -8px 0 24px rgba(0, 0, 0, 0.4);
+      inset 1px 0 0 var(--glass-top),
+      -8px 0 32px rgba(0, 0, 0, 0.55),
+      -1px 0 0 rgba(255, 255, 255, 0.018);
     transition: transform 250ms ease-in-out;
     display: flex;
     flex-direction: column;
-  }
-  .vmx-settings-drawer::before {
-    /* Brushed-metal streak, lifted from .vmx-panel for visual continuity. */
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image: linear-gradient(
-      90deg,
-      var(--brushed-hi) 0%,
-      transparent 12%,
-      transparent 88%,
-      var(--brushed-lo) 100%
-    );
-    mix-blend-mode: overlay;
-    opacity: 0.6;
   }
   .vmx-settings-drawer[data-open="true"] {
     transform: translateX(0);
   }
   .vmx-settings-drawer__header {
     position: relative;
-    height: 48px;
+    height: 52px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 var(--sp-lg);
-    border-bottom: 1px solid var(--bezel-2);
+    padding: 0 var(--sp-5);
+    border-bottom: 1px solid var(--glass-edge);
+    background: rgba(0, 0, 0, 0.3);
   }
   .vmx-settings-drawer__title {
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 700;
+    font-size: 12px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--phosphor);
-    text-shadow: var(--phosphor-glow);
+    color: var(--silk);
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+  }
+  .vmx-settings-drawer__title::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 4px var(--amber), 0 0 8px var(--amber-40);
   }
   .vmx-settings-drawer__close {
-    width: 28px;
-    height: 28px;
-    border-radius: 4px;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--rad-sm);
     background: transparent;
     border: 1px solid transparent;
-    color: var(--ink-dim);
-    font-family: "DM Mono", monospace;
-    font-size: 18px;
+    color: var(--silk-40);
+    font-family: var(--type-mono);
+    font-size: 16px;
     line-height: 1;
     cursor: pointer;
     transition: color var(--motion-snap) ease-out,
-                border-color var(--motion-snap) ease-out;
+                border-color var(--motion-snap) ease-out,
+                background var(--motion-snap) ease-out;
   }
   .vmx-settings-drawer__close:hover {
-    color: var(--phosphor);
-    border-color: var(--phosphor-dim);
+    color: var(--amber);
+    border-color: var(--amber-40);
+    background: rgba(255, 138, 61, 0.06);
   }
   .vmx-settings-drawer__body {
     flex: 1;
     overflow-y: auto;
-    padding: var(--sp-lg);
+    padding: var(--sp-5);
     display: flex;
     flex-direction: column;
-    gap: var(--sp-md);
+    gap: var(--sp-4);
     position: relative;
   }
-  .vmx-settings-drawer__body::-webkit-scrollbar {
-    width: 8px;
-  }
-  .vmx-settings-drawer__body::-webkit-scrollbar-track {
-    background: var(--panel-deep);
-  }
+  .vmx-settings-drawer__body::-webkit-scrollbar { width: 6px; }
+  .vmx-settings-drawer__body::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
   .vmx-settings-drawer__body::-webkit-scrollbar-thumb {
-    background: var(--bezel-2);
-    border-radius: 4px;
+    background: var(--silk-22);
+    border-radius: 3px;
   }
-  .vmx-settings-drawer__body::-webkit-scrollbar-thumb:hover {
-    background: var(--bezel-3);
-  }
+  .vmx-settings-drawer__body::-webkit-scrollbar-thumb:hover { background: var(--amber-40); }
   .vmx-settings-drawer__genre-wrap {
     position: relative;
   }
@@ -179,51 +176,63 @@ const CSS = `
     display: none;
     align-items: center;
     justify-content: center;
-    background: var(--phosphor-soft);
-    border: 1px solid var(--phosphor-dim);
-    border-radius: 6px;
-    font-family: "Workbench", "Courier New", monospace;
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    border: 1px solid var(--amber-40);
+    border-radius: var(--rad-sm);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 9px;
-    letter-spacing: 0.32em;
+    letter-spacing: 0.28em;
     text-transform: uppercase;
-    color: var(--phosphor);
-    text-shadow: var(--phosphor-glow);
+    color: var(--amber);
+    text-shadow: 0 0 4px var(--amber-22);
     z-index: 2;
     transition: opacity 250ms ease-out;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 0 14px var(--amber-22);
   }
   .vmx-settings-drawer__reload-overlay[data-shown="true"] {
     display: flex;
   }
   .vmx-settings-drawer__btn {
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 11px;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 10px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    padding: var(--sp-sm) var(--sp-md);
-    background: transparent;
-    border: 1px solid var(--bezel-2);
-    color: var(--ink-dim);
-    border-radius: 4px;
+    padding: 10px var(--sp-4);
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--glass-edge);
+    color: var(--silk-65);
+    border-radius: var(--rad-sm);
     cursor: pointer;
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
     transition: color var(--motion-snap) ease-out,
-                border-color var(--motion-snap) ease-out;
+                border-color var(--motion-snap) ease-out,
+                background var(--motion-snap) ease-out,
+                box-shadow var(--motion-snap) ease-out;
   }
   .vmx-settings-drawer__btn:hover {
-    color: var(--phosphor);
-    border-color: var(--phosphor-dim);
+    color: var(--amber);
+    border-color: var(--amber-40);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.06) 0%, rgba(255, 138, 61, 0.02) 100%);
+    box-shadow: inset 0 0 12px var(--amber-22);
   }
   .vmx-settings-drawer__modal-slot {
     position: relative;
     z-index: 60;
   }
   .vmx-settings-drawer__label {
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 11px;
-    letter-spacing: 0.18em;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
+    font-size: 10px;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--ink-dim);
+    color: var(--silk-40);
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
 `;
 

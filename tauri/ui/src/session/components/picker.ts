@@ -1,11 +1,13 @@
-/* picker.ts — dropdown row component (48px row, 240px dropdown).
+/* picker.ts — dropdown row component (44px row, 240px dropdown).
  *
- * Used by voice picker, genre picker, output device picker. Lifted from
- * mocks/vibemix-app-ui.html `.persona-cell` (lines 442-477).
+ * Used by voice picker, genre picker, output device picker (session
+ * persona + output panels, and the settings drawer copies).
  *
- * Layout: [icon|avatar 24×24] [label DM Mono 14px wt 500] [auto-pill?] [▾]
- * Click opens an absolutely-positioned 240px panel beneath with options
- * listed at 32px row height, hover --phosphor-soft tint. */
+ * v5 CDJ Whisper migration (2026-05-12): row reads as a sealed dark-glass
+ * tile (mock §02 .btn), opens into a glass-1 popover (mock .tray-popover).
+ * No bevel gradients, no FL-Studio brushed-metal residue. Avatar collapses
+ * to a flat amber-disc seal; chevron is a JetBrains Mono caret that lifts
+ * to amber on open. */
 
 import { registerStyle } from "./_style-registry.js";
 
@@ -36,96 +38,146 @@ const CSS = `
   .vmx-picker__row {
     display: flex;
     align-items: center;
-    gap: var(--sp-sm);
-    height: 48px;
-    padding: 0 var(--sp-md);
-    background: linear-gradient(180deg, var(--panel-lift), var(--panel));
-    border: 1px solid var(--bezel-1);
-    border-radius: 6px;
+    gap: var(--sp-3);
+    height: 40px;
+    padding: 0 12px 0 10px;
+    background: var(--glass-2);
+    backdrop-filter: var(--blur-glass-display);
+    -webkit-backdrop-filter: var(--blur-glass-display);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+      inset 0 1px 0 rgba(255, 255, 255, 0.035),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
     cursor: pointer;
-    transition: border-color var(--motion-snap) ease-out,
+    color: var(--silk-65);
+    transition: color var(--motion-snap) ease-out,
+                border-color var(--motion-snap) ease-out,
+                background var(--motion-snap) ease-out,
                 box-shadow var(--motion-snap) ease-out;
   }
-  .vmx-picker__row:hover,
-  .vmx-picker[data-open="true"] .vmx-picker__row {
-    border-color: var(--phosphor-dim);
+  .vmx-picker__row:hover {
+    color: var(--silk);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      var(--phosphor-glow);
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+      0 0 10px var(--amber-22);
+  }
+  .vmx-picker[data-open="true"] .vmx-picker__row {
+    color: var(--amber);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    border-color: rgba(255, 138, 61, 0.14);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 var(--amber-40),
+      inset 0 0 14px var(--amber-22),
+      0 0 0 1px rgba(255, 138, 61, 0.14);
+    text-shadow: 0 0 4px var(--amber-65);
   }
   .vmx-picker__icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    color: var(--phosphor);
+    width: 18px;
+    height: 18px;
+    color: var(--amber);
     flex-shrink: 0;
+    filter: drop-shadow(0 0 3px var(--amber-22));
   }
+  /* Avatar — a flat amber-pinpoint disc on a void-2 ground (the voice "seal").
+   * v5 drops the bevel-radial-gradient that the FL-Studio direction used.
+   * The amber dot reads as a single mascot eye — quiet but characterful. */
   .vmx-picker__avatar {
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
     flex-shrink: 0;
     border-radius: 50%;
-    background: radial-gradient(circle at 50% 35%, var(--bezel-3), var(--panel) 70%, var(--panel-deep));
-    border: 1px solid var(--bezel-3);
-    box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.5);
+    background: var(--void-2);
+    border: 1px solid var(--glass-edge);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      inset 0 0 4px rgba(0, 0, 0, 0.55);
+    position: relative;
+  }
+  .vmx-picker__avatar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow:
+      0 0 3px var(--amber),
+      0 0 6px var(--amber-40);
   }
   .vmx-picker__label {
     flex: 1;
     min-width: 0;
-    font-family: "DM Mono", monospace;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--ink);
-    letter-spacing: 0.01em;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 95, "wght" 500;
+    font-size: 12px;
+    letter-spacing: 0.04em;
     line-height: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-transform: lowercase;
+    color: inherit;
   }
   .vmx-picker__auto {
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 9px;
-    letter-spacing: 0.32em;
+    letter-spacing: 0.24em;
     text-transform: uppercase;
-    padding: 2px 6px;
-    border-radius: 2px;
-    background: var(--phosphor-soft);
-    color: var(--phosphor);
+    padding: 3px 7px;
+    border-radius: 1px;
+    background: rgba(255, 138, 61, 0.08);
+    border: 1px solid var(--amber-22);
+    color: var(--amber);
     line-height: 1;
+    text-shadow: 0 0 4px var(--amber-22);
   }
   .vmx-picker__chev {
-    color: var(--ink-dim);
-    font-size: 14px;
+    font-family: var(--type-mono);
+    color: var(--silk-40);
+    font-size: 10px;
     line-height: 1;
     transition: color var(--motion-snap) ease-out,
-                transform var(--motion-snap) ease-out;
+                transform var(--motion-snap) ease-out,
+                text-shadow var(--motion-snap) ease-out;
   }
+  .vmx-picker__row:hover .vmx-picker__chev { color: var(--silk-65); }
   .vmx-picker[data-open="true"] .vmx-picker__chev {
-    color: var(--phosphor);
+    color: var(--amber);
     transform: rotate(180deg);
+    text-shadow: 0 0 4px var(--amber-22);
   }
+  /* Dropdown — sealed glass-1 popover (mock .tray-popover treatment). */
   .vmx-picker__list {
     position: absolute;
     left: 0;
-    top: calc(100% + 4px);
+    top: calc(100% + 5px);
     z-index: 30;
-    width: 240px;
+    width: 100%;
+    min-width: 200px;
     max-height: 280px;
     overflow: auto;
-    background: linear-gradient(180deg, var(--panel-lift), var(--panel));
-    border: 1px solid var(--bezel-2);
-    border-radius: 6px;
+    background: var(--glass-1);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
     box-shadow:
-      0 8px 16px rgba(0, 0, 0, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      inset 0 1px 0 var(--glass-top),
+      0 16px 40px rgba(0, 0, 0, 0.7),
+      0 4px 16px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.018);
     padding: 4px;
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-3px);
     pointer-events: none;
     transition: opacity var(--motion-transition) ease-out,
                 transform var(--motion-transition) ease-out;
@@ -135,35 +187,62 @@ const CSS = `
     transform: translateY(0);
     pointer-events: auto;
   }
+  /* Custom scrollbar — keep the popover from breaking character. */
+  .vmx-picker__list::-webkit-scrollbar { width: 4px; }
+  .vmx-picker__list::-webkit-scrollbar-track { background: transparent; }
+  .vmx-picker__list::-webkit-scrollbar-thumb {
+    background: var(--silk-22);
+    border-radius: 2px;
+  }
+  .vmx-picker__list::-webkit-scrollbar-thumb:hover { background: var(--amber-40); }
   .vmx-picker__opt {
     display: flex;
     align-items: center;
-    gap: var(--sp-sm);
+    gap: var(--sp-3);
     width: 100%;
-    padding: 0 var(--sp-md);
-    height: 32px;
+    padding: 0 10px;
+    height: 28px;
     border: none;
     background: transparent;
-    color: var(--ink);
-    font-family: "DM Mono", monospace;
-    font-size: 13px;
-    letter-spacing: 0.01em;
+    color: var(--silk-65);
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 95, "wght" 500;
+    font-size: 12px;
+    letter-spacing: 0.04em;
     line-height: 1;
     text-align: left;
+    text-transform: lowercase;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 1px;
+    transition: color 120ms ease-out, background 120ms ease-out, text-shadow 120ms ease-out;
   }
   .vmx-picker__opt:hover {
-    background: var(--phosphor-soft);
-    color: var(--phosphor);
+    color: var(--amber);
+    background: rgba(255, 138, 61, 0.06);
+    text-shadow: 0 0 4px var(--amber-22);
   }
   .vmx-picker__opt[data-selected="true"] {
-    color: var(--phosphor);
+    color: var(--amber);
+    background: rgba(255, 138, 61, 0.05);
+    text-shadow: 0 0 4px var(--amber-22);
+  }
+  .vmx-picker__opt[data-selected="true"]::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: var(--glow-faint);
+    flex-shrink: 0;
+    margin-right: 2px;
   }
   .vmx-picker__opt-sub {
     margin-left: auto;
-    font-size: 11px;
-    color: var(--ink-dim);
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--silk-40);
+    text-transform: none;
   }
 `;
 

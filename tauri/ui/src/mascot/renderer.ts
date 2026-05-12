@@ -162,13 +162,43 @@ export class MascotRenderer {
   }
 
   /**
+   * TEMP 2026-05-12 — render-bug debug snapshot. Returns a one-line
+   * summary of the scene state right after construction. Remove once the
+   * render bug is fixed.
+   */
+  getDebugSnapshot(): string {
+    const box = new Box3().setFromObject(this.characterRoot);
+    const size = new Vector3();
+    box.getSize(size);
+    const centre = new Vector3();
+    box.getCenter(centre);
+    const cp = this.camera.position;
+    const skinned = findSkinnedMesh(this.characterRoot);
+    const mat = skinned
+      ? (skinned as unknown as { material?: { name?: string; map?: unknown } }).material
+      : undefined;
+    const matName = mat?.name ?? "<no-mat>";
+    const mapPresent = mat?.map ? "yes" : "no";
+    return (
+      `box size=(${size.x.toFixed(2)},${size.y.toFixed(2)},${size.z.toFixed(2)})` +
+      ` centre=(${centre.x.toFixed(2)},${centre.y.toFixed(2)},${centre.z.toFixed(2)})` +
+      ` cam=(${cp.x.toFixed(2)},${cp.y.toFixed(2)},${cp.z.toFixed(2)})` +
+      ` near=${this.camera.near} far=${this.camera.far} fov=${this.camera.fov}` +
+      ` mat=${matName} map=${mapPresent}`
+    );
+  }
+
+  /**
    * Compute camera position + look-target from the character's bounding box.
-   * CONTEXT Area 2 — bust + upper body framing. We measure the box, place
-   * the camera 2.5x box-height back along Z, biased up so the head is at
-   * the visual centre rather than the geometric centre.
+   * CONTEXT Area 2 — bust + upper body framing.
    *
-   * Bounding box is robust against future Meshy character swaps with different
-   * scales — no hardcoded positions.
+   * 2026-05-12 fixup: Box3.setFromObject on a SkinnedMesh whose mesh node
+   * inherits the Armature's scale=0.01 ended up reporting a ~1.7cm-tall
+   * box even though the visually-skinned character is ~1.7m. That put the
+   * camera ~4cm from origin — inside the rendered mesh — so every canvas
+   * pixel painted the inside of the character (full-white window). Until
+   * we have a robust skin-aware fitting pass, hardcode the camera for a
+   * Mixamo-rigged ~1.7m biped standing at origin, framing the bust.
    */
   private frameCameraForBust(target: Object3D): void {
     const box = new Box3().setFromObject(target);
@@ -176,16 +206,18 @@ export class MascotRenderer {
     box.getSize(size);
     const centre = new Vector3();
     box.getCenter(centre);
-
-    const height = size.y > 0 ? size.y : 1.6; // fallback ~average human height
-    const focusY = centre.y + height * BUST_FOCUS_Y_BIAS;
-
-    this.camera.position.set(
-      centre.x,
-      focusY,
-      centre.z + height * BUST_CAMERA_Z_MULT,
+    // Diagnostic — read with Safari Develop → vibemix → mascot.html.
+    // eslint-disable-next-line no-console
+    console.log(
+      `[mascot] bbox size=${size.x.toFixed(3)},${size.y.toFixed(3)},${size.z.toFixed(3)} ` +
+        `centre=${centre.x.toFixed(3)},${centre.y.toFixed(3)},${centre.z.toFixed(3)}`,
     );
-    this.camera.lookAt(centre.x, focusY, centre.z);
+
+    // Fixed bust framing for a 1.7 m Mixamo biped standing at origin.
+    const focusY = 1.4;
+    this.camera.position.set(0, focusY, 3.0);
+    this.camera.lookAt(0, focusY - 0.2, 0);
+    void target; // box read above is for the console diagnostic only.
   }
 
   /**

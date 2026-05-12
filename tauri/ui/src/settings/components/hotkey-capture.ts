@@ -57,70 +57,113 @@ const CSS = `
   .vmx-hotkey-capture {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-sm);
+    gap: var(--sp-3);
   }
   .vmx-hotkey-capture__row {
     display: flex;
     align-items: center;
-    gap: var(--sp-md);
+    gap: var(--sp-3);
   }
+  /* Hotkey chip — sealed glass-3 keycap recessed into the surface.
+   * Amber readout (the actual combo) sits inside like a Pioneer LCD. */
   .vmx-hotkey-capture__chip {
     flex: 1;
     height: 36px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0 var(--sp-md);
-    background: var(--panel-deep);
-    border: 1px solid var(--bezel-2);
-    border-radius: 4px;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-    font-family: "DM Mono", monospace;
+    padding: 0 var(--sp-4);
+    background: var(--glass-3);
+    backdrop-filter: var(--blur-glass-display);
+    -webkit-backdrop-filter: var(--blur-glass-display);
+    border: 1px solid rgba(0, 0, 0, 0.55);
+    border-radius: var(--rad-sm);
+    box-shadow:
+      inset 0 2px 6px rgba(0, 0, 0, 0.85),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+      inset 0 0 14px rgba(255, 138, 61, 0.04),
+      0 0 0 1px rgba(255, 255, 255, 0.02);
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 14px;
     letter-spacing: 0.02em;
-    color: var(--phosphor);
+    color: var(--amber);
     line-height: 1;
-    text-shadow: var(--phosphor-glow);
+    text-shadow: 0 0 6px var(--amber-40), 0 0 14px var(--amber-22);
     user-select: none;
+    transition: color var(--motion-snap) ease-out,
+                text-shadow var(--motion-snap) ease-out,
+                box-shadow var(--motion-snap) ease-out;
   }
+  /* Capture mode — chip becomes warmer + pulses; signals "listening for
+   * keypress". The amber-deep shade reads as "armed" without being alarming. */
   .vmx-hotkey-capture[data-capture="true"] .vmx-hotkey-capture__chip {
-    color: var(--phosphor-warm);
-    border-color: var(--phosphor-warm);
+    color: var(--amber-deep);
+    box-shadow:
+      inset 0 2px 6px rgba(0, 0, 0, 0.85),
+      inset 0 0 0 1px var(--amber-40),
+      inset 0 0 18px var(--amber-22),
+      0 0 0 1px rgba(255, 138, 61, 0.18);
+    text-shadow: 0 0 7px var(--amber-65), 0 0 16px var(--amber-40);
     animation: vmx-hotkey-capture-pulse 1200ms ease-in-out infinite;
   }
   .vmx-hotkey-capture[data-error="true"] .vmx-hotkey-capture__chip {
-    color: var(--rec);
-    border-color: var(--rec);
-    text-shadow: none;
+    color: var(--led-fault);
+    box-shadow:
+      inset 0 2px 6px rgba(0, 0, 0, 0.85),
+      inset 0 0 0 1px rgba(212, 65, 58, 0.35),
+      inset 0 0 12px rgba(212, 65, 58, 0.10);
+    text-shadow: 0 0 6px rgba(212, 65, 58, 0.45);
   }
+  /* Rebind button — v5 amber-bleed-through-frost active treatment to
+   * match the rocker + mood-block + drop-chip vocabulary. */
   .vmx-hotkey-capture__rebind {
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 11px;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 10px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    padding: var(--sp-sm) var(--sp-md);
-    background: transparent;
-    border: 1px solid var(--bezel-2);
-    color: var(--ink-dim);
-    border-radius: 4px;
+    padding: 9px var(--sp-4);
+    background: var(--glass-2);
+    border: 1px solid var(--glass-edge);
+    color: var(--silk-65);
+    border-radius: var(--rad-sm);
     cursor: pointer;
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.035),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
     transition: color var(--motion-snap) ease-out,
-                border-color var(--motion-snap) ease-out;
+                border-color var(--motion-snap) ease-out,
+                background var(--motion-snap) ease-out,
+                box-shadow var(--motion-snap) ease-out,
+                text-shadow var(--motion-snap) ease-out;
   }
   .vmx-hotkey-capture__rebind:hover {
-    color: var(--phosphor);
-    border-color: var(--phosphor-dim);
+    color: var(--silk);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+      0 0 10px var(--amber-22);
   }
   .vmx-hotkey-capture[data-capture="true"] .vmx-hotkey-capture__rebind {
-    color: var(--phosphor-warm);
-    border-color: var(--phosphor-warm);
+    color: var(--amber);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    border-color: rgba(255, 138, 61, 0.14);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 var(--amber-40),
+      inset 0 0 14px var(--amber-22),
+      0 0 0 1px rgba(255, 138, 61, 0.14);
+    text-shadow: 0 0 4px var(--amber-65);
   }
   .vmx-hotkey-capture__error {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-mono);
     font-size: 11px;
-    line-height: 1.3;
-    color: var(--rec);
+    line-height: 1.35;
+    color: var(--led-fault);
+    text-shadow: 0 0 4px rgba(212, 65, 58, 0.18);
   }
   @keyframes vmx-hotkey-capture-pulse {
     0%, 100% { opacity: 1; }

@@ -6,13 +6,15 @@
       "clip": "Sleep_Normally",
       "states": [
         "idle_breathe_slow",
-        "sleep"
+        "sleep",
+        "puff_particle"
       ]
     },
     {
       "file": "animations/indoor_swing.glb",
       "clip": "Indoor_Swing",
       "states": [
+        "idle_breathe",
         "idle_bop_to_beat_mellow",
         "talk_loop_calm"
       ]

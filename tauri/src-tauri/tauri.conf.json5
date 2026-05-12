@@ -37,33 +37,32 @@
         "titleBarStyle": "Overlay",
         "center": true,
         "visible": true
-      },
-      // Phase 13 Plan 02 — mascot overlay declaration.
-      // Runtime `mascot_window::create_mascot_window` builder in main.rs
-      // .setup() supplies the dynamic flags (always_on_top,
-      // visible_on_all_workspaces, skip_taskbar, click-through,
-      // geometry from MascotWindowState). This static entry exists so:
-      //   1. Tauri's capability scope sees a known window label at config
-      //      load time (capabilities/default.json "windows" array).
-      //   2. Cold-cache builds know which webview entry to bundle
-      //      (mascot.html — index.ts placeholder mounts in Plan 13-04).
-      // `"visible": false` here keeps Tauri from auto-spawning before the
-      // runtime builder decides whether to show or skip; the runtime
-      // builder calls `.visible(true)` once it's ready.
-      {
-        "label": "mascot",
-        "url": "mascot.html",
-        "title": "vibemix mascot",
-        "width": 300,
-        "height": 400,
-        "decorations": false,
-        "transparent": true,
-        "visible": false
       }
+      // Phase 13 Plan 02 — the mascot overlay window is built at runtime
+      // by `mascot_window::create_mascot_window` in main.rs .setup()
+      // (transparent + always_on_top + skip_taskbar + visible_on_all_
+      // workspaces, geometry from MascotWindowState). A static entry here
+      // would collide with the runtime `WebviewWindowBuilder::new(app,
+      // "mascot", ...)` call ("a webview with label `mascot` already
+      // exists"). capabilities/default.json's `"windows": ["main", "mascot"]`
+      // is the only place that needs to know the label — it's a
+      // runtime command-scope allowlist, not a creation requirement.
     ],
     "security": {
-      // Tight CSP — webview never opens its own WebSocket (Rust does). No external connect-src.
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self'"
+      // CSP scope:
+      //   - default-src 'self' — block external origins for everything not
+      //     explicitly overridden.
+      //   - script-src 'self' 'wasm-unsafe-eval' — Three.js DRACOLoader
+      //     instantiates WASM (KHR_draco_mesh_compression on the mascot
+      //     character GLB). Without 'wasm-unsafe-eval', WebAssembly.instantiate
+      //     is blocked and the character mesh fails to load.
+      //   - worker-src 'self' blob: — DRACOLoader spawns its decoder Worker
+      //     via `new Worker(URL.createObjectURL(new Blob(...)))`. blob: must
+      //     be allowed for the worker to be constructed.
+      //   - connect-src 'self' ws://127.0.0.1:8765 — Plan 13-06 added the
+      //     mascot webview's own WS subscription to the sidecar bus.
+      //     'self' alone blocks ws://127.0.0.1:8765 (different origin).
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:8765"
     },
     "macOSPrivateApi": true
   },

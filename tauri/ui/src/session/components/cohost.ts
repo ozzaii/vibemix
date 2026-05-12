@@ -52,21 +52,68 @@ const CSS = `
     display: flex;
     flex-direction: column;
     flex: 1;
-    background: linear-gradient(180deg, var(--panel-lift) 0%, var(--panel) 100%);
-    border: 1px solid var(--bezel-1);
-    border-radius: 8px;
+    background: var(--glass-1);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-md);
     position: relative;
     overflow: hidden;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    box-shadow:
+      inset 0 1px 0 var(--glass-top),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+      0 24px 60px rgba(0, 0, 0, 0.55);
   }
-  .vmx-cohost__header {
-    padding: 14px var(--sp-md);
+  .vmx-cohost__topstrip {
+    padding: 8px var(--sp-4);
     display: flex;
     align-items: center;
-    gap: var(--sp-md);
-    border-bottom: 1px solid var(--bezel-1);
-    background: linear-gradient(180deg, var(--panel-lift) 0%, var(--panel) 100%);
+    justify-content: space-between;
+    gap: var(--sp-3);
+    border-bottom: 1px solid var(--glass-edge);
+    background: rgba(0, 0, 0, 0.4);
     position: relative;
+    z-index: 2;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+  }
+  .vmx-cohost__topstrip-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--amber);
+    text-shadow: 0 0 4px var(--amber-22);
+  }
+  .vmx-cohost__topstrip-tag::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: var(--glow-strong);
+    animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
+  }
+  .vmx-cohost__topstrip-meta {
+    font-family: var(--type-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--silk-40);
+    text-transform: none;
+  }
+  .vmx-cohost__header {
+    padding: var(--sp-3) var(--sp-4);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    border-bottom: 1px solid var(--glass-edge);
+    background: rgba(0, 0, 0, 0.25);
+    position: relative;
+    z-index: 2;
   }
   .vmx-cohost__meta {
     flex: 1;
@@ -74,175 +121,205 @@ const CSS = `
     flex-direction: column;
     gap: 3px;
   }
+  /* AVERY — display-weight character moniker, not a label. The first
+   * letter gets a pale highlight (mock §03 type specimen treatment)
+   * so the name reads as a co-host's signature, not status text. */
   .vmx-cohost__name {
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 13px;
-    color: var(--phosphor);
-    letter-spacing: 0.08em;
-    text-shadow: var(--phosphor-glow);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 82, "wght" 700;
+    font-size: 17px;
+    color: var(--silk);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     line-height: 1;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1px;
+  }
+  .vmx-cohost__name__lead {
+    color: var(--amber);
+    font-variation-settings: "wdth" 82, "wght" 800;
+    text-shadow: 0 0 6px var(--amber-40), 0 0 14px var(--amber-22);
   }
   .vmx-cohost__status {
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
     font-size: 9px;
-    color: var(--ink-dim);
-    letter-spacing: 0.2em;
+    color: var(--silk-40);
+    letter-spacing: 0.22em;
     text-transform: uppercase;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .vmx-cohost__status-led {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--ink-engraved);
-    box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.5);
+    background: rgba(15, 18, 24, 0.85);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
   .vmx-cohost__status[data-state="LISTENING"] .vmx-cohost__status-led {
-    background: var(--ok);
-    box-shadow: 0 0 6px var(--ok);
+    background: var(--led-ok);
+    box-shadow:
+      0 0 3px var(--led-ok),
+      0 0 6px rgba(109, 212, 74, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
   .vmx-cohost__status[data-state="TALKING"] .vmx-cohost__status-led {
-    background: var(--phosphor);
-    box-shadow: var(--phosphor-glow);
+    background: var(--amber);
+    box-shadow: var(--glow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    animation: vmx-cohost-talk-pulse 0.9s ease-in-out infinite;
   }
-  /* === Transcript (paper surface — locally-scoped vars per UI-SPEC §Color) === */
+  @keyframes vmx-cohost-talk-pulse {
+    0%, 70% { opacity: 1; }
+    85% { opacity: 0.35; }
+    100% { opacity: 1; }
+  }
+  /* === Transcript — dark glass display (v5) === */
   .vmx-cohost__transcript {
-    --paper-receipt-top: #f3ead7;
-    --paper-receipt-bot: #ece2c8;
-    --paper-receipt-ink: #1a1408;
-    --paper-receipt-ink-old: #5a4a30;
-    --paper-receipt-ink-older: #7a6749;
-    --paper-receipt-ts-bg: rgba(40, 28, 15, 0.06);
-    --paper-receipt-ts-ink: #8a7c5e;
-    --paper-receipt-em: #a8540a;
     flex: 1;
-    padding: 18px 18px 24px;
-    background: linear-gradient(180deg, var(--paper-receipt-top) 0%, var(--paper-receipt-bot) 100%);
+    padding: var(--sp-4) var(--sp-4) var(--sp-5);
+    background: var(--glass-3);
     border: 0;
-    color: var(--paper-receipt-ink);
-    font-family: "DM Mono", monospace;
+    color: var(--silk);
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
     font-size: 13.5px;
     line-height: 1.55;
-    letter-spacing: 0.005em;
+    letter-spacing: 0;
     position: relative;
     overflow-y: auto;
     overflow-x: hidden;
-  }
-  .vmx-cohost__transcript::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2'/><feColorMatrix values='0 0 0 0 .4  0 0 0 0 .32  0 0 0 0 .2  0 0 0 .24 0'/></filter><rect width='180' height='180' filter='url(%23p)'/></svg>");
-    mix-blend-mode: multiply;
-    opacity: 0.55;
+    z-index: 1;
   }
   .vmx-cohost__transcript::after {
+    /* Fade to bottom — long transcripts breathe into the void */
     content: "";
     position: absolute;
     left: 0; right: 0; bottom: 0;
-    height: 18px;
-    background:
-      linear-gradient(180deg, transparent, rgba(40, 28, 15, 0.18)),
-      radial-gradient(circle at 9px 18px, transparent 4px, var(--paper-receipt-bot) 4.5px) repeat-x;
-    background-size: auto, 18px 18px;
+    height: 32px;
+    background: linear-gradient(180deg, transparent, rgba(2, 3, 6, 0.88));
     pointer-events: none;
   }
   .vmx-cohost__msg {
-    margin-bottom: 14px;
-    padding-left: 20px;
+    margin-bottom: var(--sp-3);
+    padding: 4px 8px 4px 22px;
+    margin-left: -8px;
+    margin-right: -4px;
     position: relative;
-    letter-spacing: 0.005em;
+    letter-spacing: 0;
+    border-radius: var(--rad-sm);
+    transition: background 400ms ease-out, box-shadow 400ms ease-out;
   }
   .vmx-cohost__msg::before {
     content: "›";
     position: absolute;
-    left: 0;
-    top: 0;
-    color: var(--phosphor-warm);
+    left: 8px;
+    top: 4px;
+    color: var(--amber);
     font-weight: 700;
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-mono);
+    text-shadow: 0 0 4px var(--amber-22);
   }
+  /* Latest line — felt as a moment, not just a flag. Amber-22 inset
+   * glow + 1px amber edge on the left so the eye is drawn there without
+   * a heavy backdrop. The cursor caret rides on the end. */
   .vmx-cohost__msg[data-tier="now"] {
-    color: var(--paper-receipt-ink);
+    color: var(--silk);
+    background: linear-gradient(90deg, rgba(255, 138, 61, 0.07) 0%, rgba(255, 138, 61, 0.018) 70%, transparent 100%);
+    box-shadow:
+      inset 1px 0 0 var(--amber-40),
+      inset 0 0 12px rgba(255, 138, 61, 0.06);
   }
   .vmx-cohost__msg[data-tier="now"]::after {
     content: "▍";
     display: inline;
     margin-left: 2px;
-    color: var(--phosphor-warm);
+    color: var(--amber);
+    text-shadow: 0 0 4px var(--amber-22);
     animation: vmx-cohost-cursor 1000ms steps(1) infinite;
   }
   .vmx-cohost__msg[data-tier="faded"] {
-    color: var(--paper-receipt-ink-old);
+    color: var(--silk-65);
   }
   .vmx-cohost__msg[data-tier="old"] {
-    color: var(--paper-receipt-ink-older);
-    opacity: 0.7;
+    color: var(--silk-40);
   }
   .vmx-cohost__ts {
     display: inline-block;
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-mono);
     font-size: 9px;
     letter-spacing: 0.18em;
-    color: var(--paper-receipt-ts-ink);
-    background: var(--paper-receipt-ts-bg);
+    color: var(--silk-40);
+    background: rgba(255, 138, 61, 0.05);
+    border: 1px solid var(--silk-12);
     padding: 1px 5px;
-    border-radius: 2px;
+    border-radius: var(--rad-sm);
     margin-right: 6px;
     vertical-align: 1px;
     text-transform: uppercase;
   }
   .vmx-cohost__msg em {
-    font-family: "Caveat", "DM Mono", monospace;
-    font-size: 17px;
+    font-family: inherit;
     font-style: normal;
-    color: var(--paper-receipt-em);
-    font-weight: 700;
+    color: var(--amber);
+    font-weight: 600;
+    text-shadow: 0 0 4px var(--amber-22);
   }
   @keyframes vmx-cohost-cursor {
     50% { opacity: 0; }
   }
   /* === Foot strip === */
   .vmx-cohost__foot {
-    padding: 10px var(--sp-md);
-    background: linear-gradient(180deg, var(--panel-lift) 0%, var(--panel) 100%);
-    border-top: 1px solid var(--bezel-1);
+    padding: var(--sp-3) var(--sp-4);
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid var(--glass-edge);
     display: flex;
     align-items: center;
     gap: 10px;
-    font-family: "Workbench", "Courier New", monospace;
-    font-size: 9.5px;
-    letter-spacing: 0.18em;
-    color: var(--ink-dim);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    color: var(--silk-40);
     text-transform: uppercase;
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    position: relative;
+    z-index: 2;
   }
   .vmx-cohost__foot-led {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--ink-engraved);
-    box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.5);
+    background: rgba(15, 18, 24, 0.85);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
   .vmx-cohost__foot[data-grounded="true"] .vmx-cohost__foot-led {
-    background: var(--ok);
-    box-shadow: 0 0 6px var(--ok);
+    background: var(--led-ok);
+    box-shadow:
+      0 0 3px var(--led-ok),
+      0 0 6px rgba(109, 212, 74, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
   .vmx-cohost__foot[data-grounded="false"] .vmx-cohost__foot-led {
-    background: var(--phosphor);
-    box-shadow: var(--phosphor-glow);
+    background: var(--amber);
+    box-shadow: var(--glow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
   }
   .vmx-cohost__foot-latency {
     margin-left: auto;
-    font-family: "DSEG7", "DM Mono", monospace;
-    font-size: 13px;
-    color: var(--phosphor);
-    text-shadow: 0 0 4px var(--phosphor-dim);
-    letter-spacing: 0.06em;
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    color: var(--amber);
+    text-shadow: 0 0 4px var(--amber-22);
+    letter-spacing: 0.04em;
+    font-weight: 500;
   }
 `;
 
@@ -253,11 +330,40 @@ export function renderCohostPanel(props: CohostPanelProps): HTMLElement {
   root.className = "vmx-cohost";
   root.setAttribute("aria-label", "ai cohost");
 
+  // v5 "sign of life" — slow amber light sweeping the perimeter.
+  // Pure CSS; defined globally in tokens.css.
+  const sweep = document.createElement("div");
+  sweep.className = "border-anim slow rev";
+  sweep.setAttribute("aria-hidden", "true");
+  root.append(sweep);
+
+  // Shared glass-fingerprint streak — quiet character beat unifying the
+  // session deck panels (also on .vmx-timecode::after and the generic
+  // .vmx-panel via renderPanel).
+  const streak = document.createElement("span");
+  streak.className = "vmx-glass-streak bottom";
+  streak.setAttribute("aria-hidden", "true");
+  root.append(streak);
+
+  root.append(buildTopStrip());
   root.append(buildHeader(props.status));
   root.append(buildTranscript(props.transcript));
   root.append(buildFoot(props.grounded, props.latencyMs));
 
   return root;
+}
+
+function buildTopStrip(): HTMLElement {
+  const strip = document.createElement("div");
+  strip.className = "vmx-cohost__topstrip";
+  const tag = document.createElement("span");
+  tag.className = "vmx-cohost__topstrip-tag";
+  tag.textContent = "AI COHOST";
+  const meta = document.createElement("span");
+  meta.className = "vmx-cohost__topstrip-meta";
+  meta.textContent = "grounded · audio + screen";
+  strip.append(tag, meta);
+  return strip;
 }
 
 function buildHeader(status: CohostStatus): HTMLElement {
@@ -268,9 +374,16 @@ function buildHeader(status: CohostStatus): HTMLElement {
   // content now. The mascot lives in the always-on-top overlay window.
   const meta = document.createElement("div");
   meta.className = "vmx-cohost__meta";
+  // AVERY rendered as a display moniker — first letter highlighted in
+  // amber as the character's accent stroke.
   const name = document.createElement("span");
   name.className = "vmx-cohost__name";
-  name.textContent = "AVERY";
+  const lead = document.createElement("span");
+  lead.className = "vmx-cohost__name__lead";
+  lead.textContent = "A";
+  const rest = document.createElement("span");
+  rest.textContent = "VERY";
+  name.append(lead, rest);
   const statusEl = document.createElement("span");
   statusEl.className = "vmx-cohost__status";
   statusEl.dataset.state = status;

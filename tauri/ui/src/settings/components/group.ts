@@ -1,14 +1,10 @@
-/* Phase 12 Wave 4 — settings drawer group wrapper (Plan 12-05 §3).
+/* Settings drawer group wrapper.
  *
  * A "group" is one labelled section inside the slide-over drawer
- * (PERSONA, OUTPUT, HOTKEY, RECORDING, CALIBRATION). Visually it's a
- * subdued panel: Workbench 9px UPPERCASE header strip + body with
- * `--sp-md` internal padding.
- *
- * It is NOT a full `vmx-panel` — the drawer is already a single panel
- * surface (the slide-over) and stacking another brushed-metal `::before`
- * inside it would look noisy. So this is a thinner wrapper that mirrors
- * the panel header glyphs without the metal streak.
+ * (PERSONA, OUTPUT, HOTKEY, RECORDING, CALIBRATION, MASCOT). Visually a
+ * subdued v5 plate — glass-2 backdrop with silkscreen Saira header,
+ * glass-edge hairline, no streak (the drawer is already one big glass
+ * surface; stacking sheens inside it reads noisy).
  *
  * Pure-function — accepts {header, children, badge?, footer?} and returns
  * an HTMLElement. No state.
@@ -28,52 +24,62 @@ export interface SettingsGroupProps {
 const CSS = `
   .vmx-settings-group {
     position: relative;
-    background: linear-gradient(180deg, var(--panel-lift) 0%, var(--panel) 100%);
-    border: 1px solid var(--bezel-1);
-    border-radius: 6px;
+    background: var(--glass-2);
+    backdrop-filter: var(--blur-glass-display);
+    -webkit-backdrop-filter: var(--blur-glass-display);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-md);
     overflow: hidden;
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.03),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+      inset 0 1px 0 var(--glass-top),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+      0 6px 20px rgba(0, 0, 0, 0.35);
   }
   .vmx-settings-group__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--sp-md);
-    padding: var(--sp-sm) var(--sp-md);
-    border-bottom: 1px dashed var(--bezel-2);
-    font-family: "Workbench", "Courier New", monospace;
+    gap: var(--sp-3);
+    padding: 10px var(--sp-4);
+    border-bottom: 1px solid var(--glass-edge);
+    background: rgba(0, 0, 0, 0.25);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 9px;
-    letter-spacing: 0.32em;
+    letter-spacing: 0.28em;
     text-transform: uppercase;
-    color: var(--ink);
+    color: var(--silk);
     line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .vmx-settings-group__badge {
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-mono);
     font-size: 9px;
-    letter-spacing: 0.32em;
-    padding: 2px var(--sp-sm);
-    border-radius: 2px;
-    background: var(--phosphor-soft);
-    color: var(--phosphor);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 2px var(--sp-2);
+    border-radius: var(--rad-sm);
+    background: rgba(255, 138, 61, 0.08);
+    border: 1px solid var(--amber-22);
+    color: var(--amber);
     line-height: 1;
+    text-shadow: 0 0 4px var(--amber-22);
   }
   .vmx-settings-group__body {
-    padding: var(--sp-md);
+    padding: var(--sp-4);
     display: flex;
     flex-direction: column;
-    gap: var(--sp-md);
+    gap: var(--sp-3);
   }
   .vmx-settings-group__footer {
-    padding: var(--sp-sm) var(--sp-md);
-    border-top: 1px dashed var(--bezel-2);
-    background: var(--panel-deep);
-    font-family: "DM Mono", monospace;
+    padding: 8px var(--sp-4);
+    border-top: 1px solid rgba(212, 65, 58, 0.25);
+    background: rgba(212, 65, 58, 0.05);
+    font-family: var(--type-mono);
     font-size: 11px;
-    color: var(--rec);
-    line-height: 1.3;
+    color: var(--led-fault);
+    line-height: 1.35;
+    text-shadow: 0 0 4px rgba(212, 65, 58, 0.18);
   }
 `;
 
