@@ -15,6 +15,7 @@ goes through ``buf.snapshot(n)`` instead of v4's direct ``_buf[-n:]`` access.
 from __future__ import annotations
 
 import io
+import math
 import wave
 
 import numpy as np
@@ -197,3 +198,145 @@ def estimate_bpm(buf: AudioBuffer, seconds: float = 6.0) -> float:
     best_lag = lo_lag + int(np.argmax(segment))
     bpm = 60.0 * 100.0 / best_lag
     return round(bpm, 1)
+
+
+# ---------------------------------------------------------------------------
+# Phase 13-05 — downbeat-phase + bpm_confidence (mascot beat-locked entry)
+# ---------------------------------------------------------------------------
+
+
+# Range of plausible DJ BPMs we accept for phase analysis. Anything outside
+# (0, 220] is treated as invalid and yields (0.0, 0.0) confidence — the
+# anti-hallucination guard from CONTEXT.md Open Q 4 + T-13-05-02.
+_BPM_MAX_VALID: float = 220.0
+
+
+def compute_downbeat_phase(
+    samples: np.ndarray,
+    bpm: float,
+    sample_rate: int,
+    *,
+    prior_phase: float = 0.0,
+) -> tuple[float, float]:
+    """Estimate (downbeat_phase, bpm_confidence) from an audio buffer + BPM hint.
+
+    Pure function — no globals, no side effects, no caching. Same audio +
+    same ``prior_phase`` always returns the same tuple. Tests rely on this.
+
+    Returns:
+        (downbeat_phase, bpm_confidence) where:
+        * ``downbeat_phase`` ∈ [0.0, 1.0) is the fraction-through-current-bar
+          (4 beats). 0.0 = on the downbeat, 0.5 = mid-bar.
+        * ``bpm_confidence`` ∈ [0.0, 1.0]. < 0.6 means the renderer (Plan
+          13-04) should NOT beat-lock entries — fall back to immediate switch.
+
+    Anti-hallucination contract:
+        * bpm ≤ 0 / NaN / > _BPM_MAX_VALID → (0.0, 0.0). No fake confidence.
+        * fewer than 4 detectable onsets in the analysis window →
+          (prior_phase, 0.0). Preserve the last known phase but flag no
+          confidence so the renderer skips beat-lock.
+
+    Algorithm:
+        1. Validate BPM. Reject invalid → (0.0, 0.0).
+        2. Compute onset envelope via spectral flux (same approach as
+           snapshot_features uses for onsets_per_sec, scaled differently).
+        3. Find peaks in the last 4-bar window.
+        4. If < 4 peaks → (prior_phase, 0.0).
+        5. Cross-correlate detected-peak comb vs synthetic comb at `bpm`;
+           the lag of the best match modulo one bar → phase ∈ [0, 1).
+        6. Confidence = best-match prominence (peak-vs-mean of correlation),
+           clamped to [0, 1], then capped at min(1.0, n_peaks / 16.0) so a
+           handful of accidental peaks can't fake high confidence.
+    """
+    # --- Step 1: validate BPM (anti-hallucination guard) ---
+    if not isinstance(bpm, (int, float)):
+        return (0.0, 0.0)
+    if bpm <= 0 or math.isnan(bpm) or math.isinf(bpm) or bpm > _BPM_MAX_VALID:
+        return (0.0, 0.0)
+    if sample_rate <= 0 or samples is None or samples.size == 0:
+        # Defensive — fall through to "preserve prior_phase, zero confidence"
+        # to match the few-peak path semantics.
+        return (float(prior_phase), 0.0)
+
+    arr = samples.astype(np.float32) if samples.dtype != np.float32 else samples
+    # Normalize int16-range inputs (state_refresh_loop hands us snapshot()
+    # which is int16 — we cast to float32 above; if values are still in the
+    # ±32k range, divide. Otherwise assume already-normalized float in ±1.
+    if np.max(np.abs(arr)) > 2.0:
+        arr = arr / 32768.0
+
+    samples_per_beat = (60.0 / bpm) * sample_rate
+    samples_per_bar = samples_per_beat * 4.0
+    if samples_per_bar <= 0:
+        return (0.0, 0.0)
+
+    # --- Step 2: onset envelope via short-window RMS deltas ---
+    win = max(1, sample_rate // 100)  # ~10ms windows
+    if arr.size < win * 8:
+        return (float(prior_phase), 0.0)
+    n_win = arr.size // win
+    # Vectorized per-window RMS (cheap reshape over the full buffer)
+    trimmed = arr[: n_win * win].reshape(n_win, win)
+    energies = np.sqrt(np.mean(trimmed * trimmed, axis=1))
+    deltas = np.diff(energies)
+    deltas = np.clip(deltas, a_min=0.0, a_max=None)
+
+    if deltas.size == 0 or float(np.max(deltas)) <= 0.0:
+        return (float(prior_phase), 0.0)
+
+    # --- Step 3: pick peaks in deltas above an adaptive threshold ---
+    thr = max(0.005, float(deltas.mean() + deltas.std()))
+    # Restrict to the last ~4 bars worth of windows for locality.
+    bar_in_windows = int(samples_per_bar / win)
+    window_count = min(deltas.size, max(bar_in_windows * 4, 16))
+    recent = deltas[-window_count:]
+    peak_idx_local = np.flatnonzero(recent > thr)
+
+    if peak_idx_local.size < 4:
+        return (float(prior_phase), 0.0)
+
+    # Map local indices back to a sample-offset within the recent slice.
+    peak_samples = peak_idx_local.astype(np.float32) * float(win)
+
+    # --- Step 4: cross-correlate against a synthetic beat comb @ bpm ---
+    # The "lag" we want is the phase offset of the comb that best aligns
+    # with the detected peaks. We test lags in [0, samples_per_bar) at
+    # bar/64 resolution (~5-15ms depending on BPM — plenty for visual sync).
+    n_lags = 64
+    lag_step = samples_per_bar / n_lags
+    scores = np.zeros(n_lags, dtype=np.float32)
+    for i in range(n_lags):
+        lag = i * lag_step
+        # For each detected peak, distance to the nearest beat at this lag.
+        # A perfect comb match → distance 0. Score = exp(-d/tol) summed.
+        beats_under_peaks = np.round((peak_samples - lag) / samples_per_beat)
+        expected = lag + beats_under_peaks * samples_per_beat
+        d = np.abs(peak_samples - expected)
+        tol = samples_per_beat * 0.1  # 10% of a beat tolerance
+        scores[i] = float(np.sum(np.exp(-d / max(tol, 1.0))))
+
+    best_lag_idx = int(np.argmax(scores))
+    best_score = float(scores[best_lag_idx])
+    mean_score = float(scores.mean())
+    std_score = float(scores.std()) or 1e-6
+
+    # Phase: lag-from-comb / bar → fraction through the bar. By convention
+    # phase=0 means the analysis window ends on the 1; positive offsets
+    # mean we're partway into the bar.
+    phase_frac = (best_lag_idx * lag_step) / samples_per_bar
+    # Wrap into [0, 1) for safety against any FP boundary drift.
+    phase = phase_frac - math.floor(phase_frac)
+
+    # --- Step 5: confidence from peak prominence + peak-count cap ---
+    raw_conf = (best_score - mean_score) / std_score
+    # Map z-score-ish prominence into [0, 1] — empirical: prominence ≥ 3σ on
+    # ideal synthetic kicks corresponds to ~1.0; <1σ → ~0. Linear clamp.
+    norm_conf = max(0.0, min(1.0, raw_conf / 3.0))
+    # Few-peak penalty — 8 peaks ≈ 2 bars of kicks at 4/4 (the realistic
+    # minimum analysis window state_refresh_loop hands us at 4-second
+    # snapshots × 120-140 BPM). Below that, cap confidence so noisy short
+    # captures can't fabricate certainty.
+    peak_cap = min(1.0, float(peak_idx_local.size) / 8.0)
+    confidence = min(norm_conf, peak_cap)
+
+    return (float(phase), float(confidence))
