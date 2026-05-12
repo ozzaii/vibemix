@@ -7,11 +7,14 @@
  *
  * Pipeline per asset:
  *   character.glb  → gltf-pipeline Draco compress (keeps mesh + texture)
- *   animation*.glb → gltf-transform prune + dedup (drops mesh/material/texture,
- *                    keeps skeleton + animation tracks) → gltf-pipeline Draco
+ *   animation*.glb → programmatic strip via @gltf-transform/core
+ *                    (drops Mesh/Material/Texture/Image, detaches mesh refs
+ *                     from Nodes, keeps Skin/Skeleton + Animation tracks) →
+ *                    NodeIO write
  *
- * Idempotent — gltf-pipeline + gltf-transform are deterministic given the same
- * Node version. Re-running on already-built output produces byte-identical files.
+ * The pipeline is idempotent — gltf-pipeline is deterministic; the programmatic
+ * strip writes the same byte layout every time. Re-running on already-built
+ * output produces byte-identical files.
  *
  * Source files live OUTSIDE the repo (Kaan-local Downloads) and are NOT committed.
  * Maintainers run `npm run build:mascot` manually when refreshing Meshy assets;
@@ -23,13 +26,18 @@
  *               --draco.quantizePositionBits 14
  *               --draco.quantizeNormalBits 10
  *               --draco.quantizeTexcoordBits 12
- *   Animations: gltf-transform prune + dedup → gltf-pipeline --draco.compressionLevel 10
+ *   Animations: programmatic strip (Mesh/Material/Texture/Image removed,
+ *               mesh attribute cleared from skinned Nodes, Skin + Animation
+ *               kept) → written without Draco (animation buffers are small;
+ *               Draco on skeleton+anim has marginal gain and adds load-time
+ *               cost). Compression headroom comes from mesh+texture removal.
  *
  * Final bundle size: see tauri/ui/assets/mascot/MANIFEST.md
  * --------------------------------------------------------------------
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
+import { NodeIO } from "@gltf-transform/core";
+import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -37,17 +45,14 @@ import {
   rmSync,
   statSync,
   writeFileSync,
-  readFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const UI_ROOT = resolve(__dirname, "..");
-const REPO_ROOT = resolve(UI_ROOT, "..", "..");
 const OUT_DIR = resolve(UI_ROOT, "assets", "mascot");
 const OUT_ANIM_DIR = resolve(OUT_DIR, "animations");
-const TMP_DIR = resolve(UI_ROOT, ".mascot-build-tmp");
 
 const SRC_DIR = process.env.MESHY_SRC_DIR
   || "/Users/ozai/Downloads/Meshy_AI_Neon_Rebel_biped";
@@ -84,7 +89,7 @@ const ANIMATIONS = [
 const SRC_PREFIX = "Meshy_AI_Neon_Rebel_biped_";
 const SRC_SUFFIX = "_withSkin.glb";
 
-// Compression knob set — locked default. Task 2 may downgrade if bundle exceeds cap.
+// Character compression — Draco knobs locked.
 const DRACO_FLAGS = {
   compressionLevel: 10,
   quantizePositionBits: 14,
@@ -126,9 +131,7 @@ function ensureSrcDir() {
 function resetOutputDirs() {
   // Wipe to keep idempotency guaranteed — same inputs + tools = same outputs.
   if (existsSync(OUT_DIR)) rmSync(OUT_DIR, { recursive: true, force: true });
-  if (existsSync(TMP_DIR)) rmSync(TMP_DIR, { recursive: true, force: true });
   mkdirSync(OUT_ANIM_DIR, { recursive: true });
-  mkdirSync(TMP_DIR, { recursive: true });
 }
 
 function resolveBin(name) {
@@ -166,26 +169,88 @@ function compressCharacter() {
   ]);
 }
 
-function processAnimation(anim) {
+async function stripAnimationGLB(srcPath, dstPath, clipName) {
+  // Programmatic strip via @gltf-transform/core:
+  //   - clear each Node's mesh reference (so the scene no longer renders meshes)
+  //   - delete every Mesh, Material, Texture, TextureInfo
+  //   - keep Skin (skeleton inverseBindMatrices, joint list) + Animation channels
+  //   - run dispose() chain — accessors/buffers/images orphaned by removal go away
+  //
+  // Output: a single GLB that carries only the armature node graph + animation
+  // tracks. Three.js loads it via GLTFLoader and we attach the AnimationClip
+  // to the character mesh's skeleton via SkeletonUtils.retargetClip (Plan 13-04).
+  const io = new NodeIO();
+  const doc = await io.read(srcPath);
+  const root = doc.getRoot();
+
+  // 1. Detach mesh from every node.
+  for (const node of root.listNodes()) {
+    if (node.getMesh()) node.setMesh(null);
+  }
+
+  // 2. Remove all meshes (and their primitives + accessors + indices).
+  for (const mesh of root.listMeshes()) {
+    for (const prim of mesh.listPrimitives()) prim.dispose();
+    mesh.dispose();
+  }
+
+  // 3. Remove all materials.
+  for (const mat of root.listMaterials()) mat.dispose();
+
+  // 4. Remove all textures.
+  for (const tex of root.listTextures()) tex.dispose();
+
+  // 5. Reduce animation list to the single canonical clip.
+  //    Meshy animation GLBs usually carry one Animation already, but if multiple
+  //    are exported (e.g., an "Idle" + the named clip), keep only the longest.
+  const anims = root.listAnimations();
+  if (anims.length === 0) {
+    throw new Error(`no Animation tracks found in ${srcPath}`);
+  }
+  if (anims.length > 1) {
+    // Find by name first; fall back to longest by sum of input accessor max.
+    let chosen = anims.find((a) => a.getName() === clipName);
+    if (!chosen) {
+      let bestLen = -1;
+      for (const a of anims) {
+        const len = a.listChannels().reduce((acc, c) => {
+          const s = c.getSampler();
+          const inp = s ? s.getInput() : null;
+          return acc + (inp ? inp.getCount() : 0);
+        }, 0);
+        if (len > bestLen) { bestLen = len; chosen = a; }
+      }
+    }
+    for (const a of anims) {
+      if (a !== chosen) a.dispose();
+    }
+    chosen.setName(clipName);
+  } else {
+    anims[0].setName(clipName);
+  }
+
+  // 6. Strip any unused accessors / buffer views / images / extensions.
+  //    Conservative — only drops what nothing references anymore.
+  const orphanCleanup = (list, label) => {
+    for (const item of list) {
+      const links = item.listParents().filter((p) => p.propertyType !== "Root");
+      if (links.length === 0) {
+        item.dispose();
+      }
+    }
+    log(`  pruned orphans (${label}): ${list.length}`);
+  };
+  orphanCleanup(root.listAccessors(), "accessors");
+
+  // 7. Write the stripped GLB.
+  await io.write(dstPath, doc);
+}
+
+async function processAnimation(anim) {
   const src = join(SRC_DIR, `${SRC_PREFIX}${anim.src}${SRC_SUFFIX}`);
-  const stripped = join(TMP_DIR, `stripped_${anim.out}`);
   const dst = join(OUT_ANIM_DIR, anim.out);
   log(`anim ${anim.clip} → ${dst}`);
-
-  // Step 1: strip mesh/material/texture (animations only need skeleton + tracks).
-  //   `prune` drops unused nodes; `dedup` collapses duplicate accessors/buffers.
-  // Run as a pipeline: gltf-transform supports chained subcommands via repeated invocations.
-  runCli("gltf-transform", ["prune", src, stripped, "--keep-attributes", "false"]);
-  // Re-run dedup on the stripped file to collapse anything `prune` exposed.
-  runCli("gltf-transform", ["dedup", stripped, stripped]);
-
-  // Step 2: Draco-compress the residual buffer (animation tracks compress hard).
-  runCli("gltf-pipeline", [
-    "-i", stripped,
-    "-o", dst,
-    "-d",
-    `--draco.compressionLevel=${DRACO_FLAGS.compressionLevel}`,
-  ]);
+  await stripAnimationGLB(src, dst, anim.clip);
 }
 
 function writeManifest() {
@@ -248,21 +313,21 @@ function enforceBundleCap() {
   }
 }
 
-function cleanupTmp() {
-  if (existsSync(TMP_DIR)) rmSync(TMP_DIR, { recursive: true, force: true });
-}
-
-function main() {
+async function main() {
   log(`source: ${SRC_DIR}`);
   log(`out:    ${OUT_DIR}`);
   ensureSrcDir();
   resetOutputDirs();
   compressCharacter();
-  for (const anim of ANIMATIONS) processAnimation(anim);
+  for (const anim of ANIMATIONS) {
+    await processAnimation(anim);
+  }
   writeManifest();
   enforceBundleCap();
-  cleanupTmp();
   log("done.");
 }
 
-main();
+main().catch((err) => {
+  process.stderr.write(`[build-mascot] FATAL: ${err.stack || err.message || err}\n`);
+  process.exit(1);
+});
