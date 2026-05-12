@@ -1,0 +1,280 @@
+{
+  "_meta": {
+    "phase": "13-3d-mascot-overlay",
+    "plan": "08",
+    "purpose": "Deterministic event-trace fixtures covering the AI-event taxonomy from 13-CONTEXT.md Area 3. Replayed by both vitest (state-machine-fixtures.test.ts) and pytest (tests/integration/test_mascot_event_taxonomy_e2e.py) so the dispatcher + state-machine contract is pinned across the JS/Py boundary.",
+    "source-of-truth": "Generated 2026-05-12 from CONTEXT.md Area 3 event-mapping table",
+    "tolerance_ms": 100,
+    "covers_criteria": [2, 3, 4, 5, 6]
+  },
+  "traces": [
+    {
+      "name": "track_change_then_idle",
+      "criterion": 5,
+      "description": "AI event → animation state mapping covers: track_change → react_surprised → idle_bop_to_beat. Using low bpm_confidence so the followup falls through to switch_now (avoids re-scheduling on the followup leg).",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "music": { "rms": 0.3, "peak": 0.5 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": true,
+            "deck": "A",
+            "phase": "groove",
+            "bpm": 128,
+            "bpm_confidence": 0.4,
+            "downbeat_phase": 0.0,
+            "mood": "hype-man"
+          }
+        },
+        {
+          "t": 100,
+          "msg": {
+            "type": "event",
+            "subtype": "TRACK_CHANGE",
+            "payload": { "title": "Two", "deck": "B" }
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 100, "state": "react_surprised" },
+        { "after_t": 900, "state": "idle_bop_to_beat_energetic" }
+      ]
+    },
+    {
+      "name": "drop_then_groove",
+      "criterion": 5,
+      "description": "PHASE → drop produces dance_hard; PHASE → groove returns to idle_bop_to_beat. downbeat_phase=0.99 keeps both transitions inside the 30ms proximity-threshold so they fall through to switch_now (testing the event-mapping contract, not the beat-lock math which is tested separately in beat_locked_entry_at_high_confidence).",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "phase": "build",
+            "bpm": 128,
+            "bpm_confidence": 0.85,
+            "downbeat_phase": 0.99,
+            "mood": "hype-man",
+            "music": { "rms": 0.4, "peak": 0.6 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": true,
+            "deck": "A"
+          }
+        },
+        {
+          "t": 500,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "build", "to": "drop" }
+          }
+        },
+        {
+          "t": 30000,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "drop", "to": "groove" }
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 500, "state": "dance_hard" },
+        { "after_t": 30000, "state": "idle_bop_to_beat_energetic" }
+      ]
+    },
+    {
+      "name": "ai_speaks_then_done",
+      "criterion": 5,
+      "description": "AI_GENERATING_REPLY → talk_loop; AI_REPLY_DONE → react_yes → previous idle/dance",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "phase": "groove",
+            "bpm": 128,
+            "bpm_confidence": 0.85,
+            "downbeat_phase": 0.5,
+            "mood": "hype-man",
+            "music": { "rms": 0.3, "peak": 0.5 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": true,
+            "deck": "A"
+          }
+        },
+        {
+          "t": 100,
+          "msg": { "type": "event", "subtype": "AI_GENERATING_REPLY", "payload": {} }
+        },
+        {
+          "t": 3500,
+          "msg": { "type": "event", "subtype": "AI_REPLY_DONE", "payload": {} }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 100, "state": "talk_loop" },
+        { "after_t": 3500, "state": "react_yes" }
+      ]
+    },
+    {
+      "name": "manual_fire_react",
+      "criterion": 5,
+      "description": "MANUAL → react_yes (manual fire from tray menu or hotkey)",
+      "messages": [
+        {
+          "t": 0,
+          "msg": { "type": "event", "subtype": "MANUAL", "payload": {} }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 0, "state": "react_yes" }
+      ]
+    },
+    {
+      "name": "silent_phase",
+      "criterion": 5,
+      "description": "PHASE → silent maps to idle_breathe",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "groove", "to": "silent" }
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 0, "state": "idle_breathe" }
+      ]
+    },
+    {
+      "name": "mood_swap_teacher",
+      "criterion": 6,
+      "description": "ipc.mascot.mood_change → puff_particle (mood swap masked by particle/puff). The dispatcher emits a followup `idle_breathe @ 500ms` as data, but state-machine.ts's block rule denies idle_breathe (priority 20) while puff_particle (effect, priority 100) is active — that's correct, the renderer handles the puff→idle exit when the effect clip naturally completes. This trace asserts the dispatcher's initial transition only; the renderer-side puff-exit is verified manually in MANUAL-SMOKE-CHECKLIST items #18 and #29.",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "ipc.mascot.mood_change",
+            "payload": { "mood": "teacher", "previous_mood": "hype-man" }
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 0, "state": "puff_particle" }
+      ]
+    },
+    {
+      "name": "talk_blocks_dance",
+      "criterion": 5,
+      "description": "Priority order: talk_loop (80) outranks dance (40) — PHASE→drop request DURING talk is denied; mascot stays in talk_loop",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "phase": "build",
+            "bpm": 128,
+            "bpm_confidence": 0.85,
+            "downbeat_phase": 0.5,
+            "mood": "hype-man",
+            "music": { "rms": 0.3, "peak": 0.5 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": true,
+            "deck": "A"
+          }
+        },
+        {
+          "t": 50,
+          "msg": { "type": "event", "subtype": "AI_GENERATING_REPLY", "payload": {} }
+        },
+        {
+          "t": 200,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "build", "to": "drop" }
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 50, "state": "talk_loop" }
+      ]
+    },
+    {
+      "name": "beat_locked_entry_at_high_confidence",
+      "criterion": 4,
+      "description": "Beat-locked entry: dance/idle targets with bpm_confidence ≥ 0.6 schedule for next downbeat; PHASE→drop at conf=0.85 schedules-for-downbeat",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "phase": "build",
+            "bpm": 120,
+            "bpm_confidence": 0.85,
+            "downbeat_phase": 0.5,
+            "mood": "hype-man",
+            "music": { "rms": 0.3, "peak": 0.5 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": true,
+            "deck": "A"
+          }
+        },
+        {
+          "t": 100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "build", "to": "drop" }
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 1100, "state": "dance_hard" }
+      ]
+    },
+    {
+      "name": "low_confidence_immediate_switch",
+      "criterion": 4,
+      "description": "Beat-lock fallback: bpm_confidence < 0.6 falls through to switch_now — dance_hard fires immediately on PHASE→drop",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "phase": "build",
+            "bpm": 120,
+            "bpm_confidence": 0.4,
+            "downbeat_phase": 0.5,
+            "mood": "hype-man",
+            "music": { "rms": 0.3, "peak": 0.5 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": true,
+            "deck": "A"
+          }
+        },
+        {
+          "t": 100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "build", "to": "drop" }
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 100, "state": "dance_hard" }
+      ]
+    }
+  ]
+}
