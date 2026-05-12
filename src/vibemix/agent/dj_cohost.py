@@ -61,25 +61,38 @@ SILENCE_TOKEN = "<silence/>"
 # Env-var names — public contract, surfaced in CLI / Settings UI in Phase 11/12.
 ENV_SKILL_LEVEL = "VIBEMIX_SKILL_LEVEL"
 ENV_MODE = "VIBEMIX_MODE"
+# Phase 13-05 — mood persona env override. Default "hype-man" preserves
+# Phase 10 backward compat (the byte-identical-to-v4 invariant) — the
+# Coach prompt template renders the mood only for COACH cells.
+ENV_MOOD = "VIBEMIX_MOOD"
 
 # Defaults — preserve Phase 4 v4 behavior for callers that don't set env vars.
 DEFAULT_SKILL_LEVEL = "intermediate"
 DEFAULT_MODE = "hype"
+DEFAULT_MOOD = "hype-man"
 
 
-def _resolve_prompt_cell() -> str:
+def _resolve_prompt_cell(mood: str | None = None) -> str:
     """Read the env vars and dispatch to the right matrix cell.
 
     Re-evaluated per ``DJCoHostAgent`` instantiation (no module-level
     caching) so unit tests can monkeypatch and Settings UI can hot-swap
     by re-instantiating the agent (Phase 11/12).
 
-    Raises ``ValueError`` on unknown skill or mode (fail loud — silent
-    fallback would mask env-var typos).
+    Args:
+        mood: Phase 13-05 mood override. When None (default), reads
+            ``VIBEMIX_MOOD`` env var, falling back to ``"hype-man"``. A
+            non-None ``mood`` arg wins over the env var (used by Plan
+            13-06's agent-rebuild-on-mood-change path).
+
+    Raises ``ValueError`` on unknown skill, mode, or mood (fail loud —
+    silent fallback would mask env-var typos).
     """
     skill = os.environ.get(ENV_SKILL_LEVEL, DEFAULT_SKILL_LEVEL)
     mode = os.environ.get(ENV_MODE, DEFAULT_MODE)
-    return build_system_instruction(skill, mode)
+    if mood is None:
+        mood = os.environ.get(ENV_MOOD, DEFAULT_MOOD)
+    return build_system_instruction(skill, mode, mood)
 
 
 class DJCoHostAgent(Agent):
@@ -105,7 +118,11 @@ class DJCoHostAgent(Agent):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
         # text-only fallback path. We pass the matrix-resolved cell here.
-        prompt_body = _resolve_prompt_cell()
+        # Phase 13-05: prefer the live MusicState.mood over the env-var
+        # default so a mood-swap before agent build is honored. Plan 13-06
+        # is responsible for re-instantiating the agent on subsequent swaps.
+        live_mood = getattr(state, "mood", None)
+        prompt_body = _resolve_prompt_cell(mood=live_mood)
         super().__init__(
             instructions=prompt_body,
             llm=llm_inst,
