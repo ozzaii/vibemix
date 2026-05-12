@@ -1,4 +1,4 @@
-//! Phase 11 Wave 2 — first-run state persistence.
+//! Phase 11 Wave 2 — first-run state persistence (Phase 13 Plan 02 extends with mascot window state).
 //!
 //! Wraps `tauri-plugin-store` so the wizard can read/write
 //! `~/Library/Application Support/vibemix/config.json` (macOS) or
@@ -8,12 +8,24 @@
 //!
 //! Wave 4 wires the actual write paths; Wave 2 just publishes the
 //! commands so the capability allowlist locks now.
+//!
+//! ## Phase 13 Plan 02 — Mascot window state
+//!
+//! A second top-level key `mascot_window` stores the overlay window's
+//! geometry, visibility, and click-through bool. Defaults match
+//! 13-CONTEXT Open Q 1: `visible: true` (mascot shown on first launch)
+//! and `click_through: false` (drag-positionable, NOT click-through).
+//! Position fields are `Option<i32>` because first launch has no saved
+//! position — `mascot_window.rs` picks a default top-right offset.
 
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 const STORE_PATH: &str = "config.json";
 const KEY_FIRST_RUN_STATE: &str = "first_run_state";
+const KEY_MASCOT_WINDOW: &str = "mascot_window";
+
+const MASCOT_WINDOW_LABEL: &str = "mascot";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FirstRunState {
@@ -24,6 +36,37 @@ pub struct FirstRunState {
     pub target_dj_app_hint: Option<String>,
     pub target_window_id: Option<String>,
     pub blackhole_install_seen: bool,
+}
+
+/// Persisted overlay window state. `x`/`y`/`width`/`height` are `Option`
+/// so first-launch (no saved position) is distinguishable from saved
+/// `0,0` — `mascot_window::create_mascot_window` substitutes a top-right
+/// default offset when these are `None`.
+///
+/// Defaults per 13-CONTEXT Open Q 1:
+///   - `visible: true` (mascot is shown on first launch)
+///   - `click_through: false` (drag-positionable; click-through is opt-in via Settings)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MascotWindowState {
+    pub x: Option<i32>,
+    pub y: Option<i32>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub visible: bool,
+    pub click_through: bool,
+}
+
+impl Default for MascotWindowState {
+    fn default() -> Self {
+        MascotWindowState {
+            x: None,
+            y: None,
+            width: None,
+            height: None,
+            visible: true,
+            click_through: false,
+        }
+    }
 }
 
 /// Returns true when no `first_run_state` is recorded or when its
@@ -62,6 +105,36 @@ fn save_state(app: &AppHandle, state: &FirstRunState) -> Result<(), String> {
     Ok(())
 }
 
+/// Read the persisted `MascotWindowState`. Returns defaults when the key
+/// is absent (first launch).
+pub fn load_mascot_state(app: &AppHandle) -> Result<MascotWindowState, String> {
+    use tauri_plugin_store::StoreExt;
+    let store = app
+        .store(STORE_PATH)
+        .map_err(|e| format!("store init failed: {e}"))?;
+    match store.get(KEY_MASCOT_WINDOW) {
+        Some(value) => serde_json::from_value(value.clone())
+            .map_err(|e| format!("decode failed: {e}")),
+        None => Ok(MascotWindowState::default()),
+    }
+}
+
+/// Persist the `MascotWindowState`. Called from the debounced
+/// `WindowEvent::Moved`/`Resized` handler in `mascot_window.rs` AND from
+/// the `set_mascot_visible` / `set_mascot_click_through` commands.
+pub fn save_mascot_state(app: &AppHandle, state: &MascotWindowState) -> Result<(), String> {
+    use tauri_plugin_store::StoreExt;
+    let store = app
+        .store(STORE_PATH)
+        .map_err(|e| format!("store init failed: {e}"))?;
+    let value = serde_json::to_value(state).map_err(|e| format!("encode failed: {e}"))?;
+    store.set(KEY_MASCOT_WINDOW, value);
+    store
+        .save()
+        .map_err(|e| format!("store save failed: {e}"))?;
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn read_first_run_state(app: AppHandle) -> Result<FirstRunState, String> {
     load_state(&app)
@@ -73,4 +146,112 @@ pub async fn write_first_run_state(
     state: FirstRunState,
 ) -> Result<(), String> {
     save_state(&app, &state)
+}
+
+#[tauri::command]
+pub async fn read_mascot_window_state(app: AppHandle) -> Result<MascotWindowState, String> {
+    load_mascot_state(&app)
+}
+
+#[tauri::command]
+pub async fn write_mascot_window_state(
+    app: AppHandle,
+    state: MascotWindowState,
+) -> Result<(), String> {
+    save_mascot_state(&app, &state)
+}
+
+/// Toggle mascot window visibility. Updates the persisted state AND
+/// calls `show()`/`hide()` on the live "mascot" window if it exists.
+///
+/// The tray's left-click handler is the primary caller; the webview
+/// Settings drawer (Plan 13-03) also invokes this.
+#[tauri::command]
+pub async fn set_mascot_visible(app: AppHandle, visible: bool) -> Result<(), String> {
+    let mut state = load_mascot_state(&app)?;
+    state.visible = visible;
+    save_mascot_state(&app, &state)?;
+
+    if let Some(window) = app.get_webview_window(MASCOT_WINDOW_LABEL) {
+        if visible {
+            window.show().map_err(|e| format!("show failed: {e}"))?;
+        } else {
+            window.hide().map_err(|e| format!("hide failed: {e}"))?;
+        }
+    }
+    // If the window doesn't exist yet (e.g. first toggle after a hidden
+    // launch where create_mascot_window early-returned), the visible
+    // flag still persists — next app launch will build the window.
+    Ok(())
+}
+
+/// Toggle ignore-cursor-events on the mascot window. When `true`, the
+/// mascot becomes click-through (mouse events pass to the window
+/// underneath). Drag-handle UX in Plan 13-04 owns a non-click-through
+/// zone for the user to drag the mascot even when click-through is on.
+#[tauri::command]
+pub async fn set_mascot_click_through(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut state = load_mascot_state(&app)?;
+    state.click_through = enabled;
+    save_mascot_state(&app, &state)?;
+
+    if let Some(window) = app.get_webview_window(MASCOT_WINDOW_LABEL) {
+        window
+            .set_ignore_cursor_events(enabled)
+            .map_err(|e| format!("set_ignore_cursor_events failed: {e}"))?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mascot_window_state_defaults_match_context_open_q1() {
+        // 13-CONTEXT Open Q 1: click-through OFF default + mascot visible on first launch.
+        let s = MascotWindowState::default();
+        assert!(s.visible, "mascot must be visible on first launch");
+        assert!(!s.click_through, "click-through must be OFF default (draggable)");
+        assert!(s.x.is_none() && s.y.is_none(), "no saved position on first launch");
+        assert!(s.width.is_none() && s.height.is_none(), "no saved size on first launch");
+    }
+
+    #[test]
+    fn mascot_window_state_roundtrips_via_serde_json() {
+        let s = MascotWindowState {
+            x: Some(1200),
+            y: Some(80),
+            width: Some(300),
+            height: Some(400),
+            visible: true,
+            click_through: false,
+        };
+        let json = serde_json::to_value(&s).unwrap();
+        let back: MascotWindowState = serde_json::from_value(json).unwrap();
+        assert_eq!(back.x, Some(1200));
+        assert_eq!(back.y, Some(80));
+        assert_eq!(back.width, Some(300));
+        assert_eq!(back.height, Some(400));
+        assert!(back.visible);
+        assert!(!back.click_through);
+    }
+
+    #[test]
+    fn mascot_window_state_decodes_legacy_missing_fields_as_defaults() {
+        // Forward-compat: a config.json written by a future build with extra
+        // fields must still decode here (serde_json ignores unknown keys by
+        // default). A config written without optional fields must default.
+        let raw = serde_json::json!({
+            "visible": true,
+            "click_through": false
+        });
+        let s: MascotWindowState = serde_json::from_value(raw).unwrap();
+        assert_eq!(s.x, None);
+        assert_eq!(s.width, None);
+        assert!(s.visible);
+    }
 }

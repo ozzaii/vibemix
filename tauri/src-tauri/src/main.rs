@@ -19,8 +19,10 @@
 
 mod config;
 mod hotkey;
+mod mascot_window;
 mod permissions;
 mod sidecar;
+mod tray;
 mod ws_client;
 
 use std::fs;
@@ -29,6 +31,7 @@ use tauri::Manager;
 
 use crate::hotkey::HotkeyHandle;
 use crate::sidecar::SidecarHandle;
+use crate::tray::TrayHandle;
 use crate::ws_client::WsClientHandle;
 
 fn main() {
@@ -44,12 +47,19 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Phase 12 Wave 3 — push-to-mute global shortcut.
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        // Eight webview-callable commands (capability allowlist mirrors).
+        // Twelve webview-callable commands (capability allowlist mirrors).
+        // Phase 13 Plan 02 adds 4 mascot commands:
+        //   read_mascot_window_state, write_mascot_window_state,
+        //   set_mascot_visible, set_mascot_click_through
         .invoke_handler(tauri::generate_handler![
             ws_client::forward_ipc_to_sidecar,
             sidecar::restart_sidecar,
             config::read_first_run_state,
             config::write_first_run_state,
+            config::read_mascot_window_state,
+            config::write_mascot_window_state,
+            config::set_mascot_visible,
+            config::set_mascot_click_through,
             permissions::open_screen_recording_settings,
             permissions::open_microphone_settings,
             permissions::request_microphone_permission,
@@ -58,6 +68,12 @@ fn main() {
         .manage(SidecarHandle::default())
         .manage(WsClientHandle::default())
         .manage(HotkeyHandle::default())
+        .manage(TrayHandle::default())
+        // Phase 13 Plan 02 — lifecycle override. Closing the main session
+        // window hides it instead of quitting the process; only the tray
+        // `Quit vibemix` item kills the app. The mascot window has no
+        // decorations so its OS-chrome close is unreachable.
+        .on_window_event(tray::on_window_event)
         .setup(|app| {
             let app_handle = app.handle().clone();
 
@@ -95,6 +111,34 @@ fn main() {
             // Phase 12 Wave 3 — register the default push-to-mute hotkey.
             // Fires on platform default (Cmd+Shift+M / Ctrl+Shift+M).
             hotkey::register_default(&app_handle);
+
+            // Phase 13 Plan 02 — spawn the mascot overlay window.
+            // Honours persisted visibility (visible=false → no window built;
+            // tray left-click can wake it on next launch). Logs but does
+            // NOT bail setup on failure — the main session UI must still
+            // come up even if the mascot fails to build (e.g. an unusual
+            // multi-monitor topology).
+            match mascot_window::create_mascot_window(&app_handle) {
+                Ok(Some(_)) => {
+                    tracing::info!("mascot overlay window built");
+                }
+                Ok(None) => {
+                    tracing::info!("mascot overlay hidden (user preference)");
+                }
+                Err(e) => {
+                    tracing::error!("mascot window build failed: {e}");
+                }
+            }
+
+            // Phase 13 Plan 02 — initialise the system tray icon + menu.
+            // Must run AFTER create_mascot_window so the left-click handler
+            // can target the live mascot window when toggling visibility.
+            if let Err(e) = tray::init_tray(&app_handle) {
+                // Tray failure is non-fatal at setup but visibility-breaking
+                // for the user (no Quit, no Open Session UI from the menu
+                // bar). Log loudly so it's discoverable in the rotated log.
+                tracing::error!("tray init failed: {e}");
+            }
 
             Ok(())
         })
