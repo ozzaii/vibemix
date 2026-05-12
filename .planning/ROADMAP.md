@@ -20,7 +20,7 @@
 - [x] **Phase 8: macOS ScreenCaptureKit Migration** - Replace deprecated Quartz `CGWindowListCreateImageFromArray` with `pyobjc-framework-ScreenCaptureKit`. _**Complete 2026-05-11.**_ `_screen_macos.py` rewrite around SCStream + Objective-C delegate-on-dispatch-queue + SCContentFilter for window-targeted capture; mss re-scoped to win32; macOS minimum bumped to 12.3. 625 tests green; 4/4 ROADMAP success criteria PASS via mocked tests.
 - [x] **Phase 9: MIDI Controller Library (10 + Generic Fallback)** - Curated mappings for DDJ-FLX4/400/FLX6/FLX10/1000/SX3, XDJ-RX3, Numark Party Mix Live, Hercules Inpulse 300/500 + generic positional fallback + hot-plug re-enumeration. _**Complete 2026-05-12.**_ 839 tests green; 4/4 success criteria PASS. FLX4 live-verified; 9 others JSON-only (Mixxx basis) pending Phase 16/20 + community PRs.
 - [x] **Phase 10: Prompt Template Matrix (6 cells + Anti-Slop)** - 6 prompt templates (3 skill × 2 mode) + negative dictionary + `TurnHistory` anti-repetition + `<silence/>` short-circuit + describe-before-infer + past-tense framing. _**Complete 2026-05-12.**_ 978 tests green; 5/5 success criteria PASS structurally; Phase 16+17 own live verification.
-- [ ] **Phase 11: Tauri Shell + Calibration Wizard** - Tauri 2.x scaffold + Python sidecar wiring + IPC contract + 3-step calibration wizard UI (permissions → output/sample-rate → controller probe).
+- [x] **Phase 11: Tauri Shell + Calibration Wizard** - Tauri 2.x scaffold + Python sidecar wiring + IPC contract + 3-step calibration wizard UI (permissions → output/sample-rate → controller probe). _**Complete 2026-05-12 — structural gate** (code shipped, tests green, builds succeed, CI gates pass, AIza leak gate clean, capability allowlist intact, 19-message schema parity, wizard end-to-end works on Kaan's rig). Fresh-machine <90s timing → Phase 16 (Hallucination Verification Gate) + Phase 20 (Day-Zero Operations fresh-VM rehearsal)._
 - [ ] **Phase 12: Live Session UI + Settings Panel** - Meters + phase tape + AI transcript + drop countdown + MIDI event ribbon + voice/mode/genre/output pickers + push-to-mute hotkey + status badges + recording retention policy.
 - [ ] **Phase 13: Reactive Mascot (Avery)** - SVG mascot with named pose vocabulary + idle animation + magnitude-aware MIDI pose dispatch + TTS-synced mouth + eye-tracking + beat-sync bounce.
 - [ ] **Phase 14: FL-Studio Polish Phase (Critique → Execute Loop)** - Dedicated polish pass with `gsd-ui-checker` + `gsd-ui-auditor` iterations until retro-futurist-hardware bar passes (20/80 rule, textured materials, no web-app residue).
@@ -323,7 +323,7 @@ Plans:
 | 8. macOS ScreenCaptureKit Migration | 0/? | Not started | - |
 | 9. MIDI Controller Library (10 + Generic Fallback) | 0/? | Not started | - |
 | 10. Prompt Template Matrix (6 cells + Anti-Slop) | 2/2 | Complete   | 2026-05-11 |
-| 11. Tauri Shell + Calibration Wizard | 4/5 | In Progress|  |
+| 11. Tauri Shell + Calibration Wizard | 5/5 | Complete   | 2026-05-12 |
 | 12. Live Session UI + Settings Panel | 0/? | Not started | - |
 | 13. Reactive Mascot (Avery) | 0/? | Not started | - |
 | 14. FL-Studio Polish Phase (Critique → Execute Loop) | 0/? | Not started | - |
