@@ -1,24 +1,27 @@
-/* Phase 11 Wave 4 — webview entry point.
+/* Phase 12 Wave 3 — webview entry point (Plan 12-04 §Steps 6).
  *
- * Boot order:
- *   1. Mount the wizard frame DOM (renderCurrentStep — initially Step 1).
- *   2. Subscribe to ipc.status.tick so the 4 LED dots in the status bar
- *      stay live as the sidecar's heartbeat probes report.
- *   3. Wait for the sidecar's ipc.boot event (proves the WS bus is alive).
- *      If it doesn't arrive within 5s, surface the crash banner via the
- *      sidecar-error channel.
- *   4. Strip ``window.__vibemixDev`` from production builds via
- *      ``import.meta.env.DEV`` (threat T-11-W3-02 mitigation).
+ * Boot decision (per plan must-have):
+ *   1. Read first_run_state via the existing Phase 11 read_first_run_state
+ *      Tauri command. If `first_run_completed === false` (or read fails) →
+ *      mount the wizard (Phase 11 behaviour preserved).
+ *   2. Otherwise → mount the live-session UI via the session router.
  *
- * The Wave 3 console-log subscribers (ipc.boot, ipc.status.tick, ws-state,
- * sidecar-error, ipc:parse-error) are kept for DevTools visibility during
- * the structural-gate manual checkpoint.
+ * The wizard's diagnostic subscribers (ipc.boot, ipc.status.tick,
+ * ws-state, sidecar-error, ipc:parse-error) stay live in both modes —
+ * the session UI consumes ipc.status.tick directly via its own bridge,
+ * but the legacy console-log subscribers are kept for DevTools
+ * visibility during structural checkpoint and Wave 4 settings work.
+ *
+ * The Wave 4 dev surface (window.__vibemixDev) is still gated on
+ * import.meta.env.DEV so production strips it.
  */
 
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import { initCrashBanner } from "./crash-banner.js";
 import { isIpcMessage, parseIpcMessage } from "./ipc/validator.js";
+import { routeSession } from "./session/router.js";
 import {
   consumeUrlParam,
   getDevSurface,
@@ -64,31 +67,64 @@ void listen<string>("sidecar-error", (event) => {
   console.warn("[sidecar-error]", event.payload);
 });
 
-// === Wizard boot =========================================================
-function boot(): void {
+// === Boot decision =======================================================
+
+interface FirstRunStateView {
+  first_run_completed?: boolean;
+}
+
+async function shouldShowWizard(): Promise<boolean> {
+  // Phase 11 read_first_run_state Tauri command reads the
+  // tauri-plugin-store-backed config.json. Returns the default record
+  // (first_run_completed=false) when no record exists yet.
+  try {
+    const state = (await invoke("read_first_run_state")) as FirstRunStateView;
+    return !state?.first_run_completed;
+  } catch (err) {
+    // Read failure → safest default is the wizard (first-run path).
+    // eslint-disable-next-line no-console
+    console.warn("[boot] read_first_run_state failed; defaulting to wizard:", err);
+    return true;
+  }
+}
+
+async function boot(): Promise<void> {
   consumeUrlParam();
-  renderCurrentStep();
   initCrashBanner();
 
-  // Wire the status bar to ipc.status.tick (1Hz heartbeat).
-  void subscribeStatusBar();
+  const wizardMode = await shouldShowWizard();
 
-  // Wave 4: only expose the dev surface in dev builds. Production
-  // bundles strip __vibemixDev entirely (threat T-11-W3-02 mitigation).
-  if (import.meta.env.DEV) {
-    window.__vibemixDev = getDevSurface();
+  if (wizardMode) {
+    // Phase 11 path — render the wizard frame and hook the status bar.
+    renderCurrentStep();
+    void subscribeStatusBar();
+
+    if (import.meta.env.DEV) {
+      window.__vibemixDev = getDevSurface();
+      // eslint-disable-next-line no-console
+      console.log(
+        "[boot] DEV mode — window.__vibemixDev exposed:",
+        "advanceTo / currentStep / getState / setState / fakeMidiEvent / setStatusBar",
+      );
+    }
+    return;
+  }
+
+  // Phase 12 path — mount the live session UI.
+  // eslint-disable-next-line no-console
+  console.log("[boot] first_run_completed=true → mounting live session");
+  try {
+    await routeSession();
+  } catch (err) {
     // eslint-disable-next-line no-console
-    console.log(
-      "[boot] DEV mode — window.__vibemixDev exposed:",
-      "advanceTo / currentStep / getState / setState / fakeMidiEvent / setStatusBar",
-    );
+    console.error("[boot] routeSession failed:", err);
   }
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", boot);
+  document.addEventListener("DOMContentLoaded", () => void boot());
 } else {
-  boot();
+  void boot();
 }
 
 // Pin the validator import so tree-shaking doesn't drop the schema check
