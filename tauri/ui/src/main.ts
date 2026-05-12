@@ -37,7 +37,7 @@ declare global {
 }
 
 // === DevTools diagnostic subscribers (Wave 2 + Wave 4 logging) ===========
-const IPC_EVENTS = ["ipc:ipc.boot", "ipc:ipc.status.tick"] as const;
+const IPC_EVENTS = ["ipc-boot", "ipc-status-tick"] as const;
 
 for (const channel of IPC_EVENTS) {
   void listen<unknown>(channel, (event) => {
@@ -52,9 +52,9 @@ for (const channel of IPC_EVENTS) {
   });
 }
 
-void listen<string>("ipc:parse-error", (event) => {
+void listen<string>("ipc-parse-error", (event) => {
   // eslint-disable-next-line no-console
-  console.warn("[ipc:parse-error] non-JSON frame:", event.payload);
+  console.warn("[ipc.parse-error] non-JSON frame:", event.payload);
 });
 
 void listen<string>("ws-state", (event) => {

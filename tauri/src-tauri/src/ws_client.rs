@@ -85,10 +85,16 @@ pub async fn run_ws_client(app: AppHandle) {
                                 let msg_type = value
                                     .get("type")
                                     .and_then(|v| v.as_str())
-                                    .unwrap_or("unknown");
-                                app.emit(&format!("ipc:{msg_type}"), value).ok();
+                                    .unwrap_or("unknown")
+                                    .to_string();
+                                // Tauri 2.x event names reject `:` and `.`; wire
+                                // names like "ipc.session.snapshot" are routed
+                                // on the Rust side as "ipc-session-snapshot".
+                                // Listeners use the dashed form everywhere.
+                                let event_name = msg_type.replace('.', "-");
+                                app.emit(&event_name, value).ok();
                             } else {
-                                app.emit("ipc:parse-error", text.to_string()).ok();
+                                app.emit("ipc-parse-error", text.to_string()).ok();
                             }
                         }
                         Ok(Message::Close(_)) => break,
