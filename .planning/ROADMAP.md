@@ -222,13 +222,13 @@ Plans:
   6. Mood swap (hype-man ↔ teacher ↔ coach) hot-swaps the active Gemini TTS voice + animation clip pool + prompt vocabulary on the same rig within 500ms; transition masked by particle/puff effect.
   7. Menu-bar (macOS NSStatusItem) / system-tray (Windows notification area) icon is persistently visible while vibemix is running — left-click toggles overlay visibility, right-click popover surfaces mood selector + mute + open session UI + settings + quit; icon state reflects session status (idle / live / ai_thinking / error); closing main session UI does NOT quit the app.
 **UI hint**: yes
-**Plans:** 8 plans
+**Plans:** 4/8 plans executed
 Plans:
-- [ ] 13-01-PLAN.md — Meshy GLB asset bundle pipeline (Draco compress + strip; <=25 MB target; manifest.json)
-- [ ] 13-02-PLAN.md — Tauri overlay window + system tray (transparent, always-on-top, cross-Space; 4-state tray icon; tray-Quit lifecycle)
-- [ ] 13-03-PLAN.md — Phase 12 grid reshape + Settings MASCOT group (click-through toggle + mood pills; SessionState extension)
+- [x] 13-01-PLAN.md — Meshy GLB asset bundle pipeline (Draco compress + strip; <=25 MB target; manifest.json)
+- [x] 13-02-PLAN.md — Tauri overlay window + system tray (transparent, always-on-top, cross-Space; 4-state tray icon; tray-Quit lifecycle)
+- [x] 13-03-PLAN.md — Phase 12 grid reshape + Settings MASCOT group (click-through toggle + mood pills; SessionState extension)
 - [ ] 13-04-PLAN.md — Three.js renderer + AnimationMixer crossfade state machine (pure planTransition + beat-lock + idle-timeout)
-- [ ] 13-05-PLAN.md — MusicState extension (mood/bpm_confidence/downbeat_phase) + ipc.mascot.mood_change envelope + Coach prompt {mood}
+- [x] 13-05-PLAN.md — MusicState extension (mood/bpm_confidence/downbeat_phase) + ipc.mascot.mood_change envelope + Coach prompt {mood}
 - [ ] 13-06-PLAN.md — WS-bus subscription + event dispatcher + tray-state listener (full AI-event taxonomy)
 - [ ] 13-07-PLAN.md — Mood profile system + particle puff effect + mood-driven lighting + animation-pool selection
 - [ ] 13-08-PLAN.md — Verification fixtures + dispatch-latency pytest + 30-item manual smoke checklist
@@ -336,7 +336,7 @@ Plans:
 | 10. Prompt Template Matrix (6 cells + Anti-Slop) | 2/2 | Complete   | 2026-05-11 |
 | 11. Tauri Shell + Calibration Wizard | 5/5 | Complete   | 2026-05-12 |
 | 12. Live Session UI + Settings Panel | 0/? | Not started | - |
-| 13. 3D Mascot Screen Overlay | 0/8 | Planned | - |
+| 13. 3D Mascot Screen Overlay | 4/8 | In Progress|  |
 | 14. FL-Studio Polish Phase (Critique → Execute Loop) | 0/? | Not started | - |
 | 15. Recording & Session Capture Finalization | 0/? | Not started | - |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
