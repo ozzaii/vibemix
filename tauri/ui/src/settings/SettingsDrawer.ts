@@ -50,6 +50,7 @@ import {
   type RetentionSliderHandle,
 } from "./components/retention-slider.js";
 import { renderConfirmDialog } from "./components/confirm-dialog.js";
+import { MascotGroup } from "./components/mascot-group.js";
 import {
   closeSettingsState,
   getSettingsUIState,
@@ -574,6 +575,13 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
       children: calibrationBody,
     }),
   );
+
+  // --- MASCOT (Phase 13-03) -------------------------------------------------
+  // Appended last per Plan 13-03 §Task 2: order is PERSONA / OUTPUT /
+  // HOTKEY / RECORDING / CALIBRATION / MASCOT. The group is rebuilt on
+  // every drawer refresh, so SessionState diffs flow through naturally
+  // — same lifecycle as the other groups.
+  body.append(MascotGroup());
 
   // --- Modal slot rebuild ---------------------------------------------------
   renderModalSlot(modalSlot);
