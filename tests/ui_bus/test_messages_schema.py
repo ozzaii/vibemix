@@ -43,6 +43,7 @@ from vibemix.ui_bus import (
     IpcBoot,
     IpcError,
     LevelPair,
+    MascotMoodChange,
     MetersTriple,
     PermissionCheck,
     PermissionState,
@@ -186,6 +187,11 @@ def _make_examples() -> list[tuple[str, object]]:
             "IpcError",
             IpcError.make(reason="invalid payload", original_type="ipc.settings.set"),
         ),
+        # Phase 13-05 — mascot mood-swap envelope (Plan 13-05).
+        (
+            "MascotMoodChange",
+            MascotMoodChange.make(mood="teacher", previous_mood="hype-man", at=1234.56),
+        ),
     ]
 
 
@@ -197,9 +203,9 @@ def test_example_count_matches_schema_oneof() -> None:
 
     Phase 11 Wave 0 froze 19; Phase 12 added 7 (SessionSnapshot, SessionMute,
     SettingsSet, SettingsGet, SettingsState, StatusRecheck, IpcError) for
-    total 26.
+    total 26. Phase 13-05 adds 1 (MascotMoodChange) → 27.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 26
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 27
 
 
 @pytest.mark.parametrize(
@@ -221,14 +227,16 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_26() -> None:
-    """Plan-locked invariant — Phase 12 extends Wave 0's 19 to 26 (19 + 7).
+def test_schema_oneof_count_is_27() -> None:
+    """Plan-locked invariant — Phase 12 extends Wave 0's 19 to 26 (19 + 7);
+    Phase 13-05 adds 1 (MascotMoodChange) → 27.
 
-    ``definitions`` is 27 because ``LevelPair`` is a shared helper ref'd
-    from ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message.
+    ``definitions`` is 28 because ``LevelPair`` is a shared helper ref'd
+    from ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message
+    (so it counts in ``definitions`` but not in ``oneOf``).
     """
-    assert len(_SCHEMA["oneOf"]) == 26
-    assert len(_SCHEMA["definitions"]) == 27
+    assert len(_SCHEMA["oneOf"]) == 27
+    assert len(_SCHEMA["definitions"]) == 28
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:
