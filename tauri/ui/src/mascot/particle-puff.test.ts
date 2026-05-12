@@ -47,7 +47,7 @@ describe("particle-puff — spawnParticlePuff", () => {
     expect(ctrl.alive).toBe(true);
     // Opacity is a side-effect on the underlying material — get it via
     // the scene's last child (the Points we just added).
-    const last = scene.children[scene.children.length - 1] as {
+    const last = scene.children[scene.children.length - 1] as unknown as {
       material?: { opacity?: number };
     };
     expect(last.material?.opacity).toBeGreaterThan(0.4);
@@ -88,7 +88,7 @@ describe("particle-puff — spawnParticlePuff", () => {
       new Vector3(0, 0, 0),
       new Color(0xffa12e),
     );
-    const points = scene.children[0] as {
+    const points = scene.children[0] as unknown as {
       geometry: BufferGeometry;
       material: PointsMaterial;
     };
@@ -107,7 +107,7 @@ describe("particle-puff — spawnParticlePuff", () => {
       new Color(0xffa12e),
       { count: 30 },
     );
-    const points = scene.children[0] as {
+    const points = scene.children[0] as unknown as {
       geometry: BufferGeometry;
     };
     const positionAttr = points.geometry.getAttribute("position");
@@ -120,7 +120,9 @@ describe("particle-puff — spawnParticlePuff", () => {
     const ctrl = spawnParticlePuff(scene, origin, new Color(0xffa12e), {
       count: 50,
     });
-    const points = scene.children[0] as { geometry: BufferGeometry };
+    const points = scene.children[0] as unknown as {
+      geometry: BufferGeometry;
+    };
     const beforeAttr = points.geometry.getAttribute("position");
     const beforeArr = (beforeAttr.array as Float32Array).slice();
     // Tick — even a small dt should move every particle if velocities
