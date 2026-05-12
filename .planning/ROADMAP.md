@@ -323,7 +323,7 @@ Plans:
 | 8. macOS ScreenCaptureKit Migration | 0/? | Not started | - |
 | 9. MIDI Controller Library (10 + Generic Fallback) | 0/? | Not started | - |
 | 10. Prompt Template Matrix (6 cells + Anti-Slop) | 2/2 | Complete   | 2026-05-11 |
-| 11. Tauri Shell + Calibration Wizard | 0/? | Not started | - |
+| 11. Tauri Shell + Calibration Wizard | 1/5 | In Progress|  |
 | 12. Live Session UI + Settings Panel | 0/? | Not started | - |
 | 13. Reactive Mascot (Avery) | 0/? | Not started | - |
 | 14. FL-Studio Polish Phase (Critique → Execute Loop) | 0/? | Not started | - |
