@@ -26,7 +26,7 @@ tauri-build = { version = "2.6", features = ["config-json5"] }  # verified 2026-
 [dependencies]
 # Tauri core + plugins — every crossover is locked behind the capability allowlist.
 # config-json5 mirrors tauri-build's feature so runtime config also parses JSON5.
-tauri = { version = "2.11", features = ["macos-private-api", "config-json5"] }   # verified 2026-05-12
+tauri = { version = "2.11", features = ["macos-private-api", "config-json5", "tray-icon", "image-png"] }   # verified 2026-05-12; Phase 13 Plan 02 added tray-icon + image-png (system tray icon + tauri::image::Image::from_bytes for PNG decode)
 tauri-plugin-shell = "2.3"                                       # verified 2026-05-12 — sidecar spawn + shell.open
 tauri-plugin-store = "2.4"                                       # verified 2026-05-12 — config.json persistence
 tauri-plugin-fs = "2.5"                                          # verified 2026-05-12 — scoped log read for crash banner

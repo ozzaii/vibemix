@@ -37,6 +37,28 @@
         "titleBarStyle": "Overlay",
         "center": true,
         "visible": true
+      },
+      // Phase 13 Plan 02 — mascot overlay declaration.
+      // Runtime `mascot_window::create_mascot_window` builder in main.rs
+      // .setup() supplies the dynamic flags (always_on_top,
+      // visible_on_all_workspaces, skip_taskbar, click-through,
+      // geometry from MascotWindowState). This static entry exists so:
+      //   1. Tauri's capability scope sees a known window label at config
+      //      load time (capabilities/default.json "windows" array).
+      //   2. Cold-cache builds know which webview entry to bundle
+      //      (mascot.html — index.ts placeholder mounts in Plan 13-04).
+      // `"visible": false` here keeps Tauri from auto-spawning before the
+      // runtime builder decides whether to show or skip; the runtime
+      // builder calls `.visible(true)` once it's ready.
+      {
+        "label": "mascot",
+        "url": "mascot.html",
+        "title": "vibemix mascot",
+        "width": 300,
+        "height": 400,
+        "decorations": false,
+        "transparent": true,
+        "visible": false
       }
     ],
     "security": {
