@@ -86,3 +86,14 @@ tauri/src-tauri/binaries/vibemix-core-*/
 # Cargo.lock is TRACKED for binary crates (cargo convention).
 tauri/src-tauri/target/
 tauri/src-tauri/gen/
+
+# Phase 13-01 — Mascot bundle scratch dir (intermediate stripped GLBs).
+# The final compressed bundle under tauri/ui/assets/mascot/ STAYS TRACKED;
+# only the temp dir produced during `npm run build:mascot` is ignored.
+tauri/ui/.mascot-build-tmp/
+
+# Phase 13-01 — Defensive whitelist for the mascot bundle.
+# `assets/` is otherwise untouched by global ignores, but be explicit so the
+# committed bundle (GLB + manifest.json + MANIFEST.md) survives future
+# generic-glob ignore additions.
+!tauri/ui/assets/mascot/**
