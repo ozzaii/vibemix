@@ -17,6 +17,7 @@
 import { initSessionBridge } from "./ws-bridge.js";
 import { mountSessionLayout, type Mounted } from "./SessionLayout.js";
 import { startRenderLoop, stopRenderLoop } from "./render-loop.js";
+import { mountSettingsDrawer } from "../settings/SettingsDrawer.js";
 
 let mounted: Mounted | null = null;
 let unsubscribeBridge: (() => void) | null = null;
@@ -47,6 +48,10 @@ export async function routeSession(rootEl?: HTMLElement): Promise<void> {
   // render loop reads.
   const m = mountSessionLayout(root);
   mounted = m;
+
+  // Mount the settings drawer + backdrop on top of the layout. Settings
+  // are an overlay — they don't affect the live session render loop.
+  mountSettingsDrawer(document.body);
 
   // Boot the bridge — subscribes to ipc.* events and fires settings.get.
   const { unsubscribeAll } = await initSessionBridge();

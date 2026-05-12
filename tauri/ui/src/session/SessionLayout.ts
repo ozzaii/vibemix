@@ -186,12 +186,17 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
     root.append(sc);
   }
 
-  // Titlebar
+  // Titlebar — gear button opens the Settings drawer (mounted by the
+  // session router on boot). Dynamic import keeps Phase 11 wizard mode
+  // from pulling the settings bundle.
   const titlebar = renderTitlebar({
     live: state.titlebar.live,
     rec: state.titlebar.rec,
     sys: state.titlebar.sys,
     clock: state.titlebar.clock,
+    onSettingsClick: () => {
+      void import("../settings/SettingsDrawer.js").then((m) => m.openSettings());
+    },
   });
   root.append(titlebar);
 
