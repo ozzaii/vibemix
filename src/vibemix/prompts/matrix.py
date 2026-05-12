@@ -36,6 +36,34 @@ from __future__ import annotations
 from vibemix.prompts.negative_dict import NEGATIVE_PHRASES
 
 # ---------------------------------------------------------------------------
+# Phase 13-05 — mood-persona fragments (one per Plan 13 mood enum entry).
+# Picked up by ``build_system_instruction(..., mood=...)`` and rendered into
+# the COACH_* templates via the ``{mood_persona}`` placeholder. ~120 chars
+# each — anchored vocabulary cues that shift the AI's persona without
+# rewriting the whole cell.
+#
+# Anti-prompt-injection (T-13-05-06): MOOD_PERSONAS is a fixed constant.
+# User input never enters the persona fragment — only the Literal enum
+# selects which fragment is used.
+# ---------------------------------------------------------------------------
+
+MOOD_PERSONAS: dict[str, str] = {
+    "hype-man": (
+        "You're high-energy, all-caps emotional, party-anchored — celebrate "
+        "every clean move, react to the floor."
+    ),
+    "teacher": (
+        "You're patient, vocabulary-rich, framework-anchored — name "
+        "techniques, reference structure, slow your pace."
+    ),
+    "coach": (
+        "You're frank, post-mortem-anchored, debrief-style — call out what "
+        "went wrong and what to repeat next time."
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
 # Shared anti-slop substrate (appended to all NEW cells, NOT to HYPE_INTERMEDIATE)
 # ---------------------------------------------------------------------------
 
@@ -225,7 +253,7 @@ HARD TEK / ACIDCORE — Kaan plays Hard Tek (170+ BPM, distorted kicks, French/B
 # ---------------------------------------------------------------------------
 
 COACH_BEGINNER: str = (
-    """You are Kaan's patient, encouraging coach — like a friend who DJs and is teaching him. Honest but kind. Catch one specific thing per turn that could improve. Frame it as a try-this nudge, never as criticism. Anchor phrases (use these exact phrasings — they're how a kind coach talks):
+    """You are Kaan's patient, encouraging coach — like a friend who DJs and is teaching him. {mood_persona} Honest but kind. Catch one specific thing per turn that could improve. Frame it as a try-this nudge, never as criticism. Anchor phrases (use these exact phrasings — they're how a kind coach talks):
 - "the cut felt early — try 8 bars later"
 - "low boost muddied the breakdown"
 - "give the build more space"
@@ -260,7 +288,7 @@ EVIDENCE PACKET:
 # ---------------------------------------------------------------------------
 
 COACH_INTERMEDIATE: str = (
-    """You are Kaan's coach — a producer-friend who DJs at his level. Honest feedback bias. Call specific issues with timing, EQ, structure. No flattery; no hand-holding. Anchor phrases (use these exact phrasings — they're how a working coach talks at the intermediate level):
+    """You are Kaan's coach — a producer-friend who DJs at his level. {mood_persona} Honest feedback bias. Call specific issues with timing, EQ, structure. No flattery; no hand-holding. Anchor phrases (use these exact phrasings — they're how a working coach talks at the intermediate level):
 - "kicks stepped on each other for a half-bar"
 - "EQ killed the lows too aggressively"
 - "build released on the 3 — try the 1"
@@ -297,7 +325,7 @@ EVIDENCE PACKET:
 # ---------------------------------------------------------------------------
 
 COACH_PRO: str = (
-    """You are Kaan's peer — another working DJ-producer giving honest in-booth feedback. No flattery, no soft-pedaling, no explanations. Call it like a pro would. Anchor phrases (use these exact phrasings — they're how pros critique each other):
+    """You are Kaan's peer — another working DJ-producer giving honest in-booth feedback. {mood_persona} No flattery, no soft-pedaling, no explanations. Call it like a pro would. Anchor phrases (use these exact phrasings — they're how pros critique each other):
 - "phrase ended on the 3"
 - "high-mid pileup at 0:42"
 - "blend overstayed by 16"
@@ -346,8 +374,12 @@ _VALID_SKILLS = frozenset({"beginner", "intermediate", "pro"})
 _VALID_MODES = frozenset({"hype", "coach"})
 
 
-def build_system_instruction(skill: str = "intermediate", mode: str = "hype") -> str:
-    """Return the prompt cell body for ``(skill, mode)``.
+def build_system_instruction(
+    skill: str = "intermediate",
+    mode: str = "hype",
+    mood: str = "hype-man",
+) -> str:
+    """Return the prompt cell body for ``(skill, mode)`` rendered with ``mood``.
 
     Args:
         skill: One of ``"beginner"`` / ``"intermediate"`` / ``"pro"``
@@ -355,13 +387,19 @@ def build_system_instruction(skill: str = "intermediate", mode: str = "hype") ->
             behavior for callers that don't dispatch).
         mode: One of ``"hype"`` / ``"coach"`` (case-insensitive). Defaults to
             ``"hype"``.
+        mood: One of ``"hype-man"`` / ``"teacher"`` / ``"coach"`` — picks the
+            persona fragment substituted into the ``{mood_persona}``
+            placeholder inside COACH_* cells. Default ``"hype-man"`` preserves
+            Phase 10 backward compat for callers that don't pass it.
 
     Returns:
-        The prompt string for the requested cell.
+        The prompt string for the requested cell, with ``{mood_persona}``
+        substituted for COACH templates.
 
     Raises:
-        ValueError: ``skill`` not in valid set or ``mode`` not in valid set.
-            Fail loud — silent fallback to the default would mask env-var typos.
+        ValueError: ``skill`` not in valid set, ``mode`` not in valid set, or
+            ``mood`` not in the 3-element mood enum. Fail loud — silent
+            fallback to the default would mask env-var typos.
     """
     skill_norm = skill.lower().strip()
     mode_norm = mode.lower().strip()
@@ -369,4 +407,24 @@ def build_system_instruction(skill: str = "intermediate", mode: str = "hype") ->
         raise ValueError(f"unknown skill {skill!r} — must be one of {sorted(_VALID_SKILLS)}")
     if mode_norm not in _VALID_MODES:
         raise ValueError(f"unknown mode {mode!r} — must be one of {sorted(_VALID_MODES)}")
-    return _CELLS[(skill_norm, mode_norm)]
+    if mood not in MOOD_PERSONAS:
+        raise ValueError(
+            f"unknown mood {mood!r} — must be one of {sorted(MOOD_PERSONAS.keys())}"
+        )
+
+    body = _CELLS[(skill_norm, mode_norm)]
+
+    # COACH_* cells carry a ``{mood_persona}`` placeholder (Plan 13-05).
+    # HYPE_* cells are unchanged — that keeps the HYPE_INTERMEDIATE
+    # byte-identical-to-v4 golden invariant intact for the default
+    # ``build_system_instruction('intermediate', 'hype')`` call site.
+    # Anti-prompt-injection (T-13-05-06): persona fragment comes from the
+    # fixed MOOD_PERSONAS dict — never from user input.
+    if mode_norm == "coach":
+        persona = MOOD_PERSONAS[mood]
+        # Use replace() rather than .format() — the template strings contain
+        # other literal braces (none currently, but future edits could) and
+        # .format()'s strictness would break us. replace() is safe.
+        body = body.replace("{mood_persona}", persona)
+
+    return body

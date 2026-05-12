@@ -919,6 +919,61 @@ class IpcError:
         return json.dumps(d, separators=(",", ":"))
 
 
+# ---------------------------------------------------------------------------
+# Phase 13-05 — MascotMoodChange envelope
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class MascotMoodChangePayload:
+    """ipc.mascot.mood_change payload (Phase 13-05).
+
+    ``mood`` is required; ``previous_mood`` + ``at`` are optional. Per the
+    Phase 6 no-pydantic rule, the type is kept as ``str`` here — the
+    Literal narrowing happens at the SettingsApplier validation site.
+    """
+
+    mood: str  # Literal["hype-man", "teacher", "coach"]
+    previous_mood: str | None = None
+    at: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MascotMoodChange:
+    type: Literal["ipc.mascot.mood_change"]
+    ts: str
+    payload: MascotMoodChangePayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        mood: str,
+        previous_mood: str | None = None,
+        at: float | None = None,
+    ) -> MascotMoodChange:
+        return cls(
+            type="ipc.mascot.mood_change",
+            ts=_now_iso(),
+            payload=MascotMoodChangePayload(
+                mood=mood,
+                previous_mood=previous_mood,
+                at=at,
+            ),
+        )
+
+    def to_json(self) -> str:
+        # Drop previous_mood/at when None — schema accepts ["string", "null"]
+        # for previous_mood + ["number", "null"] for at, but a cleaner wire
+        # frame omits optionals when not set.
+        d = _tuples_to_lists(asdict(self))
+        for opt in ("previous_mood", "at"):
+            if d["payload"].get(opt) is None:
+                d["payload"].pop(opt, None)
+        _validate(d)
+        return json.dumps(d, separators=(",", ":"))
+
+
 # Suppress unused-import flake when ``field`` is not used by any wrapper above.
 # Keeping the import allows future wrappers with default factories to use it
 # without a churn-only diff.

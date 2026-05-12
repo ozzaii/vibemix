@@ -42,6 +42,17 @@ class MusicState:
     bpm_corrected: bool = False
     genre_profile_name: str = "unknown"
 
+    # Phase 13 (mascot overlay) — mood is SettingsApplier-owned; the other two
+    # are state_refresh_loop-owned. mood is a CONSUMER-readable evidence field
+    # (Coach prompt template + mascot renderer subscribe via the WS bus).
+    # bpm_confidence < 0.6 → renderer skips beat-locked entry (Plan 13-04
+    # Open Q 4); downbeat_phase ∈ [0, 1) is fraction-through-current-bar.
+    # Anti-hallucination: invalid BPM yields (downbeat_phase=0.0,
+    # bpm_confidence=0.0) — never a fabricated lock.
+    mood: str = "hype-man"  # Literal["hype-man", "teacher", "coach"]
+    bpm_confidence: float = 0.0  # 0..1 — 0 means "no BPM lock yet"
+    downbeat_phase: float = 0.0  # 0..1 — fraction through current bar
+
     # Controller (snapshot from MIDI thread)
     deck_a: dict = field(default_factory=dict)
     deck_b: dict = field(default_factory=dict)

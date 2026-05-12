@@ -34,11 +34,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from dataclasses import asdict
 from typing import Any, Protocol
 
 from vibemix.runtime.config_store import ConfigStore, save_config
 
 log = logging.getLogger("vibemix.runtime.settings")
+
+
+# Phase 13-05 — mood enum (anti-hallucination guard for T-13-05-01).
+_VALID_MOODS: frozenset[str] = frozenset({"hype-man", "teacher", "coach"})
 
 
 # ---------------------------------------------------------------------------
@@ -66,6 +72,22 @@ class _AudioCoreHook(Protocol):
 
 class _GenreLoaderHook(Protocol):
     def reload(self, genre: str) -> None: ...
+
+
+class _MusicStateHook(Protocol):
+    """Duck-typed MusicState — SettingsApplier only needs ``mood`` r/w under
+    ``_lock``. See ``vibemix.state.music_state.MusicState`` for the real shape."""
+
+    mood: str
+    _lock: Any  # threading.Lock-like (acquire / release / __enter__ / __exit__)
+
+
+class _WsBusHook(Protocol):
+    """Duck-typed ws-bus — SettingsApplier only needs ``emit(dict)`` which the
+    real ``WizardBus`` / ``IpcBus`` (Phase 11/12) implements as an async coro.
+    Tests pass MagicMock with ``emit = AsyncMock(...)``."""
+
+    async def emit(self, msg: dict) -> None: ...
 
 
 # ---------------------------------------------------------------------------
@@ -99,12 +121,20 @@ class SettingsApplier:
         event_detector: _EventDetectorHook | None = None,
         audio_core: _AudioCoreHook | None = None,
         genre_loader: _GenreLoaderHook | None = None,
+        music_state: _MusicStateHook | None = None,
+        ws_bus: _WsBusHook | None = None,
     ) -> None:
         self.config_store = config_store
         self.cascade_agent = cascade_agent
         self.event_detector = event_detector
         self.audio_core = audio_core
         self.genre_loader = genre_loader
+        # Phase 13-05 — mood writes back into MusicState (canonical) +
+        # emits ipc.mascot.mood_change over the WS bus the moment a swap
+        # is applied. Both refs are optional so Plan 13-05 ships independent
+        # of the orchestration plan that finally wires them in main().
+        self.music_state = music_state
+        self.ws_bus = ws_bus
 
     # ------------------------------------------------------------------
     # Dispatch entry point
@@ -136,6 +166,10 @@ class SettingsApplier:
                 return await self._apply_retention(value)
             if field == "push_to_mute_hotkey":
                 return await self._apply_hotkey(value)
+            if field == "mood":
+                return await self._apply_mood(value)
+            if field == "click_through":
+                return await self._apply_click_through(value)
             return (False, f"unknown settings field: {field!r}")
         except Exception as e:  # pragma: no cover — guard against bad hooks
             log.exception("SettingsApplier.apply(%r, %r) raised", field, value)
@@ -234,6 +268,99 @@ class SettingsApplier:
         self.config_store.push_to_mute_hotkey = value
         save_config(self.config_store)
         return (True, None)
+
+    # ------------------------------------------------------------------
+    # Phase 13-05 — mood + click_through
+    # ------------------------------------------------------------------
+
+    async def _apply_mood(self, value: Any) -> tuple[bool, str | None]:
+        """Apply a mood swap: validate enum → write MusicState under the lock
+        → persist to ConfigStore.extra → emit ipc.mascot.mood_change.
+
+        Threat T-13-05-01: invalid mood is rejected at this trust boundary
+        with ``(False, "<reason>")`` — NO silent fallback to the default.
+        """
+        if not isinstance(value, str) or value not in _VALID_MOODS:
+            return (
+                False,
+                f"mood must be one of {sorted(_VALID_MOODS)}, got {value!r}",
+            )
+        if self.music_state is None or self.ws_bus is None:
+            # No music_state / ws_bus wiring — Plan 13-05 ships before the
+            # main() glue that injects them. Fail loud rather than silently
+            # writing only ConfigStore (would desync the mascot renderer).
+            missing: list[str] = []
+            if self.music_state is None:
+                missing.append("music_state")
+            if self.ws_bus is None:
+                missing.append("ws_bus")
+            return (False, f"mood requires {', '.join(missing)} wiring")
+
+        # Capture previous mood for the emit payload.
+        previous = self.music_state.mood
+        # Skip the emit when nothing actually changed — same-value sets
+        # are legitimate (UI re-render) but the bus shouldn't see noise.
+        if previous == value:
+            return (True, None)
+
+        with self.music_state._lock:
+            self.music_state.mood = value
+
+        # ConfigStore stores mood in ``extra`` (not a typed top-level field).
+        # The Rust shell + Phase 12 settings panel persist + reload via the
+        # same ``extra`` round-trip path that already preserves Phase 11
+        # first_run_state keys, so the Phase 13 addition rides on top
+        # without a config-store schema bump.
+        self.config_store.extra["mood"] = value
+        save_config(self.config_store)
+
+        # Build + emit the mood_change envelope. The wrapper's .to_json()
+        # validates against the source-of-truth schema, so any drift between
+        # this Python emit and the JSON schema is caught here at runtime.
+        from vibemix.ui_bus import MascotMoodChange
+
+        msg = MascotMoodChange.make(
+            mood=value,
+            previous_mood=previous,
+            at=time.monotonic(),
+        )
+        # Round-trip through the wrapper so the dict we emit matches the
+        # schema-validated wire form (drops None optionals etc.).
+        import json as _json
+
+        msg_dict = _json.loads(msg.to_json())
+        try:
+            await self.ws_bus.emit(msg_dict)
+        except Exception as e:  # pragma: no cover — bus emit fail surfaces here
+            log.warning("ws_bus.emit failed for ipc.mascot.mood_change: %r", e)
+            return (False, f"emit failed: {type(e).__name__}: {e}")
+
+        return (True, None)
+
+    async def _apply_click_through(self, value: Any) -> tuple[bool, str | None]:
+        """Apply the mascot overlay's click-through toggle.
+
+        click_through is a Rust/webview-side window concern (the mascot
+        overlay uses ``set_ignore_cursor_events`` to make mouse events
+        pass through to the underlying app). The sidecar's only job is to
+        persist the canonical bit in ConfigStore so a relaunch restores it
+        — no MusicState write, no ws_bus emit.
+        """
+        if not isinstance(value, bool):
+            return (
+                False,
+                f"click_through expects bool, got {type(value).__name__}",
+            )
+        # Stored in ConfigStore.extra to keep the typed Phase-12 surface
+        # untouched (no new top-level dataclass field, no schema bump in
+        # config_store.py).
+        self.config_store.extra["click_through"] = value
+        save_config(self.config_store)
+        return (True, None)
+
+
+# Suppress unused-import noise — asdict is reserved for upcoming wrappers.
+_ = asdict
 
 
 __all__ = ["SettingsApplier", "GENRE_OVERLAY_S"]

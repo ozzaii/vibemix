@@ -29,7 +29,8 @@ export type VibemixIPCMessages =
   | SettingsGet
   | SettingsState
   | StatusRecheck
-  | IpcError;
+  | IpcError
+  | MascotMoodChange;
 
 export interface IpcBoot {
   type: "ipc.boot";
@@ -237,8 +238,10 @@ export interface SettingsSet {
       | "output_device_id"
       | "output_profile"
       | "retention_days"
-      | "push_to_mute_hotkey";
-    value: string | number | null;
+      | "push_to_mute_hotkey"
+      | "mood"
+      | "click_through";
+    value: string | number | boolean | null;
   };
 }
 export interface SettingsGet {
@@ -273,5 +276,14 @@ export interface IpcError {
   payload: {
     reason: string;
     original_type?: string | null;
+  };
+}
+export interface MascotMoodChange {
+  type: "ipc.mascot.mood_change";
+  ts: string;
+  payload: {
+    mood: "hype-man" | "teacher" | "coach";
+    previous_mood?: "hype-man" | "teacher" | "coach" | null;
+    at?: number | null;
   };
 }

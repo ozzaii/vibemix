@@ -25,6 +25,7 @@ from vibemix.prompts.matrix import (
     HYPE_BEGINNER,
     HYPE_INTERMEDIATE,
     HYPE_PRO,
+    MOOD_PERSONAS,
     build_system_instruction,
 )
 
@@ -186,10 +187,19 @@ def test_prompt_01_default_dispatch_is_intermediate_hype() -> None:
     ],
 )
 def test_prompt_01_dispatcher_returns_right_cell(skill: str, mode: str, expected: str) -> None:
-    """Each (skill, mode) tuple resolves to its named module-level constant."""
+    """Each (skill, mode) tuple resolves to its named module-level constant.
+
+    Phase 13-05: COACH cells contain a ``{mood_persona}`` placeholder that
+    the dispatcher substitutes (default mood 'hype-man'). Compare against the
+    substituted form so the test reflects the actual dispatcher contract.
+    """
     import vibemix.prompts.matrix as m
 
     expected_body = getattr(m, expected)
+    if mode == "coach":
+        expected_body = expected_body.replace(
+            "{mood_persona}", MOOD_PERSONAS["hype-man"]
+        )
     assert build_system_instruction(skill, mode) == expected_body
 
 

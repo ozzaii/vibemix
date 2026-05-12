@@ -29,7 +29,8 @@
     {"$ref": "#/definitions/SettingsGet"},
     {"$ref": "#/definitions/SettingsState"},
     {"$ref": "#/definitions/StatusRecheck"},
-    {"$ref": "#/definitions/IpcError"}
+    {"$ref": "#/definitions/IpcError"},
+    {"$ref": "#/definitions/MascotMoodChange"}
   ],
   "definitions": {
     "IpcBoot": {
@@ -525,11 +526,12 @@
           "additionalProperties": false,
           "required": ["field", "value"],
           "properties": {
-            "field": {"type": "string", "enum": ["voice", "mode", "genre", "output_device_id", "output_profile", "retention_days", "push_to_mute_hotkey"]},
+            "field": {"type": "string", "enum": ["voice", "mode", "genre", "output_device_id", "output_profile", "retention_days", "push_to_mute_hotkey", "mood", "click_through"]},
             "value": {
               "anyOf": [
                 {"type": "string"},
                 {"type": "integer", "minimum": 0},
+                {"type": "boolean"},
                 {"type": "null"}
               ]
             }
@@ -610,6 +612,26 @@
           "properties": {
             "reason": {"type": "string"},
             "original_type": {"type": ["string", "null"]}
+          }
+        }
+      }
+    },
+    "MascotMoodChange": {
+      "$comment": "Phase 13-05 — Sidecar → shell + mascot overlay. Emitted the moment SettingsApplier flips MusicState.mood + ConfigStore.mood. Carries the previous mood so the renderer (Plan 13-04) can pick the right particle/puff mask + the AT timestamp for the events.jsonl recorder.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.mascot.mood_change"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mood"],
+          "properties": {
+            "mood": {"type": "string", "enum": ["hype-man", "teacher", "coach"]},
+            "previous_mood": {"type": ["string", "null"], "enum": ["hype-man", "teacher", "coach", null]},
+            "at": {"type": ["number", "null"]}
           }
         }
       }

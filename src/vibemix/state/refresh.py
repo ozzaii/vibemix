@@ -43,6 +43,7 @@ from vibemix.audio import (
     SILENCE_DEBOUNCE_SEC,
     SILENT_RMS,
     AudioBuffer,
+    compute_downbeat_phase,
     energy_curve,
     estimate_bpm,
     long_arc_curve,
@@ -172,6 +173,20 @@ def _tick_once(
         state.vocal_active = vocal_active
         state.bpm_corrected = was_corrected
         state.genre_profile_name = profile_name
+
+        # Phase 13-05: downbeat-phase + bpm_confidence (mascot beat-lock).
+        # Pure function over the same 4-second audio window. Invalid BPM
+        # yields (0.0, 0.0) so the renderer (Plan 13-04) falls back to
+        # immediate switch — never beat-locks against fabricated phase.
+        # mood is owned by SettingsApplier, never touched here.
+        new_phase_frac, new_bpm_conf = compute_downbeat_phase(
+            pcm_for_crest,
+            bpm_cache,
+            audio_buf._sr,
+            prior_phase=state.downbeat_phase,
+        )
+        state.downbeat_phase = new_phase_frac
+        state.bpm_confidence = new_bpm_conf
 
         # Phase — dispatch on active profile.
         if active_profile is None:
