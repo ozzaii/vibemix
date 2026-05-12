@@ -55,3 +55,39 @@ missing in the worktree, where untracked files are not propagated.
 2. Update the test to skip gracefully when `cohost_v4.py` is absent
    (the byte-identical check is a load-bearing invariant when run in the main
    repo, but worktree runs are routine).
+
+---
+
+### `tests/test_phase05_verification.py::test_g5_poc_files_untouched` (pathspec collision)
+
+**Discovered during:** Post-merge pytest sweep after Wave 1.
+
+**Symptom:** `POC files modified during Phase 5: ['mascot.html']`
+
+**Root cause:** The test uses git pathspec `mascot.html` (no anchor) which matches
+BOTH `./mascot.html` (legacy Canvas2D POC at repo root) AND `tauri/ui/mascot.html`
+(NEW 3D overlay introduced by Plan 13-02 / commit `1756477`).
+
+**Pre-existing in spirit:** The Phase 5 guard was written when only one
+`mascot.html` existed (at repo root). It needs anchoring.
+
+**Suggested fix:** Change pathspec from `"mascot.html"` to `":(top)mascot.html"`
+so the guard only matches the legacy file. Apply during Phase 14 polish phase
+or as a one-line Phase 5 fix-up.
+
+---
+
+### `tests/test_audio_macos_live.py::test_open_voice_output_completes_without_real_audio_device`
+
+**Discovered during:** Post-merge pytest sweep after Wave 1.
+
+**Symptom:** `No output device matching 'External Headphones'` (also fails 'Headphones').
+
+**Root cause:** Environmental — Kaan's headphones not plugged in at test time.
+Test is live-hardware-dependent.
+
+**Pre-existing:** YES.
+
+**Suggested fix:** Pre-existing live-smoke test. Skip when target hardware
+unavailable, or move into the `VIBEMIX_LIVE_SMOKE=1` opt-in block alongside the
+already-skipped live tests (line 33 pattern).
