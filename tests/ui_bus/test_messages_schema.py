@@ -41,8 +41,17 @@ from vibemix.ui_bus import (
     CalibrationWindowList,
     DeviceInfo,
     IpcBoot,
+    IpcError,
+    LevelPair,
+    MetersTriple,
     PermissionCheck,
     PermissionState,
+    SessionMute,
+    SessionSnapshot,
+    SettingsGet,
+    SettingsSet,
+    SettingsState,
+    StatusRecheck,
     StatusTick,
     WindowInfo,
     WizardDone,
@@ -145,6 +154,38 @@ def _make_examples() -> list[tuple[str, object]]:
                 target_window_id="win-42",
             ),
         ),
+        # Phase 12 wrappers
+        (
+            "SessionSnapshot",
+            SessionSnapshot.make(
+                meters=MetersTriple(
+                    music=LevelPair(rms=0.4, peak=0.6),
+                    voice=LevelPair(rms=0.0, peak=0.0),
+                    mic=LevelPair(rms=0.05, peak=0.1),
+                ),
+            ),
+        ),
+        ("SessionMute", SessionMute.make_toggle()),
+        ("SettingsSet", SettingsSet.make(field="voice", value="kore")),
+        ("SettingsGet", SettingsGet.make()),
+        (
+            "SettingsState",
+            SettingsState.make(
+                voice="kore",
+                mode="coach",
+                genre="tech-house",
+                output_device_id=None,
+                output_profile="hp",
+                retention_days=7,
+                push_to_mute_hotkey="cmd+shift+m",
+                muted=False,
+            ),
+        ),
+        ("StatusRecheck", StatusRecheck.make(component="midi")),
+        (
+            "IpcError",
+            IpcError.make(reason="invalid payload", original_type="ipc.settings.set"),
+        ),
     ]
 
 
@@ -152,8 +193,13 @@ _EXAMPLES = _make_examples()
 
 
 def test_example_count_matches_schema_oneof() -> None:
-    """Sentinel: our roundtrip-example list must cover every schema oneOf entry."""
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 19
+    """Sentinel: our roundtrip-example list must cover every schema oneOf entry.
+
+    Phase 11 Wave 0 froze 19; Phase 12 added 7 (SessionSnapshot, SessionMute,
+    SettingsSet, SettingsGet, SettingsState, StatusRecheck, IpcError) for
+    total 26.
+    """
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 26
 
 
 @pytest.mark.parametrize(
@@ -175,10 +221,14 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_19() -> None:
-    """Plan-locked invariant — Wave 0 freezes 19 ipc.* messages."""
-    assert len(_SCHEMA["oneOf"]) == 19
-    assert len(_SCHEMA["definitions"]) == 19
+def test_schema_oneof_count_is_26() -> None:
+    """Plan-locked invariant — Phase 12 extends Wave 0's 19 to 26 (19 + 7).
+
+    ``definitions`` is 27 because ``LevelPair`` is a shared helper ref'd
+    from ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message.
+    """
+    assert len(_SCHEMA["oneOf"]) == 26
+    assert len(_SCHEMA["definitions"]) == 27
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

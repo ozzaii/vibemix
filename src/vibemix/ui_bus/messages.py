@@ -204,6 +204,121 @@ class WizardDonePayload:
 
 
 # ---------------------------------------------------------------------------
+# Phase 12 — session + settings payload structs
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LevelPair:
+    rms: float
+    peak: float
+
+
+@dataclass(frozen=True, slots=True)
+class MetersTriple:
+    music: LevelPair
+    voice: LevelPair
+    mic: LevelPair
+
+
+@dataclass(frozen=True, slots=True)
+class PhaseChunk:
+    kind: Literal["silent", "groove", "build", "drop-ghost"]
+    weight: float
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class TranscriptLine:
+    role: Literal["ai", "user", "system"]
+    text: str
+    ts: str
+
+
+@dataclass(frozen=True, slots=True)
+class MidiEventEntry:
+    control: str
+    value: float | str | None
+    ts: str
+
+
+@dataclass(frozen=True, slots=True)
+class TrackInfo:
+    title: str
+    artist: str | None = None
+    deck: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SessionSnapshotPayload:
+    meters: MetersTriple
+    phase: tuple[PhaseChunk, ...]
+    phase_now_pct: float
+    bpm: float | None
+    drop_pred_bars: int | None
+    transcript_delta: tuple[TranscriptLine, ...]
+    midi_events: tuple[MidiEventEntry, ...]
+    track: TrackInfo | None
+    cohost_status: Literal["LISTENING", "TALKING", "IDLE"]
+    latency_ms: float | None
+    grounded: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SessionMutePayload:
+    """Asymmetric payload: shell sends ``toggle`` only, sidecar acks with ``muted`` only.
+
+    Both fields optional in the schema; ``make_toggle()`` and ``make_ack()`` factories
+    enforce the one-direction asymmetry.
+    """
+
+    toggle: bool | None = None
+    muted: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsSetPayload:
+    field: Literal[
+        "voice",
+        "mode",
+        "genre",
+        "output_device_id",
+        "output_profile",
+        "retention_days",
+        "push_to_mute_hotkey",
+    ]
+    value: str | int | None
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsGetPayload:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsStatePayload:
+    voice: str
+    mode: Literal["hype", "coach"]
+    genre: str
+    output_device_id: str | None
+    output_profile: Literal["hp", "spk"]
+    retention_days: int
+    push_to_mute_hotkey: str
+    muted: bool
+
+
+@dataclass(frozen=True, slots=True)
+class StatusRecheckPayload:
+    component: Literal["livekit", "gemini", "midi", "screen"]
+
+
+@dataclass(frozen=True, slots=True)
+class IpcErrorPayload:
+    reason: str
+    original_type: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # Wrapper dataclasses (one per schema oneOf entry — 19 total)
 # ---------------------------------------------------------------------------
 # Each wrapper carries the three-field envelope: ``type`` (const string), ``ts``
@@ -609,6 +724,199 @@ class WizardDone:
 
     def to_json(self) -> str:
         return _serialize(self)
+
+
+# ---------------------------------------------------------------------------
+# Phase 12 wrapper dataclasses
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class SessionSnapshot:
+    type: Literal["ipc.session.snapshot"]
+    ts: str
+    payload: SessionSnapshotPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        meters: MetersTriple,
+        phase: tuple[PhaseChunk, ...] = (),
+        phase_now_pct: float = 0.0,
+        bpm: float | None = None,
+        drop_pred_bars: int | None = None,
+        transcript_delta: tuple[TranscriptLine, ...] = (),
+        midi_events: tuple[MidiEventEntry, ...] = (),
+        track: TrackInfo | None = None,
+        cohost_status: Literal["LISTENING", "TALKING", "IDLE"] = "IDLE",
+        latency_ms: float | None = None,
+        grounded: bool = False,
+    ) -> SessionSnapshot:
+        return cls(
+            type="ipc.session.snapshot",
+            ts=_now_iso(),
+            payload=SessionSnapshotPayload(
+                meters=meters,
+                phase=phase,
+                phase_now_pct=phase_now_pct,
+                bpm=bpm,
+                drop_pred_bars=drop_pred_bars,
+                transcript_delta=transcript_delta,
+                midi_events=midi_events,
+                track=track,
+                cohost_status=cohost_status,
+                latency_ms=latency_ms,
+                grounded=grounded,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class SessionMute:
+    type: Literal["ipc.session.mute"]
+    ts: str
+    payload: SessionMutePayload
+
+    @classmethod
+    def make_toggle(cls) -> SessionMute:
+        """Shell → sidecar: request a mute toggle."""
+        return cls(
+            type="ipc.session.mute",
+            ts=_now_iso(),
+            payload=SessionMutePayload(toggle=True),
+        )
+
+    @classmethod
+    def make_ack(cls, *, muted: bool) -> SessionMute:
+        """Sidecar → shell: ack with new mute state."""
+        return cls(
+            type="ipc.session.mute",
+            ts=_now_iso(),
+            payload=SessionMutePayload(muted=muted),
+        )
+
+    def to_json(self) -> str:
+        # Drop None fields from payload — schema doesn't accept null for
+        # toggle/muted (both are individually optional but never null).
+        d = _tuples_to_lists(asdict(self))
+        d["payload"] = {k: v for k, v in d["payload"].items() if v is not None}
+        _validate(d)
+        return json.dumps(d, separators=(",", ":"))
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsSet:
+    type: Literal["ipc.settings.set"]
+    ts: str
+    payload: SettingsSetPayload
+
+    @classmethod
+    def make(cls, *, field: str, value: str | int | None) -> SettingsSet:
+        return cls(
+            type="ipc.settings.set",
+            ts=_now_iso(),
+            payload=SettingsSetPayload(field=field, value=value),  # type: ignore[arg-type]
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsGet:
+    type: Literal["ipc.settings.get"]
+    ts: str
+    payload: SettingsGetPayload
+
+    @classmethod
+    def make(cls) -> SettingsGet:
+        return cls(type="ipc.settings.get", ts=_now_iso(), payload=SettingsGetPayload())
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsState:
+    type: Literal["ipc.settings.state"]
+    ts: str
+    payload: SettingsStatePayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        voice: str,
+        mode: Literal["hype", "coach"],
+        genre: str,
+        output_device_id: str | None,
+        output_profile: Literal["hp", "spk"],
+        retention_days: int,
+        push_to_mute_hotkey: str,
+        muted: bool,
+    ) -> SettingsState:
+        return cls(
+            type="ipc.settings.state",
+            ts=_now_iso(),
+            payload=SettingsStatePayload(
+                voice=voice,
+                mode=mode,
+                genre=genre,
+                output_device_id=output_device_id,
+                output_profile=output_profile,
+                retention_days=retention_days,
+                push_to_mute_hotkey=push_to_mute_hotkey,
+                muted=muted,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class StatusRecheck:
+    type: Literal["ipc.status.recheck"]
+    ts: str
+    payload: StatusRecheckPayload
+
+    @classmethod
+    def make(cls, *, component: Literal["livekit", "gemini", "midi", "screen"]) -> StatusRecheck:
+        return cls(
+            type="ipc.status.recheck",
+            ts=_now_iso(),
+            payload=StatusRecheckPayload(component=component),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class IpcError:
+    type: Literal["ipc.error"]
+    ts: str
+    payload: IpcErrorPayload
+
+    @classmethod
+    def make(cls, *, reason: str, original_type: str | None = None) -> IpcError:
+        return cls(
+            type="ipc.error",
+            ts=_now_iso(),
+            payload=IpcErrorPayload(reason=reason, original_type=original_type),
+        )
+
+    def to_json(self) -> str:
+        # original_type is optional in the schema; drop when None.
+        d = _tuples_to_lists(asdict(self))
+        if d["payload"].get("original_type") is None:
+            d["payload"].pop("original_type", None)
+        _validate(d)
+        return json.dumps(d, separators=(",", ":"))
 
 
 # Suppress unused-import flake when ``field`` is not used by any wrapper above.

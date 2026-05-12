@@ -44,8 +44,17 @@ from vibemix.ui_bus import (
     CalibrationWindowList,
     DeviceInfo,
     IpcBoot,
+    IpcError,
+    LevelPair,
+    MetersTriple,
     PermissionCheck,
     PermissionState,
+    SessionMute,
+    SessionSnapshot,
+    SettingsGet,
+    SettingsSet,
+    SettingsState,
+    StatusRecheck,
     StatusTick,
     WindowInfo,
     WizardDone,
@@ -144,6 +153,35 @@ def _minimal_examples() -> list[tuple[str, object]]:
                 target_window_id="win-42",
             ),
         ),
+        # Phase 12 wrappers
+        (
+            "SessionSnapshot",
+            SessionSnapshot.make(
+                meters=MetersTriple(
+                    music=LevelPair(rms=0.4, peak=0.6),
+                    voice=LevelPair(rms=0.0, peak=0.0),
+                    mic=LevelPair(rms=0.05, peak=0.1),
+                ),
+            ),
+        ),
+        ("SessionMute", SessionMute.make_toggle()),
+        ("SettingsSet", SettingsSet.make(field="voice", value="kore")),
+        ("SettingsGet", SettingsGet.make()),
+        (
+            "SettingsState",
+            SettingsState.make(
+                voice="kore",
+                mode="coach",
+                genre="tech-house",
+                output_device_id=None,
+                output_profile="hp",
+                retention_days=7,
+                push_to_mute_hotkey="cmd+shift+m",
+                muted=False,
+            ),
+        ),
+        ("StatusRecheck", StatusRecheck.make(component="midi")),
+        ("IpcError", IpcError.make(reason="invalid payload", original_type="ipc.settings.set")),
     ]
 
 
