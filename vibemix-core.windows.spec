@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# vibemix.spec.windows — PyInstaller --onedir spec for the Windows sidecar.
+# vibemix-core.windows.spec — PyInstaller --onedir spec for the Windows sidecar.
 #
 # [VERIFIED: PyInstaller Context7 /pyinstaller/pyinstaller]
 # [VERIFIED: 11-RESEARCH.md §Pitfall 2 — hidden-import misses]
@@ -93,7 +93,7 @@ for _pkg in (
 # spec is accidentally executed on macOS — log + skip rather than crash.
 if sys.platform == "darwin":
     print(
-        "[spec] WARNING: vibemix.spec.windows executed on macOS; pyobjc "
+        "[spec] WARNING: vibemix-core.windows.spec executed on macOS; pyobjc "
         "collect_all intentionally skipped — use vibemix.spec.macos instead.",
         file=sys.stderr,
     )
@@ -113,7 +113,7 @@ datas += collect_data_files(
 _IPC_SCHEMA = Path("tauri/ui/src/ipc/messages.schema.json")
 if not _IPC_SCHEMA.exists():
     raise RuntimeError(
-        f"vibemix.spec.windows: expected IPC schema at {_IPC_SCHEMA} — "
+        f"vibemix-core.windows.spec: expected IPC schema at {_IPC_SCHEMA} — "
         "Phase 11 Wave 0 should have created it."
     )
 datas += [(str(_IPC_SCHEMA), "tauri/ui/src/ipc")]
@@ -121,10 +121,10 @@ datas += [(str(_IPC_SCHEMA), "tauri/ui/src/ipc")]
 # Defensive checks on JSON profile dirs (same as macOS spec).
 _MIDI_PROFILES = Path("src/vibemix/midi/profiles")
 if not _MIDI_PROFILES.is_dir():
-    raise RuntimeError(f"vibemix.spec.windows: missing {_MIDI_PROFILES}")
+    raise RuntimeError(f"vibemix-core.windows.spec: missing {_MIDI_PROFILES}")
 _GENRE_PROFILES = Path("src/vibemix/state/genre/profiles")
 if not _GENRE_PROFILES.is_dir():
-    raise RuntimeError(f"vibemix.spec.windows: missing {_GENRE_PROFILES}")
+    raise RuntimeError(f"vibemix-core.windows.spec: missing {_GENRE_PROFILES}")
 
 # ---------------------------------------------------------------------------
 # Binaries — no nowplaying-cli on Windows (TrackWindows uses SMTC via
