@@ -22,6 +22,7 @@ mod hotkey;
 mod mascot_window;
 mod permissions;
 mod sidecar;
+mod tray;
 mod ws_client;
 
 use std::fs;
@@ -30,6 +31,7 @@ use tauri::Manager;
 
 use crate::hotkey::HotkeyHandle;
 use crate::sidecar::SidecarHandle;
+use crate::tray::TrayHandle;
 use crate::ws_client::WsClientHandle;
 
 fn main() {
@@ -66,6 +68,12 @@ fn main() {
         .manage(SidecarHandle::default())
         .manage(WsClientHandle::default())
         .manage(HotkeyHandle::default())
+        .manage(TrayHandle::default())
+        // Phase 13 Plan 02 — lifecycle override. Closing the main session
+        // window hides it instead of quitting the process; only the tray
+        // `Quit vibemix` item kills the app. The mascot window has no
+        // decorations so its OS-chrome close is unreachable.
+        .on_window_event(tray::on_window_event)
         .setup(|app| {
             let app_handle = app.handle().clone();
 
@@ -120,6 +128,16 @@ fn main() {
                 Err(e) => {
                     tracing::error!("mascot window build failed: {e}");
                 }
+            }
+
+            // Phase 13 Plan 02 — initialise the system tray icon + menu.
+            // Must run AFTER create_mascot_window so the left-click handler
+            // can target the live mascot window when toggling visibility.
+            if let Err(e) = tray::init_tray(&app_handle) {
+                // Tray failure is non-fatal at setup but visibility-breaking
+                // for the user (no Quit, no Open Session UI from the menu
+                // bar). Log loudly so it's discoverable in the rotated log.
+                tracing::error!("tray init failed: {e}");
             }
 
             Ok(())
