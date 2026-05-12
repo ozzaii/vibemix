@@ -1,20 +1,28 @@
-/* Phase 11 Wave 2 — webview entry point.
+/* Phase 11 Wave 3 — webview entry point.
  *
- * Mounts the crash banner subscription and logs every `ipc:*` event the
- * Rust shell forwards from the Python sidecar's WS bus. Validates each
- * frame against the Wave 0 ajv guard so schema drift surfaces in the
- * DevTools console (Wave 4 routes valid frames to wizard step handlers).
+ * Mounts the calibration wizard (router.ts → step1 / step2 / step3 /
+ * smoke-test). Keeps the Wave 2 crash banner + ipc.* event subscribers
+ * for DevTools visibility during Wave 4 dev.
  *
- * Wave 3 replaces the placeholder copy + adds the wizard mount; Wave 4
- * adds the `parseIpcMessage` dispatch table. This file's job for Wave 2
- * is to make the IPC path visible end-to-end at the manual checkpoint.
+ * Wave 3 drives every wizard state via MOCK data + a window.__vibemixDev
+ * debug surface. Wave 4 strips the dev surface from production builds via
+ * `import.meta.env.DEV` and wires the real ipc.* request flow.
  */
 
 import { listen } from "@tauri-apps/api/event";
 
 import { initCrashBanner } from "./crash-banner.js";
 import { isIpcMessage, parseIpcMessage } from "./ipc/validator.js";
+import { consumeUrlParam, getDevSurface, renderCurrentStep } from "./wizard/router.js";
+import type { DevSurface } from "./wizard/router.js";
 
+declare global {
+  interface Window {
+    __vibemixDev?: DevSurface;
+  }
+}
+
+// === IPC subscribers ====================================================
 // Wave 2 ipc:* logging — every event surfaces in DevTools so Kaan can
 // confirm the WS bus pipe is alive during the watchdog smoke test.
 const IPC_EVENTS = ["ipc:ipc.boot", "ipc:ipc.status.tick"] as const;
@@ -52,7 +60,28 @@ listen<string>("sidecar-error", (event) => {
   console.warn("[sidecar-error]", event.payload);
 });
 
-initCrashBanner();
+// === Wizard boot ========================================================
+function boot(): void {
+  consumeUrlParam();
+  renderCurrentStep();
+  initCrashBanner();
+
+  // Wave 3 dev surface — register window.__vibemixDev. Wave 4 wraps
+  // this in `if (import.meta.env.DEV) { ... }` so production builds
+  // strip the surface (threat T-11-W3-02 mitigation).
+  window.__vibemixDev = getDevSurface();
+  // eslint-disable-next-line no-console
+  console.log(
+    "[boot] wizard ready — drive state via window.__vibemixDev:",
+    "advanceTo / currentStep / getState / setState / fakeMidiEvent / setStatusBar"
+  );
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot);
+} else {
+  boot();
+}
 
 // Pin the validator import so tree-shaking doesn't drop the schema check
 // in production builds. Wave 4 deletes this when wizard handlers consume
