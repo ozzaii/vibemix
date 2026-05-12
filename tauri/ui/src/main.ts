@@ -92,6 +92,21 @@ async function boot(): Promise<void> {
   consumeUrlParam();
   initCrashBanner();
 
+  // DEV-only: `?dev=session-mock` bypasses both the wizard check and the
+  // Tauri IPC bridge — mounts the live session UI with a local animator
+  // so Vite dev (no Tauri runtime) shows the Phase 12 surface moving.
+  // Production builds strip this branch via import.meta.env.DEV.
+  if (import.meta.env.DEV) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("dev") === "session-mock") {
+      // eslint-disable-next-line no-console
+      console.log("[boot] DEV dev=session-mock → mounting mock session UI");
+      const { routeSessionMock } = await import("./session/mock.js");
+      await routeSessionMock();
+      return;
+    }
+  }
+
   const wizardMode = await shouldShowWizard();
 
   if (wizardMode) {

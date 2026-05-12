@@ -97,15 +97,17 @@
 - [ ] **UX-10**: Settings — recording retention policy (default 7d, configurable)
 - [x] **UX-11**: Status badges — LiveKit ok / Gemini ok / MIDI ok / screen ok (visible failure indicators)
 
-### Reactive Mascot (Avery)
+### 3D Mascot Screen Overlay
 
-- [ ] **MASCOT-01**: Mascot SVG character with named pose vocabulary (idle / alert / speaking / squint / cover-ears / puff-up / wavy / lean-left / lean-right / punch-up / freeze / bounce / zipped / shocked / dancing / sleeping / winking)
-- [ ] **MASCOT-02**: Idle animation — breathing, blinking, gentle sway, occasional ear-wiggle
-- [ ] **MASCOT-03**: Reactive pose dispatching — MIDI events trigger named poses with magnitude-aware intensity
-- [ ] **MASCOT-04**: Mouth animation synced to AI TTS audio level (mascot "speaks" with Avery)
-- [ ] **MASCOT-05**: Eye-tracking — eyes follow the most-recent control the user touched (cross-modal feedback)
-- [ ] **MASCOT-06**: Beat-sync subtle bounce on the kick (when phase = groove/peak/drop)
-- [ ] **MASCOT-07**: Mascot in main session UI (corner placement, not blocking) + larger render in calibration wizard
+- [ ] **MASCOT-01**: Single 3D rigged mascot character — Meshy-AI-generated GLB with biped skeleton + named animation clip library (~5-10 clips covering idle/dance/talk/react states), normalized via Blender MCP. NOT a multi-character pet system — one mascot, mood variation via animation pool swap.
+- [ ] **MASCOT-02**: Superwhisper-style sticky floating overlay window — transparent background, always-on-top, **persistent across macOS Spaces / Windows virtual desktops**, drag-repositionable, resizable within bounds, click-through option toggleable in Settings. Separate Tauri window from main session UI; position persists across sessions.
+- [ ] **MASCOT-03**: Three.js scene + `AnimationMixer.crossFadeTo` state machine — every state transition crossfades (200-400ms blend); no T-pose snaps, no hard cuts except explicit particle-masked mood swap.
+- [ ] **MASCOT-04**: Beat-locked clip entry — when transitioning into idle/dance states, the new clip begins on bar boundary 1 using BPM + downbeat phase from `MusicState` (grounding stack). Talk/react states are interrupt-class and start immediately.
+- [ ] **MASCOT-05**: AI event → animation state dispatch — `track_change`, `drop`, `ai_generating_reply`, `ai_reply_done`, `manual_fire`, `phase_change`, `mood_swap` all map to specific named clip transitions with documented priority order.
+- [ ] **MASCOT-06**: Talk-state animation during AI TTS utterances — mascot plays `talk_loop` (or mood-specific equivalent) while `ai_generating_reply` is active; resumes prior idle/dance state on `ai_reply_done`.
+- [ ] **MASCOT-07**: Mood state system — hype-man / teacher / coach moods hot-swap the active Gemini TTS voice + animation clip pool + prompt vocabulary on the same rig within 500ms; transition masked by particle/puff effect; default mood = hype-man.
+- [ ] **MASCOT-08**: WS:8765 event bus subscription — mascot overlay window subscribes to vibemix's existing `levels` / `events` / `state` streams with <100ms AI-event-to-state-transition-start latency; reconnects on disconnect with 1s/2s/4s/8s backoff.
+- [ ] **MASCOT-09**: Menu-bar / system-tray icon — macOS top-right menu bar (NSStatusItem) + Windows notification area icon. Persistent always-running entry point — left-click toggles mascot overlay visibility, right-click popover surfaces mood selector + mute + open session UI + settings + quit. Icon state communicates session status (idle / live / ai_thinking / error). Closing the main session UI does NOT quit — quit requires explicit tray menu action.
 
 ### Distribution & Installer
 
@@ -131,7 +133,7 @@
 
 - [ ] **POLISH-01**: Dedicated polish phase (NOT a final-week sweep) — explicit phase with critique → execute loop until the bar passes
 - [ ] **POLISH-02**: Knob/fader physics — momentum, detent feel, magnitude-mapped visual response (match pro-audio software hierarchy: FL Studio / Ableton / Bitwig / Native Instruments)
-- [ ] **POLISH-03**: Mascot pose vocabulary visually refined to character-design-document quality (every pose deliberate, no procedural rigidity)
+- [ ] **POLISH-03**: Mascot animation library visually refined to character-design-document quality (every clip deliberate, smooth crossfades, no rigging artifacts, no T-pose snaps, no in-between frames that look broken)
 - [ ] **POLISH-04**: No "web app residue" anywhere — no default Tailwind shadows, no rounded-2xl-p-6 cards, no Inter, no purple gradients
 - [ ] **POLISH-05**: All copy passes the "no AI slop" filter (per `frontend-enforcement` skill)
 - [ ] **POLISH-06**: `gsd-ui-checker` + `gsd-ui-auditor` runs between iterations; phase only completes when both pass
@@ -270,13 +272,15 @@
 | UX-09 | Phase 12 | Settings panel — mid-session changes. |
 | UX-10 | Phase 12 | Recording retention policy in Settings (storage UX in Phase 15). |
 | UX-11 | Phase 11 | Status badges (LiveKit/Gemini/MIDI/screen) — initial wiring in shell; Phase 12 surfaces them in live UI. |
-| MASCOT-01 | Phase 13 | SVG mascot + named pose vocabulary. |
-| MASCOT-02 | Phase 13 | Idle animation (breathing/blink/sway/ear-wiggle). |
-| MASCOT-03 | Phase 13 | Reactive pose dispatch (MIDI-triggered + magnitude-aware). |
-| MASCOT-04 | Phase 13 | Mouth animation synced to TTS RMS. |
-| MASCOT-05 | Phase 13 | Eye-tracking follows last-touched control. |
-| MASCOT-06 | Phase 13 | Beat-sync bounce on kick. |
-| MASCOT-07 | Phase 13 | Mascot in session UI + larger in calibration wizard. |
+| MASCOT-01 | Phase 13 | Single 3D rigged mascot GLB (Meshy-generated) with biped skeleton + named animation clip library. |
+| MASCOT-02 | Phase 13 | Superwhisper-style sticky overlay — transparent, always-on-top, persists across Spaces/virtual desktops. |
+| MASCOT-03 | Phase 13 | Three.js + `AnimationMixer.crossFadeTo` state machine (200-400ms blend, no T-pose snaps). |
+| MASCOT-04 | Phase 13 | Beat-locked clip entry on bar boundary using BPM + downbeat from `MusicState`. |
+| MASCOT-05 | Phase 13 | AI event → animation state dispatch (track_change / drop / ai_reply / manual_fire / phase_change / mood_swap). |
+| MASCOT-06 | Phase 13 | Talk-state animation during AI TTS utterances. |
+| MASCOT-07 | Phase 13 | Mood state system — voice + clip pool + vocab hot-swap on same rig. |
+| MASCOT-08 | Phase 13 | WS:8765 event bus subscription with <100ms latency + reconnect backoff. |
+| MASCOT-09 | Phase 13 | Menu-bar (macOS) / tray icon (Windows) — persistent entry point, click toggles overlay, popover quick controls. |
 | DIST-01 | Phase 18 | PyInstaller `--onedir` (avoids `--onefile` AV false-positives). |
 | DIST-02 | Phase 18 | macOS signed + notarized DMG. |
 | DIST-03 | Phase 18 | Windows MSI via SignPath OSS cert + Inno Setup 6. |
@@ -293,7 +297,7 @@
 | VERIFY-06 | Phase 16 | Critique → execute → critique → execute loop per phase. |
 | POLISH-01 | Phase 14 | Dedicated polish phase — critique → execute loop. |
 | POLISH-02 | Phase 14 | Knob/fader physics matching pro-audio software. |
-| POLISH-03 | Phase 14 | Mascot pose vocabulary refined to character-design quality. |
+| POLISH-03 | Phase 14 | Mascot animation library refined to character-design quality (clips, crossfades, no rigging artifacts). |
 | POLISH-04 | Phase 14 | Zero web-app residue (no Tailwind defaults, no Inter, no purple gradients). |
 | POLISH-05 | Phase 14 | All copy passes `frontend-enforcement` skill filter. |
 | POLISH-06 | Phase 14 | `gsd-ui-checker` + `gsd-ui-auditor` green before phase completes. |
