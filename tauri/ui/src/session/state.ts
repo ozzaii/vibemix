@@ -47,6 +47,13 @@ export interface StatusFlags {
   screen: "ok" | "denied" | null;
 }
 
+/** Mascot personality + reaction-cadence preset (Phase 13 Area 4).
+ *  Defended at every boundary: TS narrows here, sidecar schema validates
+ *  on receive (Plan 13-05 extends ipc.settings.set). Invalid string values
+ *  on the wire are dropped by the ws-bridge and the field stays at its
+ *  current value. */
+export type MascotMood = "hype-man" | "teacher" | "coach";
+
 export interface SettingsView {
   voice: string;
   mode: "hype" | "coach";
@@ -55,6 +62,13 @@ export interface SettingsView {
   output_profile: "hp" | "spk";
   retention_days: number;
   push_to_mute_hotkey: string;
+  // --- Phase 13 (mascot overlay) additions --------------------------------
+  /** Personality preset — drives Gemini voice + clip-pool + vocab. Default
+   *  per CONTEXT.md Area 4 = "hype-man". */
+  mood: MascotMood;
+  /** When ON, the overlay window passes pointer events through to the app
+   *  beneath. Default OFF (window stays draggable). */
+  click_through: boolean;
 }
 
 export interface SessionState {
@@ -114,6 +128,8 @@ function makeDefault(): SessionState {
       output_profile: "hp",
       retention_days: 30,
       push_to_mute_hotkey: "cmd+shift+m",
+      mood: "hype-man",
+      click_through: false,
     },
     muted: false,
     cohostStatus: "IDLE",
