@@ -69,3 +69,10 @@ proxy/.venv/
 tauri/ui/node_modules/
 tauri/ui/dist/
 tauri/ui/.vite/
+
+# Phase 11 Wave 1 — PyInstaller sidecar build artifacts. ``build/`` and
+# ``dist/`` are already covered by the generic Python rules above; the
+# .spec files themselves stay TRACKED (they encode the bundling contract).
+# Only the per-triple Tauri externalBin output dir is ignored here.
+*.spec.tmp
+tauri/src-tauri/binaries/vibemix-core-*/
