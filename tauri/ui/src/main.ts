@@ -89,9 +89,11 @@ function applyBlurPerfPreference(lighter: boolean): void {
 
 /** Best-effort boot-time read of the `lighter_blur` performance setting.
  *
- *  Reads `ipc.settings.state` via the existing sidecar round-trip. The
- *  `lighter_blur` field is NOT yet part of the schema — Plan 14-04 adds it
- *  on both the IPC and the SettingsApplier side. Until then this read
+ *  Reads `ipc.settings.state` via the existing sidecar round-trip. Plan
+ *  14-04 lands the field as a FLAT boolean at the top of
+ *  `SettingsState.payload` (mirrors the existing `muted`/`voice`/... flat
+ *  shape — no nested `performance.*` grouping). Until SettingsApplier
+ *  persists the bit, the field is absent on the wire and this read
  *  gracefully returns false (the safe path: full blur on a missing field
  *  means newly-installed users get the full v5 visual contract).
  *
@@ -110,13 +112,10 @@ async function readBlurPerfPreference(): Promise<boolean> {
       "ipc.settings.state",
       2000,
     )) as { payload?: Record<string, unknown> };
-    // performance.lighter_blur lands in Plan 14-04 — index defensively so
-    // a missing field reads as "off" without ever throwing.
+    // Plan 14-04 — flat boolean field on SettingsState.payload. Index
+    // defensively so a missing field reads as "off" without ever throwing.
     const payload = resp?.payload as Record<string, unknown> | undefined;
-    const perf = payload?.["performance"] as
-      | { lighter_blur?: boolean }
-      | undefined;
-    return perf?.lighter_blur === true;
+    return payload?.["lighter_blur"] === true;
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("[boot] perf preference read failed:", err);

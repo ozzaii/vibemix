@@ -320,6 +320,48 @@ def test_unknown_field_returns_error(store):
 
 
 # ---------------------------------------------------------------------------
+# lighter_blur (Phase 14-04 — perf-blur preference)
+# ---------------------------------------------------------------------------
+
+
+def test_lighter_blur_happy_path_true(store, _redirect_config_path):
+    """Setting lighter_blur=True persists the flag without touching hooks."""
+    applier = SettingsApplier(config_store=store)
+    success, error = _apply(applier, "lighter_blur", True)
+    assert (success, error) == (True, None)
+    assert store.lighter_blur is True
+    # Verify atomic write landed on disk.
+    import json
+
+    on_disk = json.loads(_redirect_config_path.read_text())
+    assert on_disk["lighter_blur"] is True
+
+
+def test_lighter_blur_happy_path_false(store, _redirect_config_path):
+    """Setting lighter_blur=False persists and clears the bit."""
+    store.lighter_blur = True
+    applier = SettingsApplier(config_store=store)
+    success, error = _apply(applier, "lighter_blur", False)
+    assert (success, error) == (True, None)
+    assert store.lighter_blur is False
+    import json
+
+    on_disk = json.loads(_redirect_config_path.read_text())
+    assert on_disk["lighter_blur"] is False
+
+
+def test_lighter_blur_rejects_non_bool(store):
+    """Non-boolean payloads are rejected at the trust boundary."""
+    applier = SettingsApplier(config_store=store)
+    for bad in ("on", 1, 0, None, "true"):
+        success, error = _apply(applier, "lighter_blur", bad)
+        assert success is False
+        assert error and "bool" in error
+    # Store stays at default — invalid writes never reach disk.
+    assert store.lighter_blur is False
+
+
+# ---------------------------------------------------------------------------
 # Persistence happens
 # ---------------------------------------------------------------------------
 

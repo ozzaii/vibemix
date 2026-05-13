@@ -170,6 +170,8 @@ class SettingsApplier:
                 return await self._apply_mood(value)
             if field == "click_through":
                 return await self._apply_click_through(value)
+            if field == "lighter_blur":
+                return await self._apply_lighter_blur(value)
             return (False, f"unknown settings field: {field!r}")
         except Exception as e:  # pragma: no cover — guard against bad hooks
             log.exception("SettingsApplier.apply(%r, %r) raised", field, value)
@@ -355,6 +357,34 @@ class SettingsApplier:
         # untouched (no new top-level dataclass field, no schema bump in
         # config_store.py).
         self.config_store.extra["click_through"] = value
+        save_config(self.config_store)
+        return (True, None)
+
+    # ------------------------------------------------------------------
+    # Phase 14-04 — perf-blur preference
+    # ------------------------------------------------------------------
+
+    async def _apply_lighter_blur(self, value: Any) -> tuple[bool, str | None]:
+        """Apply the Settings → Performance → "Lighter blur" toggle.
+
+        Presentation-only — the user's preference for swapping the heavy
+        v5 backdrop blurs for lighter variants. The webview reads it at
+        boot (main.ts) and writes ``html[data-blur-perf="on"]`` which the
+        tokens.css cascade (Wave 2) picks up to swap ``--blur-glass-*``
+        without restart. No MusicState write, no ws_bus emit, no session
+        teardown — pure persistence so next launch restores the bit.
+
+        Threat T-14-04-03: presentation-only boolean; no PII surface.
+        """
+        if not isinstance(value, bool):
+            return (
+                False,
+                f"lighter_blur expects bool, got {type(value).__name__}",
+            )
+        # Top-level typed field — extends the Phase 12 ConfigStore surface
+        # (per Plan 14-04 ConfigStore extension) so SettingsState boot
+        # snapshots can include it without an ``extra`` round-trip.
+        self.config_store.lighter_blur = value
         save_config(self.config_store)
         return (True, None)
 
