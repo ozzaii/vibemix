@@ -1077,25 +1077,19 @@ If file size becomes a concern in Phase 18 install-size review: `pyftsubset` (fo
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **What screenshot tool does the executor use for "side-by-side screenshot pair attached to plan SUMMARY"?**
-   - What we know: Kaan-side or live `npm run tauri dev` mention in `14-UI-SPEC.md` Critique Loop Configuration table. No specific tool named.
-   - What's unclear: Whether `gsd-ui-checker` itself captures screenshots, or whether Kaan manually screencaps via macOS native + diff.
-   - Recommendation: Default to Kaan manually capturing via macOS Cmd+Shift+4 → drag-select the surface → save with descriptive filename (e.g., `wave-1-wizard-step-1.png`) + crop the mock §01 reference → attach both to the plan SUMMARY. If the `gsd-ui-checker` skill includes screenshot capture, it overrides this. Plan 14-01 can ask Kaan to confirm.
+1. **What screenshot tool does the executor use for "side-by-side screenshot pair attached to plan SUMMARY"?** — RESOLVED
+   - **Resolution:** Kaan captures via macOS native screenshot (`Cmd+Shift+4` → drag-select the surface). Files saved under `.planning/phases/14-cdj-whisper-v5-migration-polish/screenshots/<plan-id>-<surface>-cycle-<N>-{live,mock}.png` + a cropped excerpt of the corresponding mock section from `mocks/vibemix-direction-final.html`. Pair attached to each plan SUMMARY via relative path link. `gsd-ui-checker` does NOT capture screenshots in its current incarnation — Kaan does the visual capture; the skill provides the textual finding output.
 
-2. **Where does the `gsd-ui-checker` / `gsd-ui-auditor` output get written?**
-   - What we know: References to "ui-checker output ref" and "ui-auditor output ref" in the polish log table schema — implying file paths.
-   - What's unclear: Whether the GSD `gsd-ui-checker` skill writes to `.planning/phases/<phase>/audits/<surface>-cycle-<N>.md` or stdout-only.
-   - Recommendation: Plan 14-01 confirms with Kaan and pins the convention before wave 1.
+2. **Where does the `gsd-ui-checker` / `gsd-ui-auditor` output get written?** — RESOLVED
+   - **Resolution:** Each invocation writes to `.planning/phases/14-cdj-whisper-v5-migration-polish/audits/<surface>-cycle-<N>-{checker,auditor}.md`. Convention locked here; the polish log `14-POLISH-LOG.md` references each output file by relative path. Plan 14-01 creates the `audits/` subdirectory in Wave 0 + scaffolds `14-POLISH-LOG.md` with this convention pinned as a header note.
 
-3. **What's the EXACT incantation to invoke `gsd-ui-checker` and `gsd-ui-auditor` skills?**
-   - What we know: The names are referenced extensively in CONTEXT.md and 14-UI-SPEC.md but no command/agent invocation form is documented locally.
-   - Recommendation: Plan 14-01 documents the invocation form. May be `/gsd-ui-check <surface>` or via an agent spawn — assume orchestrator-spawned subagent until confirmed.
+3. **What's the EXACT incantation to invoke `gsd-ui-checker` and `gsd-ui-auditor` skills?** — RESOLVED
+   - **Resolution:** Orchestrator spawns each as a `Skill()` call: `Skill(skill="gsd-ui-checker", args="14 --surface=<wizard|session|settings|mascot>")` and `Skill(skill="gsd-ui-auditor", args="14 --surface=<surface>")`. The skill writes its output file (per Q2 resolution) and returns a short summary the orchestrator captures into the polish log. If a future GSD release changes the invocation form, Plan 14-01 documents this baseline + the executor adapts.
 
-4. **Should the wizard step-strip retoning (CONTEXT Area 2 wizard wave §Structural deltas) deletion of `step-indicator.ts` legacy refs happen in wave 1 OR be split into a step-strip-only task?**
-   - What we know: Wave 1 is "wizard surface", which includes step-indicator. UI-SPEC §Surface 1 component list includes `components/step-indicator.ts` — see step-strip retone above.
-   - Recommendation: Single wave 1 plan covers all 16 wizard files including step-indicator. The step-strip is small (7 legacy refs).
+4. **Should the wizard step-strip retoning deletion of `step-indicator.ts` legacy refs happen in wave 1 OR be split into a step-strip-only task?** — RESOLVED
+   - **Resolution:** Absorbed into Plan 14-02 Task 14-02-01. `step-indicator.ts` is in 14-02's `files_modified`. Single wave 1 plan covers all 16 wizard files including the step-strip. The step-strip is small (7 legacy refs) and doesn't justify its own task.
 
 ---
 
