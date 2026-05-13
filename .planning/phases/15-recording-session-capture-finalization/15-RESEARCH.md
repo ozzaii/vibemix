@@ -630,32 +630,32 @@ function teardownAudio(audio: HTMLAudioElement | null): void {
 
 **Total assumed claims: 8.** All are low-to-medium risk; none are blocking. The planner should validate A6 explicitly (recordings root location) during planning.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Recordings root: `cwd()/recordings` (POC) vs `$APPDATA/vibemix/recordings` (Tauri scope)?**
    - What we know: `VoiceRecorder.__init__` accepts an optional `root` parameter ([VERIFIED: recorder.py:45]); current call sites pass nothing → defaults to `Path.cwd() / "recordings"` ([VERIFIED: recorder.py:46, `__main__.py:287` `VoiceRecorder()`]). The Tauri assetProtocol scope needs an absolute, app-data-dir-relative path so that scoped reads work in production.
    - What's unclear: Should Phase 15 change the default to `_app_data_dir() / "recordings"`, OR pass an explicit root from `SessionLoop`/`__main__`?
-   - **Recommendation:** Change `__main__.py` to pass `recordings_root = _app_data_dir() / "recordings"` explicitly to `VoiceRecorder(root=recordings_root)`. Keep the `Path.cwd() / "recordings"` default for backward-compat with the POC v4 script (which still ships in-repo). This way Phase 15 doesn't break `cohost_v4.py` and aligns production with the Tauri scope. Plan must surface a CONTEXT amendment if Kaan disagrees.
+   - **RESOLVED:** Change `__main__.py` to pass `recordings_root = _app_data_dir() / "recordings"` explicitly to `VoiceRecorder(root=recordings_root)`. Keep the `Path.cwd() / "recordings"` default for backward-compat with the POC v4 script (which still ships in-repo). This way Phase 15 doesn't break `cohost_v4.py` and aligns production with the Tauri scope. Plan must surface a CONTEXT amendment if Kaan disagrees.
 
 2. **`recording://` scheme name vs Tauri's built-in `asset://`?**
    - What we know: CONTEXT.md Area 2 + UI-SPEC §Tauri Configuration Delta both prescribe `recording://session_dir/voice.wav`. Tauri 2's `assetProtocol` config registers ONLY the fixed `asset://` scheme.
    - What's unclear: Is the `recording://` name aspirational/cosmetic, or does it carry a security/branding rationale?
-   - **Recommendation:** Use the built-in `asset://` via `convertFileSrc()`. The scope mechanism already limits reads to `$APPDATA/vibemix/recordings/**`, so the security goal is met. If the planner wants the literal `recording://` scheme for cosmetic clarity, add a Rust `register_uri_scheme_protocol("recording", ...)` handler — it's ~30 lines, but it's a maintenance debt for zero new functionality. Recommend the built-in path; surface to user/discuss-phase only if asked.
+   - **RESOLVED:** Use the built-in `asset://` via `convertFileSrc()`. The scope mechanism already limits reads to `$APPDATA/vibemix/recordings/**`, so the security goal is met. If the planner wants the literal `recording://` scheme for cosmetic clarity, add a Rust `register_uri_scheme_protocol("recording", ...)` handler — it's ~30 lines, but it's a maintenance debt for zero new functionality. Recommend the built-in path; surface to user/discuss-phase only if asked.
 
 3. **Recordings index — recompute on every list, or maintain a persistent index file?**
    - What we know: CONTEXT Area 3 says "live read on drawer open + after each sweep". 200 sessions × ~5 syscalls each = ~1000 syscalls = <100ms on SSD.
    - What's unclear: Will users have >500 sessions in practice? (60 min/day × 7 days = 7 sessions; unbounded retention could mean hundreds over months.)
-   - **Recommendation:** Recompute on every list — at 200 sessions the cost is invisible. If real-world usage shows >1000 sessions, add a sidecar in-memory cache invalidated on session-close + delete + sweep. Don't pre-optimize.
+   - **RESOLVED:** Recompute on every list — at 200 sessions the cost is invisible. If real-world usage shows >1000 sessions, add a sidecar in-memory cache invalidated on session-close + delete + sweep. Don't pre-optimize.
 
 4. **Crashed-session detection — sweep-time, or boot-time-only?**
    - What we know: Crash detection needs a pass that finds `session.json` files with `ended_at_iso=null`.
    - What's unclear: Should this run only on boot, or also during periodic sweep?
-   - **Recommendation:** Boot-time only. Mid-session sweeps shouldn't touch the active session's session.json. Implementation: at `SessionLoop.run()` startup, before anything else, walk `recordings/*` and rewrite any session.json with `ended_at_iso=null AND mtime older than ~30s` to set `crashed=true`. This rewrite is a separate atomic write per file.
+   - **RESOLVED:** Boot-time only. Mid-session sweeps shouldn't touch the active session's session.json. Implementation: at `SessionLoop.run()` startup, before anything else, walk `recordings/*` and rewrite any session.json with `ended_at_iso=null AND mtime older than ~30s` to set `crashed=true`. This rewrite is a separate atomic write per file.
 
 5. **`session.json` version field — needed in v1?**
    - What we know: Plan adds `session_json_version: "1.0"`.
    - What's unclear: Is forward-compat versioning premature? POC has no equivalent.
-   - **Recommendation:** Include it. Marginal cost; saves a migration scramble in v2 when we add `gemini_model_used` or similar to the schema.
+   - **RESOLVED:** Include it. Marginal cost; saves a migration scramble in v2 when we add `gemini_model_used` or similar to the schema.
 
 ## Environment Availability
 
