@@ -273,7 +273,7 @@ Plans:
 - [x] 15-03-PLAN.md — RecordingsIndex (scandir + legacy-dir synth + path-traversal-gated delete) + run_retention_sweep (3 triggers, ∞ sentinel, best-effort) + SessionLoop/SettingsApplier wiring + Kaan-rig boot-prune acknowledgement checkpoint
 - [x] 15-04-PLAN.md — recording-browser.ts + recording-row.ts (CDJ Whisper v5 tokens, lazy-mount <audio> via convertFileSrc, IntersectionObserver chunked virtualization >50 rows, decoder teardown on collapse, confirmDialog variant: danger)
 - [x] 15-05-PLAN.md — SettingsDrawer RECORDING group wiring (drawer-open recordings.list, ipc.recordings.usage subscriber, optimistic delete, loading/error states) + Kaan-rig visual UAT checkpoint
-- [ ] 15-06-PLAN.md — tests: test_poc_compat.py (REC-01..04 reader-shape invariants) + test_60min_soak.py (@pytest.mark.slow — WAV+JSONL+session.json durability + tracemalloc gate) + RecordingsIndex.list perf assertion + slow marker registration
+- [x] 15-06-PLAN.md — tests: test_poc_compat.py (REC-01..04 reader-shape invariants) + test_60min_soak.py (@pytest.mark.slow — WAV+JSONL+session.json durability + tracemalloc gate) + RecordingsIndex.list perf assertion + slow marker registration
 
 ### Phase 16: Hallucination Verification Gate
 **Goal**: 30-session offline hallucination replay suite scores ≥95% grounded reactions before any installer build. Per-genre phase-detection F1 ≥85%. 60-minute soak test passes zero `session_error` events. Critique → execute → critique → execute loop runs against the suite until the gate passes.

@@ -93,6 +93,7 @@ Plan: 6 of 6
 | Phase 15 P01 | 10min | 2 tasks | 9 files |
 | Phase 15 P02 | 25min | 2 tasks | 12 files |
 | Phase 15 P05 | 8min | 2 tasks | 5 files |
+| Phase 15 P06 | 25min | 2 tasks | 4 files |
 
 ### Plan Execution Metrics
 
