@@ -1,9 +1,10 @@
 /* meter.ts — vertical 16-segment LED meter (UI-SPEC §4).
  *
- * Each meter is 56px wide × 200px tall: a --panel-deep frame with 16
- * stacked LED segments (bottom 5 --ok, middle 8 --phosphor-warm, top 3
- * --phosphor for clip warning) plus a separate peak-hold segment that
- * floats above the current level.
+ * Each meter is 56px wide × 200px tall: a --glass-3 frame with 16
+ * stacked LED segments running a Pioneer-CDJ amber ladder (safe at the
+ * bottom in --amber-pale, warm through the body in --amber, clip at the
+ * top in --amber-deep) plus a separate peak-hold needle that floats
+ * above the current level.
  *
  * Layout-thrash-free update path: the caller writes a single CSS custom
  * property to the meter root — `--meter-rms` (0..1) and `--meter-peak`

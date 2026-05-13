@@ -230,6 +230,30 @@
   --sp-3xl: var(--sp-7);   /* 64 */
 }
 
+/* === Perf fallback — accessibility + user-toggled lighter blur ======== */
+/* Two paths swap the heavy v5 blurs for lighter variants:
+ *   1. prefers-reduced-motion: reduce — OS-level accessibility (also
+ *      freezes the .border-anim sweep).
+ *   2. html[data-blur-perf="on"] — runtime escape hatch set by main.ts at
+ *      boot when the user has enabled Settings → Performance → Lighter
+ *      blur. The Settings drawer toggle that writes this attribute lands
+ *      in Plan 14-04; this plan ships the CSS path so 14-04 has wiring. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --blur-glass:         blur(16px);
+    --blur-glass-light:   blur(8px);
+    --blur-glass-display: blur(4px);
+    --motion-border-sweep: 0s;
+  }
+  .border-anim { animation: none; opacity: 0.6; }
+}
+
+html[data-blur-perf="on"] {
+  --blur-glass:         blur(16px);
+  --blur-glass-light:   blur(8px);
+  --blur-glass-display: blur(4px);
+}
+
 /* === Reset ============================================================= */
 *,
 *::before,
