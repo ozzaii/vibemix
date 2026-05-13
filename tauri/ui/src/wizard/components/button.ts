@@ -1,13 +1,20 @@
-/* button.ts — Primary CTA + Secondary button (UI-SPEC §3 + §4).
+/* button.ts — Primary CTA + Secondary button (UI-SPEC §3 + §4 / CDJ Whisper v5).
  *
  * Single module for both variants because they share the same shell;
- * only borders + colors differ. State enum lifted verbatim from UI-SPEC
- * §3 table (disabled / idle / armed / hover-armed / pressed-armed /
- * loading) — applied via data-state attribute so CSS owns every
- * transition.
+ * only borders + colors differ. State enum (disabled / idle / armed /
+ * hover-armed / pressed-armed / loading) applied via data-state so CSS
+ * owns every transition.
  *
- * Min-width 144px, padding 12px 24px, Workbench 11px UPPERCASE 0.22em,
- * border-radius 4px, trailing `→` glyph in DM Mono per UI-SPEC.
+ * v5 anatomy:
+ *   - idle: --glass-2 + --glass-edge 1px border, inset --glass-top top
+ *     sheen + rgba(0,0,0,0.45) bottom hairline (mock §02 .btn).
+ *   - armed: amber backlight via linear-gradient(180deg, rgba(255,138,61,0.09),
+ *     rgba(255,138,61,0.025)) + --amber-40 inset bottom + --amber-22
+ *     inner glow (mock §02 .btn.on internal backlight, no external halo).
+ *   - pressed-armed: --void-2 deep recess with inset shadows.
+ *
+ * Typography: Saira var(--type-display) wdth 85 wght 600 10px UPPERCASE
+ * 0.22em tracking; trailing `→` in JetBrains Mono var(--type-mono).
  *
  * Anti-pattern guards:
  *   - No hover micro-effects beyond UI-SPEC §Motion Budget (150ms ease-out).

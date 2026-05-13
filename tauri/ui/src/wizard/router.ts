@@ -24,7 +24,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { emitIpc, sendIpcRequest, subscribeIpc } from "../ipc/client.js";
-import { MascotCorner } from "./components/mascot-corner.js";
 import { StatusBar } from "./components/status-bar.js";
 import type { StatusBarProps } from "./components/status-bar.js";
 import { StepIndicator } from "./components/step-indicator.js";
@@ -199,10 +198,9 @@ function rerender(): void {
 export function renderCurrentStep(): void {
   const stepStripMount = document.getElementById("wizard-step-strip");
   const primaryMount = document.getElementById("wizard-primary");
-  const mascotMount = document.getElementById("mascot-corner");
   const statusMount = document.getElementById("status-bar");
 
-  if (!stepStripMount || !primaryMount || !mascotMount || !statusMount) {
+  if (!stepStripMount || !primaryMount || !statusMount) {
     console.warn("[router] wizard DOM mounts missing");
     return;
   }
@@ -341,7 +339,6 @@ export function renderCurrentStep(): void {
   }
 
   renderInto(primaryMount, primary);
-  mascotMount.replaceChildren(MascotCorner());
   statusMount.replaceChildren(StatusBar(wizardState.statusBar));
 }
 

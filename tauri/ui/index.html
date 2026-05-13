@@ -5,15 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>vibemix</title>
     <!--
-      Phase 11 Wave 3 — wizard UI surfaces.
+      Wizard UI surface — CDJ Whisper v5.
 
-      Token system lifted verbatim from .planning/phases/11-tauri-shell-calibration-wizard/11-UI-SPEC.md
-      via tokens.css. 11 components + 5 step modules render the 3-step
-      calibration wizard with the anodised charcoal + phosphor amber
-      retro-futurist-hardware aesthetic from mocks/vibemix-app-ui.html.
+      Token system lifted verbatim from .planning/phases/14-cdj-whisper-v5-migration-polish/
+      14-UI-SPEC.md via tokens.css. Components render the 3-step calibration
+      wizard with the deep-glass + amber sign-of-life aesthetic from
+      mocks/vibemix-direction-final.html.
 
-      Wave 4 wires the ipc.* requests + replaces window.__vibemixDev mocks
-      with real device probes / MIDI listens.
+      Phase 14 Wave 1 collapsed the wizard grid to single-column — the
+      256×256 mascot-corner is gone (Phase 13 mascot is now an overlay
+      window, not embedded). IPC wiring lives in src/wizard/router.ts.
     -->
     <link rel="stylesheet" href="/src/tokens.css" />
   </head>
@@ -28,7 +29,6 @@
         <div id="wizard-step-strip"></div>
         <div class="wizard-grid">
           <section id="wizard-primary" class="primary-panel-mount"></section>
-          <aside id="mascot-corner"></aside>
         </div>
         <div id="wizard-cta-row" class="cta-row"></div>
       </main>
