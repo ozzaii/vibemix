@@ -1,0 +1,455 @@
+# =============================================================================
+# vibemix — Release Matrix Driver (Phase 18 Plan 18-05)
+# =============================================================================
+#
+# Triggers:
+#   - `push` of a tag matching `v*` (production release)
+#   - `workflow_dispatch` (manual rehearsal; pass `dry_run: true` to skip
+#     publish stages even when secrets are available)
+#
+# Matrix:
+#   - macos-14 (Apple Silicon — minimum target per Phase 18 CONTEXT §Area 2)
+#   - windows-latest (per Phase 18 CONTEXT §Area 3)
+#
+# Per-OS stages (5):
+#   1. BUILD    — `scripts/build_sidecar.py --spec vibemix-core.<os>.spec`
+#                 then `cargo tauri build` against the Tauri wrapper.
+#   2. SIGN     — macOS: `scripts/dist/sign_macos.sh` (Plan 18-02 chain:
+#                 codesign + create-dmg + notarytool + stapler)
+#                 Windows: `signpath/github-action-submit-signing-request@v1.2.0`
+#                 (Plan 18-03 SignPath OSS flow).
+#   3. PACKAGE  — macOS: DMG produced by sign_macos.sh stage 4.
+#                 Windows: `iscc installer/windows/vibemix-installer.iss`
+#                 (Plan 18-03 Inno Setup 6 → vibemix-installer.msi).
+#   4. VERIFY   — `python -m scripts.dist.verify_binary <bundle>` (Plan 18-01
+#                 AIza-pattern leak gate). ALWAYS runs, even in mock-signing
+#                 fallback — protects against leaked keys reaching unsigned
+#                 PR artifacts.
+#   5. PUBLISH  — `softprops/action-gh-release@v2` uploads DMG/MSI/manifest
+#                 to GitHub Releases (draft mode); curl POSTs signed
+#                 `latest.json` to api.altidus.world (Plan 18-04 contract).
+#
+# Cross-plan integration:
+#   Plan 18-01 → verify stage (`scripts/dist/verify_binary.py`)
+#   Plan 18-02 → macOS sign stage (`scripts/dist/sign_macos.sh`)
+#   Plan 18-03 → Windows package stage (`installer/windows/vibemix-installer.iss`)
+#   Plan 18-04 → publish stage (`scripts/dist/sign_manifest.sh`,
+#                placeholder-pubkey-gate against `tauri/src-tauri/tauri.conf.json5`)
+#
+# Mock-signing fallback (T-18-18 mitigation, see threat model):
+#   When ANY of APPLE_DEVELOPER_ID_P12_BASE64 / SIGNPATH_API_TOKEN /
+#   TAURI_UPDATER_PRIVATE_KEY are absent (fork PRs, dry-runs, or before
+#   Kaan configures the secrets), the workflow runs BUILD → VERIFY only.
+#   Sign + package + publish stages are skipped. The verify stage still
+#   runs on the UNSIGNED bundle so leak detection never goes offline.
+#
+# Secret discipline:
+#   - All 14 secrets referenced as `${{ secrets.XXX }}`; ZERO values inline.
+#   - `set +x` applied before every block that exports a secret env var.
+#   - GitHub Actions auto-masks the values it reads from `secrets` context.
+#   - Inventory + provenance in `.github/workflows/README.md`.
+#
+# Runbook: `docs/release-process.md`
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build + verify only; skip sign/package/publish even if secrets are present"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write   # Required for softprops/action-gh-release to create the release
+  id-token: write   # Reserved — OIDC adoption is a Phase 20 follow-up
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Wave 0 — Pre-flight gates.
+  # ---------------------------------------------------------------------------
+
+  detect-signing-mode:
+    name: Detect signing mode
+    runs-on: ubuntu-latest
+    outputs:
+      signing_available: ${{ steps.check.outputs.signing_available }}
+    steps:
+      - id: check
+        env:
+          # NOTE: secrets accessed here ONLY to test for presence; values are
+          # never echoed or persisted. GitHub masks them in any incidental
+          # log emission. `set +x` is applied before the conditional read.
+          HAS_APPLE: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 != '' }}
+          HAS_SIGNPATH: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+          HAS_TAURI_KEY: ${{ secrets.TAURI_UPDATER_PRIVATE_KEY != '' }}
+        run: |
+          set +x   # defensive — never echo secret-presence boolean composition
+          if [[ "$HAS_APPLE" == "true" && "$HAS_SIGNPATH" == "true" && "$HAS_TAURI_KEY" == "true" ]]; then
+            echo "signing_available=true" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets present — full release mode."
+          else
+            echo "signing_available=false" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets absent — mock-signing dry-run mode."
+          fi
+
+  placeholder-pubkey-gate:
+    name: Reject placeholder updater pubkey
+    runs-on: ubuntu-latest
+    # Gate fires only on tagged release pushes; PRs and workflow_dispatch
+    # skip this check so the dev loop is unblocked while Kaan generates the
+    # keypair. Tagged releases MUST have the real pubkey baked in.
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify pubkey is not the Phase 18-04 placeholder
+        run: |
+          set -e
+          if grep -q 'TAURI_UPDATER_PLACEHOLDER\|dW50cnVzdGVkIGNvbW1lbnQ6IFRBVVJJX1VQREFURVJfUExBQ0VIT0xERVI=' tauri/src-tauri/tauri.conf.json5; then
+            echo "::error::tauri.conf.json5 still contains the TAURI_UPDATER_PLACEHOLDER pubkey." >&2
+            echo "::error::Generate a real keypair per tauri/src-tauri/keys/README.md and replace the placeholder before tagging." >&2
+            exit 1
+          fi
+          echo "Pubkey placeholder gate clean."
+
+  # ---------------------------------------------------------------------------
+  # Wave 1 — Parallel build matrix.
+  # ---------------------------------------------------------------------------
+
+  build-macos:
+    name: Build macOS (Apple Silicon)
+    runs-on: macos-14
+    needs: [detect-signing-mode, placeholder-pubkey-gate]
+    # `always()` keeps this job alive when placeholder-pubkey-gate is SKIPPED
+    # (non-tag push); we only abort when it actually FAILED.
+    if: always() && needs.placeholder-pubkey-gate.result != 'failure'
+    env:
+      SIGNING_AVAILABLE: ${{ needs.detect-signing-mode.outputs.signing_available }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: astral-sh/setup-uv@v3
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install macOS build deps (create-dmg)
+        run: |
+          brew install create-dmg
+
+      # ---- Stage 1 — BUILD --------------------------------------------------
+      - name: BUILD — PyInstaller sidecar via build_sidecar.py
+        run: |
+          uv sync --frozen
+          uv run python scripts/build_sidecar.py --spec vibemix-core.macos.spec
+
+      - name: BUILD — Tauri app (cargo tauri build)
+        working-directory: tauri
+        run: |
+          npm ci
+          npm run build
+          cd src-tauri
+          cargo tauri build
+
+      # ---- Stage 2 + 3 — SIGN + PACKAGE (DMG + notarize + staple) ----------
+      - name: SIGN + PACKAGE — codesign / create-dmg / notarytool / stapler
+        if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
+        env:
+          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+          APPLE_DEVELOPER_ID_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 }}
+          APPLE_DEVELOPER_ID_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_PASSWORD }}
+          APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_KEY_ISSUER: ${{ secrets.APPLE_API_KEY_ISSUER }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          CI: "true"
+        run: |
+          set +x   # secret env vars in scope — never echo
+          chmod +x scripts/dist/sign_macos.sh
+          ./scripts/dist/sign_macos.sh tauri/src-tauri/target/release/bundle/macos/vibemix.app
+
+      # ---- Stage 4 — VERIFY (ALWAYS runs, even in mock-signing) ------------
+      - name: VERIFY — AIza scan + key-pattern grep (post-sign or unsigned)
+        run: |
+          # In full-mode the signed + notarized + stapled DMG is the canonical
+          # leak-detection surface (signing rewrites Mach-O headers and could
+          # in theory re-introduce a leak; checking post-sign is the gate).
+          # In mock-mode we still scan the unsigned .app so a leaked key in a
+          # PR cannot reach a tagged release through a green CI run.
+          if [[ "$SIGNING_AVAILABLE" == "true" && "$DRY_RUN" != "true" ]]; then
+            TARGET=$(ls dist/vibemix-*.dmg 2>/dev/null | head -1 || echo "")
+            if [[ -z "$TARGET" || ! -f "$TARGET" ]]; then
+              TARGET="tauri/src-tauri/target/release/bundle/macos/vibemix.app"
+            fi
+          else
+            TARGET="tauri/src-tauri/target/release/bundle/macos/vibemix.app"
+          fi
+          echo "Verifying: $TARGET"
+          mkdir -p dist
+          uv run python -m scripts.dist.verify_binary "$TARGET" --report dist/verify-report-macos.json
+
+      # ---- Stage 5 — UPLOAD artifact for publish job ------------------------
+      - name: Upload macOS artifacts (mock or signed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: |
+            dist/vibemix-*.dmg
+            tauri/src-tauri/target/release/bundle/macos/vibemix.app
+            dist/verify-report-macos.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    needs: [detect-signing-mode, placeholder-pubkey-gate]
+    if: always() && needs.placeholder-pubkey-gate.result != 'failure'
+    env:
+      SIGNING_AVAILABLE: ${{ needs.detect-signing-mode.outputs.signing_available }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: astral-sh/setup-uv@v3
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Inno Setup 6 (chocolatey)
+        shell: pwsh
+        run: |
+          # Pin to 6.4.x per Phase 18 CONTEXT §specifics.
+          choco install innosetup --version=6.4.0 -y --no-progress
+
+      - name: Download VC++ 2015-2022 Redistributable (x64)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer/windows/redist | Out-Null
+          # aka.ms permalink redirects to the current 14.x release; PyInstaller
+          # bundles need the VC++ runtime on stripped Win 11 installs.
+          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile installer/windows/redist/vc_redist.x64.exe
+
+      # ---- Stage 1 — BUILD --------------------------------------------------
+      - name: BUILD — PyInstaller sidecar via build_sidecar.py
+        shell: pwsh
+        run: |
+          uv sync --frozen
+          uv run python scripts/build_sidecar.py --spec vibemix-core.windows.spec
+
+      - name: BUILD — Tauri app (cargo tauri build)
+        working-directory: tauri
+        shell: pwsh
+        run: |
+          npm ci
+          npm run build
+          cd src-tauri
+          cargo tauri build
+
+      - name: BUILD — Upload unsigned binaries for SignPath request
+        if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibemix-binaries-unsigned
+          path: |
+            dist/vibemix/vibemix.exe
+            dist/vibemix/_internal/**
+          retention-days: 1
+
+      # ---- Stage 2 — SIGN (SignPath OSS flow per Plan 18-03) ---------------
+      - name: SIGN — Submit signing request to SignPath
+        if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
+        uses: signpath/github-action-submit-signing-request@v1.2.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: vibemix-binaries
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist/signed-binaries/
+
+      # ---- Stage 3 — PACKAGE (Inno Setup compile → vibemix-installer.msi) --
+      - name: PACKAGE — Compile vibemix-installer.msi via ISCC
+        if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
+        shell: pwsh
+        env:
+          SIGNPATH_SIGNTOOL_CMD: ${{ secrets.SIGNPATH_SIGNTOOL_CMD }}
+        run: |
+          # Strip the leading 'v' from tag refs: refs/tags/v0.1.0 → 0.1.0
+          $rawRef = "${env:GITHUB_REF}"
+          if ($rawRef -like "refs/tags/v*") {
+            $version = $rawRef -replace "^refs/tags/v",""
+          } else {
+            $version = "0.0.0-dispatch"
+          }
+          # version.txt is consumed by GetFileVersion() in the .iss header.
+          Set-Content -Path installer/windows/version.txt -Value $version
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\iscc.exe"
+          if (-not (Test-Path $iscc)) { $iscc = "$env:ProgramFiles\Inno Setup 6\iscc.exe" }
+          & "$iscc" `
+              "/DAppVersion=$version" `
+              "/DSourceDir=..\..\dist\signed-binaries" `
+              "/DOutputDir=..\..\output" `
+              "installer\windows\vibemix-installer.iss"
+
+      # ---- Stage 4 — VERIFY (ALWAYS runs, even in mock-signing) ------------
+      - name: VERIFY — AIza scan + key-pattern grep (post-sign or unsigned)
+        shell: pwsh
+        run: |
+          if ($env:SIGNING_AVAILABLE -eq "true" -and $env:DRY_RUN -ne "true" -and (Test-Path "output/vibemix-installer.msi")) {
+            $target = "output/vibemix-installer.msi"
+          } else {
+            $target = "dist/vibemix/vibemix.exe"
+          }
+          Write-Host "Verifying: $target"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          uv run python -m scripts.dist.verify_binary $target --report dist/verify-report-windows.json
+
+      # ---- Stage 5 — UPLOAD artifact ----------------------------------------
+      - name: Upload Windows artifacts (mock or signed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: |
+            output/vibemix-installer.msi
+            dist/vibemix/vibemix.exe
+            dist/verify-report-windows.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Wave 2 — Publish to GitHub Releases + sign + POST updater manifest.
+  # ---------------------------------------------------------------------------
+
+  release-publish:
+    name: Publish to GitHub Releases + sign manifest
+    runs-on: ubuntu-latest
+    needs: [detect-signing-mode, build-macos, build-windows]
+    # Tag-gated AND secrets-gated. PR / workflow_dispatch / mock-mode never
+    # reaches this job — protecting against accidental publish from a fork.
+    if: startsWith(github.ref, 'refs/tags/v') && needs.detect-signing-mode.outputs.signing_available == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts/
+
+      - name: PUBLISH — Sign updater manifest (latest.json) via Tauri signer
+        env:
+          TAURI_UPDATER_PRIVATE_KEY: ${{ secrets.TAURI_UPDATER_PRIVATE_KEY }}
+          TAURI_UPDATER_KEY_PASSWORD: ${{ secrets.TAURI_UPDATER_KEY_PASSWORD }}
+        run: |
+          set +x   # private key value must NEVER hit logs
+          chmod +x scripts/dist/sign_manifest.sh
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          # The DMG basename pattern is locked by sign_macos.sh stage 4.
+          MACOS_DMG=$(ls release-artifacts/macos-artifacts/vibemix-*.dmg 2>/dev/null | head -1)
+          MACOS_BASENAME=$(basename "$MACOS_DMG")
+          ./scripts/dist/sign_manifest.sh \
+              --version "$VERSION" \
+              --macos-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${MACOS_BASENAME}" \
+              --windows-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/vibemix-installer.msi" \
+              --notes "Release ${{ github.ref_name }}" \
+              --output release-artifacts/latest.json
+
+      - name: PUBLISH — POST signed manifest to api.altidus.world
+        env:
+          BRAVOH_MANIFEST_UPLOAD_TOKEN: ${{ secrets.BRAVOH_MANIFEST_UPLOAD_TOKEN }}
+        run: |
+          set +x   # bearer token must NEVER hit logs
+          # Best-effort POST — endpoint may 404 until Bravoh ops deploys
+          # /vibemix/updates/upload per docs/updater.md §Server contract.
+          # The workflow does NOT fail on 404; the manifest is also attached
+          # to the GitHub Release for fallback consumption.
+          if [[ -n "${BRAVOH_MANIFEST_UPLOAD_TOKEN:-}" ]]; then
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                -X POST \
+                -H "Authorization: Bearer ${BRAVOH_MANIFEST_UPLOAD_TOKEN}" \
+                -H "Content-Type: application/json" \
+                --data-binary @release-artifacts/latest.json \
+                "https://api.altidus.world/vibemix/updates/upload" || echo "000")
+            echo "Manifest POST → HTTP ${HTTP_CODE}"
+            if [[ "$HTTP_CODE" == "404" ]]; then
+              echo "::warning::api.altidus.world/vibemix/updates/upload returned 404 — Bravoh-side endpoint not yet deployed. Manifest will be served from GitHub Releases until then."
+            elif [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" && "$HTTP_CODE" != "202" && "$HTTP_CODE" != "204" ]]; then
+              echo "::warning::Unexpected HTTP ${HTTP_CODE} from manifest upload — manifest still attached to GH Release."
+            fi
+          else
+            echo "::warning::BRAVOH_MANIFEST_UPLOAD_TOKEN absent — skipping manifest POST."
+          fi
+
+      - name: PUBLISH — Create GitHub Release (draft) with all signed artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-artifacts/macos-artifacts/vibemix-*.dmg
+            release-artifacts/windows-artifacts/vibemix-installer.msi
+            release-artifacts/latest.json
+            release-artifacts/macos-artifacts/verify-report-macos.json
+            release-artifacts/windows-artifacts/verify-report-windows.json
+          # v1 draft → Kaan reviews + clicks Publish manually. v2 can flip
+          # to false once fresh-machine rehearsal is wired in Phase 20.
+          draft: true
+          body: |
+            ## vibemix ${{ github.ref_name }}
+
+            Signed builds for macOS (Apple Silicon) + Windows (x64). The
+            attached `latest.json` is the Tauri-signed updater manifest
+            consumed by `api.altidus.world/vibemix/updates/...` per
+            `docs/updater.md`.
+
+            ### Verification
+
+            `verify-report-macos.json` + `verify-report-windows.json` confirm
+            zero `AIza`/`AKIA`/`ya29.`/`sk-` key patterns + zero 39-char
+            Google-key shapes detected in the signed bundles
+            (Plan 18-01 leak-detection gate).
+
+            ### Install
+
+            - **macOS:** download the `.dmg`, open, drag `vibemix.app` to
+              `/Applications`.
+            - **Windows:** download `vibemix-installer.msi`, double-click,
+              follow the installer.
+
+            Update prompts honour the `update_check_on_launch` setting in
+            the Settings drawer (default `true`; opt-out per
+            `docs/updater.md`).
+          token: ${{ secrets.GITHUB_TOKEN }}
