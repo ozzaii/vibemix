@@ -20,6 +20,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import { initCrashBanner } from "./crash-banner.js";
+import { sendIpcRequest } from "./ipc/client.js";
 import { isIpcMessage, parseIpcMessage } from "./ipc/validator.js";
 import { routeSession } from "./session/router.js";
 import {
@@ -73,6 +74,56 @@ interface FirstRunStateView {
   first_run_completed?: boolean;
 }
 
+/** Apply the user's "Lighter blur" performance preference to the document
+ *  by writing/clearing the `data-blur-perf` attribute on <html>. tokens.css
+ *  reads the attribute via the cascade rule
+ *  `html[data-blur-perf="on"] { --blur-glass-* : … }` and swaps the heavy
+ *  v5 blurs for lighter variants. The Settings → Performance toggle that
+ *  flips this attribute live lands in Plan 14-04; this boot read keeps
+ *  the surface honest from first paint when the preference is persisted.
+ */
+function applyBlurPerfPreference(lighter: boolean): void {
+  if (lighter) document.documentElement.setAttribute("data-blur-perf", "on");
+  else document.documentElement.removeAttribute("data-blur-perf");
+}
+
+/** Best-effort boot-time read of the `lighter_blur` performance setting.
+ *
+ *  Reads `ipc.settings.state` via the existing sidecar round-trip. The
+ *  `lighter_blur` field is NOT yet part of the schema — Plan 14-04 adds it
+ *  on both the IPC and the SettingsApplier side. Until then this read
+ *  gracefully returns false (the safe path: full blur on a missing field
+ *  means newly-installed users get the full v5 visual contract).
+ *
+ *  Failure modes (all default to "off"):
+ *   - Outside Tauri (Vite dev with no sidecar route)
+ *   - Sidecar not yet ready (10s timeout in sendIpcRequest by default;
+ *     we use a tighter 2s here so boot is never blocked on perf prefs)
+ *   - Schema violation on the response
+ *   - Field absent on a current/older sidecar build
+ */
+async function readBlurPerfPreference(): Promise<boolean> {
+  try {
+    const resp = (await sendIpcRequest(
+      "ipc.settings.get",
+      {},
+      "ipc.settings.state",
+      2000,
+    )) as { payload?: Record<string, unknown> };
+    // performance.lighter_blur lands in Plan 14-04 — index defensively so
+    // a missing field reads as "off" without ever throwing.
+    const payload = resp?.payload as Record<string, unknown> | undefined;
+    const perf = payload?.["performance"] as
+      | { lighter_blur?: boolean }
+      | undefined;
+    return perf?.lighter_blur === true;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[boot] perf preference read failed:", err);
+    return false;
+  }
+}
+
 async function shouldShowWizard(): Promise<boolean> {
   // Phase 11 read_first_run_state Tauri command reads the
   // tauri-plugin-store-backed config.json. Returns the default record
@@ -91,6 +142,15 @@ async function shouldShowWizard(): Promise<boolean> {
 async function boot(): Promise<void> {
   consumeUrlParam();
   initCrashBanner();
+
+  // Apply boot-time perf-blur preference (CONTEXT Area 3). Reads from
+  // the existing settings IPC; defaults off if the field is absent (the
+  // safe path — full v5 visual contract). Plan 14-04 wires the Settings
+  // drawer toggle that updates this attribute live. Independently, the
+  // OS-level prefers-reduced-motion media query already routes through
+  // the same tokens.css cascade — we ALSO subscribe to that here so an
+  // a11y toggle flips the attribute without a reload.
+  applyBlurPerfPreference(await readBlurPerfPreference());
 
   // DEV-only: `?dev=session-mock` bypasses both the wizard check and the
   // Tauri IPC bridge — mounts the live session UI with a local animator
