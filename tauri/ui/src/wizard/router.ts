@@ -28,11 +28,12 @@ import { StatusBar } from "./components/status-bar.js";
 import type { StatusBarProps } from "./components/status-bar.js";
 import { StepIndicator } from "./components/step-indicator.js";
 import { renderSmokeTest, type SmokeTestState } from "./smoke-test.js";
+import { renderStep0Intro } from "./step0-intro.js";
 import { renderStep1, type Step1State } from "./step1-permissions.js";
 import { renderStep2, type Step2State } from "./step2-output-device.js";
 import { renderStep3, type Step3State } from "./step3-controller.js";
 
-export type WizardStep = "permissions" | "audio" | "controller" | "smoke-test" | "done";
+export type WizardStep = "intro" | "permissions" | "audio" | "controller" | "smoke-test" | "done";
 
 export interface WizardState {
   currentStep: WizardStep;
@@ -45,7 +46,10 @@ export interface WizardState {
 }
 
 const DEFAULT_STATE: WizardState = {
-  currentStep: "permissions",
+  // Impeccable Wave 1.2 (2026-05-14): wizard now starts at "intro" — the
+  // VIBEMIX / DJ FRIEND / IN YOUR EAR hero. One click advances to
+  // permissions; the intro is never seen again post-install.
+  currentStep: "intro",
   step1: {
     screenRecording: "pending",
     microphone: "pending",
@@ -205,7 +209,11 @@ export function renderCurrentStep(): void {
     return;
   }
 
-  if (wizardState.currentStep === "smoke-test") {
+  // Intro hero + smoke-test both own the full surface — no step strip.
+  if (
+    wizardState.currentStep === "intro" ||
+    wizardState.currentStep === "smoke-test"
+  ) {
     stepStripMount.replaceChildren();
   } else {
     stepStripMount.replaceChildren(stepStripFor(wizardState.currentStep));
@@ -213,6 +221,11 @@ export function renderCurrentStep(): void {
 
   let primary: HTMLElement;
   switch (wizardState.currentStep) {
+    case "intro":
+      primary = renderStep0Intro({
+        onBegin: () => advanceTo("permissions"),
+      });
+      break;
     case "permissions":
       primary = renderStep1(wizardState.step1, {
         platform: wizardState.platform,
