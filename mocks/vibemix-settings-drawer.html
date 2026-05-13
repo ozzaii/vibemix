@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vibemix · Settings Drawer · CDJ Whisper · 2026-05-14</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@75..125,300..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ──────────────────────────────────────────────────────────────────────────
+   CDJ WHISPER · SETTINGS DRAWER · DESIGN CONTRACT
+   2026-05-14 · written after the hardcore critique that found the shipped
+   recording-browser / retention-slider / performance-toggle had drifted
+   visually because they were built without a mock to chase. This file is
+   the missing target. All glass, silk and amber values are token-derived;
+   the only hex you'll find sits in :root. Every component below is a
+   reshape-able contract — future drawer work starts here.
+   ──────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Void stack — five cool blacks */
+  --void:    #000000;
+  --void-1:  #020205;
+  --void-2:  #05070b;
+  --void-3:  #0a0c12;
+  --void-4:  #11141c;
+
+  /* Glass surfaces — sealed, deck-as-material */
+  --glass-1:  rgba(8, 10, 16, 0.78);   /* the drawer itself */
+  --glass-2:  rgba(12, 14, 22, 0.62);  /* rows + group bodies */
+  --glass-3:  rgba(2, 3, 6, 0.88);     /* recessed (readouts, expand panel) */
+  --glass-edge:     rgba(255, 255, 255, 0.065);
+  --glass-edge-up:  rgba(255, 255, 255, 0.110);
+  --glass-top:      rgba(255, 255, 255, 0.055);
+
+  /* Silk text */
+  --silk:    #d6cfc7;
+  --silk-65: rgba(214, 207, 199, 0.65);
+  --silk-40: rgba(214, 207, 199, 0.40);
+  --silk-22: rgba(214, 207, 199, 0.22);
+  --silk-12: rgba(214, 207, 199, 0.12);
+
+  /* Amber — deck light */
+  --amber:       #ff8a3d;
+  --amber-deep:  #ff5a1a;
+  --amber-pale:  #ffb88a;
+  --amber-22:    rgba(255, 138, 61, 0.22);
+  --amber-40:    rgba(255, 138, 61, 0.40);
+  --amber-65:    rgba(255, 138, 61, 0.65);
+
+  /* Rave ambient (body only, never on chrome) */
+  --rave-magenta: rgba(192, 56, 224, 0.055);
+  --rave-pink:    rgba(255, 92, 188, 0.038);
+  --rave-cyan:    rgba(72, 152, 255, 0.042);
+  --rave-purple:  rgba(118, 56, 224, 0.030);
+  --rave-teal:    rgba(64, 220, 200, 0.022);
+
+  /* Status LEDs */
+  --led-ok:    #6dd44a;
+  --led-warn:  #f4c542;
+  --led-fault: #d4413a;
+
+  /* Glass blurs */
+  --blur-glass:        blur(32px) saturate(140%);
+  --blur-glass-light:  blur(16px) saturate(120%);
+  --blur-glass-display:blur(6px)  saturate(105%);
+
+  /* Restrained glow */
+  --glow-faint:  0 0 5px var(--amber-22);
+  --glow-soft:   0 0 6px var(--amber-40), 0 0 14px var(--amber-22);
+  --glow-strong: 0 0 8px var(--amber-65), 0 0 18px var(--amber-22);
+
+  /* Type */
+  --type-display: 'Saira', system-ui, sans-serif;
+  --type-body:    'Saira', system-ui, sans-serif;
+  --type-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  /* Spacing */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 40px; --sp-7: 64px; --sp-8: 96px;
+
+  /* Radius */
+  --rad-sm: 2px;
+  --rad-md: 6px;
+  --rad-lg: 10px;
+
+  /* Drawer width */
+  --drawer-w: 480px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #000;
+  color: var(--silk);
+  font-family: var(--type-body);
+  font-weight: 400;
+  font-size: 14px;
+  font-variation-settings: "wdth" 100, "wght" 400;
+  line-height: 1.45;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-image:
+    radial-gradient(ellipse 92% 78% at 50% 45%, transparent 0%, rgba(0,0,0,0.5) 75%, rgba(0,0,0,0.9) 100%),
+    radial-gradient(ellipse 55% 38% at 18% 22%, var(--rave-magenta), transparent 60%),
+    radial-gradient(ellipse 48% 36% at 84% 78%, var(--rave-cyan),    transparent 55%),
+    radial-gradient(ellipse 60% 42% at 55% 105%, var(--rave-pink),   transparent 60%),
+    radial-gradient(ellipse 35% 28% at 92% 12%, var(--rave-purple),  transparent 55%),
+    radial-gradient(ellipse 28% 22% at 5% 88%,  var(--rave-teal),    transparent 55%),
+    linear-gradient(180deg, #02030a 0%, #000000 55%, #030208 100%);
+  background-attachment: fixed;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='420' height='420'><filter id='d'><feTurbulence type='fractalNoise' baseFrequency='0.42' numOctaves='3' seed='9'/></filter><rect width='100%25' height='100%25' filter='url(%23d)' opacity='0.022'/></svg>"),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' seed='5'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.028'/></svg>");
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: overlay;
+}
+
+main { position: relative; z-index: 2; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ANIMATED BORDER (drawer only — one panel, one breathing light)
+   ────────────────────────────────────────────────────────────────────────── */
+@keyframes borderSweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.border-anim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    conic-gradient(
+      from 0deg at 50% 50%,
+      transparent 0%,
+      transparent 30%,
+      rgba(255, 138, 61, 0.28) 45%,
+      rgba(255, 220, 180, 0.42) 50%,
+      rgba(255, 138, 61, 0.28) 55%,
+      transparent 70%,
+      transparent 100%
+    );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+          mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  padding: 1px;
+  pointer-events: none;
+  z-index: 4;
+  animation: borderSweep 26s linear infinite;
+  opacity: 0.9;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   META BAR + BRIEF (specimen header — matches direction-final pattern)
+   ────────────────────────────────────────────────────────────────────────── */
+.meta-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-4) var(--sp-6);
+  border-bottom: 1px solid var(--glass-edge);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  position: relative;
+  z-index: 3;
+}
+.meta-bar .brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-family: var(--type-body);
+  font-weight: 700;
+  font-variation-settings: "wdth" 85, "wght" 700;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.meta-bar .brand::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  background: var(--amber);
+  border-radius: 50%;
+  box-shadow: 0 0 4px var(--amber), 0 0 8px var(--amber-40);
+  animation: brandPulse 5s ease-in-out infinite;
+}
+@keyframes brandPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+.meta-bar .brand .tag {
+  font-weight: 400;
+  font-variation-settings: "wdth" 100, "wght" 400;
+  color: var(--silk-65);
+  margin-left: var(--sp-2);
+  letter-spacing: 0.18em;
+}
+.meta-bar .versions {
+  display: flex;
+  gap: var(--sp-5);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  color: var(--silk-40);
+  letter-spacing: 0.08em;
+}
+
+.brief {
+  padding: var(--sp-8) var(--sp-6) var(--sp-7);
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: var(--sp-7);
+  border-bottom: 1px solid var(--glass-edge);
+  align-items: end;
+}
+.brief .h0 {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 82, "wght" 700;
+  font-size: 84px;
+  line-height: 0.9;
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
+}
+.brief .h0 .accent {
+  color: var(--amber);
+  text-shadow: 0 0 10px var(--amber-40), 0 0 22px var(--amber-22);
+  display: block;
+  font-variation-settings: "wdth" 82, "wght" 800;
+}
+.brief .lede {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--silk-65);
+  max-width: 52ch;
+}
+.brief .lede strong { color: var(--silk); font-weight: 600; }
+.brief .lede em { color: var(--amber); font-style: normal; font-weight: 600; }
+
+.brief .lede .ascii {
+  display: block;
+  font-family: var(--type-mono);
+  font-size: 11px;
+  color: var(--silk-40);
+  margin-top: var(--sp-4);
+  white-space: pre;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   SECTION SHELL
+   ────────────────────────────────────────────────────────────────────────── */
+.section {
+  padding: var(--sp-7) var(--sp-6);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-7);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.section-head .num-idx {
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--amber);
+}
+.section-head h2 {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 22px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.section-head .right-note {
+  margin-left: auto;
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--silk-40);
+  text-transform: uppercase;
+}
+
+/* Universal label */
+.label {
+  font-family: var(--type-body);
+  font-weight: 500;
+  font-variation-settings: "wdth" 90, "wght" 500;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--silk-65);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   §01 · DRAWER SURFACE — the rectangle that slides over the session UI
+   ────────────────────────────────────────────────────────────────────────── */
+.surface-stage {
+  position: relative;
+  height: 720px;
+  background: var(--void-1);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    0 24px 64px rgba(0, 0, 0, 0.6);
+}
+/* Faint "session deck behind the drawer" hint — the user's live UI
+ * doesn't go away; the drawer overlays it. We render a desaturated
+ * silhouette so the drawer can read as "in-context". */
+.surface-stage .behind {
+  position: absolute;
+  inset: 0;
+  padding: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  opacity: 0.32;
+  filter: blur(1.2px);
+  pointer-events: none;
+}
+.surface-stage .behind .behind-h {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 82, "wght" 700;
+  font-size: 56px;
+  line-height: 0.9;
+  text-transform: uppercase;
+  color: var(--silk);
+}
+.surface-stage .behind .behind-h .acc { color: var(--amber); }
+.surface-stage .behind .behind-row {
+  display: flex;
+  gap: var(--sp-4);
+  font-family: var(--type-mono);
+  font-size: 12px;
+  color: var(--silk-65);
+}
+.surface-stage .behind .behind-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--amber-deep), var(--amber), transparent 80%);
+  border-radius: 1px;
+  width: 64%;
+  margin-top: var(--sp-5);
+}
+.surface-stage .behind .behind-meter-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--sp-4);
+  margin-top: var(--sp-6);
+}
+.surface-stage .behind .behind-meter {
+  height: 4px;
+  background: var(--glass-3);
+  border-radius: 1px;
+  position: relative;
+  overflow: hidden;
+}
+.surface-stage .behind .behind-meter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 62%;
+  background: linear-gradient(90deg, var(--amber-deep), var(--amber));
+}
+
+/* Backdrop scrim while drawer is open — a tasteful dim, not a black wash */
+.surface-stage .scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 28% 50%, rgba(0,0,0,0.55), rgba(0,0,0,0.78));
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* The drawer itself */
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--drawer-w);
+  background: var(--glass-1);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border-left: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 1px 0 0 var(--glass-edge-up),
+    -36px 0 80px rgba(0, 0, 0, 0.78);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--glass-edge);
+  background: rgba(0, 0, 0, 0.35);
+}
+.drawer-header .title {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 9px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--silk);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.drawer-header .title::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: var(--glow-faint);
+}
+.drawer-header .close {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 100, "wght" 400;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--amber);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--rad-sm);
+  text-shadow: 0 0 4px var(--amber-40);
+  transition: text-shadow 180ms ease-out;
+}
+.drawer-header .close:hover {
+  text-shadow: 0 0 8px var(--amber-65), 0 0 16px var(--amber-22);
+}
+
+.drawer-body {
+  overflow-y: auto;
+  padding: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.drawer-footer {
+  padding: var(--sp-3) var(--sp-5);
+  border-top: 1px solid var(--glass-edge);
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--silk-40);
+  text-transform: uppercase;
+}
+.drawer-footer .ver { color: var(--silk-65); }
+
+/* Group shell — used by §02 / §03 / §04 inside the drawer */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.group-head .g-title {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--silk);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+.group-head .g-meta {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--silk-40);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   §02 · RECORDINGS GROUP
+   ────────────────────────────────────────────────────────────────────────── */
+.rec-list {
+  display: flex;
+  flex-direction: column;
+}
+.rec-row {
+  position: relative;
+  background: var(--glass-2);
+  border-bottom: 1px solid var(--glass-edge);
+  transition: background 150ms ease-out;
+  cursor: pointer;
+}
+.rec-row:first-child { border-top: 1px solid var(--glass-edge); }
+.rec-row:hover { background: rgba(214, 207, 199, 0.06); }
+.rec-row__head {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--sp-3);
+  gap: var(--sp-3);
+}
+.rec-row__when {
+  flex: 0 0 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  user-select: none;
+}
+.rec-row__when .rel {
+  font-family: var(--type-body);
+  font-size: 13px;
+  font-variation-settings: "wdth" 95, "wght" 500;
+  color: var(--silk);
+  line-height: 1.1;
+}
+.rec-row__when .abs {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  color: var(--silk-40);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+.rec-row:hover .rec-row__when .abs { opacity: 1; }
+
+.rec-row__stats {
+  flex: 1 1 auto;
+  display: flex;
+  gap: var(--sp-3);
+  font-family: var(--type-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  align-items: baseline;
+}
+.rec-row__stats .dur { color: var(--silk-65); }
+.rec-row__stats .size { color: var(--silk-40); }
+
+.rec-row__icons {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--sp-1);
+}
+.rec-icon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--silk-65);
+  cursor: pointer;
+  border-radius: var(--rad-sm);
+  transition: color 150ms ease-out, filter 150ms ease-out;
+}
+.rec-icon[data-kind="play"]:hover {
+  color: var(--amber);
+  filter: drop-shadow(var(--glow-faint));
+}
+.rec-icon[data-kind="reveal"]:hover {
+  color: var(--silk);
+}
+.rec-icon[data-kind="delete"] { color: var(--silk-40); }
+.rec-icon[data-kind="delete"]:hover {
+  color: var(--led-fault);
+  box-shadow: inset 0 0 8px rgba(212, 65, 58, 0.18);
+}
+.rec-icon svg { width: 14px; height: 14px; }
+
+/* Row · expanded — built lazily; shows audio + first 5 transcript lines */
+.rec-row[data-open="true"] {
+  background: rgba(214, 207, 199, 0.04);
+}
+.rec-row[data-open="true"] .rec-row__when .abs { opacity: 1; }
+.rec-row__panel {
+  display: none;
+  padding: 0 var(--sp-4) var(--sp-4);
+  background: var(--glass-3);
+  border-top: 1px solid var(--amber-22);
+  box-shadow: inset 0 1px 0 var(--glass-top);
+}
+.rec-row[data-open="true"] .rec-row__panel {
+  display: block;
+  padding-top: var(--sp-4);
+}
+.rec-row__panel audio {
+  width: 100%;
+  height: 32px;
+  accent-color: var(--amber);
+  display: block;
+  margin-bottom: var(--sp-3);
+  background: transparent;
+  filter: invert(0.92);
+}
+.rec-row__transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--type-body);
+  font-size: 12px;
+}
+.rec-evt {
+  padding: var(--sp-1) 0;
+  display: flex;
+  gap: var(--sp-2);
+  align-items: baseline;
+}
+.rec-evt__t {
+  flex: 0 0 52px;
+  font-family: var(--type-mono);
+  font-size: 10px;
+  color: var(--silk-40);
+  font-variant-numeric: tabular-nums;
+}
+.rec-evt__label { line-height: 1.4; }
+.rec-evt--bold .rec-evt__label {
+  color: var(--silk);
+  border-left: 1px solid var(--amber-22);
+  padding-left: var(--sp-3);
+}
+.rec-evt--dim .rec-evt__label { color: var(--silk-40); }
+.rec-evt--bold { color: var(--silk); }
+
+/* Empty state */
+.rec-empty {
+  padding: var(--sp-6) var(--sp-3);
+  border-top: 1px solid var(--glass-edge);
+  border-bottom: 1px solid var(--glass-edge);
+  background: var(--glass-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.rec-empty .copy {
+  font-family: var(--type-body);
+  font-size: 13px;
+  color: var(--silk-40);
+  text-align: center;
+}
+.rec-empty .copy em { color: var(--silk-65); font-style: normal; }
+.rec-empty .back {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--amber);
+  text-decoration: none;
+  border-bottom: 1px solid var(--amber-40);
+  padding-bottom: 2px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   §03 · RETENTION SLIDER (6 stops)
+   ────────────────────────────────────────────────────────────────────────── */
+.retention {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.retention__readout {
+  align-self: flex-start;
+  font-family: var(--type-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: var(--silk);
+  line-height: 1;
+  padding: 7px 12px 9px;
+  background: var(--glass-3);
+  backdrop-filter: var(--blur-glass-display);
+  -webkit-backdrop-filter: var(--blur-glass-display);
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  border-radius: var(--rad-sm);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 0 14px rgba(255, 138, 61, 0.04),
+    0 0 0 1px rgba(255, 255, 255, 0.02);
+  text-shadow: 0 0 6px rgba(255, 138, 61, 0.20);
+  user-select: none;
+}
+.retention__track-wrap {
+  position: relative;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-1);
+}
+.retention__track {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 50%;
+  height: 3px;
+  background:
+    linear-gradient(90deg,
+      rgba(214, 207, 199, 0.07) 0%,
+      rgba(214, 207, 199, 0.18) 50%,
+      rgba(214, 207, 199, 0.07) 100%);
+  transform: translateY(-50%);
+  pointer-events: none;
+  border-radius: 1px;
+}
+.retention__track-lit {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 50%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--amber-deep), var(--amber) 70%, var(--amber-pale));
+  transform: translateY(-50%) scaleX(var(--lit-scale, 0));
+  transform-origin: left center;
+  pointer-events: none;
+  border-radius: 2px;
+  box-shadow: 0 0 4px var(--amber-22);
+  transition: transform 150ms ease-out;
+}
+.retention__stops {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  z-index: 1;
+}
+.retention__knob {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--void-2);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  padding: 0;
+  transition: background 150ms ease-out, border-color 150ms ease-out,
+              box-shadow 150ms ease-out, transform 150ms ease-out;
+}
+.retention__knob:hover {
+  border-color: var(--amber-40);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    0 0 6px var(--amber-22);
+  transform: scale(1.08);
+}
+.retention__knob[data-active="true"] {
+  background: var(--amber);
+  border-color: var(--amber-pale);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -0.5px 0 rgba(0, 0, 0, 0.4),
+    0 0 4px var(--amber-65),
+    0 0 9px var(--amber-22);
+}
+.retention__labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  line-height: 1;
+  padding: 0 2px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+.retention__lbl[data-active="true"] {
+  color: var(--amber);
+  text-shadow: 0 0 4px var(--amber-22);
+}
+.retention__readable {
+  font-family: var(--type-body);
+  font-size: 12px;
+  font-variation-settings: "wdth" 100, "wght" 400;
+  color: var(--silk-65);
+  line-height: 1.5;
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--glass-edge);
+}
+.retention__readable em { color: var(--amber); font-style: normal; }
+.retention__readable .mono {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  color: var(--silk-40);
+  letter-spacing: 0.04em;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   §04 · PERFORMANCE — LIGHTER BLUR toggle
+   ────────────────────────────────────────────────────────────────────────── */
+.perf-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--sp-4);
+  padding-top: var(--sp-1);
+}
+.perf-row__label {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--silk);
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+.perf-toggle {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 7px 16px;
+  background: var(--glass-3);
+  border: 1px solid var(--glass-edge);
+  color: var(--silk-65);
+  border-radius: var(--rad-sm);
+  cursor: pointer;
+  line-height: 1;
+  min-width: 56px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+  transition: all 180ms ease-out;
+}
+.perf-toggle:hover {
+  color: var(--silk);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 0 10px var(--amber-22);
+}
+.perf-toggle[data-on="true"] {
+  color: var(--amber);
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+  border-color: var(--amber-40);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 var(--amber-40),
+    inset 0 0 14px var(--amber-22),
+    0 0 0 1px rgba(255, 138, 61, 0.14);
+  text-shadow: 0 0 4px var(--amber-65);
+}
+.perf-helper {
+  font-family: var(--type-body);
+  font-size: 12px;
+  color: var(--silk-40);
+  line-height: 1.5;
+  grid-column: 1 / -1;
+}
+.perf-helper strong { color: var(--silk-65); font-weight: 500; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   §05 · ANTI-PATTERNS COMPLIANCE block
+   ────────────────────────────────────────────────────────────────────────── */
+.code-block {
+  background: var(--glass-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  padding: var(--sp-5) var(--sp-6);
+  font-family: var(--type-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--silk-65);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+.code-block .c-comment { color: var(--silk-40); }
+.code-block .c-key { color: var(--amber); }
+.code-block .c-bad { color: var(--led-fault); text-decoration: line-through; opacity: 0.65; }
+.code-block .c-ok { color: var(--led-ok); }
+.code-block .c-note { color: var(--silk); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   §06 · DELETE UX — undo toast
+   ────────────────────────────────────────────────────────────────────────── */
+.toast-stage {
+  position: relative;
+  height: 220px;
+  background: var(--void-1);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  overflow: hidden;
+}
+.toast-stage .ts-bg {
+  position: absolute;
+  inset: 0;
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  opacity: 0.4;
+  filter: blur(0.6px);
+}
+.toast-stage .ts-bg .ts-row {
+  height: 28px;
+  background: var(--glass-2);
+  border-bottom: 1px solid var(--glass-edge);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-3);
+  gap: var(--sp-3);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  color: var(--silk-40);
+}
+.toast-stage .ts-row.gone {
+  opacity: 0.15;
+  text-decoration: line-through;
+}
+.toast {
+  position: absolute;
+  bottom: var(--sp-4);
+  right: var(--sp-4);
+  background: var(--glass-1);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-sm);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    0 12px 28px rgba(0, 0, 0, 0.6);
+  padding: var(--sp-3) var(--sp-4);
+  font-family: var(--type-body);
+  font-size: 11px;
+  color: var(--silk-65);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  letter-spacing: 0.02em;
+  z-index: 2;
+}
+.toast::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: var(--glow-faint);
+}
+.toast .undo {
+  color: var(--amber);
+  text-decoration: none;
+  border-bottom: 1px solid var(--amber-40);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 90, "wght" 500;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.toast .undo:hover {
+  color: var(--amber-pale);
+  border-bottom-color: var(--amber);
+  text-shadow: 0 0 4px var(--amber-40);
+}
+.toast .countdown {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  color: var(--silk-40);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+/* Toast progress hairline */
+.toast::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--amber), var(--amber-40));
+  transform-origin: left center;
+  animation: toastCountdown 4s linear forwards;
+}
+@keyframes toastCountdown {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   FOOTER
+   ────────────────────────────────────────────────────────────────────────── */
+footer {
+  padding: var(--sp-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--silk-40);
+}
+footer .right { text-align: right; line-height: 1.7; }
+footer a { color: var(--amber); text-decoration: none; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ANATOMY · §01 INSET — drawer annotations (callouts)
+   ────────────────────────────────────────────────────────────────────────── */
+.callouts {
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: calc(100% - var(--drawer-w));
+  pointer-events: none;
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--silk-40);
+  z-index: 3;
+}
+.callout {
+  position: absolute;
+  white-space: pre;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.callout::after {
+  content: '';
+  display: inline-block;
+  height: 1px;
+  width: 56px;
+  background: linear-gradient(90deg, transparent, var(--amber-40));
+}
+.callout.amber { color: var(--amber); }
+.callout.c-top    { top: 24px;  right: 12px; }
+.callout.c-list   { top: 200px; right: 12px; }
+.callout.c-slider { top: 470px; right: 12px; }
+.callout.c-perf   { top: 580px; right: 12px; }
+.callout.c-foot   { bottom: 24px; right: 12px; }
+</style>
+</head>
+
+<body>
+<main>
+
+<!-- ─── META BAR ─────────────────────────────────────────────────────── -->
+<div class="meta-bar">
+  <div class="brand">
+    vibemix
+    <span class="tag">SETTINGS DRAWER · DESIGN CONTRACT</span>
+  </div>
+  <div class="versions">
+    <span>2026-05-14</span>
+    <span>drawer · recordings · retention · performance · undo-toast</span>
+    <span>saira · jetbrains mono</span>
+  </div>
+</div>
+
+<!-- ─── BRIEF ─────────────────────────────────────────────────────────── -->
+<div class="brief">
+  <h1 class="h0">
+    THE DRAWER<br>
+    SLIDES OVER<br>
+    <span class="accent">— NEVER OVER THE SET —</span>
+  </h1>
+  <div class="lede">
+    <p>The session is the deck. The drawer is a <strong>second pane of glass</strong> that slides in from the right, lays a faint scrim over the live UI, and holds the meta-tasks: <em>recordings, retention, performance</em>. When closed it's gone — when open, the set is still readable behind it.</p>
+    <p style="margin-top: 14px;">Built after the 2026-05-14 critique found the shipped components had drifted (no design mock = visual entropy). This file is the missing target — one drawer surface, one breathing border, every row earns its space, amber appears only on what's <em>active or destructive</em>.</p>
+<span class="ascii">┌────── drawer anatomy ──────┐
+│ header   · SETTINGS · ×    │
+│                            │
+│ §02      · RECORDINGS      │
+│ §03      · RETENTION       │
+│ §04      · PERFORMANCE     │
+│                            │
+│ footer   · vibemix 0.1.0   │
+└────────────────────────────┘</span>
+  </div>
+</div>
+
+<!-- ─── §01 DRAWER SURFACE ───────────────────────────────────────────── -->
+<section class="section">
+  <div class="section-head">
+    <span class="num-idx">§ 01</span>
+    <h2>Drawer Surface</h2>
+    <span class="right-note">glass-1 · 480px · breathing border · sealed</span>
+  </div>
+
+  <div class="surface-stage">
+
+    <!-- The behind-the-scrim session UI, desaturated -->
+    <div class="behind">
+      <span class="behind-h">JACKED<br><span class="acc">TOMAN REMIX</span></span>
+      <div class="behind-row">
+        <span>NOW PLAYING · 128 BPM · A min</span>
+      </div>
+      <div class="behind-bar"></div>
+      <div class="behind-meter-row">
+        <div class="behind-meter"></div>
+        <div class="behind-meter" style="--w:48%"></div>
+        <div class="behind-meter" style="--w:32%"></div>
+      </div>
+    </div>
+
+    <!-- The scrim dims everything behind the drawer -->
+    <div class="scrim"></div>
+
+    <!-- Anatomy callouts (only visible in the mock — not in the app) -->
+    <div class="callouts">
+      <div class="callout c-top amber">drawer-header · SETTINGS · ×</div>
+      <div class="callout c-list">recordings group · 12 sessions · 480 MB</div>
+      <div class="callout c-slider">retention · 6-stop disc · active = 7 days</div>
+      <div class="callout c-perf">performance · LIGHTER BLUR pill</div>
+      <div class="callout c-foot">drawer-footer · version stamp</div>
+    </div>
+
+    <!-- The drawer itself — the design target -->
+    <aside class="drawer" aria-label="Settings drawer">
+      <div class="border-anim"></div>
+
+      <header class="drawer-header">
+        <div class="title">SETTINGS</div>
+        <button class="close" aria-label="Close settings">×</button>
+      </header>
+
+      <div class="drawer-body">
+
+        <!-- §02 RECORDINGS GROUP -->
+        <section class="group" aria-label="Recordings">
+          <div class="group-head">
+            <span class="g-title">RECORDINGS</span>
+            <span class="g-meta">12 sessions · 480 MB</span>
+          </div>
+
+          <div class="rec-list">
+
+            <!-- Row 1 — expanded · shows audio + transcript -->
+            <article class="rec-row" data-open="true" tabindex="0">
+              <div class="rec-row__head">
+                <div class="rec-row__when">
+                  <span class="rel">2 hours ago</span>
+                  <span class="abs">2026-05-14 19:42</span>
+                </div>
+                <div class="rec-row__stats">
+                  <span class="dur">1h 24m</span>
+                  <span class="size">86 MB</span>
+                </div>
+                <div class="rec-row__icons">
+                  <button class="rec-icon" data-kind="play" aria-label="Play">
+                    <svg viewBox="0 0 16 16"><path d="M4 3 L13 8 L4 13 Z" fill="currentColor"/></svg>
+                  </button>
+                  <button class="rec-icon" data-kind="reveal" aria-label="Reveal in Finder">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M9 3 L13 3 L13 7"/><path d="M13 3 L7 9"/><path d="M3 7 L3 13 L13 13 L13 10"/>
+                    </svg>
+                  </button>
+                  <button class="rec-icon" data-kind="delete" aria-label="Delete">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M5 2 L11 2 L11 4 M3 4 L13 4 M5 4 L5 14 L11 14 L11 4"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="rec-row__panel">
+                <audio controls preload="metadata"></audio>
+                <div class="rec-row__transcript">
+                  <div class="rec-evt rec-evt--dim">
+                    <span class="rec-evt__t">[+0:00]</span>
+                    <span class="rec-evt__label">session start</span>
+                  </div>
+                  <div class="rec-evt rec-evt--dim">
+                    <span class="rec-evt__t">[+0:42]</span>
+                    <span class="rec-evt__label">trigger: track_change</span>
+                  </div>
+                  <div class="rec-evt rec-evt--bold">
+                    <span class="rec-evt__t">[+0:48]</span>
+                    <span class="rec-evt__label">Hold the line — drop on the 32-bar boundary.</span>
+                  </div>
+                  <div class="rec-evt rec-evt--dim">
+                    <span class="rec-evt__t">[+3:11]</span>
+                    <span class="rec-evt__label">midi · jog_a 0.28</span>
+                  </div>
+                  <div class="rec-evt rec-evt--bold">
+                    <span class="rec-evt__t">[+3:24]</span>
+                    <span class="rec-evt__label">Nice — the EQ sweep landed exactly on the snare flam.</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <!-- Row 2 -->
+            <article class="rec-row" tabindex="0">
+              <div class="rec-row__head">
+                <div class="rec-row__when">
+                  <span class="rel">yesterday · 21:04</span>
+                  <span class="abs">2026-05-13 21:04</span>
+                </div>
+                <div class="rec-row__stats">
+                  <span class="dur">48m</span>
+                  <span class="size">52 MB</span>
+                </div>
+                <div class="rec-row__icons">
+                  <button class="rec-icon" data-kind="play" aria-label="Play">
+                    <svg viewBox="0 0 16 16"><path d="M4 3 L13 8 L4 13 Z" fill="currentColor"/></svg>
+                  </button>
+                  <button class="rec-icon" data-kind="reveal" aria-label="Reveal in Finder">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M9 3 L13 3 L13 7"/><path d="M13 3 L7 9"/><path d="M3 7 L3 13 L13 13 L13 10"/>
+                    </svg>
+                  </button>
+                  <button class="rec-icon" data-kind="delete" aria-label="Delete">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M5 2 L11 2 L11 4 M3 4 L13 4 M5 4 L5 14 L11 14 L11 4"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="rec-row__panel"></div>
+            </article>
+
+            <!-- Row 3 -->
+            <article class="rec-row" tabindex="0">
+              <div class="rec-row__head">
+                <div class="rec-row__when">
+                  <span class="rel">3 days ago</span>
+                  <span class="abs">2026-05-11 23:18</span>
+                </div>
+                <div class="rec-row__stats">
+                  <span class="dur">2h 11m</span>
+                  <span class="size">124 MB</span>
+                </div>
+                <div class="rec-row__icons">
+                  <button class="rec-icon" data-kind="play" aria-label="Play">
+                    <svg viewBox="0 0 16 16"><path d="M4 3 L13 8 L4 13 Z" fill="currentColor"/></svg>
+                  </button>
+                  <button class="rec-icon" data-kind="reveal" aria-label="Reveal in Finder">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M9 3 L13 3 L13 7"/><path d="M13 3 L7 9"/><path d="M3 7 L3 13 L13 13 L13 10"/>
+                    </svg>
+                  </button>
+                  <button class="rec-icon" data-kind="delete" aria-label="Delete">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M5 2 L11 2 L11 4 M3 4 L13 4 M5 4 L5 14 L11 14 L11 4"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="rec-row__panel"></div>
+            </article>
+
+            <!-- Row 4 -->
+            <article class="rec-row" tabindex="0">
+              <div class="rec-row__head">
+                <div class="rec-row__when">
+                  <span class="rel">last week</span>
+                  <span class="abs">2026-05-07 18:55</span>
+                </div>
+                <div class="rec-row__stats">
+                  <span class="dur">42m</span>
+                  <span class="size">48 MB</span>
+                </div>
+                <div class="rec-row__icons">
+                  <button class="rec-icon" data-kind="play" aria-label="Play">
+                    <svg viewBox="0 0 16 16"><path d="M4 3 L13 8 L4 13 Z" fill="currentColor"/></svg>
+                  </button>
+                  <button class="rec-icon" data-kind="reveal" aria-label="Reveal in Finder">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M9 3 L13 3 L13 7"/><path d="M13 3 L7 9"/><path d="M3 7 L3 13 L13 13 L13 10"/>
+                    </svg>
+                  </button>
+                  <button class="rec-icon" data-kind="delete" aria-label="Delete">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M5 2 L11 2 L11 4 M3 4 L13 4 M5 4 L5 14 L11 14 L11 4"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="rec-row__panel"></div>
+            </article>
+          </div>
+        </section>
+
+        <!-- §03 RETENTION GROUP -->
+        <section class="group" aria-label="Retention">
+          <div class="group-head">
+            <span class="g-title">RETENTION</span>
+            <span class="g-meta">auto-prune older</span>
+          </div>
+          <div class="retention">
+            <div class="retention__readout">7 D</div>
+            <div class="retention__track-wrap">
+              <div class="retention__track"></div>
+              <div class="retention__track-lit" style="--lit-scale: 0.2"></div>
+              <div class="retention__stops">
+                <button class="retention__knob" data-active="false" aria-label="1 day"></button>
+                <button class="retention__knob" data-active="true"  aria-label="7 days"></button>
+                <button class="retention__knob" data-active="false" aria-label="30 days"></button>
+                <button class="retention__knob" data-active="false" aria-label="90 days"></button>
+                <button class="retention__knob" data-active="false" aria-label="1 year"></button>
+                <button class="retention__knob" data-active="false" aria-label="forever"></button>
+              </div>
+            </div>
+            <div class="retention__labels">
+              <span class="retention__lbl" data-active="false">1d</span>
+              <span class="retention__lbl" data-active="true">7d</span>
+              <span class="retention__lbl" data-active="false">30d</span>
+              <span class="retention__lbl" data-active="false">90d</span>
+              <span class="retention__lbl" data-active="false">1y</span>
+              <span class="retention__lbl" data-active="false">∞</span>
+            </div>
+            <div class="retention__readable">
+              auto-pruning after <em>7 days</em> &middot; <span class="mono">runs on startup + every 6h</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- §04 PERFORMANCE GROUP -->
+        <section class="group" aria-label="Performance">
+          <div class="group-head">
+            <span class="g-title">PERFORMANCE</span>
+            <span class="g-meta">render budget</span>
+          </div>
+          <div class="perf-row">
+            <span class="perf-row__label">LIGHTER BLUR</span>
+            <button class="perf-toggle" data-on="false" role="switch" aria-checked="false">OFF</button>
+            <span class="perf-helper">swap heavy blur for lighter — <strong>recommended on older Macs / Windows laptops</strong>. Applies instantly; persists across launches.</span>
+          </div>
+        </section>
+
+      </div>
+
+      <footer class="drawer-footer">
+        <span>vibemix &middot; <span class="ver">0.1.0-rc1</span></span>
+        <span>cdj whisper · v5</span>
+      </footer>
+    </aside>
+  </div>
+
+  <!-- Empty state — alternate render of the recordings group -->
+  <div style="margin-top: var(--sp-6); display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); align-items: start;">
+
+    <div>
+      <div class="label" style="margin-bottom: var(--sp-3);">recordings · empty state</div>
+      <div style="background: var(--glass-2); border: 1px solid var(--glass-edge); border-radius: var(--rad-md); padding: var(--sp-4);">
+        <div class="group-head">
+          <span class="g-title">RECORDINGS</span>
+          <span class="g-meta">0 sessions · 0 MB</span>
+        </div>
+        <div class="rec-empty">
+          <div class="copy">no recordings yet &mdash; <em>start a session to capture one</em></div>
+          <a href="#" class="back">&larr; back to session</a>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="label" style="margin-bottom: var(--sp-3);">recordings · loading state</div>
+      <div style="background: var(--glass-2); border: 1px solid var(--glass-edge); border-radius: var(--rad-md); padding: var(--sp-4);">
+        <div class="group-head">
+          <span class="g-title">RECORDINGS</span>
+          <span class="g-meta">loading…</span>
+        </div>
+        <div style="padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2);">
+          <div style="height: 44px; background: var(--glass-3); border-radius: var(--rad-sm); position: relative; overflow: hidden;">
+            <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(214,207,199,0.06), transparent); animation: shimmer 1.4s ease-in-out infinite;"></div>
+          </div>
+          <div style="height: 44px; background: var(--glass-3); border-radius: var(--rad-sm); position: relative; overflow: hidden;">
+            <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(214,207,199,0.06), transparent); animation: shimmer 1.4s ease-in-out infinite 0.2s;"></div>
+          </div>
+          <div style="height: 44px; background: var(--glass-3); border-radius: var(--rad-sm); position: relative; overflow: hidden;">
+            <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(214,207,199,0.06), transparent); animation: shimmer 1.4s ease-in-out infinite 0.4s;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <style>
+    @keyframes shimmer {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+  </style>
+</section>
+
+<!-- ─── §05 ANTI-PATTERN COMPLIANCE ──────────────────────────────────── -->
+<section class="section">
+  <div class="section-head">
+    <span class="num-idx">§ 05</span>
+    <h2>Anti-Patterns Compliance</h2>
+    <span class="right-note">what was deliberately avoided</span>
+  </div>
+
+  <div class="code-block"><span class="c-comment">/* settings-drawer · anti-pattern register */</span>
+
+<span class="c-bad">- side-stripe accent borders on rows</span>
+<span class="c-ok">+ background-tint hover only · the row reads as flat panel</span>
+
+<span class="c-bad">- gradient text (amber→pale on the readout)</span>
+<span class="c-ok">+ solid silk on glass-3 recess · text-shadow does the depth</span>
+
+<span class="c-bad">- hero-metric template ("12 SESSIONS / —— total recordings")</span>
+<span class="c-ok">+ inline group-head meta · "12 sessions · 480 MB" silkscreen</span>
+
+<span class="c-bad">- modal-first delete confirmation</span>
+<span class="c-ok">+ optimistic delete + 4s undo toast · see §06</span>
+
+<span class="c-bad">- glassmorphism stacking (group cards on top of drawer glass)</span>
+<span class="c-ok">+ ONE glass surface (the drawer) · groups are flat dividers</span>
+
+<span class="c-bad">- 3+ concurrent border-anim sweeps (anxiety, not life)</span>
+<span class="c-ok">+ ONE breathing border · the drawer · 26s sweep</span>
+
+<span class="c-bad">- AI-assistant tropes (sparkles, "✨ smart cleanup")</span>
+<span class="c-ok">+ humanized readable line · "auto-pruning after 7 days"</span>
+
+<span class="c-bad">- decorative icons next to every label</span>
+<span class="c-ok">+ icons only on action cells (play / reveal / delete)</span>
+
+<span class="c-note">// every element earns its space. Pioneer-grade restraint:</span>
+<span class="c-note">// if it doesn't change state or carry data, it doesn't ship.</span></div>
+</section>
+
+<!-- ─── §06 DELETE UX — UNDO TOAST ───────────────────────────────────── -->
+<section class="section">
+  <div class="section-head">
+    <span class="num-idx">§ 06</span>
+    <h2>Delete UX · Undo Toast</h2>
+    <span class="right-note">optimistic delete · 4s undo · no modal</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--sp-6); align-items: start;">
+
+    <div class="toast-stage">
+      <div class="ts-bg">
+        <div class="ts-row"><span style="color: var(--silk-65);">2 hours ago</span><span>1h 24m</span><span>86 MB</span></div>
+        <div class="ts-row gone"><span>yesterday · 21:04</span><span>48m</span><span>52 MB</span></div>
+        <div class="ts-row"><span style="color: var(--silk-65);">3 days ago</span><span>2h 11m</span><span>124 MB</span></div>
+        <div class="ts-row"><span style="color: var(--silk-65);">last week</span><span>42m</span><span>48 MB</span></div>
+      </div>
+      <div class="toast">
+        <span>deleted &middot; <a class="undo">undo?</a></span>
+        <span class="countdown">4s</span>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: var(--sp-4);">
+      <div>
+        <span class="label">interaction script</span>
+        <ol style="margin-top: var(--sp-3); padding-left: var(--sp-5); font-size: 13px; line-height: 1.65; color: var(--silk-65); display: flex; flex-direction: column; gap: var(--sp-2);">
+          <li>User clicks <code style="font-family: var(--type-mono); color: var(--led-fault);">×</code> on a row.</li>
+          <li>Row vanishes <strong style="color: var(--silk);">immediately</strong> — no confirm dialog.</li>
+          <li>Toast anchors bottom-right of the drawer.</li>
+          <li>Saira 11px <code style="font-family: var(--type-mono); color: var(--silk-40);">--silk-65</code> body, amber underline on <code style="color: var(--amber);">undo?</code>.</li>
+          <li>Progress hairline counts down 4 seconds along the bottom edge.</li>
+          <li>Clicking <code style="color: var(--amber);">undo?</code> restores the row + dismisses toast.</li>
+          <li>After 4s: toast fades, delete is committed to disk via <code style="font-family: var(--type-mono); color: var(--silk-40);">ipc.recordings.delete</code>.</li>
+        </ol>
+      </div>
+      <div style="font-family: var(--type-body); font-size: 12px; color: var(--silk-40); line-height: 1.55; padding: var(--sp-3); border-left: 1px solid var(--amber-22); padding-left: var(--sp-4);">
+        Why no modal? Because the user already <em style="color: var(--silk-65); font-style: normal;">consented</em> by clicking the trash icon. A modal would add friction without adding safety — the undo toast adds <strong style="color: var(--silk-65);">safety without adding friction</strong>. Critique 2026-05-14 flagged the prior confirm-dialog pattern as modal-first; this is the agreed replacement.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ─── FOOTER ────────────────────────────────────────────────────────── -->
+<footer>
+  <div>vibemix &middot; settings drawer · design contract · 2026-05-14</div>
+  <div class="right">
+    informs &middot; <a href="#">settings-drawer.ts</a> · <a href="#">recording-browser.ts</a> · <a href="#">retention-slider.ts</a> · <a href="#">performance-group.ts</a><br>
+    supersedes &middot; the unspecified drift &middot; <a href="#">/gsd-ui-review</a> bar
+  </div>
+</footer>
+
+</main>
+
+<!-- Tiny state illustration: click a row to toggle expand -->
+<script>
+document.querySelectorAll('.rec-row').forEach(row => {
+  row.addEventListener('click', (e) => {
+    if (e.target.closest('.rec-icon')) return;
+    const open = row.dataset.open === 'true';
+    row.dataset.open = open ? 'false' : 'true';
+  });
+});
+
+// Retention knob click → flip active state + scale the lit track
+const knobs = document.querySelectorAll('.retention__knob');
+const lbls = document.querySelectorAll('.retention__lbl');
+const lit = document.querySelector('.retention__track-lit');
+const readout = document.querySelector('.retention__readout');
+const READOUTS = ['1 D', '7 D', '30 D', '90 D', '1 Y', '∞'];
+const HUMAN = ['1 day', '7 days', '30 days', '90 days', '1 year', 'forever'];
+const readable = document.querySelector('.retention__readable');
+knobs.forEach((k, i) => {
+  k.addEventListener('click', () => {
+    knobs.forEach((kk, ii) => kk.dataset.active = ii === i ? 'true' : 'false');
+    lbls.forEach((ll, ii) => ll.dataset.active = ii === i ? 'true' : 'false');
+    lit.style.setProperty('--lit-scale', `${i / (knobs.length - 1)}`);
+    readout.textContent = READOUTS[i];
+    readable.innerHTML = `auto-pruning after <em>${HUMAN[i]}</em> &middot; <span class="mono">runs on startup + every 6h</span>`;
+  });
+});
+
+// Performance toggle
+const perf = document.querySelector('.perf-toggle');
+perf.addEventListener('click', () => {
+  const next = perf.dataset.on !== 'true';
+  perf.dataset.on = next ? 'true' : 'false';
+  perf.setAttribute('aria-checked', next ? 'true' : 'false');
+  perf.textContent = next ? 'ON' : 'OFF';
+});
+</script>
+
+</body>
+</html>
