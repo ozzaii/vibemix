@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-License-Identifier: Apache-2.0
+
+  vibemix — macOS Hardened Runtime DISTRIBUTION entitlements
+  Bundle ID: world.bravoh.vibemix (LOCKED — see 11-RESEARCH.md §A8)
+
+  macOS TCC permissions (Screen Recording, Microphone, Accessibility) are
+  keyed to the bundle identifier. Any post-launch change to
+  ``world.bravoh.vibemix`` invalidates every user's previously-granted
+  permissions and force-prompts the system modal again — that's a
+  release-grade regression. The lock is enforced here, in
+  ``tauri/src-tauri/entitlements.plist`` (Phase 11 build-time plist),
+  ``tauri/src-tauri/tauri.conf.json5`` (the bundle identifier),
+  ``vibemix-core.macos.spec`` (PyInstaller spec), and
+  ``scripts/dist/sign_macos.sh`` (this file's consumer).
+
+  Reference: 18-CONTEXT.md §Area 2 — macOS Signing + Notarization
+  Reference: https://developer.apple.com/documentation/security/hardened_runtime
+
+  ────────────────────────────────────────────────────────────────────────
+  This is the DISTRIBUTION-grade entitlements file. It is consumed by
+  ``scripts/dist/sign_macos.sh`` AFTER the bundle has been built, via:
+      codesign --force --deep --options runtime \
+               --entitlements tauri/src-tauri/entitlements.macos.plist \
+               --timestamp <app-bundle>
+
+  The sibling ``tauri/src-tauri/entitlements.plist`` (Phase 11 W1) is the
+  BUILD-time entitlements used by ``cargo tauri build`` for its own
+  Tauri-wrapper signing pass. That file ships with FOUR entitlements:
+      audio-input, microphone, allow-unsigned-executable-memory,
+      disable-library-validation
+  This file ships with FIVE per CONTEXT D-Area-2:
+      audio-input, microphone, network.client, allow-jit,
+      allow-unsigned-executable-memory
+
+  Deltas vs Phase 11 build-time plist:
+    (+) network.client — explicit. Phase 5 proxy at api.altidus.world +
+        Tauri auto-updater (Plan 18-04) + every outbound Gemini call.
+        Phase 11 had it implicit; distribution-grade requires it explicit.
+    (+) allow-jit — Python interpreter on macOS 14+. Phase 11's plist
+        explicitly excluded JIT ("we don't run a JIT") on the grounds
+        that CPython is interpreted and numpy/scipy are AOT-compiled C.
+        CONTEXT D-Area-2 overrides this: ``livekit-agents`` JIT-compiles
+        regex patterns at startup, and macOS 14+ rejects the launch
+        without ``allow-jit``. This is the documented deviation. If a
+        signing run later proves JIT is NOT needed, drop it — keep the
+        plist minimal.
+    (-) disable-library-validation — Phase 11 had it for the .dylibs that
+        third parties (livekit-rtc, google-genai, sounddevice) sign with
+        their own identities. CONTEXT D-Area-2 explicitly drops it from
+        the 5-entitlement allowlist. Plan 18-05 wires the CI signing run
+        that surfaces any library-validation failure deterministically;
+        if a real failure shows up there, the fix is a docketed amendment
+        to CONTEXT D-Area-2, not a silent re-addition here.
+
+  ────────────────────────────────────────────────────────────────────────
+  WHY each entitlement (one paragraph each):
+
+  1. com.apple.security.device.audio-input
+     BlackHole 2ch virtual-audio loopback (Master capture) + Kaan's mic
+     for the KAAN_SPOKE detector. Without this, the OS returns silence
+     from CoreAudio when ``sounddevice`` opens the BlackHole input device,
+     and the whole reaction pipeline goes dark.
+
+  2. com.apple.security.device.microphone
+     User-facing TCC prompt for "vibemix would like to access the
+     microphone". Kaan's wizard Step 1 (Phase 11) triggers this; the live
+     session uses it for KAAN_SPOKE feedback gating.
+
+  3. com.apple.security.network.client
+     Outbound HTTPS to api.altidus.world (Phase 5 proxy — every LLM call,
+     every TTS call, every cohost generate_reply) + Tauri auto-updater
+     manifest fetch (Plan 18-04) + GitHub Releases redirect chase for
+     update payload download. No inbound listening — vibemix is a
+     localhost-only single-user app, no server posture.
+
+  4. com.apple.security.cs.allow-jit
+     Python interpreter on macOS 14+. The launch-time JIT path is hit by
+     livekit-agents' regex compiler and by a handful of third-party deps
+     that build trampolines at import. macOS 14+ rejects the launch with
+     a misleading "code signature invalid" error if this entitlement is
+     missing on a Hardened-Runtime + Notarized build. Documented as a
+     deviation from Phase 11's "no JIT" note (see header).
+
+  5. com.apple.security.cs.allow-unsigned-executable-memory
+     PyInstaller's bootloader runs C extensions (scipy, numpy,
+     sounddevice native libs, livekit_rtc.dylib) that allocate
+     writable+executable memory pages OUTSIDE the bundle's signed code
+     segment. Without this, Hardened Runtime kills the process the first
+     time numpy initializes its BLAS dispatcher.
+
+  ────────────────────────────────────────────────────────────────────────
+  WHAT IS DELIBERATELY NOT INCLUDED:
+
+  - The "app sandbox" key (deliberately NOT listed below)
+     BlackHole virtual-audio + global hotkeys (Phase 12's keyboard
+     shortcut for "manual trigger") break inside the sandbox. The OS
+     refuses to route audio through a virtual driver to a sandboxed app,
+     and sandboxed apps cannot register system-wide hotkeys. CONTEXT
+     D-Area-2 explicit. The price is no Mac App Store; the entire OSS
+     distribution channel is GitHub Releases (signed DMG + Sparkle-style
+     updater), so this is an accepted trade.
+
+  - com.apple.security.cs.disable-library-validation
+     Phase 11's build-time entitlements.plist includes it. This
+     distribution plist drops it per CONTEXT D-Area-2's 5-entitlement
+     allowlist. If a real signing run shows that PyInstaller's
+     _internal/ tree cannot load its bundled .dylibs without this,
+     Plan 18-05's CI surfaces the failure deterministically (spctl
+     reject + notarytool log dump). The remediation is a docketed
+     amendment to CONTEXT D-Area-2, not a silent re-addition.
+
+  - camera / address-book / location / get-task-allow
+     Zero use cases. The mascot is a rendered 3D character (Phase 13),
+     not a camera feed.
+
+  - com.apple.security.cs.allow-dyld-environment-variables
+     Plain unnecessary for the runtime. PyInstaller does its own
+     PYTHONPATH bookkeeping inside the bundle.
+
+  THREAT MODEL (per 18-02-PLAN.md threat_model):
+    T-18-05 (Spoofing of signed .dmg): mitigated by Apple Developer ID +
+            Hardened Runtime + notarization + stapler — the standard
+            macOS chain. spctl-assess gate is Stage 7 of sign_macos.sh.
+    T-18-08 (Elevation of Privilege via entitlement bloat): the file is
+            committed; PR review catches additions. CI verifies the
+            entitlement count equals exactly 5 (Plan 18-05 wires the
+            regression detector).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 1. Audio capture: BlackHole loopback (master output) + Kaan's mic -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+
+    <!-- 2. Microphone: user-facing TCC prompt; KAAN_SPOKE detector source -->
+    <key>com.apple.security.device.microphone</key>
+    <true/>
+
+    <!-- 3. Network client: Phase 5 proxy + Tauri auto-updater + Gemini calls.
+              No server posture — outbound HTTPS only. -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- 4. JIT executable memory: livekit-agents + other deps compile
+              regex / trampolines at import. macOS 14+ rejects launch
+              without this on Hardened-Runtime builds. Deviation from
+              Phase 11's "no JIT" note — see header. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!-- 5. Unsigned executable memory: PyInstaller bootloader + numpy /
+              scipy / sounddevice native libs allocate W+X pages outside
+              the signed code segment. -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+</dict>
+</plist>
