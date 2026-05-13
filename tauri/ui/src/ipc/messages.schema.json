@@ -30,7 +30,14 @@
     {"$ref": "#/definitions/SettingsState"},
     {"$ref": "#/definitions/StatusRecheck"},
     {"$ref": "#/definitions/IpcError"},
-    {"$ref": "#/definitions/MascotMoodChange"}
+    {"$ref": "#/definitions/MascotMoodChange"},
+    {"$ref": "#/definitions/RecordingsList"},
+    {"$ref": "#/definitions/RecordingsListResult"},
+    {"$ref": "#/definitions/RecordingsDelete"},
+    {"$ref": "#/definitions/RecordingsDeleteAck"},
+    {"$ref": "#/definitions/RecordingsUsage"},
+    {"$ref": "#/definitions/RecordingsEvents"},
+    {"$ref": "#/definitions/RecordingsEventsResult"}
   ],
   "definitions": {
     "IpcBoot": {
@@ -644,6 +651,160 @@
             "mood": {"type": "string", "enum": ["hype-man", "teacher", "coach"]},
             "previous_mood": {"type": ["string", "null"], "enum": ["hype-man", "teacher", "coach", null]},
             "at": {"type": ["number", "null"]}
+          }
+        }
+      }
+    },
+    "RecordingsList": {
+      "$comment": "Phase 15-01 — Shell → sidecar. Request a snapshot of all on-disk recording sessions. Empty payload; the response is RecordingsListResult. Consumed by SettingsDrawer's Recording group on drawer open.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.recordings.list"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "RecordingsListResult": {
+      "$comment": "Phase 15-01 — Sidecar → shell. Response to RecordingsList. `sessions` is an array of RecordingSummary objects (one per <YYYYMMDD-HHMMSS>/ directory under the recordings root). `bytes_total` is the sum of all session sizes — UI renders 'Recordings: N sessions, X.Y GB used'. session_dir on each summary MUST match the V12 path-traversal regex ^[0-9]{8}-[0-9]{6}$ (Phase 15-RESEARCH Security Domain).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.recordings.list_result"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sessions", "bytes_total"],
+          "properties": {
+            "sessions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["session_dir", "started_at_iso", "duration_s", "event_count", "bytes_total", "crashed"],
+                "properties": {
+                  "session_dir": {"type": "string", "pattern": "^[0-9]{8}-[0-9]{6}$"},
+                  "started_at_iso": {"type": "string", "format": "date-time"},
+                  "duration_s": {"type": "number", "minimum": 0},
+                  "event_count": {"type": "integer", "minimum": 0},
+                  "bytes_total": {"type": "integer", "minimum": 0},
+                  "crashed": {"type": "boolean"}
+                }
+              }
+            },
+            "bytes_total": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "RecordingsDelete": {
+      "$comment": "Phase 15-01 — Shell → sidecar. Delete a single recording directory after the confirmDialog 'This cannot be undone.' prompt. session_dir is the basename (NOT a path) and MUST match ^[0-9]{8}-[0-9]{6}$ — V12 path-traversal gate enforced at the schema (Phase 15-RESEARCH Security Domain). Sidecar replies with RecordingsDeleteAck.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.recordings.delete"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["session_dir"],
+          "properties": {
+            "session_dir": {"type": "string", "pattern": "^[0-9]{8}-[0-9]{6}$"}
+          }
+        }
+      }
+    },
+    "RecordingsDeleteAck": {
+      "$comment": "Phase 15-01 — Sidecar → shell. Acknowledgment for RecordingsDelete. ok=true means shutil.rmtree completed; ok=false carries a short error string for the toast/snackbar surface. session_dir echoes back so the UI can match the ack to the row that initiated the delete (the row stays in 'deleting…' state until the ack arrives).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.recordings.delete_ack"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["session_dir", "ok", "error"],
+          "properties": {
+            "session_dir": {"type": "string", "pattern": "^[0-9]{8}-[0-9]{6}$"},
+            "ok": {"type": "boolean"},
+            "error": {"type": ["string", "null"]}
+          }
+        }
+      }
+    },
+    "RecordingsUsage": {
+      "$comment": "Phase 15-01 — Sidecar → shell, push. Emitted after RetentionSweep runs (boot, retention-days change, session close) so the SettingsDrawer's 'Recordings: N sessions, X.Y GB used' line updates without polling. Same shape as the aggregate fields on RecordingsListResult but without the per-session detail array.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.recordings.usage"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sessions", "bytes_total"],
+          "properties": {
+            "sessions": {"type": "integer", "minimum": 0},
+            "bytes_total": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "RecordingsEvents": {
+      "$comment": "Phase 15-01 — Shell → sidecar. Fetch the full events.jsonl record list for a single session (used by the row-expanded transcript overlay). session_dir MUST match the V12 path-traversal regex — same gate as RecordingsDelete. Response: RecordingsEventsResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.recordings.events"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["session_dir"],
+          "properties": {
+            "session_dir": {"type": "string", "pattern": "^[0-9]{8}-[0-9]{6}$"}
+          }
+        }
+      }
+    },
+    "RecordingsEventsResult": {
+      "$comment": "Phase 15-01 — Sidecar → shell. events.jsonl record list for one session. Each per-event object REQUIRES `t` (seconds since session start, non-negative) + `kind` (string from the POC vocabulary: session_start, trigger, trigger_fired, ai_text, controller_move, midi_event, turn_error, session_error, …). Per-kind additional fields (e.g. `text` on ai_text, `reason` on trigger, `control` on controller_move) are intentionally NOT enumerated — additionalProperties: true keeps the wire shape open-extensible. The UI renders bold/dim per kind (UI-SPEC §Row expanded state).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.recordings.events_result"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["session_dir", "events"],
+          "properties": {
+            "session_dir": {"type": "string", "pattern": "^[0-9]{8}-[0-9]{6}$"},
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true,
+                "required": ["t", "kind"],
+                "properties": {
+                  "t": {"type": "number", "minimum": 0},
+                  "kind": {"type": "string"}
+                }
+              }
+            }
           }
         }
       }

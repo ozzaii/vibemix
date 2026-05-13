@@ -995,6 +995,235 @@ class MascotMoodChange:
         return json.dumps(d, separators=(",", ":"))
 
 
+# ---------------------------------------------------------------------------
+# Phase 15-01 — recordings.* payload structs + wrappers
+# ---------------------------------------------------------------------------
+# Seven new families: list (request, empty) + list_result (sessions array) +
+# delete (request, session_dir) + delete_ack (response) + usage (push) +
+# events (request, session_dir) + events_result (response, jsonl record array).
+#
+# session_dir is enforced at the SCHEMA level via ^[0-9]{8}-[0-9]{6}$ — the
+# V12 path-traversal gate. Wrappers do NOT pre-validate; ``.to_json()`` calls
+# ``_validate(d)`` which raises jsonschema.ValidationError on a bad value
+# (matches the existing Phase 11 W0 invariant: validation lives on the
+# serialize path, never inside the constructor).
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingSummary:
+    """One entry in ``RecordingsListResultPayload.sessions``.
+
+    Mirrors the on-disk recordings/<YYYYMMDD-HHMMSS>/session.json metadata
+    file (Phase 15 Plan 02). Crashed sessions surface ``crashed=True`` so
+    the UI can render the row with a distinguishing badge per UI-SPEC.
+    """
+
+    session_dir: str
+    started_at_iso: str
+    duration_s: float
+    event_count: int
+    bytes_total: int
+    crashed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsListPayload:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsListResultPayload:
+    sessions: tuple[RecordingSummary, ...] = ()
+    bytes_total: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsDeletePayload:
+    session_dir: str
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsDeleteAckPayload:
+    session_dir: str
+    ok: bool
+    error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsUsagePayload:
+    sessions: int
+    bytes_total: int
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsEventsPayload:
+    session_dir: str
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsEventsResultPayload:
+    session_dir: str
+    # Heterogeneous events.jsonl records — each dict has at least `t` + `kind`
+    # plus arbitrary kind-specific extras (validated by the schema's
+    # additionalProperties: true on the per-event element). We keep the
+    # element type as ``dict`` rather than typing it further so new event
+    # kinds (Phase 16 hallucination verifier + Phase 13 mascot mood-change
+    # log line) don't churn this signature.
+    events: tuple[dict, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsList:
+    type: Literal["ipc.recordings.list"]
+    ts: str
+    payload: RecordingsListPayload
+
+    @classmethod
+    def make(cls) -> RecordingsList:
+        return cls(
+            type="ipc.recordings.list",
+            ts=_now_iso(),
+            payload=RecordingsListPayload(),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsListResult:
+    type: Literal["ipc.recordings.list_result"]
+    ts: str
+    payload: RecordingsListResultPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        sessions: tuple[RecordingSummary, ...] | list[RecordingSummary] = (),
+        bytes_total: int = 0,
+    ) -> RecordingsListResult:
+        return cls(
+            type="ipc.recordings.list_result",
+            ts=_now_iso(),
+            payload=RecordingsListResultPayload(
+                sessions=tuple(sessions),
+                bytes_total=bytes_total,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsDelete:
+    type: Literal["ipc.recordings.delete"]
+    ts: str
+    payload: RecordingsDeletePayload
+
+    @classmethod
+    def make(cls, *, session_dir: str) -> RecordingsDelete:
+        return cls(
+            type="ipc.recordings.delete",
+            ts=_now_iso(),
+            payload=RecordingsDeletePayload(session_dir=session_dir),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsDeleteAck:
+    type: Literal["ipc.recordings.delete_ack"]
+    ts: str
+    payload: RecordingsDeleteAckPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        session_dir: str,
+        ok: bool,
+        error: str | None = None,
+    ) -> RecordingsDeleteAck:
+        return cls(
+            type="ipc.recordings.delete_ack",
+            ts=_now_iso(),
+            payload=RecordingsDeleteAckPayload(
+                session_dir=session_dir,
+                ok=ok,
+                error=error,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsUsage:
+    type: Literal["ipc.recordings.usage"]
+    ts: str
+    payload: RecordingsUsagePayload
+
+    @classmethod
+    def make(cls, *, sessions: int, bytes_total: int) -> RecordingsUsage:
+        return cls(
+            type="ipc.recordings.usage",
+            ts=_now_iso(),
+            payload=RecordingsUsagePayload(sessions=sessions, bytes_total=bytes_total),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsEvents:
+    type: Literal["ipc.recordings.events"]
+    ts: str
+    payload: RecordingsEventsPayload
+
+    @classmethod
+    def make(cls, *, session_dir: str) -> RecordingsEvents:
+        return cls(
+            type="ipc.recordings.events",
+            ts=_now_iso(),
+            payload=RecordingsEventsPayload(session_dir=session_dir),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class RecordingsEventsResult:
+    type: Literal["ipc.recordings.events_result"]
+    ts: str
+    payload: RecordingsEventsResultPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        session_dir: str,
+        events: tuple[dict, ...] | list[dict] = (),
+    ) -> RecordingsEventsResult:
+        return cls(
+            type="ipc.recordings.events_result",
+            ts=_now_iso(),
+            payload=RecordingsEventsResultPayload(
+                session_dir=session_dir,
+                events=tuple(events),
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
 # Suppress unused-import flake when ``field`` is not used by any wrapper above.
 # Keeping the import allows future wrappers with default factories to use it
 # without a churn-only diff.
