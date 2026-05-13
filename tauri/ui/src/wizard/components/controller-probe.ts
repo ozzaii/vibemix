@@ -1,13 +1,13 @@
-/* controller-probe.ts — Step 3 hero (UI-SPEC §10).
+/* controller-probe.ts — Step 3 hero (UI-SPEC §10 / CDJ Whisper v5).
  *
  * Three vertical zones:
- *   Zone A: controller silhouette + name + port + ● CONNECTED LED, or
+ *   Zone A: controller silhouette + name + port + ● CONNECTED label, or
  *           empty-state "no controller detected — plug one in or skip".
- *   Zone B: DSEG7 48px --phosphor --phosphor-halo countdown "00:10" with
- *           4 concentric rings expand-fade outward (2s ease-out infinite,
- *           0.5s stagger). States: listening / caught / timeout.
+ *   Zone B: JetBrains Mono 48px tabular-nums --amber countdown "00:10"
+ *           with 4 concentric amber rings expand-fade outward (2s ease-out
+ *           infinite, 0.5s stagger). States: listening / caught / timeout.
  *   Zone C: [ ↻ Listen again ] secondary + [ Skip — use generic mapping ]
- *           (--rec accent idle, primary-armed after timeout).
+ *           (--led-fault destructive idle, primary-armed after timeout).
  *
  * Copy strings VERBATIM from UI-SPEC §10 + §Step 3. */
 
@@ -31,22 +31,26 @@ const CSS = `
   .cmp-ctrl-probe {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-lg);
-    padding: var(--sp-lg);
+    gap: var(--sp-5);
+    padding: var(--sp-5);
   }
   .cmp-ctrl-probe__zone-a {
     display: grid;
     grid-template-columns: 64px 1fr auto;
     align-items: center;
-    gap: var(--sp-md);
-    padding: var(--sp-md);
-    background: var(--panel-deep);
-    border: 1px solid var(--bezel-1);
-    border-radius: 6px;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    gap: var(--sp-4);
+    padding: var(--sp-4);
+    background: var(--glass-3);
+    backdrop-filter: var(--blur-glass-display);
+    -webkit-backdrop-filter: var(--blur-glass-display);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-md);
+    box-shadow:
+      inset 0 2px 4px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 var(--glass-top);
   }
   .cmp-ctrl-probe__silhouette {
-    color: var(--phosphor-dim);
+    color: var(--silk-65);
     width: 64px;
     height: 40px;
     display: flex;
@@ -54,7 +58,8 @@ const CSS = `
     justify-content: center;
   }
   .cmp-ctrl-probe[data-detected="true"] .cmp-ctrl-probe__silhouette {
-    color: var(--phosphor-dim);
+    color: var(--amber);
+    filter: drop-shadow(0 0 3px var(--amber-22));
   }
   .cmp-ctrl-probe__model {
     display: flex;
@@ -62,52 +67,55 @@ const CSS = `
     gap: 2px;
   }
   .cmp-ctrl-probe__name {
-    font-family: "DM Mono", monospace;
-    font-weight: 500;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 500;
     font-size: 14px;
-    color: var(--ink);
+    color: var(--silk);
   }
   .cmp-ctrl-probe__port {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-mono);
     font-size: 11px;
-    color: var(--ink-dim);
+    color: var(--silk-65);
   }
   .cmp-ctrl-probe__connected {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-xs);
-    font-family: "Workbench", "Courier New", monospace;
+    gap: var(--sp-1);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 9px;
-    letter-spacing: 0.32em;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--ok);
+    color: var(--led-ok);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .cmp-ctrl-probe__connected-led {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--ok);
-    box-shadow: 0 0 6px var(--ok);
+    background: var(--led-ok);
+    box-shadow: 0 0 6px var(--led-ok);
   }
   .cmp-ctrl-probe__empty {
     grid-column: 1 / -1;
     display: flex;
     align-items: center;
-    gap: var(--sp-md);
-    font-family: "DM Mono", monospace;
+    gap: var(--sp-4);
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
     font-size: 14px;
-    color: var(--ink-dim);
+    color: var(--silk-65);
   }
   .cmp-ctrl-probe__empty-glyph {
-    color: var(--ink-deep);
+    color: var(--silk-40);
   }
   .cmp-ctrl-probe__zone-b {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--sp-md);
-    padding: var(--sp-2xl) var(--sp-lg);
+    gap: var(--sp-4);
+    padding: 48px var(--sp-5); /* mock-verbatim 48 — no v5 sp- token at 48 */
   }
   .cmp-ctrl-probe__lcd-frame {
     position: relative;
@@ -129,25 +137,36 @@ const CSS = `
     width: 80px;
     height: 80px;
     margin: -40px 0 0 -40px;
-    border: 1px solid var(--phosphor-soft);
+    border: 1px solid var(--amber-22);
     border-radius: 50%;
     opacity: 0;
   }
   .cmp-ctrl-probe[data-state="listening"] .cmp-ctrl-probe__ring {
     animation: cmp-ctrl-ring var(--motion-rings-listen) ease-out infinite;
   }
-  .cmp-ctrl-probe[data-state="listening"] .cmp-ctrl-probe__ring:nth-child(2) { animation-delay: 0.5s; }
-  .cmp-ctrl-probe[data-state="listening"] .cmp-ctrl-probe__ring:nth-child(3) { animation-delay: 1.0s; }
-  .cmp-ctrl-probe[data-state="listening"] .cmp-ctrl-probe__ring:nth-child(4) { animation-delay: 1.5s; }
+  .cmp-ctrl-probe[data-state="listening"] .cmp-ctrl-probe__ring:nth-child(2) {
+    animation-delay: 0.5s;
+    border-color: var(--amber-40);
+  }
+  .cmp-ctrl-probe[data-state="listening"] .cmp-ctrl-probe__ring:nth-child(3) {
+    animation-delay: 1.0s;
+    border-color: var(--amber-65);
+  }
+  .cmp-ctrl-probe[data-state="listening"] .cmp-ctrl-probe__ring:nth-child(4) {
+    animation-delay: 1.5s;
+    border-color: var(--amber-22);
+  }
   @keyframes cmp-ctrl-ring {
     0%   { opacity: 0.8; transform: scale(0.4); }
     100% { opacity: 0;   transform: scale(3); }
   }
   .cmp-ctrl-probe__lcd {
-    font-family: "DSEG7", "DM Mono", monospace;
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
     font-size: 48px;
-    color: var(--phosphor);
-    text-shadow: var(--phosphor-halo);
+    color: var(--amber);
+    text-shadow: var(--glow-soft);
     letter-spacing: 0.06em;
     line-height: 1;
     position: relative;
@@ -155,13 +174,13 @@ const CSS = `
     animation: cmp-ctrl-lcd-pulse 1s steps(1) infinite;
   }
   .cmp-ctrl-probe[data-state="timeout"] .cmp-ctrl-probe__lcd {
-    color: var(--ink-deep);
+    color: var(--silk-40);
     text-shadow: none;
     animation: none;
   }
   .cmp-ctrl-probe[data-state="caught"] .cmp-ctrl-probe__lcd {
-    color: var(--ok);
-    text-shadow: 0 0 14px var(--ok);
+    color: var(--led-ok);
+    text-shadow: 0 0 14px var(--led-ok);
     animation: none;
   }
   @keyframes cmp-ctrl-lcd-pulse {
@@ -169,27 +188,31 @@ const CSS = `
     51%, 100% { opacity: 0.85; }
   }
   .cmp-ctrl-probe__caption {
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
     font-size: 11px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--ink);
+    color: var(--silk);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
     text-align: center;
   }
   .cmp-ctrl-probe[data-state="timeout"] .cmp-ctrl-probe__caption {
-    color: var(--ink-dim);
-    font-family: "DM Mono", monospace;
+    color: var(--silk-65);
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
     font-size: 14px;
     letter-spacing: 0.01em;
     text-transform: none;
+    text-shadow: none;
   }
   .cmp-ctrl-probe[data-state="caught"] .cmp-ctrl-probe__caption {
-    color: var(--ok);
+    color: var(--led-ok);
   }
   .cmp-ctrl-probe__zone-c {
     display: flex;
     justify-content: space-between;
-    gap: var(--sp-md);
+    gap: var(--sp-4);
   }
 `;
 

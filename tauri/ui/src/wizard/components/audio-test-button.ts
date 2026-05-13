@@ -38,8 +38,8 @@ const CSS = `
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--sp-md);
-    padding: var(--sp-lg);
+    gap: var(--sp-4);
+    padding: var(--sp-5);
   }
   .cmp-audio-test__visual {
     position: relative;
@@ -52,17 +52,18 @@ const CSS = `
   .cmp-audio-test__speaker {
     width: 48px;
     height: 48px;
-    color: var(--ink-dim);
+    color: var(--silk-65);
     z-index: 2;
     position: relative;
   }
   .cmp-audio-test[data-state="playing"] .cmp-audio-test__speaker,
   .cmp-audio-test[data-state="passed"]  .cmp-audio-test__speaker {
-    color: var(--phosphor);
+    color: var(--amber);
+    filter: drop-shadow(0 0 3px var(--amber-22));
   }
   .cmp-audio-test[data-state="failed"] .cmp-audio-test__speaker,
   .cmp-audio-test[data-state="programmatic-failed"] .cmp-audio-test__speaker {
-    color: var(--rec);
+    color: var(--led-fault);
   }
   .cmp-audio-test__rings {
     position: absolute;
@@ -72,75 +73,100 @@ const CSS = `
   .cmp-audio-test__ring {
     position: absolute;
     inset: 24px;
-    border: 1.5px solid var(--phosphor-soft);
+    border: 1.5px solid var(--amber-22);
     border-radius: 50%;
     opacity: 0;
   }
   .cmp-audio-test[data-state="playing"] .cmp-audio-test__ring {
     animation: cmp-audio-ring var(--motion-rings-audio) ease-out infinite;
   }
-  .cmp-audio-test[data-state="playing"] .cmp-audio-test__ring:nth-child(2) { animation-delay: 0.375s; }
-  .cmp-audio-test[data-state="playing"] .cmp-audio-test__ring:nth-child(3) { animation-delay: 0.75s;  }
-  .cmp-audio-test[data-state="playing"] .cmp-audio-test__ring:nth-child(4) { animation-delay: 1.125s; }
+  .cmp-audio-test[data-state="playing"] .cmp-audio-test__ring:nth-child(2) {
+    animation-delay: 0.375s;
+    border-color: var(--amber-40);
+  }
+  .cmp-audio-test[data-state="playing"] .cmp-audio-test__ring:nth-child(3) {
+    animation-delay: 0.75s;
+    border-color: var(--amber-65);
+  }
+  .cmp-audio-test[data-state="playing"] .cmp-audio-test__ring:nth-child(4) {
+    animation-delay: 1.125s;
+    border-color: var(--amber-22);
+  }
   @keyframes cmp-audio-ring {
     0%   { opacity: 0.8; transform: scale(0.4); }
     100% { opacity: 0;   transform: scale(2.0); }
   }
   .cmp-audio-test__cta {
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 11px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
     padding: 12px 24px;
-    border-radius: 4px;
-    background: linear-gradient(180deg, var(--panel-lift), var(--panel));
-    border: 1px solid var(--phosphor-dim);
-    color: var(--ink-dim);
+    border-radius: var(--rad-sm);
+    background: var(--glass-2);
+    backdrop-filter: var(--blur-glass-display);
+    -webkit-backdrop-filter: var(--blur-glass-display);
+    border: 1px solid var(--amber-22);
+    color: var(--silk-65);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.035),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
     min-width: 200px;
     cursor: pointer;
     transition: border-color var(--motion-snap) ease-out, color var(--motion-snap) ease-out, box-shadow var(--motion-snap) ease-out;
   }
   .cmp-audio-test[data-state="idle"] .cmp-audio-test__cta:hover {
-    border-color: var(--phosphor);
-    color: var(--phosphor);
-    box-shadow: var(--phosphor-glow);
+    border-color: var(--amber);
+    color: var(--amber);
+    text-shadow: 0 0 4px var(--amber-65);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 0 14px var(--amber-22),
+      var(--glow-soft);
   }
   .cmp-audio-test[data-state="playing"] .cmp-audio-test__cta {
-    border-color: var(--phosphor);
-    color: var(--phosphor);
-    text-shadow: var(--phosphor-glow);
-    box-shadow: var(--phosphor-glow);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    border-color: var(--amber-40);
+    color: var(--amber);
+    text-shadow: 0 0 4px var(--amber-65);
+    box-shadow:
+      inset 0 0 14px var(--amber-22),
+      var(--glow-soft);
     cursor: progress;
   }
   .cmp-audio-test[data-state="passed"] .cmp-audio-test__cta {
-    border-color: var(--ok);
-    color: var(--ok);
+    border-color: var(--led-ok);
+    color: var(--led-ok);
   }
   .cmp-audio-test[data-state="failed"] .cmp-audio-test__cta,
   .cmp-audio-test[data-state="programmatic-failed"] .cmp-audio-test__cta {
-    border-color: var(--rec);
-    color: var(--rec);
+    border-color: var(--led-fault);
+    color: var(--led-fault);
   }
   .cmp-audio-test__lcd {
-    font-family: "DSEG7", "DM Mono", monospace;
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
     font-size: 22px;
     letter-spacing: 0.06em;
-    color: var(--phosphor);
-    text-shadow: var(--phosphor-glow);
+    color: var(--amber);
+    text-shadow: var(--glow-soft);
     line-height: 1;
     min-height: 22px;
   }
   .cmp-audio-test__micro {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-mono);
     font-size: 11px;
-    color: var(--ink-dim);
+    color: var(--silk-65);
     letter-spacing: 0.18em;
     text-transform: uppercase;
     text-align: center;
     min-height: 14px;
   }
   .cmp-audio-test__micro[data-tone="rec"] {
-    color: var(--rec);
+    color: var(--led-fault);
   }
   .cmp-audio-test__led {
     display: inline-block;
@@ -150,24 +176,25 @@ const CSS = `
     margin-right: 6px;
     vertical-align: middle;
   }
-  .cmp-audio-test__led[data-tone="ok"]  { background: var(--ok);  box-shadow: 0 0 6px var(--ok); }
-  .cmp-audio-test__led[data-tone="rec"] { background: var(--rec); box-shadow: 0 0 6px var(--rec); }
+  .cmp-audio-test__led[data-tone="ok"]  { background: var(--led-ok);    box-shadow: 0 0 6px var(--led-ok); }
+  .cmp-audio-test__led[data-tone="rec"] { background: var(--led-fault); box-shadow: 0 0 6px var(--led-fault); }
   .cmp-audio-test__confirm-row {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--sp-md);
-    margin-top: var(--sp-md);
+    gap: var(--sp-4);
+    margin-top: var(--sp-4);
   }
   .cmp-audio-test__confirm-prompt {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
     font-size: 14px;
-    color: var(--ink);
+    color: var(--silk);
     text-align: center;
   }
   .cmp-audio-test__confirm-buttons {
     display: flex;
-    gap: var(--sp-md);
+    gap: var(--sp-4);
   }
 `;
 
