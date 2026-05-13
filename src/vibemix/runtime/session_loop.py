@@ -49,11 +49,13 @@ import sys
 import time
 from collections import deque
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Protocol
 
 import jsonschema
 
 from vibemix.runtime.config_store import ConfigStore, load_config
+from vibemix.runtime.recordings_index import RecordingsIndex, run_retention_sweep
 from vibemix.runtime.settings import SettingsApplier
 from vibemix.runtime.ws_bus import WizardBus
 from vibemix.ui_bus.messages import (
@@ -62,6 +64,10 @@ from vibemix.ui_bus.messages import (
     LevelPair,
     MetersTriple,
     MidiEventEntry,
+    RecordingsDeleteAck,
+    RecordingsEventsResult,
+    RecordingsListResult,
+    RecordingsUsage,
     SessionMute,
     SessionSnapshot,
     SettingsState,
@@ -148,16 +154,20 @@ class SessionLoop:
         levels: _LevelsHook | None = None,
         playback_queue: _PlaybackQueueHook | None = None,
         controller_state: _ControllerStateHook | None = None,
+        recordings_root: Path | None = None,
     ) -> None:
         self.bus = bus
         self.config_store = config_store or load_config()
         self.settings_applier = settings_applier or SettingsApplier(
-            config_store=self.config_store
+            config_store=self.config_store,
+            recordings_root=recordings_root,
+            ws_bus=bus,
         )
         self.music_state = music_state
         self.levels = levels
         self.playback_queue = playback_queue
         self.controller_state = controller_state
+        self.recordings_root = recordings_root
 
         # Transient state
         self.muted: bool = False
@@ -197,11 +207,22 @@ class SessionLoop:
     # ------------------------------------------------------------------
 
     def register_handlers(self) -> None:
-        """Wire the 4 ipc.* handlers onto the bus."""
+        """Wire all ipc.* handlers onto the bus.
+
+        Phase 12 W2 baseline: 4 handlers (session.mute / settings.set / settings.get
+        / status.recheck). Phase 15 Plan 03 adds 3 recordings.* request handlers
+        (list / delete / events). recordings.usage is push-only — no inbound
+        shape, no handler.
+        """
         self.bus.register_handler("ipc.session.mute", self._on_session_mute)
         self.bus.register_handler("ipc.settings.set", self._on_settings_set)
         self.bus.register_handler("ipc.settings.get", self._on_settings_get)
         self.bus.register_handler("ipc.status.recheck", self._on_status_recheck)
+        # Phase 15 Plan 03 — recording browser handlers. 3 inbound types
+        # (list / delete / events). recordings.usage is push-only.
+        self.bus.register_handler("ipc.recordings.list", self._on_recordings_list)
+        self.bus.register_handler("ipc.recordings.delete", self._on_recordings_delete)
+        self.bus.register_handler("ipc.recordings.events", self._on_recordings_events)
 
     async def boot(self) -> None:
         """Emit ``ipc.boot {ready: true}``. Mirrors WizardLoop.boot()."""
@@ -269,6 +290,251 @@ class SessionLoop:
     async def _on_settings_get(self, _msg: dict) -> None:
         """Reply to ``ipc.settings.get`` with the full ``ipc.settings.state``."""
         await self._emit_settings_state()
+
+    # ------------------------------------------------------------------
+    # Phase 15 Plan 03 — recording browser handlers + retention sweep
+    # ------------------------------------------------------------------
+
+    async def _on_recordings_list(self, msg: dict) -> None:
+        """Emit ``ipc.recordings.list_result`` with every session + total bytes.
+
+        Sessions are returned newest-first by dir-name unix timestamp (see
+        RecordingsIndex.list). bytes_total is the scandir-summed total across
+        every session — matches the disk-usage line in the drawer.
+
+        If ``recordings_root`` is None (the loop was constructed without one —
+        e.g., tests for the standalone Phase 12 W2 path), emit ``ipc.error``
+        with reason=``recordings_root_not_wired`` so the UI surfaces a clear
+        diagnostic rather than a silent no-op.
+        """
+        if self.recordings_root is None:
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason="recordings_root_not_wired",
+                        original_type="ipc.recordings.list",
+                    ).to_json()
+                )
+            )
+            return
+        try:
+            loop = asyncio.get_running_loop()
+            index = RecordingsIndex(self.recordings_root)
+            summaries = await loop.run_in_executor(None, index.list)
+            _, bytes_total = await loop.run_in_executor(None, index.compute_usage)
+            result = RecordingsListResult.make(
+                sessions=summaries, bytes_total=bytes_total
+            )
+            await self.bus.emit(json.loads(result.to_json()))
+        except Exception as e:
+            log.exception("recordings.list handler failed")
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason=f"{type(e).__name__}: {e}",
+                        original_type="ipc.recordings.list",
+                    ).to_json()
+                )
+            )
+
+    async def _on_recordings_delete(self, msg: dict) -> None:
+        """Delete a session dir; emit ``ipc.recordings.delete_ack`` + fresh
+        ``ipc.recordings.usage``.
+
+        Path-traversal gate fires at the index layer (regex + is_relative_to).
+        On bad payload (wrong shape, missing session_dir), emit ``ipc.error``.
+        """
+        if self.recordings_root is None:
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason="recordings_root_not_wired",
+                        original_type="ipc.recordings.delete",
+                    ).to_json()
+                )
+            )
+            return
+        try:
+            payload = msg.get("payload", {})
+            session_dir = payload.get("session_dir")
+            if not isinstance(session_dir, str):
+                await self.bus.emit(
+                    json.loads(
+                        IpcError.make(
+                            reason="session_dir missing or not a string",
+                            original_type="ipc.recordings.delete",
+                        ).to_json()
+                    )
+                )
+                return
+            loop = asyncio.get_running_loop()
+            index = RecordingsIndex(self.recordings_root)
+            ok, err = await loop.run_in_executor(None, index.delete, session_dir)
+            ack = RecordingsDeleteAck.make(
+                session_dir=session_dir, ok=ok, error=err
+            )
+            await self.bus.emit(json.loads(ack.to_json()))
+            # Fire a fresh usage push so the drawer's disk line updates
+            # post-delete. We re-read the index because the cached numbers
+            # are stale (one session just disappeared).
+            sessions, bytes_total = await loop.run_in_executor(
+                None, index.compute_usage
+            )
+            usage = RecordingsUsage.make(
+                sessions=sessions, bytes_total=bytes_total
+            )
+            await self.bus.emit(json.loads(usage.to_json()))
+        except Exception as e:
+            log.exception("recordings.delete handler failed")
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason=f"{type(e).__name__}: {e}",
+                        original_type="ipc.recordings.delete",
+                    ).to_json()
+                )
+            )
+
+    async def _on_recordings_events(self, msg: dict) -> None:
+        """Read events.jsonl for a session; emit ``ipc.recordings.events_result``.
+
+        Path-traversal gate fires at the index layer. Malformed JSON lines
+        are silently skipped (RecordingsIndex.read_events logs at DEBUG).
+        """
+        if self.recordings_root is None:
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason="recordings_root_not_wired",
+                        original_type="ipc.recordings.events",
+                    ).to_json()
+                )
+            )
+            return
+        try:
+            payload = msg.get("payload", {})
+            session_dir = payload.get("session_dir")
+            if not isinstance(session_dir, str):
+                await self.bus.emit(
+                    json.loads(
+                        IpcError.make(
+                            reason="session_dir missing or not a string",
+                            original_type="ipc.recordings.events",
+                        ).to_json()
+                    )
+                )
+                return
+            loop = asyncio.get_running_loop()
+            index = RecordingsIndex(self.recordings_root)
+            events, err = await loop.run_in_executor(
+                None, index.read_events, session_dir
+            )
+            if err is not None:
+                await self.bus.emit(
+                    json.loads(
+                        IpcError.make(
+                            reason=err,
+                            original_type="ipc.recordings.events",
+                        ).to_json()
+                    )
+                )
+                return
+            result = RecordingsEventsResult.make(
+                session_dir=session_dir, events=tuple(events or ())
+            )
+            await self.bus.emit(json.loads(result.to_json()))
+        except Exception as e:
+            log.exception("recordings.events handler failed")
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason=f"{type(e).__name__}: {e}",
+                        original_type="ipc.recordings.events",
+                    ).to_json()
+                )
+            )
+
+    async def run_boot_sweeps(self) -> None:
+        """Phase 15 Plan 03 — boot-time trigger.
+
+        Fires ``run_retention_sweep`` with the live ``retention_days`` value
+        once on session-loop startup, BEFORE accepting any IPC traffic. The
+        crashed-session sweep runs separately at ``__main__.py`` boot (Plan
+        15-02) — by the time we get here, ``crashed=True`` markers are
+        already written, so the retention sweep walks an up-to-date tree.
+
+        Always emits a ``ipc.recordings.usage`` push at the end (even if the
+        sweep deleted nothing) so the drawer's disk-usage line is live from
+        the moment the renderer connects.
+
+        Best-effort: any unexpected exception is logged + swallowed; the
+        session loop must continue regardless.
+        """
+        if self.recordings_root is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+            deleted = await loop.run_in_executor(
+                None,
+                run_retention_sweep,
+                self.recordings_root,
+                self.config_store.retention_days,
+            )
+            if deleted:
+                log.info(
+                    "retention sweep (boot): deleted %d session(s): %s",
+                    len(deleted),
+                    ", ".join(deleted),
+                )
+            else:
+                log.info("retention sweep (boot): no sessions to prune")
+            await self._emit_recordings_usage()
+        except Exception:
+            log.exception("boot retention sweep failed")
+
+    async def on_session_close(self) -> None:
+        """Phase 15 Plan 03 — session-close trigger.
+
+        Called from ``__main__``'s close path AFTER ``recorder.close()`` so
+        the just-finished session's session.json is finalized before the
+        sweep walks the tree.
+
+        Same best-effort guarantee as run_boot_sweeps — never raises.
+        """
+        if self.recordings_root is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+            deleted = await loop.run_in_executor(
+                None,
+                run_retention_sweep,
+                self.recordings_root,
+                self.config_store.retention_days,
+            )
+            if deleted:
+                log.info(
+                    "retention sweep (close): deleted %d session(s)", len(deleted)
+                )
+            await self._emit_recordings_usage()
+        except Exception:
+            log.exception("on_session_close sweep failed")
+
+    async def _emit_recordings_usage(self) -> None:
+        """Compute current usage + emit ``ipc.recordings.usage`` on the bus."""
+        if self.recordings_root is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+            index = RecordingsIndex(self.recordings_root)
+            sessions, bytes_total = await loop.run_in_executor(
+                None, index.compute_usage
+            )
+            msg = RecordingsUsage.make(
+                sessions=sessions, bytes_total=bytes_total
+            )
+            await self.bus.emit(json.loads(msg.to_json()))
+        except Exception:
+            log.exception("recordings.usage emit failed")
 
     async def _on_status_recheck(self, msg: dict) -> None:
         """One-shot probe of a named component + emit a fresh status tick.
@@ -525,11 +791,21 @@ class SessionLoop:
     # ------------------------------------------------------------------
 
     async def run(self) -> None:
-        """Register handlers → start bus → emit boot → spawn snapshot →
-        wait on stop event → tear down. Mirrors ``WizardLoop.run``."""
+        """Register handlers → start bus → emit boot → run boot sweeps →
+        spawn snapshot → wait on stop event → tear down.
+
+        Phase 15 Plan 03: ``run_boot_sweeps()`` fires the boot-time retention
+        sweep + emits one ``recordings.usage`` push BEFORE the snapshot loop
+        starts so the renderer sees an up-to-date disk-usage line on
+        connect. Crashed-session sweep runs in ``__main__.py`` (Plan 15-02)
+        already, so by the time we reach ``run_boot_sweeps`` the tree is
+        consistent.
+        """
         self.register_handlers()
         await self.bus.start()
         await self.boot()
+        # Phase 15 Plan 03 — boot sweep (best-effort; never raises).
+        await self.run_boot_sweeps()
         self._snapshot_task = asyncio.create_task(self._snapshot_loop())
 
         # SIGTERM (Tauri Cmd+Q) + SIGINT — same pattern as WizardLoop.
@@ -571,13 +847,31 @@ async def run_session() -> int:
     The Wave 2 ship runs **standalone** — no cascade agent, no audio
     core, no MusicState. The structural surface is what 12-03 and 12-04
     glue against; live audio I/O joins the loop in 12-04.
+
+    Phase 15 Plan 03: passes ``recordings_root`` from ``app_data_dir()``
+    so the recording browser handlers + retention sweep operate on the
+    production path (``~/Library/Application Support/vibemix/recordings``
+    on macOS, ``%APPDATA%/vibemix/recordings`` on Windows). On shutdown
+    fires ``on_session_close`` for the session-close sweep trigger.
     """
     logging.basicConfig(level=logging.INFO, format="[%(name)s] %(message)s")
     bus = WizardBus()
-    loop = SessionLoop(bus)
+    # Inline import — config_store.app_data_dir is a Phase 15-02 public
+    # alias; keep the runtime/session_loop top-level imports unchanged.
+    from vibemix.runtime.config_store import app_data_dir  # noqa: PLC0415
+
+    recordings_root = app_data_dir() / "recordings"
+    loop = SessionLoop(bus, recordings_root=recordings_root)
     print("-> session boot", file=sys.stderr)
     started = time.monotonic()
-    await loop.run()
+    try:
+        await loop.run()
+    finally:
+        # Phase 15 Plan 03 — session-close trigger.
+        try:
+            await loop.on_session_close()
+        except Exception:
+            log.exception("on_session_close during run_session shutdown failed")
     print(f"-> session exit ({time.monotonic() - started:.1f}s)", file=sys.stderr)
     return 0
 
