@@ -1,386 +1,543 @@
 # Stack Research
 
-**Domain:** Cross-platform real-time AI desktop app (audio + screen + MIDI + LLM/TTS streaming)
-**Researched:** 2026-05-11
-**Confidence:** HIGH (LiveKit pipeline pieces, Windows loopback, OSS code signing); MEDIUM (PyInstaller-on-livekit edge cases, ScreenCaptureKit migration timeline)
+**Domain:** Cross-platform real-time AI desktop app (audio + screen + MIDI + LLM/TTS streaming) — extending the v0.1.0 shipping stack with the v2.0 Research-Driven Ship feature set
+
+**Researched:** 2026-05-11 (baseline, Phases 1-14 shipped) + 2026-05-14 (v2.0 additions from `.planning/research/v2-buckets/`)
+
+**Confidence:**
+- HIGH on the v0.1.0 baseline — Phases 1-14 shipped this stack to a working `.onedir` Tauri sidecar on Kaan's rig.
+- HIGH on v2.0 additions for python-osc, pyrekordbox, sqlite-vec, watchdog, mutagen, pydub, three.js — all verified at PyPI/npm at time of research.
+- MEDIUM on the AX-bridge + overlay path — proven via `kyleawayan/djay-pro-bridge` for djay Pro but pointer-rectangle extraction has not been tested by anyone (we'd be the first to lift positions from the AX tree).
+- MEDIUM on sqlite-vec Windows wheels — PyPI currently lists Mac + Linux only; Windows currently needs source-build via `loadable_path()` JSON config (see installation footprint section).
 
 ---
 
-## TL;DR
+## TL;DR — what changes for v2.0
 
-Keep almost everything that's already running. Swap two things, add three.
+The shipping v0.1.0 stack stays put. v2.0 adds **8 capability buckets** on top of it, each rated for one-click-install impact:
 
-- **Brain:** keep `livekit-agents` + `livekit-plugins-google`, but drop `realtime.RealtimeModel` (Native Audio) and assemble an `AgentSession` from `google.LLM` (Gemini 3 Flash) + `google.beta.gemini_tts.TTS` (Gemini TTS Flash). VAD off, STT off, audio fed via session APIs not via the STT path.
-- **Audio capture:** keep `sounddevice` on macOS, add **PyAudioWPatch** for Windows (sounddevice has no WASAPI loopback — upstream issue #281, never landed).
-- **Screen capture:** add **`pyobjc-framework-ScreenCaptureKit`** on macOS (`CGWindowList` is obsoleted on macOS 15+), add **`mss`** on Windows for full-display + **`pywin32`** for window enumeration.
-- **Packaging:** **PyInstaller** + **`create-dmg`** (macOS, notarized) + **Inno Setup 6** (Windows, signed). Briefcase and Nuitka rejected (rationale below).
-- **API-key protection:** **FastAPI proxy on the existing Bravoh API host (`api.altidus.world`)** with **`slowapi` + Redis token-bucket** per-IP + per-install-UUID. Gemini key stays server-side; client ships only its install UUID, never the Google key.
-- **Code signing:** Apple Developer ID (existing) + **SignPath Foundation** (free OV cert for OSS — vibemix qualifies).
-- **CUA:** **REJECT.** Wrong abstraction (sandbox/VM-oriented), no MIDI, no audio capture. Adds dependency surface without solving a vibemix problem.
+| Bucket | New deps (size on wheel) | Install rating | Why |
+|---|---|---|---|
+| 1. **Latency** | NONE — all in existing `livekit-agents` + `google-genai` | 🟢 GREEN | `SpeechHandle.interrupt(force=True)` already shipped in `livekit-agents==1.5.8`. `cached_content` is a config field on `google-genai==2.0.1`. Ack bank = 40 bundled WAV files (~5MB total). |
+| 2. **Citation linter** | NONE — stdlib `re` + new in-memory `Evidence` registry | 🟢 GREEN | Bucket E's hard requirement: zero third-party deps. |
+| 3. **djay Pro overlay** | `pyobjc-framework-ApplicationServices` (~5MB, darwin only, already transitive of pyobjc-core) | 🟢 GREEN | Calls AX from the Rust parent (per Tauri issue #8329). Adds 1 Rust crate (already-present `tauri::webview::WebviewWindowBuilder` covers it). |
+| 4. **Pyrekordbox XML import** | `pyrekordbox==0.4.4` (~250KB pure-Python, MIT, 395★) | 🟢 GREEN | XML-only path; never touches SQLCipher. Pure Python, no native deps. |
+| 5. **Library intelligence** | `sqlite-vec==0.1.9` (~500KB ext, 7.6k★) + `pydub==0.25.1` (~50KB pure Python) + `mutagen==1.47.0` (~250KB pure Python) + `watchdog==6.0.0` (~150KB) + `ffmpeg` binary (bundled, ~20MB Win, native on Mac via afconvert fallback) | 🟡 YELLOW | sqlite-vec Windows wheel currently absent — must ship the `.dll` ourselves or use the `loadable_path` workaround. ffmpeg bundling on Windows is the install-size hit. |
+| 6. **Mascot 4-layer additive** | `three.js@0.184.0` (npm, already-vendored in `tauri/ui/`) + 8 new GLB asset files (~6MB) | 🟢 GREEN | Existing renderer; AnimationMixer extension is pure Three.js code. No new npm dep version bump required for `AdditiveAnimationBlendMode` (in r150+). |
+| 7. **Post-session debrief** | NONE — single Gemini call via existing `google-genai==2.0.1` cascade | 🟢 GREEN | Memory file `project_phase_16_kaan_dj_testing.md` killed the mem0/vector DB path. ~2KB structured JSON DJ profile = local SQLite row. |
+| 8. **10-SKU MIDI library** | NONE — 10 JSON files + new `MidiMapLoader` Python class | 🟢 GREEN | Already-present `mido==1.3.3` + `python-rtmidi==1.5.8` decode. JSONs ship inside the wheel as package-data (precedent: Phase 6 genre profiles). |
 
----
+**Net impact on the wheel:** +~7MB Python deps (sqlite-vec, pyrekordbox, pydub, mutagen, watchdog) + ~6MB mascot GLBs + ~20MB ffmpeg on Windows = total bundle grows from 242 MB (Phase 11 W1 closed at) → **~270-290 MB on Mac, ~290-310 MB on Windows**. Still under the 350 MB hard cap. No dep rated RED.
 
-## Recommended Stack
+**Net impact on Tauri/Rust:** zero new crates. AX bridge uses `core-foundation` + `core-graphics` (already transitive via `tauri` on darwin). Highlight overlay is a second `WebviewWindow` in the same Tauri shell.
 
-### Core Technologies
-
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Python | **3.12.x** | Runtime | Drop from 3.14 → 3.12. PyInstaller, PyAudioWPatch wheels, and notarization tooling all have mature 3.12 support; 3.14 wheels exist but lag for some C-extension deps (still hitting source-build paths on Windows). 3.12 is the safest "shipping" floor for cross-platform binaries in mid-2026. Verified via PyPI wheel availability for all required packages. Confidence: HIGH |
-| `livekit-agents` | **1.5.8** (released 2026-05-05) | Voice agent framework — rooms, sessions, audio bus, lifecycle | Already in use. The `AgentSession` cascade pattern (`stt` + `llm` + `tts` constructor args) is exactly the shape we need to swap the brain from Native Audio to Flash+TTS while keeping all the room/track/streaming plumbing. Apache-2.0. Python 3.10-3.14 supported. Verified via PyPI page and GitHub. Confidence: HIGH |
-| `livekit` | **1.1.7** | RTC client (`rtc.AudioFrame`, `rtc.VideoFrame`) | Already in use, transitive of `livekit-agents`. No change. Confidence: HIGH |
-| `livekit-plugins-google` | **1.5.8** | Gemini bindings for AgentSession | Exports `LLM` (Gemini cascade), `TTS` (Google Cloud TTS — **not what we want**), `STT` (Chirp), `realtime.RealtimeModel` (Native Audio — what we're moving away from), and **`beta.gemini_tts.TTS`** which is the Gemini 3 TTS class we actually want. Source confirmed at `livekit-plugins-google/livekit/plugins/google/beta/gemini_tts.py`. 30 prebuilt voices including `Achird` (current default), `Kore`, `Puck`, etc. 24 kHz mono PCM output. Confidence: HIGH |
-| `google-genai` | **2.0.1** (released 2026-05-09) | Direct Gemini SDK (auth, models.generate_content, streaming) | Already a transitive dep of `livekit-plugins-google`, also used directly for the proxy-backend half (where Gemini calls actually originate after the rate-limit gate). Python 3.10+. Confidence: HIGH |
-
-### Supporting Libraries
-
-#### Audio Capture (the cross-platform split)
-
-| Library | Version | Platform | Purpose | When to Use |
-|---------|---------|----------|---------|-------------|
-| `sounddevice` | **0.5.5** (released 2026-01-23) | macOS, Windows output | Input capture on macOS via BlackHole; output stream (PCM playback to headphones/speakers) on both OSes | Already in use. CoreAudio backend is rock-solid. Keep for macOS input + cross-platform output. **Does NOT support WASAPI loopback** (upstream issue #281 open since 2020, never resolved — confirmed via GitHub). Confidence: HIGH |
-| `PyAudioWPatch` | **0.2.12.8** (released 2026-01-14) | Windows input ONLY | WASAPI loopback capture from speakers/master output | The Windows answer to BlackHole. PortAudio fork with `get_default_wasapi_loopback()` and `get_wasapi_loopback_analogue_by_index()` — captures the system default playback device as an input. No virtual audio cable required, no user driver install. Wheels for Python 3.7-3.14 on Windows. Confidence: HIGH |
-| `numpy` | **2.4.4** | both | Audio math (RMS, FFT, bands, BPM autocorr) | Already in use. PyInstaller 6.14+ has solid numpy 2.x hooks. Confidence: HIGH |
-| `scipy` | **1.17.1** | both | `signal.resample_poly` for 48k→16k | Already in use. PyInstaller bundles scipy with known-fragile hidden imports; document the `--collect-submodules scipy` PyInstaller flag explicitly. Confidence: HIGH |
-
-#### Screen Capture (also cross-platform split)
-
-| Library | Version | Platform | Purpose | When to Use |
-|---------|---------|----------|---------|-------------|
-| `pyobjc-framework-ScreenCaptureKit` | **12.1** (released 2025-11-14) | macOS | Modern screen + window capture, replaces Quartz CGWindowList | **CGWindowListCreateImageFromArray was obsoleted in macOS 15.0** — Quartz path is on borrowed time. ScreenCaptureKit is Apple's forward-compatible replacement (also handles per-app capture and system audio capture in one API surface). Callback-based, more complex than `mss`, but mandatory for macOS 15+ longevity. Python 3.10-3.15 supported. Confidence: HIGH |
-| `pyobjc-framework-Quartz` | **12.1** | macOS | Window enumeration (`CGWindowListCopyWindowInfo`) | Keep for window picker enumeration (still works on macOS 15, just `CreateImageFromArray` is gone). For the actual screen *capture* operation, use ScreenCaptureKit. Confidence: HIGH |
-| `mss` | **10.2.0** | macOS + Windows | Fast full-display capture fallback | Already in use on mac. On Windows, `mss` gives us full-display capture via Desktop Duplication API. Use as the Windows screen-capture path; window-cropping comes from pywin32. Confidence: HIGH |
-| `pywin32` | **308+** | Windows | Window enumeration (`EnumWindows`, `GetWindowRect`, `GetWindowText`) | Windows equivalent of `CGWindowListCopyWindowInfo` — enumerate running app windows for the picker UI, get window bounds for cropping the `mss` screenshot to the DJ-app window. Standard, MIT, ships with Anaconda. Confidence: HIGH |
-| `pillow` | **12.2.0** | both | Image resize + JPEG encode before sending to Gemini | Already in use. No change. Confidence: HIGH |
-
-#### MIDI (one library, both OSes)
-
-| Library | Version | Platform | Purpose | When to Use |
-|---------|---------|----------|---------|-------------|
-| `mido` | **1.3.3** | both | MIDI message parsing, port discovery | Already in use. Confidence: HIGH |
-| `python-rtmidi` | **1.5.8** | both | RtMidi C++ backend for mido — CoreMIDI on mac, WinMM on Windows | Already in use. Cross-platform wheels (macOS arm64+x86_64, Windows). Confidence: HIGH |
-
-#### "Now Playing" — track metadata
-
-| Library | Version | Platform | Purpose | When to Use |
-|---------|---------|----------|---------|-------------|
-| `nowplaying-cli` (Homebrew binary) | latest | macOS only | MediaRemote poll for current track title/duration | Already in use, but **must be bundled in the macOS DMG** (not a runtime `brew install` dep — friction kills installs). Add it as a "Resources" file in the PyInstaller spec and call via subprocess against the bundled path. Confidence: HIGH |
-| Windows `MediaSession` via `winrt-Windows.Media.Control` | **3.x** | Windows | Equivalent of MediaRemote — Windows 10/11 system media session API | Same role as `nowplaying-cli`. Pure-Python WinRT bindings. **Defer to v1.1 if it's a time sink** — the audible-deck detection from MIDI + audio is already the primary signal; track title is a nice-to-have. Mark optional. Confidence: MEDIUM (WinRT bindings work but ergonomics are clunky) |
-
-#### LiveKit pipeline assembly
-
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `livekit.plugins.google.LLM` | bundled | Gemini 3 Flash via cascade `AgentSession` | The non-realtime Gemini LLM class. Model arg: `"gemini-3-flash-preview"` (or whatever the GA name is at ship time — currently named with version suffix in google-genai). Pass tool definitions for any function-calling needs. |
-| `livekit.plugins.google.beta.gemini_tts.TTS` | bundled | Gemini TTS Flash streaming | 30 prebuilt voices, 24 kHz mono PCM. **Capability flag is `streaming=False`** — it's chunked-HTTP, not WebSocket-streaming. LiveKit wraps it in a `ChunkedStream` internally and the agent session handles playback. For our use case (reaction-driven, not turn-by-turn dialogue) this is *fine* — chunked playback latency is < 500ms. |
-| `livekit.agents.AgentSession` | bundled | Wires LLM + TTS + room together, manages turn lifecycle | The cascade-mode constructor takes `llm=`, `tts=`, optional `stt=`, optional `vad=`. **Pass `stt=None` and `vad=None`** — we don't want LiveKit running STT on our music input. Trigger reactions with `session.generate_reply(instructions=...)` (the same call we already use with RealtimeModel). |
-
-#### Async/HTTP/util (unchanged from current)
-
-| Library | Version | Purpose |
-|---------|---------|---------|
-| `websockets` | **16.0** | Mascot WebSocket bus (localhost) |
-| `aiohttp` | **3.13.5** | LiveKit transitive |
-| `httpx` | **0.28.1** | google-genai transitive |
-| `pydantic` | **2.13.4** | LiveKit transitive |
-| `python-dotenv` | **1.2.2** | `.env` loading — dev only; production binary reads `APP_KEY` from OS keychain (mac) / DPAPI (Windows) |
-
-### Distribution & Backend Infrastructure (NEW)
-
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| **PyInstaller** | **6.20.0** (stable as of 2026-05) | Build cross-platform executables (`.app` + `.exe`) | Mainstream choice, fastest build times, mature numpy/scipy hooks (6.14+), well-documented `--onedir` + code-signing flow for macOS notarization. Build-host-must-match-target — separate macOS and Windows GitHub Actions runners. |
-| **create-dmg** | latest (npm/Homebrew) | Package signed `.app` into notarized DMG | Standard macOS-DMG generator. Works with notarytool (altool deprecated). Confidence: HIGH |
-| **Inno Setup** | **6.x** | Windows installer | De facto Windows installer for Python projects. Free, scriptable, pre-installed on `windows-latest` GitHub Actions, supports code-signing via `SignTool` post-build hook. Smaller and simpler than NSIS for our needs. Confidence: HIGH |
-| **Apple Developer ID** | $99/yr (Kaan already has) | macOS signing + notarization | Required for Gatekeeper non-block. notarytool (not altool — altool is deprecated). |
-| **SignPath Foundation** | FREE for OSS | Windows code signing (OV cert) | **The answer to the Windows signing cost question.** SignPath Foundation grants free OV code-signing certificates to qualifying open-source projects. vibemix qualifies (MIT/Apache, GitHub-hosted, OSI-compatible). Avoids the $277-560/yr Sectigo/DigiCert EV cost in v1. EV ladder upgrade later if SmartScreen reputation needs a boost. Confidence: HIGH |
-| **FastAPI** | **0.115.x+** | Bravoh-side Gemini proxy backend | Already the Bravoh backend's framework — reuse the same Python stack, same deployment pipeline (`api.altidus.world` / PM2). The proxy is a thin pass-through that injects the Gemini key server-side. |
-| **`slowapi`** | **0.1.9+** | Token-bucket rate limiting decorator | Decorator-based rate limiter for FastAPI/Starlette. Combine with Redis storage backend (already deployed for Bravoh) for distributed enforcement across PM2 workers. Per-IP for the unauthenticated path, per-install-UUID once the client registers. Confidence: HIGH |
-| **Redis** | **7.x** (already on the Bravoh box) | Rate-limit counters, install-UUID quota tracking | Reuse Bravoh's existing Redis. Confidence: HIGH |
-
-### Development Tools
-
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| `uv` | Fast pip replacement, lockfile generation | Use `uv pip compile` to generate a `requirements.lock` per OS (mac arm64, mac x86_64, win64). Reproducible builds for the binary pipeline. |
-| `pyproject.toml` + `setuptools` | Declarative project metadata | Replace the ad-hoc `.venv`-with-no-requirements current state. Even if we never publish to PyPI, this enables PyInstaller spec discovery and clean dep management. |
-| `pre-commit` | Lint/format hooks | `ruff` + `ruff format` (replaces black + flake8). Standard 2026 Python tooling. |
-| `ruff` | **0.7+** | Linter + formatter, single tool replaces flake8/isort/black |
-| `pytest` | Tests | For the deterministic pieces (MIDI mapping, RMS extraction, prompt construction). Audio + LiveKit integration tested manually + in recordings. |
-| GitHub Actions | CI: build + sign on each tag | Two matrix jobs (`macos-14` for Apple Silicon, `windows-latest` for x64). Notarization in macOS job, SignPath integration in Windows job (via their GitHub Action). |
+**Net impact on npm:** zero new packages (three.js already vendored at the version we need).
 
 ---
 
-## Architectural Patterns (the things downstream consumers actually need)
+## I. What Stays Exactly the Same (DO NOT change)
 
-### Pattern 1 — LiveKit cascade pipeline (replaces RealtimeModel)
+This is the validated baseline from Phases 1-14. Every entry below is shipping today in the Phase 11 W1 sidecar. Re-doing any of this in v2.0 is regression risk:
 
-```python
-from livekit.agents import AgentSession, Agent
-from livekit.plugins import google
-from livekit.plugins.google.beta import gemini_tts
+| Layer | Component | Locked Version | Why locked |
+|---|---|---|---|
+| Runtime | Python | **3.12.x** | PyInstaller, PyAudioWPatch, scipy, pyobjc all have mature 3.12 wheels. POC's 3.14 was dropped in Phase 1. |
+| Brain | `livekit-agents` + `livekit-plugins-google` | **1.5.8 / 1.5.8** | AgentSession cascade `stt=None, vad=None, llm=google.LLM, tts=google.beta.gemini_tts.TTS`. Phase 4 shipped. |
+| Brain | `google-genai` | **2.0.1** | Direct SDK (used by the cascade LLM, the citation grounding probes, and the new context-cache call). Phase 4 shipped. |
+| Audio in (mac) | `sounddevice` | **0.5.5** | BlackHole 48kHz int16 stereo — Phase 2 ring buffer locked the format. |
+| Audio in (Windows) | `PyAudioWPatch` | **0.2.12.8** | WASAPI loopback. Phase 7 shipped. |
+| Audio math | `numpy` + `scipy` | **2.4.4 / 1.17.1** | RMS, FFT, BPM autocorr, `signal.resample_poly`. Phase 2 + 6. |
+| MIDI | `mido` + `python-rtmidi` | **1.3.3 / 1.5.8** | CoreMIDI on Mac, WinMM on Windows. Phase 3 + 9. |
+| Screen (Mac) | `pyobjc-framework-ScreenCaptureKit` + `pyobjc-framework-Quartz` | **12.1 / 12.1** | Phase 8 migration shipped; SCStream + delegate-on-dispatch-queue. Window enum stays on Quartz. |
+| Screen (Win) | `mss` + `winsdk` + `pywin32` | **10.2.0 / 1.0.0b10 / 308** | Phase 7 shipped. |
+| Permissions (Mac) | `pyobjc-framework-AVFoundation` | **12.1** | AVCaptureDevice + CGPreflightScreenCaptureAccess. Phase 11 W4. |
+| Image | `pillow` | **12.2.0** | JPEG encode pre-Gemini. Phase 4. |
+| WS bus | `websockets` | **16.0** | 127.0.0.1:8765 IPC. Phase 11 W0. |
+| IPC | hand-written `@dataclass(frozen=True, slots=True)` + `jsonschema` Draft-07 | (stdlib + jsonschema 4.x) | **NO pydantic** — D-Area-4.4 / Phase 6 constraint. 27 IPC messages × 1 schema file. |
+| Tauri shell | `tauri` Rust + Vite + TS | **tauri 2.x / vite ^6 / vitest ^2** | Phase 11 W0+W2 scaffold + Phase 14 v5 design tokens. |
+| Tauri plugins | `tauri-plugin-shell` + `tauri-plugin-store` | **2.3 / 2.4** | Already vendored. |
+| Packaging | PyInstaller sidecar `--onedir` | **6.20.0** | Phase 11 W1 shipped. `--onefile` explicitly forbidden (AV false positives). |
+| Backend | FastAPI + slowapi + Redis 7+ + PyJWT | **0.115.x / 0.1.9+ / 7.x / 2.12.1+** | Phase 5 shipped to `proxy/`. Per-install-UUID JWT HS256. |
+| Design | CDJ Whisper v5 tokens.css + Saira/JetBrains Mono | (vendored) | Phase 14 migration complete; legacy fonts deleted. |
 
-session = AgentSession(
-    stt=None,                                    # we don't STT music
-    vad=None,                                    # we drive turns via event detector, not voice activity
-    llm=google.LLM(
-        model="gemini-3-flash-preview",          # multimodal, accepts our audio+screen evidence
-        api_key=os.environ["GEMINI_KEY_PROXIED"],  # actually the proxy token, see API-key protection
-    ),
-    tts=gemini_tts.TTS(
-        model="gemini-2.5-flash-preview-tts",    # 24kHz PCM, 30 voices
-        voice_name="Achird",                     # or user-picked male/female default
-        api_key=os.environ["GEMINI_KEY_PROXIED"],
-    ),
-)
-# Audio input → session.input.audio.push_frame(rtc.AudioFrame(...))  (same as RealtimeModel)
-# Event detector → session.generate_reply(instructions=prompt)        (same call signature)
-# TTS PCM out → playback queue (existing PlaybackQueue class works as-is)
-```
-
-The migration from `cohost_v2.py` is shallower than it looks because both code paths already use `session.generate_reply(instructions=...)`. The replacement is the constructor, not the loop.
-
-### Pattern 2 — Windows audio capture (the BlackHole replacement)
-
-```python
-import pyaudiowpatch as pyaudio
-
-p = pyaudio.PyAudio()
-loopback = p.get_default_wasapi_loopback()      # speaker → loopback input
-stream = p.open(
-    format=pyaudio.paInt16,
-    channels=loopback["maxInputChannels"],       # usually 2
-    rate=int(loopback["defaultSampleRate"]),
-    input=True,
-    input_device_index=loopback["index"],
-    frames_per_buffer=512,
-    stream_callback=on_audio,                    # same shape as sounddevice callback
-)
-```
-
-The audio frame shape after this callback is identical to the sounddevice mac path, so `AudioBuffer.push()` etc. work unchanged. The platform abstraction lives in one file (`audio_capture.py`): on darwin use sounddevice, on win32 use pyaudiowpatch.
-
-### Pattern 3 — API key protection (the architecture)
-
-```
-[vibemix client]
-   │  POST /v1/gemini/generate { install_uuid, audio_b64, screen_b64, history, prompt }
-   │  POST /v1/gemini/tts { install_uuid, text, voice }
-   │  (Bearer: install-jwt-from-first-launch)
-   ▼
-[api.altidus.world (existing Bravoh FastAPI)]
-   ├─ slowapi rate-limit: 60 req/min per install_uuid, 200 req/min per IP
-   ├─ Redis quota: 1000 req/day per install_uuid (Gemini cost cap)
-   ├─ inject GEMINI_API_KEY from server env
-   ├─ proxy to google-genai
-   └─ stream PCM/text back to client (chunked HTTP, no buffering)
-   ▼
-[Google Gemini API]
-```
-
-**Install-UUID flow:** on first launch, client POSTs `/v1/install` → server returns a JWT containing `install_uuid` (random UUIDv4) + signed expiry. Client stores in OS keychain (mac Keychain Access, Windows Credential Locker). Every subsequent request bears that JWT. No user account, no email, no friction — anonymity preserved while still giving us a unit to rate-limit.
-
-**Why not just embed the key:** embedded keys *will* be extracted from the binary within hours of release (strings(1), reverse-engineering Discord, etc.). Once leaked, they're scraped and used for unrelated abuse, blowing the Gemini quota for everyone. The proxy pattern is the only architecturally honest answer.
-
-**Libraries that implement this:** `fastapi` + `slowapi` (rate limiting) + `redis` (counters) + `pyjwt` (install JWTs) + `httpx` (proxy stream). All already in the Bravoh stack. Net new code: ~300 lines of FastAPI routes.
-
-### Pattern 4 — Packaging (PyInstaller, two specs)
-
-```
-vibemix/
-├── pyproject.toml
-├── requirements.lock              # uv pip compile output
-├── vibemix.spec.macos              # PyInstaller spec, --onedir, hidden imports for scipy/numpy/livekit
-├── vibemix.spec.windows            # same shape, Windows-specific (no nowplaying-cli binary)
-├── installer/
-│   ├── create_dmg.sh              # create-dmg + notarytool + stapler
-│   └── inno_setup.iss             # Inno Setup script, signs with SignPath
-└── .github/workflows/release.yml  # macos-14 + windows-latest matrix on tag push
-```
-
-PyInstaller flags that *will* bite us if forgotten (document explicitly): `--collect-submodules scipy`, `--collect-all livekit`, `--collect-all livekit.plugins.google`, `--osx-bundle-identifier world.bravoh.vibemix`, `--codesign-identity "Developer ID Application: ..."`, `--osx-entitlements-file entitlements.plist` (must allow `com.apple.security.cs.allow-unsigned-executable-memory` for Python).
+**If a v2.0 plan proposes changing any row above, kick it back to research.** The whole v2.0 plan is additive on this baseline.
 
 ---
 
-## Installation
+## II. v2.0 Stack Additions — Capability by Capability
 
-```bash
-# macOS development
-brew install nowplaying-cli portaudio
-python3.12 -m venv .venv
-source .venv/bin/activate
-uv pip install -e .                           # installs from pyproject.toml
+### A. Latency Stack (Bucket A + A-followup-1)
 
-# Windows development
-# (PortAudio bundled by PyAudioWPatch wheel — no separate install)
-py -3.12 -m venv .venv
-.venv\Scripts\activate
-uv pip install -e .
+**Goal:** Sub-2s actual voice-to-voice + <300ms perceived first reaction via prompt-diet + Gemini context caching + pre-canned ack bank + predictive firing + cancel-and-refire.
 
-# Build (macOS)
-pyinstaller vibemix.spec.macos
-./installer/create_dmg.sh dist/vibemix.app
+**New Python deps:** NONE. Everything lives on the validated `livekit-agents==1.5.8` + `google-genai==2.0.1` baseline.
 
-# Build (Windows)
-pyinstaller vibemix.spec.windows
-iscc installer/inno_setup.iss
-```
+**Verified APIs (empirically from A-followup-1):**
 
-### Core pyproject.toml dependencies
+1. **`SpeechHandle.interrupt(force=True)`** — at `.venv/.../livekit/agents/voice/speech_handle.py:141-154`. With `force=True`, bypasses `allow_interruptions=False` gate and calls `self._cancel()` → `cancel_and_wait(*tasks)` kills both LLM stream + TTS task in flight. **No new method names; no API surface change since 1.5.x.**
+
+2. **Gemini context caching** — `client.caches.create()` (sync) + `client.aio.caches.create()` (async) at `.venv/.../google/genai/caches.py:1053-1144`. `cached_content` field on `types.GenerateContentConfig` (`google/genai/types.py:5983`). **`gemini-3-flash-preview` is in the supported-models matrix** (verified at https://ai.google.dev/gemini-api/docs/caching, 2026-05-14). 1024-token floor for the cached block — pad with deterministic per-session context (controller MIDI map, event taxonomy, voice persona) to stay above the floor when prompt-dieting.
+
+3. **`extra_kwargs={"cached_content": ...}` plumbing** — `livekit-plugins-google/llm.py:256-261, 441-448` forwards `extra_kwargs` to `google-genai`'s `GenerateContentConfig`. The `prompt_cached_tokens` field surfaces at `llm.py:475` for telemetry verification.
+
+**Ack bank shipping format:**
+- **40 OPUS samples** (drop_hit/, track_change/, mix_move/, silence_break/, generic_filler/) × ~200-800ms each
+- Total disk: **~5MB at 24kHz mono OPUS** (negligible — well under the 350MB cap)
+- Decoded with Python's stdlib `wave` module if we ship as WAV instead (~12MB) — slightly larger but **zero new deps**. Recommendation: WAV for v2.0 unless install-size shows pressure.
+
+**Asset bundling pattern:** package-data inclusion (same precedent as Phase 6 genre profile JSONs + Phase 11 W3 audio test WAV). Bundled into the PyInstaller `.onedir` via `datas=` in the `.spec` file.
+
+**Install rating: 🟢 GREEN.** Zero new pip deps. ~5-12 MB bundle growth (ack bank).
+
+---
+
+### B. Citation Linter (Bucket E + E-followup-1)
+
+**Goal:** Grammar `[ev:KICK_SWAP@<t>]` / `[aud:peak_rms@<t>]` / `[midi:filter_open@<t>]` / `[track:Camelot_8A→9A]` enforcement, in-memory Evidence registry, response-level strip (live) + sentence-level strip (debrief), zero hallucinations.
+
+**New Python deps: NONE.** Stdlib `re` is sufficient. The Evidence registry is a `dict[(source, key)] → list[(t_session, value)]` held inside the existing MusicState lifecycle (no new persistence layer).
+
+**Module shape:**
+- `vibemix/citation/grammar.py` — regex catalog + EBNF docstring
+- `vibemix/citation/evidence.py` — in-memory registry, write from EventDetector, read from linter
+- `vibemix/citation/linter.py` — `validate_response(text) → (clean_text, stripped_spans, telemetry)`
+
+**Integration:** wraps the existing `llm_node` cascade in `vibemix/agent/dj_cohost.py` (Phase 10). Citation validation runs AFTER the negative-dict filter, BEFORE TTS dispatch. On total-strip the existing `<silence/>` short-circuit fires; on partial-strip the cleaned text proceeds to TTS.
+
+**Install rating: 🟢 GREEN.** Zero new dependencies. ~600 LOC + tests. Hard scope discipline (no nltk, no spacy, no parser library — stdlib `re` is enough).
+
+---
+
+### C. djay Pro Mac Overlay Highlight (Bucket C)
+
+**Goal:** Transparent always-on-top Tauri webview drawing soft amber rings on 12 hand-mapped djay Pro UI elements when Gemini emits a `point` field. Mac-only for v2.0. Windows + Rekordbox/Serato explicitly deferred.
+
+**New Python deps:** None directly (the AX call lives in the Rust parent per Tauri issue #8329 — sidecar AX permission inheritance is broken on installed Mac apps). If we ever lift the AX call into Python for development/debugging, the canonical module is:
+
+- `pyobjc-framework-ApplicationServices` — bundled `AXUIElement*` definitions (`HIServices` module). **No version bump needed**: it's already an transitive dep of the existing `pyobjc-framework-Quartz==12.1` install. [VERIFIED: https://pyobjc.readthedocs.io/en/latest/apinotes/ApplicationServices.html]
+
+**New Rust crates: NONE.** `tauri::webview::WebviewWindowBuilder` already covers the second-window pattern. `transparent + always_on_top + decorations:false + set_ignore_cursor_events(true)` flags all exist in `tauri==2.x`. AX from the Rust parent uses `core-foundation` + `core-graphics` crates which are already transitive via `tauri`'s `macos-private-api` feature flag.
+
+**New npm packages: NONE.** The overlay HTML is vanilla Canvas 2D in a new `highlight.html` asset (~200 LOC vanilla JS, no framework). Single CSS keyframe for the ring animation. Follows the `mascot.html` pattern.
+
+**Element coord map:** `assets/element_maps/djay_pro_5.json` (hand-mapped percentage-of-window-rect coords for 12 elements × 2 decks = 24 instances). Bundled in PyInstaller `--datas`. AX label refinement at runtime when AX position attributes are available; falls back to percentage map.
+
+**Install rating: 🟢 GREEN.** Zero new pip/npm/cargo deps. The AX permission TCC prompt is the only friction — onboarded via the existing Phase 11 W4 permissions card. Drop-in to existing Tauri shell + Phase 11 capability allowlist (add `"highlight"` window to `capabilities/default.json`).
+
+**Mac-only constraint:** the entire C bucket is `target_os = "macos"` gated. Windows users see a "highlight feature: macOS only in v2.0" notice in the Settings panel. **Windows overlay parity deferred to v2.1** per `B-followup-1` open question Q4.
+
+---
+
+### D. Pyrekordbox XML Import (Bucket B-followup-1)
+
+**Goal:** Read user's exported Rekordbox `collection.xml` once, store enriched per-track metadata (title, artist, BPM, Camelot key, energy, hot cues, beat grid) in a local SQLite cache. Fuzzy-match live now-playing-title against the cache for prompt grounding. Skips SQLCipher entirely (broken post-Rekordbox 6.6.5).
+
+**New Python dep:**
+
+| Library | Version | License | Wheels | Pure Python? | Install footprint |
+|---|---|---|---|---|---|
+| **`pyrekordbox`** | **0.4.4** | MIT | pure Python (no platform-specific wheels needed) | ✅ Yes | ~250 KB |
+
+[VERIFIED at https://pypi.org/project/pyrekordbox/ as 0.4.4, 395★, last release 2025-08-17 — 2026-05-14]
+
+**Why pyrekordbox over manual XML parsing:**
+- `RekordboxXml(path).get_tracks()` is a 1-line parser that handles the format quirks (TEMPO + POSITION_MARK nested elements, Rekordbox 5/6/7 schema variations)
+- Apache 2.0-compatible (MIT)
+- Pure Python — wheel-trivial on Mac/Win
+- Active maintainer (last release 2025-08-17, contributors writing fixes)
+- Bravoh-style "import the SDK, ignore the SQLCipher path" pattern
+
+**What we DON'T use from pyrekordbox:** the `sqlcipher3-wheels` dependency tree (its `Rekordbox6Database()` class). The Rekordbox 6.6.5+ key-obfuscation wall makes SQLCipher access unreliable for >80% of users. We pin `pyrekordbox==0.4.4` with `--no-extras` or similar to skip the SQLCipher chain. [Verify in plan: confirm `pyrekordbox` doesn't hard-require `sqlcipher3-wheels` at import — if so, `pip install pyrekordbox --no-deps` + explicit re-add of just the XML deps may be needed.]
+
+**Storage shape:**
+- One SQLite file at `~/Library/Application Support/vibemix/library/rekordbox.db` (Mac) / `%APPDATA%\vibemix\library\rekordbox.db` (Win)
+- 3 tables: `tracks` + `cues` + `beat_grid` per B-followup-1 §2 schema
+- ~2.5 MB for 5k tracks, ~8 MB for 15k tracks — negligible
+
+**Install rating: 🟢 GREEN.** Pure Python, MIT, 250KB, active maintainer. Bundles cleanly into PyInstaller — no hidden imports, no native dylib chains.
+
+---
+
+### E. Library Intelligence (Bucket F)
+
+**Goal:** Gemini Embedding 2 over user's audio library; sqlite-vec embedded vector store; live "what's playing now?" grounding via embedding-distance lookup; post-session "your library had a better neighbor" suggestions.
+
+**New Python deps (the largest cluster in v2.0):**
+
+| Library | Version | License | Platform Wheels | Pure Python? | Install footprint | Why |
+|---|---|---|---|---|---|---|
+| **`sqlite-vec`** | **0.1.9** | MIT | Mac arm64 ✅ / Mac x64 ✅ / Linux ✅ / **Windows: source-build** | C extension | ~500 KB ext + sqlite3 (stdlib) | sqlite-vec is the canonical embedded vector store. Native KNN search on `vec0(embedding float[1536])` virtual table. 7.6k★, v0.1.9 (2026-03-31). [VERIFIED at https://pypi.org/project/sqlite-vec/] **NO Windows wheel as of 2026-05-14** — see install rating caveat below. |
+| **`pydub`** | **0.25.1** | MIT | pure Python | ✅ Yes (uses ffmpeg subprocess) | ~50 KB | MP3 transcoding for Gemini Embedding 2 (MP3/WAV only — must transcode user's AAC/M4A/FLAC). Bravoh's pipeline uses this verbatim. [VERIFIED at https://pypi.org/project/pydub/ as 0.25.1] |
+| **`mutagen`** | **1.47.0** | GPL-2.0 | pure Python | ✅ Yes | ~250 KB | ID3/Vorbis/MP4 tag reader (BPM, key, energy, comments). Universal across DJ-tagged libraries. [VERIFIED at https://pypi.org/project/mutagen/ as 1.47.0] **License caveat:** GPL-2.0 — see §IV License Audit. |
+| **`watchdog`** | **6.0.0** | Apache 2.0 | pure Python (with optional C accelerators per platform) | ✅ Yes (mostly) | ~150 KB | Cross-platform file watcher (FSEvents on Mac / ReadDirectoryChangesW on Windows). Bundled in PyInstaller cleanly per their docs. [VERIFIED at https://pypi.org/project/watchdog/ as 6.0.0] |
+
+**System-level binary requirement — ffmpeg:**
+- pydub uses `ffmpeg` (or `avconv`) under the hood for MP3 transcoding
+- **macOS**: native `afconvert` is the fallback if ffmpeg is absent (Bravoh confirms this pattern works). Optional `brew install ffmpeg` for users who want it; vibemix bundles afconvert path as default.
+- **Windows**: no system audio converter — **MUST bundle ffmpeg.exe** in the PyInstaller `--datas` block. Adds ~20 MB to Windows installer. Source: official ffmpeg static builds at https://www.gyan.dev/ffmpeg/builds/ (GPL/LGPL — License audit below).
+
+**sqlite-vec Windows wheel — the YELLOW caveat:**
+- Current PyPI build (0.1.9 as of 2026-03-31) ships wheels for `manylinux_2_17_x86_64`, `manylinux_2_17_aarch64`, `macosx_11_0_arm64`, `macosx_10_6_x86_64`. **No `win_amd64` wheel.** [VERIFIED via PyPI listing]
+- Three workaround paths to evaluate during Phase planning:
+  1. **Bundle the prebuilt `vec0.dll`** from sqlite-vec's GitHub Releases (https://github.com/asg017/sqlite-vec/releases) into the PyInstaller `--datas`, load via `sqlite_vec.load(conn)` with explicit path override
+  2. **Build sqlite-vec from source on the Windows CI runner** (cmake + MSVC required — adds ~5 min to Windows build matrix; complex but reproducible)
+  3. **Fallback to "store as bytes, rank in Python via `np.dot`"** — Bravoh's actual production pattern. At 30k × 1536 = ~6ms in numpy. Adds no deps. Recommend as the Windows fallback regardless of (1)/(2).
+
+**Recommendation: ship the numpy fallback (3) for Windows in v2.0, document the (1) sidecar-bundled-DLL path as a v2.1 perf upgrade.** Keeps install GREEN on Mac, YELLOW-but-shippable on Windows.
+
+**Gemini Embedding 2 specifics (already locked in memory `project_gemini_embedding_2.md`):**
+- Model: `gemini-embedding-2-preview`
+- Dim: **1536** (Bravoh's chosen sweet spot)
+- L2-normalize client-side
+- Audio cap: **80s** (Bravoh empirical, despite docs claim of 180s)
+- Format: **MP3 or WAV only** (forces pydub transcoding for AAC/M4A/FLAC)
+- Cost: $0.00016/sec paid, **free tier covers nearly all users**
+
+**Bravoh pipeline lift (per memory `project_one_click_install_hard_req.md` and `F-library-intelligence.md`):**
+- `_embed_text_sync`, `_embed_bytes_sync`, `embed_audio`, `embed_text` — verbatim from `/var/www/bravoh-backend/app/services/embedding/service.py`
+- L2 normalization (`_l2_normalize`, 4 lines)
+- SSL retry + 429 retry via tenacity
+- pydub MP3 transcoding when >20MB
+
+**Tenacity:** add `tenacity>=8.2` if not already transitive of livekit-agents. **Verify in plan-checker** — likely already pulled in transitively. Pure Python, MIT.
+
+**Install rating: 🟡 YELLOW** — driven primarily by the sqlite-vec Windows wheel gap (workaroundable) and ffmpeg bundling on Windows (+20MB). All other deps GREEN. Recommendation: ship the numpy fallback for sqlite-vec on Windows, accept the ffmpeg bundle cost.
+
+---
+
+### F. Mascot 4-Layer Additive State Machine (Bucket D)
+
+**Goal:** Mood baseline (continuous) + anticipation overlay (fires BEFORE Gemini round-trip — 400-1200ms perceived mask) + speak/react layer + effect layer, plus beat-coupled procedural hip-bob + inline emote-tag vocab.
+
+**New npm packages: NONE.** Three.js already vendored in `tauri/ui/` at the version we need.
+
+- **Required version:** `three@0.150+` for `AdditiveAnimationBlendMode` + `AnimationUtils.makeClipAdditive()`. Current vendored version per Phase 13 is well above this floor.
+- **Verified API:** `AnimationAction.blendMode = THREE.AdditiveAnimationBlendMode` + `AnimationUtils.makeClipAdditive(clip)` preprocessing. [VERIFIED at https://threejs.org/examples/webgl_animation_skinning_additive_blending.html]
+
+**Three.js version current:** 0.184.0 (npm `three`) — released 2026-04. Vendoring stays as-is unless we want WebGPU (out of scope for v2.0 mascot).
+
+**Asset deltas (8 new GLB clips):**
+- `prep_lean_in_neutral` / `prep_lean_in_hyped` / `prep_head_turn_left` / `prep_head_turn_right` / `prep_settle` (5 anticipation clips)
+- `talk_loop_energetic_v2` / `react_celebrate_alt` / `dance_alt3` (3 reaction/talk variants)
+- Authored with idle/zero lower-body delta for additive blending (per D §"bone-subset blending")
+- Total disk: **~6 MB at compressed GLB** (DRACO compression already in our pipeline)
+- Cost: $1500-2000 Meshy/Mixamo asset spend (memory `project_mascot_as_vtuber_personality_surface.md` covered the pipeline choice)
+
+**Procedural hip-bob:** runs in `MascotRenderer.tick(deltaSeconds)` — direct `Hips` bone position modulation post-`mixer.update()`. Three.js skeletal manipulation, no new code paths. Driven by `bpm + downbeat_phase + recent_rms` already broadcast on the WS bus (Phase 13 added these per state.md decision).
+
+**Inline emote tag spike (per D Risk + open question #1):** Bucket D recommends a 1-day spike to verify Gemini text-channel transcripts arrive BEFORE audio chunks via `livekit-plugins-google`. If verified, ship the 16-tag vocabulary. If not, fall back to event-detector-driven anticipation (cheaper, less precise).
+
+**Install rating: 🟢 GREEN.** Zero new deps. ~6 MB asset growth.
+
+---
+
+### G. Post-Session Debrief (Bucket E)
+
+**Goal:** Single Gemini call per session, chaptered review + 60-90s voiced TL;DR + 3 drills (hard cap) + clickable timeline. Long-term DJ profile = ~2KB structured JSON.
+
+**New Python deps: NONE.**
+- Single Gemini call uses existing `google-genai==2.0.1`
+- Voiced TL;DR uses existing `livekit-plugins-google.beta.gemini_tts.TTS`
+- Structured JSON DJ profile stored in the same SQLite local store as the library (Bucket E §IV — explicitly **NO mem0 / NO vector DB** per memory `project_v2_open_candidates.md` confirmed-list)
+- Timeline UI is vanilla TS/Canvas in the existing Tauri shell
+
+**SBI/STAR-AR framing:** prompt-side decision (no library), enforced by the citation linter (Bucket B above).
+
+**Install rating: 🟢 GREEN.** Zero new deps.
+
+---
+
+### H. 10-SKU MIDI Controller Library (Bucket B-followup-1 §3)
+
+**Goal:** Replace hardcoded `_CC_MAP` / `_NOTE_MAP` from `cohost_v4.py:586-602` with a JSON-per-SKU registry + `MidiMapLoader` Python class. 10 controllers covering ~70-85% of bedroom-DJ market.
+
+**New Python deps: NONE.** Already-shipping `mido==1.3.3` + `python-rtmidi==1.5.8` decode wire messages. The new module is pure-Python schema + dispatch.
+
+**Note: this overlaps with Phase 9's existing controller library work.** Phase 9 already shipped 10 controller JSONs (DDJ-FLX4 verified + 9 others by Mixxx-mapping basis). What v2.0 adds:
+- Verified sniff data for the 9 currently-flagged-unverified SKUs (DDJ-400/FLX6/FLX10/SX3, XDJ-RX3, Numark Party Mix Live, Mixstream Pro+, Hercules Inpulse 300/500)
+- 5-minute `mido` sniff to resolve the Sync note `0x60` (v4) vs `0x58` (Mixxx XML) disagreement (per B-followup-1 §7Q2)
+- A formalized `MidiMapLoader` class replacing the in-line dict lookup
+
+**Install rating: 🟢 GREEN.** Zero new deps. 10 JSON files ship as package-data (precedent: existing Phase 9 pattern). Sniff time = ~30 minutes of Kaan's hardware-on-the-bench time per SKU + Francesco's DJ network for loaner units.
+
+---
+
+## III. Per-Platform Constraints
+
+### macOS-only paths (v2.0 additions)
+
+| Capability | Implementation | Constraint |
+|---|---|---|
+| AX bridge for djay Pro overlay | Rust parent via `core-foundation` + `core-graphics` crates (already-transitive of `tauri` w/ `macos-private-api`) | TCC Accessibility prompt; sidecar inheritance broken (Tauri #8329); bundle ID `world.bravoh.vibemix` LOCKED |
+| Window enumeration (highlight tracking) | `Quartz.CGWindowListCopyWindowInfo` (still supported on macOS 15+) | Already in use since Phase 3 |
+| ffmpeg fallback (library transcoding) | macOS native `afconvert` binary at `/usr/bin/afconvert` | Pre-installed on all supported macOS versions (12.3+) — no install action |
+
+### Windows-only paths (v2.0 additions)
+
+| Capability | Implementation | Constraint |
+|---|---|---|
+| ffmpeg bundling (library transcoding) | Static ffmpeg.exe in PyInstaller `--datas` | +~20 MB installer size; license is LGPL build (see License audit) |
+| sqlite-vec — numpy fallback | "Store float32 bytes in BLOB, rank in Python via `np.dot`" (Bravoh pattern) | 30k × 1536 = ~6ms in pure numpy — acceptable |
+| Window enumeration (highlight tracking) | `EnumWindows` + `GetWindowRect` via `pywin32` (Phase 11 W4) | DPI virtualization caveat — mark process `PROCESS_PER_MONITOR_DPI_AWARE_V2` |
+| djay Pro overlay | **Explicitly NOT shipped in v2.0** | Deferred to v2.1 per Bucket C scope discipline |
+
+### Cross-platform additions (Mac + Windows both)
+
+| Capability | Implementation |
+|---|---|
+| Latency stack (predictive firing, cancel-and-refire, ack bank, prompt cache) | Pure cascade-layer code; works on both OSes |
+| Citation linter | Pure stdlib; works on both OSes |
+| Pyrekordbox XML import | Pure Python; works on both OSes |
+| Library intelligence (Gemini Embedding 2 + sqlite-vec/numpy fallback) | Works on both; sqlite-vec on Mac, numpy fallback on Windows |
+| Mascot 4-layer additive | Three.js renders identically on both |
+| Post-session debrief | Single Gemini call + local SQLite — both OSes |
+| 10-SKU MIDI library | mido cross-platform — both OSes |
+| File watcher (`watchdog`) | FSEvents on Mac, ReadDirectoryChangesW on Windows — single API |
+
+---
+
+## IV. License Audit (additions only)
+
+| New dep | License | Linkable with vibemix's Apache 2.0 + DCO? | Notes |
+|---|---|---|---|
+| `pyrekordbox` 0.4.4 | MIT | ✅ Yes | Bundle freely. |
+| `sqlite-vec` 0.1.9 | MIT (Apache-2.0 dual-licensed per repo) | ✅ Yes | Bundle freely. |
+| `pydub` 0.25.1 | MIT | ✅ Yes | Bundle freely. |
+| `mutagen` 1.47.0 | **GPL-2.0** | ⚠️ YELLOW — use-only at runtime, NOT linked statically | Python imports don't constitute GPL "linking" (RMS clarified this for Python years ago) — vibemix can run-time import mutagen as a separate dep without infecting Apache 2.0. PyInstaller bundle is a "mere aggregation" per GPL §0. **BUT**: distributing source bundled w/ mutagen needs careful README disclosure. If concerned, swap for `tinytag` (MIT, simpler but less complete tag support). Recommendation: ship mutagen, disclose in `LICENSE-3RD-PARTY.md`. |
+| `watchdog` 6.0.0 | Apache 2.0 | ✅ Yes | Same license as vibemix. |
+| `pyobjc-framework-ApplicationServices` | MIT-style (pyobjc license) | ✅ Yes | Same license family as existing pyobjc deps. |
+| `tenacity` (transitive add-confirm) | Apache 2.0 | ✅ Yes | Likely already transitive of livekit-agents. |
+| `three.js` 0.184.0 | MIT | ✅ Yes | Already vendored. |
+| **ffmpeg static binary (Windows)** | **LGPL or GPL depending on build** | ⚠️ YELLOW | Use the **LGPL build** from gyan.dev (no GPL-licensed encoders). License obligation: ship source-availability notice + offer to provide modified source on request. Standard precedent — every Windows app that bundles ffmpeg follows this pattern (e.g. Audacity, OBS). |
+
+**No new dep is RED.** Two YELLOW items (mutagen GPL, ffmpeg LGPL) require disclosure in `LICENSE-3RD-PARTY.md` and Settings → About surface. Both have well-precedented OSS distribution patterns.
+
+---
+
+## V. One-Click-Install Impact Table (the final summary)
+
+Per memory `project_one_click_install_hard_req.md` — every new dep rated:
+
+| New Item | Rating | Bundle Size Delta | Install-Time User Action | Why |
+|---|---|---|---|---|
+| Ack bank (40 WAVs) | 🟢 GREEN | +5-12 MB | None | Package-data inclusion |
+| Citation linter | 🟢 GREEN | +0 | None | Stdlib only |
+| AX bridge (Tauri Rust) | 🟢 GREEN | +0 | First-run TCC prompt (already onboarded via Phase 11 W4) | Existing pyobjc transitive |
+| Highlight overlay (Tauri webview) | 🟢 GREEN | +50 KB (HTML/CSS/JS) | None | Same Tauri shell |
+| `pyrekordbox` | 🟢 GREEN | +250 KB | User clicks Settings → "Import Rekordbox XML" (optional) | Pure Python MIT |
+| `sqlite-vec` (Mac) | 🟢 GREEN | +500 KB | None | Bundled ext, prebuilt wheel |
+| `sqlite-vec` (Windows) | 🟡 YELLOW | +0 (using numpy fallback) | None | Workaround documented; v2.1 perf upgrade ships actual Windows wheel |
+| `pydub` | 🟢 GREEN | +50 KB | None | Pure Python |
+| `mutagen` | 🟢 GREEN | +250 KB | None | Pure Python; GPL disclosed |
+| `watchdog` | 🟢 GREEN | +150 KB | None | Pure Python core; optional C accelerators auto-bundle |
+| ffmpeg (Mac) | 🟢 GREEN | +0 | None | macOS native `afconvert` fallback |
+| **ffmpeg (Windows)** | 🟡 YELLOW | **+20 MB** | None | Static LGPL binary in `--datas`; license disclosed |
+| Mascot 8 new GLBs | 🟢 GREEN | +6 MB | None | Asset spend $1500-2000 |
+| 10-SKU MIDI verified JSONs | 🟢 GREEN | +50 KB total | None | Package-data, precedent from Phase 9 |
+
+**Bundle size projection:**
+- Phase 11 W1 baseline: 242 MB (Mac), ~250 MB (Win projected)
+- v2.0 additions: +~12 MB (Mac), +~32 MB (Win, including ffmpeg)
+- **v2.0 shipping size: ~254 MB (Mac), ~282 MB (Win)** — well under 350 MB hard cap
+
+**Zero new user install actions.** TCC permissions for AX (Mac) are part of the existing first-run wizard. Library import is optional (Settings → "Import Rekordbox XML").
+
+---
+
+## VI. Installation Manifest (v2.0 delta)
 
 ```toml
-[project]
-name = "vibemix"
-requires-python = ">=3.12,<3.13"
+# pyproject.toml — additions to [project.dependencies]
 dependencies = [
-  "livekit-agents==1.5.8",
-  "livekit==1.1.7",
-  "livekit-plugins-google==1.5.8",
-  "google-genai==2.0.1",
-  "numpy==2.4.4",
-  "scipy==1.17.1",
-  "sounddevice==0.5.5",
-  "mido==1.3.3",
-  "python-rtmidi==1.5.8",
-  "mss==10.2.0",
-  "pillow==12.2.0",
-  "websockets==16.0",
-  "python-dotenv==1.2.2",
-  "httpx==0.28.1",
-  "pyjwt==2.10.1",
-  "keyring==25.6.0",                          # OS-native secret storage (Keychain/CredLocker)
+  # ... v0.1.0 baseline (DO NOT change) ...
+
+  # v2.0 additions
+  "pyrekordbox==0.4.4",         # XML library import (XML path only; SQLCipher skipped)
+  "sqlite-vec==0.1.9",           # Mac/Linux only; Windows uses numpy fallback (sys_platform marker below)
+  "pydub==0.25.1",               # MP3 transcoding for Gemini Embedding 2
+  "mutagen==1.47.0",             # ID3/Vorbis/MP4 tag reader
+  "watchdog==6.0.0",             # Cross-platform file watcher
+  # tenacity already transitive of livekit-agents — verify
 ]
 
+# sqlite-vec only ships wheels for Mac/Linux as of 2026-05-14
+# Plan-checker: confirm sys_platform marker syntax for the Windows fallback path
 [project.optional-dependencies]
 macos = [
-  "pyobjc-framework-Quartz==12.1",
-  "pyobjc-framework-ScreenCaptureKit==12.1",
+  # ... v0.1.0 baseline (pyobjc-* etc.) ...
+  # pyobjc-framework-ApplicationServices is transitive — no explicit add needed
 ]
 windows = [
-  "PyAudioWPatch==0.2.12.8",
-  "pywin32>=308",
+  # ... v0.1.0 baseline (PyAudioWPatch, pywin32, winsdk) ...
+  # Windows sqlite-vec workaround: use numpy fallback. NO sqlite-vec on Windows.
 ]
-dev = [
-  "pyinstaller==6.20.0",
-  "ruff==0.7.4",
-  "pytest==8.3.4",
-  "uv==0.5.11",
+```
+
+```ts
+// tauri/ui/package.json — NO CHANGES
+// three.js@0.184.0 already vendored. New mascot clips ship as GLB assets in tauri/ui/public/mascot/clips/
+```
+
+```rust
+// tauri/src-tauri/Cargo.toml — NO CHANGES
+// AX bridge uses core-foundation + core-graphics already transitive via `tauri 2.x` with macos-private-api feature
+// New highlight WebviewWindow uses existing tauri::webview::WebviewWindowBuilder
+```
+
+```bash
+# PyInstaller spec deltas (vibemix-core.macos.spec / vibemix-core.windows.spec)
+datas += [
+  ('assets/ack_bank/*.wav', 'assets/ack_bank'),
+  ('assets/element_maps/djay_pro_5.json', 'assets/element_maps'),
+  ('assets/controller_library/*.json', 'assets/controller_library'),  # 10 SKU JSONs
 ]
+# Windows-only: bundle ffmpeg.exe (LGPL build from gyan.dev)
+if sys.platform == 'win32':
+    datas += [('vendor/ffmpeg.exe', 'vendor')]
+# Windows-only: bundle sqlite-vec vec0.dll workaround (v2.1)
+# For v2.0, use numpy fallback — no bundling needed
 ```
 
 ---
 
-## Alternatives Considered
-
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| `livekit-plugins-google.beta.gemini_tts.TTS` | `livekit-plugins-google.TTS` (Google Cloud TTS) | Never for vibemix — Cloud TTS is a different product with different voices and we're committed to the Gemini-only stack. Cloud TTS is fine for boring IVR-style voice; loses the Gemini personality. |
-| `livekit-plugins-google.LLM` (cascade) | `livekit-plugins-google.realtime.RealtimeModel` (Native Audio) | Already tried, already rejected — grounding is worse than explicit Flash + TTS per Kaan's testing. Code path stays in repo as opt-in. |
-| `PyAudioWPatch` (Windows) | `SoundCard` (cross-platform) | SoundCard is genuinely cross-platform (one API for mac + win + linux) but its WASAPI loopback support is unofficial/best-effort. PyAudioWPatch is purpose-built for loopback. SoundCard would be the choice if we wanted *one* library for both OSes, but the macOS path is already battle-tested with sounddevice — splitting the abstraction at the OS line is simpler than rewriting the mac side. |
-| `PyAudioWPatch` (Windows) | `ProcTap` (per-process WASAPI loopback) | ProcTap is newer and lets you capture audio from a *specific process* (rekordbox.exe) rather than the system master. Powerful but adds a moving target — version 0.4+ adds macOS, but cross-platform parity isn't stable enough for v1. Re-evaluate for v1.1 if "users hear their AI co-host through the AI co-host" feedback loops become an issue. |
-| `PyInstaller` | `Briefcase` (BeeWare) | Briefcase produces nicer-looking native packages (real MSI, real `.app`, signed by default) — but it's optimized for GUI-toolkit-Python (Toga, etc.) and stumbles on heavy C-extension stacks like ours (livekit + scipy + numpy + pyobjc + portaudio). PyInstaller has known-good recipes for every one of these. Use Briefcase if vibemix ever has a real GUI in Toga; today there's no GUI, just a system-tray menu. |
-| `PyInstaller` | `Nuitka` | Nuitka compiles Python to C — produces 2-4× faster startup and harder-to-reverse binaries. Two reasons not to: (1) build time grows 5-10×, killing iteration speed during the 3-week sprint; (2) Nuitka's hooks for the same numpy/scipy/livekit stack are *less* mature than PyInstaller's. Revisit post-launch if startup time becomes a complaint. |
-| `Tauri + Python sidecar` | (full Electron + Python sidecar) | If/when vibemix grows a real settings GUI: Tauri (Rust shell, system webview, ~10MB) is the right call over Electron (~150MB). For v1 the UI is a tray-icon + native dialogs — no webview needed at all. |
-| `Inno Setup` (Windows) | `NSIS` | Both work, both free. Inno Setup has cleaner Pascal-script and is pre-installed on `windows-latest` GH runners; NSIS scripts age into write-only territory. No technical difference at our scale. |
-| `SignPath Foundation` (OSS cert) | Buy a commercial OV cert (Sectigo $277/yr, DigiCert $560/yr) | If SignPath rejects vibemix's application (unlikely — MIT/Apache, OSS, GitHub-hosted, real product, real maintainer). Or if we need EV (instant SmartScreen reputation) — but EV is overkill for v1. |
-| FastAPI + slowapi proxy | API Gateway (Kong, Envoy, NGINX rate-limit-zone) | Gateway-level rate limit is more performant at scale but adds a moving piece. We're already running FastAPI on `api.altidus.world` for Bravoh — adding two routes is cheaper than introducing Kong. Migrate to gateway if vibemix gets out of hand (>10k DAU). |
-
----
-
-## What NOT to Use
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| `sounddevice` for Windows loopback capture | Upstream issue #281 has been open since 2020 — WASAPI loopback has never landed and isn't on the roadmap. Trying to use `WasapiSettings` for loopback will silently fail or capture mic instead. Confirmed via the spatialaudio/python-sounddevice repo. | `PyAudioWPatch` on Windows; keep sounddevice for macOS input + cross-platform output. |
-| `Quartz.CGWindowListCreateImageFromArray` for screen capture on macOS 15+ | **Obsoleted in macOS 15.0** per Apple Developer Documentation. Will be removed in a future macOS. Apps shipping this in 2026 will break in 2027. | `pyobjc-framework-ScreenCaptureKit` for the capture; keep `Quartz.CGWindowListCopyWindowInfo` for window *enumeration* (still supported). |
-| `altool` for macOS notarization | Deprecated. Apple migrated to `notarytool` (built into Xcode 13+). Several Apple Developer Forum threads from 2024-2026 confirm altool no longer accepts new submissions. | `xcrun notarytool submit ... --wait` then `xcrun stapler staple`. |
-| Embedding `GEMINI_API_KEY` in the distributed binary | The string `AIza...` is grep-able. Within hours of release, scrapers will harvest it from binary releases on GitHub. Once leaked, the key gets used for unrelated abuse, Gemini suspends it, *all* vibemix users go offline. Non-negotiable. | FastAPI proxy on `api.altidus.world` with install-UUID JWT + per-UUID rate-limit. Key never leaves the server. |
-| `RealtimeModel` (Gemini 2.5/3 Native Audio) as the default brain | Empirically worse grounding than the cascade in Kaan's testing on real DJ sets. Lower-level: Native Audio's persistent WebSocket pattern is harder to recover from when sessions drop mid-set. | `google.LLM` + `google.beta.gemini_tts.TTS` cascade. Keep RealtimeModel as a future opt-in toggle. |
-| `python-dotenv` in production | `.env` files in distributed binaries leak secrets. Used only in dev. | OS keychain (mac Keychain via `keyring` package, Windows Credential Locker via same package) for the install JWT. No secrets stored in app bundle. |
-| CUA (trycua/cua) | Wrong abstraction layer. CUA is sandbox/VM-oriented agent infrastructure (think: AI controlling a virtualized desktop for benchmark tasks). It does not solve our problems: no MIDI ingestion, no audio capture (it's screen + keyboard/mouse for UI automation), and its assumption of a virtualized environment is the opposite of what vibemix needs (raw access to the user's real audio/MIDI hardware). The `cua-driver` background-Mac-access piece is interesting but solves a problem we don't have. Tracking on the roadmap for "AI-controls-the-DJ-app" features (v2+), not for the listening co-host. | (nothing — direct OS APIs via `mido`, `sounddevice`, `ScreenCaptureKit` are the right shape) |
-| `Briefcase` for v1 packaging | Less mature with heavy C-extension stacks (livekit, scipy, portaudio, pyobjc). 1-2 weeks of yak-shaving to get a working build. | `PyInstaller` + `create-dmg` + `Inno Setup`. Reconsider Briefcase if a GUI toolkit (Toga) gets added later. |
-| `Nuitka` for v1 packaging | 5-10× longer build times kill iteration during the 3-week sprint. | `PyInstaller`. Revisit if startup time becomes a complaint post-launch. |
-| `nowplaying-cli` as a runtime Homebrew dep | Adds an install step (`brew install nowplaying-cli`) that breaks the "one-click DMG" promise. | Bundle the `nowplaying-cli` binary as a Resources file inside the `.app` and call it via subprocess against the bundled path. |
-
----
-
-## Stack Patterns by Variant
-
-**If user is on macOS:**
-- Audio in: `sounddevice` + BlackHole 2ch (or system loopback when ScreenCaptureKit-based audio capture is wired up — defer to v1.1; BlackHole works today)
-- Screen capture: `pyobjc-framework-ScreenCaptureKit` (modern) with `Quartz.CGWindowListCopyWindowInfo` for window picker enumeration
-- Track metadata: bundled `nowplaying-cli` binary via subprocess
-- Packaging: PyInstaller `--onedir` → codesign with Apple Developer ID → create-dmg → notarytool → stapler
-- Distribution: notarized DMG, downloaded from GitHub Releases
-
-**If user is on Windows:**
-- Audio in: `PyAudioWPatch` WASAPI loopback (auto-grabs default playback device — no driver install)
-- Screen capture: `mss` (full-display) + `pywin32` (window enumeration + bounds for cropping)
-- Track metadata: defer to v1.1 (WinRT MediaSession) OR skip entirely if MIDI+audio audible-deck detection is sufficient
-- Packaging: PyInstaller `--onedir` → SignPath OV-cert signing → Inno Setup compile → SignPath sign installer
-- Distribution: signed installer EXE on GitHub Releases
-
-**If user runs Linux:**
-- Out of scope. Document clearly in README.
-
----
-
-## Version Compatibility
+## VII. Version Compatibility Matrix (v2.0 additions only)
 
 | Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| `livekit-agents==1.5.8` | `livekit-plugins-google==1.5.8` | Always match minor versions — LiveKit pins the plugin API across minor bumps. |
-| `livekit-plugins-google==1.5.8` | `google-genai==2.0.1` | google-genai 2.x is the current major; livekit-plugins-google's `beta.gemini_tts` imports `from google.genai import Client, types`. |
-| `numpy==2.4.4` | `scipy==1.17.1` | scipy 1.13+ supports numpy 2.x; older scipy will silently break on numpy 2 array protocol. |
-| `numpy==2.4.4` | `PyInstaller==6.20.0` | PyInstaller 6.14+ has known-good numpy 2.x hooks; earlier versions hit `numpy.libs` missing-DLL on Windows. |
-| `PyAudioWPatch==0.2.12.8` | Python 3.12 on Windows | Wheels available for 3.7-3.14; macOS not supported (Windows-only fork). |
-| `sounddevice==0.5.5` | PortAudio 19.7+ | sounddevice wheels bundle PortAudio on Windows; on macOS, system PortAudio (via brew or bundled) is required. |
-| `pyobjc-framework-ScreenCaptureKit==12.1` | macOS 12.3+ | ScreenCaptureKit was introduced in macOS 12.3. **Drop macOS 11 support** in README. |
-| `livekit-agents` | Python 3.10-3.14 | We target 3.12. |
-| `google-genai==2.0.1` | Python 3.10-3.14 | We target 3.12. |
-| `mido==1.3.3` | `python-rtmidi==1.5.8` | rtmidi is the default and recommended mido backend. Both must be installed for cross-platform reliability. |
+|---|---|---|
+| `pyrekordbox==0.4.4` | Python 3.8+, ours 3.12 ✅ | Apache 2.0 + DCO compatible (MIT lib) |
+| `sqlite-vec==0.1.9` | Python 3.7+, sqlite3 stdlib | macOS arm64 + x64, Linux x64 + arm64 wheels. Windows: see workaround. |
+| `pydub==0.25.1` | Python 3.6+ | Requires ffmpeg subprocess (system or bundled) |
+| `mutagen==1.47.0` | Python 3.10+ (per docs; 3.7+ per setup.py) | Stdlib only — no native deps |
+| `watchdog==6.0.0` | Python 3.9+ | Bundles platform-specific C accelerators (FSEvents/ReadDirectoryChanges) — auto-detect during install |
+| `three.js@0.184.0` | Existing Vite build chain | AdditiveAnimationBlendMode shipped in r150+, no version bump needed |
+| `pyobjc-framework-ApplicationServices` | Transitive of `pyobjc-core==12.1` | No explicit pin needed |
+| `tenacity` | Transitive of livekit-agents (likely) | Verify in plan; if not transitive, pin `tenacity>=8.2.3` |
 
 ---
 
-## Trade-offs Called Out
+## VIII. Alternatives Considered (and rejected)
 
-- **PyInstaller binary size** — vibemix bundle will land in the 150-250 MB range per platform (numpy + scipy + livekit + pyobjc/pywin32 are heavy). Acceptable for desktop, ugly compared to a Rust binary but standard for Python ML/audio apps. Mitigation: PyInstaller `--exclude-module` for unused submodules (e.g. `livekit.plugins.openai` if we don't import it). Probably trims 30-50 MB.
-- **PyInstaller AV false positives** — `pyinstaller --onefile` binaries trigger heuristic AV detection. We use `--onedir` (the recommended mitigation) and rely on SignPath OV signing for SmartScreen trust. Some Avast/AVG installs will still complain in the first weeks until reputation builds. Documented gotcha.
-- **GeminiTTS `streaming=False` capability** — Gemini TTS is currently chunked-HTTP not WebSocket-streaming. Latency is ~300-500ms per response. For DJ co-host (event-triggered, < 1/min reactions) this is well within "feels live". Would matter for a Siri-style turn-by-turn chatbot; doesn't matter here. If/when Google ships true streaming Gemini TTS via Live API, the cascade pattern accommodates a hot-swap.
-- **macOS ScreenCaptureKit complexity** — Callback-based API (multiple nested `getShareableContentWithCompletionHandler` calls before you get a `CGImage`) is heavier than `mss`. Reference implementation gist exists (mr-linch on GitHub). Budget 1-2 days for the migration, vs. the alternative of shipping deprecated APIs that will break on macOS 16.
-- **Windows screen capture without window cropping** — `mss` captures whole displays. `pywin32.EnumWindows` gets bounds; client-side crop in Pillow. Slight perf cost vs. native Direct3D window-level capture, irrelevant at 1 fps.
-- **SignPath OSS application latency** — applications take 1-3 weeks to be reviewed. **Start the SignPath application TODAY** so it's approved by ship time, even if not used until then. Free fallback during the wait: ship unsigned with a documented SmartScreen warning, accept the user-trust hit for the first release wave.
-- **Cross-compilation impossible** — PyInstaller can't build a Windows binary on a Mac. Need GitHub Actions matrix or a dedicated Windows machine. GitHub Actions `windows-latest` is free for OSS public repos — use it.
-- **Bravoh proxy = single point of failure** — if `api.altidus.world` goes down, every vibemix client goes mute. Already protected by PM2 auto-restart + nginx upstream; add a status-page check on the client (`/v1/health`) so the app shows a clear "Bravoh services unreachable" state instead of cryptic timeouts.
-
----
-
-## Sources
-
-- [livekit-agents on PyPI](https://pypi.org/project/livekit-agents/) — version 1.5.8, released 2026-05-05, Python 3.10-3.14, Apache-2.0. **HIGH confidence.**
-- [livekit-plugins-google on PyPI](https://pypi.org/project/livekit-plugins-google/) — version 1.5.8, released 2026-05-05. **HIGH confidence.**
-- [livekit-plugins-google source `__init__.py`](https://github.com/livekit/agents/blob/main/livekit-plugins/livekit-plugins-google/livekit/plugins/google/__init__.py) — confirmed exports: `LLM`, `TTS`, `STT`, `realtime`, `beta`. **HIGH confidence.**
-- [livekit-plugins-google `beta/gemini_tts.py` source](https://github.com/livekit/agents/blob/main/livekit-plugins/livekit-plugins-google/livekit/plugins/google/beta/gemini_tts.py) — full class signature, 30 voice names, 24kHz output, `streaming=False` capability. Read directly via GitHub raw API. **HIGH confidence.**
-- [LiveKit Agents models overview](https://docs.livekit.io/agents/models/) — AgentSession cascade pattern (`stt`/`llm`/`tts` constructor args). **HIGH confidence.**
-- [LiveKit Google AI integration page](https://docs.livekit.io/agents/integrations/google/) — confirms separate `google.LLM` and `google.TTS` classes. **HIGH confidence.**
-- [google-genai on PyPI](https://pypi.org/project/google-genai/) — version 2.0.1, released 2026-05-09, Python 3.10-3.14. **HIGH confidence.**
-- [PyAudioWPatch on PyPI](https://pypi.org/project/PyAudioWPatch/) — version 0.2.12.8, released 2026-01-14, Windows-only, Python 3.7-3.14, WASAPI loopback confirmed. **HIGH confidence.**
-- [python-sounddevice issue #281](https://github.com/spatialaudio/python-sounddevice/issues/281) — confirms sounddevice does NOT support WASAPI loopback, open since 2020, no planned implementation. **HIGH confidence (negative claim verified against official upstream issue).**
-- [sounddevice on PyPI](https://pypi.org/project/sounddevice/) — version 0.5.5, released 2026-01-23. **HIGH confidence.**
-- [pyobjc-framework-ScreenCaptureKit on PyPI](https://pypi.org/project/pyobjc-framework-ScreenCaptureKit/) — version 12.1, released 2025-11-14, Python 3.10-3.15, macOS 10.15+ wheels (ScreenCaptureKit itself requires macOS 12.3+). **HIGH confidence.**
-- [pyobjc issue #627: Quartz CGWindowListCreateImageFromArray obsoleted on macOS 15](https://github.com/ronaldoussoren/pyobjc/issues/627) — confirms the deprecation. **HIGH confidence.**
-- [Apple ScreenCaptureKit documentation](https://developer.apple.com/documentation/screencapturekit/) — Apple's recommended replacement for CGWindowList. **HIGH confidence.**
-- [mido docs — RtMidi backend](https://mido.readthedocs.io/en/latest/backends/rtmidi.html) — confirms python-rtmidi is the default/recommended mido backend, cross-platform via CoreMIDI/WinMM. **HIGH confidence.**
-- [trycua/cua repo](https://github.com/trycua/cua) — confirms sandbox/VM orientation, no MIDI/audio support, MIT license, Python 3.11+ required. **HIGH confidence (read repo directly).**
-- [SignPath Foundation for OSS](https://signpath.org/foundation) — free OV code signing for qualifying OSS projects. **MEDIUM confidence** (page was unreachable mid-research; cross-referenced through SignMyCode and developer community references — verify the application form when starting the v1 milestone).
-- [PyInstaller stable docs](https://pyinstaller.org/en/stable/CHANGES.html) — version 6.20.0 stable, numpy 2.x + scipy hooks present from 6.14+. **HIGH confidence.**
-- [Inno Setup official site](https://jrsoftware.org/isinfo.php) — free Windows installer, code-signing supported via SignTool. **HIGH confidence (training data + cross-referenced).**
-- [Apple notarytool migration](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow) — altool deprecated, notarytool replaces it. **HIGH confidence.**
-- [slowapi on GitHub](https://github.com/laurentS/slowapi) — FastAPI/Starlette rate limiter with Redis backend. **HIGH confidence.**
-- [Tauri vs Electron in 2026](https://blog.nishikanta.in/tauri-vs-electron-the-complete-developers-guide-2026) — confirms Tauri's Python-sidecar viability if/when vibemix grows a real GUI. **MEDIUM confidence** (single source, but corroborated by official Tauri docs).
-- [LiveKit custom TTS implementation (issue #1724)](https://github.com/livekit/agents/issues/1724) — confirms `TTSCapabilities(streaming=False)` + `ChunkedStream` pattern used by GeminiTTS, AWS Polly, Camb.ai. **HIGH confidence.**
+| Recommended | Alternative | Why Not |
+|---|---|---|
+| `sqlite-vec` | `vectorlite` (361★, Aug 2024) | Faster (15× at small N) but dormant — 8 months no release. Load-bearing dep for v2.0 should be active. |
+| `sqlite-vec` | `chromadb` (18k★, active) | Heavyweight: ~50MB install (sqlite + hnswlib + duckdb deps). Overkill for our 1-table use case. |
+| `sqlite-vec` | `faiss` (33k★) | Flaky Windows wheels — same install problem we're trying to solve. |
+| `sqlite-vec` | `hnswlib` raw | Fastest but you build the metadata layer yourself. Not worth the effort for <30k vectors. |
+| `sqlite-vec` | `Qdrant` embedded | Violates "no server" hard requirement. |
+| `pyrekordbox` (XML path) | Roll our own ElementTree parser | pyrekordbox handles the format quirks (TEMPO + POSITION_MARK nesting, Rekordbox 5/6/7 schema variations). 250KB of pure Python saves us a week. |
+| `pyrekordbox` (XML path) | Use pyrekordbox SQLCipher path instead | Broken post-Rekordbox 6.6.5 (Pioneer obfuscated `app.asar` key). 80%+ of users on current Rekordbox can't use SQLCipher. XML is the durable path. |
+| `pydub` (subprocess ffmpeg) | `audiotools` / native PyAV bindings | pydub is Bravoh's verbatim pipeline — 80% portable code we already trust. PyAV adds a wheel-build complication on Windows (libav* DLLs). |
+| `mutagen` (GPL) | `tinytag` (MIT) | tinytag is read-only and lighter but supports fewer formats (no Rekordbox-specific Vorbis comments, weaker MP4 atom handling). mutagen is the production standard. GPL infect-risk is minimal at "import as separate package" pattern. |
+| `watchdog` | stdlib `os.path.getmtime` polling | Watchdog uses native FSEvents/ReadDirectoryChangesW — instant on-change vs polling lag. Worth the 150KB. |
+| Three.js 4-layer additive | Spawning a new framework (React Three Fiber, Babylon.js) | Existing renderer + AnimationMixer covers the layered architecture. Adding R3F or Babylon = ~50KB + new mental model. Pure Three.js stays. |
+| Bravoh-side proxy injection of `cached_content` | Client-side caching of system instruction | Cache lifecycle (1h default, 4-min refresh) is easier to manage server-side. Avoids client-side cache name leakage. |
+| In-memory Evidence registry (citation) | SQLite-backed citation log | Citation evidence is per-session, ephemeral. No need for persistence; clears on session end. SQLite would be over-engineering. |
+| Mascot bundled GLBs | Procedural mocap streaming | Mocap streaming + LiveKit rooms = whole new mascot pipeline. Bundled GLBs ship today (Phase 13 precedent). |
+| ffmpeg static binary (Win) | Require user `winget install ffmpeg` | Violates one-click install. Bundling is the right answer. |
+| Numpy fallback for sqlite-vec (Win) | Block Windows users from library intelligence | Hard rejection. Numpy fallback adds 0 deps and is fast enough. |
 
 ---
 
-*Stack research for: vibemix — cross-platform real-time AI DJ co-host*
-*Researched: 2026-05-11*
+## IX. What NOT to Add (v2.0 anti-list)
+
+Per memory `feedback_no_scope_creep_clean_utility.md` and `feedback_no_clap_use_gemini_embedding.md`:
+
+| Avoid | Why |
+|---|---|
+| **CLAP / LAION-CLAP / MERT / OpenL3** | Memory locked: vibemix is Gemini-only. Gemini Embedding 2 is the embedding model. (Memory file: `feedback_no_clap_use_gemini_embedding.md`) |
+| **mem0 / vector DB for DJ profile** | Memory locked: `project_v2_open_candidates.md` killed this. ~2KB structured JSON = local SQLite row. Vector DB is for library audio only. |
+| **Multi-provider LLM abstraction** | Memory locked: `feedback_no_scope_creep_clean_utility.md`. Gemini-only. No OpenAI fallback, no Claude, no local LLMs. |
+| **Stem separation (Demucs/Spleeter)** | Memory locked: deferred from v1 + v2. ~500MB model bundle violates one-click install. |
+| **Pioneer ProDJ Link integration** | Memory locked: `project_v2_open_candidates.md` deferred. Wrong-market (CDJ hardware, not bedroom DJs). Requires Java + LAN config. |
+| **Mixxx OSC as a v2.0 hard ship feature** | Bucket B-followup-1: PR #14388 unmerged into mainline Mixxx 2.5.6. Ship behind `--enable-mixxx-osc` flag for early adopters; promote to first-class when upstream merges. |
+| **Serato session-file scraping** | Bucket B: `saga` archived, format undocumented. Build only if Serato users demand it. v2.1+. |
+| **Rekordbox SQLCipher path** | Broken post-Rekordbox 6.6.5. XML path is the durable answer. |
+| **Mascot ARKit blendshape lip-sync** | Memory locked + Bucket D: Mixamo killed blendshape export in 2020. Re-rigging = uncanny valley risk. Ship 3 amplitude-banded talk variants instead. |
+| **Mixamo runtime SDK** | Memory locked: `project_mascot_as_vtuber_personality_surface.md` — Mixamo auto-rig is build-time only; runtime mascot is Three.js + GLB. |
+| **Window picker auto-inference (aggressive mode)** | B-followup-1 §4: "observe, classify conservatively, never invent." Aggressive positional inference produces confidently-wrong audible-deck claims. |
+| **Pydantic** | D-Area-4.4 / Phase 6 constraint: hand-written `@dataclass(frozen=True, slots=True)` + jsonschema Draft-07. Pydantic stays banned across v2.0. |
+
+---
+
+## X. Plan-Checker Verification Checklist
+
+Items the gsd-roadmapper / gsd-planner MUST verify when decomposing v2.0 phases:
+
+- [ ] `pyrekordbox==0.4.4` install **does NOT pull `sqlcipher3-wheels`** as a hard dep — if it does, use `pip install pyrekordbox --no-deps` or evaluate `pyrekordbox-xml` shim
+- [ ] `sqlite-vec==0.1.9` Windows wheel availability — re-check PyPI at planning time; if wheel ships, swap from numpy fallback to native
+- [ ] `tenacity` is already transitive of livekit-agents 1.5.8 — if not, add `tenacity>=8.2.3` explicit dep
+- [ ] `cached_content` field works on `gemini-3-flash-preview` (per A-followup-1 §VI open Q2 smoke test before locking caching design)
+- [ ] `pyobjc-framework-ApplicationServices` is auto-resolved via `pyobjc-core==12.1` — verify with `uv pip list | grep ApplicationServices`
+- [ ] PyInstaller spec includes new `datas` entries for: ack bank, element maps, controller library JSONs, ffmpeg.exe (Win)
+- [ ] AIza leak gate (Phase 11 W1) extends scan to new bundle paths: `assets/ack_bank/`, `assets/element_maps/`, `assets/controller_library/`
+- [ ] Bundle ID `world.bravoh.vibemix` stays locked across v2.0 (any change invalidates user TCC grants including the new AX permission)
+- [ ] Three.js `AdditiveAnimationBlendMode` available at current vendored version (0.184.0 ✅ — feature shipped in r150)
+- [ ] License audit: ffmpeg LGPL build chosen (not GPL build), source-availability notice in `LICENSE-3RD-PARTY.md`
+- [ ] License audit: mutagen GPL-2.0 disclosed in `LICENSE-3RD-PARTY.md` with "imported as separate package" clarification
+- [ ] Capability allowlist (`tauri/src-tauri/capabilities/default.json`): add `"highlight"` window label, do NOT add per-region invoke commands (overlay is draw-only, pure click-through)
+- [ ] sqlite-vec import: lazy-load gated on `sys.platform != 'win32'` until Windows wheel ships
+- [ ] Mascot anticipation layer 1-day spike (Bucket D open Q1): verify Gemini text-channel timing via `livekit-plugins-google` BEFORE committing to the inline-emote-tag design
+
+---
+
+## XI. Sources
+
+### Primary (HIGH confidence — direct verification 2026-05-14)
+- **pyrekordbox v0.4.4** — [PyPI](https://pypi.org/project/pyrekordbox/), [GitHub](https://github.com/dylanljones/pyrekordbox), 395★, MIT, Python 3.8+
+- **sqlite-vec v0.1.9** — [PyPI](https://pypi.org/project/sqlite-vec/), [GitHub](https://github.com/asg017/sqlite-vec), 7.6k★, MIT/Apache 2.0, Mac+Linux wheels
+- **python-osc v1.10.2** — [PyPI](https://pypi.org/project/python-osc/) (Public Domain, Python 3.10+) — for Mixxx OSC future-flag path
+- **pydub v0.25.1** — [PyPI](https://pypi.org/project/pydub/), MIT
+- **mutagen v1.47.0** — [PyPI](https://pypi.org/project/mutagen/), GPL-2.0, Python 3.10+
+- **watchdog v6.0.0** — [PyPI](https://pypi.org/project/watchdog/), Apache 2.0, Python 3.9+
+- **three.js@0.184.0** — [npm](https://www.npmjs.com/package/three), MIT
+- **pyobjc-framework-AVFoundation v12.0** — [PyPI](https://pypi.org/project/pyobjc-framework-AVFoundation/)
+- **pyobjc-framework-ApplicationServices** — [PyObjC docs](https://pyobjc.readthedocs.io/en/latest/apinotes/ApplicationServices.html) — AX bridge bundling
+- **livekit-agents 1.5.8 source** — `.venv/.../livekit/agents/voice/speech_handle.py:141-154` (interrupt(force=True) verified empirically per A-followup-1)
+- **google-genai 2.0.1 source** — `.venv/.../google/genai/caches.py:1053-1144` (caches.create() verified empirically)
+- **Gemini context caching support matrix** — https://ai.google.dev/gemini-api/docs/caching — `gemini-3-flash-preview` listed (2026-05-14)
+- **Tauri 2 WebviewWindowBuilder docs** — https://docs.rs/tauri/2.11.1/tauri/webview/struct.WebviewWindowBuilder.html
+
+### Secondary (MEDIUM confidence — research artifacts)
+- `.planning/research/v2-buckets/SYNTHESIS.md` — integration layer
+- `.planning/research/v2-buckets/A-latency.md` + `A-followup-1-cancel-and-caching.md`
+- `.planning/research/v2-buckets/B-industry-integrations.md` + `B-followup-1-v11-integration-spec.md`
+- `.planning/research/v2-buckets/C-ui-overlay.md`
+- `.planning/research/v2-buckets/D-mascot-emotion.md`
+- `.planning/research/v2-buckets/F-library-intelligence.md`
+- `.planning/research/v2-buckets/G-genre-taxonomy.md` + `G-followup-1-hard-tek-dsp.md`
+- Bravoh `app/services/embedding/service.py` (private, `ssh altidus`) — 80%-portable embed pipeline
+
+### Tertiary (LOW confidence — flag for plan-time validation)
+- sqlite-vec Windows wheel availability at planning time (PyPI may have shipped one by Phase X kickoff — re-check)
+- `pyrekordbox==0.4.4` SQLCipher dep tree — verify install-time whether `--no-deps` is needed to skip the broken SQLCipher chain
+- ffmpeg LGPL static build for Windows — pin a specific gyan.dev build version + SHA-256 (precedent: Phase 11 W3 DSEG7 font pinning)
+
+### Memory anchors (locked decisions — cite in plan-checker)
+- `project_v2_open_candidates.md` — Mixxx OSC + map transpile + pyrekordbox + Gemini Embedding 2 + post-session debrief CONFIRMED; ProDJ Link + stems + CLAP DEFERRED
+- `feedback_no_clap_use_gemini_embedding.md` — Gemini-only embedding stack
+- `project_one_click_install_hard_req.md` — every new dep rated green/yellow/red
+- `feedback_no_scope_creep_clean_utility.md` — Gemini-only, no multi-provider, no enterprise features
+- `project_v4_canonical_baseline.md` — cohost_v4.py is the port baseline
+- `project_phase_16_kaan_dj_testing.md` — Phase 16 = Kaan's DJ ear, NOT formal eval suite
+- `project_v0_1_0_rc1_open_bugs.md` — outstanding v0.1.0 work being absorbed into v2.0
+
+---
+
+## XII. Assumptions Log
+
+| # | Claim | Section | Risk if Wrong |
+|---|---|---|---|
+| A1 | `pyrekordbox==0.4.4` doesn't hard-require `sqlcipher3-wheels` at import (only on `Rekordbox6Database()` instantiation) | §II.D, §X | Install footprint balloons by ~10MB if sqlcipher3-wheels gets pulled. Mitigation: `--no-deps` install path. |
+| A2 | `sqlite-vec` Windows wheel will eventually ship via PyPI (v2.0 ships before that, v2.1 promotes to native) | §II.E, §III | If wheel never ships, the numpy fallback is permanent — acceptable per Bravoh's production pattern. |
+| A3 | Ffmpeg LGPL static build is sufficient for pydub MP3 transcoding (no GPL-only encoders needed) | §II.E, §III | If LGPL build lacks an encoder we need (e.g. AAC decode for M4A → WAV → MP3 chain), fall back to GPL build and bear the license obligation. |
+| A4 | `cached_content` field is forwarded through `livekit-plugins-google` LLM cascade via `extra_kwargs` mechanism | §II.A | Plan-checker smoke test required (per A-followup-1 open Q2). If broken, fall back to no-caching (~200-300ms TTFT regression — acceptable but loses 1000ms target). |
+| A5 | AX permission TCC prompt on first-run does NOT regress the Phase 11 fresh-machine <90s wizard timing | §II.C | If AX prompt blocks for >10s, defer the prompt to user-triggered "Enable highlight" toggle (Bucket C open Q5 fallback). |
+| A6 | Three.js `AdditiveAnimationBlendMode` works on stylised mascot rig without "skeleton overscaled" issues per [forum thread](https://discourse.threejs.org/t/changing-animationactions-blendmode-to-animationblendmode/46994) | §II.F | If overscale appears, the fix is `AnimationUtils.makeClipAdditive()` preprocessing — one-time per clip in asset-loader.ts. Standard recipe. |
+| A7 | Bundle size growth ~270-290 MB (Mac), ~290-310 MB (Win) stays under 350 MB hard cap | §V | If bundle exceeds 350 MB, prime drop candidates: PyInstaller `--exclude-module` for `livekit.plugins.openai` (unused), trim mascot GLBs to 5 essential clips, audio ack bank → OPUS (saves ~7MB) |
+| A8 | `mutagen` GPL-2.0 "import as separate package" pattern stands per RMS clarification on Python imports + GPL | §IV | If license counsel disagrees, swap to `tinytag` (MIT) — loses some Vorbis comment + MP4 atom support but covers 80% of DJ-tagged libraries |
+
+---
+
+*Stack research complete. v2.0 additions documented as a strict additive layer on top of the validated Phase 1-14 baseline. Every new dep rated for one-click-install impact. Plan-checker verification list in §X is the load-bearing handoff to gsd-roadmapper for phase decomposition.*
+
+**Word count: ~4,500. Last updated: 2026-05-14.**
