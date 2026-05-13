@@ -1,11 +1,15 @@
-/* primary-panel.ts — load-bearing panel surface (UI-SPEC §2).
+/* primary-panel.ts — load-bearing panel surface (UI-SPEC §2 / CDJ Whisper v5).
  *
- * Mirrors mocks/vibemix-app-ui.html .panel (lines 295-323) — gradient
- * --panel-lift → --panel, 1px --bezel-1 border, 8px radius, inset
- * top-highlight + bottom-shadow, brushed-metal vertical streak via ::before.
+ * v5 glass anatomy: --glass-2 + --blur-glass-light + --glass-edge stroke,
+ * inset --glass-top top sheen + rgba(0,0,0,0.45) bottom hairline, deep
+ * drop shadow, shared glass-fingerprint streak — unifies wizard surfaces
+ * with the session deck panels.
  *
- * Optional header: Workbench 9px UPPERCASE 0.32em with dashed --bezel-2
- * bottom border. Optional --phosphor-soft "DETECTED" badge pill on right. */
+ * First child is the v5 animated border (conic-gradient sweep, tokens.css
+ * .border-anim utility). Panel content sits above at z-index 1+.
+ *
+ * Optional header: Saira wdth 85 wght 600 9px UPPERCASE 0.28em tracking.
+ * Optional amber pill badge on right (uses --amber-22 border + --amber). */
 
 import { registerStyle } from "./_style-registry.js";
 
@@ -74,8 +78,15 @@ export function PrimaryPanel(props: PrimaryPanelProps): HTMLElement {
   const root = document.createElement("section");
   root.className = "cmp-primary-panel";
 
-  // Shared glass-fingerprint streak — unifies wizard surfaces with the
-  // session deck panels.
+  // v5 animated border — first child of every glass panel.
+  // tokens.css .border-anim handles the conic-gradient sweep + mask
+  // composite (parent already has position: relative + overflow: hidden).
+  const borderAnim = document.createElement("div");
+  borderAnim.className = "border-anim";
+  borderAnim.setAttribute("aria-hidden", "true");
+  root.append(borderAnim);
+
+  // Shared glass-fingerprint streak — keep beneath component content.
   const streak = document.createElement("span");
   streak.className = "vmx-glass-streak";
   streak.setAttribute("aria-hidden", "true");

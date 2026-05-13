@@ -1,17 +1,18 @@
-/* step-indicator.ts — 3-node strip across top of wizard (UI-SPEC §1).
+/* step-indicator.ts — 3-node strip across top of wizard (UI-SPEC §1 / CDJ Whisper v5).
  *
- * Pending = ring --bezel-2, fill --panel-deep.
- * Active  = ring --phosphor, fill --phosphor-soft, --phosphor-glow,
- *           1.4s ease-in-out infinite pulse.
- * Complete = ring --ok, fill --ok, white ✓ inside.
+ * Pending = empty disc, 1px --glass-edge ring, faint top sheen.
+ * Active  = amber dome, --amber fill + --amber-pale ring + --glow-soft,
+ *           1.4s ease-in-out infinite pulse (motion-led-pulse token).
+ * Complete = green dome (--led-ok) with inset highlight + tick mark.
  *
- * Connector between complete-complete = solid --phosphor.
- * Between pending-pending = dashed --bezel-2.
+ * Connector between adjacent dots: 1px --silk-12 hairline by default;
+ * --amber + faint glow when the path becomes active.
  *
- * Labels: Workbench 11px UPPERCASE 0.22em.
- *   - Active label = --phosphor
- *   - Pending = --ink-dim
- *   - Complete = --ok
+ * Labels: Saira var(--type-display) wdth 85 wght 500 10px UPPERCASE
+ * 0.22em tracking + engraved text-shadow.
+ *   - Active label = --amber + faint amber glow
+ *   - Pending      = --silk-40
+ *   - Complete     = --silk-65
  */
 
 import { registerStyle } from "./_style-registry.js";
