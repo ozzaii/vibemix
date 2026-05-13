@@ -158,8 +158,8 @@
 - [ ] **GH-14**: CODE_OF_CONDUCT.md, SECURITY.md, NOTICE, TRADEMARKS.md, Apache 2.0 LICENSE
 - [ ] **GH-15**: Issue templates — bug / feature / new-controller-request
 - [ ] **GH-16**: Releases page — every binary tagged with hand-written changelog
-- [ ] **GH-17**: Repo description + topics tags (`dj`, `livekit`, `gemini`, `ai-assistant`, `audio`, `midi`, `pioneer-ddj`, `realtime-ai`)
-- [ ] **GH-18**: No rough edges in public repo — no `_test_*.py` scratch files, no `.bak` files, no committed `.env`, no large binaries in tree
+- [x] **GH-17**: Repo description + topics tags (`dj`, `livekit`, `gemini`, `ai-assistant`, `audio`, `midi`, `pioneer-ddj`, `realtime-ai`)
+- [x] **GH-18**: No rough edges in public repo — no `_test_*.py` scratch files, no `.bak` files, no committed `.env`, no large binaries in tree
 
 ### Recording & Session Capture
 
