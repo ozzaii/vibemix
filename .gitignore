@@ -105,3 +105,11 @@ tauri/ui/.mascot-build-tmp/
 # committed bundle (GLB + manifest.json + MANIFEST.md) survives future
 # generic-glob ignore additions.
 !tauri/ui/assets/mascot/**
+
+# Phase 18 Plan 18-04 — Tauri updater keys NEVER live in repo.
+# The procedure in tauri/src-tauri/keys/README.md instructs Kaan to store
+# the .key + .key.pub files OUTSIDE the repo (~/.tauri/vibemix_updater.key{,.pub}).
+# These entries are defense-in-depth: if a keypair is ever accidentally
+# dropped into the directory, git refuses to track it.
+tauri/src-tauri/keys/*.key
+tauri/src-tauri/keys/*.key.pub
