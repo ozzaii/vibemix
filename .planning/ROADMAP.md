@@ -25,7 +25,7 @@
 - [x] **Phase 13: 3D Mascot Screen Overlay** - Single 3D rigged mascot (Meshy-generated GLB) in always-on-top transparent overlay window, Three.js + AnimationMixer crossfade state machine, beat-locked clip entry, mood swap (hype-man/teacher/coach) on same rig. (completed 2026-05-12)
 - [x] **Phase 14: CDJ Whisper v5 Migration + Polish** _Completed 2026-05-13._ Component-level audit of the pre-Phase-14 v5 token-swap prototype (commit `0615344`); critique → execute loop with `gsd-ui-checker` + `gsd-ui-auditor` until the CDJ Whisper v5 contract (`mocks/vibemix-direction-final.html`) is met on every surface — glass alpha, amber accent (`#ff8a3d`), animated border sweep, night-rave ambient body, no FL-Studio tactile residue (`--bezel-*` / `--brushed-*` / `--phosphor` aliases removed from components). Wave 5 shim-delete commit `79a7208`.
 - [ ] **Phase 15: Recording & Session Capture Finalization** - Per-session dir + `input.wav`/`voice.wav`/`events.jsonl` + recording browser UI + retention enforcement (carries POC; lock UX).
-- [ ] **Phase 16: Hallucination Verification Gate** - 30-session offline replay suite ≥95% grounded + per-genre phase-detection ≥85% F1 + 60-min soak test zero `session_error`.
+- [~] **Phase 16: Hallucination Verification Gate** - Kaan personally DJs into vibemix and signs off by ear that reactions feel grounded (not slop). Deferred from formal 30-session replay suite to lived testing per 2026-05-13 decision; anti-slop code stack stays, only the gate measurement changes.
 - [ ] **Phase 17: Reaction-Reel Slop Grading Gate** - Hand-graded 30-min reaction reel blind-rated 1-5 by Kaan + Francesco + 2 DJ network friends; pass requires ≥4.0 average with zero 1-2 ratings.
 - [x] **Phase 18: Distribution — Signing, Notarization, Installers** - PyInstaller `--onedir` macOS DMG (Apple Dev ID + notarytool + stapler) + Windows MSI (SignPath OSS cert + Inno Setup 6) + Tauri auto-update + binary attack verification (`strings` + `pyinstxtractor` for `AIza` patterns). (completed 2026-05-13)
 - [ ] **Phase 19: GitHub Launch Presence** - Hero banner + demo video/GIF + install buttons + feature matrix + controller grid + screenshots + FAQ + Bravoh footer + Apache 2.0 LICENSE + DCO CONTRIBUTING + SECURITY/CODE_OF_CONDUCT/NOTICE/TRADEMARKS + issue templates + OG image + repo hygiene scrub.
@@ -276,15 +276,15 @@ Plans:
 - [x] 15-06-PLAN.md — tests: test_poc_compat.py (REC-01..04 reader-shape invariants) + test_60min_soak.py (@pytest.mark.slow — WAV+JSONL+session.json durability + tracemalloc gate) + RecordingsIndex.list perf assertion + slow marker registration
 
 ### Phase 16: Hallucination Verification Gate
-**Goal**: 30-session offline hallucination replay suite scores ≥95% grounded reactions before any installer build. Per-genre phase-detection F1 ≥85%. 60-minute soak test passes zero `session_error` events. Critique → execute → critique → execute loop runs against the suite until the gate passes.
+**Goal**: Kaan personally DJs into vibemix across varied conditions (multiple genres, mixed skill modes, both hype-man + coach) and signs off by ear that reactions feel grounded — not slop. **Decision 2026-05-13**: deferred from formal 30-session offline replay suite to lived testing. The anti-slop code stack (negative dictionary, describe-before-infer, past-tense framing, `<silence/>` token, anti-repetition ring, Gemini Embedding 2 retrieval) stays unchanged; only the *gate measurement instrument* changes from synthetic eval to Kaan's ear.
 **Depends on**: Phases 1-15 (verifies the integrated end-to-end product).
-**Requirements**: VERIFY-01, VERIFY-03, VERIFY-05, VERIFY-06.
+**Requirements**: VERIFY-01, VERIFY-03, VERIFY-05, VERIFY-06 (collapsed to a single "Kaan ear-test" pass/fail).
 **Success Criteria** (what must be TRUE):
-  1. 30-session offline replay suite (varied genres + controllers + skill modes) is graded by a second-pass LLM scorer + spot-checked by Kaan; ≥95% of AI reactions are "grounded in the audio/MIDI/screen evidence" per the rubric.
-  2. Per-genre phase-detection accuracy ≥85% event-timing F1 on the validation harness for each of techno / house / D&B / disco / pop.
-  3. 60-minute soak test on macOS + Windows passes zero `session_error` and zero `turn_error` entries in `events.jsonl`.
-  4. Plan-checker passed before execute and verifier passed after execute for every plan in this phase; the critique-execute loop is documented in the phase's verification log.
-**Plans**: TBD
+  1. Kaan runs vibemix during real DJ sessions across at least techno + house + one mood-shift genre. Reactions feel grounded (tied to what he's actually doing on the controller and what's playing through master).
+  2. No "hallucination" complaints — no reactions that reference tracks/events that didn't happen, no scripted-sounding clichés, no generic AI-assistant tone.
+  3. Mic-gating + AI-talk timing feel right — the AI doesn't talk over him or step on transitions.
+  4. Kaan writes a go/no-go verdict in `.planning/phases/16-hallucination-verification-gate/16-VERIFICATION.md` after testing. If "no-go", the specific failures get logged for follow-up work.
+**Plans**: Human-owned testing — no autonomous plans generated.
 
 ### Phase 17: Reaction-Reel Slop Grading Gate
 **Goal**: Hand-graded reaction reel — 30 minutes of varied DJing recorded with vibemix running — is blind-rated 1-5 by Kaan + Francesco + 2 DJ network friends. Pass requires ≥4.0 average with zero 1-2 ratings. This is the existential pre-release gate per PROJECT.md Core Value.
@@ -369,11 +369,11 @@ Plans:
 | 12. Live Session UI + Settings Panel | 0/? | Not started | - |
 | 13. 3D Mascot Screen Overlay | 8/8 | Complete   | 2026-05-12 |
 | 14. CDJ Whisper v5 Migration + Polish | 6/6 | Complete   | 2026-05-13 |
-| 15. Recording & Session Capture Finalization | 5/6 | In Progress|  |
-| 16. Hallucination Verification Gate | 0/? | Not started | - |
-| 17. Reaction-Reel Slop Grading Gate | 1/3 | In Progress|  |
+| 15. Recording & Session Capture Finalization | 6/6 | Complete   | 2026-05-13 |
+| 16. Hallucination Verification Gate | n/a | Human ear gate (Kaan DJ-test) | - |
+| 17. Reaction-Reel Slop Grading Gate | 3/3 | Bench ready (human grading pending) | 2026-05-13 |
 | 18. Distribution — Signing, Notarization, Installers | 5/5 | Complete   | 2026-05-13 |
-| 19. GitHub Launch Presence | 1/4 | In Progress|  |
+| 19. GitHub Launch Presence | 4/4 | Complete (content placeholders pending) | 2026-05-13 |
 | 20. Day-Zero Operations | 0/? | Not started | - |
 
 ---

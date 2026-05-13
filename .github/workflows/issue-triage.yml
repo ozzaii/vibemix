@@ -1,0 +1,71 @@
+# =============================================================================
+# vibemix — Issue Auto-Triage (Phase 20 Plan 20)
+# =============================================================================
+#
+# Adds labels to newly-opened issues based on:
+#   - Issue template `name:` field (bug / feature / controller)
+#   - `Severity` dropdown answer (bug template only)
+#   - Issue title prefix tags (`[bug]`, `[feature]`, `[controller]`)
+#
+# The `triage` label is always added so the rota responder can sweep
+# `is:open is:issue label:triage` every 4h regardless of auto-label
+# success (T-20-02 mitigation in 20-CONTEXT.md).
+#
+# Field-name contract mirrors `.github/ISSUE_TEMPLATE/bug_report.yml`,
+# `feature_request.yml`, and `new_controller.yml` from Phase 19.
+# =============================================================================
+
+name: issue-triage
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply triage labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const title = (issue.title || "").toLowerCase();
+            const body  = issue.body || "";
+            const labels = new Set(["triage"]);
+
+            // Title prefix gives us the type directly.
+            if (title.startsWith("[bug]"))         labels.add("bug");
+            if (title.startsWith("[feature]"))     labels.add("feature");
+            if (title.startsWith("[controller]"))  labels.add("controller");
+
+            // Severity dropdown from bug template.
+            // The YAML form renders as ### Severity\n\n<value>
+            const sev = body.match(/###\s*Severity\s*\n+\s*([^\n]+)/i);
+            if (sev) {
+              const s = sev[1].trim().toLowerCase();
+              if (s.includes("critical")) labels.add("severity:critical");
+              else if (s.includes("major")) labels.add("severity:major");
+              else if (s.includes("minor")) labels.add("severity:minor");
+            }
+
+            // Component dropdown — controller / midi / audio / ui / proxy / docs.
+            const comp = body.match(/###\s*Component\s*\n+\s*([^\n]+)/i);
+            if (comp) {
+              const c = comp[1].trim().toLowerCase();
+              for (const tag of ["midi", "audio", "ui", "proxy", "docs", "controller"]) {
+                if (c.includes(tag)) { labels.add(`component:${tag}`); break; }
+              }
+            }
+
+            const labelArray = Array.from(labels);
+            console.log("applying:", labelArray);
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              issue_number: issue.number,
+              labels: labelArray
+            });
