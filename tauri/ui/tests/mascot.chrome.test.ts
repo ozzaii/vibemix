@@ -128,14 +128,22 @@ describe("mascot overlay chrome (Wave 4 — 14-05)", () => {
   });
 
   describe("src/mascot/index.ts — resolveCssColor v5 migration", () => {
-    it("calls resolveCssColor with v5 token names (--amber, --silk, --silk-40)", () => {
+    it("calls resolveCssColor with v5 token names (--amber, --silk)", () => {
+      // WR-02 in 14-REVIEW.md: coach mood no longer routes through
+      // resolveCssColor("--silk-40", ...). --silk-40 carries an alpha
+      // channel that THREE.Color silently drops, collapsing coach's
+      // particle puff to the same RGB as teacher's --silk. The coach
+      // branch now constructs `new Color("#3d424c")` directly. We still
+      // assert the two well-behaved token resolutions here.
       const ts = readFileSync(MASCOT_INDEX_TS_PATH, "utf-8");
       expect(ts).toMatch(/resolveCssColor\(["']--amber["']/);
       expect(ts).toMatch(/resolveCssColor\(["']--silk["']/);
-      expect(ts).toMatch(/resolveCssColor\(["']--silk-40["']/);
     });
 
-    it("uses v5 hex fallbacks (#ff8a3d, #d6cfc7, #3d424c) — the only 3 hex literals outside tokens.css", () => {
+    it("uses v5 hex literals (#ff8a3d, #d6cfc7, #3d424c) — the only 3 hex literals outside tokens.css", () => {
+      // #ff8a3d + #d6cfc7 are resolveCssColor fallbacks (CSS-resolution
+      // failure path). #3d424c is the coach-branch direct constructor
+      // argument — load-bearing for visual distinction from teacher.
       const ts = readFileSync(MASCOT_INDEX_TS_PATH, "utf-8");
       expect(ts).toContain("#ff8a3d");
       expect(ts).toContain("#d6cfc7");
