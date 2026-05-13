@@ -55,23 +55,12 @@ const CSS = `
     text-transform: uppercase;
     color: var(--silk);
     line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
   }
-  .vmx-titlebar__wordmark::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--amber);
-    box-shadow: 0 0 4px var(--amber), 0 0 10px var(--amber-40);
-    animation: vmx-brand-pulse 5s ease-in-out infinite;
-  }
-  @keyframes vmx-brand-pulse {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.45; }
-  }
+  /* Critique pass 2 (2026-05-14): removed the amber 5s brand-pulse dot
+   * next to the wordmark. The session-deck border-anim already breathes
+   * — a second breathing light on the wordmark violated "one CDJ, one
+   * breathing light" and read as engagement-bait at the 5s cadence
+   * rather than CDJ idle. The wordmark now reads as static silk type. */
   .vmx-titlebar__pills {
     display: flex;
     align-items: center;
@@ -158,15 +147,17 @@ const CSS = `
                 border-color var(--motion-snap) ease-out,
                 box-shadow var(--motion-snap) ease-out;
   }
-  .vmx-titlebar__settings:hover,
+  /* Critique pass 2 (2026-05-14): hover + active states are now tonal,
+   * not chromatic. Previous full amber background + inset glow made the
+   * gear louder than the LIVE pill — a drawer-open chrome cue should
+   * never outshine the always-on status indicator. */
+  .vmx-titlebar__settings:hover {
+    color: var(--silk);
+    border-color: var(--silk-22);
+  }
   .vmx-titlebar__settings[data-active="true"] {
     color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
     border-color: var(--amber-40);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 var(--amber-40),
-      inset 0 0 12px var(--amber-22);
   }
   .vmx-titlebar__settings .sr-only {
     position: absolute;

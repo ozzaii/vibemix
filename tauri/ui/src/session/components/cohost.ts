@@ -225,23 +225,16 @@ const CSS = `
     font-family: var(--type-mono);
     text-shadow: 0 0 4px var(--amber-22);
   }
-  /* Latest line — felt as a moment, not just a flag. Amber-22 inset
-   * glow + 1px amber edge on the left so the eye is drawn there without
-   * a heavy backdrop. The cursor caret rides on the end. */
+  /* Latest line — eye is drawn via TWO amber signals only: the 1px
+   * inset edge on the left and the lead glyph (defined globally on
+   * .vmx-cohost__msg::before). Critique pass 2 (2026-05-14) dropped
+   * the amber gradient backdrop AND the blinking cursor caret —
+   * stacking 4 amber signals on a single line read louder than the
+   * rest of the surface. The remaining two carry the "this is the
+   * latest" semantic alone. */
   .vmx-cohost__msg[data-tier="now"] {
     color: var(--silk);
-    background: linear-gradient(90deg, rgba(255, 138, 61, 0.07) 0%, rgba(255, 138, 61, 0.018) 70%, transparent 100%);
-    box-shadow:
-      inset 1px 0 0 var(--amber-40),
-      inset 0 0 12px rgba(255, 138, 61, 0.06);
-  }
-  .vmx-cohost__msg[data-tier="now"]::after {
-    content: "▍";
-    display: inline;
-    margin-left: 2px;
-    color: var(--amber);
-    text-shadow: 0 0 4px var(--amber-22);
-    animation: vmx-cohost-cursor 1000ms steps(1) infinite;
+    box-shadow: inset 1px 0 0 var(--amber-40);
   }
   .vmx-cohost__msg[data-tier="faded"] {
     color: var(--silk-65);
@@ -270,9 +263,8 @@ const CSS = `
     font-weight: 600;
     text-shadow: 0 0 4px var(--amber-22);
   }
-  @keyframes vmx-cohost-cursor {
-    50% { opacity: 0; }
-  }
+  /* vmx-cohost-cursor keyframe retired with the blinking caret —
+   * see [data-tier="now"] above (critique pass 2). */
   /* === Foot strip === */
   .vmx-cohost__foot {
     padding: var(--sp-3) var(--sp-4);

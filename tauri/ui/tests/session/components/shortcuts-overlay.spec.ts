@@ -42,12 +42,14 @@ describe("mountShortcutsOverlay", () => {
     expect(panel?.getAttribute("data-tile")).toBe("hero");
   });
 
-  it("renders the bottom footnote with dismissal hint", () => {
+  // Critique pass 2 (2026-05-14): the "press ? again or esc to close"
+  // footnote was redundant — the kbd-key list above already shows both
+  // shortcuts. Cut for restraint. This spec pins the removal so a
+  // future regression can't reintroduce the duplicate hint.
+  it("has NO redundant dismissal-hint footnote", () => {
     const handle = mountShortcutsOverlay();
-    const foot = handle.root.querySelector<HTMLElement>(
-      ".vmx-shortcuts-panel__footnote",
-    );
-    expect(foot?.textContent).toBe("press ? again or esc to close");
+    const foot = handle.root.querySelector(".vmx-shortcuts-panel__footnote");
+    expect(foot).toBeNull();
   });
 
   it("renders the expected shortcut rows (mute, esc, back, ?)", () => {

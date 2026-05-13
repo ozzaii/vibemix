@@ -106,16 +106,6 @@ const CSS = `
     color: var(--silk-65);
     line-height: 1.4;
   }
-  .vmx-shortcuts-panel__footnote {
-    font-family: var(--type-body);
-    font-variation-settings: "wdth" 100, "wght" 400;
-    font-size: 11px;
-    color: var(--silk-40);
-    text-align: center;
-    padding-top: var(--sp-2);
-    border-top: 1px solid var(--glass-edge);
-    letter-spacing: 0.04em;
-  }
   @keyframes vmx-shortcuts-fade {
     from { opacity: 0; }
     to   { opacity: 1; }
@@ -193,10 +183,9 @@ export function mountShortcutsOverlay(
   }
   panel.append(list);
 
-  const foot = document.createElement("div");
-  foot.className = "vmx-shortcuts-panel__footnote";
-  foot.textContent = "press ? again or esc to close";
-  panel.append(foot);
+  /* Critique pass 2 (2026-05-14): footnote "press ? again or esc to
+   * close" was redundant — the kbd-key list already shows both shortcuts.
+   * Cut for restraint. */
 
   backdrop.append(panel);
   host.append(backdrop);
