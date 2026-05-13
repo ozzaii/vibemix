@@ -97,7 +97,8 @@ Plan: 6 of 6
 | Phase 17 P02 | 6min | 2 tasks | 4 files |
 
 | Phase 17 P01 | 5 min | 2 tasks | 3 files |
-| Phase 18 P01 | 35 | 2 tasks | 8 files |
+| Phase 18 P01 | 35 min | 2 tasks | 8 files |
+| Phase 18 P02 | 15 min | 3 tasks | 4 files |
 
 ### Plan Execution Metrics
 
