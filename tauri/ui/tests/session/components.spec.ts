@@ -254,7 +254,11 @@ describe("renderCohostPanel", () => {
     ).toBe(200);
   });
 
-  it("foot shows GROUNDED + DSEG7 latency when grounded=true", () => {
+  // Critique 2026-05-14: the foot now renders LED + label only — the
+  // amber tabular-mono latency readout was retired (anti-slop, real DJs
+  // don't read latency). Latency stays on the prop interface for a
+  // future Settings → Debug pane.
+  it("foot shows GROUNDED (LED + label only, no latency readout) when grounded=true", () => {
     const panel = renderCohostPanel({
       status: "LISTENING",
       transcript: [],
@@ -267,9 +271,7 @@ describe("renderCohostPanel", () => {
     expect(foot?.querySelector(".vmx-cohost__foot-lbl")?.textContent).toBe(
       "GROUNDED ON AUDIO + SCREEN",
     );
-    expect(foot?.querySelector(".vmx-cohost__foot-latency")?.textContent).toBe(
-      "0.82 s",
-    );
+    expect(foot?.querySelector(".vmx-cohost__foot-latency")).toBeNull();
   });
 
   it("foot shows WARMING UP when grounded=false", () => {

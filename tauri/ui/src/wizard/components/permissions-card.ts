@@ -1,9 +1,13 @@
 /* permissions-card.ts — Step 1 horizontal card (UI-SPEC §6 / CDJ Whisper v5).
  *
- * 56px tall, full-width glass-tile row. Left = OS-tinted icon (shield =
- * screen recording, mic = microphone). Center = silkscreen label (Saira
- * wdth 85 wght 600 9px UPPERCASE) + sub-line (Saira body 11px --silk-65).
- * Right = state indicator:
+ * Glass shell from `.vmx-tile` (tokens.css). This component owns the
+ * 56px row layout + icon-tinting + label/sub typography + the state
+ * readout. Critique 2026-05-14: dropped the duplicate shadow stack.
+ *
+ * Left: OS-tinted icon (shield = screen recording, mic = microphone).
+ * Center: silkscreen label (Saira wdth 85 wght 600 9px UPPERCASE) +
+ *   sub-line (Saira body 11px --silk-65).
+ * Right: state indicator
  *   - pending: [ Grant ] secondary button
  *   - granted: ● GRANTED — silkscreen label in --led-ok with green dome
  *   - denied:  ● DENIED — open Settings ↗ in --led-fault
@@ -33,14 +37,6 @@ const CSS = `
     gap: var(--sp-4);
     height: 56px;
     padding: 0 var(--sp-4);
-    background: var(--glass-2);
-    backdrop-filter: var(--blur-glass-light);
-    -webkit-backdrop-filter: var(--blur-glass-light);
-    border: 1px solid var(--glass-edge);
-    border-radius: var(--rad-md);
-    box-shadow:
-      inset 0 1px 0 var(--glass-top),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
   }
   .cmp-perm-card__icon {
     color: var(--silk-65);
@@ -125,7 +121,7 @@ const ICON: Record<PermissionKind, string> = {
 
 export function PermissionsCard(props: PermissionsCardProps): HTMLElement {
   const root = document.createElement("div");
-  root.className = "cmp-perm-card";
+  root.className = "cmp-perm-card vmx-tile";
   root.dataset.kind = props.kind;
   root.dataset.state = props.state;
 

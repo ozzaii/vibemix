@@ -1,26 +1,26 @@
-/* cohost.ts — full right column: transcript header + receipt-paper
- * transcript + foot status (UI-SPEC §§9-11).
+/* cohost.ts — full right column: transcript header + transcript + foot
+ * status (UI-SPEC §§9-11).
  *
- * The transcript is the second "paper" surface — locally-scoped
- * `--paper-receipt-*` CSS custom properties carry the only non-charcoal,
- * non-amber colour values in the right column. Per UI-SPEC §Color these
- * are intentionally OUT of the dark-only palette to evoke a receipt-paper
- * printout — the cohost's voice rendered as ink-on-paper.
- *
- * Lifted verbatim from mocks/vibemix-app-ui.html `.cohost-panel`,
- * `.cohost-header`, `.transcript`, `.cohost-foot` (lines 956-1112).
+ * The transcript is dark-glass (v5 — the original receipt-paper concept
+ * was retired in Phase 14). Lines tier as `.now / .faded / .old` —
+ * latest gets an amber left-edge insetshadow + caret, older lines fade
+ * toward --silk-40.
  *
  * Phase 13-03: the 42×42 mascot placeholder bubble was removed from the
  * transcript header — the mascot lives ONLY as the Phase 13 always-on-top
  * overlay window (see 13-CONTEXT.md Open Q 2: "corner dropped entirely").
- * The freed vertical space gives the meters + transcript more breathing
- * room.
+ *
+ * Critique 2026-05-14: dropped the latency-in-amber readout from the foot
+ * — real DJs don't read latency, and a tabular-mono number competed with
+ * the drop-chip beat-pulse for attention. The foot is now GROUNDED LED +
+ * single line, nothing else. Latency stays on `CohostPanelProps` for
+ * callers but is unused in render.
  *
  * Components:
  *   - "AVERY" Workbench 13px name + LISTENING/TALKING/IDLE status row
  *     (single horizontal row, left-aligned, no leading bubble)
- *   - Receipt-paper transcript with `.now / .faded / .old` line classes
- *   - Foot strip: GROUNDED / WARMING UP indicator + DSEG7 latency readout
+ *   - Tiered transcript (.now / .faded / .old)
+ *   - Foot strip: GROUNDED / WARMING UP indicator (latency-free)
  *
  * Pure-function. Transcript handles sticky-bottom scroll behaviour: when
  * the user has scrolled up, new lines do NOT auto-scroll. We track this
@@ -311,16 +311,6 @@ const CSS = `
     box-shadow: var(--glow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
   }
-  .vmx-cohost__foot-latency {
-    margin-left: auto;
-    font-family: var(--type-mono);
-    font-variant-numeric: tabular-nums;
-    font-size: 12px;
-    color: var(--amber);
-    text-shadow: 0 0 4px var(--amber-22);
-    letter-spacing: 0.04em;
-    font-weight: 500;
-  }
 `;
 
 registerStyle("vmx-cohost", CSS);
@@ -330,25 +320,19 @@ export function renderCohostPanel(props: CohostPanelProps): HTMLElement {
   root.className = "vmx-cohost";
   root.setAttribute("aria-label", "ai cohost");
 
-  // v5 "sign of life" — slow amber light sweeping the perimeter.
-  // Pure CSS; defined globally in tokens.css.
-  const sweep = document.createElement("div");
-  sweep.className = "border-anim slow rev";
-  sweep.setAttribute("aria-hidden", "true");
-  root.append(sweep);
-
-  // Shared glass-fingerprint streak — quiet character beat unifying the
-  // session deck panels (also on .vmx-timecode::after and the generic
-  // .vmx-panel via renderPanel).
-  const streak = document.createElement("span");
-  streak.className = "vmx-glass-streak bottom";
-  streak.setAttribute("aria-hidden", "true");
-  root.append(streak);
+  // Critique 2026-05-14: the cohost no longer carries its own
+  // border-anim sweep. The SessionLayout root already breathes
+  // (one CDJ, one breathing light); a second sweep on the right column
+  // diluted the sign-of-life into a nervous tic. The glass-fingerprint
+  // streak was also dropped (texture-as-decoration → AI-defaultism).
+  //
+  // The cohost reads as a quiet inner glass tile inside the breathing
+  // session shell.
 
   root.append(buildTopStrip());
   root.append(buildHeader(props.status));
   root.append(buildTranscript(props.transcript));
-  root.append(buildFoot(props.grounded, props.latencyMs));
+  root.append(buildFoot(props.grounded));
 
   return root;
 }
@@ -437,7 +421,7 @@ function populateTranscript(el: HTMLElement, lines: TranscriptLine[]): void {
   });
 }
 
-function buildFoot(grounded: boolean, latencyMs: number | null): HTMLElement {
+function buildFoot(grounded: boolean): HTMLElement {
   const foot = document.createElement("div");
   foot.className = "vmx-cohost__foot";
   foot.dataset.grounded = grounded ? "true" : "false";
@@ -452,19 +436,7 @@ function buildFoot(grounded: boolean, latencyMs: number | null): HTMLElement {
   lbl.textContent = grounded ? "GROUNDED ON AUDIO + SCREEN" : "WARMING UP";
   foot.append(lbl);
 
-  const right = document.createElement("span");
-  right.className = "vmx-cohost__foot-latency";
-  right.title = "last reaction latency";
-  right.textContent = formatLatency(latencyMs);
-  foot.append(right);
-
   return foot;
-}
-
-function formatLatency(ms: number | null): string {
-  if (ms == null) return "—";
-  const sec = ms / 1000;
-  return `${sec.toFixed(2)} s`;
 }
 
 /** Idempotent hot-update. Rebuilds transcript content but preserves the
@@ -486,8 +458,6 @@ export function setCohost(el: HTMLElement, props: CohostPanelProps): void {
     if (footLbl) {
       footLbl.textContent = props.grounded ? "GROUNDED ON AUDIO + SCREEN" : "WARMING UP";
     }
-    const lat = foot.querySelector<HTMLElement>(".vmx-cohost__foot-latency");
-    if (lat) lat.textContent = formatLatency(props.latencyMs);
   }
 
   // Transcript — rebuild lines. Preserve scroll-anchor if not sticky.

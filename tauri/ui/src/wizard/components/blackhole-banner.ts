@@ -1,8 +1,10 @@
 /* blackhole-banner.ts — Step 2 macOS-only conditional banner (UI-SPEC §8 / CDJ Whisper v5).
  *
- * Full-width glass tile inside primary panel, top-positioned (above
- * audio test). --glass-2 fill, --amber-40 1px border, composite amber
- * glow (--glow-soft outer + inset 14px --amber-22 inner).
+ * Glass shell from `.vmx-tile .vmx-tile--banner` (tokens.css) — supplies
+ * the amber border + amber-22 inset glow + outer glow-soft. This
+ * component owns only the 3-column grid + the heading/body/caption
+ * type styles + the actions column. Critique 2026-05-14: dropped the
+ * duplicate shadow stack.
  *
  * Left: 24px BlackHole waveform glyph (inline SVG) in --amber.
  * Center: heading "BLACKHOLE NOT FOUND" + body "vibemix needs blackhole
@@ -31,16 +33,6 @@ const CSS = `
     align-items: center;
     gap: var(--sp-4);
     padding: var(--sp-4) var(--sp-5);
-    background: var(--glass-2);
-    backdrop-filter: var(--blur-glass-light);
-    -webkit-backdrop-filter: var(--blur-glass-light);
-    border: 1px solid var(--amber-40);
-    border-radius: var(--rad-md);
-    box-shadow:
-      inset 0 1px 0 var(--glass-top),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-      inset 0 0 14px var(--amber-22),
-      var(--glow-soft);
     margin-bottom: var(--sp-4);
   }
   .cmp-bh-banner__glyph {
@@ -89,7 +81,8 @@ registerStyle("cmp-bh-banner", CSS);
 
 export function BlackHoleBanner(props: BlackHoleBannerProps): HTMLElement {
   const root = document.createElement("div");
-  root.className = "cmp-bh-banner";
+  root.className = "cmp-bh-banner vmx-tile";
+  root.dataset.tile = "alert";
   root.setAttribute("role", "alert");
 
   const glyph = document.createElement("div");

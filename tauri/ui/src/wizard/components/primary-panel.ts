@@ -1,12 +1,13 @@
 /* primary-panel.ts — load-bearing panel surface (UI-SPEC §2 / CDJ Whisper v5).
  *
- * v5 glass anatomy: --glass-2 + --blur-glass-light + --glass-edge stroke,
- * inset --glass-top top sheen + rgba(0,0,0,0.45) bottom hairline, deep
- * drop shadow, shared glass-fingerprint streak — unifies wizard surfaces
- * with the session deck panels.
+ * Glass shell comes from the shared `.vmx-tile .vmx-tile--panel` utility
+ * (tokens.css). This component owns ONLY the internal header/body
+ * structure + the optional amber pill badge.
  *
- * First child is the v5 animated border (conic-gradient sweep, tokens.css
- * .border-anim utility). Panel content sits above at z-index 1+.
+ * Critique 2026-05-14: stripped the duplicate shadow stack + retired
+ * the per-panel border-anim sweep + retired the texture-streak. One CDJ
+ * has one breathing light — that now lives on the cohost (session) panel
+ * only. The wizard primary panel reads quiet.
  *
  * Optional header: Saira wdth 85 wght 600 9px UPPERCASE 0.28em tracking.
  * Optional amber pill badge on right (uses --amber-22 border + --amber). */
@@ -20,21 +21,6 @@ export interface PrimaryPanelProps {
 }
 
 const CSS = `
-  .cmp-primary-panel {
-    position: relative;
-    background: var(--glass-2);
-    backdrop-filter: var(--blur-glass-light);
-    -webkit-backdrop-filter: var(--blur-glass-light);
-    border: 1px solid var(--glass-edge);
-    border-radius: var(--rad-md);
-    box-shadow:
-      inset 0 1px 0 var(--glass-top),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-      0 16px 36px rgba(0, 0, 0, 0.5),
-      0 0 0 1px rgba(255, 255, 255, 0.018);
-    overflow: hidden;
-  }
-  .cmp-primary-panel > * { position: relative; z-index: 1; }
   .cmp-primary-panel__header {
     display: flex;
     align-items: center;
@@ -76,21 +62,9 @@ registerStyle("cmp-primary-panel", CSS);
 
 export function PrimaryPanel(props: PrimaryPanelProps): HTMLElement {
   const root = document.createElement("section");
-  root.className = "cmp-primary-panel";
-
-  // v5 animated border — first child of every glass panel.
-  // tokens.css .border-anim handles the conic-gradient sweep + mask
-  // composite (parent already has position: relative + overflow: hidden).
-  const borderAnim = document.createElement("div");
-  borderAnim.className = "border-anim";
-  borderAnim.setAttribute("aria-hidden", "true");
-  root.append(borderAnim);
-
-  // Shared glass-fingerprint streak — keep beneath component content.
-  const streak = document.createElement("span");
-  streak.className = "vmx-glass-streak";
-  streak.setAttribute("aria-hidden", "true");
-  root.append(streak);
+  // Glass shell from utility; border-anim + streak removed (critique 2026-05-14).
+  root.className = "cmp-primary-panel vmx-tile";
+  root.dataset.tile = "hero";
 
   if (props.header) {
     const head = document.createElement("div");

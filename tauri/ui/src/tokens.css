@@ -289,6 +289,52 @@ body::before {
 .border-anim.slow { animation-duration: 32s; }
 .border-anim.rev  { animation-direction: reverse; }
 
+/* === Glass-tile utility (CDJ Whisper distilled) ======================== *
+ * ONE recipe for every glass surface in the app. The base class is
+ * `.vmx-tile`; density variants ride on the `data-tile` attribute so
+ * we don't collide with the Phase 14 legacy-token regex (which still
+ * pattern-matches "--panel"). Variants:
+ *   .vmx-tile                    — base (border + glass + sheen + hairline)
+ *   .vmx-tile[data-tile="hero"]  — adds deep drop shadow + 1px outer ring
+ *   .vmx-tile[data-tile="alert"] — adds amber border + amber-22 inset glow
+ *                                  + outer glow-soft (banner/alert state)
+ * The row form is just `.vmx-tile` with a height set by the component.
+ *
+ * Pre-distill: this recipe was duplicated across primary-panel,
+ * blackhole-banner, permissions-card, and a thinner cousin in
+ * performance-group's button. Critique 2026-05-14 collapsed them into
+ * this single source. Components now only own their internal CSS
+ * (header text, body padding, internal row layout) — the glass shell
+ * comes from this utility. */
+.vmx-tile {
+  position: relative;
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.vmx-tile[data-tile="hero"] {
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 16px 36px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.018);
+}
+.vmx-tile[data-tile="alert"] {
+  border-color: var(--amber-40);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 14px var(--amber-22),
+    var(--glow-soft);
+}
+.vmx-tile > * { position: relative; z-index: 1; }
+
 /* === Glass-streak utility ============================================== *
  * A faint diagonal glass-fingerprint sheen that drifts across the panel
  * face. Lifted from the v5 mock `.session::after` — promoted to a
@@ -296,7 +342,11 @@ body::before {
  * `<span class="vmx-glass-streak" aria-hidden="true"></span>` as a child
  * (parent must be `position: relative` + `overflow: hidden`).
  * Sits beneath component content at z-index 0; the panel body should
- * position its children at z-index 1+. */
+ * position its children at z-index 1+.
+ *
+ * v5-distill 2026-05-14: usage trimmed to the session/cohost panels only.
+ * Wizard-side tiles no longer sprinkle it (texture-as-decoration was
+ * reading as AI-defaultism per critique). */
 .vmx-glass-streak {
   content: "";
   position: absolute;
