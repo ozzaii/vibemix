@@ -266,9 +266,9 @@ Plans:
   3. Retention policy: default 7-day expiry runs on startup; sessions older than the configured retention threshold are deleted; the Settings panel allows user to change the threshold and surfaces current disk usage ("Recordings: 12 sessions, 3.4 GB used").
   4. No regressions vs POC recording shape — a recording from the shipping `vibemix` binary opens cleanly in the POC's diagnostic tools.
 **UI hint**: yes
-**Plans:** 6 plans
+**Plans:** 1/6 plans executed
 Plans:
-- [ ] 15-01-PLAN.md — IPC schema additions (3 families / 5 schema entries: recordings.list/list_result/delete/delete_ack/usage; drift gate 27 → 30; Python wrappers + TS codegen + path-traversal regex at schema layer)
+- [x] 15-01-PLAN.md — IPC schema additions (3 families / 5 schema entries: recordings.list/list_result/delete/delete_ack/usage; drift gate 27 → 30; Python wrappers + TS codegen + path-traversal regex at schema layer)
 - [ ] 15-02-PLAN.md — session.json writer (two-write start+close pattern) + sweep_crashed_sessions boot helper + recordings root rewire (`__main__.py` passes _app_data_dir/recordings) + Tauri assetProtocol scope + CSP media-src directive
 - [ ] 15-03-PLAN.md — RecordingsIndex (scandir + legacy-dir synth + path-traversal-gated delete) + run_retention_sweep (3 triggers, ∞ sentinel, best-effort) + SessionLoop/SettingsApplier wiring + Kaan-rig boot-prune acknowledgement checkpoint
 - [ ] 15-04-PLAN.md — recording-browser.ts + recording-row.ts (CDJ Whisper v5 tokens, lazy-mount <audio> via convertFileSrc, IntersectionObserver chunked virtualization >50 rows, decoder teardown on collapse, confirmDialog variant: danger)
@@ -354,7 +354,7 @@ Plans:
 | 12. Live Session UI + Settings Panel | 0/? | Not started | - |
 | 13. 3D Mascot Screen Overlay | 8/8 | Complete   | 2026-05-12 |
 | 14. CDJ Whisper v5 Migration + Polish | 6/6 | Complete   | 2026-05-13 |
-| 15. Recording & Session Capture Finalization | 0/6 | Not started | - |
+| 15. Recording & Session Capture Finalization | 1/6 | In Progress|  |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
 | 17. Reaction-Reel Slop Grading Gate | 0/? | Not started | - |
 | 18. Distribution — Signing, Notarization, Installers | 0/? | Not started | - |
