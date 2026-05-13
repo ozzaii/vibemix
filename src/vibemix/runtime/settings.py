@@ -33,9 +33,11 @@ Latency budget (per plan must-haves):
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Protocol
 
 from vibemix.runtime.config_store import ConfigStore, save_config
@@ -123,6 +125,7 @@ class SettingsApplier:
         genre_loader: _GenreLoaderHook | None = None,
         music_state: _MusicStateHook | None = None,
         ws_bus: _WsBusHook | None = None,
+        recordings_root: Path | None = None,
     ) -> None:
         self.config_store = config_store
         self.cascade_agent = cascade_agent
@@ -135,6 +138,11 @@ class SettingsApplier:
         # of the orchestration plan that finally wires them in main().
         self.music_state = music_state
         self.ws_bus = ws_bus
+        # Phase 15 Plan 03 — recordings_root drives the settings-change
+        # retention sweep trigger. When None, _apply_retention persists the
+        # value but does NOT fire the sweep (the boot-time sweep on the
+        # next launch picks up the new value).
+        self.recordings_root = recordings_root
 
     # ------------------------------------------------------------------
     # Dispatch entry point
@@ -255,10 +263,54 @@ class SettingsApplier:
             return (False, f"retention_days must be an integer, got {value!r}")
         if iv < 0:
             return (False, "retention_days must be ≥ 0")
-        # No runtime hook — Phase 15 reads this at boot to prune session
-        # recordings. Persist only.
         self.config_store.retention_days = iv
         save_config(self.config_store)
+
+        # Phase 15 Plan 03 — settings-change retention sweep trigger.
+        # Fires AFTER save_config so the persisted value is the one used
+        # by the boot-time sweep on the next launch too (consistent
+        # source-of-truth). Best-effort: any sweep failure logs +
+        # swallows, never bubbles up — the settings-set ack must always
+        # come back to the UI so the toggle/slider reflects the saved
+        # value.
+        if self.recordings_root is not None:
+            try:
+                # Inline import — keeps the recordings_index dependency
+                # off the SettingsApplier import surface (settings is
+                # imported by main() far earlier than recordings_index
+                # ever needs to be).
+                from vibemix.runtime.recordings_index import (  # noqa: PLC0415
+                    RecordingsIndex,
+                    run_retention_sweep,
+                )
+
+                # Offload to executor so the settings-set handler doesn't
+                # block the event loop on os.scandir + shutil.rmtree.
+                aio_loop = asyncio.get_running_loop()
+                deleted = await aio_loop.run_in_executor(
+                    None, run_retention_sweep, self.recordings_root, iv
+                )
+                log.info(
+                    "retention sweep (settings-change): deleted %d session(s)",
+                    len(deleted),
+                )
+                if self.ws_bus is not None:
+                    index = RecordingsIndex(self.recordings_root)
+                    sessions, bytes_total = await aio_loop.run_in_executor(
+                        None, index.compute_usage
+                    )
+                    # Inline import — RecordingsUsage is only used here.
+                    from vibemix.ui_bus.messages import (  # noqa: PLC0415
+                        RecordingsUsage,
+                    )
+
+                    usage = RecordingsUsage.make(
+                        sessions=sessions, bytes_total=bytes_total
+                    )
+                    await self.ws_bus.emit(json.loads(usage.to_json()))
+            except Exception:
+                log.exception("retention sweep on settings change failed")
+
         return (True, None)
 
     async def _apply_hotkey(self, value: Any) -> tuple[bool, str | None]:

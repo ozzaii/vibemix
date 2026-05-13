@@ -84,7 +84,8 @@ from vibemix.audio import (
 from vibemix.audio.recorder import sweep_crashed_sessions
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
 from vibemix.runtime import coach_loop, diag_loop, ws_broadcast
-from vibemix.runtime.config_store import app_data_dir
+from vibemix.runtime.config_store import app_data_dir, load_config
+from vibemix.runtime.recordings_index import run_retention_sweep
 from vibemix.state import EventDetector, MusicState, state_refresh_loop
 
 load_dotenv()
@@ -321,6 +322,19 @@ async def main() -> None:
     except Exception as e:
         print(f"[sweep err] {e}", file=sys.stderr)
 
+    # Phase 15 Plan 03 — boot-time retention sweep. Reads retention_days from
+    # the persisted ConfigStore (Phase 12 W2) and prunes any session dir
+    # older than that. ∞ sentinel (36500) short-circuits before scandir.
+    # Best-effort: any failure logs and continues — the live session must
+    # still start.
+    try:
+        cfg_for_sweep = load_config()
+        pruned = run_retention_sweep(recordings_root, cfg_for_sweep.retention_days)
+        if pruned:
+            print(f"-> retention sweep (boot): pruned {len(pruned)} session(s)")
+    except Exception as e:
+        print(f"[retention sweep boot err] {e}", file=sys.stderr)
+
     recorder = VoiceRecorder(root=recordings_root)
 
     registry = BufferRegistry(
@@ -500,6 +514,21 @@ async def main() -> None:
             recorder.close()
         except Exception as e:
             print(f"[close recorder err] {e}", file=sys.stderr)
+        # Phase 15 Plan 03 — session-close retention sweep trigger. Fires
+        # AFTER recorder.close() so the just-finished session's session.json
+        # is finalized (matches the data layout the sweep expects). Reads
+        # retention_days fresh in case the user changed it mid-session.
+        try:
+            cfg_for_close_sweep = load_config()
+            pruned_close = run_retention_sweep(
+                recordings_root, cfg_for_close_sweep.retention_days
+            )
+            if pruned_close:
+                print(
+                    f"-> retention sweep (close): pruned {len(pruned_close)} session(s)"
+                )
+        except Exception as e:
+            print(f"[retention sweep close err] {e}", file=sys.stderr)
         print("-> bye")
 
 
