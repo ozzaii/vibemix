@@ -1,21 +1,22 @@
 /* tokens.css — design system source-of-truth.
  *
- * v5 CDJ WHISPER direction (2026-05-12). Replaces the prior
- * FL-Studio retro-tactile direction. The mock at
+ * v5 CDJ WHISPER direction (2026-05-12, shim deleted 2026-05-13).
+ * Replaces the prior FL-Studio retro-tactile direction. The mock at
  * `mocks/vibemix-direction-final.html` is the visual contract.
- * Migration plan: `.planning/HANDOFF-cdj-whisper-v5-ui-migration.md`.
  *
  * Structure of this file:
- *   1. @import Google Fonts (Saira, JetBrains Mono) — prototype-phase
- *      remote fetch; Phase 14 audit must vendor as WOFF2.
- *   2. Legacy @font-face declarations (Workbench, DM Mono, DSEG7,
- *      Caveat) retained so any component that still hardcodes those
- *      family names by string keeps rendering during the migration.
- *      Removed component-by-component during Phase 14 audit.
- *   3. :root — v5 design tokens, then a backward-compat shim mapping
- *      old Phase 11/12 token names to v5 values. The shim lets the
- *      cascade flip most components without touching their CSS.
- *      Phase 14 audit deletes the shim and migrates references.
+ *   1. Vendored @font-face declarations (Saira variable wdth+wght +
+ *      JetBrains Mono Regular/Medium/SemiBold) — local WOFF2 paths,
+ *      no Google Fonts remote @import. SHA-256 attestations in
+ *      tauri/ui/LICENSE-3RD-PARTY.md.
+ *   2. :root — v5 design tokens (void / glass / silk / amber / rave /
+ *      led / blur-glass / glow / type / radius / spacing / layout /
+ *      motion budget). NO backward-compat shim; the cascade flip is
+ *      complete (Phase 14 Waves 1-4 migrated every consumer to v5
+ *      primitives, Wave 5 deleted the shim — this commit).
+ *   3. Perf-fallback block — prefers-reduced-motion + the runtime
+ *      escape hatch html[data-blur-perf="on"] toggled by the
+ *      Settings → Performance → "Lighter blur" pill (Plan 14-04).
  *   4. Reset + v5 body background (cinematic vignette + restrained
  *      rave washes + multi-layer film grain).
  *   5. `.border-anim` utility — the slow amber light traveling around
@@ -28,49 +29,41 @@
  * contain `#xxxxxx`.
  */
 
-/* === v5 type — Saira + JetBrains Mono ================================== */
-/* Loaded via Google Fonts for prototype iteration. Phase 14 audit
- * vendors these as WOFF2 alongside the existing fonts and updates
- * tauri/ui/LICENSE-3RD-PARTY.md with SHA-256 attestations. */
-@import url('https://fonts.googleapis.com/css2?family=Saira:wdth,wght@75..125,300..800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* === v5 type — vendored Saira + JetBrains Mono ========================= *
+ * Source: mocks/vibemix-direction-final.html replicating Google Fonts CSS
+ * for Saira + JBM. Substituted for vendored WOFF2 paths so the wizard
+ * renders offline. SHA-256 attestations in LICENSE-3RD-PARTY.md. */
 
-/* === Legacy @font-face — retained during migration ===================== */
+/* Saira — variable axes (wdth + wght). Single file, all weights+widths. */
 @font-face {
-  font-family: "Workbench";
-  src: url("/fonts/Workbench-Regular.woff2") format("woff2");
-  font-weight: 400;
+  font-family: 'Saira';
+  src: url('/fonts/Saira-VariableFont_wdth,wght.woff2') format('woff2-variations'),
+       url('/fonts/Saira-VariableFont_wdth,wght.woff2') format('woff2');
+  font-weight: 300 800;
+  font-stretch: 75% 125%;
   font-style: normal;
   font-display: swap;
 }
 
+/* JetBrains Mono — three weights as static WOFF2 (variable axis not needed for numerics) */
 @font-face {
-  font-family: "DM Mono";
-  src: url("/fonts/DMMono-Regular.woff2") format("woff2");
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
-  font-family: "DM Mono";
-  src: url("/fonts/DMMono-Medium.woff2") format("woff2");
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Medium.woff2') format('woff2');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
-  font-family: "DSEG7";
-  src: url("/fonts/DSEG7Classic-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Caveat";
-  src: url("/fonts/Caveat-Bold.woff2") format("woff2");
-  font-weight: 700;
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-SemiBold.woff2') format('woff2');
+  font-weight: 600;
   font-style: normal;
   font-display: swap;
 }
@@ -132,7 +125,7 @@
   /* --- Type --- */
   --type-display: 'Saira', system-ui, sans-serif;
   --type-body:    'Saira', system-ui, sans-serif;
-  --type-mono:    'JetBrains Mono', 'DM Mono', ui-monospace, monospace;
+  --type-mono:    'JetBrains Mono', ui-monospace, monospace;
 
   /* --- Radius --- */
   --rad-sm: 2px;
@@ -149,13 +142,12 @@
   --sp-7: 64px;
   --sp-8: 96px;
 
-  /* --- Layout & Grid (retained from Phase 11) --- */
+  /* --- Layout & Grid (retained from Phase 11; Wave 5 collapsed the
+   *                    mascot column — the wizard-grid is now single-
+   *                    column, the mascot overlay window owns its own
+   *                    surface) --- */
   --container-max: 896px;
   --col-primary: 560px;
-  --col-mascot:  256px;      /* v5 says reclaim this, but Phase 11 wizard-grid still
-                                              * assumes two columns. Leaving the reserved width in
-                                              * place so the wizard renders correctly during the
-                                              * migration; Phase 14 audit collapses to single-column. */
   --gap-col: 32px;
   --titlebar-h: 56px;
   --stepstrip-h: 64px;
@@ -171,63 +163,6 @@
   --motion-rings-listen: 2000ms;
   --motion-dseg-tick: 1000ms;
   --motion-border-sweep: 22s;   /* slow amber light around panel perimeter */
-
-  /* === Backward-compat shim ===========================================
-   * Old Phase 11/12 token names → v5 values. Lets existing components
-   * cascade-flip without code changes. Phase 14 audit migrates each
-   * component to consume v5 tokens directly, then deletes the shim.
-   * Do NOT introduce new references to these names. */
-
-  /* Charcoal family → void / glass */
-  --bg:           var(--void-1);
-  --panel:        var(--glass-1);
-  --panel-lift:   var(--glass-2);
-  --panel-deep:   var(--void-2);
-  --groove:       var(--glass-3);
-  --bezel-1:      transparent;        /* no 3D bevels in v5 — borders are glass-edge */
-  --bezel-2:      transparent;
-  --bezel-3:      transparent;
-  --brushed-hi:   var(--glass-top);
-  --brushed-lo:   rgba(0, 0, 0, 0.5);
-
-  /* Ink → silk */
-  --ink:          var(--silk);
-  --ink-dim:      rgba(214, 207, 199, 0.55);
-  --ink-deep:     rgba(214, 207, 199, 0.30);
-  --ink-engraved: rgba(214, 207, 199, 0.15);
-
-  /* Phosphor → amber (deliberate hue shift: #ffa12e → #ff8a3d) */
-  --phosphor:      var(--amber);
-  --phosphor-warm: var(--amber-deep);
-  --phosphor-dim:  var(--amber-22);    /* used as border in Phase 11 crash button */
-  --phosphor-soft: var(--amber-22);
-  --phosphor-glow: var(--glow-soft);
-  --phosphor-halo: 0 0 22px var(--amber-22);
-
-  /* Status dots — distinct hues retained (semantic, not theme) */
-  --rec: var(--led-fault);
-  --cue: #4dc4ff;                      /* reserved — Phase 11 forbade use */
-  --ok:  var(--led-ok);
-
-  /* Crash banner — glass-toned now, structure unchanged */
-  --crash-grad-top:    rgba(37, 24, 28, 0.7);
-  --crash-grad-bottom: rgba(26, 16, 20, 0.7);
-
-  /* Button gradient stops — old hover/pressed pair → glass equivalents */
-  --panel-hover-top:      var(--glass-2);
-  --panel-pressed-bottom: var(--void-2);
-
-  /* Spacing aliases — old --sp-xs … --sp-3xl → v5 scale.
-   * --sp-xl (32) and --sp-2xl (48) have no v5 equivalent so they
-   * remain literal; new code should use --sp-4 / --sp-5 / --sp-6
-   * (16 / 24 / 40) from the v5 scale instead. */
-  --sp-xs:  var(--sp-1);   /* 4 */
-  --sp-sm:  var(--sp-2);   /* 8 */
-  --sp-md:  var(--sp-4);   /* 16 */
-  --sp-lg:  var(--sp-5);   /* 24 */
-  --sp-xl:  32px;
-  --sp-2xl: 48px;
-  --sp-3xl: var(--sp-7);   /* 64 */
 }
 
 /* === Perf fallback — accessibility + user-toggled lighter blur ======== */
@@ -416,7 +351,7 @@ button[disabled] { cursor: not-allowed; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--sp-lg);
+  padding: 0 var(--sp-5);
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: var(--blur-glass-light);
   -webkit-backdrop-filter: var(--blur-glass-light);
@@ -452,34 +387,32 @@ button[disabled] { cursor: not-allowed; }
 .wizard-content {
   display: grid;
   grid-template-rows: var(--stepstrip-h) 1fr auto;
-  padding: 0 var(--sp-xl) var(--cta-margin-bottom);
+  padding: 0 32px var(--cta-margin-bottom); /* 32px — no v5 equivalent, mock-verbatim */
   overflow: hidden;
 }
 
-/* v5 reclaims the embedded mascot corner via --col-mascot: 0. Surfaces
- * that need a second column can override --col-mascot inline on
- * .wizard-grid until Phase 14 component audit removes the legacy
- * two-column assumption entirely. */
+/* v5 reclaims the embedded mascot corner — the wizard is single-column
+ * and the mascot lives in its own overlay window (Phase 13). */
 .wizard-grid {
   display: grid;
-  grid-template-columns: var(--col-primary) var(--col-mascot);
+  grid-template-columns: var(--col-primary);
   gap: var(--gap-col);
   align-items: start;
-  padding-top: var(--sp-lg);
+  padding-top: var(--sp-5);
   overflow: hidden;
 }
 
 .cta-row {
   display: flex;
   justify-content: flex-end;
-  padding-top: var(--sp-md);
+  padding-top: var(--sp-4);
 }
 
 .status-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--sp-lg);
+  padding: 0 var(--sp-5);
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: var(--blur-glass-light);
   -webkit-backdrop-filter: var(--blur-glass-light);
@@ -496,17 +429,17 @@ button[disabled] { cursor: not-allowed; }
   z-index: 8000;
   display: flex;
   align-items: center;
-  gap: var(--sp-md);
-  padding: var(--sp-md) var(--sp-lg);
-  background: linear-gradient(180deg, var(--crash-grad-top), var(--crash-grad-bottom));
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  background: linear-gradient(180deg, rgba(37, 24, 28, 0.7), rgba(26, 16, 20, 0.7)); /* mock-verbatim — destructive banner amber/red tint */
   backdrop-filter: var(--blur-glass-light);
   -webkit-backdrop-filter: var(--blur-glass-light);
-  border-top: 1px solid var(--rec);
-  border-bottom: 1px solid var(--rec);
+  border-top: 1px solid var(--led-fault);
+  border-bottom: 1px solid var(--led-fault);
   animation: crash-enter var(--motion-snap) ease-out;
 }
 #crash-banner .icon {
-  color: var(--rec);
+  color: var(--led-fault);
   font-size: 24px;
   line-height: 1;
 }

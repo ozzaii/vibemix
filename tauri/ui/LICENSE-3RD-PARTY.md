@@ -1,66 +1,73 @@
 # Third-Party Fonts — Vendored Under Their Respective Licenses
 
-vibemix ships 5 WOFF2 fonts bundled under `tauri/ui/public/fonts/`. Vendoring
-them locally (rather than fetching from Google Fonts at runtime) is a hard
-requirement so the wizard renders correctly on first launch when the user has
-no network — and so production codesigning in Phase 18 can attest the exact
-binary contents.
+vibemix ships 4 WOFF2 fonts bundled under `tauri/ui/public/fonts/` (1 Saira
+variable + 3 JetBrains Mono static). Vendoring them locally (rather than
+fetching from Google Fonts at runtime) is a hard requirement so the wizard
+renders correctly on first launch when the user has no network — and so
+production codesigning in Phase 18 can attest the exact binary contents.
 
 Each entry below records source, license, and SHA-256 of the WOFF2 we ship.
 Vendor swaps MUST update the SHA here in the same PR (Phase 18 codesign chain
 + the UI-checker (Phase 14) re-verification depend on stable hashes).
 
+Phase 14 Wave 5 (commit landing this file change) replaced the four legacy
+families used in the FL-Studio retro-tactile prototype — Workbench, DM Mono,
+DSEG7 Classic, Caveat — with two CDJ-Whisper-v5 families: Saira (variable
+width + weight) for chrome, JetBrains Mono (three static weights) for
+numerics. The legacy WOFF2 files were deleted in the same commit.
+
 ---
 
-## Workbench — Regular (400)
+## Saira — Variable (`wdth` 75–125, `wght` 300–800)
 
-- **File:** `tauri/ui/public/fonts/Workbench-Regular.woff2`
-- **Source:** Google Fonts — https://fonts.google.com/specimen/Workbench
+- **File:** `tauri/ui/public/fonts/Saira-VariableFont_wdth,wght.woff2`
+- **Source:** Google Fonts — https://fonts.google.com/specimen/Saira
 - **Subset shipped:** latin (`U+0000-00FF`)
 - **License:** SIL Open Font License 1.1 (OFL)
-- **Designer:** Anthony Carmichael, Anya Danilova, Ethan Cohen, Ilya Naumoff, Vaibhav Singh — commissioned by Google
-- **SHA-256:** `b20b75b324f2ce79700d52e4978d127783fc30840f7099abc17d4cded58e4ac3`
-- **Use in vibemix:** Display font for wordmark, step headings, button labels, panel headers (Workbench is single-weight 400 — UI-SPEC §Typography "two weight rule" max).
+- **Designer:** Héctor Gómez (Omnibus-Type)
+- **SHA-256:** `d5f1ee1ce85a2f6611d76bcd98738132f4706b099dc167f02c2093a1ec5eb975`
+- **Use in vibemix:** Primary display + body font for chrome text (wordmark,
+  step headings, button labels, panel headers, settings groups). Variable
+  axes drive UI-SPEC §Typography weight + width pairings (`"wdth" 85, "wght" 700`
+  on the wordmark; `"wdth" 100, "wght" 400` on body prose; `"wdth" 85, "wght" 600`
+  on labels). Single-file variable font replaces the multi-weight static
+  Workbench + DM Mono pair from the FL-Studio prototype.
 
-## DM Mono — Regular (400)
+## JetBrains Mono — Regular (400)
 
-- **File:** `tauri/ui/public/fonts/DMMono-Regular.woff2`
-- **Source:** Google Fonts — https://fonts.google.com/specimen/DM+Mono
+- **File:** `tauri/ui/public/fonts/JetBrainsMono-Regular.woff2`
+- **Source:** Google Fonts — https://fonts.google.com/specimen/JetBrains+Mono
 - **Subset shipped:** latin (`U+0000-00FF`)
 - **License:** SIL Open Font License 1.1 (OFL)
-- **Designer:** Colophon Foundry, Jonny Pinhorn, Indian Type Foundry
-- **SHA-256:** `fd7521f3531a5ccfc655b25c4f22e9871df3ec141ad79bb27fde20d0df347b6d`
-- **Use in vibemix:** Default body font for wizard prose, microcopy, form labels (industrial monospace pairs with Workbench's LED-display chunkiness per UI-SPEC §Typography rationale).
+- **Designer:** JetBrains (Philipp Nurullin, Konstantin Bulenkov)
+- **SHA-256:** `14425ba9c695763c1547f48a206b7aa60350a33ae23de09f0407877f3fcd89eb`
+- **Use in vibemix:** Default monospace for numerics, sample rate readouts,
+  countdown timers, transcript timestamps, and any LED/console-style chrome
+  text. Replaces DSEG7 Classic Bold's 7-segment LCD role (mock specs JetBrains
+  Mono semibold + amber glow as the production numeric face).
 
-## DM Mono — Medium (500)
+## JetBrains Mono — Medium (500)
 
-- **File:** `tauri/ui/public/fonts/DMMono-Medium.woff2`
-- **Source:** Google Fonts — https://fonts.google.com/specimen/DM+Mono
+- **File:** `tauri/ui/public/fonts/JetBrainsMono-Medium.woff2`
+- **Source:** Google Fonts — https://fonts.google.com/specimen/JetBrains+Mono
 - **Subset shipped:** latin (`U+0000-00FF`)
 - **License:** SIL Open Font License 1.1 (OFL)
-- **SHA-256:** `0e263db52797086e763679c54f84ded8cc1249879bc27dca2bd5dd446f6d9f36`
-- **Use in vibemix:** Selected option / picked device name in dropdowns (e.g. the currently-selected output device row uses weight 500 per UI-SPEC §5 dropdown contract).
+- **Designer:** JetBrains (Philipp Nurullin, Konstantin Bulenkov)
+- **SHA-256:** `cb182feeed4d798ff6961d3c79f7026279448fca0676438aaecb21f3fc39553a`
+- **Use in vibemix:** Selected option / picked device name in dropdowns; the
+  weight 500 hop from Regular signals selection without changing typeface.
 
-## DSEG7 Classic — Bold
+## JetBrains Mono — SemiBold (600)
 
-- **File:** `tauri/ui/public/fonts/DSEG7Classic-Bold.woff2`
-- **Source:** keshikan/DSEG GitHub repository — https://github.com/keshikan/DSEG
-- **Release vendored:** `v0.46` (tag) — commit SHA `a5019e1351dfa7b3c52aa3eff52ffb9c49538719`
-- **Extracted from:** `fonts-DSEG_v046.zip` — entry `fonts-DSEG_v046/DSEG7-Classic/DSEG7Classic-Bold.woff2`
-- **License:** SIL Open Font License 1.1 (OFL) — see `DSEG-LICENSE.txt` in upstream repo
-- **Designer:** keshikan (https://www.keshikan.net/fonts-e.html)
-- **SHA-256:** `ec2e7499bc8ac8f8225e1fb6a5d45ff6083c6e2b0efbaf99d37fa7b42a5767ff`
-- **Use in vibemix:** Authentic 7-segment LCD numerals — sample rate readouts, 1 kHz test indicator, 10-second controller countdown (UI-SPEC §Typography "Numeric / LCD" role).
-
-## Caveat — Bold (700)
-
-- **File:** `tauri/ui/public/fonts/Caveat-Bold.woff2`
-- **Source:** Google Fonts — https://fonts.google.com/specimen/Caveat
+- **File:** `tauri/ui/public/fonts/JetBrainsMono-SemiBold.woff2`
+- **Source:** Google Fonts — https://fonts.google.com/specimen/JetBrains+Mono
 - **Subset shipped:** latin (`U+0000-00FF`)
 - **License:** SIL Open Font License 1.1 (OFL)
-- **Designer:** Pablo Impallari, Rodrigo Fuenzalida
-- **SHA-256:** `c5e74a40a3772bf2ac4b8a051b066a2ac12247e3d8eda18aa8ea320112fd59a1`
-- **Use in vibemix:** RESERVED for Phase 12 sticker labels. Phase 11 wizard MUST NOT use it (UI-SPEC §Typography "Sticker" role explicitly reserved). Bundled now so Phase 12 has the asset ready.
+- **Designer:** JetBrains (Philipp Nurullin, Konstantin Bulenkov)
+- **SHA-256:** `400c6bfda18d5d14acad1c15d6dcb9f8e13c015e7286317e0b9a482539bef147`
+- **Use in vibemix:** Large numeric readouts (sample rate display, BPM,
+  countdown timers) where the semibold mass reads as a chunky LED segment
+  while keeping JetBrains Mono's clean letterforms.
 
 ---
 
@@ -105,14 +112,14 @@ Vendor swaps MUST update the SHA here in the same PR (Phase 18 codesign chain
 
 ## SIL Open Font License 1.1 — Summary
 
-All five vendored fonts ship under the SIL Open Font License 1.1. The OFL
+All four vendored fonts ship under the SIL Open Font License 1.1. The OFL
 permits redistribution as part of a software product so long as the font
 files themselves are not sold as a standalone product and the font name is
 not changed. Both conditions hold here:
 
 1. Fonts ship as part of the vibemix application — not sold separately.
-2. Filenames preserve upstream family names (`Workbench-Regular`,
-   `DMMono-Regular`, `DMMono-Medium`, `DSEG7Classic-Bold`, `Caveat-Bold`).
+2. Filenames preserve upstream family names (`Saira-VariableFont_wdth,wght`,
+   `JetBrainsMono-Regular`, `JetBrainsMono-Medium`, `JetBrainsMono-SemiBold`).
 
 Full OFL 1.1 text: https://scripts.sil.org/OFL_web
 
