@@ -39,12 +39,20 @@ import { renderPicker } from "../session/components/picker.js";
 import { renderRocker } from "../session/components/rocker.js";
 import { getSessionState } from "../session/state.js";
 import { sendSettings, type SettingsField } from "../session/ws-bridge.js";
-import { emitIpc } from "../ipc/client.js";
+import { emitIpc, sendIpcRequest } from "../ipc/client.js";
+import type {
+  RecordingsDeleteAck,
+  RecordingsListResult,
+} from "../ipc/messages.js";
 import { renderSettingsGroup } from "./components/group.js";
 import {
   renderHotkeyCapture,
   type HotkeyCaptureHandle,
 } from "./components/hotkey-capture.js";
+import {
+  renderRecordingBrowser,
+  type RecordingBrowserHandle,
+} from "./components/recording-browser.js";
 import {
   renderRetentionSlider,
   type RetentionSliderHandle,
@@ -56,6 +64,7 @@ import {
   closeSettingsState,
   getSettingsUIState,
   openSettingsState,
+  setRecordingsSlice,
   setSettingsUIState,
   subscribeSettingsUI,
 } from "./state.js";
@@ -381,6 +390,13 @@ export function openSettings(): void {
   // Re-render with fresh settings (sidecar may have broadcast updates
   // while the drawer was closed).
   mountedHandle.refresh();
+  // Phase 15 Plan 05 — fire the recordings.list IPC on drawer open,
+  // debounced 1s to absorb flickering re-opens (Plan §Task 2 must-haves).
+  const now = Date.now();
+  if (now - lastLoadAt > LIST_DEBOUNCE_MS) {
+    lastLoadAt = now;
+    void loadRecordings();
+  }
 }
 
 /** Slide the drawer out. Idempotent. */
@@ -403,6 +419,8 @@ export function _resetDrawerForTests(): void {
     }
   }
   mountedHandle = null;
+  recordingBrowserHandle = null;
+  lastLoadAt = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -413,6 +431,15 @@ export function _resetDrawerForTests(): void {
 
 let hotkeyHandle: HotkeyCaptureHandle | null = null;
 let retentionHandle: RetentionSliderHandle | null = null;
+// Phase 15 Plan 05 — Recording browser handle persists across refreshes
+// so the loadRecordings() async resolver can push results into the live
+// component without rebuilding it on every refresh tick.
+let recordingBrowserHandle: RecordingBrowserHandle | null = null;
+// Debounce window for drawer-open list refresh (Plan 15-05 §Task 2): a
+// flickering re-open within 1s reuses the in-memory slice instead of
+// firing a new recordings.list IPC.
+let lastLoadAt = 0;
+const LIST_DEBOUNCE_MS = 1000;
 
 function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   body.replaceChildren();
@@ -574,6 +601,37 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     },
   });
   recordingBody.append(retentionHandle.root);
+
+  // Phase 15 Plan 05 — Recording browser mounts BELOW the retention slider
+  // (UI-SPEC §Layout: order is locked retention → disk usage line →
+  // browser). The browser component owns the silkscreen disk-usage line +
+  // virtualized session rows. The drawer wires:
+  //   - On drawer open: fire `ipc.recordings.list` (debounced 1s) and
+  //     populate the browser with sessions + usage.
+  //   - On `ipc.recordings.usage` push (subscriber in ws-bridge.ts): the
+  //     slice mutates → drawer refresh runs → we call setUsage() here.
+  //   - On delete confirm: fire `ipc.recordings.delete` and optimistically
+  //     remove the row from the slice.
+  const recSlice = ui.recordings;
+  const initialUsage = recSlice.loading
+    ? { sessions: recSlice.usage.sessions, bytes_total: -1 }
+    : recSlice.error !== null
+    ? { sessions: recSlice.usage.sessions, bytes_total: -2 }
+    : recSlice.usage;
+  recordingBrowserHandle = renderRecordingBrowser({
+    initialSessions: recSlice.sessions,
+    initialUsage,
+    onReplay: () => {
+      // Row expansion is owned by the row component (audio + transcript
+      // are local — no IPC dispatched here per UI-SPEC §Component
+      // Contracts onReplay note).
+    },
+    onDelete: (session_dir, _timestamp) => {
+      void onDeleteRecording(session_dir);
+    },
+  });
+  recordingBody.append(recordingBrowserHandle.root);
+
   body.append(
     renderSettingsGroup({
       header: "RECORDING",
@@ -682,5 +740,105 @@ async function sendSettingsField(
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn(`[settings] sendSettings(${field}) failed:`, err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 15 Plan 05 — Recording browser IPC wiring.
+// ---------------------------------------------------------------------------
+
+/** Fire `ipc.recordings.list` on drawer open. Sentinel-driven loading +
+ *  error states: pushes `bytes_total: -1` to the browser usage line to
+ *  render `RECORDINGS · LOADING…`; on failure pushes `bytes_total: -2` to
+ *  render `RECORDINGS · UNAVAILABLE` (Plan 15-04 sentinel contract).
+ *
+ *  Exported for vitest coverage; the production caller is `openSettings()`. */
+export async function loadRecordings(): Promise<void> {
+  // Mark loading + flip the usage line to the LOADING sentinel.
+  setRecordingsSlice({ loading: true, error: null });
+  if (recordingBrowserHandle) {
+    recordingBrowserHandle.setUsage({
+      sessions: getSettingsUIState().recordings.usage.sessions,
+      bytes_total: -1,
+    });
+  }
+  try {
+    const reply = await sendIpcRequest<RecordingsListResult>(
+      "ipc.recordings.list",
+      {},
+      "ipc.recordings.list_result",
+    );
+    const sessions = reply.payload.sessions.map((s) => ({
+      session_dir: s.session_dir,
+      started_at_iso: s.started_at_iso,
+      duration_s: s.duration_s,
+      event_count: s.event_count,
+      bytes_total: s.bytes_total,
+      crashed: s.crashed,
+    }));
+    const usage = {
+      sessions: sessions.length,
+      bytes_total: reply.payload.bytes_total,
+    };
+    setRecordingsSlice({
+      sessions,
+      usage,
+      loading: false,
+      error: null,
+    });
+    if (recordingBrowserHandle) {
+      recordingBrowserHandle.setSessions(sessions);
+      recordingBrowserHandle.setUsage(usage);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    setRecordingsSlice({ loading: false, error: msg });
+    if (recordingBrowserHandle) {
+      recordingBrowserHandle.setUsage({
+        sessions: getSettingsUIState().recordings.usage.sessions,
+        bytes_total: -2,
+      });
+    }
+    // eslint-disable-next-line no-console
+    console.warn("[settings] ipc.recordings.list failed:", err);
+  }
+}
+
+/** Dispatch `ipc.recordings.delete` and optimistically remove the row on
+ *  ok=true ack. UI-SPEC §State Management: the trailing usage push from
+ *  the sidecar (after the sweep fires) updates the disk usage line; we
+ *  don't refetch the list here.
+ *
+ *  Exported for vitest coverage. */
+export async function onDeleteRecording(session_dir: string): Promise<void> {
+  try {
+    const reply = await sendIpcRequest<RecordingsDeleteAck>(
+      "ipc.recordings.delete",
+      { session_dir },
+      "ipc.recordings.delete_ack",
+    );
+    if (reply.payload.ok) {
+      // Optimistic remove — slice update + push to live component.
+      const current = getSettingsUIState().recordings;
+      const sessions = current.sessions.filter(
+        (s) => s.session_dir !== session_dir,
+      );
+      setRecordingsSlice({ sessions });
+      if (recordingBrowserHandle) recordingBrowserHandle.setSessions(sessions);
+    } else {
+      // ok=false ack — surface error via the slice; the next drawer refresh
+      // re-renders with the error sentinel. (UI-SPEC §Copywriting
+      // error-toast row lists `Delete failed: {error}` — Plan 15-06 wires
+      // the in-dialog retry surface; for v1 we expose via the slice.)
+      const errMsg = reply.payload.error ?? "delete failed";
+      setRecordingsSlice({ error: `delete failed: ${errMsg}` });
+      // eslint-disable-next-line no-console
+      console.warn(`[settings] recordings.delete ok=false: ${errMsg}`);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    setRecordingsSlice({ error: `delete failed: ${msg}` });
+    // eslint-disable-next-line no-console
+    console.warn("[settings] ipc.recordings.delete failed:", err);
   }
 }
