@@ -11,6 +11,11 @@
  *   - `confirmDialog`      — null or the id of the modal confirm
  *                            currently open ("re-run-calibration" only
  *                            for Phase 12).
+ *   - `recordings`         — Phase 15 Plan 05 slice. List + usage + loading
+ *                            + error for the in-drawer recording browser.
+ *                            Populated on drawer open (recordings.list
+ *                            request) and on the recordings.usage push
+ *                            subscriber wired in ws-bridge.ts.
  *
  * Persistent settings (voice, genre, retention_days, push_to_mute_hotkey,
  * …) live in SessionState (see `src/session/state.ts`) — written by the
@@ -23,14 +28,39 @@
  * wizard/state.ts.
  */
 
+import type { RecordingSummary } from "./components/recording-row.js";
+
+/** Phase 15 Plan 05 — recordings sub-slice. Sentinel `bytes_total === -1`
+ *  signals LOADING (drawer-open list request in flight); `-2` signals
+ *  UNAVAILABLE (list request errored or timed out). Both render through
+ *  `formatUsageLine` in recording-browser.ts — the sentinel approach
+ *  preserves the locked `RecordingBrowserHandle = { root, setSessions,
+ *  setUsage }` contract from Plan 15-04. */
+export interface RecordingsSlice {
+  sessions: RecordingSummary[];
+  usage: { sessions: number; bytes_total: number };
+  loading: boolean;
+  error: string | null;
+}
+
 export interface SettingsUIState {
   open: boolean;
   hotkeyCaptureMode: boolean;
   pendingGenreReload: boolean;
   confirmDialog: null | "re-run-calibration";
+  recordings: RecordingsSlice;
 }
 
 type Listener = (s: Readonly<SettingsUIState>) => void;
+
+function makeDefaultRecordings(): RecordingsSlice {
+  return {
+    sessions: [],
+    usage: { sessions: 0, bytes_total: 0 },
+    loading: false,
+    error: null,
+  };
+}
 
 function makeDefault(): SettingsUIState {
   return {
@@ -38,6 +68,7 @@ function makeDefault(): SettingsUIState {
     hotkeyCaptureMode: false,
     pendingGenreReload: false,
     confirmDialog: null,
+    recordings: makeDefaultRecordings(),
   };
 }
 
@@ -72,6 +103,15 @@ export function subscribeSettingsUI(listener: Listener): () => void {
   return () => {
     listeners.delete(listener);
   };
+}
+
+/** Phase 15 Plan 05 — partial-merge helper for the recordings slice.
+ *  Mirrors the top-level `setSettingsUIState(patch)` idiom so callers can
+ *  patch one field (e.g. `{ loading: true }`) without re-stating the full
+ *  slice. Shallow-merge: top-level keys of the slice replace; nested
+ *  objects are NOT deep-merged (matches Phase 12 SessionState semantics). */
+export function setRecordingsSlice(patch: Partial<RecordingsSlice>): void {
+  setSettingsUIState({ recordings: { ...current.recordings, ...patch } });
 }
 
 /** Convenience helpers — read like English in the drawer. */

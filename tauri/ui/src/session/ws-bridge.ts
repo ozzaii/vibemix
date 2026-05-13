@@ -32,11 +32,13 @@
 
 import { emitIpc, subscribeIpc } from "../ipc/client.js";
 import type {
+  RecordingsUsage,
   SessionSnapshot,
   SessionMute,
   SettingsState,
   StatusTick,
 } from "../ipc/messages.js";
+import { setRecordingsSlice } from "../settings/state.js";
 import {
   appendMidiEvents,
   appendTranscript,
@@ -119,6 +121,14 @@ interface WireMutePayload {
   muted?: boolean;
 }
 
+// Phase 15 Plan 05 — recordings.usage push. Sidecar broadcasts on every
+// sweep (startup / retention-change / session-close / delete) so the disk
+// usage line reflects the live folder state without a list re-fetch.
+interface WireRecordingsUsagePayload {
+  sessions: number;
+  bytes_total: number;
+}
+
 // WR-04 in 14-REVIEW.md — keep this allowlist in sync with the
 // SettingsSet schema enum at messages.schema.json:529 and the Python
 // SettingsSetPayload.field Literal at src/vibemix/ui_bus/messages.py.
@@ -176,6 +186,18 @@ export async function initSessionBridge(): Promise<{
   unsubs.push(
     await subscribeIpc<SessionMute>("ipc.session.mute", (msg) =>
       applyMuteAck(msg.payload as unknown as WireMutePayload),
+    ),
+  );
+
+  // Phase 15 Plan 05 — recordings.usage push. Updates the in-drawer disk
+  // usage line (recording-browser.ts setUsage) without rebuilding the
+  // session list. UI-SPEC §State Management: sessions array is NOT
+  // refetched on usage push (avoids list-flicker mid-interaction). The
+  // drawer's recordings.list request handles session-array updates on
+  // drawer open.
+  unsubs.push(
+    await subscribeIpc<RecordingsUsage>("ipc.recordings.usage", (msg) =>
+      applyRecordingsUsage(msg.payload as unknown as WireRecordingsUsagePayload),
     ),
   );
 
@@ -337,6 +359,15 @@ export function applyMuteAck(p: WireMutePayload): void {
   // {toggle: true} echoed back means the sidecar accepted the request
   // and emitted a fresh state — we don't need to flip locally because
   // the next ipc.settings.state will overwrite muted anyway.
+}
+
+/** Phase 15 Plan 05 — apply a recordings.usage push. Writes the usage
+ *  sub-field of the recordings slice ONLY (sessions list untouched —
+ *  UI-SPEC §State Management). Exported for vitest coverage. */
+export function applyRecordingsUsage(p: WireRecordingsUsagePayload): void {
+  setRecordingsSlice({
+    usage: { sessions: p.sessions, bytes_total: p.bytes_total },
+  });
 }
 
 /** Test-only: reset the singleton so a vitest case can rerun init. */
