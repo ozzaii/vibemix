@@ -121,16 +121,13 @@
       // `{ version, url, signature, notes, pub_date }` JSON envelope if an
       // update is available. See docs/updater.md for the full contract.
       //
-      // `pubkey` — base64-encoded minisign public key. CURRENT VALUE IS A
-      // PLACEHOLDER. Kaan must replace before tagging v0.1.0 by:
-      //   1. `npx @tauri-apps/cli signer generate -w ~/.tauri/vibemix_updater.key`
-      //   2. `cat ~/.tauri/vibemix_updater.key.pub | base64 | tr -d '\n'`
-      //   3. Paste the result here, overwriting the placeholder.
-      //   4. Store the matching private-key file's base64 contents as the
-      //      GitHub secret TAURI_UPDATER_PRIVATE_KEY and the passphrase as
-      //      TAURI_UPDATER_KEY_PASSWORD (Plan 18-05).
-      // Plan 18-05's release.yml refuses to build while the placeholder
-      // string `TAURI_UPDATER_PLACEHOLDER` remains in this file.
+      // `pubkey` — base64-encoded minisign public key. Generated 2026-05-13
+      // via `npx @tauri-apps/cli signer generate -w ~/.tauri/vibemix_updater.key`.
+      // The matching private key is at ~/.tauri/vibemix_updater.key on Kaan's
+      // Mac (NEVER commit). Before v0.1.0 tag: base64 the private half and
+      // store as GitHub secret TAURI_UPDATER_PRIVATE_KEY (no password set).
+      // Plan 18-05's release.yml gates on the literal placeholder sentinel
+      // string in the pubkey VALUE — this comment no longer trips it.
       //
       // `dialog: true` — built-in update prompt (standard Tauri UX: notify
       // user, show changelog from `notes`, ask "Update now?", show progress
@@ -141,7 +138,7 @@
       "endpoints": [
         "https://api.altidus.world/vibemix/updates/{{target}}/{{arch}}/{{current_version}}"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IFRBVVJJX1VQREFURVJfUExBQ0VIT0xERVI=",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk0QThGNkNFNDJFNjQ4N0QKUldSOVNPWkN6dmFvbEx4YjFuTmc3MUJ1MU9tdDVFRFRoUURYQW1qeWRkTC95a3FvSWV6QjBLNjEK",
       "dialog": true
     },
     "fs": {
