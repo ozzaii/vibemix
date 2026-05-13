@@ -1,21 +1,37 @@
 //! Phase 11 Wave 2 — OS permission deep-link commands.
 //!
 //! macOS: opens the Settings app at the relevant Privacy & Security pane via
-//! the `x-apple.systempreferences:` URL scheme. Windows: no-op (Windows
-//! surfaces the mic permission via standard runtime permission grant on
-//! first capture; no deep-link needed).
+//! the `x-apple.systempreferences:` URL scheme. We invoke `/usr/bin/open`
+//! directly (`Command::new("open")`) instead of going through
+//! `tauri_plugin_shell::Shell::open` because the latter is deprecated and
+//! has had silent-failure regressions on macOS Sequoia.
+//!
+//! Windows: no-op (Windows surfaces the mic permission via standard runtime
+//! permission grant on first capture; no deep-link needed).
 //!
 //! The mic-permission trigger is a Wave 2 stub (Ok); Wave 4 wires it to
 //! forward an `ipc.permission.check` to the sidecar so the AVCaptureDevice
 //! request actually fires.
 
 use tauri::AppHandle;
-use tauri_plugin_shell::ShellExt;
 
+#[cfg(target_os = "macos")]
 const URL_PRIVACY_SCREEN_CAPTURE: &str =
     "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
+#[cfg(target_os = "macos")]
 const URL_PRIVACY_MICROPHONE: &str =
     "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone";
+
+/// macOS-only helper: shell out to `/usr/bin/open URL` and surface spawn
+/// errors as String for the frontend.
+#[cfg(target_os = "macos")]
+fn open_url(url: &str) -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg(url)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("open spawn failed: {e}"))
+}
 
 /// Opens System Settings → Privacy & Security → Screen Recording.
 /// macOS only. On Windows: returns Ok immediately (no equivalent deep-link;
@@ -25,10 +41,8 @@ const URL_PRIVACY_MICROPHONE: &str =
 pub async fn open_screen_recording_settings(app: AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        app.shell()
-            .open(URL_PRIVACY_SCREEN_CAPTURE, None)
-            .map_err(|e| format!("open failed: {e}"))?;
-        Ok(())
+        let _ = app;
+        open_url(URL_PRIVACY_SCREEN_CAPTURE)
     }
     #[cfg(target_os = "windows")]
     {
@@ -47,10 +61,8 @@ pub async fn open_screen_recording_settings(app: AppHandle) -> Result<(), String
 pub async fn open_microphone_settings(app: AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        app.shell()
-            .open(URL_PRIVACY_MICROPHONE, None)
-            .map_err(|e| format!("open failed: {e}"))?;
-        Ok(())
+        let _ = app;
+        open_url(URL_PRIVACY_MICROPHONE)
     }
     #[cfg(target_os = "windows")]
     {
