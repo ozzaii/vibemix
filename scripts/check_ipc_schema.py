@@ -50,6 +50,14 @@ from vibemix.ui_bus import (
     MetersTriple,
     PermissionCheck,
     PermissionState,
+    RecordingSummary,
+    RecordingsDelete,
+    RecordingsDeleteAck,
+    RecordingsEvents,
+    RecordingsEventsResult,
+    RecordingsList,
+    RecordingsListResult,
+    RecordingsUsage,
     SessionMute,
     SessionSnapshot,
     SettingsGet,
@@ -187,6 +195,48 @@ def _minimal_examples() -> list[tuple[str, object]]:
         (
             "MascotMoodChange",
             MascotMoodChange.make(mood="teacher", previous_mood="hype-man", at=1234.56),
+        ),
+        # Phase 15-01 wrappers — recordings.*
+        ("RecordingsList", RecordingsList.make()),
+        (
+            "RecordingsListResult",
+            RecordingsListResult.make(
+                sessions=[
+                    RecordingSummary(
+                        session_dir="20260513-210410",
+                        started_at_iso="2026-05-13T21:04:10+02:00",
+                        duration_s=5040.0,
+                        event_count=38,
+                        bytes_total=12345678,
+                        crashed=False,
+                    )
+                ],
+                bytes_total=12345678,
+            ),
+        ),
+        ("RecordingsDelete", RecordingsDelete.make(session_dir="20260513-210410")),
+        (
+            "RecordingsDeleteAck",
+            RecordingsDeleteAck.make(
+                session_dir="20260513-210410", ok=True, error=None
+            ),
+        ),
+        ("RecordingsUsage", RecordingsUsage.make(sessions=12, bytes_total=3656838349)),
+        ("RecordingsEvents", RecordingsEvents.make(session_dir="20260513-210410")),
+        (
+            "RecordingsEventsResult",
+            RecordingsEventsResult.make(
+                session_dir="20260513-210410",
+                events=[
+                    {
+                        "t": 0.0,
+                        "kind": "session_start",
+                        "wall_clock_iso": "2026-05-13T21:04:10+02:00",
+                        "session_dir": "20260513-210410",
+                    },
+                    {"t": 3.21, "kind": "trigger", "reason": "phase_change"},
+                ],
+            ),
         ),
     ]
 
