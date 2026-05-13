@@ -360,7 +360,7 @@ Plans:
 | 14. CDJ Whisper v5 Migration + Polish | 6/6 | Complete   | 2026-05-13 |
 | 15. Recording & Session Capture Finalization | 5/6 | In Progress|  |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
-| 17. Reaction-Reel Slop Grading Gate | 0/3 | Not started | - |
+| 17. Reaction-Reel Slop Grading Gate | 1/3 | In Progress|  |
 | 18. Distribution — Signing, Notarization, Installers | 0/? | Not started | - |
 | 19. GitHub Launch Presence | 0/? | Not started | - |
 | 20. Day-Zero Operations | 0/? | Not started | - |
