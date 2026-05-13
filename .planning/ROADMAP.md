@@ -311,9 +311,9 @@ Plans:
   3. PyInstaller `--onedir` is used on both OSes (NOT `--onefile`); every nested `.exe` / `.dll` / `.dylib` in the bundle is individually signed; `codesign --verify --deep --strict vibemix.app` exits zero.
   4. Tauri auto-updater is signed (signed manifest URL); a manual test patches a 0.0.1 install to 0.0.2 without user intervention beyond the standard updater prompt.
   5. Binary attack verification: `strings vibemix-final-binary | grep -E '^[A-Za-z0-9_-]{39}$'` returns zero matches; `pyinstxtractor` unpack of the bundle reveals no `AIza...` strings anywhere; if any found, ship blocks.
-**Plans:** 5 plans
+**Plans:** 1/5 plans executed
 Plans:
-- [ ] 18-01-PLAN.md — Binary-attack verification gate: scripts/dist/verify_binary.py + vendored _pyinstxtractor.py + tests/dist/ test suite (clean / planted / .msi / report redaction)
+- [x] 18-01-PLAN.md — Binary-attack verification gate: scripts/dist/verify_binary.py + vendored _pyinstxtractor.py + tests/dist/ test suite (clean / planted / .msi / report redaction)
 - [ ] 18-02-PLAN.md — macOS signing bench: entitlements.macos.plist (5 distribution entitlements) + scripts/dist/sign_macos.sh (8-stage codesign+notarize+staple wrapper with retry) + docs/signing-macos.md re-sign playbook
 - [ ] 18-03-PLAN.md — Windows installer bench: installer/windows/vibemix-installer.iss (Inno Setup 6 → MSI per-machine, VC++ runtime check, SignPath SignTool) + installer/windows/README.md + docs/signing-windows.md SignPath + SmartScreen note
 - [ ] 18-04-PLAN.md — Tauri auto-updater wiring: tauri.conf.json5 stub → live (active + api.altidus.world endpoint + minisign pubkey placeholder) + src-tauri/src/updater.rs boot-time fire-and-forget + update_check_on_launch opt-out via tauri-plugin-store + tauri/src-tauri/keys/README.md key-gen procedure + docs/updater.md manifest contract
@@ -367,7 +367,7 @@ Plans:
 | 15. Recording & Session Capture Finalization | 5/6 | In Progress|  |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
 | 17. Reaction-Reel Slop Grading Gate | 1/3 | In Progress|  |
-| 18. Distribution — Signing, Notarization, Installers | 0/? | Not started | - |
+| 18. Distribution — Signing, Notarization, Installers | 1/5 | In Progress|  |
 | 19. GitHub Launch Presence | 0/? | Not started | - |
 | 20. Day-Zero Operations | 0/? | Not started | - |
 

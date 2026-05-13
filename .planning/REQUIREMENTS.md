@@ -125,7 +125,7 @@
 - [ ] **VERIFY-01**: 30-session offline hallucination verification suite — replay recorded sets, score grounding ≥95% before any installer build
 - [ ] **VERIFY-02**: Hand-graded "reaction reel" — 30 min varied DJing, blind-rated 1-5 by Kaan + Francesco + 2 DJ network friends; pass requires ≥4.0 average with zero 1-2 ratings
 - [ ] **VERIFY-03**: 60-minute soak test passing zero `session_error` events
-- [ ] **VERIFY-04**: Binary attack verification — `strings` + `pyinstxtractor` against final binary, zero `AIza`-pattern matches (key-leak gate)
+- [x] **VERIFY-04**: Binary attack verification — `strings` + `pyinstxtractor` against final binary, zero `AIza`-pattern matches (key-leak gate)
 - [ ] **VERIFY-05**: Per-genre phase-detection accuracy validation (≥85% event-timing F1 on the validation harness)
 - [ ] **VERIFY-06**: Critique → execute → critique → execute loop per phase — every phase passes plan-check before execute and verifier after; UI phases run ui-checker between polish iterations
 
