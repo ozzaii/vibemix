@@ -108,13 +108,41 @@
   },
   "plugins": {
     "updater": {
-      // Phase 11 STUB — no real endpoints, no real pubkey. Phase 18 replaces.
-      // Per RESEARCH Open Question 1 + A2: empty pubkey is accepted by the plugin builder
-      // when endpoints[] is empty (no fetch happens). REPLACED IN PHASE 18.
-      "active": false,
-      "endpoints": [],
-      "pubkey": "",
-      "dialog": false
+      // Phase 18 Plan 18-04 — live updater config (replaces the Phase 11 STUB).
+      //
+      // `active: true` enables the plugin's plugin:updater|check command
+      // (capability already granted via `updater:default` in
+      // capabilities/default.json line 16).
+      //
+      // `endpoints` URL template — `{{target}}` becomes `darwin`/`windows`,
+      // `{{arch}}` becomes `aarch64`/`x86_64`, `{{current_version}}` becomes
+      // the running app's version. The server returns 204 No Content if the
+      // running version is the latest; 200 with a
+      // `{ version, url, signature, notes, pub_date }` JSON envelope if an
+      // update is available. See docs/updater.md for the full contract.
+      //
+      // `pubkey` — base64-encoded minisign public key. CURRENT VALUE IS A
+      // PLACEHOLDER. Kaan must replace before tagging v0.1.0 by:
+      //   1. `npx @tauri-apps/cli signer generate -w ~/.tauri/vibemix_updater.key`
+      //   2. `cat ~/.tauri/vibemix_updater.key.pub | base64 | tr -d '\n'`
+      //   3. Paste the result here, overwriting the placeholder.
+      //   4. Store the matching private-key file's base64 contents as the
+      //      GitHub secret TAURI_UPDATER_PRIVATE_KEY and the passphrase as
+      //      TAURI_UPDATER_KEY_PASSWORD (Plan 18-05).
+      // Plan 18-05's release.yml refuses to build while the placeholder
+      // string `TAURI_UPDATER_PLACEHOLDER` remains in this file.
+      //
+      // `dialog: true` — built-in update prompt (standard Tauri UX: notify
+      // user, show changelog from `notes`, ask "Update now?", show progress
+      // bar, restart). Update prompts are gated by `update_check_on_launch`
+      // (default true) stored in tauri-plugin-store; opt-out flips it to
+      // false. See tauri/src-tauri/src/updater.rs for the boot-time gate.
+      "active": true,
+      "endpoints": [
+        "https://api.altidus.world/vibemix/updates/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IFRBVVJJX1VQREFURVJfUExBQ0VIT0xERVI=",
+      "dialog": true
     },
     "fs": {
       "requireLiteralLeadingDot": false
