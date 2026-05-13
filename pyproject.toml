@@ -112,7 +112,8 @@ ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "cohost*.py" = ["E", "F", "B", "I", "UP", "RUF"]
-"_test_*.py" = ["E", "F", "B", "I", "UP", "RUF"]
+# Phase 19-01: _test_*.py scratch files deleted (CONTEXT Area 5); ignore
+# rule removed to keep the config truthful to repo state.
 "test_voice.py" = ["E", "F", "B", "I", "UP", "RUF"]
 "generate_bat.py" = ["E", "F", "B", "I", "UP", "RUF"]
 
