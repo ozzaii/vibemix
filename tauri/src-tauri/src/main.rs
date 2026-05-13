@@ -23,6 +23,7 @@ mod mascot_window;
 mod permissions;
 mod sidecar;
 mod tray;
+mod updater;
 mod ws_client;
 
 use std::fs;
@@ -146,6 +147,18 @@ fn main() {
             // and re-derives tray icon state with a 2 Hz throttle. Listener
             // lives for the process lifetime — no uninstall needed.
             tray::install_tray_state_listener(&app_handle);
+
+            // Phase 18 Plan 18-04 — Tauri updater boot-time fire-and-forget.
+            // Gated by `update_check_on_launch` (default true); when true the
+            // plugin's `dialog: true` config drives the prompt UX. Failures
+            // are logged but never bail setup — the user keeps the version
+            // they have if the manifest server is unreachable. This is the
+            // lowest-priority boot task on purpose (runs AFTER sidecar +
+            // ws_client + tray are already up).
+            let updater_app = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                updater::run_update_check_if_enabled(updater_app).await;
+            });
 
             Ok(())
         })
