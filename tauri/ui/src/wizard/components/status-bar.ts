@@ -1,17 +1,16 @@
-/* status-bar.ts — bottom 40px strip with 4 LED dots (UI-SPEC §12).
+/* status-bar.ts — bottom 40px strip with 4 LED dots (UI-SPEC §12 / CDJ Whisper v5).
  *
  * Left-to-right: livekit · gemini · midi · screen.
- * Right: "made by bravoh" DM Mono 11px --ink-deep.
+ * Right: "made by bravoh" Saira body 11px --silk-40.
  *
  * LED states:
- *   - "ok"          → --ok
- *   - "connecting"  → --phosphor pulsing
- *   - "down"        → --rec
- *   - null          → --ink-engraved (not yet probed)
+ *   - "ok"          → --led-ok green dome
+ *   - "connecting"  → --amber + composite --glow-soft, breathing pulse
+ *   - "down"        → --led-fault red dome
+ *   - null          → --silk-22 unlit (not yet probed)
  *
- * UI-SPEC §12 scope: Phase 11 ships the schema + minimal visual; Phase 12
- * wires real state. The bar always renders — it's the cohort of the
- * "wizard hardware front panel" feeling. */
+ * Phase 12 wires real state via ipc.status.tick. The bar always renders
+ * — it's part of the v5 "front-panel LED row" feeling. */
 
 import { registerStyle } from "./_style-registry.js";
 
@@ -35,54 +34,58 @@ const CSS = `
   .cmp-status-bar__group {
     display: flex;
     align-items: center;
-    gap: var(--sp-md);
+    gap: var(--sp-4);
   }
   .cmp-status-bar__item {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-xs);
-    font-family: "Workbench", "Courier New", monospace;
+    gap: var(--sp-1);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 500;
     font-size: 9px;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--ink-dim);
+    color: var(--silk-40);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .cmp-status-bar__led {
     display: inline-block;
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--ink-engraved);
+    background: var(--silk-22);
     box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.5);
   }
   .cmp-status-bar__item[data-state="ok"] .cmp-status-bar__led {
-    background: var(--ok);
-    box-shadow: 0 0 6px var(--ok);
+    background: var(--led-ok);
+    box-shadow: 0 0 6px var(--led-ok);
   }
   .cmp-status-bar__item[data-state="ok"] {
-    color: var(--ink);
+    color: var(--silk);
   }
   .cmp-status-bar__item[data-state="connecting"] .cmp-status-bar__led {
-    background: var(--phosphor);
-    box-shadow: var(--phosphor-glow);
+    background: var(--amber);
+    box-shadow: var(--glow-soft);
     animation: cmp-status-pulse var(--motion-led-pulse) ease-in-out infinite;
   }
   .cmp-status-bar__item[data-state="connecting"] {
-    color: var(--phosphor);
+    color: var(--amber);
+    text-shadow: 0 0 4px var(--amber-22);
   }
   .cmp-status-bar__item[data-state="down"] .cmp-status-bar__led,
   .cmp-status-bar__item[data-state="denied"] .cmp-status-bar__led {
-    background: var(--rec);
-    box-shadow: 0 0 6px var(--rec);
+    background: var(--led-fault);
+    box-shadow: 0 0 6px var(--led-fault);
   }
   .cmp-status-bar__item[data-state="down"],
   .cmp-status-bar__item[data-state="denied"] {
-    color: var(--rec);
+    color: var(--led-fault);
   }
   .cmp-status-bar__signature {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
     font-size: 11px;
-    color: var(--ink-deep);
+    color: var(--silk-40);
     letter-spacing: 0.06em;
   }
   @keyframes cmp-status-pulse {
