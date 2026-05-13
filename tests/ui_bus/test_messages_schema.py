@@ -47,6 +47,14 @@ from vibemix.ui_bus import (
     MetersTriple,
     PermissionCheck,
     PermissionState,
+    RecordingSummary,
+    RecordingsDelete,
+    RecordingsDeleteAck,
+    RecordingsEvents,
+    RecordingsEventsResult,
+    RecordingsList,
+    RecordingsListResult,
+    RecordingsUsage,
     SessionMute,
     SessionSnapshot,
     SettingsGet,
@@ -192,6 +200,48 @@ def _make_examples() -> list[tuple[str, object]]:
             "MascotMoodChange",
             MascotMoodChange.make(mood="teacher", previous_mood="hype-man", at=1234.56),
         ),
+        # Phase 15-01 — recordings.* (4 new families surfaced as 7 schema entries).
+        ("RecordingsList", RecordingsList.make()),
+        (
+            "RecordingsListResult",
+            RecordingsListResult.make(
+                sessions=[
+                    RecordingSummary(
+                        session_dir="20260513-210410",
+                        started_at_iso="2026-05-13T21:04:10+02:00",
+                        duration_s=5040.0,
+                        event_count=38,
+                        bytes_total=12345678,
+                        crashed=False,
+                    ),
+                ],
+                bytes_total=12345678,
+            ),
+        ),
+        ("RecordingsDelete", RecordingsDelete.make(session_dir="20260513-210410")),
+        (
+            "RecordingsDeleteAck",
+            RecordingsDeleteAck.make(
+                session_dir="20260513-210410", ok=True, error=None
+            ),
+        ),
+        ("RecordingsUsage", RecordingsUsage.make(sessions=12, bytes_total=3656838349)),
+        ("RecordingsEvents", RecordingsEvents.make(session_dir="20260513-210410")),
+        (
+            "RecordingsEventsResult",
+            RecordingsEventsResult.make(
+                session_dir="20260513-210410",
+                events=[
+                    {
+                        "t": 0.0,
+                        "kind": "session_start",
+                        "wall_clock_iso": "2026-05-13T21:04:10+02:00",
+                        "session_dir": "20260513-210410",
+                    },
+                    {"t": 3.21, "kind": "trigger", "reason": "phase_change"},
+                ],
+            ),
+        ),
     ]
 
 
@@ -203,9 +253,12 @@ def test_example_count_matches_schema_oneof() -> None:
 
     Phase 11 Wave 0 froze 19; Phase 12 added 7 (SessionSnapshot, SessionMute,
     SettingsSet, SettingsGet, SettingsState, StatusRecheck, IpcError) for
-    total 26. Phase 13-05 adds 1 (MascotMoodChange) → 27.
+    total 26. Phase 13-05 added 1 (MascotMoodChange) → 27. Phase 15-01 adds
+    7 (RecordingsList, RecordingsListResult, RecordingsDelete,
+    RecordingsDeleteAck, RecordingsUsage, RecordingsEvents,
+    RecordingsEventsResult) → 34.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 27
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 34
 
 
 @pytest.mark.parametrize(
@@ -227,16 +280,17 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_27() -> None:
-    """Plan-locked invariant — Phase 12 extends Wave 0's 19 to 26 (19 + 7);
-    Phase 13-05 adds 1 (MascotMoodChange) → 27.
+def test_schema_oneof_count_is_34() -> None:
+    """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
+    (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
+    7 recordings.* families → 34.
 
-    ``definitions`` is 28 because ``LevelPair`` is a shared helper ref'd
+    ``definitions`` is 35 because ``LevelPair`` is a shared helper ref'd
     from ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message
     (so it counts in ``definitions`` but not in ``oneOf``).
     """
-    assert len(_SCHEMA["oneOf"]) == 27
-    assert len(_SCHEMA["definitions"]) == 28
+    assert len(_SCHEMA["oneOf"]) == 34
+    assert len(_SCHEMA["definitions"]) == 35
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:
