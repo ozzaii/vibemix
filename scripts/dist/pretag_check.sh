@@ -77,8 +77,13 @@ echo
 echo "[4/7] Tauri updater pubkey is not the placeholder"
 T_CONF="tauri/src-tauri/tauri.conf.json5"
 if [[ -f "$T_CONF" ]]; then
-  if grep -q "TAURI_UPDATER_PLACEHOLDER\|dW50cnVzdGVkIGNvbW1lbnQ6IFRBVVJJX1VQREFURVJfUExBQ0VIT0xERVI=" "$T_CONF"; then
-    no "$T_CONF still contains the placeholder pubkey sentinel"
+  # Only inspect the actual pubkey JSON value, not the surrounding comments
+  # (the comment block intentionally documents the sentinel string).
+  pubkey_line=$(grep -E '^\s*"pubkey":' "$T_CONF" | head -1)
+  if echo "$pubkey_line" | grep -q "TAURI_UPDATER_PLACEHOLDER\|dW50cnVzdGVkIGNvbW1lbnQ6IFRBVVJJX1VQREFURVJfUExBQ0VIT0xERVI="; then
+    no "$T_CONF pubkey value is still the placeholder sentinel"
+  elif [[ -z "$pubkey_line" ]]; then
+    no "$T_CONF has no \"pubkey\" line"
   else
     ok "$T_CONF has a real pubkey"
   fi
