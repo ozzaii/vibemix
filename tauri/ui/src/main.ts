@@ -145,10 +145,10 @@ async function boot(): Promise<void> {
   // Apply boot-time perf-blur preference (CONTEXT Area 3). Reads from
   // the existing settings IPC; defaults off if the field is absent (the
   // safe path — full v5 visual contract). Plan 14-04 wires the Settings
-  // drawer toggle that updates this attribute live. Independently, the
-  // OS-level prefers-reduced-motion media query already routes through
-  // the same tokens.css cascade — we ALSO subscribe to that here so an
-  // a11y toggle flips the attribute without a reload.
+  // drawer toggle that updates this attribute live. OS-level
+  // prefers-reduced-motion is handled independently by the
+  // @media (prefers-reduced-motion: reduce) block in tokens.css — that
+  // cascade fires live on a11y toggle, no JS subscription needed here.
   applyBlurPerfPreference(await readBlurPerfPreference());
 
   // DEV-only: `?dev=session-mock` bypasses both the wizard check and the
