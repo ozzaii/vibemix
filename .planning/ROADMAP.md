@@ -52,9 +52,13 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
 **Success Criteria** (what must be TRUE):
   1. User opens vibemix → Settings → Recordings → sees a chronologically-ordered list of past sessions with date, duration, and disk size; can click a row to reveal in Finder/Explorer.
   2. User can replay `voice.wav` (AI side) inline OR open `input.wav` (combined music + mic) in their default audio app from the same row.
-  3. User can delete a session — confirm modal → row vanishes → directory removed from disk.
+  3. User can delete a session — confirm modal → row vanishes → directory removed from disk. _(NOTE: shipped as optimistic-remove + 4s undo toast per impeccable Wave 5.A 2026-05-14 critique — confirm-modal pattern superseded.)_
   4. Retention policy (default 7d, configurable in Settings) auto-prunes recordings older than the limit on sidecar startup AND every 6h; events.jsonl logs `retention_pruned: count=N, bytes=M`.
-**Plans**: TBD
+**Plans**: 4 plans (retroactive closure — surface partially shipped before plan-phase)
+- [ ] 15-01-PLAN.md — Audit shipped surface against ROADMAP success criteria + lock criteria as new automated tests (Wave 1)
+- [ ] 15-02-PLAN.md — Add periodic 6h retention sweep + events.jsonl retention_pruned logging (Wave 2; gap closure for criterion 4)
+- [ ] 15-03-PLAN.md — Add reveal-in-Finder + open-input.wav-externally Tauri commands + UI buttons (Wave 2; gap closure for criteria 1+2)
+- [ ] 15-04-PLAN.md — Kaan ear-test checkpoint, four-criterion sign-off, EAR-TEST log (Wave 3; phase-closure gate)
 **Pitfall prevention**: None Critical (cheap, no upstream dependencies — knock it out first).
 **UI hint**: yes
 
@@ -218,7 +222,7 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 15. Recording Browser + Retention Enforcement | 0/0 | Not started | - |
+| 15. Recording Browser + Retention Enforcement | 0/4 | Planning | - |
 | 16. Hallucination Verification Gate (Kaan's DJ Ear) | 0/0 | Not started | - |
 | 17. Hard Tek Detectors v1 + GenreRouter | 0/0 | Not started | - |
 | 18. Evidence Registry + Citation Grammar | 0/0 | Not started | - |
