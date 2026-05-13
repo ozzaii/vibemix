@@ -11,6 +11,14 @@ dist/
 *.egg
 .eggs/
 
+# Phase 18 Wave 1 — verification tooling lives under scripts/dist/ and
+# tests/dist/. The generic ``dist/`` rule above would otherwise hide both
+# of these source trees. Whitelist them explicitly.
+!scripts/dist/
+!scripts/dist/**
+!tests/dist/
+!tests/dist/**
+
 # Virtual environments
 .venv/
 venv/
