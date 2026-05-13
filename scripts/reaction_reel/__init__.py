@@ -12,5 +12,7 @@ Two CLI scripts:
   a single ``report.md`` + ``scores.csv`` with pass/fail verdict against the
   rubric.
 
-Plan 17-02 ships ``grade.py`` only.
+Plans 17-02 + 17-03 ship both scripts; the full pipeline is
+``grade.py`` → ``<rater>.jsonl × N`` → ``analyze.py`` → ``report.md`` +
+``scores.csv``.
 """
