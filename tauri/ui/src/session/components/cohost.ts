@@ -42,6 +42,23 @@ export interface CohostPanelProps {
   transcript: TranscriptLine[];
   latencyMs: number | null;
   grounded: boolean;
+  /** Push-to-mute state. When true, an inline "● MUTED" pill sits next to
+   *  the AVERY status row so the mute is visible without scanning to the
+   *  banner above the transcript. Wave 6 (impeccable critique) — closes
+   *  H3 "user control & freedom" by giving cmd+m a clear visual ack.
+   *  Defaults to false on existing callers via the destructure below. */
+  muted?: boolean;
+  /** Elapsed milliseconds since `grounded` transitioned to false. When >
+   *  5000ms the foot swaps from "WARMING UP" to "COULDN'T REACH GEMINI"
+   *  + retry button so the user has a recovery path. Wave 6 closes H9
+   *  "error recovery". The render-loop computes this; the cohost is
+   *  presentation-only. Defaults to null. */
+  failureElapsedMs?: number | null;
+  /** Click handler for the retry button shown after the failure threshold
+   *  elapses. Wave 6 — callers wire this to whatever reconnect IPC exists
+   *  (currently `restart_sidecar`; a dedicated `ipc.cohost.reconnect` is
+   *  a TODO). */
+  onRetry?: () => void;
 }
 
 const MAX_TRANSCRIPT_LINES = 200;
@@ -303,6 +320,83 @@ const CSS = `
     box-shadow: var(--glow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
   }
+  /* Failure state — foot[data-failed="true"] swaps the amber LED to fault
+   * and renders a compact retry button. Wave 6 closes H9 "error recovery"
+   * by giving the user a way out when grounding has been false for >5s. */
+  .vmx-cohost__foot[data-failed="true"] .vmx-cohost__foot-led {
+    background: var(--led-fault);
+    box-shadow:
+      0 0 3px var(--led-fault),
+      0 0 6px rgba(212, 65, 58, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
+  }
+  .vmx-cohost__foot[data-failed="true"] .vmx-cohost__foot-lbl {
+    color: var(--led-fault);
+    text-shadow: 0 0 4px rgba(212, 65, 58, 0.28), 0 1px 0 rgba(0, 0, 0, 0.7);
+  }
+  .vmx-cohost__foot-retry {
+    margin-left: auto;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border: 1px solid var(--amber-40);
+    border-radius: var(--rad-sm);
+    color: var(--amber);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 var(--amber-40),
+      inset 0 0 12px var(--amber-22);
+    cursor: pointer;
+    line-height: 1;
+    text-shadow: 0 0 4px var(--amber-65);
+    transition: border-color var(--motion-snap) ease-out,
+                box-shadow var(--motion-snap) ease-out;
+  }
+  .vmx-cohost__foot-retry:hover {
+    border-color: var(--amber);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 var(--amber-65),
+      inset 0 0 18px var(--amber-40);
+  }
+  /* MUTED pill — sits inside the cohost header next to the AVERY status
+   * row. Same dome-LED + Saira-9-022 vocabulary as the titlebar pills,
+   * fault-tinted. Wave 6 closes H3 "user control & freedom" — cmd+m
+   * gets a visible ack without scanning to the banner. */
+  .vmx-cohost__muted-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    margin-left: auto;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(212, 65, 58, 0.35);
+    border-radius: var(--rad-sm);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--led-fault);
+    line-height: 1;
+    text-shadow: 0 0 4px rgba(212, 65, 58, 0.28), 0 1px 0 rgba(0, 0, 0, 0.7);
+  }
+  .vmx-cohost__muted-pill-led {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--led-fault);
+    box-shadow:
+      0 0 3px var(--led-fault),
+      0 0 6px rgba(212, 65, 58, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
+  }
 `;
 
 registerStyle("vmx-cohost", CSS);
@@ -322,9 +416,15 @@ export function renderCohostPanel(props: CohostPanelProps): HTMLElement {
   // session shell.
 
   root.append(buildTopStrip());
-  root.append(buildHeader(props.status));
+  root.append(buildHeader(props.status, props.muted ?? false));
   root.append(buildTranscript(props.transcript));
-  root.append(buildFoot(props.grounded));
+  root.append(
+    buildFoot(
+      props.grounded,
+      props.failureElapsedMs ?? null,
+      props.onRetry,
+    ),
+  );
 
   return root;
 }
@@ -342,7 +442,7 @@ function buildTopStrip(): HTMLElement {
   return strip;
 }
 
-function buildHeader(status: CohostStatus): HTMLElement {
+function buildHeader(status: CohostStatus, muted: boolean): HTMLElement {
   const head = document.createElement("header");
   head.className = "vmx-cohost__header";
 
@@ -363,6 +463,10 @@ function buildHeader(status: CohostStatus): HTMLElement {
   const statusEl = document.createElement("span");
   statusEl.className = "vmx-cohost__status";
   statusEl.dataset.state = status;
+  // Wave 6 (H6 recognition over recall) — native browser tooltip on
+  // hover. aria-label kept identical for screen readers.
+  statusEl.setAttribute("title", titleForStatus(status));
+  statusEl.setAttribute("aria-label", titleForStatus(status));
   const led = document.createElement("span");
   led.className = "vmx-cohost__status-led";
   led.setAttribute("aria-hidden", "true");
@@ -372,7 +476,42 @@ function buildHeader(status: CohostStatus): HTMLElement {
   meta.append(name, statusEl);
   head.append(meta);
 
+  // Wave 6 (H3) — inline MUTED pill. Renders only when muted=true.
+  // setCohost mounts/unmounts via the same path so diff-renders flip it.
+  if (muted) {
+    head.append(buildMutedPill());
+  }
+
   return head;
+}
+
+function buildMutedPill(): HTMLElement {
+  const pill = document.createElement("span");
+  pill.className = "vmx-cohost__muted-pill";
+  pill.setAttribute("role", "status");
+  pill.setAttribute("aria-live", "polite");
+  pill.setAttribute(
+    "title",
+    "cohost is muted — press the push-to-mute hotkey to resume",
+  );
+  const dot = document.createElement("span");
+  dot.className = "vmx-cohost__muted-pill-led";
+  dot.setAttribute("aria-hidden", "true");
+  const lbl = document.createElement("span");
+  lbl.textContent = "MUTED";
+  pill.append(dot, lbl);
+  return pill;
+}
+
+function titleForStatus(status: CohostStatus): string {
+  switch (status) {
+    case "LISTENING":
+      return "AVERY is listening to the room";
+    case "TALKING":
+      return "AVERY is talking — mic auto-gated until they finish";
+    case "IDLE":
+      return "AVERY is idle — waiting for an event to react to";
+  }
 }
 
 function buildTranscript(lines: TranscriptLine[]): HTMLElement {
@@ -413,10 +552,21 @@ function populateTranscript(el: HTMLElement, lines: TranscriptLine[]): void {
   });
 }
 
-function buildFoot(grounded: boolean): HTMLElement {
+/** Wave 6 (H9) — threshold (ms) after which a sustained grounded=false
+ *  flips the foot from "WARMING UP" to "COULDN'T REACH GEMINI" + retry.
+ *  Exported for the spec's fake-timer assertions. */
+export const GROUNDING_FAILURE_MS = 5000;
+
+function buildFoot(
+  grounded: boolean,
+  failureElapsedMs: number | null,
+  onRetry: (() => void) | undefined,
+): HTMLElement {
   const foot = document.createElement("div");
   foot.className = "vmx-cohost__foot";
   foot.dataset.grounded = grounded ? "true" : "false";
+  const failed = !grounded && (failureElapsedMs ?? 0) >= GROUNDING_FAILURE_MS;
+  foot.dataset.failed = failed ? "true" : "false";
 
   const led = document.createElement("span");
   led.className = "vmx-cohost__foot-led";
@@ -425,10 +575,45 @@ function buildFoot(grounded: boolean): HTMLElement {
 
   const lbl = document.createElement("span");
   lbl.className = "vmx-cohost__foot-lbl";
-  lbl.textContent = grounded ? "GROUNDED ON AUDIO + SCREEN" : "WARMING UP";
+  lbl.textContent = footLabelFor(grounded, failed);
   foot.append(lbl);
+  // Wave 6 (H6 recognition over recall) — native browser tooltip on
+  // hover explaining the LED state.
+  foot.setAttribute("title", footTooltipFor(grounded, failed));
+
+  if (failed) {
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "vmx-cohost__foot-retry";
+    retry.textContent = "↻ RETRY";
+    retry.setAttribute("aria-label", "retry connecting to gemini");
+    retry.setAttribute("title", "retry connecting to gemini");
+    if (onRetry) {
+      retry.addEventListener("click", (e) => {
+        e.preventDefault();
+        onRetry();
+      });
+    }
+    foot.append(retry);
+  }
 
   return foot;
+}
+
+function footLabelFor(grounded: boolean, failed: boolean): string {
+  if (grounded) return "GROUNDED ON AUDIO + SCREEN";
+  if (failed) return "COULDN'T REACH GEMINI";
+  return "WARMING UP";
+}
+
+function footTooltipFor(grounded: boolean, failed: boolean): string {
+  if (grounded) {
+    return "grounded on audio + screen capture — cohost can hear you";
+  }
+  if (failed) {
+    return "couldn't reach gemini — press retry to reconnect";
+  }
+  return "warming up — initializing audio + screen capture";
 }
 
 /** Idempotent hot-update. Rebuilds transcript content but preserves the
@@ -438,17 +623,55 @@ export function setCohost(el: HTMLElement, props: CohostPanelProps): void {
   const statusEl = el.querySelector<HTMLElement>(".vmx-cohost__status");
   if (statusEl && statusEl.dataset.state !== props.status) {
     statusEl.dataset.state = props.status;
+    const title = titleForStatus(props.status);
+    statusEl.setAttribute("title", title);
+    statusEl.setAttribute("aria-label", title);
     const lbl = statusEl.querySelector<HTMLElement>("span:last-child");
     if (lbl) lbl.textContent = props.status;
   }
 
-  // Foot
+  // Muted pill mount/unmount (H3 — visual ack for cmd+m).
+  const header = el.querySelector<HTMLElement>(".vmx-cohost__header");
+  if (header) {
+    const existing = header.querySelector<HTMLElement>(".vmx-cohost__muted-pill");
+    const muted = props.muted ?? false;
+    if (muted && !existing) {
+      header.append(buildMutedPill());
+    } else if (!muted && existing) {
+      existing.remove();
+    }
+  }
+
+  // Foot — grounded + failure recovery copy (H9).
   const foot = el.querySelector<HTMLElement>(".vmx-cohost__foot");
   if (foot) {
+    const failed =
+      !props.grounded &&
+      (props.failureElapsedMs ?? 0) >= GROUNDING_FAILURE_MS;
     foot.dataset.grounded = props.grounded ? "true" : "false";
+    foot.dataset.failed = failed ? "true" : "false";
     const footLbl = foot.querySelector<HTMLElement>(".vmx-cohost__foot-lbl");
-    if (footLbl) {
-      footLbl.textContent = props.grounded ? "GROUNDED ON AUDIO + SCREEN" : "WARMING UP";
+    if (footLbl) footLbl.textContent = footLabelFor(props.grounded, failed);
+    foot.setAttribute("title", footTooltipFor(props.grounded, failed));
+
+    // Retry button mount/unmount.
+    const existingBtn = foot.querySelector<HTMLElement>(".vmx-cohost__foot-retry");
+    if (failed && !existingBtn) {
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "vmx-cohost__foot-retry";
+      retry.textContent = "↻ RETRY";
+      retry.setAttribute("aria-label", "retry connecting to gemini");
+      retry.setAttribute("title", "retry connecting to gemini");
+      if (props.onRetry) {
+        retry.addEventListener("click", (e) => {
+          e.preventDefault();
+          props.onRetry?.();
+        });
+      }
+      foot.append(retry);
+    } else if (!failed && existingBtn) {
+      existingBtn.remove();
     }
   }
 

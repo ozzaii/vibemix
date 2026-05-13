@@ -58,6 +58,7 @@ import {
   type RetentionSliderHandle,
 } from "./components/retention-slider.js";
 import { renderConfirmDialog } from "./components/confirm-dialog.js";
+import { HelpGroup } from "./components/help-group.js";
 import { MascotGroup } from "./components/mascot-group.js";
 import { PerformanceGroup } from "./components/performance-group.js";
 import {
@@ -670,6 +671,13 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   // "lighter_blur", value: <bool> } through SettingsApplier; the boot
   // read in main.ts re-applies it on next launch.
   body.append(PerformanceGroup(settings.lighter_blur));
+
+  // --- HELP (impeccable Wave 6 — closes H10 "help & documentation") --------
+  // Last group. Shortcuts link + audio-routing checklist + GitHub link +
+  // About row. The shortcuts link mounts the same overlay as the `?` key.
+  // GitHub URL isn't yet in the Tauri capability allowlist — see the TODO
+  // in help-group.ts.
+  body.append(HelpGroup());
 
   // --- Modal slot rebuild ---------------------------------------------------
   renderModalSlot(modalSlot);

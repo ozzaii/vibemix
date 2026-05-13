@@ -165,6 +165,37 @@ const CSS = `
     overflow: hidden;
     clip: rect(0 0 0 0);
   }
+  /* Wave 6 (H6) — first-session hint chip pointing to "?". Renders once
+   * (localStorage flag) and self-dismisses on the ? press or after 8s.
+   * Sits between the clock and the settings gear; tonal — no amber so it
+   * doesn't compete with the LIVE pill. */
+  .vmx-titlebar__hint {
+    -webkit-app-region: no-drag;
+    margin-left: var(--sp-3);
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--silk-22);
+    border-radius: var(--rad-sm);
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--silk-65);
+    line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    user-select: none;
+    cursor: default;
+    transition: opacity var(--motion-transition) ease-out;
+  }
+  .vmx-titlebar__hint b {
+    font-weight: 600;
+    color: var(--silk);
+    margin: 0 3px;
+    padding: 1px 4px;
+    border: 1px solid var(--silk-22);
+    border-radius: var(--rad-sm);
+    background: rgba(0, 0, 0, 0.3);
+  }
+  .vmx-titlebar__hint[data-dismissing="true"] { opacity: 0; }
 `;
 
 registerStyle("vmx-titlebar", CSS);
@@ -202,6 +233,11 @@ export function renderTitlebar(props: TitlebarProps): HTMLElement {
     pill.className = "vmx-titlebar__pill";
     pill.dataset.key = def.key;
     pill.dataset.state = props[def.key];
+    // Wave 6 (H6 recognition over recall) — native hover tooltip + aria
+    // label explain the pill state. The label rotates with data-state via
+    // setTitlebarPill so a flip from ok→down updates both.
+    pill.setAttribute("title", titleForPill(def.key, props[def.key]));
+    pill.setAttribute("aria-label", titleForPill(def.key, props[def.key]));
     const led = document.createElement("span");
     led.className = "vmx-titlebar__pill-led";
     led.setAttribute("aria-hidden", "true");
@@ -218,6 +254,11 @@ export function renderTitlebar(props: TitlebarProps): HTMLElement {
   clock.textContent = props.clock;
   root.append(clock);
 
+  // Wave 6 (H6) — first-session shortcuts hint. Reads the localStorage
+  // flag and skips the chip if already seen. Dismisses on `?` press OR
+  // after 8 seconds, whichever comes first.
+  maybeMountShortcutsHint(root);
+
   const settings = document.createElement("button");
   settings.type = "button";
   settings.className = "vmx-titlebar__settings";
@@ -227,6 +268,9 @@ export function renderTitlebar(props: TitlebarProps): HTMLElement {
   srLabel.textContent = "SETTINGS";
   settings.append(srLabel);
   settings.setAttribute("aria-label", "SETTINGS");
+  // Wave 6 (H6) — hover tooltip surfaces the shortcut + intent. Platform
+  // detection mirrors session-shortcuts.ts (cmd on mac, ctrl elsewhere).
+  settings.setAttribute("title", `Settings · ${settingsShortcutHint()}`);
   if (props.onSettingsClick) {
     settings.addEventListener("click", (e) => {
       e.preventDefault();
@@ -253,11 +297,107 @@ export function setTitlebarPill(
   const pill = el.querySelector<HTMLElement>(
     `.vmx-titlebar__pill[data-key="${key}"]`,
   );
-  if (pill) pill.dataset.state = state;
+  if (pill) {
+    pill.dataset.state = state;
+    // Keep the H6 tooltip in sync with the new state.
+    pill.setAttribute("title", titleForPill(key, state));
+    pill.setAttribute("aria-label", titleForPill(key, state));
+  }
+}
+
+function titleForPill(
+  key: "live" | "rec" | "sys",
+  state: PillLevel,
+): string {
+  const stateWord =
+    state === "ok" ? "ok" : state === "down" ? "down" : "off";
+  switch (key) {
+    case "live":
+      if (state === "ok") return "LIVE — vibemix is listening";
+      if (state === "down") return "LIVE — session disconnected";
+      return "LIVE — session not yet started";
+    case "rec":
+      return `recording · ${stateWord}`;
+    case "sys":
+      return `system · ${stateWord}`;
+  }
+}
+
+function settingsShortcutHint(): string {
+  // jsdom + Tauri webview both expose navigator.platform; we route by
+  // first character to avoid pulling in the platform detect util.
+  try {
+    const p = (navigator?.platform ?? "").toLowerCase();
+    if (p.startsWith("mac") || p.includes("iphone") || p.includes("ipad")) {
+      return "⌘,";
+    }
+  } catch {
+    /* SSR / node — fall through to ctrl */
+  }
+  return "Ctrl+,";
 }
 
 /** Mark the gear button armed (drawer open). */
 export function setTitlebarSettingsActive(el: HTMLElement, active: boolean): void {
   const btn = el.querySelector<HTMLElement>(".vmx-titlebar__settings");
   if (btn) btn.dataset.active = active ? "true" : "false";
+}
+
+/** Wave 6 (H6) — localStorage key for the first-session hint chip.
+ *  Exported so tests can reset it; production code only reads/writes. */
+export const SHORTCUTS_HINT_STORAGE_KEY = "vmx-shortcuts-hint-seen";
+
+/** Wave 6 (H6) — auto-dismiss timeout for the hint chip (ms). */
+export const SHORTCUTS_HINT_TIMEOUT_MS = 8000;
+
+function maybeMountShortcutsHint(root: HTMLElement): void {
+  if (hasSeenShortcutsHint()) return;
+
+  const chip = document.createElement("span");
+  chip.className = "vmx-titlebar__hint";
+  chip.setAttribute("role", "note");
+  chip.setAttribute(
+    "title",
+    "press ? to open the keyboard shortcuts overlay",
+  );
+  chip.append(document.createTextNode("press "));
+  const cap = document.createElement("b");
+  cap.textContent = "?";
+  chip.append(cap);
+  chip.append(document.createTextNode(" for shortcuts"));
+  root.append(chip);
+
+  const dismiss = (): void => {
+    if (!chip.isConnected) return;
+    chip.dataset.dismissing = "true";
+    markShortcutsHintSeen();
+    document.removeEventListener("keydown", onKey);
+    window.clearTimeout(timer);
+    // Remove after the fade transition (motion-transition = 200ms).
+    window.setTimeout(() => chip.remove(), 220);
+  };
+
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === "?") dismiss();
+  };
+  document.addEventListener("keydown", onKey);
+  const timer = window.setTimeout(dismiss, SHORTCUTS_HINT_TIMEOUT_MS);
+}
+
+function hasSeenShortcutsHint(): boolean {
+  try {
+    return window.localStorage.getItem(SHORTCUTS_HINT_STORAGE_KEY) === "1";
+  } catch {
+    // SSR / sandboxed iframe — pretend the hint has been seen so we
+    // don't spam every test environment with it.
+    return true;
+  }
+}
+
+function markShortcutsHintSeen(): void {
+  try {
+    window.localStorage.setItem(SHORTCUTS_HINT_STORAGE_KEY, "1");
+  } catch {
+    /* swallow — same fallback as hasSeenShortcutsHint */
+  }
 }

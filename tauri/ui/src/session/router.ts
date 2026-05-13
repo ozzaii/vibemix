@@ -15,6 +15,7 @@
  * `body > #wizard-app` shell stays valid for the crash banner. */
 
 import { initSessionBridge } from "./ws-bridge.js";
+import { installQuitGuard } from "./quit-guard.js";
 import { mountSessionLayout, type Mounted } from "./SessionLayout.js";
 import { startRenderLoop, stopRenderLoop } from "./render-loop.js";
 import { mountSessionShortcuts } from "./session-shortcuts.js";
@@ -23,6 +24,7 @@ import { mountSettingsDrawer } from "../settings/SettingsDrawer.js";
 let mounted: Mounted | null = null;
 let unsubscribeBridge: (() => void) | null = null;
 let unsubscribeShortcuts: (() => void) | null = null;
+let unsubscribeQuitGuard: (() => void) | null = null;
 
 /** Mount the live session and start the bridge + render loop.
  *
@@ -66,6 +68,13 @@ export async function routeSession(rootEl?: HTMLElement): Promise<void> {
   // Wire the impeccable Wave 5.A keyboard shortcuts (?/cmd+m/esc). The
   // drawer owns its own Esc; this wiring covers the session surface.
   unsubscribeShortcuts = mountSessionShortcuts();
+
+  // Wave 6 (H5 error prevention) — install the beforeunload guard so an
+  // accidental ⌘W/⌘R during a live recording surfaces the browser's
+  // native confirm. The styled "STILL LIVE" dialog is reachable via
+  // confirmQuitDuringRecording() — the Rust-side onCloseRequested
+  // intercept that calls it is a TODO (Phase 17).
+  unsubscribeQuitGuard = installQuitGuard();
 }
 
 /** Tear down the session — stop the rAF, unsubscribe IPC, drop the
@@ -90,6 +99,15 @@ export async function teardownSession(): Promise<void> {
       console.warn("[session-router] shortcut unsubscribe failed:", e);
     }
     unsubscribeShortcuts = null;
+  }
+  if (unsubscribeQuitGuard) {
+    try {
+      unsubscribeQuitGuard();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[session-router] quit-guard unsubscribe failed:", e);
+    }
+    unsubscribeQuitGuard = null;
   }
   mounted = null;
 }

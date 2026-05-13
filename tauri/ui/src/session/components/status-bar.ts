@@ -327,6 +327,13 @@ function buildBadge(spec: BadgeSpec, props: StatusBarProps): HTMLElement {
   btn.dataset.state = spec.state;
   btn.dataset.clickable = spec.clickable ? "true" : "false";
   btn.dataset.tooltipOpen = "false";
+  // Wave 6 (H6 recognition over recall) — native browser hover tooltip
+  // narrates the badge state for users who don't know what each LED means.
+  // Click-tooltip (existing) is still the recovery path for "down"; this
+  // surfaces "ok" too so the user can read "LiveKit · connected" without
+  // having to click into a dead badge.
+  btn.setAttribute("title", titleForBadge(spec.key, spec.state));
+  btn.setAttribute("aria-label", titleForBadge(spec.key, spec.state));
   if (!spec.clickable) btn.disabled = true;
 
   const led = document.createElement("span");
@@ -394,4 +401,23 @@ function defaultErrorMsg(key: BadgeKey): string {
     case "midi": return "no midi controllers detected — plug one in";
     case "screen": return "screen-capture permission denied — open system settings";
   }
+}
+
+/** Wave 6 (H6) — native hover-tooltip copy for each badge. Mirrors the
+ *  defaultErrorMsg() for the "down" surface but adds an "ok" + neutral
+ *  variant so recognition works without clicking. */
+function titleForBadge(key: BadgeKey, state: string): string {
+  const label = (() => {
+    switch (key) {
+      case "livekit": return "LiveKit";
+      case "gemini": return "Gemini";
+      case "midi": return "MIDI";
+      case "screen": return "Screen capture";
+    }
+  })();
+  if (state === "ok") return `${label} · connected`;
+  if (state === "connecting") return `${label} · connecting…`;
+  if (state === "denied") return `${label} · permission denied`;
+  if (state === "down") return `${label} · disconnected — click for recovery`;
+  return `${label} · off`;
 }
