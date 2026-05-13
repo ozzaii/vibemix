@@ -31,7 +31,10 @@
 //! a different payload — equivalent UX, more portable. Documented as a
 //! deviation in the SUMMARY.
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use tauri::{
     image::Image,
@@ -72,6 +75,14 @@ const ICON_ERROR: &[u8] = include_bytes!("../icons/tray-error.png");
 pub struct TrayHandle {
     pub icon: Arc<Mutex<Option<tauri::tray::TrayIcon>>>,
 }
+
+/// Critique pass 4 (2026-05-14): cancelable quit fallback. Set to true
+/// when the tray Quit menu fires, cleared by either `confirmed-quit`
+/// (real exit) or `quit-cancelled` (user picked Stay). The 1.5s fallback
+/// timer in `handle_menu_event` checks this — only exits if still true,
+/// which means "the webview never responded at all".
+#[derive(Default, Clone)]
+pub struct QuitPending(pub Arc<AtomicBool>);
 
 /// Build the tray icon + menu and park its handle into managed state.
 /// Called once from `main.rs::setup()` after the mascot window builder.
@@ -255,25 +266,38 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
         }
         MENU_ID_QUIT => {
             // Critique pass 3 (2026-05-14): H5 quit-during-recording guard.
-            // We don't exit directly any more — instead emit
-            // `tray-quit-requested`. The webview's quit-guard listener
-            // (src/session/quit-guard.ts) checks whether a recording is in
-            // flight; if not, it immediately emits `confirmed-quit` back
-            // and we exit. If a recording IS in flight, the styled "STILL
-            // LIVE" confirm-dialog mounts and the user picks Stay / Quit.
+            // Critique pass 4 (2026-05-14): cancelable fallback timer.
             //
-            // Fallback: if the webview is unreachable (e.g. webview process
-            // crashed) we exit after a 1.5s grace period — better to lose
-            // the recording-warning UX than to leave the user without a
-            // Quit path.
+            // Flow:
+            //   1. Emit `tray-quit-requested` event.
+            //   2. Webview listener mounts the "STILL LIVE" confirm dialog
+            //      (if recording in flight) OR immediately emits
+            //      `confirmed-quit` (if not recording).
+            //   3. On "Quit anyway" → emits `confirmed-quit`; main.rs
+            //      listener calls `app.exit(0)`.
+            //   4. On "Stay" → emits `quit-cancelled`; we clear the
+            //      pending flag so the fallback timer becomes a no-op.
+            //   5. Fallback: if neither event arrives within 1.5s the
+            //      timer fires and exits anyway (webview crashed scenario).
+            //
+            // The pending flag lives on AppHandle managed state via
+            // `QuitPending`; main.rs sets up the `quit-cancelled` listener
+            // that clears it.
+            let pending = app.state::<QuitPending>().0.clone();
+            pending.store(true, Ordering::SeqCst);
             let _ = app.emit("tray-quit-requested", ());
             let fallback_app = app.clone();
+            let fallback_pending = pending.clone();
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-                // If we're still alive after 1.5s, the webview never acked.
-                // Exit anyway. (If `confirmed-quit` already fired, the
-                // process is already gone and this never runs.)
-                fallback_app.exit(0);
+                // Only exit if the webview never responded (no
+                // `quit-cancelled`, no `confirmed-quit`). The pending flag
+                // is the discriminator — `confirmed-quit` exits before
+                // this fires; `quit-cancelled` clears the flag so we
+                // become a no-op.
+                if fallback_pending.swap(false, Ordering::SeqCst) {
+                    fallback_app.exit(0);
+                }
             });
         }
         other => {

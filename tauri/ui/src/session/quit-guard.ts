@@ -99,7 +99,9 @@ export function installQuitGuard(): () => void {
  *  Rust shell (tray.rs::handle_menu_event MENU_ID_QUIT) emits
  *  `tray-quit-requested` instead of calling `app.exit(0)` directly. We
  *  decide here whether to confirm or pass straight through, then emit
- *  `confirmed-quit` so Rust can exit. Returns an unregister function. */
+ *  `confirmed-quit` (exit) or `quit-cancelled` (cancel the Rust-side
+ *  1.5s fallback timer) so the user's Stay choice is honored. Returns
+ *  an unregister function. */
 export async function installTrayQuitListener(): Promise<() => void> {
   let dialogOpen = false;
   const unlisten: UnlistenFn = await listen("tray-quit-requested", () => {
@@ -111,7 +113,12 @@ export async function installTrayQuitListener(): Promise<() => void> {
     dialogOpen = true;
     void confirmQuitDuringRecording().then((confirmed) => {
       dialogOpen = false;
-      if (confirmed) void emit("confirmed-quit");
+      if (confirmed) {
+        void emit("confirmed-quit");
+      } else {
+        // Cancel the Rust-side fallback timer — Stay must be honored.
+        void emit("quit-cancelled");
+      }
     });
   });
   return unlisten;

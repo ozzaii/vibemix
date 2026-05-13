@@ -32,7 +32,7 @@ use tauri::{Listener, Manager};
 
 use crate::hotkey::HotkeyHandle;
 use crate::sidecar::SidecarHandle;
-use crate::tray::TrayHandle;
+use crate::tray::{QuitPending, TrayHandle};
 use crate::ws_client::WsClientHandle;
 
 fn main() {
@@ -70,6 +70,7 @@ fn main() {
         .manage(WsClientHandle::default())
         .manage(HotkeyHandle::default())
         .manage(TrayHandle::default())
+        .manage(QuitPending::default())
         // Phase 13 Plan 02 — lifecycle override. Closing the main session
         // window hides it instead of quitting the process; only the tray
         // `Quit vibemix` item kills the app. The mascot window has no
@@ -155,9 +156,19 @@ fn main() {
             // exit the process. Two-step quit (tray-quit-requested ->
             // confirmed-quit) means Cmd+Q on a live recording no longer
             // drops the take silently.
+            //
+            // Pass 4 (2026-05-14): also listen for `quit-cancelled` (user
+            // picked Stay). Clear the QuitPending flag so the tray.rs
+            // fallback timer becomes a no-op when it fires at +1.5s.
+            let quit_pending_for_exit = app.state::<QuitPending>().0.clone();
             let quit_app = app_handle.clone();
             app_handle.listen("confirmed-quit", move |_event| {
+                quit_pending_for_exit.store(false, std::sync::atomic::Ordering::SeqCst);
                 quit_app.exit(0);
+            });
+            let quit_pending_for_cancel = app.state::<QuitPending>().0.clone();
+            app_handle.listen("quit-cancelled", move |_event| {
+                quit_pending_for_cancel.store(false, std::sync::atomic::Ordering::SeqCst);
             });
 
             // Phase 18 Plan 18-04 — Tauri updater boot-time fire-and-forget.
