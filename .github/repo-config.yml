@@ -1,0 +1,39 @@
+# Phase 19 — Repo metadata source of truth. Consumed by
+# scripts/dist/configure_repo.sh which wraps `gh repo edit`. Values locked
+# in .planning/phases/19-github-launch-presence/19-CONTEXT.md Area 6.
+#
+# To apply to the live GitHub repo:
+#   scripts/dist/configure_repo.sh           # dry-run print (default)
+#   scripts/dist/configure_repo.sh --apply   # actually push to GitHub
+#
+# Idempotent — re-running converges to the same end state.
+
+description: "AI co-host for your DJ set. Listens to your master output, watches your DJ software, talks back into your headphones. Open source. Mac + Windows."
+
+homepage: "https://altidus.world/vibemix"
+
+topics:
+  - dj
+  - livekit
+  - gemini
+  - ai-assistant
+  - audio
+  - midi
+  - pioneer-ddj
+  - realtime-ai
+  - tauri
+  - open-source
+
+default_branch: main
+
+# Feature switches — squash-only merge policy keeps git log clean for
+# first-time contributors browsing history (CONTEXT Area 6 + Area 1).
+enable_issues: true
+enable_projects: false
+enable_wiki: false
+
+delete_branch_on_merge: true
+
+allow_squash_merge: true
+allow_merge_commit: false
+allow_rebase_merge: false
