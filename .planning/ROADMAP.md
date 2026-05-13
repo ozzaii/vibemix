@@ -339,7 +339,7 @@ Plans:
 | 11. Tauri Shell + Calibration Wizard | 5/5 | Complete   | 2026-05-12 |
 | 12. Live Session UI + Settings Panel | 0/? | Not started | - |
 | 13. 3D Mascot Screen Overlay | 8/8 | Complete   | 2026-05-12 |
-| 14. CDJ Whisper v5 Migration + Polish | 1/6 | In Progress|  |
+| 14. CDJ Whisper v5 Migration + Polish | 2/6 | In Progress|  |
 | 15. Recording & Session Capture Finalization | 0/? | Not started | - |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
 | 17. Reaction-Reel Slop Grading Gate | 0/? | Not started | - |
