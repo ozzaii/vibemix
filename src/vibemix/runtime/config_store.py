@@ -120,6 +120,15 @@ def config_path() -> Path:
     return _app_data_dir() / "config.json"
 
 
+def app_data_dir() -> Path:
+    """Public alias for ``_app_data_dir``. Phase 15 added so callers outside
+    this module (notably ``vibemix.__main__`` resolving the recordings root)
+    can read the OS-aware path without importing a private name. Pure
+    forwarder — no behavior change, no caching.
+    """
+    return _app_data_dir()
+
+
 # ---------------------------------------------------------------------------
 # Config dataclass
 # ---------------------------------------------------------------------------
