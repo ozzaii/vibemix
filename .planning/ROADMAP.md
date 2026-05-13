@@ -27,7 +27,7 @@
 - [ ] **Phase 15: Recording & Session Capture Finalization** - Per-session dir + `input.wav`/`voice.wav`/`events.jsonl` + recording browser UI + retention enforcement (carries POC; lock UX).
 - [ ] **Phase 16: Hallucination Verification Gate** - 30-session offline replay suite ≥95% grounded + per-genre phase-detection ≥85% F1 + 60-min soak test zero `session_error`.
 - [ ] **Phase 17: Reaction-Reel Slop Grading Gate** - Hand-graded 30-min reaction reel blind-rated 1-5 by Kaan + Francesco + 2 DJ network friends; pass requires ≥4.0 average with zero 1-2 ratings.
-- [ ] **Phase 18: Distribution — Signing, Notarization, Installers** - PyInstaller `--onedir` macOS DMG (Apple Dev ID + notarytool + stapler) + Windows MSI (SignPath OSS cert + Inno Setup 6) + Tauri auto-update + binary attack verification (`strings` + `pyinstxtractor` for `AIza` patterns).
+- [x] **Phase 18: Distribution — Signing, Notarization, Installers** - PyInstaller `--onedir` macOS DMG (Apple Dev ID + notarytool + stapler) + Windows MSI (SignPath OSS cert + Inno Setup 6) + Tauri auto-update + binary attack verification (`strings` + `pyinstxtractor` for `AIza` patterns). (completed 2026-05-13)
 - [ ] **Phase 19: GitHub Launch Presence** - Hero banner + demo video/GIF + install buttons + feature matrix + controller grid + screenshots + FAQ + Bravoh footer + Apache 2.0 LICENSE + DCO CONTRIBUTING + SECURITY/CODE_OF_CONDUCT/NOTICE/TRADEMARKS + issue templates + OG image + repo hygiene scrub.
 - [ ] **Phase 20: Day-Zero Operations** - GitHub Actions CI matrix (macos-14 + windows-latest) tagged builds + fresh-machine install rehearsal on non-dev macOS + Windows + second-responder rota for first 72h.
 
@@ -311,13 +311,13 @@ Plans:
   3. PyInstaller `--onedir` is used on both OSes (NOT `--onefile`); every nested `.exe` / `.dll` / `.dylib` in the bundle is individually signed; `codesign --verify --deep --strict vibemix.app` exits zero.
   4. Tauri auto-updater is signed (signed manifest URL); a manual test patches a 0.0.1 install to 0.0.2 without user intervention beyond the standard updater prompt.
   5. Binary attack verification: `strings vibemix-final-binary | grep -E '^[A-Za-z0-9_-]{39}$'` returns zero matches; `pyinstxtractor` unpack of the bundle reveals no `AIza...` strings anywhere; if any found, ship blocks.
-**Plans:** 1/5 plans executed
+**Plans:** 5/5 plans complete
 Plans:
 - [x] 18-01-PLAN.md — Binary-attack verification gate: scripts/dist/verify_binary.py + vendored _pyinstxtractor.py + tests/dist/ test suite (clean / planted / .msi / report redaction)
 - [x] 18-02-PLAN.md — macOS signing bench: entitlements.macos.plist (5 distribution entitlements) + scripts/dist/sign_macos.sh (8-stage codesign+notarize+staple wrapper with retry) + docs/signing-macos.md re-sign playbook
-- [ ] 18-03-PLAN.md — Windows installer bench: installer/windows/vibemix-installer.iss (Inno Setup 6 → MSI per-machine, VC++ runtime check, SignPath SignTool) + installer/windows/README.md + docs/signing-windows.md SignPath + SmartScreen note
-- [ ] 18-04-PLAN.md — Tauri auto-updater wiring: tauri.conf.json5 stub → live (active + api.altidus.world endpoint + minisign pubkey placeholder) + src-tauri/src/updater.rs boot-time fire-and-forget + update_check_on_launch opt-out via tauri-plugin-store + tauri/src-tauri/keys/README.md key-gen procedure + docs/updater.md manifest contract
-- [ ] 18-05-PLAN.md — GitHub Actions release matrix: .github/workflows/release.yml (2-OS × 5-stage build→sign→package→verify→publish with mock-signing fallback) + scripts/dist/sign_manifest.sh + .github/workflows/README.md secrets inventory + docs/release-process.md release runbook
+- [x] 18-03-PLAN.md — Windows installer bench: installer/windows/vibemix-installer.iss (Inno Setup 6 → MSI per-machine, VC++ runtime check, SignPath SignTool) + installer/windows/README.md + docs/signing-windows.md SignPath + SmartScreen note
+- [x] 18-04-PLAN.md — Tauri auto-updater wiring: tauri.conf.json5 stub → live (active + api.altidus.world endpoint + minisign pubkey placeholder) + src-tauri/src/updater.rs boot-time fire-and-forget + update_check_on_launch opt-out via tauri-plugin-store + tauri/src-tauri/keys/README.md key-gen procedure + docs/updater.md manifest contract
+- [x] 18-05-PLAN.md — GitHub Actions release matrix: .github/workflows/release.yml (2-OS × 5-stage build→sign→package→verify→publish with mock-signing fallback) + scripts/dist/sign_manifest.sh + .github/workflows/README.md secrets inventory + docs/release-process.md release runbook
 
 ### Phase 19: GitHub Launch Presence
 **Goal**: `github.com/bravoh/vibemix` reads like a real product launch, not a code dump. Hero banner + demo video/GIF + install buttons + feature matrix + controller grid + screenshots + FAQ + Bravoh footer + Apache 2.0 LICENSE + full OSS hygiene (CONTRIBUTING with DCO, SECURITY, CODE_OF_CONDUCT, NOTICE, TRADEMARKS, issue templates, OG image, repo scrub).
@@ -367,7 +367,7 @@ Plans:
 | 15. Recording & Session Capture Finalization | 5/6 | In Progress|  |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
 | 17. Reaction-Reel Slop Grading Gate | 1/3 | In Progress|  |
-| 18. Distribution — Signing, Notarization, Installers | 1/5 | In Progress|  |
+| 18. Distribution — Signing, Notarization, Installers | 5/5 | Complete   | 2026-05-13 |
 | 19. GitHub Launch Presence | 0/? | Not started | - |
 | 20. Day-Zero Operations | 0/? | Not started | - |
 

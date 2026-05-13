@@ -113,11 +113,11 @@
 
 - [x] **DIST-01**: PyInstaller `--onedir` build for both OSes (avoid `--onefile` Defender false-positives)
 - [x] **DIST-02**: macOS signed + notarized DMG via Apple Developer ID + `notarytool` + Hardened Runtime + entitlements
-- [ ] **DIST-03**: Windows OV-signed MSI via SignPath Foundation (free OSS cert) + Inno Setup 6
+- [x] **DIST-03**: Windows OV-signed MSI via SignPath Foundation (free OSS cert) + Inno Setup 6
 - [ ] **DIST-04**: SignPath Foundation OSS application filed on day 1 of Phase 1 (3-week lead time)
 - [x] **DIST-05**: Tauri 2.x desktop shell wrapping the Python sidecar (10× smaller than Electron)
-- [ ] **DIST-06**: Auto-update via Tauri updater (signed manifest, opt-out in settings)
-- [ ] **DIST-07**: Fresh-machine install tested on non-dev macOS + Windows before each release
+- [x] **DIST-06**: Auto-update via Tauri updater (signed manifest, opt-out in settings)
+- [x] **DIST-07**: Fresh-machine install tested on non-dev macOS + Windows before each release
 - [ ] **DIST-08**: GitHub Actions CI matrix (macos-14 + windows-latest) building signed binaries on tag push
 
 ### Verification — Pre-Release Gates
