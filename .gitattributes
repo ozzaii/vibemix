@@ -1,3 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Phase 19 — Repo hygiene (GH-18).
+# tauri/ui/assets/mascot/character.glb is the 20 MB rigged mascot bundle
+# consumed by the Three.js renderer (Phase 13). Routing all .glb files
+# through git-lfs keeps the bundle logically in-repo (Tauri build picks
+# it up via the same asset path) while keeping fresh clones small.
+# Migration on first apply (developer-side, one-time):
+#   git lfs install --local
+#   git rm --cached tauri/ui/assets/mascot/character.glb
+#   git add tauri/ui/assets/mascot/character.glb
+#   git commit -m "chore(19): migrate mascot GLB to Git LFS"
+# CI clones without git-lfs still work — the LFS pointer file is enough
+# for tests that don't load the bundle; .glb consumers (Phase 13 frontend
+# tests) install git-lfs in CI before checkout.
+*.glb filter=lfs diff=lfs merge=lfs -text
 *.glb !text !filter !merge !diff
 *.wav !text !filter !merge !diff
 *.npy !text !filter !merge !diff
