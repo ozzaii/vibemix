@@ -132,8 +132,13 @@ const LAYOUT_CSS = `
   }
   /* The animated amber border-anim is z-index 4 (tokens.css). Promote
    * direct children above it so titlebar / grid / status-bar paint over
-   * the sweep peak without being clipped by the conic mask. */
-  .vmx-session > *:not(.border-anim) { position: relative; z-index: 5; }
+   * the sweep peak without being clipped by the conic mask. Excludes
+   * .vmx-session__screw — those are absolutely-positioned corner
+   * ornaments at z-index 100 and the :not() exclusion preserves their
+   * own rule's positioning (WR-01 from 14-REVIEW.md: :not() arguments
+   * bump this selector to (0,2,0), which would otherwise dominate the
+   * screw rule's (0,1,0) and collapse the ornaments inline). */
+  .vmx-session > *:not(.border-anim):not(.vmx-session__screw) { position: relative; z-index: 5; }
   .vmx-session__screw {
     position: absolute;
     width: 8px;
