@@ -1,0 +1,95 @@
+/* Phase 14 Plan 14-05 — Mascot overlay window chrome (Wave 4).
+ *
+ * Wraps the Phase 13 Three.js <canvas id="mascot-canvas"> in a v5 glass-
+ * chrome rectangle. The 3D scene + renderer.ts are UNTOUCHED — this file
+ * owns the perimeter chrome only.
+ *
+ * Anatomy lifted from tauri/ui/src/session/components/panel.ts (glass
+ * panel pattern), adapted for a transparent canvas wrapper:
+ *   - --glass-3 + --blur-glass-display (lightest blur in the v5 stack —
+ *     6px saturate(105%)) instead of --glass-2 + --blur-glass-light, to
+ *     minimise WebView2 transparency-bug (#10064) trigger risk per
+ *     14-CONTEXT Area 3. 32px blur on transparent overlays has caused
+ *     backdrop opacity bleed on Win11 WebView2 in real-world reports;
+ *     6px is the conservative baseline.
+ *   - border-radius 8px (vs 6px elsewhere) per 14-UI-SPEC §Surface 4.
+ *   - Inset amber bottom-edge undertone (rgba(255,138,61,0.06)) for the
+ *     "lit hardware" feel — the mascot eyes + border-anim sweep are the
+ *     reservation-list amber pixels, the bottom-edge undertone is a
+ *     faint film of warmth, not an accent.
+ *
+ * Layering inside .mascot-window (z-index reservations):
+ *   z=1  default content (children below)
+ *   z=2  the canvas (Three.js scene)
+ *   z=3  the top + bottom caption labels (silk-40, monospace)
+ *   z=4  the .border-anim sweep (sits above the canvas + chrome)
+ *
+ * The .border-anim utility is defined in tokens.css and consumes
+ * `position: relative` + `overflow: hidden` on its parent — both are
+ * provided here. Its `.slow.rev` modifier set in mascot.html gives the
+ * 32s reverse sweep that de-syncs from the session panel's forward
+ * sweep (CONTEXT Area 3). */
+
+.mascot-window {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--glass-3);
+  backdrop-filter: var(--blur-glass-display);
+  -webkit-backdrop-filter: var(--blur-glass-display);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(255, 138, 61, 0.06),
+    0 32px 64px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(255, 255, 255, 0.018);
+}
+
+.mascot-window > * {
+  position: relative;
+  z-index: 1;
+}
+
+.mascot-window > .border-anim {
+  z-index: 4;
+}
+
+.mascot-window__top-label {
+  position: absolute;
+  top: var(--sp-2);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.mascot-window__caption {
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+}
+
+.mascot-window__state-caption {
+  position: absolute;
+  bottom: var(--sp-2);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--silk-40);
+  pointer-events: none;
+}
+
+#mascot-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
