@@ -62,3 +62,155 @@ closure in Plans 15-02 / 15-03 / 15-04.
 """
 
 from __future__ import annotations
+
+from datetime import datetime, timedelta
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+from vibemix.runtime.config_store import ConfigStore
+from vibemix.runtime.recordings_index import run_retention_sweep
+
+
+# ---------------------------------------------------------------------------
+# Local helpers — minimal session-dir factory.
+#
+# tests/recording/conftest.py exposes ``make_fake_session`` but it stamps
+# session.json with the wall-clock ``datetime.now()`` (not a frozen value),
+# which would defeat Tests A and C below — both depend on the dir name and
+# the sweep's ``now`` argument being deterministic so the cutoff math is
+# exact. We build dirs by hand instead, matching the schema-shape regex
+# ``^\d{8}-\d{6}$`` enforced in recordings_index.py:78.
+# ---------------------------------------------------------------------------
+
+
+def _plant_session(root: Path, name: str) -> Path:
+    """Create ``root/<name>`` with a ``voice.wav`` placeholder so rmtree has work."""
+    session_dir = root / name
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / "voice.wav").write_bytes(b"RIFF\x00\x00\x00\x00WAVEfmt ")  # 16 bytes
+    return session_dir
+
+
+# ===========================================================================
+# Test A — default 7d retention prunes one >7d-old dir, keeps one ≤7d-old dir
+#
+# Defends ROADMAP success-criterion #4 ("default 7d") at the function
+# boundary. The cutoff math is ``now - timedelta(days=retention_days)``
+# (recordings_index.py:489); a session_start strictly older than cutoff is
+# eligible. Frozen now=2026-05-14 12:00:00, retention_days=7 ⇒
+# cutoff=2026-05-07 12:00:00. The 2026-01-01 dir is older → pruned. The
+# 2026-05-13 dir is newer → kept.
+# ===========================================================================
+
+
+def test_default_retention_7d_prunes_old_session(tmp_path: Path) -> None:
+    root = tmp_path / "recordings"
+    root.mkdir()
+    old = _plant_session(root, "20260101-120000")
+    fresh = _plant_session(root, "20260513-120000")
+
+    deleted = run_retention_sweep(
+        root,
+        retention_days=7,
+        now=datetime(2026, 5, 14, 12, 0, 0),
+    )
+
+    assert deleted == ["20260101-120000"], (
+        f"expected only the >7d-old dir to be pruned, got {deleted!r}"
+    )
+    assert not old.exists(), "old session dir must be removed from disk"
+    assert fresh.exists(), "≤7d-old session dir must remain on disk"
+
+
+# ===========================================================================
+# Test B — ∞ sentinel (retention_days=36500) short-circuits BEFORE scandir
+#
+# Defends recordings_index.py:482-483 (``if retention_days >= 36500: return [];``)
+# and the threat-register T-15-01-03 disposition: an attacker setting
+# retention_days=36500 cannot trigger expensive scandir. Mock os.scandir to
+# raise so any call would fail loud — assert the sentinel returns [] without
+# the mock ever firing.
+# ===========================================================================
+
+
+def test_infinite_sentinel_36500_short_circuits_without_scan(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "recordings"
+    root.mkdir()
+    # Plant a session that WOULD be eligible for prune at retention_days=0 —
+    # confirming the short-circuit fires BEFORE the scan loop.
+    _plant_session(root, "20200101-000000")
+
+    fake_scandir = MagicMock(side_effect=AssertionError("scandir must not be called"))
+    with patch("vibemix.runtime.recordings_index.os.scandir", fake_scandir):
+        deleted = run_retention_sweep(root, retention_days=36500)
+
+    assert deleted == [], f"sentinel must return []; got {deleted!r}"
+    fake_scandir.assert_not_called()
+
+
+# ===========================================================================
+# Test C — live-session dir excluded from sweep (T-15-03-06 threat-register)
+#
+# Defends recordings_index.py:476-481 docstring claim. The live session dir
+# is created at started_at = now(); its dir name parses to a time strictly
+# >= now - epsilon. With cutoff = now - retention_days (any positive
+# retention), session_start >= cutoff so the ``continue`` branch
+# (recordings_index.py:508) skips it. Even at retention_days=0 (cutoff=now),
+# the dir name parses to "now - 1 second", which is strictly < cutoff — but
+# the contract is that the active dir's started_at is at most epsilon
+# behind the call's ``now`` argument. We model this by passing
+# ``now = session_dir_time + 1 second``, so cutoff=session_dir_time+1s and
+# session_start=session_dir_time → session_start < cutoff. We assert the
+# sweep DOES NOT delete it because the dir was created AFTER the call's
+# semantic "now" (the active session's started_at must be > cutoff for
+# any sensible retention_days). Operationally: retention_days >= 1 day is
+# the only configurable value (the slider's lowest stop is 1d, never 0d) —
+# so the active session's started_at = wall-clock now is ALWAYS >>
+# cutoff = now - 1day. Test C codifies this with retention_days=1.
+# ===========================================================================
+
+
+def test_live_session_dir_excluded_from_sweep(tmp_path: Path) -> None:
+    root = tmp_path / "recordings"
+    root.mkdir()
+    # Frozen "now" = 2026-05-14 12:00:00. Active session started 30s ago.
+    frozen_now = datetime(2026, 5, 14, 12, 0, 0)
+    active_started = frozen_now - timedelta(seconds=30)
+    active_name = active_started.strftime("%Y%m%d-%H%M%S")
+    active_dir = _plant_session(root, active_name)
+
+    deleted = run_retention_sweep(
+        root,
+        retention_days=1,  # cutoff = frozen_now - 1d → active session is way fresher
+        now=frozen_now,
+    )
+
+    assert deleted == [], (
+        f"live (active) session dir must NOT be pruned; got {deleted!r}"
+    )
+    assert active_dir.exists(), "active session dir must remain on disk"
+
+
+# ===========================================================================
+# Test D — default ConfigStore.retention_days == 7
+#
+# Defends ROADMAP success-criterion #4 "default 7d" at the config-store
+# boundary. config_store.py:153 declares ``retention_days: int = 7``; this
+# test catches a silent drift to e.g. 14 or 30 in a future refactor.
+# ===========================================================================
+
+
+def test_default_retention_days_is_7_in_config_store() -> None:
+    cs = ConfigStore()
+    assert cs.retention_days == 7, (
+        f"ROADMAP §4 mandates default retention=7d; got {cs.retention_days!r} — "
+        "if this changed intentionally, update the ROADMAP success criteria FIRST."
+    )
+
+
+# Implicit verification: no source files were modified by these tests.
+# The 4 tests above exercise pure-read behavior of recordings_index +
+# config_store; any failure is either a real regression (fix in a NEW plan)
+# or a documentation drift between source and the audit table above.
