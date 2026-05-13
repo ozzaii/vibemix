@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-12T16:46:43.215Z"
+last_updated: "2026-05-13T11:26:42.797Z"
 progress:
   total_phases: 20
-  completed_phases: 8
-  total_plans: 56
-  completed_plans: 37
-  percent: 66
+  completed_phases: 9
+  total_plans: 62
+  completed_plans: 46
+  percent: 74
 ---
 
 # vibemix — State
@@ -22,7 +22,7 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 13 — 3D Mascot Screen Overlay
+- **Current focus:** Phase 14 — cdj-whisper-v5-migration-polish
 - **Milestone:** v1 (Bravoh-wedge drop) — target ship ~3-4 weeks (~early June 2026, before Bravoh public launch).
 - **Project mode:** standard.
 - **Granularity:** fine (20 phases).
@@ -38,7 +38,7 @@ progress:
 
 **Phase 11 close metrics:** 5 waves, 13 task commits, 95+ files created cumulative, **1066 Python tests pass** (978 Phase 10 baseline + 88 new across Wave 0-4) + 13 vitest + 4 cargo test = 1083 total. 1 known pre-existing failure (`test_g5_poc_files_untouched` — mascot.html stale-baseline since post-Phase-5 commit `398f788`); out of scope per CLAUDE.md scope-boundary rule. POC files (cohost*.py / mascot.html / mocks/) diff-untouched against the Phase 11 plan-docs commit (`7e08966`).
 
-Phase: 13 (3D Mascot Screen Overlay) — EXECUTING
+Phase: 14 (cdj-whisper-v5-migration-polish) — EXECUTING
 
 **Phase 12 ✅ shipped across 4 waves.** ~10,000 LOC across ~62 files. IPC families 19 → 26 (+7). Tests: vitest 13 → 141 (+128); pytest 35 → 1171 (+1136); cargo 4 → 13 (+9). All gates green: typecheck, `npm run check:ipc`, `cargo check`, `cargo test`, pytest. POC files diff-untouched.
 
@@ -57,11 +57,11 @@ Phase: 13 (3D Mascot Screen Overlay) — EXECUTING
 6. Hotkey rebind round-trip with reserved-combo rejection visible
 7. Re-run calibration tears down session + remounts wizard
 
-Plan: 1 of 8
+Plan: 2 of 6
 
 - **Phase 12:** ✅ code-complete. UAT deferred to Kaan's rig session.
-- **Status:** Executing Phase 13
-- **Progress:** [████████░░] 75%
+- **Status:** Ready to execute
+- **Progress:** [███████░░░] 74%
 
 ```
 [████████░░░░░░░░░░░░] 60% (12/20 phases — Phase 12 ✅ code-complete; Phase 13 next)
@@ -84,6 +84,7 @@ Plan: 1 of 8
 | Reaction-reel slop grading (≥4.0 avg) | Not yet measured |
 | 60-minute soak test (zero `session_error`) | Not yet measured |
 | Binary attack verification (zero `AIza` matches) | ✅ 0 / 482 files (Phase 11 W1 — packaging-time gate) |
+| Phase 14 P01 | 6min | 3 tasks | 16 files |
 
 ### Plan Execution Metrics
 
