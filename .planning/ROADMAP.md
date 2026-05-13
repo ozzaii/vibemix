@@ -311,7 +311,13 @@ Plans:
   3. PyInstaller `--onedir` is used on both OSes (NOT `--onefile`); every nested `.exe` / `.dll` / `.dylib` in the bundle is individually signed; `codesign --verify --deep --strict vibemix.app` exits zero.
   4. Tauri auto-updater is signed (signed manifest URL); a manual test patches a 0.0.1 install to 0.0.2 without user intervention beyond the standard updater prompt.
   5. Binary attack verification: `strings vibemix-final-binary | grep -E '^[A-Za-z0-9_-]{39}$'` returns zero matches; `pyinstxtractor` unpack of the bundle reveals no `AIza...` strings anywhere; if any found, ship blocks.
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 18-01-PLAN.md — Binary-attack verification gate: scripts/dist/verify_binary.py + vendored _pyinstxtractor.py + tests/dist/ test suite (clean / planted / .msi / report redaction)
+- [ ] 18-02-PLAN.md — macOS signing bench: entitlements.macos.plist (5 distribution entitlements) + scripts/dist/sign_macos.sh (8-stage codesign+notarize+staple wrapper with retry) + docs/signing-macos.md re-sign playbook
+- [ ] 18-03-PLAN.md — Windows installer bench: installer/windows/vibemix-installer.iss (Inno Setup 6 → MSI per-machine, VC++ runtime check, SignPath SignTool) + installer/windows/README.md + docs/signing-windows.md SignPath + SmartScreen note
+- [ ] 18-04-PLAN.md — Tauri auto-updater wiring: tauri.conf.json5 stub → live (active + api.altidus.world endpoint + minisign pubkey placeholder) + src-tauri/src/updater.rs boot-time fire-and-forget + update_check_on_launch opt-out via tauri-plugin-store + tauri/src-tauri/keys/README.md key-gen procedure + docs/updater.md manifest contract
+- [ ] 18-05-PLAN.md — GitHub Actions release matrix: .github/workflows/release.yml (2-OS × 5-stage build→sign→package→verify→publish with mock-signing fallback) + scripts/dist/sign_manifest.sh + .github/workflows/README.md secrets inventory + docs/release-process.md release runbook
 
 ### Phase 19: GitHub Launch Presence
 **Goal**: `github.com/bravoh/vibemix` reads like a real product launch, not a code dump. Hero banner + demo video/GIF + install buttons + feature matrix + controller grid + screenshots + FAQ + Bravoh footer + Apache 2.0 LICENSE + full OSS hygiene (CONTRIBUTING with DCO, SECURITY, CODE_OF_CONDUCT, NOTICE, TRADEMARKS, issue templates, OG image, repo scrub).
