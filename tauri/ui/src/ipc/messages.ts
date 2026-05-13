@@ -263,6 +263,8 @@ export interface SettingsState {
     push_to_mute_hotkey: string;
     muted: boolean;
     lighter_blur: boolean;
+    mood?: ("hype-man" | "teacher" | "coach") | null;
+    click_through?: boolean | null;
   };
 }
 export interface StatusRecheck {

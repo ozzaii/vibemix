@@ -555,7 +555,7 @@
       }
     },
     "SettingsState": {
-      "$comment": "Phase 12 — Sidecar → shell. Full settings snapshot — emitted on boot, on ipc.settings.get, and after any ipc.settings.set ack.",
+      "$comment": "Phase 12 — Sidecar → shell. Full settings snapshot — emitted on boot, on ipc.settings.get, and after any ipc.settings.set ack. IN-03 in 14-REVIEW.md added optional mood + click_through so the SettingsSet enum's 10 fields can all round-trip through a SettingsState snapshot — required list stays at the 9 always-emitted fields so existing emit paths and tests stay green.",
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "ts", "payload"],
@@ -575,7 +575,18 @@
             "retention_days": {"type": "integer", "minimum": 0},
             "push_to_mute_hotkey": {"type": "string"},
             "muted": {"type": "boolean"},
-            "lighter_blur": {"type": "boolean"}
+            "lighter_blur": {"type": "boolean"},
+            "mood": {
+              "$comment": "IN-03 in 14-REVIEW.md — optional. Null means the sidecar has no MusicState reference (boot path before audio engine starts). enum mirrors the MascotMood literal in the TS client.",
+              "anyOf": [
+                {"type": "string", "enum": ["hype-man", "teacher", "coach"]},
+                {"type": "null"}
+              ]
+            },
+            "click_through": {
+              "$comment": "IN-03 in 14-REVIEW.md — optional. Null means the field is absent from ConfigStore.extra (pre-Plan 13-05 disk state).",
+              "type": ["boolean", "null"]
+            }
           }
         }
       }
