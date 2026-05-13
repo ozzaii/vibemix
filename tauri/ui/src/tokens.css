@@ -20,7 +20,9 @@
  *   4. Reset + v5 body background (cinematic vignette + restrained
  *      rave washes + multi-layer film grain).
  *   5. `.border-anim` utility — the slow amber light traveling around
- *      panel perimeters. Drop as first child of any glass panel.
+ *      panel perimeters. Critique 2026-05-14: restricted to the session
+ *      deck only (one CDJ, one breathing light). Wizard primary-panel +
+ *      cohost previously carried duplicate sweeps — removed.
  *   6. Wizard frame layout (structural — kept verbatim from Phase 11,
  *      just retoned to v5 glass).
  *
@@ -245,8 +247,10 @@ body::before {
 
 /* === Animated border utility =========================================== */
 /* A slow amber light traveling around the panel perimeter — like the
- * gentle pulse on the front of a real CDJ-3000 sitting idle. Drop as
- * the first child of any glass panel:
+ * gentle pulse on the front of a real CDJ-3000 sitting idle. Use as the
+ * first child of the session deck panel only — NOT on every glass tile
+ * (the critique 2026-05-14 found 3+ concurrent sweeps reading as anxiety
+ * rather than sign-of-life):
  *   <div class="border-anim"></div>
  * Modifiers:
  *   .slow → 32s (use on secondary panels)

@@ -131,15 +131,21 @@ const CSS = `
     border-radius: 1px;
   }
   .vmx-retention__track-lit {
+    /* Critique 2026-05-14: animating width thrashes layout every frame.
+     * Switched to transform: scaleX with transform-origin: left so the
+     * fill scales on the compositor without re-running layout. The lit
+     * track now occupies the full track rect (left:8px / right:8px) and
+     * scales horizontally via --vmx-retention-lit-scale (0..1). */
     position: absolute;
     left: 8px;
+    right: 8px;
     top: 50%;
     height: 3px;
     background: linear-gradient(90deg, var(--amber-deep), var(--amber) 70%, var(--amber-pale));
-    transform: translateY(-50%);
+    transform: translateY(-50%) scaleX(var(--vmx-retention-lit-scale, 0));
+    transform-origin: left center;
     pointer-events: none;
-    width: var(--vmx-retention-lit, 0%);
-    transition: width var(--motion-snap) ease-out;
+    transition: transform var(--motion-snap) ease-out;
     border-radius: 2px;
     box-shadow: 0 0 4px var(--amber-22);
   }
@@ -277,10 +283,10 @@ export function renderRetentionSlider(
   root.append(labels);
 
   function syncLit(): void {
-    // Lit portion = 0% at idx 0, 100% at last idx.
+    // 0-to-1 scale → consumed by transform: scaleX in CSS (compositor-cheap).
     const last = RETENTION_STOPS.length - 1;
-    const pct = last === 0 ? 0 : (activeIdx / last) * 100;
-    trackLit.style.setProperty("--vmx-retention-lit", `${pct}%`);
+    const scale = last === 0 ? 0 : activeIdx / last;
+    trackLit.style.setProperty("--vmx-retention-lit-scale", `${scale}`);
   }
 
   function selectIndex(idx: number, fire: boolean): void {

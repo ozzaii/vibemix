@@ -402,7 +402,11 @@ describe("renderStatusBar", () => {
 // === Titlebar / rocker / picker smoke =======================================
 
 describe("renderTitlebar", () => {
-  it("renders wordmark + 3 pills + clock + settings gear", () => {
+  // Critique 2026-05-14: trimmed the triple LIVE/REC/SYS pill row to
+  // a single LIVE indicator (Pioneer hardware labels the one that
+  // matters). REC + SYS state still flows through SessionLayout's
+  // diff loop — setTitlebarPill no-ops when the DOM node is absent.
+  it("renders wordmark + 1 pill (LIVE) + clock + settings gear", () => {
     const tb = renderTitlebar({
       live: "ok",
       rec: "ok",
@@ -411,7 +415,9 @@ describe("renderTitlebar", () => {
     });
     host().append(tb);
     expect(tb.querySelector(".vmx-titlebar__wordmark")?.textContent).toBe("vibemix");
-    expect(tb.querySelectorAll(".vmx-titlebar__pill")).toHaveLength(3);
+    const pills = tb.querySelectorAll<HTMLElement>(".vmx-titlebar__pill");
+    expect(pills).toHaveLength(1);
+    expect(pills[0]?.dataset.key).toBe("live");
     expect(tb.querySelector(".vmx-titlebar__clock")?.textContent).toBe("02:44:31");
     expect(tb.querySelector(".vmx-titlebar__settings")).toBeTruthy();
   });

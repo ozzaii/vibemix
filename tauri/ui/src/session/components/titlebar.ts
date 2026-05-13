@@ -178,10 +178,15 @@ const CSS = `
 
 registerStyle("vmx-titlebar", CSS);
 
+/* Critique 2026-05-14: a triple LIVE/REC/SYS pill row is the AI-dashboard
+ * reflex — Pioneer hardware labels the ONE that matters and trusts the
+ * user with the rest. Now: LIVE is the always-visible session indicator;
+ * REC + SYS state still flow through the same `setTitlebarPill` IPC
+ * (SessionLayout's diff loop) and become no-ops because their DOM nodes
+ * aren't mounted. When v2.x adds a "degraded-state" surface, REC + SYS
+ * will re-appear conditionally — quiet by default, loud on fault. */
 const PILL_DEFS: Array<{ key: "live" | "rec" | "sys"; label: string }> = [
   { key: "live", label: "● LIVE" },
-  { key: "rec", label: "● REC" },
-  { key: "sys", label: "● SYS" },
 ];
 
 export function renderTitlebar(props: TitlebarProps): HTMLElement {
