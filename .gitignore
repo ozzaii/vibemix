@@ -11,6 +11,11 @@ dist/
 *.egg
 .eggs/
 
+# Phase 18-02 — `scripts/dist/` is SOURCE (signing/verify scripts), not build
+# output. Keep the directory tracked despite the generic `dist/` glob above.
+!scripts/dist/
+!scripts/dist/**
+
 # Virtual environments
 .venv/
 venv/
