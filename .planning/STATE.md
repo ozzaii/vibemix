@@ -46,6 +46,7 @@
 | Binary attack verification (zero `AIza` matches) | Not yet measured |
 
 ---
+| Phase 17 P01 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
