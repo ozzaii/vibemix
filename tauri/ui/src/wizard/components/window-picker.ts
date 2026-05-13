@@ -1,12 +1,14 @@
-/* window-picker.ts — Step 2 DJ-app window picker (UI-SPEC §9).
+/* window-picker.ts — Step 2 DJ-app window picker (UI-SPEC §9 / CDJ Whisper v5).
  *
  * Two modes:
- *   - "hint": auto-detected DJ app — 80×80 thumbnail (placeholder rect
- *     in Phase 11) + app name + window title + [ Select ] primary.
- *     Below: [ Pick a different window ↗ ] link.
- *   - "enum": 3-col × N-row grid (160×120 each) + privacy warning at top.
+ *   - "hint": auto-detected DJ app — 80×80 thumbnail placeholder +
+ *     app name + window title + [ Select ] primary CTA. Below:
+ *     [ Pick a different window ↗ ] link.
+ *   - "enum": 3-col × N-row grid (160×120 each) + amber privacy banner
+ *     at top.
  *
- * Plus a "non-DJ confirm" overlay modal (UI-SPEC §9). */
+ * Plus a "non-DJ confirm" overlay modal (UI-SPEC §9). All surfaces read
+ * v5 glass primitives (--glass-2/--glass-3, --glass-edge, --silk-*). */
 
 import { registerStyle } from "./_style-registry.js";
 import { Button } from "./button.js";
@@ -32,115 +34,127 @@ const CSS = `
     display: grid;
     grid-template-columns: 80px 1fr auto;
     align-items: center;
-    gap: var(--sp-md);
-    padding: var(--sp-md);
-    background: linear-gradient(180deg, var(--panel-lift), var(--panel));
-    border: 1px solid var(--bezel-1);
-    border-radius: 6px;
+    gap: var(--sp-4);
+    padding: var(--sp-4);
+    background: var(--glass-2);
+    backdrop-filter: var(--blur-glass-light);
+    -webkit-backdrop-filter: var(--blur-glass-light);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-md);
+    box-shadow:
+      inset 0 1px 0 var(--glass-top),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
   }
   .cmp-window-picker__thumb {
     width: 80px;
     height: 80px;
-    background: var(--panel-deep);
-    border: 1px solid var(--bezel-1);
-    border-radius: 4px;
+    background: var(--glass-3);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
     background-size: cover;
     background-position: center;
   }
   .cmp-window-picker__meta {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-xs);
+    gap: var(--sp-1);
     min-width: 0;
   }
   .cmp-window-picker__app {
-    font-family: "DM Mono", monospace;
-    font-weight: 500;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 500;
     font-size: 14px;
-    color: var(--ink);
+    color: var(--silk);
   }
   .cmp-window-picker__title {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-mono);
     font-size: 11px;
-    color: var(--ink-dim);
+    color: var(--silk-65);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .cmp-window-picker__pickdiff {
-    margin-top: var(--sp-md);
+    margin-top: var(--sp-4);
     text-align: center;
   }
   .cmp-window-picker__pickdiff-btn {
     background: none;
     border: none;
-    color: var(--ink-dim);
-    font-family: "DM Mono", monospace;
+    color: var(--silk-65);
+    font-family: var(--type-mono);
     font-size: 11px;
     letter-spacing: 0.06em;
     cursor: pointer;
-    padding: var(--sp-sm);
+    padding: var(--sp-2);
+    transition: color var(--motion-snap) ease-out, text-shadow var(--motion-snap) ease-out;
   }
   .cmp-window-picker__pickdiff-btn:hover {
-    color: var(--phosphor);
+    color: var(--amber);
+    text-shadow: 0 0 4px var(--amber-22);
   }
   .cmp-window-picker__privacy {
     display: flex;
     align-items: center;
-    gap: var(--sp-md);
-    padding: var(--sp-sm) var(--sp-md);
-    background: var(--phosphor-soft);
-    border-radius: 4px;
-    margin-bottom: var(--sp-md);
+    gap: var(--sp-4);
+    padding: var(--sp-2) var(--sp-4);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    border: 1px solid var(--amber-22);
+    border-radius: var(--rad-sm);
+    margin-bottom: var(--sp-4);
   }
   .cmp-window-picker__privacy-heading {
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 11px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--phosphor);
+    color: var(--amber);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .cmp-window-picker__privacy-body {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
     font-size: 11px;
-    color: var(--ink);
+    color: var(--silk);
     line-height: 1.5;
   }
   .cmp-window-picker__grid {
     display: grid;
     grid-template-columns: repeat(3, 160px);
-    gap: var(--sp-md);
+    gap: var(--sp-4);
     max-height: 280px;
     overflow-y: auto;
   }
   .cmp-window-picker__grid::-webkit-scrollbar { width: 6px; }
-  .cmp-window-picker__grid::-webkit-scrollbar-track { background: var(--panel-deep); }
-  .cmp-window-picker__grid::-webkit-scrollbar-thumb { background: var(--bezel-2); border-radius: 3px; }
+  .cmp-window-picker__grid::-webkit-scrollbar-track { background: var(--glass-3); }
+  .cmp-window-picker__grid::-webkit-scrollbar-thumb { background: var(--silk-22); border-radius: 3px; }
   .cmp-window-picker__cell {
     width: 160px;
     height: 120px;
-    background: var(--panel-deep);
-    border: 1px solid var(--bezel-1);
-    border-radius: 4px;
-    padding: var(--sp-sm);
+    background: var(--glass-3);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    padding: var(--sp-2);
     cursor: pointer;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-xs);
-    transition: border-color var(--motion-snap) ease-out;
+    gap: var(--sp-1);
+    transition: border-color var(--motion-snap) ease-out, background var(--motion-snap) ease-out;
   }
   .cmp-window-picker__cell:hover {
-    border-color: var(--phosphor-dim);
+    background: var(--glass-2);
+    border-color: var(--amber-22);
   }
   .cmp-window-picker__cell-thumb {
     flex: 1;
-    background: var(--groove);
+    background: var(--void-2);
     border-radius: 2px;
   }
   .cmp-window-picker__cell-name {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-mono);
     font-size: 11px;
-    color: var(--ink);
+    color: var(--silk);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -150,7 +164,9 @@ const CSS = `
     position: fixed;
     inset: 0;
     z-index: 9000;
-    background: rgba(7, 8, 10, 0.85);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -158,30 +174,38 @@ const CSS = `
   .cmp-window-picker__modal[hidden] { display: none; }
   .cmp-window-picker__modal-box {
     width: 420px;
-    padding: var(--sp-lg);
-    background: linear-gradient(180deg, var(--panel-lift), var(--panel));
-    border: 1px solid var(--bezel-2);
-    border-radius: 8px;
-    box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.8);
+    padding: var(--sp-5);
+    background: var(--glass-1);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-lg);
+    box-shadow:
+      inset 0 1px 0 var(--glass-top),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+      0 30px 80px rgba(0, 0, 0, 0.8);
   }
   .cmp-window-picker__modal-heading {
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 700;
     font-size: 11px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--rec);
-    margin-bottom: var(--sp-sm);
+    color: var(--led-fault);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    margin-bottom: var(--sp-2);
   }
   .cmp-window-picker__modal-body {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
     font-size: 14px;
-    color: var(--ink);
+    color: var(--silk);
     line-height: 1.5;
-    margin-bottom: var(--sp-md);
+    margin-bottom: var(--sp-4);
   }
   .cmp-window-picker__modal-actions {
     display: flex;
-    gap: var(--sp-md);
+    gap: var(--sp-4);
     justify-content: flex-end;
   }
 `;

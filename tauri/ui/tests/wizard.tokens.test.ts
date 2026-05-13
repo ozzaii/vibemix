@@ -1,13 +1,12 @@
-/* Phase 14 Wave 0 — wizard-surface migration spec.
+/* Phase 14 Wave 1 — wizard-surface migration spec (active).
  *
- * Currently `describe.skip(...)` — Wave 1 (Plan 14-02) unskips after
- * the wizard surface migration commits land. Once green, this spec
- * stays green for the rest of the phase.
+ * Unskipped by Plan 14-02 once the wizard surface migrated to v5
+ * primitives. The spec stays green for the rest of the phase.
  *
- * Renders the two heaviest-token-reference wizard components
- * (primary-panel and window-picker — together they hold ~40 of the
- * wizard's 139 legacy refs) and asserts the rendered HTML +
- * registered stylesheet text is free of legacy shim tokens.
+ * Renders the heaviest-token-reference wizard components (primary-panel,
+ * window-picker, controller-probe, dropdown-device) and asserts the
+ * rendered HTML + registered stylesheet text is free of legacy shim
+ * tokens.
  *
  * Detector reused from tokens.legacy-detect.test.ts so the bash gate
  * and the vitest gate stay byte-aligned.
@@ -28,10 +27,7 @@ function renderedHtmlPlusStyles(rendered: HTMLElement): string {
   return `${rendered.outerHTML}\n${styles}`;
 }
 
-// SKIP — Wave 1 (Plan 14-02 wizard migration) will remove the `.skip` to
-// activate this gate. Until then it would FAIL because the current wizard
-// components legitimately consume shim aliases via the cascade.
-describe.skip("wizard surface tokens (wave 1 will green this)", () => {
+describe("wizard surface tokens (wave 1)", () => {
   it("PrimaryPanel renders without legacy token refs", async () => {
     const { PrimaryPanel } = await import("../src/wizard/components/primary-panel.js");
     const child = document.createElement("div");
@@ -41,12 +37,44 @@ describe.skip("wizard surface tokens (wave 1 will green this)", () => {
     expect(containsLegacyToken(renderedHtmlPlusStyles(rendered))).toBe(false);
   });
 
+  it("PrimaryPanel has .border-anim as its first child", async () => {
+    const { PrimaryPanel } = await import("../src/wizard/components/primary-panel.js");
+    const child = document.createElement("div");
+    child.textContent = "child";
+    const rendered = PrimaryPanel({ children: child });
+    expect(rendered.firstElementChild?.classList.contains("border-anim")).toBe(true);
+  });
+
   it("WindowPicker renders without legacy token refs", async () => {
     const { WindowPicker } = await import("../src/wizard/components/window-picker.js");
     const rendered = WindowPicker({
       mode: "hint",
-      onPick: () => {},
-    } as Parameters<typeof WindowPicker>[0]);
+      detectedHint: { appName: "djay Pro", windowTitle: "main" },
+      onSelect: () => {},
+      onPickDifferent: () => {},
+    });
+    document.body.append(rendered);
+    expect(containsLegacyToken(renderedHtmlPlusStyles(rendered))).toBe(false);
+  });
+
+  it("ControllerProbe renders without legacy token refs", async () => {
+    const { ControllerProbe } = await import("../src/wizard/components/controller-probe.js");
+    const rendered = ControllerProbe({
+      state: "listening",
+      secondsLeft: 10,
+      onListenAgain: () => {},
+      onSkip: () => {},
+    });
+    document.body.append(rendered);
+    expect(containsLegacyToken(renderedHtmlPlusStyles(rendered))).toBe(false);
+  });
+
+  it("DropdownDevice renders without legacy token refs", async () => {
+    const { DropdownDevice } = await import("../src/wizard/components/dropdown-device.js");
+    const rendered = DropdownDevice({
+      devices: [{ id: "dev1", name: "Built-in Output", isSpeaker: true }],
+      onSelect: () => {},
+    });
     document.body.append(rendered);
     expect(containsLegacyToken(renderedHtmlPlusStyles(rendered))).toBe(false);
   });
