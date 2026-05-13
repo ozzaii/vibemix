@@ -69,6 +69,11 @@ export interface SettingsView {
   /** When ON, the overlay window passes pointer events through to the app
    *  beneath. Default OFF (window stays draggable). */
   click_through: boolean;
+  // --- Phase 14 (CDJ Whisper v5 polish) addition --------------------------
+  /** When ON, swaps the heavy backdrop blurs for lighter variants via
+   *  `html[data-blur-perf="on"]` cascade. Default OFF (full v5 contract).
+   *  Wired by Settings → Performance → "Lighter blur" toggle (Plan 14-04). */
+  lighter_blur: boolean;
 }
 
 export interface SessionState {
@@ -130,6 +135,7 @@ function makeDefault(): SessionState {
       push_to_mute_hotkey: "cmd+shift+m",
       mood: "hype-man",
       click_through: false,
+      lighter_blur: false,
     },
     muted: false,
     cohostStatus: "IDLE",

@@ -107,6 +107,11 @@ interface WireSettingsStatePayload {
   //     the union (T-13-03-01 mitigation).
   mood?: MascotMood | string;
   click_through?: boolean;
+  // --- Phase 14-04 (perf-blur) addition — boot snapshot includes this
+  //     once SettingsApplier persists it through ConfigStore. Until first
+  //     write the field is absent; ws-bridge keeps the SessionState
+  //     default (false → full v5 visual contract).
+  lighter_blur?: boolean;
 }
 
 interface WireMutePayload {
@@ -122,6 +127,7 @@ const SETTINGS_FIELDS = [
   "output_profile",
   "retention_days",
   "push_to_mute_hotkey",
+  "lighter_blur",
 ] as const;
 export type SettingsField = (typeof SETTINGS_FIELDS)[number];
 
@@ -192,10 +198,11 @@ export async function initSessionBridge(): Promise<{
 /** Fire-and-forget: ipc.settings.set. Sidecar replies with
  *  ipc.settings.state on success and ipc.error on failure (which the
  *  validator subscriber surfaces — we don't currently render errors,
- *  Wave 4 wires that). */
+ *  Wave 4 wires that). Phase 14-04 widens the value union to include
+ *  `boolean` for the lighter_blur perf toggle. */
 export async function sendSettings(
   field: SettingsField,
-  value: string | number | null,
+  value: string | number | boolean | null,
 ): Promise<void> {
   if (!SETTINGS_FIELDS.includes(field)) {
     throw new Error(`sendSettings: unknown field ${field}`);
@@ -305,6 +312,10 @@ export function applySettingsState(p: WireSettingsStatePayload): void {
         typeof p.click_through === "boolean"
           ? p.click_through
           : current.click_through,
+      lighter_blur:
+        typeof p.lighter_blur === "boolean"
+          ? p.lighter_blur
+          : current.lighter_blur,
     },
     muted: p.muted,
   });
