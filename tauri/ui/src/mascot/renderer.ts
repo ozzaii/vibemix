@@ -68,6 +68,39 @@ const BUST_FOCUS_Y_BIAS = 0.15;
 /** Bust-frame camera Z multiplier of character height (smaller = closer). */
 const BUST_CAMERA_Z_MULT = 2.5;
 
+// ── Internal helper: Meshy GLB material fixup ─────────────────────────────
+
+/**
+ * Meshy AI's GLB exports ship with emissiveFactor=[1,1,1] (full white
+ * self-illumination) and metallicFactor=1 (kills diffuse contribution),
+ * which makes the character render as a flat-white silhouette regardless
+ * of the baseColorTexture. Walk the scene and neutralise both so the
+ * diffuse texture takes over and standard lighting produces shading.
+ */
+function fixMeshyMaterials(root: Object3D): void {
+  root.traverse((node) => {
+    const mat = (node as unknown as { material?: unknown }).material;
+    if (!mat) return;
+    const mats = Array.isArray(mat) ? mat : [mat];
+    for (const m of mats) {
+      const mm = m as {
+        emissive?: { setRGB: (r: number, g: number, b: number) => void };
+        emissiveIntensity?: number;
+        emissiveMap?: unknown;
+        metalness?: number;
+        roughness?: number;
+      };
+      if (mm.emissive && typeof mm.emissive.setRGB === "function") {
+        mm.emissive.setRGB(0, 0, 0);
+      }
+      mm.emissiveIntensity = 0;
+      mm.emissiveMap = null;
+      mm.metalness = 0;
+      mm.roughness = 0.7;
+    }
+  });
+}
+
 // ── Internal helper: find the first SkinnedMesh in a scene tree ───────────
 
 function findSkinnedMesh(root: Object3D): Object3D | null {
@@ -140,6 +173,7 @@ export class MascotRenderer {
     // ── Character + mixer ────────────────────────────────────────────────
     const characterRoot = assets.character.scene;
     this.characterRoot = characterRoot;
+    fixMeshyMaterials(characterRoot);
     this.scene.add(characterRoot);
 
     const skinnedMesh = findSkinnedMesh(characterRoot);
