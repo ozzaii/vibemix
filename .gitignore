@@ -11,7 +11,7 @@ dist/
 *.egg
 .eggs/
 
-# Phase 18 Wave 1 — verification tooling lives under scripts/dist/ and
+# Phase 18 — verification + signing tooling lives under scripts/dist/ and
 # tests/dist/. The generic ``dist/`` rule above would otherwise hide both
 # of these source trees. Whitelist them explicitly.
 !scripts/dist/

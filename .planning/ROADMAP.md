@@ -314,7 +314,7 @@ Plans:
 **Plans:** 1/5 plans executed
 Plans:
 - [x] 18-01-PLAN.md — Binary-attack verification gate: scripts/dist/verify_binary.py + vendored _pyinstxtractor.py + tests/dist/ test suite (clean / planted / .msi / report redaction)
-- [ ] 18-02-PLAN.md — macOS signing bench: entitlements.macos.plist (5 distribution entitlements) + scripts/dist/sign_macos.sh (8-stage codesign+notarize+staple wrapper with retry) + docs/signing-macos.md re-sign playbook
+- [x] 18-02-PLAN.md — macOS signing bench: entitlements.macos.plist (5 distribution entitlements) + scripts/dist/sign_macos.sh (8-stage codesign+notarize+staple wrapper with retry) + docs/signing-macos.md re-sign playbook
 - [ ] 18-03-PLAN.md — Windows installer bench: installer/windows/vibemix-installer.iss (Inno Setup 6 → MSI per-machine, VC++ runtime check, SignPath SignTool) + installer/windows/README.md + docs/signing-windows.md SignPath + SmartScreen note
 - [ ] 18-04-PLAN.md — Tauri auto-updater wiring: tauri.conf.json5 stub → live (active + api.altidus.world endpoint + minisign pubkey placeholder) + src-tauri/src/updater.rs boot-time fire-and-forget + update_check_on_launch opt-out via tauri-plugin-store + tauri/src-tauri/keys/README.md key-gen procedure + docs/updater.md manifest contract
 - [ ] 18-05-PLAN.md — GitHub Actions release matrix: .github/workflows/release.yml (2-OS × 5-stage build→sign→package→verify→publish with mock-signing fallback) + scripts/dist/sign_manifest.sh + .github/workflows/README.md secrets inventory + docs/release-process.md release runbook

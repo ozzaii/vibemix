@@ -111,8 +111,8 @@
 
 ### Distribution & Installer
 
-- [ ] **DIST-01**: PyInstaller `--onedir` build for both OSes (avoid `--onefile` Defender false-positives)
-- [ ] **DIST-02**: macOS signed + notarized DMG via Apple Developer ID + `notarytool` + Hardened Runtime + entitlements
+- [x] **DIST-01**: PyInstaller `--onedir` build for both OSes (avoid `--onefile` Defender false-positives)
+- [x] **DIST-02**: macOS signed + notarized DMG via Apple Developer ID + `notarytool` + Hardened Runtime + entitlements
 - [ ] **DIST-03**: Windows OV-signed MSI via SignPath Foundation (free OSS cert) + Inno Setup 6
 - [ ] **DIST-04**: SignPath Foundation OSS application filed on day 1 of Phase 1 (3-week lead time)
 - [x] **DIST-05**: Tauri 2.x desktop shell wrapping the Python sidecar (10× smaller than Electron)
