@@ -342,3 +342,204 @@ describe("parseIpcMessage — ipc.error", () => {
     expect(() => parseIpcMessage(msg)).toThrow(/IPC schema violation/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 15-01 — ipc.recordings.* families
+// ---------------------------------------------------------------------------
+
+describe("parseIpcMessage — ipc.recordings.list", () => {
+  it("accepts an empty-payload request", () => {
+    const msg = {
+      type: "ipc.recordings.list",
+      ts: TS,
+      payload: {},
+    };
+    expect(() => parseIpcMessage(msg)).not.toThrow();
+  });
+
+  it("rejects extra payload field", () => {
+    const msg = {
+      type: "ipc.recordings.list",
+      ts: TS,
+      payload: { stowaway: true },
+    };
+    expect(() => parseIpcMessage(msg)).toThrow(/IPC schema violation/);
+  });
+});
+
+describe("parseIpcMessage — ipc.recordings.list_result", () => {
+  const validSummary = {
+    session_dir: "20260513-210410",
+    started_at_iso: "2026-05-13T21:04:10+02:00",
+    duration_s: 5040.0,
+    event_count: 38,
+    bytes_total: 12345678,
+    crashed: false,
+  };
+
+  it("accepts a one-session response", () => {
+    const msg = {
+      type: "ipc.recordings.list_result",
+      ts: TS,
+      payload: { sessions: [validSummary], bytes_total: 12345678 },
+    };
+    expect(() => parseIpcMessage(msg)).not.toThrow();
+  });
+
+  it("accepts an empty sessions array", () => {
+    const msg = {
+      type: "ipc.recordings.list_result",
+      ts: TS,
+      payload: { sessions: [], bytes_total: 0 },
+    };
+    expect(() => parseIpcMessage(msg)).not.toThrow();
+  });
+
+  it("rejects RecordingSummary with non-conforming session_dir", () => {
+    const msg = {
+      type: "ipc.recordings.list_result",
+      ts: TS,
+      payload: {
+        sessions: [{ ...validSummary, session_dir: "not-a-timestamp" }],
+        bytes_total: 12345678,
+      },
+    };
+    expect(() => parseIpcMessage(msg)).toThrow(/IPC schema violation/);
+  });
+});
+
+describe("parseIpcMessage — ipc.recordings.delete", () => {
+  it("accepts a valid session_dir", () => {
+    const msg = {
+      type: "ipc.recordings.delete",
+      ts: TS,
+      payload: { session_dir: "20260513-210410" },
+    };
+    expect(() => parseIpcMessage(msg)).not.toThrow();
+  });
+
+  it("rejects ../../etc/passwd (V12 path-traversal gate)", () => {
+    const msg = {
+      type: "ipc.recordings.delete",
+      ts: TS,
+      payload: { session_dir: "../../etc/passwd" },
+    };
+    expect(() => parseIpcMessage(msg)).toThrow(/IPC schema violation/);
+  });
+});
+
+describe("parseIpcMessage — ipc.recordings.delete_ack", () => {
+  it("accepts ok=true with null error", () => {
+    const msg = {
+      type: "ipc.recordings.delete_ack",
+      ts: TS,
+      payload: { session_dir: "20260513-210410", ok: true, error: null },
+    };
+    expect(() => parseIpcMessage(msg)).not.toThrow();
+  });
+
+  it("accepts ok=false with string error", () => {
+    const msg = {
+      type: "ipc.recordings.delete_ack",
+      ts: TS,
+      payload: { session_dir: "20260513-210410", ok: false, error: "locked" },
+    };
+    expect(() => parseIpcMessage(msg)).not.toThrow();
+  });
+});
+
+describe("parseIpcMessage — ipc.recordings.usage", () => {
+  it("accepts a sessions + bytes_total push", () => {
+    const msg = {
+      type: "ipc.recordings.usage",
+      ts: TS,
+      payload: { sessions: 12, bytes_total: 3656838349 },
+    };
+    expect(() => parseIpcMessage(msg)).not.toThrow();
+  });
+
+  it("rejects negative bytes_total", () => {
+    const msg = {
+      type: "ipc.recordings.usage",
+      ts: TS,
+      payload: { sessions: 12, bytes_total: -1 },
+    };
+    expect(() => parseIpcMessage(msg)).toThrow(/IPC schema violation/);
+  });
+});
+
+describe("parseIpcMessage — ipc.recordings.events", () => {
+  it("accepts a valid session_dir", () => {
+    const msg = {
+      type: "ipc.recordings.events",
+      ts: TS,
+      payload: { session_dir: "20260513-210410" },
+    };
+    expect(() => parseIpcMessage(msg)).not.toThrow();
+  });
+
+  it("rejects ../../etc/passwd (V12 path-traversal gate mirror)", () => {
+    const msg = {
+      type: "ipc.recordings.events",
+      ts: TS,
+      payload: { session_dir: "../../etc/passwd" },
+    };
+    expect(() => parseIpcMessage(msg)).toThrow(/IPC schema violation/);
+  });
+});
+
+describe("parseIpcMessage — ipc.recordings.events_result", () => {
+  it("accepts a 3-event sample with heterogeneous kinds (open extensibility)", () => {
+    const msg = {
+      type: "ipc.recordings.events_result",
+      ts: TS,
+      payload: {
+        session_dir: "20260513-210410",
+        events: [
+          {
+            t: 0.0,
+            kind: "session_start",
+            wall_clock_iso: "2026-05-13T21:04:10+02:00",
+            session_dir: "20260513-210410",
+          },
+          { t: 5.04, kind: "ai_text", text: "Nice transition." },
+          { t: 7.11, kind: "controller_move", control: "filter_a", value: 0.62 },
+        ],
+      },
+    };
+    expect(() => parseIpcMessage(msg)).not.toThrow();
+  });
+
+  it("accepts an empty events array", () => {
+    const msg = {
+      type: "ipc.recordings.events_result",
+      ts: TS,
+      payload: { session_dir: "20260513-210410", events: [] },
+    };
+    expect(() => parseIpcMessage(msg)).not.toThrow();
+  });
+
+  it("rejects events missing required `kind`", () => {
+    const msg = {
+      type: "ipc.recordings.events_result",
+      ts: TS,
+      payload: {
+        session_dir: "20260513-210410",
+        events: [{ t: 1.0 }],
+      },
+    };
+    expect(() => parseIpcMessage(msg)).toThrow(/IPC schema violation/);
+  });
+
+  it("rejects events with negative `t`", () => {
+    const msg = {
+      type: "ipc.recordings.events_result",
+      ts: TS,
+      payload: {
+        session_dir: "20260513-210410",
+        events: [{ t: -1.0, kind: "session_start" }],
+      },
+    };
+    expect(() => parseIpcMessage(msg)).toThrow(/IPC schema violation/);
+  });
+});
