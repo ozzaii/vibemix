@@ -331,9 +331,9 @@ Plans:
   5. Repo scrub passes: zero `_test_*.py` scratch files, zero `.bak` files, zero committed `.env`, no large binaries in tree (mascot sprites + demo media in release assets or external CDN), repo description + topics tags (`dj`, `livekit`, `gemini`, `ai-assistant`, `audio`, `midi`, `pioneer-ddj`, `realtime-ai`) populated.
   6. Custom OG / social-preview image renders correctly when the repo URL is pasted into X / Discord / Slack previews.
 **UI hint**: yes
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 Plans:
-- [ ] 19-01-PLAN.md — Repo scrub (delete 5 scratch artifacts) + Git LFS for character.glb + .gitignore extensions + .github/repo-config.yml + configure_repo.sh + pre-commit binary gate + tests/repo/ CI gate (GH-17, GH-18)
+- [x] 19-01-PLAN.md — Repo scrub (delete 5 scratch artifacts) + Git LFS for character.glb + .gitignore extensions + .github/repo-config.yml + configure_repo.sh + pre-commit binary gate + tests/repo/ CI gate (GH-17, GH-18)
 - [ ] 19-02-PLAN.md — OSS hygiene files: CONTRIBUTING.md (DCO + 3 paths) + CODE_OF_CONDUCT.md (Covenant 2.1) + SECURITY.md + NOTICE (generated) + TRADEMARKS.md + 3 issue templates + PR template + gen_notice.py (GH-13, GH-14, GH-15)
 - [ ] 19-03-PLAN.md — README.md full rewrite (12 sections per CONTEXT Area 1; 12 FAQ entries verbatim; feature matrix grounded in Phase 10 anchors; 10-controller grid; banned-phrase gate) + docs/midi-mapping.md (GH-02..GH-12, GH-16)
 - [ ] 19-04-PLAN.md — Branded architecture SVG generator (CDJ Whisper v5 palette, 4 swim-lanes) + hero PNG placeholder (1280×640 amber gradient) + demo GIF placeholder + reserved controllers/screenshots dirs (GH-02, GH-08)
@@ -373,7 +373,7 @@ Plans:
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
 | 17. Reaction-Reel Slop Grading Gate | 1/3 | In Progress|  |
 | 18. Distribution — Signing, Notarization, Installers | 5/5 | Complete   | 2026-05-13 |
-| 19. GitHub Launch Presence | 0/4 | Not started | - |
+| 19. GitHub Launch Presence | 1/4 | In Progress|  |
 | 20. Day-Zero Operations | 0/? | Not started | - |
 
 ---
