@@ -443,12 +443,14 @@ async function boot(): Promise<void> {
    * tests).
    *
    * Phase 14 Plan 14-05 — fallback hexes track the v5 token VALUES
-   * (--amber #ff8a3d, --silk #d6cfc7, --silk-40 rendered tint #3d424c)
-   * from tokens.css, duplicated here only as literal-string defaults for
-   * THREE.Color when CSS resolution fails. tokens.css remains the single
+   * (--amber #ff8a3d, --silk #d6cfc7) from tokens.css, duplicated here
+   * only as literal-string defaults for THREE.Color when CSS resolution
+   * fails. The coach branch uses a flat slate hex (#3d424c) directly
+   * because --silk-40's alpha channel is dropped by THREE.Color (see
+   * WR-02 in 14-REVIEW.md). tokens.css remains the single
    * source-of-truth for accent paint at the CSS layer; these three hex
-   * literals at the resolveCssColor sites below are the only hex
-   * literals permitted outside tokens.css (audit gate).
+   * literals (#ff8a3d, #d6cfc7, #3d424c) are the only hex literals
+   * permitted outside tokens.css (audit gate).
    */
   function resolveCssColor(varName: string, fallback: string): Color {
     try {
@@ -470,15 +472,23 @@ async function boot(): Promise<void> {
     // Step 2 — pick destination-mood tint.
     //   hype-man → amber (warm) — v5 --amber
     //   teacher  → silk (cream-leaning) — v5 --silk
-    //   coach    → slate (silk-40 reads as desaturated coach tint)
+    //   coach    → slate constant (distinct from teacher's silk)
     let color: Color;
     if (mood === "hype-man") {
       color = resolveCssColor("--amber", "#ff8a3d");
     } else if (mood === "teacher") {
       color = resolveCssColor("--silk", "#d6cfc7");
     } else {
-      // coach — slate; --silk-40 carries the desaturated coach tint.
-      color = resolveCssColor("--silk-40", "#3d424c");
+      // coach — slate hex literal. WR-02 in 14-REVIEW.md flagged that
+      // routing this through resolveCssColor("--silk-40", ...) collapses
+      // to teacher's silk RGB at runtime: --silk-40 resolves to
+      // rgba(214, 207, 199, 0.40), THREE.Color silently drops the alpha
+      // channel and yields the same RGB as --silk (#d6cfc7), making
+      // coach + teacher visually indistinguishable. The hex literal here
+      // approximates --silk-40 composited over --void-2 (#05070b) while
+      // preserving the intended slate cast — kept as a documented
+      // audit-gate exception (alongside #ff8a3d and #d6cfc7).
+      color = new Color("#3d424c");
     }
 
     // Steps 3 + 4 — fire visual.
