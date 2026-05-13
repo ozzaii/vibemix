@@ -28,8 +28,8 @@ export interface ConfirmDialogProps {
   cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
-  /** Confirm button styling — "rec" for destructive actions
-   *  (default keeps the phosphor look). Phase 12 only uses the default. */
+  /** Confirm button styling — "danger" for destructive actions
+   *  (default keeps the v5 amber look). Phase 12 only uses the default. */
   variant?: "default" | "danger";
 }
 
