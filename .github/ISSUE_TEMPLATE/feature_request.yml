@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a new feature or improvement
+title: "[feature] "
+labels: ["feature", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Heads up: vibemix is intentionally narrow-scope. We say no to a lot. Please read PROJECT.md (in the repo) before filing — it lists what's explicitly out of scope.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: "Describe the user-facing problem, not the implementation."
+      placeholder: "When I'm mixing techno at 140 BPM, vibemix sometimes ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      placeholder: "Add a setting that ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: "Including 'do nothing' if relevant."
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope assessment (your honest guess)
+      options:
+        - "Small (single file, single PR)"
+        - "Medium (a few files, one weekend)"
+        - "Large (multiple subsystems, weeks)"
+        - "Don't know"

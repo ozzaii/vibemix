@@ -1,0 +1,52 @@
+name: New controller request
+description: Ask for support for a MIDI controller we haven't curated yet
+title: "[controller] <Vendor> <Model>"
+labels: ["controller", "midi"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        vibemix ships with 10 curated controller mappings + a generic fallback. We add more if there's demand or if you're willing to test.
+
+  - type: input
+    id: vendor
+    attributes:
+      label: Vendor
+      placeholder: "Pioneer DJ / Numark / Hercules / Native Instruments / ..."
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model name
+      placeholder: "DDJ-200, MC7000, Mixtrack Platinum FX, ..."
+    validations:
+      required: true
+
+  - type: input
+    id: vidpid
+    attributes:
+      label: USB VID/PID (if you know it)
+      placeholder: "0x2b73:0x0017"
+
+  - type: input
+    id: midimap
+    attributes:
+      label: Existing MIDI map
+      description: "Link to a Mixxx mapping, Traktor TSI, or vendor PDF. The more we have, the faster we curate."
+
+  - type: dropdown
+    id: testing
+    attributes:
+      label: Willing to test?
+      options:
+        - "Yes — I own the controller and can run vibemix nightlies"
+        - "No — just requesting support"
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?

@@ -1,0 +1,64 @@
+name: Bug report
+description: Something's broken or behaves unexpectedly
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more specific you are, the faster we can fix it.
+
+  - type: input
+    id: version
+    attributes:
+      label: vibemix version
+      description: "Run `vibemix --version` and paste the output."
+      placeholder: "v0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS Sequoia (15.x)
+        - macOS Sonoma (14.x)
+        - macOS earlier
+        - Windows 11
+        - Windows 10
+        - Other (specify in repro steps)
+    validations:
+      required: true
+
+  - type: input
+    id: controller
+    attributes:
+      label: Controller (if relevant)
+      placeholder: "Pioneer DDJ-FLX4"
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: "What did you do? What did you expect? What happened instead?"
+      placeholder: |
+        1. Launch vibemix
+        2. ...
+        3. Expected: ...
+        4. Got: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: events
+    attributes:
+      label: events.jsonl excerpt
+      description: "Paste the last 20-50 lines of `recordings/<latest-session>/events.jsonl` if relevant. Redact anything sensitive."
+      render: jsonl
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: "Screenshots, console logs, hardware quirks, etc."

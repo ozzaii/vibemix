@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: mailto:security@bravoh.com
+    about: Please do NOT open a public issue for security issues. Email security@bravoh.com instead.
+  - name: General question
+    url: https://github.com/bravoh/vibemix/discussions
+    about: For questions, ideas, and conversation that aren't bugs or features.

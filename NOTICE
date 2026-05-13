@@ -1,0 +1,84 @@
+vibemix
+Copyright 2026 Bravoh
+
+This product includes software developed by Bravoh (https://bravoh.com).
+
+Licensed under the Apache License, Version 2.0 — see LICENSE file.
+
+----------------------------------------------------------------------
+
+This product bundles or depends on the following third-party software.
+Each is listed with its license. Full license text is available at the
+referenced URL or in the corresponding package on PyPI / npm / crates.io.
+
+----------------------------------------------------------------------
+Python runtime dependencies (see pyproject.toml for exact versions)
+----------------------------------------------------------------------
+
+- google-genai           — Apache 2.0     https://github.com/googleapis/python-genai
+- livekit-agents         — Apache 2.0     https://github.com/livekit/agents
+- livekit-plugins-google — Apache 2.0     https://github.com/livekit/agents
+- numpy                  — BSD-3-Clause   https://numpy.org/
+- scipy                  — BSD-3-Clause   https://scipy.org/
+- sounddevice            — MIT            https://python-sounddevice.readthedocs.io/
+- mido                   — MIT            https://mido.readthedocs.io/
+- python-rtmidi          — MIT            https://github.com/SpotlightKid/python-rtmidi
+- mss                    — MIT            https://github.com/BoboTiG/python-mss
+- Pillow                 — HPND           https://python-pillow.org/
+- pyobjc-framework-*     — MIT            https://github.com/ronaldoussoren/pyobjc
+- pyobjc-framework-ScreenCaptureKit — MIT https://github.com/ronaldoussoren/pyobjc
+- PyAudioWPatch          — MIT            https://github.com/s0d3s/PyAudioWPatch
+- pywin32                — PSF-2.0        https://github.com/mhammond/pywin32
+- websockets             — BSD-3-Clause   https://github.com/python-websockets/websockets
+- python-dotenv          — BSD-3-Clause   https://github.com/theskumar/python-dotenv
+
+----------------------------------------------------------------------
+Frontend dependencies (see tauri/ui/package.json)
+----------------------------------------------------------------------
+
+- @tauri-apps/api        — Apache 2.0 / MIT  https://github.com/tauri-apps/tauri
+- @tauri-apps/cli        — Apache 2.0 / MIT  https://github.com/tauri-apps/tauri
+- three                  — MIT               https://github.com/mrdoob/three.js
+- vite                   — MIT               https://vitejs.dev/
+- typescript             — Apache 2.0        https://www.typescriptlang.org/
+- vitest                 — MIT               https://vitest.dev/
+
+----------------------------------------------------------------------
+Rust dependencies (see tauri/src-tauri/Cargo.toml)
+----------------------------------------------------------------------
+
+- tauri                       — Apache 2.0 / MIT  https://tauri.app/
+- tauri-plugin-updater        — Apache 2.0 / MIT  https://tauri.app/
+- tauri-plugin-global-shortcut — Apache 2.0 / MIT  https://tauri.app/
+- tauri-plugin-store          — Apache 2.0 / MIT  https://tauri.app/
+- tauri-plugin-fs             — Apache 2.0 / MIT  https://tauri.app/
+- serde, serde_json           — Apache 2.0 / MIT  https://serde.rs/
+
+----------------------------------------------------------------------
+External tooling (not bundled; runtime dependencies on user's machine)
+----------------------------------------------------------------------
+
+- BlackHole 2ch (macOS) — GPL-3.0  https://github.com/ExistentialAudio/BlackHole
+- nowplaying-cli        — MIT      https://github.com/kirtan-shah/nowplaying-cli
+- djay Pro              — Proprietary, Algoriddim GmbH (not bundled; user-installed)
+
+----------------------------------------------------------------------
+External services (network calls, not bundled)
+----------------------------------------------------------------------
+
+- Google Gemini API     — Google LLC (proprietary service)
+- Bravoh proxy          — Bravoh (closed-source; proxies Gemini for vibemix clients)
+- SignPath Foundation   — provides code-signing certs for OSS Windows builds
+- Apple Notary Service  — provides notarization for macOS builds
+
+----------------------------------------------------------------------
+Regenerating this file
+----------------------------------------------------------------------
+
+This NOTICE is maintained manually. To regenerate from pyproject.toml /
+package.json / Cargo.toml, run:
+
+    python -m scripts.dist.gen_notice --write NOTICE
+
+(Stub script; expands the manifest data on demand. Manual review still
+required for license correctness.)
