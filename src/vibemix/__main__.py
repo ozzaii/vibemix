@@ -81,11 +81,34 @@ from vibemix.audio import (
     PlaybackQueue,
     VoiceRecorder,
 )
+from vibemix.audio.recorder import sweep_crashed_sessions
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
 from vibemix.runtime import coach_loop, diag_loop, ws_broadcast
+from vibemix.runtime.config_store import app_data_dir
 from vibemix.state import EventDetector, MusicState, state_refresh_loop
 
 load_dotenv()
+
+
+# =============================================================================
+# Phase 15 — recordings root resolver
+# =============================================================================
+
+
+def _resolve_recordings_root() -> "os.PathLike[str]":
+    """Return the OS-aware recordings root: ``app_data_dir() / "recordings"``.
+
+    macOS:   ``~/Library/Application Support/vibemix/recordings``
+    Windows: ``%APPDATA%/vibemix/recordings``
+    Linux:   ``$XDG_CONFIG_HOME/vibemix/recordings`` (or ``~/.config/...``)
+
+    Matches the Tauri assetProtocol scope set in ``tauri.conf.json5`` so
+    ``<audio src="asset://...">`` resolves under the same path the sidecar
+    writes to. Pure forwarder over ``app_data_dir`` from Phase 12
+    ConfigStore — no caching, no mkdir (``VoiceRecorder.__init__`` mkdirs
+    with mode=0o700 per RESEARCH Security V8).
+    """
+    return app_data_dir() / "recordings"
 
 
 # =============================================================================
@@ -284,7 +307,21 @@ async def main() -> None:
     mic = MicBuffer(gain=MIC_GAIN, levels=levels)
     audio_buf = AudioBuffer(seconds=140.0, sr=INPUT_SR_TARGET)
     clean_audio_buf = AudioBuffer(seconds=INVOKE_AUDIO_SECONDS + 5.0, sr=INPUT_SR_TARGET)
-    recorder = VoiceRecorder()
+
+    # Phase 15 — boot-time crashed-session sweep. Walks recordings_root for
+    # session.json files whose ended_at_iso is None AND mtime older than
+    # 30s; marks them crashed=True. Best-effort: any IO error logs and
+    # continues (POC parity — the sweep is a nice-to-have surface for the
+    # Plan 15-04 browser UI, not a critical-path operation).
+    recordings_root = _resolve_recordings_root()
+    try:
+        marked = sweep_crashed_sessions(recordings_root)
+        if marked:
+            print(f"-> recovered {len(marked)} crashed session(s): {', '.join(marked)}")
+    except Exception as e:
+        print(f"[sweep err] {e}", file=sys.stderr)
+
+    recorder = VoiceRecorder(root=recordings_root)
 
     registry = BufferRegistry(
         audio=audio_buf,

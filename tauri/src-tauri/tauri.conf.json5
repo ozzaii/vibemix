@@ -62,7 +62,30 @@
       //   - connect-src 'self' ws://127.0.0.1:8765 — Plan 13-06 added the
       //     mascot webview's own WS subscription to the sidecar bus.
       //     'self' alone blocks ws://127.0.0.1:8765 (different origin).
-      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:8765"
+      //   - media-src 'self' asset: http://asset.localhost — Phase 15 Plan
+      //     02. The recording browser's <audio> elements resolve voice.wav
+      //     via convertFileSrc(absPath) → asset://localhost/<path>.
+      //     Without media-src, the browser engine silently refuses the
+      //     load and the <audio> duration stays at "--:--" (RESEARCH
+      //     Pitfall 1). http://asset.localhost is the http-scheme form
+      //     emitted on Windows by WebView2.
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:8765; media-src 'self' asset: http://asset.localhost",
+      // Phase 15 Plan 02 — assetProtocol exposes the recordings dir to the
+      // webview via asset://localhost/<absolute-path> URLs. Scope locked
+      // to BOTH $APPDATA and $APPLOCALDATA variants per RESEARCH Pitfall
+      // 2: on macOS both resolve to ~/Library/Application Support/vibemix
+      // (so one is a no-op); on Windows $APPDATA = Roaming and
+      // $APPLOCALDATA = Local — listing both is the defensive pattern so
+      // a future move of the recordings dir between roaming/local doesn't
+      // silently break playback. NO new permission identifier — the
+      // asset protocol is plugin-less in Tauri 2.
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/vibemix/recordings/**",
+          "$APPLOCALDATA/vibemix/recordings/**"
+        ]
+      }
     },
     "macOSPrivateApi": true
   },
