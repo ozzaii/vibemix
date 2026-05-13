@@ -51,6 +51,7 @@ import {
 } from "./components/retention-slider.js";
 import { renderConfirmDialog } from "./components/confirm-dialog.js";
 import { MascotGroup } from "./components/mascot-group.js";
+import { PerformanceGroup } from "./components/performance-group.js";
 import {
   closeSettingsState,
   getSettingsUIState,
@@ -95,6 +96,12 @@ const CSS = `
     transition: transform 250ms ease-in-out;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+  }
+  /* z-index discipline — keep header + body above .border-anim (z 4). */
+  .vmx-settings-drawer > :not(.border-anim) {
+    position: relative;
+    z-index: 5;
   }
   .vmx-settings-drawer[data-open="true"] {
     transform: translateX(0);
@@ -287,6 +294,14 @@ export function mountSettingsDrawer(root: HTMLElement): void {
   drawer.setAttribute("aria-label", "settings");
   drawer.setAttribute("role", "complementary");
 
+  // v5 animated border — first child of the drawer glass. tokens.css:302
+  // .border-anim handles the conic-gradient + mask-composite at z-index 4;
+  // children promoted to z-index 5 above via the descendant selector in CSS.
+  const borderAnim = document.createElement("div");
+  borderAnim.className = "border-anim";
+  borderAnim.setAttribute("aria-hidden", "true");
+  drawer.append(borderAnim);
+
   // Header
   const header = document.createElement("div");
   header.className = "vmx-settings-drawer__header";
@@ -407,7 +422,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
 
   // --- PERSONA --------------------------------------------------------------
   const personaBody = document.createElement("div");
-  personaBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-md);";
+  personaBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-4);";
 
   // Voice picker
   personaBody.append(
@@ -476,7 +491,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
 
   // --- OUTPUT ---------------------------------------------------------------
   const outputBody = document.createElement("div");
-  outputBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-md);";
+  outputBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-4);";
   outputBody.append(
     renderPicker({
       label: "DEVICE",
@@ -523,7 +538,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
 
   // --- HOTKEY ---------------------------------------------------------------
   const hotkeyBody = document.createElement("div");
-  hotkeyBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-sm);";
+  hotkeyBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-2);";
   const hotkeyLabel = document.createElement("div");
   hotkeyLabel.className = "vmx-settings-drawer__label";
   hotkeyLabel.textContent = "PUSH-TO-MUTE";
@@ -546,7 +561,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
 
   // --- RECORDING ------------------------------------------------------------
   const recordingBody = document.createElement("div");
-  recordingBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-sm);";
+  recordingBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-2);";
   const recordingLabel = document.createElement("div");
   recordingLabel.className = "vmx-settings-drawer__label";
   recordingLabel.textContent = "RETENTION";
@@ -568,7 +583,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
 
   // --- CALIBRATION ----------------------------------------------------------
   const calibrationBody = document.createElement("div");
-  calibrationBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-sm);";
+  calibrationBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-2);";
   const reRunBtn = document.createElement("button");
   reRunBtn.type = "button";
   reRunBtn.className = "vmx-settings-drawer__btn";
@@ -586,11 +601,17 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   );
 
   // --- MASCOT (Phase 13-03) -------------------------------------------------
-  // Appended last per Plan 13-03 §Task 2: order is PERSONA / OUTPUT /
-  // HOTKEY / RECORDING / CALIBRATION / MASCOT. The group is rebuilt on
-  // every drawer refresh, so SessionState diffs flow through naturally
-  // — same lifecycle as the other groups.
+  // Appended per Plan 13-03 §Task 2; per Plan 14-04 the new PERFORMANCE
+  // group sits AFTER MASCOT. Final order: PERSONA / OUTPUT / HOTKEY /
+  // RECORDING / CALIBRATION / MASCOT / PERFORMANCE.
   body.append(MascotGroup());
+
+  // --- PERFORMANCE (Phase 14-04) -------------------------------------------
+  // Single-row group: "LIGHTER BLUR" toggle wiring the data-blur-perf
+  // attribute on <html>. The toggle persists via settings.set { field:
+  // "lighter_blur", value: <bool> } through SettingsApplier; the boot
+  // read in main.ts re-applies it on next launch.
+  body.append(PerformanceGroup(settings.lighter_blur));
 
   // --- Modal slot rebuild ---------------------------------------------------
   renderModalSlot(modalSlot);
