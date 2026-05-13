@@ -433,6 +433,7 @@ class SessionLoop:
             retention_days=self.config_store.retention_days,
             push_to_mute_hotkey=self.config_store.push_to_mute_hotkey,
             muted=self.muted,
+            lighter_blur=self.config_store.lighter_blur,
         )
         await self.bus.emit(json.loads(state.to_json()))
 

@@ -72,6 +72,10 @@ _PHASE12_FIELDS: tuple[str, ...] = (
     "output_profile",
     "retention_days",
     "push_to_mute_hotkey",
+    # Phase 14-04 — perf-blur preference. Persisted alongside the other
+    # Phase 12 settings; default False (full v5 visual contract on fresh
+    # installs). Read at boot by main.ts to set html[data-blur-perf].
+    "lighter_blur",
 )
 _PHASE11_FIELDS: tuple[str, ...] = (
     "first_run_completed",
@@ -139,6 +143,8 @@ class ConfigStore:
     output_profile: str = "hp"
     retention_days: int = 7
     push_to_mute_hotkey: str = field(default_factory=_default_hotkey)
+    # Phase 14-04 — perf-blur preference (default False = full v5 visuals).
+    lighter_blur: bool = False
 
     # Phase 11 fields (preserved verbatim — sidecar reads only, Rust writes)
     first_run_completed: bool | None = None
