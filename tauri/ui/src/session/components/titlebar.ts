@@ -173,6 +173,11 @@ const CSS = `
     -webkit-app-region: no-drag;
     margin-left: var(--sp-3);
     padding: 4px 8px;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid var(--silk-22);
     border-radius: var(--rad-sm);
@@ -185,6 +190,12 @@ const CSS = `
     user-select: none;
     cursor: default;
     transition: opacity var(--motion-transition) ease-out;
+  }
+  /* Narrow-window guard (critique pass 3 2026-05-14): below 720px hide
+   * the hint chip rather than push past the gear button. The ? shortcut
+   * itself still works via keyboard. */
+  @media (max-width: 720px) {
+    .vmx-titlebar__hint { display: none; }
   }
   .vmx-titlebar__hint b {
     font-weight: 600;

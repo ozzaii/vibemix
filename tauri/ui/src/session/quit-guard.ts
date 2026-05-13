@@ -1,33 +1,34 @@
 /* quit-guard.ts — confirm-on-quit when the user closes the window during
- * a live recording session (impeccable Wave 6, closes H5 "error
- * prevention").
+ * a live recording session (impeccable Wave 6 + pass-3 Rust wiring).
  *
- * Two surfaces:
+ * Three surfaces:
  *
- *   1. `beforeunload` listener — the browser-native confirm dialog the
- *      user sees if the renderer is torn down without a Tauri-side
- *      intercept (Cmd+W reload in dev, or any path where the Rust shell
- *      doesn't get the close request first). When `isRecording()` returns
- *      true we set returnValue + preventDefault so the browser shows its
- *      native "Leave this page?" prompt.
+ *   1. `beforeunload` listener — browser-native confirm if the renderer
+ *      is torn down without going through the Tauri event channel
+ *      (Cmd+W reload in dev, browser-pane refresh). Native dialog only.
  *
- *   2. `confirmQuitDuringRecording()` — the styled confirm-dialog the
- *      Tauri shell SHOULD call from `onCloseRequested` (Rust-side
- *      intercept; TODO Phase 17 — we don't wire Rust here, just ship the
- *      JS surface so the wiring lands when the Rust intercept does).
- *      Tests pin this path.
+ *   2. `confirmQuitDuringRecording()` — styled CDJ-Whisper confirm
+ *      dialog. Called by `installTrayQuitListener()` when the tray Quit
+ *      menu emits `tray-quit-requested`.
  *
- * Why both? Tauri 2's webview surfaces `beforeunload` only for
- * navigation, not for OS-level close. To intercept the close button we'd
- * need a Rust-side `app.on_window_event` handler emitting an IPC event
- * back to the renderer (TODO). Until then the beforeunload listener is
- * the only thing standing between an in-flight recording and an
- * accidental ⌘W during a calibration pass.
+ *   3. `installTrayQuitListener()` — the load-bearing path. Listens for
+ *      the `tray-quit-requested` event from the Rust shell (emitted by
+ *      tray.rs::handle_menu_event on Quit menu click). If `isRecording()`
+ *      is false → immediately emit `confirmed-quit` back to Rust. Else →
+ *      mount the styled dialog; on "Quit anyway" emit `confirmed-quit`;
+ *      on "Stay" do nothing (Rust falls back to exit after 1.5s if no ack,
+ *      but the dialog should resolve before then).
+ *
+ * Pass-3 critique (2026-05-14) closes the H5 gap (was 3/4 → 4/4) by
+ * wiring the Rust tray-side handshake. Cmd+Q on a live recording no
+ * longer drops the take.
  *
  * The recording-active check uses `status.livekit === "ok"` as a proxy
  * for "session is recording" — the recording pipeline (cohost_v4.py)
  * writes WAVs continuously once the LiveKit session is up, so an "ok"
  * livekit pill is functionally equivalent to "recording in progress". */
+
+import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import { renderConfirmDialog } from "../settings/components/confirm-dialog.js";
 import { getSessionState } from "./state.js";
@@ -77,14 +78,13 @@ export function confirmQuitDuringRecording(
 /** Wire the browser-level beforeunload listener. Returns an unregister
  *  function the router calls on session teardown.
  *
- *  This is the SAFETY NET. The primary surface is the Rust-side
- *  onCloseRequested → confirmQuitDuringRecording() path; that's a TODO.
- *  In the meantime, beforeunload covers ⌘W / ⌘R / browser-pane reload. */
+ *  Safety-net for ⌘W / ⌘R / browser-pane reload paths that route around
+ *  the Tauri event channel. The PRIMARY recording-safety surface is
+ *  `installTrayQuitListener()` below — that intercepts the actual OS-level
+ *  Quit menu click. */
 export function installQuitGuard(): () => void {
   const listener = (e: BeforeUnloadEvent): string | undefined => {
     if (!isRecording()) return undefined;
-    // Modern browsers ignore the message but require both calls + a
-    // returnValue setter to surface their built-in confirm.
     e.preventDefault();
     e.returnValue = "your set is recording. quit anyway?";
     return "your set is recording. quit anyway?";
@@ -93,4 +93,26 @@ export function installQuitGuard(): () => void {
   return (): void => {
     window.removeEventListener("beforeunload", listener);
   };
+}
+
+/** Wire the Tauri tray-quit-requested → confirmed-quit handshake. The
+ *  Rust shell (tray.rs::handle_menu_event MENU_ID_QUIT) emits
+ *  `tray-quit-requested` instead of calling `app.exit(0)` directly. We
+ *  decide here whether to confirm or pass straight through, then emit
+ *  `confirmed-quit` so Rust can exit. Returns an unregister function. */
+export async function installTrayQuitListener(): Promise<() => void> {
+  let dialogOpen = false;
+  const unlisten: UnlistenFn = await listen("tray-quit-requested", () => {
+    if (dialogOpen) return;
+    if (!isRecording()) {
+      void emit("confirmed-quit");
+      return;
+    }
+    dialogOpen = true;
+    void confirmQuitDuringRecording().then((confirmed) => {
+      dialogOpen = false;
+      if (confirmed) void emit("confirmed-quit");
+    });
+  });
+  return unlisten;
 }

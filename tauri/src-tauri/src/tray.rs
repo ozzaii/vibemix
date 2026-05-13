@@ -254,9 +254,27 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
             let _ = app.emit("tray-open-settings", ());
         }
         MENU_ID_QUIT => {
-            // The ONE legitimate exit path. Lifecycle override below
-            // makes sure window close events don't reach this code path.
-            app.exit(0);
+            // Critique pass 3 (2026-05-14): H5 quit-during-recording guard.
+            // We don't exit directly any more — instead emit
+            // `tray-quit-requested`. The webview's quit-guard listener
+            // (src/session/quit-guard.ts) checks whether a recording is in
+            // flight; if not, it immediately emits `confirmed-quit` back
+            // and we exit. If a recording IS in flight, the styled "STILL
+            // LIVE" confirm-dialog mounts and the user picks Stay / Quit.
+            //
+            // Fallback: if the webview is unreachable (e.g. webview process
+            // crashed) we exit after a 1.5s grace period — better to lose
+            // the recording-warning UX than to leave the user without a
+            // Quit path.
+            let _ = app.emit("tray-quit-requested", ());
+            let fallback_app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                // If we're still alive after 1.5s, the webview never acked.
+                // Exit anyway. (If `confirmed-quit` already fired, the
+                // process is already gone and this never runs.)
+                fallback_app.exit(0);
+            });
         }
         other => {
             tracing::debug!("unrecognised tray menu id: {other}");

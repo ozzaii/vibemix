@@ -15,7 +15,7 @@
  * `body > #wizard-app` shell stays valid for the crash banner. */
 
 import { initSessionBridge } from "./ws-bridge.js";
-import { installQuitGuard } from "./quit-guard.js";
+import { installQuitGuard, installTrayQuitListener } from "./quit-guard.js";
 import { mountSessionLayout, type Mounted } from "./SessionLayout.js";
 import { startRenderLoop, stopRenderLoop } from "./render-loop.js";
 import { mountSessionShortcuts } from "./session-shortcuts.js";
@@ -25,6 +25,7 @@ let mounted: Mounted | null = null;
 let unsubscribeBridge: (() => void) | null = null;
 let unsubscribeShortcuts: (() => void) | null = null;
 let unsubscribeQuitGuard: (() => void) | null = null;
+let unsubscribeTrayQuit: (() => void) | null = null;
 
 /** Mount the live session and start the bridge + render loop.
  *
@@ -71,10 +72,15 @@ export async function routeSession(rootEl?: HTMLElement): Promise<void> {
 
   // Wave 6 (H5 error prevention) — install the beforeunload guard so an
   // accidental ⌘W/⌘R during a live recording surfaces the browser's
-  // native confirm. The styled "STILL LIVE" dialog is reachable via
-  // confirmQuitDuringRecording() — the Rust-side onCloseRequested
-  // intercept that calls it is a TODO (Phase 17).
+  // native confirm. Covers the in-renderer paths.
   unsubscribeQuitGuard = installQuitGuard();
+
+  // Critique pass 3 — install the tray-quit handshake listener. The Rust
+  // tray.rs emits `tray-quit-requested` instead of exit(0); we decide
+  // whether to confirm via the styled CDJ-Whisper dialog, then emit
+  // `confirmed-quit` so Rust exits. Closes H5 to 4/4 (Cmd+Q no longer
+  // drops a live recording silently).
+  unsubscribeTrayQuit = await installTrayQuitListener();
 }
 
 /** Tear down the session — stop the rAF, unsubscribe IPC, drop the
@@ -108,6 +114,15 @@ export async function teardownSession(): Promise<void> {
       console.warn("[session-router] quit-guard unsubscribe failed:", e);
     }
     unsubscribeQuitGuard = null;
+  }
+  if (unsubscribeTrayQuit) {
+    try {
+      unsubscribeTrayQuit();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[session-router] tray-quit unsubscribe failed:", e);
+    }
+    unsubscribeTrayQuit = null;
   }
   mounted = null;
 }

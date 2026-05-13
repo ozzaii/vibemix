@@ -27,6 +27,7 @@
       "identifier": "shell:allow-open",
       "allow": [
         { "url": "https://existential.audio/blackhole" },
+        { "url": "https://github.com/bravoh-ai/vibemix" },
         { "url": "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture" },
         { "url": "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone" }
       ]

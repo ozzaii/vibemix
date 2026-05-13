@@ -28,7 +28,7 @@ mod ws_client;
 
 use std::fs;
 
-use tauri::Manager;
+use tauri::{Listener, Manager};
 
 use crate::hotkey::HotkeyHandle;
 use crate::sidecar::SidecarHandle;
@@ -147,6 +147,18 @@ fn main() {
             // and re-derives tray icon state with a 2 Hz throttle. Listener
             // lives for the process lifetime — no uninstall needed.
             tray::install_tray_state_listener(&app_handle);
+
+            // Critique pass 3 (2026-05-14) — quit confirmation listener.
+            // The webview's quit-guard emits `confirmed-quit` after the
+            // user picks "Quit anyway" in the recording-confirm dialog (or
+            // immediately if no recording is in flight). On receipt we
+            // exit the process. Two-step quit (tray-quit-requested ->
+            // confirmed-quit) means Cmd+Q on a live recording no longer
+            // drops the take silently.
+            let quit_app = app_handle.clone();
+            app_handle.listen("confirmed-quit", move |_event| {
+                quit_app.exit(0);
+            });
 
             // Phase 18 Plan 18-04 — Tauri updater boot-time fire-and-forget.
             // Gated by `update_check_on_launch` (default true); when true the
