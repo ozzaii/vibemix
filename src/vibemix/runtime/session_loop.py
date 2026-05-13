@@ -424,6 +424,21 @@ class SessionLoop:
 
     async def _emit_settings_state(self) -> None:
         """Emit a full ``ipc.settings.state`` reflecting current config + ``muted``."""
+        # IN-03 in 14-REVIEW.md — round-trip mood + click_through too,
+        # so the SettingsSet enum's 10 fields can all be persisted
+        # through SettingsState. mood reads from MusicState (the live
+        # source-of-truth Plan 13-05's settings applier writes to);
+        # click_through reads from ConfigStore.extra (where Plan 13-05's
+        # _apply_click_through persists it).
+        mood: str | None = None
+        if self.music_state is not None:
+            raw_mood = getattr(self.music_state, "mood", None)
+            if raw_mood in ("hype-man", "teacher", "coach"):
+                mood = raw_mood
+        click_through_raw = self.config_store.extra.get("click_through")
+        click_through: bool | None = (
+            click_through_raw if isinstance(click_through_raw, bool) else None
+        )
         state = SettingsState.make(
             voice=self.config_store.voice,
             mode=self.config_store.mode,  # type: ignore[arg-type]
@@ -434,6 +449,8 @@ class SessionLoop:
             push_to_mute_hotkey=self.config_store.push_to_mute_hotkey,
             muted=self.muted,
             lighter_blur=self.config_store.lighter_blur,
+            mood=mood,  # type: ignore[arg-type]
+            click_through=click_through,
         )
         await self.bus.emit(json.loads(state.to_json()))
 

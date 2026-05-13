@@ -309,6 +309,14 @@ class SettingsStatePayload:
     push_to_mute_hotkey: str
     muted: bool
     lighter_blur: bool
+    # IN-03 in 14-REVIEW.md — optional fields so the SettingsSet enum's
+    # 10 fields can round-trip through SettingsState. Default None
+    # preserves the wire shape callers had before Phase 14 (the
+    # schema's `additionalProperties: false` rejects keys that are
+    # literally None when serialized; the wrapper's to_json strips None
+    # via _strip_none_optionals — see SettingsState.make).
+    mood: Literal["hype-man", "teacher", "coach"] | None = None
+    click_through: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -863,6 +871,11 @@ class SettingsState:
         push_to_mute_hotkey: str,
         muted: bool,
         lighter_blur: bool = False,
+        # IN-03 in 14-REVIEW.md — optional. Callers that have a
+        # MusicState reference (session loop) pass through; callers that
+        # don't (tests, boot smoke) leave defaulted-None.
+        mood: Literal["hype-man", "teacher", "coach"] | None = None,
+        click_through: bool | None = None,
     ) -> SettingsState:
         return cls(
             type="ipc.settings.state",
@@ -877,6 +890,8 @@ class SettingsState:
                 push_to_mute_hotkey=push_to_mute_hotkey,
                 muted=muted,
                 lighter_blur=lighter_blur,
+                mood=mood,
+                click_through=click_through,
             ),
         )
 
