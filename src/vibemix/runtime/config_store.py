@@ -183,6 +183,18 @@ class ConfigStore:
                 kwargs["retention_days"] = int(kwargs["retention_days"])
             except (TypeError, ValueError):
                 kwargs.pop("retention_days", None)
+        # IN-02 in 14-REVIEW.md — coerce/drop non-bool lighter_blur from
+        # disk. A corrupted config.json with `"lighter_blur": "yes"` or
+        # `1` would otherwise populate the dataclass verbatim and break
+        # the boot-time SettingsState emit (schema requires `"type":
+        # "boolean"`). bool is a subclass of int in Python, so
+        # `isinstance(True, int)` is True — keep the explicit bool check
+        # to reject ints. Same treatment applied to the other Phase 11
+        # bool fields so the policy is uniform: silently drop garbage
+        # rather than emit a broken ack.
+        for _bool_field in ("lighter_blur", "first_run_completed", "blackhole_install_seen"):
+            if _bool_field in kwargs and not isinstance(kwargs[_bool_field], bool):
+                kwargs.pop(_bool_field, None)
         return cls(extra=extra, **kwargs)
 
     def to_dict(self) -> dict[str, Any]:
