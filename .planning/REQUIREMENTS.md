@@ -172,19 +172,175 @@
 
 ---
 
-## v2 / Deferred
+## v2.0 Research-Driven Ship Requirements
 
-- [ ] Highlight reel export (auto-generate shareable clips from recordings) — marketing-funnel multiplier
+**Milestone:** v2.0 — Research-driven feature ship + absorbed v0.1.0 outstanding ship infrastructure.
+**Generated:** 2026-05-14 from PROJECT.md v2.0 milestone + research/SUMMARY.md + 12 v2-bucket artifacts.
+**Absorbs:** Outstanding v0.1.0 ship work (Phases 15-20 — recording browser, hallucination gate, sign+notarize, README, day-zero ops) folded into v2.0's 12-phase plan.
+
+### Detection & Grounding — Generalized Event Detector
+
+- [ ] **SENSE-11**: `GenreRouter` class — atomic detector-dict swap on `MusicState.active_genre` change without restarting session
+- [ ] **SENSE-12**: 6 cross-genre event detectors landed in v2.0 core: `KICK_SWAP`, `SUB_LAYER_ARRIVAL`, `BREAKDOWN_KICK_KILL`, `REENTRY_KICK_LAND`, `KICK_DENSITY_SHIFT`, `PHRASE_BOUNDARY`
+- [ ] **SENSE-13**: `MusicState` extended with `buildup_score`, `predicted_drop_in_sec`, `beat_phase`, `active_genre` fields (backward-compat defaults so Phase 3 golden equivalence holds)
+- [ ] **SENSE-14**: `PHRASE_BOUNDARY` detector via band-limited (40-120Hz) autocorrelation locking downbeat phase, ±1 bar accuracy, self-corrects on `BREAKDOWN_KICK_KILL`
+- [ ] **SENSE-15**: Per-genre detector dispatch architecture — `vibemix/events/genres/<genre>.py` registry + `_impl/` shared DSP primitives; baseline detectors byte-identical to v4 when no genre-specific detector fires
+- [ ] **SENSE-16**: Reference-WAV tuning harness — `scripts/tune_detectors.py` plays curated tracks through detector chain + emits per-fire CSV for Kaan ear-audit
+
+### Detection & Grounding — Evidence Registry + Citation Linter
+
+- [ ] **GROUND-01**: `EvidenceRegistry` — in-memory dict `(source, key) → list[t_session]`, written synchronously from `state_refresh_loop` and `EventDetector._fire`; SIBLING write-target alongside MusicState, never separate writer
+- [ ] **GROUND-02**: Citation grammar (EBNF locked) — `[ev:<TYPE>@<t>]`, `[aud:<key>@<t>]`, `[midi:<event>@<t>]`, `[track:<id>]`, `[screen:<key>]`, `[mix:<derived>]`, `[tend:<profile-fact>]` + multi-citation `[ev:DROP@04:22; aud:peak_rms=0.91]`
+- [ ] **GROUND-03**: Citation grammar baked into Gemini system instruction (v1.0 prompt-only, no enforcement — corpus seeding)
+- [ ] **GROUND-04**: `CitationLinter` Python class — stdlib `re` only, no third-party dep, in-memory validate against EvidenceRegistry
+- [ ] **GROUND-05**: Live-mode citation enforcement — response-level strip; total-strip falls back to ack bank via `PROMPT-09` integration
+- [ ] **GROUND-06**: Citation linter telemetry — `stripped_rate_15s > 0.4` triggers next-response bypass with `[unverified]` log marker; per-session `slop_ratio` metric surfaced via `ipc.session.citation`
+- [ ] **GROUND-07**: Per-mode tolerance bands — ±1.0s live, ±2.0s debrief (rolling-latency-aware optional)
+- [ ] **GROUND-08**: Prompt-side mitigation — "If you cannot cite, say 'I'm listening' — never reply with empty text" appended to live system instruction
+
+### Latency & Liveness — The Latency Stack
+
+- [ ] **LATENCY-01**: Pre-canned ack bank — 40 OPUS samples (Achird voice, generated offline once + pinned to TTS model version), bypass LiveKit TTS path via direct `PlaybackQueue.push()`
+- [ ] **LATENCY-02**: Ack rotation deque (maxlen=10) prevents same-sample-within-30s collision per event class
+- [ ] **LATENCY-03**: Per-event-class ack buckets — `drop_hit/`, `track_change/`, `mix_move/`, `silence_break/`, `generic_filler/`
+- [ ] **LATENCY-04**: Ack fires only when `rolling_ttft_avg_ms > 800`; suppresses when LLM is fast that turn
+- [ ] **LATENCY-05**: Min-ack-to-response gap = 400ms to prevent awkward overlap
+- [ ] **LATENCY-06**: `CachedLLM` subclass injecting `cached_content` via `extra_kwargs`; ~500-1500ms TTFT win per call
+- [ ] **LATENCY-07**: System instruction padded with deterministic context (MIDI map dump + event taxonomy enum + persona spec) to stay above Gemini's 1024-token cache floor when prompt-dieting
+- [ ] **LATENCY-08**: Cache lifecycle manager — creates cache on session start, refreshes every 4 min (TTL 5min minimum)
+- [ ] **LATENCY-09**: Prompt diet — audio Part trimmed 18s → 6s on non-PHASE events; screen Part skipped on MIX_MOVE/HEARTBEAT
+- [ ] **LATENCY-10**: `SpeechHandle.interrupt(force=True)` wrapper for programmatic cancel-and-refire (bypasses `allow_interruptions=False` user-mic gate)
+- [ ] **LATENCY-11**: Cancel cooldown hard cap — `CANCEL_COOLDOWN_S = 8.0` (Pitfall 1 mitigation)
+- [ ] **LATENCY-12**: Cancel soft cap — 30/session telemetry assertion auto-disables cancel-and-refire if `interrupted_rate > 3/min sustained`
+- [ ] **LATENCY-13**: Priority-gated cancel — higher-priority event (DROP=10 > MIX_MOVE=5) preempts in-flight generation; lower-priority queued or dropped
+
+### Personality & Anticipation — Mascot
+
+- [ ] **MASCOT-10**: 4-layer additive state machine refactor (simplified for v2.0 — mood baseline + anticipation overlay + speak/react; full effect layer deferred to v2.1)
+- [ ] **MASCOT-11**: Anticipation layer fires T+50ms from `EventDetector.detect()` — BEFORE Gemini round-trip — masks 400-1200ms of perceived latency
+- [ ] **MASCOT-12**: 5 new `prep_*` GLB clips authored with idle-zero lower-body delta (additive blend layer)
+- [ ] **MASCOT-13**: 2.5s anticipation timeout crossfades prep → `prep_settle` (NOT snap-back-to-idle on Gemini misfire — Pitfall 9)
+- [ ] **MASCOT-14**: Cancel-aware anticipation crossfade — `SpeechHandle.interrupt(force=True)` triggers prep-fadeout
+- [ ] **MASCOT-15**: Linter-strip-aware crossfade — total-strip triggers prep-fadeout + ack-only fallback
+- [ ] **MASCOT-16**: Beat-coupled procedural hip-bob — `Hips` bone Y offset weighted by RMS, locked to `MusicState.bpm + beat_phase`; two modes (phase-locked at >150 BPM, amplitude-driven at <130 BPM)
+- [ ] **MASCOT-17**: Three.js `AnimationUtils.makeClipAdditive` pass on all prep clips; p99 frame budget ≤22ms verified via vitest perf test
+- [ ] **MASCOT-18**: BPM phase drift mitigation — re-sync on every downbeat detection from `MusicState.beat_phase`
+- [ ] **MASCOT-19**: GLB clip total budget ≤15MB CI gate (anticipation adds ~6MB; remaining headroom for v2.1 emote-tag clips)
+
+### Cross-Software Integration — djay Pro Mac Overlay
+
+- [ ] **OVERLAY-01**: AX bridge in Tauri Rust parent (`tauri/src-tauri/src/ax_bridge.rs`) — sidecar requests rect via `ipc.overlay.ax_position` query; AX NEVER called from Python (Tauri #8329 mitigation, codebase grep gate)
+- [ ] **OVERLAY-02**: Day-1 AX-from-Rust-parent feasibility spike on code-signed bundle (Pitfall 3 prevention) — verifies kyleawayan/djay-pro-bridge pattern works on installed signed app, not just dev
+- [ ] **OVERLAY-03**: Second Tauri `WebviewWindow` (`label="overlay"`, transparent, always_on_top, set_ignore_cursor_events(true), decorations=false)
+- [ ] **OVERLAY-04**: Window tracker @10Hz follows djay Pro window bounds (move/resize/fullscreen-Spaces detection)
+- [ ] **OVERLAY-05**: 12 hand-mapped pointable elements in `tauri/ui/src/overlay/elements.json` — per-deck (mid/high/low EQ, gain, filter, fader, jog, play, cue, sync, tempo slider, hot cues) for djay Pro v5
+- [ ] **OVERLAY-06**: Canvas 2D ring renderer (amber `--ring-active` token, fade-in 200ms, hold 800ms, fade-out 300ms); 8s cooldown per element, at-most-one-ring-per-3s utterance
+- [ ] **OVERLAY-07**: Fullscreen-Spaces toast (Pitfall 4 mitigation) — overlay vanishes when DJ goes fullscreen on macOS; surface "Windowed mode for ring highlights" inline notice
+- [ ] **OVERLAY-08**: Dual-monitor coord-space consistency — all-Quartz no-NSScreen (Pitfall 13 mitigation, multi-monitor Y-flip)
+- [ ] **OVERLAY-09**: `#[cfg(target_os = "macos")]` gate — Windows + Rekordbox/Serato overlay deferred to v2.1+; README flags Mac-only scope at launch
+
+### Cross-Software Integration — Pyrekordbox XML Library Import
+
+- [ ] **LIBRARY-01**: `RekordboxLibrary` class with `pyrekordbox==0.4.4` XML parser (handles Rekordbox 5/6/7 schema variations, TEMPO + POSITION_MARK nested elements)
+- [ ] **LIBRARY-02**: SQLite cache at `$APPDATA/vibemix/library/rekordbox.db` — 3 tables (tracks, cues, beat_grid)
+- [ ] **LIBRARY-03**: 4-tier fuzzy lookup confidence ladder — exact → BPM-disambiguated → partial+artist → partial-only; artist OR BPM required for ≥0.7 confidence (Pitfall 16 mitigation)
+- [ ] **LIBRARY-04**: Confidence-aware grounding — "I think this is X" when <0.5; full citation `[track:<id>]` when ≥0.7
+- [ ] **LIBRARY-05**: Drag-drop + file-picker UX in Settings → Library tab
+- [ ] **LIBRARY-06**: 30-day staleness nudge + lookup-fail counter (Pitfall 15 mitigation)
+- [ ] **LIBRARY-07**: SQLCipher path explicitly skipped (broken post-Rekordbox 6.6.5)
+- [ ] **LIBRARY-08**: Sqlite-vec architectural slot reserved for v2.1 library intelligence; v2.0 ships only the SOURCE path, not the embed pipeline
+
+### Cross-Software Integration — MIDI Library Extension
+
+- [ ] **MIDI-15**: `MidiMapLoader` class replaces hardcoded `_CC_MAP`/`_NOTE_MAP` dicts; loads from `vibemix/midi/library/<sku>.json`
+- [ ] **MIDI-16**: DDJ-FLX4 Sync note disambiguation — 0x60 (v4) vs 0x58 (Mixxx canonical) resolved via 5-min mido sniff with Kaan present
+- [ ] **MIDI-17**: Verified mido-sniff data for DDJ-400, FLX6, FLX10, SX3, XDJ-RX3, Hercules Inpulse 300/500, Numark Party Mix Live, Numark Mixstream Pro+
+- [ ] **MIDI-18**: Community sniff tooling at `scripts/sniff_controller.py` — captures CC + note + value-range for PR contribution path
+- [ ] **MIDI-19**: Generic-MIDI fallback "observes, classifies conservatively, never invents" — logs activity, no aggressive role inference
+
+### Coaching & Memory — Post-Session Debrief (Architectural Slot Only — v2.0)
+
+- [ ] **DEBRIEF-01**: Sidecar `--debrief <session_dir>` flag spawns separate child process on WS bus port 8766 (avoids 8765 collision with live sidecar); architectural slot only, full UI feature deferred to v2.1
+- [ ] **DEBRIEF-02**: IPC schema reservations for `ipc.debrief.start`, `ipc.debrief.status`, `ipc.debrief.result` (3 messages, hidden in v2.0, surfaced in v2.1)
+
+### Ship & Distribution — Absorbed from v0.1.0
+
+- [ ] **REC-07**: Recording browser UI surface (REC-05 was marked complete but UX needs v2.0 polish — Phase 15 in absorbed plan)
+- [ ] **REC-08**: Retention enforcement cron worker (REC-06 hooks)
+- [ ] **DIST-09**: Apple Developer ID DMG sign + notarize (Issuer ID `3f60cc6b-df70-4ff8-9ceb-865dac6c1b4b` supplied 2026-05-14; key URMDRP5M3P — Apple Developer Program Agreement update outstanding, Francesco-action-required)
+- [ ] **DIST-10**: notarytool `--keychain-profile vibemix-URMDRP5M3P` configured; staple + validate against `spctl --assess` after sign
+- [ ] **DIST-11**: SignPath OSS Windows MSI sign — application filed Day-1 of v2.0 (~1-week SLA)
+- [ ] **DIST-12**: GitHub release matrix (macos-14 arm64 + macos-14 intel + windows-latest x86_64 + windows-latest arm64) with AIza-scan-clean across new bundle paths
+- [ ] **DIST-13**: Tauri Updater `latest.json` ed25519-signed; secret-name audit (`TAURI_UPDATER_KEY_PASSWORD` vs `TAURI_UPDATER_PRIVATE_KEY_PASSWORD` — Pitfall 7)
+- [ ] **DIST-14**: Updater manifest POST to `api.altidus.world/vibemix/updates/upload` (Bravoh ops deploys this endpoint as carry-forward)
+- [ ] **GH-19**: README full rewrite — value-prop paragraph above the fold, 30s demo GIF embedded, 12-question FAQ pre-seeded (anti-slop, anti-API-key, why-Gemini), 8-controller logo grid, badges row, install one-liner
+- [ ] **GH-20**: Hero PNG already shipped (Phase 19 absorbed); architecture SVG already shipped; 30s demo GIF NEW asset required
+- [ ] **GH-21**: CONTRIBUTING.md controller-mapping path with `scripts/sniff_controller.py` reference
+
+### Ship & Distribution — Day-Zero Operations
+
+- [ ] **OPS-01**: Fresh-macOS-VM rehearsal — clean macOS 14+ install, no dev cruft, screencast recorded (Pitfall 31 mitigation — Kaan's rig has BlackHole pre-installed + TCC granted, false-pass risk if used)
+- [ ] **OPS-02**: Fresh-Windows-VM rehearsal — clean Windows 11 install, AV/Defender SmartScreen reputation building check
+- [ ] **OPS-03**: `api.altidus.world/healthz` curl gate Day-0 (Pitfall 32 mitigation — endpoint must be deployed before first user installs)
+- [ ] **OPS-04**: Discord server setup — roles + channels + bot (Pitfall 34 mitigation — first 100 stars can't gather without it)
+- [ ] **OPS-05**: GitHub issue templates + auto-labeler (`.github/workflows/issue-triage.yml`) — Pitfall 35 mitigation
+- [ ] **OPS-06**: Bravoh proxy load test (100 RPS for 5 min, p99 <500ms) — Pitfall 30 / 39 mitigation
+- [ ] **OPS-07**: Adaptive cap + dashboard for proxy budget — soft cap auto-throttles per-user when 50€/mo per-user nears breach
+- [ ] **OPS-08**: Pre-seeded friend/dev stars (15+) before public launch to bootstrap social proof
+
+### Viral Wave — Demo Film + Channel Posts
+
+- [ ] **VIRAL-01**: 30s viral demo film — single take or curated multi-take, djay Pro 5 windowed mode, CDJ Whisper color, Kaan + DDJ-FLX4 + HD25 headphones
+- [ ] **VIRAL-02**: Beat A (T+8s): "AI points at the knob" — amber overlay ring on mid EQ deck A synchronized with Gemini voice line citing the move
+- [ ] **VIRAL-03**: Beat B (T+14s): "Anticipation lean-in BEFORE voice" — mascot leans forward 200ms before Gemini audio arrives
+- [ ] **VIRAL-04**: Beat C (T+22-25s): "3 seconds of deliberate silence" — AI stays quiet because nothing meaningful happened; anti-slop made visual
+- [ ] **VIRAL-05**: Twitter thread post — technical breakdown, Beat A hero image, code snippets, GitHub link
+- [ ] **VIRAL-06**: IG Reels post (IT + EN dual-track) — cinematic cut, music swell, Beat B hero
+- [ ] **VIRAL-07**: Reddit r/Beatmatch + r/DJs post — Beat C hero, open-source angle, EULA-friendly framing
+- [ ] **VIRAL-08**: HN "Show HN" post — engineering breakdown, anti-slop story, Beat A hero
+- [ ] **VIRAL-09**: Pre-seeded FAQ per channel — anti-slop, anti-API-key, why-Gemini, Rekordbox-in-v2-roadmap
+- [ ] **VIRAL-10**: GitHub stars ticker outro frame — frames the call-to-action against 15+ pre-seeded star count
+
+### Hallucination Verification Gate — Kaan's DJ Ear
+
+- [ ] **VERIFY-07**: Hallucination Verification Gate is Kaan's personal DJ-set testing (3-5 real sessions across the milestone) — NOT a 30-session formal eval suite per memory `project_phase_16_kaan_dj_testing`; supersedes VERIFY-01/02/03/05 from v0.1.0 plan
+- [ ] **VERIFY-08**: Phase 16 ear-test runs against shipped detector + linter + ack bank + mascot anticipation as they land in subsequent phases; tuning CSV from `scripts/tune_detectors.py` is the audit surface
+- [ ] **VERIFY-09**: Stretch — Francesco + 5-tester beta pool inside Phase 16 (Pitfall 40 sample-size-of-1 mitigation)
+- [ ] **VERIFY-10**: Phase 16 ear-test MUST replay sessions with `linter_silence_streak > 2` and assert it doesn't happen on real DJ sets (Pitfall 2 ground-truth)
+
+---
+
+## v2.1+ Deferred
+
+These features have research-locked implementation paths but are explicitly OUT of v2.0 scope. Move into next milestone after v2.0 ships.
+
+- [ ] Predictive drop firing — gated on Kaan ear-test telemetry from v2.0 baseline (A-bucket open Q1)
+- [ ] 4-layer mascot additive state machine full structural rewrite (~14 E-days; v2.0 ships only simplified anticipation subset)
+- [ ] Inline emote-tag vocabulary (15 tags) — gated on 1-day Gemini text-channel-timing spike (D-bucket A3 risk)
+- [ ] Post-session debrief MVP UI — chaptered + voiced TL;DR + 3 drills + clickable timeline (~7 E-days); architectural slot DEBRIEF-01/02 ships in v2.0
+- [ ] Long-term DJ profile — ~2KB JSON regenerated each session, injected verbatim into next live prompt; profile_*.json schema
+- [ ] Cross-mode citation enforcement — extend live linter to debrief + library + genre sentence-level (E-followup §3)
+- [ ] Library intelligence v1 — file watcher (watchdog) → Gemini Embedding 2 audio embed → sqlite-vec store (or numpy fallback on Win) → "what should I play next?" + transition critique queries
+- [ ] Library-aware drill cards — "3 tracks from your library that fix this" — depends on library intel + debrief
+- [ ] Hard Tek-specific detectors `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` — ship as Wave 2 of P17 if v2.0 timeline allows; else v2.1
+- [ ] Rekordbox / Serato overlay via template matching (canvas-rendered apps, AX returns nothing)
+- [ ] Windows overlay parity — DPI virtualization + EnumWindows + WS_EX_LAYERED+TRANSPARENT
+- [ ] VirtualDJ OSC integration (paid Pro license required upstream)
+- [ ] Genre expansion: Techno → Tech House → DnB → Trance → UKG → Trap → Disco (per-genre detector + reaction-vocab + 1 weekend each)
+- [ ] Mixxx OSC as first-class integration (currently behind `--enable-mixxx-osc` flag, gated on PR #14388 upstream merge)
+- [ ] Highlight reel export (auto-generate shareable clips from recordings)
 - [ ] Session replay UI with timeline scrubber
-- [ ] "Coach this moment" manual trigger (user taps a button to ask Avery about the last 10s)
+- [ ] "Coach this moment" manual trigger
 - [ ] Live mid-mix Coach nudges (Pro mode opt-in only)
-- [ ] Windows now-playing via winsdk GSMTC (if `SCREEN-06` deferred)
+- [ ] Windows now-playing via winsdk GSMTC (if SCREEN-06 deferred)
 - [ ] Additional controller mappings beyond the curated 10
-- [ ] Track recommendation / library scanner ("pair this with X from your folder")
 - [ ] Auto-detect genre (replaces manual picker — research-grade)
 - [ ] Multi-language UI chrome (currently English only)
+- [ ] Procedural mascot mouth from audio amplitude (3 talk variants — calm/loop/hype)
 
 ## Out of Scope
+
+**v0.1.0 Out-of-Scope (preserved):**
 
 - **Gemini Live Native Audio modality** — grounding tested worse than Flash + TTS cascade; codepath stays in repo but not the shipping path
 - **Headphone cue listening** — Gemini conflates cue with master, produces wrong reactions
@@ -197,6 +353,32 @@
 - **Twitch / YouTube live streaming integration** — record-for-later is enough for v1
 - **Mascot.html (legacy POC overlay)** as a shipped UI surface — superseded by the in-app reactive mascot (MASCOT-01..07)
 - **Auto-publish highlight clips** — manual review only (copyright safety)
+
+**v2.0 additions to Out-of-Scope (memory-locked, anti-slop / scope-creep guards):**
+
+- **30-session formal hallucination eval suite (supersedes v0.1.0 VERIFY-01/02/03/05)** — Kaan's personal DJ-set testing IS the hallucination gate per memory `project_phase_16_kaan_dj_testing`. No replay harness, no LLM scorer, no F1 validator.
+- **CLAP / OpenL3 / MERT / LAION-CLAP audio embedding models** — Gemini-only product per memory `feedback_no_clap_use_gemini_embedding`. Gemini Embedding 2 is the embedding model.
+- **mem0 / motorhead / Chroma / Qdrant for long-term DJ profile** — solves wrong problem (cross-conversation retrieval) + violates one-click-install per memory `project_v2_open_candidates`. DJ tendencies = ~2KB structured JSON, regenerated each session.
+- **Multi-provider LLM abstraction layer** — Gemini-only, no OpenAI / Anthropic / Whisper / Replicate codepath per memory `feedback_no_scope_creep_clean_utility`.
+- **Stem separation (Demucs / spleeter / open-unmix)** — ~500MB model bundle violates one-click-install hard requirement.
+- **Pioneer ProDJ Link (`python-prodj-link` / `beat-link`)** — requires CDJ hardware on Ethernet; bedroom DJ audience doesn't have CDJs. Wrong market.
+- **Rekordbox SQLCipher direct DB path** — Pioneer broke automatic key extraction at v6.6.5+; XML export path is the durable alternative.
+- **Mixamo ARKit blendshape lip-sync for mascot** — Mixamo killed blendshape export 2020; current rig has no blendshapes; re-rigging is 2-3 weeks + uncanny valley risk. Use 3 amplitude-banded talk variants instead.
+- **pydantic in IPC layer** — Phase 6 D-Area-4.4 constraint; hand-written `@dataclass(frozen=True, slots=True)` + jsonschema Draft-07 is the IPC contract.
+- **Predictive drop firing default-on in v2.0** — gated on Kaan ear-test telemetry; ships off-by-default + per-genre toggle.
+- **AX from Python sidecar for djay overlay** — Tauri #8329; AX MUST run in Rust parent. Codebase grep gate fails CI if AX called from Python.
+- **Rekordbox / Serato / Traktor / djay / VirtualDJ-Home real-time deck telemetry** — no public real-time API; deferred to v2.1+ template-matching attempts or never.
+- **Mixxx OSC as a v2.0 first-class integration** — PR #14388 still draft upstream; ships behind `--enable-mixxx-osc` flag if at all; promote when upstream merges.
+- **Rekordbox overlay highlight (template-matching)** — v2.1+; canvas-rendered UI requires fragile per-version coord mapping.
+- **Windows overlay highlight parity** — v2.1+; DPI virtualization + EnumWindows + WS_EX_LAYERED+TRANSPARENT.
+- **Library intelligence file-watcher + embed pipeline** — v2.1+; v2.0 ships only the SOURCE path (Pyrekordbox XML one-shot import).
+- **Post-session debrief UI surface** — v2.1+; v2.0 ships only the architectural slot (sidecar --debrief flag + port 8766 + IPC reservations).
+- **Long-term DJ profile injection into live prompt** — v2.1+; depends on debrief UI.
+- **Cross-mode citation enforcement (debrief + library + genre)** — v2.1+; v2.0 ships live-mode enforcement only.
+- **30+ controller mappings** — curated 10-SKU library is the v2.0 cap; community-PR path opens via `scripts/sniff_controller.py`.
+- **Auto-detect genre via on-device classifier** — v2.1+; v2.0 uses user-declared genre + nowplaying-cli metadata.
+- **Discord bot full automation** — v2.0 ships only Discord server + manual moderation; bot moderation v2.1+.
+- **Custom Gemini fine-tunes** — Gemini Pro/Flash off-the-shelf only; no fine-tuning infrastructure in v2.0.
 
 ---
 
