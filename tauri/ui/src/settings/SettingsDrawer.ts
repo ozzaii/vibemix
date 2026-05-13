@@ -670,8 +670,13 @@ async function applyHotkeyCapture(combo: string): Promise<void> {
 
 async function sendSettingsField(
   field: SettingsField,
-  value: string | number | null,
+  value: string | number | boolean | null,
 ): Promise<void> {
+  // WR-03 in 14-REVIEW.md — value union widened to match ws-bridge's
+  // sendSettings (which was widened to include boolean for Plan
+  // 14-04's lighter_blur). Without this, any future drawer-side toggle
+  // wanting to flow through this try/catch wrapper would need a type
+  // assertion to pass a boolean.
   try {
     await sendSettings(field, value);
   } catch (err) {
