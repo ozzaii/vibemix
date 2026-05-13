@@ -1,10 +1,11 @@
 /* Phase 12 Wave 4 — hotkey capture row (Plan 12-05 §3 HOTKEY group).
  *
  * Two states:
- *   1. Idle  — shows the current combo as a DM Mono 14px chip in
- *              `--phosphor`, plus a `[ ↻ Rebind ]` secondary button.
- *   2. Capture — chip becomes "PRESS KEYS…" pulsing `--phosphor-warm`;
- *              a single keydown captures the new combo and emits it.
+ *   1. Idle  — shows the current combo as a JetBrains Mono 14px chip in
+ *              var(--amber), plus a `[ ↻ Rebind ]` secondary button.
+ *   2. Capture — chip becomes "PRESS KEYS…" pulsing var(--amber-deep)
+ *              with var(--glow-soft); a single keydown captures the new
+ *              combo and emits it.
  *
  * Reserved combos (rejected at capture time with inline `--rec` error):
  *   macOS  — cmd+q / cmd+w / cmd+tab / cmd+space / cmd+shift+tab

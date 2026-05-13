@@ -1,6 +1,6 @@
 /* Phase 12 Wave 4 — retention slider (Plan 12-05 §3 RECORDING group).
  *
- * 6-stop knurled-knob slider for recording retention:
+ * 6-stop retention discs (one per retention tier):
  *   index 0 → 1 day
  *   index 1 → 3 days
  *   index 2 → 7 days
@@ -11,15 +11,18 @@
  *                policy treats >=36500 as the "keep forever" branch.)
  *
  * Visuals (UI-SPEC §13 RECORDING):
- *   - DSEG7 22px readout above the track shows current selection
- *     (`1 D` / `3 D` / `7 D` / `14 D` / `30 D` / `INF`).
- *   - Horizontal track, 2px `--bezel-1`, lit portion `--phosphor-soft`.
- *   - 6 knurled-knob stops along the track: 14×14 circle, `--panel-deep`
- *     fill, 1px `--phosphor-dim` border, `--phosphor-glow` on hover.
- *   - Active stop knob: solid `--phosphor` fill (no halo halation needed —
- *     the lit-track portion sells the position).
+ *   - JetBrains Mono 18px tabular-nums readout above the track shows
+ *     current selection (`1 D` / `3 D` / `7 D` / `14 D` / `30 D` / `INF`).
+ *   - Horizontal track: 1px var(--glass-edge) recessed hairline; lit portion
+ *     is a linear-gradient(90deg, var(--amber-deep), var(--amber) 70%,
+ *     var(--amber-pale)) ribbon with var(--amber-22) bloom.
+ *   - 6 retention discs along the track: 14×14 circle, var(--void-2) fill,
+ *     1px var(--glass-edge) border, hover lifts to var(--amber-40) edge
+ *     + var(--amber-22) bloom.
+ *   - Active disc: solid var(--amber) fill with var(--amber-pale) edge —
+ *     the lit-track portion already sells the position.
  *
- * Emits via `onChange(days)` exactly when the user clicks a stop. The
+ * Emits via `onChange(days)` exactly when the user clicks a disc. The
  * caller wires this to `sendSettings('retention_days', days)`.
  */
 

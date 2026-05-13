@@ -6,9 +6,9 @@
  *     (Plan 13-02 wires the actual `set_mascot_click_through` Tauri
  *     command). Default OFF — the window stays draggable.
  *   - MOOD: 3 segmented pills (HYPE-MAN / TEACHER / COACH). The active
- *     pill is filled with `--phosphor-soft` + `--phosphor` text +
- *     phosphor halo, matching the brushed-metal recess of the existing
- *     interaction rocker (no flat fills).
+ *     pill paints amber-backlit per the v5 .mood-btn.on anatomy (mock-
+ *     verbatim gradient + inset glow), matching the existing interaction
+ *     rocker (no flat fills).
  *
  * IPC wiring:
  *   - mood pill click          → emitIpc('ipc.settings.set', { field: 'mood', value })
@@ -21,15 +21,16 @@
  * `ipc.settings.state` ack on the round-trip — that's how this component
  * re-syncs after a successful change.
  *
- * Frontend-enforcement compliance:
+ * Frontend-enforcement compliance (CDJ Whisper v5 contract):
  *   - NO Inter / Tailwind / hex literals. Every color is a `var(--*)`
  *     read; the spec's hex-grep guard pulls this CSS from <style
  *     data-scope="vmx-mascot-group"> and asserts zero matches.
- *   - 20/80 rule: dominant tone is `--ink-engraved` panel; phosphor amber
- *     accent appears ONLY on the active pill (and via the existing rocker
- *     component's active-state).
- *   - Workbench display for "MASCOT" heading (via the parent Group
- *     wrapper), DM Mono for pill labels.
+ *   - 20/80 rule: dominant tone is var(--glass-3) recessed plate;
+ *     amber accent appears ONLY on the active pill (accent-reservation
+ *     item 4 — active mood pill) and via the existing rocker's active
+ *     state.
+ *   - Saira variable-axis display for "MASCOT" heading (via the parent
+ *     Group wrapper).
  *   - Toggle reuses `renderRocker` ("rocker" variant) — no new toggle
  *     shape per Plan 13-03 frontend_enforcement_constraints.
  */
