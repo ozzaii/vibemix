@@ -1,10 +1,10 @@
-/* blackhole-banner.ts — Step 2 macOS-only conditional banner (UI-SPEC §8).
+/* blackhole-banner.ts — Step 2 macOS-only conditional banner (UI-SPEC §8 / CDJ Whisper v5).
  *
- * Full-width inside primary panel, top-positioned (above audio test).
- * --phosphor-halo border-glow + --phosphor-dim border + linear-gradient
- * --panel-lift→--panel background.
+ * Full-width glass tile inside primary panel, top-positioned (above
+ * audio test). --glass-2 fill, --amber-40 1px border, composite amber
+ * glow (--glow-soft outer + inset 14px --amber-22 inner).
  *
- * Left: 24px BlackHole waveform glyph (inline SVG) in --phosphor.
+ * Left: 24px BlackHole waveform glyph (inline SVG) in --amber.
  * Center: heading "BLACKHOLE NOT FOUND" + body "vibemix needs blackhole
  * to hear your master output. it's free, takes 30 seconds." (VERBATIM
  * from UI-SPEC §Step 2).
@@ -12,7 +12,7 @@
  * [ ↻ Recheck ] (secondary).
  *
  * postClickState true → primary disabled with caption "opened in browser
- * — install then click Recheck below" (DM Mono 11px --ink-dim). */
+ * — install then click Recheck below" (Saira body 11px --silk-65). */
 
 import { registerStyle } from "./_style-registry.js";
 import { BLACKHOLE_SVG } from "../icons/speaker.svg.js";
@@ -29,49 +29,59 @@ const CSS = `
     display: grid;
     grid-template-columns: 24px 1fr auto;
     align-items: center;
-    gap: var(--sp-md);
-    padding: var(--sp-md) var(--sp-lg);
-    background: linear-gradient(180deg, var(--panel-lift), var(--panel));
-    border: 1px solid var(--phosphor-dim);
-    border-radius: 6px;
-    box-shadow: var(--phosphor-halo);
-    margin-bottom: var(--sp-md);
+    gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-5);
+    background: var(--glass-2);
+    backdrop-filter: var(--blur-glass-light);
+    -webkit-backdrop-filter: var(--blur-glass-light);
+    border: 1px solid var(--amber-40);
+    border-radius: var(--rad-md);
+    box-shadow:
+      inset 0 1px 0 var(--glass-top),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+      inset 0 0 14px var(--amber-22),
+      var(--glow-soft);
+    margin-bottom: var(--sp-4);
   }
   .cmp-bh-banner__glyph {
-    color: var(--phosphor);
+    color: var(--amber);
     display: flex;
     align-items: center;
     justify-content: center;
+    filter: drop-shadow(0 0 3px var(--amber-22));
   }
   .cmp-bh-banner__text {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-xs);
+    gap: var(--sp-1);
   }
   .cmp-bh-banner__heading {
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 11px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--phosphor);
-    text-shadow: var(--phosphor-glow);
+    color: var(--amber);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), 0 0 6px var(--amber-40);
   }
   .cmp-bh-banner__body {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
     font-size: 14px;
-    color: var(--ink);
+    color: var(--silk);
     line-height: 1.5;
   }
   .cmp-bh-banner__caption {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
     font-size: 11px;
-    color: var(--ink-dim);
-    margin-top: var(--sp-xs);
+    color: var(--silk-65);
+    margin-top: var(--sp-1);
   }
   .cmp-bh-banner__actions {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-sm);
+    gap: var(--sp-2);
   }
 `;
 

@@ -30,30 +30,33 @@ export interface Step1Callbacks {
 
 const CSS = `
   .wizard-step__heading {
-    font-family: "Workbench", "Courier New", monospace;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 700;
     font-size: 22px;
     letter-spacing: 0.04em;
-    color: var(--phosphor);
-    text-shadow: var(--phosphor-glow);
+    color: var(--amber);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), var(--glow-soft);
     line-height: 1.1;
-    margin: 0 0 var(--sp-sm);
+    margin: 0 0 var(--sp-2);
+    text-transform: uppercase;
   }
   .wizard-step__subtitle {
-    font-family: "DM Mono", monospace;
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
     font-size: 14px;
-    color: var(--ink-dim);
+    color: var(--silk-65);
     line-height: 1.5;
-    margin: 0 0 var(--sp-lg);
+    margin: 0 0 var(--sp-5);
   }
   .wizard-step__cards {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-md);
+    gap: var(--sp-4);
   }
   .wizard-step__cta-row {
     display: flex;
     justify-content: flex-end;
-    margin-top: var(--sp-lg);
+    margin-top: var(--sp-5);
   }
 `;
 
