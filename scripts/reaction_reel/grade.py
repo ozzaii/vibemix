@@ -43,6 +43,7 @@ import subprocess
 import sys
 import textwrap
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -87,6 +88,11 @@ SLOP_FLAGS: tuple[str, ...] = (
 # tuple-of-types) below so bools-as-ints don't slip through (bool IS an int
 # in Python; we explicitly forbid the conflation for the "would_clip" /
 # "grounded" / "timely" / "unique" / "personality_fit" booleans).
+#
+# ``graded_at_iso`` is added in Plan 17-03 (the analyzer's threat model
+# T-17-03-02 — Repudiation — relies on a per-record timestamp). ``rater``
+# field already supplies identity; ``graded_at_iso`` provides the audit
+# trail timestamp. The full set of 11 fields matches 17-RUBRIC.md §3.
 _REQUIRED_FIELDS: dict[str, type | tuple[type, ...]] = {
     "reaction_id": str,
     "score": int,
@@ -98,6 +104,7 @@ _REQUIRED_FIELDS: dict[str, type | tuple[type, ...]] = {
     "slop_flag": str,
     "comment": str,
     "would_clip": bool,
+    "graded_at_iso": str,
 }
 
 CONTEXT_WINDOW_S: float = 15.0  # ±15s per CONTEXT Area 2 §Reaction extraction.
@@ -642,6 +649,11 @@ def _prompt_grade_for_reaction(
             "slop_flag": slop_flag,
             "comment": comment,
             "would_clip": would_clip,
+            # ISO-8601 UTC timestamp at submission — Plan 17-03 analyzer
+            # uses this for the per-record audit trail (T-17-03-02).
+            "graded_at_iso": datetime.now(timezone.utc)
+                .replace(microsecond=0)
+                .isoformat(),
         }
         try:
             validate_grade(grade)

@@ -344,6 +344,7 @@ def test_validate_grade_enforces_locked_schema() -> None:
         "slop_flag": "none",
         "comment": "Solid call — wouldn't clip though.",
         "would_clip": False,
+        "graded_at_iso": "2026-05-13T14:00:00+00:00",
     }
     # No exception → pass.
     validate_grade(good)
@@ -395,6 +396,7 @@ def test_write_grade_appends_one_line_and_fsyncs(tmp_path: Path) -> None:
         "slop_flag": "none",
         "comment": "Real friend energy.",
         "would_clip": True,
+        "graded_at_iso": "2026-05-13T14:00:00+00:00",
     }
     grade_b = dict(grade_a, reaction_id="bbb22222", score=3, slop_flag="generic")
 
@@ -497,6 +499,7 @@ def test_resume_skips_already_graded_reactions(tmp_path: Path) -> None:
                 "slop_flag": "none",
                 "comment": "ok",
                 "would_clip": False,
+                "graded_at_iso": "2026-05-13T14:00:00+00:00",
             },
         )
 
