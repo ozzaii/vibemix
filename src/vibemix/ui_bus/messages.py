@@ -286,8 +286,11 @@ class SettingsSetPayload:
         "output_profile",
         "retention_days",
         "push_to_mute_hotkey",
+        "mood",
+        "click_through",
+        "lighter_blur",
     ]
-    value: str | int | None
+    value: str | int | bool | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,6 +308,7 @@ class SettingsStatePayload:
     retention_days: int
     push_to_mute_hotkey: str
     muted: bool
+    lighter_blur: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -858,6 +862,7 @@ class SettingsState:
         retention_days: int,
         push_to_mute_hotkey: str,
         muted: bool,
+        lighter_blur: bool = False,
     ) -> SettingsState:
         return cls(
             type="ipc.settings.state",
@@ -871,6 +876,7 @@ class SettingsState:
                 retention_days=retention_days,
                 push_to_mute_hotkey=push_to_mute_hotkey,
                 muted=muted,
+                lighter_blur=lighter_blur,
             ),
         )
 
