@@ -123,19 +123,23 @@ const LAYOUT_CSS = `
     --col-left: 320px;
     --col-center: 420px;
     --col-right: 420px;
-    --gap-col: var(--sp-lg);
+    --gap-col: var(--sp-5);
     display: grid;
     grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
     height: 100vh;
     position: relative;
     overflow: hidden;
   }
+  /* The animated amber border-anim is z-index 4 (tokens.css). Promote
+   * direct children above it so titlebar / grid / status-bar paint over
+   * the sweep peak without being clipped by the conic mask. */
+  .vmx-session > *:not(.border-anim) { position: relative; z-index: 5; }
   .vmx-session__screw {
     position: absolute;
     width: 8px;
     height: 8px;
     z-index: 100;
-    color: var(--bezel-3);
+    color: var(--silk-22);
     pointer-events: none;
   }
   .vmx-session__screw[data-corner="tl"] { top: 6px; left: 6px; }
@@ -146,14 +150,14 @@ const LAYOUT_CSS = `
     display: grid;
     grid-template-columns: var(--col-left) var(--col-center) var(--col-right);
     gap: var(--gap-col);
-    padding: var(--sp-xl);
+    padding: 32px; /* mock-verbatim — no v5 spacing equivalent for 32 */
     overflow: hidden;
     align-items: start;
   }
   .vmx-session__col {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-md);
+    gap: var(--sp-4);
     min-width: 0;
   }
   .vmx-session__col[data-col="right"] {
@@ -161,10 +165,10 @@ const LAYOUT_CSS = `
   }
   .vmx-session__meter-strip {
     display: flex;
-    gap: var(--sp-md);
+    gap: var(--sp-4);
     align-items: flex-end;
     justify-content: space-around;
-    padding: var(--sp-md) 0 0;
+    padding: var(--sp-4) 0 0;
   }
   @media (max-width: 1100px) {
     .vmx-session__grid {
@@ -183,7 +187,15 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const root = document.createElement("div");
   root.className = "vmx-session";
 
-  // Corner screws — pure ornament per UI-SPEC §Panel screws.
+  // v5 animated border — first child of the session glass panel.
+  // tokens.css `.border-anim` handles the conic-gradient + mask-composite.
+  // Parent already satisfies position: relative + overflow: hidden.
+  const borderAnim = document.createElement("div");
+  borderAnim.className = "border-anim";
+  borderAnim.setAttribute("aria-hidden", "true");
+  root.append(borderAnim);
+
+  // Corner screws — pure ornament per UI-SPEC §Panel screws (recolored to --silk-22).
   for (const corner of ["tl", "tr", "bl", "br"] as const) {
     const sc = document.createElement("span");
     sc.className = "vmx-session__screw";

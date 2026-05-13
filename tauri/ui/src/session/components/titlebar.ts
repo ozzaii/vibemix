@@ -2,9 +2,10 @@
  *
  * Extends the Phase 11 wizard titlebar with the live-session affordances:
  *   - traffic-light spacer (left)
- *   - "vibemix" Workbench 28px wordmark with --phosphor-glow
- *   - 3 status pills (LIVE / REC / SYS) — each with a 6×6 LED
- *   - DSEG7 22px live clock
+ *   - "vibemix" Saira (wdth 78, wght 800) 20px wordmark with an animated
+ *     amber-dot brand bullet
+ *   - 3 status pills (LIVE / REC / SYS) — each with a 6×6 dome LED
+ *   - JetBrains Mono tabular-nums 18px live clock
  *   - SETTINGS gear button (right) — fires onSettingsClick
  *
  * Pure-function: accept props, return HTMLElement, no internal state. The

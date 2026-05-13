@@ -1,14 +1,14 @@
 /* rocker.ts — segmented rocker switch with two visual variants.
  *
  *   variant: "rocker"      — simple segmented (BEG / INT / PRO or HP / SPK).
- *   variant: "interaction" — LED-prefixed buttons (● HYPE / ● COACH).
+ *   variant: "interaction" — mood block buttons (HYPE / TEACH / COACH).
  *
- * Lifted verbatim from mocks/vibemix-app-ui.html `.mode-rocker` (lines
- * 351-405) and `.interaction` (lines 408-438). Active position lit
- * --phosphor background with --phosphor-glow inset and --phosphor text;
- * inactive --panel-deep + --ink-dim. Rocker bezel uses inset shadow
- * to look pressed-in. Pure-function — accepts {options, active, onChange,
- * variant} and emits a click that fires onChange(optionId). */
+ * v5 CDJ Whisper: active segment lit with the canonical amber-bleed-
+ * through-frost recipe (--amber gradient + --amber-22 inset glow +
+ * --amber-40 hairline + --amber text with --glow-soft text-shadow);
+ * inactive sits flat on --glass-3 + --silk-40. Rocker bezel uses inset
+ * shadow to look pressed-in. Pure-function — accepts {options, active,
+ * onChange, variant} and emits a click that fires onChange(optionId). */
 
 import { registerStyle } from "./_style-registry.js";
 
