@@ -1,4 +1,7 @@
 /* Phase 12 Wave 4 — Settings drawer mount/open/close (Plan 12-05 §7).
+ * Phase 15 Plan 05 — adds 4 cases covering the in-drawer recording browser
+ * wiring: list IPC dispatch on open, list-result populates rows, delete
+ * ok=true optimistically removes, list timeout flips usage to UNAVAILABLE.
  *
  * Asserts:
  *   - mountSettingsDrawer is idempotent (two calls = one DOM tree).
@@ -7,35 +10,65 @@
  *   - Backdrop click closes the drawer.
  *   - ✕ button closes the drawer.
  *   - Esc does NOT close when a modal confirm is in flight.
+ *   - Phase 15: recordings.list fires on drawer open.
+ *   - Phase 15: list_result populates row count.
+ *   - Phase 15: delete ok=true removes row optimistically.
+ *   - Phase 15: list error → disk usage line shows UNAVAILABLE.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock @tauri-apps/api/core BEFORE importing the drawer module — the
 // drawer imports `invoke` for the rebind_hotkey command. In jsdom we
-// don't want a real Tauri context.
+// don't want a real Tauri context. `convertFileSrc` is pulled in
+// transitively via recording-row.ts (Phase 15 Plan 04).
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (_cmd: string, _args?: Record<string, unknown>) => {}),
+  convertFileSrc: (path: string): string => `asset://localhost${path}`,
 }));
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async () => () => {}),
 }));
 
+// Phase 15 Plan 05 — mock the IPC client so list/delete dispatches are
+// observable + controllable in test cases. The drawer's loadRecordings()
+// and onDeleteRecording() functions both call sendIpcRequest.
+const sendIpcRequestMock = vi.fn();
+vi.mock("../../src/ipc/client.js", () => ({
+  emitIpc: vi.fn(async () => undefined),
+  sendIpcRequest: (
+    requestType: string,
+    requestPayload: Record<string, unknown>,
+    responseType: string,
+    timeoutMs?: number,
+  ) => sendIpcRequestMock(requestType, requestPayload, responseType, timeoutMs),
+  subscribeIpc: vi.fn(async () => () => {}),
+}));
+
 import {
   _resetDrawerForTests,
   closeSettings,
+  loadRecordings,
   mountSettingsDrawer,
+  onDeleteRecording,
   openSettings,
 } from "../../src/settings/SettingsDrawer.js";
 import {
   _resetSettingsUIStateForTests,
   getSettingsUIState,
+  setRecordingsSlice,
   setSettingsUIState,
 } from "../../src/settings/state.js";
 
 beforeEach(() => {
   _resetSettingsUIStateForTests();
   _resetDrawerForTests();
+  sendIpcRequestMock.mockReset();
+  // Default: never-resolves so non-Phase-15 tests don't hit a stub
+  // resolution race. Specific cases override below.
+  sendIpcRequestMock.mockImplementation(
+    () => new Promise(() => undefined),
+  );
   document.body.replaceChildren();
 });
 
@@ -192,5 +225,146 @@ describe("group rendering", () => {
     mountSettingsDrawer(document.body);
     openSettings();
     expect(document.querySelectorAll(".vmx-retention__knob").length).toBe(6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 15 Plan 05 — Recording browser wiring inside the RECORDING group.
+// ---------------------------------------------------------------------------
+
+describe("Phase 15: recording browser wiring", () => {
+  it("fires ipc.recordings.list on drawer open with empty payload", async () => {
+    // Capture the request without resolving so we can assert the call args.
+    sendIpcRequestMock.mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    mountSettingsDrawer(document.body);
+    openSettings();
+
+    // Yield a microtask so the void loadRecordings() promise schedules its
+    // sendIpcRequest call.
+    await Promise.resolve();
+
+    const listCalls = sendIpcRequestMock.mock.calls.filter(
+      (c) => c[0] === "ipc.recordings.list",
+    );
+    expect(listCalls.length).toBe(1);
+    expect(listCalls[0]![1]).toEqual({});
+    expect(listCalls[0]![2]).toBe("ipc.recordings.list_result");
+  });
+
+  it("list_result populates 2 row elements in the recording browser DOM", async () => {
+    sendIpcRequestMock.mockResolvedValueOnce({
+      type: "ipc.recordings.list_result",
+      ts: "2026-05-13T21:04:10+02:00",
+      payload: {
+        sessions: [
+          {
+            session_dir: "20260513-210410",
+            started_at_iso: "2026-05-13T21:04:10+02:00",
+            duration_s: 1800,
+            event_count: 22,
+            bytes_total: 1_500_000,
+            crashed: false,
+          },
+          {
+            session_dir: "20260512-182200",
+            started_at_iso: "2026-05-12T18:22:00+02:00",
+            duration_s: 7380,
+            event_count: 71,
+            bytes_total: 2_500_000,
+            crashed: false,
+          },
+        ],
+        bytes_total: 4_000_000,
+      },
+    });
+    // Mount + set drawer open via state (NOT openSettings, which would
+    // auto-fire loadRecordings + consume the one-shot mock). We drive
+    // loadRecordings explicitly so the assertion runs after the resolver.
+    mountSettingsDrawer(document.body);
+    setSettingsUIState({ open: true });
+    await loadRecordings();
+
+    const rows = document.querySelectorAll(".vmx-rec-row");
+    expect(rows.length).toBe(2);
+    // Slice state mirrors the wire payload.
+    const slice = getSettingsUIState().recordings;
+    expect(slice.sessions.length).toBe(2);
+    expect(slice.usage.bytes_total).toBe(4_000_000);
+    expect(slice.loading).toBe(false);
+    expect(slice.error).toBeNull();
+  });
+
+  it("delete ok=true ack optimistically removes the row from the slice", async () => {
+    // Seed two sessions in the slice directly (skip the list dispatch for
+    // this case — we test only the delete path).
+    setRecordingsSlice({
+      sessions: [
+        {
+          session_dir: "20260513-210410",
+          started_at_iso: "2026-05-13T21:04:10+02:00",
+          duration_s: 1800,
+          event_count: 22,
+          bytes_total: 1_500_000,
+          crashed: false,
+        },
+        {
+          session_dir: "20260512-182200",
+          started_at_iso: "2026-05-12T18:22:00+02:00",
+          duration_s: 7380,
+          event_count: 71,
+          bytes_total: 2_500_000,
+          crashed: false,
+        },
+      ],
+      usage: { sessions: 2, bytes_total: 4_000_000 },
+    });
+    // Mount + set open via state to avoid auto-firing loadRecordings.
+    mountSettingsDrawer(document.body);
+    setSettingsUIState({ open: true });
+
+    // Stub the delete reply.
+    sendIpcRequestMock.mockResolvedValueOnce({
+      type: "ipc.recordings.delete_ack",
+      ts: "2026-05-13T21:04:10+02:00",
+      payload: {
+        session_dir: "20260513-210410",
+        ok: true,
+        error: null,
+      },
+    });
+
+    await onDeleteRecording("20260513-210410");
+
+    const deleteCalls = sendIpcRequestMock.mock.calls.filter(
+      (c) => c[0] === "ipc.recordings.delete",
+    );
+    expect(deleteCalls.length).toBe(1);
+    expect(deleteCalls[0]![1]).toEqual({ session_dir: "20260513-210410" });
+    expect(deleteCalls[0]![2]).toBe("ipc.recordings.delete_ack");
+
+    const slice = getSettingsUIState().recordings;
+    expect(slice.sessions.length).toBe(1);
+    expect(slice.sessions[0]!.session_dir).toBe("20260512-182200");
+  });
+
+  it("list IPC timeout swaps the disk-usage line to UNAVAILABLE copy", async () => {
+    sendIpcRequestMock.mockRejectedValueOnce(
+      new Error("ipc timeout: no ipc.recordings.list_result within 10000ms"),
+    );
+    // Mount + open via state directly so loadRecordings runs exactly once
+    // and consumes the one-shot rejecting mock.
+    mountSettingsDrawer(document.body);
+    setSettingsUIState({ open: true });
+    await loadRecordings();
+
+    const usage = document.querySelector<HTMLElement>(".vmx-rec-browser__usage");
+    expect(usage?.textContent).toBe("RECORDINGS · UNAVAILABLE");
+
+    const slice = getSettingsUIState().recordings;
+    expect(slice.loading).toBe(false);
+    expect(slice.error).not.toBeNull();
+    expect(slice.error).toContain("ipc timeout");
   });
 });
