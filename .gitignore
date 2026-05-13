@@ -113,3 +113,28 @@ tauri/ui/.mascot-build-tmp/
 # dropped into the directory, git refuses to track it.
 tauri/src-tauri/keys/*.key
 tauri/src-tauri/keys/*.key.pub
+
+# ---------------------------------------------------------------------------
+# Phase 19 — Repo hygiene (GH-18)
+# ---------------------------------------------------------------------------
+# Defense-in-depth even though POC's cohost.streaming.py.bak stays tracked:
+# any *new* .bak file is scratch and should not enter the repo.
+*.bak
+
+# v5 session screenshots produced by the design-iteration shoots cluttering
+# git status during Phase 11-14. They live under repo root and are scratch.
+v5-*.png
+
+# Claude Code worktrees + Playwright MCP scratch dirs are per-agent / per-run
+# state and must never be tracked.
+.claude/worktrees/
+.playwright-mcp/
+
+# Node modules at repo root (e.g. from running ``npx`` against the repo root).
+# Tauri-specific node_modules under ``tauri/ui/`` already ignored above.
+/node_modules/
+
+# Docs assets (Phase 19) — Plan 19-03/04 ship hero.png + architecture.svg.
+# Defensive whitelist so future generic image globs don't suppress them.
+!docs/assets/
+!docs/assets/**

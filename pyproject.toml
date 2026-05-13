@@ -92,6 +92,10 @@ dev = [
     # ``--onedir`` package for Tauri's ``externalBin`` to spawn. Dev-only —
     # the shipped binary never executes pyinstaller itself.
     "pyinstaller==6.20.0",
+    # Phase 19 Plan 19-01: PyYAML is the loader for .github/repo-config.yml
+    # in tests/repo/test_repo_metadata.py + scripts/dist/configure_repo.sh
+    # (consumed via `yq` on the shell side; YAML parse on the Python side).
+    "pyyaml>=6.0",
 ]
 
 # Hatchling includes non-Python files inside a package directory by default
@@ -112,7 +116,8 @@ ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "cohost*.py" = ["E", "F", "B", "I", "UP", "RUF"]
-"_test_*.py" = ["E", "F", "B", "I", "UP", "RUF"]
+# Phase 19-01: _test_*.py scratch files deleted (CONTEXT Area 5); ignore
+# rule removed to keep the config truthful to repo state.
 "test_voice.py" = ["E", "F", "B", "I", "UP", "RUF"]
 "generate_bat.py" = ["E", "F", "B", "I", "UP", "RUF"]
 
