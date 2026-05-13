@@ -119,6 +119,13 @@ interface WireMutePayload {
   muted?: boolean;
 }
 
+// WR-04 in 14-REVIEW.md — keep this allowlist in sync with the
+// SettingsSet schema enum at messages.schema.json:529 and the Python
+// SettingsSetPayload.field Literal at src/vibemix/ui_bus/messages.py.
+// All three must list the same 10 fields. Today mascot-group.ts
+// bypasses sendSettings via direct emitIpc for mood + click_through,
+// but any future caller using sendSettings would hit the runtime
+// `unknown field` throw without this entry.
 const SETTINGS_FIELDS = [
   "voice",
   "mode",
@@ -127,7 +134,9 @@ const SETTINGS_FIELDS = [
   "output_profile",
   "retention_days",
   "push_to_mute_hotkey",
-  "lighter_blur",
+  "mood",            // Plan 13-05
+  "click_through",   // Plan 13-05
+  "lighter_blur",    // Plan 14-04
 ] as const;
 export type SettingsField = (typeof SETTINGS_FIELDS)[number];
 
