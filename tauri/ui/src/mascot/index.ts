@@ -30,6 +30,7 @@
 
 import { Clock, Color } from "three";
 
+import "./chrome.css";
 import { loadMascotAssets } from "./asset-loader.js";
 import { dispatchEvent, type SnapshotSlice } from "./event-dispatcher.js";
 import {
@@ -45,6 +46,7 @@ import {
   tickIdleTimeout,
   type MachineState,
 } from "./state-machine.js";
+import { STATE_CLASS } from "./types.js";
 import type { MascotState, StateRequest, StateTrigger } from "./types.js";
 import { connectMascotBus, type MascotBusClient } from "./ws-client.js";
 
@@ -339,6 +341,10 @@ async function boot(): Promise<void> {
       }
     }
 
+    // 5. Plan 14-05 — repaint the bottom state caption only when
+    //    machine.current has actually changed (free no-op on most frames).
+    writeStateCaptionIfChanged();
+
     renderer.tick(dt);
     requestAnimationFrame(frame);
   }
@@ -347,6 +353,7 @@ async function boot(): Promise<void> {
   // ── Resize ──────────────────────────────────────────────────────────────
   window.addEventListener("resize", () => {
     renderer.resize(window.innerWidth, window.innerHeight);
+    writeOverlayCaption();
   });
 
   // ── Teardown (best-effort; HMR-friendly) ───────────────────────────────
@@ -354,6 +361,68 @@ async function boot(): Promise<void> {
     if (bus) bus.close();
     if (mockTimer !== null) clearInterval(mockTimer);
   });
+
+  // ── Plan 14-05 — overlay chrome captions ───────────────────────────────
+  // The mascot.html wrapper carries two silkscreen labels in JetBrains
+  // Mono var(--silk-40): a top dimension caption "OVERLAY · STICKY ·
+  // ALL SPACES · {W}×{H}" (updates on mount + resize) and a bottom
+  // state caption "{class} · {state}" (updates on every rAF tick, but
+  // only when the machine.current name changes). Both are defensive
+  // querySelector lookups — if mascot.html isn't carrying the v5 chrome
+  // wrapper (e.g. unit-test fixtures with a bare canvas), they silently
+  // no-op.
+
+  /** Initial top-label dimension text seeded by mascot.html. */
+  const overlayCaptionEl = document.querySelector<HTMLElement>(
+    ".mascot-window__caption",
+  );
+  const stateCaptionEl = document.querySelector<HTMLElement>(
+    ".mascot-window__state-caption",
+  );
+
+  function writeOverlayCaption(): void {
+    if (!overlayCaptionEl) {
+      console.debug(`${TAG} .mascot-window__caption not present — caption skipped`);
+      return;
+    }
+    overlayCaptionEl.textContent =
+      `OVERLAY · STICKY · ALL SPACES · ${window.innerWidth}×${window.innerHeight}`;
+  }
+
+  /** Format a MascotState into a "{class} · {state-without-class-prefix}"
+   *  silkscreen label, matching the 14-UI-SPEC Copywriting Contract row
+   *  "Mascot state label" (lowercase, "·" separator, dashes between words).
+   *  Examples:
+   *    idle_bop_to_beat_mellow  → "idle · bop-to-beat-mellow"
+   *    talk_loop_energetic      → "talk · loop-energetic"
+   *    react_drop               → "react · drop"
+   *    puff_particle            → "effect · particle"
+   *    sleep                    → "idle · sleep"
+   */
+  function formatStateLabel(state: MascotState): string {
+    const cls = STATE_CLASS[state];
+    // Strip the class-prefix from the state name if present (idle_breathe
+    // → breathe, talk_loop_calm → loop_calm). Some states (celebrate,
+    // sleep, locomotion_*, puff_particle) don't carry the class prefix
+    // verbatim — fall back to the full state name then.
+    const lower = state.toLowerCase();
+    const stripped = lower.startsWith(`${cls}_`) ? lower.slice(cls.length + 1) : lower;
+    return `${cls} · ${stripped.replace(/_/g, "-")}`;
+  }
+
+  let lastStateLabelWritten = "";
+  function writeStateCaptionIfChanged(): void {
+    if (!stateCaptionEl) return;
+    const label = formatStateLabel(machine.current);
+    if (label !== lastStateLabelWritten) {
+      stateCaptionEl.textContent = label;
+      lastStateLabelWritten = label;
+    }
+  }
+
+  // Initial mount — seed both captions from current state.
+  writeOverlayCaption();
+  writeStateCaptionIfChanged();
 
   // ── Plan 13-07 — mood-change handler ─────────────────────────────────
   // Plan 13-06 will route ipc.mascot.mood_change → handleMoodChange(); for
@@ -368,14 +437,18 @@ async function boot(): Promise<void> {
   // mood-aware boot/return state) — we drive that here in step 5.
 
   /**
-   * Resolve a CSS variable to a THREE.Color. Falls back to phosphor amber
+   * Resolve a CSS variable to a THREE.Color. Falls back to a literal hex
    * if the var is missing/empty (the variable may not be present in the
-   * mascot window's reduced stylesheet at boot).
+   * mascot window's reduced stylesheet at boot, or jsdom-stripped during
+   * tests).
    *
-   * The fallback amber hex is the canonical --phosphor token VALUE
-   * (#ffa12e) from tokens.css — duplicated here only as a literal-string
-   * default for THREE.Color when CSS resolution fails. tokens.css remains
-   * the single source-of-truth for accent paint at the CSS layer.
+   * Phase 14 Plan 14-05 — fallback hexes track the v5 token VALUES
+   * (--amber #ff8a3d, --silk #d6cfc7, --silk-40 rendered tint #3d424c)
+   * from tokens.css, duplicated here only as literal-string defaults for
+   * THREE.Color when CSS resolution fails. tokens.css remains the single
+   * source-of-truth for accent paint at the CSS layer; these three hex
+   * literals at the resolveCssColor sites below are the only hex
+   * literals permitted outside tokens.css (audit gate).
    */
   function resolveCssColor(varName: string, fallback: string): Color {
     try {
@@ -395,19 +468,17 @@ async function boot(): Promise<void> {
     const profile = MOOD_PROFILES[mood];
 
     // Step 2 — pick destination-mood tint.
-    //   hype-man → phosphor amber (warm) — --phosphor
-    //   teacher  → cream — falls back to phosphor-warm if no --ink-paper
-    //   coach    → slate — falls back to ink-deep
+    //   hype-man → amber (warm) — v5 --amber
+    //   teacher  → silk (cream-leaning) — v5 --silk
+    //   coach    → slate (silk-40 reads as desaturated coach tint)
     let color: Color;
     if (mood === "hype-man") {
-      color = resolveCssColor("--phosphor", "#ffa12e");
+      color = resolveCssColor("--amber", "#ff8a3d");
     } else if (mood === "teacher") {
-      // tokens.css doesn't carry a cream var; the cream literal here is
-      // a deliberate, plan-authorised fallback (PLAN.md Task 2 step 2b).
-      color = resolveCssColor("--phosphor-soft", "#efe6d6");
+      color = resolveCssColor("--silk", "#d6cfc7");
     } else {
-      // coach — slate; --ink-deep is charcoal-grey from tokens.css.
-      color = resolveCssColor("--ink-deep", "#3d424c");
+      // coach — slate; --silk-40 carries the desaturated coach tint.
+      color = resolveCssColor("--silk-40", "#3d424c");
     }
 
     // Steps 3 + 4 — fire visual.

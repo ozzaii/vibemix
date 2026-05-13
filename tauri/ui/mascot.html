@@ -14,42 +14,74 @@
       + `decorations: false` + `visible_on_all_workspaces: true` per
       13-CONTEXT Area 2.
 
-      Plan 13-04 (this plan):
+      Phase 14 Plan 14-05 (Wave 4) — CDJ Whisper v5 mascot overlay chrome.
+        - tokens.css now linked so the .border-anim utility + v5 vars
+          cascade in.
+        - html/body forced background: transparent !important so the
+          Phase 13 transparent-overlay invariant survives the tokens.css
+          load (tokens.css ships a v5 dark vignette body background that
+          would otherwise opaque-out the desktop compositing path).
+        - body::before film-grain SVG is disabled in the mascot window —
+          it would render over the desktop on every overlay frame, again
+          breaking transparency.
+        - A new <div class="mascot-window"> wrapper hosts the canvas with
+          glass-3 + display blur + amber bottom-edge undertone, with a
+          .border-anim.slow.rev (32s reverse sweep — de-sync from
+          session's 22s forward sweep per 14-CONTEXT Area 3).
+        - Three.js scene + renderer.ts are UNTOUCHED — this is purely a
+          chrome wrapper around the existing <canvas id="mascot-canvas">.
+
+      Plan 13-04 / 13-06 invariants honoured:
         - /src/mascot/index.ts boots a Three.js WebGLRenderer against the
           canvas below, loads /assets/mascot/manifest.json + 21 GLBs, and
           drives state transitions through a pure-function state machine.
-        - Plan 13-06 (event dispatch) replaces the DEV window.__mascot
-          handle with a WS:8765 subscription that translates ipc.* envelopes
-          to state requests.
+        - WS:8765 subscription translates ipc.* envelopes to state requests.
 
       Hard rules honoured (frontend-enforcement skill):
         - No external CDNs, no inline scripts beyond the module import.
-        - Transparent root chain — `html` + `body` are explicitly
-          background: transparent so the Tauri transparent flag composites
-          the WebGL canvas straight over the desktop. Inline styles keep
-          this self-contained from any token.css surface (the mascot lives
-          outside the session-UI dark surface).
+        - Transparent root chain — html + body explicitly transparent so
+          the Tauri transparent flag composites the WebGL canvas + the
+          .mascot-window chrome rectangle straight over the desktop.
         - PixelRatio capped + transparent clear are owned by renderer.ts.
     -->
+    <link rel="stylesheet" href="/src/tokens.css" />
     <style>
+      /* Phase 14 Wave 4 — transparent-overlay invariant override.
+       *
+       * tokens.css applies a v5 cinematic body background (radial vignette
+       * + rave washes) at the global :root scope. That would opaque-out
+       * the mascot overlay window. The !important is justified — the
+       * overlay window MUST composite over the desktop (Phase 13 always-
+       * on-top + transparent-bg contract). Disabling body::before kills
+       * the film-grain SVG layer that would otherwise paint a full-rect
+       * dust texture over the desktop at z-index 9999. */
       html,
       body {
         margin: 0;
         padding: 0;
-        background: transparent;
+        background: transparent !important;
+        background-image: none !important;
         overflow: hidden;
         width: 100vw;
         height: 100vh;
       }
+      body::before {
+        display: none !important;
+      }
       #mascot-canvas {
         display: block;
-        width: 100vw;
-        height: 100vh;
       }
     </style>
   </head>
   <body style="background: transparent; margin: 0; padding: 0; overflow: hidden;">
-    <canvas id="mascot-canvas" aria-hidden="true"></canvas>
+    <div class="mascot-window">
+      <div class="border-anim slow rev" aria-hidden="true"></div>
+      <div class="mascot-window__top-label">
+        <span class="mascot-window__caption">OVERLAY · STICKY · ALL SPACES · 320×420</span>
+      </div>
+      <canvas id="mascot-canvas" aria-hidden="true"></canvas>
+      <div class="mascot-window__state-caption" aria-hidden="true">idle · bop-to-beat</div>
+    </div>
     <script type="module" src="/src/mascot/index.ts"></script>
   </body>
 </html>
