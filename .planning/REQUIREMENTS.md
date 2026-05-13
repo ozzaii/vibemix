@@ -514,3 +514,109 @@ These features have research-locked implementation paths but are explicitly OUT 
 
 ---
 *Last updated: 2026-05-11 after roadmap synthesis (gsd-roadmapper traceability pass)*
+
+## v2.0 Traceability
+
+*Populated by `gsd-roadmapper` 2026-05-14 — each v2.0 REQ-ID maps to exactly one phase.*
+
+| REQ-ID | Phase | Notes |
+|--------|-------|-------|
+| SENSE-11 | Phase 17 | `GenreRouter` atomic detector-dict swap. |
+| SENSE-12 | Phase 17 | 6 cross-genre detectors: KICK_SWAP / SUB_LAYER_ARRIVAL / BREAKDOWN_KICK_KILL / REENTRY_KICK_LAND / KICK_DENSITY_SHIFT / PHRASE_BOUNDARY. |
+| SENSE-13 | Phase 17 | MusicState +4 fields with backward-compat defaults. |
+| SENSE-14 | Phase 17 | PHRASE_BOUNDARY 40-120Hz band-limited autocorr, ±1 bar, self-correct on BREAKDOWN_KICK_KILL. |
+| SENSE-15 | Phase 17 | Per-genre detector dispatch architecture. |
+| SENSE-16 | Phase 17 | `scripts/tune_detectors.py` reference-WAV tuning harness. |
+| GROUND-01 | Phase 18 | EvidenceRegistry as SIBLING write-target, never separate writer. |
+| GROUND-02 | Phase 18 | Citation grammar EBNF locked (8 forms + multi-citation). |
+| GROUND-03 | Phase 18 | Grammar baked into Gemini system instruction (v1.0 prompt-only seeding). |
+| GROUND-04 | Phase 20 | `CitationLinter` stdlib `re` only, no third-party dep. |
+| GROUND-05 | Phase 20 | Live-mode response-level strip + ack-bank fallback. |
+| GROUND-06 | Phase 20 | Telemetry guard `stripped_rate_15s > 0.4` bypass + `slop_ratio` metric. |
+| GROUND-07 | Phase 20 | Per-mode tolerance ±1.0s live / ±2.0s debrief. |
+| GROUND-08 | Phase 20 | Prompt-side "I'm listening" mitigation appended to live system instruction. |
+| LATENCY-01 | Phase 19 | 40 OPUS ack samples (Achird voice, offline-generated, TTS-version-pinned). |
+| LATENCY-02 | Phase 19 | Ack rotation deque maxlen=10, no same-sample-within-30s. |
+| LATENCY-03 | Phase 19 | Per-event-class ack buckets (drop_hit / track_change / mix_move / silence_break / generic_filler). |
+| LATENCY-04 | Phase 19 | Ack fires only when `rolling_ttft_avg_ms > 800`. |
+| LATENCY-05 | Phase 19 | Min-ack-to-response gap = 400ms. |
+| LATENCY-06 | Phase 19 | `CachedLLM` subclass injecting `cached_content` via `extra_kwargs`. |
+| LATENCY-07 | Phase 19 | System instruction padded with deterministic context above 1024-token cache floor. |
+| LATENCY-08 | Phase 19 | Cache lifecycle manager refreshes every 4 min (TTL 5 min minimum). |
+| LATENCY-09 | Phase 19 | Prompt diet — audio Part 18s→6s on non-PHASE, screen skipped on MIX_MOVE/HEARTBEAT. |
+| LATENCY-10 | Phase 19 | `SpeechHandle.interrupt(force=True)` wrapper bypasses `allow_interruptions=False`. |
+| LATENCY-11 | Phase 19 | `CANCEL_COOLDOWN_S = 8.0` hard cap (Pitfall 1 mitigation). |
+| LATENCY-12 | Phase 19 | 30/session soft cap telemetry assertion auto-disable. |
+| LATENCY-13 | Phase 19 | Priority-gated cancel (DROP=10 > MIX_MOVE=5). |
+| MASCOT-10 | Phase 22 | 4-layer additive simplified subset (mood + anticipation + speak/react); full effect layer v2.1. |
+| MASCOT-11 | Phase 22 | Anticipation fires T+50ms from `EventDetector.detect()` — BEFORE Gemini round-trip. |
+| MASCOT-12 | Phase 22 | 5 `prep_*` GLB clips with idle-zero lower-body delta. |
+| MASCOT-13 | Phase 22 | 2.5s anticipation timeout crossfades prep → `prep_settle` (Pitfall 9). |
+| MASCOT-14 | Phase 22 | Cancel-aware anticipation crossfade on `interrupt(force=True)`. |
+| MASCOT-15 | Phase 22 | Linter-strip-aware crossfade on total-strip + ack-only fallback. |
+| MASCOT-16 | Phase 22 | Beat-coupled procedural hip-bob; phase-locked >150 BPM, amplitude-driven <130 BPM. |
+| MASCOT-17 | Phase 22 | `AnimationUtils.makeClipAdditive` on all prep clips; p99 frame budget ≤22ms vitest perf. |
+| MASCOT-18 | Phase 22 | BPM phase drift mitigation — re-sync on every downbeat. |
+| MASCOT-19 | Phase 22 | GLB clip total budget ≤15MB CI gate. |
+| OVERLAY-01 | Phase 24 | AX bridge in Tauri Rust parent; AX NEVER called from Python (codebase grep gate). |
+| OVERLAY-02 | Phase 24 | Day-1 AX-from-Rust-parent feasibility spike on code-signed bundle (Pitfall 3). |
+| OVERLAY-03 | Phase 24 | Second Tauri `WebviewWindow` label="overlay" with transparent + always_on_top + click-through. |
+| OVERLAY-04 | Phase 24 | Window tracker @10Hz following djay Pro window bounds. |
+| OVERLAY-05 | Phase 24 | 12 hand-mapped pointable elements in `elements.json` for djay Pro v5. |
+| OVERLAY-06 | Phase 24 | Canvas 2D ring renderer with 8s per-element cooldown + ≤1 ring/3s utterance. |
+| OVERLAY-07 | Phase 24 | Fullscreen-Spaces toast (Pitfall 4 mitigation). |
+| OVERLAY-08 | Phase 24 | Dual-monitor all-Quartz no-NSScreen coord consistency (Pitfall 13). |
+| OVERLAY-09 | Phase 24 | `#[cfg(target_os = "macos")]` gate; Win + Rekordbox/Serato deferred v2.1. |
+| LIBRARY-01 | Phase 25 | `RekordboxLibrary` class with `pyrekordbox==0.4.4` XML parser. |
+| LIBRARY-02 | Phase 25 | SQLite cache `$APPDATA/vibemix/library/rekordbox.db` (tracks + cues + beat_grid). |
+| LIBRARY-03 | Phase 25 | 4-tier fuzzy lookup confidence ladder; artist OR BPM required for ≥0.7 (Pitfall 16). |
+| LIBRARY-04 | Phase 25 | Confidence-aware grounding rendering. |
+| LIBRARY-05 | Phase 25 | Drag-drop + file-picker UX in Settings → Library tab. |
+| LIBRARY-06 | Phase 25 | 30-day staleness nudge + lookup-fail counter (Pitfall 15). |
+| LIBRARY-07 | Phase 25 | SQLCipher path explicitly skipped. |
+| LIBRARY-08 | Phase 25 | Sqlite-vec architectural slot reserved for v2.1 (v2.0 ships only SOURCE path). |
+| MIDI-15 | Phase 23 | `MidiMapLoader` replaces hardcoded `_CC_MAP`/`_NOTE_MAP`. |
+| MIDI-16 | Phase 23 | DDJ-FLX4 Sync note disambiguation via 5-min mido sniff (Pitfall 25). |
+| MIDI-17 | Phase 23 | Verified mido-sniff data for 9 SKUs. |
+| MIDI-18 | Phase 23 | `scripts/sniff_controller.py` community contribution tooling. |
+| MIDI-19 | Phase 23 | Generic-MIDI fallback "observes, classifies conservatively, never invents." |
+| DEBRIEF-01 | Phase 25 | Sidecar `--debrief <session_dir>` flag, separate child process on WS bus port 8766. |
+| DEBRIEF-02 | Phase 25 | IPC schema reservations `ipc.debrief.start/.status/.result` (hidden in v2.0, surfaced v2.1). |
+| REC-07 | Phase 15 | Recording browser UI surface (v2.0 polish over REC-05). |
+| REC-08 | Phase 15 | Retention enforcement cron worker (REC-06 hooks). |
+| DIST-09 | Phase 21 | Apple Developer ID DMG sign + notarize (Issuer ID supplied; agreement update outstanding — Francesco-action). |
+| DIST-10 | Phase 21 | notarytool `--keychain-profile vibemix-URMDRP5M3P` + staple + spctl assess. |
+| DIST-11 | Phase 21 | SignPath OSS Windows MSI sign — application filed Day-1 (~1-week SLA). |
+| DIST-12 | Phase 21 | GitHub release matrix 4 binaries + AIza-scan-clean across new bundle paths. |
+| DIST-13 | Phase 21 | Tauri Updater latest.json ed25519-signed + secret-name audit (Pitfall 7). |
+| DIST-14 | Phase 21 | Updater manifest POST to `api.altidus.world/vibemix/updates/upload` (Bravoh ops carry-forward). |
+| GH-19 | Phase 26 | README full rewrite (value-prop above the fold + 30s demo GIF + 12-question FAQ + 8-controller logo grid + badges + install one-liner). |
+| GH-20 | Phase 26 | 30s demo GIF NEW asset (hero PNG + architecture SVG already shipped Phase 19 absorbed). |
+| GH-21 | Phase 26 | CONTRIBUTING.md controller-mapping path with `scripts/sniff_controller.py`. |
+| OPS-01 | Phase 26 | Fresh-macOS-VM rehearsal (no BlackHole pre-install, no TCC pre-grant — Pitfall 31). |
+| OPS-02 | Phase 26 | Fresh-Windows-VM rehearsal (AV/Defender SmartScreen reputation check). |
+| OPS-03 | Phase 26 | `api.altidus.world/healthz` curl gate Day-0 (Pitfall 32). |
+| OPS-04 | Phase 26 | Discord server setup — roles + channels + bot (Pitfall 34). |
+| OPS-05 | Phase 26 | GitHub issue templates + auto-labeler (Pitfall 35). |
+| OPS-06 | Phase 26 | Bravoh proxy load test 100 RPS for 5 min, p99 <500ms (Pitfall 30/39). |
+| OPS-07 | Phase 26 | Adaptive cap + dashboard for proxy budget. |
+| OPS-08 | Phase 26 | Pre-seeded friend/dev stars (15+) before public launch. |
+| VIRAL-01 | Phase 26 | 30s viral demo film — djay Pro 5 windowed mode, CDJ Whisper color, Kaan + DDJ-FLX4 + HD25. |
+| VIRAL-02 | Phase 26 | Beat A (T+8s) — amber overlay ring on mid EQ deck A. |
+| VIRAL-03 | Phase 26 | Beat B (T+14s) — anticipation lean-in BEFORE voice. |
+| VIRAL-04 | Phase 26 | Beat C (T+22-25s) — 3 seconds of deliberate silence. |
+| VIRAL-05 | Phase 26 | Twitter thread post — Beat A hero. |
+| VIRAL-06 | Phase 26 | IG Reels post (IT + EN) — Beat B hero. |
+| VIRAL-07 | Phase 26 | Reddit r/Beatmatch + r/DJs post — Beat C hero. |
+| VIRAL-08 | Phase 26 | HN Show HN post — Beat A hero. |
+| VIRAL-09 | Phase 26 | Pre-seeded FAQ per channel. |
+| VIRAL-10 | Phase 26 | GitHub stars ticker outro frame. |
+| VERIFY-07 | Phase 16 | Hallucination Verification Gate = Kaan's personal DJ-set testing (3-5 sessions); supersedes v0.1.0 VERIFY-01/02/03/05. |
+| VERIFY-08 | Phase 16 | Phase 16 runs against shipped detector + linter + ack bank + mascot anticipation as they land. |
+| VERIFY-09 | Phase 16 | Stretch — Francesco + 5-tester beta pool (Pitfall 40 mitigation). |
+| VERIFY-10 | Phase 16 | Replay sessions with `linter_silence_streak > 2` and assert it doesn't happen (Pitfall 2 ground-truth). |
+
+**v2.0 Coverage:** 94 / 94 v2.0 requirements mapped. No orphans. No duplicates.
+
+---
+*Last updated: 2026-05-14 after v2.0 roadmap synthesis (gsd-roadmapper traceability pass)*
