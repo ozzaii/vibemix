@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v0.1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-13T12:18:05.309Z"
+last_updated: "2026-05-13T12:25:40Z"
 progress:
   total_phases: 20
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 62
-  completed_plans: 50
-  percent: 81
+  completed_plans: 56
+  percent: 90
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-12 (Phase 12 ✅ code-complete across all 4 waves; UAT pending — Phase 13 next)
+**Last updated:** 2026-05-13 (Phase 14 ✅ shipped — CDJ Whisper v5 migration complete across all 4 surfaces; shim deleted; Phase 15 next)
 
 ---
 
@@ -38,7 +38,7 @@ progress:
 
 **Phase 11 close metrics:** 5 waves, 13 task commits, 95+ files created cumulative, **1066 Python tests pass** (978 Phase 10 baseline + 88 new across Wave 0-4) + 13 vitest + 4 cargo test = 1083 total. 1 known pre-existing failure (`test_g5_poc_files_untouched` — mascot.html stale-baseline since post-Phase-5 commit `398f788`); out of scope per CLAUDE.md scope-boundary rule. POC files (cohost*.py / mascot.html / mocks/) diff-untouched against the Phase 11 plan-docs commit (`7e08966`).
 
-Phase: 14 (cdj-whisper-v5-migration-polish) — EXECUTING
+Phase: 14 (cdj-whisper-v5-migration-polish) — ✅ COMPLETE 2026-05-13
 
 **Phase 12 ✅ shipped across 4 waves.** ~10,000 LOC across ~62 files. IPC families 19 → 26 (+7). Tests: vitest 13 → 141 (+128); pytest 35 → 1171 (+1136); cargo 4 → 13 (+9). All gates green: typecheck, `npm run check:ipc`, `cargo check`, `cargo test`, pytest. POC files diff-untouched.
 
@@ -59,12 +59,12 @@ Phase: 14 (cdj-whisper-v5-migration-polish) — EXECUTING
 
 Plan: 6 of 6
 
-- **Phase 12:** ✅ code-complete. UAT deferred to Kaan's rig session.
-- **Status:** Ready to execute
-- **Progress:** [████████░░] 81%
+- **Phase 14:** ✅ shipped — shim deleted, v5 primitives consumed directly across all four surfaces; perf-fallback CSS shipped; mascot overlay wears v5 chrome.
+- **Status:** Phase 14 closed; Phase 15 next
+- **Progress:** [█████████░] 90%
 
 ```
-[████████░░░░░░░░░░░░] 60% (12/20 phases — Phase 12 ✅ code-complete; Phase 13 next)
+[██████████████░░░░░░] 70% (14/20 phases — Phase 14 ✅ complete 2026-05-13; Phase 15 next)
 ```
 
 ---
@@ -75,7 +75,7 @@ Plan: 6 of 6
 
 | Metric | Value |
 |--------|-------|
-| Phases complete | 10 / 20 |
+| Phases complete | 14 / 20 |
 | v1 requirements mapped | 128 / 128 |
 | v1 requirements complete | 25 / 128 |
 | Critical pitfalls mitigated | 0 / 9 |
@@ -89,6 +89,7 @@ Plan: 6 of 6
 | Phase 14 P03 | ~4 min | 3 tasks | 7 files |
 | Phase 14 P04 | 11 min | 3 tasks | 20 files |
 | Phase 14 P05 | 7min | 2 tasks | 6 files |
+| Phase 14 P06 | 4 min | 3 tasks | 7 files |
 
 ### Plan Execution Metrics
 
@@ -195,12 +196,15 @@ None yet — all dependencies are pinned and verified.
 
 - 2026-05-12 — Phase 11 Wave 4 (Plan 11-05) + Phase 11 close shipped end-to-end: 2 task commits (`21f72af` feat — WizardLoop class with 9 ipc.* handlers covering permission.check / list_devices / probe_audio / user_heard_tone / start_midi_listen / list_windows / smoke_test / wizard.done / wizard.start; WizardBus class added to ws_bus.py as a sibling to ws_broadcast (mascot 30Hz contract preserved); platform probes (_permissions_macos.py with AVCaptureDevice + CGPreflightScreenCaptureAccess; _permissions_windows.py with MVP stubs; _windows_macos.py with Quartz.CGWindowListCopyWindowInfo + 5-app DJ hint table; _windows_windows.py with EnumWindows + 4-app DJ hint table; typed permissions.py + windows.py selectors); __main__.py --wizard now dispatches to vibemix.runtime.wizard.run_wizard (Wave 1 stub deleted); pyobjc-framework-AVFoundation>=12.1 added (darwin only); 10 new wizard tests (test_wizard_loop_ipc.py 7 + test_first_run_state.py 3) + test_wizard_entrypoint.py rewritten for Wave 4 reality. `f237ee4` feat — TS ipc/client.ts (sendIpcRequest + subscribeIpc + emitIpc with 10s Promise.race timeout per RESEARCH Pitfall 6); router.ts setTimeout mocks replaced with real ipc.* request bodies (Step 1 polls permission.check @1Hz, Step 2 fires list_devices + list_windows + probe_audio with 35s timeout for 30s user-confirm window, Step 3 races start_midi_listen vs midi_timeout, smoke-test sends smoke_test with 30s timeout); main.ts wires subscribeStatusBar + DEV-gates __vibemixDev via import.meta.env.DEV (closes Wave 3 threat T-11-W3-02 carry-over); Rust ws_client.rs adds WsClientHandle managed state + forward_ipc_to_sidecar body (replaces Wave 2 stub); capability allowlist description extended to enumerate 7 app commands so regression-check grep passes. + this docs commit (11-05-SUMMARY.md + 11-SUMMARY.md + STATE/ROADMAP/REQUIREMENTS advance). 1066 Python tests green (1013 baseline + 53 new across Wave 4) + 13 vitest + 4 cargo test. Schema CI gates: check_ipc_schema.py + npm run check:ipc + npm run build all green. Warning #4 invariant verified: zero `invoke("enumerate_windows", ...)` in webview src; capability allowlist has no enumerate_windows entry. Window-picker enumeration is WS-only via ipc.calibration.list_windows; Quartz / EnumWindows runs in vibemix.platform.windows.enumerate_windows called from WizardLoop._on_list_windows via run_in_executor. Smoke-test cascade greeting routes to offline-greeting WAV fallback (full cascade-greeting one-shot deferred to Phase 12 settings-panel re-run UX). 5 Rule-1/3 deviations auto-fixed (IpcMessage codegen alias, import.meta.env types, DropdownDevice isBlackhole drop, sidecar entrypoint test rewrite, schema-invalid frame test fix). Phase 11 STRUCTURAL gate complete — fresh-machine <90s wizard timing explicitly NOT measured (owned by Phase 16 Hallucination Verification Gate + Phase 20 Day-Zero Operations fresh-VM rehearsal). POC files (cohost*.py / mascot.html / mocks/) diff-untouched against Phase 11 plan-docs commit 7e08966. Bundle id world.bravoh.vibemix LOCKED throughout.
 
+- 2026-05-13 — Phase 14 (CDJ Whisper v5 Migration + Polish) shipped end-to-end: 6 waves, ~14 task commits, single subtractive close. Wave 0 (14-01) reconciled vendored WOFF2 + scripted gates + vitest harness + polish log + ROADMAP success-criterion #4 typeface text. Wave 1 (14-02) migrated wizard surfaces (225 legacy refs eliminated, collapsed wizard-grid, border-anim inserted on PrimaryPanel). Wave 2 (14-03) migrated SessionLayout + shipped perf-fallback CSS (prefers-reduced-motion + html[data-blur-perf="on"]). Wave 3 (14-04) migrated SettingsDrawer + added PerformanceGroup + extended SettingsView with lighter_blur + IPC enum extension. Wave 4 (14-05) wrapped the mascot overlay in v5 glass chrome + .border-anim.slow.rev + unskipped mascot.chrome.test.ts. Wave 5 (14-06 — this commit `79a7208`) deleted the backward-compat shim block from tokens.css + deleted the legacy `@font-face` block (Workbench, DM Mono Regular/Medium, DSEG7, Caveat) + replaced Google Fonts remote @import with vendored Saira variable (wdth+wght) + JetBrains Mono Regular/Medium/SemiBold WOFF2 + deleted 5 legacy WOFF2 files + updated LICENSE-3RD-PARTY.md with 4 SHA-256 attestations + wired and unwired the one-shot pre-commit hook (`scripts/check_v5_migration.sh --strict`). All three repo-wide --strict gates green (migration + fonts + copy). 275 vitest passing. IPC schema parity 27 == 27. Pytest baseline (2 pre-existing failures: test_audio_macos_live HEADPHONEMG env from Phase 7 W1 + test_g5_poc_files_untouched mascot.html baseline drift from Phase 11 — both pre-existing per CLAUDE.md scope-boundary rule; unchanged by this plan). All four surfaces (wizard, session, settings, mascot) consume v5 primitives directly; no shim, no FL-Studio tactile residue. POLISH-01/02/04/06 closed; POLISH-03 (mascot v5 chrome) closed in 14-05; POLISH-05 perf verification on Kaan rig deferred to `npm run tauri dev` review session (Windows transparency rehearsal deferred to Phase 20 fresh-machine).
+
 ### Next Session
 
-- Continue with **Phase 12 — Live Session UI + Settings Panel**. Inputs: tokens.css (lifted unchanged from Phase 11 Wave 3), ipc.* schema (19 messages from Wave 0 + ipc.status.tick wiring from Wave 4), status bar component (Wave 3 §12), mascot reserved corner (256×256 at bottom-right; Phase 13 fills it later), Re-run calibration entry point that spawns `vibemix --wizard` independently. Wave 4 deferred items roll forward: (a) full cascade-greeting one-shot AgentSession context manager for the smoke test (Phase 12 owns); (b) real WinRT mic-permission probe via winsdk.Windows.Devices.Enumeration.DeviceAccessInformation (Phase 18 hardening); (c) live UI badge bar wiring with real LiveKit/Gemini probe states (Phase 12 visual surface).
-- **Phase 16/20 carry-forwards from Phase 11:** fresh-machine <90s wizard timing rehearsal (Phase 16 owns the production-quality-reaction gate; Phase 20 owns the fresh-VM CI matrix). Inputs already locked: `scripts/reset_first_run.py` + `scripts/build_sidecar.py` + `scripts/check_ipc_schema.py` + bundle id `world.bravoh.vibemix` + entitlements.plist.
+- Continue with **Phase 15 — Recording & Session Capture Finalization**. Per-session dir + `input.wav`/`voice.wav`/`events.jsonl` + recording browser UI + retention enforcement; carries POC; lock UX.
+- **Phase 14 deferred to Kaan's rig:** (a) `npm run tauri dev` visual review of all four surfaces (wizard, session, settings, mascot); (b) Performance toggle persistence rehearsal (set "Lighter blur" ON → close + reopen → verify persistence); (c) macOS prefers-reduced-motion rehearsal (toggle in Accessibility → reload → verify border-anim freeze + blur drops); (d) Windows transparency rehearsal (deferred to Phase 20 fresh-machine if no Windows machine right now).
+- **Phase 16/20 carry-forwards from Phase 11:** fresh-machine <90s wizard timing rehearsal (Phase 16 owns the production-quality-reaction gate; Phase 20 owns the fresh-VM CI matrix). Inputs locked: `scripts/reset_first_run.py` + `scripts/build_sidecar.py` + `scripts/check_ipc_schema.py` + bundle id `world.bravoh.vibemix` + entitlements.plist.
 - Kaan-side outstanding: SignPath OSS application (Phase 1 carry-forward, ~1 week SLA). Optional live smoke verification of `python -m vibemix` vs `./run_v4.sh` on his rig. **Phase 5 carry-over**: deploy `proxy/` to `api.altidus.world` when ready. **Phase 6 + 7 carry-over**: collect 30-min recorded sets per genre (techno / house / D&B / disco / pop) for Phase 16; arrange Windows test access for Phase 20 fresh-machine rehearsal. **Phase 7 deferred items** (in `.planning/phases/07-windows-port-audio-screen/deferred-items.md`): test_audio_macos_live HEADPHONEMG env mismatch (broaden substring or mark macos_audio opt-in) + ruff I001 in test_midi_common.py (one-line `ruff check --fix`).
 
 ---
 
-*State managed by gsd-roadmapper at 2026-05-11; updated by /gsd-execute-phase on 2026-05-12 (Phase 11 ✅ complete — structural gate; Phase 12 next).*
+*State managed by gsd-roadmapper at 2026-05-11; updated by /gsd-execute-phase on 2026-05-13 (Phase 14 ✅ complete — shim deleted; Phase 15 next).*

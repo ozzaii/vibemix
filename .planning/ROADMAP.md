@@ -23,7 +23,7 @@
 - [x] **Phase 11: Tauri Shell + Calibration Wizard** - Tauri 2.x scaffold + Python sidecar wiring + IPC contract + 3-step calibration wizard UI (permissions → output/sample-rate → controller probe). _**Complete 2026-05-12 — structural gate** (code shipped, tests green, builds succeed, CI gates pass, AIza leak gate clean, capability allowlist intact, 19-message schema parity, wizard end-to-end works on Kaan's rig). Fresh-machine <90s timing → Phase 16 (Hallucination Verification Gate) + Phase 20 (Day-Zero Operations fresh-VM rehearsal)._
 - [x] **Phase 12: Live Session UI + Settings Panel** - Meters + phase tape + AI transcript + drop countdown + MIDI event ribbon + voice/mode/genre/output pickers + push-to-mute hotkey + status badges + recording retention policy. _**Code-complete 2026-05-12** across 4 waves (~10k LOC, ~62 files). IPC families 19 → 26. vitest 13 → 141, pytest 35 → 1171, cargo 4 → 13. 7 hardware UAT scenarios deferred to Kaan's rig — see `12-VERIFICATION.md` status `human_needed`._
 - [x] **Phase 13: 3D Mascot Screen Overlay** - Single 3D rigged mascot (Meshy-generated GLB) in always-on-top transparent overlay window, Three.js + AnimationMixer crossfade state machine, beat-locked clip entry, mood swap (hype-man/teacher/coach) on same rig. (completed 2026-05-12)
-- [ ] **Phase 14: CDJ Whisper v5 Migration + Polish** - Component-level audit of the pre-Phase-14 v5 token-swap prototype (commit `0615344`); critique → execute loop with `gsd-ui-checker` + `gsd-ui-auditor` until the CDJ Whisper v5 contract (`mocks/vibemix-direction-final.html`) is met on every surface — glass alpha, amber accent (`#ff8a3d`), animated border sweep, night-rave ambient body, no FL-Studio tactile residue (`--bezel-*` / `--brushed-*` / `--phosphor` aliases removed from components).
+- [x] **Phase 14: CDJ Whisper v5 Migration + Polish** _Completed 2026-05-13._ Component-level audit of the pre-Phase-14 v5 token-swap prototype (commit `0615344`); critique → execute loop with `gsd-ui-checker` + `gsd-ui-auditor` until the CDJ Whisper v5 contract (`mocks/vibemix-direction-final.html`) is met on every surface — glass alpha, amber accent (`#ff8a3d`), animated border sweep, night-rave ambient body, no FL-Studio tactile residue (`--bezel-*` / `--brushed-*` / `--phosphor` aliases removed from components). Wave 5 shim-delete commit `79a7208`.
 - [ ] **Phase 15: Recording & Session Capture Finalization** - Per-session dir + `input.wav`/`voice.wav`/`events.jsonl` + recording browser UI + retention enforcement (carries POC; lock UX).
 - [ ] **Phase 16: Hallucination Verification Gate** - 30-session offline replay suite ≥95% grounded + per-genre phase-detection ≥85% F1 + 60-min soak test zero `session_error`.
 - [ ] **Phase 17: Reaction-Reel Slop Grading Gate** - Hand-graded 30-min reaction reel blind-rated 1-5 by Kaan + Francesco + 2 DJ network friends; pass requires ≥4.0 average with zero 1-2 ratings.
@@ -247,7 +247,14 @@ Plans:
   6. All copy passes the "no AI slop" filter per `frontend-enforcement` skill — and explicitly: no FL-Studio tactile residue ("knob/fader physics" framing, "brushed aluminum", "anodised charcoal", "retro-futurist hardware" microcopy purged from chrome + tooltips + transcripts).
   7. Iteration loop documented in a polish log: each `ui-checker` → fix → `ui-auditor` cycle captured until both gates green. Backdrop-filter perf verified on a non-dev machine (`blur(32px) saturate(140%)` fallback to `blur(16px)` documented if measured stutter).
 **UI hint**: yes
-**Plans**: TBD
+**Plans:** 6 plans
+Plans:
+- [x] 14-01-PLAN.md — Wave 0 reconciliation: scripted gates + vitest harness + vendored WOFF2 + polish log
+- [x] 14-02-PLAN.md — Wave 1 wizard surface migration (225 legacy refs eliminated)
+- [x] 14-03-PLAN.md — Wave 2 live session UI migration + perf-fallback CSS shipped (25 legacy refs + perf toggle wiring)
+- [x] 14-04-PLAN.md — Wave 3 settings drawer migration + Performance group UI (15 legacy refs + new component)
+- [x] 14-05-PLAN.md — Wave 4 mascot overlay window chrome migration (greenfield wrapper + resolveCssColor v5)
+- [x] 14-06-PLAN.md — Wave 5 subtractive shim-delete + repo-wide final sweep
 
 ### Phase 15: Recording & Session Capture Finalization
 **Goal**: Per-session recording is locked: `recordings/<YYYYMMDD-HHMMSS>/` with `input.wav` (16kHz mono int16) + `voice.wav` (24kHz mono int16) + `events.jsonl` + `session.json` metadata. Recording browser UI lists/replays/deletes past sessions. Retention policy (default 7 days) is configurable in Settings.
@@ -339,7 +346,7 @@ Plans:
 | 11. Tauri Shell + Calibration Wizard | 5/5 | Complete   | 2026-05-12 |
 | 12. Live Session UI + Settings Panel | 0/? | Not started | - |
 | 13. 3D Mascot Screen Overlay | 8/8 | Complete   | 2026-05-12 |
-| 14. CDJ Whisper v5 Migration + Polish | 5/6 | In Progress|  |
+| 14. CDJ Whisper v5 Migration + Polish | 6/6 | Complete   | 2026-05-13 |
 | 15. Recording & Session Capture Finalization | 0/? | Not started | - |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
 | 17. Reaction-Reel Slop Grading Gate | 0/? | Not started | - |
