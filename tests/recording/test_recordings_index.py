@@ -11,6 +11,11 @@ Test 6: list() on a non-existent recordings_root returns empty tuple (fresh inst
 Test 7: list() on a dir with malformed session.json falls back to legacy synth.
 Test 8: read_events() — valid + malformed line skipped + missing file empty +
         path-traversal rejected.
+
+Plan 15-06 appends:
+Test 9 (perf gate, RESEARCH Q3 verification): list() against 200 fake sessions
+        completes in <100ms locally (<500ms on CI runners — perf-gate-relaxed-on-ci
+        per RESEARCH).
 """
 
 from __future__ import annotations
@@ -362,3 +367,52 @@ def test_module_exports_symbols_for_consumers() -> None:
     assert not SESSION_DIR_RE.match("../../etc/passwd")
     assert not SESSION_DIR_RE.match("2026-05-13")
     assert not SESSION_DIR_RE.match("")
+
+
+# ---------------------------------------------------------------------------
+# Test 9 — Plan 15-06 perf gate: list() <100ms for 200 sessions
+# (RESEARCH Open Question Q3 — empirical verification of the
+# "scandir-based listing scales to drawer-realistic counts" claim that
+# Plan 15-03 relied on when picking recompute-on-demand over a cache.)
+# ---------------------------------------------------------------------------
+
+
+def test_list_perf_200_sessions(
+    tmp_recordings_dir: Path, make_fake_session: Callable[..., Path]
+) -> None:
+    """RecordingsIndex(root).list() against 200 fake sessions completes
+    within the perf budget.
+
+    Local-dev budget: <100ms. CI runner budget: <500ms (filesystems on
+    GH Actions / GitLab runners are noticeably slower; relaxed-on-ci per
+    plan behavior spec — keeps the gate green without dropping the
+    real-world performance assertion).
+    """
+    # Build 200 sessions with monotonically incrementing dir names.
+    # 20260101-000000, 20260101-000001, ... up to 200 distinct names.
+    for i in range(200):
+        # Spread across minute boundaries so all names are valid timestamps.
+        hh = (i // 3600) % 24
+        mm = (i // 60) % 60
+        ss = i % 60
+        name = f"20260101-{hh:02d}{mm:02d}{ss:02d}"
+        make_fake_session(name=name, ended=True)
+
+    idx = RecordingsIndex(tmp_recordings_dir)
+
+    # Cold-cache timing — `os.scandir` may benefit from FS-cache warmth on
+    # a subsequent call. Single measurement is what the IPC handler sees.
+    start = time.perf_counter()
+    sessions = idx.list()
+    elapsed = time.perf_counter() - start
+
+    assert len(sessions) == 200
+
+    # perf-gate-relaxed-on-ci — GH Actions / CI filesystems are slower than
+    # local dev. RESEARCH Q3 budget is 100ms local; allow 500ms on CI.
+    on_ci = bool(os.environ.get("CI"))
+    budget = 0.5 if on_ci else 0.1
+    assert elapsed < budget, (
+        f"list() against 200 sessions took {elapsed * 1000:.1f}ms "
+        f"(budget {budget * 1000:.0f}ms on {'CI' if on_ci else 'local'})"
+    )
