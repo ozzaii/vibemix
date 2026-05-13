@@ -295,7 +295,11 @@ Plans:
   2. Reel is graded blind (graders don't see the codepath) by 4 raters (Kaan + Francesco + 2 DJ network friends) on 1-5 "would a real friend say this?" scale per AI reaction.
   3. Average rating ≥4.0 with zero 1-2 ratings across all reactions; if gate fails, Phase 10 (prompt-engineering) re-enters with iteration budget (up to 3 cycles) before considering scope-cut to Hype-man-only.
   4. Grading rubric is documented and the per-reaction scores + comments are archived for post-launch iteration reference.
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 17-01-PLAN.md — Documentation: 17-RUBRIC.md (anchored 1-5 scale + 10-field schema) + 17-CAPTURE-PROTOCOL.md (5 × 6-min segment matrix) + 17-ITERATION-LOOP.md (3-cycle Phase 10 re-entry budget)
+- [ ] 17-02-PLAN.md — scripts/reaction_reel/grade.py: blind-grading CLI with SHA8 anonymization, per-rater deterministic shuffle, resumable JSONL writer + 12 unit tests
+- [ ] 17-03-PLAN.md — scripts/reaction_reel/analyze.py: PASS/FAIL/INCOMPLETE/TIE_BREAKER verdict aggregator + report.md/scores.csv writers + 14 unit tests + end-to-end pipeline integration test
 
 ### Phase 18: Distribution — Signing, Notarization, Installers
 **Goal**: macOS DMG signed + notarized via Apple Developer ID + `notarytool` + Hardened Runtime + entitlements. Windows MSI OV-signed via SignPath Foundation (approved from day-1 application in Phase 1) + Inno Setup 6. Tauri auto-update wired with signed manifest. Binary attack verification confirms zero `AIza` key-leak.
@@ -356,7 +360,7 @@ Plans:
 | 14. CDJ Whisper v5 Migration + Polish | 6/6 | Complete   | 2026-05-13 |
 | 15. Recording & Session Capture Finalization | 5/6 | In Progress|  |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
-| 17. Reaction-Reel Slop Grading Gate | 0/? | Not started | - |
+| 17. Reaction-Reel Slop Grading Gate | 0/3 | Not started | - |
 | 18. Distribution — Signing, Notarization, Installers | 0/? | Not started | - |
 | 19. GitHub Launch Presence | 0/? | Not started | - |
 | 20. Day-Zero Operations | 0/? | Not started | - |
