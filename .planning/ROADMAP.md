@@ -323,7 +323,7 @@ Plans:
 | 14. FL-Studio Polish Phase (Critique → Execute Loop) | 0/? | Not started | - |
 | 15. Recording & Session Capture Finalization | 0/? | Not started | - |
 | 16. Hallucination Verification Gate | 0/? | Not started | - |
-| 17. Reaction-Reel Slop Grading Gate | 0/? | Not started | - |
+| 17. Reaction-Reel Slop Grading Gate | 1/3 | In Progress|  |
 | 18. Distribution — Signing, Notarization, Installers | 0/? | Not started | - |
 | 19. GitHub Launch Presence | 0/? | Not started | - |
 | 20. Day-Zero Operations | 0/? | Not started | - |
