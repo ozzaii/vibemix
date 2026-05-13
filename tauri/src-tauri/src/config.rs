@@ -25,6 +25,19 @@ const STORE_PATH: &str = "config.json";
 const KEY_FIRST_RUN_STATE: &str = "first_run_state";
 const KEY_MASCOT_WINDOW: &str = "mascot_window";
 
+/// Phase 18 Plan 18-04 — bool. Default `true`. When `false`, the boot-time
+/// updater check in `updater::run_update_check_if_enabled` returns early
+/// without hitting the manifest endpoint. Read directly from
+/// `tauri-plugin-store`'s `config.json` (no IPC schema change — the
+/// sidecar's `_PHASE12_FIELDS` allowlist preserves unknown top-level keys
+/// on round-trip per `src/vibemix/runtime/config_store.py` lines 14-22).
+/// The Settings UI surface for flipping this is deferred to Phase 19
+/// polish (one row in the existing `PerformanceGroup` or a new
+/// `UpdateGroup`). When that ships, it calls `tauri-plugin-store`'s
+/// built-in `set` command via the existing `store:default` capability —
+/// no new app command needed.
+pub const KEY_UPDATE_CHECK_ON_LAUNCH: &str = "update_check_on_launch";
+
 const MASCOT_WINDOW_LABEL: &str = "mascot";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
