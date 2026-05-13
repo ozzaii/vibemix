@@ -33,6 +33,11 @@ export default defineConfig({
       ["tests/**/*.test.ts", "jsdom"],
       ["src/**/*.dom.spec.ts", "jsdom"],
       ["src/mascot/*.test.ts", "jsdom"],
+      // Phase 15 Plan 04 — Recording browser specs live alongside their
+      // components per plan §files_modified; they construct HTMLElement
+      // instances + poke data-attrs and need jsdom (rather than the
+      // default node env for src/**/*.spec.ts).
+      ["src/settings/components/recording-*.spec.ts", "jsdom"],
     ],
   },
 });
