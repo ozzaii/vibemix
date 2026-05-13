@@ -11,6 +11,12 @@
 // *.spec.ts files. asset-loader.test.ts mocks fetch + GLTFLoader and
 // needs jsdom; state-machine.test.ts is pure-function and works in either
 // env. The glob below routes both under jsdom for simplicity.
+//
+// Phase 14 Plan 14-01 adds tests/**/*.test.ts (token migration specs).
+// `tokens.legacy-detect.test.ts` is pure-function and works in node env;
+// the per-surface specs (wizard|session|settings.tokens + mascot.chrome)
+// render components / parse HTML and need jsdom. The `tests/**/*.test.ts`
+// extension is added to `include` and routed under jsdom for simplicity.
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -20,9 +26,11 @@ export default defineConfig({
       "src/**/*.spec.ts",
       "src/**/*.test.ts",
       "tests/**/*.spec.ts",
+      "tests/**/*.test.ts",
     ],
     environmentMatchGlobs: [
       ["tests/**/*.spec.ts", "jsdom"],
+      ["tests/**/*.test.ts", "jsdom"],
       ["src/**/*.dom.spec.ts", "jsdom"],
       ["src/mascot/*.test.ts", "jsdom"],
     ],
