@@ -15,7 +15,7 @@ Per-surface critique-loop record. Wave-based: each surface gets up to 3 cycles o
 | settings | 1 | objective gates only (Kaan-side ui-checker/ui-auditor deferred to `npm run tauri dev` review) | objective gates only | f60fbd6, fb06a0e, e67593c, e4cf069, 5278193 | ✅ green (auto-advance) |
 | settings | 2 | — | — | — | ⬜ not started |
 | settings | 3 | — | — | — | ⬜ not started |
-| mascot | 1 | — | — | — | ⬜ not started |
+| mascot | 1 | objective gates only (Kaan-side ui-checker/ui-auditor deferred to `npm run tauri dev` review) | objective gates only | 31340b8, e5765bc | ✅ green (auto-advance) |
 | mascot | 2 | — | — | — | ⬜ not started |
 | mascot | 3 | — | — | — | ⬜ not started |
 
@@ -28,7 +28,7 @@ Per-surface critique-loop record. Wave-based: each surface gets up to 3 cycles o
 | wizard | deferred — Kaan to capture during `npm run tauri dev` review | mocks/vibemix-direction-final.html §02 | (see 14-02-SUMMARY.md `## Deferred Screenshots`) |
 | session | deferred — Kaan to capture during `npm run tauri dev` review | mocks/vibemix-direction-final.html §01 left | (see 14-03-SUMMARY.md `## Deferred Screenshots`) |
 | settings | deferred — Kaan to capture during `npm run tauri dev` review (open drawer + scroll to PERFORMANCE group) | mocks/vibemix-direction-final.html §02 spec-panel | (see 14-04-SUMMARY.md `## Deferred Screenshots`) |
-| mascot | — | mocks/vibemix-direction-final.html §01 right | — |
+| mascot | deferred — Kaan to capture during `npm run tauri dev` review (overlay window + drag + mood-swap chrome invariance) | mocks/vibemix-direction-final.html §01 right | (see 14-05-SUMMARY.md `## Deferred Screenshots`) |
 
 ## Perf Verification (POLISH-05 + CONTEXT Area 3 — must close before phase end)
 
