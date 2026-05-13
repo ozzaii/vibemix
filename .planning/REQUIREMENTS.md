@@ -163,12 +163,12 @@
 
 ### Recording & Session Capture
 
-- [ ] **REC-01**: Per-session directory `recordings/<YYYYMMDD-HHMMSS>/`
-- [ ] **REC-02**: `input.wav` — 16kHz mono int16 (music + mic mix sent to Gemini)
-- [ ] **REC-03**: `voice.wav` — 24kHz mono int16 (Gemini TTS PCM output)
-- [ ] **REC-04**: `events.jsonl` — session timeline (triggers, AI text, errors, MIDI events)
+- [x] **REC-01**: Per-session directory `recordings/<YYYYMMDD-HHMMSS>/`
+- [x] **REC-02**: `input.wav` — 16kHz mono int16 (music + mic mix sent to Gemini)
+- [x] **REC-03**: `voice.wav` — 24kHz mono int16 (Gemini TTS PCM output)
+- [x] **REC-04**: `events.jsonl` — session timeline (triggers, AI text, errors, MIDI events)
 - [ ] **REC-05**: Recording browser UI — list past sessions, replay, delete
-- [ ] **REC-06**: Retention policy enforcement (default 7d, configurable in Settings)
+- [x] **REC-06**: Retention policy enforcement (default 7d, configurable in Settings)
 
 ---
 
