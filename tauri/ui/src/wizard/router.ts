@@ -24,6 +24,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { emitIpc, sendIpcRequest, subscribeIpc } from "../ipc/client.js";
+import { registerShortcuts } from "../session/shortcuts.js";
 import { StatusBar } from "./components/status-bar.js";
 import type { StatusBarProps } from "./components/status-bar.js";
 import { StepIndicator } from "./components/step-indicator.js";
@@ -167,6 +168,36 @@ export function advanceTo(next: WizardStep): void {
   }
 }
 
+/** Walk the wizard one step backward. Intro has no back (it's the first
+ *  surface a user sees). Smoke-test goes back to controller. Wired to the
+ *  per-step `[ ← Back ]` button + the `esc` / `cmd+[` shortcut.
+ *
+ *  Impeccable Wave 5.A — closes the Heuristic 3 (User Control & Freedom)
+ *  gap from the 2026-05-14 critique: previously the wizard was strictly
+ *  one-way until the user finished. */
+export function back(): void {
+  const current = wizardState.currentStep;
+  switch (current) {
+    case "intro":
+      return; // No back from the first surface.
+    case "permissions":
+      // Permissions is the first wizard step proper; back returns to intro.
+      advanceTo("intro");
+      return;
+    case "audio":
+      advanceTo("permissions");
+      return;
+    case "controller":
+      advanceTo("audio");
+      return;
+    case "smoke-test":
+      advanceTo("controller");
+      return;
+    case "done":
+      return; // Wizard is done; no back.
+  }
+}
+
 export function currentStep(): WizardStep {
   return wizardState.currentStep;
 }
@@ -199,7 +230,25 @@ function rerender(): void {
   }
 }
 
+// Impeccable Wave 5.A — register wizard-wide back shortcuts once. The
+// callback inspects the live currentStep so adding a step doesn't require
+// re-binding (and intro stays a no-op via back()).
+let wizardShortcutsRegistered = false;
+function ensureWizardShortcuts(): void {
+  if (wizardShortcutsRegistered) return;
+  wizardShortcutsRegistered = true;
+  registerShortcuts({
+    "cmd+[": () => back(),
+    "ctrl+[": () => back(),
+    // `esc` from a wizard step walks back one. The intro returns no-op
+    // via back(), and the smoke-test surface absorbs esc (it's the last
+    // step before completion — `back()` is the safe action).
+    escape: () => back(),
+  });
+}
+
 export function renderCurrentStep(): void {
+  ensureWizardShortcuts();
   const stepStripMount = document.getElementById("wizard-step-strip");
   const primaryMount = document.getElementById("wizard-primary");
   const statusMount = document.getElementById("status-bar");
@@ -230,6 +279,7 @@ export function renderCurrentStep(): void {
       primary = renderStep1(wizardState.step1, {
         platform: wizardState.platform,
         onContinue: () => advanceTo("audio"),
+        onBack: () => back(),
         onGrantScreen: () => {
           void invoke("open_screen_recording_settings").catch((err) => {
             console.warn("[step1] open_screen_recording_settings failed:", err);
@@ -262,6 +312,7 @@ export function renderCurrentStep(): void {
       primary = renderStep2(wizardState.step2, {
         platform: wizardState.platform,
         onContinue: () => advanceTo("controller"),
+        onBack: () => back(),
         onSelectDevice: (id) =>
           setState({ step2: { ...wizardState.step2, selectedDeviceId: id } }),
         onPlayTest: () => {
@@ -310,6 +361,7 @@ export function renderCurrentStep(): void {
       }
       primary = renderStep3(wizardState.step3, {
         onContinue: () => advanceTo("smoke-test"),
+        onBack: () => back(),
         onListenAgain: () => {
           step3ListenStarted = false;
           setState({

@@ -26,6 +26,9 @@ export interface Step1Callbacks {
   onGrantMic: () => void;
   onOpenScreenSettings: () => void;
   onOpenMicSettings: () => void;
+  /** Impeccable Wave 5.A — walks the wizard one step backward. Optional
+   *  for back-compat with existing tests; the router always wires it. */
+  onBack?: () => void;
 }
 
 const CSS = `
@@ -55,8 +58,17 @@ const CSS = `
   }
   .wizard-step__cta-row {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
     margin-top: var(--sp-5);
+  }
+  /* Hidden when no Back affordance is wired (intro / smoke-test / done). */
+  .wizard-step__cta-row[data-back="false"] {
+    justify-content: flex-end;
+  }
+  .wizard-step__cta-row[data-back="false"] .wizard-step__back-spacer {
+    display: none;
   }
 `;
 
@@ -109,6 +121,23 @@ export function renderStep1(state: Step1State, cb: Step1Callbacks): HTMLElement 
 
   const ctaRow = document.createElement("div");
   ctaRow.className = "wizard-step__cta-row";
+  ctaRow.dataset.back = cb.onBack ? "true" : "false";
+
+  // Back button — bottom-left affordance (impeccable Wave 5.A). Hidden
+  // when no callback is wired (preserves the legacy single-button layout
+  // for unit tests that don't pass onBack).
+  if (cb.onBack) {
+    ctaRow.append(
+      Button({
+        variant: "secondary",
+        state: "idle",
+        label: "Back",
+        leadingGlyph: "←",
+        onClick: cb.onBack,
+      }),
+    );
+  }
+
   const allGranted = required.every((s) => s === "granted");
   ctaRow.append(
     Button({

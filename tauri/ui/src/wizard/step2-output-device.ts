@@ -37,6 +37,9 @@ export interface Step2Callbacks {
   onRecheckBlackHole: () => void;
   onSelectWindow: () => void;
   onPickDifferent: () => void;
+  /** Impeccable Wave 5.A — walks the wizard one step backward. Optional
+   *  for back-compat with existing tests; the router always wires it. */
+  onBack?: () => void;
 }
 
 export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement {
@@ -114,6 +117,18 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
 
   const ctaRow = document.createElement("div");
   ctaRow.className = "wizard-step__cta-row";
+  ctaRow.dataset.back = cb.onBack ? "true" : "false";
+  if (cb.onBack) {
+    ctaRow.append(
+      Button({
+        variant: "secondary",
+        state: "idle",
+        label: "Back",
+        leadingGlyph: "←",
+        onClick: cb.onBack,
+      }),
+    );
+  }
   const armed = state.audioPassed && state.windowSelected;
   ctaRow.append(
     Button({

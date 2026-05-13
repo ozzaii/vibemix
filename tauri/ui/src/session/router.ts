@@ -17,10 +17,12 @@
 import { initSessionBridge } from "./ws-bridge.js";
 import { mountSessionLayout, type Mounted } from "./SessionLayout.js";
 import { startRenderLoop, stopRenderLoop } from "./render-loop.js";
+import { mountSessionShortcuts } from "./session-shortcuts.js";
 import { mountSettingsDrawer } from "../settings/SettingsDrawer.js";
 
 let mounted: Mounted | null = null;
 let unsubscribeBridge: (() => void) | null = null;
+let unsubscribeShortcuts: (() => void) | null = null;
 
 /** Mount the live session and start the bridge + render loop.
  *
@@ -60,6 +62,10 @@ export async function routeSession(rootEl?: HTMLElement): Promise<void> {
   // Start the render loop. From this point on every snapshot tick
   // mutates SessionState → CSS variables / data attributes on screen.
   startRenderLoop(m);
+
+  // Wire the impeccable Wave 5.A keyboard shortcuts (?/cmd+m/esc). The
+  // drawer owns its own Esc; this wiring covers the session surface.
+  unsubscribeShortcuts = mountSessionShortcuts();
 }
 
 /** Tear down the session — stop the rAF, unsubscribe IPC, drop the
@@ -75,6 +81,15 @@ export async function teardownSession(): Promise<void> {
       console.warn("[session-router] unsubscribe failed:", e);
     }
     unsubscribeBridge = null;
+  }
+  if (unsubscribeShortcuts) {
+    try {
+      unsubscribeShortcuts();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[session-router] shortcut unsubscribe failed:", e);
+    }
+    unsubscribeShortcuts = null;
   }
   mounted = null;
 }

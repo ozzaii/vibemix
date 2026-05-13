@@ -20,6 +20,9 @@ export interface Step3Callbacks {
   onContinue: () => void;
   onListenAgain: () => void;
   onSkip: () => void;
+  /** Impeccable Wave 5.A — walks the wizard one step backward. Optional
+   *  for back-compat with existing tests; the router always wires it. */
+  onBack?: () => void;
 }
 
 export function renderStep3(state: Step3State, cb: Step3Callbacks): HTMLElement {
@@ -52,6 +55,18 @@ export function renderStep3(state: Step3State, cb: Step3Callbacks): HTMLElement 
 
   const ctaRow = document.createElement("div");
   ctaRow.className = "wizard-step__cta-row";
+  ctaRow.dataset.back = cb.onBack ? "true" : "false";
+  if (cb.onBack) {
+    ctaRow.append(
+      Button({
+        variant: "secondary",
+        state: "idle",
+        label: "Back",
+        leadingGlyph: "←",
+        onClick: cb.onBack,
+      }),
+    );
+  }
   const armed = state.probeState === "caught" || state.probeState === "timeout";
   ctaRow.append(
     Button({
