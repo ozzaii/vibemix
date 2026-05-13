@@ -70,6 +70,8 @@ Exceptions:
 
 ## Typography
 
+> **Mock-verbatim, frontend-enforcement subordinated.** The 8 role-distinct sizes and 5 weight stops below are lifted verbatim from `mocks/vibemix-direction-final.html` (lines 1389–1402) and are intentional — the v5 contract subordinates the default `frontend-enforcement` "max 4 sizes / max 2 weights" heuristic for this phase per CONTEXT.md Area 4 reconciliation. Single variable-width font (Saira) covers all roles via `wdth` + `wght` axes; numerics use JetBrains Mono with `tabular-nums`. Pre-empts critique-cycle re-flagging.
+
 Variable-axis usage per the v5 mock (lines 1389–1402). Display + body collapse to a single family (Saira) because variable axes let the same font flex from condensed-heavy display down to body. Mono is JetBrains Mono with tabular-nums for numerics.
 
 | Role                | Font        | Size      | Weight | Width axis | Line height | Tracking          | Case      | Notes                                                                 |
