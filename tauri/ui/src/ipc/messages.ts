@@ -30,7 +30,14 @@ export type VibemixIPCMessages =
   | SettingsState
   | StatusRecheck
   | IpcError
-  | MascotMoodChange;
+  | MascotMoodChange
+  | RecordingsList
+  | RecordingsListResult
+  | RecordingsDelete
+  | RecordingsDeleteAck
+  | RecordingsUsage
+  | RecordingsEvents
+  | RecordingsEventsResult;
 
 export interface IpcBoot {
   type: "ipc.boot";
@@ -289,5 +296,68 @@ export interface MascotMoodChange {
     mood: "hype-man" | "teacher" | "coach";
     previous_mood?: "hype-man" | "teacher" | "coach" | null;
     at?: number | null;
+  };
+}
+export interface RecordingsList {
+  type: "ipc.recordings.list";
+  ts: string;
+  payload: {};
+}
+export interface RecordingsListResult {
+  type: "ipc.recordings.list_result";
+  ts: string;
+  payload: {
+    sessions: {
+      session_dir: string;
+      started_at_iso: string;
+      duration_s: number;
+      event_count: number;
+      bytes_total: number;
+      crashed: boolean;
+    }[];
+    bytes_total: number;
+  };
+}
+export interface RecordingsDelete {
+  type: "ipc.recordings.delete";
+  ts: string;
+  payload: {
+    session_dir: string;
+  };
+}
+export interface RecordingsDeleteAck {
+  type: "ipc.recordings.delete_ack";
+  ts: string;
+  payload: {
+    session_dir: string;
+    ok: boolean;
+    error: string | null;
+  };
+}
+export interface RecordingsUsage {
+  type: "ipc.recordings.usage";
+  ts: string;
+  payload: {
+    sessions: number;
+    bytes_total: number;
+  };
+}
+export interface RecordingsEvents {
+  type: "ipc.recordings.events";
+  ts: string;
+  payload: {
+    session_dir: string;
+  };
+}
+export interface RecordingsEventsResult {
+  type: "ipc.recordings.events_result";
+  ts: string;
+  payload: {
+    session_dir: string;
+    events: {
+      t: number;
+      kind: string;
+      [k: string]: unknown;
+    }[];
   };
 }
