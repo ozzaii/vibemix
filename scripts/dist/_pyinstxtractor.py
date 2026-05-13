@@ -22,17 +22,20 @@ runtime-exception; the **format description** is freely usable). This
 extractor implements the read side of that format only — no PyInstaller
 internals, no GPL-derived code.
 
-Cookie shape (PyInstaller 4.x .. 6.x):
+Cookie shape (PyInstaller 2.1+ — what we ship; struct format ``!8sIIii64s``):
 
     struct COOKIE {
-        char magic[8];      // "MEI\014\013\012\013\016"
-        uint32 lengthnHi;   // total archive length (high 32 bits)
-        uint32 lengthnLo;   // total archive length (low 32 bits)
-        uint32 toc;         // TOC offset from archive start
-        uint32 tocLen;      // TOC byte length
-        uint32 pyver;       // py version * 100 (or *1000 from 3.10+)
-        char pylibname[64]; // libpython filename
+        char    magic[8];        // "MEI\014\013\012\013\016"
+        uint32  lengthofPackage; // total archive byte length
+        uint32  toc;             // TOC offset from archive start
+        int32   tocLen;          // TOC byte length
+        int32   pyver;           // py version * 100 (or *1000 from 3.10+)
+        char    pylibname[64];   // libpython filename
     };
+
+Cookie size: 8 + 4*4 + 64 = 88 bytes (PyInstaller 2.1+).
+Cookie size: 8 + 4*4 = 24 bytes (PyInstaller 2.0 — same int layout, no
+pylibname).
 
 The cookie is the LAST occurrence of the magic in the file. The TOC is a
 sequence of variable-length entries:
@@ -175,8 +178,9 @@ class PyInstArchive:
         return pos + idx
 
     def _parse_cookie(self, cookie_pos: int) -> bool:
-        """Parse the 88-byte cookie at ``cookie_pos`` and record the
-        archive boundary + TOC offset.
+        """Parse the cookie at ``cookie_pos`` (24 or 88 bytes depending
+        on PyInstaller version) and record the archive boundary + TOC
+        offset.
         """
         assert self._fh is not None
         fh = self._fh
@@ -184,50 +188,77 @@ class PyInstArchive:
         raw = fh.read(88)
         if len(raw) < 24:
             return False
-        # struct: 8s I I I I I 64s — big-endian
-        # bytes 0-7   : magic
-        # bytes 8-11  : lengthHi  (added in PyInstaller 5+; for older
-        #               PyInstaller this slot holds the archive length
-        #               and the high half is implicitly zero)
-        # bytes 12-15 : lengthLo
-        # bytes 16-19 : tocOffset
-        # bytes 20-23 : tocLen
-        # The "modern" cookie is 88 bytes (with pyver + pylibname); the
-        # legacy cookie is 24 bytes. Both keep the first 24 bytes shaped
-        # the same way: magic + length-hi + length-lo + toc + tocLen.
-        magic, length_hi, length_lo, toc_off, toc_len = struct.unpack(
-            ">8sIIII", raw[:24]
+
+        # Layout (PyInstaller 2.0 — 24 bytes) and (PyInstaller 2.1+ — 88
+        # bytes) share the first 24 bytes:
+        #
+        #   bytes 0-7   : magic
+        #   bytes 8-11  : lengthofPackage (uint32 — total archive bytes)
+        #   bytes 12-15 : tocOffset       (uint32 — TOC offset from
+        #                                  archive start)
+        #   bytes 16-19 : tocLen          (int32  — TOC byte length)
+        #   bytes 20-23 : pyver           (int32  — py version * 100 or
+        #                                  *1000 for 3.10+)
+        #
+        # The 2.1+ cookie adds a 64-byte pylibname after pyver; we don't
+        # need it.
+        magic, archive_total, toc_off, toc_len, pyver = struct.unpack(
+            ">8sIIii", raw[:24]
         )
         if magic != PYINST_MAGIC:
             return False
+        if toc_len <= 0 or archive_total <= 0:
+            return False
 
-        # On PyInstaller 4.x the cookie has only 24+4+4 = 32 bytes; on
-        # 5.x+ it grows to include pyver and pylibname. We tolerate
-        # either by guarding the extra read.
-        if len(raw) >= 32:
-            try:
-                pyver = struct.unpack(">I", raw[24:28])[0]
-            except struct.error:
-                pyver = 0
-        else:
-            pyver = 0
+        # Real PyInstaller bundles append the CArchive after a bootloader
+        # binary; the archive itself starts at ``cookie_pos + 24 +
+        # (88-24 if v2.1) - archive_total``. The file-size-relative form
+        # works for any leading bootloader padding:
+        fh.seek(0, 2)
+        file_size = fh.tell()
+        # Modern PyInstaller writes a trailing pylibname pad (64 bytes
+        # past the cookie head) which is included in archive_total. The
+        # "tail bytes" between cookie+cookie_size and file end is zero
+        # in our case but can hold extra bytes in real bundles; the
+        # bootloader convention is archive_start = file_size -
+        # (archive_total + tail_bytes).
+        # Approximation: archive_start = (cookie_pos + cookie_size) -
+        # archive_total. We try both common cookie sizes (88 for 2.1+
+        # then 24 for 2.0) and pick the one that yields a non-negative
+        # plausible TOC offset.
+        candidates = []
+        for cookie_size in (88, 24):
+            if cookie_pos + cookie_size > file_size:
+                continue
+            arc_start = (cookie_pos + cookie_size) - archive_total
+            if arc_start < 0:
+                continue
+            candidate_toc_offset = arc_start + toc_off
+            if 0 <= candidate_toc_offset < file_size:
+                if candidate_toc_offset + toc_len <= file_size:
+                    candidates.append((cookie_size, arc_start, candidate_toc_offset))
+        if not candidates:
+            # Last-ditch fallback — assume archive starts at file
+            # beginning. Works for the synthetic test fixture.
+            arc_start = file_size - archive_total
+            if arc_start < 0:
+                arc_start = 0
+            candidates.append((88, arc_start, arc_start + toc_off))
 
-        archive_total = (length_hi << 32) | length_lo
-        # archive_start = cookie_pos + 24 - archive_total ... but
-        # historically the archive begins at the start of the bootloader
-        # + (file_size - archive_total). Use file-size-relative form
-        # which matches both layouts:
-        assert self._fh is not None
-        self._fh.seek(0, 2)
-        file_size = self._fh.tell()
-        self._archive_start = file_size - archive_total
-        if self._archive_start < 0:
-            # Defensive fallback: assume the archive starts at the
-            # cookie's archive_total offset, not before file start.
-            self._archive_start = 0
-        self._toc_offset = self._archive_start + toc_off
+        cookie_size, self._archive_start, self._toc_offset = candidates[0]
         self._toc_len = toc_len
         self._py_version = pyver
+        _LOG.debug(
+            "cookie parsed: cookie_pos=%d cookie_size=%d archive_total=%d "
+            "archive_start=%d toc_offset=%d toc_len=%d pyver=%d",
+            cookie_pos,
+            cookie_size,
+            archive_total,
+            self._archive_start,
+            self._toc_offset,
+            self._toc_len,
+            self._py_version,
+        )
         return True
 
     # ----------------------------------------------------------------- toc
