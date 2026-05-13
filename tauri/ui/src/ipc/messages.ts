@@ -240,7 +240,8 @@ export interface SettingsSet {
       | "retention_days"
       | "push_to_mute_hotkey"
       | "mood"
-      | "click_through";
+      | "click_through"
+      | "lighter_blur";
     value: string | number | boolean | null;
   };
 }
@@ -261,6 +262,7 @@ export interface SettingsState {
     retention_days: number;
     push_to_mute_hotkey: string;
     muted: boolean;
+    lighter_blur: boolean;
   };
 }
 export interface StatusRecheck {

@@ -269,6 +269,7 @@ describe("parseIpcMessage — ipc.settings.state", () => {
       retention_days: 7,
       push_to_mute_hotkey: "cmd+shift+m",
       muted: false,
+      lighter_blur: false,
     },
   };
 
