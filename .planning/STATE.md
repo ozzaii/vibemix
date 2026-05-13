@@ -1,15 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.1.0
-milestone_name: milestone
-status: verifying
-last_updated: "2026-05-13T17:18:51.326Z"
+milestone: v2.0
+milestone_name: Research-Driven Ship
+status: planning
+last_updated: "2026-05-13T21:19:39.447Z"
+last_activity: 2026-05-13
 progress:
-  total_phases: 20
-  completed_phases: 13
-  total_plans: 80
-  completed_plans: 67
-  percent: 84
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # vibemix — State
@@ -32,42 +33,10 @@ progress:
 
 ## Current Position
 
-**Phase 11 ✅ complete (structural gate).** Wave 4 (Plan 11-05) shipped the wizard flow logic end-to-end — `src/vibemix/runtime/wizard.py` (WizardLoop with 9 ipc.* handlers: permission.check, calibration.list_devices / probe_audio / user_heard_tone / start_midi_listen / list_windows / smoke_test, wizard.done, wizard.start); `vibemix.platform.permissions` + `vibemix.platform.windows` typed selectors with macOS/Windows underscore-prefixed concrete impls (AVCaptureDevice + Quartz.CGWindowListCopyWindowInfo on darwin; EnumWindows + winsdk MVP stubs on win32); `tauri/ui/src/ipc/client.ts` (sendIpcRequest + subscribeIpc + emitIpc with 10s Promise.race timeout per RESEARCH Pitfall 6); Wave 3 router.ts setTimeout mocks replaced wholesale with real ipc.* request bodies; Rust `ws_client.rs` exposes `WsClientHandle` managed state + `forward_ipc_to_sidecar` body (replaces Wave 2 stub); `__main__.py` --wizard now dispatches to `vibemix.runtime.wizard.run_wizard` (Wave 1 stub deleted); `scripts/reset_first_run.py` + `tests/wizard/` (8 files, 41 tests). Window-picker is WS-only (Warning #4 reaffirmed — no Rust enumerate_windows command; webview source has zero `invoke("enumerate_windows", ...)` calls). DEV-gated __vibemixDev surface closes the W3 threat T-11-W3-02 carry-over.
-
-**Phase 11 outcome scope-of-gate clarification:** Phase 11 is the STRUCTURAL gate (code shipped, tests green, builds succeed, CI gates pass, AIza leak gate clean, capability allowlist intact, 19-message schema parity, wizard end-to-end works on Kaan's rig). The fresh-machine <90s wizard timing clock is OWNED BY Phase 16 (Hallucination Verification Gate — production-quality reactions on first-run) + Phase 20 (Day-Zero Operations — fresh-machine rehearsal on clean VMs). Kaan's rig has BlackHole pre-installed + DDJ-FLX4 + TCC granted — not a fresh non-dev macOS, so timing the wizard here would either false-pass or false-fail. Phase 11 unblocks Phase 16+20; it does not pre-empt them.
-
-**Phase 11 close metrics:** 5 waves, 13 task commits, 95+ files created cumulative, **1066 Python tests pass** (978 Phase 10 baseline + 88 new across Wave 0-4) + 13 vitest + 4 cargo test = 1083 total. 1 known pre-existing failure (`test_g5_poc_files_untouched` — mascot.html stale-baseline since post-Phase-5 commit `398f788`); out of scope per CLAUDE.md scope-boundary rule. POC files (cohost*.py / mascot.html / mocks/) diff-untouched against the Phase 11 plan-docs commit (`7e08966`).
-
-Phase: 14 (cdj-whisper-v5-migration-polish) — ✅ COMPLETE 2026-05-13
-
-**Phase 12 ✅ shipped across 4 waves.** ~10,000 LOC across ~62 files. IPC families 19 → 26 (+7). Tests: vitest 13 → 141 (+128); pytest 35 → 1171 (+1136); cargo 4 → 13 (+9). All gates green: typecheck, `npm run check:ipc`, `cargo check`, `cargo test`, pytest. POC files diff-untouched.
-
-- **Wave 1 (12-01)** — IPC schema: 7 new ipc.* families (`session.snapshot` 30Hz, `session.mute` toggle/ack, `settings.set/get/state`, `status.recheck`, `error`). Hand-written `@dataclass(frozen=True, slots=True)` mirrors; codegen → TS unions; drift gate count parity 26 == 26.
-- **Wave 2 (12-02 + 12-03 parallel)** — Sidecar: `SessionLoop` + `SettingsApplier` + `ConfigStore` at `src/vibemix/runtime/`; 30Hz snapshot emit from MusicState + EventDetector + transcript ring + ControllerState; per-field dispatch matrix; OS-aware config dirs; atomic writes; transient `muted` state. Presentation: 12 components + 5 inline SVG icons + `SessionLayout` composer at `tauri/ui/src/session/`; pure-function pattern + `registerStyle()` singleton + zero hardcoded hex; jsdom vitest harness added.
-- **Wave 3 (12-04)** — Glue: `SessionState` singleton + `ws-bridge` IPC subscribers + single `rAF` render-loop (CSS-variable hot updates + transcript sticky-bottom) + Phase 11 `router.session()` + `main.ts` boot decision (`first_run_completed` → session, else wizard). Push-to-mute via `tauri-plugin-global-shortcut` with reserved-combo rejection + window-focus gate; `PlaybackQueue.clear()` lands; `rebind_hotkey` Tauri command exposed.
-- **Wave 4 (12-05)** — Settings drawer slide-over (z-50, live session keeps rendering behind backdrop): PERSONA / OUTPUT / HOTKEY / RECORDING / CALIBRATION groups, hotkey-capture state machine, 6-stop knurled retention slider, confirm-dialog modal, gear button wires `openSettings()`. ∞ retention encoded as `36500` sentinel. `12-VERIFICATION.md` status: `human_needed` — 7 hardware UAT scenarios deferred to Kaan's rig.
-
-**Phase 12 deferred items (UAT pending — `human_needed`):**
-
-1. Live UI sustained ≥30 fps on Retina during 60-min session
-2. Mid-session voice/mode/output/profile hot-reload effect verified end-to-end
-3. Push-to-mute drains PlaybackQueue mid-utterance
-4. MIDI hot-unplug flips badge red within 2s
-5. Genre change overlay + profile reload confirmed
-6. Hotkey rebind round-trip with reserved-combo rejection visible
-7. Re-run calibration tears down session + remounts wizard
-
-Plan: 6 of 6
-
-- **Phase 14:** ✅ shipped — shim deleted, v5 primitives consumed directly across all four surfaces; perf-fallback CSS shipped; mascot overlay wears v5 chrome.
-- **Status:** Phase complete — ready for verification
-- **Progress:** [████████░░] 84%
-
-```
-[██████████████░░░░░░] 70% (14/20 phases — Phase 14 ✅ complete 2026-05-13; Phase 15 next)
-```
-
----
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-13 — Milestone v2.0 started
 
 ## Performance Metrics
 

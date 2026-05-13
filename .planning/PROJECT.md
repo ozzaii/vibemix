@@ -10,6 +10,39 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
+## Current Milestone: v2.0 Research-Driven Ship
+
+**Goal:** Ship a public open-source AI DJ co-host that reacts in-bar, never hallucinates, with a viral demo arsenal earning 1000+ GitHub stars.
+
+**Absorbs:** Outstanding v0.1.0 work (Phases 15-20 — recording, UAT, sign, release, day-zero ops) folded into a single bulky milestone alongside the research-driven feature set surfaced by the v2-bucket research swarm (`.planning/research/v2-buckets/SYNTHESIS.md` + 11 supporting artifacts).
+
+**Target features (12 buckets):**
+
+1. **Ship infrastructure (absorb v0.1.0 outstanding)** — recording browser + retention enforcement, UAT, Apple Developer ID sign + notarize + DMG, SignPath Windows MSI, GitHub release matrix, day-zero ops
+2. **Generalized event detector v1** — 6 cross-genre detectors: `KICK_SWAP` (kick character change), `SUB_LAYER_ARRIVAL` (sub-band onset), `BREAKDOWN_KICK_KILL`, `REENTRY_KICK_LAND`, `KICK_DENSITY_SHIFT`, `PHRASE_BOUNDARY` (band-limited autocorr, ±1 bar). Anchored to `cohost_v4.py`'s existing detector surface. (Hard Tek-only detectors `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` deferred to follow-on)
+3. **Latency stack** — Gemini prompt diet + context caching (1024-token floor managed via padding), pre-canned ack bank (~40 OPUS samples), cancel-and-refire (`SpeechHandle.interrupt(force=True)` empirically verified), predictive firing (~2 bars early on buildup, gated playback)
+4. **Mascot 4-layer additive state machine** — mood baseline + anticipation overlay (fires BEFORE Gemini round-trip, 400-1200ms perceived mask) + speak/react + effect, plus beat-coupled hip-bob + inline emote-tag vocab (gated on 1-day Gemini text-channel timing spike)
+5. **Citation linter** — anti-slop tech impl. Grammar `[ev:<TYPE>@<t>]` / `[aud:<key>@<t>]` / `[midi:<event>@<t>]` / `[track:<id>]`. In-memory Evidence registry, stdlib `re`, response-level strip in live (ack-bank fallback), sentence-level in debrief. Cross-mode (live + debrief + library + genre)
+6. **djay Pro Mac overlay highlight** — viral demo anchor. 12 hand-mapped pointable elements (mid/high/low EQ × 2 decks, filter, faders, crossfader, jog, etc.) via AX from Tauri parent process (not sidecar per #8329)
+7. **Pyrekordbox XML one-shot library import** — durable path post-SQLCipher-breakage; lookup BPM/key/cues from imported library by track title fuzzy match
+8. **10-SKU MIDI controller library** — DDJ-FLX4 (verified) + FLX6/FLX10/SX3/XDJ-RX3 + Hercules Inpulse 300/500 + Numark Party Mix Live + Mixstream Pro+ + DDJ-400. JSON-per-SKU + `MidiMapLoader`. Auto-detect on launch
+9. **Post-session debrief** — single Gemini call per session, chaptered review + 60-90s voiced TL;DR + 3 drills (hard cap) + clickable timeline. SBI/STAR-AR (NOT sandwich). Long-term DJ profile = ~2KB structured JSON (NO mem0/vector DB)
+10. **Library intelligence** — Gemini Embedding 2 (1536-dim, 80s audio cap, MP3/WAV) + sqlite-vec embedded vector store + Bravoh pipeline lifted 80% verbatim. File-watcher → embed → query. Free tier via Bravoh proxy (~100 reactions/day)
+11. **Cross-mode citation enforcement** — extend §5 linter to library + genre modes; per-session slop ratio telemetry surface
+12. **Viral demo film + post arsenal** — 30s djay Pro overlay cut with 3 signature beats (point-at-knob, anticipation lean-in, anti-slop silence beat). Twitter thread + IG Reels (IT + EN) + Reddit r/Beatmatch + HN Show HN. Pre-seeded FAQ.
+
+**Source-of-truth artifacts:**
+
+- `.planning/research/v2-buckets/SYNTHESIS.md` — integration layer + priority matrix
+- `.planning/research/v2-buckets/A-latency.md` + `A-followup-1-cancel-and-caching.md`
+- `.planning/research/v2-buckets/B-industry-integrations.md` + `B-followup-1-v11-integration-spec.md`
+- `.planning/research/v2-buckets/C-ui-overlay.md`
+- `.planning/research/v2-buckets/D-mascot-emotion.md`
+- `.planning/research/v2-buckets/E-debrief-pedagogy.md` + `E-followup-1-citation-linter.md`
+- `.planning/research/v2-buckets/F-library-intelligence.md`
+- `.planning/research/v2-buckets/G-genre-taxonomy.md` + `G-followup-1-hard-tek-dsp.md`
+- `.planning/research/v2-buckets/synthesis-viral-demo.md`
+
 ## Requirements
 
 ### Validated
