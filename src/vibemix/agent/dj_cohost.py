@@ -51,7 +51,7 @@ from livekit.agents import tts as agents_tts
 from vibemix.agent.config import LLM_MODEL
 from vibemix.audio import INVOKE_AUDIO_SECONDS, AudioBuffer, VoiceRecorder, snapshot_wav
 from vibemix.prompts import build_system_instruction, filter_for_slop
-from vibemix.state import AICoach, Event, MusicState
+from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState
 
 # Sentinel suppression-token the LLM emits when nothing's worth reacting to.
 # The cascade swallows it. See ``vibemix.prompts.matrix`` for the prompt-side
@@ -114,6 +114,7 @@ class DJCoHostAgent(Agent):
         recorder: VoiceRecorder,
         llm_inst: agents_llm.LLM,
         tts_inst: agents_tts.TTS,
+        evidence_registry: EvidenceRegistry | None = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -121,6 +122,10 @@ class DJCoHostAgent(Agent):
         # Phase 13-05: prefer the live MusicState.mood over the env-var
         # default so a mood-swap before agent build is honored. Plan 13-06
         # is responsible for re-instantiating the agent on subsequent swaps.
+        # Plan 18-03: prompt_body now includes the citation-grammar block
+        # appended via build_system_instruction's default
+        # include_citation_grammar=True — Gemini SEES the grammar in the
+        # system instruction (GROUND-03 prompt-only seeding).
         live_mood = getattr(state, "mood", None)
         prompt_body = _resolve_prompt_cell(mood=live_mood)
         super().__init__(
@@ -134,6 +139,11 @@ class DJCoHostAgent(Agent):
         self._screen_buf = screen_buf
         self._state = state
         self._recorder = recorder
+        # Plan 18-03 — evidence registry for per-turn snapshot threading.
+        # Default None preserves Phase 4 backward-compat (the agent is the
+        # only call site that wires the registry into AICoach.build_prompt;
+        # standalone tests + legacy run paths skip the snapshot).
+        self._registry: EvidenceRegistry | None = evidence_registry
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         # Both the LiveKit-side ``instructions`` AND the google.genai-side
@@ -157,12 +167,29 @@ class DJCoHostAgent(Agent):
         ev = self._pending_event
         self._pending_event = None
 
+        # Plan 18-03 — snapshot the EvidenceRegistry FRESH per turn so the
+        # AICoach.evidence_line corpus footer reflects observations written
+        # by state_refresh_loop + EventDetector since the last invocation.
+        # snapshot() is O(N) over total observations and lock-guarded; with
+        # the cohost_v4 cooldown gates a 1h DJ session caps at ~500 obs, so
+        # this fits well under 1ms per turn (cheap). When _registry is None
+        # (default Phase 4 backward-compat path), pass None — AICoach skips
+        # the corpus footer and the v4 byte-identical evidence_line is
+        # preserved. This is the production-corpus seeding loop:
+        #   registry → snapshot → AICoach evidence_corpus footer → Gemini
+        # plus the citation-grammar block in the system instruction
+        # (Task 1) tells Gemini HOW to cite against that corpus.
+        snapshot = self._registry.snapshot() if self._registry is not None else None
+
         # Build grounded text packet (same evidence + task v2 used)
         if ev is not None:
-            text_prompt = AICoach.build_prompt(ev)
+            text_prompt = AICoach.build_prompt(ev, registry_snapshot=snapshot)
         else:
             # No event context (e.g. generate_reply called without prep) — fall back
-            text_prompt = AICoach.build_prompt(Event(type="MANUAL", state=self._state, extra={}))
+            text_prompt = AICoach.build_prompt(
+                Event(type="MANUAL", state=self._state, extra={}),
+                registry_snapshot=snapshot,
+            )
 
         audio_wav = snapshot_wav(self._clean_audio_buf, INVOKE_AUDIO_SECONDS)
         # Per-invocation dump folder — full audit trail for rapid dev.
