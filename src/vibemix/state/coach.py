@@ -37,7 +37,20 @@ class AICoach:
     SYSTEM_INSTRUCTION; this class only adds event-specific evidence + task."""
 
     @staticmethod
-    def evidence_line(state: MusicState) -> str:
+    def evidence_line(
+        state: MusicState,
+        *,
+        registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None = None,
+    ) -> str:
+        """Build the grounded-state evidence string for the AI prompt.
+
+        ``registry_snapshot`` (Phase 18 Plan 02): optional EvidenceRegistry
+        snapshot dict ``{source: {key: (t1, t2, ...)}}``. When non-None AND
+        non-empty, an ``evidence_corpus[ev=N,aud=M,mix=K]`` footer is
+        appended — primes Gemini that grounded observations exist (Plan
+        18-03 builds on this to bake the citation grammar). Default None
+        preserves the v4 byte-identical output for all existing callers.
+        """
         e = []
         if state.audible:
             b = state.bands
@@ -94,6 +107,22 @@ class AICoach:
             titles = [repr(t) for _, t in state.track_history[-3:]]
             e.append(f"recent_tracks: {'→'.join(titles)}")
 
+        # Phase 18 Plan 02 — evidence-corpus footer. When the registry
+        # snapshot is provided AND has at least one observation, append a
+        # single-line summary of citable observation counts. This SEEDS
+        # the grammar primer that Plan 18-03 expands in the prompt body —
+        # Gemini sees "evidence corpus exists" and (with Plan 18-03's
+        # grammar block) learns to cite against it. The default-None gate
+        # below preserves the v4 byte-identical output for all existing
+        # callers (Phase 4 invariant; HYPE_INTERMEDIATE prompt golden test
+        # stays green).
+        if registry_snapshot:
+            ev_n = sum(len(v) for v in registry_snapshot.get("ev", {}).values())
+            aud_n = sum(len(v) for v in registry_snapshot.get("aud", {}).values())
+            mix_n = sum(len(v) for v in registry_snapshot.get("mix", {}).values())
+            if (ev_n + aud_n + mix_n) > 0:
+                e.append(f"evidence_corpus[ev={ev_n},aud={aud_n},mix={mix_n}]")
+
         return " | ".join(e)
 
     @staticmethod
@@ -149,7 +178,17 @@ class AICoach:
         return "React naturally. 10-14 words."
 
     @staticmethod
-    def build_prompt(ev: Event) -> str:
-        evidence = AICoach.evidence_line(ev.state)
+    def build_prompt(
+        ev: Event,
+        *,
+        registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None = None,
+    ) -> str:
+        """Format the per-event prompt body.
+
+        ``registry_snapshot`` (Phase 18 Plan 02) threads through to
+        ``evidence_line`` for the evidence-corpus footer. Default None
+        preserves the v4 byte-identical output.
+        """
+        evidence = AICoach.evidence_line(ev.state, registry_snapshot=registry_snapshot)
         task = AICoach.task_for_event(ev)
         return f"[{evidence} | event={ev.type}] {task}"
