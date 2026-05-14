@@ -28,6 +28,11 @@ from __future__ import annotations
 from vibemix.state.coach import AICoach
 from vibemix.state.event import Event
 from vibemix.state.event_detector import EventDetector
+from vibemix.state.evidence_registry import (
+    EVIDENCE_CITATION_RE,
+    EVIDENCE_SOURCES,
+    EvidenceRegistry,
+)
 from vibemix.state.genre import (
     EmaSmoother,
     GenreProfile,
@@ -49,9 +54,12 @@ from vibemix.state.track_resolver import derive_audible_deck, derive_audible_tra
 
 __all__ = [
     "AICoach",
+    "EVIDENCE_CITATION_RE",
+    "EVIDENCE_SOURCES",
     "EmaSmoother",
     "Event",
     "EventDetector",
+    "EvidenceRegistry",
     "GenreProfile",
     "GenreRouter",
     "HysteresisState",
