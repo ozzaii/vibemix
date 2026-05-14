@@ -64,19 +64,27 @@ def test_hype_intermediate_byte_identical_to_v4_invariant_holds_for_default_mood
     """Phase 10 invariant — HYPE_INTERMEDIATE is byte-identical to the v4
     SYSTEM_INSTRUCTION (load-bearing IP per CLAUDE.md). When mood is the
     default ('hype-man'), ``build_system_instruction('intermediate', 'hype',
-    include_citation_grammar=False)`` MUST still return that pinned golden,
-    byte-for-byte.
+    include_citation_grammar=False, include_listening_fallback=False)`` MUST
+    still return that pinned golden, byte-for-byte.
 
     Phase 13-05 added the placeholder to all 6 templates but renders it only
     when mood != 'hype-man'. Plan 18-03 adds the citation-grammar block by
-    default; the v4-byte-identity invariant is preserved at the cell-constant
-    level via ``include_citation_grammar=False``.
+    default; Plan 20-02 adds the IM_LISTENING_FRAGMENT by default. The
+    v4-byte-identity invariant is preserved at the cell-constant level via
+    the double opt-out (matches the persona.SYSTEM_INSTRUCTION call shape).
     """
     out_default_optout = build_system_instruction(
-        "intermediate", "hype", include_citation_grammar=False
+        "intermediate",
+        "hype",
+        include_citation_grammar=False,
+        include_listening_fallback=False,
     )
     out_explicit_default_mood = build_system_instruction(
-        "intermediate", "hype", mood="hype-man", include_citation_grammar=False
+        "intermediate",
+        "hype",
+        mood="hype-man",
+        include_citation_grammar=False,
+        include_listening_fallback=False,
     )
     # Both must equal the pinned HYPE_INTERMEDIATE golden.
     assert out_default_optout == HYPE_INTERMEDIATE

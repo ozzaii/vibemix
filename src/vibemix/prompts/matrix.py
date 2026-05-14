@@ -33,6 +33,7 @@ byte-equal to the v4 port.
 
 from __future__ import annotations
 
+from vibemix.coach.prompt_fragments import IM_LISTENING_FRAGMENT
 from vibemix.prompts.negative_dict import NEGATIVE_PHRASES
 
 # ---------------------------------------------------------------------------
@@ -433,6 +434,7 @@ def build_system_instruction(
     mood: str = "hype-man",
     *,
     include_citation_grammar: bool = True,
+    include_listening_fallback: bool = True,
 ) -> str:
     """Return the prompt cell body for ``(skill, mode)`` rendered with ``mood``.
 
@@ -453,11 +455,20 @@ def build_system_instruction(
             — used by ``vibemix.agent.persona`` to preserve the Phase 4
             byte-identical-to-v4 ``SYSTEM_INSTRUCTION`` invariant + by
             v4-byte-identity tests in ``tests/prompts/test_matrix.py``.
+        include_listening_fallback: Plan 20-02 — when True (default), the
+            ``IM_LISTENING_FRAGMENT`` (GROUND-08 prompt-side mitigation) is
+            appended AFTER the citation-grammar block so the grammar primes
+            the "if you cannot cite" clause. The live ``DJCoHostAgent`` rides
+            the default to learn the fail-soft rule automatically. When
+            False, the fragment is suppressed — used by
+            ``vibemix.agent.persona`` together with
+            ``include_citation_grammar=False`` to preserve the v4-byte-
+            identity invariant on ``SYSTEM_INSTRUCTION``.
 
     Returns:
         The prompt string for the requested cell, with ``{mood_persona}``
         substituted for COACH templates and (by default) the citation
-        grammar block appended.
+        grammar block + the fail-soft fragment appended.
 
     Raises:
         ValueError: ``skill`` not in valid set, ``mode`` not in valid set, or
@@ -499,5 +510,17 @@ def build_system_instruction(
     # surface can locate the grammar tail unambiguously.
     if include_citation_grammar:
         body = body + "\n\n" + CITATION_GRAMMAR_BLOCK
+
+    # Plan 20-02 — append the fail-soft fragment (GROUND-08 prompt-side
+    # mitigation). The fragment lands AFTER the citation-grammar block so
+    # the grammar context primes its "if you cannot cite" opening clause.
+    # IM_LISTENING_FRAGMENT already starts with "\n\n--- FAIL-SOFT RULE..."
+    # — no extra separator needed (mirror of the locked copy in
+    # src/vibemix/coach/prompt_fragments.py). Default-on so every live
+    # system instruction carries the rule; explicit opt-out preserves the
+    # v4-byte-identity invariant when paired with
+    # ``include_citation_grammar=False`` (used by persona.SYSTEM_INSTRUCTION).
+    if include_listening_fallback:
+        body = body + IM_LISTENING_FRAGMENT
 
     return body

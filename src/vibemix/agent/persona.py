@@ -21,14 +21,19 @@ from __future__ import annotations
 from vibemix.prompts.matrix import HYPE_INTERMEDIATE, build_system_instruction
 
 # Backward-compat: SYSTEM_INSTRUCTION === HYPE_INTERMEDIATE === v4 port.
-# Plan 18-03: opt out of the citation-grammar-block append so SYSTEM_INSTRUCTION
-# stays byte-identical to the v4 cell constant. The grammar block is appended
-# at the dispatcher boundary (DJCoHostAgent's prompt_body via the default
-# include_citation_grammar=True), not at this backward-compat re-export —
-# this keeps the v4-byte-identity invariant green AND lets the live agent
-# get the grammar block via the dispatcher's default path.
+# Plan 18-03 + Plan 20-02: opt out of BOTH the citation-grammar-block append
+# (Phase 18) and the fail-soft IM_LISTENING_FRAGMENT append (Plan 20-02) so
+# SYSTEM_INSTRUCTION stays byte-identical to the v4 cell constant. Both
+# additions are made at the dispatcher boundary (DJCoHostAgent's prompt_body
+# via the default include_citation_grammar=True + include_listening_fallback=True),
+# not at this backward-compat re-export — this keeps the v4-byte-identity
+# invariant green AND lets the live agent get both additions via the
+# dispatcher's default path.
 SYSTEM_INSTRUCTION: str = build_system_instruction(
-    "intermediate", "hype", include_citation_grammar=False
+    "intermediate",
+    "hype",
+    include_citation_grammar=False,
+    include_listening_fallback=False,
 )
 
 # Sanity guard at import time — if the matrix dispatcher ever drifts away

@@ -154,17 +154,24 @@ def test_prompt_01_six_cells_are_pairwise_unique() -> None:
 
 def test_prompt_01_hype_intermediate_byte_identical_to_persona() -> None:
     """HYPE_INTERMEDIATE == build_system_instruction('intermediate', 'hype',
-    include_citation_grammar=False) == vibemix.agent.persona.SYSTEM_INSTRUCTION
-    (Phase 4 v4 port). Plan 18-03 adds the citation-grammar block by default;
-    the v4-byte-identity invariant is preserved at the cell-constant boundary
-    via include_citation_grammar=False (the persona re-export uses this same
-    opt-out so SYSTEM_INSTRUCTION stays byte-identical to v4).
+    include_citation_grammar=False, include_listening_fallback=False) ==
+    vibemix.agent.persona.SYSTEM_INSTRUCTION (Phase 4 v4 port). Plan 18-03
+    adds the citation-grammar block by default; Plan 20-02 adds the
+    IM_LISTENING_FRAGMENT by default. The v4-byte-identity invariant is
+    preserved at the cell-constant boundary via the double opt-out (the
+    persona re-export uses this exact pair so SYSTEM_INSTRUCTION stays
+    byte-identical to v4).
     """
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     assert HYPE_INTERMEDIATE == SYSTEM_INSTRUCTION
     assert (
-        build_system_instruction("intermediate", "hype", include_citation_grammar=False)
+        build_system_instruction(
+            "intermediate",
+            "hype",
+            include_citation_grammar=False,
+            include_listening_fallback=False,
+        )
         == SYSTEM_INSTRUCTION
     )
 
@@ -221,7 +228,12 @@ def test_prompt_01_dispatcher_returns_right_cell(skill: str, mode: str, expected
             "{mood_persona}", MOOD_PERSONAS["hype-man"]
         )
     assert (
-        build_system_instruction(skill, mode, include_citation_grammar=False)
+        build_system_instruction(
+            skill,
+            mode,
+            include_citation_grammar=False,
+            include_listening_fallback=False,
+        )
         == expected_body
     )
 
@@ -401,19 +413,25 @@ def test_p_grammar_block_appended_to_every_cell(skill: str, mode: str) -> None:
 def test_q_v4_byte_identity_preserved_at_constant_level() -> None:
     """Test Q — HYPE_INTERMEDIATE constant string is byte-identical to the v4
     SYSTEM_INSTRUCTION (Phase 4 invariant + load-bearing IP per CLAUDE.md).
-    The grammar block is appended via the dispatcher; the underlying constant
-    body is untouched. Opt-out via include_citation_grammar=False also returns
-    byte-identical to the constant."""
+    The grammar block + the Plan 20-02 fail-soft fragment are appended via
+    the dispatcher; the underlying constant body is untouched. Double opt-out
+    (include_citation_grammar=False + include_listening_fallback=False)
+    returns byte-identical to the constant."""
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     # Constant unchanged
     assert HYPE_INTERMEDIATE == SYSTEM_INSTRUCTION
-    # Opt-out path returns the constant byte-for-byte
+    # Double opt-out returns the constant byte-for-byte
     assert (
-        build_system_instruction("intermediate", "hype", include_citation_grammar=False)
+        build_system_instruction(
+            "intermediate",
+            "hype",
+            include_citation_grammar=False,
+            include_listening_fallback=False,
+        )
         == HYPE_INTERMEDIATE
     )
-    # Default path is a strict superset (constant + appended block)
+    # Default path is a strict superset (constant + grammar + fragment)
     default_out = build_system_instruction("intermediate", "hype")
     assert default_out.startswith(HYPE_INTERMEDIATE)
     assert len(default_out) > len(HYPE_INTERMEDIATE)
