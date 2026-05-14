@@ -150,17 +150,23 @@ def test_track_atom_existence_only() -> None:
     """track:<id> atom is existence-only — no @t parsing.
 
     Match on key presence in registry["track"]; no tolerance involved.
+
+    NOTE: parse_citations EBNF regex rejects whitespace inside the body
+    (the body charset is ``[^\\s,\\]]+`` per evidence_registry.py:79).
+    The plan's narrative example "Marlon Hoffstadt - Atlas" is shorthand
+    for the spaceless form Gemini actually emits — track IDs at the
+    citation-grammar boundary are the slug form (no spaces).
     """
-    snap = _registry(("track", "Marlon Hoffstadt - Atlas", None))
+    snap = _registry(("track", "MarlonHoffstadt-Atlas", None))
     linter = CitationLinter()
 
-    valid = linter.check("[track:Marlon Hoffstadt - Atlas]", snap, mode="live")
+    valid = linter.check("[track:MarlonHoffstadt-Atlas]", snap, mode="live")
     assert valid.valid is True
     assert valid.reason == "valid"
 
-    invalid = linter.check("[track:Some Other Track]", snap, mode="live")
+    invalid = linter.check("[track:SomeOtherTrack]", snap, mode="live")
     assert invalid.valid is False
-    assert ("track", "Some Other Track") in invalid.missing
+    assert ("track", "SomeOtherTrack") in invalid.missing
     assert invalid.reason == "invalid_atoms"
 
 
