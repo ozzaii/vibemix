@@ -58,10 +58,12 @@ from vibemix.prompts import build_system_instruction, filter_for_slop
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
 from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
+from vibemix.ui_bus import SessionOverlayHighlight
 
 if TYPE_CHECKING:  # pragma: no cover — typing-only
     from vibemix.agent.ack_bank import AckBank
     from vibemix.audio.buffers import PlaybackQueue
+    from vibemix.runtime.ws_bus import IpcBus
 
 # Sentinel suppression-token the LLM emits when nothing's worth reacting to.
 # The cascade swallows it. See ``vibemix.prompts.matrix`` for the prompt-side
@@ -93,6 +95,12 @@ ENV_MOOD = "VIBEMIX_MOOD"
 DEFAULT_SKILL_LEVEL = "intermediate"
 DEFAULT_MODE = "hype"
 DEFAULT_MOOD = "hype-man"
+
+# Plan 24-02 — overlay-highlight defaults.
+# 1300ms = 200ms fade-in + 800ms hold + 300ms fade-out per CDJ Whisper v5
+# ring animation timing. Matches the Rust overlay.html CSS keyframe.
+OVERLAY_DURATION_MS: int = 1300
+OVERLAY_COLOR: str = "amber"
 
 
 def _resolve_prompt_cell(mood: str | None = None) -> str:
@@ -149,6 +157,11 @@ class DJCoHostAgent(Agent):
         stripped_rate_tracker: StrippedRateTracker | None = None,
         ack_bank: "AckBank | None" = None,
         playback: "PlaybackQueue | None" = None,
+        # Plan 24-02 — overlay-highlight publish path. Default None
+        # preserves backward compat (no overlay events). When non-None,
+        # llm_node publishes ipc.session.overlay-highlight envelopes for
+        # every [screen:<element>] citation in an emit-action turn.
+        ipc_bus: "IpcBus | None" = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -201,6 +214,8 @@ class DJCoHostAgent(Agent):
             x is not None
             for x in (citation_linter, stripped_rate_tracker, ack_bank, playback)
         )
+        # Plan 24-02 — overlay-highlight publish path. Wired iff non-None.
+        self._ipc_bus: "IpcBus | None" = ipc_bus
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         # Both the LiveKit-side ``instructions`` AND the google.genai-side
@@ -613,6 +628,41 @@ class DJCoHostAgent(Agent):
                     self._ai_text_history.append(stripped[:140])
                 else:
                     print("[ai_text] <empty> (skip TTS)", flush=True)
+                # Legacy path = no linter wired; treat as if citation_action
+                # were "emit" for the overlay publish (the user heard the
+                # text). Plan 20-01 wired-path callers set citation_action
+                # explicitly in the branches above.
+                if citation_action == "skip":
+                    citation_action = "emit"
+
+        # ---- Plan 24-02 — overlay-highlight publish ----
+        # Fire once per [screen:<element>] citation IFF:
+        #   1. ipc_bus is wired (sidecar publish path enabled).
+        #   2. citation_action is a "user-heard-the-text" action — "emit"
+        #      (normal flow) or "bypass" (unverified-but-spoken via the
+        #      one-shot bypass guard). "strip" and "skip"-from-suppression
+        #      do NOT publish: a ring without audio is ghost-firing.
+        # Best-effort: every step wrapped in try/except so a malformed
+        # element_id, schema validation error, or bus emit failure
+        # cannot break the LLM response path (T-18-04-03-style mitigation).
+        if self._ipc_bus is not None and citation_action in ("emit", "bypass"):
+            try:
+                for source, body in parse_citations(full_text):
+                    if source != "screen":
+                        continue
+                    # The body of a [screen:<key>] atom is the element_id
+                    # verbatim — no @t suffix per evidence_registry grammar.
+                    element_id = body.strip()
+                    if not element_id:
+                        continue
+                    msg = SessionOverlayHighlight.make(
+                        element_id=element_id,
+                        color=OVERLAY_COLOR,
+                        duration_ms=OVERLAY_DURATION_MS,
+                    )
+                    await self._ipc_bus.emit(msg.to_dict())
+            except Exception as e:  # noqa: BLE001 — best-effort telemetry
+                print(f"\n[overlay publish err] {e}", file=sys.stderr)
 
         # ---- Per-invocation dump (always written, even on suppression) ----
         try:
