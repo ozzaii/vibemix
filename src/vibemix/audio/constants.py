@@ -75,6 +75,12 @@ MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 e
     # re-entry past the natural pair window and silently swallow the moment.
     "BREAKDOWN_KICK_KILL": 20.0,
     "REENTRY_KICK_LAND": 12.0,
+    # Plan 17-04 — phrase-boundary structural detector (SENSE-14). 24s gap
+    # prevents same-phrase double-fire while still allowing every-other-phrase
+    # reactivity at typical BPM × 16 bars (≈12-15s per phrase). Bar-count is
+    # the meaningful unit (PHRASE_BOUNDARY_MIN_BARS_BETWEEN_FIRES below); the
+    # 24s wall-clock floor is a redundant guard.
+    "PHRASE_BOUNDARY": 24.0,
 }
 
 TRACK_CHANGE_MIN_CONFIDENCE = 0.5  # v4:143 — ignore stale nowplaying-cli phantom tracks
@@ -155,3 +161,41 @@ KICK_REENTRY_BAR_TOLERANCE: float = 0.20
 # still pair with it. After 30s the breakdown effectively "ended on its own"
 # — there's no specific re-entry moment worth calling out anymore.
 KICK_REENTRY_MAX_AGE_S: float = 30.0
+
+# ---- Phase 17 Plan 04 — PhraseBoundaryDetector thresholds (SENSE-14) ----
+# PHRASE_BOUNDARY fires on a downbeat that closes an 8/16/32-bar phrase. The
+# bar count is locked via 40-120Hz band-limited autocorrelation in
+# `_phrase_dsp.py`. Anti-hallucination: the detector self-corrects when
+# `BREAKDOWN_KICK_KILL` fires (re-uses the kill detector's `last_kill_at` —
+# same idiom as ReentryKickLand) and refuses to fire on `bpm_confidence < 0.5`
+# (the lock cannot be trusted below that threshold).
+#
+# PHRASE_BOUNDARY_BAR_TOLERANCE: beat_phase distance-to-downbeat tolerance.
+# 0.20 = ±20% of one bar — matches KICK_REENTRY_BAR_TOLERANCE for consistency
+# (both detectors gate on "near a downbeat" semantics).
+PHRASE_BOUNDARY_BAR_TOLERANCE: float = 0.20
+# PHRASE_BOUNDARY_MIN_BARS_BETWEEN_FIRES: even outside the wall-clock cooldown,
+# never fire two phrase boundaries inside 8 bars (≈12-15s at 130-170 BPM).
+# Bar count is the meaningful unit — wall-clock cooldown is a redundant floor.
+PHRASE_BOUNDARY_MIN_BARS_BETWEEN_FIRES: int = 8
+# PHRASE_AUTOCORR_LOW_HZ / PHRASE_AUTOCORR_HIGH_HZ: band-limit edges for the
+# kick-band autocorrelation per SENSE-14. Same band as `kick_band_centroid`
+# in `_dsp.py`; deliberately wider than just the sub-band (60Hz) so that
+# pitched-up kicks (Hard Tek tops out around 100-120Hz fundamental) still
+# register inside the autocorr window.
+PHRASE_AUTOCORR_LOW_HZ: float = 40.0
+PHRASE_AUTOCORR_HIGH_HZ: float = 120.0
+
+# ---- Phase 17 — bpm_confidence anti-hallucination floor for downbeat-gated
+# detectors. Promoted from the private `_BPM_CONFIDENCE_MIN_FOR_DOWNBEAT`
+# constant in `reentry_kick_land.py` (Plan 17-03) since `PhraseBoundaryDetector`
+# (Plan 17-04) consumes the same threshold. Slightly looser than Phase 13's
+# mascot-render gate (0.6) — re-entry / phrase detection is more time-critical
+# than mascot animation; we'd rather miss a marginal-confidence event than
+# fire a fabricated one, but the bar should not be so high that legitimate
+# Hard Tek BPM locks at confidence ≈ 0.55 silently lose their structural calls.
+BPM_CONFIDENCE_MIN_FOR_DOWNBEAT: float = 0.5
+# Alias of the SENSE-14 phrase-lock-confidence floor for callers that want
+# the semantic name (the underlying number is the same: lock seeding and
+# the per-tick gate share one threshold).
+PHRASE_BOUNDARY_MIN_LOCK_CONFIDENCE: float = BPM_CONFIDENCE_MIN_FOR_DOWNBEAT

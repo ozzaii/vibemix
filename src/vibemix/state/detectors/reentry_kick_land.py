@@ -25,6 +25,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from vibemix.audio.constants import (
+    BPM_CONFIDENCE_MIN_FOR_DOWNBEAT,
     KICK_REENTRY_BAR_TOLERANCE,
     KICK_REENTRY_MAX_AGE_S,
     KICK_REENTRY_SUB_FLOOR,
@@ -39,10 +40,11 @@ if TYPE_CHECKING:
     from vibemix.state.music_state import MusicState
 
 # Phase 13 anti-hallucination guard threshold (mirror of mascot renderer's
-# beat-locked-entry skip rule per Plan 13-04 Open Q 4). When BPM confidence
-# falls below 0.5, ``beat_phase`` is fabricated (forced to 0.0) and MUST NOT
-# be trusted by alignment-sensitive consumers.
-_BPM_CONFIDENCE_MIN_FOR_DOWNBEAT: float = 0.5
+# beat-locked-entry skip rule per Plan 13-04 Open Q 4). Lifted to
+# ``vibemix.audio.constants`` in Plan 17-04 since ``PhraseBoundaryDetector``
+# consumes the same threshold; aliased locally for backward-compat readability
+# (modules that already imported the private name keep working).
+_BPM_CONFIDENCE_MIN_FOR_DOWNBEAT: float = BPM_CONFIDENCE_MIN_FOR_DOWNBEAT
 
 
 class ReentryKickLandDetector:
