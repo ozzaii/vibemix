@@ -1,0 +1,44 @@
+# vibemix — Wave 0 AX feasibility spike (Phase 24)
+#
+# Standalone Cargo binary crate, NOT a workspace member of the shipping
+# `vibemix` Tauri crate next door. Kept under tauri/src-tauri/spike/ so
+# future macOS / Tauri updates can re-validate the AX-from-Rust-parent
+# inheritance assumption with one `cargo build --release` + `sign-and-test.sh`.
+#
+# Crate selection (per 24-01-PLAN.md Task 1):
+#   - core-graphics 0.24 — CGWindowListCopyWindowInfo + Quartz coord-space.
+#   - core-foundation 0.10 — CFDictionary/CFArray plumbing for the above.
+#   - accessibility-sys 0.1 — raw bindings to HIServices' AXUIElement* API.
+#     Chosen over objc2-app-kit because accessibility-sys ships the exact
+#     C-FFI surface the kyleawayan/djay-pro-bridge pattern uses; objc2
+#     family wraps the same APIs but adds a runtime-message dispatch layer
+#     we don't need for a CLI spike.
+#   - objc 0.2 — minimal ObjC runtime helpers, transitive dep of
+#     accessibility-sys; pinned here for explicit version visibility.
+#
+# All four crates are macOS-only by construction. The crate is guarded with
+# `cfg(target_os = "macos")` in main.rs so a stray `cargo check` on Windows
+# CI does not error out.
+
+[package]
+name = "vibemix-ax-spike"
+version = "0.0.1"
+description = "vibemix Phase 24 Wave-0 AX-from-Rust-parent feasibility spike"
+edition = "2021"
+rust-version = "1.77"
+publish = false
+
+[[bin]]
+name = "vibemix-ax-spike"
+path = "src/main.rs"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.24"
+core-foundation = "0.10"
+accessibility-sys = "0.1"
+objc = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = false
+strip = true
