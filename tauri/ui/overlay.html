@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" style="background: transparent; margin: 0; padding: 0;">
+  <head>
+    <meta charset="UTF-8" />
+    <title>vibemix overlay</title>
+    <!--
+      Phase 24 Plan 02 — overlay-highlight webview entry.
+
+      Opened by `tauri/src-tauri/src/overlay.rs::show_overlay_highlight`
+      as a per-element WebviewWindow (label = "overlay-<element_id>"):
+        - transparent: true  (no opaque background; just the ring)
+        - always_on_top: true
+        - decorations: false
+        - skip_taskbar: true
+        - visible_on_all_workspaces: true
+        - set_ignore_cursor_events(true) AFTER build (click-through)
+
+      The Rust side passes color + duration_ms as URL query params:
+        overlay.html?color=amber&duration_ms=1300
+
+      Ring lifecycle (CDJ Whisper v5 amber):
+        fade-in 200ms → hold 800ms → fade-out 300ms == 1300ms total.
+
+      The window is closed after duration_ms by a Tokio task in
+      overlay.rs — no inline JS timer needed; the CSS animation runs
+      once and the OS window closes underneath it.
+    -->
+    <style>
+      html, body {
+        background: transparent !important;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        /* The Rust side already calls set_ignore_cursor_events(true) on
+           the WebviewWindow; pointer-events: none here is belt-and-braces
+           for the rare case where a corner click hits the webview before
+           the click-through flag propagates. */
+        pointer-events: none;
+      }
+      .ring {
+        position: absolute;
+        inset: 4px;
+        border-radius: 18px;
+        border: 3px solid var(--ring-color, #f59e0b);
+        box-shadow:
+          0 0 12px 2px var(--ring-color, #f59e0b),
+          inset 0 0 8px 1px var(--ring-color, #f59e0b);
+        opacity: 0;
+        animation: ring-pulse var(--ring-duration, 1300ms) ease-in-out 1 forwards;
+      }
+      @keyframes ring-pulse {
+        0%   { opacity: 0; transform: scale(0.96); }
+        15%  { opacity: 1; transform: scale(1.0); }
+        77%  { opacity: 1; transform: scale(1.0); }
+        100% { opacity: 0; transform: scale(1.04); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="ring" id="ring"></div>
+    <script type="module" src="/src/overlay/overlay-runtime.ts"></script>
+  </body>
+</html>

@@ -18,8 +18,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
+mod djay_ax;
 mod hotkey;
 mod mascot_window;
+mod overlay;
 mod permissions;
 mod recordings;
 mod sidecar;
@@ -55,6 +57,8 @@ fn main() {
         //   set_mascot_visible, set_mascot_click_through
         // Phase 15 Plan 03 adds 2 recording commands:
         //   reveal_in_os, open_input_wav
+        // Phase 24 Plan 02 adds 1 overlay command:
+        //   show_overlay_highlight
         .invoke_handler(tauri::generate_handler![
             ws_client::forward_ipc_to_sidecar,
             sidecar::restart_sidecar,
@@ -70,6 +74,7 @@ fn main() {
             hotkey::rebind_hotkey,
             recordings::reveal_in_os,
             recordings::open_input_wav,
+            overlay::show_overlay_highlight,
         ])
         .manage(SidecarHandle::default())
         .manage(WsClientHandle::default())
