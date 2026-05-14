@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: prompt-only)
 status: completed
-last_updated: "2026-05-14T05:05:00.000Z"
-last_activity: 2026-05-14 -- Phase 19 Plan 05 (runtime wiring gap closure) shipped — Phase 19 latency stack v1 LIVE end-to-end
+last_updated: "2026-05-14T08:45:00.000Z"
+last_activity: 2026-05-14 -- Phase 20 Plan 01 complete (CitationLinter LIVE)
 progress:
   total_phases: 12
-  completed_phases: 4
-  total_plans: 25
+  completed_phases: 3
+  total_plans: 29
   completed_plans: 19
-  percent: 76
+  percent: 66
 ---
 
 # vibemix — State
@@ -33,10 +33,10 @@ progress:
 
 ## Current Position
 
-Phase: 19 — COMPLETE (with runtime-wiring closure)
-Plan: Not started
-Status: Phase 19 (Latency Stack v1) LIVE end-to-end — 19-01 CancelGate + 19-02 prompt diet + 19-03 GeminiContextCache + 19-04 AckBank + 19-05 runtime wiring all shipped. Verifier-flagged gaps (LATENCY-04/05/06/11/12 BLOCKED at runtime) all closed.
-Last activity: 2026-05-14 -- Phase 19 Plan 05 (runtime wiring) shipped
+Phase: 20 — IN PROGRESS (Plan 01 complete)
+Plan: 02 — IM_LISTENING_FRAGMENT prompt-side fail-soft (next)
+Status: Phase 20 wave 1 — CitationLinter + StrippedRateTracker shipped LIVE; v2.0 anti-slop contract enforced in DJCoHostAgent.llm_node
+Last activity: 2026-05-14 -- Phase 20 Plan 01 complete (CitationLinter + telemetry guard wired; 33 new tests passing; pytest 1766 passed total)
 
 ## Performance Metrics
 
@@ -81,6 +81,7 @@ All Phase 1–14 decisions remain locked. Highlights for v2.0 plan-checker:
 - **AX from Rust parent, NEVER from Python sidecar** (Tauri #8329). Codebase grep gate in P24 fails CI on AX-from-sidecar.
 - **Cancel-and-refire CAPPED**: `CANCEL_COOLDOWN_S = 8.0` hard + 30 cancels per session soft. Auto-disable on cap breach. Mandatory in P19, not v2.x follow-up.
 - **Citation linter telemetry guard**: `stripped_rate_15s > 0.4` triggers next-response bypass. Mandatory in P20, shipped Wave 1.
+- **Plan 20-01 LIVE (2026-05-14)**: `vibemix.coach` package shipped — `CitationLinter` (response-level binary, never token/partial), `LintResult` (frozen+slots, with `reason` field per planner deviation #6), `StrippedRateTracker` (one-shot bypass + re-arm). `DJCoHostAgent.llm_node` extended with 4 optional kwargs (`citation_linter` / `stripped_rate_tracker` / `ack_bank` / `playback`); `_linter_wired` all-or-nothing flag preserves Phase 18/19 byte-identity for legacy callers (88-test dj_cohost regression suite green). 33 new tests, full pytest 1766 passed.
 - **Mascot anticipation timeout = 2.5s** + cancel-aware + linter-strip-aware crossfades. Mandatory in P22, shipped Wave 1.
 - **Wave 0 day-1 spikes reserved**: P22 (Gemini text-channel ordering), P24 (AX-from-Rust-parent on signed bundle), P25 (`pyrekordbox` SQLCipher dep tree).
 - **Apple Issuer ID**: `3f60cc6b-df70-4ff8-9ceb-865dac6c1b4b` supplied 2026-05-14. **Apple Developer Program Agreement update outstanding — Francesco-action-required** (flagged in P21 plan).

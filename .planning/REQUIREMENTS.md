@@ -192,10 +192,10 @@
 - [x] **GROUND-01**: `EvidenceRegistry` — in-memory dict `(source, key) → list[t_session]`, written synchronously from `state_refresh_loop` and `EventDetector._fire`; SIBLING write-target alongside MusicState, never separate writer (Phase 18-01 + 18-02)
 - [x] **GROUND-02**: Citation grammar (EBNF locked) — `[ev:<TYPE>@<t>]`, `[aud:<key>@<t>]`, `[midi:<event>@<t>]`, `[track:<id>]`, `[screen:<key>]`, `[mix:<derived>]`, `[tend:<profile-fact>]` + multi-citation `[ev:DROP@04:22; aud:peak_rms=0.91]` (Phase 18-01); citation_count telemetry per AI turn shipped (Phase 18-04)
 - [x] **GROUND-03**: Citation grammar baked into Gemini system instruction (v1.0 prompt-only, no enforcement — corpus seeding) (Phase 18-03)
-- [ ] **GROUND-04**: `CitationLinter` Python class — stdlib `re` only, no third-party dep, in-memory validate against EvidenceRegistry
-- [ ] **GROUND-05**: Live-mode citation enforcement — response-level strip; total-strip falls back to ack bank via `PROMPT-09` integration
-- [ ] **GROUND-06**: Citation linter telemetry — `stripped_rate_15s > 0.4` triggers next-response bypass with `[unverified]` log marker; per-session `slop_ratio` metric surfaced via `ipc.session.citation`
-- [ ] **GROUND-07**: Per-mode tolerance bands — ±1.0s live, ±2.0s debrief (rolling-latency-aware optional)
+- [x] **GROUND-04**: `CitationLinter` Python class — stdlib `re` only, no third-party dep, in-memory validate against EvidenceRegistry
+- [x] **GROUND-05**: Live-mode citation enforcement — response-level strip; total-strip falls back to ack bank via `PROMPT-09` integration
+- [x] **GROUND-06**: Citation linter telemetry — `stripped_rate_15s > 0.4` triggers next-response bypass with `[unverified]` log marker; per-session `slop_ratio` metric surfaced via `ipc.session.citation`
+- [x] **GROUND-07**: Per-mode tolerance bands — ±1.0s live, ±2.0s debrief (rolling-latency-aware optional)
 - [ ] **GROUND-08**: Prompt-side mitigation — "If you cannot cite, say 'I'm listening' — never reply with empty text" appended to live system instruction
 
 ### Latency & Liveness — The Latency Stack

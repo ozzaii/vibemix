@@ -74,7 +74,7 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
   4. Kaan's qualitative sign-off — "this feels like a DJ friend, not AI commentary" — recorded in `.planning/phases/16-.../EAR-TEST-LOG.md` as the release gate.
   5. **Stretch (Pitfall 40 mitigation):** Francesco + 5-tester beta pool runs the same gate on 2+ sessions each before public ship.
 **Plans**: 4 plans
-  - [ ] 20-01-PLAN.md — CitationLinter core + StrippedRateTracker telemetry guard + DJCoHostAgent.llm_node strip wiring + ack-bank fallback (Wave 1)
+  - [x] 20-01-PLAN.md — CitationLinter core + StrippedRateTracker telemetry guard + DJCoHostAgent.llm_node strip wiring + ack-bank fallback (Wave 1)
   - [ ] 20-02-PLAN.md — Prompt-side IM_LISTENING_FRAGMENT mitigation appended to live system instruction (Wave 2)
   - [ ] 20-03-PLAN.md — scripts/replay_linter.py offline replay harness + synthetic Kaan-style fixture (Wave 3)
   - [ ] 20-04-PLAN.md — ipc.session.citation schema + wrapper + coach-loop publish + Tauri Diagnostics stub component (Wave 4)
@@ -249,7 +249,7 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
 | 17. Hard Tek Detectors v1 + GenreRouter | 6/6 | Complete   | 2026-05-14 |
 | 18. Evidence Registry + Citation Grammar | 4/4 | Complete   | 2026-05-14 |
 | 19. Latency Stack v1 | 5/5 | Complete   | 2026-05-14 |
-| 20. Citation Linter ENFORCEMENT | 0/0 | Not started | - |
+| 20. Citation Linter ENFORCEMENT | 1/4 | In Progress|  |
 | 21. Sign + Notarize + Release Matrix | 0/0 | Not started | - |
 | 22. Mascot Anticipation + Hip-Bob | 0/0 | Not started | - |
 | 23. 10-SKU MIDI Library + MidiMapLoader | 0/0 | Not started | - |
