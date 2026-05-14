@@ -49,7 +49,7 @@ const CSS = `
     font-size: 14px;
     color: var(--silk-65);
     line-height: 1.5;
-    margin: 0 0 var(--sp-5);
+    margin: 0 0 var(--sp-4);
   }
   .wizard-step__cards {
     display: flex;
@@ -61,7 +61,7 @@ const CSS = `
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
-    margin-top: var(--sp-5);
+    margin-top: var(--sp-4);
   }
   /* Hidden when no Back affordance is wired (intro / smoke-test / done). */
   .wizard-step__cta-row[data-back="false"] {

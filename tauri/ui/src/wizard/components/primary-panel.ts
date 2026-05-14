@@ -54,7 +54,7 @@ const CSS = `
   }
   .cmp-primary-panel__body {
     position: relative;
-    padding: var(--sp-5);
+    padding: var(--sp-4) var(--sp-5);
   }
 `;
 

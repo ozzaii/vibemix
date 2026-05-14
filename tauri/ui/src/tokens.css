@@ -450,20 +450,51 @@ button[disabled] { cursor: not-allowed; }
 
 .wizard-content {
   display: grid;
-  grid-template-rows: var(--stepstrip-h) 1fr auto;
+  grid-template-rows: var(--stepstrip-h) minmax(0, 1fr) auto;
   padding: 0 32px var(--cta-margin-bottom); /* 32px — no v5 equivalent, mock-verbatim */
   overflow: hidden;
+  min-height: 0;
 }
 
 /* v5 reclaims the embedded mascot corner — the wizard is single-column
- * and the mascot lives in its own overlay window (Phase 13). */
+ * and the mascot lives in its own overlay window (Phase 13).
+ *
+ * `overflow-y: auto` + `min-height: 0` make the middle grid row the
+ * scroll container when a step's content (Step 2 with BlackHole banner +
+ * device dropdown + audio test + window picker) exceeds viewport height.
+ * Without these, the wizard window cropped the bottom of the step body
+ * and the "Yes, sounded clean" confirm row became unreachable on the
+ * default 980×700 Tauri window size. The parent (.wizard-content) keeps
+ * `overflow: hidden` so the titlebar + status bar + step strip stay
+ * pinned; only the step body scrolls. */
 .wizard-grid {
   display: grid;
   grid-template-columns: var(--col-primary);
   gap: var(--gap-col);
   align-items: start;
-  padding-top: var(--sp-5);
-  overflow: hidden;
+  padding-top: var(--sp-4);
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+/* Restrained CDJ-Whisper scrollbar — visible only when scrolling is
+ * actually required. WebKit + Blink only; Firefox falls back to the
+ * system scrollbar. Width matches the v5 1px hairline language. */
+.wizard-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.wizard-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.wizard-grid::-webkit-scrollbar-thumb {
+  background: var(--silk-22, rgba(232, 224, 213, 0.18));
+  border-radius: 3px;
+}
+.wizard-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--silk-40, rgba(232, 224, 213, 0.4));
 }
 
 .cta-row {

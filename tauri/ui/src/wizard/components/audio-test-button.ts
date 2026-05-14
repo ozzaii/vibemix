@@ -34,24 +34,33 @@ export interface AudioTestButtonProps {
 }
 
 const CSS = `
+  /* Compact stack — the wizard window is locked at 960×680 (UI-SPEC
+   * §Window Dimensions). After chrome (titlebar 56 + statusbar 40 + step
+   * strip 64 + cta margin 24 + grid padding 24), the step body has
+   * ~472px to render heading + subtitle + dropdown + audio test +
+   * (optional) BlackHole banner + window picker + Continue CTA. The
+   * audio test is the heaviest block in that budget, so its internal
+   * padding/gap/visual size is tuned to keep the default Step 2 render
+   * scrollless on the locked window. The .wizard-grid scroll fallback
+   * (tokens.css) still catches the BlackHole-banner-present case. */
   .cmp-audio-test {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--sp-4);
-    padding: var(--sp-5);
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-5);
   }
   .cmp-audio-test__visual {
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 96px;
-    height: 96px;
+    width: 72px;
+    height: 72px;
   }
   .cmp-audio-test__speaker {
-    width: 48px;
-    height: 48px;
+    width: 36px;
+    height: 36px;
     color: var(--silk-65);
     z-index: 2;
     position: relative;
@@ -72,7 +81,7 @@ const CSS = `
   }
   .cmp-audio-test__ring {
     position: absolute;
-    inset: 24px;
+    inset: 18px;
     border: 1.5px solid var(--amber-22);
     border-radius: 50%;
     opacity: 0;
@@ -182,8 +191,8 @@ const CSS = `
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--sp-4);
-    margin-top: var(--sp-4);
+    gap: var(--sp-3);
+    margin-top: var(--sp-3);
   }
   .cmp-audio-test__confirm-prompt {
     font-family: var(--type-body);
