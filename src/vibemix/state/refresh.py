@@ -38,8 +38,12 @@ import time
 from collections import deque
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from vibemix.audio import (
     AUDIBLE_DEBOUNCE_SEC,
+    BPM_VALID_MAX,
+    BPM_VALID_MIN,
     SILENCE_DEBOUNCE_SEC,
     SILENT_RMS,
     AudioBuffer,
@@ -48,6 +52,11 @@ from vibemix.audio import (
     estimate_bpm,
     long_arc_curve,
     snapshot_features,
+)
+from vibemix.audio.constants import (
+    BUILDUP_SLOPE_WINDOW_S,
+    GENRE_BPM_BANDS,
+    GENRE_CENTROID_HARD_TEK_MIN,
 )
 from vibemix.state.genre import (
     EmaSmoother,
@@ -60,6 +69,70 @@ from vibemix.state.genre import (
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
+
+
+def _classify_active_genre(bpm: float, feats: dict) -> str:
+    """Coarse BPM-band + spectral-centroid heuristic for `active_genre`.
+
+    Per CONTEXT D-04: house 118-128, techno 128-138, hard_tek 140-BPM_VALID_MAX,
+    "unknown" otherwise. Bands intentionally non-overlapping; the gaps
+    (128-128, 138-140) → "unknown" (per "trust the audio" — don't force-classify
+    ambiguous tempos).
+
+    Anti-hallucination: invalid BPM (≤ 0 or outside the autocorr-noise-reject
+    window BPM_VALID_MIN..BPM_VALID_MAX) yields "unknown" — no fabricated genre
+    during BPM lock-up. Mirrors the v4 `_music_truly_playing` rule
+    (T-17-01-01 mitigation in 17-01-PLAN threat register).
+
+    Hard Tek extra gate: when BPM lands in the hard_tek band, also require
+    `(mid_share + high_share) >= GENRE_CENTROID_HARD_TEK_MIN` — distorted-kick
+    spectral signature gate, anti-misclassify-on-house-with-fast-tempo. Below
+    floor → "unknown" (we'd rather not classify than mis-classify).
+    """
+    if bpm <= 0 or not (BPM_VALID_MIN <= bpm <= BPM_VALID_MAX):
+        return "unknown"
+    centroid = feats.get("mid_share", 0.0) + feats.get("high_share", 0.0)
+    for name, (lo, hi) in GENRE_BPM_BANDS.items():
+        if name == "unknown":
+            continue
+        if lo <= bpm < hi or (name == "hard_tek" and bpm == hi):
+            if name == "hard_tek" and centroid < GENRE_CENTROID_HARD_TEK_MIN:
+                return "unknown"
+            return name
+    return "unknown"
+
+
+def _compute_buildup_score(curve: list, window_s: float, hop_s: float = 1.0) -> float:
+    """Slope of the trailing `int(window_s/hop_s)` samples of `curve`,
+    normalized into [0.0, 1.0]. Negative slopes (energy falling) clamp to 0.0
+    — buildups are monotonic-climbs only; falling energy is a job for
+    BREAKDOWN_KICK_KILL, NOT a negative buildup.
+
+    Bound contract: `buildup_score ∈ [0.0, 1.0]`. Cheap (n=8 polyfit, ~µs;
+    T-17-01-03 in threat register).
+    """
+    n = int(window_s / hop_s)
+    if n <= 1 or not curve:
+        return 0.0
+    tail = list(curve)[-n:]
+    if len(tail) < 2:
+        return 0.0
+    xs = np.arange(len(tail), dtype=np.float64)
+    ys = np.asarray(tail, dtype=np.float64)
+    # Least-squares slope (deg=1). Epsilon-floor catches polyfit float noise
+    # on flat curves (np yields ~1e-16 instead of exact 0.0); below 1e-9 is
+    # numerically indistinguishable from "no slope" given energy_curve
+    # values are themselves rounded by snapshot_features.
+    slope = float(np.polyfit(xs, ys, 1)[0])
+    if slope <= 1e-9:
+        return 0.0
+    max_recent = max(0.05, float(np.max(ys)))
+    score = (slope * window_s) / max_recent
+    if score < 0.0:
+        return 0.0
+    if score > 1.0:
+        return 1.0
+    return score
 
 if TYPE_CHECKING:
     from vibemix.platform._midi_macos import ControllerState
@@ -187,6 +260,18 @@ def _tick_once(
         )
         state.downbeat_phase = new_phase_frac
         state.bpm_confidence = new_bpm_conf
+
+        # Phase 17 — Hard Tek detectors v1 (SENSE-13). Three of the four new
+        # MusicState fields are written here; `predicted_drop_in_sec` stays at
+        # the dataclass default `None` because predictive drop firing is
+        # OFF-by-default in v2.0 per CONTEXT D (telemetry-guarded flip is v2.1
+        # work, NOT Phase 17). `beat_phase` is a Phase-17-named alias of
+        # `downbeat_phase` so SENSE-12 detector module imports don't reach
+        # into Phase-13 naming. No new audio I/O — `feats` and `curve` are
+        # already in scope from the Phase 6 path above.
+        state.active_genre = _classify_active_genre(bpm_cache, feats)
+        state.buildup_score = _compute_buildup_score(curve, BUILDUP_SLOPE_WINDOW_S)
+        state.beat_phase = state.downbeat_phase
 
         # Phase — dispatch on active profile.
         if active_profile is None:

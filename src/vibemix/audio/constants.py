@@ -68,3 +68,28 @@ TRACK_CHANGE_MIN_CONFIDENCE = 0.5  # v4:143 — ignore stale nowplaying-cli phan
 MUSIC_PRESENCE_MIN_SECONDS = 4.0  # v4:1178 — sustained-audible gate before auto-events
 BPM_VALID_MIN = 100.0  # v4:1181 — autocorr-noise reject lower bound
 BPM_VALID_MAX = 180.0  # v4:1182 — autocorr-noise reject upper bound
+
+# ---- Phase 17 — Hard Tek detectors v1 (SENSE-13/SENSE-15) ----
+# Coarse BPM-band + spectral-centroid heuristic for `MusicState.active_genre`
+# (no ML in v2.0 per CONTEXT D-04). Bands are intentionally non-overlapping;
+# the gaps (128-128, 138-140) → "unknown" (per "trust the audio" — don't
+# force-classify ambiguous tempos). The hard_tek upper bound is anchored to
+# `BPM_VALID_MAX` so a spurious 250 BPM autocorr lock can never silently flip
+# the active genre — the genre router shares the autocorr-noise-reject ceiling
+# (SENSE-15 contract; T-17-01-01 mitigation in 17-01-PLAN threat register).
+GENRE_BPM_BANDS: dict[str, tuple[float, float]] = {
+    "house": (118.0, 128.0),
+    "techno": (128.0, 138.0),
+    "hard_tek": (140.0, BPM_VALID_MAX),
+    "unknown": (0.0, 0.0),
+}
+
+# `buildup_score` is the slope of the trailing 8s of `MusicState.energy_curve`
+# (curve resolution = 1s hop in refresh.py → window covers 8 samples).
+BUILDUP_SLOPE_WINDOW_S: float = 8.0
+
+# When BPM lands in the hard_tek band, also require (mid_share + high_share)
+# to exceed this floor — distorted-kick spectral signature gate, anti-
+# misclassify-on-house-with-fast-tempo. Bands are normalized shares (sum to
+# ~1.0), so the floor lives in [0.0, 1.0].
+GENRE_CENTROID_HARD_TEK_MIN: float = 0.55
