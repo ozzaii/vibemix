@@ -52,6 +52,14 @@ export type MascotState =
   | "gesture_wide_alt"
   // ── Effect (highest priority — masks mood swap, etc.) ────────────────
   | "puff_particle"
+  // ── Anticipation pool (Phase 22 — additive overlay on the SAME mixer
+  //    per Pitfall 19; priority slot between react=60 and talk=80 — fires
+  //    over react/dance/idle but yields to talk when audio arrives) ─────
+  | "prep_lean_in_neutral"
+  | "prep_lean_in_hyped"
+  | "prep_head_turn_left"
+  | "prep_head_turn_right"
+  | "prep_settle"
   // ── Misc (low priority utilities) ────────────────────────────────────
   | "celebrate"
   | "sleep"
@@ -69,6 +77,7 @@ export type MascotStateClass =
   | "react"
   | "explanation"
   | "effect"
+  | "anticipation"
   | "misc";
 
 /**
@@ -104,6 +113,13 @@ export const STATE_CLASS: Record<MascotState, MascotStateClass> = {
   gesture_wide: "explanation",
   gesture_wide_alt: "explanation",
   puff_particle: "effect",
+  // Phase 22: anticipation overlay (additive on SAME mixer per Pitfall 19).
+  // Each prep_* clip is its own 1:1 state — no shared clips, no aliasing.
+  prep_lean_in_neutral: "anticipation",
+  prep_lean_in_hyped: "anticipation",
+  prep_head_turn_left: "anticipation",
+  prep_head_turn_right: "anticipation",
+  prep_settle: "anticipation",
   celebrate: "react",
   sleep: "idle",
   locomotion_walk: "misc",
@@ -124,6 +140,9 @@ export const STATE_CLASS: Record<MascotState, MascotStateClass> = {
 export const STATE_PRIORITY: Record<MascotStateClass, number> = {
   effect: 100,
   talk: 80,
+  // Phase 22: anticipation (additive layer) — yields to talk (80) when
+  // audio arrives but pre-empts react/dance/idle/explanation/misc.
+  anticipation: 70,
   react: 60,
   dance: 40,
   explanation: 30,
@@ -148,7 +167,13 @@ export type StateTrigger =
   | "mood_swap"
   | "idle_timeout"
   | "boot"
-  | "level_pulse";
+  | "level_pulse"
+  // Phase 22 — anticipation fires from predictive evidence (buildup_score
+  // climbing, kick density shift looming). `anticipation_settle` plays the
+  // reverse-curve return when the predicted event lands or the window
+  // times out.
+  | "anticipate"
+  | "anticipation_settle";
 
 /**
  * Public request envelope. Callers (Plan 13-06 WS bridge, dev __mascot

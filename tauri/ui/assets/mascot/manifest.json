@@ -146,6 +146,41 @@
       "states": [
         "locomotion_run"
       ]
+    },
+    {
+      "file": "animations/prep_lean_in_neutral.glb",
+      "clip": "Alert_Quick_Turn_Right",
+      "states": [
+        "prep_lean_in_neutral"
+      ]
+    },
+    {
+      "file": "animations/prep_lean_in_hyped.glb",
+      "clip": "Alert_Quick_Turn_Right",
+      "states": [
+        "prep_lean_in_hyped"
+      ]
+    },
+    {
+      "file": "animations/prep_head_turn_left.glb",
+      "clip": "Alert_Quick_Turn_Right",
+      "states": [
+        "prep_head_turn_left"
+      ]
+    },
+    {
+      "file": "animations/prep_head_turn_right.glb",
+      "clip": "Alert_Quick_Turn_Right",
+      "states": [
+        "prep_head_turn_right"
+      ]
+    },
+    {
+      "file": "animations/prep_settle.glb",
+      "clip": "Shrug",
+      "states": [
+        "prep_settle"
+      ]
     }
   ],
   "bundle_bytes_target": 26214400,
