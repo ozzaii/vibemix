@@ -30,8 +30,8 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
 
 - [ ] **Phase 15: Recording Browser + Retention Enforcement** — Surface recording inventory, replay, delete, retention cron worker.
 - [ ] **Phase 16: Hallucination Verification Gate (Kaan's DJ Ear)** — Calendar-blocking ear-test against shipped detector + linter + ack bank + mascot anticipation as they land.
-- [ ] **Phase 17: Hard Tek Detectors v1 + GenreRouter + MusicState Extension** — Six cross-genre detectors landed in v2.0 core, MusicState +4 fields, per-genre dispatch architecture. _Parallel with Phase 18._
-- [ ] **Phase 18: Evidence Registry + Citation Grammar in Prompts (v1.0 prompt-only)** — EvidenceRegistry sibling write-target, citation grammar EBNF locked, grammar baked into Gemini system instruction (no enforcement yet — corpus seeding). _Parallel with Phase 17._
+- [x] **Phase 17: Hard Tek Detectors v1 + GenreRouter + MusicState Extension** — Six cross-genre detectors landed in v2.0 core, MusicState +4 fields, per-genre dispatch architecture. _Parallel with Phase 18._ (completed 2026-05-14)
+- [x] **Phase 18: Evidence Registry + Citation Grammar in Prompts (v1.0 prompt-only)** — EvidenceRegistry sibling write-target, citation grammar EBNF locked, grammar baked into Gemini system instruction, citation_count telemetry shipped (no enforcement yet — corpus seeding). _Parallel with Phase 17._ (completed 2026-05-14)
 - [ ] **Phase 19: Latency Stack v1 — Ack Bank + Cached Content + Cancel-and-Refire** — 40 OPUS samples + rotation deque + cached_content + prompt diet + `SpeechHandle.interrupt(force=True)` with hard cancel cooldown.
 - [ ] **Phase 20: Citation Linter ENFORCEMENT (Live Mode)** — Response-level strip + ack-bank fallback + telemetry guard + prompt-side mitigation. Anti-slop contract goes live.
 - [ ] **Phase 21: Sign + Notarize + GitHub Release Matrix** — Apple Developer ID DMG sign + notarize + SignPath OSS MSI + 4-target release matrix + Tauri updater signature audit. **Binary shippable at phase close.**
@@ -88,12 +88,12 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
   4. `GenreRouter` atomically swaps detector-dict on `MusicState.active_genre` change without restarting session.
   5. `scripts/tune_detectors.py` reference-WAV tuning harness emits per-fire CSV consumable by Kaan ear-audit (Phase 16 input).
 **Plans**: 6 plans across 6 waves (sequential — Wave 2/3/4 detector plans share `__init__.py` + `constants.py`, so they serialize)
-- [ ] 17-01-PLAN.md — MusicState +4 fields + state_refresh_loop writes (Wave 1; SENSE-13)
-- [ ] 17-02-PLAN.md — Kick-side detectors: KICK_SWAP / SUB_LAYER_ARRIVAL / KICK_DENSITY_SHIFT (Wave 2; SENSE-12)
-- [ ] 17-03-PLAN.md — Breakdown/re-entry pair: BREAKDOWN_KICK_KILL + REENTRY_KICK_LAND (Wave 3; SENSE-12)
-- [ ] 17-04-PLAN.md — PHRASE_BOUNDARY + 40-120Hz band-limited autocorr DSP module (Wave 4; SENSE-12, SENSE-14)
-- [ ] 17-05-PLAN.md — GenreRouter + per-genre dispatch under `vibemix/events/genres/` + EventDetector wiring (Wave 5; SENSE-11, SENSE-15)
-- [ ] 17-06-PLAN.md — `scripts/tune_detectors.py` reference-WAV harness + Hard Tek anchor track Kaan-action surface (Wave 6; SENSE-16)
+- [x] 17-01-PLAN.md — MusicState +4 fields + state_refresh_loop writes (Wave 1; SENSE-13)
+- [x] 17-02-PLAN.md — Kick-side detectors: KICK_SWAP / SUB_LAYER_ARRIVAL / KICK_DENSITY_SHIFT (Wave 2; SENSE-12)
+- [x] 17-03-PLAN.md — Breakdown/re-entry pair: BREAKDOWN_KICK_KILL + REENTRY_KICK_LAND (Wave 3; SENSE-12)
+- [x] 17-04-PLAN.md — PHRASE_BOUNDARY + 40-120Hz band-limited autocorr DSP module (Wave 4; SENSE-12, SENSE-14)
+- [x] 17-05-PLAN.md — GenreRouter + per-genre dispatch under `vibemix/events/genres/` + EventDetector wiring (Wave 5; SENSE-11, SENSE-15)
+- [x] 17-06-PLAN.md — `scripts/tune_detectors.py` reference-WAV harness + Hard Tek anchor track Kaan-action surface (Wave 6; SENSE-16)
 **Pitfall prevention**: Per-genre cooldown tuning matches `G-followup-1` (`MIN_EVENT_GAP_PER_TYPE`); 6 baseline detectors only — Hard Tek-overlay `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` deferred to v2.1 per cross-doc reconciliation.
 
 ### Phase 18: Evidence Registry + Citation Grammar in Prompts (v1.0 prompt-only)
@@ -107,10 +107,10 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
   3. Citation grammar baked into Gemini system instruction in `AICoach.build_prompt`; v1.0 = prompt-only seeding, NO enforcement yet — Gemini learns the shape in prod.
   4. `events.jsonl` records `citation_count_per_response` per AI turn; Phase 16 ear-test consumes the rolling average as Phase 20 readiness signal.
 **Plans**: 4 plans across 4 waves
-- [ ] 18-01-PLAN.md — EvidenceRegistry skeleton + citation grammar regex (Wave 1; GROUND-01 + GROUND-02)
-- [ ] 18-02-PLAN.md — Wire registry into state_refresh_loop + EventDetector._fire as SIBLING write-targets (Wave 2; GROUND-01)
-- [ ] 18-03-PLAN.md — Citation grammar EBNF baked into Gemini system instruction + DJCoHostAgent threads snapshot (Wave 3; GROUND-02 + GROUND-03)
-- [ ] 18-04-PLAN.md — citation_count events.jsonl telemetry + rolling 50-turn average for Phase 16 readiness (Wave 4; GROUND-02)
+- [x] 18-01-PLAN.md — EvidenceRegistry skeleton + citation grammar regex (Wave 1; GROUND-01 + GROUND-02)
+- [x] 18-02-PLAN.md — Wire registry into state_refresh_loop + EventDetector._fire as SIBLING write-targets (Wave 2; GROUND-01)
+- [x] 18-03-PLAN.md — Citation grammar EBNF baked into Gemini system instruction + DJCoHostAgent threads snapshot (Wave 3; GROUND-02 + GROUND-03)
+- [x] 18-04-PLAN.md — citation_count events.jsonl telemetry + rolling 50-turn average for Phase 16 readiness (Wave 4; GROUND-02)
 **Pitfall prevention**: P12 (registry race) — single synchronous writer; ships v1.0 without enforcement so Gemini text-channel drift doesn't sustain false-strips before Phase 20's telemetry guard exists.
 
 ### Phase 19: Latency Stack v1 — Ack Bank + Cached Content + Cancel-and-Refire
@@ -234,7 +234,7 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
 |-------|----------------|--------|-----------|
 | 15. Recording Browser + Retention Enforcement | 0/4 | Planning | - |
 | 16. Hallucination Verification Gate (Kaan's DJ Ear) | 0/0 | Not started | - |
-| 17. Hard Tek Detectors v1 + GenreRouter | 0/6 | Planning | - |
+| 17. Hard Tek Detectors v1 + GenreRouter | 6/6 | Complete   | 2026-05-14 |
 | 18. Evidence Registry + Citation Grammar | 0/4 | Planning | - |
 | 19. Latency Stack v1 | 0/0 | Not started | - |
 | 20. Citation Linter ENFORCEMENT | 0/0 | Not started | - |
