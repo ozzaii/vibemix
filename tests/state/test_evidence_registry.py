@@ -257,3 +257,116 @@ def test_evidence_13_parse_citations_multi_form_GROUND02() -> None:
 
     # No citations → empty list, not error.
     assert parse_citations("plain text with no brackets") == []
+
+
+# --------------------------------------------------------------------------- #
+# Test Z — record_citation_count basic — Plan 18-04 GROUND-02 telemetry       #
+# --------------------------------------------------------------------------- #
+def test_evidence_Z_record_citation_count_basic_GROUND02() -> None:
+    """record_citation_count appends to the rolling buffer; citation_telemetry
+    returns the live snapshot.
+
+    Plan 18-04 — Phase 16 ear-test consumes ``citation_telemetry()["mean"]``
+    as the rolling-50-turn signal that gates Phase 20 enforcement readiness.
+    """
+    reg = EvidenceRegistry()
+    reg.record_citation_count(3)
+    tel = reg.citation_telemetry()
+    assert tel == {"window_size": 1, "mean": 3.0, "total_turns_observed": 1}
+
+
+# --------------------------------------------------------------------------- #
+# Test AA — rolling window 50 — Plan 18-04 D-LOCKED                           #
+# --------------------------------------------------------------------------- #
+def test_evidence_AA_rolling_window_50_DLOCKED() -> None:
+    """Record 75 counts; ``citation_telemetry()`` returns window_size=50,
+    total_turns_observed=75, mean = average of LAST 50 counts.
+
+    deque(maxlen=50) auto-evicts oldest — this test locks that contract.
+    """
+    reg = EvidenceRegistry()
+    counts = [(i % 7) for i in range(75)]  # varied integers 0..6
+    for n in counts:
+        reg.record_citation_count(n)
+
+    tel = reg.citation_telemetry()
+    assert tel["window_size"] == 50
+    assert tel["total_turns_observed"] == 75
+    # Mean = average of the LAST 50 counts (counts[25:75]).
+    expected_mean = sum(counts[25:75]) / 50
+    assert tel["mean"] == expected_mean
+
+
+# --------------------------------------------------------------------------- #
+# Test AB — zero-count + empty-buffer handled — Plan 18-04                    #
+# --------------------------------------------------------------------------- #
+def test_evidence_AB_zero_and_empty_buffer_handled() -> None:
+    """Empty buffer returns mean=0.0 (not NaN, not None). Recording 0 stays 0.
+
+    Locks the no-NaN contract — Phase 16 ear-test reads ``mean`` as a float
+    and would otherwise need to special-case NaN-vs-zero ambiguity.
+    """
+    reg = EvidenceRegistry()
+
+    # Empty-buffer shape — never called record_citation_count.
+    empty = reg.citation_telemetry()
+    assert empty == {"window_size": 0, "mean": 0.0, "total_turns_observed": 0}
+
+    # Recording a zero count keeps mean at 0.0 (not NaN).
+    reg.record_citation_count(0)
+    tel = reg.citation_telemetry()
+    assert tel == {"window_size": 1, "mean": 0.0, "total_turns_observed": 1}
+
+
+# --------------------------------------------------------------------------- #
+# Test AC — thread-safety: record + snapshot — Plan 18-04                     #
+# --------------------------------------------------------------------------- #
+def test_evidence_AC_record_thread_safety_DLOCKED_P12() -> None:
+    """8 threads × 100 record_citation_count(1) → exactly 800 turns, mean 1.0.
+
+    Same single-Lock contract as Test 3 (source-dict writes). No torn writes,
+    no lost updates.
+    """
+    reg = EvidenceRegistry()
+    n_threads = 8
+    records_per_thread = 100
+
+    def worker() -> None:
+        for _ in range(records_per_thread):
+            reg.record_citation_count(1)
+
+    threads = [threading.Thread(target=worker) for _ in range(n_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    tel = reg.citation_telemetry()
+    assert tel["total_turns_observed"] == n_threads * records_per_thread
+    # Buffer is bounded at 50; all entries are 1 → mean = 1.0.
+    assert tel["window_size"] == 50
+    assert tel["mean"] == 1.0
+
+
+# --------------------------------------------------------------------------- #
+# Test AD — clear() resets the citation buffer — Plan 18-04                    #
+# --------------------------------------------------------------------------- #
+def test_evidence_AD_clear_resets_citation_buffer() -> None:
+    """``clear()`` resets the rolling buffer + total_turns counter.
+
+    Locks per-session reset semantic — VoiceRecorder.close() will call
+    clear() at session boundary so observations + telemetry don't leak
+    across DJ sessions.
+    """
+    reg = EvidenceRegistry()
+    reg.record_citation_count(5)
+    reg.record_citation_count(7)
+    assert reg.citation_telemetry()["total_turns_observed"] == 2
+
+    reg.clear()
+
+    assert reg.citation_telemetry() == {
+        "window_size": 0,
+        "mean": 0.0,
+        "total_turns_observed": 0,
+    }
