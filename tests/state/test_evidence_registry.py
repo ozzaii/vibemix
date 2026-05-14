@@ -23,6 +23,7 @@ from vibemix.state import (
     EVIDENCE_CITATION_RE,
     EVIDENCE_SOURCES,
     EvidenceRegistry,
+    parse_citations,
 )
 
 
@@ -208,3 +209,51 @@ def test_evidence_11_sources_constant_locked_GROUND02() -> None:
     assert EVIDENCE_SOURCES == frozenset(
         {"ev", "aud", "midi", "track", "screen", "mix", "tend"}
     )
+
+
+# --------------------------------------------------------------------------- #
+# Test 12 — registry-grammar coherence — GROUND-01 + GROUND-02
+# --------------------------------------------------------------------------- #
+def test_evidence_12_registry_grammar_coherence_GROUND01_GROUND02() -> None:
+    """Every EVIDENCE_SOURCES key is matchable AND writable.
+
+    Locks the contract between the regex and the registry's accepted
+    source vocabulary so Phase 20's linter can trust both pieces.
+    """
+    reg = EvidenceRegistry()
+    for source in EVIDENCE_SOURCES:
+        citation = f"[{source}:test_key@10.0]"
+        assert EVIDENCE_CITATION_RE.fullmatch(citation) is not None, (
+            f"EVIDENCE_CITATION_RE failed to match valid synthetic citation {citation!r}"
+        )
+        reg.write(source=source, key="test_key", t_session=10.0)
+
+    snap = reg.snapshot()
+    # Every source landed in the registry under "test_key".
+    for source in EVIDENCE_SOURCES:
+        assert snap[source]["test_key"] == (10.0,)
+
+
+# --------------------------------------------------------------------------- #
+# Test 13 — multi-citation findall yields per-source pairs — GROUND-02
+# --------------------------------------------------------------------------- #
+def test_evidence_13_parse_citations_multi_form_GROUND02() -> None:
+    """parse_citations splits each multi-citation atom on the first colon.
+
+    The helper is the parser the Phase 20 linter and Plan 18-04 telemetry
+    will reuse; landing it here in v1.0 locks the API contract.
+    """
+    text = "[ev:KICK_SWAP@45.2,aud:bpm@45.0,midi:cue_a@45.1]"
+    out = parse_citations(text)
+    assert out == [
+        ("ev", "KICK_SWAP@45.2"),
+        ("aud", "bpm@45.0"),
+        ("midi", "cue_a@45.1"),
+    ]
+
+    # Single-citation form also yields a one-element list.
+    single = parse_citations("preface [track:abc-123] suffix")
+    assert single == [("track", "abc-123")]
+
+    # No citations → empty list, not error.
+    assert parse_citations("plain text with no brackets") == []

@@ -51,6 +51,7 @@ __all__ = [
     "EVIDENCE_CITATION_RE",
     "EVIDENCE_SOURCES",
     "EvidenceRegistry",
+    "parse_citations",
 ]
 
 
@@ -196,3 +197,41 @@ class EvidenceRegistry:
         """
         with self._lock:
             return sum(len(v) for inner in self._data.values() for v in inner.values())
+
+
+# --------------------------------------------------------------------------- #
+# Parser helper                                                                #
+# --------------------------------------------------------------------------- #
+
+
+def parse_citations(text: str) -> list[tuple[str, str]]:
+    """Walk ``text`` and yield ``(source, body)`` pairs for every citation atom.
+
+    Handles both single-citation forms (``[ev:KICK_SWAP@45.2]``) and the
+    comma-joined multi-citation form (``[ev:KICK_SWAP@45.2,aud:bpm@45.0]``)
+    in a single pass via ``EVIDENCE_CITATION_RE``.
+
+    Each atom is split on the FIRST ``:`` so the body retains any inner
+    structure (the ``key@t`` shape for ``ev`` / ``aud`` / ``midi`` or the
+    free-form key for ``track`` / ``screen`` / ``mix`` / ``tend``).
+
+    v1.0 callers MUST NOT rely on the inner-body shape being parsed
+    further (e.g., splitting key from ``@t``) — that's Phase 20 territory
+    and locking the inner shape now would force a v2 API change when
+    Phase 20 tightens per-source body grammar.
+
+    Returns an empty list if no citations match — never raises on
+    malformed input (regex misses are silently skipped, satisfying
+    threat T-18-01-04 mitigation).
+
+    Used by Plan 18-04 telemetry (citation-count parsing) and Phase 20
+    linter (per-citation grounding lookup against ``EvidenceRegistry``).
+    """
+    out: list[tuple[str, str]] = []
+    for match in EVIDENCE_CITATION_RE.finditer(text):
+        # Strip the surrounding `[` `]` then split on `,` to get atoms.
+        body = match.group(0)[1:-1]
+        for atom in body.split(","):
+            source, _, atom_body = atom.partition(":")
+            out.append((source, atom_body))
+    return out

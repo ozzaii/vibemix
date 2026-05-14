@@ -32,6 +32,7 @@ from vibemix.state.evidence_registry import (
     EVIDENCE_CITATION_RE,
     EVIDENCE_SOURCES,
     EvidenceRegistry,
+    parse_citations,
 )
 from vibemix.state.genre import (
     EmaSmoother,
@@ -73,6 +74,7 @@ __all__ = [
     "get_active_profile",
     "list_profiles",
     "load_profile",
+    "parse_citations",
     "set_active_profile",
     "state_refresh_loop",
     "validate_bpm",
