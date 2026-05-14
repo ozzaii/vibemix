@@ -95,9 +95,23 @@ def request_microphone_permission() -> None:
     )
 
 
+def request_screen_recording_permission() -> bool:
+    """Trigger the macOS Screen Recording dialog via CGRequestScreenCaptureAccess.
+
+    Unlike microphone (which uses AVCaptureDevice.requestAccess), screen
+    capture has no async request API. CGRequestScreenCaptureAccess shows
+    the consent prompt + registers the app in System Settings → Privacy &
+    Security → Screen Recording. Returns the post-call boolean.
+    """
+    import Quartz  # type: ignore[import-not-found]
+
+    return bool(Quartz.CGRequestScreenCaptureAccess())
+
+
 __all__ = [
     "PermissionStatus",
     "check_microphone_permission",
     "check_screen_recording_permission",
     "request_microphone_permission",
+    "request_screen_recording_permission",
 ]

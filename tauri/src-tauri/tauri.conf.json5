@@ -92,9 +92,13 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
-    // externalBin path is RELATIVE to src-tauri/. Tauri appends the target-triple suffix
-    // automatically; the Wave 1 build script lays out binaries/vibemix-core-<triple>/<binary>.
-    "externalBin": ["binaries/vibemix-core"],
+    // sidecar shipped as a resource directory (not externalBin) so PyInstaller's
+    // --onedir _internal/ tree stays intact under Contents/Resources/.
+    // sidecar.rs::spawn_sidecar_with_watchdog resolves the path via
+    // app.path().resource_dir(). externalBin flattens onedir into MacOS/ which
+    // breaks the PyInstaller bootloader (looks for libpython3.12.dylib in
+    // Contents/Frameworks/ when .app detected).
+    "resources": ["binaries/vibemix-core-aarch64-apple-darwin/**/*"],
     "icon": ["icons/icon.png"],
     "macOS": {
       "minimumSystemVersion": "12.3",

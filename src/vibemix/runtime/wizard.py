@@ -135,19 +135,33 @@ class WizardLoop:
     # ------------------------------------------------------------------
 
     async def _on_permission_check(self, msg: dict) -> None:
-        """Resolve permission state via the platform selector."""
+        """Resolve permission state via the platform selector.
+
+        If status is ``notDetermined``, also fires the platform's request API
+        so the OS surfaces the native consent dialog and the app gets added
+        to the Privacy & Security list. Subsequent polls pick up the new
+        state.
+        """
         kind = msg.get("payload", {}).get("kind")
         if kind not in ("screen_recording", "microphone"):
             log.warning("permission.check: unknown kind %r — ignored", kind)
             return
-        # Deferred import — keeps wizard boot lightweight; AVFoundation
-        # only resolves on darwin.
         from vibemix.platform import permissions  # noqa: PLC0415
 
         if kind == "screen_recording":
             status = permissions.check_screen_recording_permission()
+            if status == "notDetermined":
+                try:
+                    permissions.request_screen_recording_permission()
+                except Exception as exc:  # pragma: no cover — degrade gracefully
+                    log.warning("request_screen_recording_permission failed: %r", exc)
         else:
             status = permissions.check_microphone_permission()
+            if status == "notDetermined":
+                try:
+                    permissions.request_microphone_permission()
+                except Exception as exc:  # pragma: no cover
+                    log.warning("request_microphone_permission failed: %r", exc)
         reply = PermissionState.make(kind=kind, status=status)
         await self.bus.emit(json.loads(reply.to_json()))
 

@@ -31,6 +31,14 @@ use tauri_plugin_shell::ShellExt;
 
 const MAX_RESTARTS: u32 = 3;
 
+/// Target triple of the bundled sidecar. Matches the per-triple directory
+/// name produced by scripts/build_sidecar.py. Hard-coded for the macOS build
+/// — Windows ships under its own triple via a parallel cfg block.
+#[cfg(target_os = "macos")]
+const SIDECAR_TRIPLE: &str = "aarch64-apple-darwin";
+#[cfg(target_os = "windows")]
+const SIDECAR_TRIPLE: &str = "x86_64-pc-windows-msvc";
+
 /// Shared handle to the most-recently-spawned sidecar child. `restart_sidecar`
 /// reads this to kill the current process; the watchdog loop refreshes it on
 /// every spawn. Wave 4 may extend this struct with a wake-up channel.
@@ -73,10 +81,9 @@ pub async fn spawn_sidecar_with_watchdog(
             tokio::time::sleep(Duration::from_millis(500 * restart_count as u64)).await;
         }
 
-        let mut cmd = app
-            .shell()
-            .sidecar("vibemix-core")
+        let sidecar_bin = resolve_sidecar_path(&app)
             .map_err(|e| format!("sidecar lookup failed: {e}"))?;
+        let mut cmd = app.shell().command(&sidecar_bin);
         // Phase 12 Wave 3 — post-wizard launches spawn the sidecar with
         // `--session` so SessionLoop registers its ipc.session.* handlers.
         // Wizard launches keep `--wizard` (Phase 11 wave 4 behaviour).
@@ -163,6 +170,36 @@ pub async fn spawn_sidecar_with_watchdog(
         )
         .ok();
     }
+}
+
+/// Resolve the bundled sidecar binary path inside the .app/.exe.
+///
+/// Tauri's `bundle.resources` puts each pattern's match under
+/// Contents/Resources/<relative-path> (macOS) or resources/<relative-path>
+/// (Windows), preserving the directory structure. The sidecar's
+/// PyInstaller --onedir tree is therefore at:
+///     Contents/Resources/binaries/vibemix-core-<triple>/
+/// with the inner binary at:
+///     vibemix-core-<triple>/vibemix-core-<triple>[.exe]
+/// next to its _internal/ tree (which the PyInstaller bootloader needs).
+fn resolve_sidecar_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("resource_dir() failed: {e}"))?;
+    let exe_suffix = if cfg!(target_os = "windows") { ".exe" } else { "" };
+    let bin_name = format!("vibemix-core-{SIDECAR_TRIPLE}{exe_suffix}");
+    let path = resource_dir
+        .join("binaries")
+        .join(format!("vibemix-core-{SIDECAR_TRIPLE}"))
+        .join(&bin_name);
+    if !path.exists() {
+        return Err(format!(
+            "bundled sidecar binary missing at {}",
+            path.display()
+        ));
+    }
+    Ok(path)
 }
 
 /// Read the last non-empty line from the rotated log. Used as the

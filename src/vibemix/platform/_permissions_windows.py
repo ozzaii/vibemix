@@ -47,9 +47,15 @@ def request_microphone_permission() -> None:
     return None
 
 
+def request_screen_recording_permission() -> bool:
+    """Windows: no system-wide gate. Return True so the macOS-parity API holds."""
+    return True
+
+
 __all__ = [
     "PermissionStatus",
     "check_microphone_permission",
     "check_screen_recording_permission",
     "request_microphone_permission",
+    "request_screen_recording_permission",
 ]
