@@ -287,12 +287,17 @@ class SettingsApplier:
                 # Offload to executor so the settings-set handler doesn't
                 # block the event loop on os.scandir + shutil.rmtree.
                 aio_loop = asyncio.get_running_loop()
-                deleted = await aio_loop.run_in_executor(
+                # Plan 15-02 — run_retention_sweep now returns
+                # RetentionSweepResult(deleted_names, bytes_pruned). We
+                # log both for parity with boot/close sweeps.
+                result = await aio_loop.run_in_executor(
                     None, run_retention_sweep, self.recordings_root, iv
                 )
                 log.info(
-                    "retention sweep (settings-change): deleted %d session(s)",
-                    len(deleted),
+                    "retention sweep (settings-change): deleted %d session(s) "
+                    "(%d bytes)",
+                    len(result.deleted_names),
+                    result.bytes_pruned,
                 )
                 if self.ws_bus is not None:
                     index = RecordingsIndex(self.recordings_root)

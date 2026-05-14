@@ -474,17 +474,18 @@ class SessionLoop:
             return
         try:
             loop = asyncio.get_running_loop()
-            deleted = await loop.run_in_executor(
+            result = await loop.run_in_executor(
                 None,
                 run_retention_sweep,
                 self.recordings_root,
                 self.config_store.retention_days,
             )
-            if deleted:
+            if result.deleted_names:
                 log.info(
-                    "retention sweep (boot): deleted %d session(s): %s",
-                    len(deleted),
-                    ", ".join(deleted),
+                    "retention sweep (boot): deleted %d session(s) (%d bytes): %s",
+                    len(result.deleted_names),
+                    result.bytes_pruned,
+                    ", ".join(result.deleted_names),
                 )
             else:
                 log.info("retention sweep (boot): no sessions to prune")
@@ -505,15 +506,17 @@ class SessionLoop:
             return
         try:
             loop = asyncio.get_running_loop()
-            deleted = await loop.run_in_executor(
+            result = await loop.run_in_executor(
                 None,
                 run_retention_sweep,
                 self.recordings_root,
                 self.config_store.retention_days,
             )
-            if deleted:
+            if result.deleted_names:
                 log.info(
-                    "retention sweep (close): deleted %d session(s)", len(deleted)
+                    "retention sweep (close): deleted %d session(s) (%d bytes)",
+                    len(result.deleted_names),
+                    result.bytes_pruned,
                 )
             await self._emit_recordings_usage()
         except Exception:
