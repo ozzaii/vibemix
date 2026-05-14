@@ -984,3 +984,65 @@ def test_AK_phase16_readiness_signal_end_to_end(mocker, tmp_path) -> None:
     assert tel["mean"] == expected_mean, (
         f"Phase 16 readiness signal drift: expected mean {expected_mean}, got {tel['mean']}"
     )
+
+
+# ---------- Plan 19-05 — TTFTMeter wiring ----------
+
+
+def _build_agent_with_meter(mocker, tmp_path: Path, meter):
+    """Construct a DJCoHostAgent wired to the supplied TTFTMeter."""
+    mocker.patch.object(Agent, "__init__", return_value=None)
+    state = _build_state()
+    recorder = _FakeRecorder(tmp_path)
+    genai_client = mocker.MagicMock()
+    screen_buf = mocker.MagicMock()
+    agent = DJCoHostAgent(
+        genai_client=genai_client,
+        clean_audio_buf=mocker.MagicMock(),
+        screen_buf=screen_buf,
+        state=state,
+        recorder=recorder,
+        llm_inst=mocker.MagicMock(),
+        tts_inst=mocker.MagicMock(),
+        ttft_meter=meter,
+    )
+    return agent, genai_client, recorder, state
+
+
+def test_ttft_set_next_event_calls_meter_record_event_fired(mocker, tmp_path) -> None:
+    """Plan 19-05: agent.set_next_event(ev) → meter.record_event_fired called."""
+    meter = mocker.MagicMock()
+    agent, _, _, state = _build_agent_with_meter(mocker, tmp_path, meter)
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    meter.record_event_fired.assert_called_once()
+
+
+def test_ttft_set_next_event_no_meter_does_nothing(mocker, tmp_path) -> None:
+    """Plan 19-05: agent constructed without ttft_meter — set_next_event still works."""
+    agent, _, _, state = _build_agent(mocker, tmp_path)
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)  # Must not raise
+    assert agent._pending_event is ev
+
+
+def test_ttft_llm_node_records_first_chunk_on_first_non_empty(
+    mocker, tmp_path
+) -> None:
+    """Plan 19-05: llm_node calls meter.record_first_chunk exactly once on the
+    first non-empty chunk yield (not per-chunk)."""
+    meter = mocker.MagicMock()
+    agent, gen_client, _, state = _build_agent_with_meter(mocker, tmp_path, meter)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["", "hello", " ", "kaan"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    # Exactly one record_first_chunk call (on "hello" — the first non-empty).
+    meter.record_first_chunk.assert_called_once()
