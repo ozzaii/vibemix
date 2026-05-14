@@ -33,8 +33,8 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
 - [x] **Phase 17: Hard Tek Detectors v1 + GenreRouter + MusicState Extension** — Six cross-genre detectors landed in v2.0 core, MusicState +4 fields, per-genre dispatch architecture. _Parallel with Phase 18._ (completed 2026-05-14)
 - [x] **Phase 18: Evidence Registry + Citation Grammar in Prompts (v1.0 prompt-only)** — EvidenceRegistry sibling write-target, citation grammar EBNF locked, grammar baked into Gemini system instruction, citation_count telemetry shipped (no enforcement yet — corpus seeding). _Parallel with Phase 17._ (completed 2026-05-14)
 - [x] **Phase 19: Latency Stack v1 — Ack Bank + Cached Content + Cancel-and-Refire** — 40 OPUS samples + rotation deque + cached_content + prompt diet + `SpeechHandle.interrupt(force=True)` with hard cancel cooldown. (completed 2026-05-14)
-- [ ] **Phase 20: Citation Linter ENFORCEMENT (Live Mode)** — Response-level strip + ack-bank fallback + telemetry guard + prompt-side mitigation. Anti-slop contract goes live.
-- [ ] **Phase 21: Sign + Notarize + GitHub Release Matrix** — Apple Developer ID DMG sign + notarize + SignPath OSS MSI + 4-target release matrix + Tauri updater signature audit. **Binary shippable at phase close.**
+- [x] **Phase 20: Citation Linter ENFORCEMENT (Live Mode)** — Response-level strip + ack-bank fallback + telemetry guard + prompt-side mitigation. Anti-slop contract goes live. (completed 2026-05-14)
+- [x] **Phase 21: Sign + Notarize + GitHub Release Matrix** — Apple Developer ID DMG sign + notarize + SignPath OSS MSI + 4-target release matrix + Tauri updater signature audit. **Binary shippable at phase close.** (completed 2026-05-14)
 - [ ] **Phase 22: Mascot Anticipation Layer + Beat-Coupled Hip-Bob** — 4-layer simplified subset (mood + anticipation + speak/react) + 5 prep_* GLB clips + procedural hip-bob + timeout/cancel-aware crossfades. _Parallel with Phase 23._ Wave 0 = 1-day Gemini text-channel ordering spike.
 - [ ] **Phase 23: 10-SKU MIDI Controller Library + MidiMapLoader** — JSON-per-SKU registry + verified sniff data for 9 SKUs + DDJ-FLX4 Sync note resolution + community sniff tooling. _Parallel with Phase 22._
 - [ ] **Phase 24: djay Pro Mac Overlay Highlight** — Viral demo Beat A anchor. 12 hand-mapped pointable elements + AX-from-Rust-parent + 2nd Tauri WebviewWindow + window tracker @10Hz. Mac-only in v2.0. Wave 0 = 1-day AX-from-signed-bundle feasibility spike.
@@ -75,9 +75,9 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
   5. **Stretch (Pitfall 40 mitigation):** Francesco + 5-tester beta pool runs the same gate on 2+ sessions each before public ship.
 **Plans**: 4 plans
   - [x] 20-01-PLAN.md — CitationLinter core + StrippedRateTracker telemetry guard + DJCoHostAgent.llm_node strip wiring + ack-bank fallback (Wave 1)
-  - [ ] 20-02-PLAN.md — Prompt-side IM_LISTENING_FRAGMENT mitigation appended to live system instruction (Wave 2)
-  - [ ] 20-03-PLAN.md — scripts/replay_linter.py offline replay harness + synthetic Kaan-style fixture (Wave 3)
-  - [ ] 20-04-PLAN.md — ipc.session.citation schema + wrapper + coach-loop publish + Tauri Diagnostics stub component (Wave 4)
+  - [x] 20-02-PLAN.md — Prompt-side IM_LISTENING_FRAGMENT mitigation appended to live system instruction (Wave 2)
+  - [x] 20-03-PLAN.md — scripts/replay_linter.py offline replay harness + synthetic Kaan-style fixture (Wave 3)
+  - [x] 20-04-PLAN.md — ipc.session.citation schema + wrapper + coach-loop publish + Tauri Diagnostics stub component (Wave 4)
 **Pitfall prevention**: P2 (linter silence streak ground-truth), P10 (predictive misfire rate ear-gate), P40 (sample-size-of-1 stretch with Francesco + 5 testers).
 
 ### Phase 17: Hard Tek Detectors v1 + GenreRouter + MusicState Extension
@@ -145,7 +145,7 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
   4. Prompt-side mitigation appended to live system instruction — "If you cannot cite, say 'I'm listening' — never reply with empty text" — Gemini fails toward graceful unsourced-but-honest line, not stripped void.
   5. Replay of recorded Kaan session through linter: `stripped_rate < 0.15` overall (Phase 16 ground-truth assertion).
 **Plans**: 4 plans
-  - [ ] 20-01-PLAN.md — CitationLinter core + StrippedRateTracker telemetry guard + DJCoHostAgent.llm_node strip wiring + ack-bank fallback (Wave 1)
+  - [x] 20-01-PLAN.md — CitationLinter core + StrippedRateTracker telemetry guard + DJCoHostAgent.llm_node strip wiring + ack-bank fallback (Wave 1)
   - [ ] 20-02-PLAN.md — Prompt-side IM_LISTENING_FRAGMENT mitigation appended to live system instruction (Wave 2)
   - [ ] 20-03-PLAN.md — scripts/replay_linter.py offline replay harness + synthetic Kaan-style fixture (Wave 3)
   - [ ] 20-04-PLAN.md — ipc.session.citation schema + wrapper + coach-loop publish + Tauri Diagnostics stub component (Wave 4)
@@ -249,9 +249,9 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
 | 17. Hard Tek Detectors v1 + GenreRouter | 6/6 | Complete   | 2026-05-14 |
 | 18. Evidence Registry + Citation Grammar | 4/4 | Complete   | 2026-05-14 |
 | 19. Latency Stack v1 | 5/5 | Complete   | 2026-05-14 |
-| 20. Citation Linter ENFORCEMENT | 1/4 | In Progress|  |
-| 21. Sign + Notarize + Release Matrix | 0/0 | Not started | - |
-| 22. Mascot Anticipation + Hip-Bob | 0/0 | Not started | - |
+| 20. Citation Linter ENFORCEMENT | 5/5 | Complete   | 2026-05-14 |
+| 21. Sign + Notarize + Release Matrix | 1/1 | Complete   | 2026-05-14 |
+| 22. Mascot Anticipation + Hip-Bob | 1/2 | In Progress|  |
 | 23. 10-SKU MIDI Library + MidiMapLoader | 0/0 | Not started | - |
 | 24. djay Pro Mac Overlay Highlight | 0/0 | Not started | - |
 | 25. Pyrekordbox XML + DEBRIEF slot | 0/0 | Not started | - |

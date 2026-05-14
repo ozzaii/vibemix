@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: prompt-only)
 status: completed
-last_updated: "2026-05-14T08:45:00.000Z"
-last_activity: 2026-05-14 -- Phase 20 Plan 01 complete (CitationLinter LIVE)
+last_updated: "2026-05-14T06:51:29.228Z"
+last_activity: 2026-05-14 -- Phase 21 marked complete
 progress:
   total_phases: 12
-  completed_phases: 3
-  total_plans: 29
-  completed_plans: 19
-  percent: 66
+  completed_phases: 5
+  total_plans: 30
+  completed_plans: 25
+  percent: 83
 ---
 
 # vibemix — State
@@ -33,10 +33,10 @@ progress:
 
 ## Current Position
 
-Phase: 20 — IN PROGRESS (Plan 01 complete)
-Plan: 02 — IM_LISTENING_FRAGMENT prompt-side fail-soft (next)
-Status: Phase 20 wave 1 — CitationLinter + StrippedRateTracker shipped LIVE; v2.0 anti-slop contract enforced in DJCoHostAgent.llm_node
-Last activity: 2026-05-14 -- Phase 20 Plan 01 complete (CitationLinter + telemetry guard wired; 33 new tests passing; pytest 1766 passed total)
+Phase: 22 — Plan 01 COMPLETE (spike harness shipped, measurement deferred to Kaan)
+Plan: 02 — anticipation fire-path (next; unblocked per CONTEXT D-LOCKED — does NOT depend on spike verdict)
+Status: Phase 21 complete; Phase 22 Plan 01 complete
+Last activity: 2026-05-14 -- Plan 22-01 spike harness shipped (commits 2761d3e/c95732e/e3d6478); ≥10-turn real-run measurement deferred to Kaan via KAAN-ACTION.md
 
 ## Performance Metrics
 
@@ -86,6 +86,7 @@ All Phase 1–14 decisions remain locked. Highlights for v2.0 plan-checker:
 - **Wave 0 day-1 spikes reserved**: P22 (Gemini text-channel ordering), P24 (AX-from-Rust-parent on signed bundle), P25 (`pyrekordbox` SQLCipher dep tree).
 - **Apple Issuer ID**: `3f60cc6b-df70-4ff8-9ceb-865dac6c1b4b` supplied 2026-05-14. **Apple Developer Program Agreement update outstanding — Francesco-action-required** (flagged in P21 plan).
 - **Predictive drop firing OFF-by-default in v2.0** (per memory `feedback_no_scope_creep_clean_utility`). Telemetry guard pre-wired for v2.1 turn-on after Phase 16 ear-test baseline.
+- **Plan 22-01 SHIPPED (2026-05-14)**: spike instrumentation harness `scripts/spike_gemini_text_ordering.py` (8-col CSV, `--dry-run` self-test, real-run skeleton with listener contract in docstring) + verdict-report template `WAVE-0-SPIKE.md` (status: pending_kaan_measurement, locked thresholds: text_first_rate ≥ 0.8 → text-first; ≤ 0.2 → audio-first; else inconclusive). 13 new tests green (1830 → 1843 passed). Measurement step deferred to Kaan via `KAAN-ACTION.md` — Phase 16 ear-test workflow. v2.0 anticipation work (Plans 22-02 / 22-03) unblocked per CONTEXT D-LOCKED.
 
 ### Open To-dos
 
@@ -122,6 +123,7 @@ All Phase 1–14 decisions remain locked. Highlights for v2.0 plan-checker:
 
 ### Next Session
 
+- **P22-01 followup (Kaan-action ONLY): run spike harness against ≥10 real Gemini Live turns** — `KAAN-ACTION.md` in phase 22 dir spells the steps. Wire `_run_real()` LiveKit listeners at measurement time (livekit-plugins-google version-dependent), run `.venv/bin/python scripts/spike_gemini_text_ordering.py --turns 10` during a Phase 16 ear-test session, fill `WAVE-0-SPIKE.md` verdict + stats table, flip status to `measured`. NOT a roadmap blocker — Plans 22-02 / 22-03 ship event-detector-driven anticipation regardless.
 - **P19-05 followup (Kaan-action ONLY): real Achird-voice OPUS recordings** — replace 40 silent placeholders one-for-one (offline Gemini TTS Achird voice; ~80-200ms each; re-run AIza-key scan on new bytes per CONTEXT D-08). Runtime path verified end-to-end on silent payload; only file bytes change.
 - Run `/gsd-plan-phase 15` to plan Phase 15 — Recording Browser + Retention Enforcement (REC-07, REC-08). Cheap, no upstream dependencies — knock it out first.
 - Phase 20 (Citation Linter ENFORCEMENT) now unblocked — depends on Phase 18 (EvidenceRegistry, ✅) + Phase 19 (ack bank, ✅). `/gsd-plan-phase 20` ready when prioritized.
