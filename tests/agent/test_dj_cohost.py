@@ -741,3 +741,242 @@ def test_y_full_prompt_path_evidence_corpus_and_grammar_block_smoke(
     # Grammar surface check — at least one EBNF source form is in the system
     # instruction so Gemini can pattern-match against it.
     assert "[ev:" in sys_instr
+
+
+# ---------- Plan 18-04 — citation-count telemetry (Tests AE–AJ) -------------
+
+
+def test_AE_citation_count_event_written_per_turn(mocker, tmp_path) -> None:
+    """Test AE — every Gemini turn writes a ``citation_count`` events.jsonl
+    line with the integer count parsed from the FULL response text + a
+    response_id matching the per-invocation dump folder pattern.
+
+    Closes ROADMAP success criterion #4: events.jsonl records
+    citation_count_per_response per AI turn.
+    """
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    # Two valid citations in the response.
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["great drop [ev:KICK_SWAP@45.2] [aud:bpm@45.2]"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    citation_events = [e for e in recorder.events if e[0] == "citation_count"]
+    assert len(citation_events) == 1, (
+        f"expected 1 citation_count event, got {len(citation_events)}: {recorder.events!r}"
+    )
+    kind, fields = citation_events[0]
+    assert kind == "citation_count"
+    assert fields["count"] == 2
+    # response_id matches NNNN_TS pattern (e.g. "0001_HHMMSS")
+    rid = fields["response_id"]
+    assert rid.startswith("0001_"), f"response_id {rid!r} should start with 0001_"
+    assert len(rid.split("_")) == 2
+
+
+def test_AF_citation_count_fires_for_silence_suppressed_turn(mocker, tmp_path) -> None:
+    """Test AF — silence-suppressed turn STILL emits citation_count.
+
+    Phase 16 ear-test needs Gemini's true emission rate, NOT the post-
+    suppression rate. A turn that emits ``<silence/>`` along with an ev
+    citation must still register count=1 in events.jsonl.
+    """
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    # <silence/> short-circuits the turn but the citation atom is still in
+    # the full_text the parser sees.
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["<silence/> [ev:HEARTBEAT@30.0]"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    kinds = [k for k, _ in recorder.events]
+    # Suppression MUST have fired (silence_short_circuit) AND citation_count
+    # MUST have been written for the same turn.
+    assert "silence_short_circuit" in kinds
+    citation_events = [e for e in recorder.events if e[0] == "citation_count"]
+    assert len(citation_events) == 1
+    assert citation_events[0][1]["count"] == 1
+
+
+def test_AG_citation_count_zero_when_no_citations(mocker, tmp_path) -> None:
+    """Test AG — response with zero citations emits ``count=0``."""
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["great drop"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    citation_events = [e for e in recorder.events if e[0] == "citation_count"]
+    assert len(citation_events) == 1
+    assert citation_events[0][1]["count"] == 0
+
+
+def test_AH_registry_record_citation_count_called_per_turn(mocker, tmp_path) -> None:
+    """Test AH — when registry wired, ``record_citation_count`` is called per
+    llm_node turn, advancing ``citation_telemetry()["total_turns_observed"]``
+    by exactly 1 per call."""
+    from vibemix.state import EvidenceRegistry
+
+    registry = EvidenceRegistry()
+    agent, gen_client, _, state = _build_agent_with_registry(mocker, tmp_path, registry)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    def _stream(*_a, **_kw):
+        return _async_iter(["great drop [ev:KICK_SWAP@45.2] [aud:bpm@45.2]"])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(side_effect=_stream)
+
+    # Pre-call baseline.
+    assert registry.citation_telemetry()["total_turns_observed"] == 0
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+    assert registry.citation_telemetry()["total_turns_observed"] == 1
+    assert registry.citation_telemetry()["mean"] == 2.0  # 2 citations parsed
+
+    # Second call advances total_turns by 1 again.
+    ev2 = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev2)
+    _drive_llm_node(agent)
+    assert registry.citation_telemetry()["total_turns_observed"] == 2
+
+
+def test_AI_telemetry_path_is_best_effort_never_raises(mocker, tmp_path) -> None:
+    """Test AI — if ``parse_citations`` raises (corrupt regex, OOM, anything),
+    the LLM response path MUST still complete: chunks yielded, ai_text event
+    written. No exception escapes into the LiveKit cascade.
+
+    Mitigates threat T-18-04-03 (telemetry breaking the LLM stream).
+    """
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    # Force parse_citations to raise — simulates a corrupt regex / OOM /
+    # whatever future regression. The agent code MUST swallow it.
+    mocker.patch(
+        "vibemix.agent.dj_cohost.parse_citations",
+        side_effect=RuntimeError("simulated parse failure"),
+    )
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["clean reply text"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    # MUST NOT raise.
+    chunks = _drive_llm_node(agent)
+    assert chunks == ["clean reply text"]
+    # ai_text event still written — LLM response path completed cleanly.
+    kinds = [k for k, _ in recorder.events]
+    assert "ai_text" in kinds
+    # citation_count may be missing OR count=0 — both are valid best-effort
+    # outcomes. The hard contract is "no exception escapes".
+    citation_events = [e for e in recorder.events if e[0] == "citation_count"]
+    if citation_events:
+        # If the agent chose to emit a fallback count=0, that's fine too.
+        assert citation_events[0][1]["count"] == 0
+
+
+def test_AJ_no_registry_path_writes_recorder_event_only(mocker, tmp_path) -> None:
+    """Test AJ — when ``evidence_registry=None`` (default Phase 4 backward-
+    compat), ``citation_count`` event STILL lands in events.jsonl (recorder-
+    side write), but the registry-side rolling buffer is simply not updated
+    (because there is no registry).
+    """
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    assert agent._registry is None  # default
+
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["great drop [track:abc-123]"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    citation_events = [e for e in recorder.events if e[0] == "citation_count"]
+    assert len(citation_events) == 1, (
+        "citation_count events.jsonl line MUST land even when no registry wired"
+    )
+    assert citation_events[0][1]["count"] == 1
+
+
+# ---------- Plan 18-04 Task 3 — Phase 16 readiness signal (Test AK) ---------
+
+
+def test_AK_phase16_readiness_signal_end_to_end(mocker, tmp_path) -> None:
+    """Test AK — END-TO-END Phase 16 readiness signal (ROADMAP success #4):
+
+    Construct the full stack (registry + EventDetector(registry) +
+    DJCoHostAgent(registry)). Drive 10 mock LLM turns with varying
+    citation counts. After all turns, ``registry.citation_telemetry()``
+    returns the EXACT signal Phase 16 ear-test will consume to gate
+    Phase 20 enforcement readiness.
+
+    Counts: [3, 0, 2, 1, 4, 0, 2, 5, 1, 3] = 21 total / 10 turns = mean 2.1
+    """
+    from vibemix.state import EventDetector, EvidenceRegistry
+
+    registry = EvidenceRegistry()
+    # Construct EventDetector with the same registry (Plan 18-02 wiring).
+    EventDetector(evidence_registry=registry)
+
+    agent, gen_client, _, state = _build_agent_with_registry(mocker, tmp_path, registry)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    # Build 10 response strings with the exact citation counts below.
+    # Use a mix of single-citation and multi-citation forms so the parser
+    # exercises both paths.
+    responses = [
+        "[ev:A@1] [ev:B@2] [ev:C@3]",  # 3
+        "no citations here",  # 0
+        "[ev:A@1,aud:bpm@1]",  # 2 (multi-citation in one bracket)
+        "[track:xyz-1]",  # 1
+        "[ev:A@1] [aud:bpm@2] [midi:cue_a@3] [track:xyz-1]",  # 4
+        "<silence/>",  # 0
+        "[ev:A@1] [aud:bpm@2]",  # 2
+        "[ev:A@1] [aud:bpm@2] [midi:cue_a@3] [track:xyz-1] [screen:wave_a]",  # 5
+        "[mix:audible_deck=A]",  # 1
+        "[tend:user_likes_acid] [ev:A@1] [aud:bpm@2]",  # 3
+    ]
+    expected_counts = [3, 0, 2, 1, 4, 0, 2, 5, 1, 3]
+
+    response_iter = iter(responses)
+
+    def _stream(*_a, **_kw):
+        return _async_iter([next(response_iter)])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(side_effect=_stream)
+
+    for _ in range(10):
+        ev = Event(type="HEARTBEAT", state=state, extra={})
+        agent.set_next_event(ev)
+        _drive_llm_node(agent)
+
+    tel = registry.citation_telemetry()
+    assert tel["window_size"] == 10
+    assert tel["total_turns_observed"] == 10
+    expected_mean = sum(expected_counts) / 10
+    assert tel["mean"] == expected_mean, (
+        f"Phase 16 readiness signal drift: expected mean {expected_mean}, got {tel['mean']}"
+    )
