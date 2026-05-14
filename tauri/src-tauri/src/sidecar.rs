@@ -225,16 +225,30 @@ fn resolve_sidecar_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-/// Read the last non-empty line from the rotated log. Used as the
-/// `last_error` payload on `sidecar-crashed`.
+/// Read the most-informative line from the tail of the rotated log.
+///
+/// Used as the `last_error` payload on `sidecar-crashed`. We prefer the
+/// *last `[FATAL]` line* over the literal last non-empty line because
+/// the Python sidecar can emit benign post-FATAL chatter (atexit
+/// handlers, asyncio cleanup, retry banners) that would otherwise
+/// clobber the actual cause of death in the crash banner. Falls back to
+/// the last non-empty line when no `[FATAL]` marker is present (e.g.,
+/// the sidecar died from an uncaught exception with a regular
+/// traceback tail).
 pub(crate) fn read_last_log_line(p: &std::path::Path) -> Option<String> {
     use std::io::{BufRead, BufReader};
     let f = std::fs::File::open(p).ok()?;
-    BufReader::new(f)
+    let lines: Vec<String> = BufReader::new(f)
         .lines()
-        .filter_map(|l| l.ok())
+        .map_while(Result::ok)
         .filter(|l| !l.trim().is_empty())
-        .last()
+        .collect();
+    lines
+        .iter()
+        .rev()
+        .find(|l| l.contains("[FATAL]"))
+        .or_else(|| lines.last())
+        .cloned()
 }
 
 #[cfg(test)]
@@ -274,6 +288,38 @@ mod tests {
     fn read_last_log_line_returns_none_for_empty_file() {
         let f = NamedTempFile::new().unwrap();
         assert!(read_last_log_line(f.path()).is_none());
+    }
+
+    #[test]
+    fn read_last_log_line_prefers_fatal_over_post_fatal_chatter() {
+        // Real-world pattern: Python sidecar logs [FATAL] then atexit /
+        // asyncio cleanup spew. The crash banner needs the FATAL line,
+        // not the meaningless tail.
+        let mut f = NamedTempFile::new().unwrap();
+        writeln!(f, "-> wizard boot").unwrap();
+        writeln!(f, "[FATAL] ws_bus port bind failed on 127.0.0.1:8765").unwrap();
+        writeln!(f, "[FATAL] another vibemix process is already running; quit it before relaunching.").unwrap();
+        writeln!(f, "asyncio cleanup task <Task pending name='Task-3'>").unwrap();
+        writeln!(f, "  done").unwrap();
+        f.flush().unwrap();
+
+        let last = read_last_log_line(f.path()).expect("should find a FATAL line");
+        // The last [FATAL] (not the literal last line) wins.
+        assert!(last.contains("another vibemix process is already running"));
+        assert!(last.starts_with("[FATAL]"));
+    }
+
+    #[test]
+    fn read_last_log_line_falls_back_to_tail_when_no_fatal() {
+        // No [FATAL] marker — the helper still returns the last line.
+        let mut f = NamedTempFile::new().unwrap();
+        writeln!(f, "Traceback (most recent call last):").unwrap();
+        writeln!(f, "  File \"x.py\", line 1").unwrap();
+        writeln!(f, "RuntimeError: boom").unwrap();
+        f.flush().unwrap();
+
+        let last = read_last_log_line(f.path()).expect("should find tail");
+        assert_eq!(last, "RuntimeError: boom");
     }
 }
 

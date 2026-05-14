@@ -33,16 +33,16 @@
 //! so the canonicalize() prefix check resolves against the same disk
 //! location the sidecar wrote.
 //!
-//! Tauri 2.x deprecation note: `app.shell().open(...)` is deprecated in
-//! favor of `tauri-plugin-opener`; acceptable for Phase 15 closure per
-//! Cargo.toml line 30 inline note. Phase 21 binary-shippable gate may
-//! migrate.
+//! Tauri 2.x deprecation note: `app.shell().open(...)` is deprecated.
+//! `open_input_wav` migrated to a direct `std::process::Command` shell-out
+//! matching the `reveal_in_os` pattern above — same OS handler delegation
+//! (`open` on macOS, `cmd /C start` on Windows), zero plugin dependency,
+//! deprecation warning gone.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use tauri::AppHandle;
-use tauri_plugin_shell::ShellExt;
 
 /// Resolve the OS-aware recordings root that the Python sidecar writes to.
 ///
@@ -159,18 +159,43 @@ pub async fn reveal_in_os(_app: AppHandle, session_dir: String) -> Result<(), St
 
 /// Open `<recordings_root>/<session_dir>/input.wav` in the OS default audio app.
 ///
-/// Uses `tauri-plugin-shell::open()` which delegates to the OS file
-/// association (LaunchServices on macOS, ShellExecute on Windows). The
-/// path is validated against the recordings root before the shell-out so a
-/// crafted `session_dir` cannot escape to e.g. `/etc/passwd`.
+/// Direct shell-out to the OS handler — `open <path>` on macOS delegates to
+/// LaunchServices (same surface `tauri-plugin-shell::open()` wrapped, but
+/// without the deprecated plugin layer); `cmd /C start "" <path>` on Windows
+/// delegates to ShellExecute. The path is validated against the recordings
+/// root before the shell-out so a crafted `session_dir` cannot escape to
+/// e.g. `/etc/passwd` (T-15-03-01 / T-15-03-04 in 15-03-PLAN).
+///
+/// AppHandle is retained in the signature for forward-compat with future
+/// telemetry; the function does not currently consult it.
 #[tauri::command]
-pub async fn open_input_wav(app: AppHandle, session_dir: String) -> Result<(), String> {
+pub async fn open_input_wav(_app: AppHandle, session_dir: String) -> Result<(), String> {
     let root = resolve_recordings_root()?;
     let candidate = root.join(&session_dir).join("input.wav");
     let safe = validate_under_root(&candidate, &root)?;
-    app.shell()
-        .open(safe.to_string_lossy().to_string(), None)
-        .map_err(|e| format!("shell.open: {e}"))?;
+    let safe_str = safe.to_string_lossy().to_string();
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&safe_str)
+            .status()
+            .map_err(|e| format!("open: {e}"))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // `start` is a cmd builtin — invoke via `cmd /C`. The empty quoted
+        // string is the window title slot; without it the first quoted arg
+        // is consumed as the title and the file path is ignored.
+        Command::new("cmd")
+            .args(["/C", "start", "", &safe_str])
+            .status()
+            .map_err(|e| format!("cmd start: {e}"))?;
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = safe_str;
+        return Err("unsupported platform".into());
+    }
     Ok(())
 }
 
