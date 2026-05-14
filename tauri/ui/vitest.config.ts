@@ -38,6 +38,10 @@ export default defineConfig({
       // instances + poke data-attrs and need jsdom (rather than the
       // default node env for src/**/*.spec.ts).
       ["src/settings/components/recording-*.spec.ts", "jsdom"],
+      // Phase 20 Plan 04 — citation-diagnostics renderer; same DOM-API
+      // pattern as recording-row and friends, needs jsdom for textContent /
+      // title-attr / dataset assertions.
+      ["src/settings/components/citation-diagnostics.spec.ts", "jsdom"],
     ],
   },
 });

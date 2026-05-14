@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """coach_loop — verbatim port of cohost_v4.py:1754-1852, with Plan 19-05
-runtime wiring for AckBank + CancelGate + TTFTMeter + PlaybackQueue.
+runtime wiring for AckBank + CancelGate + TTFTMeter + PlaybackQueue, plus
+Plan 20-04 periodic ipc.session.citation publish to the Tauri Settings →
+Diagnostics surface (GROUND-06 anti-slop telemetry channel).
 
 Polls MusicState for events at 10Hz, fires AI reactions via
 ``session.generate_reply``. Single-in-flight enforcement (stale-clear at
@@ -34,18 +36,33 @@ Plan 19-05 wiring (additive — backward compatible):
 - When ANY of the four kwargs is None, the legacy path runs verbatim with
   ``allow_interruptions=False`` to preserve the byte-identical Phase 4
   contract for existing callers / tests.
+
+Plan 20-04 wiring (additive — backward compatible):
+- ``ipc_bus`` + ``citation_telemetry`` are NEW kwargs with default None.
+  When both are non-None, the loop publishes ``ipc.session.citation`` every
+  ``CITATION_PUBLISH_INTERVAL_S`` (2.0s) seconds via ``ipc_bus.emit(dict)``
+  with payload ``{slop_ratio, stripped_rate_15s, last_unverified_response,
+  bypass_active}`` sourced from the telemetry callable.
+- A telemetry-callable failure prints to stderr ``[coach citation publish
+  err]`` and STILL bumps the publish_at debounce so a chronically-broken
+  callable cannot spam the log faster than once per interval.
+- When either kwarg is None, the publish gate is skipped and the legacy
+  Plan 19-05 path runs unchanged (byte-identical for existing tests).
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from vibemix.audio import AI_TALK_THRESHOLD, MIC_TALK_THRESHOLD, Levels, VoiceRecorder
 from vibemix.runtime.cancel import CANCEL_COOLDOWN_S
 from vibemix.state import EventDetector, MusicState
+from vibemix.ui_bus import SessionCitation
 
 if TYPE_CHECKING:
     from livekit.agents import AgentSession
@@ -55,6 +72,12 @@ if TYPE_CHECKING:
     from vibemix.audio import PlaybackQueue
     from vibemix.runtime.cancel import CancelGate
     from vibemix.runtime.ttft import TTFTMeter
+    from vibemix.runtime.ws_bus import IpcBus
+
+# Plan 20-04 — periodic ipc.session.citation publish cadence (0.5Hz). Lower
+# than ipc.session.snapshot's 30Hz because slop_ratio + stripped_rate_15s
+# evolve slowly (15s rolling window + cumulative ratio).
+CITATION_PUBLISH_INTERVAL_S = 2.0
 
 
 async def coach_loop(
@@ -72,6 +95,8 @@ async def coach_loop(
     cancel_gate: CancelGate | None = None,
     ttft_meter: TTFTMeter | None = None,
     playback: PlaybackQueue | None = None,
+    ipc_bus: IpcBus | None = None,
+    citation_telemetry: Callable[[], dict] | None = None,
 ) -> None:
     """Polls MusicState for events at 10Hz. On event → prompt AI. Single
     in-flight generation at a time. Mic detection happens here against
@@ -84,6 +109,7 @@ async def coach_loop(
     await asyncio.sleep(2.0)
 
     last_ai_voice_at = 0.0
+    last_citation_publish_at = 0.0
     mic_active_frames = 0
     mic_silence_since = 0.0
 
@@ -93,10 +119,31 @@ async def coach_loop(
         and ttft_meter is not None
         and playback is not None
     )
+    citation_wired = ipc_bus is not None and citation_telemetry is not None
 
     while not stop_event.is_set():
         await asyncio.sleep(0.1)
         now = time.time()
+
+        # Plan 20-04 — periodic ipc.session.citation publish (0.5Hz). Runs
+        # before the in_flight skip so anti-slop telemetry keeps flowing
+        # even while a reaction is generating. The whole gate is wrapped in
+        # try/except + always bumps last_citation_publish_at so a broken
+        # telemetry callable cannot spam stderr faster than the interval.
+        if citation_wired and (now - last_citation_publish_at) >= CITATION_PUBLISH_INTERVAL_S:
+            try:
+                tel = citation_telemetry()  # type: ignore[misc]
+                msg = SessionCitation.make(
+                    slop_ratio=float(tel.get("slop_ratio", 0.0)),
+                    stripped_rate_15s=float(tel.get("stripped_rate_15s", 0.0)),
+                    last_unverified_response=tel.get("last_unverified_response"),
+                    bypass_active=bool(tel.get("bypass_active", False)),
+                )
+                await ipc_bus.emit(json.loads(msg.to_json()))  # type: ignore[union-attr]
+            except Exception as e:
+                print(f"\n[coach citation publish err] {e}", file=sys.stderr)
+            finally:
+                last_citation_publish_at = now
 
         # Don't fire while a generation is in-flight
         if trigger_state.get("in_flight"):
