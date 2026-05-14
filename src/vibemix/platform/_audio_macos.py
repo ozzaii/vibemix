@@ -36,19 +36,143 @@ def assert_device_sample_rate(device_index: int, expected: int) -> None:
     ``Stream.samplerate`` after opening (which reports the PortAudio-negotiated
     rate and silently lies about device drift — RESEARCH.md Q2).
 
-    Raises ``SampleRateMismatchError`` with a multi-line actionable message
-    including the Audio MIDI Setup fix steps + Drift Correction note.
+    On mismatch, attempts to set the rate programmatically via
+    ``set_device_nominal_sample_rate`` (best-effort — PyObjC's CoreAudio
+    binding for void* is not always usable). If that fails, opens Audio
+    MIDI Setup so the user can flip the rate by hand, then raises a
+    ``SampleRateMismatchError`` with the exact fix steps.
     """
     info = sd.query_devices(device_index)
     actual = int(info["default_samplerate"])
     name = info.get("name", f"device {device_index}")
-    if actual != expected:
-        raise SampleRateMismatchError(
-            f"{name} is configured at {actual}Hz but vibemix expects {expected}Hz.\n"
-            f"Fix: open Audio MIDI Setup -> {name} -> Format -> "
-            f"{expected:,} Hz (2 ch, 32-bit float).\n"
-            f"Also enable Drift Correction on BlackHole if you use a Multi-Output Device."
+    if actual == expected:
+        return
+    if set_device_nominal_sample_rate(name, expected):
+        info = sd.query_devices(device_index)
+        if int(info["default_samplerate"]) == expected:
+            return
+    # Best-effort auto-fix failed — fall back to opening Audio MIDI Setup
+    # so the user lands one click from the right device.
+    try:
+        import subprocess  # noqa: PLC0415
+
+        subprocess.Popen(  # noqa: S607
+            ["open", "-a", "Audio MIDI Setup"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
+    except Exception:
+        pass
+    raise SampleRateMismatchError(
+        f"{name} is configured at {actual}Hz but vibemix expects {expected}Hz.\n"
+        f"Opened Audio MIDI Setup — select {name} on the left, then "
+        f"set Format to {expected:,} Hz, 2 ch.\n"
+        f"For BlackHole-backed Multi-Output Devices, also tick 'Drift "
+        f"Correction' on the BlackHole row so the OS resamples cleanly."
+    )
+
+
+def set_device_nominal_sample_rate(device_name: str, rate: int) -> bool:
+    """Set a CoreAudio device's nominal sample rate via the AudioToolbox API.
+
+    Uses pyobjc's CoreAudio bindings to walk
+    kAudioHardwarePropertyDevices, match by deviceNameCFString, then write
+    kAudioDevicePropertyNominalSampleRate. Returns True on success, False
+    on any failure (device not found, rate unsupported, API error).
+    """
+    try:
+        from CoreAudio import (  # type: ignore[import-not-found]
+            AudioObjectGetPropertyData,
+            AudioObjectGetPropertyDataSize,
+            AudioObjectPropertyAddress,
+            AudioObjectSetPropertyData,
+        )
+    except Exception:
+        return False
+
+    def fourcc(s: str) -> int:
+        return int.from_bytes(s.encode("ascii"), "big")
+
+    kAudioObjectSystemObject = 1
+    kAudioHardwarePropertyDevices = fourcc("dev#")
+    kAudioDevicePropertyDeviceNameCFString = fourcc("lnam")
+    kAudioDevicePropertyNominalSampleRate = fourcc("nsrt")
+    kAudioObjectPropertyScopeGlobal = fourcc("glob")
+    kAudioObjectPropertyElementMain = 0
+
+    addr = AudioObjectPropertyAddress(
+        kAudioHardwarePropertyDevices,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain,
+    )
+    try:
+        status, size = AudioObjectGetPropertyDataSize(
+            kAudioObjectSystemObject, addr, 0, None, None
+        )
+    except Exception:
+        return False
+    if status != 0 or size == 0:
+        return False
+
+    try:
+        status, _size, device_ids = AudioObjectGetPropertyData(
+            kAudioObjectSystemObject, addr, 0, None, size, None
+        )
+    except Exception:
+        return False
+    if status != 0 or not device_ids:
+        return False
+
+    name_addr = AudioObjectPropertyAddress(
+        kAudioDevicePropertyDeviceNameCFString,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain,
+    )
+    rate_addr = AudioObjectPropertyAddress(
+        kAudioDevicePropertyNominalSampleRate,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain,
+    )
+
+    for dev_id in device_ids:
+        try:
+            status_n, name_size = AudioObjectGetPropertyDataSize(
+                dev_id, name_addr, 0, None, None
+            )
+            if status_n != 0:
+                continue
+            status_n, _sz, name_obj = AudioObjectGetPropertyData(
+                dev_id, name_addr, 0, None, name_size, None
+            )
+            if status_n != 0 or name_obj is None:
+                continue
+            device_str = str(name_obj)
+        except Exception:
+            continue
+        if device_str != device_name:
+            continue
+        try:
+            status_r, _sz, cur_rate = AudioObjectGetPropertyData(
+                dev_id, rate_addr, 0, None, 8, None
+            )
+        except Exception:
+            return False
+        if status_r != 0:
+            return False
+        try:
+            cur_value = float(cur_rate)
+        except (TypeError, ValueError):
+            cur_value = 0.0
+        if int(cur_value) == rate:
+            return True
+        try:
+            set_status = AudioObjectSetPropertyData(
+                dev_id, rate_addr, 0, None, 8, float(rate)
+            )
+        except Exception:
+            return False
+        return set_status == 0
+    return False
 
 
 class _SoundDeviceStreamHandle:
