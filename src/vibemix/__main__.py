@@ -65,7 +65,12 @@ from vibemix.agent import (
 )
 from vibemix.agent.ack_bank import AckBank
 from vibemix.agent.cache import GeminiContextCache
-from vibemix.coach import CitationLinter, StrippedRateTracker
+from vibemix.coach import (
+    STRIPPED_RATE_THRESHOLD,
+    CitationIpcShim,
+    CitationLinter,
+    StrippedRateTracker,
+)
 from vibemix.audio import (
     INPUT_CHUNK_FRAMES,
     INPUT_SR_NATIVE,
@@ -481,6 +486,63 @@ async def main() -> None:
     evidence_registry = EvidenceRegistry()
     citation_linter = CitationLinter() if anti_slop_enabled else None
     stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
+    # In-process IpcBus shim — Plan 20-04's coach_loop publish gate
+    # duck-types against ``await ipc_bus.emit(dict)``. The shim buffers each
+    # SessionCitation envelope into a bounded deque (no I/O). v2.x follow-up
+    # multiplexes the buffer onto the mascot ws_broadcast clients (the WS
+    # port is already owned by ws_broadcast — see citation_ipc_shim docstring
+    # for the two-option v2.x wiring path).
+    citation_shim: CitationIpcShim | None = (
+        CitationIpcShim() if anti_slop_enabled else None
+    )
+
+    def _citation_telemetry() -> dict:
+        """Closure invoked by ``coach_loop``'s publish gate every
+        ``CITATION_PUBLISH_INTERVAL_S`` (2.0s). Reads fresh from the
+        StrippedRateTracker + EvidenceRegistry on every call so the
+        emitted SessionCitation envelope reflects the latest state.
+
+        Returns the 4 keys ``SessionCitation.make()`` expects:
+
+        - ``slop_ratio``: placeholder ``1 / (1 + mean)`` derived from the
+          rolling-50-turn citation-count mean — drops toward 0 as Gemini
+          emits more citations. The true slop metric (slop-vs-clean turn
+          ratio) is a v2.x refinement once we have a stable definition;
+          the placeholder is intentionally loud (1.0 at cold-start)
+          rather than silent.
+        - ``stripped_rate_15s``: tracker rate fresh per call. 0.0 when
+          tracker is None (anti-slop disabled).
+        - ``last_unverified_response``: ``None`` — no simple existing
+          source. v2.x adds a 5-entry ring buffer of stripped/bypassed
+          response texts so the Settings → Diagnostics surface can show
+          the most recent unverified emission.
+        - ``bypass_active``: non-destructive read — ``rate >
+          STRIPPED_RATE_THRESHOLD``. We deliberately do NOT call
+          ``tracker.should_bypass()`` here because that's the one-shot
+          latch consumer; using it from telemetry would race the gate
+          decision in the agent's llm_node strip path.
+
+        T-20-05-03: the callable must not raise. ``coach_loop`` does
+        wrap it in try/except, but staying clean keeps the publish path
+        quiet.
+        """
+        reg_tel = evidence_registry.citation_telemetry()
+        mean = reg_tel.get("mean", 0.0)
+        slop_ratio = 1.0 / (1.0 + mean) if mean > 0 else 1.0
+        rate = (
+            stripped_rate_tracker.rate()
+            if stripped_rate_tracker is not None
+            else 0.0
+        )
+        bypass_active = (
+            stripped_rate_tracker is not None and rate > STRIPPED_RATE_THRESHOLD
+        )
+        return {
+            "slop_ratio": float(slop_ratio),
+            "stripped_rate_15s": float(rate),
+            "last_unverified_response": None,  # v2.x follow-up
+            "bypass_active": bool(bypass_active),
+        }
 
     agent = DJCoHostAgent(
         genai_client=genai_client,
@@ -543,6 +605,8 @@ async def main() -> None:
             cancel_gate=cancel_gate,
             ttft_meter=ttft_meter,
             playback=playback,
+            ipc_bus=citation_shim,
+            citation_telemetry=_citation_telemetry if anti_slop_enabled else None,
         )
     )
 
