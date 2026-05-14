@@ -9,19 +9,20 @@
 
 const params = new URLSearchParams(window.location.search);
 
+const COLOR_AMBER = "#f59e0b";
 const COLOR_MAP: Record<string, string> = {
-  amber: "#f59e0b",
+  amber: COLOR_AMBER,
   red: "#ef4444",
   green: "#10b981",
   blue: "#3b82f6",
 };
 
 function resolveColor(raw: string | null): string {
-  if (!raw) return COLOR_MAP.amber;
+  if (!raw) return COLOR_AMBER;
   const key = raw.toLowerCase();
   // Allowlist-only: refuse arbitrary CSS color injection. Falls back
   // to amber for any unknown token.
-  return COLOR_MAP[key] ?? COLOR_MAP.amber;
+  return COLOR_MAP[key] ?? COLOR_AMBER;
 }
 
 function resolveDuration(raw: string | null): number {
