@@ -174,8 +174,16 @@ def _read_csv(path: Path) -> tuple[list[str], list[dict[str, str]]]:
 
 
 def test_harness_processes_synthetic_wav_emits_csv(tmp_path: Path) -> None:
-    """End-to-end: a 16s 130 BPM synthetic kick WAV with a breakdown at 8s
-    drives the harness; CSV exists with the locked header schema and rows.
+    """End-to-end: a 130 BPM synthetic kick WAV with a breakdown drives the
+    harness; CSV exists with the locked header schema and rows.
+
+    Plan-deviation note (Rule 3 / blocking): the plan specified a 16s WAV
+    with a breakdown at 8s, but the BREAKDOWN_KICK_KILL detector requires
+    an 8s baseline window (``_BASELINE_WINDOW_SEC``) to age before its
+    first evaluation, AND ``_music_truly_playing`` requires 4s of audible
+    history before the chain runs at all — so a 16s WAV produces zero
+    fires (the chain is ``baseline-seeding`` for almost the whole run).
+    Extended to 30s with breakdown at 14s so the chain has room to evolve.
     """
     from tests.scripts.fixtures.synth_kick_pattern import write_synth_kick_wav
 
@@ -183,10 +191,10 @@ def test_harness_processes_synthetic_wav_emits_csv(tmp_path: Path) -> None:
     write_synth_kick_wav(
         wav_path,
         bpm=130.0,
-        duration_s=16.0,
+        duration_s=30.0,
         sample_rate=16000,
-        breakdown_at_s=8.0,
-        breakdown_duration_s=2.0,
+        breakdown_at_s=14.0,
+        breakdown_duration_s=4.0,
     )
 
     csv_path = tmp_path / "out.csv"
@@ -208,10 +216,11 @@ def test_harness_processes_synthetic_wav_emits_csv(tmp_path: Path) -> None:
     bad = [r for r in rows if r["detector_name"] not in _ALLOWED_DETECTOR_NAMES]
     assert not bad, f"unrecognised detector_name(s) in CSV: {[r['detector_name'] for r in bad][:3]}"
 
-    # All t_seconds within [0.0, 16.0].
+    # All t_seconds within [0.0, 30.0] (extended from plan's 16.0 — see
+    # docstring note on the WAV-length deviation).
     for r in rows:
         t = float(r["t_seconds"])
-        assert 0.0 <= t <= 16.0, f"row t_seconds={t} outside [0.0, 16.0]"
+        assert 0.0 <= t <= 30.0, f"row t_seconds={t} outside [0.0, 30.0]"
 
     # All bar_index non-negative integers.
     for r in rows:
@@ -239,15 +248,21 @@ def test_harness_no_input_files_logs_anchor_tracks_to_do(
 
 
 def test_harness_processes_multiple_wavs(tmp_path: Path) -> None:
-    """Two input WAVs → CSV rows tagged with both basenames in the `track` column."""
+    """Two input WAVs → CSV rows tagged with both basenames in the `track` column.
+
+    Plan-deviation note: WAV durations extended to 30s (from plan's 12s) for
+    the same reason as Test 4 — chain detectors need ≥18s of audible context
+    before the first fire is possible (4s music-presence + 8s baseline-window
+    + ~6s post-rotation evaluation slack).
+    """
     from tests.scripts.fixtures.synth_kick_pattern import write_synth_kick_wav
 
     wav_a = tmp_path / "deck_a.wav"
     wav_b = tmp_path / "deck_b.wav"
-    write_synth_kick_wav(wav_a, bpm=130.0, duration_s=12.0, sample_rate=16000,
-                        breakdown_at_s=6.0, breakdown_duration_s=2.0)
-    write_synth_kick_wav(wav_b, bpm=150.0, duration_s=12.0, sample_rate=16000,
-                        breakdown_at_s=6.0, breakdown_duration_s=2.0)
+    write_synth_kick_wav(wav_a, bpm=130.0, duration_s=30.0, sample_rate=16000,
+                        breakdown_at_s=14.0, breakdown_duration_s=4.0)
+    write_synth_kick_wav(wav_b, bpm=150.0, duration_s=30.0, sample_rate=16000,
+                        breakdown_at_s=14.0, breakdown_duration_s=4.0)
 
     csv_path = tmp_path / "multi.csv"
     from scripts import tune_detectors
@@ -279,10 +294,10 @@ def test_harness_uses_real_eventdetector_with_genre_router(
     write_synth_kick_wav(
         wav_path,
         bpm=150.0,
-        duration_s=16.0,
+        duration_s=30.0,
         sample_rate=16000,
-        breakdown_at_s=8.0,
-        breakdown_duration_s=2.0,
+        breakdown_at_s=14.0,
+        breakdown_duration_s=4.0,
     )
     csv_path = tmp_path / "spy.csv"
 
@@ -313,17 +328,20 @@ def test_harness_uses_real_eventdetector_with_genre_router(
 
 
 def test_harness_breakdown_wav_fires_kick_kill_then_reentry(tmp_path: Path) -> None:
-    """End-to-end pair-detection: 16s 150 BPM techno-band WAV with 2s
-    breakdown at 8s should produce a BREAKDOWN_KICK_KILL row near t≈8.0
-    (within ±2.0s — the harness ticks at 100ms cadence and the detector
-    needs an 8s baseline window before the first fire becomes possible).
+    """End-to-end pair-detection: 30s 150 BPM techno-band WAV with 4s
+    breakdown at 14s should produce some chain detector activity (KICK_SWAP
+    / PHASE / KICK_DENSITY_SHIFT around the breakdown boundary).
 
-    We're flexible on REENTRY_KICK_LAND — the synthetic 60Hz pure sine may
-    fall below the hard_tek spectral centroid floor and route to the
-    `unknown` (empty) chain instead of the hard_tek chain. The minimum
-    contract: if the kill fires, the test still passes (the pair-detection
-    contract for the kick→reentry pair lives in the unit tests for
-    ReentryKickLandDetector — Plan 17-03 — not here).
+    Plan-deviation note: WAV extended from plan's 16s to 30s + breakdown
+    moved from 8s to 14s for the same baseline-window reason as Test 4.
+
+    We're flexible on the specific detector that fires — the synthetic
+    60Hz pure sine may fall below the hard_tek spectral centroid floor and
+    route to the techno (or rarely "unknown") chain. The minimum contract
+    is that the harness produces SOME event on a breakdown-bearing WAV,
+    proving end-to-end that the detector dispatch survived the synthetic
+    audio (the strict pair-detection unit-test contract for kick→reentry
+    lives in the ReentryKickLandDetector unit tests — Plan 17-03).
     """
     from tests.scripts.fixtures.synth_kick_pattern import write_synth_kick_wav
 
@@ -331,10 +349,10 @@ def test_harness_breakdown_wav_fires_kick_kill_then_reentry(tmp_path: Path) -> N
     write_synth_kick_wav(
         wav_path,
         bpm=150.0,
-        duration_s=16.0,
+        duration_s=30.0,
         sample_rate=16000,
-        breakdown_at_s=8.0,
-        breakdown_duration_s=2.0,
+        breakdown_at_s=14.0,
+        breakdown_duration_s=4.0,
     )
     csv_path = tmp_path / "kill.csv"
 
@@ -344,24 +362,19 @@ def test_harness_breakdown_wav_fires_kick_kill_then_reentry(tmp_path: Path) -> N
     assert rc == 0
 
     _, rows = _read_csv(csv_path)
-    # The harness MAY route through the `unknown` (empty) chain if the
-    # synthetic 60Hz sine falls below the hard_tek centroid gate. In that
-    # case the genre detector chain doesn't fire — only baseline detectors
-    # do. Assert the harness produced *some* output and either:
-    # (a) a BREAKDOWN_KICK_KILL row near t≈8 if the techno chain ran, OR
-    # (b) at least one row from the baseline path proving the harness ran
-    #     end-to-end against the breakdown input.
+    # The harness MAY route through the techno chain (synthetic 60Hz kicks
+    # fall in the techno BPM band but the centroid gate may still apply).
+    # Assert the harness produced *some* output proving end-to-end pipeline
+    # health on the breakdown input.
     assert rows, "harness produced no events on the breakdown WAV"
 
     kill_rows = [r for r in rows if r["detector_name"] == "BREAKDOWN_KICK_KILL"]
     if kill_rows:
-        # If the techno chain DID run, the kill should land in the breakdown
-        # window. Allow ±2.0s slack: the detector's 8s baseline window means
-        # the earliest possible kill detection is ~8s into the input; the
-        # actual fire lags slightly because the writer needs LOW_RMS+ for
-        # several ticks before the kill predicate becomes true.
+        # If the chain DID surface a kill, it should land in the post-
+        # baseline-window slice. With baseline seeded around t≈4.6 and
+        # rotating every 8s, the kill window is roughly [12.6, 22.6].
         kill_t = float(kill_rows[0]["t_seconds"])
-        assert 6.0 <= kill_t <= 12.0, (
+        assert 12.0 <= kill_t <= 24.0, (
             f"BREAKDOWN_KICK_KILL fired at t={kill_t:.2f} — expected within "
-            f"[6.0, 12.0] given a breakdown at t=8.0±0.5"
+            f"[12.0, 24.0] given a breakdown at t=14.0..18.0"
         )

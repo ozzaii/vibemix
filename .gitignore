@@ -138,3 +138,8 @@ v5-*.png
 # Defensive whitelist so future generic image globs don't suppress them.
 !docs/assets/
 !docs/assets/**
+
+# Phase 17 Plan 06 — tune_detectors.py default output. Per-run CSVs can be
+# large; copy the relevant CSV under .planning/ if you want it versioned
+# alongside the threshold change it justifies (T-17-06-04 mitigation).
+tuning_runs/
