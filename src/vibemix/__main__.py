@@ -158,7 +158,90 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Run the standalone session IPC loop (no cascade graph; Phase 12 W2).",
     )
+    # Phase 25 Plan 25-03 — DEBRIEF architectural slot (DEBRIEF-01). v2.0
+    # ships the entry-point + port constant + 3 IPC schema reservations
+    # only; the v2.1 implementation drops in the chaptered TL;DR + drill
+    # cards + clickable timeline behind this flag without touching the API
+    # surface (flag name, port, message types are locked here).
+    # ``nargs="?"`` lets the flag take an optional SESSION_DIR — bare
+    # ``--debrief`` registers the smoke / port-reservation banner; with a
+    # path it logs the reserved-session intent. Absence keeps ``None`` so
+    # the dispatch in cli_entry can distinguish "no flag" from "empty arg".
+    parser.add_argument(
+        "--debrief",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="SESSION_DIR",
+        help=(
+            "Run as post-session DEBRIEF sidecar — binds the DEBRIEF ws bus on "
+            "127.0.0.1:8766, emits the 3 reserved DEBRIEF schemas only, never "
+            "engages audio I/O or LiveKit. SESSION_DIR is the path to a "
+            "closed recordings/* session; omit for a no-op smoke. v2.0 "
+            "architectural slot — full UI feature ships v2.1 "
+            "(DEBRIEF-01 + DEBRIEF-02)."
+        ),
+    )
     return parser.parse_args(argv)
+
+
+# =============================================================================
+# DEBRIEF sidecar — Phase 25 Plan 25-03 architectural slot
+# =============================================================================
+
+
+# Port reserved for the v2.1 DEBRIEF ws bus. Lives separate from the live
+# mascot bus on 8765 (CONTEXT D-Area-1.1 / D-Area-1.3). v2.0 does NOT bind
+# this port — the constant is a forward-compatibility reservation only. v2.1
+# wires the real listener + 3-message emit path behind ``--debrief``.
+DEBRIEF_PORT: int = 8766
+
+
+def _run_debrief_sidecar(session_dir: str) -> None:
+    """v2.0 DEBRIEF sidecar — banner log + port reservation only.
+
+    DEBRIEF-01 reserves the surface: a separate sidecar process bound to
+    ``127.0.0.1:DEBRIEF_PORT`` (avoids the live mascot bus on 8765). In
+    v2.0 the sidecar emits a single ``logging.INFO`` banner line and
+    returns — no audio I/O, no LiveKit, no session replay. v2.1 drops in
+    the chaptered TL;DR + drill cards + clickable timeline behind this
+    entry-point without changing the API surface.
+
+    ``session_dir`` semantics:
+
+      * ``""`` (sentinel): bare ``--debrief`` was passed — log the no-arg
+        smoke banner; useful for verifying the flag plumbing without
+        loading a real session.
+      * non-empty path: log the path-reserved banner; v2.1 will validate
+        the path against the ``recordings/`` allowlist + open the session.
+
+    Port 8766 is documented as reserved but is NOT bound in v2.0. Binding
+    it now would create a phantom listener with no handlers, surfacing in
+    ``lsof`` as dead weight and confusing diagnostics.
+    """
+    import logging
+
+    logger = logging.getLogger("vibemix.debrief")
+    # Lazy basicConfig — only configure the root if the caller didn't.
+    if not logging.getLogger().handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        )
+    if session_dir:
+        logger.info(
+            "debrief sidecar v2.0 architectural slot — session_dir=%r "
+            "reserved for v2.1 implementation; port %d locked; no work "
+            "performed.",
+            session_dir,
+            DEBRIEF_PORT,
+        )
+    else:
+        logger.info(
+            "debrief sidecar v2.0 architectural slot — no session_dir "
+            "provided; port %d locked; no work performed.",
+            DEBRIEF_PORT,
+        )
 
 
 # =============================================================================
@@ -712,6 +795,13 @@ def cli_entry(argv: list[str] | None = None) -> None:
     """
     args = _parse_args(argv)
     try:
+        if args.debrief is not None:
+            # Phase 25 Plan 25-03 — DEBRIEF architectural slot. Dispatched
+            # before --wizard / --session because it MUST NOT engage audio
+            # I/O or LiveKit (v2.0 contract: log + return only). v2.1 will
+            # wire the real session-replay loop here.
+            _run_debrief_sidecar(session_dir=args.debrief)
+            return
         if args.wizard:
             # Deferred import — the live-runtime path doesn't need the
             # wizard module loaded.
