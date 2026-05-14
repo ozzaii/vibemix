@@ -24,6 +24,11 @@ let pendingResolve: ((payload: { type: string; ts: string; payload: EventsPayloa
 let pendingReject: ((err: Error) => void) | null = null;
 let lastRequest: { type: string; payload: Record<string, unknown> } | null = null;
 
+// Plan 15-03 Task 2 mocks for the new shell-out wrappers; spy fns let the
+// reveal/open-external tests assert the exact `session_dir` passed through.
+const revealInOSMock = vi.fn(async (_session_dir: string) => undefined);
+const openInputWavMock = vi.fn(async (_session_dir: string) => undefined);
+
 vi.mock("../../ipc/client.js", () => ({
   sendIpcRequest: vi.fn(
     (requestType: string, requestPayload: Record<string, unknown>) => {
@@ -34,6 +39,8 @@ vi.mock("../../ipc/client.js", () => ({
       });
     },
   ),
+  revealInOS: (sd: string) => revealInOSMock(sd),
+  openInputWav: (sd: string) => openInputWavMock(sd),
 }));
 
 import { renderRecordingRow } from "./recording-row.js";
@@ -54,6 +61,8 @@ beforeEach(() => {
   pendingReject = null;
   lastRequest = null;
   matchMediaReduced = false;
+  revealInOSMock.mockClear();
+  openInputWavMock.mockClear();
   // jsdom does not implement matchMedia by default; stub a controllable one.
   Object.defineProperty(window, "matchMedia", {
     writable: true,
@@ -494,5 +503,116 @@ describe("recording-row — Test 14: HTML escape via textContent", () => {
     expect(transcript).not.toBeNull();
     expect(transcript!.querySelectorAll("script").length).toBe(0);
     expect(transcript!.textContent).toContain("<script>alert(1)</script>");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 15-03 Task 2 — reveal + open-external action buttons.
+// Cluster grew from 64px (replay + delete) to 128px (replay + reveal +
+// open-external + delete). Tests below pin the wiring + a11y contract.
+// ---------------------------------------------------------------------------
+
+describe("recording-row — Test 15: row renders 4 action buttons in correct order", () => {
+  it("emits replay → reveal → open-external → delete inside the action cluster", () => {
+    const handle = renderRecordingRow({
+      summary: baseSummary,
+      onToggle: vi.fn(),
+      onDelete: vi.fn(),
+    });
+    document.body.append(handle.root);
+
+    const buttons = Array.from(
+      handle.root.querySelectorAll<HTMLButtonElement>(
+        ".vmx-rec-row__actions .vmx-rec-row__btn",
+      ),
+    );
+    expect(buttons.length).toBe(4);
+    expect(buttons.map((b) => b.dataset.kind)).toEqual([
+      "replay",
+      "reveal",
+      "open-external",
+      "delete",
+    ]);
+
+    // Action cluster grew to 128px to host the 4-button row (UI-SPEC §Color
+    // accepted-expansion: amber-reserved spots 8 → 10).
+    const styleBlock = document.querySelector<HTMLStyleElement>(
+      'style[data-scope="vmx-rec-row"]',
+    );
+    expect(styleBlock?.textContent ?? "").toMatch(
+      /\.vmx-rec-row__actions[^}]*flex:\s*0\s+0\s+128px/,
+    );
+  });
+});
+
+describe("recording-row — Test 16: reveal button click invokes revealInOS", () => {
+  it("passes the row's session_dir to the wrapper, stops bubbling, no onToggle/onDelete", () => {
+    const onToggle = vi.fn();
+    const onDelete = vi.fn();
+    const handle = renderRecordingRow({
+      summary: baseSummary,
+      onToggle,
+      onDelete,
+    });
+    document.body.append(handle.root);
+
+    const revealBtn = handle.root.querySelector<HTMLButtonElement>(
+      '.vmx-rec-row__btn[data-kind="reveal"]',
+    );
+    expect(revealBtn).not.toBeNull();
+    revealBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(revealInOSMock).toHaveBeenCalledTimes(1);
+    expect(revealInOSMock).toHaveBeenCalledWith(baseSummary.session_dir);
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe("recording-row — Test 17: open-external button click invokes openInputWav", () => {
+  it("passes the row's session_dir to the wrapper, stops bubbling, no onToggle/onDelete", () => {
+    const onToggle = vi.fn();
+    const onDelete = vi.fn();
+    const handle = renderRecordingRow({
+      summary: baseSummary,
+      onToggle,
+      onDelete,
+    });
+    document.body.append(handle.root);
+
+    const openExtBtn = handle.root.querySelector<HTMLButtonElement>(
+      '.vmx-rec-row__btn[data-kind="open-external"]',
+    );
+    expect(openExtBtn).not.toBeNull();
+    openExtBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(openInputWavMock).toHaveBeenCalledTimes(1);
+    expect(openInputWavMock).toHaveBeenCalledWith(baseSummary.session_dir);
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe("recording-row — Test 18: aria-labels for reveal + open-external", () => {
+  it("matches the documented a11y format including formatted timestamp", () => {
+    const handle = renderRecordingRow({
+      summary: baseSummary,
+      onToggle: vi.fn(),
+      onDelete: vi.fn(),
+    });
+    document.body.append(handle.root);
+
+    const revealBtn = handle.root.querySelector<HTMLButtonElement>(
+      '.vmx-rec-row__btn[data-kind="reveal"]',
+    );
+    const openExtBtn = handle.root.querySelector<HTMLButtonElement>(
+      '.vmx-rec-row__btn[data-kind="open-external"]',
+    );
+    expect(revealBtn?.getAttribute("aria-label")).toBe(
+      "reveal session 2026-05-13 21:04 in Finder",
+    );
+    expect(openExtBtn?.getAttribute("aria-label")).toBe(
+      "open input.wav for session 2026-05-13 21:04 in default app",
+    );
   });
 });
