@@ -129,7 +129,15 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
       }),
     );
   }
-  const armed = state.audioPassed && state.windowSelected;
+  // Continue is armed once the window has been picked. We previously
+  // required state.audioPassed too, but the 1kHz tone test can fail in
+  // ways that don't reflect the user's actual rig (sample rate
+  // mismatch flagged as failure even though the user heard it; user
+  // clicked Retry once and is now on a stale failed state with the
+  // Yes button stranded behind the disabled-on-failed branch). The
+  // tone test stays informational — user judgment over a fragile
+  // probe heuristic.
+  const armed = state.windowSelected;
   ctaRow.append(
     Button({
       variant: "primary",
