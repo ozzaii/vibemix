@@ -106,7 +106,11 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
   2. Citation grammar EBNF locked: `[ev:<TYPE>@<t>]`, `[aud:<key>@<t>]`, `[midi:<event>@<t>]`, `[track:<id>]`, `[screen:<key>]`, `[mix:<derived>]`, `[tend:<profile-fact>]` + multi-citation form.
   3. Citation grammar baked into Gemini system instruction in `AICoach.build_prompt`; v1.0 = prompt-only seeding, NO enforcement yet — Gemini learns the shape in prod.
   4. `events.jsonl` records `citation_count_per_response` per AI turn; Phase 16 ear-test consumes the rolling average as Phase 20 readiness signal.
-**Plans**: TBD
+**Plans**: 4 plans across 4 waves
+- [ ] 18-01-PLAN.md — EvidenceRegistry skeleton + citation grammar regex (Wave 1; GROUND-01 + GROUND-02)
+- [ ] 18-02-PLAN.md — Wire registry into state_refresh_loop + EventDetector._fire as SIBLING write-targets (Wave 2; GROUND-01)
+- [ ] 18-03-PLAN.md — Citation grammar EBNF baked into Gemini system instruction + DJCoHostAgent threads snapshot (Wave 3; GROUND-02 + GROUND-03)
+- [ ] 18-04-PLAN.md — citation_count events.jsonl telemetry + rolling 50-turn average for Phase 16 readiness (Wave 4; GROUND-02)
 **Pitfall prevention**: P12 (registry race) — single synchronous writer; ships v1.0 without enforcement so Gemini text-channel drift doesn't sustain false-strips before Phase 20's telemetry guard exists.
 
 ### Phase 19: Latency Stack v1 — Ack Bank + Cached Content + Cancel-and-Refire
@@ -231,7 +235,7 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
 | 15. Recording Browser + Retention Enforcement | 0/4 | Planning | - |
 | 16. Hallucination Verification Gate (Kaan's DJ Ear) | 0/0 | Not started | - |
 | 17. Hard Tek Detectors v1 + GenreRouter | 0/6 | Planning | - |
-| 18. Evidence Registry + Citation Grammar | 0/0 | Not started | - |
+| 18. Evidence Registry + Citation Grammar | 0/4 | Planning | - |
 | 19. Latency Stack v1 | 0/0 | Not started | - |
 | 20. Citation Linter ENFORCEMENT | 0/0 | Not started | - |
 | 21. Sign + Notarize + Release Matrix | 0/0 | Not started | - |
