@@ -68,7 +68,7 @@ Type roles (3 sizes, 2 weights per role — strict; refused to exceed):
 | Role | Family | Size | Weight | Line Height | Letter Spacing | Usage |
 |------|--------|------|--------|-------------|----------------|-------|
 | Wordmark | Workbench | 28px | 400 (only weight ships) | 1.0 | 0.04em | "vibemix" titlebar wordmark, glows with `--phosphor-glow` |
-| Step Heading (H1) | Workbench | 22px | 400 | 1.1 | 0.04em | "STEP 1 / 3 — PERMISSIONS" |
+| Step Heading (H1) | Workbench | 22px | 400 | 1.1 | 0.04em | "STEP 1 / 3 · PERMISSIONS" |
 | Section Label | Workbench | 9px | 400 | 1.0 | 0.32em (UPPERCASE) | Panel headers ("AUDIO IN", "MIDI", "OUTPUT DEVICE") |
 | Body | DM Mono | 14px | 400 | 1.5 | 0.01em | Wizard prose, descriptions, microcopy |
 | Label | DM Mono | 11px | 400 | 1.35 | 0.18em (UPPERCASE) | Form field labels, pill text, status pills |
@@ -150,7 +150,7 @@ Phosphor is FORBIDDEN on:
 - Mascot placeholder rectangle (Phase 11 = empty `--ink-engraved` outline only)
 
 Destructive color (`--rec`) reserved for:
-- "Skip — use generic mapping" button (NOT destructive but action-of-last-resort; warm-warning tone)
+- "Skip · use generic mapping" button (NOT destructive but action-of-last-resort; warm-warning tone)
 - "Permission denied" inline error
 - "1kHz test failed — recheck" inline error
 - "Sidecar stopped — restart?" crash banner
@@ -244,13 +244,13 @@ States: `idle`, `armed` (form valid, ready to advance), `hover-armed`, `pressed-
 
 Padding: 12px 24px. Font: Workbench 11px UPPERCASE 0.22em. Border-radius: 4px. Min-width: 144px. Trailing glyph: `→` (DM Mono).
 
-### 4. Secondary Button ("Recheck", "Skip — generic mapping", "Open install page")
+### 4. Secondary Button ("Recheck", "Skip · use generic mapping", "Open install page")
 
 Same shell as primary, but:
 - Border: 1px solid `--bezel-2` (never lit)
 - Text: `--ink` always
 - Hover: text → `--phosphor`, border → `--phosphor-dim`. No fill change.
-- "Skip — generic mapping" leading glyph: `↻` (dim ink, switches to phosphor on hover).
+- "Skip · use generic mapping" leading glyph: `↻` (dim ink, switches to phosphor on hover).
 
 ### 5. Dropdown — Device Picker (Step 2)
 
@@ -280,7 +280,7 @@ OS-aware row. Each permission = horizontal card:
 - Right: state indicator —
   - Pending: `[ Grant ]` secondary button
   - Granted: `● GRANTED` Workbench 9px in `--ok` with `--ok` LED
-  - Denied: `● DENIED — open Settings ↗` in `--rec` with `--rec` LED, clicking opens deep-link
+  - Denied: `● DENIED · open Settings ↗` in `--rec` with `--rec` LED, clicking opens deep-link
 
 macOS = 2 cards (Screen Recording + Microphone). Windows = 1 card (Microphone). DO NOT show empty/N-A cards for the OS that doesn't need them.
 
@@ -294,12 +294,12 @@ Hero element. States lift the mock's `.drop-chip` (lines 871-910) for the visual
 | `playing` | "■ PLAYING…" — `--phosphor` border, `--phosphor` text + glow. Animated 4-ring concentric pulse around speaker glyph @ 1.5s ease-out (matches 1.5s sine duration). DSEG7 mini-readout above shows "1000 Hz" in `--phosphor`. |
 | `passed` | "✓ HEARD IT — PASSED" — `--ok` border, `--ok` text. LED dot `--ok`. Below: DSEG7 readout shows detected sample rate (e.g. "48000 Hz") in `--phosphor`. |
 | `failed` | "✕ DIDN'T HEAR — RETRY" — `--rec` border, `--rec` text. LED dot `--rec`. Inline microcopy: "no signal heard. check headphone volume + cable" (DM Mono 11px `--ink-dim`). |
-| `programmatic-failed` | Adds inline: "sample rate mismatch — BlackHole reporting {actual}, expected 48000" (DM Mono 11px `--rec`). |
+| `programmatic-failed` | Adds inline: "sample rate mismatch. blackhole reporting {actual}, expected 48000." (DM Mono 11px `--rec`). |
 
 Layout: vertical stack — speaker-glyph (48×48px) → state label → DSEG7 readout → secondary microcopy. Centered in primary panel.
 
 Below the audio test: "Did you hear it?" question + two buttons:
-- `[ Yes — sounded clean ]` (primary armed style)
+- `[ Yes, sounded clean ]` (primary armed style)
 - `[ ↻ Retry ]` (secondary)
 
 Both audible AND programmatic guards must pass to advance. Programmatic failure surfaces above the user-confirm row in `--rec` inline error band.
@@ -316,7 +316,7 @@ Banner layout (mirrors mock `.drop-chip` border-glow treatment):
 - Center: heading (Workbench 11px UPPERCASE) "BLACKHOLE NOT FOUND" + body (DM Mono 14px `--ink`) "vibemix needs blackhole to hear your master output. it's free, takes 30 seconds."
 - Right: stacked buttons — `[ Open install page ↗ ]` (primary armed) and below it `[ ↻ Recheck ]` (secondary)
 
-`[ Open install page ↗ ]` opens `https://existential.audio/blackhole` in default browser via `tauri-plugin-shell`. After click, button transitions to disabled with caption "opened in browser — install then click Recheck below" (DM Mono 11px `--ink-dim`).
+`[ Open install page ↗ ]` opens `https://existential.audio/blackhole` in default browser via `tauri-plugin-shell`. After click, button transitions to disabled with caption "opened in browser. install then click Recheck below." (DM Mono 11px `--ink-dim`).
 
 ### 9. Window Picker (Step 2 — after audio test passes)
 
@@ -330,7 +330,7 @@ Hint-list view (renders if any of djay Pro / Rekordbox / Serato DJ Pro / Traktor
 
 Full enumeration view (fallback when no DJ app detected, or user clicks "pick different"):
 - Grid: 3 columns × N rows, each cell 160×120 (thumbnail + name)
-- Above grid: warning row in `--phosphor-soft` background — Workbench 11px "PRIVACY" + DM Mono 11px `--ink` "vibemix only captures the window you pick — never your full screen"
+- Above grid: warning row in `--phosphor-soft` background — Workbench 11px "PRIVACY" + DM Mono 11px `--ink` "vibemix only captures the window you pick, never your full screen."
 - If user picks a non-DJ window: modal confirm — heading Workbench 11px "NOT A DJ APP" + body DM Mono 14px `--ink` "vibemix works best with djay, rekordbox, serato, traktor, virtualdj — continue with {app_name} anyway?" + buttons `[ ↻ Pick another ]` / `[ Continue anyway ]`. Choice logged to `events.jsonl` per CONTEXT.
 
 ### 10. Controller Probe (Step 3)
@@ -342,7 +342,7 @@ Three layout zones stacked vertically.
 - Center: model name in DM Mono 14px weight 500 `--ink` (e.g. "Pioneer DDJ-FLX4") + port name DM Mono 11px `--ink-dim` ("USB MIDI · port 0")
 - Right: `● CONNECTED` Workbench 9px `--ok` with `--ok` LED
 
-If no controller detected: zone A renders empty-state — DM Mono 14px `--ink-dim` "no controller detected — plug one in or skip" + `--ink-deep` plug-glyph in place of model glyph.
+If no controller detected: zone A renders empty-state — DM Mono 14px `--ink-dim` "no controller detected. plug one in or skip." + `--ink-deep` plug-glyph in place of model glyph.
 
 **Zone B — Listen Indicator (center, the heart of step 3):**
 
@@ -359,7 +359,7 @@ States:
 
 **Zone C — Skip Row (bottom):**
 - Left: `[ ↻ Listen again ]` secondary button (re-arms 10s countdown)
-- Right: `[ Skip — use generic mapping ]` button. Idle = secondary style with `--rec` text accent. Becomes primary-armed after timeout.
+- Right: `[ Skip · use generic mapping ]` button. Idle = secondary style with `--rec` text accent. Becomes primary-armed after timeout.
 
 ### 11. Exit Smoke Test (after Step 3 passes)
 
@@ -425,7 +425,7 @@ Wizard MUST be fully keyboard-traversable (tab/shift-tab/enter/escape). Tab orde
 
 **Step 1 (Permissions):** Permission card 1 → [Grant 1] → Permission card 2 (if macOS) → [Grant 2] → [Continue].
 **Step 2:** [Open install page] (if BlackHole missing) → [Recheck] → Audio test button → [Yes] → [Retry] → Device dropdown → Window picker → [Continue].
-**Step 3:** [Listen again] → [Skip — generic mapping] → [Continue] (after caught/timeout).
+**Step 3:** [Listen again] → [Skip · use generic mapping] → [Continue] (after caught/timeout).
 **Smoke test:** [Replay] → [Open vibemix].
 
 Focus ring: 2px solid `--phosphor` with `--phosphor-glow`, offset 2px from element. Visible on `:focus-visible` only (no focus ring on mouse click).
@@ -475,7 +475,7 @@ Negative-dictionary applies — `vibemix.prompts.negative_dict.NEGATIVE_PHRASES`
 
 | Element | Copy |
 |---------|------|
-| H1 | `STEP 1 / 3 — PERMISSIONS` |
+| H1 | `STEP 1 / 3 · PERMISSIONS` |
 | Subtitle | `vibemix needs to listen to your master output and watch your dj window.` |
 | macOS Screen Recording card label | `SCREEN RECORDING` |
 | macOS Screen Recording card sub | `required to see your dj software window` |
@@ -485,7 +485,7 @@ Negative-dictionary applies — `vibemix.prompts.negative_dict.NEGATIVE_PHRASES`
 | Windows Mic card sub | `lets you talk back to avery — turn off mid-set anytime` |
 | Grant button | `[ Grant ]` |
 | Granted state | `● GRANTED` |
-| Denied state | `● DENIED — open Settings ↗` |
+| Denied state | `● DENIED · open Settings ↗` |
 | Macos Settings deep-link prefix | `x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture` |
 | Continue button | `[ Continue → ]` |
 
@@ -493,12 +493,12 @@ Negative-dictionary applies — `vibemix.prompts.negative_dict.NEGATIVE_PHRASES`
 
 | Element | Copy |
 |---------|------|
-| H1 | `STEP 2 / 3 — OUTPUT DEVICE` |
+| H1 | `STEP 2 / 3 · OUTPUT DEVICE` |
 | Subtitle | `picking your headphones and proving the audio chain works.` |
 | BlackHole banner heading | `BLACKHOLE NOT FOUND` |
 | BlackHole banner body | `vibemix needs blackhole to hear your master output. it's free, takes 30 seconds.` |
 | BlackHole install button | `[ Open install page ↗ ]` |
-| BlackHole post-click caption | `opened in browser — install then click Recheck below` |
+| BlackHole post-click caption | `opened in browser. install then click Recheck below.` |
 | BlackHole recheck button | `[ ↻ Recheck ]` |
 | Device dropdown label (panel header) | `OUTPUT DEVICE` |
 | Device dropdown auto-pill | `AUTO` |
@@ -508,14 +508,14 @@ Negative-dictionary applies — `vibemix.prompts.negative_dict.NEGATIVE_PHRASES`
 | Audio test passed | `✓ HEARD IT — PASSED` |
 | Audio test failed | `✕ DIDN'T HEAR — RETRY` |
 | Audio test prompt | `did you hear a clean tone?` |
-| Audio test yes | `[ Yes — sounded clean ]` |
+| Audio test yes | `[ Yes, sounded clean ]` |
 | Audio test retry | `[ ↻ Retry ]` |
-| Audio test programmatic-fail line | `sample rate mismatch — blackhole reporting {actual}, expected 48000` |
+| Audio test programmatic-fail line | `sample rate mismatch. blackhole reporting {actual}, expected 48000.` |
 | Window picker header | `DJ APP DETECTED` |
 | Window picker hint when no DJ app | `no dj app open — pick the window you want vibemix to watch` |
 | Window picker pick-different link | `[ Pick a different window ↗ ]` |
 | Window picker privacy warning heading | `PRIVACY` |
-| Window picker privacy warning body | `vibemix only captures the window you pick — never your full screen` |
+| Window picker privacy warning body | `vibemix only captures the window you pick, never your full screen.` |
 | Non-DJ confirm heading | `NOT A DJ APP` |
 | Non-DJ confirm body | `vibemix works best with djay, rekordbox, serato, traktor, virtualdj — continue with {app_name} anyway?` |
 | Non-DJ confirm pick-another | `[ ↻ Pick another ]` |
@@ -525,16 +525,16 @@ Negative-dictionary applies — `vibemix.prompts.negative_dict.NEGATIVE_PHRASES`
 
 | Element | Copy |
 |---------|------|
-| H1 | `STEP 3 / 3 — CONTROLLER` |
+| H1 | `STEP 3 / 3 · CONTROLLER` |
 | Subtitle | `proving your midi gear is wired in.` |
 | Detected zone heading | `CONNECTED CONTROLLER` |
 | Detected zone connected state | `● CONNECTED` |
-| Empty-state (no controller) | `no controller detected — plug one in or skip` |
+| Empty-state (no controller) | `no controller detected. plug one in or skip.` |
 | Listen instruction | `PRESS ANY PAD OR BUTTON` |
 | Caught state | `✓ {control_label} — CONNECTED` (e.g. `✓ play_a — CONNECTED`) |
 | Timeout state | `no midi received` |
 | Listen-again button | `[ ↻ Listen again ]` |
-| Skip button | `[ Skip — use generic mapping ]` |
+| Skip button | `[ Skip · use generic mapping ]` |
 
 ### Smoke Test Strings
 
@@ -566,9 +566,9 @@ Negative-dictionary applies — `vibemix.prompts.negative_dict.NEGATIVE_PHRASES`
 
 | Phase | Primary CTA | Empty state | Error state | Destructive |
 |-------|-------------|-------------|-------------|-------------|
-| Step 1 | `[ Continue → ]` | No empty state — page always renders permission cards | `● DENIED — open Settings ↗` | none |
-| Step 2 | `[ Continue → ]` | "no dj app open — pick the window you want vibemix to watch" | `sample rate mismatch — blackhole reporting {actual}, expected 48000` | none |
-| Step 3 | `[ Continue → ]` (becomes armed after caught/skip) | `no controller detected — plug one in or skip` | `no midi received` | `[ Skip — use generic mapping ]` (action-of-last-resort, no confirm required — generic fallback is graceful, not destructive) |
+| Step 1 | `[ Continue → ]` | No empty state — page always renders permission cards | `● DENIED · open Settings ↗` | none |
+| Step 2 | `[ Continue → ]` | "no dj app open — pick the window you want vibemix to watch" | `sample rate mismatch. blackhole reporting {actual}, expected 48000.` | none |
+| Step 3 | `[ Continue → ]` (becomes armed after caught/skip) | `no controller detected. plug one in or skip.` | `no midi received` | `[ Skip · use generic mapping ]` (action-of-last-resort, no confirm required — generic fallback is graceful, not destructive) |
 | Smoke test | `[ Open vibemix → ]` | n/a | `didn't hear avery? [ ↻ Replay ]` | none |
 | Crash banner | `[ Restart ]` | n/a | `{sidecar error line}` | none |
 
