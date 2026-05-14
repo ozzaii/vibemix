@@ -10,6 +10,8 @@ fire because there's no prior measurement.
 
 from __future__ import annotations
 
+import pytest
+
 from vibemix.runtime.ttft import TTFTMeter
 
 
@@ -104,4 +106,4 @@ def test_uses_injected_time_fn() -> None:
     meter.record_event_fired()
     state[0] = 50.123
     meter.record_first_chunk()
-    assert meter.rolling_avg_ms() == 123.0
+    assert meter.rolling_avg_ms() == pytest.approx(123.0)
