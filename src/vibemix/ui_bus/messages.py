@@ -29,6 +29,7 @@ from typing import Literal
 import jsonschema
 
 from vibemix.ui_bus.schemas.citation import SessionCitationPayload
+from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
 
 # Resolve the schema relative to this file:
 #   src/vibemix/ui_bus/messages.py  -> parents[3] == repo root.
@@ -1265,6 +1266,52 @@ class SessionCitation:
 
     def to_json(self) -> str:
         return _serialize(self)
+
+
+# ---------------------------------------------------------------------------
+# Phase 24-02 — Overlay highlight IPC
+# ---------------------------------------------------------------------------
+# OVERLAY-01 — sidecar→shell push fired on a valid [screen:<element_id>]
+# citation when the citation linter's action is "emit" (i.e. the user
+# actually heard the response). The Tauri shell invokes Rust
+# show_overlay_highlight; AX query → transparent click-through overlay
+# window → amber ring CSS animation → auto-close after duration_ms.
+# Payload struct lives in vibemix.ui_bus.schemas.overlay (subpackage layout
+# matches Plan 20-04 SessionCitation conventions).
+
+
+@dataclass(frozen=True, slots=True)
+class SessionOverlayHighlight:
+    type: Literal["ipc.session.overlay-highlight"]
+    ts: str
+    payload: SessionOverlayHighlightPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        element_id: str,
+        color: Literal["amber", "red", "green", "blue"] = "amber",
+        duration_ms: int = 1300,
+    ) -> SessionOverlayHighlight:
+        return cls(
+            type="ipc.session.overlay-highlight",
+            ts=_now_iso(),
+            payload=SessionOverlayHighlightPayload(
+                element_id=element_id,
+                color=color,
+                duration_ms=duration_ms,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        """Convenience: serialize + reparse to a plain dict for ipc_bus.emit
+        callers that prefer not to JSON-roundtrip themselves. Mirrors the
+        coach.py SessionCitation publish pattern."""
+        return json.loads(self.to_json())
 
 
 # Suppress unused-import flake when ``field`` is not used by any wrapper above.

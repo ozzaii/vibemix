@@ -87,6 +87,8 @@ from vibemix.ui_bus.messages import (
     RecordingsUsagePayload,
     # Phase 20-04 — citation diagnostics
     SessionCitation,
+    # Phase 24-02 — overlay-highlight
+    SessionOverlayHighlight,
     SessionMute,
     SessionMutePayload,
     SessionSnapshot,
@@ -103,6 +105,7 @@ from vibemix.ui_bus.messages import (
     TranscriptLine,
 )
 from vibemix.ui_bus.schemas.citation import SessionCitationPayload
+from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
 from vibemix.ui_bus.validator import parse_message, validate_message
 
 __all__ = [
@@ -175,6 +178,9 @@ __all__ = [
     # Phase 20-04
     "SessionCitation",
     "SessionCitationPayload",
+    # Phase 24-02
+    "SessionOverlayHighlight",
+    "SessionOverlayHighlightPayload",
     "SessionMute",
     "SessionMutePayload",
     "SessionSnapshot",

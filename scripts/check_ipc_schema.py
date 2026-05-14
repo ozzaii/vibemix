@@ -60,6 +60,7 @@ from vibemix.ui_bus import (
     RecordingsUsage,
     SessionCitation,
     SessionMute,
+    SessionOverlayHighlight,
     SessionSnapshot,
     SettingsGet,
     SettingsSet,
@@ -231,6 +232,15 @@ def _minimal_examples() -> list[tuple[str, object]]:
                 stripped_rate_15s=0.07,
                 last_unverified_response=None,
                 bypass_active=False,
+            ),
+        ),
+        # Phase 24-02 — overlay-highlight
+        (
+            "SessionOverlayHighlight",
+            SessionOverlayHighlight.make(
+                element_id="waveform_a",
+                color="amber",
+                duration_ms=1300,
             ),
         ),
         ("RecordingsEvents", RecordingsEvents.make(session_dir="20260513-210410")),

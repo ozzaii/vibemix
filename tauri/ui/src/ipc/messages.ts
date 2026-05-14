@@ -38,7 +38,8 @@ export type VibemixIPCMessages =
   | RecordingsDeleteAck
   | RecordingsUsage
   | RecordingsEvents
-  | RecordingsEventsResult;
+  | RecordingsEventsResult
+  | SessionOverlayHighlight;
 
 export interface IpcBoot {
   type: "ipc.boot";
@@ -370,5 +371,14 @@ export interface RecordingsEventsResult {
       kind: string;
       [k: string]: unknown;
     }[];
+  };
+}
+export interface SessionOverlayHighlight {
+  type: "ipc.session.overlay-highlight";
+  ts: string;
+  payload: {
+    element_id: string;
+    color: "amber" | "red" | "green" | "blue";
+    duration_ms: number;
   };
 }
