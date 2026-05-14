@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: prompt-only)
 status: completed
-last_updated: "2026-05-14T04:33:00.000Z"
-last_activity: 2026-05-14 -- Phase 19 Plan 04 (AckBank) shipped — Phase 19 latency stack v1 COMPLETE
+last_updated: "2026-05-14T05:05:00.000Z"
+last_activity: 2026-05-14 -- Phase 19 Plan 05 (runtime wiring gap closure) shipped — Phase 19 latency stack v1 LIVE end-to-end
 progress:
   total_phases: 12
   completed_phases: 4
-  total_plans: 24
-  completed_plans: 18
-  percent: 75
+  total_plans: 25
+  completed_plans: 19
+  percent: 76
 ---
 
 # vibemix — State
@@ -33,10 +33,10 @@ progress:
 
 ## Current Position
 
-Phase: 19 — COMPLETE
+Phase: 19 — COMPLETE (with runtime-wiring closure)
 Plan: Not started
-Status: Phase 19 (Latency Stack v1) complete — 19-01 CancelGate + 19-02 prompt diet + 19-03 GeminiContextCache + 19-04 AckBank all shipped
-Last activity: 2026-05-14 -- Phase 19 Plan 04 (AckBank) shipped
+Status: Phase 19 (Latency Stack v1) LIVE end-to-end — 19-01 CancelGate + 19-02 prompt diet + 19-03 GeminiContextCache + 19-04 AckBank + 19-05 runtime wiring all shipped. Verifier-flagged gaps (LATENCY-04/05/06/11/12 BLOCKED at runtime) all closed.
+Last activity: 2026-05-14 -- Phase 19 Plan 05 (runtime wiring) shipped
 
 ## Performance Metrics
 
@@ -117,11 +117,11 @@ All Phase 1–14 decisions remain locked. Highlights for v2.0 plan-checker:
 - 2026-05-13 — Phase 14 (CDJ Whisper v5 Migration + Polish) ✅ shipped end-to-end. Backward-compat shim deleted; Saira + JetBrains Mono vendored; legacy fonts removed; all four surfaces (wizard, session, settings, mascot) consume v5 primitives directly. POLISH-01/02/04/06 closed; POLISH-03 closed in 14-05; POLISH-05 perf verification on Kaan rig deferred to `npm run tauri dev` review session.
 - 2026-05-14 — Milestone v2.0 roadmap generated. 12 phases P15-P26 derived from 94 v2.0 REQ-IDs anchored to research/SUMMARY.md 12-phase decomposition. Outstanding v0.1.0 work absorbed into v2.0 (recording browser → P15, sign+release → P21, README + Day-Zero ops + viral demo → P26). All 9 Critical pitfalls encoded into phase plans (P1 → P19, P2 → P20, P3 → P24, P4 → P24, P5 → P21, P6 → P21, P7 → P21, P8 → P19, P9 → P22). Two parallel bundles (P17||P18, P22||P23). Critical-path total ~10-12 weeks engineering, binary shippable from P21 close. Cross-document contradictions reconciled (debrief = architectural slot only in v2.0; 6 baseline detectors in v2.0, 2 Hard Tek overlay deferred to v2.1). Wave 0 day-1 spikes reserved in P22 / P24 / P25 plan files.
 - 2026-05-14 — Phase 19 (Latency Stack v1) COMPLETE end-to-end. 19-01 CancelGate chokepoint (cancel-cooldown 8s + soft cap 30/session, Pitfall 1 closed), 19-02 prompt diet (audio 18s→6s + screen-skip on MIX_MOVE/HEARTBEAT), 19-03 GeminiContextCache (1024-token floor + 4min refresh + invalidate hook, Pitfall 11 closed), 19-04 AckBank (40 silent-OPUS placeholders + per-bucket rotation deque + four-gate `should_fire` honoring TTFT + cancel-cooldown cross-cut + min-gap-to-response/ack, Pitfall 8 closed). Plan 19-04 surfaced two follow-ups: (a) AckBank wiring in coach loop (deferred per planner SUMMARY deviation #5), (b) Kaan-action: real Achird-voice OPUS recordings to replace silent placeholders before v2.0 RC. Tests: 1711 passed (was 1692), 9 pre-existing failures unchanged. Phase 20 (Citation Linter ENFORCEMENT) now unblocked.
+- 2026-05-14 — Phase 19 Plan 05 (runtime wiring gap closure) COMPLETE. Verifier flagged LATENCY-04/05/06/11/12 satisfied at primitive layer but BLOCKED at runtime (no call sites in coach.py + DJCoHostAgent constructed without cache kwarg). Plan 19-05 wires all four primitives end-to-end: TTFTMeter primitive (rolling-avg event_fired→first_chunk in ms; 1500ms sentinel default passes ack TTFT gate on first event); coach_loop wired path with ack_bank.should_fire pre-LLM fire + cancel_gate.try_cancel + agent.invalidate_cache + allow_interruptions=True flip; DJCoHostAgent.set_next_event records meter event_fired + llm_node records first_chunk; __main__.py constructs cache + ack_bank + cancel_gate + ttft_meter, awaits cache.create with graceful degradation (cache=None on failure → agent's None-cache fallback path), spawns refresh_loop as background task, threads instances into agent + coach_loop. POC files untouched. Tests: 1733 passed (was 1711, +22 new), 9 pre-existing failures unchanged. SOLE remaining Phase 19 work: replace 40 silent OPUS placeholders with Achird-voice recordings (Kaan-action, file-bytes swap only).
 
 ### Next Session
 
-- **P19-04 followup: AckBank wiring in coach loop** — call `should_fire` on every Event before LLM dispatch; if `(True, "fire")` then `pick_for_event` → `PlaybackQueue.push(pcm.tobytes())`; plumb `cancel_cooldown_active` from `CancelGate.last_cancel_at + CANCEL_COOLDOWN_S`; plumb `rolling_ttft_avg_ms` from session telemetry; emit `recorder.log_event("ack_fire", ...)` for Phase 16 attribution. Without this, the bank is loaded but never fires.
-- **P19-04 followup: real Achird-voice OPUS recordings** — replace 40 silent placeholders one-for-one (Kaan-action; offline Gemini TTS Achird voice; ~80-200ms each; re-run AIza-key scan on new bytes per CONTEXT D-08).
+- **P19-05 followup (Kaan-action ONLY): real Achird-voice OPUS recordings** — replace 40 silent placeholders one-for-one (offline Gemini TTS Achird voice; ~80-200ms each; re-run AIza-key scan on new bytes per CONTEXT D-08). Runtime path verified end-to-end on silent payload; only file bytes change.
 - Run `/gsd-plan-phase 15` to plan Phase 15 — Recording Browser + Retention Enforcement (REC-07, REC-08). Cheap, no upstream dependencies — knock it out first.
 - Phase 20 (Citation Linter ENFORCEMENT) now unblocked — depends on Phase 18 (EvidenceRegistry, ✅) + Phase 19 (ack bank, ✅). `/gsd-plan-phase 20` ready when prioritized.
 - Schedule Kaan's first DJ-set ear-test session to land alongside P17/P18 ship — Phase 16 is calendar-blocking on tuning signal.
