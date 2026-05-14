@@ -800,6 +800,27 @@ async def main() -> None:
 # =============================================================================
 
 
+def _enable_line_buffering() -> None:
+    """Flip stdout/stderr to line-buffered so the Tauri rotating log captures
+    diagnostic lines in real time instead of in 4–8 KB pipe-buffer batches.
+
+    Why: CPython's default is line-buffered when isatty(), fully-buffered
+    otherwise. The Tauri shell spawns the sidecar through a pipe so stderr
+    falls into the fully-buffered branch — ``[FATAL] ws_bus port bind failed``
+    can sit in the buffer until the process exits, which makes the watchdog's
+    ``read_last_log_line`` race the FATAL marker and surface the wrong tail.
+
+    Best-effort: if the streams have been replaced by something without
+    ``reconfigure`` (frozen-app edge cases) or are already closed, we silently
+    fall through. The log will lag in that case but nothing breaks.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            pass
+
+
 def cli_entry(argv: list[str] | None = None) -> None:
     """Synchronous CLI entry. Parses args (``--version`` short-circuits via
     argparse's ``action="version"``), then routes to one of three runtimes:
@@ -816,6 +837,7 @@ def cli_entry(argv: list[str] | None = None) -> None:
     will flip the post-wizard spawn to ``vibemix --session`` once the
     session loop owns the snapshot path the renderer drives off.
     """
+    _enable_line_buffering()
     args = _parse_args(argv)
     try:
         if args.debrief is not None:
