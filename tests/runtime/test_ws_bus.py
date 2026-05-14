@@ -431,10 +431,12 @@ def test_pkg_05_runtime_package_surface():
     Phase 12 W2 extends the surface with SessionLoop/run_session and
     re-exports WizardLoop/run_wizard alongside the Phase 4 surface so
     ``from vibemix.runtime import ...`` is the single import point.
+    v0.1.0-rc1 adds ``watch_parent`` for orphan-process self-shutdown.
     """
     import vibemix.runtime as runtime_pkg
     from vibemix.runtime import coach_loop, diag_loop, ws_broadcast  # noqa: F401
     from vibemix.runtime import SessionLoop, WizardLoop, run_session, run_wizard  # noqa: F401
+    from vibemix.runtime import watch_parent  # noqa: F401
 
     assert set(runtime_pkg.__all__) == {
         "SessionLoop",
@@ -443,5 +445,6 @@ def test_pkg_05_runtime_package_surface():
         "diag_loop",
         "run_session",
         "run_wizard",
+        "watch_parent",
         "ws_broadcast",
     }

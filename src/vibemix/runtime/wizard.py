@@ -51,6 +51,7 @@ import time
 import wave
 from pathlib import Path
 
+from vibemix.runtime.parent_watchdog import watch_parent
 from vibemix.runtime.ws_bus import WizardBus
 from vibemix.ui_bus.messages import (
     CalibrationAudioResult,
@@ -97,6 +98,7 @@ class WizardLoop:
         self.bus = bus
         self._stop = asyncio.Event()
         self._status_tick_task: asyncio.Task | None = None
+        self._parent_watch_task: asyncio.Task | None = None
         self._user_heard_tone_event = asyncio.Event()
         self._user_heard_tone_result: bool | None = None
 
@@ -546,6 +548,10 @@ class WizardLoop:
             sys.exit(2)
         await self.boot()
         self._status_tick_task = asyncio.create_task(self._status_tick_loop())
+        # Orphan-process self-shutdown — set _stop if Tauri parent dies
+        # abruptly (Force Quit / kill -9 / Rust panic) so we don't sit on
+        # port 8765 and block the next dev launch.
+        self._parent_watch_task = asyncio.create_task(watch_parent(self._stop))
 
         # SIGTERM (Tauri Cmd+Q) + SIGINT — set the stop event so the
         # status loop exits + the bus tears down. Windows doesn't
@@ -560,12 +566,13 @@ class WizardLoop:
         try:
             await self._stop.wait()
         finally:
-            if self._status_tick_task is not None:
-                self._status_tick_task.cancel()
-                try:
-                    await self._status_tick_task
-                except (asyncio.CancelledError, Exception):
-                    pass
+            for task in (self._status_tick_task, self._parent_watch_task):
+                if task is not None:
+                    task.cancel()
+                    try:
+                        await task
+                    except (asyncio.CancelledError, Exception):
+                        pass
             await self.bus.stop()
 
 

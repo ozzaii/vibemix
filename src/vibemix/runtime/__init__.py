@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from vibemix.runtime.coach import coach_loop
 from vibemix.runtime.diag import diag_loop
+from vibemix.runtime.parent_watchdog import watch_parent
 from vibemix.runtime.session_loop import SessionLoop, run_session
 from vibemix.runtime.wizard import WizardLoop, run_wizard
 from vibemix.runtime.ws_bus import ws_broadcast
@@ -29,5 +30,6 @@ __all__ = [
     "diag_loop",
     "run_session",
     "run_wizard",
+    "watch_parent",
     "ws_broadcast",
 ]

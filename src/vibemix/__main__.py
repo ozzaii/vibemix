@@ -92,7 +92,7 @@ from vibemix.audio import (
 )
 from vibemix.audio.recorder import sweep_crashed_sessions
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
-from vibemix.runtime import coach_loop, diag_loop, ws_broadcast
+from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
 from vibemix.runtime.cancel import CancelGate
 from vibemix.runtime.config_store import app_data_dir, load_config
 from vibemix.runtime.recordings_index import run_retention_sweep
@@ -723,6 +723,11 @@ async def main() -> None:
     if cache is not None:
         cache_refresh_task = asyncio.create_task(cache.refresh_loop(stop_event))
 
+    # Orphan-process self-shutdown — trips stop_event if Tauri parent
+    # dies abruptly so the live runtime closes audio streams + session
+    # cleanly instead of orphaning under launchd with port 8765 held.
+    parent_watch_task = asyncio.create_task(watch_parent(stop_event))
+
     # --- Input stream — last because state must be ready ---
     input_stream = audio_backend.open_capture(
         input_idx,
@@ -746,6 +751,7 @@ async def main() -> None:
             ws_task,
             diag_task,
             track_task,
+            parent_watch_task,
         ]
         if cache_refresh_task is not None:
             cleanup_tasks.append(cache_refresh_task)

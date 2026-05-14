@@ -55,6 +55,7 @@ from typing import Any, Protocol
 import jsonschema
 
 from vibemix.runtime.config_store import ConfigStore, load_config
+from vibemix.runtime.parent_watchdog import watch_parent
 from vibemix.runtime.recordings_index import RecordingsIndex, run_retention_sweep
 from vibemix.runtime.settings import SettingsApplier
 from vibemix.runtime.ws_bus import WizardBus
@@ -196,6 +197,7 @@ class SessionLoop:
         self._stop = asyncio.Event()
         self._snapshot_task: asyncio.Task | None = None
         self._retention_task: asyncio.Task | None = None
+        self._parent_watch_task: asyncio.Task | None = None
         self._transcript: deque[TranscriptLine] = deque(maxlen=TRANSCRIPT_RING_SIZE)
         # ``_transcript_unsent`` is the slice not yet emitted in a snapshot
         # delta. Snapshot builds ``transcript_delta`` from this; on emit
@@ -926,6 +928,9 @@ class SessionLoop:
         # Phase 15 Plan 03 — boot sweep (best-effort; never raises).
         await self.run_boot_sweeps()
         self._snapshot_task = asyncio.create_task(self._snapshot_loop())
+        # Orphan-process self-shutdown — set _stop if Tauri parent dies
+        # abruptly so we don't sit on port 8765 and block the next launch.
+        self._parent_watch_task = asyncio.create_task(watch_parent(self._stop))
         # Phase 15 Plan 02 — periodic 6h retention sweep task. Spawned
         # only when recordings_root is wired (i.e., not in --session
         # standalone mode without the recordings tree). Cancellation is
@@ -946,18 +951,17 @@ class SessionLoop:
         try:
             await self._stop.wait()
         finally:
-            if self._snapshot_task is not None:
-                self._snapshot_task.cancel()
-                try:
-                    await self._snapshot_task
-                except (asyncio.CancelledError, Exception):
-                    pass
-            if self._retention_task is not None:
-                self._retention_task.cancel()
-                try:
-                    await self._retention_task
-                except (asyncio.CancelledError, Exception):
-                    pass
+            for task in (
+                self._snapshot_task,
+                self._retention_task,
+                self._parent_watch_task,
+            ):
+                if task is not None:
+                    task.cancel()
+                    try:
+                        await task
+                    except (asyncio.CancelledError, Exception):
+                        pass
             await self.bus.stop()
 
     def request_stop(self) -> None:
