@@ -58,6 +58,7 @@ from vibemix.ui_bus import (
     RecordingsList,
     RecordingsListResult,
     RecordingsUsage,
+    SessionCitation,
     SessionMute,
     SessionSnapshot,
     SettingsGet,
@@ -222,6 +223,16 @@ def _minimal_examples() -> list[tuple[str, object]]:
             ),
         ),
         ("RecordingsUsage", RecordingsUsage.make(sessions=12, bytes_total=3656838349)),
+        # Phase 20-04 — citation diagnostics
+        (
+            "SessionCitation",
+            SessionCitation.make(
+                slop_ratio=0.12,
+                stripped_rate_15s=0.07,
+                last_unverified_response=None,
+                bypass_active=False,
+            ),
+        ),
         ("RecordingsEvents", RecordingsEvents.make(session_dir="20260513-210410")),
         (
             "RecordingsEventsResult",

@@ -25,6 +25,7 @@
     {"$ref": "#/definitions/WizardDone"},
     {"$ref": "#/definitions/SessionSnapshot"},
     {"$ref": "#/definitions/SessionMute"},
+    {"$ref": "#/definitions/SessionCitation"},
     {"$ref": "#/definitions/SettingsSet"},
     {"$ref": "#/definitions/SettingsGet"},
     {"$ref": "#/definitions/SettingsState"},
@@ -516,6 +517,27 @@
           "properties": {
             "toggle": {"type": "boolean"},
             "muted": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "SessionCitation": {
+      "$comment": "Phase 20 — Sidecar to shell. Live anti-slop telemetry: per-session slop_ratio (cumulative stripped/total), 15s rolling stripped_rate, the last unverified response text (when bypass fires), and the live bypass_active flag. UX-Settings-Diagnostics surface for the citation linter. GROUND-06.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.session.citation"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["slop_ratio", "stripped_rate_15s", "last_unverified_response", "bypass_active"],
+          "properties": {
+            "slop_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+            "stripped_rate_15s": {"type": "number", "minimum": 0, "maximum": 1},
+            "last_unverified_response": {"type": ["string", "null"]},
+            "bypass_active": {"type": "boolean"}
           }
         }
       }

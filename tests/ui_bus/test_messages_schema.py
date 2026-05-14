@@ -44,6 +44,7 @@ from vibemix.ui_bus import (
     IpcError,
     LevelPair,
     MascotMoodChange,
+    SessionCitation,
     MetersTriple,
     PermissionCheck,
     PermissionState,
@@ -242,6 +243,16 @@ def _make_examples() -> list[tuple[str, object]]:
                 ],
             ),
         ),
+        # Phase 20-04 — citation diagnostics
+        (
+            "SessionCitation",
+            SessionCitation.make(
+                slop_ratio=0.12,
+                stripped_rate_15s=0.07,
+                last_unverified_response=None,
+                bypass_active=False,
+            ),
+        ),
     ]
 
 
@@ -256,9 +267,9 @@ def test_example_count_matches_schema_oneof() -> None:
     total 26. Phase 13-05 added 1 (MascotMoodChange) → 27. Phase 15-01 adds
     7 (RecordingsList, RecordingsListResult, RecordingsDelete,
     RecordingsDeleteAck, RecordingsUsage, RecordingsEvents,
-    RecordingsEventsResult) → 34.
+    RecordingsEventsResult) → 34. Phase 20-04 adds 1 (SessionCitation) → 35.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 34
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 35
 
 
 @pytest.mark.parametrize(
@@ -280,17 +291,17 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_34() -> None:
+def test_schema_oneof_count_is_35() -> None:
     """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
     (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
-    7 recordings.* families → 34.
+    7 recordings.* families → 34; Phase 20-04 adds 1 (SessionCitation) → 35.
 
-    ``definitions`` is 35 because ``LevelPair`` is a shared helper ref'd
+    ``definitions`` is 36 because ``LevelPair`` is a shared helper ref'd
     from ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message
     (so it counts in ``definitions`` but not in ``oneOf``).
     """
-    assert len(_SCHEMA["oneOf"]) == 34
-    assert len(_SCHEMA["definitions"]) == 35
+    assert len(_SCHEMA["oneOf"]) == 35
+    assert len(_SCHEMA["definitions"]) == 36
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

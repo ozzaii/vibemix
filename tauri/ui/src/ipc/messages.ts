@@ -25,6 +25,7 @@ export type VibemixIPCMessages =
   | WizardDone
   | SessionSnapshot
   | SessionMute
+  | SessionCitation
   | SettingsSet
   | SettingsGet
   | SettingsState
@@ -232,6 +233,16 @@ export interface SessionMute {
   payload: {
     toggle?: boolean;
     muted?: boolean;
+  };
+}
+export interface SessionCitation {
+  type: "ipc.session.citation";
+  ts: string;
+  payload: {
+    slop_ratio: number;
+    stripped_rate_15s: number;
+    last_unverified_response: string | null;
+    bypass_active: boolean;
   };
 }
 export interface SettingsSet {

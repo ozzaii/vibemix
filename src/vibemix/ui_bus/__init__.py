@@ -85,6 +85,8 @@ from vibemix.ui_bus.messages import (
     RecordingsListResultPayload,
     RecordingsUsage,
     RecordingsUsagePayload,
+    # Phase 20-04 — citation diagnostics
+    SessionCitation,
     SessionMute,
     SessionMutePayload,
     SessionSnapshot,
@@ -100,6 +102,7 @@ from vibemix.ui_bus.messages import (
     TrackInfo,
     TranscriptLine,
 )
+from vibemix.ui_bus.schemas.citation import SessionCitationPayload
 from vibemix.ui_bus.validator import parse_message, validate_message
 
 __all__ = [
@@ -169,6 +172,9 @@ __all__ = [
     "RecordingsListResultPayload",
     "RecordingsUsage",
     "RecordingsUsagePayload",
+    # Phase 20-04
+    "SessionCitation",
+    "SessionCitationPayload",
     "SessionMute",
     "SessionMutePayload",
     "SessionSnapshot",

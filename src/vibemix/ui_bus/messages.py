@@ -28,6 +28,8 @@ from typing import Literal
 
 import jsonschema
 
+from vibemix.ui_bus.schemas.citation import SessionCitationPayload
+
 # Resolve the schema relative to this file:
 #   src/vibemix/ui_bus/messages.py  -> parents[3] == repo root.
 #   parents[0] = ui_bus, [1] = vibemix, [2] = src, [3] = repo root.
@@ -1217,6 +1219,47 @@ class RecordingsEventsResult:
             payload=RecordingsEventsResultPayload(
                 session_dir=session_dir,
                 events=tuple(events),
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+# ---------------------------------------------------------------------------
+# Phase 20-04 — Citation diagnostics IPC
+# ---------------------------------------------------------------------------
+# GROUND-06 + 20-CONTEXT D-Bypass-Audit-Surface — sidecar→shell push of the
+# CitationLinter's slop_ratio + StrippedRateTracker's 15s rolling rate +
+# last unverified response text + bypass_active flag. Read-only telemetry;
+# the Tauri Settings → Diagnostics surface consumes for live display.
+# Payload struct lives in vibemix.ui_bus.schemas.citation (subpackage layout
+# adopted in Plan 20-04 — keeps messages.py wrappers thin).
+
+
+@dataclass(frozen=True, slots=True)
+class SessionCitation:
+    type: Literal["ipc.session.citation"]
+    ts: str
+    payload: SessionCitationPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        slop_ratio: float,
+        stripped_rate_15s: float,
+        last_unverified_response: str | None,
+        bypass_active: bool,
+    ) -> SessionCitation:
+        return cls(
+            type="ipc.session.citation",
+            ts=_now_iso(),
+            payload=SessionCitationPayload(
+                slop_ratio=slop_ratio,
+                stripped_rate_15s=stripped_rate_15s,
+                last_unverified_response=last_unverified_response,
+                bypass_active=bypass_active,
             ),
         )
 
