@@ -10,6 +10,12 @@ the per-event prompt from ``ev.type`` + ``ev.extra``.
 should NOT depend on it being a snapshot (the state-refresh writer keeps
 mutating the same object); use ``state`` only to read fields synchronously
 inside the event-handling code path.
+
+Plan 19-01 extension: ``priority: int`` carries a deterministic per-type
+default from EVENT_PRIORITY. CancelGate (runtime/cancel.py) reads this int
+to decide whether an incoming Event preempts an in-flight one. The reserved
+``DROP`` slot is pre-wired here per CONTEXT D-04 ahead of Phase 17 emitting
+real DROP events.
 """
 
 from __future__ import annotations
@@ -18,6 +24,22 @@ from dataclasses import dataclass, field
 
 from vibemix.state.music_state import MusicState
 
+# Per-type cancel-and-refire ladder (CONTEXT D-04). Higher int = stronger
+# claim on the speech bus. MANUAL and DROP tie at the ceiling because both
+# represent an unambiguous "react now" — MANUAL is user-issued, DROP is the
+# musical climax. KAAN_SPOKE sits one rung below: Kaan's voice should win
+# over passive music observations but never over an explicit user trigger.
+EVENT_PRIORITY: dict[str, int] = {
+    "MANUAL": 10,
+    "DROP": 10,
+    "KAAN_SPOKE": 9,
+    "TRACK_CHANGE": 7,
+    "PHASE": 6,
+    "MIX_MOVE": 5,
+    "LAYER_ARRIVAL": 4,
+    "HEARTBEAT": 1,
+}
+
 
 @dataclass
 class Event:
@@ -25,3 +47,11 @@ class Event:
     type: str
     state: MusicState
     extra: dict = field(default_factory=dict)
+    # priority: 0 = "use EVENT_PRIORITY default for this type"; non-zero
+    # explicit value bypasses the lookup. Kept LAST in the field order so
+    # existing positional callers (Event(type, state, extra=...)) keep working.
+    priority: int = 0
+
+    def __post_init__(self) -> None:
+        if self.priority == 0:
+            self.priority = EVENT_PRIORITY.get(self.type, 0)
