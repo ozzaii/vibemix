@@ -457,3 +457,99 @@ def test_t_grammar_block_enumerates_v1_event_types(ev_type: str) -> None:
     from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
 
     assert ev_type in CITATION_GRAMMAR_BLOCK, f"event type {ev_type!r} not enumerated"
+
+
+# ---------------------------------------------------------------------------
+# Plan 20-02 — IM_LISTENING_FRAGMENT integration
+# ---------------------------------------------------------------------------
+
+
+def test_default_path_includes_im_listening_fragment() -> None:
+    """build_system_instruction() default kwargs append IM_LISTENING_FRAGMENT.
+
+    GROUND-08 hard requirement — every live system instruction must carry the
+    fail-soft rule so Gemini's failure mode shifts from stripped void to
+    "I'm listening".
+    """
+    from vibemix.coach import IM_LISTENING_FRAGMENT
+
+    out = build_system_instruction()
+    assert IM_LISTENING_FRAGMENT in out
+
+
+def test_default_path_includes_grammar_block_too() -> None:
+    """Both Phase 18 grammar block AND Plan 20-02 fragment ride the default path.
+
+    Default kwargs are include_citation_grammar=True + include_listening_fallback=True
+    — the live agent gets both without explicit opt-in.
+    """
+    from vibemix.coach import IM_LISTENING_FRAGMENT
+    from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+
+    out = build_system_instruction()
+    assert CITATION_GRAMMAR_BLOCK in out
+    assert IM_LISTENING_FRAGMENT in out
+
+
+def test_grammar_after_cell_body_then_fragment() -> None:
+    """Append order is: cell_body → CITATION_GRAMMAR_BLOCK → IM_LISTENING_FRAGMENT.
+
+    The grammar block primes "if you cannot cite" — the fragment depends on
+    that priming, so order is load-bearing.
+    """
+    from vibemix.coach import IM_LISTENING_FRAGMENT
+    from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+
+    out = build_system_instruction("intermediate", "hype")
+    body_idx = out.index(HYPE_INTERMEDIATE)
+    grammar_idx = out.index(CITATION_GRAMMAR_BLOCK)
+    fragment_idx = out.index(IM_LISTENING_FRAGMENT)
+
+    assert body_idx < grammar_idx < fragment_idx, (
+        f"append order drift: body={body_idx} grammar={grammar_idx} fragment={fragment_idx}"
+    )
+
+
+def test_opt_out_listening_fallback_alone() -> None:
+    """include_listening_fallback=False suppresses the fragment but keeps the grammar.
+
+    Backward-compat with Phase 18 callers that want the grammar block but not
+    the Plan 20-02 fail-soft addition.
+    """
+    from vibemix.coach import IM_LISTENING_FRAGMENT
+    from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+
+    out = build_system_instruction(include_listening_fallback=False)
+    assert IM_LISTENING_FRAGMENT not in out
+    assert CITATION_GRAMMAR_BLOCK in out
+
+
+def test_double_opt_out_byte_identical_to_cell() -> None:
+    """include_citation_grammar=False AND include_listening_fallback=False
+    returns the underlying cell constant byte-for-byte. This is the path
+    persona.SYSTEM_INSTRUCTION uses to keep the v4-byte-identity invariant."""
+    out = build_system_instruction(
+        "intermediate",
+        "hype",
+        include_citation_grammar=False,
+        include_listening_fallback=False,
+    )
+    assert out == HYPE_INTERMEDIATE
+
+
+def test_invalid_skill_still_raises() -> None:
+    """Sanity — adding the new kwarg must not change ValueError surface."""
+    with pytest.raises(ValueError, match="unknown skill"):
+        build_system_instruction("nonsense", "hype", include_listening_fallback=True)
+
+
+def test_persona_system_instruction_still_byte_equal_to_hype_intermediate() -> None:
+    """persona.SYSTEM_INSTRUCTION === HYPE_INTERMEDIATE — byte-identity invariant.
+
+    Pins the v4-port contract through the Plan 20-02 dispatcher change. If the
+    persona opt-out drifts, the import-time assert in persona.py fires AND
+    this test fails — double safety net.
+    """
+    from vibemix.agent.persona import SYSTEM_INSTRUCTION
+
+    assert SYSTEM_INSTRUCTION == HYPE_INTERMEDIATE
