@@ -1,0 +1,23 @@
+{
+  "vendor": "Pioneer",
+  "model": "DDJ-200",
+  "description": "Pioneer DDJ-200 2-deck smart DJ starter controller (rekordbox / WeDJ / djay Pro / Beatport DJ). Mapping inferred from Pioneer DDJ-200 MIDI documentation. Convention-aligned with DDJ-400 / FLX4 (channel 0/1 = deck A/B, CC 7/11/15 EQ, CC 19 vol). Smaller surface — no jog wheels in the same sense (touch strips), no tempo fader on hardware; tempo and jog entries omitted. Hardware verification deferred.",
+  "verified": false,
+  "controls": {
+    "vol_a":      {"type": "cc",   "channel": 0, "value": 19, "semantic": "vol_a",      "status": "tentative — needs hardware verification"},
+    "vol_b":      {"type": "cc",   "channel": 1, "value": 19, "semantic": "vol_b",      "status": "tentative — needs hardware verification"},
+    "eq_hi_a":    {"type": "cc",   "channel": 0, "value": 7,  "semantic": "eq_hi_a",    "status": "tentative — needs hardware verification"},
+    "eq_hi_b":    {"type": "cc",   "channel": 1, "value": 7,  "semantic": "eq_hi_b",    "status": "tentative — needs hardware verification"},
+    "eq_mid_a":   {"type": "cc",   "channel": 0, "value": 11, "semantic": "eq_mid_a",   "status": "tentative — needs hardware verification"},
+    "eq_mid_b":   {"type": "cc",   "channel": 1, "value": 11, "semantic": "eq_mid_b",   "status": "tentative — needs hardware verification"},
+    "eq_low_a":   {"type": "cc",   "channel": 0, "value": 15, "semantic": "eq_low_a",   "status": "tentative — needs hardware verification"},
+    "eq_low_b":   {"type": "cc",   "channel": 1, "value": 15, "semantic": "eq_low_b",   "status": "tentative — needs hardware verification"},
+    "xfader":     {"type": "cc",   "channel": 6, "value": 31, "semantic": "xfader",     "status": "tentative — needs hardware verification"},
+    "play_a":     {"type": "note", "channel": 0, "value": 11, "semantic": "play_a",     "status": "tentative — needs hardware verification"},
+    "play_b":     {"type": "note", "channel": 1, "value": 11, "semantic": "play_b",     "status": "tentative — needs hardware verification"},
+    "cue_a":      {"type": "note", "channel": 0, "value": 12, "semantic": "cue_a",      "status": "tentative — needs hardware verification"},
+    "cue_b":      {"type": "note", "channel": 1, "value": 12, "semantic": "cue_b",      "status": "tentative — needs hardware verification"},
+    "sync_a":     {"type": "note", "channel": 0, "value": 88, "semantic": "sync_a",     "status": "tentative — needs hardware verification"},
+    "sync_b":     {"type": "note", "channel": 1, "value": 88, "semantic": "sync_b",     "status": "tentative — needs hardware verification"}
+  }
+}

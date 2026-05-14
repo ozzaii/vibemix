@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://vibemix.dev/schemas/midi-controller-map.json",
+  "title": "Vibemix MIDI Controller Map",
+  "description": "Per-SKU MIDI controller mapping shape. Loaded by MidiMapLoader and validated on construction.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["vendor", "model", "description", "verified", "controls"],
+  "properties": {
+    "vendor": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Brand name (e.g. 'Pioneer', 'Denon', 'Native Instruments', 'Numark')."
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Model name (e.g. 'DDJ-FLX4', 'MC7000')."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One-line human description of the controller's verification status + scope."
+    },
+    "verified": {
+      "type": "boolean",
+      "description": "true if the entire map is hardware-sniffed end-to-end. false otherwise (per-control status field is authoritative)."
+    },
+    "controls": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "channel", "value", "semantic", "status"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["cc", "note"],
+            "description": "MIDI message type — 'cc' = control_change, 'note' = note_on/note_off."
+          },
+          "channel": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 15,
+            "description": "Zero-based MIDI channel (0-15)."
+          },
+          "value": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 127,
+            "description": "CC number (when type='cc') or note number (when type='note')."
+          },
+          "semantic": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Normalized semantic event name — e.g. 'eq_low_a', 'fader_b', 'sync_a', 'cue_b', 'jog_a'."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "pending-verdict",
+              "tentative — needs hardware verification"
+            ],
+            "description": "Per-control verification status. 'verified' = hardware-sniffed. 'pending-verdict' = ambiguity awaiting resolution (e.g. FLX4 Sync 0x60 vs 0x58). 'tentative' = research-grounded, needs hardware confirmation."
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "vendor": "Native Instruments",
+  "model": "Kontrol S2 Mk3",
+  "description": "Native Instruments Traktor Kontrol S2 Mk3 2-deck mid-tier controller. Mapping inferred from Traktor Pro 3 default MIDI mapping. NI convention: channel 0/1 per deck, vol on CC 0, EQ on CC 2/3/4 (NI hi/mid/low). Hardware verification deferred — every entry tentative.",
+  "verified": false,
+  "controls": {
+    "vol_a":      {"type": "cc",   "channel": 0, "value": 0,  "semantic": "vol_a",      "status": "tentative — needs hardware verification"},
+    "vol_b":      {"type": "cc",   "channel": 1, "value": 0,  "semantic": "vol_b",      "status": "tentative — needs hardware verification"},
+    "eq_hi_a":    {"type": "cc",   "channel": 0, "value": 2,  "semantic": "eq_hi_a",    "status": "tentative — needs hardware verification"},
+    "eq_hi_b":    {"type": "cc",   "channel": 1, "value": 2,  "semantic": "eq_hi_b",    "status": "tentative — needs hardware verification"},
+    "eq_mid_a":   {"type": "cc",   "channel": 0, "value": 3,  "semantic": "eq_mid_a",   "status": "tentative — needs hardware verification"},
+    "eq_mid_b":   {"type": "cc",   "channel": 1, "value": 3,  "semantic": "eq_mid_b",   "status": "tentative — needs hardware verification"},
+    "eq_low_a":   {"type": "cc",   "channel": 0, "value": 4,  "semantic": "eq_low_a",   "status": "tentative — needs hardware verification"},
+    "eq_low_b":   {"type": "cc",   "channel": 1, "value": 4,  "semantic": "eq_low_b",   "status": "tentative — needs hardware verification"},
+    "tempo_a":    {"type": "cc",   "channel": 0, "value": 8,  "semantic": "tempo_a",    "status": "tentative — needs hardware verification"},
+    "tempo_b":    {"type": "cc",   "channel": 1, "value": 8,  "semantic": "tempo_b",    "status": "tentative — needs hardware verification"},
+    "filter_a":   {"type": "cc",   "channel": 0, "value": 5,  "semantic": "filter_a",   "status": "tentative — needs hardware verification"},
+    "filter_b":   {"type": "cc",   "channel": 1, "value": 5,  "semantic": "filter_b",   "status": "tentative — needs hardware verification"},
+    "xfader":     {"type": "cc",   "channel": 0, "value": 1,  "semantic": "xfader",     "status": "tentative — needs hardware verification"},
+    "play_a":     {"type": "note", "channel": 0, "value": 1,  "semantic": "play_a",     "status": "tentative — needs hardware verification"},
+    "play_b":     {"type": "note", "channel": 1, "value": 1,  "semantic": "play_b",     "status": "tentative — needs hardware verification"},
+    "cue_a":      {"type": "note", "channel": 0, "value": 2,  "semantic": "cue_a",      "status": "tentative — needs hardware verification"},
+    "cue_b":      {"type": "note", "channel": 1, "value": 2,  "semantic": "cue_b",      "status": "tentative — needs hardware verification"},
+    "sync_a":     {"type": "note", "channel": 0, "value": 3,  "semantic": "sync_a",     "status": "tentative — needs hardware verification"},
+    "sync_b":     {"type": "note", "channel": 1, "value": 3,  "semantic": "sync_b",     "status": "tentative — needs hardware verification"},
+    "jog_a":      {"type": "note", "channel": 0, "value": 24, "semantic": "jog_a",      "status": "tentative — needs hardware verification"},
+    "jog_b":      {"type": "note", "channel": 1, "value": 24, "semantic": "jog_b",      "status": "tentative — needs hardware verification"}
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "vendor": "Pioneer",
+  "model": "DDJ-REV1",
+  "description": "Pioneer DDJ-REV1 2-deck battle-style Serato DJ Lite controller (turntable layout: tempo on left, jog wheels facing the user). Mapping inferred from Pioneer DDJ-REV1 MIDI documentation + Serato DJ Lite default mapping. Channel 0/1 = deck A/B convention. Hardware verification deferred.",
+  "verified": false,
+  "controls": {
+    "vol_a":      {"type": "cc",   "channel": 0, "value": 19, "semantic": "vol_a",      "status": "tentative — needs hardware verification"},
+    "vol_b":      {"type": "cc",   "channel": 1, "value": 19, "semantic": "vol_b",      "status": "tentative — needs hardware verification"},
+    "eq_hi_a":    {"type": "cc",   "channel": 0, "value": 7,  "semantic": "eq_hi_a",    "status": "tentative — needs hardware verification"},
+    "eq_hi_b":    {"type": "cc",   "channel": 1, "value": 7,  "semantic": "eq_hi_b",    "status": "tentative — needs hardware verification"},
+    "eq_mid_a":   {"type": "cc",   "channel": 0, "value": 11, "semantic": "eq_mid_a",   "status": "tentative — needs hardware verification"},
+    "eq_mid_b":   {"type": "cc",   "channel": 1, "value": 11, "semantic": "eq_mid_b",   "status": "tentative — needs hardware verification"},
+    "eq_low_a":   {"type": "cc",   "channel": 0, "value": 15, "semantic": "eq_low_a",   "status": "tentative — needs hardware verification"},
+    "eq_low_b":   {"type": "cc",   "channel": 1, "value": 15, "semantic": "eq_low_b",   "status": "tentative — needs hardware verification"},
+    "tempo_a":    {"type": "cc",   "channel": 0, "value": 0,  "semantic": "tempo_a",    "status": "tentative — needs hardware verification"},
+    "tempo_b":    {"type": "cc",   "channel": 1, "value": 0,  "semantic": "tempo_b",    "status": "tentative — needs hardware verification"},
+    "xfader":     {"type": "cc",   "channel": 6, "value": 31, "semantic": "xfader",     "status": "tentative — needs hardware verification"},
+    "play_a":     {"type": "note", "channel": 0, "value": 11, "semantic": "play_a",     "status": "tentative — needs hardware verification"},
+    "play_b":     {"type": "note", "channel": 1, "value": 11, "semantic": "play_b",     "status": "tentative — needs hardware verification"},
+    "cue_a":      {"type": "note", "channel": 0, "value": 12, "semantic": "cue_a",      "status": "tentative — needs hardware verification"},
+    "cue_b":      {"type": "note", "channel": 1, "value": 12, "semantic": "cue_b",      "status": "tentative — needs hardware verification"},
+    "sync_a":     {"type": "note", "channel": 0, "value": 88, "semantic": "sync_a",     "status": "tentative — needs hardware verification"},
+    "sync_b":     {"type": "note", "channel": 1, "value": 88, "semantic": "sync_b",     "status": "tentative — needs hardware verification"},
+    "jog_a":      {"type": "note", "channel": 0, "value": 54, "semantic": "jog_a",      "status": "tentative — needs hardware verification"},
+    "jog_b":      {"type": "note", "channel": 1, "value": 54, "semantic": "jog_b",      "status": "tentative — needs hardware verification"}
+  }
+}
