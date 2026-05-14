@@ -640,3 +640,104 @@ def test_x_llm_node_takes_fresh_snapshot_per_turn(mocker, tmp_path) -> None:
     assert "TRACK_CHANGE@20.0" in second_snap["ev"], (
         "snapshot is stale across llm_node calls — must be taken fresh per turn"
     )
+
+
+# ---------- Plan 18-03 Task 3 — cross-package smoke test (Test Y) ----------
+
+
+def test_y_full_prompt_path_evidence_corpus_and_grammar_block_smoke(
+    mocker, tmp_path
+) -> None:
+    """Test Y — END-TO-END smoke (GROUND-02 + GROUND-03):
+
+    Plan 18-01 (registry instantiation) →
+    Plan 18-02 (EventDetector._fire writes ev observation; AICoach threads
+                snapshot into evidence_line corpus footer) →
+    Plan 18-03 (build_system_instruction appends CITATION_GRAMMAR_BLOCK;
+                DJCoHostAgent.llm_node passes snapshot through).
+
+    Drive a synthetic TRACK_CHANGE through EventDetector (writes
+    [ev:TRACK_CHANGE@<t>] to registry), then call llm_node with the fired
+    event. Intercept the ``contents[0]`` string passed to genai.generate_
+    content_stream and assert:
+
+      a) "evidence_corpus[ev=" — Plan 18-02 footer present (snapshot threaded
+         all the way through to AICoach.evidence_line).
+      b) Plan 18-03 Task 1 wiring — _gen_cfg.system_instruction (the LLM-side
+         system prompt) contains the CITATION_GRAMMAR_BLOCK (verified via the
+         "encouraged, not required" v1.0 fail-open phrase substring).
+
+    Locks the entire Plan 18 prompt-side wiring in one assertion."""
+    from vibemix.state import EventDetector, EvidenceRegistry
+
+    # Plan 18-01 — registry
+    registry = EvidenceRegistry()
+    # Plan 18-02 — EventDetector wired with the registry; firing TRACK_CHANGE
+    # writes [ev:TRACK_CHANGE@<t_session>] to the registry as a side effect.
+    detector = EventDetector(evidence_registry=registry)
+
+    # Build a state that will trigger TRACK_CHANGE on the SECOND detect()
+    # call. The first call seeds last_audible_track baseline; the second
+    # observes the change and fires.
+    state = _build_state()
+
+    # Plan 18-03 — DJCoHostAgent wired with the SAME registry so its
+    # llm_node threads the snapshot through to AICoach.build_prompt.
+    agent, gen_client, _, _ = _build_agent_with_registry(mocker, tmp_path, registry)
+
+    # Force EventDetector to bypass music-presence + cooldown gates so the
+    # synthetic state in this unit-test environment fires TRACK_CHANGE
+    # immediately (the gates exist for live runs; they would otherwise
+    # require a 7s warmup + valid BPM history that the unit test can't
+    # reasonably synthesize). Patching is the smallest-blast-radius move
+    # vs. constructing 10+ state ticks.
+    mocker.patch.object(detector, "_music_truly_playing", return_value=True)
+    detector.last_audible_track = "OLD_TRACK"  # seed baseline so a flip fires
+
+    # Drive detect() — fires TRACK_CHANGE + writes to registry.
+    ev = detector.detect(state, kaan_just_spoke=False, manual=False)
+    assert ev is not None, "EventDetector did not fire — test setup bug"
+    assert ev.type == "TRACK_CHANGE"
+
+    # Sanity — registry has the [ev:TRACK_CHANGE@<t>] observation.
+    snap_check = registry.snapshot()
+    assert "ev" in snap_check
+    assert any(k.startswith("TRACK_CHANGE") for k in snap_check["ev"]), (
+        f"EventDetector._fire did not write to registry; snap={snap_check}"
+    )
+
+    # Wire the agent + drive llm_node end-to-end.
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    captured: dict[str, Any] = {}
+
+    async def _capturing_stream(*_a, **kwargs):
+        captured["contents"] = kwargs["contents"]
+        captured["config"] = kwargs["config"]
+        return _async_iter(["[ev:TRACK_CHANGE@30.0] track flipped — heavier"])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        side_effect=_capturing_stream
+    )
+
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    # (a) Plan 18-02 footer present in the user prompt text — proves the
+    # snapshot threaded all the way through to AICoach.evidence_line.
+    assert "contents" in captured, "generate_content_stream was not called"
+    user_prompt_text: str = captured["contents"][0]
+    assert "evidence_corpus[ev=" in user_prompt_text, (
+        f"Plan 18-02 corpus footer missing from user prompt; got: {user_prompt_text[:300]!r}"
+    )
+
+    # (b) Plan 18-03 Task 1 — the CITATION_GRAMMAR_BLOCK is in the SYSTEM
+    # instruction (NOT the user prompt — system instructions live in the
+    # GenerateContentConfig). Verify via the v1.0 fail-open phrase.
+    sys_instr: str = captured["config"].system_instruction
+    assert "encouraged, not required" in sys_instr, (
+        "CITATION_GRAMMAR_BLOCK missing from system_instruction — "
+        "Plan 18-03 Task 1 wiring broken"
+    )
+    # Grammar surface check — at least one EBNF source form is in the system
+    # instruction so Gemini can pattern-match against it.
+    assert "[ev:" in sys_instr
