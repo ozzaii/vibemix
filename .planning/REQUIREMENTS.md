@@ -241,7 +241,208 @@ Cross-reference list — these v2.0 REQ-IDs flip from `[ ]` to `[x]` when their 
 
 ## Traceability
 
-(Empty — populated by gsd-roadmapper at roadmap creation time)
+Every v2.1 REQ-ID maps to exactly one v2.1 phase. 100% coverage validated 2026-05-14 by `gsd-roadmapper` at roadmap creation time. **Total: 105 / 105 v2.1 REQ-IDs mapped.**
+
+> Note: the doc footer claims "87" — that was a count drafted while requirements were being added. The authoritative enumeration below counts 105 unique v2.1 REQ-IDs (8 EVAL + 6 v2.0 carry-forward + 9 LIBRARY new + 9 DEBRIEF + 4 SENSE + 8 MASCOT new + 7 PROFILE + 9 INSTALL + 10 SEC + 7 ASSETS + 6 OPS + 7 AUDIT + 7 DIST + 8 SHIP = 105). The "87 v2.1 REQ-IDs" sentence in the footer is corrected by this table.
+
+### Eval & Hallucination Gate — Autonomous Proxy (Phase 27)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| EVAL-01 | Phase 27 | Pending |
+| EVAL-02 | Phase 27 | Pending |
+| EVAL-03 | Phase 27 | Pending |
+| EVAL-04 | Phase 27 | Pending |
+| EVAL-05 | Phase 27 | Pending |
+| EVAL-06 | Phase 27 | Pending |
+| EVAL-07 | Phase 27 | Pending |
+| EVAL-08 | Phase 27 | Pending |
+
+### Carry-Forward Close-Out (Phase 27)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| LIBRARY-09 | Phase 27 | Pending |
+| REC-09 | Phase 27 | Pending |
+| LATENCY-14 | Phase 27 | Pending |
+| LATENCY-15 | Phase 27 | Pending |
+| MASCOT-11 | Phase 27 | Pending (real-GLB execution lives in Phase 35 ASSETS-03) |
+| MIDI-20 | Phase 27 | Pending |
+
+### Library Intelligence v1 (Phase 28)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| LIBRARY-10 | Phase 28 | Pending |
+| LIBRARY-11 | Phase 28 | Pending |
+| LIBRARY-12 | Phase 28 | Pending |
+| LIBRARY-13 | Phase 28 | Pending |
+| LIBRARY-14 | Phase 28 | Pending |
+| LIBRARY-05 | Phase 28 | Pending (drag-drop UX — closes v2.0 deferred surface) |
+| LIBRARY-15 | Phase 28 | Pending |
+| LIBRARY-16 | Phase 28 | Pending |
+| LIBRARY-17 | Phase 28 | Pending |
+
+### Post-Session Debrief MVP UI (Phase 29)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| DEBRIEF-03 | Phase 29 | Pending |
+| DEBRIEF-04 | Phase 29 | Pending |
+| DEBRIEF-05 | Phase 29 | Pending |
+| DEBRIEF-06 | Phase 29 | Pending |
+| DEBRIEF-07 | Phase 29 | Pending |
+| DEBRIEF-08 | Phase 29 | Pending |
+| DEBRIEF-09 | Phase 29 | Pending |
+| DEBRIEF-10 | Phase 29 | Pending |
+| DEBRIEF-11 | Phase 29 | Pending |
+
+### 2 Hard Tek Detectors (Phase 30)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| SENSE-17 | Phase 30 | Pending |
+| SENSE-18 | Phase 30 | Pending |
+| SENSE-19 | Phase 30 | Pending |
+| SENSE-20 | Phase 30 | Pending |
+
+### 4-Layer Mascot Full Additive (Phase 31)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| MASCOT-20 | Phase 31 | Pending |
+| MASCOT-21 | Phase 31 | Pending |
+| MASCOT-22 | Phase 31 | Pending |
+| MASCOT-23 | Phase 31 | Pending |
+| MASCOT-24 | Phase 31 | Pending |
+| MASCOT-25 | Phase 31 | Pending |
+| MASCOT-26 | Phase 31 | Pending |
+| MASCOT-27 | Phase 31 | Pending |
+
+### Long-Term DJ Profile (Phase 32)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| PROFILE-01 | Phase 32 | Pending |
+| PROFILE-02 | Phase 32 | Pending |
+| PROFILE-03 | Phase 32 | Pending |
+| PROFILE-04 | Phase 32 | Pending |
+| PROFILE-05 | Phase 32 | Pending |
+| PROFILE-06 | Phase 32 | Pending |
+| PROFILE-07 | Phase 32 | Pending |
+
+### One-Click Install Hardening (Phase 33)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| INSTALL-01 | Phase 33 | Pending |
+| INSTALL-02 | Phase 33 | Pending |
+| INSTALL-03 | Phase 33 | Pending |
+| INSTALL-04 | Phase 33 | Pending |
+| INSTALL-05 | Phase 33 | Pending |
+| INSTALL-06 | Phase 33 | Pending |
+| INSTALL-07 | Phase 33 | Pending |
+| INSTALL-08 | Phase 33 | Pending |
+| INSTALL-09 | Phase 33 | Pending |
+
+### Open-Source Security Pass (Phase 34)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| SEC-01 | Phase 34 | Pending |
+| SEC-02 | Phase 34 | Pending |
+| SEC-03 | Phase 34 | Pending |
+| SEC-04 | Phase 34 | Pending |
+| SEC-05 | Phase 34 | Pending |
+| SEC-06 | Phase 34 | Pending |
+| SEC-07 | Phase 34 | Pending |
+| SEC-08 | Phase 34 | Pending |
+| SEC-09 | Phase 34 | Pending |
+| SEC-10 | Phase 34 | Pending |
+
+### Real GLBs + Viral Demo Film (Phase 35)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| ASSETS-01 | Phase 35 | Pending |
+| ASSETS-02 | Phase 35 | Pending |
+| ASSETS-03 | Phase 35 | Pending (closes v2.0 MASCOT-11 placeholder) |
+| ASSETS-04 | Phase 35 | Pending |
+| ASSETS-05 | Phase 35 | Pending |
+| ASSETS-06 | Phase 35 | Pending |
+| ASSETS-07 | Phase 35 | Pending |
+
+### Day-Zero Operations (Phase 36)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| OPS-09 | Phase 36 | Pending |
+| OPS-10 | Phase 36 | Pending |
+| OPS-11 | Phase 36 | Pending |
+| OPS-12 | Phase 36 | Pending |
+| OPS-13 | Phase 36 | Pending |
+| OPS-14 | Phase 36 | Pending |
+
+### Cross-Phase Integration Audit (Phase 37)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| AUDIT-01 | Phase 37 | Pending |
+| AUDIT-02 | Phase 37 | Pending |
+| AUDIT-03 | Phase 37 | Pending |
+| AUDIT-04 | Phase 37 | Pending |
+| AUDIT-05 | Phase 37 | Pending |
+| AUDIT-06 | Phase 37 | Pending |
+| AUDIT-07 | Phase 37 | Pending |
+
+### Signing Pipeline Real Execution (Phase 38)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| DIST-15 | Phase 38 | Pending |
+| DIST-16 | Phase 38 | Pending |
+| DIST-17 | Phase 38 | Pending |
+| DIST-18 | Phase 38 | Pending |
+| DIST-09 | Phase 38 | Pending (legal-capacity carveout — Francesco-action) |
+| DIST-11 | Phase 38 | Pending (legal-capacity carveout — Kaan-action) |
+| DIST-19 | Phase 38 | Pending |
+
+### Public RC Cut + Ship (Phase 39)
+
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| SHIP-01 | Phase 39 | Pending |
+| SHIP-02 | Phase 39 | Pending |
+| SHIP-03 | Phase 39 | Pending |
+| SHIP-04 | Phase 39 | Pending |
+| SHIP-05 | Phase 39 | Pending |
+| SHIP-06 | Phase 39 | Pending |
+| SHIP-07 | Phase 39 | Pending |
+| SHIP-08 | Phase 39 | Pending |
+
+### Coverage Summary
+
+| Phase | REQ Count | Notes |
+|-------|-----------|-------|
+| Phase 27 | 14 | 8 EVAL + 6 carry-forward |
+| Phase 28 | 9 | Library v1 + LIBRARY-05 carry-forward |
+| Phase 29 | 9 | DEBRIEF MVP UI |
+| Phase 30 | 4 | Hard Tek detectors |
+| Phase 31 | 8 | 4-layer mascot |
+| Phase 32 | 7 | DJ profile |
+| Phase 33 | 9 | Install hardening |
+| Phase 34 | 10 | Security pass |
+| Phase 35 | 7 | Real GLBs + viral demo |
+| Phase 36 | 6 | Day-zero ops |
+| Phase 37 | 7 | Integration audit |
+| Phase 38 | 7 | Signing real exec (incl. 2 legal carveouts) |
+| Phase 39 | 8 | RC cut + ship |
+| **Total** | **105** | **100% mapped (no orphans, no duplicates)** |
+
+### v2.0 Carry-Forward Closures Cross-Reference
+
+(See `## v2.1 Carry-Forward Closures (V2.0 Items Closing in v2.1)` above for the source-of-truth mapping from v2.0 REQ-IDs to their v2.1 closing REQ.)
+
 
 ---
 
