@@ -86,7 +86,7 @@ export async function sendIpcRequest<TResponse extends IpcMessage = IpcMessage>(
       reject(new Error(`ipc timeout: no ${responseType} within ${timeoutMs}ms`));
     }, timeoutMs);
 
-    listen<unknown>(`ipc:${responseType}`, (event) => {
+    listen<unknown>(responseType.replace(/\./g, "-"), (event) => {
       try {
         const msg = parseIpcMessage(event.payload) as TResponse;
         cleanup();
@@ -121,7 +121,7 @@ export async function subscribeIpc<T extends IpcMessage = IpcMessage>(
   type: string,
   callback: (msg: T) => void,
 ): Promise<UnlistenFn> {
-  return await listen<unknown>(`ipc:${type}`, (event) => {
+  return await listen<unknown>(type.replace(/\./g, "-"), (event) => {
     try {
       const msg = parseIpcMessage(event.payload) as T;
       callback(msg);

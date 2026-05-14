@@ -127,8 +127,45 @@ class WizardLoop:
 
     async def boot(self) -> None:
         """Emit ``ipc.boot {ready: true}`` so the Tauri shell can render
-        the wizard. Called exactly once after ``register_handlers``."""
+        the wizard. Called exactly once after ``register_handlers``.
+
+        Also fires platform permission requests for any kind that resolves
+        to ``notDetermined`` so vibemix registers with TCC immediately
+        (otherwise the OS only adds the app to System Settings → Privacy
+        list AFTER first capture-API invocation, which can be confusing
+        when the wizard's Grant button just deep-links to Settings).
+        """
         await self.bus.emit(json.loads(IpcBoot.make(ready=True).to_json()))
+        self._prime_tcc_registration()
+
+    def _prime_tcc_registration(self) -> None:
+        try:
+            from vibemix.platform import permissions  # noqa: PLC0415
+        except Exception as exc:  # pragma: no cover
+            log.warning("permissions module unavailable: %r", exc)
+            return
+        try:
+            mic_status = permissions.check_microphone_permission()
+            print(f"[tcc-prime] microphone status: {mic_status}", flush=True)
+            if mic_status == "notDetermined":
+                permissions.request_microphone_permission()
+                print("[tcc-prime] microphone request fired", flush=True)
+        except Exception as exc:  # pragma: no cover
+            log.warning("priming microphone TCC failed: %r", exc)
+        try:
+            scr_status = permissions.check_screen_recording_permission()
+            print(f"[tcc-prime] screen_recording status: {scr_status}", flush=True)
+            # macOS CGPreflightScreenCaptureAccess returns a boolean — there's
+            # no notDetermined state for screen capture. Always call
+            # CGRequestScreenCaptureAccess on first wizard boot: it shows
+            # the consent prompt if no decision was made, or returns the
+            # cached value if already decided. Either way the app gets
+            # registered in System Settings → Privacy → Screen Recording.
+            if scr_status != "authorized":
+                granted = permissions.request_screen_recording_permission()
+                print(f"[tcc-prime] screen_recording request fired -> {granted}", flush=True)
+        except Exception as exc:  # pragma: no cover
+            log.warning("priming screen-recording TCC failed: %r", exc)
 
     # ------------------------------------------------------------------
     # Handlers

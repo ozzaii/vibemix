@@ -69,7 +69,7 @@
       //     load and the <audio> duration stays at "--:--" (RESEARCH
       //     Pitfall 1). http://asset.localhost is the http-scheme form
       //     emitted on Windows by WebView2.
-      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:8765; media-src 'self' asset: http://asset.localhost",
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:8765 ipc: http://ipc.localhost; media-src 'self' asset: http://asset.localhost",
       // Phase 15 Plan 02 — assetProtocol exposes the recordings dir to the
       // webview via asset://localhost/<absolute-path> URLs. Scope locked
       // to BOTH $APPDATA and $APPLOCALDATA variants per RESEARCH Pitfall
