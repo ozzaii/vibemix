@@ -731,3 +731,131 @@ def test_main_genre_unknown_sys_exits(monkeypatch):
     # Valid choices listed:
     assert "techno" in msg
     assert "none" in msg
+
+
+# ---------------------------------------------------------------------------
+# Plan 19-05 — SMOKE-07/08 — GeminiContextCache wiring + graceful degradation
+# ---------------------------------------------------------------------------
+
+
+def _patch_cache_create(mocker, *, raise_exc: Exception | None = None):
+    """Patch GeminiContextCache.create + refresh_loop on the main module.
+
+    On raise_exc=None, .create returns a fake name; .refresh_loop is a long-
+    running coroutine that waits on stop_event. On raise_exc set, .create
+    raises that exception (graceful-degradation path)."""
+    import vibemix.__main__ as main_mod
+
+    cache_mock = MagicMock()
+    if raise_exc is None:
+        cache_mock.create = AsyncMock(return_value="caches/fake-cache-name")
+    else:
+        cache_mock.create = AsyncMock(side_effect=raise_exc)
+
+    refresh_started = {"called": False}
+
+    async def fake_refresh_loop(stop_event):
+        refresh_started["called"] = True
+        await stop_event.wait()
+
+    cache_mock.refresh_loop = fake_refresh_loop
+
+    cache_factory = MagicMock(return_value=cache_mock)
+    mocker.patch.object(main_mod, "GeminiContextCache", cache_factory)
+
+    return {"factory": cache_factory, "instance": cache_mock, "refresh_started": refresh_started}
+
+
+def _patch_ack_bank_constructor(mocker):
+    """Patch AckBank() in main_mod so the smoke doesn't need real OPUS files
+    on disk (the bank IS populated in the repo, but mocking keeps the smoke
+    fast and isolated from filesystem state)."""
+    import vibemix.__main__ as main_mod
+
+    ack_mock = MagicMock()
+    factory = MagicMock(return_value=ack_mock)
+    mocker.patch.object(main_mod, "AckBank", factory)
+    return {"factory": factory, "instance": ack_mock}
+
+
+def test_smoke_07_cache_create_called_on_startup(monkeypatch, mocker, tmp_path):
+    """SMOKE-07: Plan 19-05 — main() awaits GeminiContextCache.create() at
+    startup and spawns refresh_loop as a background asyncio task."""
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+
+    _build_audio_mocks(mocker)
+    _build_sensor_mocks(mocker)
+    _build_state_refresh_noop(mocker)
+    _build_livekit_mocks(mocker)
+    _patch_voice_recorder(mocker, tmp_path)
+    cache = _patch_cache_create(mocker)
+    _patch_ack_bank_constructor(mocker)
+
+    tasks_seen: list = []
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen)
+
+    from vibemix.__main__ import main
+
+    async def driver():
+        main_task = asyncio.create_task(main())
+        await _REAL_SLEEP(0.05)
+        main_task.cancel()
+        try:
+            await asyncio.wait_for(main_task, timeout=3.0)
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    asyncio.run(driver())
+
+    # GeminiContextCache constructor was called once and create awaited.
+    assert cache["factory"].call_count == 1
+    cache["instance"].create.assert_awaited_once()
+    # refresh_loop was spawned (set the flag from inside).
+    assert cache["refresh_started"]["called"] is True
+
+
+def test_smoke_08_cache_create_failure_graceful_degradation(
+    monkeypatch, mocker, tmp_path
+):
+    """SMOKE-08: Plan 19-05 — when cache.create raises, main() logs a
+    warning and proceeds with cache=None (graceful degradation). The
+    DJCoHostAgent constructor is still called and the agent works without
+    a cache (Phase 4 byte-identical fallback)."""
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+
+    _build_audio_mocks(mocker)
+    _build_sensor_mocks(mocker)
+    _build_state_refresh_noop(mocker)
+    livekit_mocks = _build_livekit_mocks(mocker)
+    _patch_voice_recorder(mocker, tmp_path)
+    cache = _patch_cache_create(mocker, raise_exc=RuntimeError("simulated cache failure"))
+    _patch_ack_bank_constructor(mocker)
+
+    tasks_seen: list = []
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen)
+
+    from vibemix.__main__ import main
+
+    async def driver():
+        main_task = asyncio.create_task(main())
+        await _REAL_SLEEP(0.05)
+        main_task.cancel()
+        try:
+            await asyncio.wait_for(main_task, timeout=3.0)
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    asyncio.run(driver())
+
+    cache["instance"].create.assert_awaited_once()
+    # refresh_loop must NOT have been spawned (cache is None after failure).
+    assert cache["refresh_started"]["called"] is False
+    # DJCoHostAgent still constructed (graceful degradation), with
+    # cache kwarg present (None on failure).
+    agent_call = livekit_mocks["DJCoHostAgent"].call_args
+    assert "cache" in agent_call.kwargs
+    assert agent_call.kwargs["cache"] is None
