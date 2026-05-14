@@ -87,7 +87,13 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
   3. `PHRASE_BOUNDARY` locks downbeat phase within ±1 bar via band-limited (40-120Hz) autocorrelation; self-corrects on `BREAKDOWN_KICK_KILL`.
   4. `GenreRouter` atomically swaps detector-dict on `MusicState.active_genre` change without restarting session.
   5. `scripts/tune_detectors.py` reference-WAV tuning harness emits per-fire CSV consumable by Kaan ear-audit (Phase 16 input).
-**Plans**: TBD
+**Plans**: 6 plans across 6 waves (sequential — Wave 2/3/4 detector plans share `__init__.py` + `constants.py`, so they serialize)
+- [ ] 17-01-PLAN.md — MusicState +4 fields + state_refresh_loop writes (Wave 1; SENSE-13)
+- [ ] 17-02-PLAN.md — Kick-side detectors: KICK_SWAP / SUB_LAYER_ARRIVAL / KICK_DENSITY_SHIFT (Wave 2; SENSE-12)
+- [ ] 17-03-PLAN.md — Breakdown/re-entry pair: BREAKDOWN_KICK_KILL + REENTRY_KICK_LAND (Wave 3; SENSE-12)
+- [ ] 17-04-PLAN.md — PHRASE_BOUNDARY + 40-120Hz band-limited autocorr DSP module (Wave 4; SENSE-12, SENSE-14)
+- [ ] 17-05-PLAN.md — GenreRouter + per-genre dispatch under `vibemix/events/genres/` + EventDetector wiring (Wave 5; SENSE-11, SENSE-15)
+- [ ] 17-06-PLAN.md — `scripts/tune_detectors.py` reference-WAV harness + Hard Tek anchor track Kaan-action surface (Wave 6; SENSE-16)
 **Pitfall prevention**: Per-genre cooldown tuning matches `G-followup-1` (`MIN_EVENT_GAP_PER_TYPE`); 6 baseline detectors only — Hard Tek-overlay `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` deferred to v2.1 per cross-doc reconciliation.
 
 ### Phase 18: Evidence Registry + Citation Grammar in Prompts (v1.0 prompt-only)
@@ -224,7 +230,7 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
 |-------|----------------|--------|-----------|
 | 15. Recording Browser + Retention Enforcement | 0/4 | Planning | - |
 | 16. Hallucination Verification Gate (Kaan's DJ Ear) | 0/0 | Not started | - |
-| 17. Hard Tek Detectors v1 + GenreRouter | 0/0 | Not started | - |
+| 17. Hard Tek Detectors v1 + GenreRouter | 0/6 | Planning | - |
 | 18. Evidence Registry + Citation Grammar | 0/0 | Not started | - |
 | 19. Latency Stack v1 | 0/0 | Not started | - |
 | 20. Citation Linter ENFORCEMENT | 0/0 | Not started | - |
