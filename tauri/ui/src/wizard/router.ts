@@ -323,8 +323,26 @@ export function renderCurrentStep(): void {
         },
         onAudioYes: () => {
           // Forward the user's Yes — the sidecar correlates this
-          // with the in-flight probe_audio handler.
+          // with the in-flight probe_audio handler (if still waiting).
           void emitIpc("ipc.calibration.user_heard_tone", { heard: true });
+          // If the probe already resolved as "failed" (timeout or
+          // programmatic mismatch) before the user clicked Yes, the
+          // sidecar's user_heard_tone event has already fired and the
+          // emit above is a no-op. Honor the user's override locally so
+          // Continue arms — they're the ground truth on whether they
+          // heard the tone.
+          if (
+            wizardState.step2.audioTestState === "failed" ||
+            wizardState.step2.audioTestState === "programmatic-failed"
+          ) {
+            setState({
+              step2: {
+                ...wizardState.step2,
+                audioTestState: "passed",
+                audioPassed: true,
+              },
+            });
+          }
         },
         onAudioRetry: () => {
           void emitIpc("ipc.calibration.user_heard_tone", { heard: false });

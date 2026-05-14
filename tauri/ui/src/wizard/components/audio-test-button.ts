@@ -275,7 +275,15 @@ export function AudioTestButton(props: AudioTestButtonProps): HTMLElement {
     prompt.textContent = "did you hear a clean tone?";
     const buttons = document.createElement("div");
     buttons.className = "cmp-audio-test__confirm-buttons";
-    const yesArmed = props.state === "passed" || props.state === "playing";
+    // Yes is armed any time the confirm row is shown — including "failed"
+    // and "programmatic-failed". This lets the user override a misfire
+    // (e.g., took >30s to click and the probe timed out, or sample rate
+    // mismatch but tone was clearly audible). Disabling Yes in failed
+    // strands the user: Retry just re-plays the same tone on the same
+    // device, so without override there is no path forward. The confirm
+    // row itself only renders for the four states this branch handles,
+    // so Yes is unconditionally armed here.
+    const yesArmed = true;
     buttons.append(
       Button({
         variant: "primary",
