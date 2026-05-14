@@ -38,9 +38,12 @@ def fake_session(fake_handle):
 
 @pytest.fixture
 def fake_agent():
-    """DJCoHostAgent stub — ``set_next_event`` records the most recent ev."""
+    """DJCoHostAgent stub — ``set_next_event`` records the most recent ev.
+    Plan 19-05: ``invalidate_cache`` is an AsyncMock so the cancel-and-refire
+    branch can ``await agent.invalidate_cache()``."""
     a = MagicMock()
     a.set_next_event = MagicMock()
+    a.invalidate_cache = AsyncMock(return_value=None)
     return a
 
 
@@ -87,3 +90,50 @@ def fake_event(music_state):
     from vibemix.state import Event
 
     return Event(type="TRACK_CHANGE", state=music_state, extra={})
+
+
+# ---------------------------------------------------------------------------
+# Plan 19-05 — fixtures for ack_bank / cancel_gate / ttft_meter / playback
+# wiring tests in test_coach_ack_wiring.py + test_coach_cancel_wiring.py.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def fake_playback():
+    """PlaybackQueue stub — push records bytes for assertion."""
+    p = MagicMock()
+    p.push = MagicMock()
+    return p
+
+
+@pytest.fixture
+def fake_ack_bank():
+    """AckBank stub — should_fire returns (False, 'ttft_ok') by default;
+    pick_for_event returns a deterministic placeholder ndarray."""
+    import numpy as np
+
+    bank = MagicMock()
+    bank.should_fire = MagicMock(return_value=(False, "ttft_ok"))
+    bank.pick_for_event = MagicMock(
+        return_value=("drop_hit", np.zeros(2400, dtype=np.int16), 0)
+    )
+    return bank
+
+
+@pytest.fixture
+def fake_cancel_gate():
+    """CancelGate stub — last_cancel_at=0.0 (no prior cancel); try_cancel
+    returns False by default."""
+    gate = MagicMock()
+    gate.last_cancel_at = 0.0
+    gate.try_cancel = MagicMock(return_value=False)
+    return gate
+
+
+@pytest.fixture
+def fake_ttft_meter():
+    """TTFTMeter stub — rolling_avg_ms returns the sentinel 1500.0 by default
+    so the should_fire TTFT gate passes (>800ms)."""
+    meter = MagicMock()
+    meter.rolling_avg_ms = MagicMock(return_value=1500.0)
+    return meter
