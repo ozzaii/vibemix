@@ -205,9 +205,9 @@
 - [ ] **LATENCY-03**: Per-event-class ack buckets — `drop_hit/`, `track_change/`, `mix_move/`, `silence_break/`, `generic_filler/`
 - [ ] **LATENCY-04**: Ack fires only when `rolling_ttft_avg_ms > 800`; suppresses when LLM is fast that turn
 - [ ] **LATENCY-05**: Min-ack-to-response gap = 400ms to prevent awkward overlap
-- [ ] **LATENCY-06**: `CachedLLM` subclass injecting `cached_content` via `extra_kwargs`; ~500-1500ms TTFT win per call
-- [ ] **LATENCY-07**: System instruction padded with deterministic context (MIDI map dump + event taxonomy enum + persona spec) to stay above Gemini's 1024-token cache floor when prompt-dieting
-- [ ] **LATENCY-08**: Cache lifecycle manager — creates cache on session start, refreshes every 4 min (TTL 5min minimum)
+- [x] **LATENCY-06**: `CachedLLM` subclass injecting `cached_content` via `extra_kwargs`; ~500-1500ms TTFT win per call
+- [x] **LATENCY-07**: System instruction padded with deterministic context (MIDI map dump + event taxonomy enum + persona spec) to stay above Gemini's 1024-token cache floor when prompt-dieting
+- [x] **LATENCY-08**: Cache lifecycle manager — creates cache on session start, refreshes every 4 min (TTL 5min minimum)
 - [ ] **LATENCY-09**: Prompt diet — audio Part trimmed 18s → 6s on non-PHASE events; screen Part skipped on MIX_MOVE/HEARTBEAT
 - [ ] **LATENCY-10**: `SpeechHandle.interrupt(force=True)` wrapper for programmatic cancel-and-refire (bypasses `allow_interruptions=False` user-mic gate)
 - [ ] **LATENCY-11**: Cancel cooldown hard cap — `CANCEL_COOLDOWN_S = 8.0` (Pitfall 1 mitigation)
