@@ -23,8 +23,10 @@ Wave 2 Plan 03 will add:
 
 from __future__ import annotations
 
-# Per-detector re-exports are added in Tasks 2/3 of this plan as each module
-# lands. Importing this package alone gives consumers the shared DSP primitives
-# via ``from vibemix.state.detectors._dsp import ...``.
+from vibemix.state.detectors.kick_swap import KickSwapDetector
+from vibemix.state.detectors.sub_layer_arrival import SubLayerArrivalDetector
 
-__all__: list[str] = []
+__all__: list[str] = [
+    "KickSwapDetector",
+    "SubLayerArrivalDetector",
+]
