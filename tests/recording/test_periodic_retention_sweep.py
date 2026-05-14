@@ -28,16 +28,28 @@ Schema reconciliation note (15-CONTEXT.md vs recorder.py:294):
 
 from __future__ import annotations
 
+import asyncio
+import json
 import shutil
+import time
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
+from vibemix.runtime import config_store as cs_mod
+from vibemix.runtime.config_store import ConfigStore
 from vibemix.runtime.recordings_index import (
     RetentionSweepResult,
     run_retention_sweep,
 )
+from vibemix.runtime.session_loop import (
+    RETENTION_SWEEP_INTERVAL_S,
+    SessionLoop,
+)
+from vibemix.ui_bus.validator import validate_message
 
 
 # ===========================================================================
@@ -159,3 +171,285 @@ def test_partial_failure_sums_bytes_for_successful_deletes_only(
     # Only the successful one is in deleted_names + counted in bytes_pruned.
     assert result.deleted_names == ["20260102-120000"]
     assert result.bytes_pruned == 1100  # NOT 1450 (would include the failed dir)
+
+
+# ===========================================================================
+# Task 2 — periodic 6h sweep loop in SessionLoop
+# ===========================================================================
+
+
+class FakeBus:
+    def __init__(self) -> None:
+        self.handlers: dict[str, Callable[[dict], Awaitable[None]]] = {}
+        self.emitted: list[dict] = []
+        self.started = False
+        self.stopped = False
+
+    def register_handler(
+        self, message_type: str, handler: Callable[[dict], Awaitable[None]]
+    ) -> None:
+        self.handlers[message_type] = handler
+
+    async def start(self) -> None:
+        self.started = True
+
+    async def stop(self) -> None:
+        self.stopped = True
+
+    async def emit(self, msg: dict) -> None:
+        validate_message(msg)
+        self.emitted.append(json.loads(json.dumps(msg)))
+
+
+@pytest.fixture
+def fake_bus() -> FakeBus:
+    return FakeBus()
+
+
+@pytest.fixture(autouse=True)
+def _redirect_config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    target = tmp_path / "config.json"
+    monkeypatch.setattr(cs_mod, "config_path", lambda: target)
+    return target
+
+
+def test_constant_is_six_hours() -> None:
+    """RETENTION_SWEEP_INTERVAL_S = 6h = 21600s, per CONTEXT.md §Retention Enforcement."""
+    assert RETENTION_SWEEP_INTERVAL_S == 6 * 60 * 60
+    assert RETENTION_SWEEP_INTERVAL_S == 21600
+
+
+def test_periodic_sweep_fires_at_interval(
+    tmp_recordings_dir: Path, fake_bus: FakeBus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test 2A — at a 50ms interval, ≥3 sweeps fire in 200ms (boot + 2+ ticks).
+
+    Verifies the periodic loop is actually spawned by ``SessionLoop.run()``
+    AND fires at the configured cadence. Boot sweep (1 call) + ≥2 periodic
+    ticks at 50ms over 200ms = ≥3 total calls.
+    """
+    # Patch the interval to 50ms — tests must run fast.
+    monkeypatch.setattr(
+        "vibemix.runtime.session_loop.RETENTION_SWEEP_INTERVAL_S", 0.05
+    )
+    sweep_mock = MagicMock(return_value=RetentionSweepResult([], 0))
+    monkeypatch.setattr(
+        "vibemix.runtime.session_loop.run_retention_sweep", sweep_mock
+    )
+
+    cfg = ConfigStore(retention_days=7)
+    loop_obj = SessionLoop(
+        fake_bus, config_store=cfg, recordings_root=tmp_recordings_dir
+    )
+
+    async def _drive() -> None:
+        run_task = asyncio.create_task(loop_obj.run())
+        try:
+            await asyncio.sleep(0.20)
+        finally:
+            loop_obj.request_stop()
+            try:
+                await asyncio.wait_for(run_task, timeout=1.0)
+            except asyncio.TimeoutError:
+                run_task.cancel()
+                try:
+                    await run_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+    asyncio.run(_drive())
+
+    # Boot sweep + ≥2 periodic ticks. We use ≥3 to keep the test resilient
+    # to scheduler jitter on a heavily loaded CI box (could be 4 or 5).
+    assert sweep_mock.call_count >= 3, (
+        f"expected ≥3 sweep calls (boot + ≥2 periodic ticks at 50ms over 200ms), "
+        f"got {sweep_mock.call_count}"
+    )
+
+
+def test_periodic_sweep_respects_stop_event(
+    tmp_recordings_dir: Path, fake_bus: FakeBus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test 2B — request_stop completes the loop in <0.5s even with a 10s interval.
+
+    Proves the loop awaits on _stop.wait() races (NOT a bare asyncio.sleep)
+    so SIGTERM/SIGINT shutdown does not hang the sidecar for up to 6h
+    (T-15-02-01 disposition).
+    """
+    monkeypatch.setattr(
+        "vibemix.runtime.session_loop.RETENTION_SWEEP_INTERVAL_S", 10.0
+    )
+    sweep_mock = MagicMock(return_value=RetentionSweepResult([], 0))
+    monkeypatch.setattr(
+        "vibemix.runtime.session_loop.run_retention_sweep", sweep_mock
+    )
+
+    cfg = ConfigStore(retention_days=7)
+    loop_obj = SessionLoop(
+        fake_bus, config_store=cfg, recordings_root=tmp_recordings_dir
+    )
+
+    elapsed_holder: dict[str, float] = {}
+
+    async def _drive() -> None:
+        run_task = asyncio.create_task(loop_obj.run())
+        await asyncio.sleep(0.05)  # let boot sweep + the periodic loop spawn
+        t0 = time.monotonic()
+        loop_obj.request_stop()
+        try:
+            await asyncio.wait_for(run_task, timeout=2.0)
+        except asyncio.TimeoutError:
+            run_task.cancel()
+            try:
+                await run_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            elapsed_holder["t"] = float("inf")
+            return
+        elapsed_holder["t"] = time.monotonic() - t0
+
+    asyncio.run(_drive())
+    assert elapsed_holder["t"] < 0.5, (
+        f"request_stop must complete within 0.5s; took {elapsed_holder['t']:.3f}s. "
+        "If this fails, the periodic loop is using a bare asyncio.sleep instead "
+        "of an asyncio.wait race against _stop."
+    )
+
+
+def test_periodic_sweep_logs_events_jsonl_when_recorder_active(
+    tmp_recordings_dir: Path, fake_bus: FakeBus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test 2C — when active_recorder is present + count>0, an events.jsonl line is written.
+
+    Schema: ``{"t": <float>, "kind": "retention_pruned", "count": N, "bytes": M}``
+    via VoiceRecorder.log_event (NOT CONTEXT.md's approximate
+    ``{"event", ..., "t_session"}`` wording).
+    """
+    # Build a real VoiceRecorder so its events.jsonl is on disk for inspection.
+    from vibemix.audio.recorder import VoiceRecorder
+
+    recorder = VoiceRecorder(root=tmp_recordings_dir)
+    try:
+        # Patch sweep to return a non-empty result.
+        sweep_mock = MagicMock(
+            return_value=RetentionSweepResult(["20260101-120000"], 4096)
+        )
+        monkeypatch.setattr(
+            "vibemix.runtime.session_loop.run_retention_sweep", sweep_mock
+        )
+
+        cfg = ConfigStore(retention_days=7)
+        loop_obj = SessionLoop(
+            fake_bus,
+            config_store=cfg,
+            recordings_root=tmp_recordings_dir,
+            active_recorder=recorder,
+        )
+
+        # Drive ONE periodic tick directly via the shared helper.
+        asyncio.run(loop_obj._fire_one_retention_sweep("periodic"))
+
+        # Inspect events.jsonl tail line.
+        events_path = recorder.events_path
+        lines = events_path.read_text(encoding="utf-8").splitlines()
+        # Skip blank lines.
+        non_empty = [ln for ln in lines if ln.strip()]
+        assert non_empty, "events.jsonl must have at least one line (session_start)"
+        # The retention_pruned line is the last one written.
+        last = json.loads(non_empty[-1])
+        assert last["kind"] == "retention_pruned"
+        assert last["count"] == 1
+        assert last["bytes"] == 4096
+        assert isinstance(last["t"], (int, float))
+    finally:
+        recorder.close()
+
+
+def test_periodic_sweep_no_events_log_when_no_active_recorder(
+    tmp_recordings_dir: Path, fake_bus: FakeBus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test 2D — active_recorder=None: sweep fires + logs to logger only, no jsonl write."""
+    sweep_mock = MagicMock(
+        return_value=RetentionSweepResult(["20260101-120000"], 4096)
+    )
+    monkeypatch.setattr(
+        "vibemix.runtime.session_loop.run_retention_sweep", sweep_mock
+    )
+
+    cfg = ConfigStore(retention_days=7)
+    loop_obj = SessionLoop(
+        fake_bus,
+        config_store=cfg,
+        recordings_root=tmp_recordings_dir,
+        active_recorder=None,  # explicit
+    )
+
+    # Must not raise.
+    asyncio.run(loop_obj._fire_one_retention_sweep("periodic"))
+
+    # No session dirs were created by anything other than the (mocked) sweep.
+    # Confirm no events.jsonl exists anywhere under recordings_root.
+    jsonl_files = list(tmp_recordings_dir.rglob("events.jsonl"))
+    assert jsonl_files == [], (
+        f"no events.jsonl should be written when no active_recorder; found {jsonl_files!r}"
+    )
+
+
+def test_periodic_sweep_skips_jsonl_log_on_zero_pruned(
+    tmp_recordings_dir: Path, fake_bus: FakeBus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test 2E — count=0 ticks skip the events.jsonl write to keep noise down.
+
+    6h cadence × ~99% no-op rate = up to 24 zero-prune ticks per day. Logging
+    each one would flood events.jsonl with noise. We log only when count > 0
+    (T-15-02-04 disposition).
+    """
+    from vibemix.audio.recorder import VoiceRecorder
+
+    recorder = VoiceRecorder(root=tmp_recordings_dir)
+    try:
+        sweep_mock = MagicMock(return_value=RetentionSweepResult([], 0))
+        monkeypatch.setattr(
+            "vibemix.runtime.session_loop.run_retention_sweep", sweep_mock
+        )
+
+        cfg = ConfigStore(retention_days=7)
+        loop_obj = SessionLoop(
+            fake_bus,
+            config_store=cfg,
+            recordings_root=tmp_recordings_dir,
+            active_recorder=recorder,
+        )
+        asyncio.run(loop_obj._fire_one_retention_sweep("periodic"))
+
+        events_path = recorder.events_path
+        lines = [
+            ln
+            for ln in events_path.read_text(encoding="utf-8").splitlines()
+            if ln.strip()
+        ]
+        # session_start is line 0; no retention_pruned line should follow.
+        kinds = [json.loads(ln).get("kind") for ln in lines]
+        assert "retention_pruned" not in kinds, (
+            f"zero-prune ticks must NOT write retention_pruned; events kinds: {kinds!r}"
+        )
+    finally:
+        recorder.close()
+
+
+def test_periodic_sweep_short_circuits_when_recordings_root_none(
+    fake_bus: FakeBus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Stand-alone --session mode without recordings_root: periodic loop must no-op."""
+    sweep_mock = MagicMock(return_value=RetentionSweepResult([], 0))
+    monkeypatch.setattr(
+        "vibemix.runtime.session_loop.run_retention_sweep", sweep_mock
+    )
+
+    cfg = ConfigStore(retention_days=7)
+    # recordings_root NOT provided.
+    loop_obj = SessionLoop(fake_bus, config_store=cfg, recordings_root=None)
+
+    # Direct invocation must early-return (no exception, no sweep).
+    asyncio.run(loop_obj._fire_one_retention_sweep("periodic"))
+    sweep_mock.assert_not_called()
