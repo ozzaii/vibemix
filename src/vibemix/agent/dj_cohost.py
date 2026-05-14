@@ -48,6 +48,7 @@ from livekit.agents import Agent, ModelSettings
 from livekit.agents import llm as agents_llm
 from livekit.agents import tts as agents_tts
 
+from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL
 from vibemix.audio import INVOKE_AUDIO_SECONDS, AudioBuffer, VoiceRecorder, snapshot_wav
 from vibemix.prompts import build_system_instruction, filter_for_slop
@@ -129,6 +130,7 @@ class DJCoHostAgent(Agent):
         llm_inst: agents_llm.LLM,
         tts_inst: agents_tts.TTS,
         evidence_registry: EvidenceRegistry | None = None,
+        cache: GeminiContextCache | None = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -158,6 +160,11 @@ class DJCoHostAgent(Agent):
         # only call site that wires the registry into AICoach.build_prompt;
         # standalone tests + legacy run paths skip the snapshot).
         self._registry: EvidenceRegistry | None = evidence_registry
+        # Plan 19-03 — optional context cache. None default preserves Phase 4
+        # backward compat (llm_node uses self._gen_cfg with system_instruction
+        # inline). When non-None AND cache.current_name() returns a string,
+        # llm_node builds a per-call gen_cfg with cached_content set.
+        self._cache: GeminiContextCache | None = cache
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         # Both the LiveKit-side ``instructions`` AND the google.genai-side
@@ -271,6 +278,34 @@ class DJCoHostAgent(Agent):
         except Exception:
             pass
 
+        # ---- Plan 19-03 — context-cache dispatch ----
+        # Three branches:
+        #   1. cache is None at construction → cache_state="disabled", reuse
+        #      self._gen_cfg by reference (Phase 4 byte-identical path).
+        #   2. cache non-None but current_name()=None (warm-up window OR
+        #      post-invalidate gap) → cache_state="cold", same fallback as
+        #      disabled (system_instruction in self._gen_cfg drives the call).
+        #   3. cache non-None AND current_name() returns a string → cache_
+        #      state="warm", build a per-call gen_cfg with cached_content set
+        #      and system_instruction OMITTED (Gemini rejects passing both).
+        #      thinking_config + temperature + max_output_tokens preserved.
+        if self._cache is None:
+            gen_cfg = self._gen_cfg
+            cache_state = "disabled"
+        else:
+            cache_name = self._cache.current_name()
+            if cache_name is None:
+                gen_cfg = self._gen_cfg
+                cache_state = "cold"
+            else:
+                gen_cfg = types.GenerateContentConfig(
+                    cached_content=cache_name,
+                    thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+                    temperature=1.0,
+                    max_output_tokens=220,
+                )
+                cache_state = "warm"
+
         self._recorder.log_event(
             "llm_invoke",
             event=ev_tag,
@@ -282,12 +317,13 @@ class DJCoHostAgent(Agent):
             has_screen=bool(screen_jpeg),
             audio_seconds=int(audio_seconds),
             diet=diet,
+            cache_state=cache_state,
             prompt=text_prompt,
             invoke_dir=str(invoke_dir),
         )
         print(
             f"\n[llm {ev_tag} #{invoke_n:04d}] audio={len(audio_wav) // 1024}KB"
-            f"({int(audio_seconds)}s) diet={diet} "
+            f"({int(audio_seconds)}s) diet={diet} cache={cache_state} "
             f"screen={'yes' if screen_jpeg else 'no'} dump={invoke_dir.name}"
         )
 
@@ -302,7 +338,7 @@ class DJCoHostAgent(Agent):
             stream = await self._genai_client.aio.models.generate_content_stream(
                 model=LLM_MODEL,
                 contents=contents,
-                config=self._gen_cfg,
+                config=gen_cfg,
             )
             async for chunk in stream:
                 txt = getattr(chunk, "text", None) or ""
@@ -429,3 +465,18 @@ class DJCoHostAgent(Agent):
             )
         except Exception:
             pass
+
+    async def invalidate_cache(self) -> None:
+        """Invalidate the context cache — Plan 19-03 cancel-aware chokepoint.
+
+        Called by the cancel-and-refire path in Plan 19-01 (CancelGate
+        telemetry callback) to ensure the refire starts with a fresh cache
+        rather than one that may carry context from the cancelled in-flight
+        turn. No-op when the agent was constructed without a cache (the
+        Phase 4 backward-compat default).
+
+        This is the single public agent-side surface for cache invalidation —
+        downstream code (Plan 19-04 ack-bank wiring, future Settings UI)
+        SHOULD call this method, NOT reach into self._cache directly."""
+        if self._cache is not None:
+            await self._cache.invalidate()
