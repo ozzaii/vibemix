@@ -260,14 +260,15 @@ def test_recordings_events_result_accepts_empty_events_array() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 8 — drift-gate count parity (35 oneOf == 35 wrapper dataclasses
-# after Phase 20-04 added SessionCitation)
+# Test 8 — drift-gate count parity (36 oneOf == 36 wrapper dataclasses
+# after Phase 24-02 added SessionOverlayHighlight)
 # ---------------------------------------------------------------------------
 
 
-def test_count_parity_at_35() -> None:
+def test_count_parity_at_36() -> None:
     """Phase 15 Plan 01 bumped the IPC count 27 → 34 (+7 recordings.* families);
-    Phase 20-04 adds SessionCitation → 35. Both sides — schema oneOf and Python
+    Phase 20-04 added SessionCitation → 35; Phase 24-02 adds
+    SessionOverlayHighlight → 36. Both sides — schema oneOf and Python
     wrapper dataclasses — must match exactly.
     """
     from vibemix.ui_bus import messages as ui_bus_messages
@@ -280,8 +281,8 @@ def test_count_parity_at_35() -> None:
         and "type" in obj.__dataclass_fields__
     )
 
-    assert len(_SCHEMA["oneOf"]) == 35, "schema oneOf count should be 35 after Phase 20-04"
-    assert wrapper_count == 35, f"wrapper count {wrapper_count} != 35"
+    assert len(_SCHEMA["oneOf"]) == 36, "schema oneOf count should be 36 after Phase 24-02"
+    assert wrapper_count == 36, f"wrapper count {wrapper_count} != 36"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:
