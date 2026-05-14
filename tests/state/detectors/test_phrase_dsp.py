@@ -140,12 +140,16 @@ def test_band_limited_autocorr_locks_at_150bpm_and_170bpm():
 
 def test_band_limited_autocorr_rejects_high_freq_noise():
     """Pink noise band-limited to 1-4kHz (well above the 40-120Hz kick band)
-    must produce a much weaker autocorr peak than a real synthetic kick
-    pattern of identical duration. The 40-120Hz pre-band-limit is what
-    suppresses out-of-band content."""
+    must NOT produce a meaningful autocorr peak. The 40-120Hz pre-band-limit
+    suppresses out-of-band content; when the residual in-band energy is < 1%
+    of the input RMS, the function returns an empty array (anti-hallucination
+    per T-17-04-01 — never normalize numerical noise to 1.0 at lag-0).
+
+    Synthetic kick pattern of identical duration produces a real peak, so the
+    contract is asymmetric: kick → real autocorr; noise → empty / negligible."""
     rng = np.random.default_rng(seed=42)
     n = _SR * 16
-    # Generate white noise then high-pass via FFT mask to 1-4kHz
+    # Generate white noise then bandpass via FFT mask to 1-4kHz
     noise = rng.standard_normal(n).astype(np.float32)
     spec = np.fft.rfft(noise)
     freqs = np.fft.rfftfreq(n, d=1.0 / _SR)
@@ -163,15 +167,17 @@ def test_band_limited_autocorr_rejects_high_freq_noise():
     kick = _synth_kick_pattern(130.0, duration_s=16.0, sr=_SR)
     ac_kick = band_limited_autocorr(kick, _SR)
 
-    # Look at the dominant lag>0 peak in each.
-    # (lag-0 is normalized to 1 by definition; we want lag>0 strength.)
-    noise_peak = float(np.max(np.abs(ac_noise[100:])))
-    kick_peak = float(np.max(np.abs(ac_kick[100:])))
-
-    assert kick_peak > 0.0, "synthetic kick should produce a measurable peak"
-    assert noise_peak < 0.3 * kick_peak, (
-        f"out-of-band noise peak {noise_peak:.3f} should be < 30% of kick peak {kick_peak:.3f}"
-    )
+    # Kick produces a real autocorr; out-of-band noise produces an empty array.
+    assert ac_kick.size > 0, "synthetic kick must produce a measurable autocorr"
+    if ac_noise.size > 0:
+        # If any residual passed the 1% floor, the lag>0 peak must be much
+        # weaker than the kick's lag>0 peak.
+        noise_peak = float(np.max(np.abs(ac_noise[100:]))) if ac_noise.size > 100 else 0.0
+        kick_peak = float(np.max(np.abs(ac_kick[100:])))
+        assert noise_peak < 0.3 * kick_peak, (
+            f"out-of-band noise peak {noise_peak:.3f} should be < 30% of kick peak {kick_peak:.3f}"
+        )
+    # Either branch satisfies the rejection contract.
 
 
 # ---------------------------------------------------------------------------
