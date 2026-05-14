@@ -73,14 +73,15 @@ log = logging.getLogger("vibemix.wizard")
 # Bundled fallback greeting WAV — Wave 4 ships ``offline-greeting.wav`` under
 # ``tauri/ui/public/audio/`` so the smoke test still plays audio when Gemini
 # is down on first launch. ``scripts/gen_offline_greeting.py`` regenerates it.
-_OFFLINE_GREETING_PATH = (
-    Path(__file__).resolve().parents[3]
-    / "tauri"
-    / "ui"
-    / "public"
-    / "audio"
-    / "offline-greeting.wav"
-)
+def _resolve_offline_greeting_path() -> Path:
+    rel = Path("tauri") / "ui" / "public" / "audio" / "offline-greeting.wav"
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return Path(meipass) / rel
+    return Path(__file__).resolve().parents[3] / rel
+
+
+_OFFLINE_GREETING_PATH = _resolve_offline_greeting_path()
 
 
 class WizardLoop:

@@ -21,6 +21,7 @@ ref-resolver is cached internally, much cheaper than top-level
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -36,12 +37,18 @@ from vibemix.ui_bus.schemas.debrief import (
 )
 from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
 
-# Resolve the schema relative to this file:
-#   src/vibemix/ui_bus/messages.py  -> parents[3] == repo root.
-#   parents[0] = ui_bus, [1] = vibemix, [2] = src, [3] = repo root.
-_SCHEMA_PATH = (
-    Path(__file__).resolve().parents[3] / "tauri" / "ui" / "src" / "ipc" / "messages.schema.json"
-)
+
+def _resolve_schema_path() -> Path:
+    rel = Path("tauri") / "ui" / "src" / "ipc" / "messages.schema.json"
+    # PyInstaller-frozen bundle: schema bundled under sys._MEIPASS.
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return Path(meipass) / rel
+    # Dev source tree: parents[3] from src/vibemix/ui_bus/messages.py == repo root.
+    return Path(__file__).resolve().parents[3] / rel
+
+
+_SCHEMA_PATH = _resolve_schema_path()
 _SCHEMA: dict = json.loads(_SCHEMA_PATH.read_text())
 _VALIDATOR = jsonschema.Draft7Validator(_SCHEMA)
 
