@@ -332,3 +332,85 @@ def test_build_prompt_track_change_with_prev_flows_through():
     out = AICoach.build_prompt(ev)
     assert "event=TRACK_CHANGE" in out
     assert "(was: 'A')" in out
+
+
+# =============================================================================
+# Phase 18 Plan 02 — AICoach evidence_line + build_prompt registry_snapshot
+# =============================================================================
+
+
+def test_18_02_evidence_line_byte_identical_when_no_snapshot():
+    """Test L — backward-compat: existing signature still works.
+
+    AICoach.evidence_line(state) without snapshot kwarg returns the SAME
+    string it does today (byte-for-byte). Existing test_coach.py tests stay
+    GREEN unchanged (verified by the rest of this file). This test pins
+    the no-kwarg path explicitly.
+    """
+    state = MusicState()  # silent default
+    out_no_kwarg = AICoach.evidence_line(state)
+    out_none_kwarg = AICoach.evidence_line(state, registry_snapshot=None)
+    assert out_no_kwarg == out_none_kwarg
+    # Byte-identical to the v4 silent baseline pinned in
+    # test_evidence_line_silent_state_full_format above.
+    assert out_no_kwarg == (
+        "hearing[silent] | track=unknown | deck=none | set_time=0:00 | recent_moves[8s]: NONE"
+    )
+
+
+def test_18_02_evidence_line_appends_corpus_footer_when_snapshot_present():
+    """Test M — snapshot kwarg appended as evidence-corpus footer.
+
+    AICoach.evidence_line(state, registry_snapshot={...}) appends a single
+    line "evidence_corpus[ev=N,aud=M,mix=K]" at the end where N/M/K are
+    integer counts of observations per source. Only present when snapshot
+    is non-None AND has at least one observation; otherwise omitted.
+    """
+    state = MusicState()
+    snapshot = {
+        "ev": {"HEARTBEAT": (10.0, 80.0), "MIX_MOVE": (45.0,)},  # 3 obs
+        "aud": {"rms": (5.0, 6.0, 7.0, 8.0), "bpm": (5.0,)},     # 5 obs
+        "mix": {"phase=drop": (45.0,)},                           # 1 obs
+    }
+    out = AICoach.evidence_line(state, registry_snapshot=snapshot)
+    assert "evidence_corpus[ev=3,aud=5,mix=1]" in out
+    # Footer appears once, at the very end (after the last existing pipe)
+    assert out.endswith("evidence_corpus[ev=3,aud=5,mix=1]")
+
+
+def test_18_02_evidence_line_omits_footer_when_snapshot_empty():
+    """Empty snapshot dict → footer omitted (no zero-only line)."""
+    state = MusicState()
+    out_empty = AICoach.evidence_line(state, registry_snapshot={})
+    assert "evidence_corpus" not in out_empty
+
+    # All-zero counts (snapshot has source keys but no observations) → omitted
+    out_zero_obs = AICoach.evidence_line(state, registry_snapshot={"ev": {}, "aud": {}, "mix": {}})
+    assert "evidence_corpus" not in out_zero_obs
+
+
+def test_18_02_evidence_line_handles_missing_source_keys():
+    """Snapshot with only some source keys → counts the present ones, treats
+    missing keys as 0. No KeyError."""
+    state = MusicState()
+    snapshot = {"ev": {"HEARTBEAT": (10.0,)}}  # only ev, no aud/mix
+    out = AICoach.evidence_line(state, registry_snapshot=snapshot)
+    assert "evidence_corpus[ev=1,aud=0,mix=0]" in out
+
+
+def test_18_02_build_prompt_threads_snapshot_kwarg():
+    """Test N — build_prompt accepts and threads snapshot.
+
+    AICoach.build_prompt(ev, registry_snapshot=...) calls evidence_line with
+    the same snapshot. Default None preserves Phase 4 invariant.
+    """
+    ev = _ev("HEARTBEAT")
+    snapshot = {"ev": {"HEARTBEAT": (45.0,)}}
+    out = AICoach.build_prompt(ev, registry_snapshot=snapshot)
+    assert "evidence_corpus[ev=1,aud=0,mix=0]" in out
+
+    # Default None preserves Phase 4 invariant — same as build_prompt(ev)
+    out_default = AICoach.build_prompt(ev)
+    out_none = AICoach.build_prompt(ev, registry_snapshot=None)
+    assert out_default == out_none
+    assert "evidence_corpus" not in out_default
