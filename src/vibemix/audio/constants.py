@@ -68,6 +68,13 @@ MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 e
     "KICK_SWAP": 14.0,
     "SUB_LAYER_ARRIVAL": 16.0,
     "KICK_DENSITY_SHIFT": 18.0,
+    # Plan 17-03 — paired breakdown / re-entry detectors. KILL gets the same
+    # 20s cooldown as MIX_MOVE (it's a structural moment, not a fast tap).
+    # REENTRY uses 12s — shorter because the kill→reentry pair is bounded
+    # (KICK_REENTRY_MAX_AGE_S = 30s); a longer cooldown would push the
+    # re-entry past the natural pair window and silently swallow the moment.
+    "BREAKDOWN_KICK_KILL": 20.0,
+    "REENTRY_KICK_LAND": 12.0,
 }
 
 TRACK_CHANGE_MIN_CONFIDENCE = 0.5  # v4:143 — ignore stale nowplaying-cli phantom tracks
@@ -119,3 +126,32 @@ SUB_JUMP_THRESHOLD: float = 0.10
 # ≈ 1.0/sec, 4-on-floor techno ≈ 2.5/sec, hard tek 4-on-floor ≈ 5.0/sec —
 # 1.5/sec is the smallest robustly-detectable shift between any two regimes.
 KICK_DENSITY_SHIFT_DELTA: float = 1.5
+
+# ---- Phase 17 Plan 03 — Breakdown / Re-entry detector thresholds (SENSE-12) ----
+# Paired detectors: BREAKDOWN_KICK_KILL fires when the kick disappears mid-track
+# (filter sweep / breakdown / drop preparation); REENTRY_KICK_LAND fires when
+# the kick comes back near a downbeat within KICK_REENTRY_MAX_AGE_S of the kill.
+#
+# KICK_KILL_SUB_FLOOR: sub_share floor below which the kick is "killed". Half
+# of LAYER_ARRIVAL high_jump magnitude (0.10) — kick removal is a smaller
+# fraction-shift than a layer arrival because the sub band only needs to drop,
+# not jump (its floor doubles as the no-kick anchor for the re-entry watch).
+KICK_KILL_SUB_FLOOR: float = 0.10
+# KICK_KILL_SUB_DROP_MIN: minimum (prev_sub - new_sub) magnitude — anti-noise
+# gate. Without this floor a quiet section that's been at sub=0.08 baseline
+# could spuriously fire the kill detector the first time we read it.
+KICK_KILL_SUB_DROP_MIN: float = 0.15
+# KICK_REENTRY_SUB_FLOOR: hysteresis floor — re-entry requires sub_share to
+# recover above 0.18 (higher than KICK_KILL_SUB_FLOOR=0.10 to avoid rapid
+# re-fire on jitter near the kill floor).
+KICK_REENTRY_SUB_FLOOR: float = 0.18
+# KICK_REENTRY_BAR_TOLERANCE: beat_phase distance-to-downbeat tolerance.
+# 0.20 = ±20% of one bar (beat_phase ∈ [0, 1)). Looser than ±1 beat (0.25)
+# per CONTEXT — Hard Tek's distorted onsets blur precise downbeat detection,
+# so we accept ±20% of bar; SENSE-14 PHRASE_BOUNDARY (Plan 04) sharpens the
+# absolute downbeat, but re-entry just needs "near a downbeat" not exact lock.
+KICK_REENTRY_BAR_TOLERANCE: float = 0.20
+# KICK_REENTRY_MAX_AGE_S: maximum age of a kill event for the re-entry to
+# still pair with it. After 30s the breakdown effectively "ended on its own"
+# — there's no specific re-entry moment worth calling out anymore.
+KICK_REENTRY_MAX_AGE_S: float = 30.0
