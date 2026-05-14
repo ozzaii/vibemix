@@ -200,11 +200,11 @@
 
 ### Latency & Liveness — The Latency Stack
 
-- [ ] **LATENCY-01**: Pre-canned ack bank — 40 OPUS samples (Achird voice, generated offline once + pinned to TTS model version), bypass LiveKit TTS path via direct `PlaybackQueue.push()`
-- [ ] **LATENCY-02**: Ack rotation deque (maxlen=10) prevents same-sample-within-30s collision per event class
-- [ ] **LATENCY-03**: Per-event-class ack buckets — `drop_hit/`, `track_change/`, `mix_move/`, `silence_break/`, `generic_filler/`
-- [ ] **LATENCY-04**: Ack fires only when `rolling_ttft_avg_ms > 800`; suppresses when LLM is fast that turn
-- [ ] **LATENCY-05**: Min-ack-to-response gap = 400ms to prevent awkward overlap
+- [x] **LATENCY-01**: Pre-canned ack bank — 40 OPUS samples (Achird voice, generated offline once + pinned to TTS model version), bypass LiveKit TTS path via direct `PlaybackQueue.push()`
+- [x] **LATENCY-02**: Ack rotation deque (maxlen=10) prevents same-sample-within-30s collision per event class
+- [x] **LATENCY-03**: Per-event-class ack buckets — `drop_hit/`, `track_change/`, `mix_move/`, `silence_break/`, `generic_filler/`
+- [x] **LATENCY-04**: Ack fires only when `rolling_ttft_avg_ms > 800`; suppresses when LLM is fast that turn
+- [x] **LATENCY-05**: Min-ack-to-response gap = 400ms to prevent awkward overlap
 - [x] **LATENCY-06**: `CachedLLM` subclass injecting `cached_content` via `extra_kwargs`; ~500-1500ms TTFT win per call
 - [x] **LATENCY-07**: System instruction padded with deterministic context (MIDI map dump + event taxonomy enum + persona spec) to stay above Gemini's 1024-token cache floor when prompt-dieting
 - [x] **LATENCY-08**: Cache lifecycle manager — creates cache on session start, refreshes every 4 min (TTL 5min minimum)

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: prompt-only)
 status: completed
-last_updated: "2026-05-14T04:14:38.966Z"
-last_activity: 2026-05-14 -- Phase 18 marked complete
+last_updated: "2026-05-14T04:33:00.000Z"
+last_activity: 2026-05-14 -- Phase 19 Plan 04 (AckBank) shipped — Phase 19 latency stack v1 COMPLETE
 progress:
   total_phases: 12
-  completed_phases: 2
+  completed_phases: 4
   total_plans: 24
-  completed_plans: 16
-  percent: 67
+  completed_plans: 18
+  percent: 75
 ---
 
 # vibemix — State
@@ -33,10 +33,10 @@ progress:
 
 ## Current Position
 
-Phase: 18 — COMPLETE
+Phase: 19 — COMPLETE
 Plan: Not started
-Status: Phase 18 complete
-Last activity: 2026-05-14 -- Phase 18 marked complete
+Status: Phase 19 (Latency Stack v1) complete — 19-01 CancelGate + 19-02 prompt diet + 19-03 GeminiContextCache + 19-04 AckBank all shipped
+Last activity: 2026-05-14 -- Phase 19 Plan 04 (AckBank) shipped
 
 ## Performance Metrics
 
@@ -116,10 +116,14 @@ All Phase 1–14 decisions remain locked. Highlights for v2.0 plan-checker:
 
 - 2026-05-13 — Phase 14 (CDJ Whisper v5 Migration + Polish) ✅ shipped end-to-end. Backward-compat shim deleted; Saira + JetBrains Mono vendored; legacy fonts removed; all four surfaces (wizard, session, settings, mascot) consume v5 primitives directly. POLISH-01/02/04/06 closed; POLISH-03 closed in 14-05; POLISH-05 perf verification on Kaan rig deferred to `npm run tauri dev` review session.
 - 2026-05-14 — Milestone v2.0 roadmap generated. 12 phases P15-P26 derived from 94 v2.0 REQ-IDs anchored to research/SUMMARY.md 12-phase decomposition. Outstanding v0.1.0 work absorbed into v2.0 (recording browser → P15, sign+release → P21, README + Day-Zero ops + viral demo → P26). All 9 Critical pitfalls encoded into phase plans (P1 → P19, P2 → P20, P3 → P24, P4 → P24, P5 → P21, P6 → P21, P7 → P21, P8 → P19, P9 → P22). Two parallel bundles (P17||P18, P22||P23). Critical-path total ~10-12 weeks engineering, binary shippable from P21 close. Cross-document contradictions reconciled (debrief = architectural slot only in v2.0; 6 baseline detectors in v2.0, 2 Hard Tek overlay deferred to v2.1). Wave 0 day-1 spikes reserved in P22 / P24 / P25 plan files.
+- 2026-05-14 — Phase 19 (Latency Stack v1) COMPLETE end-to-end. 19-01 CancelGate chokepoint (cancel-cooldown 8s + soft cap 30/session, Pitfall 1 closed), 19-02 prompt diet (audio 18s→6s + screen-skip on MIX_MOVE/HEARTBEAT), 19-03 GeminiContextCache (1024-token floor + 4min refresh + invalidate hook, Pitfall 11 closed), 19-04 AckBank (40 silent-OPUS placeholders + per-bucket rotation deque + four-gate `should_fire` honoring TTFT + cancel-cooldown cross-cut + min-gap-to-response/ack, Pitfall 8 closed). Plan 19-04 surfaced two follow-ups: (a) AckBank wiring in coach loop (deferred per planner SUMMARY deviation #5), (b) Kaan-action: real Achird-voice OPUS recordings to replace silent placeholders before v2.0 RC. Tests: 1711 passed (was 1692), 9 pre-existing failures unchanged. Phase 20 (Citation Linter ENFORCEMENT) now unblocked.
 
 ### Next Session
 
+- **P19-04 followup: AckBank wiring in coach loop** — call `should_fire` on every Event before LLM dispatch; if `(True, "fire")` then `pick_for_event` → `PlaybackQueue.push(pcm.tobytes())`; plumb `cancel_cooldown_active` from `CancelGate.last_cancel_at + CANCEL_COOLDOWN_S`; plumb `rolling_ttft_avg_ms` from session telemetry; emit `recorder.log_event("ack_fire", ...)` for Phase 16 attribution. Without this, the bank is loaded but never fires.
+- **P19-04 followup: real Achird-voice OPUS recordings** — replace 40 silent placeholders one-for-one (Kaan-action; offline Gemini TTS Achird voice; ~80-200ms each; re-run AIza-key scan on new bytes per CONTEXT D-08).
 - Run `/gsd-plan-phase 15` to plan Phase 15 — Recording Browser + Retention Enforcement (REC-07, REC-08). Cheap, no upstream dependencies — knock it out first.
+- Phase 20 (Citation Linter ENFORCEMENT) now unblocked — depends on Phase 18 (EvidenceRegistry, ✅) + Phase 19 (ack bank, ✅). `/gsd-plan-phase 20` ready when prioritized.
 - Schedule Kaan's first DJ-set ear-test session to land alongside P17/P18 ship — Phase 16 is calendar-blocking on tuning signal.
 - Optional pre-P21: re-verify SignPath OSS application status (file Day-1 of P21 if not approved).
 - Kaan-side outstanding (Phase 14 deferred): (a) `npm run tauri dev` visual review of all four CDJ Whisper v5 surfaces; (b) performance toggle persistence rehearsal; (c) macOS prefers-reduced-motion rehearsal; (d) Windows transparency rehearsal (deferred to Phase 26 fresh-VM).
