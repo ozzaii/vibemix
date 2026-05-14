@@ -53,6 +53,31 @@ class MusicState:
     bpm_confidence: float = 0.0  # 0..1 — 0 means "no BPM lock yet"
     downbeat_phase: float = 0.0  # 0..1 — fraction through current bar
 
+    # Phase 17 — Hard Tek detectors v1 (SENSE-13). Backward-compat defaults
+    # so Phase 3 golden-equivalence holds. These four fields are READ by the
+    # Wave 2 detectors (KICK_SWAP, SUB_LAYER_ARRIVAL, BREAKDOWN_KICK_KILL,
+    # REENTRY_KICK_LAND, KICK_DENSITY_SHIFT, PHRASE_BOUNDARY) and by the
+    # GenreRouter; they are WRITTEN only inside the existing single-writer
+    # block in state_refresh_loop._tick_once.
+    #
+    # `predicted_drop_in_sec` stays None unless a Phase 17 v2.1 telemetry
+    # guard flips it on — predictive drop firing is OFF-by-default in v2.0
+    # per CONTEXT D. Downstream consumers MUST treat it as Optional[float]
+    # and honor None as "predictive firing OFF" (T-17-01-04 mitigation).
+    #
+    # `active_genre` is one of "house" / "techno" / "hard_tek" / "unknown";
+    # invalid BPM yields "unknown" (anti-hallucination — no fabricated genre
+    # during BPM lock-up; mirrors the v4 `_music_truly_playing` rule and
+    # T-17-01-01 mitigation).
+    #
+    # `beat_phase` is a Phase-17-named alias of `downbeat_phase` so SENSE-12
+    # detector module imports don't reach into Phase-13 naming. Both fields
+    # carry the bar-fraction in [0, 1).
+    buildup_score: float = 0.0  # 0..1 — trailing 8s monotonic energy climb
+    predicted_drop_in_sec: float | None = None  # OFF by default in v2.0
+    beat_phase: float = 0.0  # 0..1 — Phase 17 alias of downbeat_phase
+    active_genre: str = "unknown"  # "house" | "techno" | "hard_tek" | "unknown"
+
     # Controller (snapshot from MIDI thread)
     deck_a: dict = field(default_factory=dict)
     deck_b: dict = field(default_factory=dict)
