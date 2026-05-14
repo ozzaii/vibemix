@@ -51,6 +51,7 @@ from vibemix.agent import (
     MIC_DEVICE,
     OPENROUTER_TTS_MODEL,
     OUTPUT_DEVICE,
+    SYSTEM_INSTRUCTION,
     TTS_FALLBACK_MODEL,
     TTS_MODEL,
     VOICE,
@@ -62,6 +63,8 @@ from vibemix.agent import (
     get_or_create_install_uuid,
     get_or_refresh_jwt,
 )
+from vibemix.agent.ack_bank import AckBank
+from vibemix.agent.cache import GeminiContextCache
 from vibemix.audio import (
     INPUT_CHUNK_FRAMES,
     INPUT_SR_NATIVE,
@@ -84,8 +87,10 @@ from vibemix.audio import (
 from vibemix.audio.recorder import sweep_crashed_sessions
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
 from vibemix.runtime import coach_loop, diag_loop, ws_broadcast
+from vibemix.runtime.cancel import CancelGate
 from vibemix.runtime.config_store import app_data_dir, load_config
 from vibemix.runtime.recordings_index import run_retention_sweep
+from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import EventDetector, MusicState, state_refresh_loop
 
 load_dotenv()
@@ -431,6 +436,25 @@ async def main() -> None:
         tts_inst = build_tts_chain(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
         print(f"-> tts:   {OPENROUTER_TTS_MODEL} via proxy (voice={VOICE})")
 
+    # ---- Plan 19-05 — Phase 19 latency-stack wiring ----
+    # Construct the four primitives BEFORE the agent so we can pass
+    # cache + ttft_meter into DJCoHostAgent and ack_bank + cancel_gate
+    # + ttft_meter + playback into coach_loop.
+    ttft_meter = TTFTMeter()
+    ack_bank = AckBank()  # eager-loads 40 OPUS files; raises AckBankError on bad shape
+    cancel_gate = CancelGate()
+    cache: GeminiContextCache | None = GeminiContextCache(
+        client=genai_client,
+        system_instruction_body=SYSTEM_INSTRUCTION,
+        model=LLM_MODEL,
+    )
+    try:
+        await cache.create()
+        print("-> cache: warm (Gemini context cache active)")
+    except Exception as e:
+        print(f"-> cache disabled: {e}", file=sys.stderr)
+        cache = None  # graceful degradation — agent's None-cache branch handles it
+
     agent = DJCoHostAgent(
         genai_client=genai_client,
         clean_audio_buf=clean_audio_buf,
@@ -439,6 +463,8 @@ async def main() -> None:
         recorder=recorder,
         llm_inst=llm_inst,
         tts_inst=tts_inst,
+        cache=cache,
+        ttft_meter=ttft_meter,
     )
 
     session = AgentSession(llm=llm_inst, tts=tts_inst)
@@ -476,8 +502,19 @@ async def main() -> None:
             manual_trigger,
             trigger_state,
             stop_event,
+            ack_bank=ack_bank,
+            cancel_gate=cancel_gate,
+            ttft_meter=ttft_meter,
+            playback=playback,
         )
     )
+
+    # Plan 19-05 — spawn cache refresh_loop AFTER session.start so the
+    # cache lifecycle runs alongside the live event loop. Skipped when
+    # cache is None (graceful degradation path).
+    cache_refresh_task: asyncio.Task | None = None
+    if cache is not None:
+        cache_refresh_task = asyncio.create_task(cache.refresh_loop(stop_event))
 
     # --- Input stream — last because state must be ready ---
     input_stream = audio_backend.open_capture(
@@ -495,7 +532,17 @@ async def main() -> None:
         await stop_event.wait()
     finally:
         midi_stop.set()
-        for t in (coach_task, refresh_task, screen_task, ws_task, diag_task, track_task):
+        cleanup_tasks: list[asyncio.Task] = [
+            coach_task,
+            refresh_task,
+            screen_task,
+            ws_task,
+            diag_task,
+            track_task,
+        ]
+        if cache_refresh_task is not None:
+            cleanup_tasks.append(cache_refresh_task)
+        for t in cleanup_tasks:
             t.cancel()
             try:
                 await t
