@@ -61,7 +61,7 @@ class KickSwapDetector:
     def detect(
         self,
         state: "MusicState",
-        audio_buf: "AudioBuffer",
+        audio_buf: "AudioBuffer | None",
         now: float,
     ) -> Event | None:
         """Return an ``Event("KICK_SWAP", ...)`` when the kick-band centroid
@@ -71,11 +71,24 @@ class KickSwapDetector:
         Order of gates matters — silence gate fires FIRST so a silent buffer
         doesn't seed a phantom baseline (anti-hallucination per the v4
         "trust the audio" rule).
+
+        ``audio_buf=None`` is a graceful no-op (Plan 17-05 contract — when
+        EventDetector is constructed without an audio_buf the kick-side
+        detectors silently can't fire; no exception, no log per T-17-05
+        threat note).
         """
         # 1. Silence gate: must be BEFORE baseline seeding. A breakdown / pause
         #    must NOT seed a "kick at 0Hz" baseline that the next audible tick
         #    would diff against.
         if state.rms < LOW_RMS:
+            return None
+
+        # 1b. audio_buf-required gate (Plan 17-05). KickSwap needs raw samples
+        #     to compute the kick-band centroid; without an audio_buf there's
+        #     nothing to snapshot. Graceful no-op — keep last_centroid_hz so
+        #     the moment audio_buf is supplied (e.g. in __main__.py) we can
+        #     resume seeding.
+        if audio_buf is None:
             return None
 
         # 2-3. Snapshot the trailing _WINDOW_SEC and compute the kick-band

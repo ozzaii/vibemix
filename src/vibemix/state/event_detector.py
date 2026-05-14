@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """EventDetector — verbatim port of cohost_v4.py:1169-1325.
 
-TWO STRUCTURAL DEVIATIONS FROM V4:
+THREE STRUCTURAL DEVIATIONS FROM V4:
   1. (Phase 3) v4:1182-1186 had three class-level constants
      (MUSIC_PRESENCE_MIN_SECONDS, BPM_VALID_MIN, BPM_VALID_MAX). 02-PATTERNS.md
      + 03-CONTEXT.md lifted them OUT to ``vibemix.audio.constants`` so all
@@ -13,6 +13,14 @@ TWO STRUCTURAL DEVIATIONS FROM V4:
      The baseline ``self.last_band_signature = sig`` line is preserved so a
      non-vocal post-vocal jump doesn't false-fire against a stale baseline.
      Every other gate + cooldown is v4 byte-identical.
+  3. (Phase 17 Plan 05) EventDetector now COMPOSES a ``GenreRouter`` (SENSE-11)
+     and consults its active chain on every ``.detect()`` call AFTER the v4
+     baseline rules (TRACK_CHANGE / PHASE / LAYER_ARRIVAL / MIX_MOVE) and
+     BEFORE the HEARTBEAT fallthrough. The constructor gains an OPTIONAL
+     ``audio_buf=None`` kwarg that's threaded through to chain detectors
+     that need raw samples (KickSwap, PhraseBoundary). Default ``None``
+     preserves backward compat with ``EventDetector()`` callers (coach.py
+     unchanged; tests that exercise baseline rules unchanged).
 
 The three cardinal rules (from v4:1170-1180):
     1. KAAN_SPOKE + MANUAL always bypass the music-presence gate.
@@ -25,11 +33,17 @@ The three cardinal rules (from v4:1170-1180):
 MIX_MOVE significance keys (v4:1299-1305 — verbatim, this is the v4 anti-slop
 tightening from v3's looser set):
     ('killed', '_low:', '_mid:', '_hi:', '_filter:', 'xfader', 'big', '_play→')
+
+Priority order with the genre chain inserted:
+    KAAN_SPOKE > MANUAL > [music-presence gate] > TRACK_CHANGE > PHASE
+    > LAYER_ARRIVAL > MIX_MOVE > [genre-chain detectors in chain order]
+    > HEARTBEAT
 """
 
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
 from vibemix.audio.constants import (
     BPM_VALID_MAX,
@@ -41,7 +55,11 @@ from vibemix.audio.constants import (
     TRACK_CHANGE_MIN_CONFIDENCE,
 )
 from vibemix.state.event import Event
+from vibemix.state.genre_router import GenreRouter
 from vibemix.state.music_state import MusicState
+
+if TYPE_CHECKING:
+    from vibemix.audio.buffers import AudioBuffer
 
 
 class EventDetector:
@@ -60,7 +78,15 @@ class EventDetector:
     # vibemix.audio.constants so the constants are configurable from one place.
     # EventDetector imports them at module scope (above); no class-attrs needed.
 
-    def __init__(self):
+    def __init__(self, audio_buf: "AudioBuffer | None" = None) -> None:
+        """Construct EventDetector with optional ``audio_buf`` for genre-chain
+        detectors that need raw samples (KickSwap, PhraseBoundary).
+
+        Default ``audio_buf=None`` preserves backward compat — every existing
+        caller (``coach.py`` test fixtures, the v4-baseline test suite) still
+        constructs ``EventDetector()`` with no arguments. Genre detectors that
+        need samples will gracefully no-op when audio_buf is None (their
+        snapshot calls return empty data → first-call seeding only)."""
         self.last_event_at = 0.0
         self.last_per_type_at: dict[str, float] = {}
         self.last_phase: str = "silent"
@@ -69,6 +95,14 @@ class EventDetector:
         self.last_mix_moves_seen: list[str] = []
         # Music-presence tracking
         self._audible_since: float | None = None
+
+        # Phase 17 Plan 05 — genre-chain composition. Router defaults to
+        # the "unknown" baseline chain (empty list), so behavior matches v4
+        # byte-identical until a state with active_genre != "unknown"
+        # arrives. The audio_buf is THREADED through to chain detectors on
+        # every iteration (see .detect() below).
+        self.audio_buf = audio_buf
+        self.router = GenreRouter(initial_genre="unknown")
 
     def _cooldown_ok(self, ev_type: str, now: float) -> bool:
         gap = MIN_EVENT_GAP_PER_TYPE.get(ev_type, EVENT_GLOBAL_MIN_GAP)
@@ -102,6 +136,14 @@ class EventDetector:
 
     def detect(self, state: MusicState, *, kaan_just_spoke: bool, manual: bool) -> Event | None:
         now = time.time()
+
+        # Phase 17 Plan 05 — atomic chain swap on active_genre flip. The swap
+        # happens HERE at the top of detect(), BEFORE any iteration so a swap
+        # mid-call cannot leave a half-iterated chain (T-17-05-02 mitigation).
+        # Same-genre swap is a no-op (idempotent — chain detectors keep their
+        # seeded baselines across spurious-equal flips).
+        if state.active_genre != self.router.current_genre:
+            self.router.swap(state.active_genre)
 
         # Mic + manual bypass silence guards (conversation/control events)
         if kaan_just_spoke and self._cooldown_ok("MIC", now):
@@ -211,7 +253,19 @@ class EventDetector:
         # Always keep seen-list fresh so we don't replay old moves later
         self.last_mix_moves_seen = [m for _, m in state.recent_moves][-12:]
 
-        # 5) Heartbeat — long silence in conversation while music is going
+        # 5) Genre-chain detectors (Phase 17 Plan 05 — SENSE-11 / SENSE-15).
+        # Iterate the active per-genre chain in registration order; first
+        # detector to return an Event wins. The audio_buf threaded into
+        # __init__ is passed to each detector — those that don't need it
+        # (SubLayerArrival, KickDensityShift, BreakdownKickKill) ignore it.
+        # This is BEFORE the HEARTBEAT step so a real genre event always
+        # beats the long-silence catch-all.
+        for det in self.router.active_chain():
+            ev = det.detect(state, self.audio_buf, now)
+            if ev is not None:
+                return ev
+
+        # 6) Heartbeat — long silence in conversation while music is going
         if self._cooldown_ok("HEARTBEAT", now):
             self._fire("HEARTBEAT", now)
             return Event("HEARTBEAT", state)

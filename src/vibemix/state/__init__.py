@@ -41,6 +41,7 @@ from vibemix.state.genre import (
     set_active_profile,
     validate_bpm,
 )
+from vibemix.state.genre_router import GenreRouter
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
 from vibemix.state.refresh import state_refresh_loop
@@ -52,6 +53,7 @@ __all__ = [
     "Event",
     "EventDetector",
     "GenreProfile",
+    "GenreRouter",
     "HysteresisState",
     "MusicState",
     "VocalDetector",

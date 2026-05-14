@@ -356,7 +356,11 @@ async def main() -> None:
     state = MusicState()
     state.set_start_at = _time.time()
     state.phase_started_at = _time.time()
-    event_detector = EventDetector()
+    # Phase 17 Plan 05 — pass audio_buf to EventDetector so genre-chain
+    # detectors that need raw samples (KickSwap, PhraseBoundary) can call
+    # snapshot APIs on it. Default-None signature in EventDetector.__init__
+    # keeps the no-arg form working for tests + coach.py callers.
+    event_detector = EventDetector(audio_buf=audio_buf)
 
     # --- Audio I/O via AudioMacOS firewall ---
     audio_backend = AudioMacOS(registry, recorder)

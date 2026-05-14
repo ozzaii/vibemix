@@ -101,7 +101,7 @@ class PhraseBoundaryDetector:
     def detect(
         self,
         state: "MusicState",
-        audio_buf: "AudioBuffer",
+        audio_buf: "AudioBuffer | None",
         now: float,
     ) -> Event | None:
         """Return an ``Event("PHRASE_BOUNDARY", ...)`` when a downbeat closes
@@ -117,9 +117,22 @@ class PhraseBoundaryDetector:
             4. Lock seeding — only when no anchor OR BPM changed materially.
             5. Bar arithmetic + min-bars-between-fires + cooldown + boundary
                check.
+
+        ``audio_buf=None`` is a graceful no-op (Plan 17-05 contract — when
+        EventDetector is constructed without an audio_buf the lock-seeding
+        step has no samples to work with; detector silently can't fire,
+        no exception, no log per T-17-05 threat note). The kill-driven
+        self-correction step still runs because it doesn't need samples —
+        it just observes ``kill_detector.last_kill_at``.
         """
         # 1. Silence gate (RMS floor + Phase 6 silent classification).
         if state.rms < LOW_RMS or state.phase == "silent":
+            return None
+
+        # 1b. audio_buf-required gate (Plan 17-05). The lock-seeding step
+        #     needs raw samples for autocorr; without an audio_buf there's
+        #     nothing to seed the downbeat lock with. Graceful no-op.
+        if audio_buf is None:
             return None
 
         # 2. BPM confidence gate — anti-hallucination per T-17-04-01.
