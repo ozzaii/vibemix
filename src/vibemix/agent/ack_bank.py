@@ -240,9 +240,70 @@ class AckBank:
         available = [i for i in range(ACKS_PER_BUCKET) if i not in rot]
         if available:
             idx = available[0]
+            rot.append(idx)
         else:
-            # LRU fallback — deque[0] is the oldest entry. Guarded by the
-            # test_pick_for_event_lru_fallback_when_all_indices_in_deque case.
-            idx = rot[0]
-        rot.append(idx)
+            # LRU fallback — deque[0] is the oldest entry. Pop it from the
+            # head AND re-append so the next call sees a different LRU
+            # (otherwise the head stays pinned to the same idx forever
+            # and pick_for_event silently returns the same clip on every
+            # over-saturated call). Guarded by
+            # test_pick_for_event_lru_fallback_when_all_indices_in_deque.
+            idx = rot.popleft()
+            rot.append(idx)
         return (bucket, self._clips[bucket][idx], idx)
+
+    # ------------------------------------------------------------------
+    # Four-gate fire decision (LATENCY-04 + LATENCY-05 + Plan 19-01 cross-cut)
+    # ------------------------------------------------------------------
+
+    def should_fire(
+        self,
+        rolling_ttft_avg_ms: float,
+        last_ack_at: float | None,
+        last_response_at: float | None,
+        cancel_cooldown_active: bool,
+    ) -> tuple[bool, str]:
+        """Decide whether to play an ack right now.
+
+        Returns ``(decision, reason)`` where ``reason`` is a one-word tag the
+        wiring caller logs as telemetry. The four gates apply in this order
+        (short-circuit on first deny):
+
+        1. **TTFT gate (LATENCY-04)** — only fire when Gemini is slow enough
+           that an ack is needed to bridge the perceived gap. ``rolling_ttft_avg_ms
+           <= ACK_TTFT_GATE_MS`` (≤ 800ms) → ``"ttft_ok"`` (suppress).
+        2. **Cancel-cooldown (CONTEXT D-08 cross-cut from Plan 19-01)** — no
+           ack while CancelGate is mid-cooldown. Firing both an ack and the
+           refire would mean two distinct reactions back-to-back, which is
+           the slop failure mode the latency stack exists to prevent.
+        3. **Min-gap to previous response (LATENCY-05)** — too soon after the
+           previous Gemini reply finished playing. ``now - last_response_at <
+           ACK_MIN_GAP_S`` → ``"min_gap"``.
+        4. **Min-gap to previous ack** — guard against rapid back-to-back
+           acks (e.g. two events firing inside 200ms when both get past the
+           TTFT gate). ``now - last_ack_at < ACK_MIN_GAP_S`` → ``"min_gap"``.
+
+        ``last_ack_at`` and ``last_response_at`` are caller-tracked
+        ``time.monotonic`` floats (or ``None`` on first call before either
+        has occurred). The wiring caller (Plan 19-04 follow-up) updates
+        them after each ack fire and Gemini response respectively.
+        ``cancel_cooldown_active`` is a snapshot the caller computes from
+        ``CancelGate.last_cancel_at`` + ``CANCEL_COOLDOWN_S``.
+        """
+        # Gate 1: TTFT.
+        if rolling_ttft_avg_ms <= ACK_TTFT_GATE_MS:
+            return (False, "ttft_ok")
+
+        # Gate 2: cancel cooldown — Plan 19-01 cross-cut.
+        if cancel_cooldown_active:
+            return (False, "cancel_cooldown")
+
+        # Gates 3 + 4: min-gap timing. Read clock once; both gates compare
+        # against the same ``now`` so they share a consistent timeline.
+        now = self._time_fn()
+        if last_response_at is not None and (now - last_response_at) < ACK_MIN_GAP_S:
+            return (False, "min_gap")
+        if last_ack_at is not None and (now - last_ack_at) < ACK_MIN_GAP_S:
+            return (False, "min_gap")
+
+        return (True, "fire")
