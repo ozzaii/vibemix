@@ -33,7 +33,11 @@ import pytest
 
 from vibemix.runtime import config_store as cs_mod
 from vibemix.runtime.config_store import ConfigStore
-from vibemix.runtime.recordings_index import RecordingsIndex, run_retention_sweep
+from vibemix.runtime.recordings_index import (
+    RecordingsIndex,
+    RetentionSweepResult,
+    run_retention_sweep,
+)
 from vibemix.runtime.session_loop import SessionLoop
 from vibemix.runtime.settings import SettingsApplier
 from vibemix.ui_bus.validator import validate_message
@@ -94,7 +98,8 @@ def test_boot_fires_retention_sweep_once_with_current_config(
 ) -> None:
     cfg = ConfigStore(retention_days=5)
     with patch(
-        "vibemix.runtime.session_loop.run_retention_sweep", return_value=[]
+        "vibemix.runtime.session_loop.run_retention_sweep",
+        return_value=RetentionSweepResult([], 0),
     ) as sweep_mock:
         loop = SessionLoop(
             fake_bus, config_store=cfg, recordings_root=tmp_recordings_dir
@@ -141,7 +146,8 @@ def test_settings_change_fires_sweep_with_new_value(
         config_store=cfg, recordings_root=tmp_recordings_dir, ws_bus=fake_bus
     )
     with patch(
-        "vibemix.runtime.recordings_index.run_retention_sweep", return_value=[]
+        "vibemix.runtime.recordings_index.run_retention_sweep",
+        return_value=RetentionSweepResult([], 0),
     ) as sweep_mock:
         ok, err = asyncio.run(applier.apply("retention_days", 3))
     assert ok is True
@@ -167,7 +173,8 @@ def test_session_close_fires_sweep_and_emits_usage(
         fake_bus, config_store=cfg, recordings_root=tmp_recordings_dir
     )
     with patch(
-        "vibemix.runtime.session_loop.run_retention_sweep", return_value=[]
+        "vibemix.runtime.session_loop.run_retention_sweep",
+        return_value=RetentionSweepResult([], 0),
     ) as sweep_mock:
         asyncio.run(loop.on_session_close())
     sweep_mock.assert_called_once()
@@ -194,15 +201,20 @@ def test_sentinel_36500_skips_scandir(
         return real_scandir(*args, **kwargs)
 
     monkeypatch.setattr("vibemix.runtime.recordings_index.os.scandir", tracking_scandir)
-    deleted = run_retention_sweep(tmp_recordings_dir, 36500)
-    assert deleted == []
+    result = run_retention_sweep(tmp_recordings_dir, 36500)
+    assert result.deleted_names == []
+    assert result.bytes_pruned == 0
     assert scan_calls == []  # sentinel short-circuited BEFORE any scandir call
 
 
 def test_sentinel_skips_when_root_missing(tmp_path: Path) -> None:
     missing = tmp_path / "definitely-not-there"
-    assert run_retention_sweep(missing, 36500) == []
-    assert run_retention_sweep(missing, 7) == []
+    sentinel_result = run_retention_sweep(missing, 36500)
+    assert sentinel_result.deleted_names == []
+    assert sentinel_result.bytes_pruned == 0
+    short_result = run_retention_sweep(missing, 7)
+    assert short_result.deleted_names == []
+    assert short_result.bytes_pruned == 0
 
 
 def test_retention_sweep_deletes_only_old_sessions(
@@ -215,9 +227,9 @@ def test_retention_sweep_deletes_only_old_sessions(
     old = make_fake_session(name=old_name)
     new = make_fake_session(name=new_name)
 
-    deleted = run_retention_sweep(tmp_recordings_dir, 7)
-    assert old_name in deleted
-    assert new_name not in deleted
+    result = run_retention_sweep(tmp_recordings_dir, 7)
+    assert old_name in result.deleted_names
+    assert new_name not in result.deleted_names
     assert not old.exists()
     assert new.exists()
 
@@ -277,10 +289,10 @@ def test_best_effort_sweep_continues_past_rmtree_error(
     monkeypatch.setattr(
         "vibemix.runtime.recordings_index.shutil.rmtree", patched_rmtree
     )
-    deleted = run_retention_sweep(tmp_recordings_dir, 7)
+    result = run_retention_sweep(tmp_recordings_dir, 7)
     # The locked one is NOT in deleted, the other IS.
-    assert old_a not in deleted
-    assert older_b in deleted
+    assert old_a not in result.deleted_names
+    assert older_b in result.deleted_names
     # Locked dir still on disk; other one is gone.
     assert sd_a.exists()
     assert not sd_b.exists()

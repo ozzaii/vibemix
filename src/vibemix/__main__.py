@@ -329,9 +329,12 @@ async def main() -> None:
     # still start.
     try:
         cfg_for_sweep = load_config()
-        pruned = run_retention_sweep(recordings_root, cfg_for_sweep.retention_days)
-        if pruned:
-            print(f"-> retention sweep (boot): pruned {len(pruned)} session(s)")
+        result = run_retention_sweep(recordings_root, cfg_for_sweep.retention_days)
+        if result.deleted_names:
+            print(
+                f"-> retention sweep (boot): pruned {len(result.deleted_names)} "
+                f"session(s) ({result.bytes_pruned} bytes)"
+            )
     except Exception as e:
         print(f"[retention sweep boot err] {e}", file=sys.stderr)
 
@@ -520,12 +523,14 @@ async def main() -> None:
         # retention_days fresh in case the user changed it mid-session.
         try:
             cfg_for_close_sweep = load_config()
-            pruned_close = run_retention_sweep(
+            result_close = run_retention_sweep(
                 recordings_root, cfg_for_close_sweep.retention_days
             )
-            if pruned_close:
+            if result_close.deleted_names:
                 print(
-                    f"-> retention sweep (close): pruned {len(pruned_close)} session(s)"
+                    f"-> retention sweep (close): pruned "
+                    f"{len(result_close.deleted_names)} session(s) "
+                    f"({result_close.bytes_pruned} bytes)"
                 )
         except Exception as e:
             print(f"[retention sweep close err] {e}", file=sys.stderr)

@@ -90,6 +90,18 @@ SNAPSHOT_INTERVAL: float = 1.0 / SNAPSHOT_HZ
 TRANSCRIPT_RING_SIZE: int = 200
 MIDI_EVENT_RING_SIZE: int = 64
 
+# Phase 15 Plan 02 — periodic retention sweep cadence. The boot + close
+# + settings-change triggers cover startup, shutdown, and user-driven
+# retention changes; this constant drives the long-haul fall-through
+# trigger so a session left running for >6h still gets its expired
+# recordings pruned without manual intervention. CONTEXT.md §"Retention
+# Enforcement" locks 6h.
+#
+# Tests monkeypatch this attribute to a sub-second value; the periodic
+# loop reads the module attribute (NOT a captured local) on every iteration
+# so a runtime patch takes effect on the next tick.
+RETENTION_SWEEP_INTERVAL_S: float = 6 * 60 * 60  # 21600s = 6h
+
 
 # ---------------------------------------------------------------------------
 # Structural protocols for injected runtime refs
@@ -155,6 +167,7 @@ class SessionLoop:
         playback_queue: _PlaybackQueueHook | None = None,
         controller_state: _ControllerStateHook | None = None,
         recordings_root: Path | None = None,
+        active_recorder: object | None = None,
     ) -> None:
         self.bus = bus
         self.config_store = config_store or load_config()
@@ -168,11 +181,21 @@ class SessionLoop:
         self.playback_queue = playback_queue
         self.controller_state = controller_state
         self.recordings_root = recordings_root
+        # Phase 15 Plan 02 — `active_recorder` is the live VoiceRecorder
+        # instance whose events.jsonl receives the per-sweep
+        # `retention_pruned` line when count > 0. None in --session
+        # standalone mode (no cascade graph yet) so the periodic loop
+        # logs to Python logger only — never raises.
+        # Typed as `object` to dodge a circular import on
+        # `vibemix.audio.recorder.VoiceRecorder`; the hot path uses
+        # duck-typed `.log_event(kind, **fields)`.
+        self.active_recorder = active_recorder
 
         # Transient state
         self.muted: bool = False
         self._stop = asyncio.Event()
         self._snapshot_task: asyncio.Task | None = None
+        self._retention_task: asyncio.Task | None = None
         self._transcript: deque[TranscriptLine] = deque(maxlen=TRANSCRIPT_RING_SIZE)
         # ``_transcript_unsent`` is the slice not yet emitted in a snapshot
         # delta. Snapshot builds ``transcript_delta`` from this; on emit
@@ -469,28 +492,14 @@ class SessionLoop:
 
         Best-effort: any unexpected exception is logged + swallowed; the
         session loop must continue regardless.
+
+        Phase 15 Plan 02 — body delegates to the shared
+        ``_fire_one_retention_sweep`` helper so the boot trigger shares the
+        same code path as the periodic + close triggers (single place to
+        adjust the events.jsonl logging gate, log line shape, and usage
+        emit ordering).
         """
-        if self.recordings_root is None:
-            return
-        try:
-            loop = asyncio.get_running_loop()
-            deleted = await loop.run_in_executor(
-                None,
-                run_retention_sweep,
-                self.recordings_root,
-                self.config_store.retention_days,
-            )
-            if deleted:
-                log.info(
-                    "retention sweep (boot): deleted %d session(s): %s",
-                    len(deleted),
-                    ", ".join(deleted),
-                )
-            else:
-                log.info("retention sweep (boot): no sessions to prune")
-            await self._emit_recordings_usage()
-        except Exception:
-            log.exception("boot retention sweep failed")
+        await self._fire_one_retention_sweep("boot")
 
     async def on_session_close(self) -> None:
         """Phase 15 Plan 03 — session-close trigger.
@@ -501,23 +510,119 @@ class SessionLoop:
 
         Same best-effort guarantee as run_boot_sweeps — never raises.
         """
+        await self._fire_one_retention_sweep("close")
+
+    # ------------------------------------------------------------------
+    # Phase 15 Plan 02 — shared retention-sweep dispatch
+    # ------------------------------------------------------------------
+
+    async def _fire_one_retention_sweep(self, trigger: str) -> None:
+        """Run one retention sweep + emit usage push + log events.jsonl line.
+
+        Single dispatch point for all four sweep triggers (boot, periodic,
+        close, settings-change* — *settings-change uses the SettingsApplier's
+        own path because it needs the NEW value before the slider commits;
+        every other trigger reads ``self.config_store.retention_days``).
+
+        Pseudo-flow:
+            1. recordings_root None → early return (no sweep).
+            2. Offload run_retention_sweep to executor (filesystem-bound).
+            3. Log to Python logger (always — even zero-prune ticks).
+            4. If count > 0 AND active_recorder set → write events.jsonl line
+               via VoiceRecorder.log_event("retention_pruned",
+               count=N, bytes=M). Plan 15-02 T-15-02-04 disposition: skip
+               the events.jsonl write on count == 0 to keep noise down.
+            5. Always emit ipc.recordings.usage so the drawer's disk-usage
+               line stays live (even on zero-prune ticks the bytes_total
+               from compute_usage may have changed if other surfaces
+               wrote/deleted between sweeps).
+
+        Best-effort: any exception is logged + swallowed.
+        """
         if self.recordings_root is None:
             return
         try:
             loop = asyncio.get_running_loop()
-            deleted = await loop.run_in_executor(
+            result = await loop.run_in_executor(
                 None,
                 run_retention_sweep,
                 self.recordings_root,
                 self.config_store.retention_days,
             )
-            if deleted:
+            if result.deleted_names:
                 log.info(
-                    "retention sweep (close): deleted %d session(s)", len(deleted)
+                    "retention sweep (%s): deleted %d session(s) (%d bytes): %s",
+                    trigger,
+                    len(result.deleted_names),
+                    result.bytes_pruned,
+                    ", ".join(result.deleted_names),
                 )
+                self._log_retention_event_to_active_recorder(
+                    count=len(result.deleted_names),
+                    bytes_pruned=result.bytes_pruned,
+                )
+            else:
+                log.info("retention sweep (%s): no sessions to prune", trigger)
             await self._emit_recordings_usage()
         except Exception:
-            log.exception("on_session_close sweep failed")
+            log.exception("retention sweep (%s) failed", trigger)
+
+    def _log_retention_event_to_active_recorder(
+        self, *, count: int, bytes_pruned: int
+    ) -> None:
+        """Write the `retention_pruned` events.jsonl line on the live recorder.
+
+        No-op when ``self.active_recorder`` is None (the --session standalone
+        path runs without a live recorder). Duck-typed: any object with a
+        ``log_event(kind, **fields)`` method works — keeps the periodic loop
+        decoupled from the audio package import surface.
+
+        Schema: ``{"t": <secs-since-session-start>, "kind": "retention_pruned",
+        "count": N, "bytes": M}`` — matches existing events.jsonl shape
+        (recorder.py:304's ``{"t": round(rel, 3), "kind": kind, **fields}``).
+        CONTEXT.md's ``{"event": ..., "t_session": ...}`` wording was
+        approximate; the runtime contract is what ships.
+        """
+        if self.active_recorder is None:
+            return
+        log_event = getattr(self.active_recorder, "log_event", None)
+        if log_event is None:
+            log.warning(
+                "active_recorder has no log_event method — retention_pruned not logged"
+            )
+            return
+        try:
+            log_event("retention_pruned", count=count, bytes=bytes_pruned)
+        except Exception:
+            log.exception("active_recorder.log_event(retention_pruned) failed")
+
+    async def _periodic_retention_sweep_loop(self) -> None:
+        """Fire ``_fire_one_retention_sweep("periodic")`` every interval.
+
+        Uses ``asyncio.wait_for(self._stop.wait(), timeout=interval)`` so
+        cancellation is sub-second (NOT bare ``asyncio.sleep`` which would
+        block for up to 6h on shutdown — T-15-02-01 disposition; Test 2B
+        is the gate).
+
+        Reads ``RETENTION_SWEEP_INTERVAL_S`` from the module on every
+        iteration so test monkeypatches take effect on the next tick.
+        """
+        # Inline import to read the module attribute fresh on every iteration
+        # — `from X import Y` would freeze a local at import time, defeating
+        # monkeypatch.
+        from vibemix.runtime import session_loop as _self_mod  # noqa: PLC0415
+
+        while not self._stop.is_set():
+            interval = float(_self_mod.RETENTION_SWEEP_INTERVAL_S)
+            try:
+                await asyncio.wait_for(self._stop.wait(), timeout=interval)
+                # _stop fired during the wait — exit immediately.
+                return
+            except asyncio.TimeoutError:
+                pass  # interval elapsed without stop — fire a sweep
+            if self._stop.is_set():
+                return
+            await self._fire_one_retention_sweep("periodic")
 
     async def _emit_recordings_usage(self) -> None:
         """Compute current usage + emit ``ipc.recordings.usage`` on the bus."""
@@ -807,6 +912,14 @@ class SessionLoop:
         # Phase 15 Plan 03 — boot sweep (best-effort; never raises).
         await self.run_boot_sweeps()
         self._snapshot_task = asyncio.create_task(self._snapshot_loop())
+        # Phase 15 Plan 02 — periodic 6h retention sweep task. Spawned
+        # only when recordings_root is wired (i.e., not in --session
+        # standalone mode without the recordings tree). Cancellation is
+        # sub-second via the asyncio.wait_for race against _stop.
+        if self.recordings_root is not None:
+            self._retention_task = asyncio.create_task(
+                self._periodic_retention_sweep_loop()
+            )
 
         # SIGTERM (Tauri Cmd+Q) + SIGINT — same pattern as WizardLoop.
         loop = asyncio.get_running_loop()
@@ -823,6 +936,12 @@ class SessionLoop:
                 self._snapshot_task.cancel()
                 try:
                     await self._snapshot_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            if self._retention_task is not None:
+                self._retention_task.cancel()
+                try:
+                    await self._retention_task
                 except (asyncio.CancelledError, Exception):
                     pass
             await self.bus.stop()
