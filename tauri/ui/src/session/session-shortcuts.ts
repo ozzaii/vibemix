@@ -7,7 +7,9 @@
  *             don't want to stack overlays on top of it).
  *   `cmd+m` / `ctrl+m` → toggle mute via the existing ws-bridge `sendMute`
  *             IPC. The sidecar replies with the new muted state which the
- *             muted-banner consumes on the snapshot tick.
+ *             cohost panel's inline breathing pill renders on the snapshot
+ *             tick (the standalone muted-banner is currently inactive —
+ *             see `components/muted-banner.ts` header for context).
  *   `esc`   → close the shortcuts overlay if open; otherwise no-op (the
  *             drawer's own Esc handler takes precedence when it's open).
  *

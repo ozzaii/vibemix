@@ -5,7 +5,17 @@
  * JetBrains Mono hotkey hint. v5 CDJ Whisper migration (2026-05-12):
  * dropped the FL-Studio crash-grad treatment in favour of the same dark
  * glass material the rest of the session deck is sealed in. The fault
- * signal comes from the inset bleed + dome LED, not a heavy panel tint. */
+ * signal comes from the inset bleed + dome LED, not a heavy panel tint.
+ *
+ * INACTIVE — held for future re-use. The 2026-05-14 critique pass 2
+ * collapsed the muted-state stack from three signals (this banner +
+ * statusbar LED + cohost inline pill) down to a single breathing
+ * cohost pill, so SessionLayout no longer mounts this renderer. The
+ * file + tests stay in tree as a ready-to-mount surface for any
+ * future urgent banner that doesn't fit inside the cohost pill (e.g.
+ * a network-down or recording-disk-full alarm). Do NOT delete without
+ * also removing `tauri/ui/tests/session/components.spec.ts` cases for
+ * `renderMutedBanner`. */
 
 import { registerStyle } from "./_style-registry.js";
 
