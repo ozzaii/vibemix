@@ -80,6 +80,69 @@ versioned alongside the threshold change it justifies.
 
 ---
 
+## replay_linter.py — offline citation lint replay (Plan 20-03)
+
+Replays a recorded session through `CitationLinter` **offline** — no Gemini
+API call, no LiveKit, no PlaybackQueue. Reconstructs an `EvidenceRegistry`
+from the session's `events.jsonl`, lints every recorded `response.txt`, and
+writes a per-response CSV. The `stripped_rate` summary is the gate Phase 16
+ear-test uses to ratify a session for release.
+
+### Usage
+
+```bash
+.venv/bin/python scripts/replay_linter.py \
+    --session <SESSION_DIR> \
+    [--mode live|debrief] \
+    [--out <CSV_PATH>] \
+    [--print-rate]
+```
+
+- `--session` (required) — path to a recorded session dir. Must contain
+  `events.jsonl` (the observation log) and a `responses/` subdir of
+  `NNNN_HHMMSS_<EVENT>/response.txt` files (per Phase 18 telemetry shape,
+  see `DJCoHostAgent.llm_node`).
+- `--mode live|debrief` (default `live`) — citation tolerance band. `live`
+  = ±1.0s (`LIVE_TOLERANCE_S`); `debrief` = ±2.0s (`DEBRIEF_TOLERANCE_S`,
+  Phase 25 architectural slot).
+- `--out` (default `<SESSION_DIR>/linter_report.csv`) — CSV output path.
+- `--print-rate` — emit an extra `STRIPPED_RATE=<float:.4f>` line on
+  stdout for shell-pipe consumption (Phase 16 audit scripts).
+
+### CSV schema
+
+| Column            | Type   | Meaning                                                                    |
+| ----------------- | ------ | -------------------------------------------------------------------------- |
+| `response_id`     | string | Invocation dir name (`NNNN_HHMMSS_<EVENT>`, lex-sorted = invocation order) |
+| `t_session`       | float  | Seconds since the FIRST response's HHMMSS (first row is always `0.0`)      |
+| `citations_found` | int    | Parsed citation atoms in the response                                      |
+| `valid`           | bool   | Binary linter decision (whole-utterance gate)                              |
+| `reason`          | string | One of `valid` / `no_citations` / `invalid_atoms` / `malformed_atom`       |
+| `missing_atoms`   | string | Semicolon-joined `source:body` pairs for misses (empty for valid)          |
+
+### Phase 16 ear-test workflow
+
+1. Run a real DJ session through the live agent — the recorder writes
+   `<session>/events.jsonl` + `<session>/invocations/<NNNN_HHMMSS_EV>/`
+   per turn (per Plan 18-04 telemetry).
+2. Symlink `<session>/invocations` → `<session>/responses` (or copy the
+   per-turn dirs containing `response.txt` into a `responses/` subdir
+   matching the layout this tool expects).
+3. Run replay with `--print-rate`. The `stripped_rate < 0.15` threshold
+   (CONTEXT D-Gate-Replay) is the ratification gate — sessions exceeding
+   it block release.
+
+### Synthetic fixture
+
+`tests/scripts/fixtures/synthetic_session/` ships a self-contained 7-
+response fixture spanning all 7 EBNF atom shapes (`ev` / `aud` / `midi` /
+`track` / `screen` / `mix` / `tend`) plus one deliberately invalid `I'm
+listening` fail-soft response. The fixture's `stripped_rate` lands at
+`1/7 ≈ 0.143 < 0.15` — pinning the threshold gate in CI before Phase 16
+swaps in real recorded sessions.
+
+---
+
 ## Other scripts
 
 - `gen_sine.py` — generates the 1kHz / 1.5s calibration tone WAV used by
