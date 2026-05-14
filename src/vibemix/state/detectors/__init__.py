@@ -23,10 +23,12 @@ Wave 2 Plan 03 will add:
 
 from __future__ import annotations
 
+from vibemix.state.detectors.kick_density_shift import KickDensityShiftDetector
 from vibemix.state.detectors.kick_swap import KickSwapDetector
 from vibemix.state.detectors.sub_layer_arrival import SubLayerArrivalDetector
 
 __all__: list[str] = [
+    "KickDensityShiftDetector",
     "KickSwapDetector",
     "SubLayerArrivalDetector",
 ]
