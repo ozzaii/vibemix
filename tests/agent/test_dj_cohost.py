@@ -178,7 +178,12 @@ def test_agent_04_set_next_event(mocker, tmp_path) -> None:
 
 
 def test_llm_node_01_yields_chunks_in_order(mocker, tmp_path) -> None:
-    """LLM-NODE-01: yields each non-empty text chunk in order."""
+    """LLM-NODE-01: yields each non-empty text chunk in order.
+
+    Plan 18-03: build_prompt is now called with kwarg
+    ``registry_snapshot=None`` when no registry is wired (the agent's
+    default state in this test). Assert positional ev + kwarg explicitly.
+    """
     agent, gen_client, _, state = _build_agent(mocker, tmp_path)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: rms=0.05")
@@ -192,7 +197,7 @@ def test_llm_node_01_yields_chunks_in_order(mocker, tmp_path) -> None:
 
     chunks = _drive_llm_node(agent)
     assert chunks == ["hello ", "world"]
-    AICoach.build_prompt.assert_called_once_with(ev)
+    AICoach.build_prompt.assert_called_once_with(ev, registry_snapshot=None)
     # pending event was consumed
     assert agent._pending_event is None
 
@@ -487,3 +492,151 @@ def test_pkg_03_dj_cohost_agent_exported() -> None:
     import vibemix.agent as vagent
 
     assert "DJCoHostAgent" in vagent.__all__
+
+
+# ---------- Plan 18-03 — evidence_registry threading (Tests U–X) ----------
+
+
+def _build_agent_with_registry(
+    mocker, tmp_path: Path, registry
+) -> tuple[DJCoHostAgent, Any, _FakeRecorder, MusicState]:
+    """Variant of _build_agent that threads an EvidenceRegistry into the agent."""
+    mocker.patch.object(Agent, "__init__", return_value=None)
+    state = _build_state()
+    recorder = _FakeRecorder(tmp_path)
+    genai_client = mocker.MagicMock()
+    screen_buf = mocker.MagicMock()
+    agent = DJCoHostAgent(
+        genai_client=genai_client,
+        clean_audio_buf=mocker.MagicMock(),
+        screen_buf=screen_buf,
+        state=state,
+        recorder=recorder,
+        llm_inst=mocker.MagicMock(),
+        tts_inst=mocker.MagicMock(),
+        evidence_registry=registry,
+    )
+    return agent, genai_client, recorder, state
+
+
+def test_u_evidence_registry_kwarg_accepted_and_grammar_in_system_instruction(
+    mocker, tmp_path
+) -> None:
+    """Test U — DJCoHostAgent(..., evidence_registry=...) constructs cleanly
+    (default None preserves backward compat) AND the system instruction Gemini
+    sees contains the citation-grammar block (proves Task 1's wiring reached
+    the live LLM path)."""
+    from vibemix.state import EvidenceRegistry
+
+    # Default None — backward compat
+    agent, _, _, _ = _build_agent(mocker, tmp_path)
+    assert agent._registry is None
+
+    # Explicit registry — stored on the agent
+    registry = EvidenceRegistry()
+    agent2, _, _, _ = _build_agent_with_registry(mocker, tmp_path, registry)
+    assert agent2._registry is registry
+
+    # Plan 18-03 Task 1 wiring sanity — system_instruction the LLM sees
+    # contains the grammar block. Locks the dispatcher → prompt_body →
+    # _gen_cfg.system_instruction path end-to-end.
+    assert "[ev:" in agent2._gen_cfg.system_instruction
+    assert "encouraged, not required" in agent2._gen_cfg.system_instruction
+
+
+def test_v_llm_node_calls_build_prompt_with_snapshot_when_registry_wired(
+    mocker, tmp_path
+) -> None:
+    """Test V — when registry wired AND pre-loaded, llm_node calls
+    AICoach.build_prompt with kwarg ``registry_snapshot=`` containing the
+    loaded observation."""
+    from vibemix.state import EvidenceRegistry
+
+    registry = EvidenceRegistry()
+    registry.write("ev", "TRACK_CHANGE@30.0", 30.0)
+
+    agent, gen_client, _, state = _build_agent_with_registry(mocker, tmp_path, registry)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["ok"])
+    )
+
+    ev = Event(type="TRACK_CHANGE", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    AICoach.build_prompt.assert_called_once()
+    call = AICoach.build_prompt.call_args
+    # Positional first arg = the Event
+    assert call.args[0] is ev
+    # Kwarg registry_snapshot present + non-empty + contains the loaded obs
+    snap = call.kwargs.get("registry_snapshot")
+    assert snap is not None, "registry_snapshot kwarg missing"
+    assert "ev" in snap
+    assert "TRACK_CHANGE@30.0" in snap["ev"]
+    assert snap["ev"]["TRACK_CHANGE@30.0"] == (30.0,)
+
+
+def test_w_llm_node_passes_none_snapshot_when_no_registry(mocker, tmp_path) -> None:
+    """Test W — when evidence_registry=None (default — Phase 4 behavior),
+    llm_node calls build_prompt with registry_snapshot=None (or kwarg
+    absent — both are valid no-op contracts)."""
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+    assert agent._registry is None  # default
+
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["ok"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    AICoach.build_prompt.assert_called_once()
+    call = AICoach.build_prompt.call_args
+    # Either registry_snapshot=None OR kwarg absent — both are no-op contracts
+    snap = call.kwargs.get("registry_snapshot", None)
+    assert snap is None, f"expected None snapshot when registry unwired, got {snap!r}"
+
+
+def test_x_llm_node_takes_fresh_snapshot_per_turn(mocker, tmp_path) -> None:
+    """Test X — two consecutive llm_node invocations; between them, write a
+    new observation; the SECOND build_prompt call MUST receive a snapshot
+    containing the new observation. Locks "snapshot per turn" semantic."""
+    from vibemix.state import EvidenceRegistry
+
+    registry = EvidenceRegistry()
+    registry.write("ev", "TRACK_CHANGE@10.0", 10.0)
+
+    agent, gen_client, _, state = _build_agent_with_registry(mocker, tmp_path, registry)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    def _stream(*_a, **_kw):
+        return _async_iter(["chunk"])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(side_effect=_stream)
+
+    # First turn — snapshot has 1 observation
+    ev1 = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev1)
+    _drive_llm_node(agent)
+    first_snap = AICoach.build_prompt.call_args.kwargs["registry_snapshot"]
+    assert "TRACK_CHANGE@10.0" in first_snap["ev"]
+    assert "TRACK_CHANGE@20.0" not in first_snap.get("ev", {})
+
+    # Mutate registry between turns — add a fresh observation
+    registry.write("ev", "TRACK_CHANGE@20.0", 20.0)
+
+    # Second turn — snapshot MUST include the new observation
+    ev2 = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev2)
+    _drive_llm_node(agent)
+    second_snap = AICoach.build_prompt.call_args.kwargs["registry_snapshot"]
+    assert "TRACK_CHANGE@10.0" in second_snap["ev"]
+    assert "TRACK_CHANGE@20.0" in second_snap["ev"], (
+        "snapshot is stale across llm_node calls — must be taken fresh per turn"
+    )
