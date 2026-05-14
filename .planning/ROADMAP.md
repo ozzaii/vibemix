@@ -76,7 +76,7 @@ Started 2026-05-14 via `/gsd-new-milestone`. Public OSS RC milestone — close e
 **External-gated sequential (after approvals):** Phase 38 → Phase 33 → Phase 36.
 **Ship prep sequential (after ALL):** Phase 37 → Phase 39.
 
-**Estimated wall-clock to RC:** **5–7 weeks of focused engineering** (research-grade confidence; aligns with PROJECT.md "early June 2026" target with ~1 week slip risk). External clock is the critical path; engineering is parallelizable to fit.
+**Estimated wall-clock to RC:** **5–7 weeks of focused engineering** (research-grade confidence). External clock (Apple + SignPath approvals) is the critical path; engineering is parallelizable to fit. No hard calendar target — ship-when-ready per `gsd-autonomous fully` mode.
 
 **Bar:** 1000+ GitHub stars · "real DJ friend in your ear, no AI slop" · clean install zero friction · autonomous discharge of every Kaan-action surface except the two legal-capacity items.
 
