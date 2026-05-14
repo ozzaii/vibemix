@@ -52,6 +52,7 @@ from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL
 from vibemix.audio import INVOKE_AUDIO_SECONDS, AudioBuffer, VoiceRecorder, snapshot_wav
 from vibemix.prompts import build_system_instruction, filter_for_slop
+from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
 from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
 
@@ -131,6 +132,7 @@ class DJCoHostAgent(Agent):
         tts_inst: agents_tts.TTS,
         evidence_registry: EvidenceRegistry | None = None,
         cache: GeminiContextCache | None = None,
+        ttft_meter: TTFTMeter | None = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -165,6 +167,12 @@ class DJCoHostAgent(Agent):
         # inline). When non-None AND cache.current_name() returns a string,
         # llm_node builds a per-call gen_cfg with cached_content set.
         self._cache: GeminiContextCache | None = cache
+        # Plan 19-05 — optional TTFT meter. None default preserves backward
+        # compat for tests that don't drive the meter. When non-None,
+        # set_next_event records the event-fired timestamp and llm_node
+        # records the first non-empty stream chunk timestamp; the rolling
+        # average feeds AckBank.should_fire(rolling_ttft_avg_ms=...).
+        self._ttft_meter: TTFTMeter | None = ttft_meter
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         # Both the LiveKit-side ``instructions`` AND the google.genai-side
@@ -178,6 +186,11 @@ class DJCoHostAgent(Agent):
 
     def set_next_event(self, ev: Event) -> None:
         self._pending_event = ev
+        # Plan 19-05 — start the TTFT measurement window. Overwriting an
+        # existing pending pointer is intentional (the previous event was
+        # preempted via CancelGate or failed via TimeoutError).
+        if self._ttft_meter is not None:
+            self._ttft_meter.record_event_fired()
 
     async def llm_node(
         self,
@@ -334,6 +347,9 @@ class DJCoHostAgent(Agent):
         buffered_chunks: list[str] = []
         t_start = time.time()
         llm_err: str | None = None
+        # Plan 19-05 — record first-chunk arrival exactly once per turn for
+        # the TTFT meter. Skipped when no meter wired (Phase 4 backward-compat).
+        first_chunk_recorded = False
         try:
             stream = await self._genai_client.aio.models.generate_content_stream(
                 model=LLM_MODEL,
@@ -344,6 +360,9 @@ class DJCoHostAgent(Agent):
                 txt = getattr(chunk, "text", None) or ""
                 if not txt:
                     continue
+                if not first_chunk_recorded and self._ttft_meter is not None:
+                    self._ttft_meter.record_first_chunk()
+                    first_chunk_recorded = True
                 print(txt, end="", flush=True)
                 full_text += txt
                 buffered_chunks.append(txt)
