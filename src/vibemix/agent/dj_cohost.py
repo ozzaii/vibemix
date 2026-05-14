@@ -51,7 +51,7 @@ from livekit.agents import tts as agents_tts
 from vibemix.agent.config import LLM_MODEL
 from vibemix.audio import INVOKE_AUDIO_SECONDS, AudioBuffer, VoiceRecorder, snapshot_wav
 from vibemix.prompts import build_system_instruction, filter_for_slop
-from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState
+from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
 
 # Sentinel suppression-token the LLM emits when nothing's worth reacting to.
 # The cascade swallows it. See ``vibemix.prompts.matrix`` for the prompt-side
@@ -283,6 +283,44 @@ class DJCoHostAgent(Agent):
         print()
         elapsed = time.time() - t_start
         stripped = full_text.strip()
+
+        # ---- Plan 18-04: citation-count telemetry ----
+        # Count citations in the FULL response text BEFORE the suppression
+        # gate. Even silence/slop suppressed turns get their emissions
+        # counted — Phase 16 ear-test reads ``registry.citation_telemetry()``
+        # as Gemini's TRUE emission rate (not the post-suppression rate)
+        # to gate Phase 20 enforcement readiness.
+        #
+        # response_id format ``f"{invoke_n:04d}_{invoke_ts}"`` matches the
+        # per-invocation dump folder name pattern (line ~202) so the
+        # events.jsonl line cross-references the dump folder trivially.
+        # The recorder.log_event auto-injects ``t = time.time() -
+        # self.start_time`` (recorder.py:303) — DO NOT pass ``t`` manually.
+        #
+        # Best-effort: every step is wrapped in try/except: pass — a
+        # parser failure or recorder write failure MUST NOT break the LLM
+        # response path (matches v4 anti-pattern parity, threat T-18-04-03).
+        try:
+            citation_pairs = parse_citations(full_text)
+            citation_count = len(citation_pairs)
+        except Exception:
+            citation_count = 0
+
+        response_id = f"{invoke_n:04d}_{invoke_ts}"
+        try:
+            self._recorder.log_event(
+                "citation_count",
+                count=citation_count,
+                response_id=response_id,
+            )
+        except Exception:
+            pass  # best-effort; recorder write failure must not block LLM path
+
+        if self._registry is not None:
+            try:
+                self._registry.record_citation_count(citation_count)
+            except Exception:
+                pass  # best-effort; registry update failure must not block LLM path
 
         # ---- Silence + slop gate (Phase 10) ----
         suppression: str | None = None
