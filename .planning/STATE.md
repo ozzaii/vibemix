@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Research-Driven Ship
-status: shipped
-last_updated: "2026-05-14T12:00:00.000Z"
-last_activity: 2026-05-14 -- v2.0 milestone archived via /gsd-complete-milestone (tech_debt accepted)
+milestone: v2.1
+milestone_name: The Unified Cut
+status: planning
+last_updated: "2026-05-14T19:27:51.632Z"
+last_activity: 2026-05-14
 progress:
-  total_phases: 12
-  completed_phases: 10
-  total_plans: 38
-  completed_plans: 37
-  percent: 100
-next_milestone: v2.1
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # vibemix — State
@@ -34,10 +33,10 @@ next_milestone: v2.1
 
 ## Current Position
 
-Milestone: v2.0 — ARCHIVED
-Phase: All 12 phases complete or formally deferred
-Status: Between milestones (`/gsd-new-milestone` for v2.1)
-Last activity: 2026-05-14 -- v2.0 milestone archived via /gsd-complete-milestone (tech_debt accepted; local tag v2.0 created, not pushed)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-14 — Milestone v2.1 started
 
 ## Performance Metrics
 

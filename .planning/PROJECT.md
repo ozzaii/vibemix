@@ -10,41 +10,53 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current State
+## Current Milestone: v2.1 The Unified Cut
 
-**Last shipped:** v2.0 Research-Driven Ship — 2026-05-14 (status: `tech_debt` accepted per `gsd-autonomous fully` mode).
+**Goal:** Ship a public open-source RC where every v2.0 component is fully integrated, validated, securely packaged, and one-click-installable — every missed integration opportunity closed, every human-needed surface autonomously discharged, "icon tap → grant permissions → ready to mix" zero-friction onboarding.
 
-**Currently:** No active milestone — `/gsd-new-milestone` to begin v2.1 planning.
+**Mode:** `gsd-autonomous fully` — Claude has full Mac access; every blocker + human-needed item discharged autonomously (only privacy rule + destructive risk still pause). Phase 16 ear-test memory override accepted for this milestone (autonomous replay + LLM-judge proxy gate substitutes for Kaan-ear-only path).
 
-### v2.0 shipped surfaces (binary: not yet cut to RC; Kaan-action backlog rolls into v2.1)
+**Target features:**
 
-- **Anti-slop contract LIVE** — every Gemini reaction is citation-validated against an in-memory `EvidenceRegistry` SIBLING write-target alongside `MusicState`; un-cited responses strip to 40-OPUS ack-bank fallback. `VIBEMIX_ANTI_SLOP=on` env flag default on; boot banner surfaces dispatch decision. Phase 18 + Phase 20.
-- **6 cross-genre event detectors** in v2.0 core — `KICK_SWAP`, `SUB_LAYER_ARRIVAL`, `BREAKDOWN_KICK_KILL`, `REENTRY_KICK_LAND`, `KICK_DENSITY_SHIFT`, `PHRASE_BOUNDARY` (40-120Hz band-limited autocorr, ±1 bar) + `GenreRouter` atomic dispatch on `MusicState.active_genre`. Phase 17.
-- **Latency Stack v1** — 40-OPUS `AckBank` with per-bucket rotation deque + `GeminiContextCache` (1024-token floor, 4min refresh) + `CancelGate` (8s hard cap + 30/session soft cap) + `TTFTMeter` rolling avg + prompt diet (audio 18s→6s, screen-skip on MIX_MOVE/HEARTBEAT). All wired through `__main__.py` + `coach_loop`. Phase 19.
-- **10-SKU MIDI library** — JSON-per-SKU registry + `MidiMapLoader` for Pioneer DDJ-FLX4/400/200/REV1, Denon MC7000/6000, NI Kontrol S4/S2, Numark Mixtrack Platinum FX / Pro FX. Per-control `verified` / `pending-verdict` / `tentative` status. Community-PR via `scripts/sniff_controller.py`. Phase 23.
-- **djay Pro Mac overlay** — AX bridge in Tauri Rust parent (NEVER from Python — codebase grep gate enforces #8329), second `WebviewWindow(label="overlay")`, 12 hand-mapped pointable elements, Canvas 2D amber ring renderer (fade-in 200ms / hold 800ms / fade-out 300ms), 8s per-element cooldown, fullscreen-Spaces toast, dual-monitor coord-space all-Quartz. Phase 24.
-- **Mascot anticipation layer** — `MascotStateClass "anticipation"` priority 70 + 5 `prep_*` GLB members + `AdditiveLayer` (Three.js single-mixer) + 30Hz ws_bus payload with `beat_phase` + `active_genre` + 2.5s timeout + cancel-aware + linter-strip-aware crossfades. Real GLBs = artist task. Phase 22.
-- **Pyrekordbox XML import + DEBRIEF slot** — `RekordboxLibrary` parses Rekordbox 5/6/7 schemas (TEMPO + POSITION_MARK), SQLite cache at `$APPDATA/vibemix/library/rekordbox.db`, SQLCipher path explicitly skipped, sidecar `--debrief <session_dir>` flag on port 8766 + 3 IPC schema reservations for v2.1 docking. Phase 25.
-- **Recording browser** — chronological session list + 4-button action cluster (replay · reveal · open-external · delete) + Rust path-traversal gate + optimistic-remove + 4s undo + retention sweep @ 6h with `retention_pruned` events.jsonl logging. Phase 15.
-- **Launch ammo** — README anti-slop hook + `BRANDING.md` + `ai_misbehavior` issue template + CONTRIBUTING.md controller-mapping path + 4-channel post drafts (Twitter / IG Reels IT+EN / Reddit / HN) + `scripts/dayzero/proxy_load_test.py` (100 RPS × 5min p99 < 500ms gate) + `scripts/dayzero/healthz_check.sh` watchdog. Phase 26.
-- **Sign + Release CI scaffold** — `release.yml` 4-target matrix (macos-14 arm64 + intel, windows-latest x86_64 + arm64) + Pitfall-7 secret-name audit gate + ed25519 updater signing + `docs/signpath-application.md` Day-1 checklist. Approvals (Apple Developer Program Agreement = Francesco-action, SignPath OSS = Kaan-action ~1-week SLA) = `21-DEFERRED.md`. Phase 21.
+1. **All v2.0 carry-forward autonomously closed** — signing pipeline (Apple Developer Program Agreement update + SignPath OSS application + secrets injection) executed; 40 Achird-voice OPUS recordings rendered via Gemini TTS; DDJ-FLX4 Sync sniff via on-machine MIDI; dormant `EvidenceRegistry.register_library` wired; Phase 15 Plan 04 retention sweep verified; 9-SKU controller verification substitute.
+2. **Hallucination Verification Gate — autonomous proxy** — recorded-session replay harness + LLM-judge scorer + F1 validator against shipped P17 detectors + P18 EvidenceRegistry + P19 ack bank + P20 linter + P22 anticipation.
+3. **Library intelligence v1** — Gemini Embedding 2 + sqlite-vec / numpy fallback · vibe search · "what's playing" grounding · drag-drop import UI · 30-day staleness nudge.
+4. **Post-session debrief MVP UI** — chaptered review · 60–90s voiced TL;DR · 3 drills · clickable timeline, lehimli to DEBRIEF-01 / DEBRIEF-02 architectural slot.
+5. **4-layer mascot full additive state machine** — base + emotion + anticipation + reaction; replaces v2.0 simplified anticipation subset.
+6. **2 Hard Tek detectors** — `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` (taxonomy completion).
+7. **Long-term DJ profile** — ~2KB JSON regenerated each session, injected verbatim into next live prompt.
+8. **One-click install hardening** — Mac DMG + Windows MSI fresh-VM tested end-to-end · TCC permissions wizard · auto-fetch deps · sidecar rebuild with v0.1.0-rc1 polish (line-buffer + parent_watchdog + tray toggle merged) · first-launch onboarding flow.
+9. **Open-source security pass** — API key gate audit · secret scanner CI · dependency CVE audit · signed-binary verification · permission least-scope · threat model + SECURITY.md.
+10. **Real GLB animations + 30s viral demo film autonomously** — text-to-3D / Mixamo-rigged `prep_*` animations + demo film generated from real session screen capture.
+11. **Day-Zero ops live** — Discord auto-provision · pre-seeded star coordination · proxy load test (100 RPS × 5min p99 < 500ms) verified · healthz live · launch trigger sequence executable.
+12. **Cross-phase integration audit** — every cross-phase seam re-verified end-to-end; zero orphan-but-shipped surfaces; integration-checker PASS gate.
+13. **Public RC cut + ship** — signed binary tagged · GitHub release published · social posts on 4 channels · README hero finalized.
 
-### Carry-forward to v2.1 (Kaan-action surface, top items)
+**Bar:** 1000+ GitHub stars, "real DJ friend in your ear, no AI slop", clean install zero friction, public RC ready to unleash.
 
-1. **Phase 21 signing approvals** — Apple Developer Program Agreement update (Francesco) + SignPath OSS Foundation application (Kaan, ~1-week SLA). Without these, no shippable signed binary.
-2. **Phase 16 Kaan DJ ear-test** — 3-5 real DJ sessions across techno / house / hard-tek consuming shipped P17 detectors + P18 EvidenceRegistry + P19 ack bank + P20 linter + P22 anticipation. Bar = "real DJ friend in your ear, no AI slop". Hallucination gate per memory `project_phase_16_kaan_dj_testing`.
-3. **Phase 22 + Phase 26 — real `prep_*` GLB animations (artist) + 30s viral demo film (Kaan demo shoot)** — both feed Beat B of viral wave (mascot anticipation lean-in BEFORE voice arrives).
+**Phase numbering** continues from Phase 27 (default; no `--reset-phase-numbers`).
 
-Lower-priority Kaan-action backlog: 40 Achird-voice OPUS recordings (replace silent placeholders), DDJ-FLX4 Sync sniff, 9-SKU community verification PRs, Discord server setup, Fresh-VM rehearsals (macOS + Windows), 15+ pre-seeded stars, Pro logo SVG, `EvidenceRegistry.register_library` 5-min defensive wiring patch.
+<details>
+<summary>📦 v2.0 Research-Driven Ship (shipped 2026-05-14, status <code>tech_debt</code>) — archived narrative</summary>
 
-### Next Milestone Goals (stub — to be refined by `/gsd-new-milestone`)
+12 phases shipped Claude-side end-to-end + 2 deferred-to-Kaan (Phase 15 Plan 04 UAT + Phase 16 ear-test). 1961 passing tests · 0 v2.0 regressions · 220 commits since `v0.1.0-rc1`.
 
-- Close Kaan-action backlog (top 3 above) so v2.0 RC can cut and ship publicly.
-- Library intelligence v1 — Gemini Embedding 2 + sqlite-vec / numpy fallback (per memory `project_gemini_embedding_2`).
-- Post-session debrief MVP UI (chaptered review + 60-90s voiced TL;DR + 3 drills + clickable timeline) docking into v2.0's architectural slot (DEBRIEF-01 / DEBRIEF-02).
-- 4-layer mascot additive state machine full structural rewrite (v2.0 ships simplified anticipation subset).
-- Long-term DJ profile (~2KB JSON regenerated each session, injected verbatim into next live prompt).
-- 2 Hard Tek-specific detectors (`DISTORTION_CLIMB` + `ACID_LINE_ENTRY`).
+**Highlights:**
+
+- Anti-slop contract LIVE — every Gemini reaction citation-validated against `EvidenceRegistry`; un-cited responses strip to 40-OPUS ack-bank fallback. Phase 18 + Phase 20.
+- 6 cross-genre event detectors (`KICK_SWAP`, `SUB_LAYER_ARRIVAL`, `BREAKDOWN_KICK_KILL`, `REENTRY_KICK_LAND`, `KICK_DENSITY_SHIFT`, `PHRASE_BOUNDARY`) + `GenreRouter` atomic dispatch. Phase 17.
+- Latency Stack v1 — 40-OPUS `AckBank` + `GeminiContextCache` (1024-token floor / 4min refresh) + `CancelGate` (8s hard / 30 soft) + `TTFTMeter` + prompt diet. Phase 19.
+- 10-SKU MIDI library + `MidiMapLoader`. Phase 23.
+- djay Pro Mac overlay — Rust-parent AX bridge + second WebviewWindow + Canvas 2D amber ring. Phase 24.
+- Mascot anticipation layer — `AdditiveLayer` + 5 `prep_*` GLB stubs + 30Hz ws_bus + cancel-aware crossfades. Phase 22.
+- Pyrekordbox XML import + DEBRIEF architectural slot (sidecar `--debrief` flag + port 8766 + 3 IPC reservations). Phase 25.
+- Recording browser + retention sweep. Phase 15.
+- Sign + release CI scaffold (`release.yml` 4-target matrix + Pitfall-7 audit). Phase 21.
+- README anti-slop hook + `BRANDING.md` + 4-channel post drafts + day-zero ops scripts. Phase 26.
+
+Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning/milestones/v2.0-REQUIREMENTS.md` · Audit: `.planning/milestones/v2.0-MILESTONE-AUDIT.md`.
+
+</details>
 
 <details>
 <summary>📦 v2.0 milestone target features (archived — see <code>.planning/milestones/v2.0-ROADMAP.md</code>)</summary>
@@ -261,4 +273,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-14 after v2.0 milestone close (status: `tech_debt` accepted per `gsd-autonomous fully` mode)*
+*Last updated: 2026-05-14 — milestone v2.1 "The Unified Cut" started via `/gsd-new-milestone` (fully autonomous mode; v2.0 closed at `tech_debt`)*
