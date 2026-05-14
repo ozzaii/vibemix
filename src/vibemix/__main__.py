@@ -65,6 +65,7 @@ from vibemix.agent import (
 )
 from vibemix.agent.ack_bank import AckBank
 from vibemix.agent.cache import GeminiContextCache
+from vibemix.coach import CitationLinter, StrippedRateTracker
 from vibemix.audio import (
     INPUT_CHUNK_FRAMES,
     INPUT_SR_NATIVE,
@@ -91,7 +92,12 @@ from vibemix.runtime.cancel import CancelGate
 from vibemix.runtime.config_store import app_data_dir, load_config
 from vibemix.runtime.recordings_index import run_retention_sweep
 from vibemix.runtime.ttft import TTFTMeter
-from vibemix.state import EventDetector, MusicState, state_refresh_loop
+from vibemix.state import (
+    EventDetector,
+    EvidenceRegistry,
+    MusicState,
+    state_refresh_loop,
+)
 
 load_dotenv()
 
@@ -455,6 +461,27 @@ async def main() -> None:
         print(f"-> cache disabled: {e}", file=sys.stderr)
         cache = None  # graceful degradation — agent's None-cache branch handles it
 
+    # ---- Plan 20-05 — Phase 20 anti-slop runtime wiring ----
+    # Env-var gate: VIBEMIX_ANTI_SLOP defaults to "on". Set to "off" / "0" /
+    # "false" to fall back to the legacy non-wired path (v4 byte-identical
+    # legacy emit path inside DJCoHostAgent.llm_node). Default-on because
+    # anti-slop IS the v2.0 product — Phase 20's central thesis.
+    #
+    # The EvidenceRegistry is constructed unconditionally so state_refresh_loop
+    # always has a target for observation writes; only the linter + tracker
+    # flip on/off via the env flag. Threading the registry into the agent
+    # gives the linter a non-empty snapshot to validate against (without
+    # this, every response strips with reason='no_citations').
+    anti_slop_flag = os.environ.get("VIBEMIX_ANTI_SLOP", "on").strip().lower()
+    anti_slop_enabled = anti_slop_flag not in ("off", "0", "false")
+    print(
+        "-> anti-slop: "
+        f"{'on' if anti_slop_enabled else 'off (VIBEMIX_ANTI_SLOP)'}"
+    )
+    evidence_registry = EvidenceRegistry()
+    citation_linter = CitationLinter() if anti_slop_enabled else None
+    stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
+
     agent = DJCoHostAgent(
         genai_client=genai_client,
         clean_audio_buf=clean_audio_buf,
@@ -465,6 +492,11 @@ async def main() -> None:
         tts_inst=tts_inst,
         cache=cache,
         ttft_meter=ttft_meter,
+        evidence_registry=evidence_registry,
+        citation_linter=citation_linter,
+        stripped_rate_tracker=stripped_rate_tracker,
+        ack_bank=ack_bank,
+        playback=playback,
     )
 
     session = AgentSession(llm=llm_inst, tts=tts_inst)
@@ -488,7 +520,12 @@ async def main() -> None:
     track_task = asyncio.create_task(track_macos.run_poll_loop(stop_event))
     refresh_task = asyncio.create_task(
         state_refresh_loop(
-            state, audio_buf, midi_macos.controller_state, track_macos.track_info, stop_event
+            state,
+            audio_buf,
+            midi_macos.controller_state,
+            track_macos.track_info,
+            stop_event,
+            evidence_registry=evidence_registry,
         )
     )
     coach_task = asyncio.create_task(
