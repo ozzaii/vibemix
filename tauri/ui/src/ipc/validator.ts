@@ -6,33 +6,43 @@
  * This module is the runtime trust boundary T-11-W0-04: webview accepts NO
  * sidecar frame that fails ajv validation.
  *
- * Schema is imported as JSON via tsconfig `resolveJsonModule: true`. ajv is
- * compiled once at module load — calling `validate(raw)` is cheap.
+ * Uses ajv standalone (pre-compiled validator emitted by codegen-ipc.mjs) so
+ * the CSP can stay free of `unsafe-eval` — ajv's runtime `.compile(schema)`
+ * relies on `new Function(...)` which Tauri's CSP blocks.
  */
 
-import Ajv, { type ValidateFunction } from "ajv";
-import addFormats from "ajv-formats";
-
-import schema from "./messages.schema.json" with { type: "json" };
+// @ts-expect-error — generated file ships without .d.ts; validator is a
+// function(value) => boolean with `.errors` populated on failure.
+import validateGenerated from "./validator.generated.mjs";
 import type { VibemixIPCMessages as IpcMessage } from "./messages.js";
 
-// `strict: false` because our schema uses `$comment` (Draft-07 supported but
-// not part of ajv's strict-keywords whitelist) and the discriminated union
-// is by oneOf-with-const rather than ajv's discriminator extension.
-const ajv = new Ajv({ allErrors: true, strict: false });
-addFormats(ajv);
+type AjvValidator = ((data: unknown) => boolean) & {
+  errors?: Array<{
+    instancePath: string;
+    keyword: string;
+    message?: string;
+    params?: Record<string, unknown>;
+  }> | null;
+};
 
-const validate: ValidateFunction = ajv.compile(schema);
+const validate = validateGenerated as AjvValidator;
+
+function errorsText(): string {
+  if (!validate.errors || validate.errors.length === 0) return "no errors";
+  return validate.errors
+    .map((e) => `${e.instancePath || "(root)"} ${e.message ?? e.keyword}`)
+    .join("; ");
+}
 
 /**
  * Parse an inbound IPC frame.
  *
- * @throws Error with `ajv.errorsText(...)` body when validation fails. The
+ * @throws Error with a summary of ajv errors when validation fails. The
  *   Wave 4 WizardLoop will catch + log + drop the frame (DoS mitigation).
  */
 export function parseIpcMessage(raw: unknown): IpcMessage {
   if (!validate(raw)) {
-    throw new Error(`IPC schema violation: ${ajv.errorsText(validate.errors)}`);
+    throw new Error(`IPC schema violation: ${errorsText()}`);
   }
   return raw as IpcMessage;
 }
@@ -42,7 +52,7 @@ export function parseIpcMessage(raw: unknown): IpcMessage {
  * that want to log-and-skip rather than raise.
  */
 export function isIpcMessage(raw: unknown): raw is IpcMessage {
-  return validate(raw) as boolean;
+  return validate(raw);
 }
 
 export type { IpcMessage };

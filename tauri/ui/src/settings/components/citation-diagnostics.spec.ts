@@ -184,7 +184,7 @@ describe("citation-diagnostics — Test 5: update() refreshes without rebuilding
     expect(
       handle.root.querySelector(".citation-diag-last-unverified"),
     ).toBeNull();
-    expect(badge.dataset.active).toBe("false");
+    expect(badge!.dataset.active).toBe("false");
   });
 });
 
