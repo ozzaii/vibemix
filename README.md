@@ -21,7 +21,7 @@
 
 ---
 
-vibemix listens to your master output, watches your DJ software's screen, ingests your controller, and talks back into your headphones — like a real DJ friend in your ear, not generic AI commentary. Built by [Bravoh](https://altidus.world) and released open-source as the warm-up for our main launch.
+**A real DJ friend in your ear — no AI slop.** vibemix listens to your master output, watches your DJ software's screen, ingests your controller, and talks back into your headphones in a way that's grounded in what you actually just did. Not generic "AI assistant" commentary. Not hallucinated track names. Not late reactions to events that already passed. Built by [Bravoh](https://altidus.world) and released open-source as the warm-up for our main launch.
 
 > **Audio privacy in one line:** your audio is streamed to Bravoh's Gemini proxy for analysis. Recordings stay on your machine. See [FAQ](#faq) for the long version.
 
@@ -34,6 +34,7 @@ vibemix listens to your master output, watches your DJ software's screen, ingest
 | macOS (Apple Silicon) | [vibemix.dmg](https://github.com/bravoh/vibemix/releases/latest) |
 | Windows 11 | [vibemix-installer.msi](https://github.com/bravoh/vibemix/releases/latest) |
 
+<!-- TBD(launch): Install URLs go live with the first signed release (Phase 21 deliverable). Verify the `bravoh/vibemix` org/repo slug matches the final GitHub home before public launch. -->
 <!-- TODO: drop install GIFs (clone-to-running in <60s) into docs/assets/install/ -->
 
 Builds are signed (Apple Developer ID on macOS, SignPath OSS cert on Windows) and notarized. Auto-update is on by default; opt out in Settings.
@@ -67,6 +68,13 @@ Out-of-the-box mappings for 10 controllers. Anything else uses the generic posit
 | <img src="docs/assets/controllers/hercules_inpulse_300.png" width="200" /><br/>**Hercules DJControl Inpulse 300** | <img src="docs/assets/controllers/hercules_inpulse_500.png" width="200" /><br/>**Hercules DJControl Inpulse 500** |
 
 Calibrate any other controller — see [docs/midi-mapping.md](docs/midi-mapping.md).
+
+### Don't see your controller?
+
+Two ways to add it:
+
+1. **File a request** — open a [new-controller issue](https://github.com/bravoh/vibemix/issues/new?template=new_controller.yml) and we'll triage. <!-- TBD: confirm org slug `bravoh/vibemix` matches the final repo name before launch -->
+2. **Send a PR** — run `python3 scripts/sniff_controller.py` to capture your controller's MIDI shape, then drop a JSON profile under `src/vibemix/midi/profiles/` per [CONTRIBUTING.md](CONTRIBUTING.md#2-new-controller-mapping). CI auto-merges clean profile additions.
 
 ---
 
