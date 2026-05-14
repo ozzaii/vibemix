@@ -40,6 +40,9 @@ The body shape is intentionally permissive in v1.0 — we accept any
 non-bracket, non-whitespace, non-comma sequence so prompt-only seeding
 does not reject valid Gemini output that drifts in shape early. Phase 20
 will tighten per-source body grammar.
+
+Plan 25-02 adds ``register_library`` so ``[track:<id>]`` citations
+resolve against the user's real Rekordbox collection.
 """
 
 from __future__ import annotations
@@ -47,6 +50,10 @@ from __future__ import annotations
 import collections
 import re
 import threading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover — type-only import
+    from vibemix.library.rekordbox import RekordboxLibrary
 
 __all__ = [
     "EVIDENCE_CITATION_RE",
@@ -155,6 +162,51 @@ class EvidenceRegistry:
             self._data.clear()
             self._citation_buffer.clear()
             self._total_turns = 0
+
+    # --- library wiring (Plan 25-02) ------------------------------------ #
+
+    def register_library(
+        self,
+        lib: RekordboxLibrary | object,
+        t_session: float = 0.0,
+    ) -> int:
+        """Register every track in ``lib`` as a ``track:<id>`` observation.
+
+        Phase 18 EvidenceRegistry already lists ``track`` as a valid source
+        in ``EVIDENCE_SOURCES``. The Phase 20 ``CitationLinter`` walks
+        ``EVIDENCE_CITATION_RE`` matches and calls ``has(source, key, t_target)``
+        to gate Gemini output — registering the user's real Rekordbox track
+        IDs here lets ``[track:<id>]`` citations resolve against their
+        collection instead of nowplaying-cli ghost-text only.
+
+        ``t_session=0.0`` is the canonical "library load" timestamp — it's
+        the moment of session start so any in-session citation lookup
+        (tol=±1.0s live, ±2.0s debrief per GROUND-07) falls outside this
+        window unless the linter explicitly skips the timestamp check for
+        the ``track`` source. Plan 25-03 wires linter behavior — for v2.0
+        this method just exposes the registration primitive.
+
+        Argument typing accepts the canonical ``RekordboxLibrary`` (via
+        TYPE_CHECKING import) but the runtime path uses duck-typed access
+        — any object with a ``tracks`` mapping works, which keeps tests
+        lightweight (no need to instantiate the full library for registry
+        coverage).
+
+        Returns the number of entries registered. Idempotent on identical
+        inputs — duplicate calls append duplicate ``t_session`` values to
+        the same key, but ``has()`` checks any-of so the read path is
+        unaffected.
+        """
+        tracks_map = getattr(lib, "tracks", None)
+        if not isinstance(tracks_map, dict):
+            return 0
+        count = 0
+        with self._lock:
+            inner = self._data.setdefault("track", {})
+            for track_id in tracks_map:
+                inner.setdefault(str(track_id), []).append(t_session)
+                count += 1
+        return count
 
     # --- reads ----------------------------------------------------------- #
 
