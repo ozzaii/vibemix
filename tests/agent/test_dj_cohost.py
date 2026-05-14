@@ -183,6 +183,10 @@ def test_llm_node_01_yields_chunks_in_order(mocker, tmp_path) -> None:
     Plan 18-03: build_prompt is now called with kwarg
     ``registry_snapshot=None`` when no registry is wired (the agent's
     default state in this test). Assert positional ev + kwarg explicitly.
+
+    Plan 19-02: build_prompt also receives a ``diet=True/False`` kwarg —
+    HEARTBEAT is ack-eligible so diet=True. Asserted explicitly so a future
+    diet-dispatch regression is caught here too.
     """
     agent, gen_client, _, state = _build_agent(mocker, tmp_path)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -197,7 +201,7 @@ def test_llm_node_01_yields_chunks_in_order(mocker, tmp_path) -> None:
 
     chunks = _drive_llm_node(agent)
     assert chunks == ["hello ", "world"]
-    AICoach.build_prompt.assert_called_once_with(ev, registry_snapshot=None)
+    AICoach.build_prompt.assert_called_once_with(ev, registry_snapshot=None, diet=True)
     # pending event was consumed
     assert agent._pending_event is None
 

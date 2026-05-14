@@ -52,11 +52,25 @@ from vibemix.agent.config import LLM_MODEL
 from vibemix.audio import INVOKE_AUDIO_SECONDS, AudioBuffer, VoiceRecorder, snapshot_wav
 from vibemix.prompts import build_system_instruction, filter_for_slop
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
+from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
 
 # Sentinel suppression-token the LLM emits when nothing's worth reacting to.
 # The cascade swallows it. See ``vibemix.prompts.matrix`` for the prompt-side
 # instruction.
 SILENCE_TOKEN = "<silence/>"
+
+# Plan 19-02 — events where the screen Part is ALWAYS skipped, even if a
+# screen frame is available. CONTEXT D-08 rule: MIX_MOVE + HEARTBEAT keep the
+# diet payload tight (text + 6s audio only). Pre-wires the v2.x re-enable
+# path with the diet rule already enforced — for v2.0 the screen Part is
+# always None (v4 anti-hallucination invariant), so this guard is a no-op
+# today; it becomes load-bearing the day the screen Part comes back.
+SCREEN_SKIP_EVENTS: frozenset[str] = frozenset({"MIX_MOVE", "HEARTBEAT"})
+
+# Plan 19-02 — diet audio window for ack-eligible events. Trims from the
+# default 18s INVOKE_AUDIO_SECONDS to 6s — saves ≥500ms TTFT (CONTEXT D-08
+# Pitfall 9) by reducing the multimodal payload size.
+DIET_AUDIO_SECONDS: float = 6.0
 
 # Env-var names — public contract, surfaced in CLI / Settings UI in Phase 11/12.
 ENV_SKILL_LEVEL = "VIBEMIX_SKILL_LEVEL"
@@ -181,17 +195,29 @@ class DJCoHostAgent(Agent):
         # (Task 1) tells Gemini HOW to cite against that corpus.
         snapshot = self._registry.snapshot() if self._registry is not None else None
 
+        # Plan 19-02 — diet dispatch. Ack-eligible events (HEARTBEAT,
+        # MIX_MOVE, LAYER_ARRIVAL, KAAN_SPOKE) shrink to a 6s audio window
+        # + the compact 5-field evidence_line; non-ack events keep the full
+        # 18s window + full evidence_line + corpus footer. An unknown
+        # ev.type defaults safely to diet=False (full payload) — erring
+        # toward correctness over latency (T-19-02-02 mitigation).
+        ev_type_for_diet = ev.type if ev is not None else "MANUAL"
+        diet = ev_type_for_diet in ACK_ELIGIBLE_EVENTS
+        audio_seconds = DIET_AUDIO_SECONDS if diet else INVOKE_AUDIO_SECONDS
+        skip_screen = ev_type_for_diet in SCREEN_SKIP_EVENTS
+
         # Build grounded text packet (same evidence + task v2 used)
         if ev is not None:
-            text_prompt = AICoach.build_prompt(ev, registry_snapshot=snapshot)
+            text_prompt = AICoach.build_prompt(ev, registry_snapshot=snapshot, diet=diet)
         else:
             # No event context (e.g. generate_reply called without prep) — fall back
             text_prompt = AICoach.build_prompt(
                 Event(type="MANUAL", state=self._state, extra={}),
                 registry_snapshot=snapshot,
+                diet=diet,
             )
 
-        audio_wav = snapshot_wav(self._clean_audio_buf, INVOKE_AUDIO_SECONDS)
+        audio_wav = snapshot_wav(self._clean_audio_buf, audio_seconds)
         # Per-invocation dump folder — full audit trail for rapid dev.
         invoke_ts = time.strftime("%H%M%S")
         invoke_n = getattr(self, "_invoke_counter", 0) + 1
@@ -209,6 +235,12 @@ class DJCoHostAgent(Agent):
         except Exception as _e:
             print(f"[dump err] {_e}", file=sys.stderr)
         # Single-modality: audio only. Screen + MIDI metadata caused hallucination.
+        # Plan 19-02 pre-wiring: when v2.x re-enables screen capture, the
+        # gate becomes ``screen_jpeg = None if skip_screen else
+        # self._screen_buf.latest()[0]`` — for v2.0 the line stays None per
+        # the v4 anti-hallucination invariant. The screen Part append below
+        # gets a ``not skip_screen`` guard so the diet rule is enforced
+        # the moment the screen frame becomes non-None.
         screen_jpeg = None
 
         # Short-term verbal memory — don't repeat or rephrase what you just said
@@ -223,13 +255,13 @@ class DJCoHostAgent(Agent):
         contents: list = [
             text_prompt
             + (
-                f"\n\nAttached: last {int(INVOKE_AUDIO_SECONDS)}s of audio (mix + mic). "
+                f"\n\nAttached: last {int(audio_seconds)}s of audio (mix + mic). "
                 f"Your ears are the referee — the evidence above is grounded context."
             )
             + history_clause,
             types.Part.from_bytes(data=audio_wav, mime_type="audio/wav"),
         ]
-        if screen_jpeg:
+        if screen_jpeg and not skip_screen:
             contents.append(types.Part.from_bytes(data=screen_jpeg, mime_type="image/jpeg"))
 
         ev_tag = ev.type if ev else "MANUAL"
@@ -248,11 +280,14 @@ class DJCoHostAgent(Agent):
             phase=self._state.phase,
             audio_bytes=len(audio_wav),
             has_screen=bool(screen_jpeg),
+            audio_seconds=int(audio_seconds),
+            diet=diet,
             prompt=text_prompt,
             invoke_dir=str(invoke_dir),
         )
         print(
-            f"\n[llm {ev_tag} #{invoke_n:04d}] audio={len(audio_wav) // 1024}KB "
+            f"\n[llm {ev_tag} #{invoke_n:04d}] audio={len(audio_wav) // 1024}KB"
+            f"({int(audio_seconds)}s) diet={diet} "
             f"screen={'yes' if screen_jpeg else 'no'} dump={invoke_dir.name}"
         )
 
@@ -380,7 +415,8 @@ class DJCoHostAgent(Agent):
                         "rms": round(self._state.rms, 4),
                         "bpm": round(self._state.bpm, 1),
                         "audio_bytes": len(audio_wav),
-                        "audio_seconds": INVOKE_AUDIO_SECONDS,
+                        "audio_seconds": audio_seconds,
+                        "diet": diet,
                         "llm_latency_s": round(elapsed, 2),
                         "llm_error": llm_err,
                         "response_chars": len(full_text),
