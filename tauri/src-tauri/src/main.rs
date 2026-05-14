@@ -21,6 +21,7 @@ mod config;
 mod hotkey;
 mod mascot_window;
 mod permissions;
+mod recordings;
 mod sidecar;
 mod tray;
 mod updater;
@@ -48,10 +49,12 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Phase 12 Wave 3 — push-to-mute global shortcut.
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        // Twelve webview-callable commands (capability allowlist mirrors).
+        // Webview-callable commands (capability allowlist mirrors).
         // Phase 13 Plan 02 adds 4 mascot commands:
         //   read_mascot_window_state, write_mascot_window_state,
         //   set_mascot_visible, set_mascot_click_through
+        // Phase 15 Plan 03 adds 2 recording commands:
+        //   reveal_in_os, open_input_wav
         .invoke_handler(tauri::generate_handler![
             ws_client::forward_ipc_to_sidecar,
             sidecar::restart_sidecar,
@@ -65,6 +68,8 @@ fn main() {
             permissions::open_microphone_settings,
             permissions::request_microphone_permission,
             hotkey::rebind_hotkey,
+            recordings::reveal_in_os,
+            recordings::open_input_wav,
         ])
         .manage(SidecarHandle::default())
         .manage(WsClientHandle::default())
