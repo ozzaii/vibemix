@@ -41,6 +41,7 @@ import os
 import sys
 import time
 from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 from google import genai
 from google.genai import types
@@ -48,13 +49,19 @@ from livekit.agents import Agent, ModelSettings
 from livekit.agents import llm as agents_llm
 from livekit.agents import tts as agents_tts
 
+from vibemix.agent.ack_bank import BUCKET_FOR_EVENT
 from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL
 from vibemix.audio import INVOKE_AUDIO_SECONDS, AudioBuffer, VoiceRecorder, snapshot_wav
+from vibemix.coach import CitationLinter, StrippedRateTracker
 from vibemix.prompts import build_system_instruction, filter_for_slop
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
 from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
+
+if TYPE_CHECKING:  # pragma: no cover — typing-only
+    from vibemix.agent.ack_bank import AckBank
+    from vibemix.audio.buffers import PlaybackQueue
 
 # Sentinel suppression-token the LLM emits when nothing's worth reacting to.
 # The cascade swallows it. See ``vibemix.prompts.matrix`` for the prompt-side
@@ -133,6 +140,15 @@ class DJCoHostAgent(Agent):
         evidence_registry: EvidenceRegistry | None = None,
         cache: GeminiContextCache | None = None,
         ttft_meter: TTFTMeter | None = None,
+        # Plan 20-01 — citation-linter chokepoint kwargs. ALL FOUR must be
+        # non-None for the wired path; default None preserves Phase 18/19
+        # backward-compat (legacy emit-everything-from-buffered-chunks
+        # behavior). The all-or-nothing wiring keeps the byte-identity
+        # guarantee for the existing tests/agent/test_dj_cohost.py suite.
+        citation_linter: CitationLinter | None = None,
+        stripped_rate_tracker: StrippedRateTracker | None = None,
+        ack_bank: "AckBank | None" = None,
+        playback: "PlaybackQueue | None" = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -173,6 +189,18 @@ class DJCoHostAgent(Agent):
         # records the first non-empty stream chunk timestamp; the rolling
         # average feeds AckBank.should_fire(rolling_ttft_avg_ms=...).
         self._ttft_meter: TTFTMeter | None = ttft_meter
+        # Plan 20-01 — citation linter chokepoint. All four kwargs default
+        # None; the wired path runs iff ALL FOUR are non-None. ``_linter_wired``
+        # is computed once at __init__ to avoid four None-checks on every
+        # turn (the gate runs in the LLM hot-path).
+        self._linter: CitationLinter | None = citation_linter
+        self._stripped_tracker: StrippedRateTracker | None = stripped_rate_tracker
+        self._ack_bank: "AckBank | None" = ack_bank
+        self._playback: "PlaybackQueue | None" = playback
+        self._linter_wired: bool = all(
+            x is not None
+            for x in (citation_linter, stripped_rate_tracker, ack_bank, playback)
+        )
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         # Both the LiveKit-side ``instructions`` AND the google.genai-side
@@ -334,9 +362,15 @@ class DJCoHostAgent(Agent):
             prompt=text_prompt,
             invoke_dir=str(invoke_dir),
         )
+        # Plan 20-01: surface the linter wiring state in the per-turn
+        # log line so coach-loop tails show the gate decision next to
+        # cache state. Actual gate decision (valid|invalid|skip) is
+        # logged after the stream — see the meta.json dump below.
+        linter_state = "wired" if self._linter_wired else "skip"
         print(
             f"\n[llm {ev_tag} #{invoke_n:04d}] audio={len(audio_wav) // 1024}KB"
             f"({int(audio_seconds)}s) diet={diet} cache={cache_state} "
+            f"linter={linter_state} "
             f"screen={'yes' if screen_jpeg else 'no'} dump={invoke_dir.name}"
         )
 
@@ -424,6 +458,15 @@ class DJCoHostAgent(Agent):
             if slop_matches:
                 suppression = "slop"
 
+        # Plan 20-01 meta.json fields — initialized here so the dump
+        # path at the bottom can reference them regardless of which
+        # branch ran. "skip" means the wired path was not taken (legacy
+        # path or suppression beat the linter to it).
+        citation_action: str = "skip"
+        citation_lint_valid: bool | None = None
+        citation_lint_reason: str | None = None
+        citation_lint_missing_payload: list[list[str]] | None = None
+
         if suppression == "silence":
             self._recorder.log_event(
                 "silence_short_circuit",
@@ -442,16 +485,134 @@ class DJCoHostAgent(Agent):
             )
             print(f"[ai_text] <slop suppressed: {slop_matches}>", flush=True)
         else:
-            # Clean turn — yield the buffered chunks in their original order
-            # and run the v4 ai_text logging path (history append + log event).
-            for txt in buffered_chunks:
-                yield txt
-            if stripped:
-                print(f"[ai_text] {stripped!r}", flush=True)
-                self._recorder.log_event("ai_text", text=full_text, latency_s=round(elapsed, 2))
-                self._ai_text_history.append(stripped[:140])
+            # Plan 20-01 — citation linter chokepoint runs HERE, after the
+            # silence/slop gate, before yielding chunks. The wired path
+            # (all 4 kwargs non-None) runs the binary response-level linter
+            # against the same registry snapshot already taken at line ~216
+            # (REUSE — never call self._registry.snapshot() twice per turn,
+            # races would be possible). The legacy path emits unchanged.
+            #
+            # Decision ladder (when wired AND suppression is None):
+            #   1. valid → emit + tracker.record(False) + ai_text log.
+            #   2. invalid + bypass → emit anyway + record(False) +
+            #      citation_bypass log + "[ai_text:unverified]" stdout.
+            #      Bypass is one-shot per breach window (T-20-01-02).
+            #   3. invalid + strip → DO NOT yield + ack-bank PCM push
+            #      (when ev.type ∈ BUCKET_FOR_EVENT) + record(True) +
+            #      citation_strip log. silence > invented citation.
+            if self._linter_wired and self._linter is not None:
+                lint_result = self._linter.check(
+                    full_text, snapshot, mode="live"
+                )
+                citation_lint_valid = lint_result.valid
+                citation_lint_reason = lint_result.reason
+                citation_lint_missing_payload = [list(t) for t in lint_result.missing]
+
+                if lint_result.valid:
+                    citation_action = "emit"
+                    for txt in buffered_chunks:
+                        yield txt
+                    if self._stripped_tracker is not None:
+                        self._stripped_tracker.record(False)
+                    if stripped:
+                        print(f"[ai_text] {stripped!r}", flush=True)
+                        self._recorder.log_event(
+                            "ai_text",
+                            text=full_text,
+                            latency_s=round(elapsed, 2),
+                        )
+                        self._ai_text_history.append(stripped[:140])
+                    else:
+                        print("[ai_text] <empty> (skip TTS)", flush=True)
+                else:
+                    # Invalid — consult the one-shot bypass before stripping.
+                    bypass_active = (
+                        self._stripped_tracker.should_bypass()
+                        if self._stripped_tracker is not None
+                        else False
+                    )
+                    if bypass_active:
+                        citation_action = "bypass"
+                        for txt in buffered_chunks:
+                            yield txt
+                        # Bypass means we did NOT strip — tracker records
+                        # the actual outcome (False = "we let it through").
+                        if self._stripped_tracker is not None:
+                            self._stripped_tracker.record(False)
+                        self._recorder.log_event(
+                            "citation_bypass",
+                            response_id=response_id,
+                            raw_text=full_text,
+                            missing=citation_lint_missing_payload,
+                            reason=lint_result.reason,
+                            latency_s=round(elapsed, 2),
+                        )
+                        print(
+                            f"[ai_text:unverified] {stripped!r}", flush=True
+                        )
+                        # History appended on bypass — the user heard the
+                        # text, so the no-repeat memory must reflect it.
+                        if stripped:
+                            self._ai_text_history.append(stripped[:140])
+                    else:
+                        # Strip path — no chunks yielded, ack-bank PCM
+                        # injected if the event class is in the bucket map.
+                        citation_action = "strip"
+                        ack_bucket: str | None = None
+                        ack_sample_idx: int | None = None
+                        if ev is not None and ev.type in BUCKET_FOR_EVENT:
+                            try:
+                                bucket, pcm, sample_idx = (
+                                    self._ack_bank.pick_for_event(ev)
+                                    if self._ack_bank is not None
+                                    else (None, None, None)
+                                )
+                                if (
+                                    bucket is not None
+                                    and pcm is not None
+                                    and self._playback is not None
+                                ):
+                                    self._playback.push(pcm.tobytes())
+                                    ack_bucket = bucket
+                                    ack_sample_idx = sample_idx
+                            except Exception as _e:
+                                print(
+                                    f"[ack err] {_e}", file=sys.stderr
+                                )
+                        if self._stripped_tracker is not None:
+                            self._stripped_tracker.record(True)
+                        self._recorder.log_event(
+                            "citation_strip",
+                            response_id=response_id,
+                            raw_text=full_text,
+                            missing=citation_lint_missing_payload,
+                            reason=lint_result.reason,
+                            ack_bucket=ack_bucket,
+                            ack_sample_index=ack_sample_idx,
+                            latency_s=round(elapsed, 2),
+                        )
+                        print(
+                            f"[ai_text:stripped] reason={lint_result.reason} "
+                            f"ack={ack_bucket}",
+                            flush=True,
+                        )
+                        # History NOT appended — nothing was emitted.
             else:
-                print("[ai_text] <empty> (skip TTS)", flush=True)
+                # Legacy Phase 18/19 path — clean turn, yield buffered chunks
+                # in their original order and run the v4 ai_text logging
+                # path (history append + log event). Byte-identical to the
+                # pre-Plan-20 behavior (locked by
+                # tests/agent/test_dj_cohost.py + test_dj_cohost_silence_*).
+                for txt in buffered_chunks:
+                    yield txt
+                if stripped:
+                    print(f"[ai_text] {stripped!r}", flush=True)
+                    self._recorder.log_event(
+                        "ai_text", text=full_text, latency_s=round(elapsed, 2)
+                    )
+                    self._ai_text_history.append(stripped[:140])
+                else:
+                    print("[ai_text] <empty> (skip TTS)", flush=True)
 
         # ---- Per-invocation dump (always written, even on suppression) ----
         try:
@@ -477,6 +638,12 @@ class DJCoHostAgent(Agent):
                         "response_chars": len(full_text),
                         "suppression": suppression,
                         "slop_matches": slop_matches,
+                        # Plan 20-01 — citation linter chokepoint outcome.
+                        # When wired==False, all four are None (skip path).
+                        "citation_lint_valid": citation_lint_valid,
+                        "citation_lint_reason": citation_lint_reason,
+                        "citation_lint_missing": citation_lint_missing_payload,
+                        "citation_action": citation_action,
                     },
                     indent=2,
                     ensure_ascii=False,
