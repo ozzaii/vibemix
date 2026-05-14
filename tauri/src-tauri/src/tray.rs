@@ -54,6 +54,7 @@ const MENU_ID_MOOD_HYPE: &str = "mood-hype-man";
 const MENU_ID_MOOD_TEACHER: &str = "mood-teacher";
 const MENU_ID_MOOD_COACH: &str = "mood-coach";
 const MENU_ID_MUTE: &str = "mute-mic";
+const MENU_ID_TOGGLE_MASCOT: &str = "toggle-mascot";
 const MENU_ID_OPEN_SESSION: &str = "open-session";
 const MENU_ID_RECALIBRATE: &str = "re-run-calibration";
 const MENU_ID_SETTINGS: &str = "open-settings";
@@ -152,6 +153,19 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         Some("CmdOrCtrl+Shift+M"),
     )?;
+    // Explicit toggle for mascot visibility. The tray's left-click already
+    // toggles, but the binding is invisible from the menu — once the
+    // persisted `mascot_window.visible: false` state is reached, users with
+    // no muscle memory for "click the tray icon" are stuck searching for
+    // a way to bring the mascot back. This item is the discoverable path
+    // alongside the same canonical setter the left-click uses.
+    let toggle_mascot = MenuItem::with_id(
+        app,
+        MENU_ID_TOGGLE_MASCOT,
+        "Toggle Mascot",
+        true,
+        None::<&str>,
+    )?;
     let open_session = MenuItem::with_id(
         app,
         MENU_ID_OPEN_SESSION,
@@ -190,6 +204,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         .item(&mood_teacher)
         .item(&mood_coach)
         .item(&mute)
+        .item(&toggle_mascot)
         .item(&open_session)
         .item(&recalibrate)
         .item(&settings)
@@ -248,6 +263,25 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
             // path) — tray just kicks the same event the global shortcut
             // already fires through.
             let _ = app.emit("tray-mute-toggle", ());
+        }
+        MENU_ID_TOGGLE_MASCOT => {
+            // Same canonical setter the tray left-click invokes — reads
+            // the persisted visible flag, flips it, lets set_mascot_visible
+            // update both the live window and the config atomically.
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let state = match config::load_mascot_state(&app_handle) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        tracing::warn!("toggle mascot menu: load_mascot_state failed: {e}");
+                        return;
+                    }
+                };
+                if let Err(e) = config::set_mascot_visible(app_handle.clone(), !state.visible).await
+                {
+                    tracing::warn!("toggle mascot menu: set_mascot_visible failed: {e}");
+                }
+            });
         }
         MENU_ID_OPEN_SESSION => {
             if let Some(window) = app.get_webview_window("main") {
@@ -673,6 +707,7 @@ mod tests {
             MENU_ID_MOOD_TEACHER,
             MENU_ID_MOOD_COACH,
             MENU_ID_MUTE,
+            MENU_ID_TOGGLE_MASCOT,
             MENU_ID_OPEN_SESSION,
             MENU_ID_RECALIBRATE,
             MENU_ID_SETTINGS,
