@@ -103,6 +103,89 @@ jobs:
             echo "Signing secrets absent — mock-signing dry-run mode."
           fi
 
+  secret-name-audit:
+    name: Audit Tauri updater secret-name alignment
+    runs-on: ubuntu-latest
+    # Pitfall 7 prevention: Tauri docs alternate between TAURI_UPDATER_KEY_PASSWORD
+    # and TAURI_UPDATER_PRIVATE_KEY_PASSWORD; drift between the 3 files (release.yml,
+    # tauri.conf.json5, sign_manifest.sh) causes a SILENT updater-signature failure
+    # (latest.json signed with wrong env var → updater rejects). Per
+    # tauri/src-tauri/keys/README.md the canonical name is TAURI_UPDATER_KEY_PASSWORD;
+    # the audit fires on tag pushes + workflow_dispatch rehearsals.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert single canonical password env var name
+        # Matches ACTUAL env-var usage patterns (env: KEY:, ${{ secrets.KEY }},
+        # $KEY, ${KEY}, "${KEY:-...}", : "${KEY:?...}") rather than bare substring;
+        # this keeps the audit's own assertion strings from self-matching. Per
+        # planner-antipatterns.md grep-gate hygiene, # and // comments stripped.
+        run: |
+          set -e
+          FAIL=0
+          # Usage-pattern regex (extended): preceded by env-context, $, ${, "${,
+          # or followed by colon-assign, equals, or close-paren in secrets context.
+          USAGE_RE='(\$\{?|secrets\.|env:[[:space:]]+|: ?"?\$\{|^[[:space:]]*[A-Z_]*=)'
+          for f in .github/workflows/release.yml tauri/src-tauri/tauri.conf.json5 scripts/dist/sign_manifest.sh; do
+            if [[ ! -f "$f" ]]; then
+              echo "::error::Audit file missing: $f"
+              FAIL=1
+              continue
+            fi
+            BODY=$(grep -v '^[[:space:]]*#' "$f" | grep -v '^[[:space:]]*//' || true)
+            # Forbidden = the Tauri docs alternate name. Match only when in usage position.
+            FORBIDDEN_HITS=$(printf '%s\n' "$BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_PRIVATE_KEY_PASSWORD" -c || true)
+            CANONICAL_HITS=$(printf '%s\n' "$BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_KEY_PASSWORD" -c || true)
+            echo "  $f → forbidden_usages=$FORBIDDEN_HITS canonical_usages=$CANONICAL_HITS"
+            if [[ "$FORBIDDEN_HITS" -gt 0 ]]; then
+              echo "::error::Pitfall 7 (silent updater signature failure): TAURI_UPDATER_PRIVATE_KEY_PASSWORD used in $f — Tauri docs alternate the two names; pick TAURI_UPDATER_KEY_PASSWORD per tauri/src-tauri/keys/README.md and align all three files."
+              FAIL=1
+            fi
+          done
+          # Canonical name must appear ≥1 in usage position in release.yml AND
+          # sign_manifest.sh. tauri.conf.json5 references the PUBKEY not the password.
+          REL_BODY=$(grep -v '^[[:space:]]*#' .github/workflows/release.yml)
+          SCR_BODY=$(grep -v '^[[:space:]]*#' scripts/dist/sign_manifest.sh)
+          RELEASE_CANON=$(printf '%s\n' "$REL_BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_KEY_PASSWORD" -c || true)
+          SCRIPT_CANON=$(printf '%s\n' "$SCR_BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_KEY_PASSWORD" -c || true)
+          if [[ "$RELEASE_CANON" -lt 1 ]]; then
+            echo "::error::Pitfall 7: canonical TAURI_UPDATER_KEY_PASSWORD has no usage-pattern hit in release.yml — pipeline cannot sign manifest."
+            FAIL=1
+          fi
+          if [[ "$SCRIPT_CANON" -lt 1 ]]; then
+            echo "::error::Pitfall 7: canonical TAURI_UPDATER_KEY_PASSWORD has no usage-pattern hit in sign_manifest.sh — pipeline cannot sign manifest."
+            FAIL=1
+          fi
+          if [[ "$FAIL" -ne 0 ]]; then
+            exit 1
+          fi
+          echo "secret-name-audit (password) — OK: only TAURI_UPDATER_KEY_PASSWORD used as env var across all 3 files."
+
+      - name: Assert TAURI_UPDATER_PRIVATE_KEY referenced consistently
+        # Same usage-pattern matching: catches actual env-var refs, ignores
+        # mentions inside the audit step's own assertion strings.
+        run: |
+          set -e
+          USAGE_RE='(\$\{?|secrets\.|env:[[:space:]]+|: ?"?\$\{|^[[:space:]]*[A-Z_]*=)'
+          REL_BODY=$(grep -v '^[[:space:]]*#' .github/workflows/release.yml)
+          SCR_BODY=$(grep -v '^[[:space:]]*#' scripts/dist/sign_manifest.sh)
+          # Match TAURI_UPDATER_PRIVATE_KEY but NOT TAURI_UPDATER_PRIVATE_KEY_PASSWORD
+          # (so the forbidden-password name doesn't satisfy this gate by accident).
+          RELEASE_HITS=$(printf '%s\n' "$REL_BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_PRIVATE_KEY([^A-Z_]|\$)" -c || true)
+          SCRIPT_HITS=$(printf '%s\n' "$SCR_BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_PRIVATE_KEY([^A-Z_]|\$)" -c || true)
+          echo "  release.yml → TAURI_UPDATER_PRIVATE_KEY usages=$RELEASE_HITS"
+          echo "  sign_manifest.sh → TAURI_UPDATER_PRIVATE_KEY usages=$SCRIPT_HITS"
+          if [[ "$RELEASE_HITS" -lt 1 ]]; then
+            echo "::error::Pitfall 7: TAURI_UPDATER_PRIVATE_KEY has no usage-pattern hit in release.yml — release-publish job cannot wire the secret."
+            exit 1
+          fi
+          if [[ "$SCRIPT_HITS" -lt 1 ]]; then
+            echo "::error::Pitfall 7: TAURI_UPDATER_PRIVATE_KEY has no usage-pattern hit in sign_manifest.sh — manifest signer cannot materialise the key."
+            exit 1
+          fi
+          echo "secret-name-audit (private-key) — OK: TAURI_UPDATER_PRIVATE_KEY referenced consistently."
+
   placeholder-pubkey-gate:
     name: Reject placeholder updater pubkey
     runs-on: ubuntu-latest
