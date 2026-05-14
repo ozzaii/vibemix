@@ -36,7 +36,6 @@ import {
   type TranscriptLine,
 } from "./components/cohost.js";
 import { renderStatusBar, type BadgeState } from "./components/status-bar.js";
-import { renderMutedBanner } from "./components/muted-banner.js";
 import { SCREW_SVG } from "./icons/screw.svg.js";
 import { HEADPHONES_SVG } from "./icons/headphones.svg.js";
 
@@ -303,11 +302,15 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const rightCol = document.createElement("section");
   rightCol.className = "vmx-session__col";
   rightCol.dataset.col = "right";
+  // bannerSlot retained as an empty mount point so the layout grid stays
+  // stable. The previous muted-banner mount stacked a 3rd fault-tinted
+  // alarm signal alongside the cohost inline pill and the statusbar muted
+  // strip; critique 2026-05-14 pass 2 collapsed mute to a single breathing
+  // indicator (the cohost pill, where the eye already is). The banner
+  // renderer stays in the codebase for future re-use, but mounting is
+  // gated off here.
   const bannerSlot = document.createElement("div");
   bannerSlot.className = "vmx-session__banner-slot";
-  if (state.status.muted) {
-    bannerSlot.append(renderMutedBanner({ hotkey: state.status.hotkey }));
-  }
   rightCol.append(bannerSlot);
   // Wave 6 — pass muted + grounding-failure props through. The cohost
   // owns the visual surfaces (MUTED pill, retry button); layout owns
@@ -624,18 +627,10 @@ export function renderSessionFrame(mounted: Mounted, next: SessionState): void {
     });
   }
 
-  // Muted banner mount/unmount
-  if (
-    mounted.current.status.muted !== next.status.muted ||
-    mounted.current.status.hotkey !== next.status.hotkey
-  ) {
-    mounted.bannerSlot.replaceChildren();
-    if (next.status.muted) {
-      mounted.bannerSlot.append(
-        renderMutedBanner({ hotkey: next.status.hotkey }),
-      );
-    }
-  }
+  // Muted state: the cohost inline pill is now the sole breathing indicator
+  // for mute; the banner slot stays empty (kept as a mount stub so future
+  // urgent banners can land here). Critique 2026-05-14 pass 2 collapsed the
+  // triple-mute stack to one signal.
 
   // Status bar — rebuild only if any badge state changed (cheap; bar is small)
   const sbPrev = mounted.current.status;

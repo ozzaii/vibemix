@@ -268,7 +268,7 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
     plug.innerHTML = PLUG_SVG;
     const txt = document.createElement("span");
     // UI-SPEC §Step 3 "Empty-state" — VERBATIM
-    txt.textContent = "no controller detected — plug one in or skip";
+    txt.textContent = "no controller detected. plug one in or skip.";
     empty.append(plug, txt);
     zoneA.append(empty);
   }
@@ -294,7 +294,7 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
   if (props.state === "caught") {
     lcd.textContent = "✓";
     // UI-SPEC §Step 3 "Caught state" — VERBATIM template
-    caption.textContent = `✓ ${props.caughtLabel ?? "control"} — CONNECTED`;
+    caption.textContent = `✓ ${props.caughtLabel ?? "control"} · CONNECTED`;
   } else if (props.state === "timeout") {
     lcd.textContent = "--:--";
     // UI-SPEC §Step 3 "Timeout state" — VERBATIM
@@ -326,7 +326,7 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
       state: props.state === "timeout" ? "armed" : "idle",
       destructive: props.state !== "timeout",
       // UI-SPEC §Step 3 "Skip button" — VERBATIM
-      label: "Skip — use generic mapping",
+      label: "Skip · use generic mapping",
       leadingGlyph: "[",
       trailingGlyph: "]",
       onClick: props.onSkip,

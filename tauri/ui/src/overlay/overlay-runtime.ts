@@ -9,12 +9,16 @@
 
 const params = new URLSearchParams(window.location.search);
 
-const COLOR_AMBER = "#f59e0b";
+// Aligned with the CDJ-Whisper token palette so the overlay ring reads
+// against the same colour vocabulary as the rest of the surface. The
+// amber matches --amber (#ff8a3d); fault / ok use the LED palette;
+// blue is reserved (no current consumer, kept as a named slot).
+const COLOR_AMBER = "#ff8a3d";
 const COLOR_MAP: Record<string, string> = {
   amber: COLOR_AMBER,
-  red: "#ef4444",
-  green: "#10b981",
-  blue: "#3b82f6",
+  red: "#d4413a",
+  green: "#6dd44a",
+  blue: "#4898ff",
 };
 
 function resolveColor(raw: string | null): string {

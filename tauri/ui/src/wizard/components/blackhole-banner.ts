@@ -105,7 +105,7 @@ export function BlackHoleBanner(props: BlackHoleBannerProps): HTMLElement {
     const caption = document.createElement("div");
     caption.className = "cmp-bh-banner__caption";
     // UI-SPEC §Step 2 "BlackHole post-click caption" — VERBATIM
-    caption.textContent = "opened in browser — install then click Recheck below";
+    caption.textContent = "opened in browser. install then click Recheck below.";
     text.append(caption);
   }
 

@@ -140,13 +140,12 @@ const CSS = `
       0 0 6px rgba(212, 65, 58, 0.28),
       inset 0 1px 0 rgba(255, 255, 255, 0.3),
       inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
-    animation: vmx-statusbar-rec-blink 1400ms ease-in-out infinite;
   }
+  /* Critique 2026-05-14 pass 2: the statusbar muted strip is a quiet
+   * label, not a third alarm. The cohost inline pill carries the live
+   * breathing cadence; this LED stays solid so the eye reads one signal,
+   * not three. */
   .vmx-statusbar__muted[hidden] { display: none; }
-  @keyframes vmx-statusbar-rec-blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
-  }
   /* Signature — Saira italic at very low alpha so brand chrome is
    * present but does not compete with active state indicators. The
    * earlier Caveat treatment fought the Pioneer aesthetic; v5 makes the

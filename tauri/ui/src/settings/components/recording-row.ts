@@ -279,33 +279,28 @@ const CSS = `
     box-shadow: inset 0 0 8px rgba(212, 65, 58, 0.18);  /* destructive-hover exception (UI-SPEC §Color) */
     border-radius: var(--rad-sm);
   }
-  /* Critique 2026-05-14: previous (transition: height) 0 to auto was a
-   * silent no-op (browsers can't animate to/from auto) AND every frame
-   * would have re-run layout. Switched to the grid-template-rows 0fr to
-   * 1fr pattern: the parent grid animates the row size while the inner
-   * stays at its natural height. min-height: 0 on the inner is required
-   * so the grid child can shrink below its content size. */
+  /* Expand pattern: parent grid animates grid-template-rows 0fr to 1fr;
+   * inner keeps constant padding so the open/close stays off the layout
+   * property axis. Parent's overflow: hidden clips the inner while the
+   * row is collapsed. min-height: 0 on the inner lets the grid child
+   * shrink below its content size. */
   .vmx-rec-row__expand {
     display: grid;
     grid-template-rows: 0fr;
     transition: grid-template-rows 250ms ease-out;
+    overflow: hidden;
   }
   .vmx-rec-row__expand[data-open="true"] {
     grid-template-rows: 1fr;
   }
   .vmx-rec-row__expand-inner {
-    overflow: hidden;
     min-height: 0;
-    padding: 0 var(--sp-4);
+    padding: var(--sp-4);
     background: var(--glass-3);
     border-top: 1px solid var(--amber-22);
     box-shadow: inset 0 1px 0 var(--glass-top);
     max-height: 40vh;
     overflow-y: auto;
-    transition: padding 250ms ease-out;
-  }
-  .vmx-rec-row__expand[data-open="true"] .vmx-rec-row__expand-inner {
-    padding: var(--sp-4);
   }
   .vmx-rec-row__audio {
     width: 100%;

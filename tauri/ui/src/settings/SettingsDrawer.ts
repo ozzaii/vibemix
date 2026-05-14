@@ -133,7 +133,7 @@ const CSS = `
     gap: 8px;
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 700;
-    font-size: 12px;
+    font-size: 14px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--silk);
@@ -155,13 +155,22 @@ const CSS = `
     background: transparent;
     border: 1px solid transparent;
     color: var(--silk-40);
-    font-family: var(--type-mono);
-    font-size: 16px;
     line-height: 1;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     transition: color var(--motion-snap) ease-out,
                 border-color var(--motion-snap) ease-out,
                 background var(--motion-snap) ease-out;
+  }
+  .vmx-settings-drawer__close svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    fill: none;
   }
   .vmx-settings-drawer__close:hover {
     color: var(--amber);
@@ -198,7 +207,7 @@ const CSS = `
     border-radius: var(--rad-sm);
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 600;
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.28em;
     text-transform: uppercase;
     color: var(--amber);
@@ -323,7 +332,7 @@ export function mountSettingsDrawer(root: HTMLElement): void {
   close.type = "button";
   close.className = "vmx-settings-drawer__close";
   close.setAttribute("aria-label", "close settings");
-  close.textContent = "✕";
+  close.innerHTML = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M1 1L13 13M13 1L1 13"/></svg>';
   close.addEventListener("click", (e) => {
     e.preventDefault();
     closeSettings();

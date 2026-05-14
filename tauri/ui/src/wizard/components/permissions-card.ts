@@ -176,7 +176,7 @@ export function PermissionsCard(props: PermissionsCardProps): HTMLElement {
     led.setAttribute("aria-hidden", "true");
     const txt = document.createElement("span");
     // UI-SPEC §Step 1 — VERBATIM
-    txt.textContent = "DENIED — open Settings ↗";
+    txt.textContent = "DENIED · open Settings ↗";
     denied.append(led, txt);
     denied.addEventListener("click", () => props.onOpenSettings?.());
     denied.addEventListener("keydown", (e) => {

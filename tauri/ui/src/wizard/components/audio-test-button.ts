@@ -260,7 +260,7 @@ export function AudioTestButton(props: AudioTestButtonProps): HTMLElement {
     micro.dataset.tone = "rec";
     const actual = props.actualRate ?? 0;
     // UI-SPEC §Step 2 audio-test-programmatic-fail line — VERBATIM template
-    micro.textContent = `sample rate mismatch — blackhole reporting ${actual}, expected 48000`;
+    micro.textContent = `sample rate mismatch. blackhole reporting ${actual}, expected 48000.`;
   }
 
   root.append(visual, cta, lcd, micro);
@@ -289,7 +289,7 @@ export function AudioTestButton(props: AudioTestButtonProps): HTMLElement {
         variant: "primary",
         state: yesArmed ? "armed" : "disabled",
         // UI-SPEC §Step 2 "Audio test yes" — VERBATIM
-        label: "Yes — sounded clean",
+        label: "Yes, sounded clean",
         leadingGlyph: "[",
         trailingGlyph: "]",
         onClick: props.onYes,

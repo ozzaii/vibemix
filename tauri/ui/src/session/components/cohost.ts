@@ -492,7 +492,7 @@ function buildMutedPill(): HTMLElement {
   pill.setAttribute("aria-live", "polite");
   pill.setAttribute(
     "title",
-    "cohost is muted — press the push-to-mute hotkey to resume",
+    "cohost is muted. press the push-to-mute hotkey to resume.",
   );
   const dot = document.createElement("span");
   dot.className = "vmx-cohost__muted-pill-led";
@@ -508,9 +508,9 @@ function titleForStatus(status: CohostStatus): string {
     case "LISTENING":
       return "AVERY is listening to the room";
     case "TALKING":
-      return "AVERY is talking — mic auto-gated until they finish";
+      return "AVERY is talking. mic auto-gated until they finish.";
     case "IDLE":
-      return "AVERY is idle — waiting for an event to react to";
+      return "AVERY is idle. waiting for an event to react to.";
   }
 }
 
@@ -608,12 +608,12 @@ function footLabelFor(grounded: boolean, failed: boolean): string {
 
 function footTooltipFor(grounded: boolean, failed: boolean): string {
   if (grounded) {
-    return "grounded on audio + screen capture — cohost can hear you";
+    return "grounded on audio + screen capture. cohost can hear you.";
   }
   if (failed) {
-    return "couldn't reach gemini — press retry to reconnect";
+    return "couldn't reach gemini. press retry to reconnect.";
   }
-  return "warming up — initializing audio + screen capture";
+  return "warming up. initializing audio + screen capture.";
 }
 
 /** Idempotent hot-update. Rebuilds transcript content but preserves the

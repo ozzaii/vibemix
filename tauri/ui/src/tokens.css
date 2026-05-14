@@ -143,6 +143,16 @@
   --sp-6: 40px;
   --sp-7: 64px;
   --sp-8: 96px;
+  /* Named spacing aliases — historic call-sites in session/* expect these.
+   * Resolve to the numeric scale so the CSS cascade doesn't silently
+   * fall back to 0 on undefined tokens. */
+  --sp-sm: var(--sp-2);
+  --sp-md: var(--sp-4);
+
+  /* --- Status alias — REC pill in titlebar + drop-chip read --rec
+   * (UI-SPEC vocabulary); resolve to the fault LED so the indicator
+   * renders red instead of falling back to transparent. */
+  --rec: var(--led-fault);
 
   /* --- Layout & Grid (retained from Phase 11; Wave 5 collapsed the
    *                    mascot column — the wizard-grid is now single-
