@@ -51,7 +51,7 @@ EVENT_GLOBAL_MIN_GAP = (
 )
 HEARTBEAT_SEC = 70.0  # v4:133 — heartbeat event cadence (retuned post-chat-log)
 
-MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142
+MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 extension
     "TRACK_CHANGE": 6.0,
     "PHASE": 18.0,
     "LAYER_ARRIVAL": 16.0,
@@ -59,6 +59,15 @@ MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142
     "HEARTBEAT": HEARTBEAT_SEC,
     "MIC": 3.0,
     "MANUAL": 1.5,
+    # Phase 17 SENSE-12 — kick-side cross-genre detectors (per CONTEXT D-cooldown
+    # locked rule "matches G-followup-1"). Tuned on the v4 coexistence matrix:
+    # KICK_SWAP slightly faster than LAYER_ARRIVAL since kick character changes
+    # are the main "moment" worth catching; SUB_LAYER_ARRIVAL mirrors
+    # LAYER_ARRIVAL (its bass-side analog); KICK_DENSITY_SHIFT mirrors PHASE
+    # (it's a structural shift, not a layer arrival).
+    "KICK_SWAP": 14.0,
+    "SUB_LAYER_ARRIVAL": 16.0,
+    "KICK_DENSITY_SHIFT": 18.0,
 }
 
 TRACK_CHANGE_MIN_CONFIDENCE = 0.5  # v4:143 — ignore stale nowplaying-cli phantom tracks
@@ -93,3 +102,20 @@ BUILDUP_SLOPE_WINDOW_S: float = 8.0
 # misclassify-on-house-with-fast-tempo. Bands are normalized shares (sum to
 # ~1.0), so the floor lives in [0.0, 1.0].
 GENRE_CENTROID_HARD_TEK_MIN: float = 0.55
+
+# ---- Phase 17 — Kick-side detector thresholds (SENSE-12) ----
+# Calibrated against v4 "kick character change" intuition; Plan 06 tuning
+# harness (reference-WAV CSV against Hard Tek anchors) will confirm/adjust.
+#
+# KICK_SWAP_CENTROID_DELTA_HZ: a 12Hz centroid shift in the 40-120Hz band is
+# the smallest robustly-perceptible "different kick" delta — below it the
+# centroid drift is dominated by low-band noise across consecutive 4s windows.
+KICK_SWAP_CENTROID_DELTA_HZ: float = 12.0
+# SUB_JUMP_THRESHOLD: 0.10 fraction jump in `state.bands["sub"]` — same
+# magnitude as the existing v4 LAYER_ARRIVAL high-band-jump threshold (0.10),
+# kept symmetrical so the bass-side detector behaves like its mid/high analog.
+SUB_JUMP_THRESHOLD: float = 0.10
+# KICK_DENSITY_SHIFT_DELTA: 1.5 onsets/sec absolute change. Half-time techno
+# ≈ 1.0/sec, 4-on-floor techno ≈ 2.5/sec, hard tek 4-on-floor ≈ 5.0/sec —
+# 1.5/sec is the smallest robustly-detectable shift between any two regimes.
+KICK_DENSITY_SHIFT_DELTA: float = 1.5

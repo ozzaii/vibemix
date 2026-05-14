@@ -75,7 +75,12 @@ def test_mic_gating_constants_match_v4() -> None:
 
 
 def test_event_gap_dict_shape_and_values() -> None:
-    """MIN_EVENT_GAP_PER_TYPE dict — v4:134-142."""
+    """MIN_EVENT_GAP_PER_TYPE dict — v4:134-142 + Phase 17 SENSE-12 extension.
+
+    Phase 17 Plan 02 added three kick-side event types (KICK_SWAP,
+    SUB_LAYER_ARRIVAL, KICK_DENSITY_SHIFT) per CONTEXT D-cooldown LOCKED rule
+    "matches G-followup-1". The v4 entries below MUST stay pinned at v4 values.
+    """
     assert set(MIN_EVENT_GAP_PER_TYPE.keys()) == {
         "TRACK_CHANGE",
         "PHASE",
@@ -84,6 +89,10 @@ def test_event_gap_dict_shape_and_values() -> None:
         "HEARTBEAT",
         "MIC",
         "MANUAL",
+        # Phase 17 SENSE-12 — kick-side cross-genre detectors (Plan 17-02)
+        "KICK_SWAP",
+        "SUB_LAYER_ARRIVAL",
+        "KICK_DENSITY_SHIFT",
     }
     assert MIN_EVENT_GAP_PER_TYPE["TRACK_CHANGE"] == 6.0
     assert MIN_EVENT_GAP_PER_TYPE["PHASE"] == 18.0
