@@ -1,21 +1,22 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.0
-milestone_name: prompt-only)
-status: completed
-last_updated: "2026-05-14T06:51:29.228Z"
-last_activity: 2026-05-14 -- Phase 21 marked complete
+milestone_name: Research-Driven Ship
+status: shipped
+last_updated: "2026-05-14T12:00:00.000Z"
+last_activity: 2026-05-14 -- v2.0 milestone archived via /gsd-complete-milestone (tech_debt accepted)
 progress:
   total_phases: 12
-  completed_phases: 5
-  total_plans: 30
-  completed_plans: 25
-  percent: 83
+  completed_phases: 10
+  total_plans: 38
+  completed_plans: 37
+  percent: 100
+next_milestone: v2.1
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-14 (Milestone v2.0 roadmap generated — 12 phases P15–P26 derived from 94 v2.0 REQ-IDs anchored to research/SUMMARY.md 12-phase decomposition; Phase 14 ✅ shipped 2026-05-13; outstanding v0.1.0 work absorbed into v2.0)
+**Last updated:** 2026-05-14 — v2.0 Research-Driven Ship SHIPPED + archived to `.planning/milestones/v2.0-ROADMAP.md`. Local annotated git tag `v2.0` created (not pushed — Kaan's decision). No active milestone; `/gsd-new-milestone` to begin v2.1.
 
 ---
 
@@ -23,29 +24,30 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 15 — Recording Browser + Retention Enforcement (entry phase for v2.0).
-- **Milestone:** v2.0 Research-Driven Ship — target ship ~3-4 weeks (~early June 2026, before Bravoh public launch).
+- **Current focus:** Between milestones — Kaan-action backlog from v2.0 (signing approvals, Phase 16 DJ ear-test, real GLBs + viral demo film) rolls into v2.1 scope.
+- **Last shipped:** v2.0 Research-Driven Ship — 2026-05-14 (status: `tech_debt` accepted per `gsd-autonomous fully` mode).
 - **Project mode:** standard.
-- **Granularity:** fine (12 phases for v2.0).
+- **Granularity:** fine (12 phases shipped in v2.0).
 - **Model profile:** quality (all agents on Opus, all checkpoints on).
 
 ---
 
 ## Current Position
 
-Phase: 22 — Plan 01 COMPLETE (spike harness shipped, measurement deferred to Kaan)
-Plan: 02 — anticipation fire-path (next; unblocked per CONTEXT D-LOCKED — does NOT depend on spike verdict)
-Status: Phase 21 complete; Phase 22 Plan 01 complete
-Last activity: 2026-05-14 -- Plan 22-01 spike harness shipped (commits 2761d3e/c95732e/e3d6478); ≥10-turn real-run measurement deferred to Kaan via KAAN-ACTION.md
+Milestone: v2.0 — ARCHIVED
+Phase: All 12 phases complete or formally deferred
+Status: Between milestones (`/gsd-new-milestone` for v2.1)
+Last activity: 2026-05-14 -- v2.0 milestone archived via /gsd-complete-milestone (tech_debt accepted; local tag v2.0 created, not pushed)
 
 ## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
 | Phases complete (v0.1.0) | 14 / 14 |
-| Phases complete (v2.0) | 0 / 12 |
+| Phases complete (v2.0) | 10 / 12 code-shipped (2 deferred to Kaan-action: P15-04 UAT + P16 ear-test) |
 | v2.0 REQ-IDs mapped | 94 / 94 ✓ |
-| v2.0 REQ-IDs complete | 0 / 94 |
+| v2.0 REQ-IDs satisfied end-to-end | 56 / 94 (60%) + 25 satisfied-at-primitive Kaan/external pending + 13 unwired-self-contained |
+| v2.0 tests at close | 1961 passed / 10 pre-existing fail / 7 skipped (0 v2.0 regressions) |
 | Critical pitfalls (v2.0) mitigated in plan | 9 / 9 (encoded in phase plans; verification at execute time) |
 | Hallucination verification (Kaan's DJ ear) | Phase 16 — Not yet measured |
 | Hero asset shipped (architecture SVG + hero PNG) | ✅ (Phase 19 absorbed; commit 137200b + 4d20511) |

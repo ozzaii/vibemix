@@ -10,28 +10,65 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v2.0 Research-Driven Ship
+## Current State
 
-**Goal:** Ship a public open-source AI DJ co-host that reacts in-bar, never hallucinates, with a viral demo arsenal earning 1000+ GitHub stars.
+**Last shipped:** v2.0 Research-Driven Ship — 2026-05-14 (status: `tech_debt` accepted per `gsd-autonomous fully` mode).
 
-**Absorbs:** Outstanding v0.1.0 work (Phases 15-20 — recording, UAT, sign, release, day-zero ops) folded into a single bulky milestone alongside the research-driven feature set surfaced by the v2-bucket research swarm (`.planning/research/v2-buckets/SYNTHESIS.md` + 11 supporting artifacts).
+**Currently:** No active milestone — `/gsd-new-milestone` to begin v2.1 planning.
 
-**Target features (12 buckets):**
+### v2.0 shipped surfaces (binary: not yet cut to RC; Kaan-action backlog rolls into v2.1)
 
-1. **Ship infrastructure (absorb v0.1.0 outstanding)** — recording browser + retention enforcement, UAT, Apple Developer ID sign + notarize + DMG, SignPath Windows MSI, GitHub release matrix, day-zero ops
-2. **Generalized event detector v1** — 6 cross-genre detectors: `KICK_SWAP` (kick character change), `SUB_LAYER_ARRIVAL` (sub-band onset), `BREAKDOWN_KICK_KILL`, `REENTRY_KICK_LAND`, `KICK_DENSITY_SHIFT`, `PHRASE_BOUNDARY` (band-limited autocorr, ±1 bar). Anchored to `cohost_v4.py`'s existing detector surface. (Hard Tek-only detectors `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` deferred to follow-on)
-3. **Latency stack** — Gemini prompt diet + context caching (1024-token floor managed via padding), pre-canned ack bank (~40 OPUS samples), cancel-and-refire (`SpeechHandle.interrupt(force=True)` empirically verified), predictive firing (~2 bars early on buildup, gated playback)
-4. **Mascot 4-layer additive state machine** — mood baseline + anticipation overlay (fires BEFORE Gemini round-trip, 400-1200ms perceived mask) + speak/react + effect, plus beat-coupled hip-bob + inline emote-tag vocab (gated on 1-day Gemini text-channel timing spike)
-5. **Citation linter** — anti-slop tech impl. Grammar `[ev:<TYPE>@<t>]` / `[aud:<key>@<t>]` / `[midi:<event>@<t>]` / `[track:<id>]`. In-memory Evidence registry, stdlib `re`, response-level strip in live (ack-bank fallback), sentence-level in debrief. Cross-mode (live + debrief + library + genre)
-6. **djay Pro Mac overlay highlight** — viral demo anchor. 12 hand-mapped pointable elements (mid/high/low EQ × 2 decks, filter, faders, crossfader, jog, etc.) via AX from Tauri parent process (not sidecar per #8329)
-7. **Pyrekordbox XML one-shot library import** — durable path post-SQLCipher-breakage; lookup BPM/key/cues from imported library by track title fuzzy match
-8. **10-SKU MIDI controller library** — DDJ-FLX4 (verified) + FLX6/FLX10/SX3/XDJ-RX3 + Hercules Inpulse 300/500 + Numark Party Mix Live + Mixstream Pro+ + DDJ-400. JSON-per-SKU + `MidiMapLoader`. Auto-detect on launch
-9. **Post-session debrief** — single Gemini call per session, chaptered review + 60-90s voiced TL;DR + 3 drills (hard cap) + clickable timeline. SBI/STAR-AR (NOT sandwich). Long-term DJ profile = ~2KB structured JSON (NO mem0/vector DB)
-10. **Library intelligence** — Gemini Embedding 2 (1536-dim, 80s audio cap, MP3/WAV) + sqlite-vec embedded vector store + Bravoh pipeline lifted 80% verbatim. File-watcher → embed → query. Free tier via Bravoh proxy (~100 reactions/day)
-11. **Cross-mode citation enforcement** — extend §5 linter to library + genre modes; per-session slop ratio telemetry surface
-12. **Viral demo film + post arsenal** — 30s djay Pro overlay cut with 3 signature beats (point-at-knob, anticipation lean-in, anti-slop silence beat). Twitter thread + IG Reels (IT + EN) + Reddit r/Beatmatch + HN Show HN. Pre-seeded FAQ.
+- **Anti-slop contract LIVE** — every Gemini reaction is citation-validated against an in-memory `EvidenceRegistry` SIBLING write-target alongside `MusicState`; un-cited responses strip to 40-OPUS ack-bank fallback. `VIBEMIX_ANTI_SLOP=on` env flag default on; boot banner surfaces dispatch decision. Phase 18 + Phase 20.
+- **6 cross-genre event detectors** in v2.0 core — `KICK_SWAP`, `SUB_LAYER_ARRIVAL`, `BREAKDOWN_KICK_KILL`, `REENTRY_KICK_LAND`, `KICK_DENSITY_SHIFT`, `PHRASE_BOUNDARY` (40-120Hz band-limited autocorr, ±1 bar) + `GenreRouter` atomic dispatch on `MusicState.active_genre`. Phase 17.
+- **Latency Stack v1** — 40-OPUS `AckBank` with per-bucket rotation deque + `GeminiContextCache` (1024-token floor, 4min refresh) + `CancelGate` (8s hard cap + 30/session soft cap) + `TTFTMeter` rolling avg + prompt diet (audio 18s→6s, screen-skip on MIX_MOVE/HEARTBEAT). All wired through `__main__.py` + `coach_loop`. Phase 19.
+- **10-SKU MIDI library** — JSON-per-SKU registry + `MidiMapLoader` for Pioneer DDJ-FLX4/400/200/REV1, Denon MC7000/6000, NI Kontrol S4/S2, Numark Mixtrack Platinum FX / Pro FX. Per-control `verified` / `pending-verdict` / `tentative` status. Community-PR via `scripts/sniff_controller.py`. Phase 23.
+- **djay Pro Mac overlay** — AX bridge in Tauri Rust parent (NEVER from Python — codebase grep gate enforces #8329), second `WebviewWindow(label="overlay")`, 12 hand-mapped pointable elements, Canvas 2D amber ring renderer (fade-in 200ms / hold 800ms / fade-out 300ms), 8s per-element cooldown, fullscreen-Spaces toast, dual-monitor coord-space all-Quartz. Phase 24.
+- **Mascot anticipation layer** — `MascotStateClass "anticipation"` priority 70 + 5 `prep_*` GLB members + `AdditiveLayer` (Three.js single-mixer) + 30Hz ws_bus payload with `beat_phase` + `active_genre` + 2.5s timeout + cancel-aware + linter-strip-aware crossfades. Real GLBs = artist task. Phase 22.
+- **Pyrekordbox XML import + DEBRIEF slot** — `RekordboxLibrary` parses Rekordbox 5/6/7 schemas (TEMPO + POSITION_MARK), SQLite cache at `$APPDATA/vibemix/library/rekordbox.db`, SQLCipher path explicitly skipped, sidecar `--debrief <session_dir>` flag on port 8766 + 3 IPC schema reservations for v2.1 docking. Phase 25.
+- **Recording browser** — chronological session list + 4-button action cluster (replay · reveal · open-external · delete) + Rust path-traversal gate + optimistic-remove + 4s undo + retention sweep @ 6h with `retention_pruned` events.jsonl logging. Phase 15.
+- **Launch ammo** — README anti-slop hook + `BRANDING.md` + `ai_misbehavior` issue template + CONTRIBUTING.md controller-mapping path + 4-channel post drafts (Twitter / IG Reels IT+EN / Reddit / HN) + `scripts/dayzero/proxy_load_test.py` (100 RPS × 5min p99 < 500ms gate) + `scripts/dayzero/healthz_check.sh` watchdog. Phase 26.
+- **Sign + Release CI scaffold** — `release.yml` 4-target matrix (macos-14 arm64 + intel, windows-latest x86_64 + arm64) + Pitfall-7 secret-name audit gate + ed25519 updater signing + `docs/signpath-application.md` Day-1 checklist. Approvals (Apple Developer Program Agreement = Francesco-action, SignPath OSS = Kaan-action ~1-week SLA) = `21-DEFERRED.md`. Phase 21.
 
-**Source-of-truth artifacts:**
+### Carry-forward to v2.1 (Kaan-action surface, top items)
+
+1. **Phase 21 signing approvals** — Apple Developer Program Agreement update (Francesco) + SignPath OSS Foundation application (Kaan, ~1-week SLA). Without these, no shippable signed binary.
+2. **Phase 16 Kaan DJ ear-test** — 3-5 real DJ sessions across techno / house / hard-tek consuming shipped P17 detectors + P18 EvidenceRegistry + P19 ack bank + P20 linter + P22 anticipation. Bar = "real DJ friend in your ear, no AI slop". Hallucination gate per memory `project_phase_16_kaan_dj_testing`.
+3. **Phase 22 + Phase 26 — real `prep_*` GLB animations (artist) + 30s viral demo film (Kaan demo shoot)** — both feed Beat B of viral wave (mascot anticipation lean-in BEFORE voice arrives).
+
+Lower-priority Kaan-action backlog: 40 Achird-voice OPUS recordings (replace silent placeholders), DDJ-FLX4 Sync sniff, 9-SKU community verification PRs, Discord server setup, Fresh-VM rehearsals (macOS + Windows), 15+ pre-seeded stars, Pro logo SVG, `EvidenceRegistry.register_library` 5-min defensive wiring patch.
+
+### Next Milestone Goals (stub — to be refined by `/gsd-new-milestone`)
+
+- Close Kaan-action backlog (top 3 above) so v2.0 RC can cut and ship publicly.
+- Library intelligence v1 — Gemini Embedding 2 + sqlite-vec / numpy fallback (per memory `project_gemini_embedding_2`).
+- Post-session debrief MVP UI (chaptered review + 60-90s voiced TL;DR + 3 drills + clickable timeline) docking into v2.0's architectural slot (DEBRIEF-01 / DEBRIEF-02).
+- 4-layer mascot additive state machine full structural rewrite (v2.0 ships simplified anticipation subset).
+- Long-term DJ profile (~2KB JSON regenerated each session, injected verbatim into next live prompt).
+- 2 Hard Tek-specific detectors (`DISTORTION_CLIMB` + `ACID_LINE_ENTRY`).
+
+<details>
+<summary>📦 v2.0 milestone target features (archived — see <code>.planning/milestones/v2.0-ROADMAP.md</code>)</summary>
+
+**Goal (v2.0):** Ship a public open-source AI DJ co-host that reacts in-bar, never hallucinates, with a viral demo arsenal earning 1000+ GitHub stars.
+
+**Absorbed:** Outstanding v0.1.0 work (Phases 15-20 — recording, UAT, sign, release, day-zero ops) folded into a single bulky milestone alongside the research-driven feature set from the v2-bucket research swarm (`.planning/research/v2-buckets/SYNTHESIS.md` + 11 supporting artifacts).
+
+**Target features (12 buckets — shipped):**
+
+1. Ship infrastructure (absorb v0.1.0 outstanding) — recording browser + retention enforcement, UAT, Apple Developer ID sign + notarize + DMG, SignPath Windows MSI, GitHub release matrix, day-zero ops
+2. Generalized event detector v1 — 6 cross-genre detectors
+3. Latency stack — Gemini prompt diet + context caching + 40-OPUS ack bank + cancel-and-refire
+4. Mascot 4-layer additive state machine (simplified for v2.0)
+5. Citation linter — anti-slop tech impl
+6. djay Pro Mac overlay highlight — viral demo Beat A anchor
+7. Pyrekordbox XML one-shot library import
+8. 10-SKU MIDI controller library
+9. Post-session debrief — architectural slot only in v2.0
+10. Library intelligence — deferred to v2.1
+11. Cross-mode citation enforcement — live mode only in v2.0
+12. Viral demo film + post arsenal
+
+**v2.0 source-of-truth artifacts:**
 
 - `.planning/research/v2-buckets/SYNTHESIS.md` — integration layer + priority matrix
 - `.planning/research/v2-buckets/A-latency.md` + `A-followup-1-cancel-and-caching.md`
@@ -42,6 +79,8 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 - `.planning/research/v2-buckets/F-library-intelligence.md`
 - `.planning/research/v2-buckets/G-genre-taxonomy.md` + `G-followup-1-hard-tek-dsp.md`
 - `.planning/research/v2-buckets/synthesis-viral-demo.md`
+
+</details>
 
 ## Requirements
 
@@ -222,4 +261,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-11 after initialization*
+*Last updated: 2026-05-14 after v2.0 milestone close (status: `tech_debt` accepted per `gsd-autonomous fully` mode)*
