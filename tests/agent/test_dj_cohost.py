@@ -112,7 +112,12 @@ def test_agent_01_subclass_of_livekit_agent() -> None:
 
 def test_agent_02_super_init_kwargs(mocker, tmp_path) -> None:
     """AGENT-02: super().__init__ called with instructions, llm, tts,
-    allow_interruptions=False."""
+    allow_interruptions=False.
+
+    Plan 18-03: ``instructions`` now includes the citation-grammar block
+    appended after the v4 body — assert the v4 body is the prefix and the
+    grammar block's signature substring is present.
+    """
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     mocker.patch.object(Agent, "__init__", return_value=None)
@@ -130,14 +135,19 @@ def test_agent_02_super_init_kwargs(mocker, tmp_path) -> None:
         tts_inst=tts,
     )
     kw = Agent.__init__.call_args.kwargs
-    assert kw["instructions"] == SYSTEM_INSTRUCTION
+    assert kw["instructions"].startswith(SYSTEM_INSTRUCTION)
+    assert "[ev:" in kw["instructions"]  # Plan 18-03 grammar block present
     assert kw["llm"] is llm
     assert kw["tts"] is tts
     assert kw["allow_interruptions"] is False
 
 
 def test_agent_03_initial_state(mocker, tmp_path) -> None:
-    """AGENT-03: pending event None, history empty deque maxlen 10, gen cfg."""
+    """AGENT-03: pending event None, history empty deque maxlen 10, gen cfg.
+
+    Plan 18-03: ``_gen_cfg.system_instruction`` includes the citation-grammar
+    block appended after the v4 body.
+    """
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     agent, _, _, _ = _build_agent(mocker, tmp_path)
@@ -148,7 +158,8 @@ def test_agent_03_initial_state(mocker, tmp_path) -> None:
 
     assert isinstance(agent._gen_cfg, types.GenerateContentConfig)
     # GenerateContentConfig is a pydantic model — direct field access works
-    assert agent._gen_cfg.system_instruction == SYSTEM_INSTRUCTION
+    assert agent._gen_cfg.system_instruction.startswith(SYSTEM_INSTRUCTION)
+    assert "[ev:" in agent._gen_cfg.system_instruction
     assert agent._gen_cfg.temperature == 1.0
     assert agent._gen_cfg.max_output_tokens == 220
     level = agent._gen_cfg.thinking_config.thinking_level

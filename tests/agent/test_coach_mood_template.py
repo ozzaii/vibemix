@@ -63,17 +63,21 @@ def test_no_literal_mood_placeholder_in_rendered_output():
 def test_hype_intermediate_byte_identical_to_v4_invariant_holds_for_default_mood():
     """Phase 10 invariant — HYPE_INTERMEDIATE is byte-identical to the v4
     SYSTEM_INSTRUCTION (load-bearing IP per CLAUDE.md). When mood is the
-    default ('hype-man'), ``build_system_instruction('intermediate', 'hype')``
-    MUST still return that pinned golden, byte-for-byte.
+    default ('hype-man'), ``build_system_instruction('intermediate', 'hype',
+    include_citation_grammar=False)`` MUST still return that pinned golden,
+    byte-for-byte.
 
-    Phase 13-05 adds the placeholder to all 6 templates but renders it only
-    when mood != 'hype-man' so this invariant continues to hold for the
-    default backward-compat path.
+    Phase 13-05 added the placeholder to all 6 templates but renders it only
+    when mood != 'hype-man'. Plan 18-03 adds the citation-grammar block by
+    default; the v4-byte-identity invariant is preserved at the cell-constant
+    level via ``include_citation_grammar=False``.
     """
-    out_default = build_system_instruction("intermediate", "hype")
+    out_default_optout = build_system_instruction(
+        "intermediate", "hype", include_citation_grammar=False
+    )
     out_explicit_default_mood = build_system_instruction(
-        "intermediate", "hype", mood="hype-man"
+        "intermediate", "hype", mood="hype-man", include_citation_grammar=False
     )
     # Both must equal the pinned HYPE_INTERMEDIATE golden.
-    assert out_default == HYPE_INTERMEDIATE
+    assert out_default_optout == HYPE_INTERMEDIATE
     assert out_explicit_default_mood == HYPE_INTERMEDIATE

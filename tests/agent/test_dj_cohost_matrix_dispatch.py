@@ -97,22 +97,27 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 def test_dispatch_01_defaults_to_intermediate_hype(mocker, tmp_path, _clean_env) -> None:
-    """Unset env vars → HYPE_INTERMEDIATE (= v4 SYSTEM_INSTRUCTION = backward
-    compat with Phase 4)."""
+    """Unset env vars → HYPE_INTERMEDIATE body (= v4 SYSTEM_INSTRUCTION =
+    backward compat with Phase 4) PLUS the Plan 18-03 citation-grammar block
+    appended after. The v4 body is preserved as the prefix; the grammar
+    block follows."""
     instructions = _instructions_kw_for_env(mocker, tmp_path)
-    assert instructions == HYPE_INTERMEDIATE
+    assert instructions.startswith(HYPE_INTERMEDIATE)
+    assert "[ev:" in instructions  # Plan 18-03 citation-grammar block present
 
 
 def test_dispatch_02_default_equals_persona_system_instruction(
     mocker, tmp_path, _clean_env
 ) -> None:
-    """Default also equals vibemix.agent.persona.SYSTEM_INSTRUCTION (the
-    re-export). Pins backward-compat invariant for callers reading SYSTEM_INSTRUCTION."""
+    """Default also starts with vibemix.agent.persona.SYSTEM_INSTRUCTION (the
+    re-export — byte-identical to HYPE_INTERMEDIATE). Pins backward-compat at
+    the cell-constant level; Plan 18-03's grammar block is appended on top."""
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     instructions = _instructions_kw_for_env(mocker, tmp_path)
-    assert instructions == SYSTEM_INSTRUCTION
-    assert instructions == HYPE_INTERMEDIATE  # transitive
+    assert instructions.startswith(SYSTEM_INSTRUCTION)
+    assert instructions.startswith(HYPE_INTERMEDIATE)  # transitive
+    assert "[ev:" in instructions
 
 
 # ---------- explicit env-var dispatch ------------------------------------
@@ -134,11 +139,17 @@ def test_dispatch_02_default_equals_persona_system_instruction(
 def test_dispatch_03_each_cell_selectable_via_env(
     mocker, tmp_path, monkeypatch, skill, mode, expected_cell
 ) -> None:
-    """Setting VIBEMIX_SKILL_LEVEL + VIBEMIX_MODE selects the right cell."""
+    """Setting VIBEMIX_SKILL_LEVEL + VIBEMIX_MODE selects the right cell.
+
+    Plan 18-03: the dispatcher appends the citation-grammar block on top of
+    the cell body — assert the body is the prefix and the grammar block's
+    signature substring is present in the appended tail.
+    """
     monkeypatch.setenv("VIBEMIX_SKILL_LEVEL", skill)
     monkeypatch.setenv("VIBEMIX_MODE", mode)
     instructions = _instructions_kw_for_env(mocker, tmp_path)
-    assert instructions == expected_cell
+    assert instructions.startswith(expected_cell)
+    assert "[ev:" in instructions
 
 
 def test_dispatch_04_pro_coach_via_env(mocker, tmp_path, monkeypatch) -> None:
@@ -148,7 +159,9 @@ def test_dispatch_04_pro_coach_via_env(mocker, tmp_path, monkeypatch) -> None:
     instructions = _instructions_kw_for_env(mocker, tmp_path)
     # Phase 13-05: COACH templates are rendered with the mood persona; the
     # default mood ('hype-man') is picked when VIBEMIX_MOOD is unset.
-    assert instructions == _coach_rendered(COACH_PRO)
+    # Plan 18-03: the citation-grammar block is appended after the rendered cell.
+    assert instructions.startswith(_coach_rendered(COACH_PRO))
+    assert "[ev:" in instructions
     assert "phrase ended on the 3" in instructions  # COACH_PRO anchor
 
 
@@ -157,7 +170,8 @@ def test_dispatch_05_case_insensitive_via_env(mocker, tmp_path, monkeypatch) -> 
     monkeypatch.setenv("VIBEMIX_SKILL_LEVEL", "PRO")
     monkeypatch.setenv("VIBEMIX_MODE", "COACH")
     instructions = _instructions_kw_for_env(mocker, tmp_path)
-    assert instructions == _coach_rendered(COACH_PRO)
+    assert instructions.startswith(_coach_rendered(COACH_PRO))
+    assert "[ev:" in instructions
 
 
 # ---------- gen_cfg.system_instruction also picks up the dispatch ---------
@@ -184,7 +198,11 @@ def test_dispatch_06_gen_cfg_system_instruction_matches_dispatch(
         tts_inst=mocker.MagicMock(),
     )
     # Phase 13-05: mood-persona substitution applies to COACH cells.
-    assert agent._gen_cfg.system_instruction == _coach_rendered(COACH_BEGINNER)
+    # Plan 18-03: the citation-grammar block is appended on top of the
+    # rendered cell — assert the rendered cell is the prefix and the
+    # grammar block's signature substring is present.
+    assert agent._gen_cfg.system_instruction.startswith(_coach_rendered(COACH_BEGINNER))
+    assert "[ev:" in agent._gen_cfg.system_instruction
 
 
 # ---------- invalid env values fail loudly --------------------------------
@@ -257,9 +275,12 @@ def test_dispatch_10_re_reading_env_per_instantiation(mocker, tmp_path, monkeypa
     monkeypatch.setenv("VIBEMIX_SKILL_LEVEL", "pro")
     monkeypatch.setenv("VIBEMIX_MODE", "hype")
     inst1 = _instructions_kw_for_env(mocker, tmp_path)
-    assert inst1 == HYPE_PRO
+    # Plan 18-03: dispatcher appends grammar block; assert prefix match.
+    assert inst1.startswith(HYPE_PRO)
+    assert "[ev:" in inst1
 
     monkeypatch.setenv("VIBEMIX_SKILL_LEVEL", "beginner")
     monkeypatch.setenv("VIBEMIX_MODE", "coach")
     inst2 = _instructions_kw_for_env(mocker, tmp_path)
-    assert inst2 == _coach_rendered(COACH_BEGINNER)
+    assert inst2.startswith(_coach_rendered(COACH_BEGINNER))
+    assert "[ev:" in inst2
