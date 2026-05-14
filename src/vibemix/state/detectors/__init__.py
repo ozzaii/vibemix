@@ -10,16 +10,19 @@ Detectors are READ-ONLY consumers of ``MusicState`` — Phase 3 single-writer
 invariant is preserved (only ``state_refresh_loop._tick_once`` writes inside
 ``state._lock``).
 
-Wave 2 ships four of the six baseline detectors so far (Plan 17-03 Task 2
-adds the fifth, ``ReentryKickLandDetector``):
+Wave 2 ships five of the six baseline detectors (Plan 04 will add the sixth,
+``PhraseBoundaryDetector``):
     - ``KickSwapDetector``            — within-track kick character change (centroid shift)
     - ``SubLayerArrivalDetector``     — sub bass / 808 arrival on stable BPM
     - ``KickDensityShiftDetector``    — half-time → 4-on-floor regime change
     - ``BreakdownKickKillDetector``   — kick disappears mid-track (filter sweep / breakdown)
-
-Wave 2 Plan 03 Task 2 + Plan 04 will add:
     - ``ReentryKickLandDetector``     — kick comes back near a downbeat (paired with kill)
-    - ``PhraseBoundaryDetector``      — bar-multiple structural boundary
+
+Pair contract: ``ReentryKickLandDetector`` takes a ``BreakdownKickKillDetector``
+instance as a constructor argument and reads its public ``.last_kill_at``
+attribute. Plan 17-05's ``GenreRouter`` is responsible for wiring exactly
+one re-entry detector per active genre with the matching kill instance — no
+globals, no shared mutable state across genre swaps.
 """
 
 from __future__ import annotations
@@ -27,11 +30,13 @@ from __future__ import annotations
 from vibemix.state.detectors.breakdown_kick_kill import BreakdownKickKillDetector
 from vibemix.state.detectors.kick_density_shift import KickDensityShiftDetector
 from vibemix.state.detectors.kick_swap import KickSwapDetector
+from vibemix.state.detectors.reentry_kick_land import ReentryKickLandDetector
 from vibemix.state.detectors.sub_layer_arrival import SubLayerArrivalDetector
 
 __all__: list[str] = [
     "BreakdownKickKillDetector",
     "KickDensityShiftDetector",
     "KickSwapDetector",
+    "ReentryKickLandDetector",
     "SubLayerArrivalDetector",
 ]
