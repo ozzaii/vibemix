@@ -44,6 +44,7 @@ will tighten per-source body grammar.
 
 from __future__ import annotations
 
+import collections
 import re
 import threading
 
@@ -118,6 +119,14 @@ class EvidenceRegistry:
     def __init__(self) -> None:
         self._data: dict[str, dict[str, list[float]]] = {}
         self._lock: threading.Lock = threading.Lock()
+        # Plan 18-04 — rolling buffer of per-turn citation counts. deque
+        # maxlen=50 caps the window at the LAST 50 Gemini turns so the
+        # rolling mean reflects current emission rate (not lifetime). The
+        # ``_total_turns`` counter is unbounded — Phase 16 ear-test reads
+        # it as the "turns observed" denominator, so it must NOT cap.
+        # Same single-Lock contract as the source-dict writes (closes P12).
+        self._citation_buffer: collections.deque[int] = collections.deque(maxlen=50)
+        self._total_turns: int = 0
 
     # --- writes ---------------------------------------------------------- #
 
@@ -138,9 +147,14 @@ class EvidenceRegistry:
 
         Plan 18-02 wires this into the per-session lifecycle so observations
         do not leak across DJ sessions.
+
+        Plan 18-04: also resets the citation-count rolling buffer + total-
+        turns counter so telemetry doesn't leak across sessions either.
         """
         with self._lock:
             self._data.clear()
+            self._citation_buffer.clear()
+            self._total_turns = 0
 
     # --- reads ----------------------------------------------------------- #
 
@@ -186,6 +200,51 @@ class EvidenceRegistry:
             if timestamps is None:
                 return False
             return any(abs(t - t_target) <= tol for t in timestamps)
+
+    # --- citation telemetry (Plan 18-04) -------------------------------- #
+
+    def record_citation_count(self, n: int) -> None:
+        """Append one Gemini-turn citation count to the rolling buffer.
+
+        Called from ``DJCoHostAgent.llm_node`` AFTER the response stream
+        completes (BEFORE the suppression gate so silence/slop turns are
+        also counted — Phase 16 needs Gemini's true emission rate).
+
+        Lock-guarded — same contract as ``write()``. ``deque(maxlen=50)``
+        auto-evicts the oldest entry when the buffer is full; the
+        ``_total_turns`` counter is unbounded.
+        """
+        with self._lock:
+            self._citation_buffer.append(n)
+            self._total_turns += 1
+
+    def citation_telemetry(self) -> dict[str, int | float]:
+        """Return the rolling-50-turn citation-count snapshot.
+
+        Returns:
+            ``{"window_size": <int 0..50>, "mean": <float>,
+               "total_turns_observed": <int>}``
+
+        ``mean`` is a Python float; no rounding here — Phase 16 ear-test
+        and the Phase 20 stripped_rate guard own display rounding.
+        Empty-buffer (no record_citation_count() calls yet) returns
+        ``mean=0.0`` (not NaN, not None) so callers don't have to special-
+        case the cold-start state.
+
+        Lock-guarded snapshot — call cost is O(window_size) for the sum,
+        bounded at 50, so well under 1µs per call. Phase 16 may poll this
+        per second without contention impact on the writer paths.
+        """
+        with self._lock:
+            window_size = len(self._citation_buffer)
+            mean = (
+                sum(self._citation_buffer) / window_size if window_size else 0.0
+            )
+            return {
+                "window_size": window_size,
+                "mean": mean,
+                "total_turns_observed": self._total_turns,
+            }
 
     # --- introspection --------------------------------------------------- #
 
