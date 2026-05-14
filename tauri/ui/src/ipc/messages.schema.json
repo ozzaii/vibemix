@@ -39,7 +39,10 @@
     {"$ref": "#/definitions/RecordingsUsage"},
     {"$ref": "#/definitions/RecordingsEvents"},
     {"$ref": "#/definitions/RecordingsEventsResult"},
-    {"$ref": "#/definitions/SessionOverlayHighlight"}
+    {"$ref": "#/definitions/SessionOverlayHighlight"},
+    {"$ref": "#/definitions/DebriefSessionLoaded"},
+    {"$ref": "#/definitions/DebriefCitationSummary"},
+    {"$ref": "#/definitions/DebriefEventTimeline"}
   ],
   "definitions": {
     "IpcBoot": {
@@ -848,6 +851,76 @@
             "element_id": {"type": "string", "minLength": 1, "maxLength": 64},
             "color": {"type": "string", "enum": ["amber", "red", "green", "blue"]},
             "duration_ms": {"type": "integer", "minimum": 0, "maximum": 8000}
+          }
+        }
+      }
+    },
+    "DebriefSessionLoaded": {
+      "$comment": "Phase 25 Plan 25-03 — DEBRIEF architectural slot (v2.0 reservation; full UI v2.1). Sidecar → shell. Fired once when the DEBRIEF sidecar opens a session_dir; carries session metadata so the v2.1 UI can render the top banner. DEBRIEF-01 + DEBRIEF-02. v2.0 does NOT emit this message — port 8766 is reserved but not bound.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.debrief.session-loaded"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["session_id", "started_at", "duration_s"],
+          "properties": {
+            "session_id": {"type": "string", "minLength": 1, "maxLength": 128},
+            "started_at": {"type": "number", "minimum": 0},
+            "duration_s": {"type": "number", "minimum": 0}
+          }
+        }
+      }
+    },
+    "DebriefCitationSummary": {
+      "$comment": "Phase 25 Plan 25-03 — DEBRIEF architectural slot (v2.0 reservation; full UI v2.1). Sidecar → shell. Aggregate citation stats over the loaded session — mirrors Phase 20 CitationLinter + StrippedRateTracker telemetry. DEBRIEF-02.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.debrief.citation-summary"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "valid", "stripped", "bypassed"],
+          "properties": {
+            "total": {"type": "integer", "minimum": 0},
+            "valid": {"type": "integer", "minimum": 0},
+            "stripped": {"type": "integer", "minimum": 0},
+            "bypassed": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "DebriefEventTimeline": {
+      "$comment": "Phase 25 Plan 25-03 — DEBRIEF architectural slot (v2.0 reservation; full UI v2.1). Sidecar → shell. Chronological event timeline (events.jsonl projection) for the v2.1 clickable-timeline UI. Each event row keeps additionalProperties:true so the row schema can grow in v2.1 without re-versioning this wrapper. DEBRIEF-02.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.debrief.event-timeline"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["events"],
+          "properties": {
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true,
+                "required": ["t", "kind"],
+                "properties": {
+                  "t": {"type": "number", "minimum": 0},
+                  "kind": {"type": "string"}
+                }
+              }
+            }
           }
         }
       }

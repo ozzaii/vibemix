@@ -29,6 +29,11 @@ from typing import Literal
 import jsonschema
 
 from vibemix.ui_bus.schemas.citation import SessionCitationPayload
+from vibemix.ui_bus.schemas.debrief import (
+    DebriefCitationSummaryPayload,
+    DebriefEventTimelinePayload,
+    DebriefSessionLoadedPayload,
+)
 from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
 
 # Resolve the schema relative to this file:
@@ -1312,6 +1317,100 @@ class SessionOverlayHighlight:
         callers that prefer not to JSON-roundtrip themselves. Mirrors the
         coach.py SessionCitation publish pattern."""
         return json.loads(self.to_json())
+
+
+# ---------------------------------------------------------------------------
+# Phase 25 Plan 25-03 — DEBRIEF architectural slot (3 wrappers)
+# ---------------------------------------------------------------------------
+# DEBRIEF-01 + DEBRIEF-02: reservation only in v2.0 — the sidecar
+# ``--debrief`` flag binds a separate ws bus on 127.0.0.1:8766 (port
+# constant in vibemix.__main__.DEBRIEF_PORT) and emits these 3 schemas.
+# v2.1 fills in the chaptered TL;DR + drill cards + clickable timeline
+# behind the SAME message types — schemas locked here.
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefSessionLoaded:
+    type: Literal["ipc.debrief.session-loaded"]
+    ts: str
+    payload: DebriefSessionLoadedPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        session_id: str,
+        started_at: float,
+        duration_s: float,
+    ) -> DebriefSessionLoaded:
+        return cls(
+            type="ipc.debrief.session-loaded",
+            ts=_now_iso(),
+            payload=DebriefSessionLoadedPayload(
+                session_id=session_id,
+                started_at=started_at,
+                duration_s=duration_s,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefCitationSummary:
+    type: Literal["ipc.debrief.citation-summary"]
+    ts: str
+    payload: DebriefCitationSummaryPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        total: int,
+        valid: int,
+        stripped: int,
+        bypassed: int,
+    ) -> DebriefCitationSummary:
+        return cls(
+            type="ipc.debrief.citation-summary",
+            ts=_now_iso(),
+            payload=DebriefCitationSummaryPayload(
+                total=total,
+                valid=valid,
+                stripped=stripped,
+                bypassed=bypassed,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefEventTimeline:
+    type: Literal["ipc.debrief.event-timeline"]
+    ts: str
+    payload: DebriefEventTimelinePayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        events: tuple[dict, ...] | list[dict],
+    ) -> DebriefEventTimeline:
+        # Normalize list→tuple for frozen dataclass hashability. The
+        # ``_tuples_to_lists`` helper above converts back to list at JSON
+        # serialization time so the schema's ``type: array`` is honored.
+        events_tuple = tuple(events)
+        return cls(
+            type="ipc.debrief.event-timeline",
+            ts=_now_iso(),
+            payload=DebriefEventTimelinePayload(events=events_tuple),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
 
 
 # Suppress unused-import flake when ``field`` is not used by any wrapper above.

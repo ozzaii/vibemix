@@ -39,7 +39,10 @@ export type VibemixIPCMessages =
   | RecordingsUsage
   | RecordingsEvents
   | RecordingsEventsResult
-  | SessionOverlayHighlight;
+  | SessionOverlayHighlight
+  | DebriefSessionLoaded
+  | DebriefCitationSummary
+  | DebriefEventTimeline;
 
 export interface IpcBoot {
   type: "ipc.boot";
@@ -380,5 +383,35 @@ export interface SessionOverlayHighlight {
     element_id: string;
     color: "amber" | "red" | "green" | "blue";
     duration_ms: number;
+  };
+}
+export interface DebriefSessionLoaded {
+  type: "ipc.debrief.session-loaded";
+  ts: string;
+  payload: {
+    session_id: string;
+    started_at: number;
+    duration_s: number;
+  };
+}
+export interface DebriefCitationSummary {
+  type: "ipc.debrief.citation-summary";
+  ts: string;
+  payload: {
+    total: number;
+    valid: number;
+    stripped: number;
+    bypassed: number;
+  };
+}
+export interface DebriefEventTimeline {
+  type: "ipc.debrief.event-timeline";
+  ts: string;
+  payload: {
+    events: {
+      t: number;
+      kind: string;
+      [k: string]: unknown;
+    }[];
   };
 }

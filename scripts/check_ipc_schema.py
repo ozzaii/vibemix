@@ -42,6 +42,9 @@ from vibemix.ui_bus import (
     CalibrationStartMidiListen,
     CalibrationUserHeardTone,
     CalibrationWindowList,
+    DebriefCitationSummary,
+    DebriefEventTimeline,
+    DebriefSessionLoaded,
     DeviceInfo,
     IpcBoot,
     IpcError,
@@ -257,6 +260,30 @@ def _minimal_examples() -> list[tuple[str, object]]:
                     },
                     {"t": 3.21, "kind": "trigger", "reason": "phase_change"},
                 ],
+            ),
+        ),
+        # Phase 25 Plan 25-03 — DEBRIEF architectural slot (3 reservations)
+        (
+            "DebriefSessionLoaded",
+            DebriefSessionLoaded.make(
+                session_id="20260513-210410",
+                started_at=1715616250.0,
+                duration_s=5040.0,
+            ),
+        ),
+        (
+            "DebriefCitationSummary",
+            DebriefCitationSummary.make(
+                total=120, valid=95, stripped=20, bypassed=5
+            ),
+        ),
+        (
+            "DebriefEventTimeline",
+            DebriefEventTimeline.make(
+                events=(
+                    {"t": 0.0, "kind": "session_start"},
+                    {"t": 3.21, "kind": "trigger"},
+                ),
             ),
         ),
     ]

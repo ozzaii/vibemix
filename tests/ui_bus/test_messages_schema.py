@@ -39,6 +39,9 @@ from vibemix.ui_bus import (
     CalibrationStartMidiListen,
     CalibrationUserHeardTone,
     CalibrationWindowList,
+    DebriefCitationSummary,
+    DebriefEventTimeline,
+    DebriefSessionLoaded,
     DeviceInfo,
     IpcBoot,
     IpcError,
@@ -263,6 +266,30 @@ def _make_examples() -> list[tuple[str, object]]:
                 duration_ms=1300,
             ),
         ),
+        # Phase 25 Plan 25-03 — DEBRIEF architectural slot (3 reservations)
+        (
+            "DebriefSessionLoaded",
+            DebriefSessionLoaded.make(
+                session_id="20260513-210410",
+                started_at=1715616250.0,
+                duration_s=5040.0,
+            ),
+        ),
+        (
+            "DebriefCitationSummary",
+            DebriefCitationSummary.make(
+                total=120, valid=95, stripped=20, bypassed=5
+            ),
+        ),
+        (
+            "DebriefEventTimeline",
+            DebriefEventTimeline.make(
+                events=(
+                    {"t": 0.0, "kind": "session_start"},
+                    {"t": 3.21, "kind": "trigger"},
+                ),
+            ),
+        ),
     ]
 
 
@@ -278,9 +305,11 @@ def test_example_count_matches_schema_oneof() -> None:
     7 (RecordingsList, RecordingsListResult, RecordingsDelete,
     RecordingsDeleteAck, RecordingsUsage, RecordingsEvents,
     RecordingsEventsResult) → 34. Phase 20-04 adds 1 (SessionCitation) → 35.
-    Phase 24-02 adds 1 (SessionOverlayHighlight) → 36.
+    Phase 24-02 adds 1 (SessionOverlayHighlight) → 36. Phase 25 Plan 25-03
+    adds 3 DEBRIEF reservations (DebriefSessionLoaded, DebriefCitationSummary,
+    DebriefEventTimeline) → 39.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 36
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 39
 
 
 @pytest.mark.parametrize(
@@ -302,18 +331,21 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_36() -> None:
+def test_schema_oneof_count_is_39() -> None:
     """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
     (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
     7 recordings.* families → 34; Phase 20-04 adds 1 (SessionCitation) → 35;
-    Phase 24-02 adds 1 (SessionOverlayHighlight) → 36.
+    Phase 24-02 adds 1 (SessionOverlayHighlight) → 36; Phase 25 Plan 25-03
+    adds 3 DEBRIEF architectural-slot reservations → 39.
 
-    ``definitions`` is 37 because ``LevelPair`` is a shared helper ref'd
+    ``definitions`` is 40 because ``LevelPair`` is a shared helper ref'd
     from ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message
-    (so it counts in ``definitions`` but not in ``oneOf``).
+    (so it counts in ``definitions`` but not in ``oneOf``); the 3 new
+    DEBRIEF entries appear in BOTH ``oneOf`` and ``definitions``, so the
+    skew between the two counts stays at 1.
     """
-    assert len(_SCHEMA["oneOf"]) == 36
-    assert len(_SCHEMA["definitions"]) == 37
+    assert len(_SCHEMA["oneOf"]) == 39
+    assert len(_SCHEMA["definitions"]) == 40
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:
