@@ -690,6 +690,240 @@ def test_tick_falls_back_to_v4_classify_when_no_profile():
     assert state.phase == "silent"
 
 
+# =============================================================================
+# Phase 17 — Hard Tek detectors v1: 4 new MusicState fields populated each tick
+# =============================================================================
+
+
+def test_tick_writes_active_genre_house():
+    """bpm_cache=124.0 lands in the house band (118-128). Centroid floor only
+    applies to hard_tek, so house classifies regardless of mid/high mix."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+    state = MusicState()
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,  # block estimate_bpm so 124.0 survives
+    )
+    assert state.active_genre == "house"
+
+
+def test_tick_writes_active_genre_hard_tek_requires_centroid(mocker):
+    """bpm_cache=150 lands in hard_tek band BUT requires (mid_share +
+    high_share) >= GENRE_CENTROID_HARD_TEK_MIN (0.55). Below floor →
+    "unknown" (anti-misclassify-on-house-with-fast-tempo)."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+
+    # Stub snapshot_features so we can drive the centroid deterministically
+    # — _audible_buf() yields ~mid/high concentrated around 440Hz which we
+    # can't bend without a different fixture.
+    def fake_feats_low_centroid(buf, seconds=4.0):
+        return {
+            "rms": 0.1,
+            "onsets_per_sec": 1.0,
+            "sub_share": 0.40,
+            "low_share": 0.20,
+            "mid_share": 0.30,
+            "high_share": 0.10,  # mid+high = 0.40 < 0.55 → "unknown"
+        }
+
+    def fake_feats_high_centroid(buf, seconds=4.0):
+        return {
+            "rms": 0.1,
+            "onsets_per_sec": 1.0,
+            "sub_share": 0.20,
+            "low_share": 0.20,
+            "mid_share": 0.30,
+            "high_share": 0.30,  # mid+high = 0.60 ≥ 0.55 → "hard_tek"
+        }
+
+    state = MusicState()
+    buf = _audible_buf()
+
+    mocker.patch("vibemix.state.refresh.snapshot_features", side_effect=fake_feats_low_centroid)
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=150.0,
+        last_bpm_at=1000.0,
+    )
+    assert state.active_genre == "unknown", "centroid floor reject for house-with-fast-tempo"
+
+    state2 = MusicState()
+    mocker.patch("vibemix.state.refresh.snapshot_features", side_effect=fake_feats_high_centroid)
+    _tick_once(
+        state2,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=150.0,
+        last_bpm_at=1000.0,
+    )
+    assert state2.active_genre == "hard_tek", (
+        "centroid floor passed → distorted-kick spectral signature → hard_tek"
+    )
+
+
+def test_tick_writes_buildup_score_from_energy_curve_slope(mocker):
+    """Monotonic-climb energy_curve → positive buildup_score in [0.0, 1.0].
+    Flat curve → buildup_score ≈ 0.0. Negative slopes clamp to 0.0
+    (buildups are monotonic-climbs only — falling energy is a job for
+    BREAKDOWN_KICK_KILL, NOT a negative buildup)."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+
+    state = MusicState()
+    buf = _audible_buf()
+
+    # Climbing curve (8 samples, monotonic) → positive score.
+    mocker.patch(
+        "vibemix.state.refresh.energy_curve",
+        return_value=[0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09],
+    )
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,
+    )
+    assert 0.0 < state.buildup_score <= 1.0, (
+        f"expected positive in (0, 1], got {state.buildup_score}"
+    )
+
+    # Flat curve → score ≈ 0.0.
+    state2 = MusicState()
+    mocker.patch("vibemix.state.refresh.energy_curve", return_value=[0.05] * 8)
+    _tick_once(
+        state2,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,
+    )
+    assert state2.buildup_score == 0.0, f"flat curve should yield 0.0, got {state2.buildup_score}"
+
+    # Falling curve → score clamps to 0.0 (negative slope rejected).
+    state3 = MusicState()
+    mocker.patch(
+        "vibemix.state.refresh.energy_curve",
+        return_value=[0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02],
+    )
+    _tick_once(
+        state3,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,
+    )
+    assert state3.buildup_score == 0.0, "falling energy must clamp to 0.0, not go negative"
+
+
+def test_tick_writes_beat_phase_mirroring_downbeat_phase():
+    """state.beat_phase mirrors state.downbeat_phase after every tick.
+    Phase 17 alias — both consumers should agree. Phase 13's downbeat_phase
+    already computes the bar-fraction; Phase 17 detectors want a
+    Phase-17-named handle (`beat_phase`) so SENSE-12 detector module imports
+    don't reach into Phase-13 naming."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+
+    state = MusicState()
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,
+    )
+    assert state.beat_phase == state.downbeat_phase
+
+
+def test_tick_keeps_predicted_drop_in_sec_none_by_default():
+    """Predictive drop firing is OFF-by-default per CONTEXT D — the
+    telemetry-guarded flip is v2.1 work, NOT Phase 17. After any tick,
+    state.predicted_drop_in_sec must remain None."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+
+    state = MusicState()
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,
+    )
+    assert state.predicted_drop_in_sec is None
+
+
+def test_tick_with_invalid_bpm_yields_unknown_genre():
+    """bpm_cache=0.0 → "unknown" — no fabricated genre during BPM lock-up.
+    Mirrors the v4 `_music_truly_playing` rule (T-17-01-01 mitigation)."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+
+    state = MusicState()
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=1000.0,
+    )
+    assert state.active_genre == "unknown"
+
+
 def test_state_refresh_loop_swallows_tick_exceptions(mocker, capsys):
     """v4:1750-1751 — error wrap. Loop continues after exception, error
     written to stderr with the v4 prefix."""
