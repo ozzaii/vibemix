@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='utf-8'?>
+<DJ_PLAYLISTS Version="1.0.0">
+  <PRODUCT Name="vibemix" Version="1.0.0" Company="vibemix-test" />
+  <COLLECTION Entries="5">
+    <TRACK Location="file://localhost//Users/test/Music/track-1.mp3" TrackID="1" Name="Test Track One" Artist="Artist A" Album="Album X" AverageBpm="124.0" Tonality="Am" TotalTime="240">
+      <POSITION_MARK Name="intro" Type="0" Start="8.0" Num="1" />
+      <POSITION_MARK Name="drop" Type="0" Start="32.0" Num="2" />
+      <POSITION_MARK Name="breakdown" Type="0" Start="96.0" Num="3" />
+    </TRACK>
+    <TRACK Location="file://localhost//Users/test/Music/track-2.mp3" TrackID="2" Name="Test Track Two" Artist="Artist B" Album="Album Y" AverageBpm="128.0" Tonality="Cm" TotalTime="300">
+      <POSITION_MARK Name="intro" Type="0" Start="8.0" Num="1" />
+      <POSITION_MARK Name="drop" Type="0" Start="32.0" Num="2" />
+      <POSITION_MARK Name="breakdown" Type="0" Start="96.0" Num="3" />
+    </TRACK>
+    <TRACK Location="file://localhost//Users/test/Music/track-3.mp3" TrackID="3" Name="Test Track Three" Artist="Artist C" Album="Album Z" AverageBpm="132.5" Tonality="Gm" TotalTime="360">
+      <POSITION_MARK Name="intro" Type="0" Start="8.0" Num="1" />
+      <POSITION_MARK Name="drop" Type="0" Start="32.0" Num="2" />
+      <POSITION_MARK Name="breakdown" Type="0" Start="96.0" Num="3" />
+      <POSITION_MARK Name="loop8" Type="4" Start="48.0" Num="4" End="64.0" />
+    </TRACK>
+    <TRACK Location="file://localhost//Users/test/Music/track-4.mp3" TrackID="4" Name="Test Track Four" Artist="Artist D" Album="Album W" AverageBpm="90.0" Tonality="Dm" TotalTime="180">
+      <POSITION_MARK Name="intro" Type="0" Start="8.0" Num="1" />
+      <POSITION_MARK Name="drop" Type="0" Start="32.0" Num="2" />
+      <POSITION_MARK Name="breakdown" Type="0" Start="96.0" Num="3" />
+    </TRACK>
+    <TRACK Location="file://localhost//Users/test/Music/track-5.mp3" TrackID="5" Name="Test Track Five" Artist="Artist E" Album="Album V" AverageBpm="150.0" Tonality="F#m" TotalTime="420">
+      <POSITION_MARK Name="intro" Type="0" Start="8.0" Num="1" />
+      <POSITION_MARK Name="drop" Type="0" Start="32.0" Num="2" />
+      <POSITION_MARK Name="breakdown" Type="0" Start="96.0" Num="3" />
+    </TRACK>
+  </COLLECTION>
+  <PLAYLISTS>
+    <NODE Name="ROOT" Type="0" Count="0" />
+  </PLAYLISTS>
+</DJ_PLAYLISTS>
