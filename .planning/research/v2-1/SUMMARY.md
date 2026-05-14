@@ -322,7 +322,7 @@ The 5-phase foundation cluster (Phases 27 + 28 + 29 + 30 + 34) runs **completely
 
 **Roadmapper recommendation:** start Phase 38 unblocking (file SignPath OSS application + Apple agreement update prep) on day 1 in parallel with Phase 27. The external clock is the critical path; everything else can shuffle around it.
 
-**Estimated wall-clock to RC:** **5-7 weeks of focused engineering**, aligning with PROJECT.md's "early June 2026" timeline (researched 2026-05-14 → 5 weeks = mid-June, ~1 week slip risk).
+**Estimated wall-clock to RC:** **5-7 weeks of focused engineering** (researched 2026-05-14). No hard calendar target — ship-when-ready; external Apple + SignPath approval clock is the bottleneck, engineering parallelizes around it.
 
 ---
 

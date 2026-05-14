@@ -4,7 +4,7 @@
 
 A free, open-source AI co-host for live DJ sets. Runs locally on macOS or Windows: listens to your master output, watches your DJ software's screen, ingests your controller actions over MIDI, and talks back into your headphones or speakers as either a hype-man (party mode) or a coach (feedback mode). Three user levels — Beginner / Intermediate / Pro — with prompt templates tuned to each, plus a curated library of ~10 popular MIDI controllers mapped out of the box.
 
-Bravoh's first open-source release. Built as a polished, narrow-scope utility that drops weeks before Bravoh's public launch — gets attention, builds trust, and warms an audience that converts into Bravoh's waitlist.
+Bravoh's first open-source release. Built as a polished, narrow-scope utility that warms an audience converting into Bravoh's waitlist.
 
 ## Core Value
 
@@ -220,7 +220,7 @@ The GitHub repo is the front door for 100% of organic discovery. It must read li
 
 **Where this comes from.** The codebase started as a personal Friday-night hobby experiment — Kaan wanted an AI co-host while DJing on his DDJ-FLX4. Three iterations explored different architectures: `cohost.py` (heuristic triggers + Gemini 3 Flash multimodal), `cohost_lk.py` (LiveKit + Gemini 2.5 Native Audio realtime), `cohost_v2.py` (single-source-of-truth `MusicState` + EventDetector + audible-deck detection). All run, all have rough edges. The Native Audio realtime path showed worse grounding than the explicit Flash + TTS path despite more architectural plumbing — hence the v1 architectural decision to keep LiveKit's *pipeline* (rooms/agents/tracks/streaming) but swap the brain to Flash + TTS.
 
-**Why open-source now.** Bravoh (the AI Artist Operating System) ships its public launch ~3-4 weeks out from today (2026-05-11). Bravoh has a 140k-view real on the project's Instagram account and a Closed Beta running since March 1, 2026. The DJ co-host is a fast-shipping, narrowly-scoped, demo-able artefact that lives downstream of Bravoh's positioning ("we build cool AI for musicians, here's a free taste") — it is the marketing wedge that turns "interested" into "watching the Bravoh waitlist".
+**Why open-source now.** Bravoh (the AI Artist Operating System) has a 140k-view reel on the project's Instagram account and a Closed Beta running since March 1, 2026. The DJ co-host is a fast-shipping, narrowly-scoped, demo-able artefact that lives downstream of Bravoh's positioning ("we build cool AI for musicians, here's a free taste") — it is the marketing wedge that turns "interested" into "watching the Bravoh waitlist".
 
 **Existing user.** Kaan, primarily — the codebase started as his Friday-night experiment. The open-source release expands to "any DJ with a controller + a DJ software running on mac or windows" — beginner curiosity to pro feedback-loop.
 
@@ -228,7 +228,7 @@ The GitHub repo is the front door for 100% of organic discovery. It must read li
 
 ## Constraints
 
-- **Timeline**: Drop before Bravoh's public launch (~3-4 weeks out, ~early June 2026). Marketing momentum requires vibemix in the wild ahead of Bravoh's wave.
+- **Timeline**: No hard calendar target — ship-when-ready per `gsd-autonomous fully` mode. External Apple Developer Program Agreement + SignPath OSS approvals are the critical path; engineering parallelizes around the external clock.
 - **Quality bar**: "Real DJ friend in your ear, no AI slop" — Kaan will block release if reactions feel scripted, late, hallucinated, or generic.
 - **Budget**: 150-200 € launch marketing (IG ads, paid posts), ~50 €/month ongoing Gemini API for end-user requests. Reassess if usage scales.
 - **Tech stack**: Locked on LiveKit pipeline + Gemini 3 Flash + Gemini TTS streaming. No other LLM providers (Bravoh is Gemini-only).
