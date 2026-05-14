@@ -463,8 +463,31 @@ async def main() -> None:
 
     # --- Audio I/O via AudioMacOS firewall ---
     audio_backend = AudioMacOS(registry, recorder)
-    input_idx = audio_backend.find_device(INPUT_DEVICE, "input")
-    output_idx = audio_backend.find_device(OUTPUT_DEVICE, "output")
+    try:
+        input_idx = audio_backend.find_device(INPUT_DEVICE, "input")
+        output_idx = audio_backend.find_device(OUTPUT_DEVICE, "output")
+    except RuntimeError as e:
+        # Most common real-world fail: BlackHole 2ch isn't installed
+        # (INPUT_DEVICE missing). Exit 3 is the sidecar's "audio-device-
+        # missing" sentinel — the Tauri shell shows a setup banner with
+        # the BlackHole install link rather than the generic crash UI.
+        is_input_miss = INPUT_DEVICE in str(e)
+        device_kind = "input" if is_input_miss else "output"
+        device_name = INPUT_DEVICE if is_input_miss else OUTPUT_DEVICE
+        print(
+            f"[FATAL] required audio device missing: {device_name!r} ({device_kind})",
+            file=sys.stderr,
+            flush=True,
+        )
+        print(f"[FATAL] {e}", file=sys.stderr, flush=True)
+        if is_input_miss:
+            print(
+                "[FATAL] install BlackHole 2ch via `brew install blackhole-2ch` "
+                "or https://existential.audio/blackhole/",
+                file=sys.stderr,
+                flush=True,
+            )
+        sys.exit(3)
 
     stop_event = asyncio.Event()
 

@@ -147,6 +147,29 @@ pub async fn spawn_sidecar_with_watchdog(
             return Ok(());
         }
 
+        // Exit codes 2 + 3 are sidecar "fatal — do not retry" sentinels.
+        // 2 = port 8765 already bound (another vibemix is running)
+        // 3 = required audio device missing (BlackHole not installed)
+        // Retrying just races the same fault forever — emit a distinct
+        // banner with `reason` set so the webview can route to the
+        // matching recovery surface.
+        if exit_code == 2 || exit_code == 3 {
+            let reason = if exit_code == 2 { "port-in-use" } else { "audio-device-missing" };
+            let last_line = read_last_log_line(&log_path).unwrap_or_default();
+            app.emit(
+                "sidecar-crashed",
+                serde_json::json!({
+                    "restart_count": 0,
+                    "last_error": last_line,
+                    "reason": reason,
+                }),
+            )
+            .ok();
+            return Err(format!(
+                "sidecar refused to start (reason={reason}, exit={exit_code})"
+            ));
+        }
+
         restart_count += 1;
         if restart_count > MAX_RESTARTS {
             let last_line = read_last_log_line(&log_path).unwrap_or_default();

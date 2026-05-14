@@ -907,7 +907,21 @@ class SessionLoop:
         consistent.
         """
         self.register_handlers()
-        await self.bus.start()
+        try:
+            await self.bus.start()
+        except OSError as e:
+            print(
+                f"[FATAL] ws_bus port bind failed on 127.0.0.1:8765 — {e}",
+                file=sys.stderr,
+                flush=True,
+            )
+            print(
+                "[FATAL] another vibemix process is already running; "
+                "quit it before relaunching.",
+                file=sys.stderr,
+                flush=True,
+            )
+            sys.exit(2)
         await self.boot()
         # Phase 15 Plan 03 — boot sweep (best-effort; never raises).
         await self.run_boot_sweeps()

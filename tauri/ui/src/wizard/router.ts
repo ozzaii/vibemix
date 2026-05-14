@@ -736,7 +736,20 @@ async function completeWizard(): Promise<void> {
       },
     });
   } catch (err) {
+    // Without surfacing this, the wizard advances to "done" but the
+    // first_run_completed flag isn't persisted → wizard silently
+    // re-opens on next launch. Show an inline retry instead of
+    // looping forever.
     console.warn("[wizard] completion write failed:", err);
+    const detail = err instanceof Error ? err.message : String(err);
+    const retry = window.confirm(
+      `Setup couldn't be saved (${detail}).\n\nRetry now? Cancel to continue ` +
+      `without saving — vibemix will re-open the wizard on next launch.`,
+    );
+    if (retry) {
+      await completeWizard();
+      return;
+    }
   }
   setState({ currentStep: "done" });
 }
@@ -752,14 +765,25 @@ export async function subscribeStatusBar(): Promise<void> {
   statusBarSubscribed = true;
   await subscribeIpc("ipc.status.tick", (msg) => {
     const payload = (msg as { payload: { livekit: string; gemini: string; midi: number | null; screen: string } }).payload;
-    setState({
+    // The status tick fires at 1Hz. Routing it through setState() would
+    // call rerender() → renderCurrentStep() → replaceChildren on the
+    // wizard's primary surface, which restarts the entrance animation
+    // every second and visually looks like the page is reloading.
+    // Mutate state in place + re-render ONLY the status-bar mount.
+    wizardState = {
+      ...wizardState,
       statusBar: {
         livekit: payload.livekit as StatusBarProps["livekit"],
         gemini: payload.gemini as StatusBarProps["gemini"],
         midi: payload.midi,
         screen: payload.screen as StatusBarProps["screen"],
       },
-    });
+    };
+    notify();
+    const statusMount = document.getElementById("status-bar");
+    if (statusMount) {
+      statusMount.replaceChildren(StatusBar(wizardState.statusBar));
+    }
   });
 }
 

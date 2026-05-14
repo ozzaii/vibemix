@@ -134,9 +134,14 @@ class WizardLoop:
         (otherwise the OS only adds the app to System Settings → Privacy
         list AFTER first capture-API invocation, which can be confusing
         when the wizard's Grant button just deep-links to Settings).
+        The prime runs in a worker thread because
+        ``CGRequestScreenCaptureAccess`` blocks until the user dismisses
+        the consent prompt — without offload it would stall the asyncio
+        loop, the websocket clients would time out, and the webview would
+        flap reconnecting until the user clicked.
         """
         await self.bus.emit(json.loads(IpcBoot.make(ready=True).to_json()))
-        self._prime_tcc_registration()
+        asyncio.create_task(asyncio.to_thread(self._prime_tcc_registration))
 
     def _prime_tcc_registration(self) -> None:
         try:
@@ -518,7 +523,27 @@ class WizardLoop:
         """Register handlers → start bus → emit boot → run status loop →
         wait on stop event → tear down."""
         self.register_handlers()
-        await self.bus.start()
+        try:
+            await self.bus.start()
+        except OSError as e:
+            # Port 8765 already bound (another vibemix instance, zombie
+            # process, or a colliding process). Without this guard the
+            # exception propagates uncaught and the sidecar exits with a
+            # generic non-zero code → watchdog retries forever. Print a
+            # stable marker the shell parses (sidecar.rs reads the last
+            # log line on crash) and exit 2 (sentinel: fatal-bind-fail).
+            print(
+                f"[FATAL] ws_bus port bind failed on 127.0.0.1:8765 — {e}",
+                file=sys.stderr,
+                flush=True,
+            )
+            print(
+                "[FATAL] another vibemix process is already running; "
+                "quit it before relaunching.",
+                file=sys.stderr,
+                flush=True,
+            )
+            sys.exit(2)
         await self.boot()
         self._status_tick_task = asyncio.create_task(self._status_tick_loop())
 
