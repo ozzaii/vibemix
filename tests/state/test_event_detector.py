@@ -547,3 +547,216 @@ def test_phase_event_still_fires_when_vocal_active(mocker):
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is not None
     assert ev.type == "PHASE"
+
+
+# =============================================================================
+# Phase 17 Plan 05 — GenreRouter wrapping (additive — baseline tests above
+# stay byte-identical, this section pins the new genre-chain behavior).
+# =============================================================================
+
+from vibemix.state.detectors import SubLayerArrivalDetector  # noqa: E402
+from vibemix.state.genre_router import GenreRouter  # noqa: E402
+
+
+def test_event_detector_default_construction_works_unchanged():
+    """``EventDetector()`` constructs fine with no args — baseline backward
+    compat (Plan 17-05 Task 2 Test 1). Constructor MAY take an optional
+    ``audio_buf`` kwarg, but the no-arg form must keep working so existing
+    call sites (coach.py, __main__.py until Plan 17-05 wires the kwarg)
+    don't break."""
+    d = EventDetector()
+    assert d.last_event_at == 0.0
+    assert d.last_per_type_at == {}
+    assert d._audible_since is None
+    # New attribute introduced by Plan 17-05 — router defaults to "unknown"
+    # baseline so behavior matches v4 byte-identical until a state with
+    # active_genre != "unknown" arrives.
+    assert hasattr(d, "router")
+    assert isinstance(d.router, GenreRouter)
+    assert d.router.current_genre == "unknown"
+    assert d.router.active_chain() == []
+    # Audio buf defaults to None when not supplied
+    assert hasattr(d, "audio_buf")
+    assert d.audio_buf is None
+
+
+def test_event_detector_swaps_chain_on_active_genre_change(mocker):
+    """First detect with state.active_genre="unknown" uses baseline; second
+    call with state.active_genre="techno" triggers ``router.swap("techno")``."""
+    d = EventDetector()
+    ms = _state(audible=False, bpm=0.0)  # silence — gate stops at music-presence
+    _patch_time(mocker, 1000.0)
+    d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert d.router.current_genre == "unknown"
+
+    # Flip active genre on the SAME state object — next detect should swap
+    ms.active_genre = "techno"
+    d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert d.router.current_genre == "techno"
+    # Chain is now the techno chain (5 detectors)
+    assert len(d.router.active_chain()) == 5
+
+
+def test_event_detector_routes_genre_event_when_no_baseline_fires(mocker):
+    """Drive a state through detect() that does NOT trigger baseline rules
+    but DOES make a genre-chain detector fire (set active_genre="house",
+    drive a sub_share jump that triggers SubLayerArrivalDetector). Detect
+    returns the genre-chain Event (SUB_LAYER_ARRIVAL)."""
+    d = EventDetector()
+    # Music truly playing, no track change, no phase change, no layer/mix moves.
+    # Set active_genre="house" so the house chain (SubLayerArrival + Phrase) is active.
+    ms = _state(
+        bands={"sub": 0.10, "low": 0.30, "mid": 0.30, "high": 0.30},
+        rms=0.06,
+        phase="groove",
+    )
+    ms.active_genre = "house"
+    t = _prime_music_playing(d, ms, mocker)
+
+    # Tick 1 — swap router to house, seed chain detectors. SubLayerArrival
+    # seeds baseline_sub on its first audible call.
+    d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert d.router.current_genre == "house"
+
+    # Move forward past SubLayerArrival's 8s baseline window AND its 16s
+    # SUB_LAYER_ARRIVAL cooldown AND the global 10s gap.
+    t.return_value = 1030.0
+    # Spike the sub band by 0.30 (>> SUB_JUMP_THRESHOLD=0.10) under stable BPM.
+    ms.bands = {"sub": 0.45, "low": 0.20, "mid": 0.20, "high": 0.15}
+    ev = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert ev is not None
+    assert ev.type == "SUB_LAYER_ARRIVAL"
+
+
+def test_event_detector_baseline_priority_wins_when_both_fire(mocker):
+    """When BOTH a baseline rule (TRACK_CHANGE) AND a genre-chain detector
+    could fire on the same tick, the baseline rule wins (it executes first
+    in EventDetector.detect)."""
+    d = EventDetector()
+    ms = _state(
+        audible_track="trackB",
+        audible_track_confidence=0.6,
+        bands={"sub": 0.10, "low": 0.30, "mid": 0.30, "high": 0.30},
+    )
+    ms.active_genre = "house"
+    t = _prime_music_playing(d, ms, mocker)
+
+    # Tick 1 — seed everything (baseline last_audible_track gets bumped to
+    # "trackB" inside detect's track-change branch on this tick).
+    ev1 = d.detect(ms, kaan_just_spoke=False, manual=False)
+    # That first call DOES fire TRACK_CHANGE (trackB != None baseline).
+    assert ev1 is not None
+    assert ev1.type == "TRACK_CHANGE"
+
+    # Move past all cooldowns. Stage a NEW track change AND a sub spike.
+    t.return_value = 1030.0
+    ms.audible_track = "trackC"
+    ms.audible_track_confidence = 0.9
+    ms.bands = {"sub": 0.45, "low": 0.20, "mid": 0.20, "high": 0.15}
+
+    ev2 = d.detect(ms, kaan_just_spoke=False, manual=False)
+    # Baseline TRACK_CHANGE wins over genre-chain SUB_LAYER_ARRIVAL.
+    assert ev2 is not None
+    assert ev2.type == "TRACK_CHANGE"
+
+
+def test_event_detector_audio_buf_threading():
+    """Genre detectors that need ``audio_buf`` (KickSwap, PhraseBoundary)
+    receive the SAME audio_buf instance EventDetector was constructed with.
+
+    Verified structurally — EventDetector exposes the audio_buf attribute,
+    and chain iteration in detect() passes ``self.audio_buf`` to each
+    detector's ``.detect(state, audio_buf, now)`` call. We assert the
+    attribute identity here; behavior is exercised in
+    test_event_detector_routes_genre_event_when_no_baseline_fires above
+    for the no-audio_buf case."""
+
+    class FakeBuf:
+        pass
+
+    fake = FakeBuf()
+    d = EventDetector(audio_buf=fake)
+    assert d.audio_buf is fake
+
+
+def test_event_detector_chain_detect_continues_on_none_returns(mocker):
+    """Given a chain where every detector returns None, EventDetector
+    returns the HEARTBEAT fallthrough (matches existing baseline contract).
+    Verified by setting active_genre to techno (chain has 5 detectors) on
+    a tick where no detector has the input it needs to fire."""
+    d = EventDetector()
+    ms = _state(
+        bands={"sub": 0.20, "low": 0.30, "mid": 0.30, "high": 0.20},
+        recent_moves=[],
+    )
+    ms.active_genre = "techno"
+    _prime_music_playing(d, ms, mocker)
+
+    # No track, no phase change, no layer jump, no mix moves, no centroid
+    # data (no audio_buf), no kill seeded, no phrase lock — every detector
+    # in the techno chain returns None on this tick. EventDetector falls
+    # through to HEARTBEAT.
+    ev = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert ev is not None
+    assert ev.type == "HEARTBEAT"
+
+
+def test_event_detector_audio_buf_passed_to_chain_detectors(mocker):
+    """End-to-end: build EventDetector with a fake audio_buf, set active
+    genre to techno, and confirm a chain detector that records the audio_buf
+    it received sees the SAME instance EventDetector was constructed with.
+
+    This is the threading-of-audio_buf contract — Test 5 verifies the
+    attribute, this test verifies the runtime call propagates it."""
+    captured: list = []
+
+    class RecordingDetector:
+        def __init__(self):
+            self.last_event_at = 0.0
+
+        def detect(self, state, audio_buf, now):
+            captured.append(audio_buf)
+            return None
+
+    class FakeBuf:
+        pass
+
+    fake = FakeBuf()
+    d = EventDetector(audio_buf=fake)
+    # Force the router to a chain that contains our recorder. We do this by
+    # directly poking the private chain — pragmatic test seam, no need to
+    # add a public API for "inject test detector".
+    d.router._chain = [RecordingDetector()]
+    d.router.current_genre = "techno"  # so the swap-on-mismatch path doesn't replace it
+    d.router._initialized = True
+
+    ms = _state()
+    ms.active_genre = "techno"
+    _prime_music_playing(d, ms, mocker)
+    d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert captured  # detector was called
+    assert captured[0] is fake
+
+
+def test_event_detector_swap_happens_before_chain_iteration(mocker):
+    """Atomicity — when state.active_genre != router.current_genre, the
+    router.swap() runs at the TOP of detect() BEFORE any chain iteration.
+    Verified by checking that the chain detectors invoked match the NEW
+    genre (not the old one)."""
+    d = EventDetector()
+    ms = _state()
+    ms.active_genre = "house"
+    _prime_music_playing(d, ms, mocker)
+    d.detect(ms, kaan_just_spoke=False, manual=False)
+    # House chain seeded
+    assert d.router.current_genre == "house"
+    house_chain_types = {type(x) for x in d.router.active_chain()}
+    assert SubLayerArrivalDetector in house_chain_types
+
+    # Flip to techno — next detect must swap BEFORE iterating
+    ms.active_genre = "techno"
+    d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert d.router.current_genre == "techno"
+    # House detectors no longer reachable through router
+    new_chain_types = {type(x) for x in d.router.active_chain()}
+    assert SubLayerArrivalDetector not in new_chain_types  # techno chain doesn't have sub_layer
