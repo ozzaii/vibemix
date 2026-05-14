@@ -79,7 +79,9 @@ def test_event_gap_dict_shape_and_values() -> None:
 
     Phase 17 Plan 02 added three kick-side event types (KICK_SWAP,
     SUB_LAYER_ARRIVAL, KICK_DENSITY_SHIFT) per CONTEXT D-cooldown LOCKED rule
-    "matches G-followup-1". The v4 entries below MUST stay pinned at v4 values.
+    "matches G-followup-1". Plan 17-03 added the paired breakdown / re-entry
+    pair (BREAKDOWN_KICK_KILL, REENTRY_KICK_LAND). The v4 entries below MUST
+    stay pinned at v4 values.
     """
     assert set(MIN_EVENT_GAP_PER_TYPE.keys()) == {
         "TRACK_CHANGE",
@@ -93,6 +95,9 @@ def test_event_gap_dict_shape_and_values() -> None:
         "KICK_SWAP",
         "SUB_LAYER_ARRIVAL",
         "KICK_DENSITY_SHIFT",
+        # Phase 17 SENSE-12 — paired breakdown / re-entry detectors (Plan 17-03)
+        "BREAKDOWN_KICK_KILL",
+        "REENTRY_KICK_LAND",
     }
     assert MIN_EVENT_GAP_PER_TYPE["TRACK_CHANGE"] == 6.0
     assert MIN_EVENT_GAP_PER_TYPE["PHASE"] == 18.0
@@ -101,6 +106,9 @@ def test_event_gap_dict_shape_and_values() -> None:
     assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == 70.0
     assert MIN_EVENT_GAP_PER_TYPE["MIC"] == 3.0
     assert MIN_EVENT_GAP_PER_TYPE["MANUAL"] == 1.5
+    # Plan 17-03 paired-detector cooldowns
+    assert MIN_EVENT_GAP_PER_TYPE["BREAKDOWN_KICK_KILL"] == 20.0
+    assert MIN_EVENT_GAP_PER_TYPE["REENTRY_KICK_LAND"] == 12.0
     # HEARTBEAT key should reference the HEARTBEAT_SEC module-level constant
     assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == HEARTBEAT_SEC
 
