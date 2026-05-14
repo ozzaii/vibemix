@@ -58,6 +58,7 @@ from vibemix.audio.constants import (
     GENRE_BPM_BANDS,
     GENRE_CENTROID_HARD_TEK_MIN,
 )
+from vibemix.state.evidence_registry import EvidenceRegistry
 from vibemix.state.genre import (
     EmaSmoother,
     HysteresisState,
@@ -154,6 +155,7 @@ def _tick_once(
     vocal_detector: VocalDetector | None = None,
     hysteresis_state: HysteresisState | None = None,
     feature_history: deque[dict] | None = None,
+    evidence_registry: EvidenceRegistry | None = None,
 ) -> tuple[float, float, float, float]:
     """One iteration of the state_refresh_loop body. Extracted so tests can
     drive single ticks deterministically with fake time and fake snapshots.
@@ -163,6 +165,21 @@ def _tick_once(
 
     Phase 6 additions: crest factor, BPM validation, vocal detection, phase
     dispatch — all gated on the active genre profile.
+
+    Phase 18 Plan 02 additions: optional ``evidence_registry`` kwarg. When
+    wired, writes citable observations INSIDE the same ``with state._lock:``
+    batch as MusicState writes — single-snapshot consistency contract:
+      - "aud" source: 7 audio-feature keys per tick, GATED on state.audible
+        (silent ticks are not citable — closes the "cite RMS at silent
+        moment" hallucination class).
+      - "mix" source: ``phase=<name>`` and ``audible_deck=<name>``, written
+        ONLY on change (per-tick noise filtering — phase already debounced
+        via state.phase_history; deck handled by tracking prev_deck below).
+
+    Lock ordering: ``state._lock`` OUTER, ``EvidenceRegistry._lock`` INNER —
+    consistent across all writers (refresh.py + EventDetector._fire). Closes
+    Pitfall P12 (registry race) at the runtime boundary. All registry writes
+    wrapped in try/except so a downstream failure cannot kill the tick.
     """
     # Lazy-default Phase 6 loop-local state for tests that omit them.
     if crest_smoother is None:
@@ -291,6 +308,13 @@ def _tick_once(
                 state.phase_history.pop(0)
             state.phase = new_phase
             state.phase_started_at = now
+            # Phase 18 Plan 02 — mix-source change-only write.
+            if evidence_registry is not None:
+                try:
+                    t_session = max(0.0, now - state.set_start_at)
+                    evidence_registry.write("mix", f"phase={new_phase}", t_session)
+                except Exception:
+                    pass
 
         # Controller snapshot
         cs = controller_state.deck_snapshot()
@@ -299,10 +323,19 @@ def _tick_once(
         state.xfader = cs["xfader"]
         state.controller_connected = cs["connected"]
 
-        # Audible deck inference
+        # Audible deck inference. Capture prev_deck BEFORE the assignment so
+        # we can detect a deck flip and write a change-only "mix" observation
+        # to the EvidenceRegistry (Phase 18 Plan 02).
+        prev_deck = state.audible_deck
         aud_deck, deck_conf = derive_audible_deck(cs["A"], cs["B"], cs["xfader"], cs["connected"])
         state.audible_deck = aud_deck
         state.deck_confidence = deck_conf
+        if evidence_registry is not None and prev_deck != aud_deck:
+            try:
+                t_session = max(0.0, now - state.set_start_at)
+                evidence_registry.write("mix", f"audible_deck={aud_deck}", t_session)
+            except Exception:
+                pass
 
         # Track inference (cross-reference with audible deck)
         tsnap = track_info.snapshot()
@@ -325,6 +358,25 @@ def _tick_once(
         # 16k ring buffer, ~1ms)
         state.long_arc = long_arc_curve(audio_buf, seconds=120.0, hop=10.0)
 
+        # Phase 18 Plan 02 — aud-source per-tick writes, GATED on state.audible.
+        # Silent ticks do NOT register aud observations — closes the
+        # "Gemini cites aud:rms@45.2 at a silent moment" hallucination class.
+        # All 7 keys are written together so a single snapshot tick exposes
+        # the full audio surface to the prompt grammar (Plan 18-03 reads
+        # the snapshot once per llm_node invocation).
+        if evidence_registry is not None and state.audible:
+            try:
+                t_session = max(0.0, now - state.set_start_at)
+                evidence_registry.write("aud", "rms", t_session)
+                evidence_registry.write("aud", "bpm", t_session)
+                evidence_registry.write("aud", "onset_density", t_session)
+                evidence_registry.write("aud", "sub_share", t_session)
+                evidence_registry.write("aud", "low_share", t_session)
+                evidence_registry.write("aud", "mid_share", t_session)
+                evidence_registry.write("aud", "high_share", t_session)
+            except Exception:
+                pass
+
     return last_audible_high, last_audible_low, bpm_cache, last_bpm_at
 
 
@@ -334,6 +386,8 @@ async def state_refresh_loop(
     controller_state: ControllerState,
     track_info: TrackInfo,
     stop_event: asyncio.Event,
+    *,
+    evidence_registry: EvidenceRegistry | None = None,
 ) -> None:
     """Updates MusicState every 100ms from all sources. The ONLY writer to state.
     Audible flag is debounced — sustained samples required to flip in either
@@ -345,6 +399,12 @@ async def state_refresh_loop(
     feature_history deque as loop-local state, threaded through _tick_once.
     These are NOT in MusicState — they're internal detector machinery, not
     consumer evidence.
+
+    Phase 18 Plan 02: optional ``evidence_registry`` kwarg threads through
+    to ``_tick_once`` on every iteration. When wired, per-tick aud + on-change
+    mix observations are written INSIDE the same ``with state._lock:`` batch
+    that writes MusicState fields — single-snapshot consistency. Default
+    ``None`` preserves backward compat with all existing callers.
     """
     last_audible_high = 0.0
     last_audible_low = 0.0
@@ -376,6 +436,7 @@ async def state_refresh_loop(
                 vocal_detector=vocal_detector,
                 hysteresis_state=hysteresis_state,
                 feature_history=feature_history,
+                evidence_registry=evidence_registry,
             )
         except Exception as e:
             print(f"[state refresh err] {e}", file=sys.stderr)
