@@ -123,7 +123,11 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
   3. Prompt diet trims audio Part 18s→6s on non-PHASE events; screen Part skipped on MIX_MOVE/HEARTBEAT — observed TTFT win ≥500ms.
   4. `SpeechHandle.interrupt(force=True)` wrapper preempts in-flight generation on priority-bumped events (DROP=10 > MIX_MOVE=5); HARD cap `CANCEL_COOLDOWN_S = 8.0` + SOFT cap 30/session telemetry auto-disable.
   5. Synthetic burst-event harness (20 events in 30s) emits ≤3 `interrupted=True` outcomes; min-ack-to-response gap = 400ms enforced.
-**Plans**: TBD
+**Plans**: 4 plans
+  - [ ] 19-01-PLAN.md — Cancel-and-refire chokepoint + Event.priority field (LATENCY-10/11/12/13)
+  - [ ] 19-02-PLAN.md — Prompt diet — diet=True path + 6s audio window + screen skip (LATENCY-09)
+  - [ ] 19-03-PLAN.md — Gemini context caching — 1024-token floor + 4min refresh + invalidate hook (LATENCY-06/07/08)
+  - [ ] 19-04-PLAN.md — 40-OPUS ack bank — loader + per-bucket rotation + should_fire gate + placeholder generator (LATENCY-01/02/03/04/05)
 **Pitfall prevention**: P1 (cancel-budget blowout — 8s cooldown cap + 30/session soft cap shipped WITH cancel-fire impl), P8 (ack rotation collision — deque + per-event-class buckets shipped WITH ack bank impl), P10 (predictive misfire rate — predictive firing OFF-by-default in v2.0 per project memory, telemetry guard pre-wired for v2.1 turn-on), P11 (1024-token floor — system instruction padding asserted on cache creation).
 
 ### Phase 20: Citation Linter ENFORCEMENT (Live Mode)
@@ -235,7 +239,7 @@ Phases AFTER P21 can be cut to v2.0.1 if Bravoh-launch timeline (~early June 202
 | 15. Recording Browser + Retention Enforcement | 0/4 | Planning | - |
 | 16. Hallucination Verification Gate (Kaan's DJ Ear) | 0/0 | Not started | - |
 | 17. Hard Tek Detectors v1 + GenreRouter | 6/6 | Complete   | 2026-05-14 |
-| 18. Evidence Registry + Citation Grammar | 0/4 | Planning | - |
+| 18. Evidence Registry + Citation Grammar | 4/4 | Complete   | 2026-05-14 |
 | 19. Latency Stack v1 | 0/0 | Not started | - |
 | 20. Citation Linter ENFORCEMENT | 0/0 | Not started | - |
 | 21. Sign + Notarize + Release Matrix | 0/0 | Not started | - |
