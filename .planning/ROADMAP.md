@@ -59,7 +59,7 @@ Started 2026-05-14 via `/gsd-new-milestone`. Public OSS RC milestone — close e
 - [x] **Phase 30: 2 Hard Tek Detectors** — `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` (taxonomy completion). REQ count: 4. Pitfalls: P49. Shipped 2026-05-15 — 45 tests pass, 1000-cycle race gate green, 0 code-review findings.
 - [x] **Phase 31: 4-Layer Mascot Full Additive State Machine** — Base + Emotion + Anticipation + Reaction (EXTENDS v2.0, never rewrites). REQ count: 8. Pitfalls: P47, P62, P72. Shipped 2026-05-15 — 17/17 mascot tests pass, 8/8 plans committed, GLB sub-budget 21.67/25 MB green.
 - [x] **Phase 32: Long-Term DJ Profile (~2KB JSON)** — Post-session regen + verbatim cache-side inject + content allowlist. REQ count: 7. Pitfalls: P51, P53, P60. Shipped 2026-05-15 — 6/6 plans committed, 61 backend tests + 6 UI tests green, P51/P53/P60 privacy gates enforced.
-- [ ] **Phase 33: One-Click Install Hardening** — TCC pre-grant wizard + BlackHole auto-detect + fresh-VM rehearsal + sidecar polish + first-launch onboarding. REQ count: 9. Pitfalls: P50, P63, P67, P69, P71.
+- [x] **Phase 33: One-Click Install Hardening** — TCC pre-grant wizard + BlackHole auto-detect + fresh-VM rehearsal + sidecar polish + first-launch onboarding. REQ count: 9. Pitfalls: P50, P63, P67, P69, P71. Shipped 2026-05-15 — 9/9 plans committed, 50 tests green (25 pytest + 25 vitest); real-VM matrix execution + ≤60s timing validation deferred to KAAN-ACTION-LEGAL INSTALL-VM-RUN.
 - [x] **Phase 34: Open-Source Security Pass** — Secret scanner + dep CVE + SBOM + STRIDE-lite + signed-binary verify + SECURITY.md + telemetry opt-in default-OFF. REQ count: 10. Pitfalls: P64, P65, P67. Shipped 2026-05-15 — 10/10 plans committed (SEC-01..SEC-10), 63 tests green, gitleaks + pip-audit + cargo-audit + SBOM (syft) + STRIDE-lite + signed-verifier all wired.
 - [x] **Phase 35: Real GLB Animations + 30s Viral Demo Film** — Meshy v6 / Hunyuan3D + Mixamo auto-rig + 5 `prep_*` replacement + ffmpeg 3-beat cut + bundled `demo.mp4`. REQ count: 7. Pitfalls: P52, P57, P58, P61, P68. Shipped 2026-05-15 — 6/6 plans committed (scaffold + CI gates), 35 tests green; real-asset production deferred to KAAN-ACTION-LEGAL per `gsd-autonomous fully`.
 - [x] **Phase 36: Day-Zero Ops Automation** — Discord auto-provision + 100 RPS × 5min real load test + pre-seeded star coordination + launch trigger sequence + healthz live. REQ count: 6. Pitfalls: P59, P78. Shipped 2026-05-15 — 6/6 plans committed (OPS-09..OPS-14), 36 tests green, launch_trigger.sh T-30/T+0/T+5/T+24h sequence + Bravoh ops endpoint contract.
@@ -326,7 +326,7 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
 | 30. 2 Hard Tek Detectors | 0/0 | Not started | — |
 | 31. 4-Layer Mascot Full Additive | 0/0 | Not started | — |
 | 32. Long-Term DJ Profile | 0/0 | Not started | — |
-| 33. One-Click Install Hardening | 0/0 | Not started | — |
+| 33. One-Click Install Hardening | 9/9 | Shipped 2026-05-15 | 50 tests green; real-VM matrix Kaan-action |
 | 34. Open-Source Security Pass | 0/0 | Not started | — |
 | 35. Real GLBs + Viral Demo Film | 0/0 | Not started | — |
 | 36. Day-Zero Ops Automation | 0/0 | Not started | — |
