@@ -105,6 +105,16 @@ class MusicState:
     set_start_at: float = 0.0
     last_kaan_spoke_at: float = 0.0
 
+    # Phase 31 — 4-layer mascot additive state machine (ADDITIVE per
+    # Pitfall P47). Both fields default to None so v2.0 golden-equivalence
+    # tests stay byte-identical until the Phase 31 ws_bus extension fires
+    # the first non-None payload. Single-writer rule still holds:
+    # `emotion` is set inside state_refresh_loop._tick_once via
+    # emotion_router.derive_emotion(); `last_reaction_intent` is set by
+    # the AICoach reaction-tag parser path.
+    emotion: str | None = None  # "neutral" | "focused" | "hyped" | "concerned" | None
+    last_reaction_intent: str | None = None  # MascotReaction whitelist value or None
+
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     @property

@@ -77,6 +77,14 @@ async def ws_broadcast(
             # bpm_confidence the bus still emits beat_phase as-is and
             # the renderer (Plan 13-04 Open Q 4) ignores beat-locked
             # behavior.
+            # Phase 31 — 4-layer mascot extension (ADDITIVE per Pitfall
+            # P47). `emotion` ("neutral"/"focused"/"hyped"/"concerned"/
+            # None) drives the priority-60 EmotionLayer on the frontend.
+            # `reaction_intent` (MascotReaction whitelist value / None)
+            # is set by the AICoach emote-tag parser and consumed by
+            # the priority-80 ReactionLayer. Both fields default None
+            # which the renderer interprets as "no-op" — backward
+            # compatible with v2.0 subscribers that don't read them.
             payload = json.dumps(
                 {
                     **levels.snapshot(),
@@ -89,6 +97,8 @@ async def ws_broadcast(
                     "downbeat_phase": state.downbeat_phase,
                     "beat_phase": state.beat_phase,
                     "active_genre": state.active_genre,
+                    "emotion": state.emotion,
+                    "reaction_intent": state.last_reaction_intent,
                 }
             )
             dead = []

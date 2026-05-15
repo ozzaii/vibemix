@@ -67,6 +67,7 @@ from vibemix.state.genre import (
     get_active_profile,
     validate_bpm,
 )
+from vibemix.state.emotion_router import derive_emotion
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
@@ -315,6 +316,14 @@ def _tick_once(
                     evidence_registry.write("mix", f"phase={new_phase}", t_session)
                 except Exception:
                     pass
+
+        # Phase 31 Plan 03 — Mascot emotion derivation (ADDITIVE per
+        # Pitfall P47). Pure function over the just-written MusicState
+        # fields. The frontend EmotionLayer reads this via the ws_bus
+        # `emotion` field and re-fires its priority-60 channel only when
+        # the value changes (no per-tick churn).
+        time_in_phase = max(0.0, now - state.phase_started_at) if state.phase_started_at else 0.0
+        state.emotion = derive_emotion(state.active_genre, state.rms, time_in_phase)
 
         # Controller snapshot
         cs = controller_state.deck_snapshot()
