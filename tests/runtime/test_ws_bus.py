@@ -432,17 +432,27 @@ def test_pkg_05_runtime_package_surface():
     re-exports WizardLoop/run_wizard alongside the Phase 4 surface so
     ``from vibemix.runtime import ...`` is the single import point.
     v0.1.0-rc1 adds ``watch_parent`` for orphan-process self-shutdown.
+    Phase 34 / SEC-10 adds ``print_security_banner`` + ``banner_lines``
+    + ``OUTBOUND_ENDPOINTS`` for the auditable privacy claim.
     """
     import vibemix.runtime as runtime_pkg
     from vibemix.runtime import coach_loop, diag_loop, ws_broadcast  # noqa: F401
     from vibemix.runtime import SessionLoop, WizardLoop, run_session, run_wizard  # noqa: F401
     from vibemix.runtime import watch_parent  # noqa: F401
+    from vibemix.runtime import (  # noqa: F401
+        OUTBOUND_ENDPOINTS,
+        banner_lines,
+        print_security_banner,
+    )
 
     assert set(runtime_pkg.__all__) == {
+        "OUTBOUND_ENDPOINTS",
         "SessionLoop",
         "WizardLoop",
+        "banner_lines",
         "coach_loop",
         "diag_loop",
+        "print_security_banner",
         "run_session",
         "run_wizard",
         "watch_parent",
