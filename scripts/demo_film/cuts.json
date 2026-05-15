@@ -1,0 +1,8 @@
+{
+  "_doctrine": "Phase 35 ASSETS-05 / Pitfall P57 — manual cut, NO AI auto-pacing. max_cuts is the hard ceiling enforced by cut.sh.",
+  "source": "raw/dj_session_placeholder.mov",
+  "vo_track": null,
+  "max_cuts": 8,
+  "output": "docs/assets/demo.mp4",
+  "cuts": []
+}
