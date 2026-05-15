@@ -33,6 +33,16 @@ export default defineConfig({
       ["tests/**/*.test.ts", "jsdom"],
       ["src/**/*.dom.spec.ts", "jsdom"],
       ["src/mascot/*.test.ts", "jsdom"],
+      // Phase 31 Plan 02 — per-channel layer files live under
+      // src/mascot/layers/{base,emotion,reaction}.ts. base layer is
+      // pure-state but emotion/reaction layer tests may touch DOM
+      // helpers (matches existing src/mascot/*.test.ts policy).
+      ["src/mascot/layers/*.test.ts", "jsdom"],
+      // Phase 31 Plan 05 — v2.0 test name port-verbatim suite. Lives
+      // under src/mascot/__tests__/*.spec.ts per Pitfall P47 evidence
+      // anchors. Uses real AnimationMixer + AnimationClip fixtures.
+      ["src/mascot/__tests__/*.spec.ts", "jsdom"],
+      ["src/mascot/__tests__/*.test.ts", "jsdom"],
       // Phase 15 Plan 04 — Recording browser specs live alongside their
       // components per plan §files_modified; they construct HTMLElement
       // instances + poke data-attrs and need jsdom (rather than the

@@ -199,3 +199,63 @@ export interface StateRequest {
   /** AnimationMixer.crossFadeTo blend duration in ms. Default 300ms. */
   blendMs?: number;
 }
+
+// ── Phase 31: 4-layer additive extensions (ADDITIVE-ONLY per Pitfall P47) ───
+//
+// These unions feed the new emotion + reaction layers. They DO NOT alter
+// the existing MascotState / MascotStateClass / STATE_PRIORITY contracts
+// — v2.0 anticipation priority 70 stays verbatim. The new layers live
+// alongside the existing state-machine via the PriorityStack manager;
+// these types just give that manager a shared vocabulary for the new
+// channels.
+
+/**
+ * Emotion-layer states. Driven by `MusicState.active_genre + energy_band`
+ * via the Python `emotion_router` and broadcast on the ws_bus `emotion`
+ * payload field.
+ *
+ * - neutral: default; everything baseline.
+ * - focused: techno/house at mid energy — heads-down working groove.
+ * - hyped: any genre at high energy — crowd peak / drop landed.
+ * - concerned: low energy persisting through a long phase — dead air risk.
+ */
+export type MascotEmotion = "neutral" | "focused" | "hyped" | "concerned";
+
+/** Frozen iteration order for runtime validation. */
+export const MASCOT_EMOTIONS: readonly MascotEmotion[] = Object.freeze([
+  "neutral",
+  "focused",
+  "hyped",
+  "concerned",
+]);
+
+/**
+ * Reaction-layer intents. Whitelist for `[emote:NAME]` tags parsed out of
+ * Gemini response text. Anti-slop: unknown tags are rejected by the parser.
+ *
+ * - wave: greeting / acknowledgment.
+ * - point_left / point_right: pointing toward DJ or audience.
+ * - fist_pump: peak-energy reaction.
+ * - nod: subtle agreement.
+ * - headbang: hard-energy reaction (Hard Tek peaks).
+ * - surprised: unexpected event (key change, surprise drop).
+ */
+export type MascotReaction =
+  | "wave"
+  | "point_left"
+  | "point_right"
+  | "fist_pump"
+  | "nod"
+  | "headbang"
+  | "surprised";
+
+/** Frozen iteration order — drives the emote_parser whitelist on the Python side. */
+export const MASCOT_REACTIONS: readonly MascotReaction[] = Object.freeze([
+  "wave",
+  "point_left",
+  "point_right",
+  "fist_pump",
+  "nod",
+  "headbang",
+  "surprised",
+]);
