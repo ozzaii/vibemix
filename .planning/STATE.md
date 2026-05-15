@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: The Unified Cut
 status: executing
-last_updated: "2026-05-15T09:58:09.366Z"
-last_activity: 2026-05-15 -- Phase 28 execution started
+last_updated: "2026-05-15T13:33:01.623Z"
+last_activity: 2026-05-15 -- Phase 29 Wave 1 complete (Plan 29-00, 12 tests + 199 regression pass); Waves 2-7 pending — resume via /gsd:execute-phase 29
 progress:
   total_phases: 13
-  completed_phases: 1
-  total_plans: 18
-  completed_plans: 9
-  percent: 50
+  completed_phases: 2
+  total_plans: 27
+  completed_plans: 19
+  percent: 16
 ---
 
 # vibemix — State
@@ -23,7 +23,7 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 28 — library-intelligence-v1
+- **Current focus:** Phase 29 — post-session-debrief-mvp-ui
 - **Last shipped:** v2.0 Research-Driven Ship — 2026-05-14 (status: `tech_debt` accepted).
 - **Project mode:** standard.
 - **Granularity:** fine.
@@ -34,10 +34,10 @@ progress:
 
 ## Current Position
 
-Phase: 28 (library-intelligence-v1) — EXECUTING
-Plan: 1 of 9
-Status: Executing Phase 28
-Last activity: 2026-05-15 -- Phase 28 execution started
+Phase: 29 (post-session-debrief-mvp-ui) — EXECUTING (Wave 1 of 7 done)
+Plan: 1 of 9 complete (29-00); 29-01/02/03/04/05/06/07/08 pending
+Status: Executing Phase 29 — Wave 2 next (29-01 + 29-03 parallel)
+Last activity: 2026-05-15 -- Wave 1 (Plan 29-00 Wave 0 unblock) complete: capability allowlist + EvidenceRegistry snapshot + __main__.py short-circuit verification + 8 fixtures + A1/A3/A5/A7 probe verdicts. A5 + A7 deferred to KAAN-ACTION-PROXY.md (autonomous fallbacks documented). Resume via `/gsd:execute-phase 29` — picks up at Wave 2.
 
 ## Performance Metrics
 
