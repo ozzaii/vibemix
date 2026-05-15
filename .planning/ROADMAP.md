@@ -123,14 +123,14 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
   5. Embedding cost stays under €50/month via 24h query cache + sampled grounding + content-hash dedupe.
 **Critical pitfalls:** P48 (register_library final-mile orphan), P54 (180s embedding cap → 3-excerpt strategy), P55 (Mac/Win top-k divergence), P56 (embedding cost runaway).
 **Parallel-with:** P27, P29, P30, P34.
-**Plans:** 3/9 plans executed
+**Plans:** 4/9 plans executed
 - [x] 28-01-PLAN.md — Gemini Embedding 2 client + content-hash cache + shared cosine_topk (LIBRARY-10)
 - [x] 28-02-PLAN.md — sqlite-vec + numpy store backends + Mac/Win parity gate (LIBRARY-11; Wave 0 ARM64 Win probe)
 - [ ] 28-03-PLAN.md — Vibe-search NL query + 24h cache + CLI subcommand (LIBRARY-12)
 - [ ] 28-04-PLAN.md — Event-gated grounding + DJCoHostAgent citation injection + P48 invocation/E2E tests (LIBRARY-13; Wave 0 Bravoh proxy probe)
 - [ ] 28-05-PLAN.md — Track-to-track similarity USER-ASKED-only (LIBRARY-14; anti-feature regression guard)
 - [ ] 28-06-PLAN.md — Drag-drop import UX + Tauri 2 dedupe + progress bar (LIBRARY-05; vanilla TS)
-- [ ] 28-07-PLAN.md — 30-day staleness nudge + UI banner + 7-day snooze (LIBRARY-15)
+- [x] 28-07-PLAN.md — 30-day staleness nudge + UI banner + 7-day snooze (LIBRARY-15)
 - [ ] 28-08-PLAN.md — Cost projection + runtime telemetry + CI hard gate ≤ €50 (LIBRARY-16; Option B locked)
 - [x] 28-09-PLAN.md — 10 new IPC schemas on port 8765 + Python/TS codegen parity (LIBRARY-17)
 **UI hint:** yes
@@ -312,7 +312,7 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 27. Eval Harness + Carry-Forward Close-Out | 2/9 | In Progress|  |
-| 28. Library Intelligence v1 | 3/9 | In Progress|  |
+| 28. Library Intelligence v1 | 4/9 | In Progress|  |
 | 29. Post-Session Debrief MVP UI | 0/0 | Not started | — |
 | 30. 2 Hard Tek Detectors | 0/0 | Not started | — |
 | 31. 4-Layer Mascot Full Additive | 0/0 | Not started | — |
