@@ -42,7 +42,17 @@ export type VibemixIPCMessages =
   | SessionOverlayHighlight
   | DebriefSessionLoaded
   | DebriefCitationSummary
-  | DebriefEventTimeline;
+  | DebriefEventTimeline
+  | LibraryImport
+  | LibraryImportProgress
+  | LibraryImportCancel
+  | LibrarySearchRequest
+  | LibrarySearchResult
+  | LibraryConfidence
+  | LibraryStalenessNudge
+  | LibraryStalenessAction
+  | LibrarySimilarRequest
+  | LibrarySimilarResult;
 
 export interface IpcBoot {
   type: "ipc.boot";
@@ -413,5 +423,111 @@ export interface DebriefEventTimeline {
       kind: string;
       [k: string]: unknown;
     }[];
+  };
+}
+export interface LibraryImport {
+  type: "ipc.library.import";
+  ts: string;
+  payload: {
+    path: string;
+    schema_version: "1";
+  };
+}
+export interface LibraryImportProgress {
+  type: "ipc.library.import_progress";
+  ts: string;
+  payload: {
+    total: number;
+    done: number;
+    current_track_name: string;
+    cache_hits: number;
+    cancelled: boolean;
+    schema_version: "1";
+  };
+}
+export interface LibraryImportCancel {
+  type: "ipc.library.import_cancel";
+  ts: string;
+  payload: {
+    schema_version: "1";
+  };
+}
+export interface LibrarySearchRequest {
+  type: "ipc.library.search";
+  ts: string;
+  payload: {
+    query: string;
+    k: number;
+    schema_version: "1";
+  };
+}
+export interface LibrarySearchResult {
+  type: "ipc.library.search_result";
+  ts: string;
+  payload: {
+    query: string;
+    matches: {
+      track_id: string;
+      title: string;
+      artist: string;
+      bpm: number | null;
+      confidence: number;
+      snippet: string;
+    }[];
+    cache_hit: boolean;
+    schema_version: "1";
+  };
+}
+export interface LibraryConfidence {
+  type: "ipc.library.confidence";
+  ts: string;
+  payload: {
+    track_id: string | null;
+    cosine: number;
+    decision: "cited" | "uncertain" | "below_threshold";
+    event_id: string;
+    cost_warning: boolean;
+    schema_version: "1";
+  };
+}
+export interface LibraryStalenessNudge {
+  type: "ipc.library.staleness_nudge";
+  ts: string;
+  payload: {
+    age_days: number;
+    snoozed_until_ts: number | null;
+    schema_version: "1";
+  };
+}
+export interface LibraryStalenessAction {
+  type: "ipc.library.staleness_action";
+  ts: string;
+  payload: {
+    action: "dismiss" | "snooze_7d";
+    schema_version: "1";
+  };
+}
+export interface LibrarySimilarRequest {
+  type: "ipc.library.similar_request";
+  ts: string;
+  payload: {
+    track_id: string;
+    k: number;
+    schema_version: "1";
+  };
+}
+export interface LibrarySimilarResult {
+  type: "ipc.library.similar_result";
+  ts: string;
+  payload: {
+    track_id: string;
+    results: {
+      track_id: string;
+      similarity: number;
+      title: string;
+      artist: string;
+      bpm: number | null;
+    }[];
+    schema_version: "1";
   };
 }

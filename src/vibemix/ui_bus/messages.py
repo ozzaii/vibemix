@@ -35,6 +35,18 @@ from vibemix.ui_bus.schemas.debrief import (
     DebriefEventTimelinePayload,
     DebriefSessionLoadedPayload,
 )
+from vibemix.ui_bus.schemas.library import (
+    LibraryConfidencePayload,
+    LibraryImportCancelPayload,
+    LibraryImportPayload,
+    LibraryImportProgressPayload,
+    LibrarySearchRequestPayload,
+    LibrarySearchResultPayload,
+    LibrarySimilarRequestPayload,
+    LibrarySimilarResultPayload,
+    LibraryStalenessActionPayload,
+    LibraryStalenessNudgePayload,
+)
 from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
 
 
@@ -1414,6 +1426,238 @@ class DebriefEventTimeline:
             type="ipc.debrief.event-timeline",
             ts=_now_iso(),
             payload=DebriefEventTimelinePayload(events=events_tuple),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+# ---------------------------------------------------------------------------
+# Phase 28 — Library IPC wrappers (Plan 28-09)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryImport:
+    type: Literal["ipc.library.import"]
+    ts: str
+    payload: LibraryImportPayload
+
+    @classmethod
+    def make(cls, *, path: str) -> LibraryImport:
+        return cls(
+            type="ipc.library.import",
+            ts=_now_iso(),
+            payload=LibraryImportPayload(path=path),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryImportProgress:
+    type: Literal["ipc.library.import_progress"]
+    ts: str
+    payload: LibraryImportProgressPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        total: int,
+        done: int,
+        current_track_name: str,
+        cache_hits: int,
+        cancelled: bool = False,
+    ) -> LibraryImportProgress:
+        return cls(
+            type="ipc.library.import_progress",
+            ts=_now_iso(),
+            payload=LibraryImportProgressPayload(
+                total=total,
+                done=done,
+                current_track_name=current_track_name,
+                cache_hits=cache_hits,
+                cancelled=cancelled,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryImportCancel:
+    type: Literal["ipc.library.import_cancel"]
+    ts: str
+    payload: LibraryImportCancelPayload
+
+    @classmethod
+    def make(cls) -> LibraryImportCancel:
+        return cls(
+            type="ipc.library.import_cancel",
+            ts=_now_iso(),
+            payload=LibraryImportCancelPayload(),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibrarySearchRequest:
+    type: Literal["ipc.library.search"]
+    ts: str
+    payload: LibrarySearchRequestPayload
+
+    @classmethod
+    def make(cls, *, query: str, k: int = 10) -> LibrarySearchRequest:
+        return cls(
+            type="ipc.library.search",
+            ts=_now_iso(),
+            payload=LibrarySearchRequestPayload(query=query, k=k),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibrarySearchResult:
+    type: Literal["ipc.library.search_result"]
+    ts: str
+    payload: LibrarySearchResultPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        query: str,
+        matches: tuple[dict, ...] | list[dict],
+        cache_hit: bool,
+    ) -> LibrarySearchResult:
+        return cls(
+            type="ipc.library.search_result",
+            ts=_now_iso(),
+            payload=LibrarySearchResultPayload(
+                query=query, matches=tuple(matches), cache_hit=cache_hit
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryConfidence:
+    type: Literal["ipc.library.confidence"]
+    ts: str
+    payload: LibraryConfidencePayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        track_id: str | None,
+        cosine: float,
+        decision: str,
+        event_id: str,
+        cost_warning: bool = False,
+    ) -> LibraryConfidence:
+        return cls(
+            type="ipc.library.confidence",
+            ts=_now_iso(),
+            payload=LibraryConfidencePayload(
+                track_id=track_id,
+                cosine=cosine,
+                decision=decision,
+                event_id=event_id,
+                cost_warning=cost_warning,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryStalenessNudge:
+    type: Literal["ipc.library.staleness_nudge"]
+    ts: str
+    payload: LibraryStalenessNudgePayload
+
+    @classmethod
+    def make(
+        cls, *, age_days: int, snoozed_until_ts: float | None
+    ) -> LibraryStalenessNudge:
+        return cls(
+            type="ipc.library.staleness_nudge",
+            ts=_now_iso(),
+            payload=LibraryStalenessNudgePayload(
+                age_days=age_days, snoozed_until_ts=snoozed_until_ts
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryStalenessAction:
+    type: Literal["ipc.library.staleness_action"]
+    ts: str
+    payload: LibraryStalenessActionPayload
+
+    @classmethod
+    def make(cls, *, action: str) -> LibraryStalenessAction:
+        return cls(
+            type="ipc.library.staleness_action",
+            ts=_now_iso(),
+            payload=LibraryStalenessActionPayload(action=action),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibrarySimilarRequest:
+    type: Literal["ipc.library.similar_request"]
+    ts: str
+    payload: LibrarySimilarRequestPayload
+
+    @classmethod
+    def make(cls, *, track_id: str, k: int = 10) -> LibrarySimilarRequest:
+        return cls(
+            type="ipc.library.similar_request",
+            ts=_now_iso(),
+            payload=LibrarySimilarRequestPayload(track_id=track_id, k=k),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibrarySimilarResult:
+    type: Literal["ipc.library.similar_result"]
+    ts: str
+    payload: LibrarySimilarResultPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        track_id: str,
+        results: tuple[dict, ...] | list[dict],
+    ) -> LibrarySimilarResult:
+        return cls(
+            type="ipc.library.similar_result",
+            ts=_now_iso(),
+            payload=LibrarySimilarResultPayload(
+                track_id=track_id, results=tuple(results)
+            ),
         )
 
     def to_json(self) -> str:

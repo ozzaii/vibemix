@@ -49,6 +49,16 @@ from vibemix.ui_bus import (
     IpcBoot,
     IpcError,
     LevelPair,
+    LibraryConfidence,
+    LibraryImport,
+    LibraryImportCancel,
+    LibraryImportProgress,
+    LibrarySearchRequest,
+    LibrarySearchResult,
+    LibrarySimilarRequest,
+    LibrarySimilarResult,
+    LibraryStalenessAction,
+    LibraryStalenessNudge,
     MascotMoodChange,
     MetersTriple,
     PermissionCheck,
@@ -283,6 +293,78 @@ def _minimal_examples() -> list[tuple[str, object]]:
                 events=(
                     {"t": 0.0, "kind": "session_start"},
                     {"t": 3.21, "kind": "trigger"},
+                ),
+            ),
+        ),
+        # Phase 28 Plan 09 — Library IPC
+        (
+            "LibraryImport",
+            LibraryImport.make(path="/tmp/lib.xml"),
+        ),
+        (
+            "LibraryImportProgress",
+            LibraryImportProgress.make(
+                total=10,
+                done=5,
+                current_track_name="Artist — Track",
+                cache_hits=3,
+            ),
+        ),
+        ("LibraryImportCancel", LibraryImportCancel.make()),
+        (
+            "LibrarySearchRequest",
+            LibrarySearchRequest.make(query="acid techno", k=10),
+        ),
+        (
+            "LibrarySearchResult",
+            LibrarySearchResult.make(
+                query="acid techno",
+                matches=(
+                    {
+                        "track_id": "t1",
+                        "title": "X",
+                        "artist": "Y",
+                        "bpm": 138.0,
+                        "confidence": 0.87,
+                        "snippet": "X — Y",
+                    },
+                ),
+                cache_hit=False,
+            ),
+        ),
+        (
+            "LibraryConfidence",
+            LibraryConfidence.make(
+                track_id="t1",
+                cosine=0.85,
+                decision="cited",
+                event_id="ev-1",
+            ),
+        ),
+        (
+            "LibraryStalenessNudge",
+            LibraryStalenessNudge.make(age_days=45, snoozed_until_ts=None),
+        ),
+        (
+            "LibraryStalenessAction",
+            LibraryStalenessAction.make(action="snooze_7d"),
+        ),
+        (
+            "LibrarySimilarRequest",
+            LibrarySimilarRequest.make(track_id="t1", k=10),
+        ),
+        (
+            "LibrarySimilarResult",
+            LibrarySimilarResult.make(
+                track_id="t1",
+                results=(
+                    {
+                        "track_id": "t2",
+                        "similarity": 0.82,
+                        "title": "Z",
+                        "artist": "W",
+                        "bpm": 140.0,
+                    },
                 ),
             ),
         ),
