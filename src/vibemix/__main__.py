@@ -200,50 +200,39 @@ DEBRIEF_PORT: int = 8766
 
 
 def _run_debrief_sidecar(session_dir: str) -> None:
-    """v2.0 DEBRIEF sidecar — banner log + port reservation only.
-
-    DEBRIEF-01 reserves the surface: a separate sidecar process bound to
-    ``127.0.0.1:DEBRIEF_PORT`` (avoids the live mascot bus on 8765). In
-    v2.0 the sidecar emits a single ``logging.INFO`` banner line and
-    returns — no audio I/O, no LiveKit, no session replay. v2.1 drops in
-    the chaptered TL;DR + drill cards + clickable timeline behind this
-    entry-point without changing the API surface.
+    """Plan 29-02 DEBRIEF sidecar dispatch.
 
     ``session_dir`` semantics:
 
-      * ``""`` (sentinel): bare ``--debrief`` was passed — log the no-arg
-        smoke banner; useful for verifying the flag plumbing without
-        loading a real session.
-      * non-empty path: log the path-reserved banner; v2.1 will validate
-        the path against the ``recordings/`` allowlist + open the session.
+      * ``""`` (sentinel): bare ``--debrief`` was passed — log a banner
+        without doing work (useful for verifying flag plumbing).
+      * non-empty path: invoke :func:`vibemix.debrief.main.run` which
+        canonicalizes the path, validates it lives under recordings
+        root, runs the cache-hit fast path / first-time generation, and
+        starts the WS server on 127.0.0.1:DEBRIEF_PORT (8766).
 
-    Port 8766 is documented as reserved but is NOT bound in v2.0. Binding
-    it now would create a phantom listener with no handlers, surfacing in
-    ``lsof`` as dead weight and confusing diagnostics.
+    Errors from the orchestrator surface as ``ipc.debrief.error`` frames
+    over the WS bus, then the process exits cleanly. See plan 29-02
+    SUMMARY for the reason codes.
     """
     import logging
 
     logger = logging.getLogger("vibemix.debrief")
-    # Lazy basicConfig — only configure the root if the caller didn't.
     if not logging.getLogger().handlers:
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         )
-    if session_dir:
+    if not session_dir:
         logger.info(
-            "debrief sidecar v2.0 architectural slot — session_dir=%r "
-            "reserved for v2.1 implementation; port %d locked; no work "
-            "performed.",
-            session_dir,
+            "[debrief] no session_dir provided; port %d reserved.",
             DEBRIEF_PORT,
         )
-    else:
-        logger.info(
-            "debrief sidecar v2.0 architectural slot — no session_dir "
-            "provided; port %d locked; no work performed.",
-            DEBRIEF_PORT,
-        )
+        return
+    logger.info("[debrief] starting sidecar for %r (port %d)", session_dir, DEBRIEF_PORT)
+    from vibemix.debrief.main import run as run_debrief
+
+    run_debrief(session_dir, port=DEBRIEF_PORT)
 
 
 # =============================================================================

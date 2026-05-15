@@ -23,9 +23,15 @@ Plans:
 from __future__ import annotations
 
 from vibemix.debrief.chapters import ChapterRegion, derive_chapters
+from vibemix.debrief.main import (
+    resolve_recordings_root,
+    run,
+    validate_session_dir_under_root,
+)
 from vibemix.debrief.persistence import read_debrief, write_debrief
 from vibemix.debrief.session_loader import (
     EventsMissing,
+    InvalidSessionDir,
     SessionTooShort,
     load_session,
 )
@@ -38,12 +44,16 @@ from vibemix.debrief.stripper import (
 __all__ = [
     "ChapterRegion",
     "EventsMissing",
+    "InvalidSessionDir",
     "SessionTooShort",
     "UncitedSentencesFound",
     "assert_all_cited",
     "derive_chapters",
     "load_session",
     "read_debrief",
+    "resolve_recordings_root",
+    "run",
     "strip_uncited_sentences",
+    "validate_session_dir_under_root",
     "write_debrief",
 ]
