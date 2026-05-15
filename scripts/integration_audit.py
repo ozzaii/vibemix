@@ -92,7 +92,7 @@ SEAMS: list[dict[str, str]] = [
         "source": "scripts/eval/replay_harness.py",
         "source_symbol": "main",
         "sink": ".github/workflows/eval.yml",
-        "sink_symbol": "replay-harness step",
+        "sink_symbol": "scripts.eval.replay_harness",
         "test": "tests/e2e/test_seam_p27__eval_gate.py",
     },
     {
