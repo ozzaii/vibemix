@@ -101,6 +101,7 @@ class GeminiContextCache:
         ttl_s: float = GEMINI_CACHE_TTL_S,
         refresh_s: float = GEMINI_CACHE_REFRESH_S,
         time_fn=time.monotonic,
+        profile_section: str = "",
     ) -> None:
         self._client = client
         self._body = system_instruction_body
@@ -109,17 +110,26 @@ class GeminiContextCache:
         self._refresh_s = refresh_s
         self._time_fn = time_fn
         self._current_name: str | None = None
+        # Plan 32-02 / PROFILE-03 — optional long-term DJ profile section.
+        # Concatenated AFTER system_instruction_body but BEFORE the deterministic
+        # pad block. Empty string default = byte-identical to the pre-Phase-32
+        # path. P60: profile lives in the CACHE body, NEVER in the per-turn
+        # llm_node prompt — DJCoHostAgent.llm_node has no reference to it.
+        self._profile_section: str = profile_section
 
     def padded_body(self) -> str:
-        """Return self._body padded above the 1024-token Gemini cache floor.
+        """Return system_instruction_body + profile_section, padded above the
+        1024-token Gemini cache floor if needed.
 
-        If the body's token-proxy (char-len // 4) is already ≥ floor, returns
-        body unchanged. Else returns body + "\\n\\n" + _CACHE_PAD_BLOCK. The
-        pad block is fixed-content so identical inputs produce identical
-        padded outputs (cache-key stability invariant)."""
-        if (len(self._body) // 4) >= GEMINI_CACHE_TOKEN_FLOOR:
-            return self._body
-        return self._body + "\n\n" + _CACHE_PAD_BLOCK
+        If the combined (body + profile_section) char-length // 4 is already
+        ≥ floor, returns the combined body unchanged. Else appends the
+        deterministic _CACHE_PAD_BLOCK. The pad block is fixed-content so
+        identical inputs (same body + same profile_section) produce identical
+        padded outputs (cache-key stability invariant — Pitfall 11 + P60)."""
+        combined = self._body + self._profile_section
+        if (len(combined) // 4) >= GEMINI_CACHE_TOKEN_FLOOR:
+            return combined
+        return combined + "\n\n" + _CACHE_PAD_BLOCK
 
     async def create(self) -> str | None:
         """Upload the padded body to Gemini's cache store; store + return name.

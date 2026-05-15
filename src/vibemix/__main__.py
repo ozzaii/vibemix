@@ -94,6 +94,7 @@ from vibemix.audio import (
 from vibemix.audio.recorder import sweep_crashed_sessions
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
+from vibemix.profile import load_profile, render_profile_for_cache
 from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
 from vibemix.runtime.cancel import CancelGate
 from vibemix.runtime.config_store import app_data_dir, load_config
@@ -551,10 +552,19 @@ async def main() -> None:
     ttft_meter = TTFTMeter()
     ack_bank = AckBank()  # eager-loads 40 OPUS files; raises AckBankError on bad shape
     cancel_gate = CancelGate()
+    # Plan 32-02 / PROFILE-03 — load long-term DJ profile into the cache body.
+    # P60: profile lives in the CACHE, never in the per-turn prompt. If the
+    # file is missing or invalid, ``profile_dict`` is None and the cache section
+    # is the empty string — byte-identical to the pre-Phase-32 cache body.
+    profile_dict = load_profile()
+    profile_section = render_profile_for_cache(profile_dict)
+    if profile_dict is not None:
+        print(f"-> profile: loaded ({len(profile_section)} chars in cache section)")
     cache: GeminiContextCache | None = GeminiContextCache(
         client=genai_client,
         system_instruction_body=SYSTEM_INSTRUCTION,
         model=LLM_MODEL,
+        profile_section=profile_section,
     )
     try:
         await cache.create()
