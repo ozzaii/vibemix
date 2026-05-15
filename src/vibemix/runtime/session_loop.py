@@ -65,6 +65,9 @@ from vibemix.ui_bus.messages import (
     LevelPair,
     MetersTriple,
     MidiEventEntry,
+    ProfileDeleteAck,
+    ProfileRegenerateResult,
+    ProfileViewResult,
     RecordingsDeleteAck,
     RecordingsEventsResult,
     RecordingsListResult,
@@ -169,6 +172,7 @@ class SessionLoop:
         controller_state: _ControllerStateHook | None = None,
         recordings_root: Path | None = None,
         active_recorder: object | None = None,
+        evidence_registry: object | None = None,
     ) -> None:
         self.bus = bus
         self.config_store = config_store or load_config()
@@ -191,6 +195,13 @@ class SessionLoop:
         # `vibemix.audio.recorder.VoiceRecorder`; the hot path uses
         # duck-typed `.log_event(kind, **fields)`.
         self.active_recorder = active_recorder
+        # Phase 32 / PROFILE-07 — EvidenceRegistry reference used by the
+        # Settings → Profile panel's "regenerate now" handler. Duck-typed
+        # as `object` (the hot path calls ``.snapshot()`` only); None in
+        # standalone runs means the regenerate path returns
+        # ``insufficient_evidence`` instead of producing an empty profile
+        # from a snapshot-less registry.
+        self.evidence_registry = evidence_registry
 
         # Transient state
         self.muted: bool = False
@@ -248,6 +259,23 @@ class SessionLoop:
         self.bus.register_handler("ipc.recordings.list", self._on_recordings_list)
         self.bus.register_handler("ipc.recordings.delete", self._on_recordings_delete)
         self.bus.register_handler("ipc.recordings.events", self._on_recordings_events)
+        # Phase 32 / PROFILE-07 — Settings → Profile panel.
+        # Three request-reply pairs:
+        #   view       → view_result   (snapshot + bytes + consent)
+        #   regenerate → regenerate_result (consent-gated, citation-gated)
+        #   delete     → delete_ack    (unlink + cache invalidate is caller's job)
+        self.bus.register_handler("ipc.profile.view", self._on_profile_view)
+        self.bus.register_handler(
+            "ipc.profile.regenerate", self._on_profile_regenerate
+        )
+        self.bus.register_handler("ipc.profile.delete", self._on_profile_delete)
+        # PROFILE-05 — Settings panel may also surface a re-toggle of consent
+        # (the "enable" affordance on the consent-off empty state). The
+        # WizardLoop handler is the primary writer but the SessionLoop also
+        # accepts it so the panel works post-wizard without re-launching it.
+        self.bus.register_handler(
+            "ipc.profile.set_consent", self._on_profile_set_consent
+        )
 
     async def boot(self) -> None:
         """Emit ``ipc.boot {ready: true}``. Mirrors WizardLoop.boot()."""
@@ -478,6 +506,181 @@ class SessionLoop:
                     ).to_json()
                 )
             )
+
+    # ------------------------------------------------------------------
+    # Phase 32 / PROFILE-07 — Settings → Profile panel handlers
+    # ------------------------------------------------------------------
+    #
+    # All four handlers are best-effort: schema-valid replies always, errors
+    # encoded into the result payload (NOT raised). The renderer is the
+    # source of truth for what gets shown; the sidecar only writes to disk
+    # when consent is explicitly ON.
+    #
+    # P51 / P53 / P60 hard rule: the profile dict NEVER leaves the cache +
+    # disk surface — this handler only touches the on-disk profile.json,
+    # never the per-turn prompt path. The grep gate
+    # (tests/profile/test_profile_not_in_per_turn_prompt.py) protects the
+    # agent's llm_node from accidental reference.
+
+    async def _on_profile_view(self, _msg: dict) -> None:
+        """Reply to ``ipc.profile.view`` with the on-disk profile snapshot.
+
+        Empty payload in; ``ipc.profile.view_result`` out with:
+          - ``profile``: parsed dict or ``None`` if absent / consent off.
+          - ``bytes``: UTF-8 byte length of the serialized profile (0 when None).
+          - ``consent``: current profile_consent state (so the renderer can
+            switch between loaded/empty/consent-off states in one round trip).
+
+        Best-effort: load failures fall through to ``profile=None``.
+        """
+        try:
+            from vibemix.profile import load_consent, load_profile
+
+            consent = load_consent()
+            profile = load_profile() if consent else None
+            raw = (
+                json.dumps(profile, separators=(",", ":"), sort_keys=True).encode(
+                    "utf-8"
+                )
+                if profile
+                else b""
+            )
+            result = ProfileViewResult.make(
+                profile=profile, bytes=len(raw), consent=consent
+            )
+            await self.bus.emit(json.loads(result.to_json()))
+        except Exception as e:
+            log.exception("profile.view handler failed")
+            # Best-effort: emit a view_result with profile=None so the UI
+            # can still render the empty state.
+            try:
+                fallback = ProfileViewResult.make(
+                    profile=None, bytes=0, consent=False
+                )
+                await self.bus.emit(json.loads(fallback.to_json()))
+            except Exception:
+                pass
+            log.warning("profile.view fallback emitted (cause=%s)", e)
+
+    async def _on_profile_regenerate(self, _msg: dict) -> None:
+        """Reply to ``ipc.profile.regenerate``.
+
+        Consent OFF → reply with ``ok=False, error="consent_off"`` (UI surfaces
+        the enable affordance).
+
+        Consent ON but no live EvidenceRegistry OR insufficient citations →
+        ``ok=False, error="insufficient_evidence"`` (PROFILE-06 drift gate;
+        the builder retains the prior profile rather than over-fitting).
+
+        On success → save the new profile to disk + reply with the dict.
+
+        The reply ALWAYS validates against the schema; errors are encoded into
+        the payload (ok=False + error string ≤200 chars), NEVER raised.
+        """
+        try:
+            from vibemix.profile import (
+                build_profile,
+                load_consent,
+                load_profile,
+                save_profile,
+            )
+
+            if not load_consent():
+                result = ProfileRegenerateResult.make(
+                    ok=False, profile=None, error="consent_off"
+                )
+                await self.bus.emit(json.loads(result.to_json()))
+                return
+            prior = load_profile()
+            evidence: dict[str, dict[str, tuple[float, ...]]] = {}
+            if self.evidence_registry is not None:
+                try:
+                    evidence = self.evidence_registry.snapshot()  # type: ignore[attr-defined]
+                except Exception as snap_err:
+                    log.warning("evidence_registry.snapshot() failed: %s", snap_err)
+            # PROFILE-06 gate at the handler: a regenerate request with
+            # NO live evidence AND no prior profile means the user clicked
+            # "regenerate" before vibemix could observe anything useful.
+            # Falling through to build_profile would produce a cold-start
+            # dict (genre=unknown / tempo_bin=128-138 / empty tags) that
+            # has no real signal — surface insufficient_evidence so the UI
+            # tells the user "keep mixing and try again" instead of pretend-
+            # personalizing. Once at least one session worth of evidence
+            # exists the builder's ≥2-citation gate per field takes over.
+            if not evidence and prior is None:
+                result = ProfileRegenerateResult.make(
+                    ok=False, profile=None, error="insufficient_evidence"
+                )
+                await self.bus.emit(json.loads(result.to_json()))
+                return
+            new_profile = build_profile(prior, [], evidence, consent=True)
+            if new_profile is None:
+                result = ProfileRegenerateResult.make(
+                    ok=False, profile=None, error="insufficient_evidence"
+                )
+                await self.bus.emit(json.loads(result.to_json()))
+                return
+            save_profile(new_profile)
+            result = ProfileRegenerateResult.make(
+                ok=True, profile=new_profile, error=None
+            )
+            await self.bus.emit(json.loads(result.to_json()))
+        except Exception as e:
+            log.exception("profile.regenerate handler failed")
+            err_short = f"{type(e).__name__}: {e}"[:200]
+            result = ProfileRegenerateResult.make(
+                ok=False, profile=None, error=err_short
+            )
+            await self.bus.emit(json.loads(result.to_json()))
+
+    async def _on_profile_delete(self, _msg: dict) -> None:
+        """Reply to ``ipc.profile.delete``.
+
+        Unlinks ``~/.config/vibemix/profile.json``. Returns ``ok=True`` iff a
+        file existed and was deleted; ``ok=False, error="not_found"`` when no
+        file was present (UI surfaces an empty-state confirmation either way).
+
+        Best-effort: filesystem errors are encoded into the payload, never
+        raised.
+        """
+        try:
+            from vibemix.profile import delete_profile
+
+            deleted = delete_profile()
+            result = ProfileDeleteAck.make(
+                ok=deleted, error=None if deleted else "not_found"
+            )
+            await self.bus.emit(json.loads(result.to_json()))
+        except Exception as e:
+            log.exception("profile.delete handler failed")
+            err_short = f"{type(e).__name__}: {e}"[:200]
+            result = ProfileDeleteAck.make(ok=False, error=err_short)
+            await self.bus.emit(json.loads(result.to_json()))
+
+    async def _on_profile_set_consent(self, msg: dict) -> None:
+        """Reply to ``ipc.profile.set_consent`` from the Settings panel.
+
+        Mirrors ``WizardLoop._on_profile_set_consent`` — persists the bool to
+        state.json. Emits ``ipc.profile.consent_state`` ack so the renderer
+        can confirm the write landed and refresh the panel's empty state.
+
+        Best-effort: persistence failures are logged + swallowed; the UI's
+        toggle remains the source of truth for the open dialog and a retry
+        is one click away.
+        """
+        try:
+            from vibemix.profile import save_consent
+            from vibemix.ui_bus.messages import ProfileConsentState
+
+            payload = msg.get("payload", {})
+            consent = bool(payload.get("consent", False))
+            save_consent(consent)
+            log.info("profile_consent persisted from session panel: %s", consent)
+            await self.bus.emit(
+                json.loads(ProfileConsentState.make(consent=consent).to_json())
+            )
+        except Exception as e:
+            log.warning("session.profile.set_consent persistence failed: %s", e)
 
     async def run_boot_sweeps(self) -> None:
         """Phase 15 Plan 03 — boot-time trigger.

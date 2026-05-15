@@ -55,6 +55,9 @@ export default defineConfig({
       // Phase 29 Plans 05+06 — all debrief specs (component renders +
       // recording-row debrief button) need jsdom for HTMLElement APIs.
       ["src/debrief/__tests__/*.spec.ts", "jsdom"],
+      // Phase 32 Plan 05 — Settings → Profile panel renderer (vanilla TS
+      // DOM construction + dataset assertions). Same env as recording-*.
+      ["src/settings/components/profile-panel.spec.ts", "jsdom"],
     ],
   },
 });

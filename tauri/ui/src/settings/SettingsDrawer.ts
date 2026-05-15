@@ -50,6 +50,7 @@ import {
   type HotkeyCaptureHandle,
 } from "./components/hotkey-capture.js";
 import { renderLibraryPanel } from "./components/library-panel.js";
+import { renderProfilePanel } from "./components/profile-panel.js";
 import { renderStalenessBanner } from "./components/staleness-banner.js";
 import {
   renderRecordingBrowser,
@@ -669,6 +670,21 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     renderSettingsGroup({
       header: "LIBRARY",
       children: libraryBody,
+    }),
+  );
+
+  // --- PROFILE (Phase 32 / PROFILE-07) -------------------------------------
+  // Long-term DJ profile (~2KB JSON, content-allowlisted). View / regenerate
+  // / delete + consent toggle. Lives between LIBRARY and CALIBRATION because
+  // both are user-data groups; PROFILE is the more sensitive one so it sits
+  // adjacent to LIBRARY for findability (32-RESEARCH §"Settings panel
+  // insertion"). The panel renders synchronously with an empty state and
+  // fires ipc.profile.view on mount to populate.
+  const profileHandle = renderProfilePanel();
+  body.append(
+    renderSettingsGroup({
+      header: "PROFILE",
+      children: profileHandle.element,
     }),
   );
 
