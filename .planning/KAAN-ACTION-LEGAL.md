@@ -162,3 +162,59 @@ are the remaining work. Autonomous test surface uses synthetic fixtures.
       (e.g. `scripts/demo_film/raw/vo_take_01.wav`).
     - Mark `ASSETS-VO` as `done` here when final decision is made +
       (if VO) committed to local raw/ + `vo_track` set in cuts.json.
+
+---
+
+## Phase 36 — Day-Zero Operations
+
+Real-world execution items that vibemix autonomously scaffolded scripts for but
+that Kaan / Francesco / Bravoh team must run themselves.
+
+### OPS-09-RUN — Discord server creation
+- Generate a Discord bot token at https://discord.com/developers/applications.
+- Set `DISCORD_BOT_TOKEN` env locally.
+- Dry-run first: `python scripts/dayzero/discord_provision.py --dry-run`.
+- Live: `python scripts/dayzero/discord_provision.py --live`.
+- Verify: roles (founder, contributor, DJ, lurker) + channels (#announcements,
+  #help, #show-and-tell, #controllers, #ai-misbehavior, #dev) exist.
+- Mark `done` here once Discord server is up + bot kicked-and-removed.
+
+### OPS-10-RUN — Live 100 RPS proxy load test
+- Coordinate with Bravoh team — could DDOS prod if mistimed.
+- Pre-flight: confirm api.altidus.world/vibemix has rate-limit headroom.
+- Run: `python scripts/dayzero/proxy_load_test.py --target https://api.altidus.world/vibemix --duration 300 --rps 100`.
+- Verify: artifact under `.planning/eval-runs/loadtest_<ts>.json`; p99 < 500ms; error rate < 1%.
+- Mark `done` here when verdict = PASS.
+
+### OPS-11-CRON — Healthz watchdog cron install
+- Bravoh sysadmin installs `*/5 * * * *` cron entry per
+  `scripts/dayzero/healthz_cron.example` on the Bravoh server.
+- Required env vars set in cron: `DISCORD_WEBHOOK_URL`, `HEALTHZ_URL`.
+- First failure-mode test: temporarily stop the healthz endpoint → confirm
+  Discord webhook fires within 5 minutes.
+- Mark `done` here after Discord alert verified.
+
+### OPS-12-OUTREACH — Aligned-community star sourcing
+- Read `scripts/dayzero/seed_stars.md` protocol.
+- Outreach manually across 4 pools (Bravoh team, DJ network, ARRAY OSS,
+  contributor circle). NO random friend-favors (Pitfall P59).
+- Log targets in `scripts/dayzero/seed_stars.log` (gitignored).
+- Target: ≥15 confirmed Day-1 stars before launch.
+- Mark `done` here when ≥15 names confirmed.
+
+### OPS-13-EXECUTE — Launch trigger execution
+- Recommended slot: 09:00 EST (Pitfall P78 timing).
+- Required env: `GH_TOKEN`, `DISCORD_WEBHOOK_URL`, `RELEASE_TAG`, `REPO`.
+- Dry-run preview: `bash scripts/dayzero/launch_trigger.sh` (no --publish).
+- Live: `bash scripts/dayzero/launch_trigger.sh --publish`.
+- 4 stages run in sequence: T-30 → T+0 → T+5 → T+24h.
+- Cross-post copies from `scripts/dayzero/launch_copy/{twitter,instagram,linkedin,reddit}.txt`.
+- Mark `done` here when T+24h recap posts successfully.
+
+### OPS-14-SERVER — Bravoh ops endpoint deployment
+- Bravoh team deploys `POST /vibemix/updates/upload` per
+  `docs/bravoh-ops-endpoint.md`.
+- Bravoh team deploys `GET /vibemix/updates/latest.json` feed.
+- Bravoh team deploys `GET /vibemix/healthz` endpoint.
+- Issue `BRAVOH_UPDATE_TOKEN` for CI → upload at one-token-per-release rotation.
+- Mark `done` here when all 3 endpoints respond 200 OK on smoke check.
