@@ -173,8 +173,30 @@ def test_empty_corpus_returns_0_with_artifacts(tmp_path: Path) -> None:
 
 
 def test_judges_unknown_value_raises_not_implemented(tmp_path: Path) -> None:
-    """--judges with an unknown name raises NotImplementedError (Plan 02 wires real ones)."""
+    """--judges with an unknown name raises NotImplementedError.
+
+    Plan 27-02 wires gemini-3-pro and gemini-3-flash; truly-unknown names
+    (typos, future judges) still raise.
+    """
     from scripts.eval.replay_harness import _build_judge_callable
 
     with pytest.raises(NotImplementedError):
-        _build_judge_callable("gemini-3-flash")  # Plan 02 path
+        _build_judge_callable("gemini-9-future")  # not in the supported set
+
+
+def test_judges_gemini_pro_path_returns_callable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plan 27-02 wiring: gemini-3-pro is now a recognized judge name."""
+    from scripts.eval.replay_harness import _build_judge_callable
+
+    # _build_judge_callable returns the callable lazily; no API contact happens
+    # until the callable is invoked. We just verify the build path works.
+    cb = _build_judge_callable("gemini-3-pro")
+    assert callable(cb)
+
+
+def test_judges_comma_separated_list_parses(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plan 27-02 dispatcher: comma-separated judges parse + return callable."""
+    from scripts.eval.replay_harness import _build_judge_callable
+
+    cb = _build_judge_callable("gemini-3-pro,gemini-3-flash")
+    assert callable(cb)

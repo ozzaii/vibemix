@@ -93,16 +93,51 @@ def call_judges_stub(event: dict[str, Any], response_text: str) -> dict[str, Any
 def _build_judge_callable(judges_arg: str):
     """Return a callable ``(event, response_text) -> verdict_dict``.
 
-    ``noop`` returns the deterministic stub. Plan 02 wires the real judge
-    here; this plan only recognizes the noop alias.
+    ``noop`` returns the deterministic stub from Plan 27-01.
+
+    Plan 27-02 wires the real Gemini Pro + Flash judges via
+    ``scripts.eval.judge.call_judges``. Multiple judges are comma-separated:
+    ``--judges gemini-3-pro,gemini-3-flash``.
     """
     if judges_arg == "noop":
         return call_judges_stub
-    # Plan 02 hand-off: from scripts.eval.judge import build_judge_chain
-    # return build_judge_chain(judges_arg, vcr_mode=os.environ.get("VCR_RECORD_MODE", "none"))
-    raise NotImplementedError(
-        f"--judges {judges_arg!r} requires Plan 02; only 'noop' is wired in Plan 27-01"
-    )
+
+    # Plan 27-02 real-judge dispatch
+    import asyncio
+
+    from scripts.eval.judge import call_judges
+
+    judge_list = [j.strip() for j in judges_arg.split(",") if j.strip()]
+    valid = {"noop", "gemini-3-pro", "gemini-3-flash"}
+    unknown = set(judge_list) - valid
+    if unknown:
+        raise NotImplementedError(
+            f"--judges contains unknown names: {sorted(unknown)}; "
+            f"supported: {sorted(valid)}"
+        )
+
+    # Lazy genai.Client — only instantiated when actually needed.
+    _client_cache: dict = {"client": None}
+
+    def _get_client():
+        if _client_cache["client"] is None:
+            from google import genai
+
+            api_key = os.environ.get("GEMINI_API_KEY", "")
+            if not api_key:
+                raise RuntimeError(
+                    "GEMINI_API_KEY not set — required for non-noop judges"
+                )
+            _client_cache["client"] = genai.Client(api_key=api_key)
+        return _client_cache["client"]
+
+    def _call(event: dict, response_text: str) -> dict:
+        client = _get_client()
+        return asyncio.run(
+            call_judges(judge_list, response_text, event, client=client)
+        )
+
+    return _call
 
 
 async def replay_one_session(
