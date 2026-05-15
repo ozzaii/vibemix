@@ -2,17 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: The Unified Cut
-status: in_progress
-next_milestone: v2.1
-last_updated: "2026-05-14T20:00:00.000Z"
-last_activity: 2026-05-14
+status: executing
+last_updated: "2026-05-15T09:58:09.366Z"
+last_activity: 2026-05-15 -- Phase 28 execution started
 progress:
   total_phases: 13
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
-  next_phase: 27
+  completed_phases: 1
+  total_plans: 18
+  completed_plans: 9
+  percent: 50
 ---
 
 # vibemix — State
@@ -25,7 +23,7 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** v2.1 The Unified Cut — public OSS RC. Foundation cluster (P27 + P28 + P29 + P30 + P34) starts day 1 in parallel; external Apple+SignPath approval clock is the critical path.
+- **Current focus:** Phase 28 — library-intelligence-v1
 - **Last shipped:** v2.0 Research-Driven Ship — 2026-05-14 (status: `tech_debt` accepted).
 - **Project mode:** standard.
 - **Granularity:** fine.
@@ -36,10 +34,10 @@ progress:
 
 ## Current Position
 
-Phase: **Phase 27 — Eval Harness + v2.0 Carry-Forward Close-Out** (entry-ready, parallel cluster A with P28/P29/P30/P34)
-Plan: —
-Status: Entry-ready (roadmap created, phase planning not started)
-Last activity: 2026-05-14 — v2.1 roadmap scaffolded; 105 REQ-IDs mapped 100% across Phases 27–39; ROADMAP.md + REQUIREMENTS.md Traceability + STATE.md updated.
+Phase: 28 (library-intelligence-v1) — EXECUTING
+Plan: 1 of 9
+Status: Executing Phase 28
+Last activity: 2026-05-15 -- Phase 28 execution started
 
 ## Performance Metrics
 
@@ -90,11 +88,13 @@ All Phase 1–26 decisions remain locked. Highlights:
 ### Open To-dos
 
 **v2.1 day-1 unblock actions:**
+
 - **File SignPath OSS Foundation application** (Kaan-action) on day 1 — ~1-week SLA. Lives in `.planning/phases/38-signing-pipeline-real-execution/KAAN-ACTION-LEGAL.md` once Phase 38 scaffolds.
 - **Start Apple Developer Program Agreement update prep** (Francesco-action) on day 1 — Issuer ID `3f60cc6b-df70-4ff8-9ceb-865dac6c1b4b` already supplied 2026-05-14.
 - **Run `/gsd-plan-phase 27`** to plan Phase 27 — foundation cluster's anchor.
 
 **v2.1 parallel cluster A phases (planning-ready):**
+
 - Phase 27 — Eval Harness + Carry-Forward Close-Out (no v2.1 prereqs)
 - Phase 28 — Library Intelligence v1 (closes v2.0 register_library orphan; needs Phase 25 surface — shipped)
 - Phase 29 — Post-Session Debrief MVP UI (docks into v2.0 DEBRIEF slot — shipped)
@@ -102,16 +102,19 @@ All Phase 1–26 decisions remain locked. Highlights:
 - Phase 34 — Open-Source Security Pass (extends v2.0 CI scaffold — shipped)
 
 **v2.1 sequential cluster B (gated):**
+
 - Phase 31 needs Phase 30
 - Phase 32 needs Phase 28 + Phase 30
 - Phase 35 needs Phase 31
 
 **v2.1 external-gated:**
+
 - Phase 38 needs Apple Dev Agreement + SignPath OSS approval (external)
 - Phase 33 needs Phase 38 (signed binary required for fresh-VM rehearsal)
 - Phase 36 needs Phase 21 + Phase 26 scaffold (both shipped — can start in parallel with P35)
 
 **v2.1 ship prep (sequential after all):**
+
 - Phase 37 needs ALL v2.1 phases shipped
 - Phase 39 needs Phase 37 + Phase 38 signed binary
 
