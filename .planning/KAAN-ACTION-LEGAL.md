@@ -79,3 +79,86 @@ real-track F1 scoring waits on Kaan's curation pass.
    - Unblocks the F1 ≥ 0.80-per-detector gate (Phase 27 EVAL-03 matrix)
      for the hard_tek genre slice. Until then the F1 number is reported
      against synthetic fixtures only.
+
+## Source: Phase 35 ASSETS-01..07 — Real GLBs + 30s demo film
+
+**Phase:** `.planning/phases/35-real-glb-animations-30s-viral-demo-film/`
+**Plans:** 35-01 .. 35-06 (autonomous deliverables shipped; assets pending Kaan-action)
+**Status:** Phase 35 pipeline + CI gates + docs landed. Real GLBs + demo.mp4 + VO
+are the remaining work. Autonomous test surface uses synthetic fixtures.
+
+### Action items
+
+6. **ASSETS-MESHY-A/B — Generate Meshy v6 vs Hunyuan3D 3.0, pick winner**
+   - Budget: ~$50 in credits across the two services.
+   - Generate ONE shot from each per `docs/asset_pipeline.md` § 1.
+   - Compare on silhouette readability @ 320×320, bone topology
+     (Mixamo-friendly biped), texture density (KTX2 tolerance).
+   - Pick winner. Stash raw GLB to `tauri/ui/assets/mascot/raw/`
+     (gitignored — keeps per-iteration noise out of git history).
+   - Mark `ASSETS-MESHY-A/B` as `done` here when winner is staged.
+
+7. **ASSETS-MIXAMO-RIG — Mixamo auto-rig + 8-12 motion clip selection**
+   - Mixamo (free with Adobe account): upload winner GLB, place rig
+     markers, auto-rig (~30s server-side).
+   - Per the 5 prep_* state map in `docs/asset_pipeline.md` § 2:
+     pick the Mixamo motion clip that fits each state, trim to
+     0.8-1.5s, "In Place" enabled.
+   - SkeletonHelper QA per `docs/asset_pipeline.md` § 3: visually
+     verify no bone drift / foot penetration / hand intersection /
+     spine pop. If any fail → Rokoko Studio retargeting fallback
+     ($5/mo, see Pitfall P61).
+   - Mark `ASSETS-MIXAMO-RIG` as `done` here when all 5 prep_* +
+     any new react_* clips pass SkeletonHelper QA.
+
+8. **ASSETS-PREP-REPLACE — Replace 5 prep_*.glb placeholders with real GLBs**
+   - Run `python scripts/glb_optimize.py --optimize tauri/ui/assets/mascot/raw/ tauri/ui/assets/mascot/animations/` to DRACO + KTX2 compress.
+   - Verify gates:
+     - `./scripts/check_mascot_glb_size.sh` (≤ 25 MB total).
+     - `python scripts/glb_optimize.py --check tauri/ui/assets/mascot/` (≤ 600 KB per animation clip + total).
+     - `cd tauri/ui && npm test -- additive-layer` (Phase 22-02 idle-zero contract — bone-level).
+     - `pytest tests/repo/test_phase_22_02_prep_glb_contract.py` (structural).
+   - Filenames MUST be drop-in same-name overwrite. The 5 prep_* names
+     are the manifest contract surface.
+   - Mark `ASSETS-PREP-REPLACE` as `done` here when all 4 gates pass.
+
+9. **ASSETS-SESSION-RECORD — Record 3min+ raw DJ session**
+   - Follow `scripts/demo_film/recording_protocol.md` checklist.
+   - Setup: vibemix live, BlackHole 2ch, DDJ-FLX4 (or any v0.1
+     supported controller), djay Pro / Mixxx, Quartz screen capture
+     scoped to the DJ window.
+   - 3 minutes minimum, 1080p+, 60fps preferred, 48kHz stereo direct
+     from BlackHole (not mic).
+   - Stash to `scripts/demo_film/raw/dj_session_<YYYY_MM_DD>.mov`
+     (gitignored — kept locally, demo.mp4 is the shipped artifact).
+   - Mark `ASSETS-SESSION-RECORD` as `done` here when raw is stashed
+     + reviewed for "real DJ friend" energy.
+
+10. **ASSETS-DEMO-CUT — Manual ffmpeg cut to 30s demo.mp4**
+    - Plan cuts per `scripts/demo_film/3beat_structure.md` (Beat A
+      overlay highlight → Beat B mascot lean-in BEFORE voice → Beat C
+      cited reaction). Hard ceiling 8 cuts (Pitfall P57).
+    - Populate `scripts/demo_film/cuts.json` with cut objects:
+      `{id, start, end}`. Map each id to beat_a_* / beat_b_* / beat_c_*.
+    - Validate: `bash scripts/demo_film/cut.sh --dry-run`.
+    - Produce: `bash scripts/demo_film/cut.sh`.
+    - Output: `docs/assets/demo.mp4`.
+    - Update README hero block: replace `sha256=PLACEHOLDER` with
+      `sha256=$(shasum -a 256 docs/assets/demo.mp4 | cut -d' ' -f1)`.
+    - Verify: `python scripts/check_readme_hero_hash.py` exits 0.
+    - Mark `ASSETS-DEMO-CUT` as `done` here when the hero hash gate
+      passes locally + the README renders the new asset on GitHub.
+
+11. **ASSETS-VO — Voiceover (Kaan/Francesco-written + recorded OR no-VO)**
+    - Default per `scripts/demo_film/vo_policy.md`: NO VO (captions
+      carry the narrative).
+    - If a VO is added: Kaan or Francesco writes the copy (3 sentences
+      max), Kaan or Francesco records it in one take. Imperfection is
+      the feature.
+    - NO ElevenLabs, NO OpenAI TTS, NO Gemini TTS, NO synthesized
+      narration (Pitfall P58 — enforced by
+      `tests/scripts/test_demo_film_no_ai_vo.py` grep gate).
+    - If using VO: set `vo_track` in `cuts.json` to the local path
+      (e.g. `scripts/demo_film/raw/vo_take_01.wav`).
+    - Mark `ASSETS-VO` as `done` here when final decision is made +
+      (if VO) committed to local raw/ + `vo_track` set in cuts.json.
