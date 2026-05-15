@@ -34,7 +34,9 @@ from vibemix.events.genres import (
     build_techno_chain,
 )
 from vibemix.state.detectors import (
+    AcidLineEntryDetector,
     BreakdownKickKillDetector,
+    DistortionClimbDetector,
     KickDensityShiftDetector,
     KickSwapDetector,
     PhraseBoundaryDetector,
@@ -194,19 +196,23 @@ def test_techno_chain_contains_all_kick_detectors():
 # ---------- Test 9 ----------
 
 
-def test_hard_tek_chain_is_techno_plus_tightened_cooldowns():
-    """``build_hard_tek_chain()`` returns the same 5 detector classes as
-    techno. Plan 06's tune_detectors.py harness lands actual cooldown
-    overrides; this plan ships the override mechanism and current values
-    match the ``MIN_EVENT_GAP_PER_TYPE`` defaults."""
+def test_hard_tek_chain_is_techno_plus_overlay_detectors():
+    """``build_hard_tek_chain()`` returns the techno baseline (5 detectors)
+    PLUS the two Phase 30 SENSE-17/SENSE-18 overlay detectors
+    (DISTORTION_CLIMB + ACID_LINE_ENTRY) — 7 total. The overlays NEVER appear
+    in techno/house chains (verified via test 7 + test 8 above)."""
     chain = build_hard_tek_chain()
     types = [type(d) for d in chain]
+    # Baseline 5 (same as techno):
     assert KickSwapDetector in types
     assert KickDensityShiftDetector in types
     assert BreakdownKickKillDetector in types
     assert ReentryKickLandDetector in types
     assert PhraseBoundaryDetector in types
-    assert len(chain) == 5
+    # Phase 30 overlays:
+    assert DistortionClimbDetector in types
+    assert AcidLineEntryDetector in types
+    assert len(chain) == 7
 
     # Same pair contract as techno
     kill = next(d for d in chain if isinstance(d, BreakdownKickKillDetector))
@@ -214,6 +220,31 @@ def test_hard_tek_chain_is_techno_plus_tightened_cooldowns():
     phrase = next(d for d in chain if isinstance(d, PhraseBoundaryDetector))
     assert reentry.kill_detector is kill
     assert phrase.kill_detector is kill
+
+    # Overlay detectors come AFTER the kick-side detectors per chain-order
+    # contract (CONTEXT D — anti-double-fire vs. KICK_SWAP).
+    distortion = next(d for d in chain if isinstance(d, DistortionClimbDetector))
+    acid = next(d for d in chain if isinstance(d, AcidLineEntryDetector))
+    kick_swap = next(d for d in chain if isinstance(d, KickSwapDetector))
+    assert chain.index(kick_swap) < chain.index(distortion)
+    assert chain.index(kick_swap) < chain.index(acid)
+
+
+def test_techno_chain_does_not_contain_hard_tek_overlays():
+    """DISTORTION_CLIMB + ACID_LINE_ENTRY are Hard Tek-only. Techno chain
+    must NOT contain them — the chain-selection IS the genre gate."""
+    chain = build_techno_chain()
+    types = [type(d) for d in chain]
+    assert DistortionClimbDetector not in types
+    assert AcidLineEntryDetector not in types
+
+
+def test_house_chain_does_not_contain_hard_tek_overlays():
+    """House chain must not include Hard Tek-only detectors."""
+    chain = build_house_chain()
+    types = [type(d) for d in chain]
+    assert DistortionClimbDetector not in types
+    assert AcidLineEntryDetector not in types
 
 
 # ---------- Test 10 ----------

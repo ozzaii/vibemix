@@ -30,7 +30,14 @@ from __future__ import annotations
 
 import logging
 
-from vibemix.events.genres import GENRE_REGISTRY
+# NOTE: GENRE_REGISTRY is imported LAZILY inside ``swap()`` rather than at
+# module load. The registry's per-genre chain builders pull from
+# ``vibemix.state.detectors`` — and the state package's ``__init__`` itself
+# imports ``GenreRouter`` from this module. Importing the registry eagerly
+# would create a circular import chain when an entry point starts at
+# ``vibemix.events.genres`` (the partially-initialised state package would
+# come back through ``hard_tek.build_hard_tek_chain``'s detectors import).
+# Phase 30 SENSE-19 — see the lazy import inside ``swap()``.
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +93,11 @@ class GenreRouter:
             # We track this with a simple sentinel — the _initialized flag.
             if getattr(self, "_initialized", False):
                 return False
+
+        # Lazy import — see module-level note. By the time swap() is called
+        # the events.genres package is fully initialised so the import is
+        # a cheap cached module lookup.
+        from vibemix.events.genres import GENRE_REGISTRY
 
         builder = GENRE_REGISTRY.get(new_genre)
         if builder is None:
