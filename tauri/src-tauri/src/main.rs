@@ -41,7 +41,7 @@ use crate::tray::{QuitPending, TrayHandle};
 use crate::ws_client::WsClientHandle;
 
 fn main() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         // Plugins — every one is gated by the capability allowlist.
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
@@ -52,7 +52,16 @@ fn main() {
         // Phase 18 ships real signed manifests.
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Phase 12 Wave 3 — push-to-mute global shortcut.
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
+
+    // Phase 33 / INSTALL-02 — macOS TCC plugin (check_permission /
+    // request_permission / subscribe). Wired macOS-only so Windows builds
+    // stay green. The capability allowlist gates which commands the
+    // webview is allowed to invoke.
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_plugin_macos_permissions::init());
+
+    builder
         // Webview-callable commands (capability allowlist mirrors).
         // Phase 13 Plan 02 adds 4 mascot commands:
         //   read_mascot_window_state, write_mascot_window_state,

@@ -59,6 +59,11 @@ dirs-next = "2"                                                  # verified 2026
 core-graphics = "0.24"          # CGWindowListCopyWindowInfo — djay window rect
 core-foundation = "0.10"        # CFDictionary / CFArray plumbing
 accessibility-sys = "0.1"       # AXUIElementCreateApplication / kAX* attributes
+# Phase 33 / INSTALL-02 — TCC permission check + request + state-change
+# subscribe used by the one-click install wizard and the in-session
+# revoke watcher (INSTALL-06 / P71). macOS-only — Windows degrades to
+# OS-managed runtime grant on first capture.
+tauri-plugin-macos-permissions = "2.3.0"
 
 [dev-dependencies]
 tempfile = "3"                                                   # verified 2026-05-12 — watchdog log-tail tests

@@ -17,6 +17,9 @@
     "updater:default",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
+    "macos-permissions:default",
+    "macos-permissions:allow-check-permission",
+    "macos-permissions:allow-request-permission",
     {
       "identifier": "shell:allow-execute",
       "allow": [
