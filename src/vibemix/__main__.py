@@ -701,6 +701,29 @@ async def main() -> None:
     except Exception as e:
         print(f"-> staleness check failed: {e}", file=sys.stderr)
 
+    # ── Plan 28-04 — grounding pipeline (event-gated, P56 cost ceiling) ──
+    # Build Grounding lazily — only when (a) library cache exists AND
+    # (b) the proxy probe shows the embedContent route is available. The
+    # agent reads ``grounding`` via kwargs (Pitfall P53); the agent path
+    # tolerates ``None`` and falls back to nowplaying-cli citations only.
+    grounding = None
+    if library_cache.exists():
+        try:
+            from vibemix.library import (
+                LibraryEmbedder as _LibraryEmbedder,
+                Grounding as _Grounding,
+                open_store as _open_store,
+            )
+
+            _embed_client = genai_client  # already proxy-wired upstream
+            _library_embedder = _LibraryEmbedder(_embed_client)
+            _library_store = _open_store()
+            grounding = _Grounding(_library_embedder, _library_store)
+            print("-> grounding: armed (event-gated, threshold=0.7)")
+        except Exception as e:
+            print(f"-> grounding: disabled ({e})", file=sys.stderr)
+            grounding = None
+
     session = AgentSession(llm=llm_inst, tts=tts_inst)
     session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
     print(f"-> AgentSession headless (no Room); audio out → PlaybackQueue @ {OUTPUT_SR}Hz")

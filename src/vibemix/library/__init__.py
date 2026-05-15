@@ -22,6 +22,14 @@ from vibemix.library.rekordbox import (
     RekordboxLibrary,
     TrackEntry,
 )
+from vibemix.library.grounding import (
+    CITATION_THRESHOLD,
+    TRACK_AWARE_EVENTS,
+    UNCERTAIN_THRESHOLD,
+    Citation,
+    Grounding,
+    identify_playing,
+)
 from vibemix.library.search import (
     QUERY_CACHE_TTL,
     VibeSearchResult,
@@ -38,10 +46,13 @@ from vibemix.library.staleness import (
 from vibemix.library.store import LibraryStore, open_store, snapshot_hash
 
 __all__ = [
+    "CITATION_THRESHOLD",
+    "Citation",
     "CuePoint",
     "EMBEDDING_DIM",
     "EXCERPT_STRATEGY_VERSION",
     "GEMINI_EMBEDDING_MODEL",
+    "Grounding",
     "LibraryEmbedder",
     "LibraryStore",
     "NumpyStore",
@@ -49,11 +60,14 @@ __all__ = [
     "RekordboxLibrary",
     "SNOOZE_DURATION_SECONDS",
     "STALE_AGE_SECONDS",
+    "TRACK_AWARE_EVENTS",
     "TrackEntry",
+    "UNCERTAIN_THRESHOLD",
     "VibeSearchResult",
     "apply_snooze_action",
     "cosine_topk",
     "emit_nudge_if_stale",
+    "identify_playing",
     "is_snoozed",
     "is_stale",
     "l2_normalize",
