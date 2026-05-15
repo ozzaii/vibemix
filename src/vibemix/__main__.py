@@ -861,6 +861,195 @@ def _enable_line_buffering() -> None:
             pass
 
 
+# ─── Phase 28 — `vibemix library` CLI subcommand group ──────────────────────
+
+
+def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
+    """Build the `library` subparser tree. Plan 28-03 owns `search`; later
+    plans append their own subcommands by importing this helper."""
+    sub = parser.add_subparsers(dest="library_command", required=True)
+
+    # Plan 28-03 — search
+    sp_search = sub.add_parser(
+        "search", help="Natural-language vibe-search against your library"
+    )
+    sp_search.add_argument("query", help="vibe-search query string")
+    sp_search.add_argument(
+        "--k", type=int, default=10, help="number of matches (default 10)"
+    )
+    sp_search.add_argument(
+        "--json",
+        action="store_true",
+        default=True,
+        help="emit JSON to stdout (default: on)",
+    )
+    sp_search.set_defaults(func=_cmd_library_search)
+
+    # Plan 28-05 — similar (USER-ASKED only; placeholder until plan ships)
+    sp_similar = sub.add_parser(
+        "similar",
+        help="Find tracks similar to a seed track (USER-ASKED only)",
+    )
+    sp_similar.add_argument("track_id", help="seed track id")
+    sp_similar.add_argument("--k", type=int, default=10)
+    sp_similar.set_defaults(func=_cmd_library_similar)
+
+    # Plan 28-08 — budget (placeholder until plan ships)
+    sp_budget = sub.add_parser(
+        "budget", help="Show monthly Gemini Embedding cost projection"
+    )
+    sp_budget.set_defaults(func=_cmd_library_budget)
+
+
+def _run_library_cli(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="vibemix library")
+    _build_library_subparsers(parser)
+    args = parser.parse_args(argv)
+    return int(args.func(args) or 0)
+
+
+def _cmd_library_search(args: argparse.Namespace) -> int:
+    import json as _json
+    import os as _os
+
+    from vibemix.agent.proxy_client import build_proxy_genai_client
+    from vibemix.library import (
+        LibraryEmbedder,
+        RekordboxLibrary,
+        open_store,
+        vibe_search,
+    )
+
+    proxy_jwt = _os.environ.get("VIBEMIX_PROXY_JWT")
+    proxy_url = _os.environ.get(
+        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
+    )
+    if not proxy_jwt:
+        print(
+            _json.dumps(
+                {
+                    "error": (
+                        "VIBEMIX_PROXY_JWT not set. Export the sidecar JWT "
+                        "or run via the Tauri shell."
+                    ),
+                    "results": [],
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    lib = RekordboxLibrary()
+    if not lib.try_load_cache():
+        print(
+            _json.dumps(
+                {
+                    "error": (
+                        "No library cache. Drag a Rekordbox XML onto "
+                        "Settings → Library first."
+                    ),
+                    "results": [],
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    client = build_proxy_genai_client(proxy_jwt, proxy_url)
+    embedder = LibraryEmbedder(client)
+    store = open_store()
+    try:
+        results, cache_hit = vibe_search(
+            embedder, store, lib, args.query, k=args.k
+        )
+    finally:
+        store.close()
+
+    _json.dump(
+        {
+            "query": args.query,
+            "cache_hit": cache_hit,
+            "results": [r.to_dict() for r in results],
+        },
+        sys.stdout,
+        indent=2,
+    )
+    sys.stdout.write("\n")
+    return 0
+
+
+def _cmd_library_similar(args: argparse.Namespace) -> int:
+    """Plan 28-05 — USER-ASKED similar-track query."""
+    import json as _json
+    import os as _os
+
+    from vibemix.agent.proxy_client import build_proxy_genai_client
+    from vibemix.library import (
+        LibraryEmbedder,
+        RekordboxLibrary,
+        open_store,
+    )
+    from vibemix.library.similar import similar_to
+
+    proxy_jwt = _os.environ.get("VIBEMIX_PROXY_JWT")
+    proxy_url = _os.environ.get(
+        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
+    )
+    if not proxy_jwt:
+        print(
+            _json.dumps(
+                {
+                    "error": "VIBEMIX_PROXY_JWT not set.",
+                    "results": [],
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    lib = RekordboxLibrary()
+    if not lib.try_load_cache():
+        print(
+            _json.dumps(
+                {"error": "No library cache.", "results": []}
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    client = build_proxy_genai_client(proxy_jwt, proxy_url)
+    embedder = LibraryEmbedder(client)
+    store = open_store()
+    try:
+        results = similar_to(
+            embedder, store, lib, args.track_id, k=args.k
+        )
+    finally:
+        store.close()
+    _json.dump(
+        {
+            "track_id": args.track_id,
+            "results": [r.to_dict() for r in results],
+        },
+        sys.stdout,
+        indent=2,
+    )
+    sys.stdout.write("\n")
+    return 0
+
+
+def _cmd_library_budget(args: argparse.Namespace) -> int:
+    """Plan 28-08 — monthly Gemini Embedding cost projection."""
+    import json as _json
+
+    from vibemix.library.budget import project_monthly_cost
+
+    projection = project_monthly_cost()
+    _json.dump(projection, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
 def cli_entry(argv: list[str] | None = None) -> None:
     """Synchronous CLI entry. Parses args (``--version`` short-circuits via
     argparse's ``action="version"``), then routes to one of three runtimes:
@@ -878,6 +1067,15 @@ def cli_entry(argv: list[str] | None = None) -> None:
     session loop owns the snapshot path the renderer drives off.
     """
     _enable_line_buffering()
+    # Phase 28 — `vibemix library <subcommand>` is dispatched BEFORE
+    # _parse_args so the legacy --wizard / --session / --debrief flag layer
+    # is untouched. Plan 28-03 owns `search`; Plan 28-05 will add `similar`,
+    # Plan 28-08 will add `budget` via the same _build_library_subparsers
+    # helper below.
+    raw_argv = sys.argv[1:] if argv is None else list(argv)
+    if raw_argv and raw_argv[0] == "library":
+        sys.exit(_run_library_cli(raw_argv[1:]))
+
     args = _parse_args(argv)
     try:
         if args.debrief is not None:

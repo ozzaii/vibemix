@@ -22,6 +22,11 @@ from vibemix.library.rekordbox import (
     RekordboxLibrary,
     TrackEntry,
 )
+from vibemix.library.search import (
+    QUERY_CACHE_TTL,
+    VibeSearchResult,
+    vibe_search,
+)
 from vibemix.library.staleness import (
     SNOOZE_DURATION_SECONDS,
     STALE_AGE_SECONDS,
@@ -40,10 +45,12 @@ __all__ = [
     "LibraryEmbedder",
     "LibraryStore",
     "NumpyStore",
+    "QUERY_CACHE_TTL",
     "RekordboxLibrary",
     "SNOOZE_DURATION_SECONDS",
     "STALE_AGE_SECONDS",
     "TrackEntry",
+    "VibeSearchResult",
     "apply_snooze_action",
     "cosine_topk",
     "emit_nudge_if_stale",
@@ -52,4 +59,5 @@ __all__ = [
     "l2_normalize",
     "open_store",
     "snapshot_hash",
+    "vibe_search",
 ]

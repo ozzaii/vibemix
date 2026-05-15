@@ -202,4 +202,5 @@ markers = [
     "integration: end-to-end integration tests that spin up real WS servers / clients (Plan 13-08+)",
     "slow: 60-min soak test; runs only via `pytest -m slow` (Phase 15 Plan 06)",
     "parity: Mac/Win bit-identity gate for the library backend (Phase 28 Plan 02 P55 mitigation)",
+    "cli: subprocess CLI integration tests (slower than unit tests; run via `pytest -m cli` for full coverage)",
 ]
