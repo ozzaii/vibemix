@@ -10,10 +10,26 @@ Public surface:
     ``from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry, CuePoint``
 """
 
+from vibemix.library._cosine import EMBEDDING_DIM, cosine_topk, l2_normalize
+from vibemix.library.embed import (
+    EXCERPT_STRATEGY_VERSION,
+    GEMINI_EMBEDDING_MODEL,
+    LibraryEmbedder,
+)
 from vibemix.library.rekordbox import (
     CuePoint,
     RekordboxLibrary,
     TrackEntry,
 )
 
-__all__ = ["CuePoint", "RekordboxLibrary", "TrackEntry"]
+__all__ = [
+    "CuePoint",
+    "EMBEDDING_DIM",
+    "EXCERPT_STRATEGY_VERSION",
+    "GEMINI_EMBEDDING_MODEL",
+    "LibraryEmbedder",
+    "RekordboxLibrary",
+    "TrackEntry",
+    "cosine_topk",
+    "l2_normalize",
+]
