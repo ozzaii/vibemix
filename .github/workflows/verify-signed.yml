@@ -1,0 +1,68 @@
+# Phase 34 / SEC-05 — signed-binary verifier surface.
+#
+# Phase 38 wires real Apple notarytool + SignPath chain validation.
+# Phase 34 ships the verifier *surface*: checksum + load-command presence
+# checks. On no-signing-yet runs the workflow exits with a notice.
+#
+# Pitfall P46 — this workflow MUST NOT POST/PUT to apple/signpath endpoints.
+# The audit step below grep-asserts that contract.
+
+name: Verify Signed Binary
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      artifact_url:
+        description: "URL of signed artifact to verify"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit-no-apple-signpath-post:
+    name: Audit — no Apple/SignPath POST/PUT (P46)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Grep for forbidden POST/PUT to Apple/SignPath
+        run: |
+          set -euo pipefail
+          # Allow read-only references (notarytool log fetch is read).
+          # Block any curl/wget POST/PUT to apple/signpath domains in workflows.
+          if grep -RIn --include='*.yml' --include='*.yaml' \
+            -E '(curl|wget).*(POST|PUT).*(apple\.com|signpath\.io|notarytool)' \
+            .github/workflows; then
+            echo "::error::Forbidden POST/PUT to Apple/SignPath endpoints (P46)"
+            exit 1
+          fi
+          if grep -RIn --include='*.py' --include='*.sh' \
+            -E '(POST|PUT).*(apple\.com|signpath\.io|notarytool)' \
+            scripts/ 2>/dev/null; then
+            echo "::error::Forbidden POST/PUT to Apple/SignPath endpoints (P46) in scripts"
+            exit 1
+          fi
+          echo "::notice::No forbidden Apple/SignPath POST/PUT references detected."
+
+  verify:
+    name: Verify signed artifact (surface only)
+    needs: audit-no-apple-signpath-post
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run verifier (skip-if-missing)
+        run: |
+          set -euo pipefail
+          # Phase 34 ships the surface; Phase 38 will pass the real artifact.
+          python scripts/dist/verify_signed.py --skip-if-missing
