@@ -37,6 +37,10 @@ import {
   renderStepProfileConsent,
   type ProfileConsentState,
 } from "./step-profile-consent.js";
+import {
+  renderStepTelemetryConsent,
+  type TelemetryConsentState,
+} from "./step-telemetry-consent.js";
 
 export type WizardStep =
   | "intro"
@@ -44,6 +48,7 @@ export type WizardStep =
   | "audio"
   | "controller"
   | "profile-consent"
+  | "telemetry-consent"
   | "smoke-test"
   | "done";
 
@@ -53,6 +58,7 @@ export interface WizardState {
   step2: Step2State;
   step3: Step3State;
   profileConsent: ProfileConsentState;
+  telemetryConsent: TelemetryConsentState;
   smokeTest: SmokeTestState;
   statusBar: StatusBarProps;
   platform: "darwin" | "win32" | "linux";
@@ -88,6 +94,12 @@ const DEFAULT_STATE: WizardState = {
   profileConsent: {
     // PROFILE-05 default-OFF — non-negotiable. The toggle MUST start
     // unchecked; the user opts in explicitly.
+    consent: false,
+  },
+  telemetryConsent: {
+    // Phase 34 / SEC-08 (Pitfall P67) — default-OFF, non-negotiable.
+    // The "Don't share" radio is the default-selected option; this
+    // field's value mirrors that radio's state.
     consent: false,
   },
   smokeTest: {
@@ -135,6 +147,7 @@ const STEP_ORDER: WizardStep[] = [
   "audio",
   "controller",
   "profile-consent",
+  "telemetry-consent",
   "smoke-test",
 ];
 
@@ -217,8 +230,11 @@ export function back(): void {
     case "profile-consent":
       advanceTo("controller");
       return;
-    case "smoke-test":
+    case "telemetry-consent":
       advanceTo("profile-consent");
+      return;
+    case "smoke-test":
+      advanceTo("telemetry-consent");
       return;
     case "done":
       return; // Wizard is done; no back.
@@ -444,11 +460,36 @@ export function renderCurrentStep(): void {
             // eslint-disable-next-line no-console
             console.warn("[profile-consent] set_consent emit failed:", err);
           });
-          advanceTo("smoke-test");
+          advanceTo("telemetry-consent");
         },
         onToggle: (next) =>
           setState({
             profileConsent: { ...wizardState.profileConsent, consent: next },
+          }),
+        onBack: () => back(),
+      });
+      break;
+    case "telemetry-consent":
+      primary = renderStepTelemetryConsent(wizardState.telemetryConsent, {
+        onContinue: () => {
+          // Phase 34 / SEC-08 — fire-and-forget IPC mirror so the sidecar
+          // persists telemetry_consent: bool to state.json BEFORE the
+          // smoke-test surface mounts. The handler ack is non-blocking;
+          // the radio state is the source of truth in this moment.
+          void emitIpc("ipc.telemetry.set_consent", {
+            consent: wizardState.telemetryConsent.consent,
+          }).catch((err) => {
+            // eslint-disable-next-line no-console
+            console.warn("[telemetry-consent] set_consent emit failed:", err);
+          });
+          advanceTo("smoke-test");
+        },
+        onToggle: (next) =>
+          setState({
+            telemetryConsent: {
+              ...wizardState.telemetryConsent,
+              consent: next,
+            },
           }),
         onBack: () => back(),
       });
