@@ -1,0 +1,67 @@
+# Phase 34 / SEC-09 — Tauri capability snapshot lint.
+#
+# The committed SNAPSHOT.json is the canonical permission set. CI
+# regenerates the snapshot from default.json on every PR and fails if
+# they differ. Adding new capabilities requires updating the snapshot
+# in the same PR + a SECURITY_CAPABILITY_DELTA: block in the PR
+# description.
+
+name: Tauri Capabilities Lint
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tauri/src-tauri/capabilities/**'
+      - 'scripts/dist/snapshot_capabilities.py'
+      - '.github/workflows/capabilities-lint.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tauri/src-tauri/capabilities/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  capabilities-snapshot:
+    name: Snapshot drift check
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check capability snapshot
+        run: |
+          set -euo pipefail
+          python scripts/dist/snapshot_capabilities.py --check
+
+      - name: SECURITY_CAPABILITY_DELTA description gate
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # If the PR touches the capability file at all, the description
+          # must contain a SECURITY_CAPABILITY_DELTA: justification. The
+          # snapshot-check step above already gates *correctness*; this
+          # gate ensures humans review the *intent*.
+          git fetch --depth=1 origin "$BASE" || true
+          if git diff --name-only "$BASE" "$HEAD" 2>/dev/null \
+              | grep -q "tauri/src-tauri/capabilities/"; then
+            if ! echo "${PR_BODY:-}" | grep -q "SECURITY_CAPABILITY_DELTA:"; then
+              echo "::error::PR modifies Tauri capabilities but description is missing 'SECURITY_CAPABILITY_DELTA: <reason>' block."
+              exit 1
+            fi
+            echo "::notice::SECURITY_CAPABILITY_DELTA block present — proceeding."
+          else
+            echo "::notice::No capability changes in this PR."
+          fi

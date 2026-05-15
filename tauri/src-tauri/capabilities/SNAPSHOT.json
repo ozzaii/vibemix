@@ -1,0 +1,72 @@
+{
+  "identifier": "default",
+  "permissions": [
+    "core:app:default",
+    "core:default",
+    "core:event:default",
+    "core:path:default",
+    "core:webview:default",
+    "core:window:allow-start-dragging",
+    "core:window:default",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "positioner:default",
+    "process:default",
+    "store:default",
+    "updater:default",
+    {
+      "allow": [
+        {
+          "args": [
+            {
+              "validator": "^--(wizard|session|debrief)$"
+            },
+            {
+              "validator": "^\\d{8}-\\d{6}$"
+            }
+          ],
+          "name": "binaries/vibemix-core",
+          "sidecar": true
+        }
+      ],
+      "identifier": "shell:allow-execute"
+    },
+    {
+      "allow": [
+        {
+          "path": "$APPDATA/vibemix/recordings/**/*"
+        },
+        {
+          "path": "$APPLOCALDATA/vibemix/recordings/**/*"
+        },
+        {
+          "url": "https://existential.audio/blackhole"
+        },
+        {
+          "url": "https://github.com/bravoh-ai/vibemix"
+        },
+        {
+          "url": "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+        },
+        {
+          "url": "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+        }
+      ],
+      "identifier": "shell:allow-open"
+    },
+    {
+      "allow": [
+        {
+          "path": "$APPLOCALDATA/vibemix/logs/sidecar.log"
+        }
+      ],
+      "identifier": "fs:allow-read-text-file"
+    }
+  ],
+  "windows": [
+    "debrief",
+    "main",
+    "mascot",
+    "overlay-*"
+  ]
+}
