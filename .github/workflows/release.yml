@@ -284,6 +284,19 @@ jobs:
           cargo tauri build --target ${{ matrix.rust_target }}
 
       # ---- Stage 2 + 3 — SIGN + PACKAGE (DMG + notarize + staple) ----------
+      # Phase 38 DIST-15 — Apple notarytool wiring annotation step.
+      # When SIGNING_AVAILABLE != 'true' (Apple Dev secrets absent) the actual
+      # sign step is silently skipped by the gate above. This annotation makes
+      # the skip EXPLICIT in CI logs and points operators at KAAN-ACTION-LEGAL.md
+      # DIST-09 (Francesco-action, legal capacity — Pitfall P46 carveout).
+      - name: SIGN — Apple notarytool wiring annotation (empty-secret skip)
+        if: env.SIGNING_AVAILABLE != 'true'
+        run: |
+          echo "::warning::Apple Dev ID secrets absent — see KAAN-ACTION-LEGAL.md DIST-09 (Francesco-action) + DIST-11. xcrun notarytool step skipped."
+          echo "  expected secrets (Kaan creates after Apple approves):"
+          echo "    APPLE_DEVELOPER_ID_P12_BASE64, APPLE_DEVELOPER_ID_PASSWORD,"
+          echo "    APPLE_TEAM_ID, APPLE_API_KEY_ID, APPLE_API_KEY_ISSUER, APPLE_API_KEY_P8"
+
       - name: SIGN + PACKAGE — codesign / create-dmg / notarytool / stapler
         if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
         env:
