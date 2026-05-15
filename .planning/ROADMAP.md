@@ -147,7 +147,16 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
   5. `debrief.v1` jsonschema is locked additive-only — no breaking changes across v2.1.
 **Critical pitfalls:** P81 (audio format cross-webview parity → MP3 verified on WKWebView + WebView2), P82 (schema lock additive-only).
 **Parallel-with:** P27, P28, P30, P34.
-**Plans:** TBD
+**Plans:** 9 plans (0/9 executed)
+- [ ] 29-00-PLAN.md — Wave 0 unblock: capability allowlist + EvidenceRegistry snapshot + __main__ short-circuit + Wave 0 probes (A1/A3/A5/A7)
+- [ ] 29-01-PLAN.md — Python debrief/ package: chapters / tldr / drills / stripper / persistence / session_loader (DEBRIEF-03/04/06/07)
+- [ ] 29-02-PLAN.md — --debrief sidecar mode + ws_server on 127.0.0.1:8766 + progressive emit (DEBRIEF-08/09)
+- [ ] 29-03-PLAN.md — debrief.v1 schema lock: 5 new wrappers + P82 additive-only baseline gate (DEBRIEF-10)
+- [ ] 29-04-PLAN.md — Rust debrief_window.rs: open_debrief_window command + DebriefSidecarHandle + close-event handler (DEBRIEF-08/09)
+- [ ] 29-05-PLAN.md — Vanilla TS UI: debrief.html + 6 components + WaveSurfer v7.12.7 + CDJ Whisper styling (DEBRIEF-03/04/05/06)
+- [ ] 29-06-PLAN.md — Settings → Recordings Open Debrief 5th button + disable gate (DEBRIEF-11)
+- [ ] 29-07-PLAN.md — Cited-critique stripping integration into TLDR + drills + TS defense-in-depth (DEBRIEF-07 hard gate)
+- [ ] 29-08-PLAN.md — End-to-end smoke + cross-platform verdict (Mac WKWebView + Win WebView2)
 **UI hint:** yes
 
 ### Phase 30: 2 Hard Tek Detectors (DISTORTION_CLIMB + ACID_LINE_ENTRY)
@@ -313,7 +322,7 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
 |-------|----------------|--------|-----------|
 | 27. Eval Harness + Carry-Forward Close-Out | 2/9 | In Progress|  |
 | 28. Library Intelligence v1 | 8/9 | In Progress|  |
-| 29. Post-Session Debrief MVP UI | 0/0 | Not started | — |
+| 29. Post-Session Debrief MVP UI | 0/9 | Planning complete |  |
 | 30. 2 Hard Tek Detectors | 0/0 | Not started | — |
 | 31. 4-Layer Mascot Full Additive | 0/0 | Not started | — |
 | 32. Long-Term DJ Profile | 0/0 | Not started | — |
