@@ -173,3 +173,7 @@ v5-*.png
 # large; copy the relevant CSV under .planning/ if you want it versioned
 # alongside the threshold change it justifies (T-17-06-04 mitigation).
 tuning_runs/
+
+# Phase 36 — Day-1 star sourcing log. Contains personal GitHub handles +
+# contact info; never commit. Protocol lives in scripts/dayzero/seed_stars.md.
+scripts/dayzero/seed_stars.log
