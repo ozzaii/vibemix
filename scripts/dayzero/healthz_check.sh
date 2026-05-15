@@ -29,6 +29,7 @@ INTERVAL=30
 MAX_ITERATIONS=0  # 0 = infinite
 DRY_RUN=0
 ALERT_CMD=""
+WEBHOOK_URL="${DISCORD_WEBHOOK_URL:-}"
 
 usage() {
   cat <<'EOF'
@@ -43,6 +44,8 @@ Options:
   --max-iterations N    Stop after N iterations (0 = infinite, default: 0)
   --dry-run             Synthesize a deterministic alert schedule (no HTTP)
   --alert-cmd CMD       Shell command to invoke on non-200 (optional)
+  --webhook-url URL     Discord webhook URL to POST on non-200
+                        (also read from $DISCORD_WEBHOOK_URL)
   -h | --help           Show this help
 
 Output:
@@ -64,6 +67,8 @@ while [[ $# -gt 0 ]]; do
       DRY_RUN=1; shift ;;
     --alert-cmd)
       ALERT_CMD="$2"; shift 2 ;;
+    --webhook-url)
+      WEBHOOK_URL="$2"; shift 2 ;;
     -h|--help)
       usage; exit 0 ;;
     *)
@@ -104,6 +109,19 @@ while :; do
     if [[ -n "$ALERT_CMD" ]]; then
       # Run via sh -c so multi-word commands work; failures don't terminate the loop.
       sh -c "$ALERT_CMD" || true
+    fi
+    if [[ -n "$WEBHOOK_URL" ]]; then
+      # JSON body — keep the schema flat so Discord renders it as a content message.
+      BODY=$(printf '{"content": "vibemix healthz alert: target=%s status=%s iso=%s"}' \
+        "$TARGET" "$STATUS" "$ISO_TS")
+      if [[ $DRY_RUN -eq 1 ]]; then
+        # Dry-run path — never touch the network. Logged for test assertions.
+        echo "[would-post] webhook=${WEBHOOK_URL} body=${BODY}" >&2
+      else
+        # Live path — failure does not terminate the watchdog loop.
+        curl -s -X POST -H "Content-Type: application/json" \
+          --max-time 10 -d "$BODY" "$WEBHOOK_URL" >/dev/null || true
+      fi
     fi
   else
     echo "[OK] iso=${ISO_TS} target=${TARGET} status=200 iteration=${ITERATIONS}"
