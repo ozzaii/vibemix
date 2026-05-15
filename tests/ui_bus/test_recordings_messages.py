@@ -265,7 +265,7 @@ def test_recordings_events_result_accepts_empty_events_array() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_count_parity_at_55() -> None:
+def test_count_parity_at_63() -> None:
     """Phase 15 Plan 01 bumped the IPC count 27 → 34 (+7 recordings.* families);
     Phase 20-04 added SessionCitation → 35; Phase 24-02 added
     SessionOverlayHighlight → 36; Phase 25 Plan 25-03 added 3 DEBRIEF
@@ -274,6 +274,9 @@ def test_count_parity_at_55() -> None:
     LibrarySimilar*) → 49; Phase 29 Plan 29-03 added 6 DEBRIEF v2.1
     additive wrappers (DebriefChapterList, DebriefTldrAudio, DebriefDrills,
     DebriefCitationTooltipReq, DebriefCitationTooltip, DebriefError) → 55.
+    Phase 32 Plans 32-04..05 added 8 profile.* messages (ProfileSetConsent,
+    ProfileConsentState, ProfileView, ProfileViewResult, ProfileRegenerate,
+    ProfileRegenerateResult, ProfileDelete, ProfileDeleteAck) → 63.
     Both sides — schema oneOf and Python wrapper dataclasses — must match
     exactly.
     """
@@ -287,8 +290,8 @@ def test_count_parity_at_55() -> None:
         and "type" in obj.__dataclass_fields__
     )
 
-    assert len(_SCHEMA["oneOf"]) == 55, "schema oneOf count should be 55 after Plan 29-03"
-    assert wrapper_count == 55, f"wrapper count {wrapper_count} != 55"
+    assert len(_SCHEMA["oneOf"]) == 63, "schema oneOf count should be 63 after Plan 32-05"
+    assert wrapper_count == 63, f"wrapper count {wrapper_count} != 63"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

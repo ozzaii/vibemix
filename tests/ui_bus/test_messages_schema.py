@@ -70,6 +70,15 @@ from vibemix.ui_bus import (
     MetersTriple,
     PermissionCheck,
     PermissionState,
+    # Phase 32 — long-term DJ profile wrappers (PROFILE-04/05/07).
+    ProfileConsentState,
+    ProfileDelete,
+    ProfileDeleteAck,
+    ProfileRegenerate,
+    ProfileRegenerateResult,
+    ProfileSetConsent,
+    ProfileView,
+    ProfileViewResult,
     RecordingSummary,
     RecordingsDelete,
     RecordingsDeleteAck,
@@ -448,6 +457,23 @@ def _make_examples() -> list[tuple[str, object]]:
                 ),
             ),
         ),
+        # Phase 32 / PROFILE-04..07 — long-term DJ profile IPC (8 wrappers).
+        ("ProfileSetConsent", ProfileSetConsent.make(consent=False)),
+        ("ProfileConsentState", ProfileConsentState.make(consent=False)),
+        ("ProfileView", ProfileView.make()),
+        (
+            "ProfileViewResult",
+            ProfileViewResult.make(profile=None, bytes=0, consent=False),
+        ),
+        ("ProfileRegenerate", ProfileRegenerate.make()),
+        (
+            "ProfileRegenerateResult",
+            ProfileRegenerateResult.make(
+                ok=False, profile=None, error="consent_off"
+            ),
+        ),
+        ("ProfileDelete", ProfileDelete.make()),
+        ("ProfileDeleteAck", ProfileDeleteAck.make(ok=True, error=None)),
     ]
 
 
@@ -472,8 +498,11 @@ def test_example_count_matches_schema_oneof() -> None:
     LibrarySimilarResult) → 49. Phase 29 Plan 29-03 adds 6 DEBRIEF v2.1
     additive wrappers (DebriefChapterList, DebriefTldrAudio, DebriefDrills,
     DebriefCitationTooltipReq, DebriefCitationTooltip, DebriefError) → 55.
+    Phase 32 Plans 32-04..05 add 8 profile.* schemas (ProfileSetConsent,
+    ProfileConsentState, ProfileView, ProfileViewResult, ProfileRegenerate,
+    ProfileRegenerateResult, ProfileDelete, ProfileDeleteAck) → 63.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 55
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 63
 
 
 @pytest.mark.parametrize(
@@ -495,14 +524,16 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_55() -> None:
+def test_schema_oneof_count_is_63() -> None:
     """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
     (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
     7 recordings.* families → 34; Phase 20-04 adds 1 (SessionCitation) → 35;
     Phase 24-02 adds 1 (SessionOverlayHighlight) → 36; Phase 25 Plan 25-03
     adds 3 DEBRIEF architectural-slot reservations → 39; Phase 28 Plan 28-09
     adds 10 library.* messages → 49; Phase 29 Plan 29-03 adds 6 DEBRIEF v2.1
-    additive wrappers → 55.
+    additive wrappers → 55; Phase 32 Plans 32-04..05 add 8 profile.*
+    messages (set_consent/consent_state/view/view_result/regenerate/
+    regenerate_result/delete/delete_ack) → 63.
 
     ``definitions`` count grows alongside oneOf since every new wrapper
     adds one entry to both. ``LevelPair`` is a shared helper ref'd from
@@ -510,8 +541,8 @@ def test_schema_oneof_count_is_55() -> None:
     (so it counts in ``definitions`` but not in ``oneOf``); the skew
     between the two counts stays at 1.
     """
-    assert len(_SCHEMA["oneOf"]) == 55
-    assert len(_SCHEMA["definitions"]) == 56
+    assert len(_SCHEMA["oneOf"]) == 63
+    assert len(_SCHEMA["definitions"]) == 64
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:
