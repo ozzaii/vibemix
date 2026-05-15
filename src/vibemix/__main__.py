@@ -35,6 +35,7 @@ import os
 import signal
 import sys
 import threading
+from pathlib import Path
 
 import httpx
 import numpy as np
@@ -91,6 +92,7 @@ from vibemix.audio import (
     VoiceRecorder,
 )
 from vibemix.audio.recorder import sweep_crashed_sessions
+from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
 from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
 from vibemix.runtime.cancel import CancelGate
@@ -666,6 +668,18 @@ async def main() -> None:
         ack_bank=ack_bank,
         playback=playback,
     )
+
+    # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──
+    library_cache = Path.home() / ".cache" / "vibemix" / "library.pkl"
+    if library_cache.exists():
+        lib = RekordboxLibrary()
+        if lib.try_load_cache():
+            registered = evidence_registry.register_library(lib)
+            print(f"-> library: {registered} tracks registered for [track:<id>] citations")
+        else:
+            print("-> library: cache present but failed to load — skipping registration")
+    else:
+        print("-> library: no cache at ~/.cache/vibemix/library.pkl — citations limited to nowplaying-cli")
 
     session = AgentSession(llm=llm_inst, tts=tts_inst)
     session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
