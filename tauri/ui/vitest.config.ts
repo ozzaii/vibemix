@@ -42,9 +42,9 @@ export default defineConfig({
       // pattern as recording-row and friends, needs jsdom for textContent /
       // title-attr / dataset assertions.
       ["src/settings/components/citation-diagnostics.spec.ts", "jsdom"],
-      // Phase 29 Plan 06 — debrief button specs render recording-row;
-      // need jsdom for HTMLElement APIs.
-      ["src/debrief/__tests__/recording-row-*.spec.ts", "jsdom"],
+      // Phase 29 Plans 05+06 — all debrief specs (component renders +
+      // recording-row debrief button) need jsdom for HTMLElement APIs.
+      ["src/debrief/__tests__/*.spec.ts", "jsdom"],
     ],
   },
 });
