@@ -350,6 +350,21 @@ async def main() -> None:
       VIBEMIX_PROXY_BASE_URL = 'https://api.altidus.world' (default)
       VIBEMIX_CLIENT_VERSION = vibemix.__version__ (default)
     """
+    # ----- Phase 34 / SEC-10 — auditable privacy banner -----
+    # Emitted to stderr BEFORE any network activity so a user reading the
+    # sidecar log sees the privacy posture before the proxy /register
+    # call. Telemetry state is read from the persisted ConfigStore.
+    try:
+        from vibemix.runtime.sec_check import print_security_banner
+
+        _cfg = load_config()
+        print_security_banner(
+            telemetry_on=getattr(_cfg, "telemetry_consent", False),
+            version=__version__,
+        )
+    except Exception as _e:  # pragma: no cover — banner must never crash
+        print(f"[sec_check] banner skipped: {_e}", file=sys.stderr)
+
     # ----- Phase 5 mode dispatch -----
     mode = os.environ.get("VIBEMIX_LLM_MODE", "direct").lower()
     proxy_base_url = os.environ.get("VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world")
