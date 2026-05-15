@@ -100,12 +100,12 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
   7. DDJ-FLX4 Sync note disambiguation is locked via autonomous synthetic MIDI replay against fixture synthesized from `cohost_v4.py` `_NOTE_MAP` (POC-confirmed: note 0x60 verified, note 0x58 alt = tentative).
 **Critical pitfalls:** P42 (LLM-judge self-bias → 2-judge cross-check), P43 (corpus overfit → diversity gate, ≥ 3 sets, Hard Tek ≤ 70%), P44 (lenient F1 → substance metric), P45 (cited-but-empty → embedding-relevance), P46 (legal carveout NEVER autonomous → `KAAN-ACTION-LEGAL.md` prep starts here), P48 (`register_library` orphan), P63 (bundle ID lock), P69 (universal2 sidecar — RESEARCH critical correction → target-triple convention not lipo-merge), P70 (WASAPI device change).
 **Parallel-with:** P28, P29, P30, P34.
-**Plans:** 9 plans
-- [ ] 27-01-PLAN.md — Replay Harness Core (EVAL-01 + EVAL-08): scripts/eval/replay_harness.py + AudioBuffer.fill_from_wav + F1 math + scorecard renderer
+**Plans:** 2/9 plans executed
+- [x] 27-01-PLAN.md — Replay Harness Core (EVAL-01 + EVAL-08): scripts/eval/replay_harness.py + AudioBuffer.fill_from_wav + F1 math + scorecard renderer
 - [ ] 27-02-PLAN.md — 2-Judge Cross-Check Architecture (EVAL-02 + EVAL-04 + EVAL-05): Pro+Flash rubrics + Gemini Embedding 2 cited-relevance + VCR cassettes
 - [ ] 27-03-PLAN.md — Corpus Assembly + Diversity Gate (EVAL-03): 6 public-domain DJ sessions + manifest.json + LICENSES.md + git-LFS
 - [ ] 27-04-PLAN.md — Threshold Lock + CI Gate (EVAL-06 + EVAL-07 + EVAL-08 commit lifecycle): autonomous-signed THRESHOLD-LOCK.md + .github/workflows/eval.yml + KAAN-ACTION-LEGAL.md
-- [ ] 27-05-PLAN.md — register_library Wire-In (LIBRARY-09): 5-line patch in __main__.py + invocation test + end-to-end citation test
+- [x] 27-05-PLAN.md — register_library Wire-In (LIBRARY-09): 5-line patch in __main__.py + invocation test + end-to-end citation test
 - [ ] 27-06-PLAN.md — REC-09 Tauri Target-Triple Sidecars (CRITICAL CORRECTION over lipo-merge): build_sidecar.py --target-arch + release.yml matrix + tauri.conf.json5 externalBin
 - [ ] 27-07-PLAN.md — WASAPI IMMNotificationClient Subscription (LATENCY-14): non-blocking COM callback + worker thread soft-restart + macOS stub
 - [ ] 27-08-PLAN.md — 40 Achird OPUS Ack Regeneration (LATENCY-15): scripts/generate_ack_audio.py + manifest.json + AIza scan zero matches
@@ -123,7 +123,16 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
   5. Embedding cost stays under €50/month via 24h query cache + sampled grounding + content-hash dedupe.
 **Critical pitfalls:** P48 (register_library final-mile orphan), P54 (180s embedding cap → 3-excerpt strategy), P55 (Mac/Win top-k divergence), P56 (embedding cost runaway).
 **Parallel-with:** P27, P29, P30, P34.
-**Plans:** TBD
+**Plans:** 9/9 planned
+- [ ] 28-01-PLAN.md — Gemini Embedding 2 client + content-hash cache + shared cosine_topk (LIBRARY-10)
+- [ ] 28-02-PLAN.md — sqlite-vec + numpy store backends + Mac/Win parity gate (LIBRARY-11; Wave 0 ARM64 Win probe)
+- [ ] 28-03-PLAN.md — Vibe-search NL query + 24h cache + CLI subcommand (LIBRARY-12)
+- [ ] 28-04-PLAN.md — Event-gated grounding + DJCoHostAgent citation injection + P48 invocation/E2E tests (LIBRARY-13; Wave 0 Bravoh proxy probe)
+- [ ] 28-05-PLAN.md — Track-to-track similarity USER-ASKED-only (LIBRARY-14; anti-feature regression guard)
+- [ ] 28-06-PLAN.md — Drag-drop import UX + Tauri 2 dedupe + progress bar (LIBRARY-05; vanilla TS)
+- [ ] 28-07-PLAN.md — 30-day staleness nudge + UI banner + 7-day snooze (LIBRARY-15)
+- [ ] 28-08-PLAN.md — Cost projection + runtime telemetry + CI hard gate ≤ €50 (LIBRARY-16; Option B locked)
+- [ ] 28-09-PLAN.md — 10 new IPC schemas on port 8765 + Python/TS codegen parity (LIBRARY-17)
 **UI hint:** yes
 
 ### Phase 29: Post-Session Debrief MVP UI
@@ -302,8 +311,8 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 27. Eval Harness + Carry-Forward Close-Out | 0/9 | Planning complete | — |
-| 28. Library Intelligence v1 | 0/0 | Not started | — |
+| 27. Eval Harness + Carry-Forward Close-Out | 2/9 | In Progress|  |
+| 28. Library Intelligence v1 | 0/9 | Planned (ready to execute) | — |
 | 29. Post-Session Debrief MVP UI | 0/0 | Not started | — |
 | 30. 2 Hard Tek Detectors | 0/0 | Not started | — |
 | 31. 4-Layer Mascot Full Additive | 0/0 | Not started | — |
