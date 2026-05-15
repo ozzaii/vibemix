@@ -16,11 +16,13 @@ from vibemix.library.embed import (
     GEMINI_EMBEDDING_MODEL,
     LibraryEmbedder,
 )
+from vibemix.library.index_numpy import NumpyStore
 from vibemix.library.rekordbox import (
     CuePoint,
     RekordboxLibrary,
     TrackEntry,
 )
+from vibemix.library.store import LibraryStore, open_store, snapshot_hash
 
 __all__ = [
     "CuePoint",
@@ -28,8 +30,12 @@ __all__ = [
     "EXCERPT_STRATEGY_VERSION",
     "GEMINI_EMBEDDING_MODEL",
     "LibraryEmbedder",
+    "LibraryStore",
+    "NumpyStore",
     "RekordboxLibrary",
     "TrackEntry",
     "cosine_topk",
     "l2_normalize",
+    "open_store",
+    "snapshot_hash",
 ]

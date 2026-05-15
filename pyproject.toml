@@ -115,6 +115,7 @@ dependencies = [
     # Pin to >=1.0.0b10 so resolver accepts the published beta; production
     # tracks the latest beta until Microsoft graduates to 1.0.0.
     "winsdk>=1.0.0b10 ; sys_platform == 'win32'",
+    "sqlite-vec>=0.1.9",
 ]
 
 [project.urls]
@@ -200,4 +201,5 @@ markers = [
     "windows_only: requires sys.platform == 'win32' — live tests for the Windows port (Phase 7 Wave 3+, executed in Phase 20 CI matrix)",
     "integration: end-to-end integration tests that spin up real WS servers / clients (Plan 13-08+)",
     "slow: 60-min soak test; runs only via `pytest -m slow` (Phase 15 Plan 06)",
+    "parity: Mac/Win bit-identity gate for the library backend (Phase 28 Plan 02 P55 mitigation)",
 ]
