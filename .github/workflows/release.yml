@@ -210,8 +210,26 @@ jobs:
   # ---------------------------------------------------------------------------
 
   build-macos:
-    name: Build macOS (Apple Silicon)
-    runs-on: macos-14
+    name: Build macOS (${{ matrix.arch }})
+    # Plan 27-06 / REC-09 carry-forward: matrix builds BOTH arm64 + x86_64
+    # PyInstaller sidecars on their native runners so Apple Silicon users
+    # never see the Rosetta translation prompt on first launch (Pitfall P69).
+    # NEVER lipo-merge the two outputs — RESEARCH §Critical Correction:
+    # PyInstaller embeds its PKG archive in only the last merged slice;
+    # the other arch silently segfaults at app launch.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+            target_triple: aarch64-apple-darwin
+            rust_target: aarch64-apple-darwin
+          - arch: x86_64
+            runner: macos-13
+            target_triple: x86_64-apple-darwin
+            rust_target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
     needs: [detect-signing-mode, placeholder-pubkey-gate]
     # `always()` keeps this job alive when placeholder-pubkey-gate is SKIPPED
     # (non-tag push); we only abort when it actually FAILED.
@@ -234,17 +252,28 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.rust_target }}
 
       - name: Install macOS build deps (create-dmg)
         run: |
           brew install create-dmg
 
       # ---- Stage 1 — BUILD --------------------------------------------------
-      - name: BUILD — PyInstaller sidecar via build_sidecar.py
+      - name: BUILD — PyInstaller sidecar via build_sidecar.py (${{ matrix.arch }})
         run: |
           uv sync --frozen
-          uv run python scripts/build_sidecar.py --spec vibemix-core.macos.spec
+          uv run python scripts/build_sidecar.py \
+            --spec vibemix-core.macos.spec \
+            --target-arch ${{ matrix.arch }}
+
+      - name: VERIFY single-arch (Pitfall P69 critical correction)
+        run: |
+          BIN="tauri/src-tauri/binaries/vibemix-core-${{ matrix.target_triple }}/vibemix-core-${{ matrix.target_triple }}"
+          test -f "$BIN" || ( echo "missing artifact: $BIN" && exit 1 )
+          ARCHS=$(lipo -archs "$BIN")
+          test "$ARCHS" = "${{ matrix.arch }}" || \
+            ( echo "REC-09 violation: expected single-arch ${{ matrix.arch }}; got $ARCHS" && exit 1 )
+          echo "OK: $BIN is single-arch ${{ matrix.arch }}"
 
       - name: BUILD — Tauri app (cargo tauri build)
         working-directory: tauri
@@ -252,7 +281,7 @@ jobs:
           npm ci
           npm run build
           cd src-tauri
-          cargo tauri build
+          cargo tauri build --target ${{ matrix.rust_target }}
 
       # ---- Stage 2 + 3 — SIGN + PACKAGE (DMG + notarize + staple) ----------
       - name: SIGN + PACKAGE — codesign / create-dmg / notarytool / stapler
@@ -270,7 +299,7 @@ jobs:
         run: |
           set +x   # secret env vars in scope — never echo
           chmod +x scripts/dist/sign_macos.sh
-          ./scripts/dist/sign_macos.sh tauri/src-tauri/target/release/bundle/macos/vibemix.app
+          ./scripts/dist/sign_macos.sh tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app
 
       # ---- Stage 4 — VERIFY (ALWAYS runs, even in mock-signing) ------------
       - name: VERIFY — AIza scan + key-pattern grep (post-sign or unsigned)
@@ -283,23 +312,28 @@ jobs:
           if [[ "$SIGNING_AVAILABLE" == "true" && "$DRY_RUN" != "true" ]]; then
             TARGET=$(ls dist/vibemix-*.dmg 2>/dev/null | head -1 || echo "")
             if [[ -z "$TARGET" || ! -f "$TARGET" ]]; then
-              TARGET="tauri/src-tauri/target/release/bundle/macos/vibemix.app"
+              TARGET="tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app"
             fi
           else
-            TARGET="tauri/src-tauri/target/release/bundle/macos/vibemix.app"
+            TARGET="tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app"
           fi
           echo "Verifying: $TARGET"
           mkdir -p dist
           uv run python -m scripts.dist.verify_binary "$TARGET" --report dist/verify-report-macos.json
 
       # ---- Stage 5 — UPLOAD artifact for publish job ------------------------
-      - name: Upload macOS artifacts (mock or signed)
+      # Plan 27-06 / REC-09: per-arch artifact name keeps the two matrix
+      # outputs distinct. Publish job downloads both and uploads them as
+      # separate release assets (no lipo-merge — see RESEARCH §Critical
+      # Correction).
+      - name: Upload macOS artifacts (mock or signed) — ${{ matrix.arch }}
         uses: actions/upload-artifact@v4
         with:
-          name: macos-artifacts
+          name: macos-artifacts-${{ matrix.arch }}
           path: |
             dist/vibemix-*.dmg
-            tauri/src-tauri/target/release/bundle/macos/vibemix.app
+            tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app
+            tauri/src-tauri/binaries/vibemix-core-${{ matrix.target_triple }}/
             dist/verify-report-macos.json
           if-no-files-found: warn
           retention-days: 7
@@ -462,8 +496,11 @@ jobs:
           set +x   # private key value must NEVER hit logs
           chmod +x scripts/dist/sign_manifest.sh
           VERSION="${GITHUB_REF#refs/tags/v}"
-          # The DMG basename pattern is locked by sign_macos.sh stage 4.
-          MACOS_DMG=$(ls release-artifacts/macos-artifacts/vibemix-*.dmg 2>/dev/null | head -1)
+          # Plan 27-06 / REC-09: per-arch artifacts live under
+          # release-artifacts/macos-artifacts-arm64/ + macos-artifacts-x86_64/.
+          # Manifest URL points at the arm64 DMG (current default for the
+          # majority of macOS users); v2.2 may add per-arch updater entries.
+          MACOS_DMG=$(ls release-artifacts/macos-artifacts-arm64/vibemix-*.dmg 2>/dev/null | head -1)
           MACOS_BASENAME=$(basename "$MACOS_DMG")
           ./scripts/dist/sign_manifest.sh \
               --version "$VERSION" \
@@ -502,10 +539,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release-artifacts/macos-artifacts/vibemix-*.dmg
+            release-artifacts/macos-artifacts-arm64/vibemix-*.dmg
+            release-artifacts/macos-artifacts-x86_64/vibemix-*.dmg
             release-artifacts/windows-artifacts/vibemix-installer.msi
             release-artifacts/latest.json
-            release-artifacts/macos-artifacts/verify-report-macos.json
+            release-artifacts/macos-artifacts-arm64/verify-report-macos.json
+            release-artifacts/macos-artifacts-x86_64/verify-report-macos.json
             release-artifacts/windows-artifacts/verify-report-windows.json
           # v1 draft → Kaan reviews + clicks Publish manually. v2 can flip
           # to false once fresh-machine rehearsal is wired in Phase 20.
