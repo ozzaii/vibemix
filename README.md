@@ -7,14 +7,16 @@
 <p align="center"><em>An AI co-host for your DJ set. Open source. Mac + Windows.</em></p>
 
 <!-- vibemix:hero-start sha256=PLACEHOLDER path=docs/assets/demo.mp4 -->
-<!-- Phase 35 ASSETS-07: the 30s demo film lands at docs/assets/demo.mp4
-     via Kaan-action (KAAN-ACTION-LEGAL.md ASSETS-DEMO-CUT). Until then
-     the placeholder GIF below renders + the sha256=PLACEHOLDER sentinel
-     keeps scripts/check_readme_hero_hash.py green. When the real asset
-     ships, swap the sentinel for the actual SHA256 and replace the
-     <img> with a <video>. -->
+<!-- Phase 35 ASSETS-07 + Phase 39 SHIP-02: the 30s demo film lands at
+     docs/assets/demo.mp4 via Kaan-action (KAAN-ACTION-LEGAL.md
+     ASSETS-DEMO-CUT). The <video> tag below points at it; until the
+     asset ships, the <img> fallback GIF + the sha256=PLACEHOLDER
+     sentinel keep scripts/check_readme_hero_hash.py green. When the
+     real asset lands, swap the sentinel for the actual SHA256. -->
 <p align="center">
-  <img src="docs/assets/demo-placeholder.gif" alt="vibemix demo (placeholder — real demo coming)" width="720" />
+  <video src="docs/assets/demo.mp4" controls muted playsinline width="720" poster="docs/assets/demo-placeholder.gif">
+    <img src="docs/assets/demo-placeholder.gif" alt="vibemix demo (placeholder — real demo coming)" width="720" />
+  </video>
 </p>
 <!-- vibemix:hero-end -->
 
@@ -61,6 +63,27 @@ vibemix has 3 skill levels × 2 modes. Pick one before each set.
 | **Pro**          | > "That was a stack and a hot-cue trigger inside one bar. Disgusting." <br/> > "BPM jump was tight. Sub stayed in the pocket." | > "You're hitting the same loop tool four tracks in a row. Crowd's reading it." |
 
 Each cell speaks a different vocabulary on purpose. Beginner is encouragement-heavy; Pro assumes you know the language. Coach mode is always past-tense — vibemix won't talk while you're working.
+
+### What's shipped in v2.1
+
+<!-- AUTO-GEN: feature-matrix START — auto-populated by scripts/launch/sync_feature_matrix.py -->
+
+| Phase | Surface | What shipped |
+|---|---|---|
+| 27 | Eval Harness + v2.0 Carry-Forward Close-Out | Autonomous hallucination proxy gate + sidecar universal2 + WASAPI subscription + Achird OPUS render + FLX4 sync sniff + `register_library` 5-min orphan patch |
+| 28 | Library Intelligence v1 | Gemini Embedding 2 + sqlite-vec / numpy fallback · vibe search · "what's playing" grounding · drag-drop UI · 30-day staleness nudge |
+| 29 | Post-Session Debrief MVP UI | Chaptered review · 60–90s voiced TL;DR · 3 drills · clickable timeline · cited critique |
+| 30 | 2 Hard Tek Detectors | `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` (taxonomy completion) |
+| 31 | 4-Layer Mascot Full Additive State Machine | Base + Emotion + Anticipation + Reaction (EXTENDS v2.0, never rewrites) |
+| 32 | Long-Term DJ Profile (~2KB JSON) | Post-session regen + verbatim cache-side inject + content allowlist |
+| 33 | One-Click Install Hardening | TCC pre-grant wizard + BlackHole auto-detect + fresh-VM rehearsal + sidecar polish + first-launch onboarding |
+| 34 | Open-Source Security Pass | Secret scanner + dep CVE + SBOM + STRIDE-lite + signed-binary verify + SECURITY.md + telemetry opt-in default-OFF |
+| 35 | Real GLB Animations + 30s Viral Demo Film | Meshy v6 / Hunyuan3D + Mixamo auto-rig + 5 `prep_*` replacement + ffmpeg 3-beat cut + bundled `demo.mp4` |
+| 36 | Day-Zero Ops Automation | Discord auto-provision + 100 RPS × 5min real load test + pre-seeded star coordination + launch trigger sequence + healthz live |
+| 37 | Cross-Phase Integration Audit Gate | `tests/e2e/test_seam_*` + integration audit script + orphan inventory + grey-area decision log |
+| 38 | Signing Pipeline Real Execution | Apple notarytool + SignPath GH Action wired with real secrets + post-sign verifier + Kaan local rehearsal script |
+
+<!-- AUTO-GEN: feature-matrix END -->
 
 ---
 
