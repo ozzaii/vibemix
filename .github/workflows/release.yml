@@ -416,6 +416,20 @@ jobs:
           retention-days: 1
 
       # ---- Stage 2 — SIGN (SignPath OSS flow per Plan 18-03) ---------------
+      # Phase 38 DIST-16 — SignPath wiring annotation step.
+      # When SIGNING_AVAILABLE != 'true' the SignPath submission step is silently
+      # skipped. This annotation makes the skip EXPLICIT and points operators at
+      # KAAN-ACTION-LEGAL.md DIST-11 (Kaan-action — SignPath OSS Foundation
+      # application has a ~1-week SLA from submission; Pitfall P46 carveout).
+      - name: SIGN — SignPath wiring annotation (empty-secret skip)
+        if: env.SIGNING_AVAILABLE != 'true'
+        shell: pwsh
+        run: |
+          Write-Host "::warning::SignPath approval pending — see KAAN-ACTION-LEGAL.md DIST-11 (Kaan-action). signpath/github-action-submit-signing-request step skipped."
+          Write-Host "  expected secrets (Kaan creates after SignPath approves):"
+          Write-Host "    SIGNPATH_API_TOKEN, SIGNPATH_ORGANIZATION_ID,"
+          Write-Host "    SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG"
+
       - name: SIGN — Submit signing request to SignPath
         if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
         uses: signpath/github-action-submit-signing-request@v1.2.0
