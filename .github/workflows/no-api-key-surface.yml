@@ -1,0 +1,48 @@
+# Phase 33 / Plan 33-09 / INSTALL-09 — API-key entry surface gate.
+#
+# Memory rule (project_one_click_install_hard_req): vibemix NEVER ships
+# a UI surface that accepts a Gemini API key from the user. The proxy
+# sits at Bravoh and rate-limits per client. There is no key entry,
+# no settings field, no env-var prompt.
+#
+# This workflow greps the UI source tree (vanilla TS + HTML) for any
+# input / label / placeholder that captures a Gemini API key. Any
+# match fails the PR with file:line.
+
+name: No API Key Surface
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tauri/ui/**'
+      - 'tests/security/test_no_api_key_surface.py'
+      - '.github/workflows/no-api-key-surface.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tauri/ui/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-api-key-surface:
+    name: No API key surface (INSTALL-09)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Grep gate
+        run: |
+          set -euo pipefail
+          python -m pytest tests/security/test_no_api_key_surface.py -v
