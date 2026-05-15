@@ -87,11 +87,17 @@ def verify(artifact: Path, expected_sha256: str | None = None) -> VerifyResult:
         notes.append(f"no expected sha256 supplied (computed only): {actual[:16]}")
 
     signed_mac = signed_win = False
-    if artifact.suffix.lower() in {".dmg", ".pkg"} or "darwin" in str(artifact).lower():
+    is_mac_artifact = (
+        artifact.suffix.lower() in {".dmg", ".pkg"} or "darwin" in str(artifact).lower()
+    )
+    is_win_artifact = (
+        artifact.suffix.lower() in {".msi", ".exe"} or "windows" in str(artifact).lower()
+    )
+    if is_mac_artifact:
         signed_mac = _scan_macho_for_codesign(artifact)
         if not signed_mac:
             notes.append("macOS signing artifact missing — Phase 38 will wire")
-    if artifact.suffix.lower() in {".msi", ".exe"} or "windows" in str(artifact).lower():
+    if is_win_artifact:
         signed_win = _scan_pe_for_authenticode(artifact)
         if not signed_win:
             notes.append("Windows signing artifact missing — Phase 38 will wire")
@@ -105,6 +111,22 @@ def verify(artifact: Path, expected_sha256: str | None = None) -> VerifyResult:
     )
 
 
+def is_signed_for_platform(result: VerifyResult) -> bool:
+    """Return True iff the artifact carries the expected signing surface.
+
+    Phase 38 DIST-17 — used by the release-publish gate. A `.dmg`/`.pkg` MUST
+    return signed_mac=True; a `.msi`/`.exe` MUST return signed_win=True. For
+    artifacts of unknown type we pass (avoids false positives on .json reports).
+    """
+    suffix = result.artifact.suffix.lower()
+    path_str = str(result.artifact).lower()
+    if suffix in {".dmg", ".pkg"} or "darwin" in path_str:
+        return result.signed_mac
+    if suffix in {".msi", ".exe"} or "windows" in path_str:
+        return result.signed_win
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--artifact", type=Path, required=False,
@@ -112,6 +134,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--expected-sha256", type=str, default=None)
     p.add_argument("--skip-if-missing", action="store_true",
                    help="exit 0 with ::notice:: if artifact is missing")
+    p.add_argument("--require-signed", action="store_true",
+                   help="Phase 38 DIST-17 — exit 1 if signing surface missing "
+                        "for the artifact's platform (release-publish gate).")
     args = p.parse_args(argv)
 
     if args.artifact is None or not args.artifact.exists():
@@ -135,6 +160,15 @@ def main(argv: list[str] | None = None) -> int:
         "signed_win": result.signed_win,
         "notes": result.notes,
     }, indent=2))
+
+    if args.require_signed and not is_signed_for_platform(result):
+        print(
+            "::error::verify_signed: --require-signed set but artifact lacks "
+            f"signing surface (signed_mac={result.signed_mac}, "
+            f"signed_win={result.signed_win}). Publish blocked (DIST-17)."
+        )
+        return 1
+
     return 0
 
 
