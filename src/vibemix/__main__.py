@@ -923,10 +923,14 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_similar.add_argument("--k", type=int, default=10)
     sp_similar.set_defaults(func=_cmd_library_similar)
 
-    # Plan 28-08 — budget (placeholder until plan ships)
+    # Plan 28-08 — budget telemetry + projection
     sp_budget = sub.add_parser(
         "budget", help="Show monthly Gemini Embedding cost projection"
     )
+    sp_budget.add_argument(
+        "--dau", type=int, default=1000, help="daily-active users (default 1000)"
+    )
+    sp_budget.add_argument("--json", action="store_true")
     sp_budget.set_defaults(func=_cmd_library_budget)
 
 
@@ -1068,14 +1072,51 @@ def _cmd_library_similar(args: argparse.Namespace) -> int:
 
 
 def _cmd_library_budget(args: argparse.Namespace) -> int:
-    """Plan 28-08 — monthly Gemini Embedding cost projection."""
+    """Plan 28-08 — monthly Gemini Embedding cost projection + telemetry."""
     import json as _json
+    from dataclasses import asdict as _asdict
 
-    from vibemix.library.budget import project_monthly_cost
+    from vibemix.library.budget import (
+        BUDGET_CEILING_EUR,
+        get_telemetry,
+        project_monthly_cost,
+    )
 
-    projection = project_monthly_cost()
-    _json.dump(projection, sys.stdout, indent=2)
-    sys.stdout.write("\n")
+    p = project_monthly_cost(dau=args.dau)
+    tel = get_telemetry()
+
+    if getattr(args, "json", False):
+        _json.dump(
+            {
+                "projection": _asdict(p),
+                "telemetry": tel.as_dict(),
+                "dau": args.dau,
+            },
+            sys.stdout,
+            indent=2,
+        )
+        sys.stdout.write("\n")
+        return 0
+
+    print(f"\nPhase 28 Cost Projection @ DAU={args.dau}\n")
+    print(f"  Feature                         Monthly (EUR)")
+    print(f"  One-time library indexing       {p.indexing_eur:>8.2f}")
+    print(f"  Vibe-search NL queries          {p.vibe_search_eur:>8.2f}")
+    print(f'  "What\'s playing" grounding      {p.grounding_eur:>8.2f}')
+    print(f"  Track-to-track similarity       {p.similar_eur:>8.2f}")
+    print(f"  Session-end retrieval embed     {p.session_retrieval_eur:>8.2f}")
+    print(f"  ────────────────────────────────────────────")
+    print(f"  Total                           {p.total_eur:>8.2f}")
+    print(f"  Ceiling                         {p.ceiling_eur:>8.2f}")
+    print(f"  Under budget                    {p.under_budget}")
+    print()
+    print("Runtime telemetry (this process):")
+    td = tel.as_dict()
+    print(f"  audio_embeds:               {td['audio_embeds']}")
+    print(f"  text_embeds:                {td['text_embeds']}")
+    print(f"  cache_hits:                 {td['cache_hits']}")
+    print(f"  current_cost_estimate_eur:  {td['current_cost_estimate_eur']:.4f}")
+    print(f"  cost_warning_active:        {td['cost_warning_active']}")
     return 0
 
 

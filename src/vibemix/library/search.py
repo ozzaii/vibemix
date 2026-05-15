@@ -110,6 +110,9 @@ def vibe_search(
             result_json, ts = row
             if (time.time() - float(ts)) < QUERY_CACHE_TTL:
                 cached = json.loads(result_json)
+                # Plan 28-08 — query cache hit telemetry.
+                from vibemix.library.budget import get_telemetry as _gt
+                _gt().increment_cache_hit()
                 return (
                     [VibeSearchResult(**d) for d in cached],
                     True,

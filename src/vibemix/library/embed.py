@@ -194,6 +194,9 @@ class LibraryEmbedder:
         cached = self._cache_get(key)
         if cached is not None:
             logger.debug("LibraryEmbedder cache hit: %s", track.track_id)
+            # Plan 28-08 — telemetry.
+            from vibemix.library.budget import get_telemetry as _gt
+            _gt().increment_cache_hit()
             return cached
 
         local_path: Path | None = None
@@ -363,6 +366,9 @@ class LibraryEmbedder:
             ),
         )
         values = list(result.embeddings[0].values)
+        # Plan 28-08 — runtime cost telemetry.
+        from vibemix.library.budget import get_telemetry as _gt
+        _gt().increment_audio_embed()
         return np.asarray(values, dtype=np.float32)
 
     def _call_gemini_text(self, text: str) -> np.ndarray:
@@ -379,6 +385,9 @@ class LibraryEmbedder:
             ),
         )
         values = list(result.embeddings[0].values)
+        # Plan 28-08 — runtime cost telemetry.
+        from vibemix.library.budget import get_telemetry as _gt
+        _gt().increment_text_embed()
         return np.asarray(values, dtype=np.float32)
 
     # ─── Internal: text-only signature & cache key ────────────────────────

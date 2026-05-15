@@ -30,6 +30,13 @@ from vibemix.library.grounding import (
     Grounding,
     identify_playing,
 )
+from vibemix.library.budget import (
+    BUDGET_CEILING_EUR,
+    BudgetTelemetry,
+    CostProjection,
+    get_telemetry,
+    project_monthly_cost,
+)
 from vibemix.library.search import (
     QUERY_CACHE_TTL,
     VibeSearchResult,
@@ -47,8 +54,11 @@ from vibemix.library.staleness import (
 from vibemix.library.store import LibraryStore, open_store, snapshot_hash
 
 __all__ = [
+    "BUDGET_CEILING_EUR",
+    "BudgetTelemetry",
     "CITATION_THRESHOLD",
     "Citation",
+    "CostProjection",
     "CuePoint",
     "EMBEDDING_DIM",
     "EXCERPT_STRATEGY_VERSION",
@@ -73,7 +83,9 @@ __all__ = [
     "is_snoozed",
     "is_stale",
     "l2_normalize",
+    "get_telemetry",
     "open_store",
+    "project_monthly_cost",
     "similar_to",
     "snapshot_hash",
     "vibe_search",

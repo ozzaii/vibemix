@@ -123,6 +123,9 @@ def identify_playing(
             contents=[_types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)],
             config=_types.EmbedContentConfig(output_dimensionality=768),
         )
+        # Plan 28-08 — grounding audio embed telemetry.
+        from vibemix.library.budget import get_telemetry as _gt
+        _gt().increment_audio_embed()
         from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
 
         vec = np.asarray(
