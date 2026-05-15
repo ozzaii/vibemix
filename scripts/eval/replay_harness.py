@@ -43,8 +43,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# CONTEXT EVAL-01 default thresholds. Plan 04 will replace with a parser of
-# eval/THRESHOLD-LOCK.md frontmatter; this plan consumes the dict only.
+# CONTEXT EVAL-06 default thresholds — kept inline for Plan 27-01 ergonomics;
+# Plan 27-04's --threshold-lock arg overrides via eval/THRESHOLD-LOCK.md.
 DEFAULT_THRESHOLDS: dict[str, float] = {
     "f1_min": 0.80,
     "substance_min": 0.65,
@@ -52,6 +52,22 @@ DEFAULT_THRESHOLDS: dict[str, float] = {
     "bypass_max": 0.15,
     "per_genre_f1_min": 0.70,
 }
+
+
+def _load_thresholds(lock_path: Path | None) -> dict[str, float]:
+    """Plan 27-04 wire-in: load thresholds from THRESHOLD-LOCK.md when present."""
+    if lock_path is None:
+        return DEFAULT_THRESHOLDS
+    from scripts.eval.threshold_lock import parse_threshold_lock_frontmatter
+
+    parsed = parse_threshold_lock_frontmatter(lock_path)
+    thresholds = parsed.get("thresholds", {})
+    if not isinstance(thresholds, dict) or not thresholds:
+        return DEFAULT_THRESHOLDS
+    # Merge: lock values override defaults; missing keys fall back.
+    out = dict(DEFAULT_THRESHOLDS)
+    out.update({k: float(v) for k, v in thresholds.items()})
+    return out
 
 # Hard cap per session WAV — 300 MB. Defensive against an over-sized corpus
 # entry triggering a process-OOM during fill_from_wav (T-27-01-04).
@@ -299,7 +315,8 @@ async def _run(args: argparse.Namespace) -> int:
         # Still write empty artifacts so downstream tooling has them.
         from scripts.eval.scorecard import render_scorecard
 
-        md, data = render_scorecard([], DEFAULT_THRESHOLDS)
+        empty_thresholds = _load_thresholds(args.threshold_lock)
+        md, data = render_scorecard([], empty_thresholds)
         (output / "eval_report.json").write_text(
             json.dumps(data, indent=2), encoding="utf-8"
         )
@@ -315,7 +332,8 @@ async def _run(args: argparse.Namespace) -> int:
 
     from scripts.eval.scorecard import render_scorecard
 
-    md, data = render_scorecard(list(results), DEFAULT_THRESHOLDS)
+    thresholds = _load_thresholds(args.threshold_lock)
+    md, data = render_scorecard(list(results), thresholds)
     (output / "eval_report.json").write_text(
         json.dumps(data, indent=2), encoding="utf-8"
     )
