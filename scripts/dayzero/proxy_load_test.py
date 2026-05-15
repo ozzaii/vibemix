@@ -5,7 +5,8 @@ Fires N concurrent HTTPS requests/second at a target URL for M seconds
 and reports min/median/p95/p99 latency, error rate, and a pass/fail verdict
 against p99<budget + error_rate<budget gates.
 
-Default target: https://api.altidus.world/vibemix/healthz
+Default target: local-mock (autonomous safety — never DDOS prod).
+Switch to live with --target https://api.altidus.world/vibemix/healthz.
 Default profile: 100 RPS × 300s × 20 concurrent in-flight.
 
 Run modes:
@@ -27,12 +28,19 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
+import pathlib
 import random
 import statistics
 import sys
 import time
 from dataclasses import dataclass, asdict
 from typing import Optional
+
+
+# Sentinel target value — never resolves to a real network call.
+LOCAL_MOCK_TARGET: str = "local-mock"
+LOCAL_MOCK_ENDPOINT: str = "http://127.0.0.1:0/mock"
 
 try:
     import httpx
@@ -257,8 +265,12 @@ def _build_argparser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--target",
-        default="https://api.altidus.world/vibemix/healthz",
-        help="Target URL (default: %(default)s)",
+        default=LOCAL_MOCK_TARGET,
+        help=(
+            "Target URL or 'local-mock' (default: local-mock — never hits the "
+            "network). Use --target https://api.altidus.world/vibemix/healthz "
+            "for live runs."
+        ),
     )
     p.add_argument("--rps", type=int, default=100, help="Requests per second (default: 100)")
     p.add_argument(
@@ -302,7 +314,40 @@ def _build_argparser() -> argparse.ArgumentParser:
         action="store_true",
         help="Emit machine-readable JSON summary on stdout",
     )
+    p.add_argument(
+        "--artifact-dir",
+        default=None,
+        help=(
+            "Directory to write the verdict JSON artifact "
+            "(default: .planning/eval-runs/ if present)"
+        ),
+    )
+    p.add_argument(
+        "--no-artifact",
+        action="store_true",
+        help="Skip writing the verdict JSON artifact",
+    )
     return p
+
+
+def _resolve_artifact_dir(arg_dir: Optional[str]) -> Optional[pathlib.Path]:
+    """Locate the artifact directory. Returns None if unavailable."""
+    if arg_dir:
+        return pathlib.Path(arg_dir)
+    cwd = pathlib.Path.cwd()
+    candidate = cwd / ".planning" / "eval-runs"
+    if candidate.is_dir():
+        return candidate
+    return None
+
+
+def write_artifact(verdict: "Verdict", artifact_dir: pathlib.Path) -> pathlib.Path:
+    """Write the verdict JSON artifact to `artifact_dir`. Returns the path."""
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    ts = int(time.time())
+    out = artifact_dir / f"loadtest_{ts}.json"
+    out.write_text(json.dumps(asdict(verdict), indent=2))
+    return out
 
 
 def _format_human_report(v: Verdict) -> str:
@@ -329,7 +374,15 @@ def _format_human_report(v: Verdict) -> str:
 def main(argv: Optional[list[str]] = None) -> int:
     args = _build_argparser().parse_args(argv)
 
-    if args.dry_run:
+    # `local-mock` target always runs synthetic samples (autonomous safety).
+    is_local_mock = args.target == LOCAL_MOCK_TARGET
+    if is_local_mock and not args.dry_run:
+        print(
+            "[local-mock] synthesizing samples — never hits the network",
+            file=sys.stderr,
+        )
+
+    if args.dry_run or is_local_mock:
         print(
             f"[dry-run] synthesizing {int(args.rps * args.duration)} samples "
             f"(seed={args.dry_run_seed})",
@@ -368,6 +421,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(json.dumps(asdict(verdict)))
     else:
         print(_format_human_report(verdict))
+
+    # Persist the verdict artifact unless explicitly suppressed.
+    if not args.no_artifact:
+        artifact_dir = _resolve_artifact_dir(args.artifact_dir)
+        if artifact_dir is None:
+            print(
+                "[artifact] skipped — .planning/eval-runs/ not found "
+                "(pass --artifact-dir to override)",
+                file=sys.stderr,
+            )
+        else:
+            out = write_artifact(verdict, artifact_dir)
+            print(f"[artifact] wrote {out}", file=sys.stderr)
 
     return 0 if verdict.verdict == "PASS" else 1
 
