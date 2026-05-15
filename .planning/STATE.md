@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: The Unified Cut
-status: executing
-last_updated: "2026-05-15T13:33:01.623Z"
-last_activity: 2026-05-15 -- Phase 29 Wave 1 complete (Plan 29-00, 12 tests + 199 regression pass); Waves 2-7 pending — resume via /gsd:execute-phase 29
+status: shipped (tech_debt)
+last_updated: "2026-05-16T00:30:00Z"
+last_activity: 2026-05-16 -- v2.1 archived via /gsd:complete-milestone — 13 phases (27-39) shipped engineering-green; 105/105 REQ-IDs engineering-satisfied; 15 KAAN-ACTION-LEGAL carveouts deferred (legal capacity + customer-facing publish + real-hardware + real-asset + post-approval); local annotated git tag v2.1.0 created. Next: /gsd:new-milestone for v2.2.
 progress:
   total_phases: 13
-  completed_phases: 2
-  total_plans: 27
-  completed_plans: 19
-  percent: 16
+  completed_phases: 13
+  total_plans: 96
+  completed_plans: 96
+  percent: 100
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-14 — v2.1 "The Unified Cut" roadmap created. 13 phases (27–39) scaffolded from `.planning/research/v2-1/SUMMARY.md`. 105 v2.1 REQ-IDs mapped 100% across phases. Phase 27 entry-ready (parallel cluster A with 28 + 29 + 30 + 34).
+**Last updated:** 2026-05-16 — v2.1 "The Unified Cut" SHIPPED + archived. 13 phases (27–39) engineering-complete. 105/105 v2.1 REQ-IDs engineering-satisfied. 15 carveouts in `KAAN-ACTION-LEGAL.md` (NEVER autonomously discharged per `gsd-autonomous fully` mode). No active milestone — run `/gsd:new-milestone` to scaffold v2.2.
 
 ---
 
@@ -23,121 +23,115 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 29 — post-session-debrief-mvp-ui
-- **Last shipped:** v2.0 Research-Driven Ship — 2026-05-14 (status: `tech_debt` accepted).
+- **Current focus:** _none active_ — v2.1 archived, awaiting `/gsd:new-milestone` v2.2.
+- **Last shipped:** v2.1 The Unified Cut — 2026-05-16 (status: `tech_debt` accepted).
 - **Project mode:** standard.
 - **Granularity:** fine.
 - **Model profile:** quality (all agents on Opus, all checkpoints on).
-- **Autonomy mode:** `gsd-autonomous fully` — every blocker + human-needed item discharged autonomously, only privacy rule + destructive risk + legal-capacity carveouts (Apple Dev Agreement + SignPath OSS) still pause. Phase 16 ear-test memory override accepted for v2.1 only (autonomous proxy gate via Phase 27 substitutes).
+- **Autonomy mode:** `gsd-autonomous fully` — every blocker + human-needed item discharged autonomously, only privacy rule + destructive risk + legal-capacity carveouts (Apple Dev Agreement + SignPath OSS) still pause.
 
 ---
 
 ## Current Position
 
-Phase: 29 (post-session-debrief-mvp-ui) — EXECUTING (Wave 1 of 7 done)
-Plan: 1 of 9 complete (29-00); 29-01/02/03/04/05/06/07/08 pending
-Status: Executing Phase 29 — Wave 2 next (29-01 + 29-03 parallel)
-Last activity: 2026-05-15 -- Wave 1 (Plan 29-00 Wave 0 unblock) complete: capability allowlist + EvidenceRegistry snapshot + __main__.py short-circuit verification + 8 fixtures + A1/A3/A5/A7 probe verdicts. A5 + A7 deferred to KAAN-ACTION-PROXY.md (autonomous fallbacks documented). Resume via `/gsd:execute-phase 29` — picks up at Wave 2.
+Phase: _none active_ (v2.1 closed)
+Plan: _none active_
+Status: Milestone v2.1 archived; no active phase. Awaiting `/gsd:new-milestone` to scaffold v2.2.
+Last activity: 2026-05-16 -- /gsd:complete-milestone executed. `.planning/milestones/v2.1-ROADMAP.md` + `v2.1-REQUIREMENTS.md` + `v2.1-MILESTONE-AUDIT.md` archived; ROADMAP.md collapsed; PROJECT.md updated; v2.1.0 annotated git tag created LOCAL ONLY (not pushed — Kaan publishes when ready).
 
 ## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
 | Phases complete (v0.1.0) | 14 / 14 |
-| Phases complete (v2.0) | 10 / 12 code-shipped (2 deferred to Kaan-action: P15-04 UAT + P16 ear-test) |
-| Phases complete (v2.1) | 0 / 13 |
-| Plans complete (v2.1) | 0 / 0 (planning not started) |
+| Phases complete (v2.0) | 10 / 12 code-shipped (2 deferred to Kaan-action) |
+| Phases complete (v2.1) | 13 / 13 engineering-green (4 carry `human_needed` carveouts: Phase 33 / 35 / 38 / 39) |
+| Plans complete (v2.1) | 96 / 96 |
 | v2.0 REQ-IDs mapped | 94 / 94 ✓ (archived) |
-| v2.0 REQ-IDs satisfied end-to-end | 56 / 94 (60%) + 25 satisfied-at-primitive Kaan/external pending + 13 unwired-self-contained |
 | v2.1 REQ-IDs mapped | 105 / 105 ✓ (100% coverage, no orphans) |
-| v2.1 REQ-IDs satisfied | 0 / 105 (execution not started) |
-| v2.0 tests at close | 1961 passed / 10 pre-existing fail / 7 skipped (0 v2.0 regressions) |
-| Critical pitfalls (v2.1) tracked | 11 critical (P42–P52) + 41 v2.0 carry-forward + 35 high/medium (P53–P88) mapped to phases |
-| Estimated wall-clock to RC | 5–7 weeks of focused engineering |
+| v2.1 REQ-IDs engineering-satisfied | 105 / 105 (100%) |
+| v2.1 carveouts deferred to KAAN-ACTION-LEGAL | 15 (legal-capacity P46 × 2 + customer-facing publish × 6 + real-hardware × 4 + real-asset × 2 + post-approval × 1) |
+| v2.1 cross-phase integration seams WIRED | 5 / 5 |
+| v2.1 phase-scope tests added | 633 (on top of v2.0 1961 baseline) |
+| v2.1 commits since `v2.0` tag | 225 |
+| v2.1 LOC delta | +114,845 / -69,617 across 947 files (net ~+45k) |
+| v2.1 git tag | `v2.1.0` (annotated, LOCAL ONLY — not pushed) |
 
 ---
 
 ## Accumulated Context
 
-### Decisions Locked (v2.1 — new this milestone)
+### Decisions Locked (v2.1 — shipped)
 
-- **Phase numbering CONTINUES** from v2.0 — v2.1 starts at Phase 27 (v2.0 closed at Phase 26). No `--reset-phase-numbers`.
-- **13-phase decomposition P27–P39** with build-order: parallel cluster A (27+28+29+30+34) → sequential B (31→32→35) → external-gated (38→33→36) → ship prep (37→39).
-- **`gsd-autonomous fully` mode** — every Kaan-action item discharged autonomously EXCEPT two legal-capacity carveouts (Apple Developer Program Agreement update + SignPath OSS Foundation application). Pitfall P46 encodes this — CI bash audit grep against POST/PUT to apple/signpath endpoints catches autonomous-discharge attempts.
-- **Phase 16 ear-test memory override accepted for v2.1 only** — Phase 27 autonomous hallucination-proxy gate (2-judge cross-check + corpus diversity + substance metric + cited-but-irrelevant filter + F1) substitutes for Kaan-ear-only test. Override expires post-v2.1.
-- **3 new runtime deps total** for v2.1: `sqlite-vec==0.1.9` (carry-forward from v2.0 — Mac only, Win numpy fallback), `wavesurfer.js ^7.10` (npm), `tauri-plugin-macos-permissions = "2.3.0"` (Rust crate). Net bundle delta <1 MB; ~10 dev/CI-only adds. Bundle stays at ~201 MB vs 350 MB hard cap.
-- **Critical path = external approvals**, not engineering. Day-1 action: file SignPath OSS Foundation application + start Apple Developer Program Agreement update prep in parallel with Phase 27 execution. Engineering parallelism absorbs slack.
-- **No architectural redesign in v2.1.** 3-process Tauri-shell + Python-sidecar + FastAPI-proxy model is locked. Every v2.1 feature lands via EXTEND / DOCK-TO-SLOT / NEW out-of-band — no new processes, no new buses (ports 8765 live + 8766 debrief stay).
-- **Phase 31 4-layer mascot = ADDITIVE EXTENSION, not rewrite** (Pitfall P47). All v2.0 mascot tests port verbatim; priority-70 + 2.5s timeout + cancel-aware + linter-strip-aware preserved by exact test name.
-- **Phase 28 closes v2.0 `register_library` final-mile orphan** (Pitfall P48) — invocation test + end-to-end live citation test + Phase 37 fresh-VM smoke required for "WIRED" verdict.
-- **DJ profile NEVER per-turn prompt prefix** — lives in `GeminiContextCache` to preserve 1024-token floor (Pitfall P60). Content allowlist + jsonschema `additionalProperties: false` blocks track titles + free-form strings (Pitfall P51).
-- **POC files (`cohost*.py`, `mascot.html`) UNTOUCHED across every v2.1 phase** — `test_g5_poc_files_untouched.py` extended with v2.1 modified-files allowlist (Phase 37 AUDIT-07).
+- **Phase numbering CONTINUED** from v2.0 — v2.1 closed at Phase 39. v2.2 starts at Phase 40 (no `--reset-phase-numbers`).
+- **13-phase decomposition P27–P39** with build-order: parallel cluster A (27+28+29+30+34) → sequential B (31→32→35) → external-gated (38→33→36) → ship prep (37→39). Executed as planned.
+- **`gsd-autonomous fully` mode** applied at milestone close — every Kaan-action item discharged autonomously EXCEPT two legal-capacity carveouts (DIST-09 + DIST-11). P46 hard rule + CI Bash + PowerShell audit grep enforces.
+- **Phase 16 ear-test memory override accepted for v2.1 only** — Phase 27 autonomous proxy gate substituted. Override EXPIRES post-v2.1 (P85 enforced in Phase 39-08). v2.2 must re-route hallucination-gate strategy.
+- **Universal2 sidecar = target-triple convention NOT lipo-merge** — research-corrected (Phase 27-06); eliminates Rosetta prompt on Apple Silicon.
+- **Phase 31 4-layer mascot = ADDITIVE EXTENSION** (P47) — all v2.0 mascot tests port verbatim; grep gate enforces.
+- **DJ profile NEVER per-turn prompt prefix** (P60) — lives in `GeminiContextCache`; jsonschema `additionalProperties: false` blocks track titles (P51); default-OFF consent.
+- **Track-to-track similarity USER-ASKED-only** (LIBRARY-14 anti-feature guard) — physically gated to CLI + `ipc.library.similar_request`; never auto-surfaces.
+- **POC files BYTE-IDENTICAL to v2.0 tag** — `cohost*.py`, `mascot.html`, `cohost.streaming.py.bak`; Phase 37-06 immutability gate enforces.
+- **Honest RC labeling** — `v2.1.0-rc1` not premature `v1.0.0`; v1.0.0 decision deferred to Kaan post-2-week bake (SHIP-V1-DECISION).
 
-### Decisions Locked (v0.1.0 + v2.0 carry-forward — see prior STATE.md history)
+### Decisions Locked (v0.1.0 + v2.0 — see prior STATE.md history)
 
 All Phase 1–26 decisions remain locked. Highlights:
 
 - 3-process architecture (Tauri shell + Python sidecar + FastAPI proxy on `api.altidus.world`).
-- Bundle ID `world.bravoh.vibemix` LOCKED — TCC permissions break on any change (Pitfall P63).
-- AIza leak gate held: 0 / 482 files match at v2.0 close; v2.1 new bundled assets (40 Achird OPUS, Gemini Embedding 2 caches, real GLBs, mascot-pipeline outputs) re-scan and must stay 0.
+- Bundle ID `world.bravoh.vibemix` LOCKED (Pitfall P63) — Phase 33-07 CI grep enforces.
+- AIza leak gate held: 0 / 482 files match at v2.0 close + 0 new bytes in v2.1 (gitleaks Phase 34-01).
 - macOS 12.3+ / Windows 10/11. Linux excluded.
 - Apache 2.0 + DCO license; signing via Apple Developer ID + SignPath OSS.
 - Gemini-only AI (no Anthropic / OpenAI / Ollama / CLAP / OpenL3 / MERT / sentence-transformers / torch).
-- Three.js (single 3D engine); vanilla TS in `tauri/ui/src/` (NOT React); WaveSurfer.js for Phase 29 timeline.
+- Three.js (single 3D engine); vanilla TS in `tauri/ui/src/` (NOT React); WaveSurfer.js for Phase 29 debrief timeline.
 
-### Open To-dos
+### Deferred Items (15 carveouts — KAAN-ACTION-LEGAL.md)
 
-**v2.1 day-1 unblock actions:**
+Categorized per `gsd-autonomous fully` mode at milestone close 2026-05-16:
 
-- **File SignPath OSS Foundation application** (Kaan-action) on day 1 — ~1-week SLA. Lives in `.planning/phases/38-signing-pipeline-real-execution/KAAN-ACTION-LEGAL.md` once Phase 38 scaffolds.
-- **Start Apple Developer Program Agreement update prep** (Francesco-action) on day 1 — Issuer ID `3f60cc6b-df70-4ff8-9ceb-865dac6c1b4b` already supplied 2026-05-14.
-- **Run `/gsd-plan-phase 27`** to plan Phase 27 — foundation cluster's anchor.
-
-**v2.1 parallel cluster A phases (planning-ready):**
-
-- Phase 27 — Eval Harness + Carry-Forward Close-Out (no v2.1 prereqs)
-- Phase 28 — Library Intelligence v1 (closes v2.0 register_library orphan; needs Phase 25 surface — shipped)
-- Phase 29 — Post-Session Debrief MVP UI (docks into v2.0 DEBRIEF slot — shipped)
-- Phase 30 — 2 Hard Tek Detectors (extends v2.0 GenreRouter — shipped)
-- Phase 34 — Open-Source Security Pass (extends v2.0 CI scaffold — shipped)
-
-**v2.1 sequential cluster B (gated):**
-
-- Phase 31 needs Phase 30
-- Phase 32 needs Phase 28 + Phase 30
-- Phase 35 needs Phase 31
-
-**v2.1 external-gated:**
-
-- Phase 38 needs Apple Dev Agreement + SignPath OSS approval (external)
-- Phase 33 needs Phase 38 (signed binary required for fresh-VM rehearsal)
-- Phase 36 needs Phase 21 + Phase 26 scaffold (both shipped — can start in parallel with P35)
-
-**v2.1 ship prep (sequential after all):**
-
-- Phase 37 needs ALL v2.1 phases shipped
-- Phase 39 needs Phase 37 + Phase 38 signed binary
+| Category | Item | Status |
+|----------|------|--------|
+| legal_capacity_carveouts (P46) | DIST-09 (Apple Dev Agreement update — Francesco) | deferred |
+| legal_capacity_carveouts (P46) | DIST-11 (SignPath OSS Foundation — Kaan, ~1-week SLA) | deferred |
+| post_approval_mechanical | DIST-19 (sign+verify smoke on first signed binary) | deferred |
+| post_approval_mechanical | SEC-06-PGP (real PGP key for security@bravoh.com) | deferred |
+| post_approval_mechanical | TAURI-UPDATER-KEY (real ed25519 updater key) | deferred |
+| real_hardware_carveouts | INSTALL-VM-RUN (fresh-VM rehearsal real execution) | deferred |
+| real_hardware_carveouts | INSTALL-60S-CHECK (stopwatch onboarding ≤60s per VM) | deferred |
+| real_hardware_carveouts | INSTALL-BLACKHOLE-PROBE (real Mac probe) | deferred |
+| real_hardware_carveouts | INSTALL-DEFENDER (Defender SmartScreen reputation propagation — external 1-2 wk) | deferred |
+| customer_facing_publishes | SHIP-CUT (gh release create v2.1.0-rc1 --draft) | deferred |
+| customer_facing_publishes | SHIP-TWEET (4-channel social publish) | deferred |
+| customer_facing_publishes | SHIP-DISCORD (#announcements launch post) | deferred |
+| customer_facing_publishes | SHIP-TRANSFER (repo transfer to bravoh/vibemix org) | deferred |
+| customer_facing_publishes | SHIP-ROTATE (24h monitoring rotation execution) | deferred |
+| customer_facing_publishes | SHIP-V1-DECISION (cut v1.0.0 / RC2 / pause after ~2-week bake) | deferred |
+| real_asset_production | ASSETS-PROD-GLB (5 real Meshy/Hunyuan3D + Mixamo-rigged GLBs) | deferred |
+| real_asset_production | ASSETS-PROD-DEMO (30s demo.mp4 ffmpeg cut + README hero refresh) | deferred |
+| ops_real_execution | OPS-09-RUN (run discord_provision.py against real Discord) | deferred |
+| ops_real_execution | OPS-10-RUN (real 100 RPS prod load test — coordination required) | deferred |
+| ops_real_execution | OPS-11-CRON (healthz cron install on Bravoh server) | deferred |
+| ops_real_execution | OPS-12-OUTREACH (manual aligned-community outreach 15+ stars) | deferred |
+| ops_real_execution | OPS-13-EXECUTE (run launch_trigger.sh --publish on launch day) | deferred |
+| ops_real_execution | OPS-14-SERVER (Bravoh server /vibemix/updates/upload + healthz deploy) | deferred |
+| bug_acceptance | HARDTEK-CORPUS-001 (real Hard Tek anchor-track curation; synthetic fixtures cover CI) | accepted in-scope cleanup |
+| bug_acceptance | ACK-BANK-REMAINING-20 (20 of 40 Achird OPUS pending Gemini quota reset, ~$0.10) | accepted in-scope cleanup |
+| bug_acceptance | EVAL-VCR-CASSETTES (one-time VCR_RECORD_MODE=new_episodes population) | accepted in-scope cleanup |
+| bug_acceptance | EVAL-CORPUS-WAVS (6 × 30-min public-domain DJ session WAV downloads — 200 MB git-LFS) | accepted in-scope cleanup |
+| bug_acceptance | BRAVOH-PROXY-PROBE (Bravoh proxy Wave 0 real-host probe; MOCK_PROXY_FOR_DEV=1 in dev) | accepted in-scope cleanup |
+| bug_acceptance | AUDIT-VM (scripts/integration_audit.py on fresh VM — depends on Phase 33 + Phase 38 external clock) | accepted in-scope cleanup |
+| bug_acceptance | AUDIT-SIGN-VERIFY (signed-binary verifier on real artifacts — depends on Phase 38 secrets) | accepted in-scope cleanup |
 
 ### Blockers
 
-- **Apple Developer Program Agreement update** — Francesco-action-required. Does NOT block Phase 27 entry, foundation cluster, or sequential cluster B; DOES block Phase 38.
-- **SignPath OSS Foundation approval status** — Kaan-action-required (re-file day 1 of v2.1 if not already approved). ~1-week SLA. DOES block Phase 38.
-- No engineering-side blockers for Phase 27 entry — proceed.
+- **Apple Developer Program Agreement update** — Francesco-action, P46 legal-capacity. Blocks SHIP-CUT (real `gh release create`) and any signed-binary CI leg until discharged.
+- **SignPath OSS Foundation approval** — Kaan-action, ~1-week SLA, P46 legal-capacity. Blocks Windows-signing CI leg + SHIP-CUT.
+- No engineering-side blockers at v2.1 close. v2.2 can scaffold and execute in parallel with the external clock.
 
-### Risks (v2.1 critical pitfalls — encoded in roadmap phase notes)
+### Risks (v2.1 critical pitfalls — closed at milestone)
 
-- **P42** (LLM-judge self-bias) → Phase 27 mitigation: 2-judge cross-check (Pro + Flash, different rubrics, both ≥ 0.80) + cited-but-empty cosine ≥ 0.4 filter + Kaan-veto bookmark.
-- **P43** (replay-harness corpus overfit) → Phase 27 mitigation: ≥ 3 public-domain DJ sets, Hard Tek/techno ≤ 70%, per-detector-per-genre F1 matrix.
-- **P44** (F1 too lenient) → Phase 27 mitigation: `useful_response_ratio ≥ 0.65` substance metric + per-event-class substance + bypass-rate ceiling 0.15.
-- **P45** (citation linter gamed) → Phase 27 + 32 mitigation: min-8-words-around-citation + embedding-relevance check (orthogonal to F1).
-- **P46** (legal-capacity autonomous-discharge attempt) → Phase 27 + 38 mitigation: `KAAN-ACTION-LEGAL.md` + CI bash audit grep against POST/PUT to apple/signpath endpoints.
-- **P47** (4-layer mascot rewrite breaks priority 70) → Phase 31 mitigation: additive-only refactor, all v2.0 mascot tests port verbatim.
-- **P48** (`register_library` final-mile orphan ships AGAIN) → Phase 28 + Phase 37 mitigation: invocation test + end-to-end live citation test + fresh-VM smoke.
-- **P49** (GenreRouter atomic swap breaks during Hard Tek add) → Phase 30 mitigation: construct-time registration only via `MappingProxyType` + 1000-cycle stress test.
-- **P50** (macOS 15 Settings reorg breaks TCC pre-grant) → Phase 33 mitigation: multi-version VM matrix (12.3 + 14 + 15) + dynamic URL fallback ladder.
-- **P51** (DJ profile leaks track titles) → Phase 32 mitigation: profile content allowlist + jsonschema `additionalProperties: false` + user consent.
-- **P52** (real GLBs push bundle past 350 MB cap) → Phase 31 + Phase 35 mitigation: CI gate < 350 MB + mascot sub-budget ≤ 25 MB + DRACO L7+ + KTX2/WebP.
-- **41 v2.0 carry-forward pitfalls** + 35 high/medium (P53–P88) tracked in `.planning/research/v2-1/PITFALLS.md`, mapped to owning phase in roadmap.
+All 11 critical pitfalls (P42–P52) mitigated in shipped code. P46 (legal-capacity autonomous-discharge attempt) is the only ongoing live rule — CI Bash + PowerShell audit grep against POST/PUT to apple/signpath endpoints (Phase 27-04 + Phase 34-05 + Phase 38-06). P85 (Phase 16 ear-test override expiry) tracked for v2.2 hallucination-gate strategy.
 
 ---
 
@@ -145,19 +139,17 @@ All Phase 1–26 decisions remain locked. Highlights:
 
 ### Last Session
 
-- 2026-05-14 — v2.0 Research-Driven Ship SHIPPED + archived to `.planning/milestones/v2.0-ROADMAP.md`. Local annotated git tag `v2.0` created. 10/12 phases shipped Claude-side end-to-end + 2 deferred (P15-04 UAT, P16 ear-test). 1961 passing tests, 220 commits since `v0.1.0-rc1`. Status: `tech_debt` accepted per `gsd-autonomous fully` mode.
-- 2026-05-14 — Milestone v2.1 "The Unified Cut" initiated via `/gsd-new-milestone`. PROJECT.md "Current Milestone" section appended; REQUIREMENTS.md v2.1 draft written (105 REQ-IDs across 13 phases enumerated). Research synthesis SUMMARY.md + STACK.md + FEATURES.md + ARCHITECTURE.md + PITFALLS.md anchored under `.planning/research/v2-1/`.
-- 2026-05-14 — v2.1 ROADMAP scaffolded (this session). 13 phases P27–P39 derived 1:1 from research/SUMMARY.md bucket decomposition. REQUIREMENTS.md Traceability section populated (105/105 mapped, no orphans). Critical pitfalls P42–P52 encoded in phase notes; sequential / parallel build-order graph locked. Critical-path callout = external Apple+SignPath approvals (NOT engineering). Estimated wall-clock to RC: 5–7 weeks focused engineering.
+- 2026-05-16 — v2.1 The Unified Cut SHIPPED + archived via `/gsd:complete-milestone`. 13 phases shipped engineering-green; 105/105 REQ-IDs satisfied; 5/5 integration seams WIRED. 15 carveouts in KAAN-ACTION-LEGAL.md. Local annotated git tag `v2.1.0` created (NOT pushed — Kaan publishes when ready). Status: `tech_debt` accepted per `gsd-autonomous fully` mode.
+- 2026-05-16 — Phase 39 verified + Phase 37 integration audit + Section 8 gsd-audit-milestone extension confirmed WIRED + tech_debt verdict. v2.1-MILESTONE-AUDIT.md frozen at 105/105 engineering satisfied.
+- 2026-05-15 — Phases 27–38 shipped (waves of 1-3 phases per day per `gsd-autonomous fully` execution cadence).
 
 ### Next Session
 
-- **Run `/gsd-plan-phase 27`** to plan Phase 27 — Eval Harness + v2.0 Carry-Forward Close-Out. Foundation cluster's anchor; no v2.1 prereqs.
-- **In parallel: file SignPath OSS Foundation application + start Apple Developer Program Agreement update prep** (day-1 unblock actions for Phase 38 — external clock is critical path).
-- **In parallel: `/gsd-plan-phase 28`, `29`, `30`, `34`** can ALL start once Phase 27 plan-checker passes (foundation cluster runs in parallel; assign Claude pulls accordingly).
-- Phase 27 should produce: `scripts/eval/replay_harness.py` + `.github/workflows/eval.yml` + universal2 sidecar + WASAPI `IMMNotificationClient` subscription + 40 Achird OPUS recordings + DDJ-FLX4 sync sniff fixture + 5-min `register_library` patch.
-- Phase 27 needs research-phase: judge prompt rubric design + corpus diversity sourcing (≥3 public-domain DJ sets license-cleared).
-- Carry-forward Kaan-side outstanding (Phase 14): (a) `npm run tauri dev` visual review of all four CDJ Whisper v5 surfaces; (b) Windows transparency rehearsal — folds into Phase 33 fresh-VM matrix.
+- **`/gsd:new-milestone` to scaffold v2.2** — Phase 16 ear-test override expires; choose either restored Kaan-ear-only gate OR permanent autonomous proxy adoption.
+- **Track external clock**: Apple Developer Program Agreement update (Francesco) + SignPath OSS Foundation application (Kaan) discharge gates the v2.1.0-rc1 public publish — NEVER autonomously discharged per P46.
+- **Once approvals land**: discharge KAAN-ACTION-LEGAL sequence — DIST-09 + DIST-11 → DIST-19 sign+verify smoke → Phase 33 real-VM matrix (INSTALL-VM-RUN + INSTALL-60S-CHECK + INSTALL-BLACKHOLE-PROBE) → Phase 38 signed-binary verifier → Phase 39 §SHIP customer-facing publishes (SHIP-CUT / SHIP-TWEET / SHIP-DISCORD / SHIP-TRANSFER / SHIP-ROTATE) → SHIP-V1-DECISION after ~2-week bake.
+- **Re-run integration audit** after each carveout discharge: `python scripts/integration_audit.py --write-milestone-audit .planning/v2.1-MILESTONE-AUDIT.md --force`.
 
 ---
 
-*State managed by gsd-roadmapper at 2026-05-14 (milestone v2.1 roadmap scaffolded — 13 phases P27–P39; Phase 27 entry-ready; foundation cluster A parallel-startable).*
+*State managed by gsd-complete-milestone at 2026-05-16 (v2.1 The Unified Cut archived — engineering-complete; KAAN-ACTION-LEGAL discharge gates public RC).*

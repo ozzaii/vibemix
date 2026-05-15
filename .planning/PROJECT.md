@@ -10,31 +10,39 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v2.1 The Unified Cut
+## Current State
 
-**Goal:** Ship a public open-source RC where every v2.0 component is fully integrated, validated, securely packaged, and one-click-installable — every missed integration opportunity closed, every human-needed surface autonomously discharged, "icon tap → grant permissions → ready to mix" zero-friction onboarding.
+**Last shipped:** v2.1 "The Unified Cut" — 2026-05-16 (status: `tech_debt` accepted per `gsd-autonomous fully` mode).
 
-**Mode:** `gsd-autonomous fully` — Claude has full Mac access; every blocker + human-needed item discharged autonomously (only privacy rule + destructive risk still pause). Phase 16 ear-test memory override accepted for this milestone (autonomous replay + LLM-judge proxy gate substitutes for Kaan-ear-only path).
+**Next milestone:** _none active_ — run `/gsd:new-milestone` to scaffold v2.2.
 
-**Target features:**
+**Phase numbering** continues from Phase 40 in the next milestone (default; no `--reset-phase-numbers`).
 
-1. **All v2.0 carry-forward autonomously closed** — signing pipeline (Apple Developer Program Agreement update + SignPath OSS application + secrets injection) executed; 40 Achird-voice OPUS recordings rendered via Gemini TTS; DDJ-FLX4 Sync sniff via on-machine MIDI; dormant `EvidenceRegistry.register_library` wired; Phase 15 Plan 04 retention sweep verified; 9-SKU controller verification substitute.
-2. **Hallucination Verification Gate — autonomous proxy** — recorded-session replay harness + LLM-judge scorer + F1 validator against shipped P17 detectors + P18 EvidenceRegistry + P19 ack bank + P20 linter + P22 anticipation.
-3. **Library intelligence v1** — Gemini Embedding 2 + sqlite-vec / numpy fallback · vibe search · "what's playing" grounding · drag-drop import UI · 30-day staleness nudge.
-4. **Post-session debrief MVP UI** — chaptered review · 60–90s voiced TL;DR · 3 drills · clickable timeline, lehimli to DEBRIEF-01 / DEBRIEF-02 architectural slot.
-5. **4-layer mascot full additive state machine** — base + emotion + anticipation + reaction; replaces v2.0 simplified anticipation subset.
-6. **2 Hard Tek detectors** — `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` (taxonomy completion).
-7. **Long-term DJ profile** — ~2KB JSON regenerated each session, injected verbatim into next live prompt.
-8. **One-click install hardening** — Mac DMG + Windows MSI fresh-VM tested end-to-end · TCC permissions wizard · auto-fetch deps · sidecar rebuild with v0.1.0-rc1 polish (line-buffer + parent_watchdog + tray toggle merged) · first-launch onboarding flow.
-9. **Open-source security pass** — API key gate audit · secret scanner CI · dependency CVE audit · signed-binary verification · permission least-scope · threat model + SECURITY.md.
-10. **Real GLB animations + 30s viral demo film autonomously** — text-to-3D / Mixamo-rigged `prep_*` animations + demo film generated from real session screen capture.
-11. **Day-Zero ops live** — Discord auto-provision · pre-seeded star coordination · proxy load test (100 RPS × 5min p99 < 500ms) verified · healthz live · launch trigger sequence executable.
-12. **Cross-phase integration audit** — every cross-phase seam re-verified end-to-end; zero orphan-but-shipped surfaces; integration-checker PASS gate.
-13. **Public RC cut + ship** — signed binary tagged · GitHub release published · social posts on 4 channels · README hero finalized.
+**Critical path to public ship:** KAAN-ACTION-LEGAL discharge — Apple Developer Program Agreement update (Francesco, P46) + SignPath OSS Foundation application (Kaan, ~1-week SLA, P46) gate the RC publish. Phase 39 §SHIP customer-facing publishes + §POST-RC-CLEANUP NEVER autonomously discharged. Engineering is shippable; the external clock is the bottleneck.
 
-**Bar:** 1000+ GitHub stars, "real DJ friend in your ear, no AI slop", clean install zero friction, public RC ready to unleash.
+<details>
+<summary>📦 v2.1 The Unified Cut (shipped 2026-05-16, status <code>tech_debt</code>) — archived narrative</summary>
 
-**Phase numbering** continues from Phase 27 (default; no `--reset-phase-numbers`).
+13 phases shipped engineering-green under `gsd-autonomous fully` mode. 96 plans, 633 phase-scope tests added on top of v2.0 baseline, 225 commits since `v2.0` tag, net ~+45k LOC. 105 / 105 v2.1 REQ-IDs engineering-satisfied. 15 carveouts deferred to KAAN-ACTION-LEGAL (legal capacity + customer-facing publish + real-hardware + real-asset + post-approval). All 5 cross-phase integration seams audited WIRED.
+
+**Highlights:**
+
+- **Autonomous hallucination-proxy gate (Phase 27)** — replay harness + 2-judge cross-check (Gemini 3 Pro + Flash) + corpus diversity + substance + cited-relevance filter. Substitutes for Kaan's Phase 16 ear-test for v2.1 only (override expires post-v2.1 per P85).
+- **Library intelligence v1 (Phase 28)** — Gemini Embedding 2 + sqlite-vec (Mac) / numpy (Win) with bit-identical top-K parity + vibe-search NL CLI + drag-drop UX + 30-day staleness nudge + €50/month CI cost gate.
+- **Post-session debrief MVP UI (Phase 29)** — chaptered review + 60-90s voiced TL;DR + 3 drills + WaveSurfer.js clickable timeline + cited-critique strip. Second Tauri WebviewWindow docks into v2.0 sidecar slot via port 8766.
+- **4-layer mascot full additive state machine (Phase 31)** — Base + Emotion + Anticipation + Reaction with priority-stacked crossfades; v2.0 mascot tests port verbatim (P47); GLB bundle 21.67/25 MB.
+- **Long-term DJ profile (Phase 32)** — ~2KB allowlist-only JSON cache-side injected into `GeminiContextCache` (P60 preserved); `additionalProperties: false`; default-OFF consent; ≥ 2 citations per tendency.
+- **One-click install hardening (Phase 33)** — TCC permissions wizard (macOS 12.3 / 14 / 15 fallback ladder) + BlackHole probe + onboarding stopwatch + bundle-ID lock + no-API-key-surface assertion.
+- **Open-source security pass (Phase 34)** — gitleaks + pip-audit + osv-scanner + cargo-audit + cargo-deny + syft SBOM + signed-binary verifier + STRIDE-lite threat model + SECURITY.md + telemetry opt-in default-OFF + capability allowlist lint.
+- **Signing pipeline real execution (Phase 38)** — Apple notarytool + SignPath GH Action wired into `release.yml` + post-sign verifier release-publish gate + PowerShell local-rehearsal + P46 audit (Bash + PowerShell mirror).
+- **Cross-phase integration audit (Phase 37)** — 5 critical seams (P18→P20, P19→agent, P25→P28, P27→eval-gate, P31→ws_bus) all WIRED with green e2e tests + orphan inventory CI gate + grey-area decision log (P87) + POC immutability gate against v2.0 git tag.
+- **Day-zero ops automation (Phase 36) + Public RC cut scaffold (Phase 39)** — Discord auto-provision + 100 RPS load test + healthz watchdog + aligned-community star-seeding + T-30/T+0/T+5/T+24h launch trigger + 5-channel social publisher with NACK + `cut_release.sh` 6-gate pre-flight (NEVER calls `gh release create` autonomously).
+- **2 Hard Tek detectors (Phase 30)** — `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` complete v2.0's 6-detector taxonomy; GenreRouter `MappingProxyType` atomic-swap regression test (8 readers × 1000 swaps, no race).
+- **Universal2 sidecar (Phase 27-06)** — research-corrected from lipo-merge to target-triple convention (PyInstaller PKG archive embeds only in last merged slice). Eliminates Rosetta prompt on Apple Silicon. WASAPI `IMMNotificationClient` subscription handles mid-session default-device-change on Windows.
+
+Full archive: `.planning/milestones/v2.1-ROADMAP.md` · Requirements: `.planning/milestones/v2.1-REQUIREMENTS.md` · Audit: `.planning/milestones/v2.1-MILESTONE-AUDIT.md`.
+
+</details>
 
 <details>
 <summary>📦 v2.0 Research-Driven Ship (shipped 2026-05-14, status <code>tech_debt</code>) — archived narrative</summary>
@@ -273,4 +281,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-14 — milestone v2.1 "The Unified Cut" started via `/gsd-new-milestone` (fully autonomous mode; v2.0 closed at `tech_debt`)*
+*Last updated: 2026-05-16 — milestone v2.1 "The Unified Cut" SHIPPED + archived via `/gsd:complete-milestone` (status: `tech_debt` accepted — KAAN-ACTION-LEGAL discharge pending public RC publish). Next: `/gsd:new-milestone` for v2.2.*
