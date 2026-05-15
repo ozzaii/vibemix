@@ -126,6 +126,13 @@ class WizardLoop:
         # ipc.wizard.start (re-run) — registered as a no-op stop trigger here;
         # the live-runtime path in Phase 12 will own the re-run UX.
         self.bus.register_handler("ipc.wizard.start", self._on_wizard_start)
+        # Phase 32 / PROFILE-05 — first-launch consent persistence. The
+        # wizard's profile-consent step fires this BEFORE smoke-test so the
+        # sidecar has the consent flag committed to state.json before the
+        # session-runtime path inherits it.
+        self.bus.register_handler(
+            "ipc.profile.set_consent", self._on_profile_set_consent
+        )
 
     async def boot(self) -> None:
         """Emit ``ipc.boot {ready: true}`` so the Tauri shell can render
@@ -428,6 +435,30 @@ class WizardLoop:
         Phase 12 settings button is wired.
         """
         log.info("wizard start requested (Phase 12 owns the re-run UX)")
+
+    async def _on_profile_set_consent(self, msg: dict) -> None:
+        """Phase 32 / PROFILE-05 — persist profile_consent to state.json.
+
+        The wizard's profile-consent step fires this on Continue. Default-OFF
+        is enforced at the UI; the sidecar honors whatever boolean arrives.
+        Replies with ``ipc.profile.consent_state`` so the renderer can
+        confirm the write landed.
+        """
+        try:
+            from vibemix.profile import save_consent
+            from vibemix.ui_bus.messages import ProfileConsentState
+
+            payload = msg.get("payload", {})
+            consent = bool(payload.get("consent", False))
+            save_consent(consent)
+            log.info("profile_consent persisted: %s", consent)
+            await self.bus.emit(
+                json.loads(ProfileConsentState.make(consent=consent).to_json())
+            )
+        except Exception as e:
+            # Non-fatal: the renderer's toggle is the source of truth; the
+            # user can retry from Settings → Profile after the wizard.
+            log.warning("profile.set_consent persistence failed: %s", e)
 
     # ------------------------------------------------------------------
     # Background loops

@@ -56,6 +56,13 @@ from vibemix.ui_bus.schemas.library import (
     LibraryStalenessNudgePayload,
 )
 from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
+from vibemix.ui_bus.schemas.profile import (
+    ProfileConsentStatePayload,
+    ProfileDeleteAckPayload,
+    ProfileRegenerateResultPayload,
+    ProfileSetConsentPayload,
+    ProfileViewResultPayload,
+)
 
 
 def _resolve_schema_path() -> Path:
@@ -1819,6 +1826,169 @@ class LibrarySimilarResult:
             payload=LibrarySimilarResultPayload(
                 track_id=track_id, results=tuple(results)
             ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+# ---------------------------------------------------------------------------
+# Phase 32 — long-term DJ profile IPC
+# ---------------------------------------------------------------------------
+# PROFILE-04/05/07. Shell ↔ sidecar surface for the wizard's consent toggle
+# + Settings → Profile panel (view / regenerate / delete). All payload
+# structs live in ``vibemix.ui_bus.schemas.profile``. Default-OFF consent
+# is enforced at the wizard UI; the sidecar honors whatever boolean arrives.
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileSetConsent:
+    type: Literal["ipc.profile.set_consent"]
+    ts: str
+    payload: ProfileSetConsentPayload
+
+    @classmethod
+    def make(cls, *, consent: bool) -> ProfileSetConsent:
+        return cls(
+            type="ipc.profile.set_consent",
+            ts=_now_iso(),
+            payload=ProfileSetConsentPayload(consent=consent),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileConsentState:
+    type: Literal["ipc.profile.consent_state"]
+    ts: str
+    payload: ProfileConsentStatePayload
+
+    @classmethod
+    def make(cls, *, consent: bool) -> ProfileConsentState:
+        return cls(
+            type="ipc.profile.consent_state",
+            ts=_now_iso(),
+            payload=ProfileConsentStatePayload(consent=consent),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileView:
+    """Shell → sidecar. Empty payload; reply is ProfileViewResult."""
+
+    type: Literal["ipc.profile.view"]
+    ts: str
+    payload: dict
+
+    @classmethod
+    def make(cls) -> ProfileView:
+        return cls(type="ipc.profile.view", ts=_now_iso(), payload={})
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileViewResult:
+    type: Literal["ipc.profile.view_result"]
+    ts: str
+    payload: ProfileViewResultPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        profile: dict | None,
+        bytes: int,
+        consent: bool,
+    ) -> ProfileViewResult:
+        return cls(
+            type="ipc.profile.view_result",
+            ts=_now_iso(),
+            payload=ProfileViewResultPayload(
+                profile=profile, bytes=bytes, consent=consent
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileRegenerate:
+    """Shell → sidecar. Empty payload; reply is ProfileRegenerateResult."""
+
+    type: Literal["ipc.profile.regenerate"]
+    ts: str
+    payload: dict
+
+    @classmethod
+    def make(cls) -> ProfileRegenerate:
+        return cls(type="ipc.profile.regenerate", ts=_now_iso(), payload={})
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileRegenerateResult:
+    type: Literal["ipc.profile.regenerate_result"]
+    ts: str
+    payload: ProfileRegenerateResultPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        ok: bool,
+        profile: dict | None,
+        error: str | None,
+    ) -> ProfileRegenerateResult:
+        return cls(
+            type="ipc.profile.regenerate_result",
+            ts=_now_iso(),
+            payload=ProfileRegenerateResultPayload(
+                ok=ok, profile=profile, error=error
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileDelete:
+    """Shell → sidecar. Empty payload; reply is ProfileDeleteAck."""
+
+    type: Literal["ipc.profile.delete"]
+    ts: str
+    payload: dict
+
+    @classmethod
+    def make(cls) -> ProfileDelete:
+        return cls(type="ipc.profile.delete", ts=_now_iso(), payload={})
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileDeleteAck:
+    type: Literal["ipc.profile.delete_ack"]
+    ts: str
+    payload: ProfileDeleteAckPayload
+
+    @classmethod
+    def make(cls, *, ok: bool, error: str | None = None) -> ProfileDeleteAck:
+        return cls(
+            type="ipc.profile.delete_ack",
+            ts=_now_iso(),
+            payload=ProfileDeleteAckPayload(ok=ok, error=error),
         )
 
     def to_json(self) -> str:

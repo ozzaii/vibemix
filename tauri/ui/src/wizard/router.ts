@@ -33,14 +33,26 @@ import { renderStep0Intro } from "./step0-intro.js";
 import { renderStep1, type Step1State } from "./step1-permissions.js";
 import { renderStep2, type Step2State } from "./step2-output-device.js";
 import { renderStep3, type Step3State } from "./step3-controller.js";
+import {
+  renderStepProfileConsent,
+  type ProfileConsentState,
+} from "./step-profile-consent.js";
 
-export type WizardStep = "intro" | "permissions" | "audio" | "controller" | "smoke-test" | "done";
+export type WizardStep =
+  | "intro"
+  | "permissions"
+  | "audio"
+  | "controller"
+  | "profile-consent"
+  | "smoke-test"
+  | "done";
 
 export interface WizardState {
   currentStep: WizardStep;
   step1: Step1State;
   step2: Step2State;
   step3: Step3State;
+  profileConsent: ProfileConsentState;
   smokeTest: SmokeTestState;
   statusBar: StatusBarProps;
   platform: "darwin" | "win32" | "linux";
@@ -72,6 +84,11 @@ const DEFAULT_STATE: WizardState = {
     probeState: "listening",
     secondsLeft: 10,
     caughtLabel: undefined,
+  },
+  profileConsent: {
+    // PROFILE-05 default-OFF — non-negotiable. The toggle MUST start
+    // unchecked; the user opts in explicitly.
+    consent: false,
   },
   smokeTest: {
     greetingPlayed: false,
@@ -113,7 +130,13 @@ function setState(
   rerender();
 }
 
-const STEP_ORDER: WizardStep[] = ["permissions", "audio", "controller", "smoke-test"];
+const STEP_ORDER: WizardStep[] = [
+  "permissions",
+  "audio",
+  "controller",
+  "profile-consent",
+  "smoke-test",
+];
 
 function indexOf(step: WizardStep): number {
   return STEP_ORDER.indexOf(step);
@@ -125,6 +148,7 @@ function stepStripFor(current: WizardStep): HTMLElement {
     { id: "permissions", label: "permissions" },
     { id: "audio", label: "device" },
     { id: "controller", label: "controller" },
+    { id: "profile-consent", label: "profile" },
   ];
   return StepIndicator({
     steps: stepsConfig.map((s, i) => {
@@ -190,8 +214,11 @@ export function back(): void {
     case "controller":
       advanceTo("audio");
       return;
-    case "smoke-test":
+    case "profile-consent":
       advanceTo("controller");
+      return;
+    case "smoke-test":
+      advanceTo("profile-consent");
       return;
     case "done":
       return; // Wizard is done; no back.
@@ -378,7 +405,7 @@ export function renderCurrentStep(): void {
         void runMidiListen();
       }
       primary = renderStep3(wizardState.step3, {
-        onContinue: () => advanceTo("smoke-test"),
+        onContinue: () => advanceTo("profile-consent"),
         onBack: () => back(),
         onListenAgain: () => {
           step3ListenStarted = false;
@@ -391,7 +418,7 @@ export function renderCurrentStep(): void {
             },
           });
         },
-        onSkip: () => advanceTo("smoke-test"),
+        onSkip: () => advanceTo("profile-consent"),
       });
       if (
         wizardState.step3.probeState === "listening" &&
@@ -399,6 +426,32 @@ export function renderCurrentStep(): void {
       ) {
         scheduleCountdownTick();
       }
+      break;
+    case "profile-consent":
+      primary = renderStepProfileConsent(wizardState.profileConsent, {
+        onContinue: () => {
+          // PROFILE-05 — emit ipc.profile.set_consent so the sidecar
+          // persists the toggle to state.json BEFORE the smoke-test
+          // mounts. The set_consent call is fire-and-forget (sidecar
+          // emits ipc.profile.consent_state ack; UI does not block on
+          // it because the toggle state is the source of truth in this
+          // moment).
+          void emitIpc("ipc.profile.set_consent", {
+            consent: wizardState.profileConsent.consent,
+          }).catch((err) => {
+            // Non-fatal: persistence retry happens via Settings → Profile
+            // panel. The user advances even if the IPC hiccup fires.
+            // eslint-disable-next-line no-console
+            console.warn("[profile-consent] set_consent emit failed:", err);
+          });
+          advanceTo("smoke-test");
+        },
+        onToggle: (next) =>
+          setState({
+            profileConsent: { ...wizardState.profileConsent, consent: next },
+          }),
+        onBack: () => back(),
+      });
       break;
     case "smoke-test":
       if (!smokeTestStarted) {
@@ -690,8 +743,9 @@ async function runMidiListen(): Promise<void> {
         caughtLabel: label,
       },
     });
-    // Auto-advance after 1s per UI-SPEC §10.
-    setTimeout(() => advanceTo("smoke-test"), 1000);
+    // Auto-advance after 1s per UI-SPEC §10. Phase 32 routes through the
+    // profile-consent step before the smoke-test surface.
+    setTimeout(() => advanceTo("profile-consent"), 1000);
   } catch (err) {
     if (!resolved) {
       console.warn("[step3] midi listen failed:", err);
@@ -832,7 +886,8 @@ export function getDevSurface(): DevSurface {
           caughtLabel: ev.label,
         },
       });
-      setTimeout(() => advanceTo("smoke-test"), 1000);
+      // Phase 32 — Step 3 routes through profile-consent before smoke-test.
+      setTimeout(() => advanceTo("profile-consent"), 1000);
     },
     setStatusBar: (status) => setState({ statusBar: status }),
   };

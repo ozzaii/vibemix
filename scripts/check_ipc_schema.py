@@ -71,6 +71,14 @@ from vibemix.ui_bus import (
     MetersTriple,
     PermissionCheck,
     PermissionState,
+    ProfileConsentState,
+    ProfileDelete,
+    ProfileDeleteAck,
+    ProfileRegenerate,
+    ProfileRegenerateResult,
+    ProfileSetConsent,
+    ProfileView,
+    ProfileViewResult,
     RecordingSummary,
     RecordingsDelete,
     RecordingsDeleteAck,
@@ -437,6 +445,23 @@ def _minimal_examples() -> list[tuple[str, object]]:
                 ),
             ),
         ),
+        # Phase 32 — long-term DJ profile wrappers (PROFILE-04/05/07)
+        ("ProfileSetConsent", ProfileSetConsent.make(consent=False)),
+        ("ProfileConsentState", ProfileConsentState.make(consent=False)),
+        ("ProfileView", ProfileView.make()),
+        (
+            "ProfileViewResult",
+            ProfileViewResult.make(profile=None, bytes=0, consent=False),
+        ),
+        ("ProfileRegenerate", ProfileRegenerate.make()),
+        (
+            "ProfileRegenerateResult",
+            ProfileRegenerateResult.make(
+                ok=False, profile=None, error="consent_off"
+            ),
+        ),
+        ("ProfileDelete", ProfileDelete.make()),
+        ("ProfileDeleteAck", ProfileDeleteAck.make(ok=True, error=None)),
     ]
 
 

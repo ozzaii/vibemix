@@ -43,6 +43,12 @@ export type VibemixIPCMessages =
   | DebriefSessionLoaded
   | DebriefCitationSummary
   | DebriefEventTimeline
+  | DebriefChapterList
+  | DebriefTldrAudio
+  | DebriefDrills
+  | DebriefCitationTooltipReq
+  | DebriefCitationTooltip
+  | DebriefError
   | LibraryImport
   | LibraryImportProgress
   | LibraryImportCancel
@@ -52,7 +58,15 @@ export type VibemixIPCMessages =
   | LibraryStalenessNudge
   | LibraryStalenessAction
   | LibrarySimilarRequest
-  | LibrarySimilarResult;
+  | LibrarySimilarResult
+  | ProfileSetConsent
+  | ProfileConsentState
+  | ProfileView
+  | ProfileViewResult
+  | ProfileRegenerate
+  | ProfileRegenerateResult
+  | ProfileDelete
+  | ProfileDeleteAck;
 
 export interface IpcBoot {
   type: "ipc.boot";
@@ -425,6 +439,97 @@ export interface DebriefEventTimeline {
     }[];
   };
 }
+export interface DebriefChapterList {
+  type: "ipc.debrief.chapter-list";
+  ts: string;
+  payload: {
+    chapters: {
+      id: string;
+      start: number;
+      end: number;
+      label: string;
+      kind: "track" | "phase" | "layer" | "mix" | "crowd";
+      citation_event_id: string;
+    }[];
+    derived_at: string;
+  };
+}
+export interface DebriefTldrAudio {
+  type: "ipc.debrief.tldr-audio";
+  ts: string;
+  payload: {
+    audio_relative_path: string;
+    duration_s: number;
+    tldr_sha256: string;
+    mime_type: "audio/mpeg";
+  };
+}
+export interface DebriefDrills {
+  type: "ipc.debrief.drills";
+  ts: string;
+  payload: {
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
+    drills: [
+      {
+        situation: string;
+        behavior: string;
+        impact: string;
+        action_recommended: string;
+        citation: string;
+      },
+      {
+        situation: string;
+        behavior: string;
+        impact: string;
+        action_recommended: string;
+        citation: string;
+      },
+      {
+        situation: string;
+        behavior: string;
+        impact: string;
+        action_recommended: string;
+        citation: string;
+      }
+    ];
+  };
+}
+export interface DebriefCitationTooltipReq {
+  type: "ipc.debrief.citation-tooltip-request";
+  ts: string;
+  payload: {
+    event_id: string;
+  };
+}
+export interface DebriefCitationTooltip {
+  type: "ipc.debrief.citation-tooltip";
+  ts: string;
+  payload: {
+    event_id: string;
+    evidence_text: string;
+    timestamp: number;
+    found: boolean;
+  };
+}
+export interface DebriefError {
+  type: "ipc.debrief.error";
+  ts: string;
+  payload: {
+    reason:
+      | "events_missing"
+      | "session_too_short"
+      | "invalid_session_dir"
+      | "sidecar_crashed"
+      | "tldr_generation_failed"
+      | "drills_generation_failed"
+      | "port_in_use"
+      | "unknown_kind";
+    message: string;
+  };
+}
 export interface LibraryImport {
   type: "ipc.library.import";
   ts: string;
@@ -529,5 +634,60 @@ export interface LibrarySimilarResult {
       bpm: number | null;
     }[];
     schema_version: "1";
+  };
+}
+export interface ProfileSetConsent {
+  type: "ipc.profile.set_consent";
+  ts: string;
+  payload: {
+    consent: boolean;
+  };
+}
+export interface ProfileConsentState {
+  type: "ipc.profile.consent_state";
+  ts: string;
+  payload: {
+    consent: boolean;
+  };
+}
+export interface ProfileView {
+  type: "ipc.profile.view";
+  ts: string;
+  payload: {};
+}
+export interface ProfileViewResult {
+  type: "ipc.profile.view_result";
+  ts: string;
+  payload: {
+    profile: {} | null;
+    bytes: number;
+    consent: boolean;
+  };
+}
+export interface ProfileRegenerate {
+  type: "ipc.profile.regenerate";
+  ts: string;
+  payload: {};
+}
+export interface ProfileRegenerateResult {
+  type: "ipc.profile.regenerate_result";
+  ts: string;
+  payload: {
+    ok: boolean;
+    profile: {} | null;
+    error: string | null;
+  };
+}
+export interface ProfileDelete {
+  type: "ipc.profile.delete";
+  ts: string;
+  payload: {};
+}
+export interface ProfileDeleteAck {
+  type: "ipc.profile.delete_ack";
+  ts: string;
+  payload: {
+    ok: boolean;
+    error: string | null;
   };
 }

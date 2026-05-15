@@ -168,6 +168,30 @@
     },
     {
       "$ref": "#/definitions/LibrarySimilarResult"
+    },
+    {
+      "$ref": "#/definitions/ProfileSetConsent"
+    },
+    {
+      "$ref": "#/definitions/ProfileConsentState"
+    },
+    {
+      "$ref": "#/definitions/ProfileView"
+    },
+    {
+      "$ref": "#/definitions/ProfileViewResult"
+    },
+    {
+      "$ref": "#/definitions/ProfileRegenerate"
+    },
+    {
+      "$ref": "#/definitions/ProfileRegenerateResult"
+    },
+    {
+      "$ref": "#/definitions/ProfileDelete"
+    },
+    {
+      "$ref": "#/definitions/ProfileDeleteAck"
     }
   ],
   "definitions": {
@@ -2642,6 +2666,142 @@
             "schema_version": {
               "const": "1"
             }
+          }
+        }
+      }
+    },
+    "ProfileSetConsent": {
+      "$comment": "Phase 32 — Shell → sidecar. Persists profile_consent to ~/.config/vibemix/state.json. Default-OFF (PROFILE-05); sidecar honors whatever boolean arrives. Sidecar replies with ProfileConsentState.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.profile.set_consent"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["consent"],
+          "properties": {"consent": {"type": "boolean"}}
+        }
+      }
+    },
+    "ProfileConsentState": {
+      "$comment": "Phase 32 — Sidecar → shell. Reflects current profile_consent from disk.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.profile.consent_state"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["consent"],
+          "properties": {"consent": {"type": "boolean"}}
+        }
+      }
+    },
+    "ProfileView": {
+      "$comment": "Phase 32 — Shell → sidecar. Empty payload; reply is ProfileViewResult with the on-disk profile + byte count + consent state.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.profile.view"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "ProfileViewResult": {
+      "$comment": "Phase 32 — Sidecar → shell. Snapshot of ~/.config/vibemix/profile.json + UTF-8 byte length + consent flag. profile is null when absent OR when consent is off. Settings → Profile panel reads this once on open.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.profile.view_result"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profile", "bytes", "consent"],
+          "properties": {
+            "profile": {"type": ["object", "null"]},
+            "bytes": {"type": "integer", "minimum": 0, "maximum": 2048},
+            "consent": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "ProfileRegenerate": {
+      "$comment": "Phase 32 — Shell → sidecar. Empty payload; rebuilds profile from current EvidenceRegistry snapshot. Reply is ProfileRegenerateResult.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.profile.regenerate"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "ProfileRegenerateResult": {
+      "$comment": "Phase 32 — Sidecar → shell. ok=true means a new profile was built AND saved; ok=false carries a short reason (consent_off / insufficient_evidence / other).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.profile.regenerate_result"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ok", "profile", "error"],
+          "properties": {
+            "ok": {"type": "boolean"},
+            "profile": {"type": ["object", "null"]},
+            "error": {"type": ["string", "null"], "maxLength": 200}
+          }
+        }
+      }
+    },
+    "ProfileDelete": {
+      "$comment": "Phase 32 — Shell → sidecar. Empty payload; unlinks ~/.config/vibemix/profile.json. Reply is ProfileDeleteAck.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.profile.delete"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "ProfileDeleteAck": {
+      "$comment": "Phase 32 — Sidecar → shell. ok=true means the file was deleted; ok=false with error='not_found' means the file did not exist (UI surfaces a 'no profile' state).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.profile.delete_ack"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ok", "error"],
+          "properties": {
+            "ok": {"type": "boolean"},
+            "error": {"type": ["string", "null"], "maxLength": 200}
           }
         }
       }
