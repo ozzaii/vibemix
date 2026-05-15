@@ -18,6 +18,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
+mod debrief_window;
 mod djay_ax;
 mod hotkey;
 mod mascot_window;
@@ -33,6 +34,7 @@ use std::fs;
 
 use tauri::{Listener, Manager};
 
+use crate::debrief_window::DebriefSidecarHandle;
 use crate::hotkey::HotkeyHandle;
 use crate::sidecar::SidecarHandle;
 use crate::tray::{QuitPending, TrayHandle};
@@ -75,8 +77,10 @@ fn main() {
             recordings::reveal_in_os,
             recordings::open_input_wav,
             overlay::show_overlay_highlight,
+            debrief_window::open_debrief_window,
         ])
         .manage(SidecarHandle::default())
+        .manage(DebriefSidecarHandle::default())
         .manage(WsClientHandle::default())
         .manage(HotkeyHandle::default())
         .manage(TrayHandle::default())
