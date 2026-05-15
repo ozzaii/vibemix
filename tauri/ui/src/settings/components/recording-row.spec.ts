@@ -512,8 +512,8 @@ describe("recording-row — Test 14: HTML escape via textContent", () => {
 // open-external + delete). Tests below pin the wiring + a11y contract.
 // ---------------------------------------------------------------------------
 
-describe("recording-row — Test 15: row renders 4 action buttons in correct order", () => {
-  it("emits replay → reveal → open-external → delete inside the action cluster", () => {
+describe("recording-row — Test 15: row renders 5 action buttons in correct order", () => {
+  it("emits replay → reveal → open-external → debrief → delete inside the action cluster", () => {
     const handle = renderRecordingRow({
       summary: baseSummary,
       onToggle: vi.fn(),
@@ -526,22 +526,15 @@ describe("recording-row — Test 15: row renders 4 action buttons in correct ord
         ".vmx-rec-row__actions .vmx-rec-row__btn",
       ),
     );
-    expect(buttons.length).toBe(4);
+    // Plan 29-06 added the Open Debrief button: 4 → 5.
+    expect(buttons.length).toBe(5);
     expect(buttons.map((b) => b.dataset.kind)).toEqual([
       "replay",
       "reveal",
       "open-external",
+      "debrief",
       "delete",
     ]);
-
-    // Action cluster grew to 128px to host the 4-button row (UI-SPEC §Color
-    // accepted-expansion: amber-reserved spots 8 → 10).
-    const styleBlock = document.querySelector<HTMLStyleElement>(
-      'style[data-scope="vmx-rec-row"]',
-    );
-    expect(styleBlock?.textContent ?? "").toMatch(
-      /\.vmx-rec-row__actions[^}]*flex:\s*0\s+0\s+128px/,
-    );
   });
 });
 

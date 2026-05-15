@@ -50,7 +50,7 @@
  * Test coverage: ./recording-row.spec.ts (14 pre-existing + 4 new = 18 cases).
  */
 
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
 import { openInputWav, revealInOS, sendIpcRequest } from "../../ipc/client.js";
 import { registerStyle } from "../../session/components/_style-registry.js";
@@ -187,6 +187,15 @@ const DELETE_SVG = `
         stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
 </svg>
 `;
+// Plan 29-06 — speech bubble + small replay arrow inside, "open debrief".
+const DEBRIEF_SVG = `
+<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" width="14" height="14">
+  <path d="M2.5 3 L13.5 3 Q14 3 14 3.5 L14 10 Q14 10.5 13.5 10.5 L7 10.5 L4.5 13 L4.5 10.5 L2.5 10.5 Q2 10.5 2 10 L2 3.5 Q2 3 2.5 3 Z"
+        fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+  <path d="M6.5 6.5 L8.5 6.5 L8.5 5 L10.5 7 L8.5 9 L8.5 7.5 L6.5 7.5 Z"
+        fill="currentColor" />
+</svg>
+`;
 
 const CSS = `
   .vmx-rec-row {
@@ -267,9 +276,17 @@ const CSS = `
      open-external-hover (3 — Plan 15-03 expansion). */
   .vmx-rec-row__btn[data-kind="replay"]:hover,
   .vmx-rec-row__btn[data-kind="reveal"]:hover,
-  .vmx-rec-row__btn[data-kind="open-external"]:hover {
+  .vmx-rec-row__btn[data-kind="open-external"]:hover,
+  .vmx-rec-row__btn[data-kind="debrief"]:not(:disabled):hover {
     color: var(--amber);
     filter: drop-shadow(var(--glow-faint));
+  }
+  /* Plan 29-06 — disabled debrief button (short or eventless session)
+     dims at 50% per CDJ Whisper restraint + sets the not-allowed cursor.
+     No glow on hover. */
+  .vmx-rec-row__btn[data-kind="debrief"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .vmx-rec-row__btn[data-kind="delete"] {
     color: var(--silk-40);
@@ -447,6 +464,41 @@ export function renderRecordingRow(opts: RecordingRowProps): RecordingRowHandle 
     });
   });
   actions.append(openExtBtn);
+
+  // Plan 29-06 — Open Debrief button. Slots between open-external and
+  // delete. Disabled when the session is too short (< 5 min) OR has
+  // too few events (< 5) per CONTEXT D-11 + RESEARCH Pitfall 6.
+  const debriefBtn = document.createElement("button");
+  debriefBtn.type = "button";
+  debriefBtn.className = "vmx-rec-row__btn";
+  debriefBtn.dataset.kind = "debrief";
+  const tooShort = summary.duration_s < 300;
+  const noEvents = summary.event_count < 5;
+  const debriefDisabled = tooShort || noEvents;
+  debriefBtn.disabled = debriefDisabled;
+  if (tooShort) {
+    debriefBtn.title = "Session too short for debrief (need ≥ 5 minutes)";
+  } else if (noEvents) {
+    debriefBtn.title = "No event data for debrief";
+  } else {
+    debriefBtn.title = "Open debrief";
+  }
+  debriefBtn.setAttribute(
+    "aria-label",
+    `open debrief for session ${formatTimestamp(summary.started_at_iso)}`,
+  );
+  debriefBtn.innerHTML = DEBRIEF_SVG;
+  debriefBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (debriefBtn.disabled) return;
+    invoke("open_debrief_window", { sessionDir: summary.session_dir }).catch(
+      (err: unknown) => {
+        // eslint-disable-next-line no-console
+        console.error("open_debrief_window failed:", err);
+      },
+    );
+  });
+  actions.append(debriefBtn);
 
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
