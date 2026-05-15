@@ -12,6 +12,24 @@
  * D-LOCKED: v2.0 ships the 3-layer subset (mood + anticipation +
  * speak/react). The full 4-layer additive model is deferred to v2.1.
  *
+ * PHASE-31 (ADDITIVE per Pitfall P47): v2.1 ships the 4-channel
+ * composition via `priority-stack.ts` + the `layers/{base,emotion,
+ * reaction}.ts` files. AdditiveLayer ITSELF is unchanged — it remains
+ * the single-channel (anticipation) overlay on the same mixer. The
+ * 4-channel view emerges at the PriorityStack composition layer:
+ *
+ *   PriorityStack
+ *   ├── base       (50) → BaseLayer       — idle_breathe family
+ *   ├── emotion    (60) → EmotionLayer    — derived from MusicState
+ *   ├── anticipation (70) → THIS FILE      — verbatim v2.0 logic
+ *   └── reaction   (80) → ReactionLayer   — [emote:*] tag fires
+ *
+ * Cancel-priority 999 (Pitfall P72) is implemented in PriorityStack
+ * and routes through ReactionLayer.cancel() — it does NOT touch this
+ * file's internals. The v2.0 priority-70 + 2.5s timeout + cancel-aware
+ * + linter-strip-aware contracts are preserved verbatim per the
+ * `__tests__/v2-*.spec.ts` port suite.
+ *
  * Anti-slop discipline (mirrors asset-loader.ts):
  *   - Unknown state name → throw (do NOT silently no-op).
  *   - Unknown clip name → throw.
