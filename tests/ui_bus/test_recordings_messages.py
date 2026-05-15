@@ -265,14 +265,17 @@ def test_recordings_events_result_accepts_empty_events_array() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_count_parity_at_49() -> None:
+def test_count_parity_at_55() -> None:
     """Phase 15 Plan 01 bumped the IPC count 27 → 34 (+7 recordings.* families);
     Phase 20-04 added SessionCitation → 35; Phase 24-02 added
     SessionOverlayHighlight → 36; Phase 25 Plan 25-03 added 3 DEBRIEF
     reservations → 39; Phase 28 Plan 28-09 added 10 library.* messages
     (LibraryImport*, LibrarySearch*, LibraryConfidence, LibraryStaleness*,
-    LibrarySimilar*) → 49. Both sides — schema oneOf and Python wrapper
-    dataclasses — must match exactly.
+    LibrarySimilar*) → 49; Phase 29 Plan 29-03 added 6 DEBRIEF v2.1
+    additive wrappers (DebriefChapterList, DebriefTldrAudio, DebriefDrills,
+    DebriefCitationTooltipReq, DebriefCitationTooltip, DebriefError) → 55.
+    Both sides — schema oneOf and Python wrapper dataclasses — must match
+    exactly.
     """
     from vibemix.ui_bus import messages as ui_bus_messages
 
@@ -284,8 +287,8 @@ def test_count_parity_at_49() -> None:
         and "type" in obj.__dataclass_fields__
     )
 
-    assert len(_SCHEMA["oneOf"]) == 49, "schema oneOf count should be 49 after Plan 28-09"
-    assert wrapper_count == 49, f"wrapper count {wrapper_count} != 49"
+    assert len(_SCHEMA["oneOf"]) == 55, "schema oneOf count should be 55 after Plan 29-03"
+    assert wrapper_count == 55, f"wrapper count {wrapper_count} != 55"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

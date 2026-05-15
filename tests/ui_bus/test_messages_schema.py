@@ -39,9 +39,17 @@ from vibemix.ui_bus import (
     CalibrationStartMidiListen,
     CalibrationUserHeardTone,
     CalibrationWindowList,
+    ChapterRegionPayload,
+    DebriefChapterList,
     DebriefCitationSummary,
+    DebriefCitationTooltip,
+    DebriefCitationTooltipReq,
+    DebriefDrills,
+    DebriefError,
     DebriefEventTimeline,
     DebriefSessionLoaded,
+    DebriefTldrAudio,
+    DrillPayload,
     DeviceInfo,
     IpcBoot,
     IpcError,
@@ -300,6 +308,67 @@ def _make_examples() -> list[tuple[str, object]]:
                 ),
             ),
         ),
+        # Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers.
+        (
+            "DebriefChapterList",
+            DebriefChapterList.make(
+                chapters=(
+                    ChapterRegionPayload(
+                        id="track-01",
+                        start=0.0,
+                        end=300.0,
+                        label="Track 1: Opening",
+                        kind="track",
+                        citation_event_id="ev:TRACK_CHANGE@00:00",
+                    ),
+                ),
+                derived_at="2026-05-15T11:21:39.656+00:00",
+            ),
+        ),
+        (
+            "DebriefTldrAudio",
+            DebriefTldrAudio.make(
+                audio_relative_path="debrief_tldr.mp3",
+                duration_s=75.0,
+                tldr_sha256="a" * 64,
+                mime_type="audio/mpeg",
+            ),
+        ),
+        (
+            "DebriefDrills",
+            DebriefDrills.make(
+                drills=tuple(
+                    DrillPayload(
+                        situation=f"Drill {i} situation",
+                        behavior=f"Behavior [ev:MIX_MOVE@01:0{i}]",
+                        impact=f"Impact [ev:PHASE@01:1{i}]",
+                        action_recommended=f"Action [track:t{i}]",
+                        citation=f"[ev:MIX_MOVE@01:0{i}]",
+                    )
+                    for i in range(3)
+                ),
+            ),
+        ),
+        (
+            "DebriefCitationTooltipReq",
+            DebriefCitationTooltipReq.make(event_id="ev:MIX_MOVE@01:23"),
+        ),
+        (
+            "DebriefCitationTooltip",
+            DebriefCitationTooltip.make(
+                event_id="ev:MIX_MOVE@01:23",
+                evidence_text="A_filter boost at 1:23",
+                timestamp=83.0,
+                found=True,
+            ),
+        ),
+        (
+            "DebriefError",
+            DebriefError.make(
+                reason="session_too_short",
+                message="Session is 120s; need >= 300s.",
+            ),
+        ),
         # Phase 28 Plan 28-09 — 10 library.* messages.
         (
             "LibraryImport",
@@ -400,9 +469,11 @@ def test_example_count_matches_schema_oneof() -> None:
     schemas (LibraryImport, LibraryImportProgress, LibraryImportCancel,
     LibrarySearchRequest, LibrarySearchResult, LibraryConfidence,
     LibraryStalenessNudge, LibraryStalenessAction, LibrarySimilarRequest,
-    LibrarySimilarResult) → 49.
+    LibrarySimilarResult) → 49. Phase 29 Plan 29-03 adds 6 DEBRIEF v2.1
+    additive wrappers (DebriefChapterList, DebriefTldrAudio, DebriefDrills,
+    DebriefCitationTooltipReq, DebriefCitationTooltip, DebriefError) → 55.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 49
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 55
 
 
 @pytest.mark.parametrize(
@@ -424,22 +495,23 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_49() -> None:
+def test_schema_oneof_count_is_55() -> None:
     """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
     (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
     7 recordings.* families → 34; Phase 20-04 adds 1 (SessionCitation) → 35;
     Phase 24-02 adds 1 (SessionOverlayHighlight) → 36; Phase 25 Plan 25-03
     adds 3 DEBRIEF architectural-slot reservations → 39; Phase 28 Plan 28-09
-    adds 10 library.* messages → 49.
+    adds 10 library.* messages → 49; Phase 29 Plan 29-03 adds 6 DEBRIEF v2.1
+    additive wrappers → 55.
 
-    ``definitions`` is 50 because ``LevelPair`` is a shared helper ref'd
-    from ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message
-    (so it counts in ``definitions`` but not in ``oneOf``); the DEBRIEF and
-    library entries appear in BOTH ``oneOf`` and ``definitions``, so the
-    skew between the two counts stays at 1.
+    ``definitions`` count grows alongside oneOf since every new wrapper
+    adds one entry to both. ``LevelPair`` is a shared helper ref'd from
+    ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message
+    (so it counts in ``definitions`` but not in ``oneOf``); the skew
+    between the two counts stays at 1.
     """
-    assert len(_SCHEMA["oneOf"]) == 49
-    assert len(_SCHEMA["definitions"]) == 50
+    assert len(_SCHEMA["oneOf"]) == 55
+    assert len(_SCHEMA["definitions"]) == 56
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

@@ -29,6 +29,8 @@ import jsonschema
 
 # Import the wrapper module + bring it into local scope for introspection.
 from vibemix.ui_bus import (
+    ChapterRegionPayload,
+    DrillPayload,
     CalibrationAudioResult,
     CalibrationDeviceList,
     CalibrationListDevices,
@@ -42,9 +44,15 @@ from vibemix.ui_bus import (
     CalibrationStartMidiListen,
     CalibrationUserHeardTone,
     CalibrationWindowList,
+    DebriefChapterList,
     DebriefCitationSummary,
+    DebriefCitationTooltip,
+    DebriefCitationTooltipReq,
+    DebriefDrills,
+    DebriefError,
     DebriefEventTimeline,
     DebriefSessionLoaded,
+    DebriefTldrAudio,
     DeviceInfo,
     IpcBoot,
     IpcError,
@@ -294,6 +302,67 @@ def _minimal_examples() -> list[tuple[str, object]]:
                     {"t": 0.0, "kind": "session_start"},
                     {"t": 3.21, "kind": "trigger"},
                 ),
+            ),
+        ),
+        # Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers
+        (
+            "DebriefChapterList",
+            DebriefChapterList.make(
+                chapters=(
+                    ChapterRegionPayload(
+                        id="track-01",
+                        start=0.0,
+                        end=300.0,
+                        label="Track 1: Opening",
+                        kind="track",
+                        citation_event_id="ev:TRACK_CHANGE@00:00",
+                    ),
+                ),
+                derived_at="2026-05-15T11:21:39.656+00:00",
+            ),
+        ),
+        (
+            "DebriefTldrAudio",
+            DebriefTldrAudio.make(
+                audio_relative_path="debrief_tldr.mp3",
+                duration_s=75.0,
+                tldr_sha256="a" * 64,
+                mime_type="audio/mpeg",
+            ),
+        ),
+        (
+            "DebriefDrills",
+            DebriefDrills.make(
+                drills=tuple(
+                    DrillPayload(
+                        situation=f"Drill {i} situation",
+                        behavior=f"Behavior [ev:MIX_MOVE@01:0{i}]",
+                        impact=f"Impact [ev:PHASE@01:1{i}]",
+                        action_recommended=f"Action [track:t{i}]",
+                        citation=f"[ev:MIX_MOVE@01:0{i}]",
+                    )
+                    for i in range(3)
+                ),
+            ),
+        ),
+        (
+            "DebriefCitationTooltipReq",
+            DebriefCitationTooltipReq.make(event_id="ev:MIX_MOVE@01:23"),
+        ),
+        (
+            "DebriefCitationTooltip",
+            DebriefCitationTooltip.make(
+                event_id="ev:MIX_MOVE@01:23",
+                evidence_text="A_filter boost at 1:23",
+                timestamp=83.0,
+                found=True,
+            ),
+        ),
+        (
+            "DebriefError",
+            DebriefError.make(
+                reason="session_too_short",
+                message="Session is 120s; need >= 300s.",
             ),
         ),
         # Phase 28 Plan 09 — Library IPC

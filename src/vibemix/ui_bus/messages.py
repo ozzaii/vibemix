@@ -31,9 +31,17 @@ import jsonschema
 
 from vibemix.ui_bus.schemas.citation import SessionCitationPayload
 from vibemix.ui_bus.schemas.debrief import (
+    ChapterRegionPayload,
+    DebriefChapterListPayload,
     DebriefCitationSummaryPayload,
+    DebriefCitationTooltipPayload,
+    DebriefCitationTooltipReqPayload,
+    DebriefDrillsPayload,
+    DebriefErrorPayload,
     DebriefEventTimelinePayload,
     DebriefSessionLoadedPayload,
+    DebriefTldrAudioPayload,
+    DrillPayload,
 )
 from vibemix.ui_bus.schemas.library import (
     LibraryConfidencePayload,
@@ -1426,6 +1434,159 @@ class DebriefEventTimeline:
             type="ipc.debrief.event-timeline",
             ts=_now_iso(),
             payload=DebriefEventTimelinePayload(events=events_tuple),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+# ---------------------------------------------------------------------------
+# Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers (P82 lock baseline)
+# ---------------------------------------------------------------------------
+# These 6 wrappers extend the debrief.v1 namespace ADDITIVELY beside the
+# 3 Phase 25 baselines (DebriefSessionLoaded / DebriefCitationSummary /
+# DebriefEventTimeline). The baselines are frozen — see
+# tests/ui_bus/test_debrief_schema_additive_only.py.
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefChapterList:
+    type: Literal["ipc.debrief.chapter-list"]
+    ts: str
+    payload: DebriefChapterListPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        chapters: tuple[ChapterRegionPayload, ...] | list[ChapterRegionPayload],
+        derived_at: str,
+    ) -> DebriefChapterList:
+        return cls(
+            type="ipc.debrief.chapter-list",
+            ts=_now_iso(),
+            payload=DebriefChapterListPayload(
+                chapters=tuple(chapters),
+                derived_at=derived_at,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefTldrAudio:
+    type: Literal["ipc.debrief.tldr-audio"]
+    ts: str
+    payload: DebriefTldrAudioPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        audio_relative_path: str,
+        duration_s: float,
+        tldr_sha256: str,
+        mime_type: str = "audio/mpeg",
+    ) -> DebriefTldrAudio:
+        return cls(
+            type="ipc.debrief.tldr-audio",
+            ts=_now_iso(),
+            payload=DebriefTldrAudioPayload(
+                audio_relative_path=audio_relative_path,
+                duration_s=duration_s,
+                tldr_sha256=tldr_sha256,
+                mime_type=mime_type,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefDrills:
+    type: Literal["ipc.debrief.drills"]
+    ts: str
+    payload: DebriefDrillsPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        drills: tuple[DrillPayload, ...] | list[DrillPayload],
+    ) -> DebriefDrills:
+        return cls(
+            type="ipc.debrief.drills",
+            ts=_now_iso(),
+            payload=DebriefDrillsPayload(drills=tuple(drills)),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefCitationTooltipReq:
+    type: Literal["ipc.debrief.citation-tooltip-request"]
+    ts: str
+    payload: DebriefCitationTooltipReqPayload
+
+    @classmethod
+    def make(cls, *, event_id: str) -> DebriefCitationTooltipReq:
+        return cls(
+            type="ipc.debrief.citation-tooltip-request",
+            ts=_now_iso(),
+            payload=DebriefCitationTooltipReqPayload(event_id=event_id),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefCitationTooltip:
+    type: Literal["ipc.debrief.citation-tooltip"]
+    ts: str
+    payload: DebriefCitationTooltipPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        event_id: str,
+        evidence_text: str,
+        timestamp: float,
+        found: bool,
+    ) -> DebriefCitationTooltip:
+        return cls(
+            type="ipc.debrief.citation-tooltip",
+            ts=_now_iso(),
+            payload=DebriefCitationTooltipPayload(
+                event_id=event_id,
+                evidence_text=evidence_text,
+                timestamp=timestamp,
+                found=found,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefError:
+    type: Literal["ipc.debrief.error"]
+    ts: str
+    payload: DebriefErrorPayload
+
+    @classmethod
+    def make(cls, *, reason: str, message: str) -> DebriefError:
+        return cls(
+            type="ipc.debrief.error",
+            ts=_now_iso(),
+            payload=DebriefErrorPayload(reason=reason, message=message),
         )
 
     def to_json(self) -> str:

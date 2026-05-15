@@ -114,6 +114,13 @@ from vibemix.ui_bus.messages import (
     DebriefSessionLoaded,
     DebriefCitationSummary,
     DebriefEventTimeline,
+    # Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers
+    DebriefChapterList,
+    DebriefTldrAudio,
+    DebriefDrills,
+    DebriefCitationTooltipReq,
+    DebriefCitationTooltip,
+    DebriefError,
     SessionMute,
     SessionMutePayload,
     SessionSnapshot,
@@ -131,9 +138,17 @@ from vibemix.ui_bus.messages import (
 )
 from vibemix.ui_bus.schemas.citation import SessionCitationPayload
 from vibemix.ui_bus.schemas.debrief import (
+    ChapterRegionPayload,
+    DebriefChapterListPayload,
     DebriefCitationSummaryPayload,
+    DebriefCitationTooltipPayload,
+    DebriefCitationTooltipReqPayload,
+    DebriefDrillsPayload,
+    DebriefErrorPayload,
     DebriefEventTimelinePayload,
     DebriefSessionLoadedPayload,
+    DebriefTldrAudioPayload,
+    DrillPayload,
 )
 from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
 from vibemix.ui_bus.validator import parse_message, validate_message
@@ -218,6 +233,21 @@ __all__ = [
     "DebriefEventTimelinePayload",
     "DebriefSessionLoaded",
     "DebriefSessionLoadedPayload",
+    # Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers
+    "ChapterRegionPayload",
+    "DebriefChapterList",
+    "DebriefChapterListPayload",
+    "DebriefCitationTooltip",
+    "DebriefCitationTooltipPayload",
+    "DebriefCitationTooltipReq",
+    "DebriefCitationTooltipReqPayload",
+    "DebriefDrills",
+    "DebriefDrillsPayload",
+    "DebriefError",
+    "DebriefErrorPayload",
+    "DebriefTldrAudio",
+    "DebriefTldrAudioPayload",
+    "DrillPayload",
     # Phase 28 Plan 09 — Library IPC
     "LibraryConfidence",
     "LibraryConfidencePayload",

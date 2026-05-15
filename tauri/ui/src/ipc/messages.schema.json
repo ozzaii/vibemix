@@ -122,6 +122,24 @@
       "$ref": "#/definitions/DebriefEventTimeline"
     },
     {
+      "$ref": "#/definitions/DebriefChapterList"
+    },
+    {
+      "$ref": "#/definitions/DebriefTldrAudio"
+    },
+    {
+      "$ref": "#/definitions/DebriefDrills"
+    },
+    {
+      "$ref": "#/definitions/DebriefCitationTooltipReq"
+    },
+    {
+      "$ref": "#/definitions/DebriefCitationTooltip"
+    },
+    {
+      "$ref": "#/definitions/DebriefError"
+    },
+    {
       "$ref": "#/definitions/LibraryImport"
     },
     {
@@ -1963,6 +1981,168 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "DebriefChapterList": {
+      "$comment": "Phase 29 Plan 29-03 \u2014 DEBRIEF v2.1 additive (P82 lock). Sidecar \u2192 shell. Chapter list emitted after debrief.chapters.derive_chapters runs. Renderer mounts ChapterList + Timeline regions.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": { "const": "ipc.debrief.chapter-list" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["chapters", "derived_at"],
+          "properties": {
+            "chapters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "start", "end", "label", "kind", "citation_event_id"],
+                "properties": {
+                  "id": { "type": "string", "minLength": 1 },
+                  "start": { "type": "number", "minimum": 0 },
+                  "end": { "type": "number", "minimum": 0 },
+                  "label": { "type": "string" },
+                  "kind": {
+                    "type": "string",
+                    "enum": ["track", "phase", "layer", "mix", "crowd"]
+                  },
+                  "citation_event_id": { "type": "string" }
+                }
+              }
+            },
+            "derived_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "DebriefTldrAudio": {
+      "$comment": "Phase 29 Plan 29-03 \u2014 DEBRIEF v2.1 additive (P82 lock). Sidecar \u2192 shell. Points to the on-disk debrief_tldr.mp3; renderer fetches via asset://. MP3-only per P81; duration_s is 60-90s per DEBRIEF-04.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": { "const": "ipc.debrief.tldr-audio" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["audio_relative_path", "duration_s", "tldr_sha256", "mime_type"],
+          "properties": {
+            "audio_relative_path": { "type": "string", "minLength": 1 },
+            "duration_s": { "type": "number", "minimum": 0 },
+            "tldr_sha256": { "type": "string", "minLength": 1 },
+            "mime_type": { "type": "string", "enum": ["audio/mpeg"] }
+          }
+        }
+      }
+    },
+    "DebriefDrills": {
+      "$comment": "Phase 29 Plan 29-03 \u2014 DEBRIEF v2.1 additive (P82 lock). Sidecar \u2192 shell. Exactly 3 SBI/STAR-AR drills per DEBRIEF-06. Each drill carries situation/behavior/impact/action_recommended + a canonical [ev:*]/[track:*]/[mix:*] citation tag.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": { "const": "ipc.debrief.drills" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["drills"],
+          "properties": {
+            "drills": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["situation", "behavior", "impact", "action_recommended", "citation"],
+                "properties": {
+                  "situation": { "type": "string" },
+                  "behavior": { "type": "string" },
+                  "impact": { "type": "string" },
+                  "action_recommended": { "type": "string" },
+                  "citation": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "DebriefCitationTooltipReq": {
+      "$comment": "Phase 29 Plan 29-03 \u2014 DEBRIEF v2.1 additive (P82 lock). Renderer \u2192 sidecar. Ask the sidecar to look up the evidence behind a citation tag from the in-memory EvidenceRegistry snapshot.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": { "const": "ipc.debrief.citation-tooltip-request" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_id"],
+          "properties": {
+            "event_id": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "DebriefCitationTooltip": {
+      "$comment": "Phase 29 Plan 29-03 \u2014 DEBRIEF v2.1 additive (P82 lock). Sidecar \u2192 renderer. Resolved evidence behind a citation tag. found=false means the snapshot didn't have it within \u00b12.0s tolerance (Phase 20 debrief band).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": { "const": "ipc.debrief.citation-tooltip" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_id", "evidence_text", "timestamp", "found"],
+          "properties": {
+            "event_id": { "type": "string" },
+            "evidence_text": { "type": "string" },
+            "timestamp": { "type": "number", "minimum": 0 },
+            "found": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "DebriefError": {
+      "$comment": "Phase 29 Plan 29-03 \u2014 DEBRIEF v2.1 additive (P82 lock). Sidecar \u2192 renderer. Error envelope. reason is allowlisted; message is developer-readable detail. Renderer maps reason to user-facing copy in error-banner.ts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": { "const": "ipc.debrief.error" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reason", "message"],
+          "properties": {
+            "reason": {
+              "type": "string",
+              "enum": [
+                "events_missing",
+                "session_too_short",
+                "invalid_session_dir",
+                "sidecar_crashed",
+                "tldr_generation_failed",
+                "drills_generation_failed",
+                "port_in_use",
+                "unknown_kind"
+              ]
+            },
+            "message": { "type": "string" }
           }
         }
       }
