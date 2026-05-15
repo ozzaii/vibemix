@@ -109,6 +109,164 @@ def kick_band_centroid(
     return centroid
 
 
+def band_spectral_flatness(
+    samples: np.ndarray,
+    sample_rate: int,
+    *,
+    low_hz: float = 200.0,
+    high_hz: float = 2000.0,
+) -> float:
+    """Wiener entropy (spectral flatness) restricted to [low_hz, high_hz].
+
+    Returns ``geometric_mean(mag) / arithmetic_mean(mag)`` over the in-band
+    FFT magnitudes. Pure tones / harmonic signals → close to 0. White noise
+    / heavily-distorted / saturated signals → close to 1. The 200–2000Hz
+    band is the Hard Tek "distortion smear" region (sub band 40-120Hz isn't
+    saturated by the same hardware-clipping signature; >2kHz is dominated by
+    hi-hats which always sit high-flatness regardless of distortion).
+
+    Numerical stability: uses log-sum trick (``exp(mean(log(mag + ε)))``)
+    so a zero-magnitude bin doesn't collapse the geometric mean to 0.
+
+    Anti-hallucination: silent input (no in-band energy) → 0.0. Never
+    fabricate a flatness value from the noise floor of an empty buffer.
+
+    Phase 30 SENSE-17 primitive. Used by DistortionClimbDetector.
+    """
+    if samples is None or samples.size == 0:
+        return 0.0
+    mag, freqs = _windowed_spectrum(samples, sample_rate)
+    mask = (freqs >= low_hz) & (freqs <= high_hz)
+    if not mask.any():
+        return 0.0
+    band_mag = mag[mask]
+    total = float(band_mag.sum())
+    if total <= 0.0:
+        return 0.0
+    eps = 1e-12
+    # Log-sum trick for geometric mean: GM = exp(mean(log(x))). Adding eps
+    # before the log keeps zero-magnitude bins from collapsing the result.
+    geo = float(np.exp(np.mean(np.log(band_mag + eps))))
+    arith = float(np.mean(band_mag))
+    if arith <= 0.0:
+        return 0.0
+    return geo / arith
+
+
+def harmonic_distortion_proxy(
+    samples: np.ndarray,
+    sample_rate: int,
+    *,
+    fundamental_hz: float = 60.0,
+    n_harmonics: int = 6,
+    bin_window_hz: float = 5.0,
+) -> float:
+    """Ratio of odd-harmonic energy to even-harmonic energy of ``fundamental_hz``.
+
+    Distortion — especially hard-clipping / saturation that Hard Tek kicks
+    are run through — emphasises odd harmonics (3rd, 5th) over even
+    (2nd, 4th, 6th). A clean sine has near-zero harmonic content; a
+    saturated kick has odd-dominant content. Ratio in [0.0, ∞]; baseline
+    pure-tone ≈ 0.0, mild distortion ≈ 0.5-1.5, hard saturation ≥ 1.5.
+
+    ``bin_window_hz`` widens the per-harmonic energy integration so an FFT
+    bin that doesn't exactly straddle the harmonic frequency still picks up
+    its energy (Hanning side-lobes spread peaks across ~2-3 bins).
+
+    Anti-hallucination: silent input → 0.0. No fabricated harmonic content.
+
+    Phase 30 SENSE-17 primitive. Used by DistortionClimbDetector.
+    """
+    if samples is None or samples.size == 0:
+        return 0.0
+    mag, freqs = _windowed_spectrum(samples, sample_rate)
+    total = float(mag.sum())
+    if total <= 0.0:
+        return 0.0
+    odd_energy = 0.0
+    even_energy = 0.0
+    for h in range(2, n_harmonics + 1):  # start at 2 (skip fundamental)
+        target = fundamental_hz * h
+        if target >= sample_rate / 2.0:
+            break
+        mask = (freqs >= target - bin_window_hz) & (freqs <= target + bin_window_hz)
+        if not mask.any():
+            continue
+        energy = float(np.sum(mag[mask] ** 2))
+        if h % 2 == 1:
+            odd_energy += energy
+        else:
+            even_energy += energy
+    return odd_energy / (even_energy + 1e-12)
+
+
+def dominant_freq_in_band(
+    samples: np.ndarray,
+    sample_rate: int,
+    *,
+    low_hz: float = 200.0,
+    high_hz: float = 800.0,
+) -> float:
+    """Frequency (Hz) of the highest-magnitude FFT bin within [low_hz, high_hz].
+
+    Used by AcidLineEntryDetector to track a TB-303 formant sweep. Returns
+    0.0 on silence OR when the in-band energy is < 1% of the total spectrum
+    (out-of-band guard mirrors ``kick_band_centroid`` — a hi-hat at 4kHz
+    must NOT register as a "dominant in-band freq" via FFT leakage).
+
+    Phase 30 SENSE-18 primitive.
+    """
+    if samples is None or samples.size == 0:
+        return 0.0
+    mag, freqs = _windowed_spectrum(samples, sample_rate)
+    mask = (freqs >= low_hz) & (freqs <= high_hz)
+    if not mask.any():
+        return 0.0
+    full_total = float(mag.sum())
+    if full_total <= 0.0:
+        return 0.0
+    band_mag = mag * mask
+    band_total = float(band_mag.sum())
+    if band_total <= 0.0:
+        return 0.0
+    # Out-of-band guard — same 1% floor as kick_band_centroid.
+    if band_total / full_total < 0.01:
+        return 0.0
+    peak_idx = int(np.argmax(band_mag))
+    return float(freqs[peak_idx])
+
+
+def band_resonance_q(
+    samples: np.ndarray,
+    sample_rate: int,
+    *,
+    low_hz: float = 200.0,
+    high_hz: float = 800.0,
+) -> float:
+    """Peak-to-mean magnitude ratio within [low_hz, high_hz] — proxy for Q.
+
+    A high-Q resonant peak (TB-303 self-oscillation territory) → ratio > 8.
+    Flat band noise → ratio ≈ 1. The proxy is monotonic in resonance Q
+    without needing a full bandwidth measurement.
+
+    Returns 0.0 on silence.
+
+    Phase 30 SENSE-18 primitive. Used by AcidLineEntryDetector.
+    """
+    if samples is None or samples.size == 0:
+        return 0.0
+    mag, freqs = _windowed_spectrum(samples, sample_rate)
+    mask = (freqs >= low_hz) & (freqs <= high_hz)
+    if not mask.any():
+        return 0.0
+    band_mag = mag[mask]
+    mean_mag = float(np.mean(band_mag))
+    if mean_mag <= 0.0:
+        return 0.0
+    peak_mag = float(np.max(band_mag))
+    return peak_mag / (mean_mag + 1e-12)
+
+
 def sub_share(
     samples: np.ndarray,
     sample_rate: int,

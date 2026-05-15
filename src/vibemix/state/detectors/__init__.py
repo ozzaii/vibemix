@@ -39,7 +39,9 @@ shared mutable state across genre swaps.
 
 from __future__ import annotations
 
+from vibemix.state.detectors.acid_line_entry import AcidLineEntryDetector
 from vibemix.state.detectors.breakdown_kick_kill import BreakdownKickKillDetector
+from vibemix.state.detectors.distortion_climb import DistortionClimbDetector
 from vibemix.state.detectors.kick_density_shift import KickDensityShiftDetector
 from vibemix.state.detectors.kick_swap import KickSwapDetector
 from vibemix.state.detectors.phrase_boundary import PhraseBoundaryDetector
@@ -47,7 +49,9 @@ from vibemix.state.detectors.reentry_kick_land import ReentryKickLandDetector
 from vibemix.state.detectors.sub_layer_arrival import SubLayerArrivalDetector
 
 __all__: list[str] = [
+    "AcidLineEntryDetector",
     "BreakdownKickKillDetector",
+    "DistortionClimbDetector",
     "KickDensityShiftDetector",
     "KickSwapDetector",
     "PhraseBoundaryDetector",

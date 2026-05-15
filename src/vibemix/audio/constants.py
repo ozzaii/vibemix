@@ -81,6 +81,12 @@ MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 e
     # the meaningful unit (PHRASE_BOUNDARY_MIN_BARS_BETWEEN_FIRES below); the
     # 24s wall-clock floor is a redundant guard.
     "PHRASE_BOUNDARY": 24.0,
+    # Phase 30 SENSE-17/18 — Hard Tek genre-specific detector cooldowns.
+    # Tight relative to PHASE/MIX_MOVE because Hard Tek climbs evolve fast
+    # (every 6-8s a fresh distortion stack arrives in a 4-minute peak-time
+    # track); longer would silently swallow a real moment.
+    "DISTORTION_CLIMB": 6.0,
+    "ACID_LINE_ENTRY": 8.0,
 }
 
 TRACK_CHANGE_MIN_CONFIDENCE = 0.5  # v4:143 — ignore stale nowplaying-cli phantom tracks
@@ -199,3 +205,30 @@ BPM_CONFIDENCE_MIN_FOR_DOWNBEAT: float = 0.5
 # the semantic name (the underlying number is the same: lock seeding and
 # the per-tick gate share one threshold).
 PHRASE_BOUNDARY_MIN_LOCK_CONFIDENCE: float = BPM_CONFIDENCE_MIN_FOR_DOWNBEAT
+
+# ---- Phase 30 — DISTORTION_CLIMB thresholds (SENSE-17) ----
+# DISTORTION_CLIMB fires when a band-limited spectral-flatness rise (signal
+# becomes more noise-like as harmonic distortion stacks up) AND an odd-vs-
+# even harmonic-energy proxy (clipping emphasises odd harmonics) AND
+# sustained kick density (we're inside a busy Hard Tek section, not a
+# breakdown) all coincide within a 2s window.
+DISTORTION_FLATNESS_DELTA_MIN: float = 0.15  # 4-window rise threshold
+DISTORTION_HARMONIC_RATIO_MIN: float = 1.5   # odd/even harmonic energy ratio
+DISTORTION_KICK_DENSITY_MIN: float = 8.0     # onsets/sec sustained floor
+DISTORTION_KICK_DENSITY_SUSTAIN_S: float = 4.0  # density must hold this long
+DISTORTION_FLATNESS_WINDOW: int = 4          # samples in flatness history
+DISTORTION_FUNDAMENTAL_HZ: float = 60.0      # kick fundamental for harmonic gate
+
+# ---- Phase 30 — ACID_LINE_ENTRY thresholds (SENSE-18) ----
+# ACID_LINE_ENTRY fires when a TB-303-style formant sweeps through the
+# 200-800Hz band over >=1.5s WITH a resonance-Q rise (proxy: peak-to-mean
+# magnitude in band climbs from <3 to >8). Both must coexist inside a 3s
+# evaluation window.
+ACID_FORMANT_LOW_HZ: float = 200.0
+ACID_FORMANT_HIGH_HZ: float = 800.0
+ACID_SWEEP_SLOPE_MIN_OCT_PER_S: float = 0.2
+ACID_SWEEP_MIN_SPAN_S: float = 1.5
+ACID_SWEEP_WINDOW_S: float = 3.0
+ACID_RESONANCE_LOW_MAX: float = 3.0  # early-window Q must drop below this
+ACID_RESONANCE_HIGH_MIN: float = 8.0  # late-window Q must climb above this
+ACID_SNAPSHOT_WINDOW_S: float = 1.5  # samples snapshot per tick

@@ -36,6 +36,11 @@ EVENT_PRIORITY: dict[str, int] = {
     "TRACK_CHANGE": 7,
     "PHASE": 6,
     "MIX_MOVE": 5,
+    # Phase 30 Hard Tek overlay detectors — sit just above LAYER_ARRIVAL
+    # because a distortion climb / acid-line entry IS the moment in a Hard
+    # Tek set worth calling out, on a par with a structural mix move.
+    "DISTORTION_CLIMB": 5,
+    "ACID_LINE_ENTRY": 5,
     "LAYER_ARRIVAL": 4,
     "HEARTBEAT": 1,
 }
