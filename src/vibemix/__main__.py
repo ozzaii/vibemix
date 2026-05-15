@@ -681,6 +681,26 @@ async def main() -> None:
     else:
         print("-> library: no cache at ~/.cache/vibemix/library.pkl — citations limited to nowplaying-cli")
 
+    # ── Plan 28-07 — 30-day staleness nudge ──
+    # Once-per-boot check. emit_ipc currently logs to stdout; the renderer
+    # IpcBus subscription is added in the same wave's UI banner spec. Plan
+    # 28-09's ipc.library.staleness_nudge schema validates the payload shape.
+    try:
+        from vibemix.library import emit_nudge_if_stale as _emit_staleness
+
+        def _staleness_emit(msg_type: str, payload: dict) -> None:
+            # v1: log a structured line; the WS bus broadcast path lands
+            # alongside the Plan 28-06 drag-drop wiring (same renderer
+            # subscription pipeline).
+            print(
+                f"-> [ipc.outbound] {msg_type} {payload}",
+                flush=True,
+            )
+
+        _emit_staleness(_staleness_emit, library_cache)
+    except Exception as e:
+        print(f"-> staleness check failed: {e}", file=sys.stderr)
+
     session = AgentSession(llm=llm_inst, tts=tts_inst)
     session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
     print(f"-> AgentSession headless (no Room); audio out → PlaybackQueue @ {OUTPUT_SR}Hz")

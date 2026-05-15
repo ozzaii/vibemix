@@ -22,6 +22,14 @@ from vibemix.library.rekordbox import (
     RekordboxLibrary,
     TrackEntry,
 )
+from vibemix.library.staleness import (
+    SNOOZE_DURATION_SECONDS,
+    STALE_AGE_SECONDS,
+    apply_snooze_action,
+    emit_nudge_if_stale,
+    is_snoozed,
+    is_stale,
+)
 from vibemix.library.store import LibraryStore, open_store, snapshot_hash
 
 __all__ = [
@@ -33,8 +41,14 @@ __all__ = [
     "LibraryStore",
     "NumpyStore",
     "RekordboxLibrary",
+    "SNOOZE_DURATION_SECONDS",
+    "STALE_AGE_SECONDS",
     "TrackEntry",
+    "apply_snooze_action",
     "cosine_topk",
+    "emit_nudge_if_stale",
+    "is_snoozed",
+    "is_stale",
     "l2_normalize",
     "open_store",
     "snapshot_hash",

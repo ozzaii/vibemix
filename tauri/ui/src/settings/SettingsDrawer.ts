@@ -49,6 +49,7 @@ import {
   renderHotkeyCapture,
   type HotkeyCaptureHandle,
 } from "./components/hotkey-capture.js";
+import { renderStalenessBanner } from "./components/staleness-banner.js";
 import {
   renderRecordingBrowser,
   type RecordingBrowserHandle,
@@ -646,6 +647,21 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     renderSettingsGroup({
       header: "RECORDING",
       children: recordingBody,
+    }),
+  );
+
+  // --- LIBRARY (Phase 28 Plan 07 + 06 wave) --------------------------------
+  // Plan 07: 30-day staleness banner mounts at the top of LIBRARY section.
+  // Plan 06 will mount the drag-drop importer directly below this.
+  const libraryBody = document.createElement("div");
+  libraryBody.style.cssText =
+    "display:flex; flex-direction:column; gap: var(--sp-2);";
+  const stalenessHandle = renderStalenessBanner();
+  libraryBody.append(stalenessHandle.element);
+  body.append(
+    renderSettingsGroup({
+      header: "LIBRARY",
+      children: libraryBody,
     }),
   );
 
