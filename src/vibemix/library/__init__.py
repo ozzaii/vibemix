@@ -35,6 +35,7 @@ from vibemix.library.search import (
     VibeSearchResult,
     vibe_search,
 )
+from vibemix.library.similar import SimilarResult, similar_to
 from vibemix.library.staleness import (
     SNOOZE_DURATION_SECONDS,
     STALE_AGE_SECONDS,
@@ -60,6 +61,7 @@ __all__ = [
     "RekordboxLibrary",
     "SNOOZE_DURATION_SECONDS",
     "STALE_AGE_SECONDS",
+    "SimilarResult",
     "TRACK_AWARE_EVENTS",
     "TrackEntry",
     "UNCERTAIN_THRESHOLD",
@@ -72,6 +74,7 @@ __all__ = [
     "is_stale",
     "l2_normalize",
     "open_store",
+    "similar_to",
     "snapshot_hash",
     "vibe_search",
 ]

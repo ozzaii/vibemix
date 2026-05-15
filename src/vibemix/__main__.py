@@ -908,10 +908,16 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_search.set_defaults(func=_cmd_library_search)
 
-    # Plan 28-05 — similar (USER-ASKED only; placeholder until plan ships)
+    # Plan 28-05 — similar (USER-ASKED only; never autosurfaces)
     sp_similar = sub.add_parser(
         "similar",
         help="Find tracks similar to a seed track (USER-ASKED only)",
+        description=(
+            "USER-ASKED similar-track lookup. This command is the only "
+            "supported entrypoint — vibemix never autosurfaces 'you might "
+            "also like' suggestions in live sessions (anti-feature guard "
+            "per CONTEXT LIBRARY-14)."
+        ),
     )
     sp_similar.add_argument("track_id", help="seed track id")
     sp_similar.add_argument("--k", type=int, default=10)
