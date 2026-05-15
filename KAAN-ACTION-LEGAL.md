@@ -10,6 +10,29 @@ gracefully (skip-with-note pattern).
 
 ---
 
+## LEGAL-CAPACITY CARVEOUTS (Pitfall P46 — hard rule)
+
+**Autonomous agents (Claude or otherwise) operating on this repo must
+NEVER discharge the following items.** They require human legal capacity
+or human identity attestation:
+
+1. **DIST-09 — Apple Developer Program Agreement update.** Francesco-action
+   (legal entity capacity — Bravoh SAGL signatory). See §6 below.
+2. **DIST-11 — SignPath OSS Foundation application.** Kaan-action (identity
+   attestation — the human who owns the OSS project). See §7 below.
+
+The remaining items below (cert generation, secret upload, smoke-tests)
+are **post-approval mechanical steps**. Once the two carveouts above
+discharge, Kaan can perform them autonomously or via guided automation.
+
+**CI enforcement (P46 audit):** `.github/workflows/verify-signed.yml` and
+`.github/workflows/release.yml` greps for forbidden `(curl|wget|
+Invoke-WebRequest|Invoke-RestMethod).*(POST|PUT).*(apple\.com|signpath\.io|
+notarytool)` patterns in any workflow or script. CI fails fast if an
+autonomous-discharge attempt slips through.
+
+---
+
 ## 1. PGP key for `security@bravoh.com` (SEC-06)
 
 **File to replace:** [`KAAN-PGP-PLACEHOLDER.asc`](./KAAN-PGP-PLACEHOLDER.asc)
@@ -127,3 +150,148 @@ Claude (and any other AI agent operating on this repo) **must not**:
 
 The `.github/workflows/verify-signed.yml::audit-no-apple-signpath-post`
 job is the persistent gate.
+
+---
+
+## 6. DIST-09 — Apple Developer Program Agreement update (FRANCESCO-ACTION)
+
+**REQ-ID:** DIST-09
+**Owner:** Francesco (Bravoh cofounder, legal entity signatory)
+**Status:** ☐ pending  ☐ in-progress  ☐ done
+**Effort:** ~10 minutes once Francesco logs in
+**Blocking for:** v1 launch (any tagged release that needs signed macOS binaries)
+
+### Why this is FRANCESCO-action
+
+Apple's Developer Program License Agreement updates require **acceptance
+by a person with legal capacity to bind the developer entity** (here:
+Bravoh SAGL). Francesco is the cofounder with that capacity. Claude (and
+any other AI agent) **cannot** legally accept this on Bravoh's behalf —
+Pitfall P46 hard rule.
+
+### Protocol
+
+1. Francesco logs into <https://developer.apple.com/account/> with the
+   Bravoh org's Apple ID (NOT a personal Apple ID).
+2. Banner at top: "Review and accept the updated Developer Program
+   License Agreement." Click → read → accept.
+3. If Apple prompts for an entity update (e.g. updated D-U-N-S, address,
+   tax info) → complete it. May require uploading a corporate document
+   (Camera di Commercio certificate) — Francesco knows where this is.
+4. Confirm the org page shows "Active" + green checkmark on the
+   "Program License Agreement" row.
+5. Update this section's checkbox to ☑ done with date.
+
+### What unblocks
+
+- Apple Developer ID Application certificate generation (mechanical, §2 above).
+- GitHub Secret upload (mechanical, §2 above).
+- macOS sign + notarize CI leg (`release.yml::build-macos::SIGN + PACKAGE`).
+
+### Sign-off block
+
+```
+DIST-09 ACCEPTED by:    _____________________   (Francesco signature)
+Date:                   _____________________
+Bravoh org Apple ID:    _____________________   (last 4 chars only — full ID is private)
+Program License Agreement version: _____________________
+```
+
+---
+
+## 7. DIST-11 — SignPath OSS Foundation application (KAAN-ACTION)
+
+**REQ-ID:** DIST-11
+**Owner:** Kaan (founder, owns the OSS project + identity)
+**Status:** ☐ pending  ☐ submitted  ☐ approved  ☐ secret-loaded
+**Effort:** ~20 minutes to submit; **~1-week SLA** for SignPath approval
+**Blocking for:** v1 launch (any tagged release that needs signed Windows binaries)
+
+### Why this is KAAN-action
+
+SignPath OSS Foundation grants free code-signing certificates to
+**identifiable open-source maintainers**. The form requires a personal
+identity attestation + repo ownership confirmation. Claude (and any
+other AI agent) **cannot** attest to Kaan's identity on his behalf —
+Pitfall P46 hard rule.
+
+### Protocol
+
+1. Open <https://signpath.org/products/foundation>.
+2. Click "Apply for free OSS code signing".
+3. Fill the form:
+   - **Repo URL:** the public vibemix repo URL (Kaan replaces with real URL).
+   - **License:** Apache-2.0 (confirm via `LICENSE` file at repo root).
+   - **Maintainer name + email:** Kaan's real name + GitHub-verified email.
+   - **Project description:** vibemix one-line pitch from `README.md`.
+   - **Distribution model:** GitHub Releases (link to releases page).
+4. Submit. SignPath emails an acknowledgement within ~24h.
+5. **Wait ~1 week** for SignPath team review. They may request follow-up
+   info (e.g. screenshot of repo activity, confirmation that no
+   commercial entity controls the project).
+6. On approval, SignPath provisions:
+   - An organization ID (UUID).
+   - A project slug.
+   - A signing-policy slug.
+   - An API token (in the SignPath dashboard under Settings → API Tokens).
+7. Kaan uploads to GitHub Secrets (mechanical, §3 above):
+   - `SIGNPATH_API_TOKEN`
+   - `SIGNPATH_ORGANIZATION_ID`
+   - `SIGNPATH_PROJECT_SLUG`
+   - `SIGNPATH_SIGNING_POLICY_SLUG`
+8. Update this section's checkbox to ☑ approved + ☑ secret-loaded with date.
+9. **Optional but recommended:** Kaan rehearses the local signing flow
+   first via `scripts/dist/sign_windows.ps1` (DIST-18 — needs the
+   `SignPathClient.exe` CLI installed locally) before the first tagged
+   release relies on CI signing.
+
+### What unblocks
+
+- SignPath signing policy configuration via SignPath dashboard
+  (NEVER via curl from CI — Pitfall P46).
+- Windows sign CI leg (`release.yml::build-windows::SIGN — Submit
+  signing request to SignPath`).
+
+### Sign-off block
+
+```
+DIST-11 APPLIED on:     _____________________   (date submitted)
+DIST-11 APPROVED on:    _____________________   (date SignPath confirmed)
+SignPath org ID (last 4 chars only):   _____________________
+SignPath project slug:  _____________________
+Secrets uploaded by:    _____________________   (Kaan signature)
+```
+
+---
+
+## 8. DIST-19 — Sign+verify smoke on first signed binary (KAAN-ACTION)
+
+**REQ-ID:** DIST-19
+**Owner:** Kaan
+**Status:** ☐ pending  ☐ done
+**Effort:** ~5 minutes per platform once first signed CI artifact lands
+
+After the first tagged release that successfully exercises both signing
+legs (i.e. DIST-09 + DIST-11 + all GitHub Secrets discharged), Kaan must:
+
+1. Download the signed `.dmg` from GitHub Releases.
+2. Run `bash tauri/src-tauri/spike/sign-and-test.sh` against it — the
+   spike script does ad-hoc codesign + AX probe (Phase 24 OVERLAY-02
+   verdict closure).
+3. Verify verdict is `VERDICT_PASS` or `VERDICT_PARTIAL`.
+4. Download the signed `.msi` from the same release.
+5. Right-click → Properties → Digital Signatures → confirm "SignPath
+   Foundation" CA appears in the chain.
+6. Update this section's checkbox.
+
+This closes v2.0 OVERLAY-02 Wave-0 verdict (was deferred to Phase 38
+gating).
+
+### Sign-off block
+
+```
+DIST-19 SMOKE PASS on:  _____________________   (date)
+macOS verdict:          _____________________   (PASS / PARTIAL / FAIL)
+Windows chain:          _____________________   (SignPath / OTHER)
+Sign-off by:            _____________________   (Kaan signature)
+```
