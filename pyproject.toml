@@ -153,6 +153,15 @@ dev = [
     # cross-check tests. Declared in this plan so the manifest is set once.
     "vcrpy>=8.0",
     "pytest-recording>=0.13",
+    # Phase 27 Plan 27-07 (LATENCY-14): comtypes is the COM bridge for
+    # IMMNotificationClient::OnDefaultDeviceChanged subscription on Windows.
+    # sys_platform marker keeps it Windows-only — macOS dev box never sees
+    # it (Pitfall P69 carry: never declare a Windows-only dep without the
+    # marker, or `uv sync` on macOS fails). Assumption A6: comtypes may be
+    # a transitive of pyaudiowpatch; declared explicitly here as defensive
+    # default so a future pyaudiowpatch version that drops the dep doesn't
+    # silently break LATENCY-14.
+    'comtypes>=1.4; sys_platform == "win32"',
 ]
 
 # Hatchling includes non-Python files inside a package directory by default
