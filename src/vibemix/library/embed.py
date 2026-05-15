@@ -225,7 +225,8 @@ class LibraryEmbedder:
 
     def _embed_audio(self, audio_path: Path, duration_s: float) -> np.ndarray:
         """Audio embed path. Returns L2-normalized float32 vector."""
-        # Short track — try single call first.
+        # Short track — try single call first; on cap-error, force-fallback.
+        force_excerpts = False
         if duration_s <= AUDIO_CAP_SECONDS:
             try:
                 clip = audio_path.read_bytes()
@@ -240,9 +241,12 @@ class LibraryEmbedder:
                     "(%s); falling back to 3-excerpt path.",
                     e,
                 )
+                force_excerpts = True
 
         # 3-excerpt path: intro / mid / outro.
-        excerpts = self._extract_excerpts(audio_path, duration_s)
+        excerpts = self._extract_excerpts(
+            audio_path, duration_s, force=force_excerpts
+        )
         vecs: list[np.ndarray] = []
         for clip in excerpts:
             vec = self._call_gemini_audio_single(clip, mime_type="audio/mpeg")
@@ -282,17 +286,23 @@ class LibraryEmbedder:
         return False
 
     def _extract_excerpts(
-        self, audio_path: Path, duration_s: float
+        self,
+        audio_path: Path,
+        duration_s: float,
+        force: bool = False,
     ) -> list[bytes]:
         """Use ffmpeg to slice 3 mp3 excerpts (intro / mid / outro).
 
         Each excerpt is 60s, encoded as MP3 at 128 kbps. Tempfiles are
         cleaned up before return.
 
-        For tracks <= 180s we should not be here (single-call path handles
-        them); defensive guard returns the whole file as 1 excerpt.
+        For tracks <= 180s, normally we should not be here (single-call
+        path handles them); defensive guard returns the whole file as 1
+        excerpt. Pass ``force=True`` to override (used when the single-call
+        path fails with an audio-cap error and we want a 3-excerpt
+        fallback even on a short-duration track).
         """
-        if duration_s <= AUDIO_CAP_SECONDS:
+        if duration_s <= AUDIO_CAP_SECONDS and not force:
             return [audio_path.read_bytes()]
 
         ffmpeg = _require_ffmpeg()
@@ -375,8 +385,12 @@ class LibraryEmbedder:
 
     @staticmethod
     def _text_signature(track: TrackEntry) -> str:
-        """Build the text-only embed signature for streaming-only tracks."""
-        bpm = int(track.bpm) if track.bpm is not None else 0
+        """Build the text-only embed signature for streaming-only tracks.
+
+        Phase 25's TrackEntry coerces missing bpm to 0.0 and missing key
+        to empty string, so we just stringify in place.
+        """
+        bpm = int(track.bpm or 0)
         key = track.key or "unknown"
         return f"{track.title} by {track.artist} | {bpm} BPM | key {key}"
 
