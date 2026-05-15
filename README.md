@@ -82,6 +82,7 @@ Each cell speaks a different vocabulary on purpose. Beginner is encouragement-he
 | 36 | Day-Zero Ops Automation | Discord auto-provision + 100 RPS × 5min real load test + pre-seeded star coordination + launch trigger sequence + healthz live |
 | 37 | Cross-Phase Integration Audit Gate | `tests/e2e/test_seam_*` + integration audit script + orphan inventory + grey-area decision log |
 | 38 | Signing Pipeline Real Execution | Apple notarytool + SignPath GH Action wired with real secrets + post-sign verifier + Kaan local rehearsal script |
+| 39 | Public RC Cut + Ship | `cut_release.sh` 6-gate pre-flight · README hero `<video>` + feature-matrix auto-sync · 5-channel social publisher + NACK window · Discord launch flow · `sync_github_meta.sh` topics/description SoT · changelog auto-populator · 24h launch-rotation doc · Phase 16 override expiry gate |
 
 <!-- AUTO-GEN: feature-matrix END -->
 
