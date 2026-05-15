@@ -147,8 +147,8 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
   5. `debrief.v1` jsonschema is locked additive-only — no breaking changes across v2.1.
 **Critical pitfalls:** P81 (audio format cross-webview parity → MP3 verified on WKWebView + WebView2), P82 (schema lock additive-only).
 **Parallel-with:** P27, P28, P30, P34.
-**Plans:** 9 plans (0/9 executed)
-- [ ] 29-00-PLAN.md — Wave 0 unblock: capability allowlist + EvidenceRegistry snapshot + __main__ short-circuit + Wave 0 probes (A1/A3/A5/A7)
+**Plans:** 1/9 plans executed
+- [x] 29-00-PLAN.md — Wave 0 unblock: capability allowlist + EvidenceRegistry snapshot + __main__ short-circuit + Wave 0 probes (A1/A3/A5/A7)
 - [ ] 29-01-PLAN.md — Python debrief/ package: chapters / tldr / drills / stripper / persistence / session_loader (DEBRIEF-03/04/06/07)
 - [ ] 29-02-PLAN.md — --debrief sidecar mode + ws_server on 127.0.0.1:8766 + progressive emit (DEBRIEF-08/09)
 - [ ] 29-03-PLAN.md — debrief.v1 schema lock: 5 new wrappers + P82 additive-only baseline gate (DEBRIEF-10)
@@ -322,7 +322,7 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
 |-------|----------------|--------|-----------|
 | 27. Eval Harness + Carry-Forward Close-Out | 2/9 | In Progress|  |
 | 28. Library Intelligence v1 | 8/9 | In Progress|  |
-| 29. Post-Session Debrief MVP UI | 0/9 | Planning complete |  |
+| 29. Post-Session Debrief MVP UI | 1/9 | In Progress|  |
 | 30. 2 Hard Tek Detectors | 0/0 | Not started | — |
 | 31. 4-Layer Mascot Full Additive | 0/0 | Not started | — |
 | 32. Long-Term DJ Profile | 0/0 | Not started | — |
