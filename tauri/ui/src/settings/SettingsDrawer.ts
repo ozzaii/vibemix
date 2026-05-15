@@ -49,6 +49,7 @@ import {
   renderHotkeyCapture,
   type HotkeyCaptureHandle,
 } from "./components/hotkey-capture.js";
+import { renderLibraryPanel } from "./components/library-panel.js";
 import { renderStalenessBanner } from "./components/staleness-banner.js";
 import {
   renderRecordingBrowser,
@@ -650,14 +651,20 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     }),
   );
 
-  // --- LIBRARY (Phase 28 Plan 07 + 06 wave) --------------------------------
-  // Plan 07: 30-day staleness banner mounts at the top of LIBRARY section.
-  // Plan 06 will mount the drag-drop importer directly below this.
+  // --- LIBRARY (Phase 28 Plan 06 + 07) -------------------------------------
+  // Plan 07: 30-day staleness banner sits at the top.
+  // Plan 06: drag-drop XML importer below.
   const libraryBody = document.createElement("div");
   libraryBody.style.cssText =
     "display:flex; flex-direction:column; gap: var(--sp-2);";
   const stalenessHandle = renderStalenessBanner();
   libraryBody.append(stalenessHandle.element);
+  // Library panel is async; mount a placeholder + swap when ready.
+  const libraryPanelSlot = document.createElement("div");
+  libraryBody.append(libraryPanelSlot);
+  void renderLibraryPanel().then((handle) => {
+    libraryPanelSlot.replaceWith(handle.element);
+  });
   body.append(
     renderSettingsGroup({
       header: "LIBRARY",
