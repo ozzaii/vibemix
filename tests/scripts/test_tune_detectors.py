@@ -378,3 +378,49 @@ def test_harness_breakdown_wav_fires_kick_kill_then_reentry(tmp_path: Path) -> N
             f"BREAKDOWN_KICK_KILL fired at t={kill_t:.2f} — expected within "
             f"[12.0, 24.0] given a breakdown at t=14.0..18.0"
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 30 SENSE-20 — Hard Tek overlay detector thresholds + corpus path
+# ---------------------------------------------------------------------------
+
+
+def test_detector_thresholds_includes_phase30_overlays() -> None:
+    """Phase 30 extended ``_DETECTOR_THRESHOLDS`` with DISTORTION_CLIMB +
+    ACID_LINE_ENTRY entries so per-fire rows carry a meaningful threshold
+    column for the two Hard Tek overlay detectors."""
+    from scripts.tune_detectors import _DETECTOR_THRESHOLDS
+
+    assert "DISTORTION_CLIMB" in _DETECTOR_THRESHOLDS
+    assert "ACID_LINE_ENTRY" in _DETECTOR_THRESHOLDS
+    # Sanity — must be non-zero positive floats (placeholder 0.0 would
+    # silently lose the column's signal value).
+    assert _DETECTOR_THRESHOLDS["DISTORTION_CLIMB"] > 0.0
+    assert _DETECTOR_THRESHOLDS["ACID_LINE_ENTRY"] > 0.0
+
+
+def test_harness_help_mentions_phase30_corpus_path() -> None:
+    """The CLI epilog points at the Phase 30 corpus path so a contributor
+    discovers the hard_tek anchor location via ``--help``."""
+    from scripts.tune_detectors import _build_arg_parser
+
+    parser = _build_arg_parser()
+    epilog_text = parser.epilog or ""
+    assert "eval/corpus/hard_tek" in epilog_text, (
+        "Expected --help epilog to mention eval/corpus/hard_tek so the "
+        "Phase 30 anchor location is discoverable via the CLI."
+    )
+
+
+def test_hard_tek_corpus_readme_exists() -> None:
+    """Phase 30 SENSE-20 corpus README documents acquisition policy + per-
+    track sidecar shape. Existence-only — the curated table is KAAN-ACTION
+    pending (HARDTEK-CORPUS-001 in .planning/KAAN-ACTION-LEGAL.md)."""
+    from pathlib import Path
+
+    readme = Path(__file__).resolve().parents[2] / "eval" / "corpus" / "hard_tek" / "README.md"
+    assert readme.exists(), f"Phase 30 corpus README missing at {readme}"
+    body = readme.read_text(encoding="utf-8")
+    assert "DISTORTION_CLIMB" in body
+    assert "ACID_LINE_ENTRY" in body
+    assert "expected_fires" in body  # JSON sidecar shape documented

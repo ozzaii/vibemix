@@ -1,22 +1,33 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""tune_detectors.py — Phase 17 reference-WAV detector tuning harness (SENSE-16).
+"""tune_detectors.py — Phase 17 reference-WAV detector tuning harness (SENSE-16),
+extended for Phase 30 SENSE-20 with the two Hard Tek overlay detectors.
 
 Reads one or more reference WAV files, drives them through the FULL Phase 17
-detector pipeline (``GenreRouter`` + baseline ``EventDetector`` + 6 Wave-2
-detectors), and emits a per-fire CSV consumable by Kaan's Phase 16 ear-audit:
++ Phase 30 detector pipeline (``GenreRouter`` + baseline ``EventDetector`` +
+6 Wave-2 detectors + 2 Hard Tek overlay detectors), and emits a per-fire
+CSV consumable by Kaan's Phase 16 ear-audit:
 
     python scripts/tune_detectors.py track1.wav [track2.wav ...] --csv out.csv
 
 CSV schema (CONTEXT D-locked — Plan 17-06):
     track, t_seconds, bar_index, detector_name, score, threshold, fired
 
+Phase 30 extension (SENSE-20):
+    - DISTORTION_CLIMB + ACID_LINE_ENTRY thresholds are wired into
+      ``_DETECTOR_THRESHOLDS`` so per-fire rows carry the right column.
+    - Hard Tek anchor tracks are documented in
+      ``eval/corpus/hard_tek/README.md``; use ``--genre-override=hard_tek``
+      to force the router into the hard_tek chain (otherwise the writer
+      derives genre from BPM bands, which the synth fixtures don't always
+      cover).
+
 Purpose: Phase 16 (Hallucination Verification Gate) needs a feedback loop —
 Kaan plays a real DJ session, hears a misfire, wants to know "what did the
 detector think it heard". This harness lets him replay any track through the
 same detector chain in a deterministic, offline way and compare CSV → ear
-truth. It's also the regression net: when Plan 17-02-04 thresholds get tuned,
-the same WAV → same CSV proves the change.
+truth. It's also the regression net: when Plan 17-02-04 / Plan 30-04
+thresholds get tuned, the same WAV → same CSV proves the change.
 
 KAAN-ACTION (STATE.md outstanding to-do):
     "Collect Hard Tek + 9 SKU reference tracks for P17 detector tuning
@@ -24,6 +35,7 @@ KAAN-ACTION (STATE.md outstanding to-do):
 
 Anchor tracks expected at (Kaan-supplied):
     .planning/phases/17-hard-tek-detectors-v1-genrerouter-musicstate-extension/anchor_tracks/
+    eval/corpus/hard_tek/audio/  ← Phase 30 SENSE-20 location
 
 Architecture:
     - Imports detector classes via the public package surface
@@ -76,6 +88,8 @@ from scipy.signal import resample_poly
 
 from vibemix.audio.buffers import AudioBuffer
 from vibemix.audio.constants import (
+    ACID_SWEEP_SLOPE_MIN_OCT_PER_S,
+    DISTORTION_FLATNESS_DELTA_MIN,
     INPUT_SR_TARGET,
     KICK_KILL_SUB_DROP_MIN,
     KICK_REENTRY_BAR_TOLERANCE,
@@ -98,6 +112,13 @@ _DETECTOR_THRESHOLDS: dict[str, float] = {
     "BREAKDOWN_KICK_KILL": KICK_KILL_SUB_DROP_MIN,
     "REENTRY_KICK_LAND": KICK_REENTRY_BAR_TOLERANCE,
     "PHRASE_BOUNDARY": PHRASE_BOUNDARY_BAR_TOLERANCE,
+    # Phase 30 SENSE-17/18 — Hard Tek overlay detectors. The "threshold"
+    # column carries the single most-representative gate value; the
+    # multi-gate score (flatness delta, harmonic ratio, density sustain
+    # for DISTORTION_CLIMB; slope, Q-low, Q-high for ACID_LINE_ENTRY)
+    # lives in the per-fire `score` JSON column.
+    "DISTORTION_CLIMB": DISTORTION_FLATNESS_DELTA_MIN,
+    "ACID_LINE_ENTRY": ACID_SWEEP_SLOPE_MIN_OCT_PER_S,
     # KICK_DENSITY_SHIFT, baseline events (TRACK_CHANGE/PHASE/LAYER_ARRIVAL/
     # MIX_MOVE/HEARTBEAT) — best-effort 0.0 placeholder; the per-fire `score`
     # column carries the actual evidence payload.
@@ -316,7 +337,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         epilog=(
             "Hard Tek anchor tracks expected at "
             ".planning/phases/17-hard-tek-detectors-v1-genrerouter-musicstate-extension/"
-            "anchor_tracks/. STATE.md outstanding to-do — Kaan-owned. See Phase 16 "
+            "anchor_tracks/ OR eval/corpus/hard_tek/audio/ (Phase 30 SENSE-20). "
+            "STATE.md outstanding to-do — Kaan-owned. See Phase 16 "
             "ear-audit for the consumer side of this harness."
         ),
     )

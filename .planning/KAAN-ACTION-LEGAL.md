@@ -58,3 +58,24 @@ Kaan can either:
 - Run the smoke at a less load-bearing moment → Phase 29 stays in
   "ready-to-ship-pending-smoke" state; subsequent phases proceed
   without dependency on this verdict
+
+## Source: Phase 30 SENSE-20 — Hard Tek reference corpus
+
+**Plan:** `.planning/phases/30-2-hard-tek-detectors-distortion-climb-acid-line-entry/30-04-PLAN.md`
+**Status:** Non-blocking — synthetic fixtures cover both detectors in CI;
+real-track F1 scoring waits on Kaan's curation pass.
+
+### Action items
+
+5. **HARDTEK-CORPUS-001 — Commit 5 CC-licensed Hard Tek anchor tracks**
+   - Source per `eval/corpus/LICENSES.md` policy: archive.org / CCMixter /
+     FMA (CC-BY / CC-BY-SA only).
+   - Per-track WAV → `eval/corpus/hard_tek/audio/<slug>.wav` (16kHz mono
+     resampled — `scripts/tune_detectors.py` does this on read).
+   - Per-track sidecar JSON → `eval/corpus/hard_tek/<slug>.json` with
+     `expected_fires: [{type, t_seconds_estimate}, ...]` for F1 scoring.
+   - Update `eval/corpus/hard_tek/README.md` curated set table with
+     real title / artist / BPM / length / license / why-included.
+   - Unblocks the F1 ≥ 0.80-per-detector gate (Phase 27 EVAL-03 matrix)
+     for the hard_tek genre slice. Until then the F1 number is reported
+     against synthetic fixtures only.
