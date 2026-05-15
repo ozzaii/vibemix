@@ -117,7 +117,12 @@ def exe_suffix_for_triple(triple: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def run_pyinstaller(spec: Path, *, clean: bool = True) -> Path:
+def run_pyinstaller(
+    spec: Path,
+    *,
+    clean: bool = True,
+    target_arch: str | None = None,
+) -> Path:
     """Invoke PyInstaller against ``spec`` via ``uv run``.
 
     Returns the resulting ``dist/vibemix-core/`` path. Raises
@@ -126,6 +131,14 @@ def run_pyinstaller(spec: Path, *, clean: bool = True) -> Path:
     ``clean`` (default True) wipes PyInstaller's intermediate caches so
     that a fresh build doesn't pick up stale modules — this is the
     recommended flag for CI matrix builds (RESEARCH §Pitfall + STACK).
+
+    ``target_arch`` (Plan 27-06 / REC-09): when set to "arm64" or "x86_64"
+    on macOS, passes ``--target-arch <arch>`` to PyInstaller so the produced
+    Mach-O binary matches the requested arch. Per RESEARCH §Critical
+    Correction, the matrix-build path uses ``--target-arch`` explicitly on
+    each runner — NEVER lipo-merge the two outputs (PyInstaller embeds its
+    PKG archive in only the last merged slice → silent segfault on launch
+    for the other arch).
     """
     if not spec.exists():
         raise FileNotFoundError(f"spec file not found: {spec}")
@@ -142,6 +155,8 @@ def run_pyinstaller(spec: Path, *, clean: bool = True) -> Path:
     ]
     if clean:
         cmd.append("--clean")
+    if target_arch:
+        cmd.extend(["--target-arch", target_arch])
 
     print(f"[build_sidecar] running: {' '.join(cmd)}", file=sys.stderr)
     subprocess.run(cmd, check=True, cwd=_PROJECT_ROOT)
@@ -153,6 +168,44 @@ def run_pyinstaller(spec: Path, *, clean: bool = True) -> Path:
             f"check the spec's COLLECT(name=...) value."
         )
     return out_dir
+
+
+def assert_single_arch_macho(binary: Path, expected_arch: str) -> None:
+    """Run ``lipo -archs`` and assert the binary is single-arch ``expected_arch``.
+
+    Plan 27-06 / REC-09 critical correction: a lipo-merged universal2
+    binary built from two PyInstaller bundles silently segfaults on the
+    arch whose PKG archive is NOT in the last merged slice. To guarantee
+    we never ship that broken artifact, every CI build asserts the
+    produced binary is single-arch matching the requested target.
+
+    ``expected_arch`` accepts ``"arm64"`` or ``"x86_64"``. Skips the check
+    on Windows (lipo is a Mach-O tool — Windows binaries are PE).
+    """
+    if sys.platform != "darwin":
+        return  # lipo is Mach-O only; PE binaries don't have multi-arch slices.
+    try:
+        result = subprocess.run(
+            ["lipo", "-archs", str(binary)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("lipo not found on PATH (macOS standard tool)") from exc
+    archs = result.stdout.strip()
+    if archs != expected_arch:
+        raise RuntimeError(
+            f"REC-09 / Pitfall P69 violation: {binary.name} is '{archs}' but "
+            f"expected single-arch '{expected_arch}'. If lipo returned "
+            f"'arm64 x86_64', someone tried the lipo-merge path despite "
+            f"RESEARCH §Critical Correction — the bundle will segfault on "
+            f"one of the two archs at app launch."
+        )
+    print(
+        f"[build_sidecar] OK: {binary.name} is single-arch {expected_arch}",
+        file=sys.stderr,
+    )
 
 
 def install_into_tauri_binaries(
@@ -315,10 +368,32 @@ def assert_no_aiza_leak(bundle_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _target_arch_to_triple(target_arch: str) -> str:
+    """Map a friendly arch name to the canonical macOS Rust target triple.
+
+    Plan 27-06 — REC-09 carry-forward closure. CI passes the friendly arch
+    on the matrix runner; this mapper produces the triple that
+    install_into_tauri_binaries + Tauri's resource layout expect.
+    """
+    mapping = {
+        "arm64": "aarch64-apple-darwin",
+        "aarch64": "aarch64-apple-darwin",
+        "x86_64": "x86_64-apple-darwin",
+        "intel": "x86_64-apple-darwin",
+    }
+    if target_arch not in mapping:
+        raise ValueError(
+            f"unknown target_arch {target_arch!r}; expected one of "
+            f"{sorted(mapping)}"
+        )
+    return mapping[target_arch]
+
+
 def build_and_install(
     spec: Path,
     *,
     triple: str | None = None,
+    target_arch: str | None = None,
     skip_aiza_check: bool = False,
 ) -> Path:
     """End-to-end: detect triple → pyinstaller → copy + rename → AIza gate.
@@ -326,18 +401,39 @@ def build_and_install(
     Returns the absolute path of the final installed binary inside
     ``tauri/src-tauri/binaries/vibemix-core-<triple>/``. Caller should
     print this path for visual verification.
+
+    ``target_arch`` (Plan 27-06 / REC-09): when set to "arm64" or "x86_64",
+    overrides triple detection AND passes ``--target-arch <arch>`` to
+    PyInstaller for cross-arch builds on the GitHub Actions matrix.
+    Adds a post-build ``lipo -archs`` single-arch assertion (T-27-06-01
+    mitigation against the lipo-merge pitfall).
     """
+    if target_arch is not None:
+        derived_triple = _target_arch_to_triple(target_arch)
+        if triple is not None and triple != derived_triple:
+            raise ValueError(
+                f"--triple {triple!r} conflicts with --target-arch {target_arch!r} "
+                f"(would derive {derived_triple!r}). Pass only one."
+            )
+        triple = derived_triple
+
     if triple is None:
         triple = detect_target_triple()
     suffix = exe_suffix_for_triple(triple)
 
     print(f"[build_sidecar] target triple: {triple}", file=sys.stderr)
+    print(f"[build_sidecar] target arch:   {target_arch or 'host (detected)'}", file=sys.stderr)
     print(f"[build_sidecar] spec:          {spec}", file=sys.stderr)
 
-    onedir = run_pyinstaller(spec)
+    onedir = run_pyinstaller(spec, target_arch=target_arch)
 
     installed = install_into_tauri_binaries(onedir, triple, exe_suffix=suffix)
     bundle_dir = installed.parent
+
+    # Plan 27-06 / REC-09: assert single-arch BEFORE the AIza scan so a
+    # lipo-merged broken bundle is rejected with a clearer error.
+    if target_arch is not None and sys.platform == "darwin":
+        assert_single_arch_macho(installed, target_arch.replace("aarch64", "arm64"))
 
     if skip_aiza_check:
         print(
@@ -374,6 +470,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Override target triple (default: detect from `rustc -vV`).",
     )
     parser.add_argument(
+        "--target-arch",
+        default=None,
+        choices=["arm64", "x86_64", "aarch64", "intel"],
+        help=(
+            "Plan 27-06 / REC-09: friendly arch alias (arm64 → "
+            "aarch64-apple-darwin; x86_64 → x86_64-apple-darwin). Also "
+            "passes --target-arch to PyInstaller for cross-arch build. "
+            "Mutually exclusive with --triple. Use this on the GitHub "
+            "Actions macOS matrix runners; --triple is for finer control."
+        ),
+    )
+    parser.add_argument(
         "--no-aiza-check",
         action="store_true",
         help=(
@@ -388,6 +496,7 @@ def main(argv: list[str] | None = None) -> int:
         installed = build_and_install(
             spec,
             triple=args.triple,
+            target_arch=args.target_arch,
             skip_aiza_check=args.no_aiza_check,
         )
     except (FileNotFoundError, RuntimeError, subprocess.CalledProcessError) as exc:
