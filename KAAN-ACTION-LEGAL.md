@@ -298,6 +298,232 @@ Sign-off by:            _____________________   (Kaan signature)
 
 ---
 
+## §SHIP — Phase 39 Public RC Cut + Ship (Kaan + Francesco actions)
+
+The Phase 39 autonomous deliverables prepare scripts, content, gates, and
+templates. The six customer-facing actions below are **Kaan/Francesco-
+action**: autonomous agents never click "publish".
+
+### SHIP-CUT — Execute `cut_release.sh` + `gh release create` (KAAN-ACTION)
+
+**REQ-ID:** SHIP-01 / SHIP-06
+**Owner:** Kaan
+**Status:** ☐ pending  ☐ done
+**Blocked on:** Phase 38 secrets populated (DIST-09 + DIST-11) + signed
+binaries in `dist/`.
+
+**Protocol:**
+
+1. Wait for Phase 37 milestone audit to be re-run (verdict WIRED).
+2. Wait for Phase 38 signing pipeline to produce signed `dist/*.dmg` + `dist/*.msi`.
+3. Run `python scripts/launch/populate_changelog.py --tag v2.1.0-rc1` to
+   render `CHANGELOG-v2.1.0-rc1.md` at repo root. Review.
+4. Run `bash scripts/launch/cut_release.sh v2.1.0-rc1`. Confirm all 6
+   pre-flight gates PASS.
+5. Copy the printed `gh release create v2.1.0-rc1 --draft ...` command.
+6. Run it. **First cut MUST be `--draft`.**
+7. Inspect the GitHub-side draft: artifacts attached, changelog renders,
+   no signing verification warnings.
+8. Flip to published: `gh release edit v2.1.0-rc1 --draft=false --repo bravoh/vibemix`.
+9. Update sign-off block.
+
+**Sign-off block:**
+
+```
+SHIP-CUT EXECUTED on:    _____________________   (date)
+Tag:                     _____________________   (e.g. v2.1.0-rc1)
+Pre-flight gates:        _____________________   (6/6 PASS / partial)
+gh release URL:          _____________________
+Draft → published flip:  _____________________   (date)
+Sign-off by:             _____________________   (Kaan signature)
+```
+
+### SHIP-TWEET — 4-channel social publish (KAAN + FRANCESCO-action)
+
+**REQ-ID:** SHIP-03
+**Owner:** Kaan (Twitter, HN, Reddit) + Francesco (IG IT/EN)
+**Status:** ☐ pending  ☐ in-NACK-window  ☐ published  ☐ verified
+**Blocked on:** SHIP-CUT published (Release URL live).
+
+**Protocol:**
+
+1. Confirm `gh release` is live + public (not draft).
+2. Run `python scripts/launch/publish_social_posts.py --dry-run` — Discord
+   preview channel receives 5 rendered post previews.
+3. 5-minute NACK window: react 👎 to any post in `#vibemix-launch-preview`
+   to veto. The script aborts if NACK detected.
+4. Once NACK window clears clean: Kaan manually posts to Twitter + HN +
+   Reddit r/DJs using the rendered text. Francesco posts to IG IT + IG EN.
+5. All posts must use the canonical `utm_source=github&utm_medium=oss&utm_campaign=vibemix_launch`
+   URL trail.
+6. Record post URLs in sign-off block.
+
+**Sign-off block:**
+
+```
+SHIP-TWEET TWITTER on:   _____________________   (URL)
+SHIP-TWEET HN on:        _____________________   (URL)
+SHIP-TWEET REDDIT on:    _____________________   (URL)
+SHIP-TWEET IG_IT on:     _____________________   (URL — Francesco)
+SHIP-TWEET IG_EN on:     _____________________   (URL — Francesco)
+Sign-off by:             _____________________   (Kaan + Francesco)
+```
+
+### SHIP-DISCORD — `#announcements` launch post (KAAN-ACTION)
+
+**REQ-ID:** SHIP-04
+**Owner:** Kaan
+**Status:** ☐ pending  ☐ done
+
+**Protocol:**
+
+1. Confirm `DISCORD_WEBHOOK_URL` (real `#announcements` webhook) is set in your
+   shell, plus `DISCORD_ALIGNED_ROLE_ID` (aligned-community pinged role).
+2. `LAUNCH_REAL=1 python scripts/launch/post_discord_launch.py --real`.
+3. Verify the announcement renders properly on the Discord side (role
+   ping resolved, link unfurls, image preview from the README hero loads).
+4. Pin the message.
+
+**Sign-off block:**
+
+```
+SHIP-DISCORD POSTED on:  _____________________   (date)
+Channel:                 _____________________   (#announcements)
+Role pinged:             _____________________   (role name)
+Pin confirmed:           _____________________   (Y/N)
+Sign-off by:             _____________________   (Kaan)
+```
+
+### SHIP-TRANSFER — Repo transfer to `bravoh/vibemix` GitHub org (KAAN-ACTION)
+
+**REQ-ID:** SHIP-05
+**Owner:** Kaan
+**Status:** ☐ pending  ☐ done
+
+**Protocol:**
+
+1. Confirm `docs/launch/github-meta.md` description + topics are correct.
+2. `GH_META_REAL=1 bash scripts/launch/sync_github_meta.sh --real`.
+3. Verify topics + description applied at <https://github.com/bravoh/vibemix>.
+4. **Then** trigger the repo transfer flow: GitHub Settings → "Transfer
+   ownership" → enter `bravoh` org → confirm. This step requires
+   destination-org admin acceptance (~1 click on Bravoh-org side).
+5. After transfer completes, re-run `sync_github_meta.sh --real` against
+   the new `bravoh/vibemix` path (topics/description re-applied).
+6. Update all `bravoh-ai/vibemix` references in docs to `bravoh/vibemix`.
+
+**Sign-off block:**
+
+```
+SHIP-TRANSFER REQUESTED on:  _____________________
+SHIP-TRANSFER COMPLETED on:  _____________________   (org-admin confirmation)
+GitHub topics applied:       _____________________   (10/10)
+Sign-off by:                 _____________________   (Kaan)
+```
+
+### SHIP-ROTATE — 24h monitoring rotation execution (KAAN + FRANCESCO + BRAVOH-action)
+
+**REQ-ID:** SHIP-07
+**Owner:** Kaan (primary) + Francesco (EU evening) + Bravoh-team (async + overnight)
+**Status:** ☐ pending  ☐ in-progress  ☐ done
+
+**Protocol:** Follow `docs/launch-rotation.md` (24h hourly schedule).
+
+Each responder logs end-of-hour handoff in `#vibemix-rota` per the
+schema in §"Handoff format". Escalation paths in the rotation doc.
+
+**Sign-off block (record at T+24h):**
+
+```
+SHIP-ROTATE T+0  → T+8   primary:   _____________________
+SHIP-ROTATE T+8  → T+16  primary:   _____________________
+SHIP-ROTATE T+16 → T+24  primary:   _____________________
+Issues opened in 24h:                _____________________
+Showstoppers escalated:              _____________________
+Star count at T+24:                  _____________________
+Sign-off by:                         _____________________   (Kaan)
+```
+
+### SHIP-V1-DECISION — Cut v1.0.0 from RC bake (KAAN-ACTION, separate phase)
+
+**REQ-ID:** SHIP-06 (ext)
+**Owner:** Kaan
+**Status:** ☐ pending  ☐ greenlit  ☐ cut
+
+**Bake window:** Minimum ~2 weeks after RC1 published. During the bake:
+
+- Monitor for showstopper bugs.
+- Collect anti-slop bug reports.
+- Triage controller-mapping issues.
+- Watch star quality (~30 day retention check; P59).
+
+If RC1 holds clean for 2+ weeks: separate phase scaffolds the v1.0.0 cut.
+If RC2 is needed: same flow, new RC tag (`v2.1.0-rc2`).
+
+**Sign-off block:**
+
+```
+SHIP-V1-DECISION at:     _____________________   (date)
+Decision:                _____________________   (cut v1 / cycle RC2 / pause)
+Reasoning:               _____________________   (1-2 lines)
+Sign-off by:             _____________________   (Kaan)
+```
+
+---
+
+## §POST-RC-CLEANUP — Phase 16 override expiry + v2.2 grooming (KAAN-ACTION)
+
+**REQ-ID:** SHIP-08 / P85
+**Owner:** Kaan
+**Status:** ☐ pending  ☐ done
+
+After the v2.1 RC is published AND the ~2-week bake window has elapsed
+without showstoppers, the following cleanup MUST be performed before
+v1.0.0 cut or v2.2 milestone scaffolding:
+
+### 1. Phase 16 ear-test memory override expiry (P85)
+
+The autonomy override line in `.planning/STATE.md`:
+
+> Phase 16 ear-test memory override accepted for v2.1 only (autonomous
+> proxy gate via Phase 27 substitutes). **Override expires post-v2.1.**
+
+…must be removed (or marked `EXPIRED on YYYY-MM-DD`). The Phase 27
+autonomous hallucination-proxy gate was a v2.1-scoped substitute for
+the original Kaan-ear-only test (Phase 16). Post-v2.1, the original
+gate is back in force — meaning v2.2+ phases that ship reaction prompts
+must include Kaan-ear test sign-off, not autonomous-only proxy gates.
+
+The `scripts/launch/cut_release.sh` exit reminder line ("Phase 16
+override cleanup reminder") flags this every time the cutter runs.
+
+### 2. Bravoh funnel verification
+
+Confirm the `utm_source=github&utm_medium=oss&utm_campaign=vibemix_launch`
+attribution lands in Bravoh's analytics. If signups are not arriving
+or attribution is broken, work with Momo to fix the proxy / landing.
+
+### 3. v2.2 backlog grooming
+
+Open issues in `.planning/research/v2-2/` (TBD) for deferred items:
+
+- Mixxx OSC integration (`v2_open_candidates`).
+- Rekordbox parse (carry-forward from v2.0 hardening).
+- ProDJ Link probe (v2 stretch).
+- Mac App Store / MS Store distribution.
+- Translation of social copy beyond IT.
+
+### Sign-off block
+
+```
+POST-RC-CLEANUP Phase 16 override expired on:  _____________________
+POST-RC-CLEANUP Bravoh funnel verified on:     _____________________
+POST-RC-CLEANUP v2.2 backlog seeded on:        _____________________
+Sign-off by:                                   _____________________   (Kaan)
+```
+
+---
+
 ## INSTALL-VM-RUN — Fresh-VM rehearsal real execution (Phase 33 / Plan 33-08)
 
 **Owner:** Kaan
