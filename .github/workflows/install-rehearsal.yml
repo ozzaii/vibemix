@@ -1,0 +1,43 @@
+# Phase 33 / Plan 33-08 — Fresh-VM install rehearsal CI.
+#
+# Runs the rehearsal orchestrator in --dry-run mode on every dispatch.
+# Real VM execution stays Kaan-action (disk space + macOS license +
+# fresh ISOs — see KAAN-ACTION-LEGAL.md INSTALL-VM-RUN).
+#
+# Gating: workflow_dispatch only + nightly cron at 03:00 UTC. We do NOT
+# run on every PR — VM operations cost real resources even in dry-run
+# (the test scaffold script reads + parses, which is cheap, but we
+# keep the cadence intentional).
+
+name: Install Rehearsal (scaffold)
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '0 3 * * *'  # nightly @ 03:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  rehearsal-dry-run:
+    name: Install rehearsal — dry-run only
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Rehearsal orchestrator dry-run
+        run: |
+          set -euo pipefail
+          python scripts/install_rehearsal/rehearsal_runner.py --matrix all
+
+      - name: Scaffold test gate
+        run: |
+          set -euo pipefail
+          pip install pytest
+          python -m pytest tests/install/test_rehearsal_scaffold.py -v

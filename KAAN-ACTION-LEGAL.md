@@ -295,3 +295,58 @@ macOS verdict:          _____________________   (PASS / PARTIAL / FAIL)
 Windows chain:          _____________________   (SignPath / OTHER)
 Sign-off by:            _____________________   (Kaan signature)
 ```
+
+---
+
+## INSTALL-VM-RUN — Fresh-VM rehearsal real execution (Phase 33 / Plan 33-08)
+
+**Owner:** Kaan
+**Status:** ☐ pending  ☐ done
+**Effort:** Variable — depends on whether tart images / Windows ISO are already cached locally.
+
+Phase 33 ships the rehearsal **scaffold** (`scripts/install_rehearsal/`
++ `.github/workflows/install-rehearsal.yml` dry-run). Real VM execution
+stays Kaan-action because it requires:
+
+1. Disk space (multi-GB per macOS image; ~20GB per Windows VM).
+2. A macOS license already attached to the host (tart images inherit
+   from Apple-licensed bare-metal).
+3. A Windows 10/11 ISO Kaan downloads from `microsoft.com/software-download`.
+
+The harness intentionally double-gates real execution behind:
+
+- `--real` CLI flag passed to `scripts/install_rehearsal/rehearsal_runner.py`.
+- `INSTALL_REHEARSAL_REAL=1` environment variable.
+
+Both must be present. Autonomous agents never set either; CI runs in
+dry-run mode only.
+
+### Run protocol (Kaan)
+
+1. Install tart on a Mac: `brew install cirruslabs/cli/tart`.
+2. Pre-cache the matrix images (one-time):
+   ```bash
+   tart clone ghcr.io/cirruslabs/macos-12.3:latest macos-12.3-base
+   tart clone ghcr.io/cirruslabs/macos-14:latest macos-14-base
+   tart clone ghcr.io/cirruslabs/macos-15:latest macos-15-base
+   ```
+3. For Windows, edit `scripts/install_rehearsal/win_vm_setup.ps1` and
+   replace the `<KAAN: paste ... ISO URL>` placeholders with real
+   Microsoft ISO URLs.
+4. Run the matrix in real mode:
+   ```bash
+   INSTALL_REHEARSAL_REAL=1 python scripts/install_rehearsal/rehearsal_runner.py --matrix all --real
+   ```
+5. Stopwatch each VM's first-launch onboarding flow against the ≤60s
+   target (INSTALL-05). Record results in the sign-off block below.
+
+### Sign-off block
+
+```
+INSTALL-VM-RUN  macOS 12.3:   _____ s  (target ≤ 60)
+INSTALL-VM-RUN  macOS 14:     _____ s  (target ≤ 60)
+INSTALL-VM-RUN  macOS 15:     _____ s  (target ≤ 60)
+INSTALL-VM-RUN  Windows 10:   _____ s  (target ≤ 60)
+INSTALL-VM-RUN  Windows 11:   _____ s  (target ≤ 60)
+Sign-off by:    _____________________   (Kaan signature)
+```
