@@ -94,13 +94,22 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
   1. A recorded DJ session in `recordings/<session>/` can be replayed end-to-end through shipped P17 detectors + P18 EvidenceRegistry + P19 ack bank + P20 linter + P22 anticipation via `scripts/eval/replay_harness.py` — deterministic, single-binary, no GPU.
   2. Both Gemini 3 Pro and Gemini 3 Flash judges (different rubric prompts) score the corpus ≥ 0.80 F1; substance metric `useful_response_ratio ≥ 0.65`; cited-but-irrelevant cosine ≥ 0.4; bypass rate ≤ 0.15. Thresholds locked in `THRESHOLD-LOCK.md` co-signed by Kaan.
   3. `.github/workflows/eval.yml` runs the harness on PR merge + nightly canary and fails the build below threshold; per-run scorecards committed under `.planning/eval-runs/`.
-  4. `EvidenceRegistry.register_library` is invoked from `__main__.py:~698-717` when `~/.cache/vibemix/library.pkl` exists; invocation test + end-to-end live citation test both pass.
-  5. macOS sidecar is universal2 (arm64 + x86_64 `lipo`-merged) so Apple Silicon users never see a Rosetta prompt; Windows WASAPI loopback subscribes to `IMMNotificationClient` so a mid-session default-device change no longer crashes the session.
+  4. `EvidenceRegistry.register_library` is invoked from `__main__.py:~668-689` (research-corrected from prior `698-717`) when `~/.cache/vibemix/library.pkl` exists; invocation test + end-to-end live citation test both pass.
+  5. macOS sidecar ships per Tauri target-triple convention (`vibemix-sidecar-aarch64-apple-darwin` + `vibemix-sidecar-x86_64-apple-darwin`) — research-corrected from `lipo`-merge approach which is technically infeasible per PyInstaller upstream (PKG archive embedded in only the last merged slice). Apple Silicon users never see a Rosetta prompt; Windows WASAPI loopback subscribes to `IMMNotificationClient` so a mid-session default-device change no longer crashes the session.
   6. 40 silent Achird-voice OPUS placeholders are replaced one-for-one via offline Gemini TTS Achird voice batch render; AIza-key scan re-runs zero matches.
-  7. DDJ-FLX4 Sync note disambiguation is locked via autonomous synthetic MIDI replay against fixture sniff — defensive both-bindings (0x60 + 0x58) confirmed or narrowed to the verified note.
-**Critical pitfalls:** P42 (LLM-judge self-bias → 2-judge cross-check), P43 (corpus overfit → diversity gate, ≥ 3 sets, Hard Tek ≤ 70%), P44 (lenient F1 → substance metric), P45 (cited-but-empty → embedding-relevance), P46 (legal carveout NEVER autonomous → `KAAN-ACTION-LEGAL.md` prep starts here), P48 (`register_library` orphan), P63 (bundle ID lock), P69 (universal2 sidecar), P70 (WASAPI device change).
+  7. DDJ-FLX4 Sync note disambiguation is locked via autonomous synthetic MIDI replay against fixture synthesized from `cohost_v4.py` `_NOTE_MAP` (POC-confirmed: note 0x60 verified, note 0x58 alt = tentative).
+**Critical pitfalls:** P42 (LLM-judge self-bias → 2-judge cross-check), P43 (corpus overfit → diversity gate, ≥ 3 sets, Hard Tek ≤ 70%), P44 (lenient F1 → substance metric), P45 (cited-but-empty → embedding-relevance), P46 (legal carveout NEVER autonomous → `KAAN-ACTION-LEGAL.md` prep starts here), P48 (`register_library` orphan), P63 (bundle ID lock), P69 (universal2 sidecar — RESEARCH critical correction → target-triple convention not lipo-merge), P70 (WASAPI device change).
 **Parallel-with:** P28, P29, P30, P34.
-**Plans:** TBD
+**Plans:** 9 plans
+- [ ] 27-01-PLAN.md — Replay Harness Core (EVAL-01 + EVAL-08): scripts/eval/replay_harness.py + AudioBuffer.fill_from_wav + F1 math + scorecard renderer
+- [ ] 27-02-PLAN.md — 2-Judge Cross-Check Architecture (EVAL-02 + EVAL-04 + EVAL-05): Pro+Flash rubrics + Gemini Embedding 2 cited-relevance + VCR cassettes
+- [ ] 27-03-PLAN.md — Corpus Assembly + Diversity Gate (EVAL-03): 6 public-domain DJ sessions + manifest.json + LICENSES.md + git-LFS
+- [ ] 27-04-PLAN.md — Threshold Lock + CI Gate (EVAL-06 + EVAL-07 + EVAL-08 commit lifecycle): autonomous-signed THRESHOLD-LOCK.md + .github/workflows/eval.yml + KAAN-ACTION-LEGAL.md
+- [ ] 27-05-PLAN.md — register_library Wire-In (LIBRARY-09): 5-line patch in __main__.py + invocation test + end-to-end citation test
+- [ ] 27-06-PLAN.md — REC-09 Tauri Target-Triple Sidecars (CRITICAL CORRECTION over lipo-merge): build_sidecar.py --target-arch + release.yml matrix + tauri.conf.json5 externalBin
+- [ ] 27-07-PLAN.md — WASAPI IMMNotificationClient Subscription (LATENCY-14): non-blocking COM callback + worker thread soft-restart + macOS stub
+- [ ] 27-08-PLAN.md — 40 Achird OPUS Ack Regeneration (LATENCY-15): scripts/generate_ack_audio.py + manifest.json + AIza scan zero matches
+- [ ] 27-09-PLAN.md — FLX4 Sync Sniff Disambiguation + MASCOT-11 Tracking Pointer (MIDI-20 + MASCOT-11): synthesized fixture from cohost_v4.py POC + ddj-flx4.json verdict + MASCOT-11 carry-forward documented as Phase 35 ASSETS-03 pointer
 
 ### Phase 28: Library Intelligence v1
 **Goal:** vibemix's spoken reactions can cite tracks from the user's library by name + the user can vibe-search the library in plain English — closing the architectural-slot reservation left in v2.0 Phase 25.
@@ -293,7 +302,7 @@ Full archive when shipped: `.planning/milestones/v2.1-ROADMAP.md`.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 27. Eval Harness + Carry-Forward Close-Out | 0/0 | Not started | — |
+| 27. Eval Harness + Carry-Forward Close-Out | 0/9 | Planning complete | — |
 | 28. Library Intelligence v1 | 0/0 | Not started | — |
 | 29. Post-Session Debrief MVP UI | 0/0 | Not started | — |
 | 30. 2 Hard Tek Detectors | 0/0 | Not started | — |
