@@ -58,6 +58,14 @@ export default defineConfig({
       // Phase 32 Plan 05 — Settings → Profile panel renderer (vanilla TS
       // DOM construction + dataset assertions). Same env as recording-*.
       ["src/settings/components/profile-panel.spec.ts", "jsdom"],
+      // Phase 33 Plans 33-01..33-09 — wizard install-hardening surface.
+      // tcc-permissions.spec is pure but blackhole-step / windows-
+      // smartscreen-step / onboarding-flow / tcc-watcher render
+      // HTMLElements via the shared style-registry helper which
+      // touches document.head at module load. Route the whole
+      // wizard __tests__ + runtime __tests__ dirs under jsdom.
+      ["src/wizard/__tests__/*.spec.ts", "jsdom"],
+      ["src/runtime/__tests__/*.spec.ts", "jsdom"],
     ],
   },
 });
