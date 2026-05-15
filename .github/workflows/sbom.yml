@@ -1,0 +1,59 @@
+# Phase 34 / SEC-04 — SBOM generation + release attachment.
+#
+# syft v1.14.0 — SPDX 2.3 format. Attaches sbom.spdx.json to the GitHub
+# Release as an artifact alongside DMG/MSI/manifest.
+
+name: SBOM
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: "Optional release id to attach to (workflow_dispatch only)"
+        required: false
+        type: string
+
+permissions:
+  contents: write   # required to upload SBOM as release asset
+
+jobs:
+  sbom:
+    name: syft SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate SBOM (Python + Rust + filesystem)
+        uses: anchore/sbom-action@v0.17.0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom.spdx.json
+          # Use syft default catalogers — covers Python, Rust, Node, generic
+          # filesystem packaging.
+
+      - name: Validate SBOM JSON
+        run: |
+          set -euo pipefail
+          python -c "import json; d = json.load(open('sbom.spdx.json')); \
+            assert d['spdxVersion'].startswith('SPDX-'), 'invalid SPDX version'; \
+            assert len(d.get('packages', [])) > 0, 'SBOM has no packages'; \
+            print(f\"SBOM ok — {len(d['packages'])} packages, version {d['spdxVersion']}\")"
+
+      - name: Upload SBOM as release asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sbom.spdx.json
+          fail_on_unmatched_files: true
+
+      - name: Upload SBOM as workflow artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-spdx-json
+          path: sbom.spdx.json
+          retention-days: 90
