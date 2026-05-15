@@ -42,6 +42,17 @@ def fake_embedder(tmp_path: Path) -> MagicMock:
     e.embed_track = MagicMock(
         side_effect=lambda t: np.zeros(768, dtype=np.float32)
     )
+
+    # Public probe added in REVIEW WR-02 fix — test must provide a real
+    # implementation since MagicMock would auto-return truthy for any track.
+    def _has_cached(track) -> bool:
+        key = e._track_hash(track)
+        row = e._cache.execute(
+            "SELECT 1 FROM embed_cache WHERE key = ?", (key,)
+        ).fetchone()
+        return row is not None
+
+    e.has_cached_embedding = MagicMock(side_effect=_has_cached)
     return e
 
 

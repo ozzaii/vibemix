@@ -66,6 +66,19 @@ export async function renderLibraryPanel(
   const status = root.querySelector(".vmx-library-status") as HTMLElement;
 
   const seenEventIds = new Set<number>();
+  // Tauri Issue #14134 dedupe: cap to last N ids — Set iteration is
+  // insertion-order so dropping `.values().next()` evicts the oldest.
+  // Long-lived Settings drawer (multi-week session) would otherwise leak.
+  const SEEN_CAP = 64;
+  function rememberId(id: number): boolean {
+    if (seenEventIds.has(id)) return false;
+    seenEventIds.add(id);
+    if (seenEventIds.size > SEEN_CAP) {
+      const oldest = seenEventIds.values().next().value;
+      if (oldest !== undefined) seenEventIds.delete(oldest);
+    }
+    return true;
+  }
   let unsubProgress: (() => void) | null = null;
   let unlistenDrop: (() => void) | null = null;
 
@@ -157,10 +170,9 @@ export async function renderLibraryPanel(
         drop.classList.remove("dragging");
         const eventId = (event as unknown as { id: number }).id;
         if (typeof eventId === "number") {
-          if (seenEventIds.has(eventId)) {
+          if (!rememberId(eventId)) {
             return;
           }
-          seenEventIds.add(eventId);
         }
         const xml = payload.paths.find((p) => /\.xml$/i.test(p));
         if (xml) {

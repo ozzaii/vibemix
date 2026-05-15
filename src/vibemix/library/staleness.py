@@ -73,7 +73,16 @@ def load_snooze_state(state_path: Path | None = None) -> float | None:
 def save_snooze_state(
     snoozed_until_ts: float, state_path: Path | None = None
 ) -> None:
-    """Atomic write of snooze state. Preserves existing keys."""
+    """Atomic write of snooze state. Preserves existing keys.
+
+    **Single-process assumption (REVIEW WR-03):** the read+merge+write
+    sequence is NOT atomic across processes. vibemix is a single-instance
+    desktop app — concurrent writers from multiple sidecar instances
+    would race and the loser's update (including unrelated state.json
+    keys) would be lost. v1 accepts this; if multi-instance support
+    lands later, add an advisory ``fcntl.flock`` around the read+write.
+    The file write itself IS atomic via ``os.replace``.
+    """
     sp = Path(state_path) if state_path else DEFAULT_STATE_FILE_PATH
     sp.parent.mkdir(parents=True, exist_ok=True)
     try:

@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import sqlite3
 from pathlib import Path
 from typing import Callable
 
@@ -55,16 +54,6 @@ class LibraryImporter:
         self._on_progress = on_progress or (lambda _payload: None)
         self._batch_size = max(1, batch_size)
         self.cancel_flag = asyncio.Event()
-
-    def _was_cache_hit(self, track_id: str, key: str) -> bool:
-        """Cheap probe of the embedder's content-hash cache (Plan 28-01)."""
-        try:
-            row = self._embedder._cache.execute(
-                "SELECT 1 FROM embed_cache WHERE key = ?", (key,)
-            ).fetchone()
-            return row is not None
-        except sqlite3.Error:
-            return False
 
     def _emit(self, payload: dict) -> None:
         try:
@@ -116,8 +105,8 @@ class LibraryImporter:
                 }
 
             # Pre-probe the cache so we count hits accurately.
-            key = self._embedder._track_hash(track)
-            was_hit = self._was_cache_hit(track.track_id, key)
+            # Uses the embedder's public probe (REVIEW WR-02 fix).
+            was_hit = self._embedder.has_cached_embedding(track)
 
             try:
                 vec = await loop.run_in_executor(

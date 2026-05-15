@@ -224,6 +224,19 @@ class LibraryEmbedder:
         vec = self._call_gemini_text(query)
         return l2_normalize(vec)
 
+    def has_cached_embedding(self, track: TrackEntry) -> bool:
+        """Return True iff a content-hash cache hit would occur.
+
+        Public probe used by ``LibraryImporter`` for accurate cache-hit
+        counting in import-progress emissions. Avoids LibraryImporter
+        reaching into ``_embedder._cache`` private attribute (REVIEW WR-02).
+        """
+        try:
+            key = self._track_hash(track)
+            return self._cache_get(key) is not None
+        except sqlite3.Error:
+            return False
+
     # ─── Internal: audio path ──────────────────────────────────────────────
 
     def _embed_audio(self, audio_path: Path, duration_s: float) -> np.ndarray:
