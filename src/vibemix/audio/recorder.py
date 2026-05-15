@@ -190,7 +190,17 @@ class VoiceRecorder:
         mode: str | None = None,
         genre: str | None = None,
         user_level: str | None = None,
+        evidence_registry: object | None = None,
     ) -> None:
+        # Phase 29-00 — optional EvidenceRegistry reference. When supplied,
+        # close() serializes its snapshot atomically to
+        # ``<session_dir>/evidence_registry.json`` BEFORE recorder teardown.
+        # The debrief sidecar (Plan 29-02) reads this file at replay time
+        # to resolve citation tooltips against real per-session observations
+        # — closes the central hallucination gate (DEBRIEF-07). Defaulting
+        # to ``None`` preserves the v4 zero-arg construction contract used
+        # by the test suite + cohost_v4 callers (POC compatibility rule).
+        self._evidence_registry = evidence_registry
         rec_dir = root if root is not None else Path.cwd() / "recordings"
         rec_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         # Defensively chmod — mkdir(mode=) interacts with umask on some platforms
@@ -374,7 +384,33 @@ class VoiceRecorder:
 
     def close(self) -> None:
         """Close all four handles. Best-effort — never raises. v4:838-850 +
-        Phase 15 session.json finalize."""
+        Phase 15 session.json finalize + Phase 29-00 evidence_registry.json."""
+        # Phase 29-00 — serialize EvidenceRegistry snapshot BEFORE WAV/JSONL
+        # close. We deliberately write OUTSIDE the recorder's threading.Lock:
+        # the registry has its own lock around snapshot(), and atomic
+        # tmp+rename is the cross-process synchronization point. Best-effort
+        # like the rest of close() — a snapshot write error must not block
+        # the recorder shutdown path (it never raises out of here).
+        if self._evidence_registry is not None:
+            try:
+                snap_fn = getattr(self._evidence_registry, "snapshot", None)
+                if callable(snap_fn):
+                    snapshot = snap_fn()
+                    # tuple -> list for JSON; EvidenceRegistry.snapshot()
+                    # returns inner values as tuples for caller-immutability.
+                    payload = {
+                        src: {k: list(v) for k, v in inner.items()}
+                        for src, inner in snapshot.items()
+                    }
+                    tmp = self.session_dir / "evidence_registry.json.tmp"
+                    final = self.session_dir / "evidence_registry.json"
+                    tmp.write_text(
+                        json.dumps(payload, indent=2, sort_keys=True),
+                        encoding="utf-8",
+                    )
+                    os.replace(tmp, final)
+            except Exception as e:  # noqa: BLE001 — best-effort
+                print(f"[evidence snapshot err] {e}")
         with self._lock:
             with contextlib.suppress(Exception):
                 self.voice_wav.close()
