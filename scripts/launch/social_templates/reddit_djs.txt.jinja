@@ -1,0 +1,26 @@
+[TITLE] vibemix — free open-source AI co-host that listens to your DJ set (mac/win)
+
+[BODY]
+
+Hey r/DJs (and r/DJsRequest / r/Beatmatch / etc),
+
+We just open-sourced vibemix — a local-first AI co-host for live sets. Runs on macOS and Windows.
+
+**What it does:**
+- Listens to your master output via BlackHole (mac) / WASAPI loopback (win)
+- Watches your djay Pro / Rekordbox screen
+- Reads MIDI controller actions (DDJ-FLX4 mapped out of box, ~10 popular controllers shipped)
+- Reacts in real-time as hype-man (party mode) or coach (feedback mode)
+
+**Why this is different:**
+- Reactions are grounded — it cites real events (BPM, tracks, MIDI moves) before speaking
+- Not generic AI slop ("nice mix!"). Actually says what just happened.
+- 3 user levels: Beginner / Intermediate / Pro. Different prompts.
+- Library citation: tells you which track from YOUR library is playing
+- Post-session debrief with chapters + drills
+
+**Privacy:** audio/MIDI/screen never persist outside your machine. Only Gemini API calls go out (rate-limited via a Bravoh proxy so we don't ship raw keys). Recordings stay local with configurable retention.
+
+**Free.** Apache 2.0. {{ release_url }}
+
+Feedback welcome. Built by a small Bravoh team alongside our main product.
