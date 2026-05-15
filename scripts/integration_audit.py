@@ -320,18 +320,46 @@ def _parse_kaan_action_file(path: Path) -> list[KaanAction]:
     """Heuristic parse: extract DIST-/SEC-/INSTALL-/AUDIT-/OPS- ID headers.
 
     Strikethrough (``~~ID~~``) lines mark completed entries — skipped.
+
+    Classification:
+      - legal-capacity: appears under a "LEGAL-CAPACITY CARVEOUTS" /
+        "legal capacity" section AND is listed there explicitly. Per
+        P46 hard rule (KAAN-ACTION-LEGAL.md §LEGAL-CAPACITY CARVEOUTS).
+      - proxy: explicit "Kaan-action" / "Francesco-action" / "artist
+        task" markers nearby.
+      - deferred: everything else.
     """
     if not path.exists():
         return []
     text = path.read_text(encoding="utf-8")
-    # Find every ID-anchored header line; we treat each H2/H3-anchored
-    # ID block as one item.
-    actions: list[KaanAction] = []
-    # Capture IDs like DIST-09, SEC-06, INSTALL-VM, AUDIT-VM, OPS-DC, etc.
-    id_pat = re.compile(r"\b((?:DIST|SEC|INSTALL|AUDIT|OPS|MID|DOC|DEMO|GLB|PROFILE|LIBRARY|AX)-[A-Z0-9_\-]+)\b")
-    # Walk line-by-line; record an action when a fresh ID first appears.
-    seen: set[str] = set()
     lines = text.splitlines()
+
+    # Pre-pass: find every ID mentioned in the "LEGAL-CAPACITY
+    # CARVEOUTS" section (between the carveouts header and the next
+    # top-level section).
+    legal_capacity_ids: set[str] = set()
+    in_carveout = False
+    id_in_text = re.compile(
+        r"\b((?:DIST|SEC|INSTALL|AUDIT|OPS|MID|DOC|DEMO|GLB|PROFILE|LIBRARY|AX)-[A-Z0-9_\-]+)\b"
+    )
+    for line in lines:
+        lower = line.lower()
+        # Section start: a header containing "legal-capacity" or "legal capacity".
+        if line.startswith("#") and ("legal-capacity" in lower or "legal capacity" in lower):
+            in_carveout = True
+            continue
+        # Section end: any subsequent H1 / H2 that's NOT a carveout header.
+        if in_carveout and line.startswith("##") and "carveout" not in lower:
+            # ## 1. PGP / ## 2. ... = sub-sections that follow; we leave
+            # the carveout block at the first non-carveout H2.
+            in_carveout = False
+        if in_carveout:
+            for m in id_in_text.finditer(line):
+                legal_capacity_ids.add(m.group(1))
+
+    actions: list[KaanAction] = []
+    id_pat = id_in_text
+    seen: set[str] = set()
     for idx, line in enumerate(lines):
         if line.startswith("#") or line.startswith("##"):
             for m in id_pat.finditer(line):
@@ -342,16 +370,20 @@ def _parse_kaan_action_file(path: Path) -> list[KaanAction]:
                 if f"~~{aid}~~" in line:
                     continue
                 seen.add(aid)
-                # Classify by neighbourhood — search ±3 lines for keywords.
                 neighbourhood = "\n".join(
                     lines[max(0, idx - 3): min(len(lines), idx + 4)]
                 )
                 lower = neighbourhood.lower()
-                if "legal-capacity" in lower or "legal capacity" in lower:
+                # Classification ladder:
+                if aid in legal_capacity_ids:
+                    kind = "legal-capacity"
+                elif "legal-capacity" in lower or "legal capacity" in lower:
                     kind = "legal-capacity"
                 elif "kaan-action" in lower or "kaan action" in lower:
                     kind = "proxy"
-                elif "francesco" in lower or "artist" in lower:
+                elif "francesco-action" in lower or "francesco action" in lower:
+                    kind = "proxy"
+                elif "artist" in lower:
                     kind = "proxy"
                 else:
                     kind = "deferred"
@@ -359,13 +391,17 @@ def _parse_kaan_action_file(path: Path) -> list[KaanAction]:
                 if "francesco" in lower:
                     owner = "Francesco"
                 blocking = "blocking" in lower or "v1 launch" in lower
+                try:
+                    src_file = str(path.relative_to(REPO))
+                except ValueError:
+                    src_file = str(path)
                 actions.append(
                     KaanAction(
                         id=aid,
                         type=kind,
                         owner=owner,
                         blocking=blocking,
-                        source_file=str(path.relative_to(REPO)),
+                        source_file=src_file,
                         detail=line.strip().lstrip("#").strip(),
                     )
                 )
