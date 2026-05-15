@@ -241,11 +241,19 @@ def generate_drills(
                 logger.warning("[debrief] %s", last_error)
                 continue
 
-        # Validate every drill's citation resolves against the snapshot.
-        invalid = [
-            i for i, d in enumerate(drills.drills)
-            if not _citation_resolves(d.citation, evidence_snapshot)
-        ]
+        # Validate every drill's citation resolves against the snapshot
+        # AND each of the 3 advice fields carries ≥ 1 citation
+        # (Plan 29-07 strict mode — DEBRIEF-07).
+        invalid: list[int] = []
+        for i, d in enumerate(drills.drills):
+            if not _citation_resolves(d.citation, evidence_snapshot):
+                invalid.append(i)
+                continue
+            # Per-field citation presence check.
+            for field_value in (d.behavior, d.impact, d.action_recommended):
+                if not EVIDENCE_CITATION_RE.search(field_value):
+                    invalid.append(i)
+                    break
         if not invalid:
             return drills
 
