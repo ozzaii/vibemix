@@ -6,10 +6,17 @@
 
 <p align="center"><em>An AI co-host for your DJ set. Open source. Mac + Windows.</em></p>
 
-<!-- TODO: replace docs/assets/demo-placeholder.gif with the real 30-45s demo MP4/GIF once shot. -->
+<!-- vibemix:hero-start sha256=PLACEHOLDER path=docs/assets/demo.mp4 -->
+<!-- Phase 35 ASSETS-07: the 30s demo film lands at docs/assets/demo.mp4
+     via Kaan-action (KAAN-ACTION-LEGAL.md ASSETS-DEMO-CUT). Until then
+     the placeholder GIF below renders + the sha256=PLACEHOLDER sentinel
+     keeps scripts/check_readme_hero_hash.py green. When the real asset
+     ships, swap the sentinel for the actual SHA256 and replace the
+     <img> with a <video>. -->
 <p align="center">
   <img src="docs/assets/demo-placeholder.gif" alt="vibemix demo (placeholder — real demo coming)" width="720" />
 </p>
+<!-- vibemix:hero-end -->
 
 <p align="center">
   <img alt="release" src="https://img.shields.io/github/v/release/bravoh/vibemix?style=flat-square&color=ff8a3d" />
