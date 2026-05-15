@@ -49,7 +49,13 @@ POC_EXEMPT_DIRS: set[str] = {"fillers", "mocks", "archive"}
 
 # Globs in ``.gitattributes`` that route files through git-lfs. Tracked
 # files matching any of these patterns are EXEMPT from the >1 MB cap.
-LFS_TRACKED_GLOBS: set[str] = {"*.glb"}
+# NOTE: matched against ``Path(path).name`` — filename-only patterns.
+LFS_TRACKED_GLOBS: set[str] = {
+    "*.glb",
+    # Phase 28 Plan 02 — synthetic parity fixture (see .gitattributes).
+    "synthetic_embeddings.npy",
+    "synthetic_queries.json",
+}
 
 ONE_MB = 1024 * 1024
 
