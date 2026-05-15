@@ -67,10 +67,10 @@ Docks into v2.0 architectural slot (DEBRIEF-01 + DEBRIEF-02 + sidecar `--debrief
 
 Completes v2.0's 6-detector taxonomy; extends `GenreRouter.build_hard_tek_chain()` per Phase 17 pre-committed comment.
 
-- [ ] **SENSE-17**: `DISTORTION_CLIMB` detector — band-limited spectral-flatness rise + harmonic-distortion proxy + sustained kick density; cooldown 6s; cite `[ev:DISTORTION_CLIMB@<t>]` with `chain_position` and `distortion_db` fields.
-- [ ] **SENSE-18**: `ACID_LINE_ENTRY` detector — TB-303-style 200-800Hz formant-sweep autocorr + resonance-rise envelope; cooldown 8s; cite `[ev:ACID_LINE_ENTRY@<t>]` with `formant_hz` and `resonance_q` fields.
-- [ ] **SENSE-19**: GenreRouter atomic-swap regression test — 1000-cycle stress test under 8 detectors registered (Pitfall P49); construct-time registration only via `MappingProxyType`.
-- [ ] **SENSE-20**: `scripts/tune_detectors.py` extended with Hard Tek reference tracks (Kaan-curated set sourced; documented in `eval/corpus/hard_tek/README.md`).
+- [x] **SENSE-17**: `DISTORTION_CLIMB` detector — band-limited spectral-flatness rise + harmonic-distortion proxy + sustained kick density; cooldown 6s; cite `[ev:DISTORTION_CLIMB@<t>]` with `chain_position` and `distortion_db` fields.
+- [x] **SENSE-18**: `ACID_LINE_ENTRY` detector — TB-303-style 200-800Hz formant-sweep autocorr + resonance-rise envelope; cooldown 8s; cite `[ev:ACID_LINE_ENTRY@<t>]` with `formant_hz` and `resonance_q` fields.
+- [x] **SENSE-19**: GenreRouter atomic-swap regression test — 1000-cycle stress test under 8 detectors registered (Pitfall P49); construct-time registration only via `MappingProxyType`.
+- [x] **SENSE-20**: `scripts/tune_detectors.py` extended with Hard Tek reference tracks (Kaan-curated set sourced; documented in `eval/corpus/hard_tek/README.md`). Real-track curation deferred to HARDTEK-CORPUS-001 (KAAN-ACTION-LEGAL.md).
 
 ## v2.1 4-Layer Mascot Full Additive State Machine (P31)
 
@@ -301,10 +301,10 @@ Every v2.1 REQ-ID maps to exactly one v2.1 phase. 100% coverage validated 2026-0
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| SENSE-17 | Phase 30 | Pending |
-| SENSE-18 | Phase 30 | Pending |
-| SENSE-19 | Phase 30 | Pending |
-| SENSE-20 | Phase 30 | Pending |
+| SENSE-17 | Phase 30 | Complete |
+| SENSE-18 | Phase 30 | Complete |
+| SENSE-19 | Phase 30 | Complete |
+| SENSE-20 | Phase 30 | Complete (real-track curation deferred to HARDTEK-CORPUS-001) |
 
 ### 4-Layer Mascot Full Additive (Phase 31)
 

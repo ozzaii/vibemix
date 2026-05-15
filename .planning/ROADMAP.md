@@ -56,7 +56,7 @@ Started 2026-05-14 via `/gsd-new-milestone`. Public OSS RC milestone — close e
 - [ ] **Phase 27: Eval Harness + v2.0 Carry-Forward Close-Out** — Autonomous hallucination proxy gate + sidecar universal2 + WASAPI subscription + Achird OPUS render + FLX4 sync sniff + `register_library` 5-min orphan patch. REQ count: 14. Pitfalls: P42, P43, P44, P45, P48, P63, P69, P70 (+ P46 legal-carveout prep).
 - [ ] **Phase 28: Library Intelligence v1** — Gemini Embedding 2 + sqlite-vec / numpy fallback · vibe search · "what's playing" grounding · drag-drop UI · 30-day staleness nudge. REQ count: 9. Pitfalls: P48, P54, P55, P56.
 - [ ] **Phase 29: Post-Session Debrief MVP UI** — Chaptered review · 60–90s voiced TL;DR · 3 drills · clickable timeline · cited critique. REQ count: 9. Pitfalls: P81, P82.
-- [ ] **Phase 30: 2 Hard Tek Detectors** — `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` (taxonomy completion). REQ count: 4. Pitfalls: P49.
+- [x] **Phase 30: 2 Hard Tek Detectors** — `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` (taxonomy completion). REQ count: 4. Pitfalls: P49. Shipped 2026-05-15 — 45 tests pass, 1000-cycle race gate green, 0 code-review findings.
 - [ ] **Phase 31: 4-Layer Mascot Full Additive State Machine** — Base + Emotion + Anticipation + Reaction (EXTENDS v2.0, never rewrites). REQ count: 8. Pitfalls: P47, P62, P72.
 - [ ] **Phase 32: Long-Term DJ Profile (~2KB JSON)** — Post-session regen + verbatim cache-side inject + content allowlist. REQ count: 7. Pitfalls: P51, P53, P60.
 - [ ] **Phase 33: One-Click Install Hardening** — TCC pre-grant wizard + BlackHole auto-detect + fresh-VM rehearsal + sidecar polish + first-launch onboarding. REQ count: 9. Pitfalls: P50, P63, P67, P69, P71.
