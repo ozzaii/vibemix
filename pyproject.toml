@@ -147,6 +147,12 @@ dev = [
     # in tests/repo/test_repo_metadata.py + scripts/dist/configure_repo.sh
     # (consumed via `yq` on the shell side; YAML parse on the Python side).
     "pyyaml>=6.0",
+    # Phase 27 Plan 27-01 (declared here for Plan 27-02 judges):
+    # VCR.py + pytest-recording cache Gemini API calls so PR CI runs at $0.
+    # Plan 27-02 uses cassettes under tests/eval/cassettes/ for the 2-judge
+    # cross-check tests. Declared in this plan so the manifest is set once.
+    "vcrpy>=8.0",
+    "pytest-recording>=0.13",
 ]
 
 # Hatchling includes non-Python files inside a package directory by default
