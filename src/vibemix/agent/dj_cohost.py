@@ -162,6 +162,14 @@ class DJCoHostAgent(Agent):
         # llm_node publishes ipc.session.overlay-highlight envelopes for
         # every [screen:<element>] citation in an emit-action turn.
         ipc_bus: "IpcBus | None" = None,
+        # Plan 32-03 / PROFILE-04 — long-term DJ profile reference. P53
+        # kwargs-only addition; None default keeps v2.0 4-kwarg construction
+        # path byte-identical. P60: profile lives in GeminiContextCache
+        # (vibemix.agent.cache.GeminiContextCache.profile_section), NEVER
+        # in the per-turn prompt. The agent stores the reference only for
+        # diagnostics; llm_node must NEVER read it (enforced by
+        # tests/profile/test_profile_not_in_per_turn_prompt.py).
+        profile: dict | None = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -216,6 +224,12 @@ class DJCoHostAgent(Agent):
         )
         # Plan 24-02 — overlay-highlight publish path. Wired iff non-None.
         self._ipc_bus: "IpcBus | None" = ipc_bus
+        # Plan 32-03 / PROFILE-04 — stored read-only reference. NEVER
+        # accessed inside llm_node (P60 grep gate enforces this). The
+        # Settings → Profile panel may read it for diagnostics without
+        # re-loading from disk. If you find yourself adding self._profile
+        # into the per-turn flow, STOP — that breaks the cache contract.
+        self._profile: dict | None = profile
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         # Both the LiveKit-side ``instructions`` AND the google.genai-side

@@ -666,6 +666,11 @@ async def main() -> None:
         stripped_rate_tracker=stripped_rate_tracker,
         ack_bank=ack_bank,
         playback=playback,
+        # Plan 32-03 / PROFILE-04 — same dict already injected into the cache
+        # body via render_profile_for_cache above. Stored on the agent for
+        # Settings → Profile panel diagnostics; NEVER read inside llm_node
+        # (P60). None default keeps v2.0 4-kwarg call shape byte-identical.
+        profile=profile_dict,
     )
 
     # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──
