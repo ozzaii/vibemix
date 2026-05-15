@@ -79,6 +79,41 @@ jobs:
   # Wave 0 — Pre-flight gates.
   # ---------------------------------------------------------------------------
 
+  # Phase 38 — Mirror of verify-signed.yml::audit-no-apple-signpath-post.
+  # Fires on tag-push directly so a forbidden POST/PUT to apple/signpath/
+  # notarytool fails the release pipeline BEFORE any signing step runs.
+  # Pitfall P46 hard rule.
+  p46-audit:
+    name: Audit — no Apple/SignPath POST/PUT (P46)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Grep for forbidden POST/PUT to Apple/SignPath/notarytool
+        run: |
+          set -euo pipefail
+          if grep -RIn --include='*.yml' --include='*.yaml' \
+            -E '(curl|wget|Invoke-WebRequest|Invoke-RestMethod).*(POST|PUT).*(apple\.com|signpath\.io|notarytool)' \
+            .github/workflows \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'; then
+            echo "::error::Forbidden POST/PUT to Apple/SignPath endpoints (P46)"
+            exit 1
+          fi
+          if grep -RIn --include='*.py' --include='*.sh' \
+            -E '(POST|PUT).*(apple\.com|signpath\.io|notarytool)' \
+            scripts/ 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'; then
+            echo "::error::Forbidden POST/PUT to Apple/SignPath endpoints (P46) in scripts"
+            exit 1
+          fi
+          if grep -RIn --include='*.ps1' \
+            -E '(Invoke-WebRequest|Invoke-RestMethod|System\.Net\.WebClient|System\.Net\.Http).*(apple\.com|signpath\.io|notarytool)' \
+            scripts/ 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'; then
+            echo "::error::Forbidden PowerShell HTTP verb to Apple/SignPath/notarytool (P46)"
+            exit 1
+          fi
+          echo "::notice::P46 audit clean — no forbidden POST/PUT references."
+
   detect-signing-mode:
     name: Detect signing mode
     runs-on: ubuntu-latest

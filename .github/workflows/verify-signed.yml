@@ -35,16 +35,35 @@ jobs:
           set -euo pipefail
           # Allow read-only references (notarytool log fetch is read).
           # Block any curl/wget POST/PUT to apple/signpath domains in workflows.
+          # Phase 38 extension: also exclude lines starting with '#' (comments)
+          # so the audit's own documentation doesn't self-match.
           if grep -RIn --include='*.yml' --include='*.yaml' \
-            -E '(curl|wget).*(POST|PUT).*(apple\.com|signpath\.io|notarytool)' \
-            .github/workflows; then
+            -E '(curl|wget|Invoke-WebRequest|Invoke-RestMethod).*(POST|PUT).*(apple\.com|signpath\.io|notarytool)' \
+            .github/workflows \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'; then
             echo "::error::Forbidden POST/PUT to Apple/SignPath endpoints (P46)"
             exit 1
           fi
           if grep -RIn --include='*.py' --include='*.sh' \
             -E '(POST|PUT).*(apple\.com|signpath\.io|notarytool)' \
-            scripts/ 2>/dev/null; then
+            scripts/ 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'; then
             echo "::error::Forbidden POST/PUT to Apple/SignPath endpoints (P46) in scripts"
+            exit 1
+          fi
+          # Phase 38 — extend coverage to PowerShell scripts and verbs.
+          if grep -RIn --include='*.ps1' \
+            -E '(Invoke-WebRequest|Invoke-RestMethod|System\.Net\.WebClient|System\.Net\.Http).*(apple\.com|signpath\.io|notarytool)' \
+            scripts/ 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'; then
+            echo "::error::Forbidden PowerShell HTTP verb to Apple/SignPath endpoints (P46) in scripts"
+            exit 1
+          fi
+          if grep -RIn --include='*.ps1' \
+            -E '(curl|wget).*(POST|PUT).*(apple\.com|signpath\.io|notarytool)' \
+            scripts/ 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'; then
+            echo "::error::Forbidden curl/wget POST/PUT to Apple/SignPath endpoints (P46) in PowerShell scripts"
             exit 1
           fi
           echo "::notice::No forbidden Apple/SignPath POST/PUT references detected."
