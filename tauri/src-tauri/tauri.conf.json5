@@ -98,7 +98,15 @@
     // app.path().resource_dir(). externalBin flattens onedir into MacOS/ which
     // breaks the PyInstaller bootloader (looks for libpython3.12.dylib in
     // Contents/Frameworks/ when .app detected).
-    "resources": ["binaries/vibemix-core-aarch64-apple-darwin/**/*"],
+    // Plan 27-06 / REC-09: ship BOTH arch-specific PyInstaller bundles so
+    // Apple Silicon users on a fresh install never see the Rosetta prompt.
+    // sidecar.rs picks the right one at runtime via std::env::consts::ARCH.
+    // RESEARCH §Critical Correction: never lipo-merge the two bundles —
+    // PyInstaller embeds its PKG archive in only the last merged slice.
+    "resources": [
+      "binaries/vibemix-core-aarch64-apple-darwin/**/*",
+      "binaries/vibemix-core-x86_64-apple-darwin/**/*"
+    ],
     "icon": ["icons/icon.png"],
     "macOS": {
       "minimumSystemVersion": "12.3",

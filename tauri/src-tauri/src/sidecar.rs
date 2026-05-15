@@ -32,12 +32,29 @@ use tauri_plugin_shell::ShellExt;
 const MAX_RESTARTS: u32 = 3;
 
 /// Target triple of the bundled sidecar. Matches the per-triple directory
-/// name produced by scripts/build_sidecar.py. Hard-coded for the macOS build
-/// — Windows ships under its own triple via a parallel cfg block.
+/// name produced by scripts/build_sidecar.py.
+///
+/// Plan 27-06 / REC-09 carry-forward: on macOS the ship now includes BOTH
+/// arm64 + x86_64 PyInstaller bundles under bundle.resources. We pick the
+/// matching triple at runtime via std::env::consts::ARCH so Apple Silicon
+/// users never see the Rosetta prompt on first launch (Pitfall P69).
 #[cfg(target_os = "macos")]
-const SIDECAR_TRIPLE: &str = "aarch64-apple-darwin";
+fn sidecar_triple() -> &'static str {
+    match std::env::consts::ARCH {
+        "aarch64" => "aarch64-apple-darwin",
+        "x86_64" => "x86_64-apple-darwin",
+        // Defensive fallback: unknown arch can't run a bundled binary. Pick
+        // the arm64 default so Apple Silicon (the dominant install base)
+        // still gets a valid path; the resolver will fail loudly with a
+        // clear error if the binary isn't present.
+        _ => "aarch64-apple-darwin",
+    }
+}
+
 #[cfg(target_os = "windows")]
-const SIDECAR_TRIPLE: &str = "x86_64-pc-windows-msvc";
+fn sidecar_triple() -> &'static str {
+    "x86_64-pc-windows-msvc"
+}
 
 /// Shared handle to the most-recently-spawned sidecar child. `restart_sidecar`
 /// reads this to kill the current process; the watchdog loop refreshes it on
@@ -211,10 +228,11 @@ fn resolve_sidecar_path(app: &AppHandle) -> Result<PathBuf, String> {
         .resource_dir()
         .map_err(|e| format!("resource_dir() failed: {e}"))?;
     let exe_suffix = if cfg!(target_os = "windows") { ".exe" } else { "" };
-    let bin_name = format!("vibemix-core-{SIDECAR_TRIPLE}{exe_suffix}");
+    let triple = sidecar_triple();
+    let bin_name = format!("vibemix-core-{triple}{exe_suffix}");
     let path = resource_dir
         .join("binaries")
-        .join(format!("vibemix-core-{SIDECAR_TRIPLE}"))
+        .join(format!("vibemix-core-{triple}"))
         .join(&bin_name);
     if !path.exists() {
         return Err(format!(
