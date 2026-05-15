@@ -672,6 +672,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Emit orphan candidates as CSV to stdout.",
     )
     parser.add_argument(
+        "--orphan-diff",
+        type=Path,
+        help="Diff current orphan scan against the given baseline CSV; "
+        "exit 1 on any new orphans (CI gate).",
+    )
+    parser.add_argument(
         "--kaan-action-rollup",
         action="store_true",
         help="Emit Kaan-action rollup as markdown to stdout.",
@@ -695,6 +701,44 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.orphan_inventory:
         print(orphan_inventory_csv())
+        return 0
+
+    if args.orphan_diff:
+        baseline_path = args.orphan_diff.resolve()
+        if not baseline_path.exists():
+            print(
+                f"ERROR: baseline orphan CSV not found at {baseline_path}",
+                file=sys.stderr,
+            )
+            return 1
+        baseline_rows = set(
+            line.strip()
+            for line in baseline_path.read_text(encoding="utf-8").splitlines()[1:]
+            if line.strip()
+        )
+        current_rows = set(
+            line.strip()
+            for line in orphan_inventory_csv().splitlines()[1:]
+            if line.strip()
+        )
+        new = current_rows - baseline_rows
+        removed = baseline_rows - current_rows
+        if new:
+            print("NEW ORPHANS (not in baseline — CI gate failure):", file=sys.stderr)
+            for row in sorted(new):
+                print(f"  + {row}", file=sys.stderr)
+            print(
+                "\nIf this is intentional, refresh the baseline:\n"
+                f"  python scripts/integration_audit.py --orphan-inventory > "
+                f"{baseline_path.relative_to(REPO) if baseline_path.is_relative_to(REPO) else baseline_path}",
+                file=sys.stderr,
+            )
+            return 1
+        if removed:
+            print("ORPHANS RESOLVED (baseline can be pruned):")
+            for row in sorted(removed):
+                print(f"  - {row}")
+        print("OK: no new orphans")
         return 0
 
     if args.kaan_action_rollup:

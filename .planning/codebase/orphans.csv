@@ -1,0 +1,6 @@
+symbol,file,kind
+GeminiClientProtocol,src/vibemix/debrief/tldr.py,class
+VoiceWavMeta,src/vibemix/debrief/session_loader.py,class
+BlackHoleProbeResult,src/vibemix/install/blackhole_probe.py,class
+set_device_nominal_sample_rate,src/vibemix/platform/_audio_macos.py,function
+OutboundEndpoint,src/vibemix/runtime/sec_check.py,class

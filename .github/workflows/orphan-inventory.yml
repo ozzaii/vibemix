@@ -1,0 +1,43 @@
+name: Orphan Inventory Gate
+
+# Phase 37 Plan 37-03 — fails on any new orphaned-but-shipped symbol.
+#
+# An orphan = a top-level Python class or function in src/vibemix/ that
+# is never referenced anywhere outside its defining file (no test
+# import, no production caller). The baseline lives at
+# `.planning/codebase/orphans.csv`.
+#
+# To refresh the baseline (after intentionally adding an orphan or
+# resolving one), run:
+#
+#     python scripts/integration_audit.py --orphan-inventory > \
+#         .planning/codebase/orphans.csv
+#
+# and commit the result.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  orphan-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run orphan-inventory diff against baseline
+        run: |
+          python scripts/integration_audit.py \
+            --orphan-diff .planning/codebase/orphans.csv
