@@ -79,6 +79,21 @@ jobs:
             --threshold-lock eval/THRESHOLD-LOCK.md \
             --output .planning/eval-runs/${{ github.sha }}/
 
+      - name: "Real-corpus calibration freshness gate (Phase 42 GATE-04)"
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # Plan 42-02 — fail when eval/corpus/sessions/ has fewer than 6
+          # populated sessions (input.wav required) OR the recalibration
+          # log carries no entry within the last 30 days. Does NOT
+          # auto-recalibrate; flags RECALIBRATION_REQUIRED for human review.
+          uv run python -m scripts.eval.recalibrate_thresholds \
+            --corpus eval/corpus/sessions \
+            --check-only \
+            --lock-path eval/THRESHOLD-LOCK.md \
+            --log-path eval/THRESHOLD-RECALIBRATION-LOG.md
+
       - name: Post scorecard to PR
         if: github.event_name == 'pull_request' && always()
         uses: actions/github-script@v7
