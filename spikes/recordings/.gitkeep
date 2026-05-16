@@ -1,0 +1,4 @@
+# Spike recording sink — runs of spikes/scripts/run_live_spike.py write
+# wav + metrics.json files here. Recordings are user-controlled — commit
+# only intentionally (Kaan's discretion per Threat T-41-06-02). Use git-LFS
+# if recordings grow past ~50 MB.

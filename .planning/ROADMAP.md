@@ -71,12 +71,12 @@ Plans:
 
 ```
 Plans:
-- [ ] 41-01-PLAN.md — ModelRouter seam + config + CI grep gate (LAT-01, LAT-07)
+- [x] 41-01-PLAN.md — ModelRouter seam + config + CI grep gate (LAT-01, LAT-07)
 - [ ] 41-02-PLAN.md — GeminiContextCache cleanup: TTL 3600s, mutation-driven refresh, cache_hit telemetry (LAT-02, LAT-03)
 - [ ] 41-03-PLAN.md — thinking_level=MINIMAL runtime gate + FLEX-on-live defense (LAT-08)
 - [ ] 41-04-PLAN.md — LLM→TTS streaming pipe-through + dual-phase gate + 3.1 Flash TTS audio-tag DSL (LAT-04, LAT-05)
-- [ ] 41-05-PLAN.md — Embedding 2 GA probe + auto-bump + 768-dim parity test + migration script (LAT-06)
-- [ ] 41-06-PLAN.md — Gemini 3.1 Flash Live spike framework + Kaan-action discharge runbook (LAT-09)
+- [x] 41-05-PLAN.md — Embedding 2 GA probe + auto-bump + 768-dim parity test + migration script (LAT-06)
+- [x] 41-06-PLAN.md — Gemini 3.1 Flash Live spike framework + Kaan-action discharge runbook (LAT-09)
 - [ ] 41-07-PLAN.md — End-to-end integration test + replay harness metrics + 41-INTEGRATION-REPORT.md (LAT-01..09)
 ```
 
