@@ -62,7 +62,7 @@ from vibemix.audio import (
     snapshot_wav,
 )
 from vibemix.coach import CitationLinter, StrippedRateTracker
-from vibemix.prompts import build_system_instruction, filter_for_slop
+from vibemix.prompts import build_parts_description, build_system_instruction, filter_for_slop
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
 from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
@@ -71,6 +71,7 @@ from vibemix.ui_bus import SessionOverlayHighlight
 if TYPE_CHECKING:  # pragma: no cover — typing-only
     from vibemix.agent.ack_bank import AckBank
     from vibemix.audio.buffers import PlaybackQueue
+    from vibemix.audio.lookahead import LookaheadProvider
     from vibemix.runtime.ws_bus import IpcBus
 
 # Sentinel suppression-token the LLM emits when nothing's worth reacting to.
@@ -187,6 +188,17 @@ class DJCoHostAgent(Agent):
         # Closes hallucination class "AI invents what Kaan said" by
         # putting Kaan's literal voice in front of Gemini.
         mic_audio_buf: "AudioBuffer | None" = None,
+        # Plan 40-03 / AUDIO-02 + AUDIO-04 — source-file lookahead provider.
+        # None default preserves Phase 4/18/19/40-01 backward compat (the
+        # 1-Part / 2-Part request shapes are byte-identical when lookahead
+        # is None). When non-None, llm_node calls
+        # ``self._lookahead.snapshot_wav()`` after the mic Part attach and
+        # conditionally appends a 3rd ``audio/wav`` Part containing 18s
+        # ending ~3s past the current playhead. The prompt-suffix labels
+        # that Part with "NOT YET HEARD BY AUDIENCE" per locked CONTEXT
+        # Q2 — closes the "AI claims to predict the future" hallucination
+        # class that lookahead introduces.
+        lookahead: "LookaheadProvider | None" = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -253,6 +265,13 @@ class DJCoHostAgent(Agent):
         # ``__main__._mic_callback_factory`` on the sounddevice audio thread
         # (verbatim port of cohost_v4.py:2278-2296 with AI-talk zero-fill).
         self._mic_audio_buf: "AudioBuffer | None" = mic_audio_buf
+        # Plan 40-03 / AUDIO-02 + AUDIO-04 — lookahead provider reference.
+        # Read-only consumer: llm_node calls ``snapshot_wav()`` per turn
+        # and conditionally appends Part 3 to ``contents``. The provider
+        # is per-session (instantiated in __main__.py next to
+        # clean_audio_buf); the title→path cache lives for the whole DJ
+        # session per RESEARCH Open Question 3 resolution.
+        self._lookahead: "LookaheadProvider | None" = lookahead
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         # Both the LiveKit-side ``instructions`` AND the google.genai-side
@@ -392,28 +411,44 @@ class DJCoHostAgent(Agent):
                             self._mic_audio_buf, MIC_AUDIO_PART_SECONDS
                         )
 
-        # Plan 40-01 — Part-aware prompt suffix. 1-Part baseline wording is
-        # preserved when mic_wav is None (Phase 4 byte-identical). When
-        # mic_wav is attached, the suffix enumerates P1 + P2 explicitly so
-        # Gemini knows the second audio Part is Kaan's voice (not part of
-        # the mix). Plan 40-03 extends this to P1 + P2 + P3 (lookahead).
-        if mic_wav is not None:
-            parts_clause = (
-                f"\n\nAttached: P1 = last {int(audio_seconds)}s of live mix (BlackHole), "
-                f"P2 = your mic (last {int(MIC_AUDIO_PART_SECONDS)}s, your voice as Kaan). "
-                f"Your ears are the referee — the evidence above is grounded context."
-            )
-        else:
-            parts_clause = (
-                f"\n\nAttached: last {int(audio_seconds)}s of audio (mix + mic). "
-                f"Your ears are the referee — the evidence above is grounded context."
-            )
+        # Plan 40-03 / AUDIO-02 + AUDIO-04 — source-file lookahead Part 3
+        # decision. Belt-and-braces try/except wrapping: the provider's
+        # snapshot_wav() already returns ``(None, meta)`` on every observed
+        # failure path (T-40-02-* threat register), but the wrapper here
+        # guarantees ``llm_node`` cannot crash even if the provider
+        # misbehaves (T-40-03-02 mitigation). When self._lookahead is
+        # None (Phase 4/40-01 backward-compat default), Part 3 is never
+        # attempted and the meta dict carries an explicit "no_lookahead"
+        # reason — feeds the lookahead_part_skipped event below.
+        lookahead_wav: bytes | None = None
+        lookahead_meta: dict = {"ok": False, "reason": "no_lookahead"}
+        if self._lookahead is not None:
+            try:
+                lookahead_wav, lookahead_meta = self._lookahead.snapshot_wav()
+            except Exception as e:  # noqa: BLE001 — graceful degrade per T-40-03-02
+                print(f"[lookahead err] {e}", file=sys.stderr)
+                lookahead_wav = None
+                lookahead_meta = {"ok": False, "reason": f"exception: {e!r}"}
+        mic_attached = mic_wav is not None
+        lookahead_attached = lookahead_wav is not None
+
+        # Plan 40-03 — Part-aware prompt suffix via build_parts_description.
+        # Delegates the 4-way string dispatch (1-Part baseline / mic-only /
+        # lookahead-only / 3-Part full) to the locked builder in
+        # vibemix.prompts.matrix. The builder encodes CONTEXT.md Q2:
+        # lookahead-present variants carry "NOT YET HEARD BY AUDIENCE" +
+        # anti-prediction guard language.
+        parts_clause = build_parts_description(
+            audio_seconds=float(audio_seconds),
+            has_mic_part=mic_attached,
+            has_lookahead_part=lookahead_attached,
+        )
 
         contents: list = [
             text_prompt + parts_clause + history_clause,
             types.Part.from_bytes(data=audio_wav, mime_type="audio/wav"),
         ]
-        if mic_wav is not None:
+        if mic_attached:
             contents.append(types.Part.from_bytes(data=mic_wav, mime_type="audio/wav"))
             self._recorder.log_event(
                 "mic_part_attached",
@@ -428,6 +463,26 @@ class DJCoHostAgent(Agent):
                 reason=mic_skip_reason or "unknown",
                 kaan_spoke_age_s=kaan_spoke_age_s,
                 rms_int16=mic_rms_int16,
+            )
+        # Plan 40-03 — Part 3 (lookahead) attach + structured event. The
+        # mic_part_* / lookahead_part_* pair forms a uniform diagnostic
+        # surface for coach-loop tails + Settings → Diagnostics; per-turn
+        # both events fire (one of each pair from each side). The lookahead
+        # event carries the provider's full meta dict so events.jsonl
+        # consumers see title / file / seek / duration / reason.
+        if lookahead_attached:
+            contents.append(
+                types.Part.from_bytes(data=lookahead_wav, mime_type="audio/wav")
+            )
+            self._recorder.log_event(
+                "lookahead_part_attached",
+                bytes=len(lookahead_wav),
+                **{k: v for k, v in lookahead_meta.items() if k != "bytes"},
+            )
+        else:
+            self._recorder.log_event(
+                "lookahead_part_skipped",
+                **lookahead_meta,
             )
         if screen_jpeg and not skip_screen:
             contents.append(types.Part.from_bytes(data=screen_jpeg, mime_type="image/jpeg"))
