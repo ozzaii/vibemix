@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>vibemix — 45s cinematic storyboard</title>
+<title>vibemix — 30s cinematic storyboard</title>
 <meta name="viewport" content="width=1280" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -607,18 +607,18 @@ body::after{
       </span>
       <span class="wordmark">vibemix</span>
       <span class="subtitle">
-        the <b>45-second hero cut</b> — 10 frames, one mascot, zero shortcuts
+        the <b>30-second hero cut</b> — 8 cuts, one mascot, zero shortcuts
       </span>
     </div>
 
     <div class="head-meta">
       <div class="meta-card">
         <div class="lbl">runtime</div>
-        <div class="val" data-ghost="88:88">00:45</div>
+        <div class="val" data-ghost="88:88">00:30</div>
       </div>
       <div class="meta-card">
-        <div class="lbl">frames</div>
-        <div class="val" data-ghost="88">10</div>
+        <div class="lbl">cuts</div>
+        <div class="val" data-ghost="88">08</div>
       </div>
       <div class="meta-card">
         <div class="lbl">director</div>
@@ -655,7 +655,7 @@ body::after{
       <div class="brief-h"><span class="num">03</span> sound brief</div>
       <p>
         original techno bed (commissioned, not licensed — Kaan provides).
-        140 bpm. F minor. builds at 0:31, drops at 0:48.
+        140 bpm. F minor. builds at 0:14, drops at 0:18.
         Avery TTS over the music — clean, off-axis, like a friend leaning into your ear.
       </p>
     </div>
@@ -664,8 +664,8 @@ body::after{
   <!-- ─── frames ─── -->
   <section class="frames">
 
-    <!-- FRAME 01 ─────────────────────────────────────────────────────── -->
-    <article class="frame">
+    <!-- FRAME 01 ─── cold open · DJ hands on FLX4 + dim room ──────────────── -->
+    <article class="frame" data-cut="1">
       <aside class="frame-num">
         <span class="dot"></span>
         <span class="n" data-ghost="88">01</span>
@@ -674,69 +674,84 @@ body::after{
 
       <div class="shot">
         <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
-          <!-- dark room — silhouette of headphones in moonlight -->
           <defs>
-            <radialGradient id="rg1" cx="50%" cy="40%" r="60%">
+            <radialGradient id="rg1" cx="50%" cy="42%" r="65%">
               <stop offset="0%" stop-color="#1a1e25"/>
               <stop offset="100%" stop-color="#050608"/>
             </radialGradient>
+            <radialGradient id="rg1amber" cx="80%" cy="20%" r="50%">
+              <stop offset="0%" stop-color="#ffa12e" stop-opacity=".18"/>
+              <stop offset="100%" stop-color="#ffa12e" stop-opacity="0"/>
+            </radialGradient>
           </defs>
           <rect width="480" height="280" fill="url(#rg1)"/>
-          <!-- soft single light source from top-right -->
-          <ellipse cx="380" cy="40" rx="160" ry="60" fill="#1a1e25" opacity=".5"/>
-          <!-- headphones silhouette on a table -->
-          <g transform="translate(180,100)">
-            <path d="M0 60 Q60 -20 120 60" stroke="#3a4150" stroke-width="6" fill="none" stroke-linecap="round"/>
-            <ellipse cx="0"   cy="80" rx="22" ry="28" fill="#0a0b0e" stroke="#2a2f38" stroke-width="2"/>
-            <ellipse cx="120" cy="80" rx="22" ry="28" fill="#0a0b0e" stroke="#2a2f38" stroke-width="2"/>
-            <ellipse cx="0"   cy="80" rx="14" ry="18" fill="#15181e"/>
-            <ellipse cx="120" cy="80" rx="14" ry="18" fill="#15181e"/>
+          <!-- single warm amber wash from top-right -->
+          <rect width="480" height="280" fill="url(#rg1amber)"/>
+          <!-- DDJ-FLX4 overhead (controller in dim room) -->
+          <g transform="translate(50,120)">
+            <rect x="0" y="0" width="380" height="130" rx="10" fill="#0e1014" stroke="#2a2f38" stroke-width="1.5"/>
+            <!-- 2 jog wheels -->
+            <circle cx="78" cy="65" r="46" fill="#15181e" stroke="#3a4150" stroke-width="1.5"/>
+            <circle cx="78" cy="65" r="20" fill="#0a0b0e" stroke="#2a2f38"/>
+            <circle cx="302" cy="65" r="46" fill="#15181e" stroke="#3a4150" stroke-width="1.5"/>
+            <circle cx="302" cy="65" r="20" fill="#0a0b0e" stroke="#2a2f38"/>
+            <!-- amber edge LED on left jog (cdj convention — single warm accent) -->
+            <circle cx="78" cy="65" r="44" fill="none" stroke="#ffa12e" stroke-width=".8" opacity=".6"/>
+            <!-- crossfader -->
+            <rect x="165" y="86" width="50" height="6" rx="3" fill="#15181e" stroke="#3a4150"/>
+            <rect x="186" y="82" width="14" height="14" rx="2" fill="#3a4150"/>
+            <!-- 4 EQ knobs cluster (top strip) -->
+            <g fill="#15181e" stroke="#3a4150">
+              <circle cx="165" cy="24" r="7"/><circle cx="184" cy="24" r="7"/>
+              <circle cx="200" cy="24" r="7"/><circle cx="217" cy="24" r="7"/>
+            </g>
           </g>
-          <!-- a hand entering from bottom-right -->
-          <g transform="translate(330,180) rotate(-20)" opacity=".85">
-            <ellipse cx="0" cy="0" rx="22" ry="14" fill="#5a4a3e"/>
-            <rect x="-2" y="-6" width="50" height="12" rx="6" fill="#5a4a3e"/>
+          <!-- DJ hands entering from bottom corners (silhouette only) -->
+          <g opacity=".88">
+            <ellipse cx="110" cy="245" rx="42" ry="20" fill="#15181e"/>
+            <rect x="90" y="240" width="60" height="40" fill="#15181e"/>
+            <ellipse cx="330" cy="245" rx="42" ry="20" fill="#15181e"/>
+            <rect x="310" y="240" width="60" height="40" fill="#15181e"/>
           </g>
-          <!-- a faint table surface line -->
-          <line x1="0" y1="200" x2="480" y2="200" stroke="#15181e" stroke-width="1"/>
+          <!-- faint room edges -->
+          <line x1="0" y1="40" x2="480" y2="40" stroke="#15181e" stroke-width="1" opacity=".4"/>
         </svg>
         <span class="tc">00:00</span>
-        <span class="duration">03 s</span>
+        <span class="duration">04 s</span>
       </div>
 
       <div class="info">
         <div class="info-head">
-          <div class="info-h">cold open · "the hand"</div>
+          <div class="info-h">cold open · "the hands"</div>
           <span class="info-tag">no voiceover</span>
         </div>
-
         <div class="info-row">
           <div class="k">composition</div>
-          <div class="v">close-up. headphones on a dark table. one hand reaches in from the bottom-right. <b>shallow DoF</b>, headphones in focus.</div>
+          <div class="v">overhead. DJ hands on the FLX4 in a <b>dim room</b>. single amber wash from camera-right at 30°. everything else warm-black. <b>20/80 — paper-thin highlight, charcoal everywhere else.</b></div>
         </div>
         <div class="info-row">
           <div class="k">camera</div>
-          <div class="v">35mm · static · slight breath. push in <em>just barely</em> as the hand touches the headphones.</div>
+          <div class="v">35mm · top-down · slow breath push as the first kick lands.</div>
         </div>
         <div class="info-row">
           <div class="k">sound</div>
-          <div class="v">silence + sub-bass hum building underneath. amber EQ-rumble like the room is about to wake up.</div>
+          <div class="v">sub-bass hum building. one kick + amber EQ-rumble. the room about to wake up.</div>
         </div>
         <div class="info-row">
-          <div class="k">lighting</div>
-          <div class="v">single warm key from camera-right at 30°. everything else black. <b>20/80 = paper-thin highlight, charcoal everywhere else.</b></div>
+          <div class="k">cast</div>
+          <div class="v">Francesco's hands. clean, ringless, on the DDJ-FLX4. no UI chip overlay — this is the live capture frame.</div>
         </div>
         <div class="info-row">
           <div class="k">energy <span class="energy"><span class="on"></span><span></span><span></span><span></span><span></span></span></div>
           <div class="v">low. patient. promises something.</div>
         </div>
 
-        <div class="stamp">frame 01 / 10</div>
+        <div class="stamp">frame 01 / 08</div>
       </div>
     </article>
 
-    <!-- FRAME 02 ─────────────────────────────────────────────────────── -->
-    <article class="frame">
+    <!-- FRAME 02 ─── vibemix wizard "Welcome" frame (1s hold) ──────────────── -->
+    <article class="frame" data-cut="2">
       <aside class="frame-num">
         <span class="dot"></span>
         <span class="n" data-ghost="88">02</span>
@@ -745,79 +760,66 @@ body::after{
 
       <div class="shot">
         <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
-          <defs>
-            <linearGradient id="rg2" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#15181e"/>
-              <stop offset="100%" stop-color="#05060a"/>
-            </linearGradient>
-          </defs>
-          <rect width="480" height="280" fill="url(#rg2)"/>
-          <!-- DDJ controller from above — geometric -->
-          <g transform="translate(60,140)">
-            <rect x="0" y="0" width="360" height="120" rx="10" fill="#0e1014" stroke="#2a2f38" stroke-width="1.5"/>
-            <!-- 2 jog wheels -->
-            <circle cx="80" cy="60" r="42" fill="#15181e" stroke="#3a4150" stroke-width="1.5"/>
-            <circle cx="80" cy="60" r="18" fill="#0a0b0e" stroke="#2a2f38"/>
-            <circle cx="280" cy="60" r="42" fill="#15181e" stroke="#3a4150" stroke-width="1.5"/>
-            <circle cx="280" cy="60" r="18" fill="#0a0b0e" stroke="#2a2f38"/>
-            <!-- crossfader -->
-            <rect x="155" y="78" width="50" height="6" rx="3" fill="#15181e" stroke="#3a4150"/>
-            <rect x="175" y="74" width="14" height="14" rx="2" fill="#3a4150"/>
-            <!-- 4 EQ knobs cluster -->
-            <g fill="#15181e" stroke="#3a4150">
-              <circle cx="155" cy="22" r="7"/><circle cx="172" cy="22" r="7"/>
-              <circle cx="189" cy="22" r="7"/><circle cx="206" cy="22" r="7"/>
-            </g>
+          <rect width="480" height="280" fill="#050608"/>
+          <!-- wizard chip — Saira hero, amber V, [ Let's go ] CTA -->
+          <g transform="translate(60,40)">
+            <rect width="360" height="200" rx="8" fill="#0a0b0e" stroke="#2a2f38" stroke-width="1.2"/>
+            <!-- amber-V wordmark (mock-verbatim: V is amber, rest is silk) -->
+            <text x="180" y="98" text-anchor="middle" font-family="Saira" font-weight="700" font-size="44" letter-spacing="2">
+              <tspan fill="#ffa12e">V</tspan><tspan fill="#c8cdd6">IBEMIX</tspan>
+            </text>
+            <!-- DJ FRIEND phrase -->
+            <text x="180" y="134" text-anchor="middle" font-family="Saira" font-weight="600" font-size="22" fill="#c8cdd6" letter-spacing="3">DJ FRIEND</text>
+            <!-- slogan with rules -->
+            <line x1="120" y1="156" x2="148" y2="156" stroke="#3d424c" stroke-width="1"/>
+            <text x="180" y="160" text-anchor="middle" font-family="Saira" font-weight="500" font-size="11" fill="#6b7280" letter-spacing="4">IN YOUR EAR</text>
+            <line x1="212" y1="156" x2="240" y2="156" stroke="#3d424c" stroke-width="1"/>
+            <!-- [ Let's go ] CTA (armed) -->
+            <rect x="138" y="170" width="84" height="22" rx="3" fill="#0a0b0e" stroke="#ffa12e" stroke-width="1"/>
+            <text x="180" y="186" text-anchor="middle" font-family="Geist Mono" font-weight="500" font-size="11" fill="#ffa12e" letter-spacing="1">[ let's go ]</text>
           </g>
-          <!-- DJ silhouette hands -->
-          <g opacity=".85">
-            <ellipse cx="120" cy="195" rx="40" ry="22" fill="#15181e"/>
-            <rect x="100" y="190" width="60" height="40" fill="#15181e"/>
-            <ellipse cx="320" cy="195" rx="40" ry="22" fill="#15181e"/>
-            <rect x="300" y="190" width="60" height="40" fill="#15181e"/>
-          </g>
-          <!-- annotation: red X over the bad transition spot -->
-          <g transform="translate(165,135)" opacity=".9">
-            <line x1="-10" y1="-10" x2="10" y2="10" stroke="#ff3553" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="10"  y1="-10" x2="-10" y2="10" stroke="#ff3553" stroke-width="2.5" stroke-linecap="round"/>
-          </g>
+          <!-- subtle amber halo behind the chip -->
+          <ellipse cx="240" cy="140" rx="240" ry="60" fill="#ffa12e" opacity=".06"/>
         </svg>
-        <span class="tc">00:03</span>
-        <span class="duration">04 s</span>
+        <span class="overlay-chip" style="top:24px; left:24px;">
+          <span class="ld"></span> wizard · step 0
+        </span>
+        <span class="tc">00:04</span>
+        <span class="duration">02 s</span>
       </div>
 
       <div class="info">
         <div class="info-head">
-          <div class="info-h">the friction · "almost there"</div>
-          <span class="info-tag">no voiceover</span>
+          <div class="info-h">the welcome · "vibemix, dj friend"</div>
+          <span class="info-tag">UI chip · wizard step 0</span>
         </div>
         <div class="info-row">
           <div class="k">composition</div>
-          <div class="v">overhead of the controller. only the DJ's hands visible. crossfader stalls mid-transition. <b>two beats of held silence on the cut.</b></div>
+          <div class="v">first paint of the wizard. <b>three-line hero stack</b>: VIBEMIX wordmark (amber V lead), <em>DJ FRIEND</em>, "— in your ear —" rule-bracketed slogan. single <code>[ let's go ]</code> CTA armed in amber.</div>
         </div>
         <div class="info-row">
           <div class="k">camera</div>
-          <div class="v">top-down · 50mm equivalent · locked.</div>
+          <div class="v">no camera — 2D motion design. <b>1 sec hold</b>. wordmark rises with 8px opacity-translate; CTA delays in 200ms. matches <code>tauri/ui/src/wizard/step0-intro.ts</code>.</div>
         </div>
         <div class="info-row">
           <div class="k">sound</div>
-          <div class="v">the music dips — wrong moment, wrong EQ. a tiny audible <em>oh no</em> moment.</div>
+          <div class="v">brief synth swell — same key as the bed (F minor). no voiceover. let the chip land in silence.</div>
         </div>
         <div class="info-row">
-          <div class="k">cast</div>
-          <div class="v">hands only. <b>Francesco's hands</b> — clean, ringless, on the DDJ-FLX4.</div>
+          <div class="k">why it's here</div>
+          <div class="v">the audience sees the <em>product</em> name and shape before the demo. Saira + amber + warm-black sells "Pioneer-grade hardware in library mode" in one glance.</div>
         </div>
         <div class="info-row">
           <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span></span><span></span><span></span></span></div>
-          <div class="v">tension. the audience leans in.</div>
+          <div class="v">declarative. quiet. the brand handshake.</div>
         </div>
 
-        <div class="stamp">frame 02 / 10</div>
+        <div class="stamp">frame 02 / 08</div>
       </div>
     </article>
 
-    <!-- FRAME 03 ─────────────────────────────────────────────────────── -->
-    <article class="frame">
+    <!-- FRAME 03 ─── calibration screen · live audio meter rising ──────────── -->
+    <article class="frame" data-cut="3">
       <aside class="frame-num">
         <span class="dot"></span>
         <span class="n" data-ghost="88">03</span>
@@ -826,70 +828,90 @@ body::after{
 
       <div class="shot">
         <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
-          <defs>
-            <radialGradient id="rg3" cx="30%" cy="50%" r="80%">
-              <stop offset="0%" stop-color="#241a08"/>
-              <stop offset="50%" stop-color="#0e0a05"/>
-              <stop offset="100%" stop-color="#020203"/>
-            </radialGradient>
-          </defs>
-          <rect width="480" height="280" fill="url(#rg3)"/>
-          <!-- close on DJ's ear with headphone -->
-          <g transform="translate(60,40)">
-            <ellipse cx="180" cy="120" rx="120" ry="140" fill="#15181e"/> <!-- silhouette head -->
-            <ellipse cx="80"  cy="120" rx="44" ry="56" fill="#0a0b0e" stroke="#2a2f38" stroke-width="2"/> <!-- headphone cup -->
-            <ellipse cx="80"  cy="120" rx="30" ry="40" fill="#15181e"/>
-            <path d="M80 64 Q180 -20 280 64" stroke="#3a4150" stroke-width="6" fill="none"/>
-            <!-- glow emanating from headphone -->
-            <ellipse cx="80" cy="120" rx="70" ry="80" fill="url(#glowG)" opacity=".7"/>
+          <rect width="480" height="280" fill="#0a0b0e"/>
+          <!-- calibration chip — 16-segment LED meter strip -->
+          <g transform="translate(80,30)">
+            <rect width="320" height="220" rx="8" fill="#0a0b0e" stroke="#2a2f38" stroke-width="1.2"/>
+            <!-- header -->
+            <text x="160" y="32" text-anchor="middle" font-family="Saira" font-weight="600" font-size="14" fill="#c8cdd6" letter-spacing="2">CALIBRATING</text>
+            <text x="160" y="50" text-anchor="middle" font-family="Geist Mono" font-weight="400" font-size="10" fill="#6b7280" letter-spacing="2">listening to your master out</text>
+            <!-- LED strip — 16 segments, bottom 8 amber-pale → middle 5 amber → top 3 amber-deep (clip) -->
+            <g transform="translate(40,68)">
+              <!-- safe band (8 segs, amber-pale) -->
+              <rect x="0" y="120" width="14" height="14" rx="1" fill="#ffa12e" opacity=".85"/>
+              <rect x="0" y="103" width="14" height="14" rx="1" fill="#ffa12e" opacity=".80"/>
+              <rect x="0" y="86"  width="14" height="14" rx="1" fill="#ffa12e" opacity=".75"/>
+              <rect x="0" y="69"  width="14" height="14" rx="1" fill="#ffa12e" opacity=".70"/>
+              <rect x="0" y="52"  width="14" height="14" rx="1" fill="#ffa12e" opacity=".60"/>
+              <rect x="0" y="35"  width="14" height="14" rx="1" fill="#6e4815" opacity=".55"/>
+              <rect x="0" y="18"  width="14" height="14" rx="1" fill="#6e4815" opacity=".30"/>
+              <rect x="0" y="1"   width="14" height="14" rx="1" fill="#6e4815" opacity=".18"/>
+              <!-- peak-hold lozenge at ~70% -->
+              <rect x="-3" y="48" width="20" height="3" rx="1.5" fill="#ffa12e"/>
+              <!-- second meter -->
+              <rect x="34" y="120" width="14" height="14" rx="1" fill="#ffa12e" opacity=".85"/>
+              <rect x="34" y="103" width="14" height="14" rx="1" fill="#ffa12e" opacity=".80"/>
+              <rect x="34" y="86"  width="14" height="14" rx="1" fill="#ffa12e" opacity=".75"/>
+              <rect x="34" y="69"  width="14" height="14" rx="1" fill="#ffa12e" opacity=".55"/>
+              <rect x="34" y="52"  width="14" height="14" rx="1" fill="#6e4815" opacity=".40"/>
+              <rect x="34" y="35"  width="14" height="14" rx="1" fill="#6e4815" opacity=".20"/>
+              <rect x="34" y="18"  width="14" height="14" rx="1" fill="#6e4815" opacity=".15"/>
+              <rect x="34" y="1"   width="14" height="14" rx="1" fill="#6e4815" opacity=".12"/>
+              <rect x="31" y="64" width="20" height="3" rx="1.5" fill="#ffa12e"/>
+              <!-- channel labels -->
+              <text x="7"  y="155" text-anchor="middle" font-family="Geist Mono" font-size="9" fill="#6b7280">L</text>
+              <text x="41" y="155" text-anchor="middle" font-family="Geist Mono" font-size="9" fill="#6b7280">R</text>
+              <!-- silk minor grid (every 4 segs) -->
+              <line x1="-6" y1="49" x2="54" y2="49" stroke="#1d2128" stroke-width=".5"/>
+              <line x1="-6" y1="100" x2="54" y2="100" stroke="#1d2128" stroke-width=".5"/>
+            </g>
+            <!-- numeric readout -->
+            <text x="200" y="120" font-family="Geist Mono" font-weight="500" font-size="34" fill="#ffa12e" letter-spacing="2">-12.3</text>
+            <text x="200" y="138" font-family="Geist Mono" font-size="10" fill="#6b7280" letter-spacing="3">DB FS</text>
+            <!-- status line -->
+            <rect x="20" y="170" width="280" height="28" rx="3" fill="#0e1014" stroke="#2a2f38"/>
+            <text x="32" y="188" font-family="Geist Mono" font-size="10" fill="#c8cdd6" letter-spacing="1">› signal detected · rising · 02:14 elapsed</text>
           </g>
-          <radialGradient id="glowG"><stop offset="0%" stop-color="#ffa12e" stop-opacity=".7"/><stop offset="100%" stop-color="#ffa12e" stop-opacity="0"/></radialGradient>
         </svg>
-        <!-- the live pill appears -->
-        <span class="overlay-chip" style="top:32px; left:32px;">
-          <span class="ld"></span> live
+        <span class="overlay-chip" style="top:24px; right:24px;">
+          <span class="ld"></span> calibrating
         </span>
-        <span class="overlay-tc" style="top:30px; right:28px;">00:03</span>
-        <!-- speech bubble — Avery's first line -->
-        <div class="speech" style="top:90px; right:24px;">
-          yo. that bass swap was clean — bring the hats up <em>just</em> a touch before the drop.
-        </div>
-        <span class="tc">00:07</span>
-        <span class="duration">03 s</span>
+        <span class="tc">00:06</span>
+        <span class="duration">04 s</span>
       </div>
 
       <div class="info">
         <div class="info-head">
-          <div class="info-h">the reveal · "yo"</div>
-          <span class="info-tag">avery vo</span>
+          <div class="info-h">first listen · "calibrating"</div>
+          <span class="info-tag">UI chip · calibration meter</span>
         </div>
         <div class="info-row">
           <div class="k">composition</div>
-          <div class="v">extreme close on the DJ's ear + headphone cup. amber glow blooms from inside the cup. <b>the LIVE pill flickers on</b> as text-overlay, top-left.</div>
+          <div class="v">calibration screen full-frame. <b>16-segment amber LED meter</b> rising in real-time, peak-hold lozenge bouncing at ~70%. silk-minor grid lines. dB FS numeric readout in Geist Mono.</div>
         </div>
         <div class="info-row">
           <div class="k">camera</div>
-          <div class="v">85mm · macro · static. the focus pull lands exactly when Avery's first syllable plays.</div>
-        </div>
-        <div class="info-row vo-row">
-          <div class="k">avery vo</div>
-          <div class="v">yo. that bass swap was clean — bring the hats up <em>just</em> a touch before the drop.</div>
+          <div class="v">no camera — UI capture. <b>04 s steady</b>. play back a 4-bar loop of the bed at the actual master-out level; let the meter dance.</div>
         </div>
         <div class="info-row">
-          <div class="k">timing</div>
-          <div class="v"><b>voice enters at 00:03.2</b>. the cut to this frame syncs to the syllable "yo".</div>
+          <div class="k">sound</div>
+          <div class="v">bed comes in for the first time. clean low-end. the meter responds in lockstep.</div>
         </div>
         <div class="info-row">
-          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span></span></div>
-          <div class="v">the reveal. the audience says "wait, what just talked."</div>
+          <div class="k">why it's here</div>
+          <div class="v">grounds the demo in <b>real audio physics</b>. the meter is the single most visceral CDJ Whisper signal — anti-slop visible from the first second.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span></span><span></span><span></span></span></div>
+          <div class="v">attentive. the audience leans in.</div>
         </div>
 
-        <div class="stamp">frame 03 / 10</div>
+        <div class="stamp">frame 03 / 08</div>
       </div>
     </article>
 
-    <!-- FRAME 04 ─────────────────────────────────────────────────────── -->
-    <article class="frame">
+    <!-- FRAME 04 ─── live session · mascot overlay subtle reaction ────────── -->
+    <article class="frame" data-cut="4">
       <aside class="frame-num">
         <span class="dot"></span>
         <span class="n" data-ghost="88">04</span>
@@ -898,69 +920,108 @@ body::after{
 
       <div class="shot">
         <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
-          <defs>
-            <linearGradient id="rg4" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#1a1e25"/>
-              <stop offset="100%" stop-color="#05060a"/>
-            </linearGradient>
-          </defs>
-          <rect width="480" height="280" fill="url(#rg4)"/>
-          <!-- a single hand on a fader, pushing up -->
-          <g transform="translate(180,60)">
-            <rect x="40" y="20" width="40" height="180" rx="4" fill="#0a0b0e" stroke="#3a4150"/>
-            <line x1="60" y1="20" x2="60" y2="200" stroke="#2a2f38"/>
-            <rect x="32" y="60" width="56" height="22" rx="3" fill="#3a4150"/>
-            <rect x="32" y="60" width="56" height="6" rx="2" fill="#5a606c"/>
-            <!-- amber LED rim on the fader cap -->
-            <line x1="32" y1="60" x2="88" y2="60" stroke="#ffa12e" stroke-width="2"/>
-            <!-- motion arrow up -->
-            <g transform="translate(110,80)">
-              <line x1="0" y1="40" x2="0" y2="0" stroke="#ffa12e" stroke-width="3" stroke-linecap="round"/>
-              <path d="M-8 8 L0 0 L8 8" stroke="#ffa12e" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <rect width="480" height="280" fill="#0a0b0e"/>
+          <!-- session UI shape — titlebar + 3 meters + cohost + status bar -->
+          <g transform="translate(20,22)">
+            <rect width="440" height="240" rx="6" fill="#0e1014" stroke="#2a2f38" stroke-width="1"/>
+            <!-- titlebar -->
+            <rect x="0" y="0" width="440" height="28" rx="6" fill="#15181e"/>
+            <circle cx="14" cy="14" r="4" fill="#ff3553"/>
+            <circle cx="28" cy="14" r="4" fill="#ffa12e"/>
+            <circle cx="42" cy="14" r="4" fill="#6b7280"/>
+            <text x="220" y="18" text-anchor="middle" font-family="Saira" font-weight="600" font-size="11" fill="#c8cdd6" letter-spacing="2">VIBEMIX · LIVE</text>
+            <text x="408" y="18" text-anchor="end" font-family="Geist Mono" font-weight="500" font-size="10" fill="#ffa12e">02:31</text>
+            <!-- master meter (left column) -->
+            <g transform="translate(16,44)">
+              <text font-family="Geist Mono" font-size="8" fill="#6b7280" letter-spacing="2">MASTER</text>
+              <g transform="translate(0,8)">
+                <rect width="8" height="100" rx="1" fill="#15181e"/>
+                <rect y="44" width="8" height="56" rx="1" fill="#ffa12e" opacity=".88"/>
+                <rect width="8" height="2" y="40" fill="#ffa12e"/>
+                <rect x="14" width="8" height="100" rx="1" fill="#15181e"/>
+                <rect x="14" y="48" width="8" height="52" rx="1" fill="#ffa12e" opacity=".82"/>
+                <rect x="14" width="8" height="2" y="44" fill="#ffa12e"/>
+              </g>
             </g>
-            <!-- finger on the fader cap -->
-            <ellipse cx="60" cy="55" rx="18" ry="10" fill="#5a4a3e"/>
-            <ellipse cx="60" cy="50" rx="14" ry="8" fill="#7a6452"/>
+            <!-- phase tape (centre top) -->
+            <g transform="translate(80,44)">
+              <text font-family="Geist Mono" font-size="8" fill="#6b7280" letter-spacing="2">PHASE</text>
+              <rect y="8" width="240" height="14" rx="2" fill="#15181e" stroke="#2a2f38"/>
+              <rect y="8" width="178" height="14" rx="2" fill="#ffa12e" opacity=".7"/>
+              <text x="120" y="19" text-anchor="middle" font-family="Geist Mono" font-size="9" fill="#0a0b0e" font-weight="500">DROP IN 6 BARS</text>
+            </g>
+            <!-- transcript strip (centre, middle) -->
+            <g transform="translate(80,68)">
+              <rect width="240" height="84" rx="3" fill="#0a0b0e" stroke="#1d2128"/>
+              <text x="8" y="20" font-family="Geist Mono" font-size="9" fill="#6b7280">› 02:24 · entered build</text>
+              <text x="8" y="38" font-family="Geist Mono" font-size="9" fill="#6b7280">› 02:28 · hats up +3 db</text>
+              <text x="8" y="56" font-family="Saira" font-style="italic" font-size="10" fill="#c8cdd6">trust the build · ride it</text>
+              <text x="8" y="74" font-family="Geist Mono" font-size="9" fill="#ffa12e">› 02:31 · 06 bars to drop</text>
+            </g>
+            <!-- mascot canvas (bottom-right corner — subtle reaction) -->
+            <g transform="translate(354,160)">
+              <rect x="-4" y="-4" width="80" height="80" rx="4" fill="#0a0b0e" stroke="#2a2f38"/>
+              <circle cx="36" cy="36" r="28" fill="#ffa12e" stroke="#a86c10" stroke-width=".8"/>
+              <ellipse cx="26" cy="32" rx="3" ry="4" fill="#1a1408"/>
+              <ellipse cx="46" cy="32" rx="3" ry="4" fill="#1a1408"/>
+              <ellipse cx="26.5" cy="31" rx=".9" ry="1.1" fill="#ffffff"/>
+              <ellipse cx="46.5" cy="31" rx=".9" ry="1.1" fill="#ffffff"/>
+              <!-- subtle smile (mid-listen, not celebrating) -->
+              <path d="M28 44 Q36 48 44 44" stroke="#1a1408" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+              <text x="36" y="84" text-anchor="middle" font-family="Geist Mono" font-size="7" fill="#6b7280" letter-spacing="1">AVERY</text>
+            </g>
+            <!-- coach/hype mode chip + persona -->
+            <g transform="translate(80,160)">
+              <rect width="100" height="22" rx="3" fill="#0a0b0e" stroke="#ffa12e"/>
+              <circle cx="10" cy="11" r="3" fill="#ffa12e"/>
+              <text x="20" y="15" font-family="Geist Mono" font-weight="500" font-size="9" fill="#ffa12e" letter-spacing="1">COACH · PRO</text>
+            </g>
+            <!-- status bar -->
+            <rect x="0" y="220" width="440" height="20" rx="0" fill="#15181e"/>
+            <text x="12" y="234" font-family="Geist Mono" font-size="9" fill="#6b7280" letter-spacing="1">listening · blackhole 2ch · ddj-flx4 · 48 kHz</text>
+            <circle cx="418" cy="230" r="4" fill="#ffa12e"/>
+            <text x="412" y="234" text-anchor="end" font-family="Geist Mono" font-size="9" fill="#ffa12e">REC</text>
           </g>
-          <!-- live light leak -->
-          <ellipse cx="430" cy="60" rx="80" ry="40" fill="#ffa12e" opacity=".18"/>
         </svg>
+        <span class="overlay-chip" style="top:24px; right:24px;">
+          <span class="ld"></span> live
+        </span>
         <span class="tc">00:10</span>
-        <span class="duration">04 s</span>
+        <span class="duration">05 s</span>
       </div>
 
       <div class="info">
         <div class="info-head">
-          <div class="info-h">the follow · "trust"</div>
-          <span class="info-tag">music swells</span>
+          <div class="info-h">live session · "avery's watching"</div>
+          <span class="info-tag">UI chip · session shell</span>
         </div>
         <div class="info-row">
           <div class="k">composition</div>
-          <div class="v">macro on the hi-hat fader. finger pushes it up. <b>amber LED rim catches as it crosses the unity mark.</b></div>
+          <div class="v">the actual vibemix session UI shape: <b>titlebar + master meter + phase tape + transcript + mascot canvas + status bar</b>. mascot Avery in the bottom-right corner — eyes tracking, soft smile, <em>subtle</em> not celebrating.</div>
         </div>
         <div class="info-row">
           <div class="k">camera</div>
-          <div class="v">100mm macro · slight handheld breath · grain visible at the edges.</div>
+          <div class="v">no camera — UI capture, real-time recording at 1080p+60fps. <b>match layout</b> of <code>mocks/vibemix-app-ui.html</code>. timecode advances live.</div>
         </div>
         <div class="info-row">
           <div class="k">sound</div>
-          <div class="v">hats lift in the mix. the build kicks. <em>the room knows.</em></div>
+          <div class="v">the bed continues. <em>no voiceover yet</em> — let the product be visible alone. 05 s for the audience to read the screen.</div>
         </div>
         <div class="info-row">
-          <div class="k">edit</div>
-          <div class="v">cut on the click of the fader cap moving past the detent. <b>04 frames of audio pre-roll.</b></div>
+          <div class="k">screen content</div>
+          <div class="v">phase tape says <b>"drop in 6 bars"</b>; transcript shows the build's evidence pre-roll; coach·pro chip armed amber; REC dot on.</div>
         </div>
         <div class="info-row">
-          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span></span></div>
-          <div class="v">rising. tension converting to anticipation.</div>
+          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span></span></div>
+          <div class="v">the product speaks. the audience says "oh — there it is."</div>
         </div>
 
-        <div class="stamp">frame 04 / 10</div>
+        <div class="stamp">frame 04 / 08</div>
       </div>
     </article>
 
-    <!-- FRAME 05 ─────────────────────────────────────────────────────── -->
-    <article class="frame">
+    <!-- FRAME 05 ─── AI line caption pop · "nice kick swap @ 2:33" ────────── -->
+    <article class="frame" data-cut="5">
       <aside class="frame-num">
         <span class="dot"></span>
         <span class="n" data-ghost="88">05</span>
@@ -970,93 +1031,71 @@ body::after{
       <div class="shot">
         <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
           <defs>
-            <radialGradient id="rg5" cx="50%" cy="40%" r="80%">
+            <radialGradient id="rg5" cx="50%" cy="50%" r="80%">
               <stop offset="0%" stop-color="#241a08"/>
-              <stop offset="60%" stop-color="#0e0a05"/>
               <stop offset="100%" stop-color="#020203"/>
             </radialGradient>
           </defs>
           <rect width="480" height="280" fill="url(#rg5)"/>
-          <!-- overhead — controller + laptop + mascot small in the corner -->
-          <g transform="translate(40,40)">
-            <rect x="0" y="0" width="200" height="120" rx="6" fill="#0e1014" stroke="#3a4150"/>
-            <text x="100" y="65" text-anchor="middle" font-family="Geist Mono" font-size="11" fill="#6b7280" letter-spacing="2">LAPTOP · vibemix</text>
-            <!-- mock app strip on the laptop -->
-            <rect x="10" y="10" width="180" height="28" rx="2" fill="#15181e"/>
-            <circle cx="20" cy="24" r="4" fill="#ffa12e"/>
-            <circle cx="32" cy="24" r="4" fill="#ff3553"/>
-            <rect x="46" y="18" width="60" height="12" rx="2" fill="#1d2128"/>
-            <!-- timecode -->
-            <rect x="120" y="14" width="60" height="20" rx="2" fill="#050608" stroke="#2a2f38"/>
-            <text x="150" y="29" text-anchor="middle" font-family="Geist Mono" font-weight="700" font-size="11" fill="#ffa12e">02:44:31</text>
-            <!-- meters -->
-            <g transform="translate(10,46)">
-              <rect width="180" height="60" rx="3" fill="#0a0b0e"/>
-              <!-- segmented LEDs row -->
-              <g fill="#ffa12e">
-                <rect x="6" y="6" width="6" height="44" rx="1"/>
-                <rect x="14" y="6" width="6" height="44" rx="1"/>
-                <rect x="22" y="6" width="6" height="44" rx="1"/>
-                <rect x="30" y="12" width="6" height="38" rx="1" opacity=".7"/>
-                <rect x="38" y="20" width="6" height="30" rx="1" opacity=".5"/>
-              </g>
-            </g>
-            <!-- mascot peeks corner -->
-            <g transform="translate(170,85)">
-              <circle cx="0" cy="0" r="12" fill="#ffa12e" stroke="#a86c10" stroke-width=".7"/>
-              <circle cx="-3" cy="-1" r="1.6" fill="#1a1408"/>
-              <circle cx="3"  cy="-1" r="1.6" fill="#1a1408"/>
-              <path d="M-3 4 Q0 6 3 4" stroke="#1a1408" stroke-width="1" fill="none"/>
-            </g>
+          <!-- background: faint outline of session UI to anchor the caption -->
+          <g transform="translate(40,40)" opacity=".35">
+            <rect width="400" height="200" rx="6" fill="none" stroke="#3a4150" stroke-width=".8"/>
+            <line x1="0" y1="28" x2="400" y2="28" stroke="#3a4150" stroke-width=".5"/>
+            <line x1="0" y1="172" x2="400" y2="172" stroke="#3a4150" stroke-width=".5"/>
           </g>
-          <!-- controller next to it -->
-          <g transform="translate(260,80)">
-            <rect width="200" height="70" rx="8" fill="#0a0b0e" stroke="#2a2f38" stroke-width="1.5"/>
-            <circle cx="40" cy="35" r="22" fill="#15181e" stroke="#3a4150"/>
-            <circle cx="160" cy="35" r="22" fill="#15181e" stroke="#3a4150"/>
-            <rect x="90" y="50" width="20" height="6" fill="#3a4150"/>
+          <!-- caption bubble centre-top — amber tint, Saira italic 500 -->
+          <g transform="translate(80,90)">
+            <rect width="320" height="60" rx="6" fill="#15181e" stroke="#ffa12e" stroke-width="1"/>
+            <!-- bubble tail (down) -->
+            <path d="M150 60 L160 72 L170 60 Z" fill="#15181e" stroke="#ffa12e" stroke-width="1"/>
+            <!-- amber lead dot -->
+            <circle cx="20" cy="30" r="5" fill="#ffa12e"/>
+            <text x="34" y="34" font-family="Saira" font-style="italic" font-weight="500" font-size="18" fill="#ffa12e" letter-spacing=".5">nice kick swap @ 2:33</text>
+            <!-- attribution -->
+            <text x="34" y="50" font-family="Geist Mono" font-size="9" fill="#6b7280" letter-spacing="2">AVERY · COACH · 0.32s</text>
           </g>
+          <!-- ambient amber halo -->
+          <ellipse cx="240" cy="120" rx="240" ry="40" fill="#ffa12e" opacity=".08"/>
         </svg>
-        <!-- overlays — the actual app UI peeks through -->
         <span class="overlay-chip" style="top:24px; right:24px;">
-          <span class="ld"></span> coach · pro
+          <span class="ld"></span> avery · speaking
         </span>
-        <span class="tc">00:14</span>
-        <span class="duration">06 s</span>
+        <span class="tc">00:15</span>
+        <span class="duration">03 s</span>
       </div>
 
       <div class="info">
         <div class="info-head">
-          <div class="info-h">the product · "this is it"</div>
-          <span class="info-tag">app on screen</span>
+          <div class="info-h">the line · "nice kick swap @ 2:33"</div>
+          <span class="info-tag">UI chip · caption pop</span>
         </div>
         <div class="info-row">
           <div class="k">composition</div>
-          <div class="v">overhead. laptop screen <b>shows the actual vibemix UI</b> animating in real-time (use the live HTML mock as the screen recording). DDJ controller beside it. mascot Avery peeks from the laptop bezel.</div>
+          <div class="v">caption bubble pops top-centre over the dimmed session shell. Saira italic 500, amber-on-warm-black. <b>copy verbatim:</b> "nice kick swap @ 2:33". attribution line in Geist Mono below.</div>
         </div>
         <div class="info-row">
           <div class="k">camera</div>
-          <div class="v">overhead · tilt 90° · slow downward push so the UI fills more of the frame each beat.</div>
+          <div class="v">no camera — bubble fades in 200ms, holds 2.6s, drifts out. matches the actual TTS delivery duration of the same line.</div>
+        </div>
+        <div class="info-row vo-row">
+          <div class="k">avery vo</div>
+          <div class="v">nice kick swap @ <em>2:33</em>.</div>
         </div>
         <div class="info-row">
-          <div class="k">sound</div>
-          <div class="v">the build continues. Avery is silent here — let the product speak.</div>
-        </div>
-        <div class="info-row">
-          <div class="k">screen content</div>
-          <div class="v">UI shows: <b>coach · pro</b>, timecode 02:44, build phase tape, hi-hat knob lit amber, "trust the build" line on the transcript.</div>
+          <div class="k">why it's here</div>
+          <div class="v">this is <b>the proof</b>. the line is tied to a real event timestamp — anti-slop made visible. the audience sees "the AI knows what just happened."</div>
         </div>
         <div class="info-row">
           <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span></span></div>
-          <div class="v">crescendo. the audience says "oh — there it is."</div>
+          <div class="v">the reveal. the audience says "oh — it actually heard."</div>
         </div>
 
-        <div class="stamp">frame 05 / 10</div>
+        <div class="stamp">frame 05 / 08</div>
       </div>
     </article>
 
-    <!-- FRAME 06 ─────────────────────────────────────────────────────── -->
-    <article class="frame">
+    <!-- FRAME 06 ─── EvidenceRegistry chip strip · anti-slop receipts ─────── -->
+    <article class="frame" data-cut="6">
       <aside class="frame-num">
         <span class="dot"></span>
         <span class="n" data-ghost="88">06</span>
@@ -1065,77 +1104,80 @@ body::after{
 
       <div class="shot">
         <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
-          <defs>
-            <linearGradient id="rg6" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#1a0e05"/>
-              <stop offset="100%" stop-color="#000"/>
-            </linearGradient>
-          </defs>
-          <rect width="480" height="280" fill="url(#rg6)"/>
-          <!-- crowd silhouettes with hands up, lit from below by amber strobes -->
-          <g opacity=".85">
-            <ellipse cx="50"  cy="240" rx="40" ry="30" fill="#0a0b0e"/>
-            <ellipse cx="130" cy="240" rx="40" ry="30" fill="#0a0b0e"/>
-            <ellipse cx="220" cy="240" rx="40" ry="30" fill="#0a0b0e"/>
-            <ellipse cx="310" cy="240" rx="40" ry="30" fill="#0a0b0e"/>
-            <ellipse cx="400" cy="240" rx="40" ry="30" fill="#0a0b0e"/>
-            <!-- raised arms -->
-            <rect x="42"  y="160" width="14" height="80" rx="6" fill="#0a0b0e"/>
-            <rect x="124" y="140" width="14" height="100" rx="6" fill="#0a0b0e"/>
-            <rect x="214" y="130" width="14" height="110" rx="6" fill="#0a0b0e"/>
-            <rect x="304" y="150" width="14" height="90" rx="6" fill="#0a0b0e"/>
-            <rect x="394" y="120" width="14" height="120" rx="6" fill="#0a0b0e"/>
+          <rect width="480" height="280" fill="#0a0b0e"/>
+          <!-- header strip -->
+          <g transform="translate(20,22)">
+            <text font-family="Saira" font-weight="600" font-size="13" fill="#c8cdd6" letter-spacing="2">EVIDENCE REGISTRY</text>
+            <text y="16" font-family="Geist Mono" font-size="9" fill="#6b7280" letter-spacing="2">anti-slop receipts · every AI line tied to a real event</text>
           </g>
-          <!-- amber strobe rays from below -->
-          <g opacity=".55">
-            <polygon points="100,280 240,40 380,280" fill="#ffa12e"/>
-            <polygon points="60,280 240,100 420,280" fill="#ff8a1a" opacity=".5"/>
+          <!-- chip strip — 3 evidence chips, stacked vertically with timecode prefix -->
+          <g transform="translate(20,76)">
+            <!-- chip 1 -->
+            <rect width="440" height="40" rx="4" fill="#15181e" stroke="#ffa12e" stroke-width=".8"/>
+            <circle cx="18" cy="20" r="4" fill="#ffa12e"/>
+            <text x="32" y="18" font-family="Geist Mono" font-weight="500" font-size="11" fill="#ffa12e" letter-spacing="1">02:33 · KICK SWAP</text>
+            <text x="32" y="32" font-family="Geist Mono" font-size="9" fill="#6b7280" letter-spacing="1">deck A → deck B · low-band cross · ddj fader cc 0x20</text>
+            <text x="424" y="24" text-anchor="end" font-family="Saira" font-style="italic" font-size="11" fill="#c8cdd6">[ kick swap @ 2:33 ]</text>
+            <!-- chip 2 -->
+            <g transform="translate(0,52)">
+              <rect width="440" height="40" rx="4" fill="#15181e" stroke="#ffa12e" stroke-width=".8"/>
+              <circle cx="18" cy="20" r="4" fill="#ffa12e"/>
+              <text x="32" y="18" font-family="Geist Mono" font-weight="500" font-size="11" fill="#ffa12e" letter-spacing="1">04:50 · LAYER DROP</text>
+              <text x="32" y="32" font-family="Geist Mono" font-size="9" fill="#6b7280" letter-spacing="1">hi-hats arrived · onset 870Hz · +6 dB rolling 4s</text>
+              <text x="424" y="24" text-anchor="end" font-family="Saira" font-style="italic" font-size="11" fill="#c8cdd6">[ layer drop @ 4:50 ]</text>
+            </g>
+            <!-- chip 3 -->
+            <g transform="translate(0,104)">
+              <rect width="440" height="40" rx="4" fill="#15181e" stroke="#ffa12e" stroke-width=".8"/>
+              <circle cx="18" cy="20" r="4" fill="#ffa12e"/>
+              <text x="32" y="18" font-family="Geist Mono" font-weight="500" font-size="11" fill="#ffa12e" letter-spacing="1">06:00 · BPM SHIFT</text>
+              <text x="32" y="32" font-family="Geist Mono" font-size="9" fill="#6b7280" letter-spacing="1">autocorr ring · 138 → 124 bpm · 14 bar window</text>
+              <text x="424" y="24" text-anchor="end" font-family="Saira" font-style="italic" font-size="11" fill="#c8cdd6">[ bpm shift @ 6:00 ]</text>
+            </g>
+            <!-- footer rule -->
+            <line y1="156" x2="440" y2="156" stroke="#1d2128" stroke-width=".5"/>
+            <text x="220" y="172" text-anchor="middle" font-family="Geist Mono" font-size="9" fill="#6b7280" letter-spacing="2">3 / 12 EVENTS SHOWN · SESSION 2026-05-11</text>
           </g>
-          <!-- volumetric haze -->
-          <ellipse cx="240" cy="190" rx="280" ry="60" fill="#ffa12e" opacity=".1"/>
         </svg>
-        <span class="overlay-chip" style="top:24px; right:24px; border-color:var(--phosphor-warm); background:linear-gradient(180deg, rgba(255,138,26,.25), rgba(255,138,26,.1));">
-          <span class="ld"></span> hype · let's go
+        <span class="overlay-chip" style="top:24px; right:24px;">
+          <span class="ld"></span> registry · 12 events
         </span>
-        <div class="speech" style="top:36px; left:30px;">
-          okay <em>LET'S GO</em>. you cooked it. ride it out.
-        </div>
-        <span class="tc">00:20</span>
-        <span class="duration">05 s</span>
+        <span class="tc">00:18</span>
+        <span class="duration">04 s</span>
       </div>
 
       <div class="info">
         <div class="info-head">
-          <div class="info-h">the flip · "let's go"</div>
-          <span class="info-tag">mode toggle</span>
+          <div class="info-h">the receipts · "anti-slop registry"</div>
+          <span class="info-tag">UI chip · evidence strip</span>
         </div>
         <div class="info-row">
           <div class="k">composition</div>
-          <div class="v">crowd from behind, arms up. <b>drop has just hit.</b> amber strobes sweep up from the booth. mode chip flips coach → hype on overlay.</div>
+          <div class="v">three evidence chips, stacked. each carries a <b>timecode · event-type</b> header (Geist Mono amber), a one-line technical evidence sub-row, and the Saira italic chip text on the right — same vocabulary the AI quoted in frame 05.</div>
         </div>
         <div class="info-row">
           <div class="k">camera</div>
-          <div class="v">wide · 24mm · handheld · the camera bounces with the kick drum (carefully — once per bar, not vlog-shaky).</div>
-        </div>
-        <div class="info-row vo-row">
-          <div class="k">avery vo</div>
-          <div class="v">okay <em>LET'S GO</em>. you cooked it. ride it out.</div>
+          <div class="v">no camera — chips reveal top-to-bottom on the beat, 4 frames apart. footer line "3 / 12 events shown" lands on the snare.</div>
         </div>
         <div class="info-row">
-          <div class="k">direction</div>
-          <div class="v">cast 8 dancers minimum. wardrobe black + one amber piece each (subtle 20/80 brand consistency in the crowd itself).</div>
+          <div class="k">sound</div>
+          <div class="v">music ducks slightly. <em>no voiceover</em> — let the receipts speak. the chip texts visibly match the AI line from frame 05.</div>
+        </div>
+        <div class="info-row">
+          <div class="k">why it's here</div>
+          <div class="v">the <b>core anti-slop thesis</b> made visual. every AI line is grounded in a logged event with technical evidence. the audience sees "this isn't ChatGPT yapping — this is grounded."</div>
         </div>
         <div class="info-row">
           <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span></div>
-          <div class="v">peak. this is the money shot.</div>
+          <div class="v">peak credibility. the brand moment for developers + serious DJs.</div>
         </div>
 
-        <div class="stamp">frame 06 / 10</div>
+        <div class="stamp">frame 06 / 08</div>
       </div>
     </article>
 
-    <!-- FRAME 07 ─────────────────────────────────────────────────────── -->
-    <article class="frame">
+    <!-- FRAME 07 ─── mascot Hype-man celebrate · mid-track moment ─────────── -->
+    <article class="frame" data-cut="7">
       <aside class="frame-num">
         <span class="dot"></span>
         <span class="n" data-ghost="88">07</span>
@@ -1147,77 +1189,86 @@ body::after{
           <defs>
             <radialGradient id="rg7" cx="50%" cy="50%" r="80%">
               <stop offset="0%" stop-color="#2a1e08"/>
-              <stop offset="100%" stop-color="#000"/>
+              <stop offset="100%" stop-color="#000000"/>
             </radialGradient>
           </defs>
           <rect width="480" height="280" fill="url(#rg7)"/>
-          <!-- DJ profile + laptop screen with mascot reacting -->
-          <g transform="translate(0,40)">
-            <!-- DJ silhouette half-frame -->
-            <path d="M0 220 L0 40 Q60 0 140 30 L160 60 L150 100 L150 160 L170 220 Z" fill="#0a0b0e"/>
-            <!-- amber rim light on the DJ -->
-            <path d="M140 30 L160 60 L150 100" stroke="#ffa12e" stroke-width="2" fill="none" opacity=".8"/>
-            <!-- laptop in front -->
-            <rect x="200" y="120" width="240" height="120" rx="6" fill="#0e1014" stroke="#3a4150"/>
-            <!-- mascot big on screen -->
-            <g transform="translate(290,170)">
-              <circle cx="0" cy="0" r="34" fill="#ffa12e" stroke="#a86c10" stroke-width="1"/>
-              <!-- headphones over -->
-              <ellipse cx="-30" cy="-8" rx="8" ry="11" fill="#0a0b0e" stroke="#3a4150"/>
-              <ellipse cx="30" cy="-8" rx="8" ry="11" fill="#0a0b0e" stroke="#3a4150"/>
-              <path d="M-26 -16 Q0 -40 26 -16" stroke="#3a4150" stroke-width="2" fill="none"/>
-              <!-- eyes (wide & happy) -->
-              <ellipse cx="-10" cy="-4" rx="4" ry="5.5" fill="#1a1408"/>
-              <ellipse cx="10"  cy="-4" rx="4" ry="5.5" fill="#1a1408"/>
-              <ellipse cx="-9"  cy="-6" rx="1.2" ry="1.6" fill="#fff"/>
-              <ellipse cx="11"  cy="-6" rx="1.2" ry="1.6" fill="#fff"/>
-              <!-- big happy mouth -->
-              <path d="M-10 6 Q0 16 10 6" stroke="#1a1408" stroke-width="2" fill="none" stroke-linecap="round"/>
-              <!-- blush -->
-              <circle cx="-18" cy="3" r="3" fill="#ff7050" opacity=".5"/>
-              <circle cx="18" cy="3" r="3" fill="#ff7050" opacity=".5"/>
-              <!-- bouncing music notes -->
-              <text x="-60" y="-30" font-family="Geist Mono" font-size="20" fill="#ffa12e">♪</text>
-              <text x="55" y="-20" font-family="Geist Mono" font-size="14" fill="#ffa12e">♫</text>
+          <!-- mascot — bigger, arms up, headbob celebrate pose -->
+          <g transform="translate(240,150)">
+            <!-- body -->
+            <ellipse cx="0" cy="20" rx="46" ry="32" fill="#ffa12e" stroke="#a86c10" stroke-width="1"/>
+            <!-- head -->
+            <circle cx="0" cy="-30" r="48" fill="#ffa12e" stroke="#a86c10" stroke-width="1"/>
+            <!-- headphones over -->
+            <ellipse cx="-46" cy="-30" rx="10" ry="14" fill="#0a0b0e" stroke="#3a4150"/>
+            <ellipse cx="46"  cy="-30" rx="10" ry="14" fill="#0a0b0e" stroke="#3a4150"/>
+            <path d="M-42 -52 Q0 -84 42 -52" stroke="#3a4150" stroke-width="2.5" fill="none"/>
+            <!-- closed-mouth grin (a DJ headbob, not a vtuber dance) -->
+            <ellipse cx="-14" cy="-30" rx="5" ry="6.5" fill="#1a1408"/>
+            <ellipse cx="14"  cy="-30" rx="5" ry="6.5" fill="#1a1408"/>
+            <ellipse cx="-12" cy="-33" rx="1.6" ry="2" fill="#ffffff"/>
+            <ellipse cx="16"  cy="-33" rx="1.6" ry="2" fill="#ffffff"/>
+            <path d="M-12 -14 Q0 -6 12 -14" stroke="#1a1408" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <circle cx="-26" cy="-22" r="4" fill="#ff7050" opacity=".55"/>
+            <circle cx="26"  cy="-22" r="4" fill="#ff7050" opacity=".55"/>
+            <!-- both hands raised — headbob amplitude -->
+            <g transform="translate(-58,-4) rotate(-22)">
+              <ellipse cx="0" cy="0" rx="16" ry="11" fill="#ffa12e" stroke="#a86c10"/>
             </g>
+            <g transform="translate(58,-4) rotate(22)">
+              <ellipse cx="0" cy="0" rx="16" ry="11" fill="#ffa12e" stroke="#a86c10"/>
+            </g>
+            <!-- music notes drifting up -->
+            <text x="-78" y="-58" font-family="Geist Mono" font-size="22" fill="#ffa12e">♪</text>
+            <text x="72" y="-46" font-family="Geist Mono" font-size="16" fill="#ffa12e">♫</text>
+            <text x="-58" y="-80" font-family="Geist Mono" font-size="14" fill="#ffa12e" opacity=".7">♪</text>
           </g>
+          <!-- amber halo behind -->
+          <ellipse cx="240" cy="140" rx="220" ry="80" fill="#ffa12e" opacity=".15"/>
+          <!-- "hype" mode chip (small, baked into SVG so it lives with the mascot frame) -->
         </svg>
-        <span class="tc">00:25</span>
-        <span class="duration">07 s</span>
+        <span class="overlay-chip" style="top:24px; right:24px; border-color:var(--phosphor-warm); background:linear-gradient(180deg, rgba(255,138,26,.25), rgba(255,138,26,.1));">
+          <span class="ld"></span> hype · let's go
+        </span>
+        <div class="speech" style="top:36px; left:30px;">
+          okay <em>LET'S GO</em>. you cooked it. ride it out.
+        </div>
+        <span class="tc">00:22</span>
+        <span class="duration">04 s</span>
       </div>
 
       <div class="info">
         <div class="info-head">
-          <div class="info-h">coexistence · "the mascot watches"</div>
-          <span class="info-tag">mascot moment</span>
+          <div class="info-h">the celebrate · "let's go"</div>
+          <span class="info-tag">mascot · hype-man celebrate clip</span>
         </div>
         <div class="info-row">
           <div class="k">composition</div>
-          <div class="v">DJ in profile on the left, laptop on the right. <b>mascot Avery fills the laptop screen</b>, beaming, eyes wide, music notes bouncing. the fun moment.</div>
+          <div class="v">mascot Avery centre-stage, <b>hype-man celebrate clip</b> — headbob amplitude, both hands up, closed-mouth grin. <em>Pioneer CDJ headbob, not vtuber dance</em>. mode chip flipped coach → hype on overlay.</div>
         </div>
         <div class="info-row">
           <div class="k">camera</div>
-          <div class="v">medium · 50mm · slow dolly left-to-right · rack focus from DJ to laptop screen mid-shot.</div>
+          <div class="v">no camera — Three.js render of <code>celebrate.glb</code> retarget from Plan 43-04. 4 s at 60fps; loop length tuned to <b>1.8s</b> so two cycles fit.</div>
         </div>
-        <div class="info-row">
-          <div class="k">sound</div>
-          <div class="v">music continues. one Avery breath/laugh sample under the kick — barely audible, subliminal warmth.</div>
+        <div class="info-row vo-row">
+          <div class="k">avery vo</div>
+          <div class="v">okay <em>LET'S GO</em>. you cooked it. ride it out.</div>
         </div>
         <div class="info-row">
           <div class="k">why it's here</div>
-          <div class="v">this is the <em>brand</em> moment. people remember mascots. give Avery time to be a character, not just a UI label.</div>
+          <div class="v">the <b>brand moment</b>. people remember mascots. give Avery time to be a character, not just a UI label. payoff after the technical credibility of frame 06.</div>
         </div>
         <div class="info-row">
-          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span></span></div>
-          <div class="v">warmth. the audience smiles.</div>
+          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span></div>
+          <div class="v">peak warmth. this is the smile shot.</div>
         </div>
 
-        <div class="stamp">frame 07 / 10</div>
+        <div class="stamp">frame 07 / 08</div>
       </div>
     </article>
 
-    <!-- FRAME 08 ─────────────────────────────────────────────────────── -->
-    <article class="frame">
+    <!-- FRAME 08 ─── end card · vibemix · altidus.world/vibemix · open-source ─ -->
+    <article class="frame" data-cut="8">
       <aside class="frame-num">
         <span class="dot"></span>
         <span class="n" data-ghost="88">08</span>
@@ -1227,9 +1278,9 @@ body::after{
       <div class="shot">
         <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
           <rect width="480" height="280" fill="#050608"/>
-          <!-- giant wordmark center, glowing -->
-          <g transform="translate(240,140)">
-            <text text-anchor="middle" font-family="Saira" font-weight="700" font-size="74" fill="#ffa12e" filter="url(#glow)" letter-spacing="2">vibemix</text>
+          <!-- giant wordmark centre, glowing -->
+          <g transform="translate(240,108)">
+            <text text-anchor="middle" font-family="Saira" font-weight="700" font-size="64" fill="#ffa12e" filter="url(#glow)" letter-spacing="2">vibemix</text>
           </g>
           <defs>
             <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
@@ -1237,174 +1288,57 @@ body::after{
               <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
             </filter>
           </defs>
-          <!-- subtitle -->
-          <text x="240" y="200" text-anchor="middle" font-family="Geist Mono" font-size="13" fill="#c8cdd6" letter-spacing="4">THE AI DJ CO-HOST</text>
+          <!-- subtitle (THE AI DJ CO-HOST) -->
+          <text x="240" y="148" text-anchor="middle" font-family="Geist Mono" font-size="11" fill="#c8cdd6" letter-spacing="4">THE AI DJ CO-HOST</text>
+          <!-- url -->
+          <text x="240" y="184" text-anchor="middle" font-family="Geist Mono" font-weight="500" font-size="14" fill="#ffa12e" letter-spacing="3">altidus.world/vibemix</text>
+          <!-- open-source CTA copy (star-goal funnel anchor per memory project_github_star_goal) -->
+          <text x="240" y="210" text-anchor="middle" font-family="Geist Mono" font-size="11" fill="#c8cdd6" letter-spacing="2">open-source · MIT · github.com/bravoh/vibemix</text>
+          <!-- caveat handwriting signature (preserved from prior frames) -->
+          <text x="240" y="248" text-anchor="middle" font-family="Caveat" font-weight="700" font-size="22" fill="#ffa12e" opacity=".88">made by bravoh · with love</text>
           <!-- faint scanlines -->
-          <g opacity=".15">
+          <g opacity=".12">
             <line x1="0" y1="40" x2="480" y2="40" stroke="#ffa12e"/>
             <line x1="0" y1="240" x2="480" y2="240" stroke="#ffa12e"/>
           </g>
-          <!-- glow halo -->
-          <ellipse cx="240" cy="140" rx="280" ry="60" fill="#ffa12e" opacity=".12"/>
-        </svg>
-        <span class="tc">00:32</span>
-        <span class="duration">06 s</span>
-      </div>
-
-      <div class="info">
-        <div class="info-head">
-          <div class="info-h">the brand · "vibemix"</div>
-          <span class="info-tag">title card</span>
-        </div>
-        <div class="info-row">
-          <div class="k">composition</div>
-          <div class="v">black field. wordmark in Saira, amber on warm-black, <b>with the hardware-LED amber halo</b>. subtitle in Geist Mono, "THE AI DJ CO-HOST".</div>
-        </div>
-        <div class="info-row">
-          <div class="k">camera</div>
-          <div class="v">no camera — pure type. <b>2D motion design.</b> wordmark types in letter-by-letter on the beat. subtitle reveals on the snare.</div>
-        </div>
-        <div class="info-row">
-          <div class="k">sound</div>
-          <div class="v">music subtly ducks — the wordmark gets a tiny synth-stab to land it.</div>
-        </div>
-        <div class="info-row">
-          <div class="k">edit</div>
-          <div class="v">hold 1.5s on full reveal. then dissolve to frame 09 on a downbeat.</div>
-        </div>
-        <div class="info-row">
-          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span></span><span></span><span></span></span></div>
-          <div class="v">declarative. confident. quiet.</div>
-        </div>
-
-        <div class="stamp">frame 08 / 10</div>
-      </div>
-    </article>
-
-    <!-- FRAME 09 ─────────────────────────────────────────────────────── -->
-    <article class="frame">
-      <aside class="frame-num">
-        <span class="dot"></span>
-        <span class="n" data-ghost="88">09</span>
-        <span class="dot"></span>
-      </aside>
-
-      <div class="shot">
-        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
-          <rect width="480" height="280" fill="#0a0b0e"/>
-          <!-- mascot waves -->
-          <g transform="translate(240,130)">
-            <circle cx="0" cy="0" r="58" fill="#ffa12e" stroke="#a86c10" stroke-width=".8"/>
-            <ellipse cx="-50" cy="-10" rx="14" ry="18" fill="#0a0b0e" stroke="#3a4150"/>
-            <ellipse cx="50" cy="-10" rx="14" ry="18" fill="#0a0b0e" stroke="#3a4150"/>
-            <path d="M-42 -22 Q0 -60 42 -22" stroke="#3a4150" stroke-width="2.5" fill="none"/>
-            <ellipse cx="-18" cy="-5" rx="7" ry="9" fill="#1a1408"/>
-            <ellipse cx="18" cy="-5" rx="7" ry="9" fill="#1a1408"/>
-            <ellipse cx="-16" cy="-9" rx="2" ry="2.6" fill="#fff"/>
-            <ellipse cx="20" cy="-9" rx="2" ry="2.6" fill="#fff"/>
-            <path d="M-15 10 Q0 22 15 10" stroke="#1a1408" stroke-width="3" fill="none" stroke-linecap="round"/>
-            <circle cx="-32" cy="6" r="5" fill="#ff7050" opacity=".5"/>
-            <circle cx="32" cy="6" r="5" fill="#ff7050" opacity=".5"/>
-            <!-- waving hand -->
-            <g transform="translate(70,-5) rotate(20)">
-              <ellipse cx="0" cy="0" rx="14" ry="10" fill="#ffa12e" stroke="#a86c10"/>
-              <line x1="6" y1="-6" x2="14" y2="-14" stroke="#a86c10" stroke-width=".5"/>
-            </g>
-          </g>
-          <!-- repo URL at the bottom -->
-          <rect x="80" y="220" width="320" height="38" rx="6" fill="#15181e" stroke="#ffa12e" stroke-width="1"/>
-          <text x="240" y="244" text-anchor="middle" font-family="Geist Mono" font-size="14" fill="#ffa12e" letter-spacing="2">github.com / bravoh / vibemix</text>
-        </svg>
-        <span class="tc">00:38</span>
-        <span class="duration">04 s</span>
-      </div>
-
-      <div class="info">
-        <div class="info-head">
-          <div class="info-h">the cta · "go get it"</div>
-          <span class="info-tag">repo link</span>
-        </div>
-        <div class="info-row">
-          <div class="k">composition</div>
-          <div class="v">mascot Avery waves at the camera. <b>repo URL fills the lower third.</b> "free for mac + windows" sub-line beneath.</div>
-        </div>
-        <div class="info-row">
-          <div class="k">camera</div>
-          <div class="v">no camera — 2D animation. mascot has a 4-frame wave loop. repo URL reveals letter-by-letter.</div>
-        </div>
-        <div class="info-row vo-row">
-          <div class="k">avery vo</div>
-          <div class="v">free. mac, windows. come find me.</div>
-        </div>
-        <div class="info-row">
-          <div class="k">copy variants</div>
-          <div class="v">A/B test: <em>"come find me"</em> vs <em>"come play"</em> vs <em>"see you soon"</em>. ship 3 cuts, pick by engagement.</div>
-        </div>
-        <div class="info-row">
-          <div class="k">energy <span class="energy"><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span></span></div>
-          <div class="v">warm goodbye. friendly invitation.</div>
-        </div>
-
-        <div class="stamp">frame 09 / 10</div>
-      </div>
-    </article>
-
-    <!-- FRAME 10 ─────────────────────────────────────────────────────── -->
-    <article class="frame">
-      <aside class="frame-num">
-        <span class="dot"></span>
-        <span class="n" data-ghost="88">10</span>
-        <span class="dot"></span>
-      </aside>
-
-      <div class="shot">
-        <svg viewBox="0 0 480 280" preserveAspectRatio="xMidYMid slice">
-          <rect width="480" height="280" fill="#000"/>
-          <text x="240" y="160" text-anchor="middle" font-family="Caveat" font-weight="700" font-size="34" fill="#ffa12e" filter="url(#glow2)">
-            made by bravoh · with love
-          </text>
-          <defs>
-            <filter id="glow2" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="2" result="b"/>
-              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
+          <!-- glow halo behind wordmark -->
+          <ellipse cx="240" cy="108" rx="260" ry="48" fill="#ffa12e" opacity=".12"/>
           <!-- tiny mascot in the corner -->
-          <g transform="translate(440,250)" opacity=".75">
+          <g transform="translate(444,256)" opacity=".75">
             <circle cx="0" cy="0" r="12" fill="#ffa12e"/>
             <circle cx="-3" cy="-1" r="1.4" fill="#1a1408"/>
             <circle cx="3"  cy="-1" r="1.4" fill="#1a1408"/>
             <path d="M-3 4 Q0 6 3 4" stroke="#1a1408" stroke-width="1" fill="none"/>
           </g>
         </svg>
-        <span class="tc">00:42</span>
-        <span class="duration">03 s</span>
+        <span class="tc">00:26</span>
+        <span class="duration">04 s</span>
       </div>
 
       <div class="info">
         <div class="info-head">
-          <div class="info-h">the tag · "with love"</div>
-          <span class="info-tag">brand mark</span>
+          <div class="info-h">the tag · "vibemix · open-source"</div>
+          <span class="info-tag">end card · star-funnel</span>
         </div>
         <div class="info-row">
           <div class="k">composition</div>
-          <div class="v">pure black. <b>Caveat handwriting</b> in phosphor amber: "made by bravoh · with love". tiny mascot waves goodbye from the bottom-right.</div>
+          <div class="v">warm-black field. <b>vibemix wordmark in Saira</b>, amber on warm-black with the hardware-LED amber halo. THE AI DJ CO-HOST subtitle in Geist Mono. URL <code>altidus.world/vibemix</code> in Geist Mono amber. open-source CTA copy beneath; Caveat handwriting signature at the bottom.</div>
         </div>
         <div class="info-row">
           <div class="k">camera</div>
-          <div class="v">2D animation. handwriting reveals like it's being written in real time, ~1.2s draw-on.</div>
+          <div class="v">no camera — pure type. <b>2D motion design.</b> wordmark types in letter-by-letter on the beat. subtitle reveals on the snare. URL + CTA + handwriting reveal in sequence over the last 1.2s.</div>
         </div>
         <div class="info-row">
           <div class="k">sound</div>
-          <div class="v">last kick of the loop. tail of reverb. silence. <em>cut.</em></div>
+          <div class="v">music subtly ducks — wordmark gets a tiny synth-stab to land it. last kick of the loop, tail of reverb, silence. <em>cut.</em></div>
         </div>
         <div class="info-row">
-          <div class="k">edit</div>
-          <div class="v">hold 1.5s after writing completes. fade to black. no logos. no URLs again. nothing else.</div>
+          <div class="k">cta copy</div>
+          <div class="v"><code>altidus.world/vibemix</code> + <code>open-source · MIT · github.com/bravoh/vibemix</code> — star-goal funnel anchor (memory <code>project_github_star_goal</code>).</div>
         </div>
         <div class="info-row">
           <div class="k">energy <span class="energy"><span class="on"></span><span></span><span></span><span></span><span></span></span></div>
-          <div class="v">quiet. signed. the cinema lights come up.</div>
+          <div class="v">declarative. confident. quiet. the cinema lights come up.</div>
         </div>
 
         <div class="stamp">scene complete</div>
@@ -1415,22 +1349,20 @@ body::after{
 
   <!-- ─── cut sheet ─── -->
   <section class="cutsheet" aria-label="cut sheet">
-    <div class="cutsheet-h">cut sheet · 45 s · 10 frames</div>
+    <div class="cutsheet-h">cut sheet · 30 s · 8 cuts</div>
 
     <div class="timeline" role="img" aria-label="full timeline strip">
       <div class="tline-seg cold">     <span class="num">01</span><span class="ttl">cold</span> </div>
-      <div class="tline-seg problem">  <span class="num">02</span><span class="ttl">friction</span> </div>
-      <div class="tline-seg reveal">   <span class="num">03</span><span class="ttl">yo</span> </div>
-      <div class="tline-seg follow">   <span class="num">04</span><span class="ttl">trust</span> </div>
-      <div class="tline-seg establish"><span class="num">05</span><span class="ttl">this is it</span></div>
-      <div class="tline-seg flip">     <span class="num">06</span><span class="ttl">let's go</span></div>
-      <div class="tline-seg coexist">  <span class="num">07</span><span class="ttl">mascot</span></div>
-      <div class="tline-seg product">  <span class="num">08</span><span class="ttl">vibemix</span></div>
-      <div class="tline-seg cta">      <span class="num">09</span><span class="ttl">go get it</span></div>
-      <div class="tline-seg tag">      <span class="num">10</span><span class="ttl">love</span></div>
+      <div class="tline-seg problem">  <span class="num">02</span><span class="ttl">welcome</span> </div>
+      <div class="tline-seg reveal">   <span class="num">03</span><span class="ttl">calibrate</span> </div>
+      <div class="tline-seg establish"><span class="num">04</span><span class="ttl">session</span></div>
+      <div class="tline-seg follow">   <span class="num">05</span><span class="ttl">caption</span></div>
+      <div class="tline-seg flip">     <span class="num">06</span><span class="ttl">receipts</span></div>
+      <div class="tline-seg coexist">  <span class="num">07</span><span class="ttl">celebrate</span></div>
+      <div class="tline-seg tag">      <span class="num">08</span><span class="ttl">tag</span></div>
     </div>
     <div class="timeline-ruler" aria-hidden="true">
-      <span>0:00</span><span>0:05</span><span>0:10</span><span>0:15</span><span>0:20</span><span>0:25</span><span>0:30</span><span>0:35</span><span>0:40</span><span>0:45</span>
+      <span>0:00</span><span>0:05</span><span>0:10</span><span>0:15</span><span>0:20</span><span>0:25</span><span>0:30</span>
     </div>
   </section>
 
