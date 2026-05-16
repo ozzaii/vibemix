@@ -662,7 +662,18 @@ async def main() -> None:
         "-> anti-slop: "
         f"{'on' if anti_slop_enabled else 'off (VIBEMIX_ANTI_SLOP)'}"
     )
-    evidence_registry = EvidenceRegistry()
+    # Plan 41-02 — mutation-driven cache refresh. When the cache is wired,
+    # every EvidenceRegistry.write() call schedules a debounced refresh (5s
+    # debounce + 30s min-interval guard inside the registry). When cache is
+    # None (degraded path), on_mutation stays None → registry stays a pure
+    # observation store with no callback overhead. The lambda closes over
+    # ``cache`` so refresh() resolves at fire-time, not at construction
+    # (lets the wiring tolerate post-construction cache invalidation —
+    # ``current_name()`` going None is fine, refresh() will re-create).
+    if cache is not None:
+        evidence_registry = EvidenceRegistry(on_mutation=lambda: cache.refresh())
+    else:
+        evidence_registry = EvidenceRegistry()
     citation_linter = CitationLinter() if anti_slop_enabled else None
     stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
     # In-process IpcBus shim — Plan 20-04's coach_loop publish gate
@@ -862,12 +873,9 @@ async def main() -> None:
         )
     )
 
-    # Plan 19-05 — spawn cache refresh_loop AFTER session.start so the
-    # cache lifecycle runs alongside the live event loop. Skipped when
-    # cache is None (graceful degradation path).
-    cache_refresh_task: asyncio.Task | None = None
-    if cache is not None:
-        cache_refresh_task = asyncio.create_task(cache.refresh_loop(stop_event))
+    # Plan 41-02 — wall-clock cache refresh_loop deleted. Cache refresh is
+    # now event-driven from EvidenceRegistry.write() (debounced 5s, capped
+    # to once per 30s). No background task to spawn or clean up.
 
     # Orphan-process self-shutdown — trips stop_event if Tauri parent
     # dies abruptly so the live runtime closes audio streams + session
@@ -899,8 +907,6 @@ async def main() -> None:
             track_task,
             parent_watch_task,
         ]
-        if cache_refresh_task is not None:
-            cleanup_tasks.append(cache_refresh_task)
         for t in cleanup_tasks:
             t.cancel()
             try:
