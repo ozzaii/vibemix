@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: in_progress
-last_updated: "2026-05-16T16:30:00.000Z"
+status: 43-05 shipped Mixamo retarget pipeline scaffold + bundle size gate + §VIS-04 Kaan-discharge runbook; Wave B Mixamo half engineering-complete (real retargets pending §VIS-04 discharge). 14/14 plan tests green; no regressions.
+last_updated: "2026-05-16T16:50:00Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 28
-  completed_plans: 23
-  percent: 58
+  completed_plans: 24
+  percent: 52
 ---
 
 # vibemix — State
@@ -34,9 +34,9 @@ progress:
 
 ## Current Position
 
-Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave A)
-Plan: 43-01 COMPLETE (UI audit driver + first audit run on session surface, VIS-01 scaffold). Remaining: 43-02 (session + mascot-overlay closure), 43-03 (wizard + calibration closure), 43-04 (meter rebuild — closes H-03 HIGH gating 43-02), 43-05/06/07 (Wave B mascot animation), 43-08/09 (Wave C hero demo pre-prod).
-Status: Tier-1 UI audit driver shipped — `scripts/launch/run_ui_audit.py` locks the 4-surface allowlist (session / mascot-overlay / wizard / calibration), writes `UI-REVIEW-<surface>.md` skeletons; first audit pass on the session window seeded with 3 HIGH + 3 MEDIUM + 2 LOW real findings (rocker hover gap, titlebar hover gap, meter gradient vs CDJ-Whisper LED-strip). 5/5 driver tests passing.
+Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave B)
+Plan: 43-01 / 43-04 / 43-07 / 43-05 COMPLETE. Remaining: 43-02 (session + mascot-overlay closure), 43-03 (wizard + calibration closure), 43-06 (mood pool runtime validation), 43-08/09 (Wave C hero demo pre-prod).
+Status: 43-05 shipped Mixamo retarget pipeline scaffold (`scripts/mascot/retarget_to_neon_rebel.py`), two-tier bundle size gate (`scripts/mascot/check_bundle_size.sh` — ≤25 MB total + 400 KB-1200 KB per-clip), Kaan source-clip manifest (`scripts/mascot/MIXAMO-CLIP-SOURCES.md`), and §VIS-04 Kaan-discharge runbook in KAAN-ACTION-LEGAL.md (Mixamo login + 5 clip downloads + retarget run). 14/14 pytest green (8 retarget + 6 bundle). Real GLB retargets stay placeholder until §VIS-04 discharge.
 Last activity: 2026-05-16
 
 ## Performance Metrics
@@ -63,6 +63,7 @@ Last activity: 2026-05-16
 | Phase 42 P03 | 14 | 3 tasks | 15 files |
 | Phase 42 P06 | 7min | 3 tasks | 3 files |
 | Phase 43 P04 | 11m 48s | 3 tasks | 6 files |
+| Phase 43 P05 | 14m 02s | 3 tasks | 8 files (7 created + 1 modified) |
 
 ## Accumulated Context
 
@@ -78,6 +79,9 @@ Last activity: 2026-05-16
 - **Plan 42-06 — Privacy tests skip-cleanly (not vacuous-true) when no ear-test logs exist** (2026-05-16) — `pytest.skip` with informative message surfaces the §GATE-05 outstanding state in CI output. Contract still holds and will fire once logs land. Avoids false-positive green coverage.
 - **Plan 42-06 — Threshold mirror via parametrized 2-decimal normalization** (2026-05-16) — README locked values formatted as `{value:.2f}` and asserted substring-present per key (`f1_min`, `substance_min`, `cited_cosine_min`, `bypass_max`, `per_genre_f1_min`). Catches both numeric drift AND format drift in the README table.
 - **Plan 42-06 — Rubric-leak sentinel derivation at test-time** (2026-05-16) — sentinels read from `judge_pro.md` + `judge_flash.md` first-meaningful-chunk (post-YAML frontmatter, ≥40 chars). Self-updating against rubric evolution; removes Phase 27's documented hardcoded-sentinel maintenance burden.
+- **Plan 43-05 — Output dir default = `tauri/ui/assets/mascot/animations/`** (2026-05-16) — CONTEXT §VIS-04 named `tauri/ui/public/mascot/` but no files exist there; existing 5 placeholders + manifest.json + `asset-loader.ts` `s.startsWith('prep_')` convention live in `assets/mascot/animations/`. Default matches reality; `--output-dir` flag still lets Kaan override.
+- **Plan 43-05 — Retarget remap stays `NotImplementedError` in plan; two paths in §VIS-04** (2026-05-16) — Scaffold ships CLI + slot taxonomy + draco shell-out + size-band predicate + file-existence guard fully functional, but the load-bearing skeleton remap is intentionally not implemented. §VIS-04 runbook documents pygltflib (preferred) + blender headless (fallback) — Kaan picks at discharge time once Mixamo source clips are downloaded.
+- **Plan 43-05 — Bundle-gate two-tier with placeholder-permissive exit-2** (2026-05-16) — Tier 1 delegates to existing Phase 31 25 MB cap (no duplication); Tier 2 adds prep_*.glb 400 KB-1200 KB band check. Today's placeholders (44-56 KB) intentionally fail Tier 2 with exit 2, which is the visible signal that §VIS-04 discharge is still pending. Test asserts `{0, 2}` not strict 0.
 
 ### Decisions Locked (v2.1 — shipped)
 

@@ -135,7 +135,7 @@ Plans:
 - [ ] 43-02-PLAN.md — UI audit closure: session + mascot overlay + hover-glow sweep (VIS-01, VIS-02)
 - [ ] 43-03-PLAN.md — UI audit closure: wizard + calibration + settings + hover-glow sweep (VIS-01, VIS-02)
 - [x] 43-04-PLAN.md — meter.ts spectrum rebuild: hardware-LED-strip + amber peak hold + silk-12 grid (VIS-03)
-- [ ] 43-05-PLAN.md — Mixamo retarget pipeline + 5 prep_*.glb swap-in scaffold + §VIS-04 KAAN-discharge (VIS-04)
+- [x] 43-05-PLAN.md — Mixamo retarget pipeline + 5 prep_*.glb swap-in scaffold + §VIS-04 KAAN-discharge (VIS-04)
 - [ ] 43-06-PLAN.md — Mood pool runtime validation (3 personas, 30s smoke) + integrated-GPU perf gate (VIS-05, VIS-06)
 - [x] 43-07-PLAN.md — Memory + storyboard doc drift cleanup: DJ bat→Neon Rebel; Workbench/DSEG7→Saira/Geist (VIS-07)
 - [ ] 43-08-PLAN.md — Hero demo storyboard v5 re-mock: 8-cut shot list + chip overlay frames + ≤8 cuts gate (VIS-08)
