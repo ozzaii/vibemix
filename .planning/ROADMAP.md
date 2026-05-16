@@ -98,6 +98,20 @@ Plans:
 5. P85 Decision Log entry committed; `cut_release.sh` reminder lines removed; `test_phase_16_override_expiry.py` retired or refactored.
 6. `eval/README.md` public-facing documentation drafted (redacts ear-test log content while documenting protocol).
 
+**Plans:** 6 plans
+
+```
+Plans:
+- [ ] 42-01-PLAN.md — Corpus scaffolding: ack-bank resume helper + VCR cassette recorder + git-LFS corpus layout + KAAN-ACTION §GATE-01/02/03 runbooks (GATE-01, GATE-02, GATE-03)
+- [ ] 42-02-PLAN.md — Threshold recalibration tooling: recalibrate_thresholds.py + ±0.10 tolerance band + THRESHOLD-RECALIBRATION-LOG.md + eval.yml --check-real-corpus mode (GATE-04)
+- [ ] 42-03-PLAN.md — Ear-test protocol + capture surface: EAR-TEST-PROTOCOL.md + JSON Schema + debrief window toggle + check_ear_test.sh + KAAN-ACTION §GATE-05 (GATE-05, GATE-07)
+- [ ] 42-04-PLAN.md — check_gate.sh hybrid wire-in: bash gate combining 7-nightly + ear-test + cut_release.sh Gate 2b insertion + P85 reminder line removal (GATE-06)
+- [ ] 42-05-PLAN.md — P85 override retirement: Decision Log entry + delete test_phase_16_override_expiry.py + positive-assertion test_gate_42_hybrid_in_force.py + STATE.md annotation (GATE-08)
+- [ ] 42-06-PLAN.md — Public eval docs: eval/README.md + threshold-mirror tests + ear-test log content redaction privacy contract test (GATE-09)
+```
+
+**Wave structure:** Wave 1 (42-01) → Wave 2 (42-02, 42-03) → Wave 3 (42-04) → Wave 4 (42-05) → Wave 5 (42-06)
+
 ### Phase 43: Visual Ship Lock
 
 **Goal:** Lock CDJ Whisper UI to FL-Studio-grade polish; replace 5 mascot stub animations with Mixamo retargets; pre-produce 30s hero demo for launch hero. Three internal waves (UI / mascot / demo prep), critique→execute loop spanning the phase.
