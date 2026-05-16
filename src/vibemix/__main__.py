@@ -727,6 +727,12 @@ async def main() -> None:
         # Settings → Profile panel diagnostics; NEVER read inside llm_node
         # (P60). None default keeps v2.0 4-kwarg call shape byte-identical.
         profile=profile_dict,
+        # Plan 40-01 / AUDIO-01 — mic-as-2nd-Gemini-Part ring. Fed by
+        # _mic_callback_factory(mic, mic_audio_buf) on the audio thread;
+        # consumed by DJCoHostAgent.llm_node when KAAN_SPOKE-recent AND
+        # the ring has signal. None default preserves byte-identical
+        # 1-Part path; the wired-in instance enables the 2-Part contract.
+        mic_audio_buf=mic_audio_buf,
     )
 
     # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──

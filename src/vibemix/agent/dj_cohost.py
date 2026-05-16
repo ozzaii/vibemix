@@ -52,7 +52,15 @@ from livekit.agents import tts as agents_tts
 from vibemix.agent.ack_bank import BUCKET_FOR_EVENT
 from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL
-from vibemix.audio import INVOKE_AUDIO_SECONDS, AudioBuffer, VoiceRecorder, snapshot_wav
+from vibemix.audio import (
+    INVOKE_AUDIO_SECONDS,
+    MIC_AUDIO_PART_PRESENCE_RMS,
+    MIC_AUDIO_PART_RECENCY_S,
+    MIC_AUDIO_PART_SECONDS,
+    AudioBuffer,
+    VoiceRecorder,
+    snapshot_wav,
+)
 from vibemix.coach import CitationLinter, StrippedRateTracker
 from vibemix.prompts import build_system_instruction, filter_for_slop
 from vibemix.runtime.ttft import TTFTMeter
@@ -170,6 +178,15 @@ class DJCoHostAgent(Agent):
         # diagnostics; llm_node must NEVER read it (enforced by
         # tests/profile/test_profile_not_in_per_turn_prompt.py).
         profile: dict | None = None,
+        # Plan 40-01 / AUDIO-01 — mic-as-2nd-Gemini-Part ring. None default
+        # preserves Phase 4/18/19 backward compat (the existing 1-Part
+        # request is byte-identical when mic_audio_buf is None). When non-
+        # None, llm_node appends a 2nd ``audio/wav`` Part to ``contents``
+        # iff (a) KAAN_SPOKE is recent (within MIC_AUDIO_PART_RECENCY_S)
+        # and (b) the ring snapshot has signal (RMS > presence floor).
+        # Closes hallucination class "AI invents what Kaan said" by
+        # putting Kaan's literal voice in front of Gemini.
+        mic_audio_buf: "AudioBuffer | None" = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -230,6 +247,12 @@ class DJCoHostAgent(Agent):
         # re-loading from disk. If you find yourself adding self._profile
         # into the per-turn flow, STOP — that breaks the cache contract.
         self._profile: dict | None = profile
+        # Plan 40-01 / AUDIO-01 — mic ring reference. Read-only consumer:
+        # llm_node snapshots the ring per turn and conditionally attaches
+        # Part 2 to ``contents``. The ring itself is fed by
+        # ``__main__._mic_callback_factory`` on the sounddevice audio thread
+        # (verbatim port of cohost_v4.py:2278-2296 with AI-talk zero-fill).
+        self._mic_audio_buf: "AudioBuffer | None" = mic_audio_buf
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         # Both the LiveKit-side ``instructions`` AND the google.genai-side
@@ -329,15 +352,83 @@ class DJCoHostAgent(Agent):
                 f"DIFFERENT angle, or stay silent if there's nothing new): {recent}"
             )
 
-        contents: list = [
-            text_prompt
-            + (
+        # Plan 40-01 / AUDIO-01 — mic-as-2nd-Gemini-Part decision. Three
+        # gates; all must pass for Part 2 to attach:
+        #   1. self._mic_audio_buf is not None
+        #   2. now - state.last_kaan_spoke_at <= MIC_AUDIO_PART_RECENCY_S
+        #   3. snapshot ring RMS > MIC_AUDIO_PART_PRESENCE_RMS * 32767
+        # The snapshot/RMS work runs ONCE; the result + skip-reason feed
+        # both the prompt suffix and the structured log line. Plan 40-03
+        # will append a 3rd lookahead Part immediately after this block.
+        mic_wav: bytes | None = None
+        mic_skip_reason: str | None = None
+        kaan_spoke_age_s: float | None = None
+        mic_rms_int16: float = 0.0
+        if self._mic_audio_buf is None:
+            mic_skip_reason = "no_mic_audio_buf"
+        else:
+            kaan_spoke_age_s = time.time() - self._state.last_kaan_spoke_at
+            if kaan_spoke_age_s > MIC_AUDIO_PART_RECENCY_S:
+                mic_skip_reason = "kaan_spoke_not_recent"
+            else:
+                # Snapshot the ring at the v4-baseline 8s window and check
+                # presence. snapshot_wav already peak-normalizes — read the
+                # raw int16 pcm via buf.snapshot() for an honest RMS gate.
+                import numpy as _np  # local import — keeps top-level clean
+
+                n = int(MIC_AUDIO_PART_SECONDS * self._mic_audio_buf._sr)
+                pcm = self._mic_audio_buf.snapshot(n)
+                if pcm.size == 0:
+                    mic_skip_reason = "mic_ring_empty"
+                else:
+                    mic_rms_int16 = float(
+                        _np.sqrt(_np.mean(pcm.astype(_np.float32) ** 2))
+                    )
+                    presence_floor_int16 = MIC_AUDIO_PART_PRESENCE_RMS * 32767.0
+                    if mic_rms_int16 < presence_floor_int16:
+                        mic_skip_reason = "mic_silent"
+                    else:
+                        mic_wav = snapshot_wav(
+                            self._mic_audio_buf, MIC_AUDIO_PART_SECONDS
+                        )
+
+        # Plan 40-01 — Part-aware prompt suffix. 1-Part baseline wording is
+        # preserved when mic_wav is None (Phase 4 byte-identical). When
+        # mic_wav is attached, the suffix enumerates P1 + P2 explicitly so
+        # Gemini knows the second audio Part is Kaan's voice (not part of
+        # the mix). Plan 40-03 extends this to P1 + P2 + P3 (lookahead).
+        if mic_wav is not None:
+            parts_clause = (
+                f"\n\nAttached: P1 = last {int(audio_seconds)}s of live mix (BlackHole), "
+                f"P2 = your mic (last {int(MIC_AUDIO_PART_SECONDS)}s, your voice as Kaan). "
+                f"Your ears are the referee — the evidence above is grounded context."
+            )
+        else:
+            parts_clause = (
                 f"\n\nAttached: last {int(audio_seconds)}s of audio (mix + mic). "
                 f"Your ears are the referee — the evidence above is grounded context."
             )
-            + history_clause,
+
+        contents: list = [
+            text_prompt + parts_clause + history_clause,
             types.Part.from_bytes(data=audio_wav, mime_type="audio/wav"),
         ]
+        if mic_wav is not None:
+            contents.append(types.Part.from_bytes(data=mic_wav, mime_type="audio/wav"))
+            self._recorder.log_event(
+                "mic_part_attached",
+                duration_s=MIC_AUDIO_PART_SECONDS,
+                rms_int16=mic_rms_int16,
+                kaan_spoke_age_s=kaan_spoke_age_s,
+                bytes=len(mic_wav),
+            )
+        else:
+            self._recorder.log_event(
+                "mic_part_skipped",
+                reason=mic_skip_reason or "unknown",
+                kaan_spoke_age_s=kaan_spoke_age_s,
+                rms_int16=mic_rms_int16,
+            )
         if screen_jpeg and not skip_screen:
             contents.append(types.Part.from_bytes(data=screen_jpeg, mime_type="image/jpeg"))
 

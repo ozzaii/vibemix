@@ -85,3 +85,28 @@ new MIC_AUDIO_PART_* constants but does NOT touch `MIN_EVENT_GAP_PER_TYPE`.
 **Action when ready to resolve:** Add `DISTORTION_CLIMB` and `ACID_LINE_ENTRY`
 to the expected key-set in `test_event_gap_dict_shape_and_values`. Separate
 fix-it task; not Phase 40 work.
+
+### Pre-existing persona byte-identity failure (test_persona_02_byte_identical_to_v4)
+
+**Discovered:** Pre-existing on `main` branch tip (commit 00e7b6c).
+
+**Symptom:** `tests/agent/test_persona.py::test_persona_02_byte_identical_to_v4`
+fails because the in-repo `SYSTEM_INSTRUCTION` no longer matches the
+extracted-from-`cohost_v4.py` body byte-for-byte. The persona has drifted
+in `vibemix.agent.persona` relative to the POC reference (likely from
+phases that intentionally evolved the system prompt beyond the v4 baseline
+— Phase 18/19/20/etc.).
+
+**Confirmed pre-existing:** Reproduces on `/Users/ozai/projects/dj-set-ai/`
+without any Plan 40-01 changes.
+
+**Reason it's deferred:** Plan 40-01 does NOT touch
+`vibemix.agent.persona.SYSTEM_INSTRUCTION` or the persona path at all —
+only `DJCoHostAgent.__init__`/`llm_node` mic Part attachment. The drift is
+expected post-Phase-18 and an outdated byte-identity gate is the only
+fragile assertion here. Separate cleanup work.
+
+**Action when ready to resolve:** Either delete the test (persona is no
+longer byte-identical post-Phase-18; ship test marks it as v4-only
+historical anchor) or update the expected baseline to the post-Phase-18
+shape. Not Phase 40 work.
