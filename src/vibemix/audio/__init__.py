@@ -54,6 +54,13 @@ from vibemix.audio.features import (
     snapshot_wav,
 )
 from vibemix.audio.levels import Levels
+from vibemix.audio.lookahead import (
+    LOOKAHEAD_SAMPLE_RATE,
+    LOOKAHEAD_SECONDS,
+    LOOKAHEAD_TIMEOUT_S,
+    LOOKAHEAD_WINDOW_SECONDS,
+    LookaheadProvider,
+)
 from vibemix.audio.recorder import VoiceRecorder
 from vibemix.audio.registry import BufferRegistry
 
@@ -68,6 +75,10 @@ __all__ = [
     "INPUT_SR_NATIVE",
     "INPUT_SR_TARGET",
     "INVOKE_AUDIO_SECONDS",
+    "LOOKAHEAD_SAMPLE_RATE",
+    "LOOKAHEAD_SECONDS",
+    "LOOKAHEAD_TIMEOUT_S",
+    "LOOKAHEAD_WINDOW_SECONDS",
     "LOW_RMS",
     "MIC_GAIN",
     "MIC_GAIN_AT_AI_TALK",
@@ -89,6 +100,7 @@ __all__ = [
     "AudioBuffer",
     "BufferRegistry",
     "Levels",
+    "LookaheadProvider",
     "MicBuffer",
     "PassthroughBuffer",
     "PlaybackQueue",
