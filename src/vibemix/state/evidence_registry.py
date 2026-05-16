@@ -47,10 +47,12 @@ resolve against the user's real Rekordbox collection.
 
 from __future__ import annotations
 
+import asyncio
 import collections
 import re
+import sys
 import threading
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 if TYPE_CHECKING:  # pragma: no cover — type-only import
     from vibemix.library.rekordbox import RekordboxLibrary
@@ -61,6 +63,23 @@ __all__ = [
     "EvidenceRegistry",
     "parse_citations",
 ]
+
+
+# --------------------------------------------------------------------------- #
+# Plan 41-02 — mutation-driven cache refresh defaults                          #
+# --------------------------------------------------------------------------- #
+
+#: Debounce window — observations land in bursts during track changes and
+#: mixing, so we wait this long after the LAST mutation before firing the
+#: cache refresh. 5s is the lower bound from the locked design (research
+#: §Pattern 2). Tests parameterize to sub-second values for fast execution.
+DEFAULT_MUTATION_DEBOUNCE_S: float = 5.0
+
+#: Minimum interval between cache.refresh() invocations. Even under sustained
+#: churn we will not re-create the explicit cache more than once per 30s —
+#: the implicit Gemini cache absorbs the unchanging prefix anyway, and the
+#: explicit cache.create() round-trips are not free.
+DEFAULT_MIN_REFRESH_INTERVAL_S: float = 30.0
 
 
 # --------------------------------------------------------------------------- #
@@ -123,7 +142,13 @@ class EvidenceRegistry:
     tuple-frozen inner lists so callers can iterate lock-free.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        on_mutation: Callable[[], Awaitable[Any]] | None = None,
+        mutation_debounce_s: float = DEFAULT_MUTATION_DEBOUNCE_S,
+        min_refresh_interval_s: float = DEFAULT_MIN_REFRESH_INTERVAL_S,
+    ) -> None:
         self._data: dict[str, dict[str, list[float]]] = {}
         self._lock: threading.Lock = threading.Lock()
         # Plan 18-04 — rolling buffer of per-turn citation counts. deque
@@ -134,6 +159,25 @@ class EvidenceRegistry:
         # Same single-Lock contract as the source-dict writes (closes P12).
         self._citation_buffer: collections.deque[int] = collections.deque(maxlen=50)
         self._total_turns: int = 0
+        # ----- Plan 41-02 — mutation-driven cache-refresh hook -----
+        # ``on_mutation`` is a callable returning an awaitable (e.g.
+        # ``lambda: cache.refresh()``). When set, every ``write()``
+        # cancels-and-reschedules a debounced asyncio timer that fires the
+        # callback on the running loop. Min-interval guard caps the fire
+        # rate so a sustained mutation burst can re-create the cache at
+        # most once per ``min_refresh_interval_s`` (Pitfall 2 — callback
+        # storm during heavy mixing).
+        #
+        # If no running event loop exists at ``write()`` time (e.g. unit
+        # tests poking the registry from sync code) the scheduler silently
+        # no-ops — the callback is best-effort, not a correctness gate.
+        # Production wiring runs inside ``state_refresh_loop`` so the loop
+        # is always available.
+        self._on_mutation: Callable[[], Awaitable[Any]] | None = on_mutation
+        self._debounce_s: float = mutation_debounce_s
+        self._min_interval_s: float = min_refresh_interval_s
+        self._pending_refresh_handle: asyncio.TimerHandle | None = None
+        self._last_refresh_at: float | None = None
 
     # --- writes ---------------------------------------------------------- #
 
@@ -144,10 +188,16 @@ class EvidenceRegistry:
         body and ``EventDetector._fire`` (Plan 18-02 wiring). No validation
         in v1.0 — the grammar regex is the validation layer at the prompt
         boundary.
+
+        Plan 41-02: every mutation also schedules a debounced cache-refresh
+        callback (if ``on_mutation`` was wired at construction). The
+        scheduler is a no-op when no running loop is available, so unit-test
+        writers from synchronous code don't fail.
         """
         with self._lock:
             inner = self._data.setdefault(source, {})
             inner.setdefault(key, []).append(t_session)
+        self._schedule_refresh()
 
     def clear(self) -> None:
         """Reset the registry — called from ``VoiceRecorder.close()`` per session.
@@ -206,6 +256,10 @@ class EvidenceRegistry:
             for track_id in tracks_map:
                 inner.setdefault(str(track_id), []).append(t_session)
                 count += 1
+        # Plan 41-02 — bulk mutation also schedules a debounced refresh
+        # (debounce will coalesce this with any concurrent write() calls).
+        if count:
+            self._schedule_refresh()
         return count
 
     # --- reads ----------------------------------------------------------- #
@@ -297,6 +351,70 @@ class EvidenceRegistry:
                 "mean": mean,
                 "total_turns_observed": self._total_turns,
             }
+
+    # --- mutation-driven refresh scheduler (Plan 41-02) ------------------ #
+
+    def _schedule_refresh(self) -> None:
+        """Cancel-and-reschedule the debounced refresh timer.
+
+        Called from ``write()`` + ``register_library()`` after every
+        observation lands. Pattern: capture the running loop; cancel any
+        in-flight timer handle; compute a delay = ``max(debounce,
+        min_interval - elapsed_since_last_refresh)``; schedule a fresh
+        ``call_later`` that, when fired, marks ``_last_refresh_at`` and
+        kicks off ``_run_callback`` as a task.
+
+        Silently no-ops in three cases:
+          - ``on_mutation`` is None (callback wiring is optional).
+          - No running event loop (e.g. synchronous test code poking
+            ``write()``). RuntimeError from ``get_running_loop`` is
+            swallowed — the callback is a latency optimisation, not a
+            correctness gate.
+        """
+        if self._on_mutation is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return  # no running loop → silently skip; sync caller is fine
+
+        now = loop.time()
+        if self._pending_refresh_handle is not None:
+            self._pending_refresh_handle.cancel()
+            self._pending_refresh_handle = None
+
+        delay = self._debounce_s
+        if self._last_refresh_at is not None:
+            elapsed = now - self._last_refresh_at
+            if elapsed < self._min_interval_s:
+                delay = max(delay, self._min_interval_s - elapsed)
+
+        def _fire() -> None:
+            self._pending_refresh_handle = None
+            self._last_refresh_at = loop.time()
+            asyncio.create_task(self._run_callback())
+
+        self._pending_refresh_handle = loop.call_later(delay, _fire)
+
+    async def _run_callback(self) -> None:
+        """Invoke ``on_mutation`` exception-safe.
+
+        Pitfall 2 — never let a cache-refresh failure kill the registry.
+        The callback is best-effort. We log to stderr (matches the cohost
+        ``[cache refresh]`` convention) and swallow.
+        """
+        callback = self._on_mutation
+        if callback is None:
+            return
+        try:
+            awaitable = callback()
+            if awaitable is not None:
+                await awaitable
+        except Exception as exc:  # pragma: no cover — log path
+            print(
+                f"[evidence registry] on_mutation callback failed: {exc!r}",
+                file=sys.stderr,
+            )
 
     # --- introspection --------------------------------------------------- #
 

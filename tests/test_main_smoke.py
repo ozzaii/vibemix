@@ -781,8 +781,20 @@ def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> 
     assert "await cache.create()" in src, "cache.create not awaited"
     # Graceful degradation — cache=None on failure, no propagation of exception
     assert "cache = None" in src, "graceful-degradation cache=None branch missing"
-    # refresh_loop spawned as background task
-    assert "cache.refresh_loop(stop_event)" in src, "refresh_loop background task missing"
+    # Plan 41-02 — wall-clock refresh_loop deleted. Cache refresh is event-
+    # driven (EvidenceRegistry.write() schedules a debounced cache.refresh()
+    # via on_mutation callback). The smoke test now asserts the inverse:
+    # the old background-task spawn must NOT appear in __main__.py.
+    assert "cache.refresh_loop(" not in src, (
+        "stale refresh_loop background task still spawned in __main__.py "
+        "(Plan 41-02 removed wall-clock refresh)"
+    )
+    # And the new wiring must be present — EvidenceRegistry built with the
+    # cache.refresh callback hooked via on_mutation.
+    assert "on_mutation=lambda: cache.refresh()" in src, (
+        "EvidenceRegistry(on_mutation=lambda: cache.refresh()) wiring "
+        "missing — Plan 41-02 mutation-driven refresh must be wired"
+    )
     # Agent gets cache + ttft_meter kwargs
     assert "cache=cache" in src, "DJCoHostAgent must receive cache=cache kwarg"
     assert "ttft_meter=ttft_meter" in src, "DJCoHostAgent must receive ttft_meter=ttft_meter kwarg"
