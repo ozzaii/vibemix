@@ -241,3 +241,12 @@ export function setMeterLevels(el: HTMLElement, levels: MeterLevels): number {
 
   return litCount;
 }
+
+/**
+ * Test-only export. Do not consume in app code.
+ * Exposed for the VIS-03 contract tests in meter.test.ts so the suite
+ * can grep the registered stylesheet for token usage (no rgba()
+ * literals, silk-12 grid, 1200ms peak decay) without parsing
+ * document.head <style> tags from a jsdom environment.
+ */
+export const _CSS_FOR_TEST = CSS;

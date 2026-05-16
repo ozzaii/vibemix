@@ -66,6 +66,11 @@ export default defineConfig({
       // wizard __tests__ + runtime __tests__ dirs under jsdom.
       ["src/wizard/__tests__/*.spec.ts", "jsdom"],
       ["src/runtime/__tests__/*.spec.ts", "jsdom"],
+      // Phase 43 Plan 43-04 (VIS-03) — meter.test.ts pins the
+      // hardware-LED-strip aesthetic. Uses renderMeter() which calls
+      // registerStyle() (touches document.head) and inspects DOM
+      // structure via querySelectorAll. Needs jsdom.
+      ["src/session/components/*.test.ts", "jsdom"],
     ],
   },
 });
