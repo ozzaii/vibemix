@@ -78,6 +78,7 @@ from vibemix.audio import (
     INPUT_SR_TARGET,
     INVOKE_AUDIO_SECONDS,
     MIC_GAIN,
+    MIC_GAIN_AT_AI_TALK,
     MUSIC_GAIN_TO_GEMINI,
     OUTPUT_BLOCKSIZE,
     OUTPUT_SR,
@@ -325,14 +326,48 @@ def _passthrough_callback_factory(passthrough: PassthroughBuffer):
     return callback
 
 
-def _mic_callback_factory(mic: MicBuffer):
-    """Verbatim port of cohost_v4.py:1965-1969 mic stream callback."""
+def _mic_callback_factory(
+    mic: MicBuffer, mic_audio_buf: "AudioBuffer | None" = None
+):
+    """Verbatim port of cohost_v4.py:1965-1969 mic stream callback.
+
+    Plan 40-01 (AUDIO-01): when ``mic_audio_buf`` is provided, the callback
+    ALSO resamples 48k→16k, zero-fills while AI talks, clips to int16, and
+    pushes into the second buffer — verbatim port of v4:2278-2296.
+
+    Backward-compat: ``mic_audio_buf=None`` (default) preserves the v2.1
+    byte-identical mic-only path so existing tests/test_main_smoke.py and
+    the legacy run path keep working.
+
+    Pitfall 1 (RESEARCH.md): the AI's own voice plays through the speakers
+    → mic → mic_audio_buf and Gemini would hear the AI saying what it just
+    said. The ``mic._current_gain() == MIC_GAIN_AT_AI_TALK`` zero-fill is
+    load-bearing IP — without it the system self-triggers KAAN_SPOKE loops.
+    """
 
     def callback(indata, frames, time_info, status):
         if status:
             print(f"[mic status] {status}", file=sys.stderr)
         mono = indata[:, 0] if indata.ndim > 1 else indata
-        mic.push(mono.astype(np.float32))
+        mono_f = mono.astype(np.float32)
+        mic.push(mono_f)
+
+        # Plan 40-01 — second-buffer tap. Sounddevice callbacks MUST NEVER
+        # crash the audio thread (v4:2293-2294); the whole branch lives
+        # inside a try/except Exception: pass.
+        if mic_audio_buf is not None:
+            try:
+                # Resample 48kHz → 16kHz (matches AudioBuffer._sr).
+                mic16f = resample_poly(
+                    mono_f, INPUT_SR_TARGET, INPUT_SR_NATIVE
+                ).astype(np.float32)
+                # AI-talk zero-fill BEFORE the int16 clip (Pitfall 1).
+                if mic._current_gain() == MIC_GAIN_AT_AI_TALK:
+                    mic16f = np.zeros_like(mic16f)
+                pcm16 = np.clip(mic16f * 32767.0, -32768, 32767).astype(np.int16)
+                mic_audio_buf.push(pcm16)
+            except Exception:
+                pass
 
     return callback
 
@@ -414,6 +449,12 @@ async def main() -> None:
     mic = MicBuffer(gain=MIC_GAIN, levels=levels)
     audio_buf = AudioBuffer(seconds=140.0, sr=INPUT_SR_TARGET)
     clean_audio_buf = AudioBuffer(seconds=INVOKE_AUDIO_SECONDS + 5.0, sr=INPUT_SR_TARGET)
+    # Plan 40-01 (AUDIO-01) — mic-as-2nd-Gemini-Part ring. 12s wide (8s
+    # snapshot + 4s jitter headroom), 16kHz int16. Fed by the mic callback
+    # below; consumed by DJCoHostAgent.llm_node when KAAN_SPOKE-recent AND
+    # the ring has signal. Zero-filled during AI talk in the callback to
+    # prevent self-triggered KAAN_SPOKE loops (Pitfall 1).
+    mic_audio_buf = AudioBuffer(seconds=12.0, sr=INPUT_SR_TARGET)
 
     # Phase 15 — boot-time crashed-session sweep. Walks recordings_root for
     # session.json files whose ended_at_iso is None AND mtime older than
@@ -530,7 +571,7 @@ async def main() -> None:
             mic_idx,
             sample_rate=INPUT_SR_NATIVE,
             block_size=INPUT_CHUNK_FRAMES,
-            callback=_mic_callback_factory(mic),
+            callback=_mic_callback_factory(mic, mic_audio_buf),
         )
         print(f"-> mic on {MIC_DEVICE} @ {INPUT_SR_NATIVE}Hz")
     except Exception as e:
@@ -686,6 +727,12 @@ async def main() -> None:
         # Settings → Profile panel diagnostics; NEVER read inside llm_node
         # (P60). None default keeps v2.0 4-kwarg call shape byte-identical.
         profile=profile_dict,
+        # Plan 40-01 / AUDIO-01 — mic-as-2nd-Gemini-Part ring. Fed by
+        # _mic_callback_factory(mic, mic_audio_buf) on the audio thread;
+        # consumed by DJCoHostAgent.llm_node when KAAN_SPOKE-recent AND
+        # the ring has signal. None default preserves byte-identical
+        # 1-Part path; the wired-in instance enables the 2-Part contract.
+        mic_audio_buf=mic_audio_buf,
     )
 
     # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──

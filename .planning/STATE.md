@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
 status: in_progress
-last_updated: "2026-05-16T14:30:00Z"
-last_activity: 2026-05-16 -- Plan 40-02 GREEN (LookaheadProvider port from cohost_v4_tr.py:624-770). 3s file-based anti-slop lookahead — nowplaying-cli + mdfind + ffmpeg pipeline; (None, meta) graceful degrade on every failure path; 8 hermetic tests pass. 2 commits (RED test + GREEN feat).
+last_updated: "2026-05-16T14:45:00Z"
+last_activity: 2026-05-16 -- Phase 40 Wave 1+2 partial (4/6 plans GREEN on main). 40-01 (mic-as-2nd-Gemini-Part + AI-talk zero-fill, AUDIO-01) / 40-02 (LookaheadProvider port from cohost_v4_tr.py:624-770, AUDIO-02) / 40-05 (PGP + Tauri updater key pre-stage scaffolding, AUDIO-05 + AUDIO-06) / 40-06 (BlackHole probe structured events + Pitfall 5 retry, AUDIO-07). Remaining: 40-04 (cooldown re-tune, AUDIO-03) + 40-03 (3rd Gemini Part wire-in + 3-Part prompt labeling, AUDIO-02 + AUDIO-04).
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 6
-  completed_plans: 2
-  percent: 33
+  completed_plans: 4
+  percent: 0
 ---
 
 # vibemix — State
@@ -35,9 +35,9 @@ progress:
 ## Current Position
 
 Phase: 40 — Anti-Slop Audio Port (in progress)
-Plan: 40-02 complete (LookaheadProvider port)
-Status: 2 / 6 plans complete in Phase 40 (40-05 + 40-02 GREEN). Awaiting parallel execution of remaining 4 plans (40-01 / 40-03 / 40-04 / 40-06).
-Last activity: 2026-05-16 -- Plan 40-02 executed (LookaheadProvider verbatim port from `cohost_v4_tr.py:624-770` into `src/vibemix/audio/lookahead.py`). 3s file-based anti-slop lookahead pipeline: `nowplaying-cli get-raw` → `mdfind -name <title>` → `ffmpeg -ss <seek> -i <path> -t <duration>` returning 18s mono 16kHz WAV ending 3s past the playhead. Every failure path returns `(None, meta_with_reason)` — never raises. 2 commits (`37c0e10` RED + `1282b4b` GREEN) + 1 SUMMARY. 8 hermetic tests pass (1 happy-path + 4 graceful-degrade + 2 security/correctness gates + 1 extrapolation-guard). 0 regressions in `tests/audio/` (66 passed; 1 deselected — `DEFERRED-40-02-01` pre-existing Phase 30 stale-test logged to `deferred-items.md`). POC immutability gate satisfied (`cohost.py` / `cohost_v2.py` / `cohost_lk.py` / `mascot.html` unchanged). Plan 40-03 hand-off note in SUMMARY.
+Plan: 40-01 / 40-02 / 40-05 / 40-06 complete (4 of 6 in Phase 40)
+Status: 4 / 6 plans complete in Phase 40. AUDIO-01 / AUDIO-02 / AUDIO-05 / AUDIO-06 / AUDIO-07 all GREEN. Remaining: 40-04 (AUDIO-03 cooldown re-tune) + 40-03 (3rd Gemini Part + 3-Part prompt labeling).
+Last activity: 2026-05-16 -- Phase 40 Waves 1 + 2 partial. 40-01 ships mic-as-2nd-Gemini-Part + AI-talk zero-fill (Pitfall 1 closed). 40-02 ships LookaheadProvider verbatim port from cohost_v4_tr.py:624-770. 40-05 ships PGP + Tauri updater key pre-stage scaffolding. 40-06 ships BlackHole probe structured events + Pitfall 5 retry. All 4 plans pass POC immutability gate (Phase 37-06). Worktree-isolation bug surfaced + worked around (agents must merge main before editing source — confirmed working on 40-02 / 40-06 / 40-01-retry).
 
 ## Performance Metrics
 
@@ -60,6 +60,12 @@ Last activity: 2026-05-16 -- Plan 40-02 executed (LookaheadProvider verbatim por
 ---
 
 ## Accumulated Context
+
+### Decisions Locked (v3.0 — in progress)
+
+- **Plan 40-01 — `AudioBuffer` reuse over new `MicAudioRing` class** (2026-05-16) — CONTEXT.md's `MicAudioRing` name was permitted but the PLAN `<interfaces>` + RESEARCH "Alternatives Considered" recommended verbatim `AudioBuffer(seconds=12.0, sr=INPUT_SR_TARGET)` reuse to match `cohost_v4.py:2257`. Anti-DRY subclass avoided.
+- **Plan 40-01 — Zero-fill at sounddevice callback boundary, not in `llm_node`** (2026-05-16) — Pitfall 1 (self-triggered KAAN_SPOKE loop) is real. Filtering in `llm_node` still lets the AI's own voice contaminate the mic ring. The callback-boundary zero-fill is load-bearing IP and keeps every downstream consumer clean. v4:2278-2296 verbatim pattern.
+- **Plan 40-01 — Three-gate Part 2 decision computed once per turn** (2026-05-16) — Snapshot + RMS reused for both prompt-suffix wording and structured log line. Avoids double-work on the LLM hot path.
 
 ### Decisions Locked (v2.1 — shipped)
 

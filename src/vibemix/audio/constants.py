@@ -36,6 +36,15 @@ MIC_GAIN_AT_AI_TALK = 0.0  # v4:118 — mic mute level while AI talks
 MIC_HOLD_AFTER_AI_MS = 350  # v4:119 — hold window after AI silence
 AI_TALK_THRESHOLD = 0.02  # v4:120 — levels.voice threshold to flip AI-active
 
+# ---- Plan 40-01 — mic-as-2nd-Part wiring (AUDIO-01) ----
+# v4 reference: cohost_v4.py:1797 snapshot duration, cohost_v4.py:2278-2296
+# zero-fill-on-AI-talk path. The 12s ring window is wider than the 8s
+# snapshot (Plan 40-01 — extra 4s is jitter headroom for the resample
+# callback boundary). Three constants only; no existing values touched.
+MIC_AUDIO_PART_SECONDS: float = 8.0  # Gemini Part 2 snapshot width
+MIC_AUDIO_PART_RECENCY_S: float = 4.0  # KAAN_SPOKE-recent gate window (Pattern 2)
+MIC_AUDIO_PART_PRESENCE_RMS: float = 0.005  # int16-domain RMS floor; skip Part 2 below this
+
 # ---- WS bus (mascot + Phase 12 Live UI) ----
 WS_HOST: str = "127.0.0.1"  # v4:123
 WS_PORT: int = 8765  # v4:124
