@@ -59,7 +59,7 @@
 
 ### Launch Positioning + Pre-stage (LAUNCH)
 
-- [ ] **LAUNCH-01**: README rewrite — "the only AI co-host that actually listens to your set" frontloaded above the fold; one-line opinionated pitch; hero artefact (static + demo.mp4 reference); "no AI slop" hook section; "built by DJs, runs on your machine, your audio doesn't leave it without you knowing" positioning
+- [x] **LAUNCH-01**: README rewrite — "the only AI co-host that actually listens to your set" frontloaded above the fold; one-line opinionated pitch; hero artefact (static + demo.mp4 reference); "no AI slop" hook section; "built by DJs, runs on your machine, your audio doesn't leave it without you knowing" positioning
 - [ ] **LAUNCH-02**: `EvidenceRegistry` citation strip surfaced in live UI — every AI reaction shows 2-3 word evidence tag (e.g. `[kick swap @ 2:33]`); click tag → debrief window opens with waveform region highlight; closes anti-slop receipts gap from §6.2 white-space
 - [ ] **LAUNCH-03**: DJ-software-logo grid in README — rekordbox, Serato, Traktor, djay Pro, VirtualDJ, Mixxx; "works alongside whatever DJ app you already use" framing
 - [ ] **LAUNCH-04**: Supported-controllers grid finalized — 10 mapped controllers with logos + "calibrate any other" callout for generic-MIDI fallback
