@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: planning
-last_updated: "2026-05-16T01:00:00Z"
-last_activity: 2026-05-16 -- v3.0 milestone scaffolded via /gsd:new-milestone after 4-bucket research swarm (.planning/research/v3-buckets/A-D.md). 6 phases (P40-P45), 57 REQ-IDs. Critical path: Apple Dev Agreement (Francesco) + SignPath OSS (Kaan, ~1-week SLA) gate the public RC publish in P45. P40-P44 engineering parallelizes around the external clock. Hybrid hallucination gate (Phase 27 autonomous proxy + Kaan-ear release veto) confirmed; P85 override formally retired in P42.
+status: in_progress
+last_updated: "2026-05-16T13:30:00Z"
+last_activity: 2026-05-16 -- Plan 40-05 GREEN (engineering pre-stage for AUDIO-05 PGP + AUDIO-06 Tauri updater key). Two dual-mode gate tests; both Kaan-discharge runbooks scaffolded in KAAN-ACTION-LEGAL.md. 4 commits.
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 6
+  completed_plans: 1
+  percent: 16
 ---
 
 # vibemix — State
@@ -34,10 +34,10 @@ progress:
 
 ## Current Position
 
-Phase: Not started (defining phase plans)
-Plan: —
-Status: v3.0 scaffolded; awaiting first phase plan (`/gsd:discuss-phase 40` recommended; `/gsd:plan-phase 40` for direct).
-Last activity: 2026-05-16 -- v3.0 milestone scaffolded. PROJECT.md updated with Current Milestone section. REQUIREMENTS.md written (57 REQ-IDs across AUDIO / LAT / GATE / VIS / LAUNCH / SHIP). ROADMAP.md updated with active v3.0 section (P40-P45). Research bucket .planning/research/v3-buckets/A-D.md committed as scoping basis.
+Phase: 40 — Anti-Slop Audio Port (in progress)
+Plan: 40-05 complete (PGP + Tauri updater key pre-stage scaffolding)
+Status: 1 / 6 plans complete in Phase 40 (40-05 GREEN — AUDIO-05 + AUDIO-06 engineering pre-stage shipped). Awaiting parallel execution of remaining 5 plans (40-01 / 40-02 / 40-03 / 40-04 / 40-06).
+Last activity: 2026-05-16 -- Plan 40-05 executed (engineering pre-stage scaffolding for KAAN-ACTION discharges AUDIO-05 PGP + AUDIO-06 Tauri updater key). 4 commits + 1 SUMMARY. Two dual-mode gate tests added (`tests/security/test_pgp_published.py` + `tests/tauri/test_updater_key_rotated.py`); both pre-discharge GREEN (11 passed + 2 skipped). Kaan-discharge runbooks documented in `KAAN-ACTION-LEGAL.md §AUDIO-05` + `§AUDIO-06`.
 
 ## Performance Metrics
 

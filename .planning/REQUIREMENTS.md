@@ -17,8 +17,8 @@
 - [ ] **AUDIO-02**: 3s file-based source-track lookahead pipeline — `nowplaying-cli` + `mdfind` + `ffmpeg` extracts next 3s from track file on disk, attached as 3rd Gemini Part (per `cohost_v4_tr.py:624-779` `LookaheadProvider`); graceful skip on streaming-only tracks
 - [ ] **AUDIO-03**: Event cooldowns re-tuned to v4 chat-tested values — `MIN_EVENT_GAP_PER_TYPE`: PHASE 18→10s, LAYER_ARRIVAL 16→10s, MIX_MOVE 20→14s, HEARTBEAT 70→45s, TRACK_CHANGE 6→5s
 - [ ] **AUDIO-04**: Prompt template documents the 3-Part contract — Part 1 = live BlackHole mix (audience perspective, all mix moves applied), Part 2 = mic (when present), Part 3 = source-file lookahead labeled `NOT YET HEARD BY AUDIENCE`
-- [ ] **AUDIO-05**: PGP key for `security@bravoh.com` generated + published to `keys.openpgp.org`; SECURITY.md points at real key (SEC-06-PGP discharge — pre-stage, no external clock)
-- [ ] **AUDIO-06**: Tauri ed25519 updater key rotated to production value; pubkey committed in `tauri.conf.json5`; private key in GH secret `TAURI_PRIVATE_KEY` (TAURI-UPDATER-KEY discharge — pre-stage, no external clock)
+- [~] **AUDIO-05**: PGP key for `security@bravoh.com` generated + published to `keys.openpgp.org`; SECURITY.md points at real key (SEC-06-PGP discharge — pre-stage, no external clock) — Plan 40-05 engineering pre-stage GREEN (slot file + SECURITY.md retarget + runbook + dual-mode gate test); Kaan-discharge runbook in `KAAN-ACTION-LEGAL.md §AUDIO-05`
+- [~] **AUDIO-06**: Tauri ed25519 updater key rotated to production value; pubkey committed in `tauri.conf.json5`; private key in GH secret `TAURI_PRIVATE_KEY` (TAURI-UPDATER-KEY discharge — pre-stage, no external clock) — Plan 40-05 engineering pre-stage GREEN (rotation comment + runbook + dual-mode gate test); Kaan-discharge runbook in `KAAN-ACTION-LEGAL.md §AUDIO-06`
 - [ ] **AUDIO-07**: BlackHole probe fresh-Mac smoke pass — Kaan creates fresh macOS user account, runs install wizard end-to-end, confirms BlackHole CTA fires (INSTALL-BLACKHOLE-PROBE discharge — pre-stage, no external clock)
 
 ### Latency Stack v2 (LAT)

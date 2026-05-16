@@ -45,7 +45,7 @@ Plans:
 - [ ] 40-02-PLAN.md — LookaheadProvider port from cohost_v4_tr.py (AUDIO-02)
 - [ ] 40-03-PLAN.md — 3rd Gemini Part wire-in + 'NOT YET HEARD' prompt labeling (AUDIO-02, AUDIO-04)
 - [ ] 40-04-PLAN.md — Event cooldown re-tune + replay-harness --print-cooldowns (AUDIO-03)
-- [ ] 40-05-PLAN.md — PGP + Tauri updater key pre-stage scaffolding (AUDIO-05, AUDIO-06)
+- [x] 40-05-PLAN.md — PGP + Tauri updater key pre-stage scaffolding (AUDIO-05, AUDIO-06) — engineering pre-stage GREEN; Kaan-discharge runbooks in `KAAN-ACTION-LEGAL.md`
 - [ ] 40-06-PLAN.md — BlackHole probe structured-event emission + Pitfall 5 retry (AUDIO-07)
 ```
 
