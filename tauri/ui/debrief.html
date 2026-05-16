@@ -48,6 +48,17 @@
             <p class="vmx-debrief-skeleton">Generating drills…</p>
           </div>
         </section>
+        <!--
+          Plan 42-03 — ear-test sign-off host. Opt-in toggle expanded by
+          mountEarTestToggle when the session loads. Submit posts to the
+          Python writer (src/vibemix/debrief/ear_test_capture.py) via
+          Tauri IPC (or the debrief WS client on 127.0.0.1:8766 in dev).
+        -->
+        <section class="vmx-debrief-ear-test" id="vmx-debrief-ear-test">
+          <div id="vmx-debrief-ear-test-toggle"
+               class="vmx-debrief-ear-test-toggle"
+               aria-label="Ear-test sign-off"></div>
+        </section>
       </main>
       <div id="vmx-debrief-error-banner" class="vmx-debrief-error-banner"
            hidden></div>

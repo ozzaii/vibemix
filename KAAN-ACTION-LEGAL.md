@@ -1059,3 +1059,94 @@ MANIFEST.md filled:       _____________________   (6 / 6)
 git lfs commit hash:      _____________________
 Sign-off by:              _____________________   (Kaan signature)
 ```
+
+---
+
+## §GATE-05 — First 2 ear-test sessions (real DJ play)
+
+**REQ-ID:** GATE-05 + GATE-07 (Phase 42-03)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 42-03 ships protocol + capture surface + bash gate)  ☐ session 1 signed  ☐ session 2 signed (different genre)  ☐ `check_ear_test.sh` exits 0
+**Effort:** 2 × ≥30 min DJ sessions + ~2 min per session for the debrief toggle sign-off
+**Blocking for:** Plan 42-04 `check_gate.sh` Gate-2 — the autonomous-proxy lane (7 nightly green) cannot ship by itself; the ear-test lane needs ≥ 2 in-window signed sessions across ≥ 2 genres with zero slop flags.
+
+### Why this is KAAN-action
+
+Real DJ play cannot be fabricated. v3.0 is single-DJ (Kaan-signed; cross-DJ
+sign-off deferred to v3.x per Plan 42 CONTEXT). Per the anti-slop manifesto
+("real DJ friend in your ear, no AI slop") only Kaan's ear closes the
+qualitative gate that the autonomous 2-judge proxy cannot.
+
+### Files involved
+
+- **Protocol document:** `eval/EAR-TEST-PROTOCOL.md` (Plan 42-03 Task 1).
+- **JSON Schema:** `eval/ear-test-logs/schema.json`.
+- **Capture writer:** `src/vibemix/debrief/ear_test_capture.py::write_ear_test_log`.
+- **Debrief UI toggle:** `tauri/ui/src/debrief/components/ear-test-toggle.ts` —
+  mounts inside the existing Phase 29 debrief window on `session-loaded`.
+- **Gate script:** `scripts/release/check_ear_test.sh` (Plan 42-03 Task 3).
+- **Output location:** `eval/ear-test-logs/<session-id>.json`.
+
+### Kaan steps
+
+1. **Session 1 — pick any genre.** Run a DJ set ≥ 30 min through vibemix
+   (any cohost variant). The recording session_id becomes the log filename.
+2. **Open the debrief window.** When the session ends, vibemix opens the
+   Phase 29 debrief window automatically (or via Settings → Recordings →
+   "View debrief"). Wait for `session-loaded` to fire — the ear-test
+   toggle mounts at the bottom of the layout.
+3. **Click the toggle:** `Bu session'ı release-gate için işaretle / Rate
+   this session for release-gate`. The form expands.
+4. **Fill the form.**
+   - Genre is pre-filled from the session metadata; correct if needed.
+   - Tick **only** the slop-flag checkboxes that actually applied
+     (`felt_slop`, `felt_scripted`, `felt_late`, `felt_generic`). For an
+     ear-pass session: leave **all four unchecked**.
+   - Optional: drop a one-line note in the textarea (what worked /
+     didn't — stays in repo as audit trail per
+     `feedback_privacy_scope_narrow`; redacted from `eval/README.md`).
+5. **Hit Sign off.** The toggle posts via Tauri IPC → writer → atomic
+   write of `eval/ear-test-logs/<session-id>.json`.
+6. **Session 2 — different genre.** Repeat steps 1–5 within a 14-day
+   window, picking a genre that differs from Session 1 (the `≥ 2 genres`
+   invariant trips if both fall into the same `genre` enum value).
+7. **Run the gate.**
+   ```bash
+   bash scripts/release/check_ear_test.sh
+   ```
+   Expected stdout: `PASS check_ear_test: 2 sessions across 2 genres in
+   last 14 days, 0 slop-flags`. Exit code 0.
+8. **Commit the logs.**
+   ```bash
+   git add eval/ear-test-logs/*.json
+   git commit -m "ear-test(42-03): first 2 GATE-05 sessions signed"
+   ```
+
+### Verification
+
+```bash
+# Direct gate invocation:
+bash scripts/release/check_ear_test.sh
+
+# Contract tests (must still pass after Kaan-discharge):
+uv run pytest tests/eval/test_check_ear_test_sh.py -q
+```
+
+### What unblocks
+
+- Plan 42-04 `check_gate.sh` Gate-2 — the umbrella cut-script that AND-gates
+  the 7 nightly autonomous-proxy results with this ear-test result.
+- `cut_release.sh` Gate-2 (Phase 39-01 slot) — the v3.0 release cut.
+
+### Sign-off block
+
+```
+GATE-05 SESSION-1 on:       _____________________   (date)
+GATE-05 SESSION-1 GENRE:    _____________________
+GATE-05 SESSION-1 SLOP:     _____________________   (none / list)
+GATE-05 SESSION-2 on:       _____________________   (date — within 14d of session 1)
+GATE-05 SESSION-2 GENRE:    _____________________   (must differ from session 1)
+GATE-05 SESSION-2 SLOP:     _____________________   (none / list)
+check_ear_test.sh exit 0:   _____________________   (yes / no)
+Sign-off by:                _____________________   (Kaan signature)
+```

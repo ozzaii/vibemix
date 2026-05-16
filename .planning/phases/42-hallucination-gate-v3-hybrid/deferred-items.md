@@ -16,3 +16,26 @@ but only seeded `genre.txt` + `source.txt` — the labeling pass that writes
 no real corpus bytes). Closure path: GATE-03 Kaan-discharge runbook (this plan's
 Task 3) directs Kaan to populate the events.jsonl per session as part of the
 corpus acquisition workflow.
+
+---
+
+## Plan 42-03 — TS check unavailable in worktree
+
+**Tool:** `tauri/ui` — `npm run check:ipc` / `tsc --noEmit`
+
+**Issue:** This worktree has no `node_modules/` installed. The TS pipeline
+(`codegen:ipc` + `tsc --noEmit`) requires `ajv` (and `typescript`) which are
+not present locally. Plan 42-03 ships
+`tauri/ui/src/debrief/components/ear-test-toggle.ts` + a `mountEarTestToggle`
+wire-in inside `debrief-window.ts` + a `sendEarTestSubmit` method on
+`ws-client.ts`.
+
+**Pre-existing:** Not introduced by Plan 42-03 — `node_modules` is not part of
+the repo (`.gitignore`'d). CI runs `npm ci` then `npm run check:ipc`; local
+worktrees rely on the developer running `npm install` once. None of the Plan
+42-03 TS changes import unfamiliar APIs — exports + DOM types only, mirroring
+the existing `citation-tooltip.ts` and `chapter-list.ts` patterns.
+
+**Disposition:** Smoke verification per the plan was the grep-check (passed —
+`mountEarTestToggle` + `EarTestSubmission` both visible). CI will run the full
+`check:ipc` on PR. No follow-up needed in repo.

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibemix.bravoh.com/schemas/ear-test-log.schema.json",
+  "title": "vibemix Ear-Test Log",
+  "description": "Structured log entry written by the Phase 29 debrief window when Kaan signs off on a DJ session for the v3.0 hybrid hallucination gate. Consumed by scripts/release/check_ear_test.sh (Plan 42-03) and scripts/release/check_gate.sh (Plan 42-04). See eval/EAR-TEST-PROTOCOL.md for the protocol that produced this shape.",
+  "type": "object",
+  "required": [
+    "session_id",
+    "started_at",
+    "duration_s",
+    "genre",
+    "slop_flags",
+    "free_form",
+    "signed_by",
+    "signed_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+      "description": "Stable session identifier. Same id appears in the recording session_dir name."
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp marking session start."
+    },
+    "duration_s": {
+      "type": "integer",
+      "minimum": 1800,
+      "description": "Session duration in seconds. Schema-level 30 min minimum (1800 s) per Plan 42-03 D-GATE-05."
+    },
+    "genre": {
+      "type": "string",
+      "enum": [
+        "hard_tek",
+        "techno",
+        "house",
+        "hip_hop",
+        "dnb",
+        "dubstep",
+        "other"
+      ],
+      "description": "Genre tag. The ≥ 2 genres in 14d invariant in check_ear_test.sh counts distinct values across this field."
+    },
+    "slop_flags": {
+      "type": "object",
+      "required": [
+        "felt_slop",
+        "felt_scripted",
+        "felt_late",
+        "felt_generic"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "felt_slop": {
+          "type": "boolean",
+          "description": "true = generic AI noise, not grounded in actual mix."
+        },
+        "felt_scripted": {
+          "type": "boolean",
+          "description": "true = reaction felt pre-canned, not responsive to the specific moment."
+        },
+        "felt_late": {
+          "type": "boolean",
+          "description": "true = reaction landed >= 3s after trigger, breaking flow."
+        },
+        "felt_generic": {
+          "type": "boolean",
+          "description": "true = reaction could apply to any track in any set."
+        }
+      }
+    },
+    "free_form": {
+      "type": "string",
+      "maxLength": 4000,
+      "description": "Free-form notes from the debrief textarea. May be empty."
+    },
+    "signed_by": {
+      "type": "string",
+      "enum": ["kaan"],
+      "description": "Signing identity. v3.0 is single-DJ (Kaan-only); cross-DJ sign-off deferred to v3.x per Plan 42 CONTEXT."
+    },
+    "signed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of sign-off submit."
+    }
+  }
+}
