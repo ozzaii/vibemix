@@ -127,6 +127,23 @@ Plans:
 5. Hero demo storyboard re-aligned to CDJ Whisper v5; pre-production package (shot list + capture plan + demo-mode config) handed off to Francesco.
 6. Memory + doc drift cleaned — `project_mascot_as_vtuber_personality_surface` updated to "Neon Rebel"; storyboard mocks aligned.
 
+**Plans:** 9 plans
+
+```
+Plans:
+- [ ] 43-01-PLAN.md — UI audit driver + first audit run (session surface seed) (VIS-01)
+- [ ] 43-02-PLAN.md — UI audit closure: session + mascot overlay + hover-glow sweep (VIS-01, VIS-02)
+- [ ] 43-03-PLAN.md — UI audit closure: wizard + calibration + settings + hover-glow sweep (VIS-01, VIS-02)
+- [ ] 43-04-PLAN.md — meter.ts spectrum rebuild: hardware-LED-strip + amber peak hold + silk-12 grid (VIS-03)
+- [ ] 43-05-PLAN.md — Mixamo retarget pipeline + 5 prep_*.glb swap-in scaffold + §VIS-04 KAAN-discharge (VIS-04)
+- [ ] 43-06-PLAN.md — Mood pool runtime validation (3 personas, 30s smoke) + integrated-GPU perf gate (VIS-05, VIS-06)
+- [ ] 43-07-PLAN.md — Memory + storyboard doc drift cleanup: DJ bat→Neon Rebel; Workbench/DSEG7→Saira/Geist (VIS-07)
+- [ ] 43-08-PLAN.md — Hero demo storyboard v5 re-mock: 8-cut shot list + chip overlay frames + ≤8 cuts gate (VIS-08)
+- [ ] 43-09-PLAN.md — Francesco pre-production handoff package + demo-mode sequencer + §VIS-09 discharge (VIS-09)
+```
+
+**Wave structure:** Wave 1 (43-01, 43-04, 43-07) → Wave 2 (43-02, 43-03, 43-05, 43-08) → Wave 3 (43-06, 43-09)
+
 ### Phase 44: Launch Positioning + Pre-stage
 
 **Goal:** README launch-ready; EvidenceRegistry citation strip visible in live UI (anti-slop receipts on screen); Bravoh funnel CTA placed; bravoh GH org stood up; SHIP-TWEET copy locked; Discord provisioning + outreach calendar finalized. Every pre-stage item discharged that doesn't require external clock.
