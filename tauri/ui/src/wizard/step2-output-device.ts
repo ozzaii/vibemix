@@ -12,6 +12,32 @@ import { DropdownDevice, type DropdownDevice as DropdownDeviceItem } from "./com
 import { AudioTestButton, type AudioTestState } from "./components/audio-test-button.js";
 import { WindowPicker, type WindowPickerMode } from "./components/window-picker.js";
 import { Button } from "./components/button.js";
+import { registerStyle } from "./components/_style-registry.js";
+
+/* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep for the output-device
+ * step. Step 2 owns the device dropdown + 1kHz test tone + window picker
+ * — every one of those is interactive. The scoped block here lifts the
+ * existing .wizard-step__cta-row glow rule (registered by
+ * step1-permissions.ts) onto the deeper device-picker / test-tone /
+ * window-picker subtrees so the entire calibration surface is uniform
+ * under cursor. */
+const CSS = `
+  .wizard-step--output-device button:not([disabled]),
+  .wizard-step--output-device [role="button"]:not([aria-disabled="true"]),
+  .wizard-step--output-device [data-interactive] {
+    transition: box-shadow var(--motion-snap) ease-out;
+  }
+  .wizard-step--output-device button:not([disabled]):hover,
+  .wizard-step--output-device button:not([disabled]):focus-visible,
+  .wizard-step--output-device [role="button"]:not([aria-disabled="true"]):hover,
+  .wizard-step--output-device [role="button"]:not([aria-disabled="true"]):focus-visible,
+  .wizard-step--output-device [data-interactive]:hover,
+  .wizard-step--output-device [data-interactive]:focus-visible {
+    box-shadow: var(--glow-faint);
+  }
+`;
+
+registerStyle("wizard-step--output-device", CSS);
 
 export interface Step2State {
   blackHolePresent: boolean;
@@ -44,6 +70,9 @@ export interface Step2Callbacks {
 
 export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement {
   const body = document.createElement("div");
+  // Scoping class so the VIS-02 hover-glow rule above latches onto this
+  // step's interactive subtree (Plan 43-03).
+  body.classList.add("wizard-step--output-device");
 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";

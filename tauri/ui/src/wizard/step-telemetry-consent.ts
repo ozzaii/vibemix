@@ -20,6 +20,31 @@
 import { PrimaryPanel } from "./components/primary-panel.js";
 import { Button } from "./components/button.js";
 import { renderTelemetryConsentCard } from "./components/telemetry-consent.js";
+import { registerStyle } from "./components/_style-registry.js";
+
+/* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep for the telemetry-
+ * consent step. P67 anti-dark-pattern rule requires both radio options
+ * to read equally weighted; the --glow-faint application below also
+ * fires on :focus-visible so keyboard navigators see the same tactility
+ * trail as cursor users. Default-OFF intent is preserved (no styling
+ * change to the radio defaults). */
+const CSS = `
+  .wizard-step--telemetry-consent button:not([disabled]),
+  .wizard-step--telemetry-consent [role="button"]:not([aria-disabled="true"]),
+  .wizard-step--telemetry-consent [data-interactive] {
+    transition: box-shadow var(--motion-snap) ease-out;
+  }
+  .wizard-step--telemetry-consent button:not([disabled]):hover,
+  .wizard-step--telemetry-consent button:not([disabled]):focus-visible,
+  .wizard-step--telemetry-consent [role="button"]:not([aria-disabled="true"]):hover,
+  .wizard-step--telemetry-consent [role="button"]:not([aria-disabled="true"]):focus-visible,
+  .wizard-step--telemetry-consent [data-interactive]:hover,
+  .wizard-step--telemetry-consent [data-interactive]:focus-visible {
+    box-shadow: var(--glow-faint);
+  }
+`;
+
+registerStyle("wizard-step--telemetry-consent", CSS);
 
 export interface TelemetryConsentState {
   consent: boolean;
@@ -83,7 +108,7 @@ export function renderStepTelemetryConsent(
   );
 
   const root = document.createElement("section");
-  root.className = "wizard-step";
+  root.className = "wizard-step wizard-step--telemetry-consent";
   root.append(panel, ctaRow);
   return root;
 }

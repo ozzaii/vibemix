@@ -14,6 +14,31 @@
 import { PrimaryPanel } from "./components/primary-panel.js";
 import { Button } from "./components/button.js";
 import { renderProfileConsentCard } from "./components/profile-consent.js";
+import { registerStyle } from "./components/_style-registry.js";
+
+/* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep for the profile-consent
+ * step. The consent toggle is the focal interactive element on this
+ * surface; the scoped rule below routes --glow-faint into the toggle
+ * row + Continue/Back CTAs on :hover and :focus-visible. The consent
+ * affordance reads cleaner under cursor without competing with the
+ * armed-state amber bleed already inside cmp-btn. */
+const CSS = `
+  .wizard-step--profile-consent button:not([disabled]),
+  .wizard-step--profile-consent [role="button"]:not([aria-disabled="true"]),
+  .wizard-step--profile-consent [data-interactive] {
+    transition: box-shadow var(--motion-snap) ease-out;
+  }
+  .wizard-step--profile-consent button:not([disabled]):hover,
+  .wizard-step--profile-consent button:not([disabled]):focus-visible,
+  .wizard-step--profile-consent [role="button"]:not([aria-disabled="true"]):hover,
+  .wizard-step--profile-consent [role="button"]:not([aria-disabled="true"]):focus-visible,
+  .wizard-step--profile-consent [data-interactive]:hover,
+  .wizard-step--profile-consent [data-interactive]:focus-visible {
+    box-shadow: var(--glow-faint);
+  }
+`;
+
+registerStyle("wizard-step--profile-consent", CSS);
 
 export interface ProfileConsentState {
   consent: boolean;
@@ -77,7 +102,7 @@ export function renderStepProfileConsent(
   );
 
   const root = document.createElement("section");
-  root.className = "wizard-step";
+  root.className = "wizard-step wizard-step--profile-consent";
   root.append(panel, ctaRow);
   return root;
 }
