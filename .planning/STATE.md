@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: Plans 43-01, 43-02, 43-04, 43-05, 43-07, 43-08 SHIPPED. 6/9 plans complete. Latest = 43-02 (session + mascot-overlay HIGH-findings-closed, hover-glow sweep, Playwright spec scaffold). VIS-04 + VIS-08 + VIS-03 + VIS-07 + VIS-02 (partial) + VIS-01 (partial) closed.
-last_updated: "2026-05-16T16:55:00Z"
+status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned. VIS-01 (partial), VIS-02 (partial), VIS-03, VIS-04 (scaffold), VIS-07, VIS-08 closed.
+last_updated: "2026-05-16T17:17:03.129Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 28
-  completed_plans: 25
-  percent: 54
+  completed_plans: 27
+  percent: 50
 ---
 
 # vibemix — State
