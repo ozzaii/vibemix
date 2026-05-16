@@ -1,5 +1,17 @@
 /* meter.ts — vertical 16-segment LED meter (UI-SPEC §4).
  *
+ * VIS-03 (Phase 43, Plan 43-04): hardware-LED-strip aesthetic locked.
+ * - 16 discrete segments (zone bands safe/warm/clip — 1-5/6-13/14-16)
+ * - amber peak-hold lozenge with 1.2s opacity decay (the single most
+ *   visceral CDJ Whisper signal — never weaken its 1200ms transition
+ *   or replace its amber stack)
+ * - silk-12 minor grid lines at indices 4/8/12/16 (downgraded from
+ *   silk-22 — the bezel detail must whisper, not compete with lit
+ *   segments)
+ * - token-only CSS: zero raw color literals. Every color resolves
+ *   via var(--token) — see tokens.css "meter spectrum — VIS-03"
+ *   block for the semantic alpha names this module consumes.
+ *
  * Each meter is 56px wide × 200px tall: a --glass-3 frame with 16
  * stacked LED segments running a Pioneer-CDJ amber ladder (safe at the
  * bottom in --amber-pale, warm through the body in --amber, clip at the
@@ -47,9 +59,9 @@ const CSS = `
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-sm);
     box-shadow:
-      inset 0 2px 6px rgba(0, 0, 0, 0.85),
-      inset 0 0 0 1px rgba(0, 0, 0, 0.5),
-      0 0 0 1px rgba(255, 255, 255, 0.022);
+      inset 0 2px 6px var(--void-85),
+      inset 0 0 0 1px var(--void-50),
+      0 0 0 1px var(--seg-hi-022);
     padding: 4px;
     display: flex;
     flex-direction: column-reverse;
@@ -66,10 +78,10 @@ const CSS = `
      * segments override these with the zoned amber treatment. */
     background:
       linear-gradient(90deg,
-        rgba(214, 207, 199, 0.025) 0%,
-        rgba(214, 207, 199, 0.06) 50%,
-        rgba(214, 207, 199, 0.025) 100%);
-    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.018);
+        var(--silk-025) 0%,
+        var(--silk-06) 50%,
+        var(--silk-025) 100%);
+    box-shadow: inset 0 0 0 0.5px var(--seg-hi-018);
     transition: background var(--motion-snap) ease-out,
                 box-shadow var(--motion-snap) ease-out,
                 opacity var(--motion-snap) ease-out;
@@ -83,21 +95,21 @@ const CSS = `
     box-shadow: none;
   }
   .vmx-meter__seg[data-zone="safe"][data-lit="true"] {
-    background: linear-gradient(180deg, var(--amber-pale), rgba(255, 184, 138, 0.7));
+    background: linear-gradient(180deg, var(--amber-pale), var(--amber-pale-70));
     box-shadow:
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.15),
+      inset 0 0 0 0.5px var(--seg-hi-15),
       0 0 3px var(--amber-22);
   }
   .vmx-meter__seg[data-zone="warm"][data-lit="true"] {
-    background: linear-gradient(180deg, var(--amber), rgba(255, 138, 61, 0.78));
+    background: linear-gradient(180deg, var(--amber), var(--amber-78));
     box-shadow:
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.12),
+      inset 0 0 0 0.5px var(--seg-hi-12),
       0 0 4px var(--amber-40);
   }
   .vmx-meter__seg[data-zone="clip"][data-lit="true"] {
-    background: linear-gradient(180deg, var(--amber-deep), rgba(255, 90, 26, 0.85));
+    background: linear-gradient(180deg, var(--amber-deep), var(--amber-deep-85));
     box-shadow:
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+      inset 0 0 0 0.5px var(--seg-hi-18),
       var(--glow-soft);
   }
   /* Green hairline marker at segment 5 — the safe/warm boundary */
@@ -113,8 +125,10 @@ const CSS = `
     opacity: 0.7;
     pointer-events: none;
   }
-  /* Faint scale tick on every third inactive segment — reads as
-   * machined detail on the bezel, never competes with lit segments. */
+  /* Faint scale tick on every fourth segment — reads as machined
+   * detail on the bezel, never competes with lit segments. VIS-03
+   * downgrades from --silk-22 → --silk-12 so the minor grid lines
+   * whisper. */
   .vmx-meter__seg[data-index="4"]::before,
   .vmx-meter__seg[data-index="8"]::before,
   .vmx-meter__seg[data-index="12"]::before,
@@ -125,7 +139,7 @@ const CSS = `
     top: 50%;
     width: 2px;
     height: 1px;
-    background: var(--silk-22);
+    background: var(--silk-12);
     transform: translateY(-50%);
     pointer-events: none;
   }
@@ -144,7 +158,7 @@ const CSS = `
     box-shadow:
       0 0 4px var(--amber-65),
       0 0 8px var(--amber-22),
-      inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      inset 0 1px 0 var(--peak-hi-35);
     bottom: calc(var(--meter-peak-pct, 0) * (100% - 8px));
     opacity: var(--meter-peak-shown, 0);
     transition: bottom 80ms ease-out,
@@ -159,7 +173,7 @@ const CSS = `
     text-transform: uppercase;
     color: var(--silk-40);
     line-height: 1;
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    text-shadow: 0 1px 0 var(--void-70);
   }
 `;
 
@@ -245,8 +259,8 @@ export function setMeterLevels(el: HTMLElement, levels: MeterLevels): number {
 /**
  * Test-only export. Do not consume in app code.
  * Exposed for the VIS-03 contract tests in meter.test.ts so the suite
- * can grep the registered stylesheet for token usage (no rgba()
- * literals, silk-12 grid, 1200ms peak decay) without parsing
+ * can grep the registered stylesheet for token usage (no raw
+ * color literals, silk-12 grid, 1200ms peak decay) without parsing
  * document.head <style> tags from a jsdom environment.
  */
 export const _CSS_FOR_TEST = CSS;

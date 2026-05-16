@@ -166,6 +166,38 @@
   --statusbar-h: 40px;
   --cta-margin-bottom: 24px;
 
+  /* --- meter spectrum — VIS-03 (Phase 43 Plan 43-04) ---
+   * Semantic tokens for the hardware-LED-strip meter render.
+   * meter.ts had 14 inline rgba() literals before VIS-03; the scrub
+   * lifted each to a named token here so the meter CSS is fully
+   * token-driven (asserted by meter.test.ts Test 6). Names follow
+   * the existing alpha-suffix convention (`-NN` = NN% alpha).
+   *
+   * Void shades — frame inset shadows + label text-shadow. Reuse
+   * across any inset-bezel surface that needs the same recess feel. */
+  --void-85: rgba(0, 0, 0, 0.85);     /* meter frame deep inset shadow */
+  --void-70: rgba(0, 0, 0, 0.7);      /* meter label text-shadow */
+  --void-50: rgba(0, 0, 0, 0.5);      /* meter frame mid inset shadow */
+  /* Silk highlights — sub-silk-12 intensities for resting-state seg
+   * texture (the LED ladder must still feel like a ladder when dark). */
+  --silk-06: rgba(214, 207, 199, 0.06);   /* resting seg gradient peak */
+  --silk-025: rgba(214, 207, 199, 0.025); /* resting seg gradient flanks */
+  /* Segment highlight insets — white tints at 1.8% → 35% for lit
+   * segments + peak lozenge top edge. Semantic name = "seg-hi" so
+   * future seg variants can branch off the same family. */
+  --seg-hi-018: rgba(255, 255, 255, 0.018); /* resting seg inset hairline */
+  --seg-hi-022: rgba(255, 255, 255, 0.022); /* meter frame outer ring */
+  --seg-hi-12:  rgba(255, 255, 255, 0.12);  /* warm seg inset highlight */
+  --seg-hi-15:  rgba(255, 255, 255, 0.15);  /* safe seg inset highlight */
+  --seg-hi-18:  rgba(255, 255, 255, 0.18);  /* clip seg inset highlight */
+  --peak-hi-35: rgba(255, 255, 255, 0.35);  /* peak lozenge top edge highlight */
+  /* Amber gradient stops — second-stop alpha mixes for safe/warm/clip
+   * seg gradients. Names mirror the existing --amber-pale / --amber /
+   * --amber-deep base hues with explicit alpha suffix. */
+  --amber-pale-70: rgba(255, 184, 138, 0.7); /* safe gradient stop B */
+  --amber-78:      rgba(255, 138, 61, 0.78); /* warm gradient stop B */
+  --amber-deep-85: rgba(255, 90, 26, 0.85);  /* clip gradient stop B */
+
   /* --- Motion budget (retained from Phase 11 + v5 border sweep) --- */
   --motion-snap: 150ms;
   --motion-transition: 200ms;
