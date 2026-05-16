@@ -1,27 +1,42 @@
 # SPDX-License-Identifier: Apache-2.0
-"""GeminiContextCache — Plan 19-03 Gemini context-caching layer.
+"""GeminiContextCache — Gemini context-caching layer.
 
 Caches the static prompt prefix (system instruction + persona + Phase 18
 citation grammar) on Gemini's server side, shaving 500-1500ms TTFT per call
-by reusing the cached prefix across the session. CONTEXT D-08 lock:
-TTL ≥5min, refresh every 4min, system instruction MUST be padded ≥1024 tokens
-BEFORE caches.create (Pitfall 11 — Gemini rejects under-floor caches with a
-non-obvious 400 error).
+by reusing the cached prefix across the session.
+
+**Plan 41-02 cleanup (v3.0):**
+
+The wall-clock ``refresh_loop`` background task is GONE. Refresh is now
+event-driven — ``EvidenceRegistry`` invokes ``cache.refresh()`` through a
+debounced callback whenever observations mutate. This eliminates dead-time
+refresh churn (the 4-min ticker created new caches even when nothing
+changed) and lets the explicit cache surface follow the data, not the wall
+clock. TTL bumped 300s → 3600s (60min) to match the lower refresh rate.
+
+**Pitfall 5 — pad invariant survives the cleanup.** ``_CACHE_PAD_BLOCK``
++ ``padded_body()`` are KEPT. Gemini 2026 implicit caching triggers only
+on prefix ≥1024 tokens; vibemix's natural prompt prefix sits around
+800-1200 tokens depending on persona, and the lean personas fall below
+the implicit-cache floor without the pad. The deterministic pad keeps
+implicit hit-rate stable even when explicit caching is disabled.
 
 Three contracts this module owns:
 
   1. **padded_body() never returns under-floor.** Token-proxy is char-len // 4
      (matches Plan 19-02; project has no tiktoken dep). Bodies <1024 token-
      proxy get the deterministic ``_CACHE_PAD_BLOCK`` appended. Determinism
-     is REQUIRED — if Gemini hashes the prefix as the cache key, a varying
-     pad would defeat the cache hit on session resume.
+     is REQUIRED — Gemini's implicit cache hashes the prefix, so a varying
+     pad would defeat the cache hit. The pad invariant also covers explicit
+     caching for sessions where the body is short.
 
-  2. **refresh_loop atomic swap.** Every 240s the loop creates a NEW cache,
+  2. **refresh() is the atomic-swap chokepoint** (replaces refresh_loop).
+     ``EvidenceRegistry.write()`` schedules a debounced callback (5-10s
+     debounce + 30s min-interval). On fire, refresh() creates a NEW cache,
      swaps ``_current_name`` to the new name, THEN deletes the old name.
-     ``current_name()`` is never None during a refresh window unless the
-     caller explicitly invalidates. On create failure, the old cache is
-     preserved (graceful degradation — fall back to the old cache for one
-     more refresh cycle, never None mid-session).
+     On create failure, the old cache is preserved (graceful degradation —
+     ``current_name()`` never returns None mid-session unless explicit
+     invalidate fires).
 
   3. **invalidate() is the cancel-aware chokepoint.** Plan 19-01's
      CancelGate telemetry callback fires through ``DJCoHostAgent.invalidate
@@ -37,7 +52,6 @@ src/vibemix/`` returns this file only.
 
 from __future__ import annotations
 
-import asyncio
 import sys
 import time
 from typing import TYPE_CHECKING
@@ -49,14 +63,16 @@ from vibemix.agent.config import LLM_MODEL
 if TYPE_CHECKING:  # pragma: no cover — type-only
     from google import genai
 
-# ---- Module constants — CONTEXT D-08 lock ----
+# ---- Module constants — Plan 41-02 lock ----
 
-# 5-min TTL minimum per Gemini cache rules — never set lower.
-GEMINI_CACHE_TTL_S = 300.0
+# 60-min TTL — explicit cache only refreshes on EvidenceRegistry mutation;
+# the longer ceiling avoids needless re-creates during quiet sets where
+# observations don't churn.
+GEMINI_CACHE_TTL_S = 3600.0
 
-# 4-min refresh < 5-min TTL → race-buffered (the new cache is always
-# created and swapped in BEFORE the old expires).
-GEMINI_CACHE_REFRESH_S = 240.0
+# (Plan 41-02) The wall-clock refresh constant + refresh_loop method were
+# removed. Refresh is now triggered by EvidenceRegistry.write() through a
+# debounced callback. See state/evidence_registry.py for the schedule logic.
 
 # Gemini cache rejects creation under this floor with a non-obvious 400
 # error (Pitfall 11). Token-proxy is char-len // 4 — matches Plan 19-02.
@@ -78,18 +94,21 @@ _CACHE_PAD_BLOCK: str = "\n".join(
 class GeminiContextCache:
     """Server-side context cache for the static prompt prefix.
 
-    Lifecycle:
+    Lifecycle (Plan 41-02):
       1. ``await cache.create()`` — uploads padded body to Gemini, stores name
       2. ``cache.current_name()`` — returns name string (None if uncreated)
-      3. ``await cache.refresh_loop(stop_event)`` — long-running coroutine
-         re-creating the cache every ``refresh_s`` seconds, swapping atomically
+      3. ``await cache.refresh()`` — invoked from EvidenceRegistry.write()
+         callback (debounced upstream); atomically swaps to a freshly-created
+         cache, deletes the old name. NOT a long-running loop — single shot
+         per call.
       4. ``await cache.invalidate()`` — clears _current_name + best-effort
          server-side delete (called by CancelGate-side cancel-and-refire)
 
     All API calls are async — caller drives them on the asyncio event loop.
     Thread safety: caller is responsible for not racing create() / invalidate()
-    against the refresh_loop. The dj_cohost wiring serializes all three on the
-    main loop so this is fine in practice.
+    against refresh(). The EvidenceRegistry debounce guarantees at most one
+    refresh() in flight at a time, and the dj_cohost wiring serializes all
+    three on the main loop so this is fine in practice.
     """
 
     def __init__(
@@ -99,7 +118,6 @@ class GeminiContextCache:
         *,
         model: str = LLM_MODEL,
         ttl_s: float = GEMINI_CACHE_TTL_S,
-        refresh_s: float = GEMINI_CACHE_REFRESH_S,
         time_fn=time.monotonic,
         profile_section: str = "",
     ) -> None:
@@ -107,7 +125,6 @@ class GeminiContextCache:
         self._body = system_instruction_body
         self._model = model
         self._ttl_s = ttl_s
-        self._refresh_s = refresh_s
         self._time_fn = time_fn
         self._current_name: str | None = None
         # Plan 32-02 / PROFILE-03 — optional long-term DJ profile section.
@@ -134,9 +151,8 @@ class GeminiContextCache:
     async def create(self) -> str | None:
         """Upload the padded body to Gemini's cache store; store + return name.
 
-        On exception, sets _current_name=None and re-raises. Callers (e.g.
-        refresh_loop) decide how to react to the failure — refresh_loop keeps
-        the OLD cache when create raises, never going None mid-session."""
+        On exception, re-raises. Callers (e.g. refresh()) restore the OLD
+        cache when create raises so the cache never goes None mid-session."""
         config = types.CreateCachedContentConfig(
             ttl=f"{int(self._ttl_s)}s",
             system_instruction=self.padded_body(),
@@ -147,9 +163,8 @@ class GeminiContextCache:
                 model=self._model, config=config
             )
         except Exception:
-            # Re-raise after CLEARING current — caller (refresh_loop) handles
-            # the keep-old-on-failure semantics by not reading _current_name
-            # between the try and the except.
+            # Re-raise; caller (refresh()) handles the keep-old-on-failure
+            # semantics by capturing old_name before invoking us.
             raise
         self._current_name = cache.name
         return self._current_name
@@ -175,50 +190,44 @@ class GeminiContextCache:
     async def _invalidate_name(self, name: str) -> None:
         """Best-effort delete of a specific cache name (no _current_name mutation).
 
-        Used by refresh_loop to delete the OLD cache name AFTER swapping
+        Used by refresh() to delete the OLD cache name AFTER swapping
         _current_name to the NEW one (atomic swap)."""
         try:
             await self._client.aio.caches.delete(name=name)
         except Exception as e:
             print(f"[cache] delete failed for {name}: {e}", file=sys.stderr)
 
-    async def refresh_loop(self, stop_event: asyncio.Event) -> None:
-        """Long-running coroutine: re-create cache every refresh_s, swap atomically.
+    async def refresh(self) -> None:
+        """Atomic-swap re-create — Plan 41-02 replacement for refresh_loop.
 
-        Loop:
-          - asyncio.wait_for(stop_event.wait(), timeout=refresh_s)
-          - on TimeoutError (the normal case): tick fired
-            - capture old_name
-            - try create() → flips _current_name to new
-            - if create succeeded AND old_name was non-None: best-effort
-              delete the old name (atomic swap order: new-then-delete)
-            - if create raised: log, continue — _current_name unchanged
-              (stays on the OLD name → graceful degradation, current_name()
-              never returns None mid-session unless explicit invalidate)
-          - on stop_event.set(): clean exit
+        Called from ``EvidenceRegistry.write()`` through a debounced callback
+        (5s debounce + 30s min-interval guard — see
+        ``state/evidence_registry.py``). Single-shot per call; the registry
+        owns the schedule, this method owns the swap.
 
-        Caller is responsible for the initial create() before driving this
-        loop — the loop only handles refreshes, not the initial population.
+        Order (atomic-swap correctness):
+          1. capture ``old_name = self._current_name``
+          2. call ``create()`` → flips ``_current_name`` to the NEW name on
+             success; raises on failure (current_name unchanged)
+          3. on success, best-effort delete the old name (server-side delete
+             may fail — the old cache will TTL-expire anyway, so we swallow)
+          4. on failure (create raised): restore ``_current_name = old_name``
+             so the OLD cache stays current → graceful degradation; never
+             goes None mid-session unless explicit invalidate fires
+
+        Re-raises the create exception so the caller (registry callback) can
+        log it. The state mutation (current_name restored to old) happens
+        BEFORE the re-raise so the cache is always in a valid state when
+        the exception unwinds.
         """
-        while not stop_event.is_set():
-            try:
-                await asyncio.wait_for(stop_event.wait(), timeout=self._refresh_s)
-                # If wait completed without timeout, stop was set — exit.
-                break
-            except asyncio.TimeoutError:
-                pass  # tick fired — proceed to refresh
-            old_name = self._current_name
-            try:
-                await self.create()
-            except Exception as e:
-                print(
-                    f"[cache refresh] failed; keeping old cache: {e}",
-                    file=sys.stderr,
-                )
-                # Restore _current_name to old (create() may have cleared it
-                # via re-raise path; keep the old cache for graceful
-                # degradation).
-                self._current_name = old_name
-                continue
-            if old_name and old_name != self._current_name:
-                await self._invalidate_name(old_name)
+        old_name = self._current_name
+        try:
+            await self.create()
+        except Exception:
+            # create() may have cleared _current_name via the re-raise path;
+            # restore to old for graceful degradation, then re-raise so the
+            # caller can log.
+            self._current_name = old_name
+            raise
+        if old_name and old_name != self._current_name:
+            await self._invalidate_name(old_name)

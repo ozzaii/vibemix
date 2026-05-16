@@ -1,14 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
-"""GeminiContextCache — Plan 19-03 cache-floor + lifecycle + invalidate.
+"""GeminiContextCache — cache-floor + lifecycle + invalidate + refresh.
 
-Pins: Pitfall 11 (cache-floor under-pad) closes here.
+Pins: Pitfall 11 (cache-floor under-pad) + Pitfall 5 (implicit-cache floor
+invariant — pad preserved post-v3.0 cleanup).
 
-CONTEXT D-08 hard rules:
-  - GEMINI_CACHE_TTL_S = 300.0  (5-min minimum, never less)
-  - GEMINI_CACHE_REFRESH_S = 240.0  (4-min refresh < 5-min TTL → race-buffered)
-  - GEMINI_CACHE_TOKEN_FLOOR = 1024  (Gemini rejects cache creation under floor)
-  - _CACHE_PAD_BLOCK is deterministic across calls within a session (cache-key
-    stability if Gemini hashes the prefix).
+Plan 41-02 lock:
+  - GEMINI_CACHE_TTL_S = 3600.0   (60-min — explicit cache refresh is now
+                                   event-driven, not wall-clock)
+  - GEMINI_CACHE_TOKEN_FLOOR = 1024  (Gemini rejects under-floor creation)
+  - GEMINI_CACHE_REFRESH_S constant removed (no wall-clock refresh)
+  - GeminiContextCache.refresh_loop() method removed (replaced by
+    EvidenceRegistry-driven .refresh() callback — single-shot)
+  - _CACHE_PAD_BLOCK deterministic across calls within a session — required
+    for BOTH explicit cache-key stability AND Gemini 2026 implicit-cache hits
+    on lean personas that fall below the 1024-token implicit floor.
 
 These tests mock the google.genai client end-to-end — no real API calls.
 """
@@ -21,12 +26,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from vibemix.agent.cache import (
-    GEMINI_CACHE_REFRESH_S,
     GEMINI_CACHE_TOKEN_FLOOR,
     GEMINI_CACHE_TTL_S,
     GeminiContextCache,
     _CACHE_PAD_BLOCK,
 )
+import vibemix.agent.cache as cache_module
 
 # ---------- helpers ----------
 
@@ -62,20 +67,29 @@ def _mk_client(create_returns: list, *, delete_raises: bool = False) -> MagicMoc
     return client
 
 
-# ---------- module constants ----------
+# ---------- module constants — Plan 41-02 lock ----------
 
 
-def test_module_constants_locked() -> None:
-    """The three numeric constants are the CONTEXT D-08 lock — assert exact values."""
-    assert GEMINI_CACHE_TTL_S == 300.0
-    assert GEMINI_CACHE_REFRESH_S == 240.0
+def test_ttl_constant_is_3600() -> None:
+    """Plan 41-02 explicit TTL bump from 300s → 3600s (60 min)."""
+    assert GEMINI_CACHE_TTL_S == 3600.0
+
+
+def test_refresh_s_constant_removed() -> None:
+    """Wall-clock refresh constant deleted — refresh is event-driven now."""
+    assert not hasattr(cache_module, "GEMINI_CACHE_REFRESH_S")
+
+
+def test_token_floor_unchanged() -> None:
+    """Implicit-cache floor invariant — Gemini still rejects <1024-token
+    caches; the pad block keeps lean personas above it."""
     assert GEMINI_CACHE_TOKEN_FLOOR == 1024
     # Pad block must be ≥4096 chars (≥1024 token-proxy) so any short body +
     # pad is guaranteed above the floor.
     assert len(_CACHE_PAD_BLOCK) >= 4096
 
 
-# ---------- padded_body() — the floor-padding contract ----------
+# ---------- padded_body() — the floor-padding contract (Pitfall 5) ----------
 
 
 def test_pad_block_pushes_short_body_above_floor() -> None:
@@ -94,27 +108,68 @@ def test_pad_block_skipped_when_body_already_above_floor() -> None:
     assert cache.padded_body() == body
 
 
-def test_pad_block_is_deterministic() -> None:
+def test_padded_body_invariant_preserved() -> None:
     """padded_body() called twice on the same body returns IDENTICAL strings —
-    cache-key stability if Gemini hashes the prefix."""
+    cache-key stability for both explicit caches AND Gemini 2026 implicit
+    caching (Pitfall 5 — pad survives the v3.0 cleanup)."""
     cache = GeminiContextCache(client=MagicMock(), system_instruction_body="hi")
     a = cache.padded_body()
     b = cache.padded_body()
     assert a == b
 
 
+def test_pad_block_unchanged_golden() -> None:
+    """The deterministic pad block string is byte-identical to the pre-cleanup
+    shape. Changing it would silently break Gemini implicit-cache hits for
+    every existing session — same prefix bytes = same cache key."""
+    # Golden invariants: header line + 80 padding lines of 60 'x' chars
+    lines = _CACHE_PAD_BLOCK.split("\n")
+    assert lines[0] == "# vibemix-pad-block-do-not-edit-cache-key-stability"
+    assert len(lines) == 81
+    assert all(ln == "# " + ("x" * 60) for ln in lines[1:])
+
+
+# ---------- __init__ surface — Plan 41-02 cleanup ----------
+
+
+def test_init_rejects_refresh_s_kwarg() -> None:
+    """Pre-cleanup constructor accepted refresh_s=240.0 — that kwarg is gone.
+    Passing it now must raise TypeError (unknown keyword argument)."""
+    with pytest.raises(TypeError):
+        GeminiContextCache(  # type: ignore[call-arg]
+            client=MagicMock(),
+            system_instruction_body="hi",
+            refresh_s=240.0,
+        )
+
+
+def test_refresh_loop_method_removed() -> None:
+    """Wall-clock background coroutine deleted — instances must not expose
+    refresh_loop. Anything still calling it is a stale wiring bug."""
+    cache = GeminiContextCache(client=MagicMock(), system_instruction_body="hi")
+    assert not hasattr(cache, "refresh_loop")
+
+
+def test_refresh_method_exists_and_is_awaitable() -> None:
+    """The new event-driven refresh() chokepoint replaces refresh_loop."""
+    cache = GeminiContextCache(client=MagicMock(), system_instruction_body="hi")
+    assert hasattr(cache, "refresh")
+    assert asyncio.iscoroutinefunction(cache.refresh)
+
+
 # ---------- create() — the API call ----------
 
 
-def test_create_calls_caches_create_with_padded_body_and_300s_ttl() -> None:
-    """create() builds CreateCachedContentConfig(ttl='300s', system_instruction
-    =padded_body) and passes it to client.aio.caches.create."""
+def test_create_calls_caches_create_with_padded_body_and_3600s_ttl() -> None:
+    """create() builds CreateCachedContentConfig(ttl='3600s',
+    system_instruction=padded_body) and passes it to client.aio.caches.create.
+    """
     client = _mk_client(["cachedContents/A"])
     cache = GeminiContextCache(client=client, system_instruction_body="hi")
     asyncio.run(cache.create())
     assert client.aio.caches.create.call_args is not None
     cfg = client.aio.caches.create.call_args.kwargs["config"]
-    assert cfg.ttl == "300s"
+    assert cfg.ttl == "3600s"
     assert cfg.system_instruction == cache.padded_body()
 
 
@@ -165,87 +220,50 @@ def test_invalidate_no_op_when_never_created() -> None:
     client.aio.caches.delete.assert_not_called()
 
 
-# ---------- refresh_loop() — atomic swap + graceful degradation ----------
+# ---------- refresh() — atomic swap + graceful degradation ----------
 
 
-def test_refresh_loop_atomic_swap() -> None:
-    """At refresh tick: create() returns a new name; current_name flips A→B
-    AFTER create completes; delete called with old name 'A'."""
+def test_refresh_atomic_swap_new_name_then_delete_old() -> None:
+    """refresh() creates a new cache, flips current_name A → B, then
+    best-effort deletes the OLD name 'A' (atomic-swap order: new-before-old).
+    """
     client = _mk_client(["cachedContents/A", "cachedContents/B"])
-    cache = GeminiContextCache(
-        client=client, system_instruction_body="hi", refresh_s=0.05
-    )
+    cache = GeminiContextCache(client=client, system_instruction_body="hi")
 
-    async def _drive() -> None:
-        await cache.create()  # initial → A
-        assert cache.current_name() == "cachedContents/A"
-        stop = asyncio.Event()
-        loop_task = asyncio.create_task(cache.refresh_loop(stop))
-        # wait long enough for one refresh tick (refresh_s=0.05 → ~0.15s safe)
-        await asyncio.sleep(0.15)
-        stop.set()
-        try:
-            await asyncio.wait_for(loop_task, timeout=1.0)
-        except asyncio.TimeoutError:
-            loop_task.cancel()
-
-    asyncio.run(_drive())
+    asyncio.run(cache.create())  # initial → A
+    assert cache.current_name() == "cachedContents/A"
+    asyncio.run(cache.refresh())  # → B + delete(A)
     assert cache.current_name() == "cachedContents/B"
-    # delete called with the OLD name "A" (atomic swap: new created BEFORE
-    # old deleted).
     delete_calls = client.aio.caches.delete.call_args_list
     assert any(c.kwargs.get("name") == "cachedContents/A" for c in delete_calls), (
         f"refresh did not delete old name; delete_calls={delete_calls!r}"
     )
 
 
-def test_refresh_loop_keeps_old_on_create_failure() -> None:
-    """create() raising on refresh keeps the old _current_name AND does NOT
-    fire delete for the old name."""
+def test_refresh_handles_create_failure_keeps_old() -> None:
+    """refresh() create-failure path: re-raises so the caller can log, BUT
+    leaves current_name on the OLD value (graceful degradation — the cache
+    never goes None mid-session from a refresh failure)."""
     client = _mk_client(
         ["cachedContents/A", RuntimeError("simulated create failure")]
     )
-    cache = GeminiContextCache(
-        client=client, system_instruction_body="hi", refresh_s=0.05
-    )
-
-    async def _drive() -> None:
-        await cache.create()  # → A
-        stop = asyncio.Event()
-        loop_task = asyncio.create_task(cache.refresh_loop(stop))
-        await asyncio.sleep(0.15)
-        stop.set()
-        try:
-            await asyncio.wait_for(loop_task, timeout=1.0)
-        except asyncio.TimeoutError:
-            loop_task.cancel()
-
-    asyncio.run(_drive())
+    cache = GeminiContextCache(client=client, system_instruction_body="hi")
+    asyncio.run(cache.create())  # → A
+    with pytest.raises(RuntimeError, match="simulated create failure"):
+        asyncio.run(cache.refresh())
     # Old cache still current — graceful degradation.
     assert cache.current_name() == "cachedContents/A"
-    # delete was NOT called (old name preserved on create failure).
+    # delete was NOT called — old preserved on create failure.
     client.aio.caches.delete.assert_not_called()
 
 
-def test_refresh_loop_stops_on_stop_event() -> None:
-    """stop_event.set() inside the wait → loop exits within 1s."""
+def test_refresh_with_no_prior_create_creates_first_cache() -> None:
+    """refresh() called before any create(): old_name is None, so we just
+    create the new cache and skip the delete. current_name flips None → A."""
     client = _mk_client(["cachedContents/A"])
-    cache = GeminiContextCache(
-        client=client, system_instruction_body="hi", refresh_s=10.0
-    )
-
-    async def _drive() -> bool:
-        await cache.create()
-        stop = asyncio.Event()
-        loop_task = asyncio.create_task(cache.refresh_loop(stop))
-        await asyncio.sleep(0.05)  # let loop enter the wait
-        stop.set()
-        try:
-            await asyncio.wait_for(loop_task, timeout=1.0)
-            return True
-        except asyncio.TimeoutError:
-            loop_task.cancel()
-            return False
-
-    exited_cleanly = asyncio.run(_drive())
-    assert exited_cleanly, "refresh_loop did not exit within 1s of stop_event.set()"
+    cache = GeminiContextCache(client=client, system_instruction_body="hi")
+    assert cache.current_name() is None
+    asyncio.run(cache.refresh())
+    assert cache.current_name() == "cachedContents/A"
+    # No old name to delete.
+    client.aio.caches.delete.assert_not_called()
