@@ -12,8 +12,17 @@ import {
   showCitationTooltip,
   type CitationTooltipPayload,
 } from "./components/citation-tooltip.js";
+import {
+  mountEarTestToggle,
+  type EarTestSubmission,
+} from "./components/ear-test-toggle.js";
 import { showErrorBanner } from "./components/error-banner.js";
 import { DebriefWsClient } from "./ws-client.js";
+
+// Type-only re-export so external callers can reference the submission
+// shape via the debrief-window module surface (mirrors the
+// CitationTooltipPayload re-export pattern used elsewhere).
+export type { EarTestSubmission };
 
 // ---------------------------------------------------------------------------
 // Bootstrap
@@ -34,6 +43,7 @@ const chaptersEl = document.getElementById("vmx-debrief-chapters");
 const drillsEl = document.getElementById("vmx-debrief-drills-list");
 const tldrEl = document.getElementById("vmx-debrief-tldr-player");
 const waveformEl = document.getElementById("vmx-debrief-waveform");
+const earTestToggleEl = document.getElementById("vmx-debrief-ear-test-toggle");
 
 if (!sessionDir) {
   if (errorBanner) {
@@ -46,8 +56,29 @@ if (!sessionDir) {
   let totalDurationS = 0;
 
   client.addEventListener("session-loaded", (e: Event) => {
-    const detail = (e as CustomEvent).detail as { duration_s: number };
+    const detail = (e as CustomEvent).detail as {
+      duration_s: number;
+      genre?: string;
+    };
     totalDurationS = detail.duration_s;
+    // Plan 42-03 — mount the ear-test toggle once the session loads so
+    // the form has a real duration_s for the submission payload.
+    if (earTestToggleEl) {
+      mountEarTestToggle(
+        earTestToggleEl,
+        {
+          session_id: sessionId,
+          duration_s: totalDurationS,
+          genre: detail.genre ?? "other",
+        },
+        {
+          errorBannerEl: errorBanner,
+          wsSink: {
+            send: (msg) => client.sendEarTestSubmit(msg.payload),
+          },
+        },
+      );
+    }
   });
 
   client.addEventListener("chapter-list", (e: Event) => {

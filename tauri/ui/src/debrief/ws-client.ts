@@ -77,6 +77,19 @@ export class DebriefWsClient extends EventTarget {
     this.ws.send(JSON.stringify(frame));
   }
 
+  // Plan 42-03 — dev-mode fallback path for ear-test sign-off. In real
+  // desktop builds the Tauri IPC channel handles writes; this WS path
+  // is exercised by `npm run dev` only.
+  sendEarTestSubmit(payload: Record<string, unknown>): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    const frame = {
+      type: "ipc.debrief.ear-test-submit",
+      ts: new Date().toISOString(),
+      payload,
+    };
+    this.ws.send(JSON.stringify(frame));
+  }
+
   close(): void {
     if (this.ws) {
       this.ws.onopen = null;
