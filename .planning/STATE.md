@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: verifying
-last_updated: "2026-05-16T15:00:14.617Z"
+status: Wave 3 in flight — 42-04 closes GATE-06 (hybrid release gate plumbing wired into cut_release.sh)
+last_updated: "2026-05-16T18:33:00.000Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 19
-  completed_plans: 15
-  percent: 33
+  completed_plans: 18
+  percent: 36
 ---
 
 # vibemix — State
@@ -35,8 +35,8 @@ progress:
 ## Current Position
 
 Phase: 42 — Hallucination Gate v3 Hybrid (in progress)
-Plan: 42-01 + 42-03 complete; 42-02 / 42-04 / 42-05 / 42-06 outstanding
-Status: Wave 2 in flight — 42-03 closes GATE-05 (protocol) + GATE-07 (capture surface)
+Plan: 42-01 + 42-02 + 42-03 + 42-04 complete; 42-05 / 42-06 outstanding
+Status: Wave 3 in flight — 42-04 closes GATE-06 (hybrid release gate plumbing wired into cut_release.sh)
 Last activity: 2026-05-16
 
 ## Performance Metrics
@@ -151,6 +151,7 @@ All 11 critical pitfalls (P42–P52) mitigated in shipped code. P46 (legal-capac
 
 ### Last Session
 
+- 2026-05-16 — Plan 42-04 complete: `scripts/release/check_gate.sh` (hybrid hallucination gate combining last-7 nightly proxy scorecards from `.planning/eval-runs/` AND `check_ear_test.sh`) + wired Gate 2b into `scripts/launch/cut_release.sh` + retired v2.1 P85 reminder echo lines. 22 tests added (14 bash-gate + 8 cut_release wire-in; 21 pass + 1 conditional jq-missing skip). Phase 39 regression baselines preserved (test_g5_poc_files_untouched + test_bundle_id_locked green; verify_signed.py call still in Gate 2). Closes GATE-06 (hybrid release gate plumbing); GATE-08 partially advanced (echo-line removal; Plan 42-05 owns the test-file retirement + P85-OVERRIDE-RETIRED.md decision-log). Commits: 4a77b4d + c204318.
 - 2026-05-16 — Plan 42-03 complete: ear-test protocol doc + JSON Schema + Python capture writer + Phase 29 debrief toggle UI + `check_ear_test.sh` release gate + §GATE-05 Kaan-discharge runbook. 41 tests added (40 pass + 1 conditional jq-missing skip); Phase 29 105-test debrief suite still green. Closes GATE-05 (protocol) + GATE-07 (capture); unblocks Plan 42-04 `check_gate.sh` Gate-2.
 - 2026-05-16 — v2.1 The Unified Cut SHIPPED + archived via `/gsd:complete-milestone`. 13 phases shipped engineering-green; 105/105 REQ-IDs satisfied; 5/5 integration seams WIRED. 15 carveouts in KAAN-ACTION-LEGAL.md. Local annotated git tag `v2.1.0` created (NOT pushed — Kaan publishes when ready). Status: `tech_debt` accepted per `gsd-autonomous fully` mode.
 - 2026-05-16 — Phase 39 verified + Phase 37 integration audit + Section 8 gsd-audit-milestone extension confirmed WIRED + tech_debt verdict. v2.1-MILESTONE-AUDIT.md frozen at 105/105 engineering satisfied.

@@ -40,7 +40,7 @@
 - [ ] **GATE-03**: 6 × 30-min public-domain DJ session WAVs in `git-LFS` corpus (close EVAL-CORPUS-WAVS — 200 MB)
 - [ ] **GATE-04**: Locked thresholds (F1≥0.80, substance≥0.65, cited-cosine≥0.40, bypass≤0.15, per-genre F1≥0.70) calibrated against real corpus on first canary run; recalibrate + re-sign if measured F1 outside ±0.10 locked range
 - [x] **GATE-05**: Ear-test protocol codified — 30min minimum per session, ≥2 genres, structured "what felt slop?" capture template in `eval/ear-test-logs/`; ear-pass requires ≥2 sessions ≥2 genres within 14d window
-- [ ] **GATE-06**: `scripts/release/check_gate.sh` cut-criteria implemented — reads last 7 nightly scorecards + signed ear-test log; SHIP-CUT gate-2 blocks unless both green
+- [x] **GATE-06**: `scripts/release/check_gate.sh` cut-criteria implemented — reads last 7 nightly scorecards + signed ear-test log; SHIP-CUT gate-2 blocks unless both green
 - [x] **GATE-07**: Debrief window exposes ear-test capture surface — "rate this session for release-gate" toggle writes `eval/ear-test-logs/<session>.json` with structured "felt slop / felt scripted / felt late / felt generic" payload
 - [ ] **GATE-08**: P85 override-expiry Decision Log entry committed — autonomous-only override formally terminated; `cut_release.sh` reminder lines removed; `test_phase_16_override_expiry.py` retired / refactored to enforce hybrid regime
 - [ ] **GATE-09**: `eval/README.md` public-facing — documents hybrid regime, threshold values, judge architecture; redacts ear-test log content while documenting protocol
