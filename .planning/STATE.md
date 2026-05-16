@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
 status: verifying
-last_updated: "2026-05-16T14:41:03.573Z"
+last_updated: "2026-05-16T15:00:14.617Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 19
-  completed_plans: 13
-  percent: 17
+  completed_plans: 15
+  percent: 33
 ---
 
 # vibemix — State
@@ -34,9 +34,9 @@ progress:
 
 ## Current Position
 
-Phase: 40 — Anti-Slop Audio Port (in progress)
-Plan: 40-01 / 40-02 / 40-05 / 40-06 complete (4 of 6 in Phase 40)
-Status: Phase complete — ready for verification
+Phase: 42 — Hallucination Gate v3 Hybrid (in progress)
+Plan: 42-01 + 42-03 complete; 42-02 / 42-04 / 42-05 / 42-06 outstanding
+Status: Wave 2 in flight — 42-03 closes GATE-05 (protocol) + GATE-07 (capture surface)
 Last activity: 2026-05-16
 
 ## Performance Metrics
@@ -60,6 +60,7 @@ Last activity: 2026-05-16
 ---
 | Phase 40 P04 | 11 | - tasks | - files |
 | Phase 41 P06 | 30min | 4 tasks | 8 files |
+| Phase 42 P03 | 14 | 3 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ Last activity: 2026-05-16
 - **Plan 40-01 — `AudioBuffer` reuse over new `MicAudioRing` class** (2026-05-16) — CONTEXT.md's `MicAudioRing` name was permitted but the PLAN `<interfaces>` + RESEARCH "Alternatives Considered" recommended verbatim `AudioBuffer(seconds=12.0, sr=INPUT_SR_TARGET)` reuse to match `cohost_v4.py:2257`. Anti-DRY subclass avoided.
 - **Plan 40-01 — Zero-fill at sounddevice callback boundary, not in `llm_node`** (2026-05-16) — Pitfall 1 (self-triggered KAAN_SPOKE loop) is real. Filtering in `llm_node` still lets the AI's own voice contaminate the mic ring. The callback-boundary zero-fill is load-bearing IP and keeps every downstream consumer clean. v4:2278-2296 verbatim pattern.
 - **Plan 40-01 — Three-gate Part 2 decision computed once per turn** (2026-05-16) — Snapshot + RMS reused for both prompt-suffix wording and structured log line. Avoids double-work on the LLM hot path.
+- **Plan 42-03 — `signed_by` enum locked to `[kaan]` at JSON Schema level** (2026-05-16) — Single-DJ regime is the v3.0 ship gate; cross-DJ sign-off requires schema bump + check_ear_test.sh update (deferred to v3.x per Plan 42 CONTEXT).
+- **Plan 42-03 — 30-min minimum enforced at JSON Schema level (`duration_s >= 1800`)** (2026-05-16) — Writer is the only producer of logs, so the bash gate trusts the schema rather than re-checking; avoids contract drift between writer + gate.
+- **Plan 42-03 — `schema.json` co-located with logs under `eval/ear-test-logs/`** (2026-05-16) — Writer + bash gate import paths stay trivially relative; bash gate skips `schema.json` by basename when globbing `*.json` so it does not pollute the log enumeration.
 
 ### Decisions Locked (v2.1 — shipped)
 
@@ -147,6 +151,7 @@ All 11 critical pitfalls (P42–P52) mitigated in shipped code. P46 (legal-capac
 
 ### Last Session
 
+- 2026-05-16 — Plan 42-03 complete: ear-test protocol doc + JSON Schema + Python capture writer + Phase 29 debrief toggle UI + `check_ear_test.sh` release gate + §GATE-05 Kaan-discharge runbook. 41 tests added (40 pass + 1 conditional jq-missing skip); Phase 29 105-test debrief suite still green. Closes GATE-05 (protocol) + GATE-07 (capture); unblocks Plan 42-04 `check_gate.sh` Gate-2.
 - 2026-05-16 — v2.1 The Unified Cut SHIPPED + archived via `/gsd:complete-milestone`. 13 phases shipped engineering-green; 105/105 REQ-IDs satisfied; 5/5 integration seams WIRED. 15 carveouts in KAAN-ACTION-LEGAL.md. Local annotated git tag `v2.1.0` created (NOT pushed — Kaan publishes when ready). Status: `tech_debt` accepted per `gsd-autonomous fully` mode.
 - 2026-05-16 — Phase 39 verified + Phase 37 integration audit + Section 8 gsd-audit-milestone extension confirmed WIRED + tech_debt verdict. v2.1-MILESTONE-AUDIT.md frozen at 105/105 engineering satisfied.
 - 2026-05-15 — Phases 27–38 shipped (waves of 1-3 phases per day per `gsd-autonomous fully` execution cadence).
