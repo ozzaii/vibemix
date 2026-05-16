@@ -30,7 +30,7 @@
 - [ ] **LAT-05**: Migration to Gemini 3.1 Flash TTS — 200+ audio tags, 300-500ms first chunk; expressive-tag DSL exposed in coach prompts (e.g. `[whisper]`, `[laugh]`, `[fast]`)
 - [ ] **LAT-06**: Gemini Embedding 2 GA migration + MRL 768-dim truncation in `sqlite-vec` / numpy index — Phase 28 library index 4× smaller on disk; bit-identical top-K parity test preserved
 - [ ] **LAT-07**: Flex inference tier routing for library indexing, debrief generation, eval-corpus replay (50% cost cut on batch paths); live coach stays Standard
-- [ ] **LAT-08**: `thinking_level=MINIMAL` (or `thinking=False`) enforced on live path — `LiveCoachClient` rejects override at runtime (avoids 7s+ TTFT regression)
+- [x] **LAT-08**: `thinking_level=MINIMAL` (or `thinking=False`) enforced on live path — `LiveCoachClient` rejects override at runtime (avoids 7s+ TTFT regression) — **Plan 41-03 GREEN**. `validate_live_config` in `src/vibemix/llm/thinking_gate.py`; wired at 3 call sites (`llm_factory.py:32`, `llm_factory.py:60`, `dj_cohost.py:294`); 18 tests; FLEX-on-live Pitfall 3 defense in same validator.
 - [x] **LAT-09**: 1-2 day Gemini 3.1 Flash Live spike with Proactive Audio enabled on real DJ clip — verdict written to `spikes/gemini-3-1-flash-live-music.md`; defer-to-v3.x toggle if it grounds, sealed-no if it doesn't
 
 ### Hallucination Gate v3 — Hybrid (GATE)
