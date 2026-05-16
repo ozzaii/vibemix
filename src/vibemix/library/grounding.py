@@ -30,7 +30,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from vibemix.library.embed import LibraryEmbedder
+from vibemix.library.embed import GEMINI_EMBEDDING_MODEL, LibraryEmbedder
 from vibemix.library.store import LibraryStore
 
 logger = logging.getLogger(__name__)
@@ -118,8 +118,9 @@ def identify_playing(
         # short (≤ 30s typical), well under the 180s cap.
         from google.genai import types as _types
 
+        # Plan 41-01: model id is router-derived via library.embed.
         result = embedder._client.models.embed_content(
-            model="gemini-embedding-2",
+            model=GEMINI_EMBEDDING_MODEL,
             contents=[_types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)],
             config=_types.EmbedContentConfig(output_dimensionality=768),
         )

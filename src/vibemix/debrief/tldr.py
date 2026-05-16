@@ -13,7 +13,9 @@ Both stages are guarded by typed exceptions so the orchestrator (Plan
 29-02) can surface ``DebriefError(reason="tldr_generation_failed")``
 without crashing the sidecar.
 
-Wave 0 A1 verdict: model id is ``gemini-3-pro-preview`` (not bare).
+Wave 0 A1 verdict: the full preview id is required (bare name → 404).
+The exact id is resolved via :func:`vibemix.llm.model_router.resolve`
+under the ``"debrief"`` path (Plan 41-01).
 Wave 0 A3 verdict: PyAV libmp3lame is in-process available; no system
 ffmpeg fallback required.
 """
@@ -25,6 +27,7 @@ import logging
 from typing import Any, Protocol
 
 from vibemix.debrief.stripper import strip_uncited_sentences
+from vibemix.llm.model_router import resolve
 
 __all__ = [
     "ACHIRD_VOICE_NAME",
@@ -41,9 +44,10 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-# Wave 0 A1: full preview id is required. Bare 'gemini-3-pro' → 404.
-DEBRIEF_TLDR_MODEL = "gemini-3-pro-preview"
-DEBRIEF_TTS_MODEL = "gemini-3-flash-tts-preview"
+# Wave 0 A1 verdict locked the preview ids; Plan 41-01 routes both through
+# vibemix.llm.model_router so a future SKU bump is a one-file edit.
+DEBRIEF_TLDR_MODEL = resolve("debrief")[0]
+DEBRIEF_TTS_MODEL = resolve("debrief_tts")[0]
 ACHIRD_VOICE_NAME = "Achird"
 
 # 150 wpm × (60-90s) bounds → 150-225 words target.

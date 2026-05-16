@@ -89,3 +89,62 @@ def test_pkg_01_all_exports_includes_required_names() -> None:
         "MIC_DEVICE",
     }
     assert expected.issubset(set(vagent.__all__))
+
+
+# ---------------------------------------------------------------------------
+# Plan 41-01 — ModelRouter dispatch (LAT-01, LAT-07)
+# ---------------------------------------------------------------------------
+
+
+def test_41_01_llm_model_matches_router() -> None:
+    """LLM_MODEL is router-derived (live_coach path)."""
+    from vibemix.llm.model_router import resolve
+
+    assert LLM_MODEL == resolve("live_coach")[0]
+
+
+def test_41_01_tts_model_matches_router() -> None:
+    """TTS_MODEL is router-derived (live_coach_tts path)."""
+    from vibemix.llm.model_router import resolve
+
+    assert TTS_MODEL == resolve("live_coach_tts")[0]
+
+
+def test_41_01_tts_fallback_model_matches_router() -> None:
+    """TTS_FALLBACK_MODEL is router-derived (live_coach_tts_fallback path)."""
+    from vibemix.llm.model_router import resolve
+
+    assert TTS_FALLBACK_MODEL == resolve("live_coach_tts_fallback")[0]
+
+
+def test_41_01_openrouter_tts_model_matches_router() -> None:
+    """OPENROUTER_TTS_MODEL is router-derived (live_coach_tts_openrouter path).
+
+    Backward-compat: the existing tts_chain monkey-patch consumes this
+    string by reference (via ``OPENROUTER_TTS_MODEL`` import), so the
+    AUDIO_STREAM_MODELS set in livekit.plugins.openai.tts still contains
+    the same string post-migration.
+    """
+    from livekit.plugins.openai import tts as openai_tts_mod
+
+    from vibemix.llm.model_router import resolve
+
+    assert OPENROUTER_TTS_MODEL == resolve("live_coach_tts_openrouter")[0]
+    # Importing vibemix.agent.tts_chain triggers the monkey-patch at module
+    # load. The string must still be in AUDIO_STREAM_MODELS afterwards.
+    import vibemix.agent.tts_chain  # noqa: F401 — module-load side effect
+
+    assert OPENROUTER_TTS_MODEL in openai_tts_mod.AUDIO_STREAM_MODELS
+
+
+def test_41_01_live_coach_service_tier_exposed() -> None:
+    """LIVE_COACH_SERVICE_TIER exposes the ServiceTier so callers that
+    need tier dispatch don't have to do a second resolve() call.
+
+    Per CONTEXT LAT-07: live_coach lives on the Standard tier.
+    """
+    from google.genai.types import ServiceTier
+
+    from vibemix.agent.config import LIVE_COACH_SERVICE_TIER
+
+    assert LIVE_COACH_SERVICE_TIER == ServiceTier.STANDARD

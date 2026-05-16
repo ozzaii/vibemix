@@ -24,18 +24,24 @@ from livekit.agents import tts as agents_tts
 from livekit.plugins import openai as openai_plugin
 from livekit.plugins.openai import tts as _openai_tts_mod
 
-# OpenRouter's Gemini TTS returns raw audio stream, not SSE. Force the
-# plugin's AudioChunkedStream path (used for tts-1) for our model.
-_openai_tts_mod.AUDIO_STREAM_MODELS.add("google/gemini-3.1-flash-tts-preview")
-
-from livekit.plugins.google.beta import gemini_tts as gemini_native_tts  # noqa: E402
-
+# Plan 41-01: import OPENROUTER_TTS_MODEL FIRST so the monkey-patch below
+# uses the router-derived constant rather than an inline literal. The v4
+# load-order invariant (monkey-patch before any openai_plugin.TTS init) is
+# preserved — `vibemix.agent.config` is import-safe and triggers no plugin
+# instantiation.
 from vibemix.agent.config import (  # noqa: E402
     OPENROUTER_TTS_MODEL,
     TTS_FALLBACK_MODEL,
     TTS_MODEL,
     VOICE,
 )
+
+# OpenRouter's Gemini TTS returns raw audio stream, not SSE. Force the
+# plugin's AudioChunkedStream path (used for tts-1) for our model.
+# Source string is the router-derived OPENROUTER_TTS_MODEL — never inline.
+_openai_tts_mod.AUDIO_STREAM_MODELS.add(OPENROUTER_TTS_MODEL)
+
+from livekit.plugins.google.beta import gemini_tts as gemini_native_tts  # noqa: E402
 
 _TTS_INSTRUCTIONS = "Casual studio friend, brief, natural — no theatrics, no announcer voice."
 

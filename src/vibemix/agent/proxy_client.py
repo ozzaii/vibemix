@@ -15,8 +15,8 @@ the proxy emits identical PCM body shape.
 from __future__ import annotations
 
 # Trigger the OpenRouter monkey-patch — load-bearing module-load side effect.
-# build_proxy_tts_chain relies on AUDIO_STREAM_MODELS containing
-# "google/gemini-3.1-flash-tts-preview".
+# build_proxy_tts_chain relies on AUDIO_STREAM_MODELS containing the
+# OpenRouter TTS model id (resolved via the model router; see tts_chain.py).
 import vibemix.agent.tts_chain  # noqa: F401  isort: skip
 from google import genai
 from google.genai import types

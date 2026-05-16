@@ -29,8 +29,10 @@ LIBRARY-04 + LIBRARY-10 hold because this module cannot bypass the proxy.
 # Critical corrections (Phase 28 RESEARCH Open Qs)
 ===============================================
 
-- Model ID is ``gemini-embedding-2`` (Open Q9 — earlier text-only
-  embedding-0xx series is superseded and CONTEXT was stale).
+- Model ID resolved via ``vibemix.llm.model_router.resolve("embedding")``
+  (Plan 41-01). Open Q9 verified the legacy text-only embedding-0xx
+  series is superseded and CONTEXT was stale; see ``_router_config.py``
+  for the live id.
 - Cache DB path is ``~/.cache/vibemix/embeddings.db`` — distinct from
   Plan 02's ``library.db`` (vec0 store) and Phase 25's ``library.pkl``
   (Rekordbox parsed cache).
@@ -53,6 +55,7 @@ from google.genai import types
 
 from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
 from vibemix.library.rekordbox import TrackEntry
+from vibemix.llm.model_router import resolve
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +63,10 @@ logger = logging.getLogger(__name__)
 # ─── Locked constants ──────────────────────────────────────────────────────────
 
 # Open Q9 — Gemini Embedding 2 supersedes the legacy text-only embedding series.
-GEMINI_EMBEDDING_MODEL = "gemini-embedding-2"
+# Plan 41-01: resolved via the model router (path: "embedding"). CRITICAL —
+# this id flows into the LibraryEmbedder cache-key SHA256. Any model rename
+# MUST be coordinated with EXCERPT_STRATEGY_VERSION (Plan 41-05 owns that).
+GEMINI_EMBEDDING_MODEL = resolve("embedding")[0]
 
 # Bump to invalidate ALL cached embeddings. Format: vN-<strategy-name>.
 EXCERPT_STRATEGY_VERSION = "v1-3excerpt-mean"

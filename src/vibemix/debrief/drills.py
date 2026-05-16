@@ -24,6 +24,7 @@ try:
 except ImportError:  # pragma: no cover — pydantic should be installed
     raise
 
+from vibemix.llm.model_router import resolve
 from vibemix.state.evidence_registry import EVIDENCE_CITATION_RE
 
 __all__ = [
@@ -36,7 +37,9 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-DEBRIEF_DRILLS_MODEL = "gemini-3-pro-preview"
+# Plan 41-01: shares the debrief router path with tldr — both run on
+# Flex 3-Pro per CONTEXT.md LAT-07.
+DEBRIEF_DRILLS_MODEL = resolve("debrief")[0]
 
 # How tight the citation→snapshot lookup is. Phase 20 ``mode="debrief"``
 # tolerance is ±2.0s.
