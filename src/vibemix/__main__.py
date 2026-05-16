@@ -77,6 +77,8 @@ from vibemix.audio import (
     INPUT_SR_NATIVE,
     INPUT_SR_TARGET,
     INVOKE_AUDIO_SECONDS,
+    LOOKAHEAD_SECONDS,
+    LOOKAHEAD_WINDOW_SECONDS,
     MIC_GAIN,
     MIC_GAIN_AT_AI_TALK,
     MUSIC_GAIN_TO_GEMINI,
@@ -87,6 +89,7 @@ from vibemix.audio import (
     AudioBuffer,
     BufferRegistry,
     Levels,
+    LookaheadProvider,
     MicBuffer,
     PassthroughBuffer,
     PlaybackQueue,
@@ -455,6 +458,19 @@ async def main() -> None:
     # the ring has signal. Zero-filled during AI talk in the callback to
     # prevent self-triggered KAAN_SPOKE loops (Pitfall 1).
     mic_audio_buf = AudioBuffer(seconds=12.0, sr=INPUT_SR_TARGET)
+    # Plan 40-03 (AUDIO-02 + AUDIO-04) — source-file lookahead provider.
+    # Per-session lifecycle: the title→path Spotlight cache + extrapolation-
+    # guard state live for the whole DJ session (RESEARCH Open Question 3
+    # resolution). The agent consumes via ``self._lookahead.snapshot_wav()``
+    # in llm_node and conditionally appends Part 3 to the multimodal
+    # contents list, labeled "NOT YET HEARD BY AUDIENCE" per locked
+    # CONTEXT.md Q2.
+    lookahead_provider = LookaheadProvider()
+    print(
+        f"-> lookahead: +{LOOKAHEAD_SECONDS:.1f}s @ "
+        f"{LOOKAHEAD_WINDOW_SECONDS:.0f}s window "
+        f"(degrades silently on streaming tracks)"
+    )
 
     # Phase 15 — boot-time crashed-session sweep. Walks recordings_root for
     # session.json files whose ended_at_iso is None AND mtime older than
@@ -733,6 +749,13 @@ async def main() -> None:
         # the ring has signal. None default preserves byte-identical
         # 1-Part path; the wired-in instance enables the 2-Part contract.
         mic_audio_buf=mic_audio_buf,
+        # Plan 40-03 / AUDIO-02 + AUDIO-04 — source-file lookahead provider.
+        # Per-session lifecycle: instantiated once above; the title→path
+        # cache + extrapolation guard state persist for the whole session.
+        # Consumed by DJCoHostAgent.llm_node via ``snapshot_wav()`` which
+        # returns ``(None, meta)`` on every failure path — the agent's
+        # try/except wrapper double-belts that contract (T-40-03-02).
+        lookahead=lookahead_provider,
     )
 
     # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──
