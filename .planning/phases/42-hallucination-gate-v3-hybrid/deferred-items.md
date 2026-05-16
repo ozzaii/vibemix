@@ -39,3 +39,23 @@ the existing `citation-tooltip.ts` and `chapter-list.ts` patterns.
 **Disposition:** Smoke verification per the plan was the grep-check (passed —
 `mountEarTestToggle` + `EarTestSubmission` both visible). CI will run the full
 `check:ipc` on PR. No follow-up needed in repo.
+
+---
+
+## Plan 42-05 — README feature-matrix pre-existing drift
+
+**Test:** `tests/repo/test_readme_feature_matrix_sync.py::test_readme_feature_matrix_in_sync`
+
+**Failure:** `README.md feature matrix out of sync. Run
+`python scripts/launch/sync_feature_matrix.py --write`.`
+
+**Pre-existing:** Drift dates from before Plan 42-05 — verified by
+`git stash && pytest && git stash pop` cycle showing the same failure with the
+plan's test file removed from disk. Plan 42-05 touches neither `README.md` nor
+`scripts/launch/sync_feature_matrix.py` nor anything routed through the feature
+matrix code path.
+
+**Disposition:** Out of scope for Plan 42-05 (SCOPE BOUNDARY rule — pre-existing
+failures in unrelated files are out of scope). Closure path: a future docs /
+chore plan can run `python scripts/launch/sync_feature_matrix.py --write` to
+flush the regenerated matrix into README.md.

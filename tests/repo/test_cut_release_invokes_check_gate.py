@@ -10,8 +10,11 @@ Pins the Phase 42 hybrid-gate plumbing decisions:
     - The success-path reminder block now references ``[GATE-06]`` and
       the hybrid gate.
     - ``scripts/release/check_gate.sh`` exists and is executable.
-    - Plan-boundary: ``tests/repo/test_phase_16_override_expiry.py``
-      still exists (its retirement is Plan 42-05).
+    - Plan-boundary (retired): the original 42-04 sanity that
+      ``tests/repo/test_phase_16_override_expiry.py`` still existed has
+      been replaced by Plan 42-05 — see
+      ``tests/repo/test_gate_42_hybrid_in_force.py``
+      ``test_expiry_test_file_actually_deleted`` for the inverse pin.
 """
 
 from __future__ import annotations
@@ -24,7 +27,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CUT_RELEASE = REPO_ROOT / "scripts" / "launch" / "cut_release.sh"
 CHECK_GATE = REPO_ROOT / "scripts" / "release" / "check_gate.sh"
-PHASE_16_OVERRIDE_TEST = REPO_ROOT / "tests" / "repo" / "test_phase_16_override_expiry.py"
 
 
 def _read_script() -> str:
@@ -149,15 +151,12 @@ def test_check_gate_script_exists_and_executable():
 # ---------------------------------------------------------------------------
 # Plan boundary — Plan 42-05 retires the v2.1 override expiry test
 # ---------------------------------------------------------------------------
-
-
-def test_p85_test_file_not_yet_deleted_in_this_plan():
-    """Sanity that Plan 42-04 did NOT delete ``tests/repo/test_phase_16_override_expiry.py``
-    — that retirement is Plan 42-05's job. Pins the plan boundary so a
-    Plan 04 change cannot creep into Plan 05's scope.
-    """
-    assert PHASE_16_OVERRIDE_TEST.is_file(), (
-        "tests/repo/test_phase_16_override_expiry.py is gone — its "
-        "retirement belongs to Plan 42-05, not Plan 42-04. Restore it "
-        "and route the deletion through Plan 42-05."
-    )
+#
+# The original 42-04 sanity test ``test_p85_test_file_not_yet_deleted_in_this_plan``
+# pinned that ``tests/repo/test_phase_16_override_expiry.py`` still existed at
+# 42-04's commit time. Plan 42-05 deletes the expiry test as planned, so the
+# sanity check is now stale (it would self-fail after 42-05 merges). The
+# deletion happened in Plan 42-05 commit 3c2daa5; the replacement positive-
+# assertion test is ``tests/repo/test_gate_42_hybrid_in_force.py`` (see
+# ``test_expiry_test_file_actually_deleted`` therein, which pins the same
+# absence in the opposite direction).
