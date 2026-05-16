@@ -19,8 +19,8 @@ gates the session surface ship.
 | --------------- | ---------------------------------------------------------------------------- | ------------------ | ----------------- |
 | session         | `tauri/ui/src/session/SessionLayout.ts`                                      | 43-02              | seeded            |
 | mascot-overlay  | `tauri/ui/src/overlay/overlay-runtime.ts` + `tauri/ui/src/mascot/renderer.ts`| 43-02              | pending           |
-| wizard          | `tauri/ui/src/wizard/onboarding-flow.ts`                                     | 43-03              | pending           |
-| calibration     | `tauri/ui/src/wizard/step1-permissions.ts` + `step2-output-device.ts`        | 43-03              | pending           |
+| wizard          | `tauri/ui/src/wizard/onboarding-flow.ts`                                     | 43-03              | zero-HIGH         |
+| calibration     | `tauri/ui/src/wizard/step1-permissions.ts` + `step2-output-device.ts`        | 43-03              | zero-HIGH         |
 
 **Status values:** `pending` (no audit run yet) → `seeded` (43-01 first pass
 findings landed) → `iteration-N` (closure plan running) → `zero-HIGH`
@@ -78,8 +78,13 @@ CDJ Whisper baseline characteristics (do NOT redesign; enforce):
   closed by 43-02. 3 HIGH + 3 MEDIUM + 2 LOW findings at iteration 0.
 - `UI-REVIEW-mascot-overlay.md` — to be seeded by 43-02 (the closure
   plan also seeds its second surface before iterating).
-- `UI-REVIEW-wizard.md` — to be seeded by 43-03.
-- `UI-REVIEW-calibration.md` — to be seeded by 43-03.
+- [`UI-REVIEW-wizard.md`](./UI-REVIEW-wizard.md) — seeded + closed by
+  43-03 (iteration 2 verdict PASS). 3 HIGH (all closed by Task 1 commit
+  7234a91) + 3 MEDIUM (deferred to v3.1) + 2 LOW.
+- [`UI-REVIEW-calibration.md`](./UI-REVIEW-calibration.md) — seeded +
+  closed by 43-03 (iteration 2 verdict PASS). 3 HIGH (all closed,
+  including T-43-03-02 STRIDE mitigation) + 2 MEDIUM (deferred to v3.1)
+  + 2 LOW.
 
 The driver script writes these filenames verbatim:
 
