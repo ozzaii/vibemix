@@ -15,6 +15,18 @@ Phase 43 / VIS-09 — Index for the Francesco capture-day handoff package.
 | [`AUDIO-CAPTURE.md`](./AUDIO-CAPTURE.md) | 3-track capture plan (Gemini-voice + ambient + headphone-return) + clapboard sync + AV spec. |
 | [`DEMO-MODE-CONFIG.md`](./DEMO-MODE-CONFIG.md) | Demo-mode deterministic 30-event sequence + reset workflow + AV spec. |
 
+## Launch orchestration
+
+Added by **Phase 44** (LAUNCH-09 + LAUNCH-10) — the day-of synchronization
+spine for the v1 ship. The Phase 43 capture-day docs above are the
+upstream prerequisites; the docs below are what Kaan + Francesco actually
+work from once the demo cut is locked.
+
+| Doc | Purpose |
+|-----|---------|
+| [`OUTREACH-CALENDAR.md`](./OUTREACH-CALENDAR.md) | LAUNCH-09 — 3 editorial pitches (DJ TechTools / DDJ Tips / Mixmag) + 3 subreddit cross-posts (r/DJs / r/Beatmatch / r/edmproduction) + 1 DJ TechTools Discord T-3 soft-launch slot. Each entry carries a 4-state status checkbox. |
+| [`LAUNCH-SEQUENCE.md`](./LAUNCH-SEQUENCE.md) | LAUNCH-10 — T-7 → T+30 timeline (T-7 pre-seed stars, T-3 Discord soft-launch, T-0 Show HN + cross-post + outreach fires, T+24h monitoring rotation, T+72h Substack draft, T+7d transparency post, T+30 SHIP-V1-DECISION review). Every row cross-links the ROADMAP phase + `KAAN-ACTION-LEGAL §LAUNCH-*` runbook it depends on. |
+
 ## Cross-references
 
 - **Storyboard mock (the 8 `data-cut` frames):** `mocks/vibemix-cinematic-storyboard.html`
