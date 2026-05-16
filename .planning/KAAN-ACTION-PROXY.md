@@ -25,3 +25,56 @@ Items deferred from autonomous execution that require Kaan's ear, eyes, or proxy
 ---
 
 How to clear an item: post the result (verdict + date) inline above and remove the entry, or move to `.planning/audits/RESOLVED.md` if the project wants a historical log.
+
+---
+
+## Phase 41 (Gemini SKU Upgrade + Latency Stack v2)
+
+## §LAT-09 — Gemini 3.1 Flash Live spike investigation
+
+**Status:** scaffolded; discharge pending
+**Scaffold landed:** Phase 41 Plan 41-06 (2026-05-16)
+**Verdict file:** `spikes/gemini-3-1-flash-live-music.md`
+
+### Why
+CONTEXT.md locks: "default cascade unchanged for v3.0 regardless of spike
+outcome." The spike validates whether Gemini 3.1 Flash Live + Proactive Audio
+is music-grounding-suitable enough to become a v3.x opt-in toggle. The
+research framework + verdict template are scaffolded; only a real DJ clip
++ Kaan's ear produces the verdict.
+
+### How to discharge
+
+1. Ensure `GEMINI_API_KEY` is set in environment.
+2. Connect a real DJ source (djay Pro / Rekordbox / Mixxx) feeding BlackHole
+   at 48kHz — same pre-flight as a normal vibemix session.
+3. Cue up a 5-min representative DJ clip: techno around 124 BPM, includes
+   2 transitions + 1 phrase shift (matches research clip recommendation).
+4. Run:
+   ```
+   python -m spikes.scripts.run_live_spike --duration-s 300
+   ```
+   Output: `spikes/recordings/spike_<UTC-timestamp>.wav` + `.metrics.json`
+5. Listen to the recording offline. Note hallucinations, grounding failures,
+   feel of latency vs cascade baseline. Compare against the v4 cascade
+   "harikaydı" feel (Phase 40 baseline).
+6. Fill in `spikes/gemini-3-1-flash-live-music.md`:
+   - Measurements section: paste numbers from `.metrics.json`
+   - Anti-Hallucination Behavior: verbatim transcript samples
+   - Session Cap Workaround Status: did session hit 15-min cap? — relevant
+     only if running > 15min duration
+   - Verdict: check ONE box (defer-to-v3.x toggle OR sealed-no)
+   - Rationale: 2–3 sentence ear notes
+7. Flip status field from `engineering-scaffolded` → `verdict-written`.
+8. Commit verdict file.
+
+### Expected time
+1–2 hours total (5 min spike + 30 min offline listen + 30 min verdict writeup).
+
+### Acceptance criteria
+- `spikes/gemini-3-1-flash-live-music.md` status field == `verdict-written`
+- All 6 sections filled (no blanks; "n/a — short spike" acceptable for
+  Session Cap Workaround Status when duration ≤ 15 min)
+- Verdict box checked (exactly one of two options)
+- Recording file filed under `spikes/recordings/` (git-LFS if > 50 MB) —
+  commit only at Kaan's discretion per privacy stance on session audio
