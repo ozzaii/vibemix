@@ -10,15 +10,26 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current State
+## Current Milestone: v3.0 — Clean OSS Ship
 
-**Last shipped:** v2.1 "The Unified Cut" — 2026-05-16 (status: `tech_debt` accepted per `gsd-autonomous fully` mode).
+**Goal:** Ship vibemix as a clean, useful, value-bringing open-source product — 500-1000+ GitHub stars in 30 days, warm the Bravoh waitlist, anti-slop credibility lock.
 
-**Next milestone:** _none active_ — run `/gsd:new-milestone` to scaffold v2.2.
+**Target features:**
 
-**Phase numbering** continues from Phase 40 in the next milestone (default; no `--reset-phase-numbers`).
+- Anti-slop audio path port — mic-as-2nd-Gemini-Part + 3s file-based source-track lookahead + cooldown re-tune to v4 chat-tested values; pre-stage independent KAAN-ACTION items (PGP key, Tauri updater key, BlackHole fresh-Mac probe)
+- Gemini SKU upgrade + latency stack v2 — `ModelRouter` seam, implicit caching, LLM→TTS pipe-through, 3.1 Flash TTS, Embedding 2 GA + MRL 768-dim, Flex tier for batch paths; 3.1 Flash Live music spike
+- Hallucination gate v3 — hybrid (Phase 27 autonomous proxy fast-lane + Kaan-ear release-cut veto); P85 override formally retired; corpus + thresholds calibrated against real audio
+- Visual ship lock — CDJ Whisper UI Tier-1 polish (gsd-ui-checker + auditor zero-HIGH); 5 mascot stub animations → real Mixamo retargets; hero demo pre-production
+- Launch positioning + pre-stage — README "the only AI co-host that actually listens to your set" frontload + EvidenceRegistry citation strip in live UI + DJ-app + controllers grid + bravoh GH org standup + 5-channel copy lock + outreach calendar
+- Public RC publish via external clock discharge — Apple Dev Agreement (Francesco) + SignPath OSS (Kaan) → DIST-19 sign+verify → VM matrix → SHIP-CUT v3.0.0-rc1 → SHIP-V1-DECISION after ~2-week bake
 
-**Critical path to public ship:** KAAN-ACTION-LEGAL discharge — Apple Developer Program Agreement update (Francesco, P46) + SignPath OSS Foundation application (Kaan, ~1-week SLA, P46) gate the RC publish. Phase 39 §SHIP customer-facing publishes + §POST-RC-CLEANUP NEVER autonomously discharged. Engineering is shippable; the external clock is the bottleneck.
+**Phase numbering:** Continues from Phase 40 (P40-P45). v2.1 ended at Phase 39.
+
+**Critical path:** Apple Dev Agreement (Francesco) + SignPath OSS (Kaan, ~1-week SLA) gate the public RC publish in Phase 45. P40-P44 engineering parallelizes around the external clock — when approvals land, SHIP-CUT is one-button.
+
+**Research basis:** `.planning/research/v3-buckets/{A-external-world, B-gemini-capabilities, C-internal-state, D-gate-and-visual}.md` — 4-bucket parallel swarm 2026-05-16.
+
+(v2.1 "The Unified Cut" shipped 2026-05-16, status `tech_debt`. v2.0 shipped 2026-05-14. v0.1.0 shipped 2026-05-13. Full archives in `.planning/milestones/`.)
 
 <details>
 <summary>📦 v2.1 The Unified Cut (shipped 2026-05-16, status <code>tech_debt</code>) — archived narrative</summary>
@@ -281,4 +292,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-16 — milestone v2.1 "The Unified Cut" SHIPPED + archived via `/gsd:complete-milestone` (status: `tech_debt` accepted — KAAN-ACTION-LEGAL discharge pending public RC publish). Next: `/gsd:new-milestone` for v2.2.*
+*Last updated: 2026-05-16 — v3.0 "Clean OSS Ship" milestone scaffolded via `/gsd:new-milestone` after 4-bucket research swarm. 6 phases (P40-P45), 57 REQ-IDs. Critical path: Apple Dev Agreement (Francesco) + SignPath OSS (Kaan) gate public RC publish in P45. P40-P44 engineering parallelizes around the external clock.*
