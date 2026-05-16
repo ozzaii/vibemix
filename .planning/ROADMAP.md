@@ -42,7 +42,7 @@
 ```
 Plans:
 - [ ] 40-01-PLAN.md — Mic as 2nd Gemini Part + ring buffer + AI-talk zero-fill (AUDIO-01)
-- [ ] 40-02-PLAN.md — LookaheadProvider port from cohost_v4_tr.py (AUDIO-02)
+- [x] 40-02-PLAN.md — LookaheadProvider port from cohost_v4_tr.py (AUDIO-02) — GREEN; per-session provider with ffmpeg + mdfind + nowplaying-cli pipeline, 8 hermetic tests, graceful-degrade on streaming-only sources
 - [ ] 40-03-PLAN.md — 3rd Gemini Part wire-in + 'NOT YET HEARD' prompt labeling (AUDIO-02, AUDIO-04)
 - [ ] 40-04-PLAN.md — Event cooldown re-tune + replay-harness --print-cooldowns (AUDIO-03)
 - [x] 40-05-PLAN.md — PGP + Tauri updater key pre-stage scaffolding (AUDIO-05, AUDIO-06) — engineering pre-stage GREEN; Kaan-discharge runbooks in `KAAN-ACTION-LEGAL.md`

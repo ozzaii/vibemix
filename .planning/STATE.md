@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
 status: in_progress
-last_updated: "2026-05-16T13:30:00Z"
-last_activity: 2026-05-16 -- Plan 40-05 GREEN (engineering pre-stage for AUDIO-05 PGP + AUDIO-06 Tauri updater key). Two dual-mode gate tests; both Kaan-discharge runbooks scaffolded in KAAN-ACTION-LEGAL.md. 4 commits.
+last_updated: "2026-05-16T14:30:00Z"
+last_activity: 2026-05-16 -- Plan 40-02 GREEN (LookaheadProvider port from cohost_v4_tr.py:624-770). 3s file-based anti-slop lookahead — nowplaying-cli + mdfind + ffmpeg pipeline; (None, meta) graceful degrade on every failure path; 8 hermetic tests pass. 2 commits (RED test + GREEN feat).
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 6
-  completed_plans: 1
-  percent: 16
+  completed_plans: 2
+  percent: 33
 ---
 
 # vibemix — State
@@ -35,9 +35,9 @@ progress:
 ## Current Position
 
 Phase: 40 — Anti-Slop Audio Port (in progress)
-Plan: 40-05 complete (PGP + Tauri updater key pre-stage scaffolding)
-Status: 1 / 6 plans complete in Phase 40 (40-05 GREEN — AUDIO-05 + AUDIO-06 engineering pre-stage shipped). Awaiting parallel execution of remaining 5 plans (40-01 / 40-02 / 40-03 / 40-04 / 40-06).
-Last activity: 2026-05-16 -- Plan 40-05 executed (engineering pre-stage scaffolding for KAAN-ACTION discharges AUDIO-05 PGP + AUDIO-06 Tauri updater key). 4 commits + 1 SUMMARY. Two dual-mode gate tests added (`tests/security/test_pgp_published.py` + `tests/tauri/test_updater_key_rotated.py`); both pre-discharge GREEN (11 passed + 2 skipped). Kaan-discharge runbooks documented in `KAAN-ACTION-LEGAL.md §AUDIO-05` + `§AUDIO-06`.
+Plan: 40-02 complete (LookaheadProvider port)
+Status: 2 / 6 plans complete in Phase 40 (40-05 + 40-02 GREEN). Awaiting parallel execution of remaining 4 plans (40-01 / 40-03 / 40-04 / 40-06).
+Last activity: 2026-05-16 -- Plan 40-02 executed (LookaheadProvider verbatim port from `cohost_v4_tr.py:624-770` into `src/vibemix/audio/lookahead.py`). 3s file-based anti-slop lookahead pipeline: `nowplaying-cli get-raw` → `mdfind -name <title>` → `ffmpeg -ss <seek> -i <path> -t <duration>` returning 18s mono 16kHz WAV ending 3s past the playhead. Every failure path returns `(None, meta_with_reason)` — never raises. 2 commits (`37c0e10` RED + `1282b4b` GREEN) + 1 SUMMARY. 8 hermetic tests pass (1 happy-path + 4 graceful-degrade + 2 security/correctness gates + 1 extrapolation-guard). 0 regressions in `tests/audio/` (66 passed; 1 deselected — `DEFERRED-40-02-01` pre-existing Phase 30 stale-test logged to `deferred-items.md`). POC immutability gate satisfied (`cohost.py` / `cohost_v2.py` / `cohost_lk.py` / `mascot.html` unchanged). Plan 40-03 hand-off note in SUMMARY.
 
 ## Performance Metrics
 
