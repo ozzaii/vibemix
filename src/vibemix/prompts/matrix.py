@@ -412,6 +412,121 @@ HARD TEK / ACIDCORE scene context — Kaan plays Hard Tek (170+ BPM, distorted k
 
 
 # ---------------------------------------------------------------------------
+# Plan 40-03 — Part-aware prompt suffix builder (locked CONTEXT.md Q1 + Q2)
+# ---------------------------------------------------------------------------
+#
+# Phase 40 Plan 03 pursues a 3-Part additive Gemini multimodal contract:
+#
+#   Part 1 — live BlackHole audio (audience perspective).      ALWAYS sent.
+#   Part 2 — mic (Kaan's voice).         Sent iff Plan 40-01 mic gates pass.
+#   Part 3 — source-file lookahead.      Sent iff LookaheadProvider returns
+#                                        bytes. NOT YET HEARD BY AUDIENCE
+#                                        per locked CONTEXT.md Q2.
+#
+# The locked decision Q1 chose 3-Part ADDITIVE over the v4 "silent offset
+# swap" pattern (cohost_v4_tr.py:1788 — that pattern replaces Part 1 with
+# the lookahead WAV; we keep both). Decision Q2 chose EXPLICIT labeling of
+# the lookahead Part with "NOT YET HEARD BY AUDIENCE" plus an anti-
+# prediction guard "do NOT describe Part N as if it has played" — closes
+# the hallucination class "AI claims to predict the future" that the
+# lookahead Part introduces by feeding Gemini audio temporally ahead of
+# the audience perspective.
+#
+# Position semantics:
+# - When BOTH mic and lookahead present: mic is P2, lookahead is P3.
+# - When ONLY lookahead present (no mic): lookahead occupies P2 — keeps
+#   slot numbering contiguous so the "NOT YET HEARD" framing reads
+#   cleanly against the actual position Gemini sees.
+#
+# All variants end with the v4 anti-slop refrain "Your ears are the
+# referee — the evidence above is grounded context." preserved from
+# Plan 40-01 (RESEARCH §Project Constraints "trust the audio").
+# ---------------------------------------------------------------------------
+
+
+def build_parts_description(
+    audio_seconds: float,
+    has_mic_part: bool,
+    has_lookahead_part: bool,
+) -> str:
+    """Anti-slop Part-aware prompt suffix for the DJCoHostAgent llm_node.
+
+    Returns one of 4 deterministic strings keyed by ``(has_mic_part,
+    has_lookahead_part)``. Pure function — no side effects, no globals
+    read.
+
+    Args:
+        audio_seconds: Length of the Part 1 live-mix audio in seconds.
+            Rendered as ``int(audio_seconds)`` into the wording.
+        has_mic_part: Whether the mic audio Part will be attached
+            (Plan 40-01 three-gate decision). When True, mic occupies
+            the P2 slot.
+        has_lookahead_part: Whether the lookahead audio Part will be
+            attached (Plan 40-03 — LookaheadProvider.snapshot_wav
+            returned non-None bytes). When True AND ``has_mic_part``
+            False, lookahead occupies P2; when both True, lookahead
+            is P3.
+
+    Returns:
+        The full suffix string starting with ``"\\n\\nAttached: "`` and
+        ending with the v4 anti-slop refrain. Lookahead-present
+        variants ALWAYS contain the literal substring
+        ``"NOT YET HEARD BY AUDIENCE"`` AND the anti-prediction guard
+        phrase ``"do NOT describe Part [23] as if it has played"`` —
+        pinned by tests/prompts/test_matrix_3part_labeling.py.
+
+    References:
+        - 40-CONTEXT.md decisions Q1 (3-Part additive) + Q2 (NOT YET
+          HEARD labeling).
+        - 40-03-PLAN.md ``<interfaces>`` block lines 122-127 (locked
+          strings — see test file for the exact substrings pinned).
+        - cohost_v4.py:1791-1813 (Part assembly reference; v4 uses the
+          rejected swap pattern — we deliberately diverge here).
+    """
+    refrain = (
+        "Your ears are the referee — "
+        "the evidence above is grounded context."
+    )
+    secs = int(audio_seconds)
+
+    if not has_mic_part and not has_lookahead_part:
+        # 1-Part baseline — no mic, no lookahead. Mention only P1.
+        return (
+            f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
+            f"(audience perspective). {refrain}"
+        )
+
+    if has_mic_part and not has_lookahead_part:
+        # 2-Part (mic) — P1 mix + P2 mic. No "NOT YET HEARD" labeling.
+        return (
+            f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
+            f"(audience perspective). P2 = your mic (last 8s, Kaan's "
+            f"literal voice). {refrain}"
+        )
+
+    if not has_mic_part and has_lookahead_part:
+        # 2-Part (lookahead at P2) — slot numbering stays contiguous when
+        # mic is absent. Anti-prediction guard refers to Part 2.
+        return (
+            f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
+            f"(audience perspective). P2 = 18s from the source file "
+            f"ending ~3s past now — NOT YET HEARD BY AUDIENCE; do NOT "
+            f"describe Part 2 as if it has played. Use it only to ground "
+            f"what you HEAR in Part 1 about to happen. {refrain}"
+        )
+
+    # Both True — 3-Part full contract. Mic at P2, lookahead at P3.
+    return (
+        f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
+        f"(audience perspective). P2 = your mic (last 8s, Kaan's literal "
+        f"voice). P3 = 18s from the source file ending ~3s past now — "
+        f"NOT YET HEARD BY AUDIENCE; do NOT describe Part 3 as if it has "
+        f"played. Use it only to ground what you HEAR in Part 1 about to "
+        f"happen. {refrain}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 

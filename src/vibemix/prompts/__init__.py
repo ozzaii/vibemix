@@ -28,6 +28,7 @@ from vibemix.prompts.matrix import (
     HYPE_BEGINNER,
     HYPE_INTERMEDIATE,
     HYPE_PRO,
+    build_parts_description,
     build_system_instruction,
 )
 from vibemix.prompts.negative_dict import NEGATIVE_PHRASES, NEGATIVE_REGEX
@@ -45,6 +46,7 @@ __all__ = [
     "NEGATIVE_PHRASES",
     "NEGATIVE_REGEX",
     "TurnHistory",
+    "build_parts_description",
     "build_system_instruction",
     "filter_for_slop",
     "summarize_session",
