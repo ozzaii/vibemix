@@ -81,6 +81,14 @@ _PHASE12_FIELDS: tuple[str, ...] = (
     # step-telemetry-consent.ts on explicit user click. Skipping the
     # wizard step leaves it False. Persisted alongside Phase 12 fields.
     "telemetry_consent",
+    # Phase 44 Plan 44-04 / LAUNCH-05 — Bravoh waitlist opt-in. Default
+    # False (OFF). Subtle Bravoh-funnel CTA surfaced in the debrief
+    # save-success view; flipped only by the user's explicit click on
+    # the debrief settings drawer toggle. Signed-out telemetry default-
+    # off per CONTEXT — the field's existence alone fires no event.
+    # Same dark-pattern discipline as telemetry_consent: an unset /
+    # missing key reads as False.
+    "bravoh_waitlist_opt_in",
 )
 _PHASE11_FIELDS: tuple[str, ...] = (
     "first_run_completed",
@@ -163,6 +171,12 @@ class ConfigStore:
     # Pitfall P67 — no dark pattern; the field's existence does not imply
     # consent. Only an explicit wizard toggle flips this to True.
     telemetry_consent: bool = False
+    # Phase 44 Plan 44-04 / LAUNCH-05 — Bravoh waitlist opt-in (default
+    # False = OFF). Subtle Bravoh-funnel CTA surfaced in the debrief
+    # save-success view; flipped only by the user's explicit click on
+    # the debrief settings drawer toggle. The field's existence does
+    # NOT imply opt-in (mirrors telemetry_consent's dark-pattern guard).
+    bravoh_waitlist_opt_in: bool = False
 
     # Phase 11 fields (preserved verbatim — sidecar reads only, Rust writes)
     first_run_completed: bool | None = None
@@ -218,6 +232,10 @@ class ConfigStore:
             # A corrupted on-disk value (e.g. "yes" or 1) silently falls
             # back to default False (OFF) rather than coercing to True.
             "telemetry_consent",
+            # Phase 44 Plan 44-04 / LAUNCH-05 — bravoh_waitlist_opt_in
+            # gets the same guard. Garbage on disk → silent default OFF;
+            # never coerce to True even when the disk value is truthy.
+            "bravoh_waitlist_opt_in",
         ):
             if _bool_field in kwargs and not isinstance(kwargs[_bool_field], bool):
                 kwargs.pop(_bool_field, None)
