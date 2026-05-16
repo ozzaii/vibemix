@@ -25,7 +25,8 @@ def test_boot_emits_ipc_boot(fake_bus: FakeBus) -> None:
 
 
 def test_register_handlers_covers_all_request_types(fake_bus: FakeBus) -> None:
-    """All 9 inbound types (8 handlers + ipc.wizard.start re-run) registered."""
+    """All inbound types registered. Phase 32 adds ipc.profile.set_consent
+    (PROFILE-05) so the wizard's profile-consent step can persist the toggle."""
     loop = WizardLoop(fake_bus)
     loop.register_handlers()
     expected = {
@@ -38,6 +39,8 @@ def test_register_handlers_covers_all_request_types(fake_bus: FakeBus) -> None:
         "ipc.calibration.smoke_test",
         "ipc.wizard.done",
         "ipc.wizard.start",
+        # Phase 32 / PROFILE-05
+        "ipc.profile.set_consent",
     }
     assert expected.issubset(set(fake_bus.handlers.keys()))
 

@@ -31,6 +31,31 @@ use tauri_plugin_shell::ShellExt;
 
 const MAX_RESTARTS: u32 = 3;
 
+/// Target triple of the bundled sidecar. Matches the per-triple directory
+/// name produced by scripts/build_sidecar.py.
+///
+/// Plan 27-06 / REC-09 carry-forward: on macOS the ship now includes BOTH
+/// arm64 + x86_64 PyInstaller bundles under bundle.resources. We pick the
+/// matching triple at runtime via std::env::consts::ARCH so Apple Silicon
+/// users never see the Rosetta prompt on first launch (Pitfall P69).
+#[cfg(target_os = "macos")]
+fn sidecar_triple() -> &'static str {
+    match std::env::consts::ARCH {
+        "aarch64" => "aarch64-apple-darwin",
+        "x86_64" => "x86_64-apple-darwin",
+        // Defensive fallback: unknown arch can't run a bundled binary. Pick
+        // the arm64 default so Apple Silicon (the dominant install base)
+        // still gets a valid path; the resolver will fail loudly with a
+        // clear error if the binary isn't present.
+        _ => "aarch64-apple-darwin",
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn sidecar_triple() -> &'static str {
+    "x86_64-pc-windows-msvc"
+}
+
 /// Shared handle to the most-recently-spawned sidecar child. `restart_sidecar`
 /// reads this to kill the current process; the watchdog loop refreshes it on
 /// every spawn. Wave 4 may extend this struct with a wake-up channel.
@@ -73,10 +98,9 @@ pub async fn spawn_sidecar_with_watchdog(
             tokio::time::sleep(Duration::from_millis(500 * restart_count as u64)).await;
         }
 
-        let mut cmd = app
-            .shell()
-            .sidecar("vibemix-core")
+        let sidecar_bin = resolve_sidecar_path(&app)
             .map_err(|e| format!("sidecar lookup failed: {e}"))?;
+        let mut cmd = app.shell().command(&sidecar_bin);
         // Phase 12 Wave 3 — post-wizard launches spawn the sidecar with
         // `--session` so SessionLoop registers its ipc.session.* handlers.
         // Wizard launches keep `--wizard` (Phase 11 wave 4 behaviour).
@@ -140,6 +164,29 @@ pub async fn spawn_sidecar_with_watchdog(
             return Ok(());
         }
 
+        // Exit codes 2 + 3 are sidecar "fatal — do not retry" sentinels.
+        // 2 = port 8765 already bound (another vibemix is running)
+        // 3 = required audio device missing (BlackHole not installed)
+        // Retrying just races the same fault forever — emit a distinct
+        // banner with `reason` set so the webview can route to the
+        // matching recovery surface.
+        if exit_code == 2 || exit_code == 3 {
+            let reason = if exit_code == 2 { "port-in-use" } else { "audio-device-missing" };
+            let last_line = read_last_log_line(&log_path).unwrap_or_default();
+            app.emit(
+                "sidecar-crashed",
+                serde_json::json!({
+                    "restart_count": 0,
+                    "last_error": last_line,
+                    "reason": reason,
+                }),
+            )
+            .ok();
+            return Err(format!(
+                "sidecar refused to start (reason={reason}, exit={exit_code})"
+            ));
+        }
+
         restart_count += 1;
         if restart_count > MAX_RESTARTS {
             let last_line = read_last_log_line(&log_path).unwrap_or_default();
@@ -165,16 +212,61 @@ pub async fn spawn_sidecar_with_watchdog(
     }
 }
 
-/// Read the last non-empty line from the rotated log. Used as the
-/// `last_error` payload on `sidecar-crashed`.
+/// Resolve the bundled sidecar binary path inside the .app/.exe.
+///
+/// Tauri's `bundle.resources` puts each pattern's match under
+/// Contents/Resources/<relative-path> (macOS) or resources/<relative-path>
+/// (Windows), preserving the directory structure. The sidecar's
+/// PyInstaller --onedir tree is therefore at:
+///     Contents/Resources/binaries/vibemix-core-<triple>/
+/// with the inner binary at:
+///     vibemix-core-<triple>/vibemix-core-<triple>[.exe]
+/// next to its _internal/ tree (which the PyInstaller bootloader needs).
+fn resolve_sidecar_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("resource_dir() failed: {e}"))?;
+    let exe_suffix = if cfg!(target_os = "windows") { ".exe" } else { "" };
+    let triple = sidecar_triple();
+    let bin_name = format!("vibemix-core-{triple}{exe_suffix}");
+    let path = resource_dir
+        .join("binaries")
+        .join(format!("vibemix-core-{triple}"))
+        .join(&bin_name);
+    if !path.exists() {
+        return Err(format!(
+            "bundled sidecar binary missing at {}",
+            path.display()
+        ));
+    }
+    Ok(path)
+}
+
+/// Read the most-informative line from the tail of the rotated log.
+///
+/// Used as the `last_error` payload on `sidecar-crashed`. We prefer the
+/// *last `[FATAL]` line* over the literal last non-empty line because
+/// the Python sidecar can emit benign post-FATAL chatter (atexit
+/// handlers, asyncio cleanup, retry banners) that would otherwise
+/// clobber the actual cause of death in the crash banner. Falls back to
+/// the last non-empty line when no `[FATAL]` marker is present (e.g.,
+/// the sidecar died from an uncaught exception with a regular
+/// traceback tail).
 pub(crate) fn read_last_log_line(p: &std::path::Path) -> Option<String> {
     use std::io::{BufRead, BufReader};
     let f = std::fs::File::open(p).ok()?;
-    BufReader::new(f)
+    let lines: Vec<String> = BufReader::new(f)
         .lines()
-        .filter_map(|l| l.ok())
+        .map_while(Result::ok)
         .filter(|l| !l.trim().is_empty())
-        .last()
+        .collect();
+    lines
+        .iter()
+        .rev()
+        .find(|l| l.contains("[FATAL]"))
+        .or_else(|| lines.last())
+        .cloned()
 }
 
 #[cfg(test)]
@@ -214,6 +306,38 @@ mod tests {
     fn read_last_log_line_returns_none_for_empty_file() {
         let f = NamedTempFile::new().unwrap();
         assert!(read_last_log_line(f.path()).is_none());
+    }
+
+    #[test]
+    fn read_last_log_line_prefers_fatal_over_post_fatal_chatter() {
+        // Real-world pattern: Python sidecar logs [FATAL] then atexit /
+        // asyncio cleanup spew. The crash banner needs the FATAL line,
+        // not the meaningless tail.
+        let mut f = NamedTempFile::new().unwrap();
+        writeln!(f, "-> wizard boot").unwrap();
+        writeln!(f, "[FATAL] ws_bus port bind failed on 127.0.0.1:8765").unwrap();
+        writeln!(f, "[FATAL] another vibemix process is already running; quit it before relaunching.").unwrap();
+        writeln!(f, "asyncio cleanup task <Task pending name='Task-3'>").unwrap();
+        writeln!(f, "  done").unwrap();
+        f.flush().unwrap();
+
+        let last = read_last_log_line(f.path()).expect("should find a FATAL line");
+        // The last [FATAL] (not the literal last line) wins.
+        assert!(last.contains("another vibemix process is already running"));
+        assert!(last.starts_with("[FATAL]"));
+    }
+
+    #[test]
+    fn read_last_log_line_falls_back_to_tail_when_no_fatal() {
+        // No [FATAL] marker — the helper still returns the last line.
+        let mut f = NamedTempFile::new().unwrap();
+        writeln!(f, "Traceback (most recent call last):").unwrap();
+        writeln!(f, "  File \"x.py\", line 1").unwrap();
+        writeln!(f, "RuntimeError: boom").unwrap();
+        f.flush().unwrap();
+
+        let last = read_last_log_line(f.path()).expect("should find tail");
+        assert_eq!(last, "RuntimeError: boom");
     }
 }
 

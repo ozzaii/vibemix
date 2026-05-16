@@ -39,14 +39,46 @@ from vibemix.ui_bus import (
     CalibrationStartMidiListen,
     CalibrationUserHeardTone,
     CalibrationWindowList,
+    ChapterRegionPayload,
+    DebriefChapterList,
+    DebriefCitationSummary,
+    DebriefCitationTooltip,
+    DebriefCitationTooltipReq,
+    DebriefDrills,
+    DebriefError,
+    DebriefEventTimeline,
+    DebriefSessionLoaded,
+    DebriefTldrAudio,
+    DrillPayload,
     DeviceInfo,
     IpcBoot,
     IpcError,
     LevelPair,
+    LibraryConfidence,
+    LibraryImport,
+    LibraryImportCancel,
+    LibraryImportProgress,
+    LibrarySearchRequest,
+    LibrarySearchResult,
+    LibrarySimilarRequest,
+    LibrarySimilarResult,
+    LibraryStalenessAction,
+    LibraryStalenessNudge,
     MascotMoodChange,
+    SessionCitation,
+    SessionOverlayHighlight,
     MetersTriple,
     PermissionCheck,
     PermissionState,
+    # Phase 32 — long-term DJ profile wrappers (PROFILE-04/05/07).
+    ProfileConsentState,
+    ProfileDelete,
+    ProfileDeleteAck,
+    ProfileRegenerate,
+    ProfileRegenerateResult,
+    ProfileSetConsent,
+    ProfileView,
+    ProfileViewResult,
     RecordingSummary,
     RecordingsDelete,
     RecordingsDeleteAck,
@@ -242,6 +274,206 @@ def _make_examples() -> list[tuple[str, object]]:
                 ],
             ),
         ),
+        # Phase 20-04 — citation diagnostics
+        (
+            "SessionCitation",
+            SessionCitation.make(
+                slop_ratio=0.12,
+                stripped_rate_15s=0.07,
+                last_unverified_response=None,
+                bypass_active=False,
+            ),
+        ),
+        # Phase 24-02 — overlay-highlight
+        (
+            "SessionOverlayHighlight",
+            SessionOverlayHighlight.make(
+                element_id="waveform_a",
+                color="amber",
+                duration_ms=1300,
+            ),
+        ),
+        # Phase 25 Plan 25-03 — DEBRIEF architectural slot (3 reservations)
+        (
+            "DebriefSessionLoaded",
+            DebriefSessionLoaded.make(
+                session_id="20260513-210410",
+                started_at=1715616250.0,
+                duration_s=5040.0,
+            ),
+        ),
+        (
+            "DebriefCitationSummary",
+            DebriefCitationSummary.make(
+                total=120, valid=95, stripped=20, bypassed=5
+            ),
+        ),
+        (
+            "DebriefEventTimeline",
+            DebriefEventTimeline.make(
+                events=(
+                    {"t": 0.0, "kind": "session_start"},
+                    {"t": 3.21, "kind": "trigger"},
+                ),
+            ),
+        ),
+        # Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers.
+        (
+            "DebriefChapterList",
+            DebriefChapterList.make(
+                chapters=(
+                    ChapterRegionPayload(
+                        id="track-01",
+                        start=0.0,
+                        end=300.0,
+                        label="Track 1: Opening",
+                        kind="track",
+                        citation_event_id="ev:TRACK_CHANGE@00:00",
+                    ),
+                ),
+                derived_at="2026-05-15T11:21:39.656+00:00",
+            ),
+        ),
+        (
+            "DebriefTldrAudio",
+            DebriefTldrAudio.make(
+                audio_relative_path="debrief_tldr.mp3",
+                duration_s=75.0,
+                tldr_sha256="a" * 64,
+                mime_type="audio/mpeg",
+            ),
+        ),
+        (
+            "DebriefDrills",
+            DebriefDrills.make(
+                drills=tuple(
+                    DrillPayload(
+                        situation=f"Drill {i} situation",
+                        behavior=f"Behavior [ev:MIX_MOVE@01:0{i}]",
+                        impact=f"Impact [ev:PHASE@01:1{i}]",
+                        action_recommended=f"Action [track:t{i}]",
+                        citation=f"[ev:MIX_MOVE@01:0{i}]",
+                    )
+                    for i in range(3)
+                ),
+            ),
+        ),
+        (
+            "DebriefCitationTooltipReq",
+            DebriefCitationTooltipReq.make(event_id="ev:MIX_MOVE@01:23"),
+        ),
+        (
+            "DebriefCitationTooltip",
+            DebriefCitationTooltip.make(
+                event_id="ev:MIX_MOVE@01:23",
+                evidence_text="A_filter boost at 1:23",
+                timestamp=83.0,
+                found=True,
+            ),
+        ),
+        (
+            "DebriefError",
+            DebriefError.make(
+                reason="session_too_short",
+                message="Session is 120s; need >= 300s.",
+            ),
+        ),
+        # Phase 28 Plan 28-09 — 10 library.* messages.
+        (
+            "LibraryImport",
+            LibraryImport.make(path="/Users/dj/library.xml"),
+        ),
+        (
+            "LibraryImportProgress",
+            LibraryImportProgress.make(
+                total=120,
+                done=45,
+                current_track_name="Title — Artist",
+                cache_hits=12,
+                cancelled=False,
+            ),
+        ),
+        (
+            "LibraryImportCancel",
+            LibraryImportCancel.make(),
+        ),
+        (
+            "LibrarySearchRequest",
+            LibrarySearchRequest.make(
+                query="driving acid techno around 138 BPM", k=10
+            ),
+        ),
+        (
+            "LibrarySearchResult",
+            LibrarySearchResult.make(
+                query="driving acid techno around 138 BPM",
+                matches=(
+                    {
+                        "track_id": "t-001",
+                        "title": "Spastik",
+                        "artist": "Plastikman",
+                        "bpm": 138.0,
+                        "confidence": 0.8423,
+                        "snippet": "Spastik — Plastikman @ 138 BPM",
+                    },
+                ),
+                cache_hit=False,
+            ),
+        ),
+        (
+            "LibraryConfidence",
+            LibraryConfidence.make(
+                track_id="t-001",
+                cosine=0.84,
+                decision="cited",
+                event_id="ev-abc123",
+                cost_warning=False,
+            ),
+        ),
+        (
+            "LibraryStalenessNudge",
+            LibraryStalenessNudge.make(age_days=37, snoozed_until_ts=None),
+        ),
+        (
+            "LibraryStalenessAction",
+            LibraryStalenessAction.make(action="snooze_7d"),
+        ),
+        (
+            "LibrarySimilarRequest",
+            LibrarySimilarRequest.make(track_id="t-001", k=10),
+        ),
+        (
+            "LibrarySimilarResult",
+            LibrarySimilarResult.make(
+                track_id="t-001",
+                results=(
+                    {
+                        "track_id": "t-007",
+                        "similarity": 0.78,
+                        "title": "Spastik (Original Mix)",
+                        "artist": "Plastikman",
+                        "bpm": 138.0,
+                    },
+                ),
+            ),
+        ),
+        # Phase 32 / PROFILE-04..07 — long-term DJ profile IPC (8 wrappers).
+        ("ProfileSetConsent", ProfileSetConsent.make(consent=False)),
+        ("ProfileConsentState", ProfileConsentState.make(consent=False)),
+        ("ProfileView", ProfileView.make()),
+        (
+            "ProfileViewResult",
+            ProfileViewResult.make(profile=None, bytes=0, consent=False),
+        ),
+        ("ProfileRegenerate", ProfileRegenerate.make()),
+        (
+            "ProfileRegenerateResult",
+            ProfileRegenerateResult.make(
+                ok=False, profile=None, error="consent_off"
+            ),
+        ),
+        ("ProfileDelete", ProfileDelete.make()),
+        ("ProfileDeleteAck", ProfileDeleteAck.make(ok=True, error=None)),
     ]
 
 
@@ -256,9 +488,21 @@ def test_example_count_matches_schema_oneof() -> None:
     total 26. Phase 13-05 added 1 (MascotMoodChange) → 27. Phase 15-01 adds
     7 (RecordingsList, RecordingsListResult, RecordingsDelete,
     RecordingsDeleteAck, RecordingsUsage, RecordingsEvents,
-    RecordingsEventsResult) → 34.
+    RecordingsEventsResult) → 34. Phase 20-04 adds 1 (SessionCitation) → 35.
+    Phase 24-02 adds 1 (SessionOverlayHighlight) → 36. Phase 25 Plan 25-03
+    adds 3 DEBRIEF reservations (DebriefSessionLoaded, DebriefCitationSummary,
+    DebriefEventTimeline) → 39. Phase 28 Plan 28-09 adds 10 library.*
+    schemas (LibraryImport, LibraryImportProgress, LibraryImportCancel,
+    LibrarySearchRequest, LibrarySearchResult, LibraryConfidence,
+    LibraryStalenessNudge, LibraryStalenessAction, LibrarySimilarRequest,
+    LibrarySimilarResult) → 49. Phase 29 Plan 29-03 adds 6 DEBRIEF v2.1
+    additive wrappers (DebriefChapterList, DebriefTldrAudio, DebriefDrills,
+    DebriefCitationTooltipReq, DebriefCitationTooltip, DebriefError) → 55.
+    Phase 32 Plans 32-04..05 add 8 profile.* schemas (ProfileSetConsent,
+    ProfileConsentState, ProfileView, ProfileViewResult, ProfileRegenerate,
+    ProfileRegenerateResult, ProfileDelete, ProfileDeleteAck) → 63.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 34
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 63
 
 
 @pytest.mark.parametrize(
@@ -280,17 +524,25 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_34() -> None:
+def test_schema_oneof_count_is_63() -> None:
     """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
     (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
-    7 recordings.* families → 34.
+    7 recordings.* families → 34; Phase 20-04 adds 1 (SessionCitation) → 35;
+    Phase 24-02 adds 1 (SessionOverlayHighlight) → 36; Phase 25 Plan 25-03
+    adds 3 DEBRIEF architectural-slot reservations → 39; Phase 28 Plan 28-09
+    adds 10 library.* messages → 49; Phase 29 Plan 29-03 adds 6 DEBRIEF v2.1
+    additive wrappers → 55; Phase 32 Plans 32-04..05 add 8 profile.*
+    messages (set_consent/consent_state/view/view_result/regenerate/
+    regenerate_result/delete/delete_ack) → 63.
 
-    ``definitions`` is 35 because ``LevelPair`` is a shared helper ref'd
-    from ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message
-    (so it counts in ``definitions`` but not in ``oneOf``).
+    ``definitions`` count grows alongside oneOf since every new wrapper
+    adds one entry to both. ``LevelPair`` is a shared helper ref'd from
+    ``SessionSnapshot.meters`` but is not itself a top-level ipc.* message
+    (so it counts in ``definitions`` but not in ``oneOf``); the skew
+    between the two counts stays at 1.
     """
-    assert len(_SCHEMA["oneOf"]) == 34
-    assert len(_SCHEMA["definitions"]) == 35
+    assert len(_SCHEMA["oneOf"]) == 63
+    assert len(_SCHEMA["definitions"]) == 64
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

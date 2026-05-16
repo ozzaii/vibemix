@@ -1,0 +1,10 @@
+vibemix is live — free, open-source AI DJ co-host for your live sets
+
+→ listens to your master output
+→ watches djay Pro / Rekordbox
+→ reacts in real-time as hype-man or coach
+→ Gemini-grounded, never AI slop
+
+mac + windows, one-click install, your sets stay local.
+
+github.com/bravoh-ai/vibemix

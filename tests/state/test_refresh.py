@@ -690,6 +690,240 @@ def test_tick_falls_back_to_v4_classify_when_no_profile():
     assert state.phase == "silent"
 
 
+# =============================================================================
+# Phase 17 — Hard Tek detectors v1: 4 new MusicState fields populated each tick
+# =============================================================================
+
+
+def test_tick_writes_active_genre_house():
+    """bpm_cache=124.0 lands in the house band (118-128). Centroid floor only
+    applies to hard_tek, so house classifies regardless of mid/high mix."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+    state = MusicState()
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,  # block estimate_bpm so 124.0 survives
+    )
+    assert state.active_genre == "house"
+
+
+def test_tick_writes_active_genre_hard_tek_requires_centroid(mocker):
+    """bpm_cache=150 lands in hard_tek band BUT requires (mid_share +
+    high_share) >= GENRE_CENTROID_HARD_TEK_MIN (0.55). Below floor →
+    "unknown" (anti-misclassify-on-house-with-fast-tempo)."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+
+    # Stub snapshot_features so we can drive the centroid deterministically
+    # — _audible_buf() yields ~mid/high concentrated around 440Hz which we
+    # can't bend without a different fixture.
+    def fake_feats_low_centroid(buf, seconds=4.0):
+        return {
+            "rms": 0.1,
+            "onsets_per_sec": 1.0,
+            "sub_share": 0.40,
+            "low_share": 0.20,
+            "mid_share": 0.30,
+            "high_share": 0.10,  # mid+high = 0.40 < 0.55 → "unknown"
+        }
+
+    def fake_feats_high_centroid(buf, seconds=4.0):
+        return {
+            "rms": 0.1,
+            "onsets_per_sec": 1.0,
+            "sub_share": 0.20,
+            "low_share": 0.20,
+            "mid_share": 0.30,
+            "high_share": 0.30,  # mid+high = 0.60 ≥ 0.55 → "hard_tek"
+        }
+
+    state = MusicState()
+    buf = _audible_buf()
+
+    mocker.patch("vibemix.state.refresh.snapshot_features", side_effect=fake_feats_low_centroid)
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=150.0,
+        last_bpm_at=1000.0,
+    )
+    assert state.active_genre == "unknown", "centroid floor reject for house-with-fast-tempo"
+
+    state2 = MusicState()
+    mocker.patch("vibemix.state.refresh.snapshot_features", side_effect=fake_feats_high_centroid)
+    _tick_once(
+        state2,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=150.0,
+        last_bpm_at=1000.0,
+    )
+    assert state2.active_genre == "hard_tek", (
+        "centroid floor passed → distorted-kick spectral signature → hard_tek"
+    )
+
+
+def test_tick_writes_buildup_score_from_energy_curve_slope(mocker):
+    """Monotonic-climb energy_curve → positive buildup_score in [0.0, 1.0].
+    Flat curve → buildup_score ≈ 0.0. Negative slopes clamp to 0.0
+    (buildups are monotonic-climbs only — falling energy is a job for
+    BREAKDOWN_KICK_KILL, NOT a negative buildup)."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+
+    state = MusicState()
+    buf = _audible_buf()
+
+    # Climbing curve (8 samples, monotonic) → positive score.
+    mocker.patch(
+        "vibemix.state.refresh.energy_curve",
+        return_value=[0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09],
+    )
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,
+    )
+    assert 0.0 < state.buildup_score <= 1.0, (
+        f"expected positive in (0, 1], got {state.buildup_score}"
+    )
+
+    # Flat curve → score ≈ 0.0.
+    state2 = MusicState()
+    mocker.patch("vibemix.state.refresh.energy_curve", return_value=[0.05] * 8)
+    _tick_once(
+        state2,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,
+    )
+    assert state2.buildup_score == 0.0, f"flat curve should yield 0.0, got {state2.buildup_score}"
+
+    # Falling curve → score clamps to 0.0 (negative slope rejected).
+    state3 = MusicState()
+    mocker.patch(
+        "vibemix.state.refresh.energy_curve",
+        return_value=[0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02],
+    )
+    _tick_once(
+        state3,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,
+    )
+    assert state3.buildup_score == 0.0, "falling energy must clamp to 0.0, not go negative"
+
+
+def test_tick_writes_beat_phase_mirroring_downbeat_phase():
+    """state.beat_phase mirrors state.downbeat_phase after every tick.
+    Phase 17 alias — both consumers should agree. Phase 13's downbeat_phase
+    already computes the bar-fraction; Phase 17 detectors want a
+    Phase-17-named handle (`beat_phase`) so SENSE-12 detector module imports
+    don't reach into Phase-13 naming."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+
+    state = MusicState()
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,
+    )
+    assert state.beat_phase == state.downbeat_phase
+
+
+def test_tick_keeps_predicted_drop_in_sec_none_by_default():
+    """Predictive drop firing is OFF-by-default per CONTEXT D — the
+    telemetry-guarded flip is v2.1 work, NOT Phase 17. After any tick,
+    state.predicted_drop_in_sec must remain None."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+
+    state = MusicState()
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=124.0,
+        last_bpm_at=1000.0,
+    )
+    assert state.predicted_drop_in_sec is None
+
+
+def test_tick_with_invalid_bpm_yields_unknown_genre():
+    """bpm_cache=0.0 → "unknown" — no fabricated genre during BPM lock-up.
+    Mirrors the v4 `_music_truly_playing` rule (T-17-01-01 mitigation)."""
+    from vibemix.state.genre import set_active_profile
+
+    set_active_profile(None)
+
+    state = MusicState()
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=1000.0,
+    )
+    assert state.active_genre == "unknown"
+
+
 def test_state_refresh_loop_swallows_tick_exceptions(mocker, capsys):
     """v4:1750-1751 — error wrap. Loop continues after exception, error
     written to stderr with the v4 prefix."""
@@ -716,3 +950,362 @@ def test_state_refresh_loop_swallows_tick_exceptions(mocker, capsys):
     asyncio.run(state_refresh_loop(state, buf, _ctrl_mock(), _track_mock(), stop))
     err = capsys.readouterr().err
     assert "[state refresh err] boom" in err
+
+
+# =============================================================================
+# Phase 18 Plan 02 — EvidenceRegistry wiring (Task 2)
+# =============================================================================
+
+from vibemix.state import EvidenceRegistry  # noqa: E402
+
+
+def test_18_02_per_tick_aud_writes_when_audible():
+    """Test E — per-tick aud writes (GROUND-01).
+
+    Drive _tick_once with audible=True synthetic state; after tick,
+    registry.snapshot()["aud"] contains keys "rms", "bpm", "onset_density",
+    "sub_share", "low_share", "mid_share", "high_share" — each with exactly
+    one t_session float.
+    """
+    registry = EvidenceRegistry()
+    state = MusicState()
+    state.set_start_at = 900.0
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=900.0,  # already past AUDIBLE_DEBOUNCE_SEC
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.5,
+        evidence_registry=registry,
+    )
+    # state.audible should now be True (sustained-audible elapsed)
+    assert state.audible is True
+    snap = registry.snapshot()
+    aud = snap.get("aud", {})
+    expected_keys = {"rms", "bpm", "onset_density", "sub_share", "low_share", "mid_share", "high_share"}
+    assert set(aud.keys()) >= expected_keys, f"missing keys: {expected_keys - set(aud.keys())}"
+    # Each key has exactly one observation from this single tick
+    for k in expected_keys:
+        assert len(aud[k]) == 1, f"{k} has {len(aud[k])} observations, expected 1"
+        # t_session = now - set_start_at = 1000.0 - 900.0 = 100.0
+        assert abs(aud[k][0] - 100.0) < 0.001
+
+
+def test_18_02_aud_NOT_written_when_silent():
+    """Test F — per-tick aud writes ONLY when audible (anti-noise).
+
+    Drive _tick_once with audible=False (silent state); registry.snapshot()
+    ["aud"] is empty (or has only zero observations). Rationale: cohost_v4
+    "trust the audio" rule — recording features for silent ticks would let
+    Gemini cite "aud:rms@45.2" on a silent moment, which is the exact
+    hallucination class P18 + P20 close.
+    """
+    registry = EvidenceRegistry()
+    state = MusicState()  # audible defaults to False
+    state.set_start_at = 900.0
+    buf = _silent_buf()  # RMS = 0, currently_loud = False
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+        evidence_registry=registry,
+    )
+    assert state.audible is False
+    snap = registry.snapshot()
+    # aud source should be entirely empty (no key was ever written)
+    assert snap.get("aud", {}) == {}
+
+
+def test_18_02_mix_write_on_phase_change():
+    """Test G — mix write on phase change (change-only).
+
+    Tick 1 with state.phase="groove" then a 2nd tick where the energy_curve
+    drives a new classify_phase result; registry.snapshot()["mix"] should
+    have key f"phase={new_phase}" with one observation. Repeated same-phase
+    ticks do NOT re-write.
+    """
+    registry = EvidenceRegistry()
+    state = MusicState()
+    state.set_start_at = 900.0
+    state.phase = "groove"  # baseline
+    buf = _audible_buf()
+    # Tick 1 — sets state.phase from classify_phase output. The tick will
+    # likely flip phase based on the synthetic curve (away from "groove").
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=900.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.5,
+        evidence_registry=registry,
+    )
+    snap1 = registry.snapshot()
+    mix1 = snap1.get("mix", {})
+    # Phase should have changed away from "groove" → at most one mix entry
+    # for the new phase (if no change happened, mix has no phase= entry).
+    phase_keys_after_tick1 = [k for k in mix1.keys() if k.startswith("phase=")]
+    if state.phase != "groove":
+        assert len(phase_keys_after_tick1) == 1
+        assert phase_keys_after_tick1[0] == f"phase={state.phase}"
+    new_phase_after_tick1 = state.phase
+    # Tick 2 — same conditions; phase should stay the same → no new write
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1001.0,
+        last_audible_high=900.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=1000.0,
+        evidence_registry=registry,
+    )
+    snap2 = registry.snapshot()
+    # Phase should be the same → mix snapshot unchanged for phase= keys
+    assert state.phase == new_phase_after_tick1
+    mix2 = snap2.get("mix", {})
+    phase_keys_after_tick2 = [k for k in mix2.keys() if k.startswith("phase=")]
+    # Same phase keys, same observation count
+    assert phase_keys_after_tick2 == phase_keys_after_tick1
+    for k in phase_keys_after_tick2:
+        # Same single observation — no new tick wrote
+        assert len(mix2[k]) == 1
+
+
+def test_18_02_mix_write_on_audible_deck_change():
+    """Test H — mix write on audible_deck change (change-only).
+
+    Tick 1 audible_deck="A" (baseline default is "none"), tick 2 audible_deck
+    becomes "B" via different controller snapshot → registry has "audible_deck=A"
+    after tick 1 + "audible_deck=B" after tick 2. A 3rd tick with the same
+    deck does NOT re-write.
+    """
+    registry = EvidenceRegistry()
+    state = MusicState()
+    state.set_start_at = 900.0
+    buf = _audible_buf()
+
+    # Tick 1 — controller mock has deck A active (default _ctrl_mock)
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=900.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.5,
+        evidence_registry=registry,
+    )
+    snap1 = registry.snapshot()
+    mix1 = snap1.get("mix", {})
+    deck_keys = [k for k in mix1.keys() if k.startswith("audible_deck=")]
+    # state.audible_deck != prev "none" → exactly one write
+    assert len(deck_keys) == 1
+    initial_deck = state.audible_deck
+    assert deck_keys[0] == f"audible_deck={initial_deck}"
+
+    # Tick 2 — same deck snapshot → no new write (same value, no change)
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1001.0,
+        last_audible_high=900.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=1000.0,
+        evidence_registry=registry,
+    )
+    snap2 = registry.snapshot()
+    mix2 = snap2.get("mix", {})
+    # Same key, still 1 observation
+    assert len(mix2.get(deck_keys[0], [])) == 1
+
+
+def test_18_02_registry_kwarg_default_keeps_existing_tests_green():
+    """Test I — registry kwarg default = None preserves all current tests.
+
+    _tick_once with no evidence_registry kwarg runs unchanged. Existing
+    tests in test_refresh.py stay GREEN with zero edits (verified by the
+    rest of this file). This test asserts the no-kwarg path is silent.
+    """
+    state = MusicState()
+    buf = _audible_buf()
+    out = _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+    )
+    # Returned tuple shape unchanged — 4 floats
+    assert len(out) == 4
+
+
+def test_18_02_registry_write_inside_state_lock_AST_check():
+    """Test J — write happens INSIDE the existing `with state._lock:` batch.
+
+    Verified via AST inspection — the registry.write call must lexically
+    appear inside the `with state._lock:` context manager block in
+    refresh._tick_once. Closes the atomic-snapshot-consistency contract.
+    """
+    import ast
+
+    import vibemix.state.refresh as r
+
+    src = r.__file__
+    with open(src) as f:
+        tree = ast.parse(f.read(), filename=src)
+
+    # Find _tick_once function def
+    tick_fn = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_tick_once":
+            tick_fn = node
+            break
+    assert tick_fn is not None, "_tick_once not found"
+
+    # Find `with state._lock:` block(s) inside _tick_once and collect Call
+    # nodes inside their bodies whose func is `evidence_registry.write` or
+    # `self._registry.write` etc.
+    registry_writes_inside_lock: list = []
+    registry_writes_outside_lock: list = []
+
+    def call_targets_registry_write(call: ast.Call) -> bool:
+        if not isinstance(call.func, ast.Attribute):
+            return False
+        if call.func.attr != "write":
+            return False
+        # Match `evidence_registry.write(...)`
+        if isinstance(call.func.value, ast.Name) and call.func.value.id == "evidence_registry":
+            return True
+        return False
+
+    # Walk the function body, tracking whether we're inside a `with state._lock:`
+    def is_state_lock_with(with_node: ast.With) -> bool:
+        for item in with_node.items:
+            ce = item.context_expr
+            # Match `state._lock` Attribute access
+            if isinstance(ce, ast.Attribute) and ce.attr == "_lock":
+                if isinstance(ce.value, ast.Name) and ce.value.id == "state":
+                    return True
+        return False
+
+    def walk(node, inside_lock: bool):
+        if isinstance(node, ast.Call) and call_targets_registry_write(node):
+            (registry_writes_inside_lock if inside_lock else registry_writes_outside_lock).append(node)
+        if isinstance(node, ast.With) and is_state_lock_with(node):
+            for child in node.body:
+                walk(child, inside_lock=True)
+            return
+        for child in ast.iter_child_nodes(node):
+            walk(child, inside_lock=inside_lock)
+
+    for child in tick_fn.body:
+        walk(child, inside_lock=False)
+
+    assert len(registry_writes_inside_lock) >= 1, (
+        "evidence_registry.write must appear at least once INSIDE `with state._lock:` block"
+    )
+    assert len(registry_writes_outside_lock) == 0, (
+        f"evidence_registry.write found OUTSIDE the state._lock block "
+        f"({len(registry_writes_outside_lock)} occurrences) — single-snapshot "
+        f"consistency requires all writes inside the lock"
+    )
+
+
+def test_18_02_golden_equivalence_stays_green_with_registry():
+    """Test K — Phase 3 golden equivalence stays green when registry is wired.
+
+    Drive _tick_once with the same inputs as test_tick_writes_audio_features
+    BUT pass a registry. MusicState fields after the tick MUST match v4
+    behavior — registry write is purely additive.
+    """
+    registry = EvidenceRegistry()
+    state = MusicState()
+    buf = _audible_buf()
+    out = _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+        evidence_registry=registry,
+    )
+    last_high, last_low, _bpm_cache, last_bpm_at = out
+
+    # Same assertions as test_tick_writes_audio_features (golden):
+    assert state.rms > 0.0
+    assert set(state.bands.keys()) == {"sub", "low", "mid", "high"}
+    assert last_bpm_at == 1000.0
+    assert last_high == 1000.0
+    assert last_low == 0.0
+
+
+def test_18_02_state_refresh_loop_threads_registry_kwarg(mocker):
+    """Test L — state_refresh_loop signature accepts evidence_registry kwarg
+    and threads it through to _tick_once on every iteration.
+    """
+    import inspect
+    sig = inspect.signature(state_refresh_loop)
+    assert "evidence_registry" in sig.parameters
+    # Default is None for backward compat
+    assert sig.parameters["evidence_registry"].default is None
+
+    # Behavioral: call state_refresh_loop with registry, capture _tick_once kwargs
+    state = MusicState()
+    state.set_start_at = 900.0
+    buf = _audible_buf()
+    stop = asyncio.Event()
+    registry = EvidenceRegistry()
+
+    captured_kwargs: list[dict] = []
+
+    real_tick_once = _tick_once
+
+    def spy_tick_once(*args, **kwargs):
+        captured_kwargs.append(kwargs)
+        # Stop the loop after first tick observed
+        stop.set()
+        return real_tick_once(*args, **kwargs)
+
+    mocker.patch("vibemix.state.refresh._tick_once", side_effect=spy_tick_once)
+
+    original_sleep = asyncio.sleep
+    async def short_sleep(delay):
+        await original_sleep(0)
+
+    mocker.patch("vibemix.state.refresh.asyncio.sleep", side_effect=short_sleep)
+
+    asyncio.run(
+        state_refresh_loop(state, buf, _ctrl_mock(), _track_mock(), stop, evidence_registry=registry)
+    )
+    assert captured_kwargs, "tick_once was never called"
+    assert captured_kwargs[0].get("evidence_registry") is registry

@@ -254,7 +254,11 @@ describe("renderCohostPanel", () => {
     ).toBe(200);
   });
 
-  it("foot shows GROUNDED + DSEG7 latency when grounded=true", () => {
+  // Critique 2026-05-14: the foot now renders LED + label only — the
+  // amber tabular-mono latency readout was retired (anti-slop, real DJs
+  // don't read latency). Latency stays on the prop interface for a
+  // future Settings → Debug pane.
+  it("foot shows GROUNDED (LED + label only, no latency readout) when grounded=true", () => {
     const panel = renderCohostPanel({
       status: "LISTENING",
       transcript: [],
@@ -267,9 +271,7 @@ describe("renderCohostPanel", () => {
     expect(foot?.querySelector(".vmx-cohost__foot-lbl")?.textContent).toBe(
       "GROUNDED ON AUDIO + SCREEN",
     );
-    expect(foot?.querySelector(".vmx-cohost__foot-latency")?.textContent).toBe(
-      "0.82 s",
-    );
+    expect(foot?.querySelector(".vmx-cohost__foot-latency")).toBeNull();
   });
 
   it("foot shows WARMING UP when grounded=false", () => {
@@ -400,7 +402,11 @@ describe("renderStatusBar", () => {
 // === Titlebar / rocker / picker smoke =======================================
 
 describe("renderTitlebar", () => {
-  it("renders wordmark + 3 pills + clock + settings gear", () => {
+  // Critique 2026-05-14: trimmed the triple LIVE/REC/SYS pill row to
+  // a single LIVE indicator (Pioneer hardware labels the one that
+  // matters). REC + SYS state still flows through SessionLayout's
+  // diff loop — setTitlebarPill no-ops when the DOM node is absent.
+  it("renders wordmark + 1 pill (LIVE) + clock + settings gear", () => {
     const tb = renderTitlebar({
       live: "ok",
       rec: "ok",
@@ -409,7 +415,9 @@ describe("renderTitlebar", () => {
     });
     host().append(tb);
     expect(tb.querySelector(".vmx-titlebar__wordmark")?.textContent).toBe("vibemix");
-    expect(tb.querySelectorAll(".vmx-titlebar__pill")).toHaveLength(3);
+    const pills = tb.querySelectorAll<HTMLElement>(".vmx-titlebar__pill");
+    expect(pills).toHaveLength(1);
+    expect(pills[0]?.dataset.key).toBe("live");
     expect(tb.querySelector(".vmx-titlebar__clock")?.textContent).toBe("02:44:31");
     expect(tb.querySelector(".vmx-titlebar__settings")).toBeTruthy();
   });

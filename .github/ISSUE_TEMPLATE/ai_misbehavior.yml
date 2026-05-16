@@ -1,0 +1,108 @@
+name: AI misbehavior / hallucination
+description: The AI said something wrong, generic, late, or made-up
+title: "[ai-slop] "
+labels: ["ai-quality", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Anti-slop is vibemix's central product thesis — "real DJ friend in your ear, no AI slop." Broken AI reactions matter more to us than feature requests. The more grounding evidence you can attach, the faster we can fix it.
+
+  - type: input
+    id: version
+    attributes:
+      label: vibemix version
+      description: "Run `vibemix --version` and paste the output."
+      placeholder: "v0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS Sequoia (15.x)
+        - macOS Sonoma (14.x)
+        - macOS earlier
+        - Windows 11
+        - Windows 10
+        - Other (specify in context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: skill_level
+    attributes:
+      label: Skill level active
+      options:
+        - Beginner
+        - Intermediate
+        - Pro
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode active
+      options:
+        - Hype-man
+        - Coach
+    validations:
+      required: true
+
+  - type: textarea
+    id: ai_said
+    attributes:
+      label: What did the AI say?
+      description: "Paste the literal text or transcribe the voice line as accurately as possible."
+      placeholder: |
+        AI: "Nice cut from <track A> into <track B>!"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actually_happened
+    attributes:
+      label: What actually happened? (the grounding ask)
+      description: "What was your real musical move? What track was actually playing? What controller action did you actually do? This is the most important field — it lets us replay the moment and check the grounding chain."
+      placeholder: |
+        I was 30 seconds into <track B> with no swap in sight. The AI hallucinated a transition that hadn't happened.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: misbehavior_class
+    attributes:
+      label: Misbehavior class (your best guess)
+      options:
+        - Hallucinated event (AI claimed something happened that didn't)
+        - Late reaction (AI talked about a move long after it ended)
+        - Generic AI slop (sounded like a generic assistant, not a DJ friend)
+        - Repeated itself (already said this 30 seconds ago)
+        - Wrong vocabulary for skill level (Pro mode talking like Beginner, etc.)
+        - Talked over my mic / interrupted me
+        - Other (describe in context)
+    validations:
+      required: true
+
+  - type: textarea
+    id: events
+    attributes:
+      label: events.jsonl excerpt
+      description: "Paste the last 30-60 lines of `recordings/<latest-session>/events.jsonl` covering the misbehavior moment. Redact anything sensitive."
+      render: jsonl
+
+  - type: input
+    id: track_context
+    attributes:
+      label: Track context (optional)
+      description: "What were you mixing? Genre + BPM range helps us understand if the model was confused by an unusual musical context."
+      placeholder: "Techno @ 138 BPM, hardgroove"
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: "Audio recording snippet, screen capture, room context, anything that helps us reproduce."

@@ -19,9 +19,14 @@
  *     --amber-22 (open-edge highlight + bold transcript line border).
  *   - Silk: --silk (active text), --silk-65 (timestamp + idle icon),
  *     --silk-40 (dim transcript lines + delete idle).
- *   - Amber accents (5 reserved uses per UI-SPEC §Color): replay-hover,
- *     <audio> accent-color, expand panel top edge, bold transcript line
- *     border-left.
+ *   - Amber accents (7 reserved uses per UI-SPEC §Color, expanded by
+ *     Plan 15-03 Task 2 from 5 → 7): replay-hover, reveal-hover,
+ *     open-external-hover, <audio> accent-color, expand panel top edge,
+ *     bold transcript line border-left, plus the silk-65→amber ink-flip
+ *     applied identically across the three "info" buttons (replay,
+ *     reveal, open-external). Plan 15-03 SUMMARY documents the expansion
+ *     as an accepted scope change (UI-SPEC's §Color reserved-amber list
+ *     went 8 → 10 elements when both new icons were introduced).
  *   - Destructive: var(--led-fault) on delete hover (the alias
  *     `var(--rec)` referenced in UI-SPEC was never defined in
  *     tokens.css — Phase 14 deleted the shim but the alias was not
@@ -31,12 +36,23 @@
  *       rgba(214, 207, 199, 0.06)  — row hover bg (silk derivation)
  *       rgba(212, 65, 58, 0.18)    — delete-hover inset shadow
  *
- * Test coverage: ./recording-row.spec.ts (14 cases).
+ * Action cluster (Plan 15-03 Task 2 — was 64px, grew to 128px):
+ *   4 buttons × 24px icon + 3 gaps × 8px = 120px + 8px breathing room.
+ *   Order left→right: replay (info) · reveal (info) · open-external (info)
+ *   · delete (destructive). Replay-style hover ink-flip (silk-65→amber)
+ *   applies to all three info buttons; delete keeps its own led-fault
+ *   hover discipline.
+ *
+ * Click handlers fire `revealInOS(session_dir)` / `openInputWav(session_dir)`
+ * from `../../ipc/client.ts` — typed thin wrappers over the Tauri Rust
+ * commands defined in tauri/src-tauri/src/recordings.rs (Plan 15-03 Task 1).
+ *
+ * Test coverage: ./recording-row.spec.ts (14 pre-existing + 4 new = 18 cases).
  */
 
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
-import { sendIpcRequest } from "../../ipc/client.js";
+import { openInputWav, revealInOS, sendIpcRequest } from "../../ipc/client.js";
 import { registerStyle } from "../../session/components/_style-registry.js";
 
 /** Mirror of `RecordingsListResult.payload.sessions[]` (codegen output from
@@ -146,10 +162,38 @@ const REPLAY_SVG = `
   <path d="M4 3 L13 8 L4 13 Z" fill="currentColor" />
 </svg>
 `;
+// Folder with a small arrow on the lower-right — "reveal in finder/explorer".
+// 16×16 viewBox to match REPLAY/DELETE; 14×14 render for a flush 24px button.
+const REVEAL_SVG = `
+<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" width="14" height="14">
+  <path d="M2 4 L6 4 L7.5 5.5 L14 5.5 L14 13 L2 13 Z" fill="none"
+        stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+  <path d="M9 9.5 L11.5 9.5 L11.5 12 M11.5 9.5 L9 12" fill="none"
+        stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
+`;
+// Square with an arrow exiting the top-right — "open in default app".
+const EXTERNAL_SVG = `
+<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" width="14" height="14">
+  <path d="M3 3 L8 3 M3 3 L3 13 L13 13 L13 8" fill="none"
+        stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M9 3 L13 3 L13 7 M13 3 L8 8" fill="none"
+        stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
+`;
 const DELETE_SVG = `
 <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" width="14" height="14">
   <path d="M5 2 L11 2 L11 4 M3 4 L13 4 M5 4 L5 14 L11 14 L11 4" fill="none"
         stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
+`;
+// Plan 29-06 — speech bubble + small replay arrow inside, "open debrief".
+const DEBRIEF_SVG = `
+<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" width="14" height="14">
+  <path d="M2.5 3 L13.5 3 Q14 3 14 3.5 L14 10 Q14 10.5 13.5 10.5 L7 10.5 L4.5 13 L4.5 10.5 L2.5 10.5 Q2 10.5 2 10 L2 3.5 Q2 3 2.5 3 Z"
+        fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+  <path d="M6.5 6.5 L8.5 6.5 L8.5 5 L10.5 7 L8.5 9 L8.5 7.5 L6.5 7.5 Z"
+        fill="currentColor" />
 </svg>
 `;
 
@@ -203,7 +247,10 @@ const CSS = `
     box-shadow: 0 0 4px var(--led-warn);
   }
   .vmx-rec-row__actions {
-    flex: 0 0 64px;
+    /* Plan 15-03 Task 2: was 64px (replay + delete only); grew to 128px to
+       host 4 buttons × 24px + 3 gaps × 8px = 120px + 8px breathing room.
+       Order left→right: replay · reveal · open-external · delete. */
+    flex: 0 0 128px;
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
@@ -223,9 +270,23 @@ const CSS = `
     transition: color var(--motion-snap) ease-out, filter var(--motion-snap) ease-out,
                 box-shadow var(--motion-snap) ease-out;
   }
-  .vmx-rec-row__btn[data-kind="replay"]:hover {
+  /* Info-button hover (replay + reveal + open-external) — silk-65→amber
+     ink-flip with a faint drop-shadow halo. UI-SPEC §Color reserved-amber
+     list: replay-hover (1), reveal-hover (2 — Plan 15-03 expansion),
+     open-external-hover (3 — Plan 15-03 expansion). */
+  .vmx-rec-row__btn[data-kind="replay"]:hover,
+  .vmx-rec-row__btn[data-kind="reveal"]:hover,
+  .vmx-rec-row__btn[data-kind="open-external"]:hover,
+  .vmx-rec-row__btn[data-kind="debrief"]:not(:disabled):hover {
     color: var(--amber);
     filter: drop-shadow(var(--glow-faint));
+  }
+  /* Plan 29-06 — disabled debrief button (short or eventless session)
+     dims at 50% per CDJ Whisper restraint + sets the not-allowed cursor.
+     No glow on hover. */
+  .vmx-rec-row__btn[data-kind="debrief"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .vmx-rec-row__btn[data-kind="delete"] {
     color: var(--silk-40);
@@ -235,15 +296,22 @@ const CSS = `
     box-shadow: inset 0 0 8px rgba(212, 65, 58, 0.18);  /* destructive-hover exception (UI-SPEC §Color) */
     border-radius: var(--rad-sm);
   }
+  /* Expand pattern: parent grid animates grid-template-rows 0fr to 1fr;
+   * inner keeps constant padding so the open/close stays off the layout
+   * property axis. Parent's overflow: hidden clips the inner while the
+   * row is collapsed. min-height: 0 on the inner lets the grid child
+   * shrink below its content size. */
   .vmx-rec-row__expand {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 250ms ease-out;
     overflow: hidden;
-    height: 0;
-    transition: height 250ms ease-out;
   }
   .vmx-rec-row__expand[data-open="true"] {
-    height: auto;
+    grid-template-rows: 1fr;
   }
   .vmx-rec-row__expand-inner {
+    min-height: 0;
     padding: var(--sp-4);
     background: var(--glass-3);
     border-top: 1px solid var(--amber-22);
@@ -283,9 +351,9 @@ const CSS = `
     margin-right: var(--sp-2);
   }
   @media (prefers-reduced-motion: reduce) {
-    .vmx-rec-row__expand { transition: none; }
-    .vmx-rec-row__expand[data-open="false"] { display: none; }
-    .vmx-rec-row__expand[data-open="true"] { display: block; height: auto; }
+    .vmx-rec-row__expand,
+    .vmx-rec-row__expand-inner { transition: none; }
+    .vmx-rec-row__expand[data-open="false"] .vmx-rec-row__expand-inner { display: none; }
   }
 `;
 
@@ -355,6 +423,82 @@ export function renderRecordingRow(opts: RecordingRowProps): RecordingRowHandle 
     onToggle();
   });
   actions.append(replayBtn);
+
+  // Plan 15-03 Task 2 — reveal-in-OS (Finder/Explorer) icon button.
+  // Per CLAUDE.md §Constraints (macOS + Windows in v1) the aria-label uses
+  // "Finder" since macOS is the v0.1.0-rc1 launch target; Plan 15-04 polish
+  // wave may platform-detect and swap copy.
+  const revealBtn = document.createElement("button");
+  revealBtn.type = "button";
+  revealBtn.className = "vmx-rec-row__btn";
+  revealBtn.dataset.kind = "reveal";
+  revealBtn.setAttribute(
+    "aria-label",
+    `reveal session ${formatTimestamp(summary.started_at_iso)} in Finder`,
+  );
+  revealBtn.innerHTML = REVEAL_SVG;
+  revealBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    revealInOS(summary.session_dir).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error("revealInOS failed:", err);
+    });
+  });
+  actions.append(revealBtn);
+
+  // Plan 15-03 Task 2 — open input.wav in OS default audio app.
+  const openExtBtn = document.createElement("button");
+  openExtBtn.type = "button";
+  openExtBtn.className = "vmx-rec-row__btn";
+  openExtBtn.dataset.kind = "open-external";
+  openExtBtn.setAttribute(
+    "aria-label",
+    `open input.wav for session ${formatTimestamp(summary.started_at_iso)} in default app`,
+  );
+  openExtBtn.innerHTML = EXTERNAL_SVG;
+  openExtBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openInputWav(summary.session_dir).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error("openInputWav failed:", err);
+    });
+  });
+  actions.append(openExtBtn);
+
+  // Plan 29-06 — Open Debrief button. Slots between open-external and
+  // delete. Disabled when the session is too short (< 5 min) OR has
+  // too few events (< 5) per CONTEXT D-11 + RESEARCH Pitfall 6.
+  const debriefBtn = document.createElement("button");
+  debriefBtn.type = "button";
+  debriefBtn.className = "vmx-rec-row__btn";
+  debriefBtn.dataset.kind = "debrief";
+  const tooShort = summary.duration_s < 300;
+  const noEvents = summary.event_count < 5;
+  const debriefDisabled = tooShort || noEvents;
+  debriefBtn.disabled = debriefDisabled;
+  if (tooShort) {
+    debriefBtn.title = "Session too short for debrief (need ≥ 5 minutes)";
+  } else if (noEvents) {
+    debriefBtn.title = "No event data for debrief";
+  } else {
+    debriefBtn.title = "Open debrief";
+  }
+  debriefBtn.setAttribute(
+    "aria-label",
+    `open debrief for session ${formatTimestamp(summary.started_at_iso)}`,
+  );
+  debriefBtn.innerHTML = DEBRIEF_SVG;
+  debriefBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (debriefBtn.disabled) return;
+    invoke("open_debrief_window", { sessionDir: summary.session_dir }).catch(
+      (err: unknown) => {
+        // eslint-disable-next-line no-console
+        console.error("open_debrief_window failed:", err);
+      },
+    );
+  });
+  actions.append(debriefBtn);
 
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";

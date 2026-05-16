@@ -1,0 +1,51 @@
+# gitleaks config — Phase 34 / SEC-01.
+#
+# We pin to gitleaks v8.21.2 default ruleset and add a single narrow allowlist
+# entry for the AIza placeholder strings that live in eval/test fixtures.
+#
+# DISCIPLINE (Pitfall P64 — surgical baseline, NOT broad allowlist):
+#   - Allowlist entries below are matched on regex + path. EVERY entry MUST
+#     carry a comment explaining WHY the placeholder is safe.
+#   - We do NOT allowlist `.*`. We do NOT allowlist by file alone (we also
+#     bind the regex). We do NOT allowlist by stopword — the placeholder
+#     pattern is unique enough that bare regex match is appropriate.
+#   - Production secret patterns are NEVER allowlisted. If a real key sneaks
+#     into a fixture path, gitleaks still catches it because the AIza placeholder
+#     pattern has a fixed-suffix that real Gemini keys don't share.
+#
+# Extension policy: when adding a new fixture allowlist:
+#   1. Add comment block describing fixture origin.
+#   2. Add regex anchored to the placeholder shape.
+#   3. Add path restriction to the fixture directory.
+
+title = "vibemix gitleaks config"
+
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Allowlist — surgical, fixture-only.
+# ---------------------------------------------------------------------------
+
+[[rules]]
+description = "vibemix-test-aiza-fixture"
+id = "vibemix-test-aiza-fixture"
+# Match the deterministic placeholder shape we use in test fixtures.
+# Real Gemini keys begin with AIza too, but our test fixtures all end in
+# the literal suffix `-TEST-FIXTURE-DO-NOT-USE`. Real keys never do.
+regex = '''AIza[0-9A-Za-z\-_]{15,30}-TEST-FIXTURE-DO-NOT-USE'''
+tags = ["test-fixture"]
+
+[allowlist]
+description = "vibemix fixture allowlist — surgical (Pitfall P64)"
+
+  [[allowlist.regexes]]
+  # Phase 27 — scripts/scan_aiza_keys.py validates synthetic AIza placeholders
+  # used by the autonomous-proxy hallucination harness. Real Gemini keys do
+  # not carry the TEST-FIXTURE suffix.
+  regex = '''AIza[0-9A-Za-z\-_]{15,30}-TEST-FIXTURE-DO-NOT-USE'''
+  paths = [
+    '''tests/eval/fixtures/.*''',
+    '''tests/security/fixtures/.*''',
+    '''scripts/scan_aiza_keys\.py''',
+  ]

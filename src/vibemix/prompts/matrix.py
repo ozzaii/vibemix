@@ -33,6 +33,7 @@ byte-equal to the v4 port.
 
 from __future__ import annotations
 
+from vibemix.coach.prompt_fragments import IM_LISTENING_FRAGMENT
 from vibemix.prompts.negative_dict import NEGATIVE_PHRASES
 
 # ---------------------------------------------------------------------------
@@ -77,6 +78,59 @@ _NEGATIVE_BAN_BLOCK = f"""--- DO NOT SAY (HARD BAN — these phrases mark you as
 The following phrases are forbidden. If any of them slip out, the cascade will
 suppress your turn entirely. Replace each with concrete listener language.
 BANNED: {_format_ban_list()}
+"""
+
+
+# ---------------------------------------------------------------------------
+# Plan 18-03 — CITATION_GRAMMAR_BLOCK (GROUND-02 + GROUND-03 prompt-only seeding)
+#
+# Constant string baked into every system instruction via
+# ``build_system_instruction(include_citation_grammar=True)`` (the default
+# for new code paths). Teaches Gemini the citation grammar without enforcing
+# it — v1.0 fails open. Phase 20 turns enforcement on (linter + ack-bank
+# fallback); v1.0 just gets the citation shape into Gemini's emissions so the
+# corpus exists by the time Phase 20 lands.
+#
+# Anti-prompt-injection (T-18-03-01): the block is a fixed string with NO
+# interpolation — no user input can mutate it (mirrors MOOD_PERSONAS pattern).
+# The 7 source forms are kept in lock-step with EVIDENCE_SOURCES (Plan 18-01)
+# via Test R cross-validation in tests/prompts/test_matrix.py.
+# ---------------------------------------------------------------------------
+
+CITATION_GRAMMAR_BLOCK: str = """--- CITATION GRAMMAR (v1.0 — encouraged, not required) ---
+
+When you reference a specific event, audio feature, controller move, track,
+screen element, mix-state, or user-profile fact, attach a grounded citation
+in this exact bracket form. Cites help the human team verify what you heard;
+they're encouraged, not required, and there is NO penalty for omitting them
+in v1.0.
+
+Forms (each is a single citation; the linter accepts any of these):
+  [ev:<TYPE>@<t>]     event citation, e.g. [ev:KICK_SWAP@45.2]
+  [aud:<key>@<t>]     audio feature, e.g. [aud:bpm@45.2] or [aud:rms@45.2]
+  [midi:<event>@<t>]  controller event, e.g. [midi:cue_a@12.7]
+  [track:<id>]        track reference, e.g. [track:Marlon Hoffstadt - Atlas]
+  [screen:<key>]      screen element, e.g. [screen:waveform_deck_a]
+  [mix:<derived>]     derived mix-state, e.g. [mix:audible_deck=A]
+  [tend:<fact>]       user-profile fact, e.g. [tend:user_likes_acid]
+
+Multi-citation (comma-separated, no whitespace inside brackets):
+  [ev:KICK_SWAP@45.2,aud:bpm@45.0]
+
+Event types currently tracked (use exactly these in [ev:<TYPE>] —
+UPPER_SNAKE_CASE):
+  KAAN_SPOKE, MANUAL, TRACK_CHANGE, PHASE, LAYER_ARRIVAL, MIX_MOVE, HEARTBEAT
+
+Timestamps (`<t>`) are SECONDS SINCE SESSION START, 1-decimal precision
+(e.g. 45.2 means 45.2 seconds into the session — the same clock as the
+evidence_corpus[…] footer). If you don't know the exact timestamp, OMIT
+the cite — never invent one.
+
+Why this matters: in a future version the cascade will validate every cite
+against the runtime evidence corpus. Cites you emit now are seeding that
+contract — but in v1.0 there is no penalty for missing cites, so prefer
+SILENCE over an invented citation. "Trust the audio, cite when you can,
+stay silent when you can't."
 """
 
 _ANTI_SLOP_FOOTER = f"""
@@ -378,6 +432,9 @@ def build_system_instruction(
     skill: str = "intermediate",
     mode: str = "hype",
     mood: str = "hype-man",
+    *,
+    include_citation_grammar: bool = True,
+    include_listening_fallback: bool = True,
 ) -> str:
     """Return the prompt cell body for ``(skill, mode)`` rendered with ``mood``.
 
@@ -391,10 +448,27 @@ def build_system_instruction(
             persona fragment substituted into the ``{mood_persona}``
             placeholder inside COACH_* cells. Default ``"hype-man"`` preserves
             Phase 10 backward compat for callers that don't pass it.
+        include_citation_grammar: Plan 18-03 — when True (default), the
+            ``CITATION_GRAMMAR_BLOCK`` (GROUND-02 + GROUND-03 prompt-only
+            seeding) is appended to the rendered cell body. When False, the
+            cell body is returned byte-identical to the underlying constant
+            — used by ``vibemix.agent.persona`` to preserve the Phase 4
+            byte-identical-to-v4 ``SYSTEM_INSTRUCTION`` invariant + by
+            v4-byte-identity tests in ``tests/prompts/test_matrix.py``.
+        include_listening_fallback: Plan 20-02 — when True (default), the
+            ``IM_LISTENING_FRAGMENT`` (GROUND-08 prompt-side mitigation) is
+            appended AFTER the citation-grammar block so the grammar primes
+            the "if you cannot cite" clause. The live ``DJCoHostAgent`` rides
+            the default to learn the fail-soft rule automatically. When
+            False, the fragment is suppressed — used by
+            ``vibemix.agent.persona`` together with
+            ``include_citation_grammar=False`` to preserve the v4-byte-
+            identity invariant on ``SYSTEM_INSTRUCTION``.
 
     Returns:
         The prompt string for the requested cell, with ``{mood_persona}``
-        substituted for COACH templates.
+        substituted for COACH templates and (by default) the citation
+        grammar block + the fail-soft fragment appended.
 
     Raises:
         ValueError: ``skill`` not in valid set, ``mode`` not in valid set, or
@@ -426,5 +500,27 @@ def build_system_instruction(
         # other literal braces (none currently, but future edits could) and
         # .format()'s strictness would break us. replace() is safe.
         body = body.replace("{mood_persona}", persona)
+
+    # Plan 18-03 — append the citation-grammar block (GROUND-02 + GROUND-03
+    # prompt-only seeding). Default-on so every Gemini system instruction
+    # sees the grammar; explicit opt-out preserves the v4-byte-identity
+    # invariant at the cell-constant boundary (used by persona.py +
+    # v4-byte-identity tests). The block lives AFTER the v4 body so the
+    # constant is preserved as the prefix — a future grep over the prompt
+    # surface can locate the grammar tail unambiguously.
+    if include_citation_grammar:
+        body = body + "\n\n" + CITATION_GRAMMAR_BLOCK
+
+    # Plan 20-02 — append the fail-soft fragment (GROUND-08 prompt-side
+    # mitigation). The fragment lands AFTER the citation-grammar block so
+    # the grammar context primes its "if you cannot cite" opening clause.
+    # IM_LISTENING_FRAGMENT already starts with "\n\n--- FAIL-SOFT RULE..."
+    # — no extra separator needed (mirror of the locked copy in
+    # src/vibemix/coach/prompt_fragments.py). Default-on so every live
+    # system instruction carries the rule; explicit opt-out preserves the
+    # v4-byte-identity invariant when paired with
+    # ``include_citation_grammar=False`` (used by persona.SYSTEM_INSTRUCTION).
+    if include_listening_fallback:
+        body = body + IM_LISTENING_FRAGMENT
 
     return body

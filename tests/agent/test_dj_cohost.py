@@ -112,7 +112,12 @@ def test_agent_01_subclass_of_livekit_agent() -> None:
 
 def test_agent_02_super_init_kwargs(mocker, tmp_path) -> None:
     """AGENT-02: super().__init__ called with instructions, llm, tts,
-    allow_interruptions=False."""
+    allow_interruptions=False.
+
+    Plan 18-03: ``instructions`` now includes the citation-grammar block
+    appended after the v4 body — assert the v4 body is the prefix and the
+    grammar block's signature substring is present.
+    """
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     mocker.patch.object(Agent, "__init__", return_value=None)
@@ -130,14 +135,19 @@ def test_agent_02_super_init_kwargs(mocker, tmp_path) -> None:
         tts_inst=tts,
     )
     kw = Agent.__init__.call_args.kwargs
-    assert kw["instructions"] == SYSTEM_INSTRUCTION
+    assert kw["instructions"].startswith(SYSTEM_INSTRUCTION)
+    assert "[ev:" in kw["instructions"]  # Plan 18-03 grammar block present
     assert kw["llm"] is llm
     assert kw["tts"] is tts
     assert kw["allow_interruptions"] is False
 
 
 def test_agent_03_initial_state(mocker, tmp_path) -> None:
-    """AGENT-03: pending event None, history empty deque maxlen 10, gen cfg."""
+    """AGENT-03: pending event None, history empty deque maxlen 10, gen cfg.
+
+    Plan 18-03: ``_gen_cfg.system_instruction`` includes the citation-grammar
+    block appended after the v4 body.
+    """
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     agent, _, _, _ = _build_agent(mocker, tmp_path)
@@ -148,7 +158,8 @@ def test_agent_03_initial_state(mocker, tmp_path) -> None:
 
     assert isinstance(agent._gen_cfg, types.GenerateContentConfig)
     # GenerateContentConfig is a pydantic model — direct field access works
-    assert agent._gen_cfg.system_instruction == SYSTEM_INSTRUCTION
+    assert agent._gen_cfg.system_instruction.startswith(SYSTEM_INSTRUCTION)
+    assert "[ev:" in agent._gen_cfg.system_instruction
     assert agent._gen_cfg.temperature == 1.0
     assert agent._gen_cfg.max_output_tokens == 220
     level = agent._gen_cfg.thinking_config.thinking_level
@@ -167,7 +178,16 @@ def test_agent_04_set_next_event(mocker, tmp_path) -> None:
 
 
 def test_llm_node_01_yields_chunks_in_order(mocker, tmp_path) -> None:
-    """LLM-NODE-01: yields each non-empty text chunk in order."""
+    """LLM-NODE-01: yields each non-empty text chunk in order.
+
+    Plan 18-03: build_prompt is now called with kwarg
+    ``registry_snapshot=None`` when no registry is wired (the agent's
+    default state in this test). Assert positional ev + kwarg explicitly.
+
+    Plan 19-02: build_prompt also receives a ``diet=True/False`` kwarg —
+    HEARTBEAT is ack-eligible so diet=True. Asserted explicitly so a future
+    diet-dispatch regression is caught here too.
+    """
     agent, gen_client, _, state = _build_agent(mocker, tmp_path)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: rms=0.05")
@@ -181,7 +201,7 @@ def test_llm_node_01_yields_chunks_in_order(mocker, tmp_path) -> None:
 
     chunks = _drive_llm_node(agent)
     assert chunks == ["hello ", "world"]
-    AICoach.build_prompt.assert_called_once_with(ev)
+    AICoach.build_prompt.assert_called_once_with(ev, registry_snapshot=None, diet=True)
     # pending event was consumed
     assert agent._pending_event is None
 
@@ -476,3 +496,553 @@ def test_pkg_03_dj_cohost_agent_exported() -> None:
     import vibemix.agent as vagent
 
     assert "DJCoHostAgent" in vagent.__all__
+
+
+# ---------- Plan 18-03 — evidence_registry threading (Tests U–X) ----------
+
+
+def _build_agent_with_registry(
+    mocker, tmp_path: Path, registry
+) -> tuple[DJCoHostAgent, Any, _FakeRecorder, MusicState]:
+    """Variant of _build_agent that threads an EvidenceRegistry into the agent."""
+    mocker.patch.object(Agent, "__init__", return_value=None)
+    state = _build_state()
+    recorder = _FakeRecorder(tmp_path)
+    genai_client = mocker.MagicMock()
+    screen_buf = mocker.MagicMock()
+    agent = DJCoHostAgent(
+        genai_client=genai_client,
+        clean_audio_buf=mocker.MagicMock(),
+        screen_buf=screen_buf,
+        state=state,
+        recorder=recorder,
+        llm_inst=mocker.MagicMock(),
+        tts_inst=mocker.MagicMock(),
+        evidence_registry=registry,
+    )
+    return agent, genai_client, recorder, state
+
+
+def test_u_evidence_registry_kwarg_accepted_and_grammar_in_system_instruction(
+    mocker, tmp_path
+) -> None:
+    """Test U — DJCoHostAgent(..., evidence_registry=...) constructs cleanly
+    (default None preserves backward compat) AND the system instruction Gemini
+    sees contains the citation-grammar block (proves Task 1's wiring reached
+    the live LLM path)."""
+    from vibemix.state import EvidenceRegistry
+
+    # Default None — backward compat
+    agent, _, _, _ = _build_agent(mocker, tmp_path)
+    assert agent._registry is None
+
+    # Explicit registry — stored on the agent
+    registry = EvidenceRegistry()
+    agent2, _, _, _ = _build_agent_with_registry(mocker, tmp_path, registry)
+    assert agent2._registry is registry
+
+    # Plan 18-03 Task 1 wiring sanity — system_instruction the LLM sees
+    # contains the grammar block. Locks the dispatcher → prompt_body →
+    # _gen_cfg.system_instruction path end-to-end.
+    assert "[ev:" in agent2._gen_cfg.system_instruction
+    assert "encouraged, not required" in agent2._gen_cfg.system_instruction
+
+
+def test_v_llm_node_calls_build_prompt_with_snapshot_when_registry_wired(
+    mocker, tmp_path
+) -> None:
+    """Test V — when registry wired AND pre-loaded, llm_node calls
+    AICoach.build_prompt with kwarg ``registry_snapshot=`` containing the
+    loaded observation."""
+    from vibemix.state import EvidenceRegistry
+
+    registry = EvidenceRegistry()
+    registry.write("ev", "TRACK_CHANGE@30.0", 30.0)
+
+    agent, gen_client, _, state = _build_agent_with_registry(mocker, tmp_path, registry)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["ok"])
+    )
+
+    ev = Event(type="TRACK_CHANGE", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    AICoach.build_prompt.assert_called_once()
+    call = AICoach.build_prompt.call_args
+    # Positional first arg = the Event
+    assert call.args[0] is ev
+    # Kwarg registry_snapshot present + non-empty + contains the loaded obs
+    snap = call.kwargs.get("registry_snapshot")
+    assert snap is not None, "registry_snapshot kwarg missing"
+    assert "ev" in snap
+    assert "TRACK_CHANGE@30.0" in snap["ev"]
+    assert snap["ev"]["TRACK_CHANGE@30.0"] == (30.0,)
+
+
+def test_w_llm_node_passes_none_snapshot_when_no_registry(mocker, tmp_path) -> None:
+    """Test W — when evidence_registry=None (default — Phase 4 behavior),
+    llm_node calls build_prompt with registry_snapshot=None (or kwarg
+    absent — both are valid no-op contracts)."""
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+    assert agent._registry is None  # default
+
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["ok"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    AICoach.build_prompt.assert_called_once()
+    call = AICoach.build_prompt.call_args
+    # Either registry_snapshot=None OR kwarg absent — both are no-op contracts
+    snap = call.kwargs.get("registry_snapshot", None)
+    assert snap is None, f"expected None snapshot when registry unwired, got {snap!r}"
+
+
+def test_x_llm_node_takes_fresh_snapshot_per_turn(mocker, tmp_path) -> None:
+    """Test X — two consecutive llm_node invocations; between them, write a
+    new observation; the SECOND build_prompt call MUST receive a snapshot
+    containing the new observation. Locks "snapshot per turn" semantic."""
+    from vibemix.state import EvidenceRegistry
+
+    registry = EvidenceRegistry()
+    registry.write("ev", "TRACK_CHANGE@10.0", 10.0)
+
+    agent, gen_client, _, state = _build_agent_with_registry(mocker, tmp_path, registry)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    def _stream(*_a, **_kw):
+        return _async_iter(["chunk"])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(side_effect=_stream)
+
+    # First turn — snapshot has 1 observation
+    ev1 = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev1)
+    _drive_llm_node(agent)
+    first_snap = AICoach.build_prompt.call_args.kwargs["registry_snapshot"]
+    assert "TRACK_CHANGE@10.0" in first_snap["ev"]
+    assert "TRACK_CHANGE@20.0" not in first_snap.get("ev", {})
+
+    # Mutate registry between turns — add a fresh observation
+    registry.write("ev", "TRACK_CHANGE@20.0", 20.0)
+
+    # Second turn — snapshot MUST include the new observation
+    ev2 = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev2)
+    _drive_llm_node(agent)
+    second_snap = AICoach.build_prompt.call_args.kwargs["registry_snapshot"]
+    assert "TRACK_CHANGE@10.0" in second_snap["ev"]
+    assert "TRACK_CHANGE@20.0" in second_snap["ev"], (
+        "snapshot is stale across llm_node calls — must be taken fresh per turn"
+    )
+
+
+# ---------- Plan 18-03 Task 3 — cross-package smoke test (Test Y) ----------
+
+
+def test_y_full_prompt_path_evidence_corpus_and_grammar_block_smoke(
+    mocker, tmp_path
+) -> None:
+    """Test Y — END-TO-END smoke (GROUND-02 + GROUND-03):
+
+    Plan 18-01 (registry instantiation) →
+    Plan 18-02 (EventDetector._fire writes ev observation; AICoach threads
+                snapshot into evidence_line corpus footer) →
+    Plan 18-03 (build_system_instruction appends CITATION_GRAMMAR_BLOCK;
+                DJCoHostAgent.llm_node passes snapshot through).
+
+    Drive a synthetic TRACK_CHANGE through EventDetector (writes
+    [ev:TRACK_CHANGE@<t>] to registry), then call llm_node with the fired
+    event. Intercept the ``contents[0]`` string passed to genai.generate_
+    content_stream and assert:
+
+      a) "evidence_corpus[ev=" — Plan 18-02 footer present (snapshot threaded
+         all the way through to AICoach.evidence_line).
+      b) Plan 18-03 Task 1 wiring — _gen_cfg.system_instruction (the LLM-side
+         system prompt) contains the CITATION_GRAMMAR_BLOCK (verified via the
+         "encouraged, not required" v1.0 fail-open phrase substring).
+
+    Locks the entire Plan 18 prompt-side wiring in one assertion."""
+    from vibemix.state import EventDetector, EvidenceRegistry
+
+    # Plan 18-01 — registry
+    registry = EvidenceRegistry()
+    # Plan 18-02 — EventDetector wired with the registry; firing TRACK_CHANGE
+    # writes [ev:TRACK_CHANGE@<t_session>] to the registry as a side effect.
+    detector = EventDetector(evidence_registry=registry)
+
+    # Build a state that will trigger TRACK_CHANGE on the SECOND detect()
+    # call. The first call seeds last_audible_track baseline; the second
+    # observes the change and fires.
+    state = _build_state()
+
+    # Plan 18-03 — DJCoHostAgent wired with the SAME registry so its
+    # llm_node threads the snapshot through to AICoach.build_prompt.
+    agent, gen_client, _, _ = _build_agent_with_registry(mocker, tmp_path, registry)
+
+    # Force EventDetector to bypass music-presence + cooldown gates so the
+    # synthetic state in this unit-test environment fires TRACK_CHANGE
+    # immediately (the gates exist for live runs; they would otherwise
+    # require a 7s warmup + valid BPM history that the unit test can't
+    # reasonably synthesize). Patching is the smallest-blast-radius move
+    # vs. constructing 10+ state ticks.
+    mocker.patch.object(detector, "_music_truly_playing", return_value=True)
+    detector.last_audible_track = "OLD_TRACK"  # seed baseline so a flip fires
+
+    # Drive detect() — fires TRACK_CHANGE + writes to registry.
+    ev = detector.detect(state, kaan_just_spoke=False, manual=False)
+    assert ev is not None, "EventDetector did not fire — test setup bug"
+    assert ev.type == "TRACK_CHANGE"
+
+    # Sanity — registry has the [ev:TRACK_CHANGE@<t>] observation.
+    snap_check = registry.snapshot()
+    assert "ev" in snap_check
+    assert any(k.startswith("TRACK_CHANGE") for k in snap_check["ev"]), (
+        f"EventDetector._fire did not write to registry; snap={snap_check}"
+    )
+
+    # Wire the agent + drive llm_node end-to-end.
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    captured: dict[str, Any] = {}
+
+    async def _capturing_stream(*_a, **kwargs):
+        captured["contents"] = kwargs["contents"]
+        captured["config"] = kwargs["config"]
+        return _async_iter(["[ev:TRACK_CHANGE@30.0] track flipped — heavier"])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        side_effect=_capturing_stream
+    )
+
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    # (a) Plan 18-02 footer present in the user prompt text — proves the
+    # snapshot threaded all the way through to AICoach.evidence_line.
+    assert "contents" in captured, "generate_content_stream was not called"
+    user_prompt_text: str = captured["contents"][0]
+    assert "evidence_corpus[ev=" in user_prompt_text, (
+        f"Plan 18-02 corpus footer missing from user prompt; got: {user_prompt_text[:300]!r}"
+    )
+
+    # (b) Plan 18-03 Task 1 — the CITATION_GRAMMAR_BLOCK is in the SYSTEM
+    # instruction (NOT the user prompt — system instructions live in the
+    # GenerateContentConfig). Verify via the v1.0 fail-open phrase.
+    sys_instr: str = captured["config"].system_instruction
+    assert "encouraged, not required" in sys_instr, (
+        "CITATION_GRAMMAR_BLOCK missing from system_instruction — "
+        "Plan 18-03 Task 1 wiring broken"
+    )
+    # Grammar surface check — at least one EBNF source form is in the system
+    # instruction so Gemini can pattern-match against it.
+    assert "[ev:" in sys_instr
+
+
+# ---------- Plan 18-04 — citation-count telemetry (Tests AE–AJ) -------------
+
+
+def test_AE_citation_count_event_written_per_turn(mocker, tmp_path) -> None:
+    """Test AE — every Gemini turn writes a ``citation_count`` events.jsonl
+    line with the integer count parsed from the FULL response text + a
+    response_id matching the per-invocation dump folder pattern.
+
+    Closes ROADMAP success criterion #4: events.jsonl records
+    citation_count_per_response per AI turn.
+    """
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    # Two valid citations in the response.
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["great drop [ev:KICK_SWAP@45.2] [aud:bpm@45.2]"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    citation_events = [e for e in recorder.events if e[0] == "citation_count"]
+    assert len(citation_events) == 1, (
+        f"expected 1 citation_count event, got {len(citation_events)}: {recorder.events!r}"
+    )
+    kind, fields = citation_events[0]
+    assert kind == "citation_count"
+    assert fields["count"] == 2
+    # response_id matches NNNN_TS pattern (e.g. "0001_HHMMSS")
+    rid = fields["response_id"]
+    assert rid.startswith("0001_"), f"response_id {rid!r} should start with 0001_"
+    assert len(rid.split("_")) == 2
+
+
+def test_AF_citation_count_fires_for_silence_suppressed_turn(mocker, tmp_path) -> None:
+    """Test AF — silence-suppressed turn STILL emits citation_count.
+
+    Phase 16 ear-test needs Gemini's true emission rate, NOT the post-
+    suppression rate. A turn that emits ``<silence/>`` along with an ev
+    citation must still register count=1 in events.jsonl.
+    """
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    # <silence/> short-circuits the turn but the citation atom is still in
+    # the full_text the parser sees.
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["<silence/> [ev:HEARTBEAT@30.0]"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    kinds = [k for k, _ in recorder.events]
+    # Suppression MUST have fired (silence_short_circuit) AND citation_count
+    # MUST have been written for the same turn.
+    assert "silence_short_circuit" in kinds
+    citation_events = [e for e in recorder.events if e[0] == "citation_count"]
+    assert len(citation_events) == 1
+    assert citation_events[0][1]["count"] == 1
+
+
+def test_AG_citation_count_zero_when_no_citations(mocker, tmp_path) -> None:
+    """Test AG — response with zero citations emits ``count=0``."""
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["great drop"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    citation_events = [e for e in recorder.events if e[0] == "citation_count"]
+    assert len(citation_events) == 1
+    assert citation_events[0][1]["count"] == 0
+
+
+def test_AH_registry_record_citation_count_called_per_turn(mocker, tmp_path) -> None:
+    """Test AH — when registry wired, ``record_citation_count`` is called per
+    llm_node turn, advancing ``citation_telemetry()["total_turns_observed"]``
+    by exactly 1 per call."""
+    from vibemix.state import EvidenceRegistry
+
+    registry = EvidenceRegistry()
+    agent, gen_client, _, state = _build_agent_with_registry(mocker, tmp_path, registry)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    def _stream(*_a, **_kw):
+        return _async_iter(["great drop [ev:KICK_SWAP@45.2] [aud:bpm@45.2]"])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(side_effect=_stream)
+
+    # Pre-call baseline.
+    assert registry.citation_telemetry()["total_turns_observed"] == 0
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+    assert registry.citation_telemetry()["total_turns_observed"] == 1
+    assert registry.citation_telemetry()["mean"] == 2.0  # 2 citations parsed
+
+    # Second call advances total_turns by 1 again.
+    ev2 = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev2)
+    _drive_llm_node(agent)
+    assert registry.citation_telemetry()["total_turns_observed"] == 2
+
+
+def test_AI_telemetry_path_is_best_effort_never_raises(mocker, tmp_path) -> None:
+    """Test AI — if ``parse_citations`` raises (corrupt regex, OOM, anything),
+    the LLM response path MUST still complete: chunks yielded, ai_text event
+    written. No exception escapes into the LiveKit cascade.
+
+    Mitigates threat T-18-04-03 (telemetry breaking the LLM stream).
+    """
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    # Force parse_citations to raise — simulates a corrupt regex / OOM /
+    # whatever future regression. The agent code MUST swallow it.
+    mocker.patch(
+        "vibemix.agent.dj_cohost.parse_citations",
+        side_effect=RuntimeError("simulated parse failure"),
+    )
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["clean reply text"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    # MUST NOT raise.
+    chunks = _drive_llm_node(agent)
+    assert chunks == ["clean reply text"]
+    # ai_text event still written — LLM response path completed cleanly.
+    kinds = [k for k, _ in recorder.events]
+    assert "ai_text" in kinds
+    # citation_count may be missing OR count=0 — both are valid best-effort
+    # outcomes. The hard contract is "no exception escapes".
+    citation_events = [e for e in recorder.events if e[0] == "citation_count"]
+    if citation_events:
+        # If the agent chose to emit a fallback count=0, that's fine too.
+        assert citation_events[0][1]["count"] == 0
+
+
+def test_AJ_no_registry_path_writes_recorder_event_only(mocker, tmp_path) -> None:
+    """Test AJ — when ``evidence_registry=None`` (default Phase 4 backward-
+    compat), ``citation_count`` event STILL lands in events.jsonl (recorder-
+    side write), but the registry-side rolling buffer is simply not updated
+    (because there is no registry).
+    """
+    agent, gen_client, recorder, state = _build_agent(mocker, tmp_path)
+    assert agent._registry is None  # default
+
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["great drop [track:abc-123]"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    citation_events = [e for e in recorder.events if e[0] == "citation_count"]
+    assert len(citation_events) == 1, (
+        "citation_count events.jsonl line MUST land even when no registry wired"
+    )
+    assert citation_events[0][1]["count"] == 1
+
+
+# ---------- Plan 18-04 Task 3 — Phase 16 readiness signal (Test AK) ---------
+
+
+def test_AK_phase16_readiness_signal_end_to_end(mocker, tmp_path) -> None:
+    """Test AK — END-TO-END Phase 16 readiness signal (ROADMAP success #4):
+
+    Construct the full stack (registry + EventDetector(registry) +
+    DJCoHostAgent(registry)). Drive 10 mock LLM turns with varying
+    citation counts. After all turns, ``registry.citation_telemetry()``
+    returns the EXACT signal Phase 16 ear-test will consume to gate
+    Phase 20 enforcement readiness.
+
+    Counts: [3, 0, 2, 1, 4, 0, 2, 5, 1, 3] = 21 total / 10 turns = mean 2.1
+    """
+    from vibemix.state import EventDetector, EvidenceRegistry
+
+    registry = EvidenceRegistry()
+    # Construct EventDetector with the same registry (Plan 18-02 wiring).
+    EventDetector(evidence_registry=registry)
+
+    agent, gen_client, _, state = _build_agent_with_registry(mocker, tmp_path, registry)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    # Build 10 response strings with the exact citation counts below.
+    # Use a mix of single-citation and multi-citation forms so the parser
+    # exercises both paths.
+    responses = [
+        "[ev:A@1] [ev:B@2] [ev:C@3]",  # 3
+        "no citations here",  # 0
+        "[ev:A@1,aud:bpm@1]",  # 2 (multi-citation in one bracket)
+        "[track:xyz-1]",  # 1
+        "[ev:A@1] [aud:bpm@2] [midi:cue_a@3] [track:xyz-1]",  # 4
+        "<silence/>",  # 0
+        "[ev:A@1] [aud:bpm@2]",  # 2
+        "[ev:A@1] [aud:bpm@2] [midi:cue_a@3] [track:xyz-1] [screen:wave_a]",  # 5
+        "[mix:audible_deck=A]",  # 1
+        "[tend:user_likes_acid] [ev:A@1] [aud:bpm@2]",  # 3
+    ]
+    expected_counts = [3, 0, 2, 1, 4, 0, 2, 5, 1, 3]
+
+    response_iter = iter(responses)
+
+    def _stream(*_a, **_kw):
+        return _async_iter([next(response_iter)])
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(side_effect=_stream)
+
+    for _ in range(10):
+        ev = Event(type="HEARTBEAT", state=state, extra={})
+        agent.set_next_event(ev)
+        _drive_llm_node(agent)
+
+    tel = registry.citation_telemetry()
+    assert tel["window_size"] == 10
+    assert tel["total_turns_observed"] == 10
+    expected_mean = sum(expected_counts) / 10
+    assert tel["mean"] == expected_mean, (
+        f"Phase 16 readiness signal drift: expected mean {expected_mean}, got {tel['mean']}"
+    )
+
+
+# ---------- Plan 19-05 — TTFTMeter wiring ----------
+
+
+def _build_agent_with_meter(mocker, tmp_path: Path, meter):
+    """Construct a DJCoHostAgent wired to the supplied TTFTMeter."""
+    mocker.patch.object(Agent, "__init__", return_value=None)
+    state = _build_state()
+    recorder = _FakeRecorder(tmp_path)
+    genai_client = mocker.MagicMock()
+    screen_buf = mocker.MagicMock()
+    agent = DJCoHostAgent(
+        genai_client=genai_client,
+        clean_audio_buf=mocker.MagicMock(),
+        screen_buf=screen_buf,
+        state=state,
+        recorder=recorder,
+        llm_inst=mocker.MagicMock(),
+        tts_inst=mocker.MagicMock(),
+        ttft_meter=meter,
+    )
+    return agent, genai_client, recorder, state
+
+
+def test_ttft_set_next_event_calls_meter_record_event_fired(mocker, tmp_path) -> None:
+    """Plan 19-05: agent.set_next_event(ev) → meter.record_event_fired called."""
+    meter = mocker.MagicMock()
+    agent, _, _, state = _build_agent_with_meter(mocker, tmp_path, meter)
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    meter.record_event_fired.assert_called_once()
+
+
+def test_ttft_set_next_event_no_meter_does_nothing(mocker, tmp_path) -> None:
+    """Plan 19-05: agent constructed without ttft_meter — set_next_event still works."""
+    agent, _, _, state = _build_agent(mocker, tmp_path)
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)  # Must not raise
+    assert agent._pending_event is ev
+
+
+def test_ttft_llm_node_records_first_chunk_on_first_non_empty(
+    mocker, tmp_path
+) -> None:
+    """Plan 19-05: llm_node calls meter.record_first_chunk exactly once on the
+    first non-empty chunk yield (not per-chunk)."""
+    meter = mocker.MagicMock()
+    agent, gen_client, _, state = _build_agent_with_meter(mocker, tmp_path, meter)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["", "hello", " ", "kaan"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    # Exactly one record_first_chunk call (on "hello" — the first non-empty).
+    meter.record_first_chunk.assert_called_once()

@@ -31,7 +31,10 @@
 //! a different payload — equivalent UX, more portable. Documented as a
 //! deviation in the SUMMARY.
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use tauri::{
     image::Image,
@@ -51,6 +54,7 @@ const MENU_ID_MOOD_HYPE: &str = "mood-hype-man";
 const MENU_ID_MOOD_TEACHER: &str = "mood-teacher";
 const MENU_ID_MOOD_COACH: &str = "mood-coach";
 const MENU_ID_MUTE: &str = "mute-mic";
+const MENU_ID_TOGGLE_MASCOT: &str = "toggle-mascot";
 const MENU_ID_OPEN_SESSION: &str = "open-session";
 const MENU_ID_RECALIBRATE: &str = "re-run-calibration";
 const MENU_ID_SETTINGS: &str = "open-settings";
@@ -72,6 +76,14 @@ const ICON_ERROR: &[u8] = include_bytes!("../icons/tray-error.png");
 pub struct TrayHandle {
     pub icon: Arc<Mutex<Option<tauri::tray::TrayIcon>>>,
 }
+
+/// Critique pass 4 (2026-05-14): cancelable quit fallback. Set to true
+/// when the tray Quit menu fires, cleared by either `confirmed-quit`
+/// (real exit) or `quit-cancelled` (user picked Stay). The 1.5s fallback
+/// timer in `handle_menu_event` checks this — only exits if still true,
+/// which means "the webview never responded at all".
+#[derive(Default, Clone)]
+pub struct QuitPending(pub Arc<AtomicBool>);
 
 /// Build the tray icon + menu and park its handle into managed state.
 /// Called once from `main.rs::setup()` after the mascot window builder.
@@ -141,6 +153,19 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         Some("CmdOrCtrl+Shift+M"),
     )?;
+    // Explicit toggle for mascot visibility. The tray's left-click already
+    // toggles, but the binding is invisible from the menu — once the
+    // persisted `mascot_window.visible: false` state is reached, users with
+    // no muscle memory for "click the tray icon" are stuck searching for
+    // a way to bring the mascot back. This item is the discoverable path
+    // alongside the same canonical setter the left-click uses.
+    let toggle_mascot = MenuItem::with_id(
+        app,
+        MENU_ID_TOGGLE_MASCOT,
+        "Toggle Mascot",
+        true,
+        None::<&str>,
+    )?;
     let open_session = MenuItem::with_id(
         app,
         MENU_ID_OPEN_SESSION,
@@ -179,6 +204,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         .item(&mood_teacher)
         .item(&mood_coach)
         .item(&mute)
+        .item(&toggle_mascot)
         .item(&open_session)
         .item(&recalibrate)
         .item(&settings)
@@ -238,6 +264,25 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
             // already fires through.
             let _ = app.emit("tray-mute-toggle", ());
         }
+        MENU_ID_TOGGLE_MASCOT => {
+            // Same canonical setter the tray left-click invokes — reads
+            // the persisted visible flag, flips it, lets set_mascot_visible
+            // update both the live window and the config atomically.
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let state = match config::load_mascot_state(&app_handle) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        tracing::warn!("toggle mascot menu: load_mascot_state failed: {e}");
+                        return;
+                    }
+                };
+                if let Err(e) = config::set_mascot_visible(app_handle.clone(), !state.visible).await
+                {
+                    tracing::warn!("toggle mascot menu: set_mascot_visible failed: {e}");
+                }
+            });
+        }
         MENU_ID_OPEN_SESSION => {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -254,9 +299,40 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
             let _ = app.emit("tray-open-settings", ());
         }
         MENU_ID_QUIT => {
-            // The ONE legitimate exit path. Lifecycle override below
-            // makes sure window close events don't reach this code path.
-            app.exit(0);
+            // Critique pass 3 (2026-05-14): H5 quit-during-recording guard.
+            // Critique pass 4 (2026-05-14): cancelable fallback timer.
+            //
+            // Flow:
+            //   1. Emit `tray-quit-requested` event.
+            //   2. Webview listener mounts the "STILL LIVE" confirm dialog
+            //      (if recording in flight) OR immediately emits
+            //      `confirmed-quit` (if not recording).
+            //   3. On "Quit anyway" → emits `confirmed-quit`; main.rs
+            //      listener calls `app.exit(0)`.
+            //   4. On "Stay" → emits `quit-cancelled`; we clear the
+            //      pending flag so the fallback timer becomes a no-op.
+            //   5. Fallback: if neither event arrives within 1.5s the
+            //      timer fires and exits anyway (webview crashed scenario).
+            //
+            // The pending flag lives on AppHandle managed state via
+            // `QuitPending`; main.rs sets up the `quit-cancelled` listener
+            // that clears it.
+            let pending = app.state::<QuitPending>().0.clone();
+            pending.store(true, Ordering::SeqCst);
+            let _ = app.emit("tray-quit-requested", ());
+            let fallback_app = app.clone();
+            let fallback_pending = pending.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                // Only exit if the webview never responded (no
+                // `quit-cancelled`, no `confirmed-quit`). The pending flag
+                // is the discriminator — `confirmed-quit` exits before
+                // this fires; `quit-cancelled` clears the flag so we
+                // become a no-op.
+                if fallback_pending.swap(false, Ordering::SeqCst) {
+                    fallback_app.exit(0);
+                }
+            });
         }
         other => {
             tracing::debug!("unrecognised tray menu id: {other}");
@@ -631,6 +707,7 @@ mod tests {
             MENU_ID_MOOD_TEACHER,
             MENU_ID_MOOD_COACH,
             MENU_ID_MUTE,
+            MENU_ID_TOGGLE_MASCOT,
             MENU_ID_OPEN_SESSION,
             MENU_ID_RECALIBRATE,
             MENU_ID_SETTINGS,

@@ -23,12 +23,14 @@ if sys.platform == "darwin":
         check_microphone_permission,
         check_screen_recording_permission,
         request_microphone_permission,
+        request_screen_recording_permission,
     )
 elif sys.platform == "win32":
     from vibemix.platform._permissions_windows import (
         check_microphone_permission,
         check_screen_recording_permission,
         request_microphone_permission,
+        request_screen_recording_permission,
     )
 else:
     raise RuntimeError(
@@ -40,4 +42,5 @@ __all__ = [
     "check_microphone_permission",
     "check_screen_recording_permission",
     "request_microphone_permission",
+    "request_screen_recording_permission",
 ]

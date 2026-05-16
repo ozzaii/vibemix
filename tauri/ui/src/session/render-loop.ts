@@ -15,6 +15,8 @@
  * The local clock display string is recomputed here (not in the
  * bridge) — wall-clock progresses regardless of snapshot arrival. */
 
+import { invoke } from "@tauri-apps/api/core";
+
 import { renderSessionFrame, type Mounted } from "./SessionLayout.js";
 import type {
   SessionState as LayoutSessionState,
@@ -24,6 +26,21 @@ import type { SessionState as BridgeSessionState } from "./state.js";
 
 let rafHandle: number | null = null;
 let mountedRef: Mounted | null = null;
+
+/** Wave 6 (H9) — handler for the "↻ RETRY" button rendered in the cohost
+ *  foot after grounding has been false for >5s. There's no dedicated
+ *  `ipc.cohost.reconnect` route today (TODO Phase 17 — surface the
+ *  partial-failure cases separately from a full sidecar restart); we
+ *  reuse the crash-banner's restart_sidecar path because a sustained
+ *  ungrounded state is functionally indistinguishable from a sidecar
+ *  hang. The handler is fire-and-forget; the bridge picks up the new
+ *  sidecar's snapshot once it boots and the foot flips back to GROUNDED. */
+function cohostRetryHandler(): void {
+  void invoke("restart_sidecar").catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.warn("[render-loop] cohost retry restart_sidecar failed:", err);
+  });
+}
 
 // Dev-mode frame-time tracking
 const FRAME_WINDOW_MS = 1000;
@@ -122,6 +139,13 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       transcript: s.transcript,
       latencyMs: s.latencyMs,
       grounded: s.grounded,
+      // Wave 6 (H9) — retry handler for the "COULDN'T REACH GEMINI" foot
+      // surface that appears after grounding has been false for >5s.
+      // No dedicated ipc.cohost.reconnect exists (TODO Phase 17?); we
+      // fall back to the existing crash-banner path (restart_sidecar)
+      // since a sustained ungrounded state is functionally the same as
+      // a sidecar-down condition.
+      onRetry: cohostRetryHandler,
     },
     status: {
       livekit: s.status.livekit,

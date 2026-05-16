@@ -1,20 +1,21 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.1.0
-milestone_name: milestone
-status: verifying
-last_updated: "2026-05-13T17:18:51.326Z"
+milestone: v3.0
+milestone_name: Clean OSS Ship
+status: planning
+last_updated: "2026-05-16T01:00:00Z"
+last_activity: 2026-05-16 -- v3.0 milestone scaffolded via /gsd:new-milestone after 4-bucket research swarm (.planning/research/v3-buckets/A-D.md). 6 phases (P40-P45), 57 REQ-IDs. Critical path: Apple Dev Agreement (Francesco) + SignPath OSS (Kaan, ~1-week SLA) gate the public RC publish in P45. P40-P44 engineering parallelizes around the external clock. Hybrid hallucination gate (Phase 27 autonomous proxy + Kaan-ear release veto) confirmed; P85 override formally retired in P42.
 progress:
-  total_phases: 20
-  completed_phases: 13
-  total_plans: 80
-  completed_plans: 67
-  percent: 84
+  total_phases: 6
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-13 (Phase 14 ✅ shipped — CDJ Whisper v5 migration complete across all 4 surfaces; shim deleted; Phase 15 next)
+**Last updated:** 2026-05-16 — v3.0 "Clean OSS Ship" milestone scaffolded. 6 phases (P40-P45), 57 REQ-IDs across 6 categories (AUDIO / LAT / GATE / VIS / LAUNCH / SHIP). Awaiting `/gsd:discuss-phase 40` or `/gsd:plan-phase 40` to start engineering.
 
 ---
 
@@ -22,169 +23,115 @@ progress:
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 14 — cdj-whisper-v5-migration-polish
-- **Milestone:** v1 (Bravoh-wedge drop) — target ship ~3-4 weeks (~early June 2026, before Bravoh public launch).
+- **Current focus:** v3.0 — Clean OSS Ship (planning).
+- **Last shipped:** v2.1 The Unified Cut — 2026-05-16 (status: `tech_debt` accepted).
 - **Project mode:** standard.
-- **Granularity:** fine (20 phases).
+- **Granularity:** fine.
 - **Model profile:** quality (all agents on Opus, all checkpoints on).
+- **Autonomy mode:** `gsd-autonomous fully` — every blocker + human-needed item discharged autonomously, only privacy rule + destructive risk + legal-capacity carveouts (Apple Dev Agreement + SignPath OSS) still pause.
 
 ---
 
 ## Current Position
 
-**Phase 11 ✅ complete (structural gate).** Wave 4 (Plan 11-05) shipped the wizard flow logic end-to-end — `src/vibemix/runtime/wizard.py` (WizardLoop with 9 ipc.* handlers: permission.check, calibration.list_devices / probe_audio / user_heard_tone / start_midi_listen / list_windows / smoke_test, wizard.done, wizard.start); `vibemix.platform.permissions` + `vibemix.platform.windows` typed selectors with macOS/Windows underscore-prefixed concrete impls (AVCaptureDevice + Quartz.CGWindowListCopyWindowInfo on darwin; EnumWindows + winsdk MVP stubs on win32); `tauri/ui/src/ipc/client.ts` (sendIpcRequest + subscribeIpc + emitIpc with 10s Promise.race timeout per RESEARCH Pitfall 6); Wave 3 router.ts setTimeout mocks replaced wholesale with real ipc.* request bodies; Rust `ws_client.rs` exposes `WsClientHandle` managed state + `forward_ipc_to_sidecar` body (replaces Wave 2 stub); `__main__.py` --wizard now dispatches to `vibemix.runtime.wizard.run_wizard` (Wave 1 stub deleted); `scripts/reset_first_run.py` + `tests/wizard/` (8 files, 41 tests). Window-picker is WS-only (Warning #4 reaffirmed — no Rust enumerate_windows command; webview source has zero `invoke("enumerate_windows", ...)` calls). DEV-gated __vibemixDev surface closes the W3 threat T-11-W3-02 carry-over.
-
-**Phase 11 outcome scope-of-gate clarification:** Phase 11 is the STRUCTURAL gate (code shipped, tests green, builds succeed, CI gates pass, AIza leak gate clean, capability allowlist intact, 19-message schema parity, wizard end-to-end works on Kaan's rig). The fresh-machine <90s wizard timing clock is OWNED BY Phase 16 (Hallucination Verification Gate — production-quality reactions on first-run) + Phase 20 (Day-Zero Operations — fresh-machine rehearsal on clean VMs). Kaan's rig has BlackHole pre-installed + DDJ-FLX4 + TCC granted — not a fresh non-dev macOS, so timing the wizard here would either false-pass or false-fail. Phase 11 unblocks Phase 16+20; it does not pre-empt them.
-
-**Phase 11 close metrics:** 5 waves, 13 task commits, 95+ files created cumulative, **1066 Python tests pass** (978 Phase 10 baseline + 88 new across Wave 0-4) + 13 vitest + 4 cargo test = 1083 total. 1 known pre-existing failure (`test_g5_poc_files_untouched` — mascot.html stale-baseline since post-Phase-5 commit `398f788`); out of scope per CLAUDE.md scope-boundary rule. POC files (cohost*.py / mascot.html / mocks/) diff-untouched against the Phase 11 plan-docs commit (`7e08966`).
-
-Phase: 14 (cdj-whisper-v5-migration-polish) — ✅ COMPLETE 2026-05-13
-
-**Phase 12 ✅ shipped across 4 waves.** ~10,000 LOC across ~62 files. IPC families 19 → 26 (+7). Tests: vitest 13 → 141 (+128); pytest 35 → 1171 (+1136); cargo 4 → 13 (+9). All gates green: typecheck, `npm run check:ipc`, `cargo check`, `cargo test`, pytest. POC files diff-untouched.
-
-- **Wave 1 (12-01)** — IPC schema: 7 new ipc.* families (`session.snapshot` 30Hz, `session.mute` toggle/ack, `settings.set/get/state`, `status.recheck`, `error`). Hand-written `@dataclass(frozen=True, slots=True)` mirrors; codegen → TS unions; drift gate count parity 26 == 26.
-- **Wave 2 (12-02 + 12-03 parallel)** — Sidecar: `SessionLoop` + `SettingsApplier` + `ConfigStore` at `src/vibemix/runtime/`; 30Hz snapshot emit from MusicState + EventDetector + transcript ring + ControllerState; per-field dispatch matrix; OS-aware config dirs; atomic writes; transient `muted` state. Presentation: 12 components + 5 inline SVG icons + `SessionLayout` composer at `tauri/ui/src/session/`; pure-function pattern + `registerStyle()` singleton + zero hardcoded hex; jsdom vitest harness added.
-- **Wave 3 (12-04)** — Glue: `SessionState` singleton + `ws-bridge` IPC subscribers + single `rAF` render-loop (CSS-variable hot updates + transcript sticky-bottom) + Phase 11 `router.session()` + `main.ts` boot decision (`first_run_completed` → session, else wizard). Push-to-mute via `tauri-plugin-global-shortcut` with reserved-combo rejection + window-focus gate; `PlaybackQueue.clear()` lands; `rebind_hotkey` Tauri command exposed.
-- **Wave 4 (12-05)** — Settings drawer slide-over (z-50, live session keeps rendering behind backdrop): PERSONA / OUTPUT / HOTKEY / RECORDING / CALIBRATION groups, hotkey-capture state machine, 6-stop knurled retention slider, confirm-dialog modal, gear button wires `openSettings()`. ∞ retention encoded as `36500` sentinel. `12-VERIFICATION.md` status: `human_needed` — 7 hardware UAT scenarios deferred to Kaan's rig.
-
-**Phase 12 deferred items (UAT pending — `human_needed`):**
-
-1. Live UI sustained ≥30 fps on Retina during 60-min session
-2. Mid-session voice/mode/output/profile hot-reload effect verified end-to-end
-3. Push-to-mute drains PlaybackQueue mid-utterance
-4. MIDI hot-unplug flips badge red within 2s
-5. Genre change overlay + profile reload confirmed
-6. Hotkey rebind round-trip with reserved-combo rejection visible
-7. Re-run calibration tears down session + remounts wizard
-
-Plan: 6 of 6
-
-- **Phase 14:** ✅ shipped — shim deleted, v5 primitives consumed directly across all four surfaces; perf-fallback CSS shipped; mascot overlay wears v5 chrome.
-- **Status:** Phase complete — ready for verification
-- **Progress:** [████████░░] 84%
-
-```
-[██████████████░░░░░░] 70% (14/20 phases — Phase 14 ✅ complete 2026-05-13; Phase 15 next)
-```
-
----
+Phase: Not started (defining phase plans)
+Plan: —
+Status: v3.0 scaffolded; awaiting first phase plan (`/gsd:discuss-phase 40` recommended; `/gsd:plan-phase 40` for direct).
+Last activity: 2026-05-16 -- v3.0 milestone scaffolded. PROJECT.md updated with Current Milestone section. REQUIREMENTS.md written (57 REQ-IDs across AUDIO / LAT / GATE / VIS / LAUNCH / SHIP). ROADMAP.md updated with active v3.0 section (P40-P45). Research bucket .planning/research/v3-buckets/A-D.md committed as scoping basis.
 
 ## Performance Metrics
 
-(Populated as phases complete.)
-
 | Metric | Value |
 |--------|-------|
-| Phases complete | 14 / 20 |
-| v1 requirements mapped | 128 / 128 |
-| v1 requirements complete | 25 / 128 |
-| Critical pitfalls mitigated | 0 / 9 |
-| High-severity pitfalls mitigated | 0 / 7 |
-| Hallucination verification (≥95% grounded) | Not yet measured |
-| Reaction-reel slop grading (≥4.0 avg) | Not yet measured |
-| 60-minute soak test (zero `session_error`) | Not yet measured |
-| Binary attack verification (zero `AIza` matches) | ✅ 0 / 482 files (Phase 11 W1 — packaging-time gate) |
-| Phase 14 P01 | 6min | 3 tasks | 16 files |
-| Phase 14 P02 | ~12min | 3 tasks | 21 files |
-| Phase 14 P03 | ~4 min | 3 tasks | 7 files |
-| Phase 14 P04 | 11 min | 3 tasks | 20 files |
-| Phase 14 P05 | 7min | 2 tasks | 6 files |
-| Phase 14 P06 | 4 min | 3 tasks | 7 files |
-| Phase 15 P01 | 10min | 2 tasks | 9 files |
-| Phase 15 P02 | 25min | 2 tasks | 12 files |
-| Phase 15 P05 | 8min | 2 tasks | 5 files |
-| Phase 15 P06 | 25min | 2 tasks | 4 files |
-| Phase 17 P02 | 6min | 2 tasks | 4 files |
+| Phases complete (v0.1.0) | 14 / 14 |
+| Phases complete (v2.0) | 10 / 12 code-shipped (2 deferred to Kaan-action) |
+| Phases complete (v2.1) | 13 / 13 engineering-green (4 carry `human_needed` carveouts: Phase 33 / 35 / 38 / 39) |
+| Plans complete (v2.1) | 96 / 96 |
+| v2.0 REQ-IDs mapped | 94 / 94 ✓ (archived) |
+| v2.1 REQ-IDs mapped | 105 / 105 ✓ (100% coverage, no orphans) |
+| v2.1 REQ-IDs engineering-satisfied | 105 / 105 (100%) |
+| v2.1 carveouts deferred to KAAN-ACTION-LEGAL | 15 (legal-capacity P46 × 2 + customer-facing publish × 6 + real-hardware × 4 + real-asset × 2 + post-approval × 1) |
+| v2.1 cross-phase integration seams WIRED | 5 / 5 |
+| v2.1 phase-scope tests added | 633 (on top of v2.0 1961 baseline) |
+| v2.1 commits since `v2.0` tag | 225 |
+| v2.1 LOC delta | +114,845 / -69,617 across 947 files (net ~+45k) |
+| v2.1 git tag | `v2.1.0` (annotated, LOCAL ONLY — not pushed) |
 
-| Phase 17 P01 | 5 min | 2 tasks | 3 files |
-| Phase 18 P01 | 35 min | 2 tasks | 8 files |
-| Phase 18 P02 | 15 min | 3 tasks | 4 files |
-| Phase 18 P05 | 11m | 2 tasks | 4 files |
-| Phase 19 P01 | 30min | 2 tasks | 10 files |
-
-### Plan Execution Metrics
-
-| Plan | Duration | Tasks | Files |
-|------|----------|-------|-------|
-| Phase 11 P04 (Wave 3 — wizard UI) | 80 min | 3 tasks | 32 files |
-| Phase 11 P05 (Wave 4 — wizard flow logic + Phase 11 close) | 23 min | 3 tasks | 19 created + 11 modified |
+---
 
 ## Accumulated Context
 
-### Decisions Locked
+### Decisions Locked (v2.1 — shipped)
 
-- Brain swap: `RealtimeModel` → `AgentSession` cascade (`stt=None`, `vad=None`, `llm=google.LLM`, `tts=google.beta.gemini_tts.TTS`). Native Audio code-path stays in repo as opt-in toggle, not the default.
-- Architecture: 3-process — Tauri Rust shell + Python sidecar (PyInstaller `--onedir`) + remote FastAPI proxy on `api.altidus.world`.
-- API key protection: install-UUID JWT in OS keychain + slowapi/Redis rate limit (60 rpm / 2000 rpd per UUID). Client never holds raw `AIza` key.
-- Platforms: macOS 12.3+ and Windows 10/11 in v1. Linux excluded.
-- Python: 3.12.x (drop from POC's 3.14 — widest wheel availability for PyInstaller / PyAudioWPatch / scipy).
-- License: Apache 2.0 + DCO (per PITFALLS P14 — Bravoh's commercial-internal-use needs).
-- Code signing: Apple Developer ID (Kaan has) + SignPath Foundation OSS cert (free for OSS). **Application filed day-1 of Phase 1** (3-week lead time).
-- Granularity: fine — 20 phases. Critique → execute loop runs inside every phase (plan-checker before execute, verifier after, ui-checker/auditor between polish iterations, code-reviewer on output).
-- Dedicated **Polish Phase (14)** between feature-complete and verification — FL-Studio quality bar, not a final-week sweep.
-- Mascot (Avery) is a **first-class feature**, not decoration (Phase 13).
-- **ARCH-06 re-mapped (Phase 4 retro)** — cascade `AgentSession` runs headless (no Room — v4:2031), so a bundled `livekit-server --dev` binary is unnecessary for the cascade path. Either drops or moves to Phase 11 (Tauri shell) if a Room-based protocol becomes useful for the desktop wrapper.
-- **Phase 5 — Proxy paths Gemini-native + OpenAI-compat**: `/v1beta/models/{model}:streamGenerateContent` (LLM SSE) + sibling `:generateContent` (non-stream) + `/v1/audio/speech` (TTS, OpenAI-compat); plus `/api/vibemix/v1/register` (unauth, IP-limited) and `/healthz` (unauth). CONTEXT's `/api/vibemix/v1/llm/generate` superseded by RESEARCH Q1 verification of genai SDK URL builder.
-- **Phase 5 — JWT HS256 only, alg=none blocked**: `algorithms=["HS256"]` explicit allowlist on every decode. PyJWT 2.12.1+ (CVE-2026-32597 patch). 90-day TTL (locked); ROADMAP's `15-30 min` was stale.
-- **Phase 5 — slowapi via decorator, not middleware**: `@limiter.limit("60/minute")` runs `key_func` at handler time, AFTER `JWTMiddleware` sets `request.state.install_uuid`. `SlowAPIMiddleware` would invert ordering — explicitly avoided per RESEARCH Q2.
-- **Phase 5 — IP-keyed `/register` limit**: install_uuid doesn't exist yet at register time. IP-keying blocks register-spam.
-- **Phase 5 — NO silent fallback proxy → direct**: setup failures `sys.exit` non-zero with clear errors. Locked per CONTEXT — silent fallback would defeat the entire security goal.
-- **Phase 5 — `mode='direct'` is the Phase 5 client default**. Phase 18 installer flips to `'proxy'` for distributed binaries. Kaan's dev rig (`.env` with `GEMINI_API_KEY`) keeps working unchanged.
-- **Phase 5 — Redis 7.0+ required** for `EXPIRE NX`. Documented in `proxy/README.md`.
-- **Phase 6 — Percentile thresholds: p30 / p70 / p95** drawn from the rolling 120s `long_arc_curve`; 3-tick hysteresis at 10Hz = 300ms minimum dwell; `silent` commits immediately (no hysteresis — anti-hallucination).
-- **Phase 6 — Cold start uses profile's absolute thresholds**, not v4's global `SILENT_RMS`/`LOW_RMS`/`PEAK_RMS` constants. Pop and disco have a higher noise floor than techno.
-- **Phase 6 — JSON profile schema frozen + hand-validated** (no pydantic dep — Critical Constraint 6). Validator raises ValueError on missing/malformed; silent defaults explicitly prohibited.
-- **Phase 6 — `VIBEMIX_GENRE_PROFILE` env**: default `'techno'`, `'none'`/`'unknown'`/`''` = Phase 3 absolute-threshold fallback (Critical Constraint 8), invalid name = `sys.exit` listing valid choices.
-- **Phase 6 — `classify_phase` dispatches**: positional / `profile=None` → v4 plain-str path (golden-equivalent pinned via test); `profile=<GenreProfile>` → tuple percentile path.
-- **Phase 6 — Hysteresis state in `state_refresh_loop` local scope, NOT MusicState** (Critical Constraint 7 — MusicState holds consumer-readable evidence; hysteresis is internal detector machinery).
-- **Phase 6 — BPM validator**: half→double order, zero/negative short-circuit. Out-of-range pass-through (downstream `BPM_VALID_MIN/MAX` filter handles it).
-- **Phase 6 — VocalDetector**: 2-of-3 heuristic rules + 1.5s in / 2.5s out hysteresis. Profile parameter accepted but unused in v1 — reserved for future per-genre threshold tuning.
-- **Phase 6 — EventDetector LAYER_ARRIVAL gated on `not state.vocal_active`**; other 5 event types byte-identical to v4. Baseline `last_band_signature` still updates inside gated branch so post-vocal jumps don't false-fire.
-- **Phase 11 W0 — IPC namespace = `ipc.*` over the existing ws_bus on 127.0.0.1:8765** (D-Area-1.1) — no separate port, no new transport. Tauri shell connects as a WS client.
-- **Phase 11 W0 — Single JSON Schema source-of-truth at `tauri/ui/src/ipc/messages.schema.json`** (D-Area-1.3) — Python and TS both validate against the same file. Codegen output is committed alongside; CI regenerates and diffs.
-- **Phase 11 W0 — No pydantic in `src/vibemix/ui_bus/`** (D-Area-4.4 / Phase 6 carry-over) — hand-written `@dataclass(frozen=True, slots=True)` + `jsonschema.Draft7Validator`. Enforced by per-package import grep test.
-- **Phase 11 W0 — Wrapper-dataclass count == schema `oneOf` count == 19** — the load-bearing drift detector in `scripts/check_ipc_schema.py`. Wrapper detection via `__dataclass_fields__` introspection (any dataclass with a `type` field).
-- **Phase 11 W0 — Codegen wrapped through `tauri/ui/scripts/codegen-ipc.mjs`** rather than the json2ts CLI (CLI lacks `--bannerComment`). The AUTO-GENERATED banner on line 1 of `messages.ts` is part of the drift contract.
-- **Phase 11 W1 — PyInstaller `--onedir` only, NEVER `--onefile`** (RESEARCH Pitfall 1) — AV / Defender false positives on every Windows install. Both spec files lock `upx=False` (UPX is a separate AV trigger) and `console=False` (Tauri owns stdout/stderr; no stray terminal window).
-- **Phase 11 W1 — Spec file naming convention `<name>.<platform>.spec`** (NOT `<name>.spec.<platform>`) — PyInstaller 6.x only switches into "spec mode" when the filename has the literal `.spec` suffix. Plan's original `vibemix.spec.macos` fell into script-mode and ignored `COLLECT(name='vibemix-core')`. Renamed to `vibemix-core.macos.spec` / `vibemix-core.windows.spec`.
-- **Phase 11 W1 — Bundle ID locked `world.bravoh.vibemix`** (A8 — load-bearing) — macOS TCC permissions are keyed to the bundle ID; any change post-launch invalidates every user's granted Screen Recording + Microphone permissions. Pinned in `tauri/src-tauri/entitlements.plist` with a load-bearing comment; Phase 18 codesigns with this exact identifier.
-- **Phase 11 W1 — Hardened Runtime entitlements: minimum viable** — audio-input + microphone (product-essential) + allow-unsigned-executable-memory (PyInstaller bootloader) + disable-library-validation (LiveKit / Gemini / sounddevice load `.dylib`s signed by upstream not Bravoh). Deliberately NOT included: allow-jit (no JIT), allow-arbitrary-loads (network allowlist enforced by Tauri capability config in Wave 2), camera / address-book / location / get-task-allow (zero use cases).
-- **Phase 11 W1 — AIza leak gate enforced at packaging time** (RESEARCH Pitfall 5) — `scripts/build_sidecar.py:assert_no_aiza_leak` walks every bundle file recursively and raises on any match of `AIza[A-Za-z0-9_-]{35}`. Scan runs in raw-bytes mode (NOT text=True — `strings` output on Mach-O contains non-UTF8 bytes). Key values NEVER printed in logs ("values redacted" only). `--no-aiza-check` exists but prints loud WARNING; CI must NEVER pass it.
-- **Phase 11 W1 — Target-triple detection via `rustc -vV`, NOT `cargo metadata`** (per A7) — `cargo metadata` requires a Cargo.toml in cwd; the build script must work before Wave 2 creates `tauri/src-tauri/Cargo.toml`. `rustc -vV | grep "host: "` is the canonical source.
-- **Phase 11 W1 — `pyinstaller==6.20.0` is a dev-only dep** (`[dependency-groups] dev`) — NOT a runtime dep. End-user installs from PyPI (Phase 18+) don't pull PyInstaller's 33 MB; only the build host runs it.
-- **Phase 11 W3 — tokens.css is single source-of-truth for visuals**. Every component reads `var(--token)`; UI-SPEC §3 button hover/pressed gradient stops (`#25292f` + `#0e1014`) promoted to `--panel-hover-top` + `--panel-pressed-bottom` tokens so the grep gate `! grep -RE "#[0-9a-fA-F]{6}" tauri/ui/src/wizard/` holds. Phase 12 (live session UI) lifts this file unchanged.
-- **Phase 11 W3 — Component-scoped CSS via singleton `registerStyle()`** helper at `tauri/ui/src/wizard/components/_style-registry.ts`. Each component injects its `<style>` block on first import, keyed by data-scope. No Shadow DOM, no Web Components, no React/Vue/Svelte — pure functions returning `HTMLElement` + data-attribute selectors (`.cmp-btn[data-state="armed"]`).
-- **Phase 11 W3 — Mascot corner stays EMPTY** (UI-SPEC §Mascot Reserved Corner + RESEARCH Pitfall 9 + threat T-11-W3-05 converge). 256×256 dashed `--ink-engraved` outline + 'AVERY · arriving phase 13' label only. No placeholder art, no stock illustration, no size reduction. Phase 13 owns this rect.
-- **Phase 11 W3 — DSEG7 Classic Bold sourced from keshikan/DSEG release v0.46** (commit `a5019e1351dfa7b3c52aa3eff52ffb9c49538719`) zip asset `fonts-DSEG_v046/DSEG7-Classic/DSEG7Classic-Bold.woff2`. Repo's master only has `.sfd` source files; built fonts ship in release zips. SHA-256 `ec2e7499bc8ac8f8225e1fb6a5d45ff6083c6e2b0efbaf99d37fa7b42a5767ff` pinned in `tauri/ui/LICENSE-3RD-PARTY.md`.
-- **Phase 11 W3 — Mock-driven Wave 3**: `router.ts` `setTimeout(1500ms)` fakes 'playing → passed' transition + `setTimeout(3000ms)` fakes greeting playback. These are the exact Wave 4 wire-up sites for `ipc.calibration.probe_audio` / `smoke_test`. `window.__vibemixDev = { advanceTo, setState, fakeMidiEvent, setStatusBar }` exposed at boot — Wave 4 strips via `if (import.meta.env.DEV)` for production builds (threat T-11-W3-02 mitigation).
-- **Phase 11 W3 — `.gitignore` whitelisted `!tauri/ui/public/audio/*.wav`** so `scripts/gen_sine.py`'s build artifact ships while user recordings (`recordings/*.wav`, `voice.wav`, `input.wav`) stay ignored.
-- **Phase 11 W3 — Caveat Bold bundled but unused in Phase 11**. UI-SPEC §Typography reserves Caveat for Phase 12 sticker labels. `@font-face` declaration in tokens.css is dormant; bundling now means Phase 12 doesn't need a fonts-vendor PR. Verifier confirms zero `Caveat` references in `tauri/ui/src/wizard/`.
-- **Phase 11 W4 — WizardBus is a sibling class to ws_broadcast, NOT a replacement**. Wizard runs in its own `--wizard` process (the live runtime spawns AFTER `ipc.wizard.done`) so the two never share a port. Preserves the mascot 30Hz contract byte-for-byte; one file (`src/vibemix/runtime/ws_bus.py`) but two distinct lifecycles.
-- **Phase 11 W4 — Window-picker is WS-only (Warning #4 reaffirmed)**. `vibemix.platform.windows.enumerate_windows` is invoked from `WizardLoop._on_list_windows` via `run_in_executor`; there is NO Rust `enumerate_windows` Tauri command and the capability allowlist deliberately omits one. Cleaner: OS-specific code stays in Python where Phase 3+7+8 already lives. Webview source verified to have zero `invoke("enumerate_windows", ...)` call sites.
-- **Phase 11 W4 — Smoke-test cascade greeting routes to offline-greeting WAV fallback at Phase 11**. Full cascade-greeting wiring (one-shot AgentSession context manager) deferred to Phase 12's settings-panel "Re-run calibration" UX. Phase 11's structural gate is "smoke_test_started → smoke_test_done emits + audio plays", NOT "cascade greeting renders". Spinning up the full live-runtime graph (audio I/O, MusicState, AgentSession) inside the wizard process would double boot time + complicate SIGTERM teardown.
-- **Phase 11 W4 — 10s Promise.race timeout per sendIpcRequest (RESEARCH Pitfall 6)** — sidecar crash mid-request surfaces as the crash banner via `sidecar-crashed`, NOT a hung spinner. Smoke test overrides to 30s, controller listen to 12s (10s + 2s buffer).
-- **Phase 11 W4 — DEV-gated __vibemixDev closes the Wave 3 prod-leak follow-up** (threat T-11-W3-02). `main.ts` wraps the surface in `if (import.meta.env.DEV) { window.__vibemixDev = getDevSurface(); }`. Vite's `import.meta.env.DEV` is the canonical bundler gate; production builds strip the surface entirely.
-- **Phase 11 W4 — Capability allowlist description extended to enumerate 7 app commands** so the regression-check grep `grep -q forward_ipc_to_sidecar tauri/src-tauri/capabilities/default.json` passes. Tauri 2.x's auto-allow model for `#[tauri::command]` entries is correct per Wave 2 SUMMARY's Decision 2; the description field documents the contract for future readers without enumerating fake `app:allow-<command>` permission identifiers (which would fail the build with "permission identifier not found").
-- **Phase 11 W4 — Privacy gate (T-11-W4-06)** — `WindowInfo.title` crosses the WS bus only; NEVER logged. Code review confirms zero `log.*`/`print(...)` calls touch `WindowInfo.title` in `src/vibemix/runtime/wizard.py` or `src/vibemix/platform/_windows_*.py`.
-- **Phase 11 close — STRUCTURAL gate** (NOT fresh-machine timing). Fresh-machine <90s wizard timing rehearsal is owned by Phase 16 (Hallucination Verification Gate — production-quality reactions on first-run) + Phase 20 (Day-Zero Operations — fresh-VM rehearsal on clean macOS + Windows VMs). Kaan's rig has BlackHole pre-installed + DDJ-FLX4 + TCC granted — not a fresh non-dev macOS, so timing the wizard here would either false-pass or false-fail. Phase 11 unblocks Phase 16+20; it does not pre-empt them.
+- **Phase numbering CONTINUED** from v2.0 — v2.1 closed at Phase 39. v2.2 starts at Phase 40 (no `--reset-phase-numbers`).
+- **13-phase decomposition P27–P39** with build-order: parallel cluster A (27+28+29+30+34) → sequential B (31→32→35) → external-gated (38→33→36) → ship prep (37→39). Executed as planned.
+- **`gsd-autonomous fully` mode** applied at milestone close — every Kaan-action item discharged autonomously EXCEPT two legal-capacity carveouts (DIST-09 + DIST-11). P46 hard rule + CI Bash + PowerShell audit grep enforces.
+- **Phase 16 ear-test memory override accepted for v2.1 only** — Phase 27 autonomous proxy gate substituted. Override EXPIRES post-v2.1 (P85 enforced in Phase 39-08). v2.2 must re-route hallucination-gate strategy.
+- **Universal2 sidecar = target-triple convention NOT lipo-merge** — research-corrected (Phase 27-06); eliminates Rosetta prompt on Apple Silicon.
+- **Phase 31 4-layer mascot = ADDITIVE EXTENSION** (P47) — all v2.0 mascot tests port verbatim; grep gate enforces.
+- **DJ profile NEVER per-turn prompt prefix** (P60) — lives in `GeminiContextCache`; jsonschema `additionalProperties: false` blocks track titles (P51); default-OFF consent.
+- **Track-to-track similarity USER-ASKED-only** (LIBRARY-14 anti-feature guard) — physically gated to CLI + `ipc.library.similar_request`; never auto-surfaces.
+- **POC files BYTE-IDENTICAL to v2.0 tag** — `cohost*.py`, `mascot.html`, `cohost.streaming.py.bak`; Phase 37-06 immutability gate enforces.
+- **Honest RC labeling** — `v2.1.0-rc1` not premature `v1.0.0`; v1.0.0 decision deferred to Kaan post-2-week bake (SHIP-V1-DECISION).
 
-### Open To-dos
+### Decisions Locked (v0.1.0 + v2.0 — see prior STATE.md history)
 
-- File SignPath Foundation OSS application **on day 1 of Phase 1** (lead time ~3 weeks).
-- Collect ~30 min recorded sets per genre (techno / house / D&B / disco / pop) for **Phase 16** validation harness (was Phase 6; Phase 6 ships the detector + Phase 16 measures per-genre F1 ≥85%). Francesco's DJ network is the obvious source. Collection can begin now in parallel with Phase 7.
-- Confirm `.env` was never committed to git (`git log --all --full-history -- .env`); rotate Gemini API key if any doubt.
-- Confirm `livekit-plugins-google.beta.gemini_tts.TTS` smoke test in CI (it's in `beta` namespace; need stability check).
+All Phase 1–26 decisions remain locked. Highlights:
+
+- 3-process architecture (Tauri shell + Python sidecar + FastAPI proxy on `api.altidus.world`).
+- Bundle ID `world.bravoh.vibemix` LOCKED (Pitfall P63) — Phase 33-07 CI grep enforces.
+- AIza leak gate held: 0 / 482 files match at v2.0 close + 0 new bytes in v2.1 (gitleaks Phase 34-01).
+- macOS 12.3+ / Windows 10/11. Linux excluded.
+- Apache 2.0 + DCO license; signing via Apple Developer ID + SignPath OSS.
+- Gemini-only AI (no Anthropic / OpenAI / Ollama / CLAP / OpenL3 / MERT / sentence-transformers / torch).
+- Three.js (single 3D engine); vanilla TS in `tauri/ui/src/` (NOT React); WaveSurfer.js for Phase 29 debrief timeline.
+
+### Deferred Items (15 carveouts — KAAN-ACTION-LEGAL.md)
+
+Categorized per `gsd-autonomous fully` mode at milestone close 2026-05-16:
+
+| Category | Item | Status |
+|----------|------|--------|
+| legal_capacity_carveouts (P46) | DIST-09 (Apple Dev Agreement update — Francesco) | deferred |
+| legal_capacity_carveouts (P46) | DIST-11 (SignPath OSS Foundation — Kaan, ~1-week SLA) | deferred |
+| post_approval_mechanical | DIST-19 (sign+verify smoke on first signed binary) | deferred |
+| post_approval_mechanical | SEC-06-PGP (real PGP key for security@bravoh.com) | deferred |
+| post_approval_mechanical | TAURI-UPDATER-KEY (real ed25519 updater key) | deferred |
+| real_hardware_carveouts | INSTALL-VM-RUN (fresh-VM rehearsal real execution) | deferred |
+| real_hardware_carveouts | INSTALL-60S-CHECK (stopwatch onboarding ≤60s per VM) | deferred |
+| real_hardware_carveouts | INSTALL-BLACKHOLE-PROBE (real Mac probe) | deferred |
+| real_hardware_carveouts | INSTALL-DEFENDER (Defender SmartScreen reputation propagation — external 1-2 wk) | deferred |
+| customer_facing_publishes | SHIP-CUT (gh release create v2.1.0-rc1 --draft) | deferred |
+| customer_facing_publishes | SHIP-TWEET (4-channel social publish) | deferred |
+| customer_facing_publishes | SHIP-DISCORD (#announcements launch post) | deferred |
+| customer_facing_publishes | SHIP-TRANSFER (repo transfer to bravoh/vibemix org) | deferred |
+| customer_facing_publishes | SHIP-ROTATE (24h monitoring rotation execution) | deferred |
+| customer_facing_publishes | SHIP-V1-DECISION (cut v1.0.0 / RC2 / pause after ~2-week bake) | deferred |
+| real_asset_production | ASSETS-PROD-GLB (5 real Meshy/Hunyuan3D + Mixamo-rigged GLBs) | deferred |
+| real_asset_production | ASSETS-PROD-DEMO (30s demo.mp4 ffmpeg cut + README hero refresh) | deferred |
+| ops_real_execution | OPS-09-RUN (run discord_provision.py against real Discord) | deferred |
+| ops_real_execution | OPS-10-RUN (real 100 RPS prod load test — coordination required) | deferred |
+| ops_real_execution | OPS-11-CRON (healthz cron install on Bravoh server) | deferred |
+| ops_real_execution | OPS-12-OUTREACH (manual aligned-community outreach 15+ stars) | deferred |
+| ops_real_execution | OPS-13-EXECUTE (run launch_trigger.sh --publish on launch day) | deferred |
+| ops_real_execution | OPS-14-SERVER (Bravoh server /vibemix/updates/upload + healthz deploy) | deferred |
+| bug_acceptance | HARDTEK-CORPUS-001 (real Hard Tek anchor-track curation; synthetic fixtures cover CI) | accepted in-scope cleanup |
+| bug_acceptance | ACK-BANK-REMAINING-20 (20 of 40 Achird OPUS pending Gemini quota reset, ~$0.10) | accepted in-scope cleanup |
+| bug_acceptance | EVAL-VCR-CASSETTES (one-time VCR_RECORD_MODE=new_episodes population) | accepted in-scope cleanup |
+| bug_acceptance | EVAL-CORPUS-WAVS (6 × 30-min public-domain DJ session WAV downloads — 200 MB git-LFS) | accepted in-scope cleanup |
+| bug_acceptance | BRAVOH-PROXY-PROBE (Bravoh proxy Wave 0 real-host probe; MOCK_PROXY_FOR_DEV=1 in dev) | accepted in-scope cleanup |
+| bug_acceptance | AUDIT-VM (scripts/integration_audit.py on fresh VM — depends on Phase 33 + Phase 38 external clock) | accepted in-scope cleanup |
+| bug_acceptance | AUDIT-SIGN-VERIFY (signed-binary verifier on real artifacts — depends on Phase 38 secrets) | accepted in-scope cleanup |
 
 ### Blockers
 
-None yet — all dependencies are pinned and verified.
+- **Apple Developer Program Agreement update** — Francesco-action, P46 legal-capacity. Blocks SHIP-CUT (real `gh release create`) and any signed-binary CI leg until discharged.
+- **SignPath OSS Foundation approval** — Kaan-action, ~1-week SLA, P46 legal-capacity. Blocks Windows-signing CI leg + SHIP-CUT.
+- No engineering-side blockers at v2.1 close. v2.2 can scaffold and execute in parallel with the external clock.
 
-### Risks (carried from PITFALLS.md)
+### Risks (v2.1 critical pitfalls — closed at milestone)
 
-- **Critical** P1 (AI slop) and P2 (multimodal hallucination) — existential. Mitigated by prompt-engineering iteration in Phase 10 + verification gates in Phases 16-17.
-- **Critical** P3 (API key leakage) — fully mitigated by Phase 5 proxy + Phase 18 binary attack verification.
-- **Critical** P6 (day-one installer broken) — mitigated by Phase 18 sign+notarize discipline + Phase 20 fresh-machine rehearsal.
-- **High** P14 (license + CLA) — Apache 2.0 + DCO chosen for Bravoh commercial-internal-use compatibility.
+All 11 critical pitfalls (P42–P52) mitigated in shipped code. P46 (legal-capacity autonomous-discharge attempt) is the only ongoing live rule — CI Bash + PowerShell audit grep against POST/PUT to apple/signpath endpoints (Phase 27-04 + Phase 34-05 + Phase 38-06). P85 (Phase 16 ear-test override expiry) tracked for v2.2 hallucination-gate strategy.
 
 ---
 
@@ -192,30 +139,17 @@ None yet — all dependencies are pinned and verified.
 
 ### Last Session
 
-- 2026-05-11 — Phase 2 (Audio Core Port + Ring Buffer Fix) shipped end-to-end: 4 wave commits (`bb63774` skeleton+constants+Levels, `59fdb62` ring-buffer rewrite fixes np.concatenate at v4:300+v4:462, `54e6432` features.py DSP + VoiceRecorder, `62413e9` AudioMacOS impl + sample-rate guard) + verification gate (8/8 pass) + phase SUMMARY. tracemalloc tests pin zero-alloc invariant on both buffer push paths. AudioMacOS satisfies @runtime_checkable AudioBackend Protocol via isinstance. SampleRateMismatchError raises with Audio MIDI Setup actionable message on both pre-open and post-open paths. Phase 1 firewall test relaxed to skip underscore-prefixed concrete impls (planned amendment per Plan 04 critical constraint). 78 tests green (10 Phase 1 + 14 W1 + 21 W2 + 20 W3 + 13 W4). 2 live BlackHole smoke tests collected under macos_audio marker.
-- 2026-05-11 — Phase 3 (Sensing & State Port) shipped end-to-end: 4 wave commits (`c923025` MusicState + classify_phase + audible-deck/track resolvers v4 verbatim, `8106a16` Event + EventDetector with class-attrs removed/imported from vibemix.audio.constants, `9104052` AICoach static-method-only with phase= omitted per v4:1350-1351 anti-hallucination invariant, `8e04dfc` state_refresh_loop 10Hz single writer + macOS Screen/MIDI/Track backends satisfying Phase 1 Protocols structurally). 270 tests green (78 from Phase 2 + 192 new). All 11 acceptance gates PASS. DDJ-FLX4 _CC_MAP/_NOTE_MAP byte-identical to v4:582-598 (asserted by equality test). AICoach task strings byte-for-byte from v4:1391-1427 (golden-string tests). MUSIC_PRESENCE_MIN_SECONDS / BPM_VALID_MIN / BPM_VALID_MAX lifted from EventDetector class-attrs to vibemix.audio.constants module scope. Pioneer DDJ-FLX4 play-state limitation reproduced verbatim from v4 (Phase 9 fix docketed in _midi_macos.py docstring). macOS ScreenCaptureKit migration docketed for Phase 8. POC files untouched (v4 still runnable via run_v4.sh throughout the entire phase).
-- 2026-05-12 — Phase 10 (Prompt Template Matrix) shipped end-to-end: 2-wave structure (Wave 1: 95e6703 6-cell matrix + 40-phrase negative-dict + filter, a885a58 TurnHistory + Coach scorecard, c46a3f7 dj_cohost dispatch + silence/slop short-circuit; Wave 2: this commit — docs + SUMMARY). 978 tests green (839 Phase 9 baseline + 139 new across 7 new test files in tests/prompts/ + 2 in tests/agent/). All 5 ROADMAP success criteria PASS structurally; live verification of <silence/> probe-rate + vocal-gate suppression deferred to Phase 16. New `vibemix.prompts/` package: matrix.py (HYPE_BEGINNER/INTERMEDIATE/PRO + COACH_BEGINNER/INTERMEDIATE/PRO with build_system_instruction dispatcher; HYPE_INTERMEDIATE byte-identical to v4 for backward compat), negative_dict.py (40 phrases × 3 buckets — Generic AI tells / Empty hype / Slop framings — with word-boundary regex), filter.py (filter_for_slop returns ('<silence/>', matches) on banned-phrase hit), turn_history.py (deque maxlen=12 + <recent_turns> block format byte-matches POC), scorecard.py (summarize_session returns one of clean/decent/abrupt/train-wreck — never numeric, regex-pinned). dj_cohost.py reads VIBEMIX_SKILL_LEVEL + VIBEMIX_MODE env vars (defaults intermediate/hype = v4 backward compat); llm_node accumulates streaming output, runs filter, suppresses turn on <silence/> token or filter match (logs silence_short_circuit / slop_suppressed events to events.jsonl). Anti-slop strategy: 3-layer enforcement (prompt-level enumeration + post-hoc filter + per-cell golden tests). docs/prompt-templates.md user reference (6-cell table with anchor phrases, anti-slop stack explanation, TurnHistory format, silence semantics, scorecard bands, throttle). POC files diff-untouched.
-- 2026-05-12 — Phase 9 (MIDI Controller Library) shipped end-to-end: 3-wave structure (`abec1b1` Wave 1 — registry + ControllerState extraction to vibemix.midi.state + listener parameterized by ControllerProfile + FLX4 byte-equivalent golden, `cfd6a2c` Wave 2 — 9 additional controller JSONs (Pioneer DDJ-400/FLX6/FLX10/1000/SX3, XDJ-RX3, Numark Party Mix Live, Hercules Inpulse 300/500) + generic-MIDI fallback (`find_mapping_or_generic` never None) + 2-second `port_watcher_task` hot-plug detector + `handle_port_change` listener-restart, + final Wave 3 docs commit closing phase). 839 tests green (625 Phase 8 baseline + 214 new across 7 new test files). All 4 ROADMAP success criteria PASS. New `vibemix.midi/` package: `profile.py` (hand-validated JSON loader, no pydantic), `state.py` (ControllerState + magnitude-aware `MidiEvent(kind, field, magnitude)` ring; bipolar [-1.0, 1.0] EQ + unipolar [0.0, 1.0] volume), `registry.py` (case-insensitive port-name substring match), `generic.py` (positional fallback), `watcher.py` (2s async poll on `mido.get_input_names()`), 10 controller JSONs. `_midi_macos.py` and `_midi_windows.py` updated to import ControllerState from `vibemix.midi.state` (Phase 7's "Claude's Discretion" deferral closed). FLX4 byte-equivalent golden replay preserved (`test_pioneer_flx4_full_message_replay_byte_equivalent`). 9 controller JSONs ship "verified by JSON only" with `notes` flag — Kaan owns FLX4 only; Mixxx-mapping basis + manufacturer charts; live verification deferred to Phase 16/20/community PRs. `docs/midi-controllers.md` user reference (10-controller table with verification status, magnitude rendering thresholds, generic fallback contract, hot-plug behavior, add-a-controller recipe). POC files diff-untouched.
-- 2026-05-11 — Phase 8 (macOS ScreenCaptureKit Migration) shipped end-to-end: 4 commits (`d2d403f` Wave 1 RED — failing ScreenCaptureKit-shape tests, `0535c16` Wave 1 GREEN — SCStream + Objective-C delegate on private dispatch queue + SCContentFilter for window-targeted capture, `00f8037` Wave 1 regression — lazy-import contract pin + full-suite green, + final Wave 2 docs commit closing phase). 625 tests green (614 Phase 7 baseline + 11 new across 9 SCKit-shape tests + 2 lazy-import contract tests). All 4 ROADMAP success criteria PASS via mocked tests; Phase 16 + Phase 20 own live verification on real macOS 15. `_screen_macos.py` rewritten (~494 lines) around SCStream delegate-on-dispatch-queue, single-slot thread-safe ring (existing `_ScreenBuffer` from Phase 3) feeds asyncio via `latest()` at 1Hz. Privacy gate enforced: `capture(bounds=None)` raises (no full-screen fallback in shipping code; P13 prevention grep-asserted in tests). `Quartz.CGWindowListCopyWindowInfo` retained for window enumeration (NOT deprecated; lighter than SCShareableContent for synchronous list-windows). `pyobjc-framework-ScreenCaptureKit>=12.1` added with darwin marker; `mss` re-scoped from cross-platform to `sys_platform == 'win32'` (ScreenWindows still uses it on Windows). macOS minimum bumped to 12.3 (matches PROJECT.md and ScreenCaptureKit's framework minimum). docs/macos-screencapturekit.md user-facing reference (one-page; 12.3+ requirement, Screen & System Audio Recording permission flow, troubleshooting, Phase 11/16 handoffs). POC files diff-untouched. Async bridge mirrors Phase 7 winsdk pattern (loop.run_in_executor for synchronous SCKit start/stop helpers).
-- 2026-05-11 — Phase 7 (Windows Port — Audio + Screen) shipped end-to-end: 5 wave commits (`76d3065` Wave 1 — platform selector + `_midi_common` extraction + Windows-only deps in pyproject with `sys_platform == 'win32'` markers, `6ebd5e5` Wave 2 plan 07-02 — AudioWindows WASAPI loopback impl + sample-rate guard, `84586ec` Wave 2 plan 07-03 — ScreenWindows + TrackWindows via winsdk SMTC + asyncio.run executor bridge, `df97dd3` Wave 3 — MidiWindows + cross-platform integration test, + final Wave 4 docs commit closing the phase). 614 tests green (531 Phase 6 baseline + 83 new across 5 mocked + 1 integration + 1 _midi_common test file + 4 live stubs gated on windows_only). All 10 acceptance gates PASS with 2 documented pre-existing items (test_audio_macos_live HEADPHONEMG env mismatch from Wave 1 baseline + ruff I001 in test_midi_common.py from Wave 1 — both in deferred-items.md). Selector + lazy-import contract pinned: `pyaudiowpatch` / `win32*` / `winsdk` never reach sys.modules on macOS, verified by integration test. winsdk async API bridged via `asyncio.run` inside `loop.run_in_executor` — mirrors macOS subprocess pattern (Phase 8 ScreenCaptureKit will adopt same pattern). Windows-only deps via `sys_platform == 'win32'` markers in `[project] dependencies` (chosen over `[project.optional-dependencies]` group — simpler for both `uv sync` and PyInstaller). DJ-app hint list expanded from macOS's djay-only to `("djay", "serato", "traktor", "rekordbox", "virtualdj")` — Windows is where Serato/Traktor/rekordbox/VirtualDJ users live. `docs/windows-setup.md` (92 lines, 8 sections) covers Phase 20 fresh-machine rehearsal + early Windows DJ-friend testers. ControllerState cross-imported from `_midi_macos` into `_midi_windows` — extraction to `_midi_common.py` deferred to Phase 9. POC files diff-untouched throughout (verified by Gate 10). Optional Kaan-verify checkpoint skipped — Kaan doesn't have Windows handy; Phase 20 CI matrix on `windows-latest` is the authoritative live gate.
-- 2026-05-11 — Phase 6 (Genre-Aware Phase Detection) shipped end-to-end: 4 wave commits (`11d358a` genre profile system + 5 JSON profiles + active-profile singleton + hand-written schema validator, `1c4e264` crest factor + EMA smoother + BPM half/double validator + VocalDetector with 1.5s/2.5s hysteresis, `01ff963` percentile phase detector + MusicState +4 fields + state_refresh_loop wiring + Phase 3 golden equivalence pinned, `84b6978` EventDetector LAYER_ARRIVAL vocal gate + VIBEMIX_GENRE_PROFILE env + vibemix.state re-exports) + final docs commit closing the phase. 531 tests green (385 Phase 5 baseline + 146 new). All 10 acceptance gates PASS. 5 hand-tuned genre profile JSONs (techno / house / drum_and_bass / disco / pop) ship in the wheel via hatchling default package-data inclusion (verified via `uv build --wheel` + `unzip -l`). Phase 3 golden equivalence pinned across 10 parametric curves — `classify_phase(curve, audible, profile=None)` returns the SAME string as the original v4 body for the SAME inputs. MusicState gains 4 new fields (`crest_factor`, `vocal_active`, `bpm_corrected`, `genre_profile_name`) with backward-compat defaults — Phase 3's `test_music_state.py` passes unchanged. Hysteresis state in `state_refresh_loop` local scope, NOT MusicState (Critical Constraint 7). LAYER_ARRIVAL gate is the ONLY EventDetector change — other 5 event types byte-identical to v4. POC files diff-untouched (`cohost_v4.py` + `run_v4.sh` continue to function unchanged throughout the entire phase). SENSE-10's 30-min per-genre validation harness deferred to Phase 16 per CONTEXT out-of-scope clause. Open To-do: collect 30-min recorded sets per genre — can begin now in parallel with Phase 7.
-- 2026-05-11 — Phase 5 (FastAPI Proxy + Install-UUID JWT) shipped end-to-end: 5 wave commits (`c04b403` proxy scaffold — FastAPI app + healthz + pydantic-settings + Redis quota helper + Dockerfile + compose, `1549130` JWT auth HS256-only with alg=none blocked + /register IP-keyed + slowapi limiter wiring, `ba8a013` LLM SSE + TTS PCM routes — Gemini-native paths verified vs SDK URL builder + circuit breaker + upstream-secret sanitization with zero-AIza leakage test, `3a3bc4c` client install_uuid + JWT cache + factory mode dispatch with NO silent fallback, + final docs commit). 385 vibemix tests green (346 baseline + 39 client-side) + 79 proxy tests green. All 8 acceptance gates PASS — G3 (zero AIza in src/vibemix/) and G6 (alg=none blocked) are the phase-level invariants. `proxy/` is an independent Python project with own pyproject.toml + uv.lock + .venv. Routes mirror genai SDK URL shape (`/v1beta/models/{model}:streamGenerateContent` + sibling + `/v1/audio/speech` OpenAI-compat); CONTEXT's `/api/vibemix/v1/llm/generate` superseded by RESEARCH Q1. JWT TTL 90 days (locked); ROADMAP's `15-30 min` reconciled. slowapi via @limiter.limit() decorator NOT SlowAPIMiddleware (RESEARCH Q2). google_plugin.LLM accepts http_options directly (verified at livekit/plugins/google/llm.py:117). Client-side install_uuid keyring + file fallback handles Pitfall 6 (null backend detection). NO silent fallback proxy → direct — setup failures sys.exit non-zero. POC files diff-untouched against Phase 4 close. Deployment runbook in proxy/README.md covers Docker + nginx + PM2 + Pitfalls 2/4/6; actual deployment to api.altidus.world pending Kaan's operational schedule (does NOT block phase close).
-- 2026-05-11 — Phase 4 (LiveKit Cascade Agent Pivot) shipped end-to-end: 4 wave commits (`28f5f09` agent persona + config + LLM factory + TTS chain with OpenRouter monkey-patch, `1fa021a` DJCoHostAgent llm_node override + PlaybackQueueAudioOutput sink, `2b7ea9b` runtime loops — coach event pump + diag meter + WS mascot bus, `ede9e59` __main__ orchestrator + CI integration smoke). 346 tests green (270 from Phase 3 + 76 new across agent/runtime/smoke). All 12 acceptance gates PASS. SYSTEM_INSTRUCTION byte-identical to v4:150-213. OpenRouter monkey-patch active at module load (TTS-01 pins invariant). DJCoHostAgent.llm_node bypasses LiveKit's text-only cascade and calls `google.genai.aio.models.generate_content_stream` directly with last 18s of audio attached as multimodal Part. Single-modality `screen_jpeg = None` preserved (v4:1502-1503 anti-hallucination). Per-invocation dump folder structure preserved verbatim for live-debug parity. Twin AudioBuffer instances in main() (140s state + INVOKE_AUDIO_SECONDS+5.0 clean). session.output.audio assigned BEFORE session.start (v4:2030-2033 invariant). _HAS_WS feature flag dropped (Phase 2 anti-pattern fix). WS_HOST/WS_PORT centralized in vibemix.audio.constants. Integration smoke test runs in CI without devices via mocked AudioMacOS + LiveKit + Gemini. ARCH-06 re-mapped — cascade runs headless (no Room) per v4:2031, no bundled livekit-server binary needed; documented in 04-SUMMARY.md Deviations. POC files untouched throughout (v4 still runnable via run_v4.sh).
-- 2026-05-12 — Phase 11 Wave 1 (PyInstaller `--onedir` sidecar packaging) shipped end-to-end: 3 commits (`c415a0c` feat — PyInstaller specs + `--wizard` flag + entitlements: `vibemix-core.macos.spec` 270 lines with collect_submodules for 14 dynamic-import packages + collect_all for 5 pyobjc frameworks + nowplaying-cli binary bundle from /opt/homebrew/bin (Apple Silicon) or /usr/local/bin (Intel) + explicit .env / credentials / key / pem excludes per RESEARCH Pitfall 5; `vibemix-core.windows.spec` 200 lines with pyaudiowpatch/pywin32/winsdk hidden imports + no pyobjc + no nowplaying-cli; `src/vibemix/__main__.py` extended with --wizard flag + _run_wizard_stub coroutine (Wave 4 replaces stub); `tauri/src-tauri/entitlements.plist` pinned bundle ID world.bravoh.vibemix per A8 with audio-input + microphone + allow-unsigned-executable-memory + disable-library-validation; tests/sidecar/test_wizard_entrypoint.py (7 tests); pyinstaller==6.20.0 added to dev deps. `a4bbfbe` chore — scripts/build_sidecar.py orchestrating detect_target_triple (rustc -vV NOT cargo metadata per A7) + run_pyinstaller + install_into_tauri_binaries (copytree + rename into tauri/src-tauri/binaries/vibemix-core-<triple>/vibemix-core-<triple>{exe} per RESEARCH Pitfall 4) + assert_no_aiza_leak Phase 5 gate; tests/sidecar/test_build_sidecar_rename.py 15 tests pinning triple detection + rename + leak gate behavior + main() argparse. `55d4c04` fix — auto-fixed 2 Rule 1 bugs discovered during full PyInstaller build on Kaan's M-series rig: (1) Plan's `vibemix.spec.macos` / `.spec.windows` filenames don't end in `.spec` literal — PyInstaller 6.x falls into script-mode and ignores COLLECT(name='vibemix-core'); renamed to `vibemix-core.macos.spec` / `vibemix-core.windows.spec` so output lands at `dist/vibemix-core/vibemix-core` as the build script expects; (2) `_scan_file_for_aiza` UnicodeDecodeError on Pillow .so (byte 0x97 at position 2713) — switched subprocess output to raw bytes (AIza is ASCII anyway), key values still redacted from logs. End-to-end build on Kaan's M-series rig exits 0 in ~45s; binary lands at `tauri/src-tauri/binaries/vibemix-core-aarch64-apple-darwin/vibemix-core-aarch64-apple-darwin` (30 MB inner binary; 242 MB bundle total — within A6 150-250 MB range, well under 350 MB hard cap). Binary `--help` prints `--wizard`, `--wizard` exits 0 with stub stderr, `--version` prints `vibemix 0.1.0-dev0` (all imports resolve inside the bundle). AIza leak gate: 0 matches across 482 scanned files. 1026 tests green (1011 baseline + 15 new sidecar tests; 22 sidecar tests total). All 10 MIDI profiles + 5 genre profiles + IPC schema + nowplaying-cli bundled at the expected paths inside `_internal/`. POC files diff-untouched. Windows spec verified compile-only (`compileall.compile_file('vibemix-core.windows.spec')` exits 0); authoritative Windows build is Phase 20 CI matrix. Manual checkpoint AUTO-SATISFIED — orchestrator confirmed Kaan's macOS dev rig as the executor host.
-- 2026-05-12 — Phase 11 Wave 0 (IPC schema source-of-truth + dual-language validation gate) shipped end-to-end: 2 task commits (`4f1d879` feat — messages.schema.json (Draft-07, 19 ipc.* messages, closed payloads, $id `vibemix.ipc.messages`) + `src/vibemix/ui_bus/` Python package (19 frozen `@dataclass(slots=True)` wrappers + 19 payload structs + 2 array-element structs + `parse_message`/`validate_message` runtime guards, no pydantic per Phase 6 / D-Area-4.4) + `tests/ui_bus/` (35 tests: parametrized roundtrip × 19 + status_tick edge cases × 12 + 4 sentinels — count match, schema valid, oneOf=19, no-pydantic-grep); `11f3eb7` chore — `tauri/ui/` Node scaffold (package.json + tsconfig.json + vitest.config.ts pinned at major.minor for vite ^6 / vitest ^2 / ajv ^8 / ajv-formats ^3 / json-schema-to-typescript ^15 / typescript ^5.7 / @tauri-apps/api ^2.11 / @tauri-apps/plugin-shell ^2.3 / @tauri-apps/plugin-store ^2.4) + `tauri/ui/scripts/codegen-ipc.mjs` (programmatic json2ts wrapper with AUTO-GENERATED banner; CLI lacks --bannerComment) + `tauri/ui/src/ipc/validator.ts` (compile-once ajv with ajv-formats, parseIpcMessage + isIpcMessage) + `tauri/ui/src/ipc/messages.ts` (codegen output committed alongside schema; discriminated union `VibemixIPCMessages`) + `tauri/ui/src/ipc/validator.spec.ts` (13 vitest cases mirroring Python status_tick asserts) + `scripts/check_ipc_schema.py` (per-dataclass roundtrip + load-bearing count-parity assertion: oneOf entries vs `__dataclass_fields__["type"]` wrapper count)). 1013 tests green (978 baseline + 35 new ui_bus) + 13 vitest. Both CI gates run in <10s: `npm run check:ipc` (codegen + tsc --noEmit) catches schema-vs-codegen drift; `python scripts/check_ipc_schema.py` catches schema-vs-wrapper drift. Three auto-fixes documented: (1) json2ts CLI binary name `json2ts` not `json-schema-to-typescript`, and CLI lacks --bannerComment — wrote programmatic wrapper [Rule 3]; (2) dataclasses.asdict preserves tuples but jsonschema's Draft-07 type checker rejects tuples for type:array — added recursive `_tuples_to_lists` in `_serialize` [Rule 1]; (3) json2ts PascalCases `$id` to `VibemixIPCMessages` (not `VibemixIpcMessages`) — updated validator.ts import [Rule 1]. POC files untouched. T-11-W0-01 / T-11-W0-04 (Tampering + DoS via malformed inbound frame) mitigated.
-- 2026-05-12 — Phase 11 Wave 3 (Plan 11-04 — Wizard UI surfaces) shipped end-to-end: 3 task commits (`81058bd` feat — tokens.css lifted verbatim from UI-SPEC §Color/§Spacing/§Typography/§Grid/§Motion/§Atmospheric Layers + 5 vendored WOFF2 fonts (Workbench Regular / DM Mono 400+500 / DSEG7 Classic Bold from keshikan/DSEG release v0.46 commit a5019e1 / Caveat Bold reserved for Phase 12) + `scripts/gen_sine.py` deterministic 48 kHz mono int16 sine generator + `tauri/ui/public/audio/sine-1khz-1500ms.wav` (72000 frames, 1.5s, -6 dBFS, 100ms fades) + `tauri/ui/LICENSE-3RD-PARTY.md` with SHA-256 attribution + `.gitignore` whitelist `!tauri/ui/public/audio/*.wav` + index.html rewritten to wizard frame (titlebar + step strip + primary panel + mascot corner + cta row + status bar + crash banner) + crash banner restyled per UI-SPEC §13 (displaces step strip, --rec borders, phosphor restart button); `e0687f0` feat — 11 wizard component modules (step-indicator §1, primary-panel §2 with brushed-metal ::before streak, button §3+§4 with 6 states + destructive variant, dropdown-device §5 with AUTO pill + 240px scroll, permissions-card §6 OS-aware, audio-test-button §7 with 4-ring concentric pulse animation + DSEG7 readout, blackhole-banner §8 with phosphor-halo, window-picker §9 hint+enum+NotDjConfirm modal, controller-probe §10 with DSEG7 48px countdown + 4 expanding rings, status-bar §12 with 4 LED dots, mascot-corner empty per Pitfall 9) + 5 inline SVG icons (shield/microphone/headphones/speaker[+blackhole/plug]/ddj-flx4) + tokens.css adds --panel-hover-top + --panel-pressed-bottom (UI-SPEC §3 button gradient stops promoted to vars so zero hex literals in component code); `de8cacc` feat — wizard/router.ts (WizardStep state machine + 250ms slide transitions per UI-SPEC §Motion + window.__vibemixDev DevTools surface + URL-param ?step= routing) + step1-permissions/step2-output-device/step3-controller/smoke-test step modules (mock-data driven; setTimeout calls mark Wave 4 ipc.* dispatch sites) + main.ts wires renderCurrentStep + getDevSurface at boot. 32 files created + 4 modified. Build verified: `npm run build` green (205 KB bundle / 56 KB gzip; 174 modules); `npm run check:ipc` green; vitest 13/13 (Wave 0 IPC validator suite intact); pytest 57/57 (ui_bus + sidecar). 6-dimension frontend-enforcement audit: PASS on copywriting (8 anchor strings present verbatim), visuals (radial gradients + film grain + scanlines + brushed-metal ::before + 10+ inset shadows), color (zero hex outside tokens.css), typography (5 @font-face declarations + Workbench/DM Mono/DSEG7 used + Caveat reserved), spacing (8-point grid + 256×256 mascot), registry safety (zero React/Vue/Tailwind/shadcn). Two auto-fixes documented: Rule 3 .gitignore *.wav blocked sine artifact → added whitelist; Rule 1 StatusLevel type too narrow for gemini/screen channels → broadened parameter type in levelToState. POC files (cohost*.py, mascot.html, mocks/*.html) diff-untouched. Manual checkpoint auto-satisfied — Phase 14 polish loop owns the true visual sign-off.
-
-- 2026-05-12 — Phase 11 Wave 4 (Plan 11-05) + Phase 11 close shipped end-to-end: 2 task commits (`21f72af` feat — WizardLoop class with 9 ipc.* handlers covering permission.check / list_devices / probe_audio / user_heard_tone / start_midi_listen / list_windows / smoke_test / wizard.done / wizard.start; WizardBus class added to ws_bus.py as a sibling to ws_broadcast (mascot 30Hz contract preserved); platform probes (_permissions_macos.py with AVCaptureDevice + CGPreflightScreenCaptureAccess; _permissions_windows.py with MVP stubs; _windows_macos.py with Quartz.CGWindowListCopyWindowInfo + 5-app DJ hint table; _windows_windows.py with EnumWindows + 4-app DJ hint table; typed permissions.py + windows.py selectors); __main__.py --wizard now dispatches to vibemix.runtime.wizard.run_wizard (Wave 1 stub deleted); pyobjc-framework-AVFoundation>=12.1 added (darwin only); 10 new wizard tests (test_wizard_loop_ipc.py 7 + test_first_run_state.py 3) + test_wizard_entrypoint.py rewritten for Wave 4 reality. `f237ee4` feat — TS ipc/client.ts (sendIpcRequest + subscribeIpc + emitIpc with 10s Promise.race timeout per RESEARCH Pitfall 6); router.ts setTimeout mocks replaced with real ipc.* request bodies (Step 1 polls permission.check @1Hz, Step 2 fires list_devices + list_windows + probe_audio with 35s timeout for 30s user-confirm window, Step 3 races start_midi_listen vs midi_timeout, smoke-test sends smoke_test with 30s timeout); main.ts wires subscribeStatusBar + DEV-gates __vibemixDev via import.meta.env.DEV (closes Wave 3 threat T-11-W3-02 carry-over); Rust ws_client.rs adds WsClientHandle managed state + forward_ipc_to_sidecar body (replaces Wave 2 stub); capability allowlist description extended to enumerate 7 app commands so regression-check grep passes. + this docs commit (11-05-SUMMARY.md + 11-SUMMARY.md + STATE/ROADMAP/REQUIREMENTS advance). 1066 Python tests green (1013 baseline + 53 new across Wave 4) + 13 vitest + 4 cargo test. Schema CI gates: check_ipc_schema.py + npm run check:ipc + npm run build all green. Warning #4 invariant verified: zero `invoke("enumerate_windows", ...)` in webview src; capability allowlist has no enumerate_windows entry. Window-picker enumeration is WS-only via ipc.calibration.list_windows; Quartz / EnumWindows runs in vibemix.platform.windows.enumerate_windows called from WizardLoop._on_list_windows via run_in_executor. Smoke-test cascade greeting routes to offline-greeting WAV fallback (full cascade-greeting one-shot deferred to Phase 12 settings-panel re-run UX). 5 Rule-1/3 deviations auto-fixed (IpcMessage codegen alias, import.meta.env types, DropdownDevice isBlackhole drop, sidecar entrypoint test rewrite, schema-invalid frame test fix). Phase 11 STRUCTURAL gate complete — fresh-machine <90s wizard timing explicitly NOT measured (owned by Phase 16 Hallucination Verification Gate + Phase 20 Day-Zero Operations fresh-VM rehearsal). POC files (cohost*.py / mascot.html / mocks/) diff-untouched against Phase 11 plan-docs commit 7e08966. Bundle id world.bravoh.vibemix LOCKED throughout.
-
-- 2026-05-13 — Phase 14 (CDJ Whisper v5 Migration + Polish) shipped end-to-end: 6 waves, ~14 task commits, single subtractive close. Wave 0 (14-01) reconciled vendored WOFF2 + scripted gates + vitest harness + polish log + ROADMAP success-criterion #4 typeface text. Wave 1 (14-02) migrated wizard surfaces (225 legacy refs eliminated, collapsed wizard-grid, border-anim inserted on PrimaryPanel). Wave 2 (14-03) migrated SessionLayout + shipped perf-fallback CSS (prefers-reduced-motion + html[data-blur-perf="on"]). Wave 3 (14-04) migrated SettingsDrawer + added PerformanceGroup + extended SettingsView with lighter_blur + IPC enum extension. Wave 4 (14-05) wrapped the mascot overlay in v5 glass chrome + .border-anim.slow.rev + unskipped mascot.chrome.test.ts. Wave 5 (14-06 — this commit `79a7208`) deleted the backward-compat shim block from tokens.css + deleted the legacy `@font-face` block (Workbench, DM Mono Regular/Medium, DSEG7, Caveat) + replaced Google Fonts remote @import with vendored Saira variable (wdth+wght) + JetBrains Mono Regular/Medium/SemiBold WOFF2 + deleted 5 legacy WOFF2 files + updated LICENSE-3RD-PARTY.md with 4 SHA-256 attestations + wired and unwired the one-shot pre-commit hook (`scripts/check_v5_migration.sh --strict`). All three repo-wide --strict gates green (migration + fonts + copy). 275 vitest passing. IPC schema parity 27 == 27. Pytest baseline (2 pre-existing failures: test_audio_macos_live HEADPHONEMG env from Phase 7 W1 + test_g5_poc_files_untouched mascot.html baseline drift from Phase 11 — both pre-existing per CLAUDE.md scope-boundary rule; unchanged by this plan). All four surfaces (wizard, session, settings, mascot) consume v5 primitives directly; no shim, no FL-Studio tactile residue. POLISH-01/02/04/06 closed; POLISH-03 (mascot v5 chrome) closed in 14-05; POLISH-05 perf verification on Kaan rig deferred to `npm run tauri dev` review session (Windows transparency rehearsal deferred to Phase 20 fresh-machine).
+- 2026-05-16 — v2.1 The Unified Cut SHIPPED + archived via `/gsd:complete-milestone`. 13 phases shipped engineering-green; 105/105 REQ-IDs satisfied; 5/5 integration seams WIRED. 15 carveouts in KAAN-ACTION-LEGAL.md. Local annotated git tag `v2.1.0` created (NOT pushed — Kaan publishes when ready). Status: `tech_debt` accepted per `gsd-autonomous fully` mode.
+- 2026-05-16 — Phase 39 verified + Phase 37 integration audit + Section 8 gsd-audit-milestone extension confirmed WIRED + tech_debt verdict. v2.1-MILESTONE-AUDIT.md frozen at 105/105 engineering satisfied.
+- 2026-05-15 — Phases 27–38 shipped (waves of 1-3 phases per day per `gsd-autonomous fully` execution cadence).
 
 ### Next Session
 
-- Continue with **Phase 15 — Recording & Session Capture Finalization**. Per-session dir + `input.wav`/`voice.wav`/`events.jsonl` + recording browser UI + retention enforcement; carries POC; lock UX.
-- **Phase 14 deferred to Kaan's rig:** (a) `npm run tauri dev` visual review of all four surfaces (wizard, session, settings, mascot); (b) Performance toggle persistence rehearsal (set "Lighter blur" ON → close + reopen → verify persistence); (c) macOS prefers-reduced-motion rehearsal (toggle in Accessibility → reload → verify border-anim freeze + blur drops); (d) Windows transparency rehearsal (deferred to Phase 20 fresh-machine if no Windows machine right now).
-- **Phase 16/20 carry-forwards from Phase 11:** fresh-machine <90s wizard timing rehearsal (Phase 16 owns the production-quality-reaction gate; Phase 20 owns the fresh-VM CI matrix). Inputs locked: `scripts/reset_first_run.py` + `scripts/build_sidecar.py` + `scripts/check_ipc_schema.py` + bundle id `world.bravoh.vibemix` + entitlements.plist.
-- Kaan-side outstanding: SignPath OSS application (Phase 1 carry-forward, ~1 week SLA). Optional live smoke verification of `python -m vibemix` vs `./run_v4.sh` on his rig. **Phase 5 carry-over**: deploy `proxy/` to `api.altidus.world` when ready. **Phase 6 + 7 carry-over**: collect 30-min recorded sets per genre (techno / house / D&B / disco / pop) for Phase 16; arrange Windows test access for Phase 20 fresh-machine rehearsal. **Phase 7 deferred items** (in `.planning/phases/07-windows-port-audio-screen/deferred-items.md`): test_audio_macos_live HEADPHONEMG env mismatch (broaden substring or mark macos_audio opt-in) + ruff I001 in test_midi_common.py (one-line `ruff check --fix`).
+- **`/gsd:new-milestone` to scaffold v2.2** — Phase 16 ear-test override expires; choose either restored Kaan-ear-only gate OR permanent autonomous proxy adoption.
+- **Track external clock**: Apple Developer Program Agreement update (Francesco) + SignPath OSS Foundation application (Kaan) discharge gates the v2.1.0-rc1 public publish — NEVER autonomously discharged per P46.
+- **Once approvals land**: discharge KAAN-ACTION-LEGAL sequence — DIST-09 + DIST-11 → DIST-19 sign+verify smoke → Phase 33 real-VM matrix (INSTALL-VM-RUN + INSTALL-60S-CHECK + INSTALL-BLACKHOLE-PROBE) → Phase 38 signed-binary verifier → Phase 39 §SHIP customer-facing publishes (SHIP-CUT / SHIP-TWEET / SHIP-DISCORD / SHIP-TRANSFER / SHIP-ROTATE) → SHIP-V1-DECISION after ~2-week bake.
+- **Re-run integration audit** after each carveout discharge: `python scripts/integration_audit.py --write-milestone-audit .planning/v2.1-MILESTONE-AUDIT.md --force`.
 
 ---
 
-*State managed by gsd-roadmapper at 2026-05-11; updated by /gsd-execute-phase on 2026-05-13 (Phase 14 ✅ complete — shim deleted; Phase 15 next).*
+*State managed by gsd-complete-milestone at 2026-05-16 (v2.1 The Unified Cut archived — engineering-complete; KAAN-ACTION-LEGAL discharge gates public RC).*

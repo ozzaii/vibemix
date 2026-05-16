@@ -241,8 +241,14 @@ describe("recording-browser — Test 5: at-threshold full mount", () => {
   });
 });
 
-describe("recording-browser — Test 6: delete button opens confirm dialog (danger)", () => {
-  it("clicking a row's delete button mounts a confirm dialog on document.body", () => {
+// IMPECCABLE WAVE 5.A (2026-05-14) — Tests 6/7/8 rewritten to assert the
+// new undo-toast pattern that replaced the modal confirm-dialog. The
+// critique flagged the modal as a Heuristic 3 (User Control & Freedom)
+// miss; the new flow optimistically removes the row + shows a 4-second
+// "deleted · undo?" toast at the bottom-right of the drawer.
+
+describe("recording-browser — Test 6: delete button removes row + shows undo toast", () => {
+  it("clicking a row's delete button removes the row and mounts an undo toast", () => {
     const handle = renderRecordingBrowser({
       initialSessions: [],
       initialUsage: { sessions: 0, bytes_total: 0 },
@@ -252,6 +258,7 @@ describe("recording-browser — Test 6: delete button opens confirm dialog (dang
     document.body.append(handle.root);
 
     handle.setSessions([fakeSession(0)]);
+    expect(handle.root.querySelectorAll(".vmx-rec-row").length).toBe(1);
 
     const deleteBtn = handle.root.querySelector<HTMLButtonElement>(
       '.vmx-rec-row__btn[data-kind="delete"]',
@@ -259,83 +266,109 @@ describe("recording-browser — Test 6: delete button opens confirm dialog (dang
     expect(deleteBtn).not.toBeNull();
     deleteBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-    // confirmDialog mounts a backdrop on document.body.
-    const dialog = document.body.querySelector<HTMLElement>(
-      ".vmx-confirm__dialog",
+    // Row vanishes immediately.
+    expect(handle.root.querySelectorAll(".vmx-rec-row").length).toBe(0);
+
+    // Toast renders on document.body with "deleted · undo?".
+    const toast = document.body.querySelector<HTMLElement>(
+      ".vmx-rec-browser__toast",
     );
-    expect(dialog).not.toBeNull();
-    expect(dialog?.dataset.variant).toBe("danger");
-
-    const heading = dialog!.querySelector<HTMLElement>(".vmx-confirm__heading");
-    // Heading uses the formatted "YYYY-MM-DD HH:MM" timestamp.
-    expect(heading?.textContent ?? "").toMatch(/Delete session 2026-05-\d\d \d\d:\d\d\?/);
-
-    const body = dialog!.querySelector<HTMLElement>(".vmx-confirm__body");
-    expect(body?.textContent).toBe("This cannot be undone.");
+    expect(toast).not.toBeNull();
+    expect(toast?.getAttribute("role")).toBe("alert");
+    const label = toast!.querySelector<HTMLElement>(
+      ".vmx-rec-browser__toast-label",
+    );
+    expect(label?.textContent).toBe("deleted");
+    const undoBtn = toast!.querySelector<HTMLButtonElement>(
+      ".vmx-rec-browser__toast-undo",
+    );
+    expect(undoBtn?.textContent).toBe("undo?");
   });
 });
 
-describe("recording-browser — Test 7: confirming delete fires onDelete", () => {
-  it("clicking CONFIRM calls onDelete(session_dir, timestamp)", () => {
-    const onDelete = vi.fn();
-    const handle = renderRecordingBrowser({
-      initialSessions: [],
-      initialUsage: { sessions: 0, bytes_total: 0 },
-      onReplay: vi.fn(),
-      onDelete,
-    });
-    document.body.append(handle.root);
+describe("recording-browser — Test 7: undo-window elapse fires onDelete", () => {
+  it("after 4s the timer fires onDelete(session_dir, timestamp)", () => {
+    vi.useFakeTimers();
+    try {
+      const onDelete = vi.fn();
+      const handle = renderRecordingBrowser({
+        initialSessions: [],
+        initialUsage: { sessions: 0, bytes_total: 0 },
+        onReplay: vi.fn(),
+        onDelete,
+      });
+      document.body.append(handle.root);
 
-    const session = fakeSession(0);
-    handle.setSessions([session]);
+      const session = fakeSession(0);
+      handle.setSessions([session]);
 
-    const deleteBtn = handle.root.querySelector<HTMLButtonElement>(
-      '.vmx-rec-row__btn[data-kind="delete"]',
-    );
-    deleteBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      const deleteBtn = handle.root.querySelector<HTMLButtonElement>(
+        '.vmx-rec-row__btn[data-kind="delete"]',
+      );
+      deleteBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-    const confirmBtn = document.body.querySelector<HTMLButtonElement>(
-      '.vmx-confirm__btn[data-kind="confirm"]',
-    );
-    expect(confirmBtn).not.toBeNull();
-    confirmBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      // Before the timer elapses, onDelete is NOT called.
+      expect(onDelete).not.toHaveBeenCalled();
 
-    expect(onDelete).toHaveBeenCalledTimes(1);
-    const [calledSessionDir, calledTimestamp] = onDelete.mock.calls[0]!;
-    expect(calledSessionDir).toBe(session.session_dir);
-    expect(typeof calledTimestamp).toBe("string");
-    expect(calledTimestamp).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+      // Advance past the 4s undo window.
+      vi.advanceTimersByTime(4000);
+
+      expect(onDelete).toHaveBeenCalledTimes(1);
+      const [calledSessionDir, calledTimestamp] = onDelete.mock.calls[0]!;
+      expect(calledSessionDir).toBe(session.session_dir);
+      expect(typeof calledTimestamp).toBe("string");
+      expect(calledTimestamp).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+
+      // Toast is torn down after commit.
+      const toast = document.body.querySelector(".vmx-rec-browser__toast");
+      expect(toast).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
-describe("recording-browser — Test 8: cancelling delete tears down the dialog", () => {
-  it("clicking CANCEL removes the dialog and does NOT fire onDelete", () => {
-    const onDelete = vi.fn();
-    const handle = renderRecordingBrowser({
-      initialSessions: [],
-      initialUsage: { sessions: 0, bytes_total: 0 },
-      onReplay: vi.fn(),
-      onDelete,
-    });
-    document.body.append(handle.root);
+describe("recording-browser — Test 8: clicking undo restores the row and skips onDelete", () => {
+  it("clicking undo restores the row, dismisses the toast, and never fires onDelete", () => {
+    vi.useFakeTimers();
+    try {
+      const onDelete = vi.fn();
+      const handle = renderRecordingBrowser({
+        initialSessions: [],
+        initialUsage: { sessions: 0, bytes_total: 0 },
+        onReplay: vi.fn(),
+        onDelete,
+      });
+      document.body.append(handle.root);
 
-    handle.setSessions([fakeSession(0)]);
+      handle.setSessions([fakeSession(0)]);
 
-    const deleteBtn = handle.root.querySelector<HTMLButtonElement>(
-      '.vmx-rec-row__btn[data-kind="delete"]',
-    );
-    deleteBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      const deleteBtn = handle.root.querySelector<HTMLButtonElement>(
+        '.vmx-rec-row__btn[data-kind="delete"]',
+      );
+      deleteBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-    let dialog = document.body.querySelector<HTMLElement>(".vmx-confirm__dialog");
-    expect(dialog).not.toBeNull();
+      // Row vanished, toast is up.
+      expect(handle.root.querySelectorAll(".vmx-rec-row").length).toBe(0);
+      const undoBtn = document.body.querySelector<HTMLButtonElement>(
+        ".vmx-rec-browser__toast-undo",
+      );
+      expect(undoBtn).not.toBeNull();
 
-    const cancelBtn = document.body.querySelector<HTMLButtonElement>(
-      '.vmx-confirm__btn[data-kind="cancel"]',
-    );
-    cancelBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      undoBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-    dialog = document.body.querySelector<HTMLElement>(".vmx-confirm__dialog");
-    expect(dialog).toBeNull();
-    expect(onDelete).not.toHaveBeenCalled();
+      // Row restored, toast torn down.
+      expect(handle.root.querySelectorAll(".vmx-rec-row").length).toBe(1);
+      expect(
+        document.body.querySelector(".vmx-rec-browser__toast"),
+      ).toBeNull();
+
+      // Even if the (cancelled) timer were still alive, advance time —
+      // onDelete must NOT fire.
+      vi.advanceTimersByTime(5000);
+      expect(onDelete).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

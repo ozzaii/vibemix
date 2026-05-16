@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """EventDetector — verbatim port of cohost_v4.py:1169-1325.
 
-TWO STRUCTURAL DEVIATIONS FROM V4:
+THREE STRUCTURAL DEVIATIONS FROM V4:
   1. (Phase 3) v4:1182-1186 had three class-level constants
      (MUSIC_PRESENCE_MIN_SECONDS, BPM_VALID_MIN, BPM_VALID_MAX). 02-PATTERNS.md
      + 03-CONTEXT.md lifted them OUT to ``vibemix.audio.constants`` so all
@@ -13,6 +13,14 @@ TWO STRUCTURAL DEVIATIONS FROM V4:
      The baseline ``self.last_band_signature = sig`` line is preserved so a
      non-vocal post-vocal jump doesn't false-fire against a stale baseline.
      Every other gate + cooldown is v4 byte-identical.
+  3. (Phase 17 Plan 05) EventDetector now COMPOSES a ``GenreRouter`` (SENSE-11)
+     and consults its active chain on every ``.detect()`` call AFTER the v4
+     baseline rules (TRACK_CHANGE / PHASE / LAYER_ARRIVAL / MIX_MOVE) and
+     BEFORE the HEARTBEAT fallthrough. The constructor gains an OPTIONAL
+     ``audio_buf=None`` kwarg that's threaded through to chain detectors
+     that need raw samples (KickSwap, PhraseBoundary). Default ``None``
+     preserves backward compat with ``EventDetector()`` callers (coach.py
+     unchanged; tests that exercise baseline rules unchanged).
 
 The three cardinal rules (from v4:1170-1180):
     1. KAAN_SPOKE + MANUAL always bypass the music-presence gate.
@@ -25,11 +33,17 @@ The three cardinal rules (from v4:1170-1180):
 MIX_MOVE significance keys (v4:1299-1305 — verbatim, this is the v4 anti-slop
 tightening from v3's looser set):
     ('killed', '_low:', '_mid:', '_hi:', '_filter:', 'xfader', 'big', '_play→')
+
+Priority order with the genre chain inserted:
+    KAAN_SPOKE > MANUAL > [music-presence gate] > TRACK_CHANGE > PHASE
+    > LAYER_ARRIVAL > MIX_MOVE > [genre-chain detectors in chain order]
+    > HEARTBEAT
 """
 
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
 from vibemix.audio.constants import (
     BPM_VALID_MAX,
@@ -41,7 +55,12 @@ from vibemix.audio.constants import (
     TRACK_CHANGE_MIN_CONFIDENCE,
 )
 from vibemix.state.event import Event
+from vibemix.state.evidence_registry import EvidenceRegistry
+from vibemix.state.genre_router import GenreRouter
 from vibemix.state.music_state import MusicState
+
+if TYPE_CHECKING:
+    from vibemix.audio.buffers import AudioBuffer
 
 
 class EventDetector:
@@ -60,7 +79,26 @@ class EventDetector:
     # vibemix.audio.constants so the constants are configurable from one place.
     # EventDetector imports them at module scope (above); no class-attrs needed.
 
-    def __init__(self):
+    def __init__(
+        self,
+        audio_buf: "AudioBuffer | None" = None,
+        *,
+        evidence_registry: EvidenceRegistry | None = None,
+    ) -> None:
+        """Construct EventDetector with optional ``audio_buf`` for genre-chain
+        detectors that need raw samples (KickSwap, PhraseBoundary).
+
+        Default ``audio_buf=None`` preserves backward compat — every existing
+        caller (``coach.py`` test fixtures, the v4-baseline test suite) still
+        constructs ``EventDetector()`` with no arguments. Genre detectors that
+        need samples will gracefully no-op when audio_buf is None (their
+        snapshot calls return empty data → first-call seeding only).
+
+        Phase 18 Plan 02: optional ``evidence_registry`` kwarg threads the
+        EvidenceRegistry through to ``_fire`` so every event fire writes a
+        ``[ev:<TYPE>@<t_session>]`` observation. Default ``None`` preserves
+        backward compat with all existing callers (tests + standalone runs)
+        — registry writes are best-effort and skipped when not wired."""
         self.last_event_at = 0.0
         self.last_per_type_at: dict[str, float] = {}
         self.last_phase: str = "silent"
@@ -69,6 +107,19 @@ class EventDetector:
         self.last_mix_moves_seen: list[str] = []
         # Music-presence tracking
         self._audible_since: float | None = None
+
+        # Phase 17 Plan 05 — genre-chain composition. Router defaults to
+        # the "unknown" baseline chain (empty list), so behavior matches v4
+        # byte-identical until a state with active_genre != "unknown"
+        # arrives. The audio_buf is THREADED through to chain detectors on
+        # every iteration (see .detect() below).
+        self.audio_buf = audio_buf
+        self.router = GenreRouter(initial_genre="unknown")
+
+        # Phase 18 Plan 02 — EvidenceRegistry write target. None = no-op path.
+        # Registry write happens INSIDE _fire AFTER cooldown bookkeeping so
+        # a registry exception cannot corrupt cooldown gates (Test D pin).
+        self._registry: EvidenceRegistry | None = evidence_registry
 
     def _cooldown_ok(self, ev_type: str, now: float) -> bool:
         gap = MIN_EVENT_GAP_PER_TYPE.get(ev_type, EVENT_GLOBAL_MIN_GAP)
@@ -103,13 +154,25 @@ class EventDetector:
     def detect(self, state: MusicState, *, kaan_just_spoke: bool, manual: bool) -> Event | None:
         now = time.time()
 
+        # Phase 17 Plan 05 — atomic chain swap on active_genre flip. The swap
+        # happens HERE at the top of detect(), BEFORE any iteration so a swap
+        # mid-call cannot leave a half-iterated chain (T-17-05-02 mitigation).
+        # Same-genre swap is a no-op (idempotent — chain detectors keep their
+        # seeded baselines across spurious-equal flips).
+        if state.active_genre != self.router.current_genre:
+            self.router.swap(state.active_genre)
+
         # Mic + manual bypass silence guards (conversation/control events)
         if kaan_just_spoke and self._cooldown_ok("MIC", now):
-            self._fire("MIC", now)
+            # cooldown_key="MIC" preserves v4's MIC cooldown bucket, but the
+            # registry observation is keyed on the EVENT TYPE ("KAAN_SPOKE")
+            # so the prompt grammar + Phase 20 linter see the externally
+            # visible event name, not the internal cooldown bucket.
+            self._fire("KAAN_SPOKE", now, state, cooldown_key="MIC")
             return Event("KAAN_SPOKE", state)
 
         if manual and self._cooldown_ok("MANUAL", now):
-            self._fire("MANUAL", now)
+            self._fire("MANUAL", now, state)
             return Event("MANUAL", state)
 
         # MUSIC-TRULY-PLAYING GATE — the cardinal rule. No auto-events
@@ -139,7 +202,7 @@ class EventDetector:
                     },
                 )
                 self.last_audible_track = state.audible_track
-                self._fire("TRACK_CHANGE", now)
+                self._fire("TRACK_CHANGE", now, state)
                 return ev
         self.last_audible_track = state.audible_track
 
@@ -155,7 +218,7 @@ class EventDetector:
                     },
                 )
                 self.last_phase = state.phase
-                self._fire("PHASE", now)
+                self._fire("PHASE", now, state)
                 return ev
         self.last_phase = state.phase
 
@@ -178,7 +241,7 @@ class EventDetector:
                     },
                 )
                 self.last_band_signature = sig
-                self._fire("LAYER_ARRIVAL", now)
+                self._fire("LAYER_ARRIVAL", now, state)
                 return ev
         self.last_band_signature = sig
 
@@ -206,18 +269,65 @@ class EventDetector:
         if new_significant and self._cooldown_ok("MIX_MOVE", now):
             self.last_mix_moves_seen = [m for _, m in state.recent_moves][-12:]
             ev = Event("MIX_MOVE", state, extra={"moves": new_significant[-3:]})
-            self._fire("MIX_MOVE", now)
+            self._fire("MIX_MOVE", now, state)
             return ev
         # Always keep seen-list fresh so we don't replay old moves later
         self.last_mix_moves_seen = [m for _, m in state.recent_moves][-12:]
 
-        # 5) Heartbeat — long silence in conversation while music is going
+        # 5) Genre-chain detectors (Phase 17 Plan 05 — SENSE-11 / SENSE-15).
+        # Iterate the active per-genre chain in registration order; first
+        # detector to return an Event wins. The audio_buf threaded into
+        # __init__ is passed to each detector — those that don't need it
+        # (SubLayerArrival, KickDensityShift, BreakdownKickKill) ignore it.
+        # This is BEFORE the HEARTBEAT step so a real genre event always
+        # beats the long-silence catch-all.
+        for det in self.router.active_chain():
+            ev = det.detect(state, self.audio_buf, now)
+            if ev is not None:
+                return ev
+
+        # 6) Heartbeat — long silence in conversation while music is going
         if self._cooldown_ok("HEARTBEAT", now):
-            self._fire("HEARTBEAT", now)
+            self._fire("HEARTBEAT", now, state)
             return Event("HEARTBEAT", state)
 
         return None
 
-    def _fire(self, ev_type: str, now: float):
+    def _fire(
+        self,
+        ev_type: str,
+        now: float,
+        state: MusicState,
+        *,
+        cooldown_key: str | None = None,
+    ) -> None:
+        """Update cooldown bookkeeping + write the [ev:<TYPE>@<t>] observation.
+
+        ``ev_type`` is the EXTERNALLY visible event name (the ``Event.type``
+        the caller returns). ``cooldown_key`` defaults to ``ev_type`` and is
+        only overridden for the KAAN_SPOKE → "MIC" mapping that preserves
+        v4's MIC cooldown bucket while exposing the event-type name to the
+        registry / prompt grammar.
+
+        Cooldown bookkeeping (``last_event_at`` + ``last_per_type_at``) is
+        updated FIRST and is authoritative. Registry write follows in a
+        try/except — a registry failure must NEVER block event firing or
+        corrupt cooldown gates (Test D pin, T-18-02-04 mitigation).
+
+        ``t_session`` is ``now - state.set_start_at`` clamped at 0.0 so an
+        unset ``set_start_at`` (== 0.0) doesn't write a unix-timestamp-sized
+        float into the registry. Sub-second resolution preserved (no rounding
+        at write time — Phase 20 linter owns rounding per GROUND-07).
+        """
+        bucket = cooldown_key or ev_type
         self.last_event_at = now
-        self.last_per_type_at[ev_type] = now
+        self.last_per_type_at[bucket] = now
+
+        # Phase 18 Plan 02 — registry write. Best-effort: a downstream
+        # registry exception cannot leak past the cooldown contract.
+        if self._registry is not None:
+            try:
+                t_session = max(0.0, now - state.set_start_at)
+                self._registry.write("ev", ev_type, t_session)
+            except Exception:
+                pass

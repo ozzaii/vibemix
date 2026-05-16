@@ -37,6 +37,9 @@ export interface Step2Callbacks {
   onRecheckBlackHole: () => void;
   onSelectWindow: () => void;
   onPickDifferent: () => void;
+  /** Impeccable Wave 5.A — walks the wizard one step backward. Optional
+   *  for back-compat with existing tests; the router always wires it. */
+  onBack?: () => void;
 }
 
 export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement {
@@ -45,7 +48,7 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
   // UI-SPEC §Step 2 H1 — VERBATIM
-  heading.textContent = "STEP 2 / 3 — OUTPUT DEVICE";
+  heading.textContent = "STEP 2 / 3 · OUTPUT DEVICE";
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
@@ -114,7 +117,27 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
 
   const ctaRow = document.createElement("div");
   ctaRow.className = "wizard-step__cta-row";
-  const armed = state.audioPassed && state.windowSelected;
+  ctaRow.dataset.back = cb.onBack ? "true" : "false";
+  if (cb.onBack) {
+    ctaRow.append(
+      Button({
+        variant: "secondary",
+        state: "idle",
+        label: "Back",
+        leadingGlyph: "←",
+        onClick: cb.onBack,
+      }),
+    );
+  }
+  // Continue is armed once the window has been picked. We previously
+  // required state.audioPassed too, but the 1kHz tone test can fail in
+  // ways that don't reflect the user's actual rig (sample rate
+  // mismatch flagged as failure even though the user heard it; user
+  // clicked Retry once and is now on a stale failed state with the
+  // Yes button stranded behind the disabled-on-failed branch). The
+  // tone test stays informational — user judgment over a fragile
+  // probe heuristic.
+  const armed = state.windowSelected;
   ctaRow.append(
     Button({
       variant: "primary",

@@ -19,7 +19,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-import { initCrashBanner } from "./crash-banner.js";
+import { initCrashBanner, showFatalBanner } from "./crash-banner.js";
 import { sendIpcRequest } from "./ipc/client.js";
 import { isIpcMessage, parseIpcMessage } from "./ipc/validator.js";
 import { routeSession } from "./session/router.js";
@@ -37,8 +37,10 @@ declare global {
   }
 }
 
-// === DevTools diagnostic subscribers (Wave 2 + Wave 4 logging) ===========
-const IPC_EVENTS = ["ipc-boot", "ipc-status-tick"] as const;
+// === DevTools diagnostic subscribers (one-shot only — status.tick is 1Hz
+// so logging it floods devtools; it's still consumed by the status bar
+// subscriber in wizard/router.ts which renders the LED dots).
+const IPC_EVENTS = ["ipc-boot"] as const;
 
 for (const channel of IPC_EVENTS) {
   void listen<unknown>(channel, (event) => {
@@ -190,8 +192,15 @@ async function boot(): Promise<void> {
   try {
     await routeSession();
   } catch (err) {
+    // Without surfacing this, the user sees a blank window with no
+    // indication anything failed. Route through the existing crash
+    // banner so the Restart button is reachable — restart_sidecar
+    // bounces the Python process which is usually enough to recover
+    // (the webview reloads on app restart anyway).
     // eslint-disable-next-line no-console
     console.error("[boot] routeSession failed:", err);
+    const detail = err instanceof Error ? err.message : String(err);
+    showFatalBanner("session-mount-failed", `Session UI failed to mount: ${detail}`);
   }
 }
 

@@ -91,6 +91,15 @@ export default defineConfig({
         main: resolve(projectRoot, "index.html"),
         // Phase 13 Plan 02 — second webview entry for the mascot overlay window.
         mascot: resolve(projectRoot, "mascot.html"),
+        // Phase 24 Plan 02 — third webview entry for the per-element
+        // overlay-highlight window. Opened on-demand by
+        // tauri/src-tauri/src/overlay.rs::show_overlay_highlight; the
+        // ring renders for duration_ms then the Rust task closes it.
+        overlay: resolve(projectRoot, "overlay.html"),
+        // Phase 29 Plan 29-05 — fourth webview entry for the post-session
+        // debrief window. Opened by tauri/src-tauri/src/debrief_window.rs
+        // ::open_debrief_window with `?session=<encoded>` query param.
+        debrief: resolve(projectRoot, "debrief.html"),
       },
     },
   },

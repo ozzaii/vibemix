@@ -140,13 +140,12 @@ const CSS = `
       0 0 6px rgba(212, 65, 58, 0.28),
       inset 0 1px 0 rgba(255, 255, 255, 0.3),
       inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
-    animation: vmx-statusbar-rec-blink 1400ms ease-in-out infinite;
   }
+  /* Critique 2026-05-14 pass 2: the statusbar muted strip is a quiet
+   * label, not a third alarm. The cohost inline pill carries the live
+   * breathing cadence; this LED stays solid so the eye reads one signal,
+   * not three. */
   .vmx-statusbar__muted[hidden] { display: none; }
-  @keyframes vmx-statusbar-rec-blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
-  }
   /* Signature — Saira italic at very low alpha so brand chrome is
    * present but does not compete with active state indicators. The
    * earlier Caveat treatment fought the Pioneer aesthetic; v5 makes the
@@ -327,6 +326,13 @@ function buildBadge(spec: BadgeSpec, props: StatusBarProps): HTMLElement {
   btn.dataset.state = spec.state;
   btn.dataset.clickable = spec.clickable ? "true" : "false";
   btn.dataset.tooltipOpen = "false";
+  // Wave 6 (H6 recognition over recall) — native browser hover tooltip
+  // narrates the badge state for users who don't know what each LED means.
+  // Click-tooltip (existing) is still the recovery path for "down"; this
+  // surfaces "ok" too so the user can read "LiveKit · connected" without
+  // having to click into a dead badge.
+  btn.setAttribute("title", titleForBadge(spec.key, spec.state));
+  btn.setAttribute("aria-label", titleForBadge(spec.key, spec.state));
   if (!spec.clickable) btn.disabled = true;
 
   const led = document.createElement("span");
@@ -394,4 +400,23 @@ function defaultErrorMsg(key: BadgeKey): string {
     case "midi": return "no midi controllers detected — plug one in";
     case "screen": return "screen-capture permission denied — open system settings";
   }
+}
+
+/** Wave 6 (H6) — native hover-tooltip copy for each badge. Mirrors the
+ *  defaultErrorMsg() for the "down" surface but adds an "ok" + neutral
+ *  variant so recognition works without clicking. */
+function titleForBadge(key: BadgeKey, state: string): string {
+  const label = (() => {
+    switch (key) {
+      case "livekit": return "LiveKit";
+      case "gemini": return "Gemini";
+      case "midi": return "MIDI";
+      case "screen": return "Screen capture";
+    }
+  })();
+  if (state === "ok") return `${label} · connected`;
+  if (state === "connecting") return `${label} · connecting…`;
+  if (state === "denied") return `${label} · permission denied`;
+  if (state === "down") return `${label} · disconnected — click for recovery`;
+  return `${label} · off`;
 }

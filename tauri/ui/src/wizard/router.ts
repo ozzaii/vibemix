@@ -24,28 +24,51 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { emitIpc, sendIpcRequest, subscribeIpc } from "../ipc/client.js";
+import { registerShortcuts } from "../session/shortcuts.js";
 import { StatusBar } from "./components/status-bar.js";
 import type { StatusBarProps } from "./components/status-bar.js";
 import { StepIndicator } from "./components/step-indicator.js";
 import { renderSmokeTest, type SmokeTestState } from "./smoke-test.js";
+import { renderStep0Intro } from "./step0-intro.js";
 import { renderStep1, type Step1State } from "./step1-permissions.js";
 import { renderStep2, type Step2State } from "./step2-output-device.js";
 import { renderStep3, type Step3State } from "./step3-controller.js";
+import {
+  renderStepProfileConsent,
+  type ProfileConsentState,
+} from "./step-profile-consent.js";
+import {
+  renderStepTelemetryConsent,
+  type TelemetryConsentState,
+} from "./step-telemetry-consent.js";
 
-export type WizardStep = "permissions" | "audio" | "controller" | "smoke-test" | "done";
+export type WizardStep =
+  | "intro"
+  | "permissions"
+  | "audio"
+  | "controller"
+  | "profile-consent"
+  | "telemetry-consent"
+  | "smoke-test"
+  | "done";
 
 export interface WizardState {
   currentStep: WizardStep;
   step1: Step1State;
   step2: Step2State;
   step3: Step3State;
+  profileConsent: ProfileConsentState;
+  telemetryConsent: TelemetryConsentState;
   smokeTest: SmokeTestState;
   statusBar: StatusBarProps;
   platform: "darwin" | "win32" | "linux";
 }
 
 const DEFAULT_STATE: WizardState = {
-  currentStep: "permissions",
+  // Impeccable Wave 1.2 (2026-05-14): wizard now starts at "intro" — the
+  // VIBEMIX / DJ FRIEND / IN YOUR EAR hero. One click advances to
+  // permissions; the intro is never seen again post-install.
+  currentStep: "intro",
   step1: {
     screenRecording: "pending",
     microphone: "pending",
@@ -67,6 +90,17 @@ const DEFAULT_STATE: WizardState = {
     probeState: "listening",
     secondsLeft: 10,
     caughtLabel: undefined,
+  },
+  profileConsent: {
+    // PROFILE-05 default-OFF — non-negotiable. The toggle MUST start
+    // unchecked; the user opts in explicitly.
+    consent: false,
+  },
+  telemetryConsent: {
+    // Phase 34 / SEC-08 (Pitfall P67) — default-OFF, non-negotiable.
+    // The "Don't share" radio is the default-selected option; this
+    // field's value mirrors that radio's state.
+    consent: false,
   },
   smokeTest: {
     greetingPlayed: false,
@@ -108,7 +142,14 @@ function setState(
   rerender();
 }
 
-const STEP_ORDER: WizardStep[] = ["permissions", "audio", "controller", "smoke-test"];
+const STEP_ORDER: WizardStep[] = [
+  "permissions",
+  "audio",
+  "controller",
+  "profile-consent",
+  "telemetry-consent",
+  "smoke-test",
+];
 
 function indexOf(step: WizardStep): number {
   return STEP_ORDER.indexOf(step);
@@ -120,6 +161,7 @@ function stepStripFor(current: WizardStep): HTMLElement {
     { id: "permissions", label: "permissions" },
     { id: "audio", label: "device" },
     { id: "controller", label: "controller" },
+    { id: "profile-consent", label: "profile" },
   ];
   return StepIndicator({
     steps: stepsConfig.map((s, i) => {
@@ -163,6 +205,42 @@ export function advanceTo(next: WizardStep): void {
   }
 }
 
+/** Walk the wizard one step backward. Intro has no back (it's the first
+ *  surface a user sees). Smoke-test goes back to controller. Wired to the
+ *  per-step `[ ← Back ]` button + the `esc` / `cmd+[` shortcut.
+ *
+ *  Impeccable Wave 5.A — closes the Heuristic 3 (User Control & Freedom)
+ *  gap from the 2026-05-14 critique: previously the wizard was strictly
+ *  one-way until the user finished. */
+export function back(): void {
+  const current = wizardState.currentStep;
+  switch (current) {
+    case "intro":
+      return; // No back from the first surface.
+    case "permissions":
+      // Permissions is the first wizard step proper; back returns to intro.
+      advanceTo("intro");
+      return;
+    case "audio":
+      advanceTo("permissions");
+      return;
+    case "controller":
+      advanceTo("audio");
+      return;
+    case "profile-consent":
+      advanceTo("controller");
+      return;
+    case "telemetry-consent":
+      advanceTo("profile-consent");
+      return;
+    case "smoke-test":
+      advanceTo("telemetry-consent");
+      return;
+    case "done":
+      return; // Wizard is done; no back.
+  }
+}
+
 export function currentStep(): WizardStep {
   return wizardState.currentStep;
 }
@@ -195,7 +273,25 @@ function rerender(): void {
   }
 }
 
+// Impeccable Wave 5.A — register wizard-wide back shortcuts once. The
+// callback inspects the live currentStep so adding a step doesn't require
+// re-binding (and intro stays a no-op via back()).
+let wizardShortcutsRegistered = false;
+function ensureWizardShortcuts(): void {
+  if (wizardShortcutsRegistered) return;
+  wizardShortcutsRegistered = true;
+  registerShortcuts({
+    "cmd+[": () => back(),
+    "ctrl+[": () => back(),
+    // `esc` from a wizard step walks back one. The intro returns no-op
+    // via back(), and the smoke-test surface absorbs esc (it's the last
+    // step before completion — `back()` is the safe action).
+    escape: () => back(),
+  });
+}
+
 export function renderCurrentStep(): void {
+  ensureWizardShortcuts();
   const stepStripMount = document.getElementById("wizard-step-strip");
   const primaryMount = document.getElementById("wizard-primary");
   const statusMount = document.getElementById("status-bar");
@@ -205,7 +301,11 @@ export function renderCurrentStep(): void {
     return;
   }
 
-  if (wizardState.currentStep === "smoke-test") {
+  // Intro hero + smoke-test both own the full surface — no step strip.
+  if (
+    wizardState.currentStep === "intro" ||
+    wizardState.currentStep === "smoke-test"
+  ) {
     stepStripMount.replaceChildren();
   } else {
     stepStripMount.replaceChildren(stepStripFor(wizardState.currentStep));
@@ -213,10 +313,16 @@ export function renderCurrentStep(): void {
 
   let primary: HTMLElement;
   switch (wizardState.currentStep) {
+    case "intro":
+      primary = renderStep0Intro({
+        onBegin: () => advanceTo("permissions"),
+      });
+      break;
     case "permissions":
       primary = renderStep1(wizardState.step1, {
         platform: wizardState.platform,
         onContinue: () => advanceTo("audio"),
+        onBack: () => back(),
         onGrantScreen: () => {
           void invoke("open_screen_recording_settings").catch((err) => {
             console.warn("[step1] open_screen_recording_settings failed:", err);
@@ -249,6 +355,7 @@ export function renderCurrentStep(): void {
       primary = renderStep2(wizardState.step2, {
         platform: wizardState.platform,
         onContinue: () => advanceTo("controller"),
+        onBack: () => back(),
         onSelectDevice: (id) =>
           setState({ step2: { ...wizardState.step2, selectedDeviceId: id } }),
         onPlayTest: () => {
@@ -259,8 +366,26 @@ export function renderCurrentStep(): void {
         },
         onAudioYes: () => {
           // Forward the user's Yes — the sidecar correlates this
-          // with the in-flight probe_audio handler.
+          // with the in-flight probe_audio handler (if still waiting).
           void emitIpc("ipc.calibration.user_heard_tone", { heard: true });
+          // If the probe already resolved as "failed" (timeout or
+          // programmatic mismatch) before the user clicked Yes, the
+          // sidecar's user_heard_tone event has already fired and the
+          // emit above is a no-op. Honor the user's override locally so
+          // Continue arms — they're the ground truth on whether they
+          // heard the tone.
+          if (
+            wizardState.step2.audioTestState === "failed" ||
+            wizardState.step2.audioTestState === "programmatic-failed"
+          ) {
+            setState({
+              step2: {
+                ...wizardState.step2,
+                audioTestState: "passed",
+                audioPassed: true,
+              },
+            });
+          }
         },
         onAudioRetry: () => {
           void emitIpc("ipc.calibration.user_heard_tone", { heard: false });
@@ -296,7 +421,8 @@ export function renderCurrentStep(): void {
         void runMidiListen();
       }
       primary = renderStep3(wizardState.step3, {
-        onContinue: () => advanceTo("smoke-test"),
+        onContinue: () => advanceTo("profile-consent"),
+        onBack: () => back(),
         onListenAgain: () => {
           step3ListenStarted = false;
           setState({
@@ -308,7 +434,7 @@ export function renderCurrentStep(): void {
             },
           });
         },
-        onSkip: () => advanceTo("smoke-test"),
+        onSkip: () => advanceTo("profile-consent"),
       });
       if (
         wizardState.step3.probeState === "listening" &&
@@ -316,6 +442,57 @@ export function renderCurrentStep(): void {
       ) {
         scheduleCountdownTick();
       }
+      break;
+    case "profile-consent":
+      primary = renderStepProfileConsent(wizardState.profileConsent, {
+        onContinue: () => {
+          // PROFILE-05 — emit ipc.profile.set_consent so the sidecar
+          // persists the toggle to state.json BEFORE the smoke-test
+          // mounts. The set_consent call is fire-and-forget (sidecar
+          // emits ipc.profile.consent_state ack; UI does not block on
+          // it because the toggle state is the source of truth in this
+          // moment).
+          void emitIpc("ipc.profile.set_consent", {
+            consent: wizardState.profileConsent.consent,
+          }).catch((err) => {
+            // Non-fatal: persistence retry happens via Settings → Profile
+            // panel. The user advances even if the IPC hiccup fires.
+            // eslint-disable-next-line no-console
+            console.warn("[profile-consent] set_consent emit failed:", err);
+          });
+          advanceTo("telemetry-consent");
+        },
+        onToggle: (next) =>
+          setState({
+            profileConsent: { ...wizardState.profileConsent, consent: next },
+          }),
+        onBack: () => back(),
+      });
+      break;
+    case "telemetry-consent":
+      primary = renderStepTelemetryConsent(wizardState.telemetryConsent, {
+        onContinue: () => {
+          // Phase 34 / SEC-08 — fire-and-forget IPC mirror so the sidecar
+          // persists telemetry_consent: bool to state.json BEFORE the
+          // smoke-test surface mounts. The handler ack is non-blocking;
+          // the radio state is the source of truth in this moment.
+          void emitIpc("ipc.telemetry.set_consent", {
+            consent: wizardState.telemetryConsent.consent,
+          }).catch((err) => {
+            // eslint-disable-next-line no-console
+            console.warn("[telemetry-consent] set_consent emit failed:", err);
+          });
+          advanceTo("smoke-test");
+        },
+        onToggle: (next) =>
+          setState({
+            telemetryConsent: {
+              ...wizardState.telemetryConsent,
+              consent: next,
+            },
+          }),
+        onBack: () => back(),
+      });
       break;
     case "smoke-test":
       if (!smokeTestStarted) {
@@ -607,8 +784,9 @@ async function runMidiListen(): Promise<void> {
         caughtLabel: label,
       },
     });
-    // Auto-advance after 1s per UI-SPEC §10.
-    setTimeout(() => advanceTo("smoke-test"), 1000);
+    // Auto-advance after 1s per UI-SPEC §10. Phase 32 routes through the
+    // profile-consent step before the smoke-test surface.
+    setTimeout(() => advanceTo("profile-consent"), 1000);
   } catch (err) {
     if (!resolved) {
       console.warn("[step3] midi listen failed:", err);
@@ -671,7 +849,20 @@ async function completeWizard(): Promise<void> {
       },
     });
   } catch (err) {
+    // Without surfacing this, the wizard advances to "done" but the
+    // first_run_completed flag isn't persisted → wizard silently
+    // re-opens on next launch. Show an inline retry instead of
+    // looping forever.
     console.warn("[wizard] completion write failed:", err);
+    const detail = err instanceof Error ? err.message : String(err);
+    const retry = window.confirm(
+      `Setup couldn't be saved (${detail}).\n\nRetry now? Cancel to continue ` +
+      `without saving — vibemix will re-open the wizard on next launch.`,
+    );
+    if (retry) {
+      await completeWizard();
+      return;
+    }
   }
   setState({ currentStep: "done" });
 }
@@ -687,14 +878,25 @@ export async function subscribeStatusBar(): Promise<void> {
   statusBarSubscribed = true;
   await subscribeIpc("ipc.status.tick", (msg) => {
     const payload = (msg as { payload: { livekit: string; gemini: string; midi: number | null; screen: string } }).payload;
-    setState({
+    // The status tick fires at 1Hz. Routing it through setState() would
+    // call rerender() → renderCurrentStep() → replaceChildren on the
+    // wizard's primary surface, which restarts the entrance animation
+    // every second and visually looks like the page is reloading.
+    // Mutate state in place + re-render ONLY the status-bar mount.
+    wizardState = {
+      ...wizardState,
       statusBar: {
         livekit: payload.livekit as StatusBarProps["livekit"],
         gemini: payload.gemini as StatusBarProps["gemini"],
         midi: payload.midi,
         screen: payload.screen as StatusBarProps["screen"],
       },
-    });
+    };
+    notify();
+    const statusMount = document.getElementById("status-bar");
+    if (statusMount) {
+      statusMount.replaceChildren(StatusBar(wizardState.statusBar));
+    }
   });
 }
 
@@ -725,7 +927,8 @@ export function getDevSurface(): DevSurface {
           caughtLabel: ev.label,
         },
       });
-      setTimeout(() => advanceTo("smoke-test"), 1000);
+      // Phase 32 — Step 3 routes through profile-consent before smoke-test.
+      setTimeout(() => advanceTo("profile-consent"), 1000);
     },
     setStatusBar: (status) => setState({ statusBar: status }),
   };

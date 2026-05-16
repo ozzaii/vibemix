@@ -1,0 +1,5 @@
+# Phase 34 / SEC-01 test fixture.
+# Contains a deterministic AIza-shaped placeholder string. The
+# -TEST-FIXTURE-DO-NOT-USE suffix is unique to placeholders.
+# Used by tests/security/test_gitleaks_baseline.py.
+AIzaSyExampleKeyOnly-TEST-FIXTURE-DO-NOT-USE

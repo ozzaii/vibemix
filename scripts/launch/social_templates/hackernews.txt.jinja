@@ -1,0 +1,21 @@
+[TITLE] Show HN: vibemix — open-source AI co-host for live DJ sets (mac/win)
+
+[URL] {{ release_url }}
+
+[BODY]
+
+vibemix is a local-first AI co-host for live DJ sets. Mac + Windows.
+
+It listens to your master output (BlackHole on mac, WASAPI loopback on win), watches your DJ software's screen, reads MIDI controller actions, and talks back into your headphones in real time as either "hype-man" or "coach". 3 user levels (Beginner / Intermediate / Pro).
+
+**Anti-slop is the product:** reactions are tied to real events (BPM jumps, track changes, MIDI moves) via a Gemini-grounded evidence registry. The model has to cite what just happened before it speaks. If reactions feel scripted, late, or hallucinated, the product fails — that's the hard quality bar.
+
+**Stack:** Tauri (rust shell) + Python sidecar + FastAPI proxy. Gemini 3 Flash + native-audio TTS streaming. WaveSurfer for the live UI. No telemetry by default. Recordings stay local.
+
+**Open source:** Apache 2.0. The Bravoh-managed proxy is closed (rate-limits Gemini per install so we don't ship raw API keys — solved the "API key in distributed binary" problem).
+
+This is Bravoh's first open-source release. We use it daily for our own DJ sets; sharing it because the friction of installing it should be zero for the broad DJ community.
+
+Roadmap: Mixxx OSC + Rekordbox parse + a few more controllers in v2.2. AMA, happy to dig into the audio pipeline / Gemini grounding / mascot state machine if anyone's curious.
+
+GitHub: {{ release_url }}

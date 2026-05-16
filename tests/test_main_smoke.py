@@ -731,3 +731,66 @@ def test_main_genre_unknown_sys_exits(monkeypatch):
     # Valid choices listed:
     assert "techno" in msg
     assert "none" in msg
+
+
+# ---------------------------------------------------------------------------
+# Plan 19-05 — SMOKE-07/08 — GeminiContextCache wiring assertions
+# ---------------------------------------------------------------------------
+#
+# These tests verify that __main__.py's source declares the cache + ack +
+# cancel + ttft wiring symbols expected by Plan 19-05. The pre-existing
+# smoke_03/04/05 failures (carried in baseline 9-failure set) prevent us
+# from running main() to completion and asserting runtime cache.create
+# behavior here — those failures are unrelated to Plan 19-05 (they exist
+# in the wiring even before this plan's __main__ edits). We use AST-level
+# inspection so the wiring contract is locked even when the live-runtime
+# smoke harness is broken.
+
+
+def test_smoke_07_main_imports_cache_and_ack_primitives() -> None:
+    """SMOKE-07: __main__.py imports the four Plan 19-05 wiring symbols
+    (GeminiContextCache + AckBank + CancelGate + TTFTMeter)."""
+    from vibemix import __main__ as main_mod
+
+    assert hasattr(main_mod, "GeminiContextCache"), "missing GeminiContextCache import"
+    assert hasattr(main_mod, "AckBank"), "missing AckBank import"
+    assert hasattr(main_mod, "CancelGate"), "missing CancelGate import"
+    assert hasattr(main_mod, "TTFTMeter"), "missing TTFTMeter import"
+    assert hasattr(main_mod, "SYSTEM_INSTRUCTION"), "missing SYSTEM_INSTRUCTION import"
+
+
+def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> None:
+    """SMOKE-08: __main__.py source contains the cache.create + graceful-
+    degradation pattern + the agent kwargs + the coach_loop kwargs.
+
+    AST-level grep of the source file: avoids the smoke_03/04/05 pre-existing
+    failure (main() teardown bug carried in baseline 9-failure set) while
+    still locking the Plan 19-05 wiring contract. If a future regression
+    drops cache=cache from DJCoHostAgent kwargs or removes the try/except
+    around cache.create, this test catches it.
+    """
+    from pathlib import Path
+
+    src = Path("src/vibemix/__main__.py").read_text()
+
+    # Cache construction
+    assert "GeminiContextCache(" in src, "GeminiContextCache constructor call missing"
+    assert "system_instruction_body=SYSTEM_INSTRUCTION" in src, (
+        "GeminiContextCache must be built with SYSTEM_INSTRUCTION body"
+    )
+    assert "await cache.create()" in src, "cache.create not awaited"
+    # Graceful degradation — cache=None on failure, no propagation of exception
+    assert "cache = None" in src, "graceful-degradation cache=None branch missing"
+    # refresh_loop spawned as background task
+    assert "cache.refresh_loop(stop_event)" in src, "refresh_loop background task missing"
+    # Agent gets cache + ttft_meter kwargs
+    assert "cache=cache" in src, "DJCoHostAgent must receive cache=cache kwarg"
+    assert "ttft_meter=ttft_meter" in src, "DJCoHostAgent must receive ttft_meter=ttft_meter kwarg"
+    # coach_loop gets ack_bank + cancel_gate + ttft_meter + playback
+    assert "ack_bank=ack_bank" in src, "coach_loop must receive ack_bank kwarg"
+    assert "cancel_gate=cancel_gate" in src, "coach_loop must receive cancel_gate kwarg"
+    assert "playback=playback" in src, "coach_loop must receive playback kwarg"
+    # Construction order — TTFTMeter + AckBank + CancelGate before agent
+    assert "TTFTMeter()" in src, "TTFTMeter not instantiated"
+    assert "AckBank()" in src, "AckBank not instantiated"
+    assert "CancelGate()" in src, "CancelGate not instantiated"

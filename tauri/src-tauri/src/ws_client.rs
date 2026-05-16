@@ -37,6 +37,11 @@ use tokio_tungstenite::{
 const WS_URL: &str = "ws://127.0.0.1:8765";
 const BACKOFF_START_MS: u64 = 250;
 const BACKOFF_CAP_MS: u64 = 5000;
+// After this many consecutive connect failures (~30s of reconnect
+// attempts with the 250→5000ms backoff), emit ws-state=unreachable so
+// the webview can show an actionable banner instead of perpetual
+// "reconnecting…". Reset to 0 on a successful connect.
+const UNREACHABLE_AFTER: u32 = 12;
 
 type WsSink = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
 
@@ -60,10 +65,14 @@ pub struct WsClientHandle {
 pub async fn run_ws_client(app: AppHandle) {
     let handle = app.state::<WsClientHandle>().inner().clone();
     let mut backoff_ms: u64 = BACKOFF_START_MS;
+    let mut consecutive_failures: u32 = 0;
+    let mut emitted_unreachable: bool = false;
     loop {
         match connect_async(WS_URL).await {
             Ok((ws, _resp)) => {
                 backoff_ms = BACKOFF_START_MS;
+                consecutive_failures = 0;
+                emitted_unreachable = false;
                 app.emit("ws-state", "connected").ok();
 
                 let (sink, mut stream) = ws.split();
@@ -113,10 +122,21 @@ pub async fn run_ws_client(app: AppHandle) {
             }
             Err(_e) => {
                 // Sidecar not up yet, or bus crashed — fall through to backoff.
+                consecutive_failures = consecutive_failures.saturating_add(1);
             }
         }
 
-        app.emit("ws-state", "reconnecting").ok();
+        // Once we cross the threshold, latch an `unreachable` event so
+        // the webview surfaces an actionable banner. We still keep
+        // reconnecting in the background — recovery is automatic if the
+        // sidecar comes back up — but the user sees the truth instead
+        // of an endless "reconnecting…" status.
+        if consecutive_failures >= UNREACHABLE_AFTER && !emitted_unreachable {
+            app.emit("ws-state", "unreachable").ok();
+            emitted_unreachable = true;
+        } else if !emitted_unreachable {
+            app.emit("ws-state", "reconnecting").ok();
+        }
         tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
         backoff_ms = (backoff_ms.saturating_mul(2)).min(BACKOFF_CAP_MS);
     }

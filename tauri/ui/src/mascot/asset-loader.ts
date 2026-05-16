@@ -34,6 +34,7 @@
 import type { AnimationClip, Bone, Object3D } from "three";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 
+import { AnimationUtils } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { retargetClip } from "three/examples/jsm/utils/SkeletonUtils.js";
@@ -282,6 +283,21 @@ export async function loadMascotAssets(
       throw new Error(
         `loadMascotAssets failed: ${entry.file} manifest entry has no 'states' labels`,
       );
+    }
+
+    // Phase 22 Plan 02 — anticipation overlay clips (`prep_*`) live on the
+    // additive layer per Pitfall 19 (single mixer, weight-managed). They
+    // are converted to additive deltas ONCE at load time via
+    // AnimationUtils.makeClipAdditive. Non-prep clips intentionally stay
+    // on the default (Normal) blend mode — only the anticipation overlay
+    // is additive in v2.0 per CONTEXT D-LOCKED (the full 4-layer model is
+    // deferred to v2.1). The check fires per-entry (the manifest authoring
+    // contract is 1 prep_* state per file — no shared clips on additive).
+    const isAnticipationEntry = entry.states.every((s) =>
+      s.startsWith("prep_"),
+    );
+    if (isAnticipationEntry) {
+      AnimationUtils.makeClipAdditive(retargetedClip);
     }
 
     for (const stateLabel of entry.states) {

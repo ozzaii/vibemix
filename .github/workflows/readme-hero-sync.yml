@@ -1,0 +1,44 @@
+name: README Hero Sync
+
+# Phase 35 Plan 35-03 / ASSETS-07 / Pitfall P68 —
+# detect drift between the README hero block (sha256 comment) and the
+# real docs/assets/demo.mp4 asset. Runs on every PR, every push to main,
+# and nightly so untouched-PR repos still surface drift.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "README.md"
+      - "docs/assets/**"
+      - "scripts/check_readme_hero_hash.py"
+      - ".github/workflows/readme-hero-sync.yml"
+  pull_request:
+    paths:
+      - "README.md"
+      - "docs/assets/**"
+      - "scripts/check_readme_hero_hash.py"
+      - ".github/workflows/readme-hero-sync.yml"
+  schedule:
+    # 03:17 UTC daily — odd minute to dodge GitHub-Actions cron stampede.
+    - cron: "17 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # We need the asset itself for hashing — checkout @ default
+          # depth fine since LFS isn't used yet.
+          lfs: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run hash sync check
+        run: python scripts/check_readme_hero_hash.py

@@ -28,9 +28,14 @@ import { renderTimecode, setTimecode } from "./components/timecode.js";
 import { renderPhaseTape, setPhaseTape, type PhaseChunk } from "./components/phase-tape.js";
 import { renderDropChip } from "./components/drop-chip.js";
 import { renderEventRibbon, setEventRibbon, type MidiEvent } from "./components/event-ribbon.js";
-import { renderCohostPanel, setCohost, type TranscriptLine, type CohostStatus } from "./components/cohost.js";
+import {
+  GROUNDING_FAILURE_MS,
+  renderCohostPanel,
+  setCohost,
+  type CohostStatus,
+  type TranscriptLine,
+} from "./components/cohost.js";
 import { renderStatusBar, type BadgeState } from "./components/status-bar.js";
-import { renderMutedBanner } from "./components/muted-banner.js";
 import { SCREW_SVG } from "./icons/screw.svg.js";
 import { HEADPHONES_SVG } from "./icons/headphones.svg.js";
 
@@ -68,6 +73,10 @@ export interface SessionState {
     transcript: TranscriptLine[];
     latencyMs: number | null;
     grounded: boolean;
+    /** Optional click handler for the H9 retry button rendered after the
+     *  grounding-failure threshold elapses. Layout passes this through to
+     *  the cohost panel verbatim. */
+    onRetry?: () => void;
   };
   status: {
     livekit: BadgeState;
@@ -116,6 +125,13 @@ export interface Mounted {
    *  listener wired during mount — true means new lines auto-scroll;
    *  false means the user has scrolled up and we preserve position. */
   userScrolledUp: boolean;
+  /** Wave 6 (H9) — timestamp (Date.now()) of the most-recent transition
+   *  from grounded=true to grounded=false. Null when grounded is currently
+   *  true OR has been true since mount. The render-loop reads this on
+   *  each frame to compute the failure-elapsed delta for the cohost foot;
+   *  the cohost flips to "COULDN'T REACH GEMINI" once the delta crosses
+   *  GROUNDING_FAILURE_MS (5s). */
+  groundedFalseSinceMs: number | null;
 }
 
 const LAYOUT_CSS = `
@@ -286,13 +302,25 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const rightCol = document.createElement("section");
   rightCol.className = "vmx-session__col";
   rightCol.dataset.col = "right";
+  // bannerSlot retained as an empty mount point so the layout grid stays
+  // stable. The previous muted-banner mount stacked a 3rd fault-tinted
+  // alarm signal alongside the cohost inline pill and the statusbar muted
+  // strip; critique 2026-05-14 pass 2 collapsed mute to a single breathing
+  // indicator (the cohost pill, where the eye already is). The banner
+  // renderer stays in the codebase for future re-use, but mounting is
+  // gated off here.
   const bannerSlot = document.createElement("div");
   bannerSlot.className = "vmx-session__banner-slot";
-  if (state.status.muted) {
-    bannerSlot.append(renderMutedBanner({ hotkey: state.status.hotkey }));
-  }
   rightCol.append(bannerSlot);
-  const cohost = renderCohostPanel(state.cohost);
+  // Wave 6 — pass muted + grounding-failure props through. The cohost
+  // owns the visual surfaces (MUTED pill, retry button); layout owns
+  // the timing source (Mounted.groundedFalseSinceMs).
+  const cohost = renderCohostPanel({
+    ...state.cohost,
+    muted: state.status.muted,
+    failureElapsedMs: null,
+    onRetry: state.cohost.onRetry,
+  });
   rightCol.append(cohost);
   grid.append(rightCol);
 
@@ -330,6 +358,9 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
     bannerSlot,
     current: state,
     userScrolledUp: false,
+    // Initialize: if cohost boots already grounded=false, start the timer
+    // immediately so the failure copy appears at t+5s rather than t+10s.
+    groundedFalseSinceMs: state.cohost.grounded ? null : Date.now(),
   };
 
   // Wire transcript scroll listener — UI-SPEC §sticky-bottom: a user
@@ -552,14 +583,32 @@ export function renderSessionFrame(mounted: Mounted, next: SessionState): void {
     setEventRibbon(mounted.eventRibbon, { events: next.events });
   }
 
+  // Wave 6 (H9) — track grounded=false dwell time. Transitions reset the
+  // timer; the elapsed delta is passed to the cohost which flips to the
+  // failure surface once it crosses GROUNDING_FAILURE_MS (5s).
+  if (mounted.current.cohost.grounded !== next.cohost.grounded) {
+    mounted.groundedFalseSinceMs = next.cohost.grounded ? null : Date.now();
+  }
+  const failureElapsedMs =
+    mounted.groundedFalseSinceMs != null
+      ? Date.now() - mounted.groundedFalseSinceMs
+      : null;
+
   // Cohost — array-ref check on transcript; status/grounded/latency
   // mutations are cheap and rebuilt unconditionally inside setCohost.
+  // muted + failureElapsedMs are also part of the diff trigger so the
+  // hot-path picks up cmd+m presses and crossings of the 5s threshold.
   const cohostTranscriptChanged =
     mounted.current.cohost.transcript !== next.cohost.transcript;
   const cohostStatusChanged =
     mounted.current.cohost.status !== next.cohost.status ||
     mounted.current.cohost.grounded !== next.cohost.grounded ||
-    mounted.current.cohost.latencyMs !== next.cohost.latencyMs;
+    mounted.current.cohost.latencyMs !== next.cohost.latencyMs ||
+    mounted.current.status.muted !== next.status.muted ||
+    // Failure threshold crossing — recompute on every frame so the foot
+    // flips exactly once at t+5s. Cheap because setCohost only mutates
+    // textContent + data-attrs.
+    crossesFailureThreshold(mounted, failureElapsedMs);
   if (cohostTranscriptChanged || cohostStatusChanged) {
     // Sync data-sticky onto the transcript so setCohost auto-scrolls
     // only when the user hasn't scrolled up. Plan §1 — sticky-bottom
@@ -570,21 +619,18 @@ export function renderSessionFrame(mounted: Mounted, next: SessionState): void {
     if (trEl) {
       trEl.dataset.sticky = mounted.userScrolledUp ? "false" : "true";
     }
-    setCohost(mounted.cohost, next.cohost);
+    setCohost(mounted.cohost, {
+      ...next.cohost,
+      muted: next.status.muted,
+      failureElapsedMs,
+      onRetry: next.cohost.onRetry,
+    });
   }
 
-  // Muted banner mount/unmount
-  if (
-    mounted.current.status.muted !== next.status.muted ||
-    mounted.current.status.hotkey !== next.status.hotkey
-  ) {
-    mounted.bannerSlot.replaceChildren();
-    if (next.status.muted) {
-      mounted.bannerSlot.append(
-        renderMutedBanner({ hotkey: next.status.hotkey }),
-      );
-    }
-  }
+  // Muted state: the cohost inline pill is now the sole breathing indicator
+  // for mute; the banner slot stays empty (kept as a mount stub so future
+  // urgent banners can land here). Critique 2026-05-14 pass 2 collapsed the
+  // triple-mute stack to one signal.
 
   // Status bar — rebuild only if any badge state changed (cheap; bar is small)
   const sbPrev = mounted.current.status;
@@ -610,6 +656,24 @@ export function renderSessionFrame(mounted: Mounted, next: SessionState): void {
   }
 
   mounted.current = next;
+}
+
+/** Wave 6 (H9) — detect frames where the grounding-failure elapsed delta
+ *  crossed the 5s threshold in either direction since the previous frame.
+ *  We can't store the prior elapsed (the render-loop doesn't expose it),
+ *  so we conservatively flag whenever the current elapsed is non-null and
+ *  the foot's current data-failed state disagrees with what the elapsed
+ *  implies. Cheap (one DOM read + one numeric compare). */
+function crossesFailureThreshold(
+  mounted: Mounted,
+  failureElapsedMs: number | null,
+): boolean {
+  const foot = mounted.cohost.querySelector<HTMLElement>(".vmx-cohost__foot");
+  if (!foot) return false;
+  const currentlyFailed = foot.dataset.failed === "true";
+  const shouldFail =
+    failureElapsedMs != null && failureElapsedMs >= GROUNDING_FAILURE_MS;
+  return currentlyFailed !== shouldFail;
 }
 
 function clamp01(n: number): number {

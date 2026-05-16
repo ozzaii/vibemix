@@ -21,6 +21,7 @@ ref-resolver is cached internally, much cheaper than top-level
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,12 +29,53 @@ from typing import Literal
 
 import jsonschema
 
-# Resolve the schema relative to this file:
-#   src/vibemix/ui_bus/messages.py  -> parents[3] == repo root.
-#   parents[0] = ui_bus, [1] = vibemix, [2] = src, [3] = repo root.
-_SCHEMA_PATH = (
-    Path(__file__).resolve().parents[3] / "tauri" / "ui" / "src" / "ipc" / "messages.schema.json"
+from vibemix.ui_bus.schemas.citation import SessionCitationPayload
+from vibemix.ui_bus.schemas.debrief import (
+    ChapterRegionPayload,
+    DebriefChapterListPayload,
+    DebriefCitationSummaryPayload,
+    DebriefCitationTooltipPayload,
+    DebriefCitationTooltipReqPayload,
+    DebriefDrillsPayload,
+    DebriefErrorPayload,
+    DebriefEventTimelinePayload,
+    DebriefSessionLoadedPayload,
+    DebriefTldrAudioPayload,
+    DrillPayload,
 )
+from vibemix.ui_bus.schemas.library import (
+    LibraryConfidencePayload,
+    LibraryImportCancelPayload,
+    LibraryImportPayload,
+    LibraryImportProgressPayload,
+    LibrarySearchRequestPayload,
+    LibrarySearchResultPayload,
+    LibrarySimilarRequestPayload,
+    LibrarySimilarResultPayload,
+    LibraryStalenessActionPayload,
+    LibraryStalenessNudgePayload,
+)
+from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
+from vibemix.ui_bus.schemas.profile import (
+    ProfileConsentStatePayload,
+    ProfileDeleteAckPayload,
+    ProfileRegenerateResultPayload,
+    ProfileSetConsentPayload,
+    ProfileViewResultPayload,
+)
+
+
+def _resolve_schema_path() -> Path:
+    rel = Path("tauri") / "ui" / "src" / "ipc" / "messages.schema.json"
+    # PyInstaller-frozen bundle: schema bundled under sys._MEIPASS.
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return Path(meipass) / rel
+    # Dev source tree: parents[3] from src/vibemix/ui_bus/messages.py == repo root.
+    return Path(__file__).resolve().parents[3] / rel
+
+
+_SCHEMA_PATH = _resolve_schema_path()
 _SCHEMA: dict = json.loads(_SCHEMA_PATH.read_text())
 _VALIDATOR = jsonschema.Draft7Validator(_SCHEMA)
 
@@ -1218,6 +1260,735 @@ class RecordingsEventsResult:
                 session_dir=session_dir,
                 events=tuple(events),
             ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+# ---------------------------------------------------------------------------
+# Phase 20-04 — Citation diagnostics IPC
+# ---------------------------------------------------------------------------
+# GROUND-06 + 20-CONTEXT D-Bypass-Audit-Surface — sidecar→shell push of the
+# CitationLinter's slop_ratio + StrippedRateTracker's 15s rolling rate +
+# last unverified response text + bypass_active flag. Read-only telemetry;
+# the Tauri Settings → Diagnostics surface consumes for live display.
+# Payload struct lives in vibemix.ui_bus.schemas.citation (subpackage layout
+# adopted in Plan 20-04 — keeps messages.py wrappers thin).
+
+
+@dataclass(frozen=True, slots=True)
+class SessionCitation:
+    type: Literal["ipc.session.citation"]
+    ts: str
+    payload: SessionCitationPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        slop_ratio: float,
+        stripped_rate_15s: float,
+        last_unverified_response: str | None,
+        bypass_active: bool,
+    ) -> SessionCitation:
+        return cls(
+            type="ipc.session.citation",
+            ts=_now_iso(),
+            payload=SessionCitationPayload(
+                slop_ratio=slop_ratio,
+                stripped_rate_15s=stripped_rate_15s,
+                last_unverified_response=last_unverified_response,
+                bypass_active=bypass_active,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+# ---------------------------------------------------------------------------
+# Phase 24-02 — Overlay highlight IPC
+# ---------------------------------------------------------------------------
+# OVERLAY-01 — sidecar→shell push fired on a valid [screen:<element_id>]
+# citation when the citation linter's action is "emit" (i.e. the user
+# actually heard the response). The Tauri shell invokes Rust
+# show_overlay_highlight; AX query → transparent click-through overlay
+# window → amber ring CSS animation → auto-close after duration_ms.
+# Payload struct lives in vibemix.ui_bus.schemas.overlay (subpackage layout
+# matches Plan 20-04 SessionCitation conventions).
+
+
+@dataclass(frozen=True, slots=True)
+class SessionOverlayHighlight:
+    type: Literal["ipc.session.overlay-highlight"]
+    ts: str
+    payload: SessionOverlayHighlightPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        element_id: str,
+        color: Literal["amber", "red", "green", "blue"] = "amber",
+        duration_ms: int = 1300,
+    ) -> SessionOverlayHighlight:
+        return cls(
+            type="ipc.session.overlay-highlight",
+            ts=_now_iso(),
+            payload=SessionOverlayHighlightPayload(
+                element_id=element_id,
+                color=color,
+                duration_ms=duration_ms,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        """Convenience: serialize + reparse to a plain dict for ipc_bus.emit
+        callers that prefer not to JSON-roundtrip themselves. Mirrors the
+        coach.py SessionCitation publish pattern."""
+        return json.loads(self.to_json())
+
+
+# ---------------------------------------------------------------------------
+# Phase 25 Plan 25-03 — DEBRIEF architectural slot (3 wrappers)
+# ---------------------------------------------------------------------------
+# DEBRIEF-01 + DEBRIEF-02: reservation only in v2.0 — the sidecar
+# ``--debrief`` flag binds a separate ws bus on 127.0.0.1:8766 (port
+# constant in vibemix.__main__.DEBRIEF_PORT) and emits these 3 schemas.
+# v2.1 fills in the chaptered TL;DR + drill cards + clickable timeline
+# behind the SAME message types — schemas locked here.
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefSessionLoaded:
+    type: Literal["ipc.debrief.session-loaded"]
+    ts: str
+    payload: DebriefSessionLoadedPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        session_id: str,
+        started_at: float,
+        duration_s: float,
+    ) -> DebriefSessionLoaded:
+        return cls(
+            type="ipc.debrief.session-loaded",
+            ts=_now_iso(),
+            payload=DebriefSessionLoadedPayload(
+                session_id=session_id,
+                started_at=started_at,
+                duration_s=duration_s,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefCitationSummary:
+    type: Literal["ipc.debrief.citation-summary"]
+    ts: str
+    payload: DebriefCitationSummaryPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        total: int,
+        valid: int,
+        stripped: int,
+        bypassed: int,
+    ) -> DebriefCitationSummary:
+        return cls(
+            type="ipc.debrief.citation-summary",
+            ts=_now_iso(),
+            payload=DebriefCitationSummaryPayload(
+                total=total,
+                valid=valid,
+                stripped=stripped,
+                bypassed=bypassed,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefEventTimeline:
+    type: Literal["ipc.debrief.event-timeline"]
+    ts: str
+    payload: DebriefEventTimelinePayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        events: tuple[dict, ...] | list[dict],
+    ) -> DebriefEventTimeline:
+        # Normalize list→tuple for frozen dataclass hashability. The
+        # ``_tuples_to_lists`` helper above converts back to list at JSON
+        # serialization time so the schema's ``type: array`` is honored.
+        events_tuple = tuple(events)
+        return cls(
+            type="ipc.debrief.event-timeline",
+            ts=_now_iso(),
+            payload=DebriefEventTimelinePayload(events=events_tuple),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+# ---------------------------------------------------------------------------
+# Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers (P82 lock baseline)
+# ---------------------------------------------------------------------------
+# These 6 wrappers extend the debrief.v1 namespace ADDITIVELY beside the
+# 3 Phase 25 baselines (DebriefSessionLoaded / DebriefCitationSummary /
+# DebriefEventTimeline). The baselines are frozen — see
+# tests/ui_bus/test_debrief_schema_additive_only.py.
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefChapterList:
+    type: Literal["ipc.debrief.chapter-list"]
+    ts: str
+    payload: DebriefChapterListPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        chapters: tuple[ChapterRegionPayload, ...] | list[ChapterRegionPayload],
+        derived_at: str,
+    ) -> DebriefChapterList:
+        return cls(
+            type="ipc.debrief.chapter-list",
+            ts=_now_iso(),
+            payload=DebriefChapterListPayload(
+                chapters=tuple(chapters),
+                derived_at=derived_at,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefTldrAudio:
+    type: Literal["ipc.debrief.tldr-audio"]
+    ts: str
+    payload: DebriefTldrAudioPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        audio_relative_path: str,
+        duration_s: float,
+        tldr_sha256: str,
+        mime_type: str = "audio/mpeg",
+    ) -> DebriefTldrAudio:
+        return cls(
+            type="ipc.debrief.tldr-audio",
+            ts=_now_iso(),
+            payload=DebriefTldrAudioPayload(
+                audio_relative_path=audio_relative_path,
+                duration_s=duration_s,
+                tldr_sha256=tldr_sha256,
+                mime_type=mime_type,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefDrills:
+    type: Literal["ipc.debrief.drills"]
+    ts: str
+    payload: DebriefDrillsPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        drills: tuple[DrillPayload, ...] | list[DrillPayload],
+    ) -> DebriefDrills:
+        return cls(
+            type="ipc.debrief.drills",
+            ts=_now_iso(),
+            payload=DebriefDrillsPayload(drills=tuple(drills)),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefCitationTooltipReq:
+    type: Literal["ipc.debrief.citation-tooltip-request"]
+    ts: str
+    payload: DebriefCitationTooltipReqPayload
+
+    @classmethod
+    def make(cls, *, event_id: str) -> DebriefCitationTooltipReq:
+        return cls(
+            type="ipc.debrief.citation-tooltip-request",
+            ts=_now_iso(),
+            payload=DebriefCitationTooltipReqPayload(event_id=event_id),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefCitationTooltip:
+    type: Literal["ipc.debrief.citation-tooltip"]
+    ts: str
+    payload: DebriefCitationTooltipPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        event_id: str,
+        evidence_text: str,
+        timestamp: float,
+        found: bool,
+    ) -> DebriefCitationTooltip:
+        return cls(
+            type="ipc.debrief.citation-tooltip",
+            ts=_now_iso(),
+            payload=DebriefCitationTooltipPayload(
+                event_id=event_id,
+                evidence_text=evidence_text,
+                timestamp=timestamp,
+                found=found,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefError:
+    type: Literal["ipc.debrief.error"]
+    ts: str
+    payload: DebriefErrorPayload
+
+    @classmethod
+    def make(cls, *, reason: str, message: str) -> DebriefError:
+        return cls(
+            type="ipc.debrief.error",
+            ts=_now_iso(),
+            payload=DebriefErrorPayload(reason=reason, message=message),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+# ---------------------------------------------------------------------------
+# Phase 28 — Library IPC wrappers (Plan 28-09)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryImport:
+    type: Literal["ipc.library.import"]
+    ts: str
+    payload: LibraryImportPayload
+
+    @classmethod
+    def make(cls, *, path: str) -> LibraryImport:
+        return cls(
+            type="ipc.library.import",
+            ts=_now_iso(),
+            payload=LibraryImportPayload(path=path),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryImportProgress:
+    type: Literal["ipc.library.import_progress"]
+    ts: str
+    payload: LibraryImportProgressPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        total: int,
+        done: int,
+        current_track_name: str,
+        cache_hits: int,
+        cancelled: bool = False,
+    ) -> LibraryImportProgress:
+        return cls(
+            type="ipc.library.import_progress",
+            ts=_now_iso(),
+            payload=LibraryImportProgressPayload(
+                total=total,
+                done=done,
+                current_track_name=current_track_name,
+                cache_hits=cache_hits,
+                cancelled=cancelled,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryImportCancel:
+    type: Literal["ipc.library.import_cancel"]
+    ts: str
+    payload: LibraryImportCancelPayload
+
+    @classmethod
+    def make(cls) -> LibraryImportCancel:
+        return cls(
+            type="ipc.library.import_cancel",
+            ts=_now_iso(),
+            payload=LibraryImportCancelPayload(),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibrarySearchRequest:
+    type: Literal["ipc.library.search"]
+    ts: str
+    payload: LibrarySearchRequestPayload
+
+    @classmethod
+    def make(cls, *, query: str, k: int = 10) -> LibrarySearchRequest:
+        return cls(
+            type="ipc.library.search",
+            ts=_now_iso(),
+            payload=LibrarySearchRequestPayload(query=query, k=k),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibrarySearchResult:
+    type: Literal["ipc.library.search_result"]
+    ts: str
+    payload: LibrarySearchResultPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        query: str,
+        matches: tuple[dict, ...] | list[dict],
+        cache_hit: bool,
+    ) -> LibrarySearchResult:
+        return cls(
+            type="ipc.library.search_result",
+            ts=_now_iso(),
+            payload=LibrarySearchResultPayload(
+                query=query, matches=tuple(matches), cache_hit=cache_hit
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryConfidence:
+    type: Literal["ipc.library.confidence"]
+    ts: str
+    payload: LibraryConfidencePayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        track_id: str | None,
+        cosine: float,
+        decision: str,
+        event_id: str,
+        cost_warning: bool = False,
+    ) -> LibraryConfidence:
+        return cls(
+            type="ipc.library.confidence",
+            ts=_now_iso(),
+            payload=LibraryConfidencePayload(
+                track_id=track_id,
+                cosine=cosine,
+                decision=decision,
+                event_id=event_id,
+                cost_warning=cost_warning,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryStalenessNudge:
+    type: Literal["ipc.library.staleness_nudge"]
+    ts: str
+    payload: LibraryStalenessNudgePayload
+
+    @classmethod
+    def make(
+        cls, *, age_days: int, snoozed_until_ts: float | None
+    ) -> LibraryStalenessNudge:
+        return cls(
+            type="ipc.library.staleness_nudge",
+            ts=_now_iso(),
+            payload=LibraryStalenessNudgePayload(
+                age_days=age_days, snoozed_until_ts=snoozed_until_ts
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryStalenessAction:
+    type: Literal["ipc.library.staleness_action"]
+    ts: str
+    payload: LibraryStalenessActionPayload
+
+    @classmethod
+    def make(cls, *, action: str) -> LibraryStalenessAction:
+        return cls(
+            type="ipc.library.staleness_action",
+            ts=_now_iso(),
+            payload=LibraryStalenessActionPayload(action=action),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibrarySimilarRequest:
+    type: Literal["ipc.library.similar_request"]
+    ts: str
+    payload: LibrarySimilarRequestPayload
+
+    @classmethod
+    def make(cls, *, track_id: str, k: int = 10) -> LibrarySimilarRequest:
+        return cls(
+            type="ipc.library.similar_request",
+            ts=_now_iso(),
+            payload=LibrarySimilarRequestPayload(track_id=track_id, k=k),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class LibrarySimilarResult:
+    type: Literal["ipc.library.similar_result"]
+    ts: str
+    payload: LibrarySimilarResultPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        track_id: str,
+        results: tuple[dict, ...] | list[dict],
+    ) -> LibrarySimilarResult:
+        return cls(
+            type="ipc.library.similar_result",
+            ts=_now_iso(),
+            payload=LibrarySimilarResultPayload(
+                track_id=track_id, results=tuple(results)
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+# ---------------------------------------------------------------------------
+# Phase 32 — long-term DJ profile IPC
+# ---------------------------------------------------------------------------
+# PROFILE-04/05/07. Shell ↔ sidecar surface for the wizard's consent toggle
+# + Settings → Profile panel (view / regenerate / delete). All payload
+# structs live in ``vibemix.ui_bus.schemas.profile``. Default-OFF consent
+# is enforced at the wizard UI; the sidecar honors whatever boolean arrives.
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileSetConsent:
+    type: Literal["ipc.profile.set_consent"]
+    ts: str
+    payload: ProfileSetConsentPayload
+
+    @classmethod
+    def make(cls, *, consent: bool) -> ProfileSetConsent:
+        return cls(
+            type="ipc.profile.set_consent",
+            ts=_now_iso(),
+            payload=ProfileSetConsentPayload(consent=consent),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileConsentState:
+    type: Literal["ipc.profile.consent_state"]
+    ts: str
+    payload: ProfileConsentStatePayload
+
+    @classmethod
+    def make(cls, *, consent: bool) -> ProfileConsentState:
+        return cls(
+            type="ipc.profile.consent_state",
+            ts=_now_iso(),
+            payload=ProfileConsentStatePayload(consent=consent),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileView:
+    """Shell → sidecar. Empty payload; reply is ProfileViewResult."""
+
+    type: Literal["ipc.profile.view"]
+    ts: str
+    payload: dict
+
+    @classmethod
+    def make(cls) -> ProfileView:
+        return cls(type="ipc.profile.view", ts=_now_iso(), payload={})
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileViewResult:
+    type: Literal["ipc.profile.view_result"]
+    ts: str
+    payload: ProfileViewResultPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        profile: dict | None,
+        bytes: int,
+        consent: bool,
+    ) -> ProfileViewResult:
+        return cls(
+            type="ipc.profile.view_result",
+            ts=_now_iso(),
+            payload=ProfileViewResultPayload(
+                profile=profile, bytes=bytes, consent=consent
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileRegenerate:
+    """Shell → sidecar. Empty payload; reply is ProfileRegenerateResult."""
+
+    type: Literal["ipc.profile.regenerate"]
+    ts: str
+    payload: dict
+
+    @classmethod
+    def make(cls) -> ProfileRegenerate:
+        return cls(type="ipc.profile.regenerate", ts=_now_iso(), payload={})
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileRegenerateResult:
+    type: Literal["ipc.profile.regenerate_result"]
+    ts: str
+    payload: ProfileRegenerateResultPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        ok: bool,
+        profile: dict | None,
+        error: str | None,
+    ) -> ProfileRegenerateResult:
+        return cls(
+            type="ipc.profile.regenerate_result",
+            ts=_now_iso(),
+            payload=ProfileRegenerateResultPayload(
+                ok=ok, profile=profile, error=error
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileDelete:
+    """Shell → sidecar. Empty payload; reply is ProfileDeleteAck."""
+
+    type: Literal["ipc.profile.delete"]
+    ts: str
+    payload: dict
+
+    @classmethod
+    def make(cls) -> ProfileDelete:
+        return cls(type="ipc.profile.delete", ts=_now_iso(), payload={})
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileDeleteAck:
+    type: Literal["ipc.profile.delete_ack"]
+    ts: str
+    payload: ProfileDeleteAckPayload
+
+    @classmethod
+    def make(cls, *, ok: bool, error: str | None = None) -> ProfileDeleteAck:
+        return cls(
+            type="ipc.profile.delete_ack",
+            ts=_now_iso(),
+            payload=ProfileDeleteAckPayload(ok=ok, error=error),
         )
 
     def to_json(self) -> str:

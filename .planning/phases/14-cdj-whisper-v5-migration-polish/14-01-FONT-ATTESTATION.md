@@ -1,4 +1,0 @@
-d5f1ee1ce85a2f6611d76bcd98738132f4706b099dc167f02c2093a1ec5eb975  tauri/ui/public/fonts/Saira-VariableFont_wdth,wght.woff2
-14425ba9c695763c1547f48a206b7aa60350a33ae23de09f0407877f3fcd89eb  tauri/ui/public/fonts/JetBrainsMono-Regular.woff2
-cb182feeed4d798ff6961d3c79f7026279448fca0676438aaecb21f3fc39553a  tauri/ui/public/fonts/JetBrainsMono-Medium.woff2
-400c6bfda18d5d14acad1c15d6dcb9f8e13c015e7286317e0b9a482539bef147  tauri/ui/public/fonts/JetBrainsMono-SemiBold.woff2

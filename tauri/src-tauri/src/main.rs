@@ -18,9 +18,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
+mod debrief_window;
+mod djay_ax;
 mod hotkey;
 mod mascot_window;
+mod overlay;
 mod permissions;
+mod recordings;
 mod sidecar;
 mod tray;
 mod updater;
@@ -28,15 +32,16 @@ mod ws_client;
 
 use std::fs;
 
-use tauri::Manager;
+use tauri::{Listener, Manager};
 
+use crate::debrief_window::DebriefSidecarHandle;
 use crate::hotkey::HotkeyHandle;
 use crate::sidecar::SidecarHandle;
-use crate::tray::TrayHandle;
+use crate::tray::{QuitPending, TrayHandle};
 use crate::ws_client::WsClientHandle;
 
 fn main() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         // Plugins — every one is gated by the capability allowlist.
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
@@ -47,11 +52,24 @@ fn main() {
         // Phase 18 ships real signed manifests.
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Phase 12 Wave 3 — push-to-mute global shortcut.
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        // Twelve webview-callable commands (capability allowlist mirrors).
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
+
+    // Phase 33 / INSTALL-02 — macOS TCC plugin (check_permission /
+    // request_permission / subscribe). Wired macOS-only so Windows builds
+    // stay green. The capability allowlist gates which commands the
+    // webview is allowed to invoke.
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_plugin_macos_permissions::init());
+
+    builder
+        // Webview-callable commands (capability allowlist mirrors).
         // Phase 13 Plan 02 adds 4 mascot commands:
         //   read_mascot_window_state, write_mascot_window_state,
         //   set_mascot_visible, set_mascot_click_through
+        // Phase 15 Plan 03 adds 2 recording commands:
+        //   reveal_in_os, open_input_wav
+        // Phase 24 Plan 02 adds 1 overlay command:
+        //   show_overlay_highlight
         .invoke_handler(tauri::generate_handler![
             ws_client::forward_ipc_to_sidecar,
             sidecar::restart_sidecar,
@@ -65,11 +83,17 @@ fn main() {
             permissions::open_microphone_settings,
             permissions::request_microphone_permission,
             hotkey::rebind_hotkey,
+            recordings::reveal_in_os,
+            recordings::open_input_wav,
+            overlay::show_overlay_highlight,
+            debrief_window::open_debrief_window,
         ])
         .manage(SidecarHandle::default())
+        .manage(DebriefSidecarHandle::default())
         .manage(WsClientHandle::default())
         .manage(HotkeyHandle::default())
         .manage(TrayHandle::default())
+        .manage(QuitPending::default())
         // Phase 13 Plan 02 — lifecycle override. Closing the main session
         // window hides it instead of quitting the process; only the tray
         // `Quit vibemix` item kills the app. The mascot window has no
@@ -147,6 +171,28 @@ fn main() {
             // and re-derives tray icon state with a 2 Hz throttle. Listener
             // lives for the process lifetime — no uninstall needed.
             tray::install_tray_state_listener(&app_handle);
+
+            // Critique pass 3 (2026-05-14) — quit confirmation listener.
+            // The webview's quit-guard emits `confirmed-quit` after the
+            // user picks "Quit anyway" in the recording-confirm dialog (or
+            // immediately if no recording is in flight). On receipt we
+            // exit the process. Two-step quit (tray-quit-requested ->
+            // confirmed-quit) means Cmd+Q on a live recording no longer
+            // drops the take silently.
+            //
+            // Pass 4 (2026-05-14): also listen for `quit-cancelled` (user
+            // picked Stay). Clear the QuitPending flag so the tray.rs
+            // fallback timer becomes a no-op when it fires at +1.5s.
+            let quit_pending_for_exit = app.state::<QuitPending>().0.clone();
+            let quit_app = app_handle.clone();
+            app_handle.listen("confirmed-quit", move |_event| {
+                quit_pending_for_exit.store(false, std::sync::atomic::Ordering::SeqCst);
+                quit_app.exit(0);
+            });
+            let quit_pending_for_cancel = app.state::<QuitPending>().0.clone();
+            app_handle.listen("quit-cancelled", move |_event| {
+                quit_pending_for_cancel.store(false, std::sync::atomic::Ordering::SeqCst);
+            });
 
             // Phase 18 Plan 18-04 — Tauri updater boot-time fire-and-forget.
             // Gated by `update_check_on_launch` (default true); when true the

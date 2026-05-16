@@ -26,6 +26,9 @@ export interface Step1Callbacks {
   onGrantMic: () => void;
   onOpenScreenSettings: () => void;
   onOpenMicSettings: () => void;
+  /** Impeccable Wave 5.A — walks the wizard one step backward. Optional
+   *  for back-compat with existing tests; the router always wires it. */
+  onBack?: () => void;
 }
 
 const CSS = `
@@ -46,7 +49,7 @@ const CSS = `
     font-size: 14px;
     color: var(--silk-65);
     line-height: 1.5;
-    margin: 0 0 var(--sp-5);
+    margin: 0 0 var(--sp-4);
   }
   .wizard-step__cards {
     display: flex;
@@ -55,8 +58,17 @@ const CSS = `
   }
   .wizard-step__cta-row {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    margin-top: var(--sp-4);
+  }
+  /* Hidden when no Back affordance is wired (intro / smoke-test / done). */
+  .wizard-step__cta-row[data-back="false"] {
     justify-content: flex-end;
-    margin-top: var(--sp-5);
+  }
+  .wizard-step__cta-row[data-back="false"] .wizard-step__back-spacer {
+    display: none;
   }
 `;
 
@@ -68,7 +80,7 @@ export function renderStep1(state: Step1State, cb: Step1Callbacks): HTMLElement 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
   // UI-SPEC §Step 1 H1 — VERBATIM
-  heading.textContent = "STEP 1 / 3 — PERMISSIONS";
+  heading.textContent = "STEP 1 / 3 · PERMISSIONS";
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
@@ -109,6 +121,23 @@ export function renderStep1(state: Step1State, cb: Step1Callbacks): HTMLElement 
 
   const ctaRow = document.createElement("div");
   ctaRow.className = "wizard-step__cta-row";
+  ctaRow.dataset.back = cb.onBack ? "true" : "false";
+
+  // Back button — bottom-left affordance (impeccable Wave 5.A). Hidden
+  // when no callback is wired (preserves the legacy single-button layout
+  // for unit tests that don't pass onBack).
+  if (cb.onBack) {
+    ctaRow.append(
+      Button({
+        variant: "secondary",
+        state: "idle",
+        label: "Back",
+        leadingGlyph: "←",
+        onClick: cb.onBack,
+      }),
+    );
+  }
+
   const allGranted = required.every((s) => s === "granted");
   ctaRow.append(
     Button({

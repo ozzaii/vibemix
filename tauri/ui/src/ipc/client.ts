@@ -86,7 +86,7 @@ export async function sendIpcRequest<TResponse extends IpcMessage = IpcMessage>(
       reject(new Error(`ipc timeout: no ${responseType} within ${timeoutMs}ms`));
     }, timeoutMs);
 
-    listen<unknown>(`ipc:${responseType}`, (event) => {
+    listen<unknown>(responseType.replace(/\./g, "-"), (event) => {
       try {
         const msg = parseIpcMessage(event.payload) as TResponse;
         cleanup();
@@ -121,7 +121,7 @@ export async function subscribeIpc<T extends IpcMessage = IpcMessage>(
   type: string,
   callback: (msg: T) => void,
 ): Promise<UnlistenFn> {
-  return await listen<unknown>(`ipc:${type}`, (event) => {
+  return await listen<unknown>(type.replace(/\./g, "-"), (event) => {
     try {
       const msg = parseIpcMessage(event.payload) as T;
       callback(msg);
@@ -144,6 +144,48 @@ export async function emitIpc(
   await invoke("forward_ipc_to_sidecar", {
     message: { type, ts: new Date().toISOString(), payload },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 15 Plan 03 — Recording shell-out wrappers.
+//
+// `revealInOS` and `openInputWav` are the typed gateway from the recording-
+// row action cluster to the Tauri Rust shell-out commands in
+// tauri/src-tauri/src/recordings.rs. The Rust side runs the security
+// gate (canonicalize-prefix check against the recordings root); the JS
+// side is just a typed `invoke()` shell.
+//
+// Argument shape: Tauri 2.x normalises Rust snake_case parameters to
+// camelCase on the JS side BY DEFAULT. The Rust signatures
+//   reveal_in_os(app: AppHandle, session_dir: String)
+//   open_input_wav(app: AppHandle, session_dir: String)
+// expose `sessionDir` as the JS-side argument key. (`app` is auto-injected
+// by Tauri and is NOT passed from JS.)
+// ---------------------------------------------------------------------------
+
+/** Reveal the session directory in macOS Finder / Windows Explorer.
+ *
+ *  `session_dir` is the BASENAME of the session folder (e.g.
+ *  `"20260513-210410"`), NOT an absolute path — the Rust command joins it
+ *  under the recordings root and rejects any traversal attempt before
+ *  shelling out to `open -R` (macOS) or `explorer /select,` (Windows).
+ *
+ *  Rejects on:
+ *    * Linux / unsupported platforms — Rust returns `Err("unsupported platform")`.
+ *    * Path-traversal violation — Rust returns `Err("path_traversal_rejected")`.
+ *    * Missing session dir — Rust returns `Err("target canon: ...")`.
+ *  Caller is responsible for surfacing failure (typically `console.error`). */
+export async function revealInOS(session_dir: string): Promise<void> {
+  return invoke("reveal_in_os", { sessionDir: session_dir });
+}
+
+/** Open `<recordings_root>/<session_dir>/input.wav` in the OS default audio app.
+ *
+ *  Same `session_dir` shape + same security gate as `revealInOS`. Uses
+ *  tauri-plugin-shell `open()` which delegates to the OS file association
+ *  (LaunchServices on macOS, ShellExecute on Windows). */
+export async function openInputWav(session_dir: string): Promise<void> {
+  return invoke("open_input_wav", { sessionDir: session_dir });
 }
 
 export const _REQUEST_TIMEOUT_MS_FOR_TESTS = REQUEST_TIMEOUT_MS;

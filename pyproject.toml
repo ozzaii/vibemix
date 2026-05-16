@@ -38,6 +38,45 @@ dependencies = [
     "sounddevice>=0.5.5",
     "mido>=1.3.3",
     "python-rtmidi>=1.5.8",
+    # Phase 25 Plan 25-01: pyrekordbox==0.4.4 is the Rekordbox collection.xml
+    # parser (XML import path only — SQLCipher path explicitly UNUSED in v2.0
+    # per CONTEXT D-01 + LIBRARY-07). pyrekordbox's setup.py hard-pulls
+    # sqlcipher3-wheels (3.2 MB binary blob) as an install_requires entry;
+    # WAVE-0-DEPS-SPIKE.md verdict locks the --no-deps install path with
+    # manual transitives co-declared below. The C-extension load in
+    # pyrekordbox.db6.database is guarded by a try/except (database.py:28-34)
+    # so the package imports cleanly under the stdlib-sqlite3 fallback.
+    #
+    # INSTALL RECIPE (encoded as `[tool.uv.sources]` override below — uv
+    # respects `--no-deps` semantics by skipping pyrekordbox's metadata
+    # install_requires when the source override declares no transitives;
+    # vibemix declares the required transitives explicitly):
+    "pyrekordbox==0.4.4",
+    # pyrekordbox transitive — bidirectional dict for rbxml tag/attr maps
+    "bidict==0.23.1",
+    # pyrekordbox transitive — ANLZ binary parser (used by .anlz; lazily by .db6)
+    "construct==2.10.70",
+    # pyrekordbox transitive — required by .db6.database import chain even when
+    # SQLCipher dormant (we never call Rekordbox6Database.unlock() in v2.0)
+    "SQLAlchemy==2.0.49",
+    # pyrekordbox transitive — Rekordbox process discovery in .config
+    "psutil==7.2.2",
+    # pyrekordbox transitive — date parsing in mysettings + rbxml
+    "python-dateutil==2.9.0.post0",
+    # NOTE: numpy / packaging / typing_extensions / six are also pyrekordbox
+    # transitives but already supplied by existing vibemix deps (numpy>=2.4.4
+    # explicit; the rest pulled transitively by SQLAlchemy / python-dateutil).
+    # SQLCipher BUNDLE EXCLUSION: sqlcipher3-wheels is intentionally NOT
+    # declared anywhere in this file — PyInstaller bundle gate (Phase 21)
+    # verifies the binary never lands in dist/. See tests/library/
+    # test_pyrekordbox_install.py for the sys.modules dormancy gate.
+    #
+    # sqlite-vec architectural slot — bundled, NOT exercised in v2.0
+    # (LIBRARY-08 + CONTEXT D-08). v2.0 ships text-match lookup only;
+    # Gemini Embedding 2 audio space + sqlite-vec ANN search ships v2.1.
+    # The pyproject.toml entry is intentionally OMITTED until v2.1 — the
+    # STATE.md STACK.md slot reservation is the architectural commitment;
+    # shipping the dep lean in v2.0 stays under the 350 MB bundle cap.
     # Phase 8: mss is win32-only now. macOS uses ScreenCaptureKit (pyobjc-
     # framework-ScreenCaptureKit, added below); the deprecated
     # ``CGWindowListCreateImageFromArray`` path that mss wraps is obsolete
@@ -76,12 +115,25 @@ dependencies = [
     # Pin to >=1.0.0b10 so resolver accepts the published beta; production
     # tracks the latest beta until Microsoft graduates to 1.0.0.
     "winsdk>=1.0.0b10 ; sys_platform == 'win32'",
+    "sqlite-vec>=0.1.9",
 ]
 
 [project.urls]
 Homepage = "https://github.com/ozzaii/vibemix"
 Repository = "https://github.com/ozzaii/vibemix"
 Issues = "https://github.com/ozzaii/vibemix/issues"
+
+[tool.uv]
+# Phase 25 Plan 25-01: pyrekordbox 0.4.4 lists sqlcipher3-wheels as a hard
+# install_requires. v2.0 ships XML import path only (CONTEXT D-01 +
+# LIBRARY-07 — SQLCipher path UNUSED). Override the transitive with a
+# never-matching marker so uv keeps it in the resolved graph (no resolver
+# error) but skips it at install time on every real platform. Saves ~3.2 MB
+# in the PyInstaller bundle and excludes a C-extension we never execute.
+# Verdict + dormancy proof: WAVE-0-DEPS-SPIKE.md.
+override-dependencies = [
+    "sqlcipher3-wheels; sys_platform == 'never_real_platform_vbm25'",
+]
 
 [dependency-groups]
 dev = [
@@ -96,6 +148,21 @@ dev = [
     # in tests/repo/test_repo_metadata.py + scripts/dist/configure_repo.sh
     # (consumed via `yq` on the shell side; YAML parse on the Python side).
     "pyyaml>=6.0",
+    # Phase 27 Plan 27-01 (declared here for Plan 27-02 judges):
+    # VCR.py + pytest-recording cache Gemini API calls so PR CI runs at $0.
+    # Plan 27-02 uses cassettes under tests/eval/cassettes/ for the 2-judge
+    # cross-check tests. Declared in this plan so the manifest is set once.
+    "vcrpy>=8.0",
+    "pytest-recording>=0.13",
+    # Phase 27 Plan 27-07 (LATENCY-14): comtypes is the COM bridge for
+    # IMMNotificationClient::OnDefaultDeviceChanged subscription on Windows.
+    # sys_platform marker keeps it Windows-only — macOS dev box never sees
+    # it (Pitfall P69 carry: never declare a Windows-only dep without the
+    # marker, or `uv sync` on macOS fails). Assumption A6: comtypes may be
+    # a transitive of pyaudiowpatch; declared explicitly here as defensive
+    # default so a future pyaudiowpatch version that drops the dep doesn't
+    # silently break LATENCY-14.
+    'comtypes>=1.4; sys_platform == "win32"',
 ]
 
 # Hatchling includes non-Python files inside a package directory by default
@@ -134,4 +201,7 @@ markers = [
     "windows_only: requires sys.platform == 'win32' — live tests for the Windows port (Phase 7 Wave 3+, executed in Phase 20 CI matrix)",
     "integration: end-to-end integration tests that spin up real WS servers / clients (Plan 13-08+)",
     "slow: 60-min soak test; runs only via `pytest -m slow` (Phase 15 Plan 06)",
+    "parity: Mac/Win bit-identity gate for the library backend (Phase 28 Plan 02 P55 mitigation)",
+    "cli: subprocess CLI integration tests (slower than unit tests; run via `pytest -m cli` for full coverage)",
+    "e2e: end-to-end debrief lifecycle tests (Phase 29 Plan 08; opt-in via `pytest -m e2e`)",
 ]

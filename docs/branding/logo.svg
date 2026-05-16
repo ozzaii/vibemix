@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 200" width="720" height="200" role="img" aria-label="vibemix">
+  <title>vibemix</title>
+  <desc>vibemix wordmark — PLACEHOLDER text-based logo. The designer-finalized logo is a Kaan-action item tracked in .planning/phases/26-readme-branding-day-zero-ops-viral-demo/KAAN-ACTION.md. Do not use for press kit, merch, or vendor co-marketing until replaced.</desc>
+  <defs>
+    <style>
+      .wordmark {
+        font-family: "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+      }
+      .glow {
+        filter: drop-shadow(0 0 18px rgba(255, 138, 61, 0.18));
+      }
+    </style>
+  </defs>
+  <!-- Background: warm black, not pure black (CDJ Whisper token ink-0) -->
+  <rect width="720" height="200" fill="#0B0A09"/>
+  <!-- Wordmark: amber accent (CDJ Whisper token amber-100) -->
+  <!-- Placeholder marker text appears at 92% Y. -->
+  <!-- Color tokens documented in BRANDING.md. -->
+
+  <g class="glow">
+    <text x="50%" y="50%"
+          dominant-baseline="central"
+          text-anchor="middle"
+          class="wordmark"
+          font-size="120"
+          fill="#FF8A3D">vibemix</text>
+  </g>
+  <!-- Placeholder marker: subtle, only visible on close inspection. -->
+  <text x="50%" y="92%"
+        dominant-baseline="central"
+        text-anchor="middle"
+        font-family="monospace"
+        font-size="10"
+        fill="#3A342D"
+        opacity="0.6">PLACEHOLDER — see BRANDING.md</text>
+</svg>

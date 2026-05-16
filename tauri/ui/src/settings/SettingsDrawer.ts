@@ -49,6 +49,9 @@ import {
   renderHotkeyCapture,
   type HotkeyCaptureHandle,
 } from "./components/hotkey-capture.js";
+import { renderLibraryPanel } from "./components/library-panel.js";
+import { renderProfilePanel } from "./components/profile-panel.js";
+import { renderStalenessBanner } from "./components/staleness-banner.js";
 import {
   renderRecordingBrowser,
   type RecordingBrowserHandle,
@@ -58,6 +61,7 @@ import {
   type RetentionSliderHandle,
 } from "./components/retention-slider.js";
 import { renderConfirmDialog } from "./components/confirm-dialog.js";
+import { HelpGroup } from "./components/help-group.js";
 import { MascotGroup } from "./components/mascot-group.js";
 import { PerformanceGroup } from "./components/performance-group.js";
 import {
@@ -132,7 +136,7 @@ const CSS = `
     gap: 8px;
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 700;
-    font-size: 12px;
+    font-size: 14px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--silk);
@@ -154,13 +158,22 @@ const CSS = `
     background: transparent;
     border: 1px solid transparent;
     color: var(--silk-40);
-    font-family: var(--type-mono);
-    font-size: 16px;
     line-height: 1;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     transition: color var(--motion-snap) ease-out,
                 border-color var(--motion-snap) ease-out,
                 background var(--motion-snap) ease-out;
+  }
+  .vmx-settings-drawer__close svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    fill: none;
   }
   .vmx-settings-drawer__close:hover {
     color: var(--amber);
@@ -197,7 +210,7 @@ const CSS = `
     border-radius: var(--rad-sm);
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 600;
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.28em;
     text-transform: uppercase;
     color: var(--amber);
@@ -322,7 +335,7 @@ export function mountSettingsDrawer(root: HTMLElement): void {
   close.type = "button";
   close.className = "vmx-settings-drawer__close";
   close.setAttribute("aria-label", "close settings");
-  close.textContent = "✕";
+  close.innerHTML = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M1 1L13 13M13 1L1 13"/></svg>';
   close.addEventListener("click", (e) => {
     e.preventDefault();
     closeSettings();
@@ -639,6 +652,42 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     }),
   );
 
+  // --- LIBRARY (Phase 28 Plan 06 + 07) -------------------------------------
+  // Plan 07: 30-day staleness banner sits at the top.
+  // Plan 06: drag-drop XML importer below.
+  const libraryBody = document.createElement("div");
+  libraryBody.style.cssText =
+    "display:flex; flex-direction:column; gap: var(--sp-2);";
+  const stalenessHandle = renderStalenessBanner();
+  libraryBody.append(stalenessHandle.element);
+  // Library panel is async; mount a placeholder + swap when ready.
+  const libraryPanelSlot = document.createElement("div");
+  libraryBody.append(libraryPanelSlot);
+  void renderLibraryPanel().then((handle) => {
+    libraryPanelSlot.replaceWith(handle.element);
+  });
+  body.append(
+    renderSettingsGroup({
+      header: "LIBRARY",
+      children: libraryBody,
+    }),
+  );
+
+  // --- PROFILE (Phase 32 / PROFILE-07) -------------------------------------
+  // Long-term DJ profile (~2KB JSON, content-allowlisted). View / regenerate
+  // / delete + consent toggle. Lives between LIBRARY and CALIBRATION because
+  // both are user-data groups; PROFILE is the more sensitive one so it sits
+  // adjacent to LIBRARY for findability (32-RESEARCH §"Settings panel
+  // insertion"). The panel renders synchronously with an empty state and
+  // fires ipc.profile.view on mount to populate.
+  const profileHandle = renderProfilePanel();
+  body.append(
+    renderSettingsGroup({
+      header: "PROFILE",
+      children: profileHandle.element,
+    }),
+  );
+
   // --- CALIBRATION ----------------------------------------------------------
   const calibrationBody = document.createElement("div");
   calibrationBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-2);";
@@ -670,6 +719,13 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   // "lighter_blur", value: <bool> } through SettingsApplier; the boot
   // read in main.ts re-applies it on next launch.
   body.append(PerformanceGroup(settings.lighter_blur));
+
+  // --- HELP (impeccable Wave 6 — closes H10 "help & documentation") --------
+  // Last group. Shortcuts link + audio-routing checklist + GitHub link +
+  // About row. The shortcuts link mounts the same overlay as the `?` key.
+  // GitHub URL isn't yet in the Tauri capability allowlist — see the TODO
+  // in help-group.ts.
+  body.append(HelpGroup());
 
   // --- Modal slot rebuild ---------------------------------------------------
   renderModalSlot(modalSlot);

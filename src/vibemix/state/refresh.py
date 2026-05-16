@@ -38,8 +38,12 @@ import time
 from collections import deque
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from vibemix.audio import (
     AUDIBLE_DEBOUNCE_SEC,
+    BPM_VALID_MAX,
+    BPM_VALID_MIN,
     SILENCE_DEBOUNCE_SEC,
     SILENT_RMS,
     AudioBuffer,
@@ -49,6 +53,12 @@ from vibemix.audio import (
     long_arc_curve,
     snapshot_features,
 )
+from vibemix.audio.constants import (
+    BUILDUP_SLOPE_WINDOW_S,
+    GENRE_BPM_BANDS,
+    GENRE_CENTROID_HARD_TEK_MIN,
+)
+from vibemix.state.evidence_registry import EvidenceRegistry
 from vibemix.state.genre import (
     EmaSmoother,
     HysteresisState,
@@ -57,9 +67,74 @@ from vibemix.state.genre import (
     get_active_profile,
     validate_bpm,
 )
+from vibemix.state.emotion_router import derive_emotion
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
+
+
+def _classify_active_genre(bpm: float, feats: dict) -> str:
+    """Coarse BPM-band + spectral-centroid heuristic for `active_genre`.
+
+    Per CONTEXT D-04: house 118-128, techno 128-138, hard_tek 140-BPM_VALID_MAX,
+    "unknown" otherwise. Bands intentionally non-overlapping; the gaps
+    (128-128, 138-140) → "unknown" (per "trust the audio" — don't force-classify
+    ambiguous tempos).
+
+    Anti-hallucination: invalid BPM (≤ 0 or outside the autocorr-noise-reject
+    window BPM_VALID_MIN..BPM_VALID_MAX) yields "unknown" — no fabricated genre
+    during BPM lock-up. Mirrors the v4 `_music_truly_playing` rule
+    (T-17-01-01 mitigation in 17-01-PLAN threat register).
+
+    Hard Tek extra gate: when BPM lands in the hard_tek band, also require
+    `(mid_share + high_share) >= GENRE_CENTROID_HARD_TEK_MIN` — distorted-kick
+    spectral signature gate, anti-misclassify-on-house-with-fast-tempo. Below
+    floor → "unknown" (we'd rather not classify than mis-classify).
+    """
+    if bpm <= 0 or not (BPM_VALID_MIN <= bpm <= BPM_VALID_MAX):
+        return "unknown"
+    centroid = feats.get("mid_share", 0.0) + feats.get("high_share", 0.0)
+    for name, (lo, hi) in GENRE_BPM_BANDS.items():
+        if name == "unknown":
+            continue
+        if lo <= bpm < hi or (name == "hard_tek" and bpm == hi):
+            if name == "hard_tek" and centroid < GENRE_CENTROID_HARD_TEK_MIN:
+                return "unknown"
+            return name
+    return "unknown"
+
+
+def _compute_buildup_score(curve: list, window_s: float, hop_s: float = 1.0) -> float:
+    """Slope of the trailing `int(window_s/hop_s)` samples of `curve`,
+    normalized into [0.0, 1.0]. Negative slopes (energy falling) clamp to 0.0
+    — buildups are monotonic-climbs only; falling energy is a job for
+    BREAKDOWN_KICK_KILL, NOT a negative buildup.
+
+    Bound contract: `buildup_score ∈ [0.0, 1.0]`. Cheap (n=8 polyfit, ~µs;
+    T-17-01-03 in threat register).
+    """
+    n = int(window_s / hop_s)
+    if n <= 1 or not curve:
+        return 0.0
+    tail = list(curve)[-n:]
+    if len(tail) < 2:
+        return 0.0
+    xs = np.arange(len(tail), dtype=np.float64)
+    ys = np.asarray(tail, dtype=np.float64)
+    # Least-squares slope (deg=1). Epsilon-floor catches polyfit float noise
+    # on flat curves (np yields ~1e-16 instead of exact 0.0); below 1e-9 is
+    # numerically indistinguishable from "no slope" given energy_curve
+    # values are themselves rounded by snapshot_features.
+    slope = float(np.polyfit(xs, ys, 1)[0])
+    if slope <= 1e-9:
+        return 0.0
+    max_recent = max(0.05, float(np.max(ys)))
+    score = (slope * window_s) / max_recent
+    if score < 0.0:
+        return 0.0
+    if score > 1.0:
+        return 1.0
+    return score
 
 if TYPE_CHECKING:
     from vibemix.platform._midi_macos import ControllerState
@@ -81,6 +156,7 @@ def _tick_once(
     vocal_detector: VocalDetector | None = None,
     hysteresis_state: HysteresisState | None = None,
     feature_history: deque[dict] | None = None,
+    evidence_registry: EvidenceRegistry | None = None,
 ) -> tuple[float, float, float, float]:
     """One iteration of the state_refresh_loop body. Extracted so tests can
     drive single ticks deterministically with fake time and fake snapshots.
@@ -90,6 +166,21 @@ def _tick_once(
 
     Phase 6 additions: crest factor, BPM validation, vocal detection, phase
     dispatch — all gated on the active genre profile.
+
+    Phase 18 Plan 02 additions: optional ``evidence_registry`` kwarg. When
+    wired, writes citable observations INSIDE the same ``with state._lock:``
+    batch as MusicState writes — single-snapshot consistency contract:
+      - "aud" source: 7 audio-feature keys per tick, GATED on state.audible
+        (silent ticks are not citable — closes the "cite RMS at silent
+        moment" hallucination class).
+      - "mix" source: ``phase=<name>`` and ``audible_deck=<name>``, written
+        ONLY on change (per-tick noise filtering — phase already debounced
+        via state.phase_history; deck handled by tracking prev_deck below).
+
+    Lock ordering: ``state._lock`` OUTER, ``EvidenceRegistry._lock`` INNER —
+    consistent across all writers (refresh.py + EventDetector._fire). Closes
+    Pitfall P12 (registry race) at the runtime boundary. All registry writes
+    wrapped in try/except so a downstream failure cannot kill the tick.
     """
     # Lazy-default Phase 6 loop-local state for tests that omit them.
     if crest_smoother is None:
@@ -188,6 +279,18 @@ def _tick_once(
         state.downbeat_phase = new_phase_frac
         state.bpm_confidence = new_bpm_conf
 
+        # Phase 17 — Hard Tek detectors v1 (SENSE-13). Three of the four new
+        # MusicState fields are written here; `predicted_drop_in_sec` stays at
+        # the dataclass default `None` because predictive drop firing is
+        # OFF-by-default in v2.0 per CONTEXT D (telemetry-guarded flip is v2.1
+        # work, NOT Phase 17). `beat_phase` is a Phase-17-named alias of
+        # `downbeat_phase` so SENSE-12 detector module imports don't reach
+        # into Phase-13 naming. No new audio I/O — `feats` and `curve` are
+        # already in scope from the Phase 6 path above.
+        state.active_genre = _classify_active_genre(bpm_cache, feats)
+        state.buildup_score = _compute_buildup_score(curve, BUILDUP_SLOPE_WINDOW_S)
+        state.beat_phase = state.downbeat_phase
+
         # Phase — dispatch on active profile.
         if active_profile is None:
             new_phase = classify_phase(curve, state.audible)
@@ -206,6 +309,21 @@ def _tick_once(
                 state.phase_history.pop(0)
             state.phase = new_phase
             state.phase_started_at = now
+            # Phase 18 Plan 02 — mix-source change-only write.
+            if evidence_registry is not None:
+                try:
+                    t_session = max(0.0, now - state.set_start_at)
+                    evidence_registry.write("mix", f"phase={new_phase}", t_session)
+                except Exception:
+                    pass
+
+        # Phase 31 Plan 03 — Mascot emotion derivation (ADDITIVE per
+        # Pitfall P47). Pure function over the just-written MusicState
+        # fields. The frontend EmotionLayer reads this via the ws_bus
+        # `emotion` field and re-fires its priority-60 channel only when
+        # the value changes (no per-tick churn).
+        time_in_phase = max(0.0, now - state.phase_started_at) if state.phase_started_at else 0.0
+        state.emotion = derive_emotion(state.active_genre, state.rms, time_in_phase)
 
         # Controller snapshot
         cs = controller_state.deck_snapshot()
@@ -214,10 +332,19 @@ def _tick_once(
         state.xfader = cs["xfader"]
         state.controller_connected = cs["connected"]
 
-        # Audible deck inference
+        # Audible deck inference. Capture prev_deck BEFORE the assignment so
+        # we can detect a deck flip and write a change-only "mix" observation
+        # to the EvidenceRegistry (Phase 18 Plan 02).
+        prev_deck = state.audible_deck
         aud_deck, deck_conf = derive_audible_deck(cs["A"], cs["B"], cs["xfader"], cs["connected"])
         state.audible_deck = aud_deck
         state.deck_confidence = deck_conf
+        if evidence_registry is not None and prev_deck != aud_deck:
+            try:
+                t_session = max(0.0, now - state.set_start_at)
+                evidence_registry.write("mix", f"audible_deck={aud_deck}", t_session)
+            except Exception:
+                pass
 
         # Track inference (cross-reference with audible deck)
         tsnap = track_info.snapshot()
@@ -240,6 +367,25 @@ def _tick_once(
         # 16k ring buffer, ~1ms)
         state.long_arc = long_arc_curve(audio_buf, seconds=120.0, hop=10.0)
 
+        # Phase 18 Plan 02 — aud-source per-tick writes, GATED on state.audible.
+        # Silent ticks do NOT register aud observations — closes the
+        # "Gemini cites aud:rms@45.2 at a silent moment" hallucination class.
+        # All 7 keys are written together so a single snapshot tick exposes
+        # the full audio surface to the prompt grammar (Plan 18-03 reads
+        # the snapshot once per llm_node invocation).
+        if evidence_registry is not None and state.audible:
+            try:
+                t_session = max(0.0, now - state.set_start_at)
+                evidence_registry.write("aud", "rms", t_session)
+                evidence_registry.write("aud", "bpm", t_session)
+                evidence_registry.write("aud", "onset_density", t_session)
+                evidence_registry.write("aud", "sub_share", t_session)
+                evidence_registry.write("aud", "low_share", t_session)
+                evidence_registry.write("aud", "mid_share", t_session)
+                evidence_registry.write("aud", "high_share", t_session)
+            except Exception:
+                pass
+
     return last_audible_high, last_audible_low, bpm_cache, last_bpm_at
 
 
@@ -249,6 +395,8 @@ async def state_refresh_loop(
     controller_state: ControllerState,
     track_info: TrackInfo,
     stop_event: asyncio.Event,
+    *,
+    evidence_registry: EvidenceRegistry | None = None,
 ) -> None:
     """Updates MusicState every 100ms from all sources. The ONLY writer to state.
     Audible flag is debounced — sustained samples required to flip in either
@@ -260,6 +408,12 @@ async def state_refresh_loop(
     feature_history deque as loop-local state, threaded through _tick_once.
     These are NOT in MusicState — they're internal detector machinery, not
     consumer evidence.
+
+    Phase 18 Plan 02: optional ``evidence_registry`` kwarg threads through
+    to ``_tick_once`` on every iteration. When wired, per-tick aud + on-change
+    mix observations are written INSIDE the same ``with state._lock:`` batch
+    that writes MusicState fields — single-snapshot consistency. Default
+    ``None`` preserves backward compat with all existing callers.
     """
     last_audible_high = 0.0
     last_audible_low = 0.0
@@ -291,6 +445,7 @@ async def state_refresh_loop(
                 vocal_detector=vocal_detector,
                 hysteresis_state=hysteresis_state,
                 feature_history=feature_history,
+                evidence_registry=evidence_registry,
             )
         except Exception as e:
             print(f"[state refresh err] {e}", file=sys.stderr)

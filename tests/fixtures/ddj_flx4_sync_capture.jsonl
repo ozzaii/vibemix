@@ -1,0 +1,11 @@
+{"_provenance": "Synthesized from cohost_v4.py _NOTE_MAP per autonomous mode + memory project_v4_canonical_baseline; not real hardware sniff. POC source confirms note 0x60 (96 dec) fires for sync on both decks; note 0x58 (88 dec) is Mixxx-canonical defensive, NOT seen in cohost_v4.py POC sessions. Phase 27 MIDI-20 verdict: sync_a/b status=verified, sync_a/b_alt status=tentative.", "source": "cohost_v4.py:786 _NOTE_MAP", "synthesized": "2026-05-15"}
+{"t_ms": 100, "type": "note_on", "channel": 0, "note": 96, "velocity": 127, "expected_semantic": "sync_a", "_note": "Deck A sync via POC-confirmed note 0x60"}
+{"t_ms": 110, "type": "note_off", "channel": 0, "note": 96, "velocity": 0}
+{"t_ms": 200, "type": "note_on", "channel": 1, "note": 96, "velocity": 127, "expected_semantic": "sync_b", "_note": "Deck B sync via POC-confirmed note 0x60"}
+{"t_ms": 210, "type": "note_off", "channel": 1, "note": 96, "velocity": 0}
+{"t_ms": 300, "type": "note_on", "channel": 0, "note": 88, "velocity": 127, "expected_semantic": null, "_note": "Mixxx-canonical 0x58 — should NOT fire sync per POC verdict; alt binding is tentative, not verified"}
+{"t_ms": 310, "type": "note_off", "channel": 0, "note": 88, "velocity": 0}
+{"t_ms": 400, "type": "note_on", "channel": 1, "note": 88, "velocity": 127, "expected_semantic": null, "_note": "Mixxx-canonical 0x58 deck B — same verdict"}
+{"t_ms": 410, "type": "note_off", "channel": 1, "note": 88, "velocity": 0}
+{"t_ms": 500, "type": "note_on", "channel": 0, "note": 11, "velocity": 127, "expected_semantic": "play_a", "_note": "Comparison: verified play binding (0x0B) — must still fire normally; regression guard"}
+{"t_ms": 510, "type": "note_off", "channel": 0, "note": 11, "velocity": 0}

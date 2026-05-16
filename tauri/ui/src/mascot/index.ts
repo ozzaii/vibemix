@@ -136,6 +136,32 @@ async function boot(): Promise<void> {
   let machine: MachineState = initialMachineState(performance.now());
   renderer.crossFadeTo("idle_breathe", 0);
 
+  // ── Drag-to-move ───────────────────────────────────────────────────────
+  // Tauri's `data-tauri-drag-region` HTML attribute is unreliable on
+  // macOS transparent + decorations:false windows. Falling back to the
+  // explicit JS API which always works on macOS. Right-click bypasses
+  // (reserved for future context menu).
+  void (async () => {
+    try {
+      const mod = await import("@tauri-apps/api/window");
+      const tauriWin = mod.getCurrentWindow();
+      console.log(`${TAG} drag handler attached on document`);
+      document.addEventListener("mousedown", (ev) => {
+        const me = ev as MouseEvent;
+        if (me.button !== 0) return;              // left-click only
+        const target = me.target as HTMLElement | null;
+        if (target?.closest("[data-no-drag]")) return;
+        // Don't preventDefault — let webview see the click. startDragging
+        // doesn't need it.
+        tauriWin.startDragging().catch((e: unknown) =>
+          console.warn(`${TAG} startDragging() rejected:`, e),
+        );
+      });
+    } catch (err) {
+      console.warn(`${TAG} drag handler unavailable (likely test/browser):`, err);
+    }
+  })();
+
   // ── Current snapshot ref (state-reader for the dispatcher) ──────────────
   // Updated by every `type: "snapshot"` bus frame. Defaults pre-connect
   // keep beat-lock off until the sidecar's first snapshot arrives.

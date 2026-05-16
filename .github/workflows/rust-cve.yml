@@ -1,0 +1,87 @@
+# Phase 34 / SEC-03 — Rust CVE gate.
+#
+# cargo-audit (Rustsec advisory DB) + cargo-deny (licenses + bans + sources).
+# Severity gate (Pitfall P65) reuses scripts/dist/severity_gate.py.
+
+name: Rust CVE
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tauri/src-tauri/**'
+      - '.github/workflows/rust-cve.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tauri/src-tauri/**'
+      - '.github/workflows/rust-cve.yml'
+  schedule:
+    - cron: '0 7 * * *'  # nightly 7am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust-cve:
+    name: cargo-audit + cargo-deny
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tauri/src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo audit DB
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/advisory-db
+            ~/.cargo/bin
+          key: cargo-audit-deny-${{ runner.os }}-v1
+
+      - name: Install cargo-audit + cargo-deny
+        run: |
+          set -euo pipefail
+          cargo install cargo-audit --version 0.20.1 --locked || true
+          cargo install cargo-deny --version 0.16.2 --locked || true
+
+      - name: cargo audit (JSON)
+        run: |
+          set -euo pipefail
+          cargo audit --json > cargo-audit.json || true
+
+      - name: cargo deny check
+        run: |
+          set -euo pipefail
+          # Run all sections; failure inside a non-blocking section (warn) is
+          # captured but does not fail the run. The advisories section is what
+          # the severity gate evaluates.
+          cargo deny --log-level warn check advisories bans licenses sources
+
+      - name: Apply severity gate (Pitfall P65)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run severity gate
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          python scripts/dist/severity_gate.py \
+            --cargo-audit tauri/src-tauri/cargo-audit.json \
+            --direct-rust-crates tauri/src-tauri/Cargo.toml
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-cve-reports
+          path: |
+            tauri/src-tauri/cargo-audit.json
+          retention-days: 30

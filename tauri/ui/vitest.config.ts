@@ -33,11 +33,39 @@ export default defineConfig({
       ["tests/**/*.test.ts", "jsdom"],
       ["src/**/*.dom.spec.ts", "jsdom"],
       ["src/mascot/*.test.ts", "jsdom"],
+      // Phase 31 Plan 02 — per-channel layer files live under
+      // src/mascot/layers/{base,emotion,reaction}.ts. base layer is
+      // pure-state but emotion/reaction layer tests may touch DOM
+      // helpers (matches existing src/mascot/*.test.ts policy).
+      ["src/mascot/layers/*.test.ts", "jsdom"],
+      // Phase 31 Plan 05 — v2.0 test name port-verbatim suite. Lives
+      // under src/mascot/__tests__/*.spec.ts per Pitfall P47 evidence
+      // anchors. Uses real AnimationMixer + AnimationClip fixtures.
+      ["src/mascot/__tests__/*.spec.ts", "jsdom"],
+      ["src/mascot/__tests__/*.test.ts", "jsdom"],
       // Phase 15 Plan 04 — Recording browser specs live alongside their
       // components per plan §files_modified; they construct HTMLElement
       // instances + poke data-attrs and need jsdom (rather than the
       // default node env for src/**/*.spec.ts).
       ["src/settings/components/recording-*.spec.ts", "jsdom"],
+      // Phase 20 Plan 04 — citation-diagnostics renderer; same DOM-API
+      // pattern as recording-row and friends, needs jsdom for textContent /
+      // title-attr / dataset assertions.
+      ["src/settings/components/citation-diagnostics.spec.ts", "jsdom"],
+      // Phase 29 Plans 05+06 — all debrief specs (component renders +
+      // recording-row debrief button) need jsdom for HTMLElement APIs.
+      ["src/debrief/__tests__/*.spec.ts", "jsdom"],
+      // Phase 32 Plan 05 — Settings → Profile panel renderer (vanilla TS
+      // DOM construction + dataset assertions). Same env as recording-*.
+      ["src/settings/components/profile-panel.spec.ts", "jsdom"],
+      // Phase 33 Plans 33-01..33-09 — wizard install-hardening surface.
+      // tcc-permissions.spec is pure but blackhole-step / windows-
+      // smartscreen-step / onboarding-flow / tcc-watcher render
+      // HTMLElements via the shared style-registry helper which
+      // touches document.head at module load. Route the whole
+      // wizard __tests__ + runtime __tests__ dirs under jsdom.
+      ["src/wizard/__tests__/*.spec.ts", "jsdom"],
+      ["src/runtime/__tests__/*.spec.ts", "jsdom"],
     ],
   },
 });

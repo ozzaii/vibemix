@@ -20,7 +20,9 @@
  *   4. Reset + v5 body background (cinematic vignette + restrained
  *      rave washes + multi-layer film grain).
  *   5. `.border-anim` utility — the slow amber light traveling around
- *      panel perimeters. Drop as first child of any glass panel.
+ *      panel perimeters. Critique 2026-05-14: restricted to the session
+ *      deck only (one CDJ, one breathing light). Wizard primary-panel +
+ *      cohost previously carried duplicate sweeps — removed.
  *   6. Wizard frame layout (structural — kept verbatim from Phase 11,
  *      just retoned to v5 glass).
  *
@@ -141,6 +143,16 @@
   --sp-6: 40px;
   --sp-7: 64px;
   --sp-8: 96px;
+  /* Named spacing aliases — historic call-sites in session/* expect these.
+   * Resolve to the numeric scale so the CSS cascade doesn't silently
+   * fall back to 0 on undefined tokens. */
+  --sp-sm: var(--sp-2);
+  --sp-md: var(--sp-4);
+
+  /* --- Status alias — REC pill in titlebar + drop-chip read --rec
+   * (UI-SPEC vocabulary); resolve to the fault LED so the indicator
+   * renders red instead of falling back to transparent. */
+  --rec: var(--led-fault);
 
   /* --- Layout & Grid (retained from Phase 11; Wave 5 collapsed the
    *                    mascot column — the wizard-grid is now single-
@@ -245,8 +257,10 @@ body::before {
 
 /* === Animated border utility =========================================== */
 /* A slow amber light traveling around the panel perimeter — like the
- * gentle pulse on the front of a real CDJ-3000 sitting idle. Drop as
- * the first child of any glass panel:
+ * gentle pulse on the front of a real CDJ-3000 sitting idle. Use as the
+ * first child of the session deck panel only — NOT on every glass tile
+ * (the critique 2026-05-14 found 3+ concurrent sweeps reading as anxiety
+ * rather than sign-of-life):
  *   <div class="border-anim"></div>
  * Modifiers:
  *   .slow → 32s (use on secondary panels)
@@ -289,6 +303,52 @@ body::before {
 .border-anim.slow { animation-duration: 32s; }
 .border-anim.rev  { animation-direction: reverse; }
 
+/* === Glass-tile utility (CDJ Whisper distilled) ======================== *
+ * ONE recipe for every glass surface in the app. The base class is
+ * `.vmx-tile`; density variants ride on the `data-tile` attribute so
+ * we don't collide with the Phase 14 legacy-token regex (which still
+ * pattern-matches "--panel"). Variants:
+ *   .vmx-tile                    — base (border + glass + sheen + hairline)
+ *   .vmx-tile[data-tile="hero"]  — adds deep drop shadow + 1px outer ring
+ *   .vmx-tile[data-tile="alert"] — adds amber border + amber-22 inset glow
+ *                                  + outer glow-soft (banner/alert state)
+ * The row form is just `.vmx-tile` with a height set by the component.
+ *
+ * Pre-distill: this recipe was duplicated across primary-panel,
+ * blackhole-banner, permissions-card, and a thinner cousin in
+ * performance-group's button. Critique 2026-05-14 collapsed them into
+ * this single source. Components now only own their internal CSS
+ * (header text, body padding, internal row layout) — the glass shell
+ * comes from this utility. */
+.vmx-tile {
+  position: relative;
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.vmx-tile[data-tile="hero"] {
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 16px 36px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.018);
+}
+.vmx-tile[data-tile="alert"] {
+  border-color: var(--amber-40);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 14px var(--amber-22),
+    var(--glow-soft);
+}
+.vmx-tile > * { position: relative; z-index: 1; }
+
 /* === Glass-streak utility ============================================== *
  * A faint diagonal glass-fingerprint sheen that drifts across the panel
  * face. Lifted from the v5 mock `.session::after` — promoted to a
@@ -296,7 +356,11 @@ body::before {
  * `<span class="vmx-glass-streak" aria-hidden="true"></span>` as a child
  * (parent must be `position: relative` + `overflow: hidden`).
  * Sits beneath component content at z-index 0; the panel body should
- * position its children at z-index 1+. */
+ * position its children at z-index 1+.
+ *
+ * v5-distill 2026-05-14: usage trimmed to the session/cohost panels only.
+ * Wizard-side tiles no longer sprinkle it (texture-as-decoration was
+ * reading as AI-defaultism per critique). */
 .vmx-glass-streak {
   content: "";
   position: absolute;
@@ -386,20 +450,51 @@ button[disabled] { cursor: not-allowed; }
 
 .wizard-content {
   display: grid;
-  grid-template-rows: var(--stepstrip-h) 1fr auto;
+  grid-template-rows: var(--stepstrip-h) minmax(0, 1fr) auto;
   padding: 0 32px var(--cta-margin-bottom); /* 32px — no v5 equivalent, mock-verbatim */
   overflow: hidden;
+  min-height: 0;
 }
 
 /* v5 reclaims the embedded mascot corner — the wizard is single-column
- * and the mascot lives in its own overlay window (Phase 13). */
+ * and the mascot lives in its own overlay window (Phase 13).
+ *
+ * `overflow-y: auto` + `min-height: 0` make the middle grid row the
+ * scroll container when a step's content (Step 2 with BlackHole banner +
+ * device dropdown + audio test + window picker) exceeds viewport height.
+ * Without these, the wizard window cropped the bottom of the step body
+ * and the "Yes, sounded clean" confirm row became unreachable on the
+ * default 980×700 Tauri window size. The parent (.wizard-content) keeps
+ * `overflow: hidden` so the titlebar + status bar + step strip stay
+ * pinned; only the step body scrolls. */
 .wizard-grid {
   display: grid;
   grid-template-columns: var(--col-primary);
   gap: var(--gap-col);
   align-items: start;
-  padding-top: var(--sp-5);
-  overflow: hidden;
+  padding-top: var(--sp-4);
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+/* Restrained CDJ-Whisper scrollbar — visible only when scrolling is
+ * actually required. WebKit + Blink only; Firefox falls back to the
+ * system scrollbar. Width matches the v5 1px hairline language. */
+.wizard-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.wizard-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.wizard-grid::-webkit-scrollbar-thumb {
+  background: var(--silk-22, rgba(232, 224, 213, 0.18));
+  border-radius: 3px;
+}
+.wizard-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--silk-40, rgba(232, 224, 213, 0.4));
 }
 
 .cta-row {

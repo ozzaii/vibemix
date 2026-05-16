@@ -1,0 +1,25 @@
+# Phase 34 / SEC-01 — pre-commit hooks.
+#
+# Single hook: gitleaks. We deliberately do NOT add ruff/black/mypy here —
+# Phase 34 scope is security-only. Formatter discipline lives outside this
+# config (see CONTRIBUTING.md if introduced later).
+#
+# Local install:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Run on demand:
+#   pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        name: gitleaks-secret-scan
+        # Use the project ruleset + surgical baseline.
+        args:
+          - "--config=.gitleaks.toml"
+          - "--baseline-path=.secrets.baseline"
+          - "--redact"
+          - "--verbose"

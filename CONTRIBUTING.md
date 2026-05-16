@@ -22,6 +22,8 @@ If you forget, fix it with: `git commit --amend -s --no-edit` (single commit) or
 
 ## Contribution Paths
 
+> **For hallucinated reactions or anti-slop violations**, please use the [AI misbehavior issue template](.github/ISSUE_TEMPLATE/ai_misbehavior.yml) instead of a generic bug report — it captures the grounding evidence we need to actually fix the underlying prompt or detector.
+
 ### 1. Bug fix or feature improvement (standard PR)
 
 1. Fork the repo, create a topic branch.
@@ -38,10 +40,18 @@ If you forget, fix it with: `git commit --amend -s --no-edit` (single commit) or
 Adding support for a controller we haven't curated? You'll add one JSON profile and a smoke test.
 
 1. Open a `new_controller` issue first so we don't get duplicates.
-2. Add `src/vibemix/midi/profiles/<your-controller-slug>.json` following the schema documented at `docs/midi-mapping.md`.
-3. Add a smoke test under `tests/midi/` that loads the profile and asserts the CC/note map shape.
-4. PR title: `feat(midi): add <vendor> <model> mapping`.
-5. CI auto-merges non-conflicting profile additions once green.
+2. Capture the controller's MIDI shape with our sniff tool. Plug the controller in, then run:
+
+   ```bash
+   source .venv/bin/activate
+   python3 scripts/sniff_controller.py --device "Your Controller Name"
+   ```
+
+   The tool listens for ~30s while you exercise every knob, fader, button, and jog wheel. It writes a JSON skeleton to stdout — the shape that goes into the profile file.
+3. Add `src/vibemix/midi/profiles/<your-controller-slug>.json` following the schema documented at `docs/midi-mapping.md`. Use the sniff output as the starting point and label every CC / note with what it does.
+4. Add a smoke test under `tests/midi/` that loads the profile and asserts the CC/note map shape.
+5. PR title: `feat(midi): add <vendor> <model> mapping`.
+6. CI auto-merges non-conflicting profile additions once green.
 
 ### 3. New prompt template
 
@@ -71,6 +81,23 @@ Prompts are where vibemix's personality lives. New templates need human review t
 - New AI providers — vibemix is Gemini-only (Bravoh decision).
 - Linux ports — out of v1 scope.
 - Stem separation / track ripping / DRM-circumvention features.
+
+---
+
+## Reporting AI misbehavior
+
+vibemix's central thesis is "real DJ friend in your ear, no AI slop." Broken AI reactions — hallucinations, generic AI slop, late reactions, wrong-vocabulary-for-skill-level, talking over your mic — matter more to us than feature requests. They're the product's central failure mode.
+
+**Use the [AI misbehavior issue template](.github/ISSUE_TEMPLATE/ai_misbehavior.yml).** The two highest-leverage fields are:
+
+1. **What did the AI say?** — the literal voice line.
+2. **What actually happened?** — your real musical move, the real track, the real controller action.
+
+That pair is what lets us replay the moment and verify the grounding chain. Without it we're guessing.
+
+If you can also attach the last 30-60 lines of `recordings/<latest-session>/events.jsonl` covering the misbehavior window, we can typically reproduce within an hour. Without those events, it's mostly archaeology.
+
+This report channel is treated as P0 in triage. We'd rather close a hallucination class than ship a new feature.
 
 ---
 

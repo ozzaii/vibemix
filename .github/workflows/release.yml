@@ -79,6 +79,41 @@ jobs:
   # Wave 0 — Pre-flight gates.
   # ---------------------------------------------------------------------------
 
+  # Phase 38 — Mirror of verify-signed.yml::audit-no-apple-signpath-post.
+  # Fires on tag-push directly so a forbidden POST/PUT to apple/signpath/
+  # notarytool fails the release pipeline BEFORE any signing step runs.
+  # Pitfall P46 hard rule.
+  p46-audit:
+    name: Audit — no Apple/SignPath POST/PUT (P46)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Grep for forbidden POST/PUT to Apple/SignPath/notarytool
+        run: |
+          set -euo pipefail
+          if grep -RIn --include='*.yml' --include='*.yaml' \
+            -E '(curl|wget|Invoke-WebRequest|Invoke-RestMethod).*(POST|PUT).*(apple\.com|signpath\.io|notarytool)' \
+            .github/workflows \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'; then
+            echo "::error::Forbidden POST/PUT to Apple/SignPath endpoints (P46)"
+            exit 1
+          fi
+          if grep -RIn --include='*.py' --include='*.sh' \
+            -E '(POST|PUT).*(apple\.com|signpath\.io|notarytool)' \
+            scripts/ 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'; then
+            echo "::error::Forbidden POST/PUT to Apple/SignPath endpoints (P46) in scripts"
+            exit 1
+          fi
+          if grep -RIn --include='*.ps1' \
+            -E '(Invoke-WebRequest|Invoke-RestMethod|System\.Net\.WebClient|System\.Net\.Http).*(apple\.com|signpath\.io|notarytool)' \
+            scripts/ 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'; then
+            echo "::error::Forbidden PowerShell HTTP verb to Apple/SignPath/notarytool (P46)"
+            exit 1
+          fi
+          echo "::notice::P46 audit clean — no forbidden POST/PUT references."
+
   detect-signing-mode:
     name: Detect signing mode
     runs-on: ubuntu-latest
@@ -102,6 +137,89 @@ jobs:
             echo "signing_available=false" >> "$GITHUB_OUTPUT"
             echo "Signing secrets absent — mock-signing dry-run mode."
           fi
+
+  secret-name-audit:
+    name: Audit Tauri updater secret-name alignment
+    runs-on: ubuntu-latest
+    # Pitfall 7 prevention: Tauri docs alternate between TAURI_UPDATER_KEY_PASSWORD
+    # and TAURI_UPDATER_PRIVATE_KEY_PASSWORD; drift between the 3 files (release.yml,
+    # tauri.conf.json5, sign_manifest.sh) causes a SILENT updater-signature failure
+    # (latest.json signed with wrong env var → updater rejects). Per
+    # tauri/src-tauri/keys/README.md the canonical name is TAURI_UPDATER_KEY_PASSWORD;
+    # the audit fires on tag pushes + workflow_dispatch rehearsals.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert single canonical password env var name
+        # Matches ACTUAL env-var usage patterns (env: KEY:, ${{ secrets.KEY }},
+        # $KEY, ${KEY}, "${KEY:-...}", : "${KEY:?...}") rather than bare substring;
+        # this keeps the audit's own assertion strings from self-matching. Per
+        # planner-antipatterns.md grep-gate hygiene, # and // comments stripped.
+        run: |
+          set -e
+          FAIL=0
+          # Usage-pattern regex (extended): preceded by env-context, $, ${, "${,
+          # or followed by colon-assign, equals, or close-paren in secrets context.
+          USAGE_RE='(\$\{?|secrets\.|env:[[:space:]]+|: ?"?\$\{|^[[:space:]]*[A-Z_]*=)'
+          for f in .github/workflows/release.yml tauri/src-tauri/tauri.conf.json5 scripts/dist/sign_manifest.sh; do
+            if [[ ! -f "$f" ]]; then
+              echo "::error::Audit file missing: $f"
+              FAIL=1
+              continue
+            fi
+            BODY=$(grep -v '^[[:space:]]*#' "$f" | grep -v '^[[:space:]]*//' || true)
+            # Forbidden = the Tauri docs alternate name. Match only when in usage position.
+            FORBIDDEN_HITS=$(printf '%s\n' "$BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_PRIVATE_KEY_PASSWORD" -c || true)
+            CANONICAL_HITS=$(printf '%s\n' "$BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_KEY_PASSWORD" -c || true)
+            echo "  $f → forbidden_usages=$FORBIDDEN_HITS canonical_usages=$CANONICAL_HITS"
+            if [[ "$FORBIDDEN_HITS" -gt 0 ]]; then
+              echo "::error::Pitfall 7 (silent updater signature failure): TAURI_UPDATER_PRIVATE_KEY_PASSWORD used in $f — Tauri docs alternate the two names; pick TAURI_UPDATER_KEY_PASSWORD per tauri/src-tauri/keys/README.md and align all three files."
+              FAIL=1
+            fi
+          done
+          # Canonical name must appear ≥1 in usage position in release.yml AND
+          # sign_manifest.sh. tauri.conf.json5 references the PUBKEY not the password.
+          REL_BODY=$(grep -v '^[[:space:]]*#' .github/workflows/release.yml)
+          SCR_BODY=$(grep -v '^[[:space:]]*#' scripts/dist/sign_manifest.sh)
+          RELEASE_CANON=$(printf '%s\n' "$REL_BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_KEY_PASSWORD" -c || true)
+          SCRIPT_CANON=$(printf '%s\n' "$SCR_BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_KEY_PASSWORD" -c || true)
+          if [[ "$RELEASE_CANON" -lt 1 ]]; then
+            echo "::error::Pitfall 7: canonical TAURI_UPDATER_KEY_PASSWORD has no usage-pattern hit in release.yml — pipeline cannot sign manifest."
+            FAIL=1
+          fi
+          if [[ "$SCRIPT_CANON" -lt 1 ]]; then
+            echo "::error::Pitfall 7: canonical TAURI_UPDATER_KEY_PASSWORD has no usage-pattern hit in sign_manifest.sh — pipeline cannot sign manifest."
+            FAIL=1
+          fi
+          if [[ "$FAIL" -ne 0 ]]; then
+            exit 1
+          fi
+          echo "secret-name-audit (password) — OK: only TAURI_UPDATER_KEY_PASSWORD used as env var across all 3 files."
+
+      - name: Assert TAURI_UPDATER_PRIVATE_KEY referenced consistently
+        # Same usage-pattern matching: catches actual env-var refs, ignores
+        # mentions inside the audit step's own assertion strings.
+        run: |
+          set -e
+          USAGE_RE='(\$\{?|secrets\.|env:[[:space:]]+|: ?"?\$\{|^[[:space:]]*[A-Z_]*=)'
+          REL_BODY=$(grep -v '^[[:space:]]*#' .github/workflows/release.yml)
+          SCR_BODY=$(grep -v '^[[:space:]]*#' scripts/dist/sign_manifest.sh)
+          # Match TAURI_UPDATER_PRIVATE_KEY but NOT TAURI_UPDATER_PRIVATE_KEY_PASSWORD
+          # (so the forbidden-password name doesn't satisfy this gate by accident).
+          RELEASE_HITS=$(printf '%s\n' "$REL_BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_PRIVATE_KEY([^A-Z_]|\$)" -c || true)
+          SCRIPT_HITS=$(printf '%s\n' "$SCR_BODY" | grep -E "${USAGE_RE}TAURI_UPDATER_PRIVATE_KEY([^A-Z_]|\$)" -c || true)
+          echo "  release.yml → TAURI_UPDATER_PRIVATE_KEY usages=$RELEASE_HITS"
+          echo "  sign_manifest.sh → TAURI_UPDATER_PRIVATE_KEY usages=$SCRIPT_HITS"
+          if [[ "$RELEASE_HITS" -lt 1 ]]; then
+            echo "::error::Pitfall 7: TAURI_UPDATER_PRIVATE_KEY has no usage-pattern hit in release.yml — release-publish job cannot wire the secret."
+            exit 1
+          fi
+          if [[ "$SCRIPT_HITS" -lt 1 ]]; then
+            echo "::error::Pitfall 7: TAURI_UPDATER_PRIVATE_KEY has no usage-pattern hit in sign_manifest.sh — manifest signer cannot materialise the key."
+            exit 1
+          fi
+          echo "secret-name-audit (private-key) — OK: TAURI_UPDATER_PRIVATE_KEY referenced consistently."
 
   placeholder-pubkey-gate:
     name: Reject placeholder updater pubkey
@@ -127,8 +245,26 @@ jobs:
   # ---------------------------------------------------------------------------
 
   build-macos:
-    name: Build macOS (Apple Silicon)
-    runs-on: macos-14
+    name: Build macOS (${{ matrix.arch }})
+    # Plan 27-06 / REC-09 carry-forward: matrix builds BOTH arm64 + x86_64
+    # PyInstaller sidecars on their native runners so Apple Silicon users
+    # never see the Rosetta translation prompt on first launch (Pitfall P69).
+    # NEVER lipo-merge the two outputs — RESEARCH §Critical Correction:
+    # PyInstaller embeds its PKG archive in only the last merged slice;
+    # the other arch silently segfaults at app launch.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+            target_triple: aarch64-apple-darwin
+            rust_target: aarch64-apple-darwin
+          - arch: x86_64
+            runner: macos-13
+            target_triple: x86_64-apple-darwin
+            rust_target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
     needs: [detect-signing-mode, placeholder-pubkey-gate]
     # `always()` keeps this job alive when placeholder-pubkey-gate is SKIPPED
     # (non-tag push); we only abort when it actually FAILED.
@@ -151,17 +287,28 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.rust_target }}
 
       - name: Install macOS build deps (create-dmg)
         run: |
           brew install create-dmg
 
       # ---- Stage 1 — BUILD --------------------------------------------------
-      - name: BUILD — PyInstaller sidecar via build_sidecar.py
+      - name: BUILD — PyInstaller sidecar via build_sidecar.py (${{ matrix.arch }})
         run: |
           uv sync --frozen
-          uv run python scripts/build_sidecar.py --spec vibemix-core.macos.spec
+          uv run python scripts/build_sidecar.py \
+            --spec vibemix-core.macos.spec \
+            --target-arch ${{ matrix.arch }}
+
+      - name: VERIFY single-arch (Pitfall P69 critical correction)
+        run: |
+          BIN="tauri/src-tauri/binaries/vibemix-core-${{ matrix.target_triple }}/vibemix-core-${{ matrix.target_triple }}"
+          test -f "$BIN" || ( echo "missing artifact: $BIN" && exit 1 )
+          ARCHS=$(lipo -archs "$BIN")
+          test "$ARCHS" = "${{ matrix.arch }}" || \
+            ( echo "REC-09 violation: expected single-arch ${{ matrix.arch }}; got $ARCHS" && exit 1 )
+          echo "OK: $BIN is single-arch ${{ matrix.arch }}"
 
       - name: BUILD — Tauri app (cargo tauri build)
         working-directory: tauri
@@ -169,9 +316,22 @@ jobs:
           npm ci
           npm run build
           cd src-tauri
-          cargo tauri build
+          cargo tauri build --target ${{ matrix.rust_target }}
 
       # ---- Stage 2 + 3 — SIGN + PACKAGE (DMG + notarize + staple) ----------
+      # Phase 38 DIST-15 — Apple notarytool wiring annotation step.
+      # When SIGNING_AVAILABLE != 'true' (Apple Dev secrets absent) the actual
+      # sign step is silently skipped by the gate above. This annotation makes
+      # the skip EXPLICIT in CI logs and points operators at KAAN-ACTION-LEGAL.md
+      # DIST-09 (Francesco-action, legal capacity — Pitfall P46 carveout).
+      - name: SIGN — Apple notarytool wiring annotation (empty-secret skip)
+        if: env.SIGNING_AVAILABLE != 'true'
+        run: |
+          echo "::warning::Apple Dev ID secrets absent — see KAAN-ACTION-LEGAL.md DIST-09 (Francesco-action) + DIST-11. xcrun notarytool step skipped."
+          echo "  expected secrets (Kaan creates after Apple approves):"
+          echo "    APPLE_DEVELOPER_ID_P12_BASE64, APPLE_DEVELOPER_ID_PASSWORD,"
+          echo "    APPLE_TEAM_ID, APPLE_API_KEY_ID, APPLE_API_KEY_ISSUER, APPLE_API_KEY_P8"
+
       - name: SIGN + PACKAGE — codesign / create-dmg / notarytool / stapler
         if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
         env:
@@ -187,7 +347,7 @@ jobs:
         run: |
           set +x   # secret env vars in scope — never echo
           chmod +x scripts/dist/sign_macos.sh
-          ./scripts/dist/sign_macos.sh tauri/src-tauri/target/release/bundle/macos/vibemix.app
+          ./scripts/dist/sign_macos.sh tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app
 
       # ---- Stage 4 — VERIFY (ALWAYS runs, even in mock-signing) ------------
       - name: VERIFY — AIza scan + key-pattern grep (post-sign or unsigned)
@@ -200,23 +360,28 @@ jobs:
           if [[ "$SIGNING_AVAILABLE" == "true" && "$DRY_RUN" != "true" ]]; then
             TARGET=$(ls dist/vibemix-*.dmg 2>/dev/null | head -1 || echo "")
             if [[ -z "$TARGET" || ! -f "$TARGET" ]]; then
-              TARGET="tauri/src-tauri/target/release/bundle/macos/vibemix.app"
+              TARGET="tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app"
             fi
           else
-            TARGET="tauri/src-tauri/target/release/bundle/macos/vibemix.app"
+            TARGET="tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app"
           fi
           echo "Verifying: $TARGET"
           mkdir -p dist
           uv run python -m scripts.dist.verify_binary "$TARGET" --report dist/verify-report-macos.json
 
       # ---- Stage 5 — UPLOAD artifact for publish job ------------------------
-      - name: Upload macOS artifacts (mock or signed)
+      # Plan 27-06 / REC-09: per-arch artifact name keeps the two matrix
+      # outputs distinct. Publish job downloads both and uploads them as
+      # separate release assets (no lipo-merge — see RESEARCH §Critical
+      # Correction).
+      - name: Upload macOS artifacts (mock or signed) — ${{ matrix.arch }}
         uses: actions/upload-artifact@v4
         with:
-          name: macos-artifacts
+          name: macos-artifacts-${{ matrix.arch }}
           path: |
             dist/vibemix-*.dmg
-            tauri/src-tauri/target/release/bundle/macos/vibemix.app
+            tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app
+            tauri/src-tauri/binaries/vibemix-core-${{ matrix.target_triple }}/
             dist/verify-report-macos.json
           if-no-files-found: warn
           retention-days: 7
@@ -286,6 +451,20 @@ jobs:
           retention-days: 1
 
       # ---- Stage 2 — SIGN (SignPath OSS flow per Plan 18-03) ---------------
+      # Phase 38 DIST-16 — SignPath wiring annotation step.
+      # When SIGNING_AVAILABLE != 'true' the SignPath submission step is silently
+      # skipped. This annotation makes the skip EXPLICIT and points operators at
+      # KAAN-ACTION-LEGAL.md DIST-11 (Kaan-action — SignPath OSS Foundation
+      # application has a ~1-week SLA from submission; Pitfall P46 carveout).
+      - name: SIGN — SignPath wiring annotation (empty-secret skip)
+        if: env.SIGNING_AVAILABLE != 'true'
+        shell: pwsh
+        run: |
+          Write-Host "::warning::SignPath approval pending — see KAAN-ACTION-LEGAL.md DIST-11 (Kaan-action). signpath/github-action-submit-signing-request step skipped."
+          Write-Host "  expected secrets (Kaan creates after SignPath approves):"
+          Write-Host "    SIGNPATH_API_TOKEN, SIGNPATH_ORGANIZATION_ID,"
+          Write-Host "    SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG"
+
       - name: SIGN — Submit signing request to SignPath
         if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
         uses: signpath/github-action-submit-signing-request@v1.2.0
@@ -349,15 +528,72 @@ jobs:
           retention-days: 7
 
   # ---------------------------------------------------------------------------
+  # Wave 1.5 — Post-sign verifier publish gate (Phase 38 DIST-17).
+  # ---------------------------------------------------------------------------
+  # Activates the Phase 34 verify_signed.py surface as a HARD gate before
+  # release-publish runs. Fails the build if any signed artifact lacks the
+  # platform-specific signing surface (Mach-O LC_CODE_SIGNATURE for .dmg/.pkg,
+  # PE MZ header for .msi/.exe). Tag-gated AND signing-mode-gated so forks +
+  # mock-mode never reach it.
+
+  verify-signed-publish-gate:
+    name: Verify signed artifacts (publish gate)
+    runs-on: ubuntu-latest
+    needs: [detect-signing-mode, build-macos, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v') && needs.detect-signing-mode.outputs.signing_available == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts/
+
+      - name: Verify macOS DMG (arm64) — DIST-17 require-signed gate
+        run: |
+          set -euo pipefail
+          DMG=$(ls release-artifacts/macos-artifacts-arm64/vibemix-*.dmg 2>/dev/null | head -1)
+          if [[ -z "$DMG" ]]; then
+            echo "::error::No arm64 DMG found in release-artifacts/"
+            exit 1
+          fi
+          python scripts/dist/verify_signed.py --artifact "$DMG" --require-signed
+
+      - name: Verify macOS DMG (x86_64) — DIST-17 require-signed gate
+        run: |
+          set -euo pipefail
+          DMG=$(ls release-artifacts/macos-artifacts-x86_64/vibemix-*.dmg 2>/dev/null | head -1)
+          if [[ -z "$DMG" ]]; then
+            echo "::error::No x86_64 DMG found in release-artifacts/"
+            exit 1
+          fi
+          python scripts/dist/verify_signed.py --artifact "$DMG" --require-signed
+
+      - name: Verify Windows MSI — DIST-17 require-signed gate
+        run: |
+          set -euo pipefail
+          MSI=release-artifacts/windows-artifacts/vibemix-installer.msi
+          if [[ ! -f "$MSI" ]]; then
+            echo "::error::Windows MSI missing at $MSI"
+            exit 1
+          fi
+          python scripts/dist/verify_signed.py --artifact "$MSI" --require-signed
+
+  # ---------------------------------------------------------------------------
   # Wave 2 — Publish to GitHub Releases + sign + POST updater manifest.
   # ---------------------------------------------------------------------------
 
   release-publish:
     name: Publish to GitHub Releases + sign manifest
     runs-on: ubuntu-latest
-    needs: [detect-signing-mode, build-macos, build-windows]
-    # Tag-gated AND secrets-gated. PR / workflow_dispatch / mock-mode never
-    # reaches this job — protecting against accidental publish from a fork.
+    needs: [detect-signing-mode, build-macos, build-windows, verify-signed-publish-gate]
+    # Tag-gated AND secrets-gated AND verifier-gated. PR / workflow_dispatch /
+    # mock-mode never reaches this job — protecting against accidental publish
+    # from a fork. Phase 38 DIST-17 adds the verifier gate.
     if: startsWith(github.ref, 'refs/tags/v') && needs.detect-signing-mode.outputs.signing_available == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -379,8 +615,11 @@ jobs:
           set +x   # private key value must NEVER hit logs
           chmod +x scripts/dist/sign_manifest.sh
           VERSION="${GITHUB_REF#refs/tags/v}"
-          # The DMG basename pattern is locked by sign_macos.sh stage 4.
-          MACOS_DMG=$(ls release-artifacts/macos-artifacts/vibemix-*.dmg 2>/dev/null | head -1)
+          # Plan 27-06 / REC-09: per-arch artifacts live under
+          # release-artifacts/macos-artifacts-arm64/ + macos-artifacts-x86_64/.
+          # Manifest URL points at the arm64 DMG (current default for the
+          # majority of macOS users); v2.2 may add per-arch updater entries.
+          MACOS_DMG=$(ls release-artifacts/macos-artifacts-arm64/vibemix-*.dmg 2>/dev/null | head -1)
           MACOS_BASENAME=$(basename "$MACOS_DMG")
           ./scripts/dist/sign_manifest.sh \
               --version "$VERSION" \
@@ -419,10 +658,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release-artifacts/macos-artifacts/vibemix-*.dmg
+            release-artifacts/macos-artifacts-arm64/vibemix-*.dmg
+            release-artifacts/macos-artifacts-x86_64/vibemix-*.dmg
             release-artifacts/windows-artifacts/vibemix-installer.msi
             release-artifacts/latest.json
-            release-artifacts/macos-artifacts/verify-report-macos.json
+            release-artifacts/macos-artifacts-arm64/verify-report-macos.json
+            release-artifacts/macos-artifacts-x86_64/verify-report-macos.json
             release-artifacts/windows-artifacts/verify-report-windows.json
           # v1 draft → Kaan reviews + clicks Publish manually. v2 can flip
           # to false once fresh-machine rehearsal is wired in Phase 20.

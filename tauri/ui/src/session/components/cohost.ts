@@ -1,26 +1,26 @@
-/* cohost.ts — full right column: transcript header + receipt-paper
- * transcript + foot status (UI-SPEC §§9-11).
+/* cohost.ts — full right column: transcript header + transcript + foot
+ * status (UI-SPEC §§9-11).
  *
- * The transcript is the second "paper" surface — locally-scoped
- * `--paper-receipt-*` CSS custom properties carry the only non-charcoal,
- * non-amber colour values in the right column. Per UI-SPEC §Color these
- * are intentionally OUT of the dark-only palette to evoke a receipt-paper
- * printout — the cohost's voice rendered as ink-on-paper.
- *
- * Lifted verbatim from mocks/vibemix-app-ui.html `.cohost-panel`,
- * `.cohost-header`, `.transcript`, `.cohost-foot` (lines 956-1112).
+ * The transcript is dark-glass (v5 — the original receipt-paper concept
+ * was retired in Phase 14). Lines tier as `.now / .faded / .old` —
+ * latest gets an amber left-edge insetshadow + caret, older lines fade
+ * toward --silk-40.
  *
  * Phase 13-03: the 42×42 mascot placeholder bubble was removed from the
  * transcript header — the mascot lives ONLY as the Phase 13 always-on-top
  * overlay window (see 13-CONTEXT.md Open Q 2: "corner dropped entirely").
- * The freed vertical space gives the meters + transcript more breathing
- * room.
+ *
+ * Critique 2026-05-14: dropped the latency-in-amber readout from the foot
+ * — real DJs don't read latency, and a tabular-mono number competed with
+ * the drop-chip beat-pulse for attention. The foot is now GROUNDED LED +
+ * single line, nothing else. Latency stays on `CohostPanelProps` for
+ * callers but is unused in render.
  *
  * Components:
  *   - "AVERY" Workbench 13px name + LISTENING/TALKING/IDLE status row
  *     (single horizontal row, left-aligned, no leading bubble)
- *   - Receipt-paper transcript with `.now / .faded / .old` line classes
- *   - Foot strip: GROUNDED / WARMING UP indicator + DSEG7 latency readout
+ *   - Tiered transcript (.now / .faded / .old)
+ *   - Foot strip: GROUNDED / WARMING UP indicator (latency-free)
  *
  * Pure-function. Transcript handles sticky-bottom scroll behaviour: when
  * the user has scrolled up, new lines do NOT auto-scroll. We track this
@@ -42,6 +42,23 @@ export interface CohostPanelProps {
   transcript: TranscriptLine[];
   latencyMs: number | null;
   grounded: boolean;
+  /** Push-to-mute state. When true, an inline "● MUTED" pill sits next to
+   *  the AVERY status row so the mute is visible without scanning to the
+   *  banner above the transcript. Wave 6 (impeccable critique) — closes
+   *  H3 "user control & freedom" by giving cmd+m a clear visual ack.
+   *  Defaults to false on existing callers via the destructure below. */
+  muted?: boolean;
+  /** Elapsed milliseconds since `grounded` transitioned to false. When >
+   *  5000ms the foot swaps from "WARMING UP" to "COULDN'T REACH GEMINI"
+   *  + retry button so the user has a recovery path. Wave 6 closes H9
+   *  "error recovery". The render-loop computes this; the cohost is
+   *  presentation-only. Defaults to null. */
+  failureElapsedMs?: number | null;
+  /** Click handler for the retry button shown after the failure threshold
+   *  elapses. Wave 6 — callers wire this to whatever reconnect IPC exists
+   *  (currently `restart_sidecar`; a dedicated `ipc.cohost.reconnect` is
+   *  a TODO). */
+  onRetry?: () => void;
 }
 
 const MAX_TRANSCRIPT_LINES = 200;
@@ -225,23 +242,16 @@ const CSS = `
     font-family: var(--type-mono);
     text-shadow: 0 0 4px var(--amber-22);
   }
-  /* Latest line — felt as a moment, not just a flag. Amber-22 inset
-   * glow + 1px amber edge on the left so the eye is drawn there without
-   * a heavy backdrop. The cursor caret rides on the end. */
+  /* Latest line — eye is drawn via TWO amber signals only: the 1px
+   * inset edge on the left and the lead glyph (defined globally on
+   * .vmx-cohost__msg::before). Critique pass 2 (2026-05-14) dropped
+   * the amber gradient backdrop AND the blinking cursor caret —
+   * stacking 4 amber signals on a single line read louder than the
+   * rest of the surface. The remaining two carry the "this is the
+   * latest" semantic alone. */
   .vmx-cohost__msg[data-tier="now"] {
     color: var(--silk);
-    background: linear-gradient(90deg, rgba(255, 138, 61, 0.07) 0%, rgba(255, 138, 61, 0.018) 70%, transparent 100%);
-    box-shadow:
-      inset 1px 0 0 var(--amber-40),
-      inset 0 0 12px rgba(255, 138, 61, 0.06);
-  }
-  .vmx-cohost__msg[data-tier="now"]::after {
-    content: "▍";
-    display: inline;
-    margin-left: 2px;
-    color: var(--amber);
-    text-shadow: 0 0 4px var(--amber-22);
-    animation: vmx-cohost-cursor 1000ms steps(1) infinite;
+    box-shadow: inset 1px 0 0 var(--amber-40);
   }
   .vmx-cohost__msg[data-tier="faded"] {
     color: var(--silk-65);
@@ -270,9 +280,8 @@ const CSS = `
     font-weight: 600;
     text-shadow: 0 0 4px var(--amber-22);
   }
-  @keyframes vmx-cohost-cursor {
-    50% { opacity: 0; }
-  }
+  /* vmx-cohost-cursor keyframe retired with the blinking caret —
+   * see [data-tier="now"] above (critique pass 2). */
   /* === Foot strip === */
   .vmx-cohost__foot {
     padding: var(--sp-3) var(--sp-4);
@@ -311,15 +320,82 @@ const CSS = `
     box-shadow: var(--glow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
   }
-  .vmx-cohost__foot-latency {
+  /* Failure state — foot[data-failed="true"] swaps the amber LED to fault
+   * and renders a compact retry button. Wave 6 closes H9 "error recovery"
+   * by giving the user a way out when grounding has been false for >5s. */
+  .vmx-cohost__foot[data-failed="true"] .vmx-cohost__foot-led {
+    background: var(--led-fault);
+    box-shadow:
+      0 0 3px var(--led-fault),
+      0 0 6px rgba(212, 65, 58, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
+  }
+  .vmx-cohost__foot[data-failed="true"] .vmx-cohost__foot-lbl {
+    color: var(--led-fault);
+    text-shadow: 0 0 4px rgba(212, 65, 58, 0.28), 0 1px 0 rgba(0, 0, 0, 0.7);
+  }
+  .vmx-cohost__foot-retry {
     margin-left: auto;
-    font-family: var(--type-mono);
-    font-variant-numeric: tabular-nums;
-    font-size: 12px;
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border: 1px solid var(--amber-40);
+    border-radius: var(--rad-sm);
     color: var(--amber);
-    text-shadow: 0 0 4px var(--amber-22);
-    letter-spacing: 0.04em;
-    font-weight: 500;
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 var(--amber-40),
+      inset 0 0 12px var(--amber-22);
+    cursor: pointer;
+    line-height: 1;
+    text-shadow: 0 0 4px var(--amber-65);
+    transition: border-color var(--motion-snap) ease-out,
+                box-shadow var(--motion-snap) ease-out;
+  }
+  .vmx-cohost__foot-retry:hover {
+    border-color: var(--amber);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 var(--amber-65),
+      inset 0 0 18px var(--amber-40);
+  }
+  /* MUTED pill — sits inside the cohost header next to the AVERY status
+   * row. Same dome-LED + Saira-9-022 vocabulary as the titlebar pills,
+   * fault-tinted. Wave 6 closes H3 "user control & freedom" — cmd+m
+   * gets a visible ack without scanning to the banner. */
+  .vmx-cohost__muted-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    margin-left: auto;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(212, 65, 58, 0.35);
+    border-radius: var(--rad-sm);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--led-fault);
+    line-height: 1;
+    text-shadow: 0 0 4px rgba(212, 65, 58, 0.28), 0 1px 0 rgba(0, 0, 0, 0.7);
+  }
+  .vmx-cohost__muted-pill-led {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--led-fault);
+    box-shadow:
+      0 0 3px var(--led-fault),
+      0 0 6px rgba(212, 65, 58, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
   }
 `;
 
@@ -330,25 +406,25 @@ export function renderCohostPanel(props: CohostPanelProps): HTMLElement {
   root.className = "vmx-cohost";
   root.setAttribute("aria-label", "ai cohost");
 
-  // v5 "sign of life" — slow amber light sweeping the perimeter.
-  // Pure CSS; defined globally in tokens.css.
-  const sweep = document.createElement("div");
-  sweep.className = "border-anim slow rev";
-  sweep.setAttribute("aria-hidden", "true");
-  root.append(sweep);
-
-  // Shared glass-fingerprint streak — quiet character beat unifying the
-  // session deck panels (also on .vmx-timecode::after and the generic
-  // .vmx-panel via renderPanel).
-  const streak = document.createElement("span");
-  streak.className = "vmx-glass-streak bottom";
-  streak.setAttribute("aria-hidden", "true");
-  root.append(streak);
+  // Critique 2026-05-14: the cohost no longer carries its own
+  // border-anim sweep. The SessionLayout root already breathes
+  // (one CDJ, one breathing light); a second sweep on the right column
+  // diluted the sign-of-life into a nervous tic. The glass-fingerprint
+  // streak was also dropped (texture-as-decoration → AI-defaultism).
+  //
+  // The cohost reads as a quiet inner glass tile inside the breathing
+  // session shell.
 
   root.append(buildTopStrip());
-  root.append(buildHeader(props.status));
+  root.append(buildHeader(props.status, props.muted ?? false));
   root.append(buildTranscript(props.transcript));
-  root.append(buildFoot(props.grounded, props.latencyMs));
+  root.append(
+    buildFoot(
+      props.grounded,
+      props.failureElapsedMs ?? null,
+      props.onRetry,
+    ),
+  );
 
   return root;
 }
@@ -366,7 +442,7 @@ function buildTopStrip(): HTMLElement {
   return strip;
 }
 
-function buildHeader(status: CohostStatus): HTMLElement {
+function buildHeader(status: CohostStatus, muted: boolean): HTMLElement {
   const head = document.createElement("header");
   head.className = "vmx-cohost__header";
 
@@ -387,6 +463,10 @@ function buildHeader(status: CohostStatus): HTMLElement {
   const statusEl = document.createElement("span");
   statusEl.className = "vmx-cohost__status";
   statusEl.dataset.state = status;
+  // Wave 6 (H6 recognition over recall) — native browser tooltip on
+  // hover. aria-label kept identical for screen readers.
+  statusEl.setAttribute("title", titleForStatus(status));
+  statusEl.setAttribute("aria-label", titleForStatus(status));
   const led = document.createElement("span");
   led.className = "vmx-cohost__status-led";
   led.setAttribute("aria-hidden", "true");
@@ -396,7 +476,42 @@ function buildHeader(status: CohostStatus): HTMLElement {
   meta.append(name, statusEl);
   head.append(meta);
 
+  // Wave 6 (H3) — inline MUTED pill. Renders only when muted=true.
+  // setCohost mounts/unmounts via the same path so diff-renders flip it.
+  if (muted) {
+    head.append(buildMutedPill());
+  }
+
   return head;
+}
+
+function buildMutedPill(): HTMLElement {
+  const pill = document.createElement("span");
+  pill.className = "vmx-cohost__muted-pill";
+  pill.setAttribute("role", "status");
+  pill.setAttribute("aria-live", "polite");
+  pill.setAttribute(
+    "title",
+    "cohost is muted. press the push-to-mute hotkey to resume.",
+  );
+  const dot = document.createElement("span");
+  dot.className = "vmx-cohost__muted-pill-led";
+  dot.setAttribute("aria-hidden", "true");
+  const lbl = document.createElement("span");
+  lbl.textContent = "MUTED";
+  pill.append(dot, lbl);
+  return pill;
+}
+
+function titleForStatus(status: CohostStatus): string {
+  switch (status) {
+    case "LISTENING":
+      return "AVERY is listening to the room";
+    case "TALKING":
+      return "AVERY is talking. mic auto-gated until they finish.";
+    case "IDLE":
+      return "AVERY is idle. waiting for an event to react to.";
+  }
 }
 
 function buildTranscript(lines: TranscriptLine[]): HTMLElement {
@@ -437,10 +552,21 @@ function populateTranscript(el: HTMLElement, lines: TranscriptLine[]): void {
   });
 }
 
-function buildFoot(grounded: boolean, latencyMs: number | null): HTMLElement {
+/** Wave 6 (H9) — threshold (ms) after which a sustained grounded=false
+ *  flips the foot from "WARMING UP" to "COULDN'T REACH GEMINI" + retry.
+ *  Exported for the spec's fake-timer assertions. */
+export const GROUNDING_FAILURE_MS = 5000;
+
+function buildFoot(
+  grounded: boolean,
+  failureElapsedMs: number | null,
+  onRetry: (() => void) | undefined,
+): HTMLElement {
   const foot = document.createElement("div");
   foot.className = "vmx-cohost__foot";
   foot.dataset.grounded = grounded ? "true" : "false";
+  const failed = !grounded && (failureElapsedMs ?? 0) >= GROUNDING_FAILURE_MS;
+  foot.dataset.failed = failed ? "true" : "false";
 
   const led = document.createElement("span");
   led.className = "vmx-cohost__foot-led";
@@ -449,22 +575,45 @@ function buildFoot(grounded: boolean, latencyMs: number | null): HTMLElement {
 
   const lbl = document.createElement("span");
   lbl.className = "vmx-cohost__foot-lbl";
-  lbl.textContent = grounded ? "GROUNDED ON AUDIO + SCREEN" : "WARMING UP";
+  lbl.textContent = footLabelFor(grounded, failed);
   foot.append(lbl);
+  // Wave 6 (H6 recognition over recall) — native browser tooltip on
+  // hover explaining the LED state.
+  foot.setAttribute("title", footTooltipFor(grounded, failed));
 
-  const right = document.createElement("span");
-  right.className = "vmx-cohost__foot-latency";
-  right.title = "last reaction latency";
-  right.textContent = formatLatency(latencyMs);
-  foot.append(right);
+  if (failed) {
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "vmx-cohost__foot-retry";
+    retry.textContent = "↻ RETRY";
+    retry.setAttribute("aria-label", "retry connecting to gemini");
+    retry.setAttribute("title", "retry connecting to gemini");
+    if (onRetry) {
+      retry.addEventListener("click", (e) => {
+        e.preventDefault();
+        onRetry();
+      });
+    }
+    foot.append(retry);
+  }
 
   return foot;
 }
 
-function formatLatency(ms: number | null): string {
-  if (ms == null) return "—";
-  const sec = ms / 1000;
-  return `${sec.toFixed(2)} s`;
+function footLabelFor(grounded: boolean, failed: boolean): string {
+  if (grounded) return "GROUNDED ON AUDIO + SCREEN";
+  if (failed) return "COULDN'T REACH GEMINI";
+  return "WARMING UP";
+}
+
+function footTooltipFor(grounded: boolean, failed: boolean): string {
+  if (grounded) {
+    return "grounded on audio + screen capture. cohost can hear you.";
+  }
+  if (failed) {
+    return "couldn't reach gemini. press retry to reconnect.";
+  }
+  return "warming up. initializing audio + screen capture.";
 }
 
 /** Idempotent hot-update. Rebuilds transcript content but preserves the
@@ -474,20 +623,56 @@ export function setCohost(el: HTMLElement, props: CohostPanelProps): void {
   const statusEl = el.querySelector<HTMLElement>(".vmx-cohost__status");
   if (statusEl && statusEl.dataset.state !== props.status) {
     statusEl.dataset.state = props.status;
+    const title = titleForStatus(props.status);
+    statusEl.setAttribute("title", title);
+    statusEl.setAttribute("aria-label", title);
     const lbl = statusEl.querySelector<HTMLElement>("span:last-child");
     if (lbl) lbl.textContent = props.status;
   }
 
-  // Foot
+  // Muted pill mount/unmount (H3 — visual ack for cmd+m).
+  const header = el.querySelector<HTMLElement>(".vmx-cohost__header");
+  if (header) {
+    const existing = header.querySelector<HTMLElement>(".vmx-cohost__muted-pill");
+    const muted = props.muted ?? false;
+    if (muted && !existing) {
+      header.append(buildMutedPill());
+    } else if (!muted && existing) {
+      existing.remove();
+    }
+  }
+
+  // Foot — grounded + failure recovery copy (H9).
   const foot = el.querySelector<HTMLElement>(".vmx-cohost__foot");
   if (foot) {
+    const failed =
+      !props.grounded &&
+      (props.failureElapsedMs ?? 0) >= GROUNDING_FAILURE_MS;
     foot.dataset.grounded = props.grounded ? "true" : "false";
+    foot.dataset.failed = failed ? "true" : "false";
     const footLbl = foot.querySelector<HTMLElement>(".vmx-cohost__foot-lbl");
-    if (footLbl) {
-      footLbl.textContent = props.grounded ? "GROUNDED ON AUDIO + SCREEN" : "WARMING UP";
+    if (footLbl) footLbl.textContent = footLabelFor(props.grounded, failed);
+    foot.setAttribute("title", footTooltipFor(props.grounded, failed));
+
+    // Retry button mount/unmount.
+    const existingBtn = foot.querySelector<HTMLElement>(".vmx-cohost__foot-retry");
+    if (failed && !existingBtn) {
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "vmx-cohost__foot-retry";
+      retry.textContent = "↻ RETRY";
+      retry.setAttribute("aria-label", "retry connecting to gemini");
+      retry.setAttribute("title", "retry connecting to gemini");
+      if (props.onRetry) {
+        retry.addEventListener("click", (e) => {
+          e.preventDefault();
+          props.onRetry?.();
+        });
+      }
+      foot.append(retry);
+    } else if (!failed && existingBtn) {
+      existingBtn.remove();
     }
-    const lat = foot.querySelector<HTMLElement>(".vmx-cohost__foot-latency");
-    if (lat) lat.textContent = formatLatency(props.latencyMs);
   }
 
   // Transcript — rebuild lines. Preserve scroll-anchor if not sticky.

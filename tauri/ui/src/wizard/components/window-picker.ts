@@ -271,7 +271,7 @@ export function WindowPicker(props: WindowPickerProps): HTMLElement {
   const pb = document.createElement("span");
   pb.className = "cmp-window-picker__privacy-body";
   // UI-SPEC §Step 2 "Window picker privacy warning body" — VERBATIM
-  pb.textContent = "vibemix only captures the window you pick — never your full screen";
+  pb.textContent = "vibemix only captures the window you pick, never your full screen.";
   privacy.append(ph, pb);
   root.append(privacy);
 

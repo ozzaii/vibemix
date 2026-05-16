@@ -1,0 +1,12 @@
+{"t": 1.0, "kind": "evidence_observation", "source": "ev", "key": "KICK_SWAP", "t_session": 5.0}
+{"t": 1.1, "kind": "evidence_observation", "source": "aud", "key": "bpm", "t_session": 5.0}
+{"t": 1.2, "kind": "evidence_observation", "source": "midi", "key": "cue_a", "t_session": 30.0}
+{"t": 1.3, "kind": "evidence_observation", "source": "ev", "key": "DROP", "t_session": 45.2}
+{"t": 1.4, "kind": "evidence_observation", "source": "aud", "key": "rms", "t_session": 45.2}
+{"t": 1.5, "kind": "evidence_observation", "source": "ev", "key": "TRACK_CHANGE", "t_session": 60.0}
+{"t": 1.6, "kind": "evidence_observation", "source": "track", "key": "marlon_hoffstadt-atlas", "t_session": 60.0}
+{"t": 1.7, "kind": "evidence_observation", "source": "screen", "key": "waveform_deck_a", "t_session": 60.0}
+{"t": 1.8, "kind": "evidence_observation", "source": "mix", "key": "audible_deck=A", "t_session": 60.0}
+{"t": 1.9, "kind": "evidence_observation", "source": "tend", "key": "user_likes_acid", "t_session": 0.0}
+{"t": 2.1, "kind": "evidence_observation", "source": "ev", "key": "PHRASE_BOUNDARY", "t_session": 90.0}
+{"t": 2.2, "kind": "evidence_observation", "source": "ev", "key": "LAYER_ARRIVAL", "t_session": 75.0}

@@ -260,13 +260,25 @@ def test_recordings_events_result_accepts_empty_events_array() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 8 — drift-gate count parity (34 oneOf == 34 wrapper dataclasses)
+# Test 8 — drift-gate count parity (49 oneOf == 49 wrapper dataclasses
+# after Phase 28 Plan 28-09 added 10 library.* messages on top of Phase 25)
 # ---------------------------------------------------------------------------
 
 
-def test_count_parity_at_34() -> None:
-    """Phase 15 Plan 01 bumps the IPC count 27 → 34 (+7 recordings.* families).
-    Both sides — schema oneOf and Python wrapper dataclasses — must match exactly.
+def test_count_parity_at_63() -> None:
+    """Phase 15 Plan 01 bumped the IPC count 27 → 34 (+7 recordings.* families);
+    Phase 20-04 added SessionCitation → 35; Phase 24-02 added
+    SessionOverlayHighlight → 36; Phase 25 Plan 25-03 added 3 DEBRIEF
+    reservations → 39; Phase 28 Plan 28-09 added 10 library.* messages
+    (LibraryImport*, LibrarySearch*, LibraryConfidence, LibraryStaleness*,
+    LibrarySimilar*) → 49; Phase 29 Plan 29-03 added 6 DEBRIEF v2.1
+    additive wrappers (DebriefChapterList, DebriefTldrAudio, DebriefDrills,
+    DebriefCitationTooltipReq, DebriefCitationTooltip, DebriefError) → 55.
+    Phase 32 Plans 32-04..05 added 8 profile.* messages (ProfileSetConsent,
+    ProfileConsentState, ProfileView, ProfileViewResult, ProfileRegenerate,
+    ProfileRegenerateResult, ProfileDelete, ProfileDeleteAck) → 63.
+    Both sides — schema oneOf and Python wrapper dataclasses — must match
+    exactly.
     """
     from vibemix.ui_bus import messages as ui_bus_messages
 
@@ -278,8 +290,8 @@ def test_count_parity_at_34() -> None:
         and "type" in obj.__dataclass_fields__
     )
 
-    assert len(_SCHEMA["oneOf"]) == 34, "schema oneOf count should be 34 after Phase 15-01"
-    assert wrapper_count == 34, f"wrapper count {wrapper_count} != 34"
+    assert len(_SCHEMA["oneOf"]) == 63, "schema oneOf count should be 63 after Plan 32-05"
+    assert wrapper_count == 63, f"wrapper count {wrapper_count} != 63"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

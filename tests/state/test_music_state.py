@@ -17,7 +17,7 @@ def test_state_imports_from_package():
     from vibemix.state import MusicState as MS  # noqa: F401
 
 
-def test_default_construction_exposes_22_fields():
+def test_default_construction_exposes_26_fields():
     state = MusicState()
 
     # Audio block (6 fields)
@@ -59,7 +59,84 @@ def test_default_construction_exposes_22_fields():
     assert state.set_start_at == 0.0
     assert state.last_kaan_spoke_at == 0.0
 
+    # Phase 17 — Hard Tek detectors v1 (SENSE-13). Backward-compat defaults
+    # so Phase 3 golden-equivalence holds (4 fields).
+    assert state.buildup_score == 0.0
+    assert state.predicted_drop_in_sec is None
+    assert state.beat_phase == 0.0
+    assert state.active_genre == "unknown"
+
     # Lock (1 field) — covered by separate test
+
+
+def test_phase_17_fields_have_backward_compat_defaults():
+    """Phase 3 golden-equivalence guard — DO NOT relax these defaults.
+
+    The four Phase 17 fields (`buildup_score`, `predicted_drop_in_sec`,
+    `beat_phase`, `active_genre`) MUST default to v4-compatible inert values
+    so consumers built before Phase 17 see no behavioral change. Predictive
+    drop firing is OFF-by-default in v2.0 — `predicted_drop_in_sec is None`
+    is the documented sentinel that downstream code (Phase 19 ack bank,
+    detector consumers) uses to skip predictive paths. Locks T-17-01-04 from
+    the threat register: silent default-drift would break Phase 3 / Phase 6
+    regression coverage at the source-of-truth dataclass."""
+    state = MusicState()
+    assert state.buildup_score == 0.0, "buildup_score default must be 0.0 (silence-equivalent)"
+    assert state.predicted_drop_in_sec is None, (
+        "predicted_drop_in_sec default must be None — predictive firing OFF by default per CONTEXT"
+    )
+    assert state.beat_phase == 0.0, "beat_phase default must be 0.0 (mirrors downbeat_phase default)"
+    assert state.active_genre == "unknown", (
+        "active_genre default must be 'unknown' — never fabricate a genre during BPM lock-up"
+    )
+
+    # Phase 3 golden-equivalence — every PRE-Phase-17 field on a default
+    # MusicState() retains its v4-baseline value. If any of these regress,
+    # Phase 3 / Phase 6 / Phase 13 tests break silently.
+    assert state.audible is False
+    assert state.rms == 0.0
+    assert state.bands == {"sub": 0.0, "low": 0.0, "mid": 0.0, "high": 0.0}
+    assert state.onset_density == 0.0
+    assert state.bpm == 0.0
+    assert state.energy_curve == []
+    assert state.phase == "silent"
+    assert state.phase_started_at == 0.0
+    assert state.crest_factor == 0.0
+    assert state.vocal_active is False
+    assert state.bpm_corrected is False
+    assert state.genre_profile_name == "unknown"
+    assert state.mood == "hype-man"
+    assert state.bpm_confidence == 0.0
+    assert state.downbeat_phase == 0.0
+    assert state.deck_a == {}
+    assert state.deck_b == {}
+    assert state.xfader == 64
+    assert state.controller_connected is False
+    assert state.audible_deck == "none"
+    assert state.deck_confidence == 0.0
+    assert state.audible_track is None
+    assert state.audible_track_confidence == 0.0
+    assert state.last_audible_track is None
+    assert state.recent_moves == []
+    assert state.long_arc == []
+    assert state.phase_history == []
+    assert state.track_history == []
+    assert state.set_start_at == 0.0
+    assert state.last_kaan_spoke_at == 0.0
+
+
+def test_phase_17_field_types_via_dataclass_fields():
+    """Lock the Phase 17 type annotations via dataclasses.fields() introspection
+    so a future refactor can't widen `predicted_drop_in_sec` to a non-Optional
+    float (which would break the OFF-by-default sentinel) or narrow
+    `active_genre` to a Literal that can't accept future genre strings."""
+    import dataclasses
+
+    by_name = {f.name: f for f in dataclasses.fields(MusicState)}
+    assert by_name["buildup_score"].type == "float"
+    assert by_name["predicted_drop_in_sec"].type == "float | None"
+    assert by_name["beat_phase"].type == "float"
+    assert by_name["active_genre"].type == "str"
 
 
 def test_default_factories_not_shared():

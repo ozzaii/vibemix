@@ -62,6 +62,29 @@ async def ws_broadcast(
             # (Plan 13-04) can subscribe to a single stream. Anti-
             # hallucination: bpm_confidence < 0.6 → renderer skips
             # beat-locked entry; mood drives clip-pool + voice swap.
+            #
+            # Phase 22-02 — extend further with `beat_phase` +
+            # `active_genre`. `beat_phase` is a Phase-17-named alias of
+            # `downbeat_phase` (both ∈ [0, 1) — fraction-through-current-
+            # bar). Both ride on the wire simultaneously because the
+            # Plan 13-06 dispatcher binds to `downbeat_phase` and the
+            # Phase 22 anticipation/hip-bob layers bind to `beat_phase`;
+            # carrying both lets the renderer migrate incrementally
+            # without breaking existing subscribers. `active_genre`
+            # ("house"/"techno"/"hard_tek"/"unknown") feeds the
+            # GenreRouter on the renderer side. Anti-hallucination is
+            # the renderer's job (the bus is a dumb wire) — under low
+            # bpm_confidence the bus still emits beat_phase as-is and
+            # the renderer (Plan 13-04 Open Q 4) ignores beat-locked
+            # behavior.
+            # Phase 31 — 4-layer mascot extension (ADDITIVE per Pitfall
+            # P47). `emotion` ("neutral"/"focused"/"hyped"/"concerned"/
+            # None) drives the priority-60 EmotionLayer on the frontend.
+            # `reaction_intent` (MascotReaction whitelist value / None)
+            # is set by the AICoach emote-tag parser and consumed by
+            # the priority-80 ReactionLayer. Both fields default None
+            # which the renderer interprets as "no-op" — backward
+            # compatible with v2.0 subscribers that don't read them.
             payload = json.dumps(
                 {
                     **levels.snapshot(),
@@ -72,6 +95,10 @@ async def ws_broadcast(
                     "mood": state.mood,
                     "bpm_confidence": state.bpm_confidence,
                     "downbeat_phase": state.downbeat_phase,
+                    "beat_phase": state.beat_phase,
+                    "active_genre": state.active_genre,
+                    "emotion": state.emotion,
+                    "reaction_intent": state.last_reaction_intent,
                 }
             )
             dead = []

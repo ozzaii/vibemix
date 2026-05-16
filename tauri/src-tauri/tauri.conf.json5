@@ -16,7 +16,7 @@
     "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm --prefix ui run dev",
-    "beforeBuildCommand": "npm --prefix ui run build"
+    "beforeBuildCommand": ""
   },
   "app": {
     "windows": [
@@ -69,7 +69,7 @@
       //     load and the <audio> duration stays at "--:--" (RESEARCH
       //     Pitfall 1). http://asset.localhost is the http-scheme form
       //     emitted on Windows by WebView2.
-      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:8765; media-src 'self' asset: http://asset.localhost",
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:8765 ipc: http://ipc.localhost; media-src 'self' asset: http://asset.localhost",
       // Phase 15 Plan 02 — assetProtocol exposes the recordings dir to the
       // webview via asset://localhost/<absolute-path> URLs. Scope locked
       // to BOTH $APPDATA and $APPLOCALDATA variants per RESEARCH Pitfall
@@ -92,9 +92,21 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
-    // externalBin path is RELATIVE to src-tauri/. Tauri appends the target-triple suffix
-    // automatically; the Wave 1 build script lays out binaries/vibemix-core-<triple>/<binary>.
-    "externalBin": ["binaries/vibemix-core"],
+    // sidecar shipped as a resource directory (not externalBin) so PyInstaller's
+    // --onedir _internal/ tree stays intact under Contents/Resources/.
+    // sidecar.rs::spawn_sidecar_with_watchdog resolves the path via
+    // app.path().resource_dir(). externalBin flattens onedir into MacOS/ which
+    // breaks the PyInstaller bootloader (looks for libpython3.12.dylib in
+    // Contents/Frameworks/ when .app detected).
+    // Plan 27-06 / REC-09: ship BOTH arch-specific PyInstaller bundles so
+    // Apple Silicon users on a fresh install never see the Rosetta prompt.
+    // sidecar.rs picks the right one at runtime via std::env::consts::ARCH.
+    // RESEARCH §Critical Correction: never lipo-merge the two bundles —
+    // PyInstaller embeds its PKG archive in only the last merged slice.
+    "resources": [
+      "binaries/vibemix-core-aarch64-apple-darwin/**/*",
+      "binaries/vibemix-core-x86_64-apple-darwin/**/*"
+    ],
     "icon": ["icons/icon.png"],
     "macOS": {
       "minimumSystemVersion": "12.3",

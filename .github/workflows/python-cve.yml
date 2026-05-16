@@ -1,0 +1,76 @@
+# Phase 34 / SEC-02 — Python CVE gate.
+#
+# pip-audit + osv-scanner (overlapping coverage; different vulnerability DBs).
+# Severity gate (Pitfall P65) enforced by scripts/dist/severity_gate.py.
+
+name: Python CVE
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * *'  # nightly 6am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-cve:
+    name: pip-audit + osv-scanner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install audit tools
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install "pip-audit>=2.7.3"
+          # osv-scanner is a Go binary — fetch the pinned release.
+          curl -sSL -o osv-scanner \
+            https://github.com/google/osv-scanner/releases/download/v1.9.1/osv-scanner_linux_amd64
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/osv-scanner
+          osv-scanner --version
+
+      - name: pip-audit (declared deps from pyproject.toml)
+        run: |
+          set -euo pipefail
+          # pip-audit reads project dependencies. Output JSON for gate parsing.
+          pip-audit --strict --format=json --output=pip-audit.json || true
+          # `|| true` because non-zero from pip-audit itself doesn't mean we
+          # want to fail — the severity gate below makes that decision.
+
+      - name: osv-scanner (lockfile + manifest)
+        run: |
+          set -euo pipefail
+          osv-scanner --format=json --output=osv.json -L pyproject.toml || true
+          osv-scanner --format=json --output=osv-uv.json --lockfile=uv.lock || true
+
+      - name: Apply severity gate (Pitfall P65)
+        id: gate
+        run: |
+          set -euo pipefail
+          python scripts/dist/severity_gate.py \
+            --pip-audit pip-audit.json \
+            --osv osv.json \
+            --direct-deps pyproject.toml
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-cve-reports
+          path: |
+            pip-audit.json
+            osv.json
+            osv-uv.json
+          retention-days: 30

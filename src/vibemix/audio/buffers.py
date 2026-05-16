@@ -117,6 +117,82 @@ class AudioBuffer:
             result[first:] = self._buf[: n - first]
             return result
 
+    def fill_from_wav(self, path) -> None:
+        """EVAL-01 helper — offline replay only; not called from the sounddevice callback.
+
+        Bulk-loads a recorded WAV file into the ring for the eval harness
+        replay path. Accepts mono or stereo WAVs at 16kHz, 44.1kHz, or 48kHz;
+        downmixes stereo→mono and resamples to ``self._sr`` (default 16kHz)
+        via scipy.signal.resample_poly (mirrors the live runtime resample path
+        in src/vibemix/audio/resample.py). Acquires the same internal lock as
+        ``push`` so a concurrent (test-only) snapshot reader sees a consistent
+        ring state — but does NOT register with any audio callback machinery.
+
+        EVAL-01 invariant: this method is called only from
+        ``scripts/eval/replay_harness.py`` and tests/. ``__main__.py`` and the
+        sounddevice callback path MUST NOT call it (Phase 37 AUDIT-07 grep
+        guard). The truncate-to-ring-capacity behavior matches v4's pathological
+        push branch (n >= size) — eval sessions of arbitrary length are clipped
+        to the ring window, which is the desired snapshot semantics.
+        """
+        import wave as _wave
+
+        with _wave.open(str(path), "rb") as wf:
+            nchannels = wf.getnchannels()
+            src_sr = wf.getframerate()
+            sampwidth = wf.getsampwidth()
+            nframes = wf.getnframes()
+            raw = wf.readframes(nframes)
+
+        if sampwidth != 2:
+            raise ValueError(
+                f"fill_from_wav: expected 16-bit PCM, got sampwidth={sampwidth}"
+            )
+
+        samples = np.frombuffer(raw, dtype=np.int16)
+
+        if nchannels == 2:
+            # Stereo → mono via average. Reshape to (frames, 2) then mean.
+            samples = samples.reshape(-1, 2).mean(axis=1).astype(np.int16)
+        elif nchannels != 1:
+            raise ValueError(
+                f"fill_from_wav: expected 1 or 2 channels, got {nchannels}"
+            )
+
+        if src_sr != self._sr:
+            # Resample via polyphase filter (same library + pattern as the live
+            # runtime resample path). Convert to float32 for the filter then
+            # back to int16 with clipping.
+            from scipy.signal import resample_poly  # noqa: PLC0415
+
+            from math import gcd as _gcd  # noqa: PLC0415
+
+            g = _gcd(self._sr, src_sr)
+            up = self._sr // g
+            down = src_sr // g
+            f32 = samples.astype(np.float32)
+            resampled = resample_poly(f32, up, down)
+            samples = np.clip(resampled, -32768, 32767).astype(np.int16)
+
+        # Bulk-write under the ring lock. If the file is larger than the ring,
+        # take only the tail (matches the v4 pathological-push branch).
+        with self._lock:
+            n = samples.size
+            if n >= self._size:
+                self._buf[:] = samples[-self._size :]
+                self._write = 0
+                self._filled = self._size
+                return
+            end = self._write + n
+            if end <= self._size:
+                self._buf[self._write : end] = samples
+            else:
+                first = self._size - self._write
+                self._buf[self._write :] = samples[:first]
+                self._buf[: n - first] = samples[first:]
+            self._write = (self._write + n) % self._size
+            self._filled = min(self._filled + n, self._size)
+
 
 class MicBuffer:
     """Pre-allocated mic ring at 48kHz float32 mono (200ms = 9600 samples).

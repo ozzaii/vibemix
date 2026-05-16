@@ -1,0 +1,48 @@
+# Phase 33 / Plan 33-07 / P63 — Bundle ID lock CI gate.
+#
+# The Tauri bundle identifier ``world.bravoh.vibemix`` is LOCKED Day 1.
+# A silent flip resets every macOS TCC permission on the user's
+# machine → bad upgrade UX. This workflow runs the bundle-id test on
+# every PR that touches tauri.conf.json5 or the security tests.
+
+name: Bundle ID Lock
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tauri/src-tauri/tauri.conf.json5'
+      - 'tauri/src-tauri/entitlements*.plist'
+      - 'tauri/src-tauri/Info.plist'
+      - 'tests/security/test_bundle_id_locked.py'
+      - '.github/workflows/bundle-id-lock.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tauri/src-tauri/tauri.conf.json5'
+      - 'tauri/src-tauri/entitlements*.plist'
+      - 'tauri/src-tauri/Info.plist'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle-id-lock:
+    name: Bundle ID lock gate (P63)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Bundle ID lock test
+        run: |
+          set -euo pipefail
+          python -m pytest tests/security/test_bundle_id_locked.py -v

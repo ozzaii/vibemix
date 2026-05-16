@@ -1,441 +1,483 @@
-<!-- refreshed: 2026-05-11 -->
-# Feature Research
+<!-- refreshed: 2026-05-14 for milestone v2.0 -->
+# Feature Research — v2.0 Research-Driven Ship
 
-**Domain:** AI live co-host for DJs (real-time hype-man / coach voice assistant for DJ software)
-**Researched:** 2026-05-11
-**Confidence:** MEDIUM-HIGH (high on existing-product landscape and controller mapping availability, medium on user-mode psychology and anti-feature predictions, low on "what hasn't been tried" because no shipping product like vibemix exists)
+**Domain:** AI live co-host for DJs (open-source, Gemini-only, Mac+Win)
+**Researched:** 2026-05-14
+**Confidence:** HIGH — derives from 12 deep-research v2-bucket artifacts (~28,000 words) + the validated v0.1.0 codebase (Phases 1–14 shipped). Confidence is lower on items still gated on a Kaan ear-test (predictive firing, KICK_SWAP thresholds, the inline emote-tag spike) and on Mixxx OSC (currently a draft PR upstream).
 
-## Domain Framing
+## Domain Framing — Where v2.0 Sits
 
-vibemix is product-greenfield: no shipping AI-co-host product talks back into a DJ's ear during a live set as either hype-man or coach. The adjacent landscape splits cleanly:
+The shipping product (Phases 1–14) already demonstrates "AI co-host that reacts to a DJ set." The v2.0 milestone is **not greenfield** — it's the move from "reacts" to "reacts in-bar, never hallucinates, with a viral demo arsenal." Three forces drive the v2.0 feature set:
 
-- **AI-in-the-DJ-software** (djay Pro AI Neural Mix, VirtualDJ 2026 AIPrompt, PulseDJ copilot, Rekordbox stems) — these are *track-tools* (separation, recommendation, automation). None talk. None react. None coach.
-- **AI music production** (BandLab AI, Ableton + Claude MCP, Suno/Udio) — for making tracks, not playing them live.
-- **Human DJ coaches / MCs** — the actual reference for the product. The "real DJ friend in your ear" bar.
+1. **The anti-slop thesis goes from prompt to enforcement.** Live and debrief outputs become citation-tagged; the linter is the post-processor that turns "trust the audio" from a rule into a contract.
+2. **Latency stops being a passive constraint.** Predictive firing + cancel-and-refire + ack bank + mascot anticipation compress the perceived voice-to-voice gap below the Doherty Threshold (400ms). v4's 5–10s window becomes a sub-2s actual / sub-300ms perceived experience.
+3. **The viral demo becomes the engineering critical path.** djay Pro overlay highlight is not a polish item — it's the seven-day spike whose successful filming feeds the IG/Reddit/HN wave that earns the 500–1000+ GitHub stars. Everything before "ship" is shaped to make Beat A / B / C filmable.
 
-The interesting tension: every existing AI-for-DJ product makes the DJ's job *easier* (auto-mix, auto-recommend, auto-separate). vibemix is the first that doesn't help the DJ mix — it reacts, hypes, or critiques. That's the wedge.
+Cross-software integrations (Mixxx OSC, Pyrekordbox XML, 10-SKU MIDI library) and coaching/memory (post-session debrief, drills, profile) feed the same grounding contract: every Gemini claim has to point at a real event, a real MIDI move, a real track in the user's library, or a real tendency in their long-term profile. None of those primitives exist in shipping AI-for-DJ tools today; together they're the wedge.
 
-## Feature Landscape
+The 12 v2-bucket research artifacts mapped seven feature categories. Each category below is read as a unit by the roadmapper to decide phase decomposition; the dependencies + complexity hints lock the build order.
 
-### Table Stakes (Users Expect These)
+---
 
-Features that, if missing, make the product feel broken or unprofessional. Open-source DJs will dismiss vibemix if these aren't there.
+## Feature Landscape by Category
 
-| Feature | Why Expected | Complexity | User Mode | Interaction Mode | Notes |
-|---------|--------------|------------|-----------|------------------|-------|
-| One-click installer (signed/notarized DMG + MSI) | Free open-source audio tools that require Terminal commands have ~5% conversion from interest to install. PulseDJ and djay are one-click. | M | All | Both | DMG already feasible (Kaan has Apple Dev account); Windows code-signing cert is ~€200/yr |
-| Auto-detect master output device | Hardcoded BlackHole assumption was a known POC limitation. Every DJ has a different audio chain (BlackHole / Loopback / Soundflower on mac; VB-Cable / Voicemeeter / WASAPI loopback on Windows). | M | All | Both | WASAPI loopback on Windows means *no virtual cable needed* — big UX win |
-| Output destination picker (headphones vs speakers) | DJs cue with headphones; AI voice goes either in-ear (solo monitor) or to the room. Must be a one-line choice. | S | All | Both | Already in active scope |
-| Voice picker (male / female, Gemini TTS prebuilt) | Voice assistants without voice choice feel impersonal. Gemini TTS has ~10+ prebuilt voices in male/female. | S | All | Both | Already in active scope |
-| Genre picker at session start | Phase-detection thresholds (drop/build/breakdown) differ massively between techno (steady 130 BPM, long builds) and pop (varied BPM, song-form structure). Auto-detect is research-grade. | S | All | Both | Already in active scope — calibrates RMS gates |
-| Three skill modes (Beginner / Intermediate / Pro) with distinct prompts | Beginners need encouragement + basic vocab; Pros need terse, technical, peer-level talk. Same voice for both = uncanny valley either way. | M | All | Both | Already in active scope — see prompt-template matrix below |
-| Two interaction modes (Hype-man / Coach) | The core product duality. Stakeholder explicit. | M | All | (defines mode) | Already in active scope |
-| Mic gating during AI talk | If AI hears its own voice via speakers, it triggers reactions to itself. POC solves this with `MicBuffer._current_gain() = 0` during AI talk + 350ms hold. | S | All | Both | Already implemented in POC |
-| Curated MIDI mappings for popular controllers | DDJ-FLX4, DDJ-400, DDJ-FLX6, DDJ-FLX10, DDJ-1000, DDJ-SX3, XDJ-RX3, Numark Party Mix Live, Hercules Inpulse 300, Hercules Inpulse 500. Without this, "AI knows what you're doing" doesn't ground. | L | All | Both | See [Controller Mapping Availability](#controller-mapping-availability) — Mixxx has open-source XML mappings for most; FLX10/SX3/RX3 need manual mapping from MIDI implementation charts |
-| Generic-MIDI fallback for unmapped controllers | The 10-controller curated list covers ~70-80% of mid-tier DJs but not the long tail. Without fallback, unmapped users see "controller not supported" and bounce. | M | All | Both | Already in active scope; less semantic context but still functional |
-| Cross-platform (macOS + Windows) | macOS-only would block ~60% of the addressable DJ audience. Windows DJs are a larger market than Mac DJs in DDJ-controller demographic. | L | All | Both | Already in active scope; Linux excluded |
-| Calibration wizard on first run | First-run setup for audio software is the #1 abandonment point. Sonarworks, Room EQ Wizard, every audio interface uses a wizard pattern. | M | All | Both | Already in active scope; see [Calibration Wizard UX](#calibration-wizard-ux-pattern) |
-| Session recording (audio + AI voice + event log) | The POC already does this. Open-source users will expect to share clips, debug bad reactions, replay favorite moments. | S | All | Both | Already implemented in POC (`input.wav` / `voice.wav` / `events.jsonl`) |
-| Push-to-mute / quick disable hotkey | When the AI is wrong or annoying mid-set, the DJ needs ONE keypress to silence it without breaking flow. Universal voice-assistant complaint: "I can't make it shut up." | S | All | Both | Critical anti-frustration feature |
-| Don't talk over vocal sections | DJs know: never talk over the lyrics. AI talking through a vocal hook = product failure. Phase detector should flag "vocals_present" and gate AI replies. | M | All | Both | Hard requirement — research-validated |
-| Reaction frequency throttle | "10-15 seconds of AI talk is the max before crowd tunes out" applies to AI too. Per-event cooldown + global silence budget needed. | S | All | Both | POC has per-type cooldown; needs global "max AI talk per minute" budget |
-| Hallucination grounding (audio evidence packet) | POC pattern: pass RMS values + recent events + timing in prompt so AI describes what's actually playing. Open-source skeptics will catch hallucinations fast. | M | All | Both | Already in active scope — hard release gate |
+> **Reading guide for the roadmapper.** Every feature traces to a v2-bucket source. **Complexity** is engineering-days (E) where known. **Depends on (existing)** = shipped in Phases 1–14; **Depends on (v2)** = same-milestone prerequisite. Anti-features have a stated reason and "what to do instead".
 
-### Differentiators (Competitive Advantage)
+---
 
-Features unique to vibemix or substantially better than the adjacent products. These drive shareability and the marketing-wedge function.
+### Category 1 — Detection & Grounding
 
-| Feature | Value Proposition | Complexity | User Mode | Interaction Mode | Notes |
-|---------|-------------------|------------|-----------|------------------|-------|
-| **Live voice reaction to master output** | First product to do this. Every other AI-for-DJ tool is silent. The shareable moment ("my AI hyped me up on that drop") is the marketing wedge. | L | All | Both | Core thesis. POC validates technical feasibility. |
-| **Magnitude-aware EQ/fader awareness in prompts** | "Slight high boost" vs "killed the lows" — the AI describes the *DJ's move*, not just "knob moved". Makes coach feedback specific. Makes hype-man feel observant. | M | All | Both | Already in active scope |
-| **Absolute set-timeline awareness** | "You're 2:44 into the set; the drop happened 11 seconds ago" — makes the AI feel present, not generic. Other AI tools don't track set time. | S | All | Both | Already in active scope |
-| **Audible-deck detection (A/B/mix)** | POC's `audible_deck` detection means AI talks about the track that's *actually playing*, not whatever's loaded. Solves the #1 hallucination class. | M | Int+Pro | Coach | POC has this in `cohost_v2.py` |
-| **Session replay with AI-voice timeline** | Records master audio + AI voice + event log per session. DJ can listen back and review: "where did the AI nail it? where did it miss?" Becomes a coaching artifact in itself. | M | All | Coach | POC already records; needs minimal playback UI |
-| **"Highlight reel" export** | After-set: AI summarizes the 3 best moments (peak drop, cleanest transition, biggest energy build) with timestamps. DJ exports as MP4 with AI voiceover. Highly shareable on IG/TikTok = direct funnel to Bravoh. | M | All | Both | NOT v1 — v1.1 candidate; flagged as differentiator because it directly serves marketing |
-| **Coach scorecard at session end** | After Coach-mode session: short text summary — "12 transitions, 8 clean, 2 train-wrecks, 2 abrupt. Strongest: 14:32 build into break. Weakest: 21:17 bass clash." Beginners get growth signal. | M | Beg+Int | Coach | Builds on existing event log |
-| **Genre-tuned phase thresholds** | Most AI music tools assume one genre. vibemix recalibrates RMS gates per genre at session start. Techno builds last 30s; pop builds last 8s. | M | All | Both | Already in active scope |
-| **Mascot easter egg (mascot.html)** | Canvas sprite that reacts to RMS at 30Hz. Already exists in POC. Optional dock-bar widget = personality signal, viral screenshots. | S | All | Both | Keep as optional widget, not core UI |
-| **"Coach this moment" manual trigger** | Hotkey or pad on controller → AI critiques the last 30 seconds on demand. Empowers the DJ to ask, vs being lectured at. Solves chatty-AI complaint. | M | Int+Pro | Coach | Builds on POC's manual trigger via mascot WS |
-| **Bravoh-managed API key (zero-config free)** | No API key signup, no Gemini account creation, no Pay-as-you-go enrollment. Just install and play. Friction kills virality. | M | All | Both | Already in active scope; requires API-abuse protection layer |
-| **Open-source under bravoh/vibemix** | First Bravoh OSS release. Stars + GitHub presence funnel devs/DJs to Bravoh waitlist. | S | All | Both | Already in active scope |
+**Thesis:** Anti-slop is solved by data, not by better prompting. Detection gives Gemini specific events to react to; the linter enforces that every claim cites one. Library intelligence + cross-mode citations close the long tail.
 
-### Anti-Features (Commonly Requested, Often Problematic)
+#### Table Stakes
 
-Features the team will be tempted to build (or asked to build) that should be deliberately excluded. The DJ-software adjacent products show why each one fails for live use.
+| Feature | Why Expected | Complexity | Depends on |
+|---|---|---|---|
+| **Generalized event detector v1 — 6 cross-genre detectors** (`KICK_SWAP` / `SUB_LAYER_ARRIVAL` / `BREAKDOWN_KICK_KILL` / `REENTRY_KICK_LAND` / `KICK_DENSITY_SHIFT` / `PHRASE_BOUNDARY`) | Kaan's "feels surface-level" critique post hard-tek session diagnosed v4's `LAYER_ARRIVAL` as genre-blind. These six detectors are the minimum to make hard-tek (and by extension techno, house, DnB) reactions ground in the moment that defines the bar. | M (~5 E-days) | Existing: v4 `EventDetector` + `AudioBuffer.snapshot_features` extension (kick-band centroid / harmonic ratio / crest factor) + `MusicState.phrase_position` (autocorr-derived). |
+| **Citation grammar in prompts** (`[ev:KICK_SWAP@04:22]` / `[aud:peak_rms@04:22]` / `[midi:deckA_filter:23@04:22]` / `[track:"..."]`) | Without grammar in the prompt, Gemini doesn't emit tokens to lint. Seeded into system instruction at v2.0 launch; live linter enforces in v2.0 follow-on. | S (1 E-day, prompt-only) | Existing: 6-cell prompt matrix + TurnHistory (Phase 10). |
+| **Cross-software MIDI grounding (10 controllers)** — DDJ-FLX4 + 9 others, magnitude-aware EQ moves | Already in scope at v0.1.0 but the v2.0 absorption confirms 10-SKU library + `MidiMapLoader` + generic-MIDI fallback ships as the *spine* of cross-platform grounding. The MIDI controller is the universal layer that works the same across every DJ app. | M (~5 E-days) | Existing: Phase 9 (FLX4 verified, 9 SKUs ship by JSON). |
+
+#### Differentiators
+
+| Feature | Value Proposition | Complexity | Depends on |
+|---|---|---|---|
+| **Citation linter (live + debrief, cross-mode)** — stdlib `re`, in-memory Evidence registry, sentence-level for debrief, response-level for live (ack-bank fallback) | The technical implementation of the anti-slop thesis. No competing AI-for-DJ tool grounds claims this way. Slop-ratio telemetry is itself a trust signal surfaced in UI. | M (~3–5 E-days) | v2: citation grammar + Evidence registry hook from EventDetector / MusicState / ControllerState / TrackInfo. Existing: anti-slop filter + scorecard (Phase 10). |
+| **Library intelligence — Gemini Embedding 2 + sqlite-vec + Bravoh pipeline port** | First product to read a DJ's own library and say "track X you played last week fits here" — grounded in their actual collection, not a generic recommender. Closes the "Gemini hallucinates a track name" failure mode entirely (track citations must come from imported library). | H (~7 E-days) | v2: Pyrekordbox XML import (the library source). Existing: Phase 5 proxy quota for embed calls. |
+| **Hard Tek deep-genre detector overlay** (`ACID_LINE_ENTRY`, plus tuned KICK_SWAP thresholds against 7-10 reference tracks) | Kaan's primary practice. Closes the "AI says 'lead synth' when it's a 303 sweep" hallucination class. Marketed in the demo film and Hard Tek subculture wedge. | M (~3 E-days, tuning-heavy) | v2: Generalized event detector v1 (acid overlay slots onto it). |
+| **Genre auto-classifier via Gemini Embedding 2 nearest-neighbor** | One-shot at session start + on `TRACK_CHANGE`, classifies against hand-curated 40-anchor library shipped in binary. ~$0.0001 per classification. Routes the per-genre detector roster atomically without session restart. | M (~2 E-days post-library-intel) | v2: Library intelligence (uses the same embed-call infrastructure). |
+
+#### Anti-Features
 
 | Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| **Real-time numeric set-rating score** | "Show my live mix score! 7.2/10!" Gamification temptation. Streamers love metrics. | Music isn't a game. Scoring a live performance mid-set creates anxiety, distracts from feel, and is what the DJ TikTok community already mocks about AI. Reduces the AI from "friend" to "judge". | Post-session Coach scorecard (qualitative + timestamped, not /10) — see Differentiators |
-| **AI generates / plays the next track for you** | "AutoMix AI" (djay Pro, VirtualDJ) does this. Easy to ship. | Defeats the entire premise. vibemix is for *DJs who DJ*. Auto-track-selection makes the human a passenger. Bravoh isn't competing with djay Pro Automix — it's solving a different problem. | Stay silent on track choice. Coach can comment on a chosen track ("solid pick for this energy"), never recommend the next one in v1. v1.1 could add opt-in next-track suggestion as Coach feature only. |
-| **AI recommends what to mix next mid-set** | PulseDJ's whole product. Visible market traction. | Same as above: this is PulseDJ's space, not vibemix's. Recommending next-track reduces the DJ. vibemix's positioning is "the friend in your ear", not "the assistant in your library". | Out of scope entirely for v1. If added later, it's an opt-in Pro-mode feature, not core. |
-| **Twitch / YouTube live-streaming integration** | "Stream my AI co-host set!" Streamer demand. | Adds OBS-virtual-camera-style complexity, copyright issues with broadcast music, latency tuning per platform. Out of scope already; correctly. | Recording-for-later-sharing is enough. DJ can route their own OBS however they want. |
-| **Multi-language UI** | International appeal. | English-only chrome with multilingual AI voice (Gemini TTS supports many languages — the AI can hype in Italian, English, French) is the sweet spot. UI translation = QA explosion. | Already correctly out of scope. AI voice language is a separate setting from UI language. |
-| **Custom voice cloning** | "Make the AI sound like me / my favorite DJ / Drake." | Legal nightmare. Copyright minefield. Gemini TTS prebuilt voices are good enough. Custom cloning would be a competitive moat... and a lawsuit moat. | Prebuilt voices only. Already correctly out of scope. |
-| **AI auto-EQs / auto-mixes for you** | "Why not have it adjust my EQ when I miss a low cut?" | Pioneer / Algoriddim already do auto-EQ in Automix mode. Doing it via vibemix would require *writing MIDI back to the controller* — opens motorized-fader / feedback-loop / hardware-state-mismatch problems. And again: vibemix doesn't replace DJ skill. | Coach mode *describes* what should have happened ("you could have cut the lows on deck B around 14:30"), never does it for you. |
-| **Real-time set-rating leaderboard** | Social gamification. | Cringe. Kills the "real DJ friend" vibe instantly. DJs hate being publicly scored. | None — don't build. |
-| **AI talks every X seconds / heartbeat mode** | "Make it more present!" Easy to implement. POC has heartbeat events. | Universal voice-assistant complaint: too chatty. Crowd tunes out at 10s; AI tunes the DJ out faster. Filling silence with AI talk = AI slop. | Event-gated only. Heartbeat events should be rare (POC default: very long cooldown). User-tunable cooldown but default conservative. |
-| **AI tries to predict the crowd reaction** | "How are people feeling?" Hooks to the crowd-reading literature. | The AI can't see the crowd. It can hear master output. Pretending to know what the dance floor is doing = hallucination by design. | Stay within sensed reality: audio, MIDI, screen. Comment on the DJ's moves and the music itself, never the crowd. |
-| **Headphone-cue listening** | "Hear what I'm cueing before I mix it!" Logical request. | Kaan confirmed in POC: Gemini conflates cue with master and produces wrong reactions. | Already correctly out of scope. Document this in README so users don't request it. |
-| **DAW / Logic / Ableton integration** | "AI co-host while I produce!" Adjacent market. | Different product. Different event model (no live audience). Different audio context. Different user. | Already correctly out of scope. |
-| **Mobile / iPad version** | Reach. | DJ software runs on laptops in 99% of pro use. iPad djay users are a casual segment with different needs. Different platform-engineering stack. | Already correctly out of scope. |
-| **Linux support** | Open-source culture expectation. | Small DJ audience on Linux. WASAPI / CoreAudio equivalents (PulseAudio / PipeWire) double the audio-stack QA cost. | Already correctly out of scope. Document clearly so the OSS community doesn't expect it. |
-| **AI generates social-share-ready highlight videos automatically without DJ review** | "Auto-post my best moments to IG!" Influencer demand. | Auto-posting AI-generated content = brand risk + privacy risk + crap-content risk. Especially if AI got the highlight wrong. | "Highlight reel export" (in Differentiators) is *manual export*, never auto-publish. DJ reviews before sharing. |
-| **AI rates the song / criticizes the producer's track** | "Was that drop good?" Tempting prompt direction. | The AI is critiquing the DJ's *use* of the music, not the music itself. Critiquing tracks = unsolicited opinion on other artists = potentially offensive to producer friends. | Coach comments on selection-fit ("this track's energy doesn't match where you're going"), never on track quality. |
-| **Mascot.html as the shipped main UI** | It's fun. Already exists. | Looks like a hobby project, not a polished product. Distracts from credibility. | Already correctly out of scope as primary UI; keep as optional widget / easter egg. |
-| **Live screenshare to other DJs (collaborative mode)** | "B2B with AI in the middle!" | Network sync, audio routing across machines, multiple controllers — explosion. | Out of scope. Single-DJ, single-machine v1. |
+|---|---|---|---|
+| **CLAP / OpenL3 / MERT for audio understanding** | Industry "standard" for music embedding, recommended by external research. | Kaan rejected: vibemix is Gemini-only; multimodal embedding 2 covers it. Bundling 50–200MB ML models blows the one-click install budget. | Gemini Embedding 2 — natively multimodal, free tier covers most libraries, no model bundling. |
+| **mem0 / vector DB for long-term DJ profile** | "Modern AI memory" pattern. | Solves the wrong problem — DJ tendencies are summarisable in 2KB JSON, not retrievable factoids. Adds Qdrant/Chroma dep, breaks one-click install. | Structured JSON profile (~2 KB, ≤10 tendencies, Gemini regenerates each session, injected verbatim into next session's prompt). |
+| **30-session formal eval harness with LLM scorer** | Standard ML eval discipline. | Phase 16 is **Kaan's DJ ear**, not a formal suite (per memory `project_phase_16_kaan_dj_testing`). Building the harness eats 2–3 weeks against a 4-week marketing window. | Kaan listens to his own session recordings + scrubs to detector fires. Tuning harness CSV (`scripts/tune_hard_tek_detectors.py`) gives him the audit surface; no F1 score required. |
+| **Live-mode partial citation enforcement** (strip half a 2-sentence response) | Sentence-level is the standard linter granularity. | A 1-of-2 stripped sentence in live mode leaves a fragment ("Yeah."). Worse than the unstripped response. | Response-level enforcement in live: if no valid citation anywhere, drop entire reply, fall back to pre-canned ack from Bucket A. Sentence-level only for debrief/library/genre. |
+| **Streaming-incremental citation linting** | "Optimize the linter, save 50ms." | The full lint pass is ~3ms on a 2-sentence response — invisible against 1500ms LLM TTFT. Implementation complexity > the saving. | Lint synchronously between LLM-complete and TTS-start. |
 
-## Hype-Man Mode: What That Actually Looks Like
+**Research notes:** [G-genre-taxonomy.md](v2-buckets/G-genre-taxonomy.md) (per-genre event catalogs), [G-followup-1-hard-tek-dsp.md](v2-buckets/G-followup-1-hard-tek-dsp.md) (KICK_SWAP DSP recipe + 10 tuning tracks + per-genre detector dispatch), [E-followup-1-citation-linter.md](v2-buckets/E-followup-1-citation-linter.md) (grammar + EBNF + Python `CitationLinter`), [F-library-intelligence.md](v2-buckets/F-library-intelligence.md) (Gemini Embedding 2 + sqlite-vec + chunk strategy), [B-industry-integrations.md](v2-buckets/B-industry-integrations.md) (MIDI as universal layer).
 
-Stakeholder framing: "party energy reactions". Translating to product behavior:
+---
 
-### What Real Club Hype-Men / MCs Do
-- **Short call-and-response** — "When I say [X], y'all say [Y]!" — coined by MC Cowboy, still the standard.
-- **Crowd commands** — "Hands in the air!", "Make some noise!", "Let me hear you scream!"
-- **Energy callouts** — short, punchy, never longer than 10-15 seconds.
-- **Drop-anticipation** — "Here it comes!" right before the drop, not after.
-- **Affirmation of the music** — "This one!", "Tune!", "DJ DJ DJ!"
-- **Crowd recognition** — "Detroit, I see you!", "Front row going crazy!"
+### Category 2 — Latency & Liveness
 
-### What Vbemix Hype-Man Should Adopt
-- Reactions in the **drop / peak / build phases**, mostly silent in groove and low phases.
-- **2-5 word reactions** are ideal. "OH this drop." "Filthy bassline." "Pull up."
-- **Anticipation-aware** — comment on build *during* the build ("ohhhh here it comes"), not 8 bars after the drop.
-- **Track-aware where possible** — if `nowplaying-cli` resolves the track, "ohh you're playing [X], classic" lands harder than generic hype.
-- **Silence is hype** too. A long pause before the drop, then a single "YES" — more impactful than constant chatter.
+**Thesis:** Cascade is the latency floor, not native audio. The fix is layered cover-up of Gemini's 1.5–3s TTFT — make T+150ms the perceived first reaction by combining a pre-canned ack, mascot anticipation, and overlay ring before the LLM finishes.
 
-### What Vbemix Hype-Man Should Never Do
-- Talk over vocal sections — universal MC rule, applies harder to AI because it can't read the room when it's wrong.
-- Generic "let's gooo" / "turn up" / "this is fire" filler — the AI-slop trap. Specificity beats hype.
-- React more than ~once per 30-90 seconds of music (genre-dependent; techno tolerates less talk than pop).
-- Claim crowd reaction it can't see ("look at this dance floor go!").
-- Sound auto-tuned or processed. Gemini TTS prebuilt voices already sound natural — don't add effects.
-- Use 2010-era hip-hop hype tropes if the DJ is playing techno. Genre-match the vocabulary.
+#### Table Stakes
 
-## Coach Mode: What That Actually Looks Like
+| Feature | Why Expected | Complexity | Depends on |
+|---|---|---|---|
+| **Pre-canned ack bank** (~40 OPUS samples organised by event class — drop_hit / track_change / mix_move / silence_break / generic_filler) | Sub-100ms first sound is the difference between "alive" and "voice assistant doing music commentary." Industry-standard backchanneling pattern (Retell, Vapi, Google Duplex). | S (~2 E-days; generation offline once, runtime is disk-read + PlaybackQueue) | Existing: PlaybackQueue (Phase 4), VoiceRecorder (Phase 2). |
+| **Prompt diet + Gemini context caching** (audio 18s→6s for non-PHASE events; drop screen on `MIX_MOVE`/`HEARTBEAT`; cached_content for system instruction with 1024-token floor) | Cheapest TTFT win (500–1500ms) with zero anti-slop regression. Caching's 1024-token floor needs deliberate padding — verified in A-followup-1. | S (~2 E-days) | Existing: cascade LLM path in `DJCoHostAgent.llm_node` (Phase 4). |
 
-Stakeholder framing: "DJ skill feedback on mixes, EQ, transitions". Translating to product behavior:
+#### Differentiators
 
-### What Real DJ Instructors Say (Vocabulary Sample)
-- **Transitions**: "phrase matching", "clean cut", "long blend", "train-wreck", "abrupt", "rushed", "you came in late on the 1", "let the breakdown play through".
-- **EQ**: "cut the lows on the incoming", "two basslines together rarely work", "you killed the highs too early", "mid-range mud", "frequency clash", "kept the kicks together — clean swap".
-- **Energy**: "you peaked too early", "give the crowd a breath", "build through, don't bail before the drop", "energy dip felt intentional", "good restraint".
-- **Selection**: "doesn't match the energy where you're going", "vibe shift was too jarring", "smart segue from house to techno", "this track's tempo arc fits the moment".
-- **Crowd-feel proxy** (since AI can't see crowd): comment on the *DJ's energy management on the master output*, never on the crowd directly.
+| Feature | Value Proposition | Complexity | Depends on |
+|---|---|---|---|
+| **Cancel-and-refire on higher-priority events** (`SpeechHandle.interrupt(force=True)`, empirically verified through cascade in A-followup-1) | Stale reactions kill the "real DJ friend" illusion. Cancel + re-fire when a higher-priority event arrives mid-generation keeps reactions in-bar. Capped at 1 cancel per 8s. | S (~2 E-days) | Existing: LiveKit `AgentSession` cascade (Phase 4). |
+| **Predictive drop firing** (`buildup_score > 0.7` + `phrase_boundary_in <= 2 bars` → fire `generate_reply` 2 bars early, gate playback on actual drop, cancel on 3s timeout misfire) | The biggest semantic win for fast genres. Hard Tek at 170 BPM (1.4s/bar) cannot land an in-bar reaction without prediction. Gated on Kaan's ear-test before on-by-default. | M (~5 E-days; design complete in A.md, needs the predictive watcher + mute-able PlaybackQueue sink) | v2: cancel-and-refire + Generalized event detector v1 (the predictive signal feeds off `PHRASE_BOUNDARY` + buildup heuristic). |
 
-### What Vbemix Coach Should Adopt
-- **Constructive language** — describe the move, then the result, then the option. "You cut the bass on B at 14:32, but kept the highs hot — that left a mid-range stack for two bars. Could have softened the mids on A first."
-- **Phrase-aware feedback** — phrase-matching is the #1 thing instructors teach. Detector for "transition started on the 1 vs mid-phrase" is implementable from BPM + onset timing.
-- **Mode-tuned tone**:
-  - *Beginner Coach*: warm, encouraging, explains terms inline. "Nice — you matched the BPMs. Next time try also bringing in the new track on the start of an 8-bar phrase so the drop lines up."
-  - *Intermediate Coach*: peer-level, names techniques. "Clean cut. EQ swap on the 1, classic move."
-  - *Pro Coach*: terse, technical, peer-level, doesn't explain basics. "Two basslines on the outro of B, half a bar before swap." — implies the DJ already knows that's a thing to fix.
-- **Specific timestamp references** — "at 14:32" not "earlier in the set". Already feasible from event log.
-- **End-of-session summary** — quantified count of transitions, classified by quality. Gives the beginner a "I grew" signal.
+#### Anti-Features
 
-### What Vbemix Coach Should Never Do
-- Use generic praise ("great mix!", "love the vibe!") — that's the AI-slop trap.
-- Critique track choice as if it were the DJ's responsibility to entertain *the AI*. The AI is the critic of *technique*, not of taste.
-- Critique the DJ's musical preferences — "I don't like dubstep" is out of scope.
-- Compare to other DJs by name — legal + cringe risk.
-- Give live mid-mix critique that distracts ("you should have killed those lows" mid-build is too late and disruptive).
-  - **Default**: critique fires *after* the transition is complete, not during.
-  - **Pro mode opt-in**: live mid-mix nudges OK if user enables.
-- Score numerically (/10). Use qualitative bands: clean / decent / abrupt / train-wreck.
+| Feature | Why Requested | Why Problematic | Alternative |
+|---|---|---|---|
+| **Revert to `gemini-2.5-flash-native-audio` for the latency floor** | Native-audio claims 400ms voice-to-voice vs cascade's 1500ms+. | Kaan tested it in v2: grounding regresses badly. Native audio cannot accept the multimodal Part shape the cascade does — the whole anti-slop thesis breaks. | Stay on cascade; latency is masked by the four-layer stack, not eliminated. |
+| **Speculative pre-generation parallel sessions** (PredGen-style, 2× LLM cost) | "Doubles the perceived speed." | Doubles API cost. The 50€/mo budget can't absorb it. | Predictive firing (single session, fire 2 bars early, cancel on misfire) hits the same perceived-speed target. |
+| **Drop `thinking_level` to off entirely** | Saves 200–400ms TTFT. | Already at `"minimal"` — remaining win is small and trades against reaction quality on borderline calls. | Keep `"minimal"` until ear-test shows reactions feel rushed; revisit only if needed. |
+| **Aggressive cancel budget** (no cap, cancel on every priority bump) | "More responsive." | Wasted API cost on canceled responses. Hard Tek's 12s/phrase rhythm means an unchecked cancel rate could 3× the per-user budget. | Cap at 1 cancel per 8s (soft); 30/hour hard cap with telemetry. |
 
-## Skill-Tier Prompt-Template Matrix
+**Research notes:** [A-latency.md](v2-buckets/A-latency.md) (12 latency levers + recommended stack + `interrupt(force=True)` empirical verification + caching 1024-token floor), [synthesis-viral-demo.md](v2-buckets/synthesis-viral-demo.md) §4 Latency timing diagram (T+150ms perceived-floor breakdown).
 
-Each cell is a distinct prompt template / persona. 6 templates total.
+---
 
-| | Hype-Man | Coach |
-|---|---------|------|
-| **Beginner** | Encouraging, warm, simple energy callouts ("Yes! That drop hit!"). Avoid technical terms. Celebrate small wins (a clean BPM-match alone is celebration-worthy). | Warm, teaches as it critiques. Explains terms inline. Asks "did you mean to do that?" Focused on: phrase matching, bass cut on swap, not playing two vocals together, energy curve. |
-| **Intermediate** | Peer-level hype. References technique casually ("filthy EQ on that swap"). Mix of energy and acknowledgment. | Peer-level critique, names techniques without explaining them. Calls out tighter stuff: phrase alignment within 4 bars, frequency clash in mids, build/drop timing. Less explanation. |
-| **Pro** | Sparse, terse, knowing. The kind of friend who says "yeah" when the drop lands and means it. Speaks rarely, lands hard. Genre-fluent vocabulary. | Terse, technical, peer-level. Comments on subtle stuff: phrase-internal timing, sub-bass overlap, energy arc across 20-minute window, transition family choice. Assumes total fluency. |
+### Category 3 — Personality & Anticipation
 
-### Beginner Wants to Be Told
-- "That was a clean transition."
-- "Try cutting the lows on the incoming track before you bring in the highs."
-- "Your BPM-match was solid."
-- "This track's energy is dropping — that's fine, you're building back up."
-- "You played two vocals together for a sec there — try mixing through the instrumental section next time."
+**Thesis:** Mascot v0.1.0 is single-layer; the "feels alive" gap is structural. Four-layer additive blending (mood + anticipation + speak + effect) + beat-coupled procedural idle + inline emote-tag vocab raises the bar from "decoration" to "live indicator of what the system actually saw."
 
-### Intermediate Wants to Be Told
-- "Clean phrase-match on that swap."
-- "Mid-range got muddy when both tracks had the lead synth — try cutting mids on one."
-- "You could have ridden the breakdown 16 more bars before bringing in the build."
-- "Tempo ramp was smart there."
+#### Table Stakes
 
-### Pro Wants to Be Told
-- (Hype) "Yes." [silence].
-- (Coach) "Sub on B was hot through the swap." (and nothing else; the Pro knows what to do).
-- (Coach) "Bar 4 of the transition was the weak point."
-- (Coach, controller-aware) "Filter sweep on A leading the swap — nice."
+| Feature | Why Expected | Complexity | Depends on |
+|---|---|---|---|
+| **Mascot anticipation layer (1-above-mood, simplified)** — `prep_lean_in_hyped` / `prep_lean_in_neutral` / `prep_head_turn` clips, fire at event-detect (T+50ms), crossfade to talk_loop on first TTS audio | The highest-leverage perceived-latency mask (400–1200ms covered). Without it, the mascot looks frozen during the 1500ms Gemini round-trip and the user assumes the app crashed. Ships ahead of the full 4-layer rewrite. | S (~3 E-days; 1 day Gemini text-channel timing spike + 2 days impl + assets) | Existing: mascot Three.js renderer (Phase 13), event-dispatcher. |
+| **Beat-coupled procedural hip-bob driven by BPM + RMS** | Already 80% wired (Phase 13 accepts bpm + downbeat_phase + bpmConfidence ≥ 0.6). The missing piece is a continuous additive bone-subset overlay on `Hips`, not a clip swap. Reads as "moves WITH me." | S (~2 E-days) | Existing: Phase 13 mascot + Phase 6 BPM + phrase_position from v2 PHRASE_BOUNDARY detector. |
 
-## Calibration Wizard UX Pattern
+#### Differentiators
 
-Reference products: Sonarworks SoundID Reference, Room EQ Wizard, every audio interface's first-run flow.
+| Feature | Value Proposition | Complexity | Depends on |
+|---|---|---|---|
+| **4-layer additive state machine** (mood + anticipation + speak/reaction + effect, layered via Three.js `AnimationUtils.makeClipAdditive`) | The full structural fix for "same emote every time." Cross-layer overlaps are the entire point — mood layer keeps breathing alive even mid-react. Costs +1–2ms/frame on M2. | H (~14 E-days incl. refactor + asset commissioning + vitest port) | v2: Mascot anticipation layer (proves the 1-above-mood shape works first). |
+| **Inline emote-tag vocabulary (15 tags + 1 mood-set tag)** — `[hype]` / `[chill]` / `[teach]` / `[surprise]` / `[nod_yes]` / `[gesture_deck_a]` / `[lean_listen]` / `[silent]` etc., stripped from TTS, mapped via `emotionMap` to states | Open-LLM-VTuber pattern adapted to DJ context. Lets Gemini drive mascot expression per turn instead of one default-per-event-type. Requires the layered architecture and the text-channel-timing spike. | M (~5 E-days post-spike) | v2: 4-layer state machine + 1-day spike on Gemini Live text-channel ordering (Bucket D A3 risk). |
+| **Amplitude-banded talk variants** (`talk_loop_calm` / `talk_loop_normal` / `talk_loop_energetic` selected per emote tag) | 80% of the "alive mouth" feel at 10% of the cost of ARKit blendshape re-rigging. Mixamo strip-blendshapes constraint forces this path; the constraint is the feature. | S (~1 E-day code + asset cost) | v2: 4-layer state machine + emote-tag vocab. |
 
-### Step Sequence (recommended)
-1. **Welcome + permissions** — request microphone, accessibility (for window screen-capture), and audio-device permissions. macOS will show system dialogs; pre-empt them with a "we need these because…" screen.
-2. **Audio output check** — pick where the AI voice goes (in-ear headphones, USB earbuds, separate room speakers). Test tone plays. User confirms "I heard the tone."
-3. **DJ-software audio capture** — detect virtual audio cable (BlackHole on mac, VB-Cable on Windows) OR use WASAPI loopback (Windows native, no install) OR Core Audio loopback (mac equivalent in macOS 13+). Auto-pick best path; show fallback instructions if no cable installed.
-4. **DJ-software window picker** — list running windows; user picks Serato / rekordbox / VirtualDJ / djay Pro / Traktor. Test screenshot displayed back to user — "is this your DJ app?"
-5. **Controller detection** — scan MIDI inputs. If a curated controller is detected, "DDJ-FLX4 detected — mapping loaded ✓". If not, "We don't have a curated map for this controller. Generic MIDI fallback will work but with less context. Want to help us add yours?"
-6. **Genre + mode + voice picker** — set defaults for the session. User can change anytime mid-session.
-7. **Play test** — start a track. AI says one calibration line ("I hear you. Loud and clear. Let's go."). User confirms volume / latency / device feel.
+#### Anti-Features
 
-### What NOT to Do in the Wizard
-- Don't ask for an API key. (We're shipping with one.)
-- Don't ask the user to manually configure audio routing in their OS-level settings — auto-detect or fall back gracefully.
-- Don't make any step required if it can be skipped (window picker can default to "all windows" if the user is impatient).
-- Don't show technical jargon ("sample rate", "buffer size") unless an advanced toggle is opened. Auto-pick sensible defaults.
+| Feature | Why Requested | Why Problematic | Alternative |
+|---|---|---|---|
+| **ARKit / Oculus viseme blendshapes for procedural lip-sync** | "Realistic mouth motion." | Mixamo stripped blendshape export in 2020; re-rigging is 2–3 weeks + uncanny-valley risk on the current stylised mascot. | Amplitude-banded talk variants (3 clips, 1 E-day). |
+| **Live2D / anime-style 2D mascot rig** | "More expressive face." | Locks demographic (anime overlap with bedroom-DJ audience is real but narrow). Abandons the stylised-abstract head approach that dodges uncanny valley. | Body-language-first stylised 3D rig (current direction); commission 8 new clips for ~$1500–2000. |
+| **Multi-mascot user-gen ("/hatch")** | Long-term retention play, "design your own pet." | v2.x stretch per memory (`project_mascot_as_vtuber_personality_surface`). Adds asset pipeline + safety/moderation surface. Not v2.0 scope. | Single mascot (DJ bat placeholder), mood variation on same rig. |
+| **Procedural jaw bone rotation driven by AudioAnalyser** | "Cheap lip-sync without re-rigging." | Reads as "puppet flapping jaw" — generic, not stylised. Worth re-evaluating as a v2.x polish layer once core 4-layer ships. | Defer to v2.x; let talk variants carry expressiveness in v2.0. |
 
-## Controller Mapping Availability
+**Research notes:** [D-mascot-emotion.md](v2-buckets/D-mascot-emotion.md) (4-layer architecture, anticipation recipe, emote tag vocab, Mixamo blendshape constraint), [synthesis-viral-demo.md](v2-buckets/synthesis-viral-demo.md) §1 Storyboard table (mascot beats integrated with overlay + ack).
 
-Findings from researching open-source mapping sources for the 10 curated controllers:
+---
 
-| Controller | Mixxx Official Mapping | Mixxx Community | Pioneer/Hercules MIDI Chart | Notes |
-|------------|------------------------|-----------------|-----------------------------|-------|
-| Pioneer DDJ-FLX4 | ✓ Yes (`Pioneer-DDJ-FLX4.midi.xml` in `mixxxdj/mixxx/main/res/controllers/`) | ✓ | ✓ AlphaTheta Help Center | Best-mapped; POC already supports |
-| Pioneer DDJ-400 | "In development" wiki status; community-mapped extensively (4-deck mapping at `apmiller108/pioneer_ddj400_mixxx_mapping`) | ✓ | ✓ | Mainstream beginner controller; well-documented |
-| Pioneer DDJ-FLX6 | Not in official Mixxx mapping list per public wiki | Community mappings exist | ✓ AlphaTheta Help Center publishes MIDI message list | Map from chart |
-| Pioneer DDJ-FLX10 | Not officially mapped in Mixxx (newer 4-channel) | Algoriddim community has unofficial mapping; some Reddit/forum efforts | ✓ AlphaTheta Help Center | Most complex; 4 channels, stems buttons, jog displays |
-| Pioneer DDJ-1000 | "In development" wiki status | Community-mapped extensively | ✓ | Common rekordbox 4-channel |
-| Pioneer DDJ-SX3 | DDJ-SX/SX2 officially mapped; SX3 community-mapped | ✓ | ✓ | Map by analogy from SX2 |
-| Pioneer XDJ-RX3 | All-in-one player, not in Mixxx official | Some community efforts | ✓ Pioneer publishes diagram | All-in-one (has built-in screen) — handle as standalone-like |
-| Numark Party Mix Live | Listed in Transitions DJ supported list; some Mixxx community | Community | Numark publishes MIDI map | Entry-level controller |
-| Hercules DJControl Inpulse 300 | ✓ Yes (official Mixxx mapping) | ✓ | ✓ Hercules publishes mapping doc | Well-supported |
-| Hercules DJControl Inpulse 500 | Manual chapter in Mixxx 2.5 docs; some MIDI mapping issues reported in 2.5.0 | Community | ✓ Hercules publishes | Master/headphone knobs are hardware-only (don't send MIDI) |
+### Category 4 — Cross-Software Integration
 
-**Implication for v1:** Mixxx open-source mapping XML is a strong foundation for ~6 of the 10 controllers (FLX4, DDJ-400, Inpulse 300 are well-mapped; SX/SX2 covers SX3 by analogy; DDJ-1000 has community work). The newer controllers (FLX10, FLX6, RX3) need manual mapping from Pioneer/AlphaTheta's published MIDI message lists, which are publicly documented at support.pioneerdj.com. Total mapping work estimate: ~2-4 days per controller for full magnitude-aware EQ + fader + transport + pad coverage. **Total: 20-40 dev-days for all 10 controllers.**
+**Thesis:** Mixxx is the only DJ platform with a real-time deck-state surface — and OSC is currently a draft PR upstream. djay Pro Mac is the only viral-demo-tractable overlay target. The MIDI controller is the cross-platform telemetry layer that works the same across every DJ app. Pyrekordbox XML is the durable library path (SQLCipher key extraction broken post-Rekordbox 6.6.5).
 
-**License note:** Mixxx is GPL2+. vibemix cannot copy Mixxx mapping XML verbatim into an MIT/Apache-licensed product without potentially triggering GPL infection (depends on whether the XML is "code" or "data" — legally murky for mapping files). **Safer path:** Use Mixxx mappings as *reference* for which MIDI message means what on each controller, then write fresh mapping data in vibemix's own format. The MIDI messages themselves (CC numbers, note numbers) are facts published by Pioneer/Hercules and are not copyrightable.
+#### Table Stakes
 
-## Competitor Feature Analysis
+| Feature | Why Expected | Complexity | Depends on |
+|---|---|---|---|
+| **10-SKU MIDI controller library + `MidiMapLoader`** — DDJ-FLX4 (verified) / FLX6 / FLX10 / SX3 / 400 / 1000 / XDJ-RX3 / Numark Party Mix Live / Mixstream Pro+ / Hercules Inpulse 300 + 500 | Cross-platform grounding spine. The B-bucket research found bedroom-DJ controllers are concentrated in ~5 SKUs; covering 10 hits ~80%. JSON-per-SKU + auto-detect by port-name substring. | M (~5 E-days; FLX4 verified, others Mixxx-XML-derived) | Existing: Phase 9 (`vibemix.midi/` package, `ControllerState`, generic-MIDI fallback, 2s hot-plug watcher). |
+| **Pyrekordbox XML one-shot import** — file picker → SQLite cache → fuzzy title/artist/BPM lookup | The durable path. Pioneer obfuscated the SQLCipher key starting Rekordbox 6.6.5, breaking automatic master.db reads. XML export is unencrypted and works for every Rekordbox version. | S (~3 E-days; ~150 LOC parser + 4-tier fuzzy lookup) | None (greenfield); writes to `~/Library/Application Support/vibemix/library/rekordbox.db`. |
+| **djay Pro Mac overlay highlight (12 elements)** — hand-mapped percentage-of-window JSON + AX refinement when available + amber-ring Canvas 2D overlay window | The viral demo anchor. djay is the only major DJ app where AX returns useful UI element data (Rekordbox + Serato render to canvas). 12 elements covers >80% of likely "point at X" utterances in a 30s cut. AX call must run in Rust parent (not sidecar — issue #8329). | M (~5–7 E-days incl. window-tracker + element map + overlay window) | Existing: Tauri shell, mascot_window.rs builder pattern, `cohost_v4.py:224-246` djay-window finder logic. |
 
-| Feature | Algoriddim djay Pro AI | VirtualDJ 2026 | PulseDJ Copilot | BandLab AI | vibemix Approach |
-|---------|-----------------------|----------------|-----------------|------------|-----------------|
-| Stem separation | ✓ Real-time Neural Mix (AudioShake-powered) | ✓ AI stems built-in | — | ✓ (for production) | ✗ Not needed — we don't manipulate audio, only react to it |
-| Auto-mix / auto-transition | ✓ Automix AI (calculates fade durations, EQ adjustments) | ✓ Auto-mix mode | ✗ | — | ✗ Anti-feature — we don't replace DJ skill |
-| Next-track recommendation | ✓ Auto-suggest based on key/BPM/energy | ✓ AIPrompt (natural-language playlist queries) | ✓ Core product feature | — | ✗ Anti-feature for v1 — defer indefinitely |
-| Real-time set commentary / voice | ✗ | ✗ (lyrics extraction is text, not voice) | ✗ | ✗ | ✓ **Core unique value** |
-| Hype-man / energy reactions | ✗ | ✗ | ✗ | ✗ | ✓ **Core unique value** |
-| Coach / technique feedback | ✗ | ✗ | ✗ | ✗ | ✓ **Core unique value** |
-| Skill-tier-aware (Beginner/Intermediate/Pro) | ✗ | ✗ | ✗ | ✗ | ✓ Differentiator |
-| MIDI controller library | ✓ 30+ supported, deep mapping | ✓ Wide support | ✓ Reads via file-watching, not direct MIDI | — | ✓ Curated 10 + generic fallback |
-| Cross-platform (mac + win) | ✓ Mac + iOS only on Pro AI (Windows version less feature-rich) | ✓ Mac + Win + Linux | ✓ Mac + Win | ✓ Web + mobile | ✓ Mac + Win |
-| Free | $5/mo or one-time | Free tier exists; Pro is $19/mo | Free in beta | Freemium | ✓ Free (we eat API cost) |
-| Open-source | ✗ | ✗ | ✗ | ✗ | ✓ **Differentiator + marketing wedge** |
-| Local-first / runs on user's machine | ✓ | ✓ | ✓ (offline-capable) | ✗ Cloud | ✓ Audio + state local, only Gemini calls go out |
-| Voice picker | n/a | n/a | n/a | n/a | ✓ Differentiator |
-| Genre-aware behavior | Auto-genre detect for recommendations | Yes (AIPrompt understands genre) | Yes | n/a | ✓ Differentiator — phase detection tuned per genre |
+#### Differentiators
 
-**Synthesis:** vibemix doesn't compete with any of these on their core feature (track manipulation / recommendation / generation). It occupies an empty quadrant: *live voice commentary on the DJ's performance*. The only adjacent failure mode is "AI talks during music" → "annoying chatbot" → bad UX. The product wins or loses on the *quality of the voice's restraint and grounding*, not on feature breadth.
+| Feature | Value Proposition | Complexity | Depends on |
+|---|---|---|---|
+| **Generic-MIDI fallback that observes without inferring** | Conservative auto-classification: detect knobs + buttons by activity, NEVER auto-assign roles. Surface picker UI after 5 min of observation. Closes "controller not supported" gracefully without producing confidently-wrong "Deck B EQ killed" claims. | S (~1 E-day) | Existing: Phase 9 generic fallback foundation. |
+| **Mixxx OSC bridge (opt-in, feature-flagged)** behind `--enable-mixxx-osc` for users running PR #14388 custom build | Mixxx is the only DJ app with a real-time deck-state surface, and the free-software DJ community is the right cultural audience for OSS vibemix. Ship behind flag in v2.0; promote to first-class if PR merges. | S (~2 E-days; ~190 LOC `MixxxBus` using `python-osc==1.10.2`) | None (greenfield). |
 
-## Feature Dependencies
+#### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---|---|---|---|
+| **Pioneer ProDJ Link CDJ integration** | "Full per-deck telemetry including phrase data from CDJ-3000." | Wrong market — requires Pioneer CDJ hardware on an Ethernet LAN. Bedroom DJs run controllers, not CDJs. Install friction (JVM bridge + open-beat-control jar) is brutal. | Skip entirely. Optional add-on if a CDJ Pro SKU ever ships. |
+| **Native Rekordbox/Serato/Traktor real-time API hooks** | "Every DJ app should work." | Algoriddim, Pioneer, Serato, Native Instruments all refuse to ship third-party APIs. Decompiling / dylib injection crosses the EULA red line. | Audio + screen + MIDI grounding (the current cross-platform path). Mixxx is the only platform with a real surface; everything else stays on the universal path. |
+| **VirtualDJ OSC bridge in v2.0** | "Best per-deck subscribe-on-change of all closed apps." | Gated behind paid Pro license — small slice of bedroom DJs. Worth a parallel `vdj_osc.py` only if VDJ Pro user demand emerges post-launch. | Defer to v2.x demand-driven. |
+| **Mapping transpiler (read Mixxx XML, emit Rekordbox/Serato/djay mapping files)** | "Cross-app mapping management." | Write-side is undocumented binary formats (Serato `.tsi`, djay `.djmap`). Out of scope; competes with Bome MIDI Translator. | Ship per-controller JSON in vibemix's own format. Users keep DJ-app mappings unchanged; vibemix parallel-listens. |
+| **Rekordbox / Serato overlay highlight in v2.0** | "DJ majority uses these." | Canvas-rendered UIs return empty AX trees; only template matching works, and it's brittle/slow at multi-scale. Ships v1.2 fast-follow per the B-bucket. | Lead the viral demo on djay Pro Mac. Frame copy as platform-agnostic ("AI that watches your set"). |
+| **djay UI redesign auto-detection** | "Coord map breaks on major djay version bump." | Auto-version-walking adds a fragile maintenance surface. | Version-pin the map (`djay_pro_5.json`), detect version via `CFBundleShortVersionString`, fall back to nearest-known map with a warning logged. |
+
+**Research notes:** [B-industry-integrations.md](v2-buckets/B-industry-integrations.md) (per-platform deep dives, tractability matrix, ProDJ Link demotion), [B-followup-1-v11-integration-spec.md](v2-buckets/B-followup-1-v11-integration-spec.md) (MixxxBus 190-LOC spec, Pyrekordbox XML schema + fuzzy match, 10-SKU JSON layout + Sync note 0x58 vs 0x60 resolution), [C-ui-overlay.md](v2-buckets/C-ui-overlay.md) (djay overlay approach hybrid (a)+(b), element vocabulary, Tauri #8329 mitigation, 30s storyboard).
+
+---
+
+### Category 5 — Coaching & Memory
+
+**Thesis:** Real teaching = identify-cause-correct loops tied to timestamps. The debrief is where actual coaching lives (live is too latency-constrained for long-form). Long-term DJ profile is structured summary, not vector retrieval.
+
+#### Table Stakes
+
+| Feature | Why Expected | Complexity | Depends on |
+|---|---|---|---|
+| **Post-session debrief (chaptered review + voiced TL;DR + 3 drills + clickable timeline)** — single Gemini call per session, ~$0.05–0.15 per debrief, SBI for critique + STAR-AR for drills (NOT sandwich) | Live mode can't teach (1–2 sentences max). Debrief is where deliberate practice closes. Strava-pattern chapter cards + Whoop-pattern auto-detection + Synthesia-pattern scrub markers. Voiced TL;DR optional (off by default for Pros). | H (~7 E-days; Gemini prompt + UI surface + scrub bar + 3-drill cards) | Existing: VoiceRecorder per-session `input.wav` / `voice.wav` / `events.jsonl` (Phase 2/15). v2: citation linter (sentence-level for chapters). |
+| **3-drill cap with "pin to next session" CTA** | Research consensus (Curious Lion, The Geeky Leader): more drills = less stickiness. 3 is the hard cap. "Pin to next session" closes the deliberate-practice loop by injecting drill context into next session's live-mode prompt. | S (~1 E-day; structured drill card spec, profile.active_drills field) | v2: Post-session debrief. |
+| **Long-term DJ profile (~2 KB structured JSON, ≤10 tendencies, regenerated each session)** | Structural summary at session end, injected verbatim (~600–800 tokens) into next session's system prompt. Rejected mem0 / vector DB — DJ tendencies aren't retrievable factoids, they're summarisable invariants. | S (~2 E-days; profile schema + regeneration prompt + live-prompt injection) | v2: Post-session debrief (generates the profile). |
+
+#### Differentiators
+
+| Feature | Value Proposition | Complexity | Depends on |
+|---|---|---|---|
+| **Skill-ladder critique (Beginner / Intermediate / Pro)** changes WHAT gets flagged, not just wording | Beginner = mechanical (beatmatch drift, phrase entry, mic bleed). Intermediate = phrasing + energy curve + harmonic. Pro = micro-craft (filter timing within bar, EQ kill placement). Same prompt scaffolding, different lenses. | S (~1 E-day; per-level templates in `vibemix/prompts/`) | Existing: 6-cell prompt matrix (Phase 10). v2: post-session debrief (the critique surface). |
+| **Library-aware drill cards** ("3 tracks from your library that fix this") below each drill's SUCCESS criterion | Closes the cross-bucket arrow: debrief diagnoses → library intelligence proposes. Filtered by Camelot compatibility + recency. Promotes drills from advice to actionable practice. | S (~1 E-day post-library-intelligence) | v2: Library intelligence + post-session debrief. |
+| **Per-session slop ratio surfaced in debrief UI** ("kept 47 of 52 reactions; 5 dropped for not citing real events") | Transparency feature — turns anti-slop discipline into a visible product signal. The kind of trust-building that differentiates from generic AI commentary. | S (<1 E-day, derived telemetry) | v2: citation linter telemetry. |
+
+#### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---|---|---|---|
+| **Full-set voiced playback (15+ minute debrief read aloud)** | "Listen-while-you-cook UX." | Long-form voiced has no skim affordance. Whoop / Strava users skim text first, dive into ~1 section. Voiced past 90s feels worse than reading. | 60–90s voiced TL;DR at the top + chapter-card text body. |
+| **Feedback sandwich** (positive-corrective-positive) | "Soft critique pedagogy." | Research-rejected — Radical Candor + Faculty Focus + PMC clinical paper all show it's ineffective; corrective-positive-positive lands better. | SBI (Situation-Behavior-Impact) for critique + STAR-AR for drills. |
+| **Per-note / per-bar accuracy scoring** (Synthesia piano pattern) | "Quantified feedback." | DJing is performative, not "correct/incorrect" — applying a scoring rubric forces a wrong model. | Identify-cause-correct loops + clickable timeline scrub. |
+| **Ask-Tell-Ask interactive turn-taking in debrief** | "Reflective coaching." | Requires multi-turn Gemini calls inside the debrief — 3× cost + UI complexity. Out of v2 scope. | Defer to v2.x stretch; ship one-shot debrief at v2.0. |
+| **Chain-of-Verification for every claim** (regenerate the debrief, verify each claim, discard inconsistent ones) | "Better grounding." | 2× Gemini cost; right shape for v2.x "deep debrief" opt-in but overkill for default. | Citation linter at sentence level catches 90%+ of unsourced claims at ~30–80ms cost. CoVe deferred. |
+| **Auto-debrief on every session ≥1 min** | "Reduce friction." | Spends Gemini budget on sessions users don't care to review. | Auto-trigger only if session > 15 min; user-click otherwise. |
+| **Streaks / XP gamification** (Duolingo pattern) | "Engagement loop." | Reads as patronising to Pros; gross-fit for DJ identity. | Skill-ladder critique (Beginner/Intermediate/Pro) — the seriousness the user wants. |
+| **mem0 / motorhead / Qdrant for long-term memory** | "Personal-AI memory infrastructure." | DJ tendencies fit in 2 KB; retrieval is not the problem. Adds vector-DB dep + breaks one-click install. | Structured JSON profile + verbatim prompt injection. |
+| **30-session formal eval harness for the debrief** | Standard ML eval. | Phase 16 is Kaan's DJ ear (memory directive). Don't auto-build the harness. | Tuning CSV + Kaan's session-recording audit (already exists from VoiceRecorder). |
+
+**Research notes:** [E-debrief-pedagogy.md](v2-buckets/E-debrief-pedagogy.md) (DJ teaching pedagogy synthesis, debrief UX patterns, profile architecture rejecting mem0, anti-slop tone calibration).
+
+---
+
+### Category 6 — Ship & Distribution
+
+**Thesis:** v0.1.0 milestone partially shipped (Phases 1–14); the v2.0 absorption pulls the remaining ship infrastructure (recording browser, UAT, sign+notarize, GitHub release matrix, day-zero ops) into this milestone alongside the research-driven features. Day-Zero Operations and Hallucination Verification Gate (Kaan DJ ear test) are the load-bearing release gates.
+
+#### Table Stakes
+
+| Feature | Why Expected | Complexity | Depends on |
+|---|---|---|---|
+| **Recording browser + retention enforcement** — per-session dir with `input.wav` / `voice.wav` / `events.jsonl` + UI list + delete + retention cap (configurable; default 30 days) | The VoiceRecorder already writes per-session under `recordings/`. The browser is the missing UX surface — open Finder/Explorer to session, replay AI voice, delete. Without retention enforcement, disk fills silently. | M (~2 E-days; UI surface + retention cron) | Existing: VoiceRecorder (Phase 2/15). |
+| **Apple Developer ID sign + notarize + DMG** | macOS Gatekeeper rejects unsigned binaries → 0% install conversion. Kaan has the Developer ID; Issuer ID is the open blocker (Phase 18 absorbed). | S (~1 E-day once Issuer ID lands) | Existing: Phase 18 P01–05 partially shipped. |
+| **SignPath Foundation Windows MSI** | Same Gatekeeper analogue (SmartScreen). SignPath OSS cert is free for OSS projects; application has ~1-week SLA — must be filed day-1 of v2.0 milestone (Phase 1 carry-forward in STATE.md). | M (~2 E-days post-cert + 3 weeks lead time on the application) | None (Kaan-blocked operationally). |
+| **GitHub release matrix** (mac arm64 + intel + win x86_64 + win arm64, single tag per cut, real changelog) | Phase 18 absorbed. Auto-built via CI matrix on tag push. | M (~2 E-days CI work) | v2: Sign + notarize discipline (above). |
+| **README full rewrite + branding + social assets** — hero PNG + architecture SVG + demo GIF placeholder + 8 controller logos grid + 12-question FAQ + value-prop paragraph above the fold | The repo is the front door for 100% of organic discovery. Phase 19 absorbed. Repo description + topics tags optimised for search. Privacy/cost/Linux/Gemini-Live FAQ pre-seeded. | M (~3 E-days; mostly content) | Existing: Phase 19 partially shipped (architecture SVG + hero PNG done in commit `137240b`). |
+| **Day-Zero Operations** — fresh-machine rehearsal (clean macOS VM + Windows VM), install playbook, post-launch playbook (rate limit + Bravoh proxy load, support triage) | Phase 20 absorbed. Without a fresh-VM rehearsal, day-one users hit BlackHole / TCC / signing edge cases nobody anticipated. | M (~3 E-days; rehearsal + playbook authoring) | v2: Sign + notarize + release matrix. |
+| **Hallucination Verification Gate (Kaan DJ ear test)** — Kaan runs 3–5 real DJ sessions with v2.0 features active, judges by feel | The hard release gate. Per memory `project_phase_16_kaan_dj_testing`: NOT a formal eval suite, Kaan's personal testing. Tuning CSV from `scripts/tune_hard_tek_detectors.py` is the audit surface. | M (~3 E-days Kaan-time, calendar-blocking) | v2: Generalized event detector + citation linter + mascot anticipation + ack bank (the surfaces under test). |
+
+#### Differentiators
+
+| Feature | Value Proposition | Complexity | Depends on |
+|---|---|---|---|
+| **One-click install <60s promise on README** (delivered via DMG + MSI + auto-deps + wizard) | The hard requirement per memory `project_one_click_install_hard_req`. Every dep choice is green/yellow/red rated for install impact (BlackHole = yellow but unavoidable on Mac audio capture; SignPath = green for end users). | S | Existing: Phase 11 calibration wizard (auto-detect devices + permission checks). |
+| **Free for end users via Bravoh-managed proxy** (per-client rate limit, no API key entry) | Friction kills virality; cost is treated as marketing. Proxy already shipped (Phase 5 — JWT HS256 + Redis quota at api.altidus.world). | (shipped) | Existing: Phase 5. |
+| **Polished README sexification** — branded hero banner, install GIFs, screenshots gallery, feature matrix (Beginner/Intermediate/Pro × Hype/Coach), CONTRIBUTING.md with controller-mapping contribution path | The repo doubles as the brand surface. CONTRIBUTING controller-mapping path is the most-likely external PR vector (community contributes SKUs vibemix lacks). | M | v2: README rewrite + 10-SKU MIDI library (Category 4). |
+
+#### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---|---|---|---|
+| **User-supplied Gemini API keys** | "Reduce our cost." | Friction kills virality (memory `feedback_no_scope_creep_clean_utility`). Bravoh-side proxy handles cost as marketing spend. | Bravoh proxy with per-client rate limit (Phase 5 shipped). |
+| **30-session formal hallucination eval** | Standard ML release gate. | Kaan's DJ ear is the explicit test per memory. Building the harness costs 2–3 weeks. | Kaan-driven session audit + tuning CSV. |
+| **Linux support** | "Niche OSS audience." | Doubles platform-engineering cost. DJ Linux audience is small. | macOS + Windows only in v2.0; Linux explicitly excluded. |
+| **Custom voice cloning** | "Brand-distinct AI voice." | Bravoh-only stack; Gemini TTS prebuilt voices cover the matrix. Cloning adds privacy + safety surface. | Gemini TTS prebuilt voices (Achird default; male/female switchable). |
+| **Real-time stream-to-Twitch/YouTube hook** | "Live broadcast integration." | Out of scope; recording for later sharing is enough. | Session recordings already exist; user shares clips post-hoc. |
+| **Auto-update channel with silent installs** | "Modern app UX." | Adds Tauri updater complexity + signing key escrow. Out of v2.0 scope. | Tagged GitHub releases; user downloads new DMG/MSI when bumped. |
+| **Anonymous telemetry without explicit consent** | "Product analytics." | Privacy-paranoid DJs would block on this. | Local-only events.jsonl per session; opt-in telemetry is a v2.x consideration. |
+| **Skipping Day-Zero rehearsal "to save time"** | "Beta ship + iterate." | First-impression DJ apps that crash at day-zero hit ~5% retention. | Phase 20 fresh-VM rehearsal is mandatory before tag-push. |
+
+**Research notes:** [project_v0_1_0_rc1_open_bugs](memory file), [project_phase_16_kaan_dj_testing](memory file), [project_one_click_install_hard_req](memory file), Phase 18+19+20 plans in `.planning/phases/` (already drafted).
+
+---
+
+### Category 7 — Viral Wave
+
+**Thesis:** The viral demo is not a feature, it's the engineering critical path. Beat A (point-at-knob) + Beat B (anticipation lean-in) + Beat C (3-second silence) = three viral assets each scrolled-content-ready on their own. Cross-platform copywriting is pre-seeded; pre-seeded FAQ in comments closes the trust loop.
+
+#### Table Stakes
+
+| Feature | Why Expected | Complexity | Depends on |
+|---|---|---|---|
+| **30-second viral demo film** — single take or curated multi-take edit; djay Pro 5 in 2-deck mode; CDJ Whisper color direction; Kaan + DDJ-FLX4 + HD25 headphones | One filmable cut feeds Twitter / IG Reels (IT + EN) / Reddit / HN. 6+ takes per beat; edit magic into the cut. | M (~2 E-days post-feature-complete) | v2: djay overlay + mascot anticipation + ack bank (the three signature beats need all three present simultaneously). |
+| **Twitter thread (5 posts)** — technical breakdown, Beat A hero image, code snippets, GitHub link | Twitter is the engineering-credibility channel. Thread structure mirrors how Cursor/Pi shipped their viral moments. | S (~1 E-day; content) | v2: 30s demo film. |
+| **IG Reels (IT + EN) — vertical 9:16 recut** — Kaan's face top third + djay screen + mascot bottom two-thirds, caption-baked | The cinematic channel + Italian community wedge. Bravoh's 140k-view real is the same account leverage. | S (~1 E-day; reframe + caption + bilingual copy) | v2: 30s demo film. |
+| **Reddit r/Beatmatch + r/DJs thread** — Beat C silence hero + open-source angle + 60-second-install promise | The DJ-community-credibility channel. Leads with Beat C (the anti-slop reveal) because the community is exhausted by AI slop. | S (~1 E-day; content + pre-seeded FAQ) | v2: 30s demo film. |
+| **Hacker News Show HN post** — Beat A hero + engineering breakdown of the grounding stack + Tauri #8329 mitigation as a real story | The hacker-credibility channel. Leads with the engineering: 4 grounding signals + cascade tradeoff + sidecar AX inheritance mitigation. | S (~1 E-day; content) | v2: 30s demo film. |
+| **Pre-seeded FAQ in comments** — privacy / cost / no-Linux / no-Gemini-Live / djay-only-launch / how-it-doesn't-hallucinate (8–12 questions across all four channels) | The first 20 comments make-or-break the thread momentum. Kaan + Francesco rotate answering; canned-but-honest replies that close the trust loop fast. | S (~0.5 E-days) | v2: All four channel posts. |
+
+#### Differentiators
+
+| Feature | Value Proposition | Complexity | Depends on |
+|---|---|---|---|
+| **Beat A — "AI points at the knob" hero frame at 0:09** — amber ring on Deck A mid EQ, mascot in talk pose, caption-baked "Mids are stacking on A — cut 'em 3 to 4 dB" | The screenshot that captions itself. Single image works on Twitter / Reddit / IG without context. Cursor-autocomplete-moment shape. | (part of demo) | v2: djay overlay. |
+| **Beat B — "AI anticipation lean-in" frame at 0:07** — mascot already in `prep_lean_in_hyped` pose ~50–150ms before voice arrives | The "huh — wait, what?" beat for viewers exhausted by reactive AI. Frames AI as predictive, not reactive — ChatGPT Voice / Pi orb shape but anticipating the *world* not its own processing. | (part of demo) | v2: Mascot anticipation. |
+| **Beat C — 3-second silence at 0:22–25** — AI says nothing; mascot keeps idle-bobbing; no overlay; subtitle in post: "The AI shuts up when there's nothing to say" | The anti-slop reveal. Pi-vs-ChatGPT-Voice "silence as feature" axis. The frame that proves the positive frames are real. | (part of demo) | v2: Citation linter live-mode strip + ack bank fallback (the actual technical reason silence happens). |
+| **Paired ring + linker** (filter knob + play/cue zone connected by thin amber line at 0:14–18) | One signature spatial trick that sells "AI sees relationships between controls," not just "names things." | (part of demo) | v2: djay overlay 12-element vocabulary + ring rendering supports multi-element with connectors. |
+| **GitHub stars ticker on outro frame** (0:29–30) | Social proof in motion at the CTA moment. Records pre-launch 15+ stars from friends/dev network for visible ticking. | (part of demo) | v2: Day-Zero seed wave from friends + ARRAY community (per PROJECT.md). |
+
+#### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---|---|---|---|
+| **Overpromise "works on every DJ app"** in copy | "Broader appeal." | First Reddit comment: "but I use Rekordbox" → trust collapses. | Frame copy as platform-agnostic ("AI that watches your set"); README explicitly lists djay-overlay as v2.0 with Rekordbox-overlay v1.2 fast-follow. |
+| **Real-time AI demo without pre-scripted beats** | "Authentic / no editing tricks." | The AI is real-time during filming but Kaan doesn't pre-know which knob it'll point at. Multi-take + magic-take edit is industry-standard for product demos. | Multi-take strategy; honest about edit but never about behaviour. AI is real; the curation is curated. |
+| **Flashing UI / constant ring fires during demo** | "More AI presence." | Reads as AI slop — the opposite of the thesis. | 8s cooldown per element; at most one ring per 3s utterance; deliberate silence beat at 0:22–25. |
+| **Influencer / sponsored-post launch** | "Paid amplification." | Wrong audience cue — open-source-DJ community filters out paid promo. | Organic Francesco-DJ-network outreach + small (€50–100) IG/TikTok ads + ARRAY community + Bravoh-team friends seeded. |
+| **Auto-translation of pre-seeded FAQ** | "All locales." | Loses Kaan/Francesco's voice. Reddit/HN reads as translated-AI-copy. | English + Italian (Kaan + Francesco's actual languages) hand-written. Other locales emerge organically post-launch. |
+| **Demo film delayed to v2.1 "for polish"** | "Ship clean utility first, market later." | The Bravoh public launch wave window is the 4-week post-v2.0 window. Slipping the demo blows the wave. | Treat the demo film as the engineering critical path. 7-day spike day-1 of v2.0 close. Buffer day on day 7 for film. |
+
+**Research notes:** [synthesis-viral-demo.md](v2-buckets/synthesis-viral-demo.md) (full 30s storyboard table, three signature beats, 7-day engineering critical path, per-platform post angles, risk register).
+
+---
+
+## Cross-Category Dependency Graph
 
 ```
-Cross-platform audio capture
-    └──requires──> Auto-detect master output device
-                       └──requires──> Calibration wizard (output device picker step)
+Category 1: Detection & Grounding
+    Generalized event detector v1 (6 detectors)
+        └──> required by Category 2 (predictive firing reads PHRASE_BOUNDARY)
+        └──> required by Category 5 (debrief grounds claims in event types)
+        └──> required by Category 7 (Beat A spatial reactions need detector-event-tied points)
+    Citation grammar in prompts
+        └──> required by Citation linter (v2.0 follow-on)
+        └──> required by Category 5 (debrief sentence-level enforcement)
+    Library intelligence (Gemini Embedding 2 + sqlite-vec)
+        └──requires──> Pyrekordbox XML import (Category 4)
+        └──> required by Category 5 (library-aware drill cards)
 
-Curated MIDI mappings
-    └──enhances──> Magnitude-aware EQ/fader awareness
-                       └──enhances──> Coach mode quality (technique critique)
-                                          └──enhances──> Skill-tier prompt-template matrix
+Category 2: Latency & Liveness
+    Pre-canned ack bank
+        └──> required by Category 3 mascot anticipation (T+150ms audible signal)
+        └──> required by Category 7 Beat B (ack lands while voice hasn't arrived)
+    Cancel-and-refire
+        └──requires──> Generalized event detector v1 (priority-aware events)
+    Predictive drop firing
+        └──requires──> Cancel-and-refire + Generalized event detector v1
+        └──gated by──> Kaan ear-test (v2.0 ship-on-by-default decision)
 
-Genre picker
-    └──requires──> Genre-tuned phase thresholds
-                       └──requires──> Phase-detection (drop/build/breakdown)
-                                          └──enhances──> Both Hype-man + Coach reactions
+Category 3: Personality & Anticipation
+    Mascot anticipation layer (1-above-mood)
+        └──> required by Category 7 Beat B (the visible-before-voice anticipation)
+    4-layer additive state machine
+        └──requires──> Mascot anticipation layer (proves shape first)
+    Inline emote-tag vocabulary
+        └──requires──> 4-layer state machine + Gemini text-channel timing spike
 
-Hallucination grounding (audio evidence packet)
-    └──requires──> AudioBuffer snapshot features (POC has this)
-                       └──blocks──> All AI inference (hard release gate)
+Category 4: Cross-Software Integration
+    10-SKU MIDI controller library
+        └──> already shipped (Phase 9)
+    Pyrekordbox XML import
+        └──> required by Category 1 Library intelligence (the source data)
+        └──> required by Category 5 library-aware drills
+    djay Pro Mac overlay highlight
+        └──requires──> Tauri parent-side AX call (mitigates issue #8329)
+        └──> required by Category 7 Beat A (the point-at-knob frame)
+    Mixxx OSC bridge
+        └──parallel──> independent feature-flagged path
 
-Hype-man mode <──conflicts──> Coach mode at same time
-    (User picks one per session; mid-session toggle OK)
+Category 5: Coaching & Memory
+    Post-session debrief
+        └──requires──> Citation linter (sentence-level chapter enforcement)
+        └──requires──> Generalized event detector v1 (events.jsonl provides citation anchors)
+        └──> generates Long-term DJ profile
+    Long-term DJ profile
+        └──requires──> Post-session debrief
+        └──injects-into──> Next session's live system prompt
+    Library-aware drill cards
+        └──requires──> Library intelligence + Post-session debrief
 
-Voice picker
-    └──requires──> Gemini TTS streaming (POC has this)
+Category 6: Ship & Distribution
+    Hallucination Verification Gate (Kaan DJ ear test)
+        └──gates──> v2.0 release
+        └──tests──> Generalized event detector v1 + Citation linter + Mascot anticipation + Ack bank
+    Apple Developer ID sign + Windows MSI + GitHub release matrix
+        └──parallel──> Kaan-blocked on Issuer ID + SignPath OSS application
+    Day-Zero Operations rehearsal
+        └──gates──> v2.0 release
+        └──requires──> All ship-infrastructure features above
 
-Mic gating
-    └──requires──> Levels.voice tracking (POC has this)
-    └──blocks──> AI hearing its own voice (critical correctness gate)
-
-Vocal-section detection
-    └──requires──> Phase detector + frequency-band analysis
-                       └──blocks──> AI talking over lyrics (critical etiquette gate)
-
-Session recording (POC has this)
-    └──enables──> Highlight reel export (v1.1)
-    └──enables──> Coach scorecard at session end (v1)
-    └──enables──> Session replay UI (v1.x)
-
-Bravoh-managed API key
-    └──requires──> API-usage abuse protection (rate-limit, per-client quota)
-                       └──blocks──> Open-source release (we'd get drained without it)
+Category 7: Viral Wave
+    30s viral demo film
+        └──requires──> djay Pro Mac overlay + Mascot anticipation + Ack bank (all three for Beat A/B/C simultaneously)
+        └──requires──> Generalized event detector v1 (grounded reactions during filming)
+    Four channel posts (Twitter / IG / Reddit / HN)
+        └──requires──> 30s viral demo film
 ```
 
-### Dependency Notes
+### Cross-Category Conflicts
 
-- **Calibration wizard is the gate**: every audio-related feature needs the wizard's output (which device, which DJ window, which controller). Wizard quality determines first-session success rate.
-- **Curated MIDI mappings → Coach quality**: without magnitude-aware EQ events, Coach can only say "you moved a knob", not "you killed the lows on the incoming". The whole differentiation collapses without good mappings.
-- **Vocal-section detection is a hard gate**: an AI that talks over lyrics is a product-killing flaw. Cheaper to ship later with vocal detection working than to ship faster without it.
-- **Hallucination grounding is a hard release gate**: Kaan has called this out as a release blocker. No grounding = no ship.
-- **Session recording → Highlight reel → Marketing virality**: the recording layer (already built in POC) is the foundation for the post-session shareable content that drives the Bravoh waitlist funnel. Don't break it during the refactor.
+- **Predictive firing × Cancel-and-refire budget:** Both consume Gemini API budget. Cap predictive fires at 1 per 12s + cancels at 1 per 8s + 30/hour hard cap.
+- **Emote-tag vocab × Live latency:** Emote tag must arrive on Gemini text channel BEFORE TTS audio for the anticipation to fire on time. 1-day spike before committing to the inline-tag approach (Bucket D A3 risk). Fallback: event-detector-driven anticipation (loses fine-grained variety but still hits T+50ms).
+- **djay overlay × Tauri sidecar AX (#8329):** AX call must run in Rust parent, not Python sidecar. Architectural constraint that ripples through Window-tracker design + IPC schema (overlay element names cross WS bus as already-resolved screen rects).
+- **Library intelligence cost × Bravoh proxy quota:** Library indexing on free tier requires BYO Gemini key (user's free-tier RPM covers it). Live queries through proxy quota. Documented in onboarding wizard.
+- **Mascot 4-layer × Mascot anticipation:** Don't ship full 4-layer in v2.0 — anticipation layer alone is the "1-above-mood" simplified subset. Full 4-layer is v2.x polish epic.
 
-## MVP Definition
+---
 
-### Launch With (v1) — The Bravoh-Wedge Drop
+## v2.0 Cut Recommendation
 
-Minimum viable product to validate the concept AND serve the marketing function.
+### Launch With (v2.0)
 
-- [x] **Cross-platform audio capture** (macOS Core Audio loopback + Windows WASAPI loopback, auto-detected) — without this, half the audience is locked out
-- [x] **Calibration wizard** (first-run, 7 steps as documented) — without this, install conversion fails
-- [x] **3 skill modes × 2 interaction modes (6 prompt templates)** — the stakeholder-defined product matrix
-- [x] **Voice picker (male/female, Gemini TTS prebuilt)** — table stakes for voice products
-- [x] **Genre picker + genre-tuned phase thresholds** — without this, techno DJs and pop DJs get the same wrong thresholds
-- [x] **10 curated controller mappings + generic MIDI fallback** — without curated, Coach mode is generic; with all 10, ~70-80% of users get full experience
-- [x] **Magnitude-aware EQ/fader events** — the "AI knows your move" effect
-- [x] **Push-to-mute hotkey** — anti-frustration baseline
-- [x] **Vocal-section gating** — AI shuts up over lyrics (hard etiquette gate)
-- [x] **Reaction frequency throttle + per-event cooldowns** — anti-chatty
-- [x] **Hallucination grounding (audio evidence in prompts)** — hard release gate
-- [x] **Session recording (input.wav + voice.wav + events.jsonl)** — keep what POC has
-- [x] **Coach scorecard at session end (Beginner + Intermediate)** — gives Beginner mode a growth signal, justifies Coach mode existence
-- [x] **One-click installer** (signed DMG + signed MSI) — distribution baseline
-- [x] **Bravoh-managed API key + abuse protection** — zero-config experience
-- [x] **Audible-deck detection (carry from POC)** — solves #1 hallucination class
+Ruthless minimum that closes "feels surface-level" + ships the viral demo arsenal.
 
-### Add After Validation (v1.x — within 1-2 months of launch)
+- [ ] **Generalized event detector v1** (6 detectors: KICK_SWAP / SUB_LAYER_ARRIVAL / BREAKDOWN_KICK_KILL / REENTRY_KICK_LAND / KICK_DENSITY_SHIFT / PHRASE_BOUNDARY) — closes the surface-level critique
+- [ ] **Latency stack v1** — prompt diet + Gemini caching + pre-canned ack bank + cancel-and-refire — sub-2s actual / sub-300ms perceived
+- [ ] **Mascot anticipation layer** (1-above-mood simplified) + beat-coupled hip-bob — 400–1200ms perceived mask
+- [ ] **Citation grammar in prompts** (prompt-only, no enforcement yet) — seeds corpus for live linter
+- [ ] **Citation linter v1.1 — live mode** (strict response-level + ack-bank fallback) — anti-slop enforcement starts
+- [ ] **djay Pro Mac overlay highlight** (12 elements + window tracker + overlay window) — viral demo anchor
+- [ ] **Pyrekordbox XML one-shot import** — library source
+- [ ] **10-SKU MIDI controller library** (already shipped Phase 9; add JSON-per-SKU + auto-detect polish)
+- [ ] **Hard Tek detector tuning** against 7-10 reference tracks — Kaan ear-test gate
+- [ ] **Recording browser + retention enforcement** — absorbed from v0.1.0 Phase 15
+- [ ] **Apple Developer ID sign + notarize + DMG + SignPath Windows MSI + GitHub release matrix** — absorbed from v0.1.0 Phase 18
+- [ ] **README full rewrite + branding + social assets** — absorbed from v0.1.0 Phase 19
+- [ ] **Day-Zero Operations rehearsal** — absorbed from v0.1.0 Phase 20
+- [ ] **Hallucination Verification Gate (Kaan DJ ear test)** — release gate
+- [ ] **30-second viral demo film + 4 channel posts** — IG/Reddit/HN/Twitter
+- [ ] **Pre-seeded FAQ + Kaan/Francesco answer rotation**
 
-Features added once core is working and users are giving feedback.
+### Add After v2.0 (v2.1 polish / fast-follow)
 
-- [ ] **Highlight reel export** — when usage shows users sharing recordings manually, automate the best-clip extraction. Marketing-funnel multiplier.
-- [ ] **Session replay UI** — simple timeline player for the recorded session (currently raw WAV files). Users will want this.
-- [ ] **"Coach this moment" manual trigger** — when chatty-AI feedback appears in early reviews, give users explicit control.
-- [ ] **More controller mappings (next 5-10 beyond the curated 10)** — driven by user requests in GitHub issues.
-- [ ] **Live mid-mix Coach nudges (Pro mode only, opt-in)** — only after the default deferred-critique mode is validated as safe.
-- [ ] **Mascot widget as optional dock toy** — keep the easter egg, polish it.
-- [ ] **Custom prompt-template editor (Pro mode)** — let users tune their own AI persona. Power-user feature.
+Features explicitly out of v2.0 but on the immediate runway.
 
-### Future Consideration (v2+)
+- [ ] **Predictive drop firing** — gated on Kaan ear-test with v2.0 baseline
+- [ ] **4-layer mascot additive state machine** — full structural rewrite
+- [ ] **Inline emote-tag vocabulary (15 tags)** — post text-channel-timing spike
+- [ ] **Post-session debrief MVP** (chaptered + voiced TL;DR + 3 drills + clickable timeline)
+- [ ] **Long-term DJ profile** — generated by debrief, injected into live
+- [ ] **Cross-mode citation enforcement** — extend live linter to debrief + library + genre
+- [ ] **Mixxx OSC bridge** behind `--enable-mixxx-osc` flag (or first-class if PR #14388 merges)
+- [ ] **Library intelligence v1** (file watcher → embed → query, basic mode)
+- [ ] **Library-aware drill cards** ("3 tracks from your library that fix this")
 
-Features to defer until product-market fit is established and there's resource to spend on them.
+### Future Consideration (v2.2+)
 
-- [ ] **Next-track recommendation (opt-in)** — only if user research strongly demands it, and only as a Coach-mode suggestion ("might want something in C minor next"), never auto-play.
-- [ ] **DAW integration (Logic, Ableton, FL)** — "the next conquest" per the stakeholder doc. Different product really; spin off later.
-- [ ] **iOS/iPad version** — only if mobile DJ-software market shifts. Currently desktop-locked.
-- [ ] **Linux support** — only if OSS community contributes the audio layer.
-- [ ] **Custom voice cloning** — never, unless legal landscape changes radically.
-- [ ] **Multi-language UI chrome** — only after critical mass in non-English markets.
-- [ ] **Library scanner / track-recommendation AI** — POC has a file-watcher already; reactivate as v1.1 if recommended.
-- [ ] **Streaming integration (Twitch/YouTube)** — not the product. Users can route through OBS themselves.
-- [ ] **Multi-DJ B2B mode** — interesting but huge complexity. Way out.
+Features that need infrastructure beyond v2.0/v2.1 ship.
 
-## Feature Prioritization Matrix
+- [ ] **Library intelligence v2** (Gemini Embedding 2 + sqlite-vec full pipeline, "what should I play next?" + "is this transition rough?" live queries)
+- [ ] **Rekordbox / Serato overlay** via template matching
+- [ ] **Genre expansion** — Techno → Tech House → DnB → Trance → UKG → Trap → Disco (~1 weekend per genre with v2.0 architecture)
+- [ ] **VirtualDJ OSC bridge** (gated on Pro-user demand signal)
+- [ ] **Windows overlay parity** (DPI + fullscreen Spaces)
+- [ ] **Mascot procedural mouth from audio amplitude** (3 talk variants)
+- [ ] **Genre auto-classifier via Gemini Embedding 2** (depends on library intelligence)
+- [ ] **"/hatch" user-generated mascots** (v2.x stretch per memory)
+- [ ] **Cross-session corpus for prompt-tuning** (slop-ratio-stripped sentence clustering)
+
+---
+
+## Feature Prioritization Matrix (v2.0 in-scope only)
 
 | Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Live voice reaction to master output | HIGH | HIGH (POC validates) | P1 |
-| Hype-man mode (3 tiers) | HIGH | MEDIUM (prompt engineering) | P1 |
-| Coach mode (3 tiers) | HIGH | MEDIUM-HIGH (prompt + scorecard logic) | P1 |
-| Calibration wizard | HIGH (gates everything) | MEDIUM | P1 |
-| Cross-platform audio capture | HIGH | HIGH (Windows is new) | P1 |
-| 10 curated MIDI mappings | HIGH | HIGH (per-controller work) | P1 |
-| Generic MIDI fallback | MEDIUM | LOW | P1 |
-| Voice picker | MEDIUM | LOW (Gemini TTS built-in) | P1 |
-| Genre picker + thresholds | HIGH (affects feel) | LOW-MEDIUM | P1 |
-| Vocal-section gating | HIGH (etiquette gate) | MEDIUM | P1 |
-| Hallucination grounding | HIGH (release gate) | LOW (POC done) | P1 |
-| Push-to-mute hotkey | MEDIUM | LOW | P1 |
-| Coach scorecard at session end | MEDIUM | LOW-MEDIUM | P1 |
-| One-click installer | HIGH (distribution gate) | MEDIUM | P1 |
-| Bravoh-managed API key + abuse protection | HIGH | MEDIUM | P1 |
-| Magnitude-aware EQ events | HIGH (differentiation) | LOW (POC done for FLX4) | P1 |
-| Session recording (carry from POC) | MEDIUM | LOW (exists) | P1 |
-| Audible-deck detection (carry from POC) | HIGH (anti-hallucination) | LOW (exists) | P1 |
-| Highlight reel export | HIGH (virality) | MEDIUM | P2 |
-| Session replay UI | MEDIUM | MEDIUM | P2 |
-| "Coach this moment" manual trigger | MEDIUM | LOW | P2 |
-| More controller mappings (11-20) | MEDIUM | HIGH | P2 |
-| Live mid-mix Coach nudges (opt-in) | MEDIUM | LOW | P2 |
-| Mascot widget polish | LOW | LOW | P2 |
-| Custom prompt-template editor | LOW (power users) | MEDIUM | P3 |
-| Next-track recommendation | LOW (anti-feature for now) | HIGH | P3 |
-| DAW integration | MEDIUM (future) | XL | P3 |
+|---|---|---|---|
+| Generalized event detector v1 | HIGH (closes surface-level) | MEDIUM (~5d) | P1 |
+| Pre-canned ack bank | HIGH (alive-feel mandatory) | LOW (~2d) | P1 |
+| Prompt diet + caching | MEDIUM (TTFT win) | LOW (~2d) | P1 |
+| Mascot anticipation layer | HIGH (perceived-latency mask) | LOW–MEDIUM (~3d) | P1 |
+| Citation grammar in prompts | MEDIUM (seeds linter corpus) | LOW (~1d) | P1 |
+| Citation linter (live mode) | HIGH (anti-slop enforcement) | MEDIUM (~3–5d) | P1 |
+| djay Pro Mac overlay (12 elements) | HIGH (viral anchor) | MEDIUM–HIGH (~5–7d) | P1 |
+| Pyrekordbox XML import | MEDIUM (library source) | LOW (~3d) | P1 |
+| 10-SKU MIDI library polish | LOW–MEDIUM (already exists) | LOW (~2d) | P1 |
+| Hard Tek detector tuning | MEDIUM (Kaan-specific, demo-critical) | MEDIUM (~3d) | P1 |
+| Recording browser + retention | MEDIUM (UX surface) | MEDIUM (~2d) | P1 |
+| Sign + notarize + DMG/MSI + release matrix | HIGH (zero-install conversion otherwise) | MEDIUM (~3d engineering + cert leads) | P1 |
+| README + branding + social assets | HIGH (organic discovery) | MEDIUM (~3d content) | P1 |
+| Day-Zero Operations rehearsal | HIGH (day-one retention) | MEDIUM (~3d) | P1 |
+| Hallucination Verification Gate | HIGH (release gate) | MEDIUM (~3d Kaan-time) | P1 |
+| 30s viral demo film | HIGH (engineering critical path) | MEDIUM (~2d post-feature-complete) | P1 |
+| 4 channel posts + pre-seeded FAQ | HIGH (launch wave) | LOW–MEDIUM (~2d) | P1 |
+| Cancel-and-refire | MEDIUM (in-bar reaction quality) | LOW (~2d) | P1–P2 |
+| Mixxx OSC bridge (feature-flagged) | LOW–MEDIUM (Mixxx-only) | LOW (~2d) | P2 |
 
 **Priority key:**
-- P1: Must have for v1 launch (~30 features)
-- P2: Should have, add within v1.x (1-2 months post-launch)
-- P3: Future consideration, post-PMF
+- **P1**: Must have for v2.0 ship — the demo film and the ear-test gate depend on these.
+- **P2**: Should have, ship if schedule allows — Mixxx OSC behind flag.
+- **P3**: Defer to v2.x — predictive firing, full 4-layer mascot, emote-tag vocab, debrief, library intelligence v2.
 
-## Specific Anti-Pattern Warnings for Implementation
-
-Distilled from competitor analysis and voice-assistant UX research:
-
-1. **Don't fill silence with AI talk.** Default cooldowns should err long (30-90s between reactions). User can shorten if they want a chattier mode. Universal voice-assistant complaint is verbosity.
-2. **Don't have the AI describe what it just heard.** "I'm hearing a drop now!" is robotic. The AI should *react* ("yesss") not narrate. The audio is right there.
-3. **Don't have the AI explain its reasoning unprompted.** Coach mode should not say "I'm telling you this because…" — just the feedback.
-4. **Don't let the AI gain confidence from absence of evidence.** If no MIDI events arrive for 60 seconds, the AI shouldn't assume "the DJ is in a flow state, time to comment" — silence is also valid signal.
-5. **Don't make the AI sound the same in all three skill tiers.** Beginner and Pro should feel like different friends, not the same voice with different word counts.
-6. **Don't ship with the AI talking over a vocal hook even once in the demo.** First impressions kill. The vocal-gate must be tight before any public demo recording.
-7. **Don't show a "score" for the user mid-session.** Post-session qualitative summary only.
-8. **Don't auto-publish anything.** Recording → user reviews → user shares. Always.
+---
 
 ## Sources
 
-### Existing AI music tools surveyed
-- [Algoriddim Neural Mix Pro](https://www.algoriddim.com/neural-mix) — real-time stem separation, MIDI-mappable Neural Mix commands
-- [Algoriddim djay Pro AI press release](https://www.algoriddim.com/press_releases/362-algoriddim-reinvents-djing-with-world-s-first-real-time-vocal-and-instrumental-separation-on-new-djay-pro-ai)
-- [VirtualDJ 2026 AI features (Digital DJ Tips)](https://www.digitaldjtips.com/virtualdj-2026/) — AIPrompt folder, auto-lyrics
-- [VirtualDJ 2026 review (gearnews)](https://www.gearnews.com/virtualdj-2026-dj/)
-- [VirtualDJ 2026 review (MusicTech)](https://musictech.com/news/gear/virtualdj-2026/)
-- [PulseDJ AI Copilot overview](https://blog.pulsedj.com/ai-dj-software) — track recommendation, file-watcher architecture, MyStyle personalization
-- [BandLab AI tools](https://blog.bandlab.com/bandlab-ai-tools-best-ai-music-generator/) — production-side comparison
-- [Claude in Ableton (MusicTech)](https://musictech.com/news/industry/claude-can-now-be-plugged-into-ableton/) — production-side AI assistant pattern
+### v2-bucket research artifacts (primary, HIGH confidence)
 
-### DJ technique / coaching / MC vocabulary
-- [Hype man (Wikipedia)](https://en.wikipedia.org/wiki/Hype_man) — historical role definition, MC Cowboy callouts
-- [Things to say on the mic as a DJ (DJ Pro Tips)](https://djprotips.com/tips-for-mcing-as-a-dj/) — 10-15s talk limit guidance
-- [DJ Transitions Masterclass — Phrasing, EQ & Filters (YouTube)](https://www.youtube.com/watch?v=Fd9jEpFG6II)
-- [EQ Mixing techniques (DJ TechTools)](https://djtechtools.com/amp/2012/03/11/eq-critical-dj-techniques-theory/)
-- [Anatomy of a great DJ mix (DJ.Studio)](https://dj.studio/blog/anatomy-great-dj-mix-structure-energy-flow-transition-logic)
-- [Common beginner DJ mistakes (ClubReady)](https://www.clubreadydjschool.com/tribe-talk/getting-started/7-common-beginner-dj-mistakes/)
-- [10 mistakes beginner DJs make (Digital DJ Tips)](https://www.digitaldjtips.com/10-things-beginner-djs-do-that-pros-dont/)
-- [How to read the dancefloor for energy cues (Learningtodj)](https://learningtodj.com/blog/how-to-read-the-dancefloor-for-energy-cues/)
-- [Control the energy level (Mixed In Key)](https://mixedinkey.com/book/control-the-energy-level-of-your-dj-sets/)
-- [Behind the booth — reading a crowd (Relentless Beats)](https://relentlessbeats.com/2026/02/behind-the-booth-how-djs-read-a-crowd-and-control-a-nights-energy/)
+- [`v2-buckets/SYNTHESIS.md`](v2-buckets/SYNTHESIS.md) — integration layer + 5 strategic calls + priority matrix
+- [`v2-buckets/A-latency.md`](v2-buckets/A-latency.md) (incl. `A-followup-1-cancel-and-caching` content) — latency engineering, `interrupt(force=True)` empirical verification, prompt caching 1024-token floor
+- [`v2-buckets/B-industry-integrations.md`](v2-buckets/B-industry-integrations.md) — per-platform tractability matrix, ProDJ Link demotion, MIDI as universal layer
+- [`v2-buckets/B-followup-1-v11-integration-spec.md`](v2-buckets/B-followup-1-v11-integration-spec.md) — MixxxBus 190-LOC spec, Pyrekordbox XML schema, 10-SKU JSON layout, Sync note 0x58 vs 0x60
+- [`v2-buckets/C-ui-overlay.md`](v2-buckets/C-ui-overlay.md) — djay overlay hybrid approach, element vocabulary, Tauri #8329 mitigation, 30s storyboard
+- [`v2-buckets/D-mascot-emotion.md`](v2-buckets/D-mascot-emotion.md) — 4-layer architecture, anticipation recipe, emote tag vocab, Mixamo blendshape constraint, latency-budget cover-up
+- [`v2-buckets/E-debrief-pedagogy.md`](v2-buckets/E-debrief-pedagogy.md) — DJ teaching pedagogy synthesis, debrief UX patterns (Strava + Whoop + Synthesia + iZotope), profile architecture rejecting mem0, anti-slop tone
+- [`v2-buckets/E-followup-1-citation-linter.md`](v2-buckets/E-followup-1-citation-linter.md) — citation grammar EBNF, regex enforcement, Python `CitationLinter` class, per-mode prompt templates, telemetry surface
+- [`v2-buckets/F-library-intelligence.md`](v2-buckets/F-library-intelligence.md) — Gemini Embedding 2 audio cap (80s empirical), sqlite-vec vs alternatives, Bravoh pipeline 80% portable, drop+breakdown chunk strategy, cost projection
+- [`v2-buckets/G-genre-taxonomy.md`](v2-buckets/G-genre-taxonomy.md) — Per-genre event catalogs (Hard Tek + 6 others), phrase awareness, genre auto-classifier
+- [`v2-buckets/G-followup-1-hard-tek-dsp.md`](v2-buckets/G-followup-1-hard-tek-dsp.md) — 8 Hard Tek detectors with DSP recipes + 10 reference tracks + tuning harness + per-genre dispatch architecture
+- [`v2-buckets/synthesis-viral-demo.md`](v2-buckets/synthesis-viral-demo.md) — 30s storyboard table, three signature beats, 7-day engineering critical path, per-platform post angles, risk register
 
-### Controller mappings / MIDI references
-- [Mixxx DDJ-FLX4 mapping (GitHub)](https://github.com/mixxxdj/mixxx/blob/main/res/controllers/Pioneer-DDJ-FLX4.midi.xml) — official open-source XML
-- [Mixxx Pioneer DDJ controllers wiki](https://github.com/mixxxdj/mixxx/wiki/Pioneer-Ddj-Controllers)
-- [Mixxx Hercules Inpulse 500 wiki](https://github.com/mixxxdj/mixxx/wiki/Hercules-DJControl-Inpulse-500)
-- [Pioneer DDJ-400 4-deck community mapping](https://github.com/apmiller108/pioneer_ddj400_mixxx_mapping)
-- [Mixxx MIDI Controller Mapping File Format](https://github.com/mixxxdj/mixxx/wiki/Midi-Controller-Mapping-File-Format)
-- [Pioneer DJ MIDI Maps forum](https://forums.pioneerdj.com/hc/en-us/community/topics/200303046-MIDI-Maps)
-- [AlphaTheta DDJ-FLX10 MIDI-compatible software](https://support.pioneerdj.com/hc/en-us/articles/16716711647129-DDJ-FLX10-MIDI-compatible-software)
-- [Rekordbox MIDI mapping customization (AlphaTheta)](https://support.pioneerdj.com/hc/en-us/articles/40182116223257-How-to-customize-rekordbox-MIDI-mapping)
+### Project state (already-shipped baseline)
 
-### UX / onboarding / anti-chatty research
-- [Intelligent assistants have poor usability (NN/Group)](https://www.nngroup.com/articles/intelligent-assistant-usability/) — verbosity is the #1 complaint
-- [Sonarworks speaker calibration onboarding](https://support.sonarworks.com/hc/en-us/articles/20378216058514-Setting-up-with-speaker-calibration) — wizard pattern reference
-- [Room EQ Wizard onboarding](https://producelikeapro.com/blog/room-eq-wizard/) — measurement wizard pattern
-- [When AI in UX stops helping and starts annoying (Monsoonfish)](https://monsoonfish.com/when-ai-in-ux-stops-helping-and-starts-annoying/)
-- [Why chatbot UX is annoying users (Clutch)](https://clutch.co/resources/fix-your-chatbot-ux)
+- [`.planning/PROJECT.md`](../PROJECT.md) — v2.0 milestone definition, 12 target features
+- [`.planning/STATE.md`](../STATE.md) — Phases 1–14 shipped, decisions locked, Phase 15+ remaining
+- `cohost_v4.py` — canonical v4 baseline (POC reference per memory)
 
-### Industry overview
-- [The 10 Best AI DJ Tools for 2026 (ZIPDJ)](https://www.zipdj.com/blog/best-ai-dj-tools)
-- [AI Tools and Software for DJ Workflows 2026 (DJ.Studio)](https://dj.studio/blog/ai-dj-workflow-programs-tools)
-- [Rise of AI DJs in 2026 (ZIPDJ)](https://www.zipdj.com/blog/ai-djs)
-- [How AI is changing DJ sets in 2025 (Next Sound)](https://nextsound.net/features/how-ai-is-changing-dj-sets-and-electronic-music-production-in-2025)
+### Memory directives (constraints driving anti-features)
 
-### Internal references
-- `/Users/ozai/projects/dj-set-ai/.planning/PROJECT.md` — stakeholder vision and active scope
-- `/Users/ozai/projects/dj-set-ai/.planning/codebase/ARCHITECTURE.md` — POC capabilities (audio capture, MIDI ingestion, phase detection, audible-deck detection, mic gating, session recording)
+- `feedback_no_clap_use_gemini_embedding` — Gemini-only, no CLAP/MERT
+- `project_phase_16_kaan_dj_testing` — Kaan's DJ ear, not formal harness
+- `project_one_click_install_hard_req` — every dep choice rated green/yellow/red
+- `feedback_no_scope_creep_clean_utility` — clean utility only, BYO-key forbidden
+- `project_anti_slop_grounded_gemini_thesis` — central product principle
+- `project_v0_1_0_rc1_open_bugs` — Phases 15–20 absorbed into v2.0
 
 ---
-*Feature research for: AI live co-host for DJs (vibemix)*
-*Researched: 2026-05-11*
+
+*Feature research for: vibemix v2.0 Research-Driven Ship milestone*
+*Researched: 2026-05-14*
+*Confidence: HIGH on category structure + complexity hints + dependencies; MEDIUM on predictive firing / emote-tag spike (both gated on near-term experiments)*

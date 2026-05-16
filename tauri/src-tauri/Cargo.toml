@@ -51,6 +51,20 @@ file-rotate = "0.8"                                              # verified 2026
 # Filesystem helpers
 dirs-next = "2"                                                  # verified 2026-05-12
 
+# Phase 24 Plan 02 — macOS AX bridge for the djay Pro overlay-highlight
+# feature. AX queries live ONLY in the Rust parent (per Pitfall 3 / Tauri
+# #8329 — the Python sidecar can't inherit AX permissions). Crates gated
+# behind cfg(target_os = "macos") so Windows builds stay green.
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.24"          # CGWindowListCopyWindowInfo — djay window rect
+core-foundation = "0.10"        # CFDictionary / CFArray plumbing
+accessibility-sys = "0.1"       # AXUIElementCreateApplication / kAX* attributes
+# Phase 33 / INSTALL-02 — TCC permission check + request + state-change
+# subscribe used by the one-click install wizard and the in-session
+# revoke watcher (INSTALL-06 / P71). macOS-only — Windows degrades to
+# OS-managed runtime grant on first capture.
+tauri-plugin-macos-permissions = "2.3.0"
+
 [dev-dependencies]
 tempfile = "3"                                                   # verified 2026-05-12 — watchdog log-tail tests
 

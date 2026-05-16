@@ -76,6 +76,11 @@ _PHASE12_FIELDS: tuple[str, ...] = (
     # Phase 12 settings; default False (full v5 visual contract on fresh
     # installs). Read at boot by main.ts to set html[data-blur-perf].
     "lighter_blur",
+    # Phase 34 / SEC-08 — telemetry consent. Default False (OFF).
+    # Pitfall P67 — no dark pattern. Toggled only by the wizard
+    # step-telemetry-consent.ts on explicit user click. Skipping the
+    # wizard step leaves it False. Persisted alongside Phase 12 fields.
+    "telemetry_consent",
 )
 _PHASE11_FIELDS: tuple[str, ...] = (
     "first_run_completed",
@@ -154,6 +159,10 @@ class ConfigStore:
     push_to_mute_hotkey: str = field(default_factory=_default_hotkey)
     # Phase 14-04 — perf-blur preference (default False = full v5 visuals).
     lighter_blur: bool = False
+    # Phase 34 / SEC-08 — telemetry consent (default False = OFF).
+    # Pitfall P67 — no dark pattern; the field's existence does not imply
+    # consent. Only an explicit wizard toggle flips this to True.
+    telemetry_consent: bool = False
 
     # Phase 11 fields (preserved verbatim — sidecar reads only, Rust writes)
     first_run_completed: bool | None = None
@@ -201,7 +210,15 @@ class ConfigStore:
         # to reject ints. Same treatment applied to the other Phase 11
         # bool fields so the policy is uniform: silently drop garbage
         # rather than emit a broken ack.
-        for _bool_field in ("lighter_blur", "first_run_completed", "blackhole_install_seen"):
+        for _bool_field in (
+            "lighter_blur",
+            "first_run_completed",
+            "blackhole_install_seen",
+            # Phase 34 / SEC-08 — telemetry_consent gets the same guard.
+            # A corrupted on-disk value (e.g. "yes" or 1) silently falls
+            # back to default False (OFF) rather than coercing to True.
+            "telemetry_consent",
+        ):
             if _bool_field in kwargs and not isinstance(kwargs[_bool_field], bool):
                 kwargs.pop(_bool_field, None)
         return cls(extra=extra, **kwargs)

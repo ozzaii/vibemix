@@ -102,19 +102,26 @@ describe("mascot overlay chrome (Wave 4 — 14-05)", () => {
   });
 
   describe("src/mascot/chrome.css — wrapper anatomy", () => {
-    it("uses --glass-3 + --blur-glass-display + --glass-edge + 8px radius", () => {
+    // v0.1.0-rc1 dev session 2026-05-13 stripped the mascot chrome
+    // rectangle entirely (background: transparent, no border, no
+    // box-shadow). The mascot is now a bare 3D character floating
+    // over the desktop — Kaan's feedback was that the chrome read as
+    // a generic "video preview window" overlay. The previous test
+    // pinned the old chrome anatomy; this version pins the bare
+    // shape the de-chrome left behind.
+    it("declares a transparent .mascot-window with no chrome border", () => {
       const css = readFileSync(MASCOT_CHROME_CSS_PATH, "utf-8");
-      expect(css).toMatch(/var\(--glass-3\)/);
-      expect(css).toMatch(/var\(--blur-glass-display\)/);
-      expect(css).toMatch(/var\(--glass-edge\)/);
-      expect(css).toMatch(/border-radius:\s*8px/);
+      const block = css.match(/\.mascot-window\s*\{[^}]+\}/);
+      expect(block).toBeTruthy();
+      expect(block![0]).toMatch(/background:\s*transparent/);
+      expect(block![0]).toMatch(/border:\s*none/);
+      expect(block![0]).toMatch(/box-shadow:\s*none/);
     });
 
     it("declares .mascot-window with position: relative + overflow: hidden", () => {
-      // Both are required by the .border-anim utility (tokens.css:320).
+      // Position required for absolute-positioned canvas child; overflow
+      // bounds the scene.
       const css = readFileSync(MASCOT_CHROME_CSS_PATH, "utf-8");
-      // .mascot-window block — match position: relative and overflow: hidden
-      // inside the first .mascot-window { ... } block.
       const block = css.match(/\.mascot-window\s*\{[^}]+\}/);
       expect(block).toBeTruthy();
       expect(block![0]).toMatch(/position:\s*relative/);

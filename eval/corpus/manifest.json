@@ -1,0 +1,15 @@
+{
+  "version": "1",
+  "sessions": [
+    {"id": "hard_tek_01", "genre": "hard_tek", "duration_s": 1800, "source": "TBD-archive-org"},
+    {"id": "hard_tek_02", "genre": "hard_tek", "duration_s": 1800, "source": "TBD-archive-org"},
+    {"id": "techno_01", "genre": "techno", "duration_s": 1800, "source": "TBD-ccmixter"},
+    {"id": "techno_02", "genre": "techno", "duration_s": 1800, "source": "TBD-fma-electronic"},
+    {"id": "house_01", "genre": "house", "duration_s": 1800, "source": "TBD-ccmixter"},
+    {"id": "house_02", "genre": "house", "duration_s": 1800, "source": "TBD-fma-electronic"}
+  ],
+  "hard_tek_pct": 0.3333333333333333,
+  "genre_distribution": {"hard_tek": 2, "techno": 2, "house": 2},
+  "sessions_min": 6,
+  "_note": "Plan 27-03 skeleton manifest. Actual WAV files + source.txt + events.jsonl populated by KAAN-ACTION Item 4 corpus acquisition step. Diversity gate passes (3 genres, hard_tek=33%). Plan 04 CI eval.yml uses [skip-eval] PR label until corpus is populated."
+}

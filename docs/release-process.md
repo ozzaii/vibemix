@@ -12,12 +12,14 @@
    SignPath dashboard before cutting `v0.1.0`. If not yet approved, the
    Windows job runs in mock-signing mode and tagged releases are blocked
    from publishing (see "Mock-signing PR validation" below).
+   If status is unknown or unresolved, see `.planning/phases/21-sign-notarize-github-release-matrix/21-DEFERRED.md` Blocker B and follow `docs/signpath-application.md` to (re-)file.
 
 2. **Apple Developer ID Application certificate imported.**
    Follow `docs/signing-macos.md` to:
    - Generate the cert in the Apple Developer portal.
    - Export `.p12` with a strong passphrase.
    - base64-encode the `.p12` for the GHA secret.
+   If the Apple Developer Program Agreement update is pending (as of v2.0 entry), see `.planning/phases/21-sign-notarize-github-release-matrix/21-DEFERRED.md` Blocker A — Francesco-action.
 
 3. **Tauri updater keypair generated.**
    ```bash

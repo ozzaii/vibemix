@@ -14,6 +14,18 @@
 # for tests that don't load the bundle; .glb consumers (Phase 13 frontend
 # tests) install git-lfs in CI before checkout.
 *.glb filter=lfs diff=lfs merge=lfs -text
+
+# Phase 27 Plan 03 — eval/corpus WAV files (public-domain DJ sessions).
+# Six sessions × 30 min × 48kHz mono ≈ 200 MB total. LFS keeps fresh
+# clones small; PR CI loads only the pointer file unless the eval gate
+# fires (when it actually needs the audio).
+eval/corpus/sessions/**/*.wav filter=lfs diff=lfs merge=lfs -text
+# Phase 28 Plan 02 — synthetic embeddings parity fixture.
+# 1000 × 768 float32 ≈ 3 MB. Deterministic from a locked seed (see
+# tests/library/fixtures/_generate.py); regenerable by anyone but
+# tracked so CI doesn't have to regenerate to run the parity gate.
+tests/library/fixtures/synthetic_embeddings.npy filter=lfs diff=lfs merge=lfs -text
+tests/library/fixtures/synthetic_queries.json filter=lfs diff=lfs merge=lfs -text
 *.glb !text !filter !merge !diff
 *.wav !text !filter !merge !diff
 *.npy !text !filter !merge !diff

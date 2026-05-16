@@ -35,6 +35,7 @@ import os
 import signal
 import sys
 import threading
+from pathlib import Path
 
 import httpx
 import numpy as np
@@ -51,6 +52,7 @@ from vibemix.agent import (
     MIC_DEVICE,
     OPENROUTER_TTS_MODEL,
     OUTPUT_DEVICE,
+    SYSTEM_INSTRUCTION,
     TTS_FALLBACK_MODEL,
     TTS_MODEL,
     VOICE,
@@ -61,6 +63,14 @@ from vibemix.agent import (
     build_tts_chain,
     get_or_create_install_uuid,
     get_or_refresh_jwt,
+)
+from vibemix.agent.ack_bank import AckBank
+from vibemix.agent.cache import GeminiContextCache
+from vibemix.coach import (
+    STRIPPED_RATE_THRESHOLD,
+    CitationIpcShim,
+    CitationLinter,
+    StrippedRateTracker,
 )
 from vibemix.audio import (
     INPUT_CHUNK_FRAMES,
@@ -82,11 +92,20 @@ from vibemix.audio import (
     VoiceRecorder,
 )
 from vibemix.audio.recorder import sweep_crashed_sessions
+from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
-from vibemix.runtime import coach_loop, diag_loop, ws_broadcast
+from vibemix.profile import load_profile, render_profile_for_cache
+from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
+from vibemix.runtime.cancel import CancelGate
 from vibemix.runtime.config_store import app_data_dir, load_config
 from vibemix.runtime.recordings_index import run_retention_sweep
-from vibemix.state import EventDetector, MusicState, state_refresh_loop
+from vibemix.runtime.ttft import TTFTMeter
+from vibemix.state import (
+    EventDetector,
+    EvidenceRegistry,
+    MusicState,
+    state_refresh_loop,
+)
 
 load_dotenv()
 
@@ -142,7 +161,79 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Run the standalone session IPC loop (no cascade graph; Phase 12 W2).",
     )
+    # Phase 25 Plan 25-03 — DEBRIEF architectural slot (DEBRIEF-01). v2.0
+    # ships the entry-point + port constant + 3 IPC schema reservations
+    # only; the v2.1 implementation drops in the chaptered TL;DR + drill
+    # cards + clickable timeline behind this flag without touching the API
+    # surface (flag name, port, message types are locked here).
+    # ``nargs="?"`` lets the flag take an optional SESSION_DIR — bare
+    # ``--debrief`` registers the smoke / port-reservation banner; with a
+    # path it logs the reserved-session intent. Absence keeps ``None`` so
+    # the dispatch in cli_entry can distinguish "no flag" from "empty arg".
+    parser.add_argument(
+        "--debrief",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="SESSION_DIR",
+        help=(
+            "Run as post-session DEBRIEF sidecar — binds the DEBRIEF ws bus on "
+            "127.0.0.1:8766, emits the 3 reserved DEBRIEF schemas only, never "
+            "engages audio I/O or LiveKit. SESSION_DIR is the path to a "
+            "closed recordings/* session; omit for a no-op smoke. v2.0 "
+            "architectural slot — full UI feature ships v2.1 "
+            "(DEBRIEF-01 + DEBRIEF-02)."
+        ),
+    )
     return parser.parse_args(argv)
+
+
+# =============================================================================
+# DEBRIEF sidecar — Phase 25 Plan 25-03 architectural slot
+# =============================================================================
+
+
+# Port reserved for the v2.1 DEBRIEF ws bus. Lives separate from the live
+# mascot bus on 8765 (CONTEXT D-Area-1.1 / D-Area-1.3). v2.0 does NOT bind
+# this port — the constant is a forward-compatibility reservation only. v2.1
+# wires the real listener + 3-message emit path behind ``--debrief``.
+DEBRIEF_PORT: int = 8766
+
+
+def _run_debrief_sidecar(session_dir: str) -> None:
+    """Plan 29-02 DEBRIEF sidecar dispatch.
+
+    ``session_dir`` semantics:
+
+      * ``""`` (sentinel): bare ``--debrief`` was passed — log a banner
+        without doing work (useful for verifying flag plumbing).
+      * non-empty path: invoke :func:`vibemix.debrief.main.run` which
+        canonicalizes the path, validates it lives under recordings
+        root, runs the cache-hit fast path / first-time generation, and
+        starts the WS server on 127.0.0.1:DEBRIEF_PORT (8766).
+
+    Errors from the orchestrator surface as ``ipc.debrief.error`` frames
+    over the WS bus, then the process exits cleanly. See plan 29-02
+    SUMMARY for the reason codes.
+    """
+    import logging
+
+    logger = logging.getLogger("vibemix.debrief")
+    if not logging.getLogger().handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        )
+    if not session_dir:
+        logger.info(
+            "[debrief] no session_dir provided; port %d reserved.",
+            DEBRIEF_PORT,
+        )
+        return
+    logger.info("[debrief] starting sidecar for %r (port %d)", session_dir, DEBRIEF_PORT)
+    from vibemix.debrief.main import run as run_debrief
+
+    run_debrief(session_dir, port=DEBRIEF_PORT)
 
 
 # =============================================================================
@@ -259,6 +350,21 @@ async def main() -> None:
       VIBEMIX_PROXY_BASE_URL = 'https://api.altidus.world' (default)
       VIBEMIX_CLIENT_VERSION = vibemix.__version__ (default)
     """
+    # ----- Phase 34 / SEC-10 — auditable privacy banner -----
+    # Emitted to stderr BEFORE any network activity so a user reading the
+    # sidecar log sees the privacy posture before the proxy /register
+    # call. Telemetry state is read from the persisted ConfigStore.
+    try:
+        from vibemix.runtime.sec_check import print_security_banner
+
+        _cfg = load_config()
+        print_security_banner(
+            telemetry_on=getattr(_cfg, "telemetry_consent", False),
+            version=__version__,
+        )
+    except Exception as _e:  # pragma: no cover — banner must never crash
+        print(f"[sec_check] banner skipped: {_e}", file=sys.stderr)
+
     # ----- Phase 5 mode dispatch -----
     mode = os.environ.get("VIBEMIX_LLM_MODE", "direct").lower()
     proxy_base_url = os.environ.get("VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world")
@@ -329,9 +435,12 @@ async def main() -> None:
     # still start.
     try:
         cfg_for_sweep = load_config()
-        pruned = run_retention_sweep(recordings_root, cfg_for_sweep.retention_days)
-        if pruned:
-            print(f"-> retention sweep (boot): pruned {len(pruned)} session(s)")
+        result = run_retention_sweep(recordings_root, cfg_for_sweep.retention_days)
+        if result.deleted_names:
+            print(
+                f"-> retention sweep (boot): pruned {len(result.deleted_names)} "
+                f"session(s) ({result.bytes_pruned} bytes)"
+            )
     except Exception as e:
         print(f"[retention sweep boot err] {e}", file=sys.stderr)
 
@@ -353,12 +462,39 @@ async def main() -> None:
     state = MusicState()
     state.set_start_at = _time.time()
     state.phase_started_at = _time.time()
-    event_detector = EventDetector()
+    # Phase 17 Plan 05 — pass audio_buf to EventDetector so genre-chain
+    # detectors that need raw samples (KickSwap, PhraseBoundary) can call
+    # snapshot APIs on it. Default-None signature in EventDetector.__init__
+    # keeps the no-arg form working for tests + coach.py callers.
+    event_detector = EventDetector(audio_buf=audio_buf)
 
     # --- Audio I/O via AudioMacOS firewall ---
     audio_backend = AudioMacOS(registry, recorder)
-    input_idx = audio_backend.find_device(INPUT_DEVICE, "input")
-    output_idx = audio_backend.find_device(OUTPUT_DEVICE, "output")
+    try:
+        input_idx = audio_backend.find_device(INPUT_DEVICE, "input")
+        output_idx = audio_backend.find_device(OUTPUT_DEVICE, "output")
+    except RuntimeError as e:
+        # Most common real-world fail: BlackHole 2ch isn't installed
+        # (INPUT_DEVICE missing). Exit 3 is the sidecar's "audio-device-
+        # missing" sentinel — the Tauri shell shows a setup banner with
+        # the BlackHole install link rather than the generic crash UI.
+        is_input_miss = INPUT_DEVICE in str(e)
+        device_kind = "input" if is_input_miss else "output"
+        device_name = INPUT_DEVICE if is_input_miss else OUTPUT_DEVICE
+        print(
+            f"[FATAL] required audio device missing: {device_name!r} ({device_kind})",
+            file=sys.stderr,
+            flush=True,
+        )
+        print(f"[FATAL] {e}", file=sys.stderr, flush=True)
+        if is_input_miss:
+            print(
+                "[FATAL] install BlackHole 2ch via `brew install blackhole-2ch` "
+                "or https://existential.audio/blackhole/",
+                file=sys.stderr,
+                flush=True,
+            )
+        sys.exit(3)
 
     stop_event = asyncio.Event()
 
@@ -424,6 +560,112 @@ async def main() -> None:
         tts_inst = build_tts_chain(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
         print(f"-> tts:   {OPENROUTER_TTS_MODEL} via proxy (voice={VOICE})")
 
+    # ---- Plan 19-05 — Phase 19 latency-stack wiring ----
+    # Construct the four primitives BEFORE the agent so we can pass
+    # cache + ttft_meter into DJCoHostAgent and ack_bank + cancel_gate
+    # + ttft_meter + playback into coach_loop.
+    ttft_meter = TTFTMeter()
+    ack_bank = AckBank()  # eager-loads 40 OPUS files; raises AckBankError on bad shape
+    cancel_gate = CancelGate()
+    # Plan 32-02 / PROFILE-03 — load long-term DJ profile into the cache body.
+    # P60: profile lives in the CACHE, never in the per-turn prompt. If the
+    # file is missing or invalid, ``profile_dict`` is None and the cache section
+    # is the empty string — byte-identical to the pre-Phase-32 cache body.
+    profile_dict = load_profile()
+    profile_section = render_profile_for_cache(profile_dict)
+    if profile_dict is not None:
+        print(f"-> profile: loaded ({len(profile_section)} chars in cache section)")
+    cache: GeminiContextCache | None = GeminiContextCache(
+        client=genai_client,
+        system_instruction_body=SYSTEM_INSTRUCTION,
+        model=LLM_MODEL,
+        profile_section=profile_section,
+    )
+    try:
+        await cache.create()
+        print("-> cache: warm (Gemini context cache active)")
+    except Exception as e:
+        print(f"-> cache disabled: {e}", file=sys.stderr)
+        cache = None  # graceful degradation — agent's None-cache branch handles it
+
+    # ---- Plan 20-05 — Phase 20 anti-slop runtime wiring ----
+    # Env-var gate: VIBEMIX_ANTI_SLOP defaults to "on". Set to "off" / "0" /
+    # "false" to fall back to the legacy non-wired path (v4 byte-identical
+    # legacy emit path inside DJCoHostAgent.llm_node). Default-on because
+    # anti-slop IS the v2.0 product — Phase 20's central thesis.
+    #
+    # The EvidenceRegistry is constructed unconditionally so state_refresh_loop
+    # always has a target for observation writes; only the linter + tracker
+    # flip on/off via the env flag. Threading the registry into the agent
+    # gives the linter a non-empty snapshot to validate against (without
+    # this, every response strips with reason='no_citations').
+    anti_slop_flag = os.environ.get("VIBEMIX_ANTI_SLOP", "on").strip().lower()
+    anti_slop_enabled = anti_slop_flag not in ("off", "0", "false")
+    print(
+        "-> anti-slop: "
+        f"{'on' if anti_slop_enabled else 'off (VIBEMIX_ANTI_SLOP)'}"
+    )
+    evidence_registry = EvidenceRegistry()
+    citation_linter = CitationLinter() if anti_slop_enabled else None
+    stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
+    # In-process IpcBus shim — Plan 20-04's coach_loop publish gate
+    # duck-types against ``await ipc_bus.emit(dict)``. The shim buffers each
+    # SessionCitation envelope into a bounded deque (no I/O). v2.x follow-up
+    # multiplexes the buffer onto the mascot ws_broadcast clients (the WS
+    # port is already owned by ws_broadcast — see citation_ipc_shim docstring
+    # for the two-option v2.x wiring path).
+    citation_shim: CitationIpcShim | None = (
+        CitationIpcShim() if anti_slop_enabled else None
+    )
+
+    def _citation_telemetry() -> dict:
+        """Closure invoked by ``coach_loop``'s publish gate every
+        ``CITATION_PUBLISH_INTERVAL_S`` (2.0s). Reads fresh from the
+        StrippedRateTracker + EvidenceRegistry on every call so the
+        emitted SessionCitation envelope reflects the latest state.
+
+        Returns the 4 keys ``SessionCitation.make()`` expects:
+
+        - ``slop_ratio``: placeholder ``1 / (1 + mean)`` derived from the
+          rolling-50-turn citation-count mean — drops toward 0 as Gemini
+          emits more citations. The true slop metric (slop-vs-clean turn
+          ratio) is a v2.x refinement once we have a stable definition;
+          the placeholder is intentionally loud (1.0 at cold-start)
+          rather than silent.
+        - ``stripped_rate_15s``: tracker rate fresh per call. 0.0 when
+          tracker is None (anti-slop disabled).
+        - ``last_unverified_response``: ``None`` — no simple existing
+          source. v2.x adds a 5-entry ring buffer of stripped/bypassed
+          response texts so the Settings → Diagnostics surface can show
+          the most recent unverified emission.
+        - ``bypass_active``: non-destructive read — ``rate >
+          STRIPPED_RATE_THRESHOLD``. We deliberately do NOT call
+          ``tracker.should_bypass()`` here because that's the one-shot
+          latch consumer; using it from telemetry would race the gate
+          decision in the agent's llm_node strip path.
+
+        T-20-05-03: the callable must not raise. ``coach_loop`` does
+        wrap it in try/except, but staying clean keeps the publish path
+        quiet.
+        """
+        reg_tel = evidence_registry.citation_telemetry()
+        mean = reg_tel.get("mean", 0.0)
+        slop_ratio = 1.0 / (1.0 + mean) if mean > 0 else 1.0
+        rate = (
+            stripped_rate_tracker.rate()
+            if stripped_rate_tracker is not None
+            else 0.0
+        )
+        bypass_active = (
+            stripped_rate_tracker is not None and rate > STRIPPED_RATE_THRESHOLD
+        )
+        return {
+            "slop_ratio": float(slop_ratio),
+            "stripped_rate_15s": float(rate),
+            "last_unverified_response": None,  # v2.x follow-up
+            "bypass_active": bool(bypass_active),
+        }
+
     agent = DJCoHostAgent(
         genai_client=genai_client,
         clean_audio_buf=clean_audio_buf,
@@ -432,7 +674,74 @@ async def main() -> None:
         recorder=recorder,
         llm_inst=llm_inst,
         tts_inst=tts_inst,
+        cache=cache,
+        ttft_meter=ttft_meter,
+        evidence_registry=evidence_registry,
+        citation_linter=citation_linter,
+        stripped_rate_tracker=stripped_rate_tracker,
+        ack_bank=ack_bank,
+        playback=playback,
+        # Plan 32-03 / PROFILE-04 — same dict already injected into the cache
+        # body via render_profile_for_cache above. Stored on the agent for
+        # Settings → Profile panel diagnostics; NEVER read inside llm_node
+        # (P60). None default keeps v2.0 4-kwarg call shape byte-identical.
+        profile=profile_dict,
     )
+
+    # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──
+    library_cache = Path.home() / ".cache" / "vibemix" / "library.pkl"
+    if library_cache.exists():
+        lib = RekordboxLibrary()
+        if lib.try_load_cache():
+            registered = evidence_registry.register_library(lib)
+            print(f"-> library: {registered} tracks registered for [track:<id>] citations")
+        else:
+            print("-> library: cache present but failed to load — skipping registration")
+    else:
+        print("-> library: no cache at ~/.cache/vibemix/library.pkl — citations limited to nowplaying-cli")
+
+    # ── Plan 28-07 — 30-day staleness nudge ──
+    # Once-per-boot check. emit_ipc currently logs to stdout; the renderer
+    # IpcBus subscription is added in the same wave's UI banner spec. Plan
+    # 28-09's ipc.library.staleness_nudge schema validates the payload shape.
+    try:
+        from vibemix.library import emit_nudge_if_stale as _emit_staleness
+
+        def _staleness_emit(msg_type: str, payload: dict) -> None:
+            # v1: log a structured line; the WS bus broadcast path lands
+            # alongside the Plan 28-06 drag-drop wiring (same renderer
+            # subscription pipeline).
+            print(
+                f"-> [ipc.outbound] {msg_type} {payload}",
+                flush=True,
+            )
+
+        _emit_staleness(_staleness_emit, library_cache)
+    except Exception as e:
+        print(f"-> staleness check failed: {e}", file=sys.stderr)
+
+    # ── Plan 28-04 — grounding pipeline (event-gated, P56 cost ceiling) ──
+    # Build Grounding lazily — only when (a) library cache exists AND
+    # (b) the proxy probe shows the embedContent route is available. The
+    # agent reads ``grounding`` via kwargs (Pitfall P53); the agent path
+    # tolerates ``None`` and falls back to nowplaying-cli citations only.
+    grounding = None
+    if library_cache.exists():
+        try:
+            from vibemix.library import (
+                LibraryEmbedder as _LibraryEmbedder,
+                Grounding as _Grounding,
+                open_store as _open_store,
+            )
+
+            _embed_client = genai_client  # already proxy-wired upstream
+            _library_embedder = _LibraryEmbedder(_embed_client)
+            _library_store = _open_store()
+            grounding = _Grounding(_library_embedder, _library_store)
+            print("-> grounding: armed (event-gated, threshold=0.7)")
+        except Exception as e:
+            print(f"-> grounding: disabled ({e})", file=sys.stderr)
+            grounding = None
 
     session = AgentSession(llm=llm_inst, tts=tts_inst)
     session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
@@ -455,7 +764,12 @@ async def main() -> None:
     track_task = asyncio.create_task(track_macos.run_poll_loop(stop_event))
     refresh_task = asyncio.create_task(
         state_refresh_loop(
-            state, audio_buf, midi_macos.controller_state, track_macos.track_info, stop_event
+            state,
+            audio_buf,
+            midi_macos.controller_state,
+            track_macos.track_info,
+            stop_event,
+            evidence_registry=evidence_registry,
         )
     )
     coach_task = asyncio.create_task(
@@ -469,8 +783,26 @@ async def main() -> None:
             manual_trigger,
             trigger_state,
             stop_event,
+            ack_bank=ack_bank,
+            cancel_gate=cancel_gate,
+            ttft_meter=ttft_meter,
+            playback=playback,
+            ipc_bus=citation_shim,
+            citation_telemetry=_citation_telemetry if anti_slop_enabled else None,
         )
     )
+
+    # Plan 19-05 — spawn cache refresh_loop AFTER session.start so the
+    # cache lifecycle runs alongside the live event loop. Skipped when
+    # cache is None (graceful degradation path).
+    cache_refresh_task: asyncio.Task | None = None
+    if cache is not None:
+        cache_refresh_task = asyncio.create_task(cache.refresh_loop(stop_event))
+
+    # Orphan-process self-shutdown — trips stop_event if Tauri parent
+    # dies abruptly so the live runtime closes audio streams + session
+    # cleanly instead of orphaning under launchd with port 8765 held.
+    parent_watch_task = asyncio.create_task(watch_parent(stop_event))
 
     # --- Input stream — last because state must be ready ---
     input_stream = audio_backend.open_capture(
@@ -488,7 +820,18 @@ async def main() -> None:
         await stop_event.wait()
     finally:
         midi_stop.set()
-        for t in (coach_task, refresh_task, screen_task, ws_task, diag_task, track_task):
+        cleanup_tasks: list[asyncio.Task] = [
+            coach_task,
+            refresh_task,
+            screen_task,
+            ws_task,
+            diag_task,
+            track_task,
+            parent_watch_task,
+        ]
+        if cache_refresh_task is not None:
+            cleanup_tasks.append(cache_refresh_task)
+        for t in cleanup_tasks:
             t.cancel()
             try:
                 await t
@@ -520,12 +863,14 @@ async def main() -> None:
         # retention_days fresh in case the user changed it mid-session.
         try:
             cfg_for_close_sweep = load_config()
-            pruned_close = run_retention_sweep(
+            result_close = run_retention_sweep(
                 recordings_root, cfg_for_close_sweep.retention_days
             )
-            if pruned_close:
+            if result_close.deleted_names:
                 print(
-                    f"-> retention sweep (close): pruned {len(pruned_close)} session(s)"
+                    f"-> retention sweep (close): pruned "
+                    f"{len(result_close.deleted_names)} session(s) "
+                    f"({result_close.bytes_pruned} bytes)"
                 )
         except Exception as e:
             print(f"[retention sweep close err] {e}", file=sys.stderr)
@@ -535,6 +880,263 @@ async def main() -> None:
 # =============================================================================
 # Entry point
 # =============================================================================
+
+
+def _enable_line_buffering() -> None:
+    """Flip stdout/stderr to line-buffered so the Tauri rotating log captures
+    diagnostic lines in real time instead of in 4–8 KB pipe-buffer batches.
+
+    Why: CPython's default is line-buffered when isatty(), fully-buffered
+    otherwise. The Tauri shell spawns the sidecar through a pipe so stderr
+    falls into the fully-buffered branch — ``[FATAL] ws_bus port bind failed``
+    can sit in the buffer until the process exits, which makes the watchdog's
+    ``read_last_log_line`` race the FATAL marker and surface the wrong tail.
+
+    Best-effort: if the streams have been replaced by something without
+    ``reconfigure`` (frozen-app edge cases) or are already closed, we silently
+    fall through. The log will lag in that case but nothing breaks.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            pass
+
+
+# ─── Phase 28 — `vibemix library` CLI subcommand group ──────────────────────
+
+
+def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
+    """Build the `library` subparser tree. Plan 28-03 owns `search`; later
+    plans append their own subcommands by importing this helper."""
+    sub = parser.add_subparsers(dest="library_command", required=True)
+
+    # Plan 28-03 — search
+    sp_search = sub.add_parser(
+        "search", help="Natural-language vibe-search against your library"
+    )
+    sp_search.add_argument("query", help="vibe-search query string")
+    sp_search.add_argument(
+        "--k", type=int, default=10, help="number of matches (default 10)"
+    )
+    sp_search.add_argument(
+        "--json",
+        action="store_true",
+        default=True,
+        help="emit JSON to stdout (default: on)",
+    )
+    sp_search.set_defaults(func=_cmd_library_search)
+
+    # Plan 28-05 — similar (USER-ASKED only; never autosurfaces)
+    sp_similar = sub.add_parser(
+        "similar",
+        help="Find tracks similar to a seed track (USER-ASKED only)",
+        description=(
+            "USER-ASKED similar-track lookup. This command is the only "
+            "supported entrypoint — vibemix never autosurfaces 'you might "
+            "also like' suggestions in live sessions (anti-feature guard "
+            "per CONTEXT LIBRARY-14)."
+        ),
+    )
+    sp_similar.add_argument("track_id", help="seed track id")
+    sp_similar.add_argument("--k", type=int, default=10)
+    sp_similar.set_defaults(func=_cmd_library_similar)
+
+    # Plan 28-08 — budget telemetry + projection
+    sp_budget = sub.add_parser(
+        "budget", help="Show monthly Gemini Embedding cost projection"
+    )
+    sp_budget.add_argument(
+        "--dau", type=int, default=1000, help="daily-active users (default 1000)"
+    )
+    sp_budget.add_argument("--json", action="store_true")
+    sp_budget.set_defaults(func=_cmd_library_budget)
+
+
+def _run_library_cli(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="vibemix library")
+    _build_library_subparsers(parser)
+    args = parser.parse_args(argv)
+    return int(args.func(args) or 0)
+
+
+def _cmd_library_search(args: argparse.Namespace) -> int:
+    import json as _json
+    import os as _os
+
+    from vibemix.agent.proxy_client import build_proxy_genai_client
+    from vibemix.library import (
+        LibraryEmbedder,
+        RekordboxLibrary,
+        open_store,
+        vibe_search,
+    )
+
+    proxy_jwt = _os.environ.get("VIBEMIX_PROXY_JWT")
+    proxy_url = _os.environ.get(
+        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
+    )
+    if not proxy_jwt:
+        print(
+            _json.dumps(
+                {
+                    "error": (
+                        "VIBEMIX_PROXY_JWT not set. Export the sidecar JWT "
+                        "or run via the Tauri shell."
+                    ),
+                    "results": [],
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    lib = RekordboxLibrary()
+    if not lib.try_load_cache():
+        print(
+            _json.dumps(
+                {
+                    "error": (
+                        "No library cache. Drag a Rekordbox XML onto "
+                        "Settings → Library first."
+                    ),
+                    "results": [],
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    client = build_proxy_genai_client(proxy_jwt, proxy_url)
+    embedder = LibraryEmbedder(client)
+    store = open_store()
+    try:
+        results, cache_hit = vibe_search(
+            embedder, store, lib, args.query, k=args.k
+        )
+    finally:
+        store.close()
+
+    _json.dump(
+        {
+            "query": args.query,
+            "cache_hit": cache_hit,
+            "results": [r.to_dict() for r in results],
+        },
+        sys.stdout,
+        indent=2,
+    )
+    sys.stdout.write("\n")
+    return 0
+
+
+def _cmd_library_similar(args: argparse.Namespace) -> int:
+    """Plan 28-05 — USER-ASKED similar-track query."""
+    import json as _json
+    import os as _os
+
+    from vibemix.agent.proxy_client import build_proxy_genai_client
+    from vibemix.library import (
+        LibraryEmbedder,
+        RekordboxLibrary,
+        open_store,
+    )
+    from vibemix.library.similar import similar_to
+
+    proxy_jwt = _os.environ.get("VIBEMIX_PROXY_JWT")
+    proxy_url = _os.environ.get(
+        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
+    )
+    if not proxy_jwt:
+        print(
+            _json.dumps(
+                {
+                    "error": "VIBEMIX_PROXY_JWT not set.",
+                    "results": [],
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    lib = RekordboxLibrary()
+    if not lib.try_load_cache():
+        print(
+            _json.dumps(
+                {"error": "No library cache.", "results": []}
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    client = build_proxy_genai_client(proxy_jwt, proxy_url)
+    embedder = LibraryEmbedder(client)
+    store = open_store()
+    try:
+        results = similar_to(
+            embedder, store, lib, args.track_id, k=args.k
+        )
+    finally:
+        store.close()
+    _json.dump(
+        {
+            "track_id": args.track_id,
+            "results": [r.to_dict() for r in results],
+        },
+        sys.stdout,
+        indent=2,
+    )
+    sys.stdout.write("\n")
+    return 0
+
+
+def _cmd_library_budget(args: argparse.Namespace) -> int:
+    """Plan 28-08 — monthly Gemini Embedding cost projection + telemetry."""
+    import json as _json
+    from dataclasses import asdict as _asdict
+
+    from vibemix.library.budget import (
+        BUDGET_CEILING_EUR,
+        get_telemetry,
+        project_monthly_cost,
+    )
+
+    p = project_monthly_cost(dau=args.dau)
+    tel = get_telemetry()
+
+    if getattr(args, "json", False):
+        _json.dump(
+            {
+                "projection": _asdict(p),
+                "telemetry": tel.as_dict(),
+                "dau": args.dau,
+            },
+            sys.stdout,
+            indent=2,
+        )
+        sys.stdout.write("\n")
+        return 0
+
+    print(f"\nPhase 28 Cost Projection @ DAU={args.dau}\n")
+    print(f"  Feature                         Monthly (EUR)")
+    print(f"  One-time library indexing       {p.indexing_eur:>8.2f}")
+    print(f"  Vibe-search NL queries          {p.vibe_search_eur:>8.2f}")
+    print(f'  "What\'s playing" grounding      {p.grounding_eur:>8.2f}')
+    print(f"  Track-to-track similarity       {p.similar_eur:>8.2f}")
+    print(f"  Session-end retrieval embed     {p.session_retrieval_eur:>8.2f}")
+    print(f"  ────────────────────────────────────────────")
+    print(f"  Total                           {p.total_eur:>8.2f}")
+    print(f"  Ceiling                         {p.ceiling_eur:>8.2f}")
+    print(f"  Under budget                    {p.under_budget}")
+    print()
+    print("Runtime telemetry (this process):")
+    td = tel.as_dict()
+    print(f"  audio_embeds:               {td['audio_embeds']}")
+    print(f"  text_embeds:                {td['text_embeds']}")
+    print(f"  cache_hits:                 {td['cache_hits']}")
+    print(f"  current_cost_estimate_eur:  {td['current_cost_estimate_eur']:.4f}")
+    print(f"  cost_warning_active:        {td['cost_warning_active']}")
+    return 0
 
 
 def cli_entry(argv: list[str] | None = None) -> None:
@@ -553,8 +1155,25 @@ def cli_entry(argv: list[str] | None = None) -> None:
     will flip the post-wizard spawn to ``vibemix --session`` once the
     session loop owns the snapshot path the renderer drives off.
     """
+    _enable_line_buffering()
+    # Phase 28 — `vibemix library <subcommand>` is dispatched BEFORE
+    # _parse_args so the legacy --wizard / --session / --debrief flag layer
+    # is untouched. Plan 28-03 owns `search`; Plan 28-05 will add `similar`,
+    # Plan 28-08 will add `budget` via the same _build_library_subparsers
+    # helper below.
+    raw_argv = sys.argv[1:] if argv is None else list(argv)
+    if raw_argv and raw_argv[0] == "library":
+        sys.exit(_run_library_cli(raw_argv[1:]))
+
     args = _parse_args(argv)
     try:
+        if args.debrief is not None:
+            # Phase 25 Plan 25-03 — DEBRIEF architectural slot. Dispatched
+            # before --wizard / --session because it MUST NOT engage audio
+            # I/O or LiveKit (v2.0 contract: log + return only). v2.1 will
+            # wire the real session-replay loop here.
+            _run_debrief_sidecar(session_dir=args.debrief)
+            return
         if args.wizard:
             # Deferred import — the live-runtime path doesn't need the
             # wizard module loaded.

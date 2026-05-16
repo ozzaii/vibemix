@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Debrief —</title>
+    <!--
+      Phase 29 Plan 29-05 — Post-session debrief window.
+
+      Second-window entry opened by tauri/src-tauri/src/debrief_window.rs
+      ::open_debrief_window with `?session=<encoded path>` query param.
+      The window connects to ws://127.0.0.1:8766 (Plan 29-02 sidecar) and
+      renders progressive frames (session-loaded → chapter-list → drills
+      → tldr-audio) into a CDJ Whisper visual surface.
+    -->
+    <link rel="stylesheet" href="/src/tokens.css" />
+    <link rel="stylesheet" href="/src/debrief/styles/debrief.css" />
+  </head>
+  <body>
+    <div id="debrief-root" class="vmx-debrief-root">
+      <header class="vmx-debrief-titlebar" data-tauri-drag-region>
+        <div class="vmx-debrief-title" data-tauri-drag-region>Debrief</div>
+        <div class="vmx-debrief-session" id="vmx-debrief-session"
+             data-tauri-drag-region></div>
+      </header>
+      <main class="vmx-debrief-layout">
+        <aside class="vmx-debrief-sidebar" id="vmx-debrief-sidebar">
+          <h2 class="vmx-debrief-section-title">Chapters</h2>
+          <ol class="vmx-debrief-chapters" id="vmx-debrief-chapters"
+              aria-live="polite"></ol>
+        </aside>
+        <section class="vmx-debrief-main" id="vmx-debrief-main">
+          <div class="vmx-debrief-tldr" id="vmx-debrief-tldr">
+            <h2 class="vmx-debrief-section-title">TL;DR</h2>
+            <div class="vmx-debrief-tldr-player" id="vmx-debrief-tldr-player">
+              <p class="vmx-debrief-skeleton">Generating voiced summary…</p>
+            </div>
+          </div>
+          <div class="vmx-debrief-timeline" id="vmx-debrief-timeline">
+            <h2 class="vmx-debrief-section-title">Timeline</h2>
+            <div id="vmx-debrief-waveform" class="vmx-debrief-waveform"></div>
+          </div>
+        </section>
+        <section class="vmx-debrief-drills" id="vmx-debrief-drills">
+          <h2 class="vmx-debrief-section-title">Drills</h2>
+          <div id="vmx-debrief-drills-list"
+               class="vmx-debrief-drills-list">
+            <p class="vmx-debrief-skeleton">Generating drills…</p>
+          </div>
+        </section>
+      </main>
+      <div id="vmx-debrief-error-banner" class="vmx-debrief-error-banner"
+           hidden></div>
+      <div id="vmx-debrief-tooltip" class="vmx-debrief-tooltip" hidden></div>
+    </div>
+    <script type="module" src="/src/debrief/debrief-window.ts"></script>
+  </body>
+</html>

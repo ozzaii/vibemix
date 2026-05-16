@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from vibemix.prompts.filter import filter_for_slop
 from vibemix.prompts.matrix import (
+    CITATION_GRAMMAR_BLOCK,
     COACH_BEGINNER,
     COACH_INTERMEDIATE,
     COACH_PRO,
@@ -34,6 +35,7 @@ from vibemix.prompts.scorecard import summarize_session
 from vibemix.prompts.turn_history import TurnHistory
 
 __all__ = [
+    "CITATION_GRAMMAR_BLOCK",
     "COACH_BEGINNER",
     "COACH_INTERMEDIATE",
     "COACH_PRO",

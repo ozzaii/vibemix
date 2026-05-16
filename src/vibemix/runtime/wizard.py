@@ -51,6 +51,7 @@ import time
 import wave
 from pathlib import Path
 
+from vibemix.runtime.parent_watchdog import watch_parent
 from vibemix.runtime.ws_bus import WizardBus
 from vibemix.ui_bus.messages import (
     CalibrationAudioResult,
@@ -73,14 +74,15 @@ log = logging.getLogger("vibemix.wizard")
 # Bundled fallback greeting WAV — Wave 4 ships ``offline-greeting.wav`` under
 # ``tauri/ui/public/audio/`` so the smoke test still plays audio when Gemini
 # is down on first launch. ``scripts/gen_offline_greeting.py`` regenerates it.
-_OFFLINE_GREETING_PATH = (
-    Path(__file__).resolve().parents[3]
-    / "tauri"
-    / "ui"
-    / "public"
-    / "audio"
-    / "offline-greeting.wav"
-)
+def _resolve_offline_greeting_path() -> Path:
+    rel = Path("tauri") / "ui" / "public" / "audio" / "offline-greeting.wav"
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return Path(meipass) / rel
+    return Path(__file__).resolve().parents[3] / rel
+
+
+_OFFLINE_GREETING_PATH = _resolve_offline_greeting_path()
 
 
 class WizardLoop:
@@ -96,6 +98,7 @@ class WizardLoop:
         self.bus = bus
         self._stop = asyncio.Event()
         self._status_tick_task: asyncio.Task | None = None
+        self._parent_watch_task: asyncio.Task | None = None
         self._user_heard_tone_event = asyncio.Event()
         self._user_heard_tone_result: bool | None = None
 
@@ -123,30 +126,93 @@ class WizardLoop:
         # ipc.wizard.start (re-run) — registered as a no-op stop trigger here;
         # the live-runtime path in Phase 12 will own the re-run UX.
         self.bus.register_handler("ipc.wizard.start", self._on_wizard_start)
+        # Phase 32 / PROFILE-05 — first-launch consent persistence. The
+        # wizard's profile-consent step fires this BEFORE smoke-test so the
+        # sidecar has the consent flag committed to state.json before the
+        # session-runtime path inherits it.
+        self.bus.register_handler(
+            "ipc.profile.set_consent", self._on_profile_set_consent
+        )
 
     async def boot(self) -> None:
         """Emit ``ipc.boot {ready: true}`` so the Tauri shell can render
-        the wizard. Called exactly once after ``register_handlers``."""
+        the wizard. Called exactly once after ``register_handlers``.
+
+        Also fires platform permission requests for any kind that resolves
+        to ``notDetermined`` so vibemix registers with TCC immediately
+        (otherwise the OS only adds the app to System Settings → Privacy
+        list AFTER first capture-API invocation, which can be confusing
+        when the wizard's Grant button just deep-links to Settings).
+        The prime runs in a worker thread because
+        ``CGRequestScreenCaptureAccess`` blocks until the user dismisses
+        the consent prompt — without offload it would stall the asyncio
+        loop, the websocket clients would time out, and the webview would
+        flap reconnecting until the user clicked.
+        """
         await self.bus.emit(json.loads(IpcBoot.make(ready=True).to_json()))
+        asyncio.create_task(asyncio.to_thread(self._prime_tcc_registration))
+
+    def _prime_tcc_registration(self) -> None:
+        try:
+            from vibemix.platform import permissions  # noqa: PLC0415
+        except Exception as exc:  # pragma: no cover
+            log.warning("permissions module unavailable: %r", exc)
+            return
+        try:
+            mic_status = permissions.check_microphone_permission()
+            print(f"[tcc-prime] microphone status: {mic_status}", flush=True)
+            if mic_status == "notDetermined":
+                permissions.request_microphone_permission()
+                print("[tcc-prime] microphone request fired", flush=True)
+        except Exception as exc:  # pragma: no cover
+            log.warning("priming microphone TCC failed: %r", exc)
+        try:
+            scr_status = permissions.check_screen_recording_permission()
+            print(f"[tcc-prime] screen_recording status: {scr_status}", flush=True)
+            # macOS CGPreflightScreenCaptureAccess returns a boolean — there's
+            # no notDetermined state for screen capture. Always call
+            # CGRequestScreenCaptureAccess on first wizard boot: it shows
+            # the consent prompt if no decision was made, or returns the
+            # cached value if already decided. Either way the app gets
+            # registered in System Settings → Privacy → Screen Recording.
+            if scr_status != "authorized":
+                granted = permissions.request_screen_recording_permission()
+                print(f"[tcc-prime] screen_recording request fired -> {granted}", flush=True)
+        except Exception as exc:  # pragma: no cover
+            log.warning("priming screen-recording TCC failed: %r", exc)
 
     # ------------------------------------------------------------------
     # Handlers
     # ------------------------------------------------------------------
 
     async def _on_permission_check(self, msg: dict) -> None:
-        """Resolve permission state via the platform selector."""
+        """Resolve permission state via the platform selector.
+
+        If status is ``notDetermined``, also fires the platform's request API
+        so the OS surfaces the native consent dialog and the app gets added
+        to the Privacy & Security list. Subsequent polls pick up the new
+        state.
+        """
         kind = msg.get("payload", {}).get("kind")
         if kind not in ("screen_recording", "microphone"):
             log.warning("permission.check: unknown kind %r — ignored", kind)
             return
-        # Deferred import — keeps wizard boot lightweight; AVFoundation
-        # only resolves on darwin.
         from vibemix.platform import permissions  # noqa: PLC0415
 
         if kind == "screen_recording":
             status = permissions.check_screen_recording_permission()
+            if status == "notDetermined":
+                try:
+                    permissions.request_screen_recording_permission()
+                except Exception as exc:  # pragma: no cover — degrade gracefully
+                    log.warning("request_screen_recording_permission failed: %r", exc)
         else:
             status = permissions.check_microphone_permission()
+            if status == "notDetermined":
+                try:
+                    permissions.request_microphone_permission()
+                except Exception as exc:  # pragma: no cover
+                    log.warning("request_microphone_permission failed: %r", exc)
         reply = PermissionState.make(kind=kind, status=status)
         await self.bus.emit(json.loads(reply.to_json()))
 
@@ -370,6 +436,30 @@ class WizardLoop:
         """
         log.info("wizard start requested (Phase 12 owns the re-run UX)")
 
+    async def _on_profile_set_consent(self, msg: dict) -> None:
+        """Phase 32 / PROFILE-05 — persist profile_consent to state.json.
+
+        The wizard's profile-consent step fires this on Continue. Default-OFF
+        is enforced at the UI; the sidecar honors whatever boolean arrives.
+        Replies with ``ipc.profile.consent_state`` so the renderer can
+        confirm the write landed.
+        """
+        try:
+            from vibemix.profile import save_consent
+            from vibemix.ui_bus.messages import ProfileConsentState
+
+            payload = msg.get("payload", {})
+            consent = bool(payload.get("consent", False))
+            save_consent(consent)
+            log.info("profile_consent persisted: %s", consent)
+            await self.bus.emit(
+                json.loads(ProfileConsentState.make(consent=consent).to_json())
+            )
+        except Exception as e:
+            # Non-fatal: the renderer's toggle is the source of truth; the
+            # user can retry from Settings → Profile after the wizard.
+            log.warning("profile.set_consent persistence failed: %s", e)
+
     # ------------------------------------------------------------------
     # Background loops
     # ------------------------------------------------------------------
@@ -466,9 +556,33 @@ class WizardLoop:
         """Register handlers → start bus → emit boot → run status loop →
         wait on stop event → tear down."""
         self.register_handlers()
-        await self.bus.start()
+        try:
+            await self.bus.start()
+        except OSError as e:
+            # Port 8765 already bound (another vibemix instance, zombie
+            # process, or a colliding process). Without this guard the
+            # exception propagates uncaught and the sidecar exits with a
+            # generic non-zero code → watchdog retries forever. Print a
+            # stable marker the shell parses (sidecar.rs reads the last
+            # log line on crash) and exit 2 (sentinel: fatal-bind-fail).
+            print(
+                f"[FATAL] ws_bus port bind failed on 127.0.0.1:8765 — {e}",
+                file=sys.stderr,
+                flush=True,
+            )
+            print(
+                "[FATAL] another vibemix process is already running; "
+                "quit it before relaunching.",
+                file=sys.stderr,
+                flush=True,
+            )
+            sys.exit(2)
         await self.boot()
         self._status_tick_task = asyncio.create_task(self._status_tick_loop())
+        # Orphan-process self-shutdown — set _stop if Tauri parent dies
+        # abruptly (Force Quit / kill -9 / Rust panic) so we don't sit on
+        # port 8765 and block the next dev launch.
+        self._parent_watch_task = asyncio.create_task(watch_parent(self._stop))
 
         # SIGTERM (Tauri Cmd+Q) + SIGINT — set the stop event so the
         # status loop exits + the bus tears down. Windows doesn't
@@ -483,12 +597,13 @@ class WizardLoop:
         try:
             await self._stop.wait()
         finally:
-            if self._status_tick_task is not None:
-                self._status_tick_task.cancel()
-                try:
-                    await self._status_tick_task
-                except (asyncio.CancelledError, Exception):
-                    pass
+            for task in (self._status_tick_task, self._parent_watch_task):
+                if task is not None:
+                    task.cancel()
+                    try:
+                        await task
+                    except (asyncio.CancelledError, Exception):
+                        pass
             await self.bus.stop()
 
 

@@ -60,7 +60,7 @@ import shutil
 import wave
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from vibemix.ui_bus.messages import RecordingSummary
 
@@ -76,6 +76,40 @@ log = logging.getLogger("vibemix.runtime.recordings_index")
 
 
 SESSION_DIR_RE: re.Pattern[str] = re.compile(r"^\d{8}-\d{6}$")
+
+
+# ---------------------------------------------------------------------------
+# Phase 15 Plan 02 — RetentionSweepResult: (deleted_names, bytes_pruned).
+#
+# NamedTuple keeps the return value tuple-iterable so any caller doing
+#     names, bytes_pruned = run_retention_sweep(...)
+# still works. Callers that previously used the bare list[str] return
+# (5 sites: __main__.py:332/523, settings.py:290, session_loop.py:477/507)
+# were updated in Plan 15-02 Task 1 to use ``.deleted_names`` for clarity
+# at the call site (Option A: minimal-diff caller refactor).
+#
+# bytes_pruned is summed BEFORE rmtree to capture the pre-deletion size
+# (the directory is gone after rmtree — there's nothing to stat). On
+# partial failure (rmtree raises on one entry), only successful deletes
+# contribute to bytes_pruned (Pitfall 4 best-effort accounting).
+# ---------------------------------------------------------------------------
+
+
+class RetentionSweepResult(NamedTuple):
+    """Result of a single retention sweep pass.
+
+    Attributes:
+        deleted_names: list of session_dir basenames that were successfully
+            removed from disk (passed the post-rmtree existence check).
+        bytes_pruned: sum of file sizes inside each deleted dir, computed
+            BEFORE rmtree. Includes only successfully-deleted dirs — a dir
+            that failed rmtree contributes 0 bytes (Pitfall 4 partial-
+            failure accounting). On the ∞ sentinel short-circuit both fields
+            are empty/zero.
+    """
+
+    deleted_names: list[str]
+    bytes_pruned: int
 
 
 # ---------------------------------------------------------------------------
@@ -458,20 +492,27 @@ def run_retention_sweep(
     retention_days: int,
     *,
     now: Optional[datetime] = None,
-) -> list[str]:
+) -> RetentionSweepResult:
     """Walk recordings_root and delete dirs older than retention_days.
 
-    Returns the list of deleted session_dir names. Sentinel
-    `retention_days >= 36500` (Phase 12 retention-slider ∞ stop) returns
-    an empty list WITHOUT scanning — explicit short-circuit so the
-    drawer's "infinite retention" choice has zero filesystem cost.
+    Returns ``RetentionSweepResult(deleted_names, bytes_pruned)``.
+    ``bytes_pruned`` is summed BEFORE rmtree to capture the pre-deletion
+    size (Plan 15-02 Task 1 — feeds the events.jsonl
+    ``{kind: "retention_pruned", count, bytes}`` line written by
+    SessionLoop's _fire_one_retention_sweep helper).
+
+    Sentinel `retention_days >= 36500` (Phase 12 retention-slider ∞ stop)
+    returns ``RetentionSweepResult([], 0)`` WITHOUT scanning — explicit
+    short-circuit so the drawer's "infinite retention" choice has zero
+    filesystem cost.
 
     `now` defaults to `datetime.now()` (no tz — matches the dir name
     format which is local-time per recorder.py:200's strftime).
 
     Per-entry rmtree failures log + continue — RESEARCH Pitfall 4. The
     sweep is best-effort; a Windows file-in-use blocking one entry must
-    NOT prevent the others from being pruned.
+    NOT prevent the others from being pruned. Failed entries do NOT
+    contribute to bytes_pruned (Pitfall 4 partial-failure accounting).
 
     Threat T-15-03-06: the live session's dir is created mid-sweep at
     `started_at = now()`. Its dir name parses to a time strictly newer
@@ -480,18 +521,19 @@ def run_retention_sweep(
     started_at is >= now-ε ≥ cutoff — still excluded.)
     """
     if retention_days >= 36500:
-        return []
+        return RetentionSweepResult([], 0)
     recordings_root = Path(recordings_root)
     if not recordings_root.exists() or not recordings_root.is_dir():
-        return []
+        return RetentionSweepResult([], 0)
 
     current = now if now is not None else datetime.now()
     cutoff = current - timedelta(days=retention_days)
     deleted: list[str] = []
+    bytes_pruned = 0
     try:
         entries = list(os.scandir(recordings_root))
     except OSError:
-        return []
+        return RetentionSweepResult([], 0)
 
     for entry in entries:
         try:
@@ -507,12 +549,19 @@ def run_retention_sweep(
             continue
         if session_start >= cutoff:
             continue
+        # Plan 15-02 — pre-delete byte accounting. Compute the dir's total
+        # size BEFORE rmtree so the events.jsonl retention_pruned line can
+        # surface "M bytes freed". Stat failures inside _scandir_size_sum
+        # silently fall through to a partial sum; if every stat fails the
+        # dir contributes 0 bytes (acceptable best-effort).
+        entry_bytes = _scandir_size_sum(Path(entry.path))
         try:
             shutil.rmtree(entry.path, ignore_errors=True)
             # Post-delete existence verification — Windows file-in-use may
             # leave the dir behind silently (per RESEARCH Pattern 3).
             if not Path(entry.path).exists():
                 deleted.append(entry.name)
+                bytes_pruned += entry_bytes
             else:
                 log.warning(
                     "retention sweep: %s still present after rmtree (file in use?)",
@@ -521,13 +570,15 @@ def run_retention_sweep(
         except OSError as e:
             # Outer try/except for the rare case where rmtree itself raises
             # (e.g., a parent path permission flip). Never propagate into
-            # the SessionLoop / SettingsApplier callers.
+            # the SessionLoop / SettingsApplier callers. Failed entries
+            # do NOT count toward bytes_pruned — best-effort accounting.
             log.warning("retention sweep failure on %s: %s", entry.name, e)
-    return deleted
+    return RetentionSweepResult(deleted, bytes_pruned)
 
 
 __all__ = [
     "RecordingsIndex",
+    "RetentionSweepResult",
     "SESSION_DIR_RE",
     "run_retention_sweep",
 ]

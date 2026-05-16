@@ -37,12 +37,25 @@ describe("wizard surface tokens (wave 1)", () => {
     expect(containsLegacyToken(renderedHtmlPlusStyles(rendered))).toBe(false);
   });
 
-  it("PrimaryPanel has .border-anim as its first child", async () => {
+  // Critique 2026-05-14: PrimaryPanel no longer carries `.border-anim`.
+  // The "one CDJ, one breathing light" rule restricts the perimeter
+  // sweep to the session deck only (cohost wraps it via SessionLayout
+  // — see session.tokens.test.ts). Wizard panels read quiet.
+  it("PrimaryPanel has NO .border-anim (sign-of-life restricted to session deck)", async () => {
     const { PrimaryPanel } = await import("../src/wizard/components/primary-panel.js");
     const child = document.createElement("div");
     child.textContent = "child";
     const rendered = PrimaryPanel({ children: child });
-    expect(rendered.firstElementChild?.classList.contains("border-anim")).toBe(true);
+    expect(rendered.querySelector(".border-anim")).toBeNull();
+  });
+
+  it("PrimaryPanel composes the shared .vmx-tile glass-tile shell with hero density", async () => {
+    const { PrimaryPanel } = await import("../src/wizard/components/primary-panel.js");
+    const child = document.createElement("div");
+    child.textContent = "child";
+    const rendered = PrimaryPanel({ children: child });
+    expect(rendered.classList.contains("vmx-tile")).toBe(true);
+    expect(rendered.dataset.tile).toBe("hero");
   });
 
   it("WindowPicker renders without legacy token refs", async () => {

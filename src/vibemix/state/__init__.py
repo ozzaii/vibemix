@@ -28,6 +28,12 @@ from __future__ import annotations
 from vibemix.state.coach import AICoach
 from vibemix.state.event import Event
 from vibemix.state.event_detector import EventDetector
+from vibemix.state.evidence_registry import (
+    EVIDENCE_CITATION_RE,
+    EVIDENCE_SOURCES,
+    EvidenceRegistry,
+    parse_citations,
+)
 from vibemix.state.genre import (
     EmaSmoother,
     GenreProfile,
@@ -41,6 +47,7 @@ from vibemix.state.genre import (
     set_active_profile,
     validate_bpm,
 )
+from vibemix.state.genre_router import GenreRouter
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
 from vibemix.state.refresh import state_refresh_loop
@@ -48,10 +55,14 @@ from vibemix.state.track_resolver import derive_audible_deck, derive_audible_tra
 
 __all__ = [
     "AICoach",
+    "EVIDENCE_CITATION_RE",
+    "EVIDENCE_SOURCES",
     "EmaSmoother",
     "Event",
     "EventDetector",
+    "EvidenceRegistry",
     "GenreProfile",
+    "GenreRouter",
     "HysteresisState",
     "MusicState",
     "VocalDetector",
@@ -63,6 +74,7 @@ __all__ = [
     "get_active_profile",
     "list_profiles",
     "load_profile",
+    "parse_citations",
     "set_active_profile",
     "state_refresh_loop",
     "validate_bpm",

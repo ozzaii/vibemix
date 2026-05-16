@@ -1,0 +1,11 @@
+Open-sourcing vibemix today — Bravoh's first OSS release.
+
+vibemix is a free AI co-host for live DJ sets. It listens to your master output, watches your DJ software's screen, and reacts as either hype-man or coach — never hallucinating, never breaking flow.
+
+Built on Gemini 3 Flash + Gemini Embedding 2 with real-time grounding from audio, screen, MIDI, and now-playing metadata. The full pipeline lives in your local machine; only Gemini API calls hit the wire.
+
+Why open-source? Two reasons:
+1. Trust. DJs run their gear close to the chest. Showing the code is the only way to credibly say "your sets stay local."
+2. Warmup. Bravoh's bigger product (AI Artist OS) launches in March. vibemix proves the grounded-AI thesis with a narrow, polished utility first.
+
+github.com/bravoh-ai/vibemix

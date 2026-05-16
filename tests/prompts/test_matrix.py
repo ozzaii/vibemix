@@ -153,21 +153,43 @@ def test_prompt_01_six_cells_are_pairwise_unique() -> None:
 
 
 def test_prompt_01_hype_intermediate_byte_identical_to_persona() -> None:
-    """HYPE_INTERMEDIATE == build_system_instruction('intermediate', 'hype')
-    == vibemix.agent.persona.SYSTEM_INSTRUCTION (Phase 4 v4 port).
+    """HYPE_INTERMEDIATE == build_system_instruction('intermediate', 'hype',
+    include_citation_grammar=False, include_listening_fallback=False) ==
+    vibemix.agent.persona.SYSTEM_INSTRUCTION (Phase 4 v4 port). Plan 18-03
+    adds the citation-grammar block by default; Plan 20-02 adds the
+    IM_LISTENING_FRAGMENT by default. The v4-byte-identity invariant is
+    preserved at the cell-constant boundary via the double opt-out (the
+    persona re-export uses this exact pair so SYSTEM_INSTRUCTION stays
+    byte-identical to v4).
     """
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     assert HYPE_INTERMEDIATE == SYSTEM_INSTRUCTION
-    assert build_system_instruction("intermediate", "hype") == SYSTEM_INSTRUCTION
+    assert (
+        build_system_instruction(
+            "intermediate",
+            "hype",
+            include_citation_grammar=False,
+            include_listening_fallback=False,
+        )
+        == SYSTEM_INSTRUCTION
+    )
 
 
 def test_prompt_01_default_dispatch_is_intermediate_hype() -> None:
     """build_system_instruction() with no args defaults to intermediate/hype
-    (preserves v4 persona for existing callers)."""
+    (preserves v4 persona body for existing callers — the citation-grammar
+    block is appended on top, but the v4 body stays byte-identical at the
+    HYPE_INTERMEDIATE constant level)."""
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
-    assert build_system_instruction() == SYSTEM_INSTRUCTION
+    out = build_system_instruction()
+    # Plan 18-03 — default appends grammar block; assert v4 body is the prefix
+    # AND the grammar block's signature substring (`[ev:`) is in the appended
+    # tail. Locks "v4 byte-identity preserved at the constant level + grammar
+    # block appended after."
+    assert out.startswith(SYSTEM_INSTRUCTION)
+    assert "[ev:" in out
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +214,11 @@ def test_prompt_01_dispatcher_returns_right_cell(skill: str, mode: str, expected
     Phase 13-05: COACH cells contain a ``{mood_persona}`` placeholder that
     the dispatcher substitutes (default mood 'hype-man'). Compare against the
     substituted form so the test reflects the actual dispatcher contract.
+
+    Plan 18-03: v4-byte-identity is preserved at the cell-constant level when
+    the new ``include_citation_grammar=False`` opt-out is passed. The default
+    path appends the citation-grammar block; this test gates that with False
+    so it locks the underlying cell selection (not the grammar append).
     """
     import vibemix.prompts.matrix as m
 
@@ -200,7 +227,15 @@ def test_prompt_01_dispatcher_returns_right_cell(skill: str, mode: str, expected
         expected_body = expected_body.replace(
             "{mood_persona}", MOOD_PERSONAS["hype-man"]
         )
-    assert build_system_instruction(skill, mode) == expected_body
+    assert (
+        build_system_instruction(
+            skill,
+            mode,
+            include_citation_grammar=False,
+            include_listening_fallback=False,
+        )
+        == expected_body
+    )
 
 
 @pytest.mark.parametrize("skill", ["BEGINNER", "Intermediate", "PRO"])
@@ -338,3 +373,201 @@ def test_prompt_01_coach_mode_includes_feedback_bias(skill: str) -> None:
     # At least one of these honest-feedback markers must be present.
     markers = ["coach", "feedback", "improve", "honest"]
     assert any(m in body.lower() for m in markers), f"coach({skill}) missing feedback-bias signal"
+
+
+# ---------------------------------------------------------------------------
+# Plan 18-03 — CITATION_GRAMMAR_BLOCK (GROUND-02 + GROUND-03 prompt-only seeding)
+# ---------------------------------------------------------------------------
+
+
+def test_o_citation_grammar_block_contains_seven_source_forms_and_multi_cite() -> None:
+    """Test O — GROUND-02: CITATION_GRAMMAR_BLOCK enumerates all 7 EBNF source
+    forms as literal substrings + the multi-citation form + the v1.0 fail-open
+    phrase 'encouraged, not required'. Locks the prompt-side grammar surface."""
+    from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+
+    # 7 single-citation forms (GROUND-02 lock)
+    for prefix in ("[ev:", "[aud:", "[midi:", "[track:", "[screen:", "[mix:", "[tend:"):
+        assert prefix in CITATION_GRAMMAR_BLOCK, f"missing source form {prefix!r}"
+
+    # Multi-citation form — concrete example Gemini can pattern-match against
+    assert "[ev:KICK_SWAP@45.2,aud:bpm@45.0]" in CITATION_GRAMMAR_BLOCK, (
+        "multi-citation example missing"
+    )
+
+    # v1.0 fail-open semantic — Gemini must not over-cite (slop class of its own)
+    assert "encouraged, not required" in CITATION_GRAMMAR_BLOCK
+
+
+@pytest.mark.parametrize("skill,mode", ALL_CELLS)
+def test_p_grammar_block_appended_to_every_cell(skill: str, mode: str) -> None:
+    """Test P — GROUND-03: build_system_instruction(skill, mode) for each of
+    the 6 cells × default mood returns a string CONTAINING
+    CITATION_GRAMMAR_BLOCK. Default kwarg behavior is "include EBNF block"."""
+    from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+
+    out = build_system_instruction(skill, mode)
+    assert CITATION_GRAMMAR_BLOCK in out, f"({skill},{mode}) missing CITATION_GRAMMAR_BLOCK"
+
+
+def test_q_v4_byte_identity_preserved_at_constant_level() -> None:
+    """Test Q — HYPE_INTERMEDIATE constant string is byte-identical to the v4
+    SYSTEM_INSTRUCTION (Phase 4 invariant + load-bearing IP per CLAUDE.md).
+    The grammar block + the Plan 20-02 fail-soft fragment are appended via
+    the dispatcher; the underlying constant body is untouched. Double opt-out
+    (include_citation_grammar=False + include_listening_fallback=False)
+    returns byte-identical to the constant."""
+    from vibemix.agent.persona import SYSTEM_INSTRUCTION
+
+    # Constant unchanged
+    assert HYPE_INTERMEDIATE == SYSTEM_INSTRUCTION
+    # Double opt-out returns the constant byte-for-byte
+    assert (
+        build_system_instruction(
+            "intermediate",
+            "hype",
+            include_citation_grammar=False,
+            include_listening_fallback=False,
+        )
+        == HYPE_INTERMEDIATE
+    )
+    # Default path is a strict superset (constant + grammar + fragment)
+    default_out = build_system_instruction("intermediate", "hype")
+    assert default_out.startswith(HYPE_INTERMEDIATE)
+    assert len(default_out) > len(HYPE_INTERMEDIATE)
+
+
+def test_r_grammar_block_cross_validated_against_evidence_sources() -> None:
+    """Test R — D-LOCKED contract: registry-vocabulary ↔ prompt-vocabulary.
+    For each source in EVIDENCE_SOURCES (Plan 18-01), the literal `[<source>:`
+    substring appears in CITATION_GRAMMAR_BLOCK. Locks the grammar contract
+    so a future drift in either side surfaces as a test failure."""
+    from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+    from vibemix.state import EVIDENCE_SOURCES
+
+    for source in EVIDENCE_SOURCES:
+        assert f"[{source}:" in CITATION_GRAMMAR_BLOCK, (
+            f"EVIDENCE_SOURCES drift: source {source!r} not in prompt grammar block"
+        )
+
+
+def test_s_grammar_block_has_v1_no_enforcement_wording() -> None:
+    """Test S — D-LOCKED v1.0 scope: explicit 'encouraged' or 'no penalty'
+    wording so Gemini does not over-cite (which would be its own slop class).
+    Phase 20 turns enforcement on; v1.0 is prompt-only seeding."""
+    from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+
+    assert (
+        "encouraged" in CITATION_GRAMMAR_BLOCK
+        or "no penalty" in CITATION_GRAMMAR_BLOCK
+    ), "v1.0 fail-open wording missing — Gemini may over-cite"
+
+
+@pytest.mark.parametrize(
+    "ev_type",
+    ["KAAN_SPOKE", "MANUAL", "TRACK_CHANGE", "PHASE", "LAYER_ARRIVAL", "MIX_MOVE", "HEARTBEAT"],
+)
+def test_t_grammar_block_enumerates_v1_event_types(ev_type: str) -> None:
+    """Test T — block contains explicit example for each event TYPE the v1.0
+    EventDetector fires (Phase 17 will add KICK_SWAP / SUB_LAYER_ARRIVAL once
+    those land — the v1.0 block enumerates only the v1.0 EventDetector
+    surface)."""
+    from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+
+    assert ev_type in CITATION_GRAMMAR_BLOCK, f"event type {ev_type!r} not enumerated"
+
+
+# ---------------------------------------------------------------------------
+# Plan 20-02 — IM_LISTENING_FRAGMENT integration
+# ---------------------------------------------------------------------------
+
+
+def test_default_path_includes_im_listening_fragment() -> None:
+    """build_system_instruction() default kwargs append IM_LISTENING_FRAGMENT.
+
+    GROUND-08 hard requirement — every live system instruction must carry the
+    fail-soft rule so Gemini's failure mode shifts from stripped void to
+    "I'm listening".
+    """
+    from vibemix.coach import IM_LISTENING_FRAGMENT
+
+    out = build_system_instruction()
+    assert IM_LISTENING_FRAGMENT in out
+
+
+def test_default_path_includes_grammar_block_too() -> None:
+    """Both Phase 18 grammar block AND Plan 20-02 fragment ride the default path.
+
+    Default kwargs are include_citation_grammar=True + include_listening_fallback=True
+    — the live agent gets both without explicit opt-in.
+    """
+    from vibemix.coach import IM_LISTENING_FRAGMENT
+    from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+
+    out = build_system_instruction()
+    assert CITATION_GRAMMAR_BLOCK in out
+    assert IM_LISTENING_FRAGMENT in out
+
+
+def test_grammar_after_cell_body_then_fragment() -> None:
+    """Append order is: cell_body → CITATION_GRAMMAR_BLOCK → IM_LISTENING_FRAGMENT.
+
+    The grammar block primes "if you cannot cite" — the fragment depends on
+    that priming, so order is load-bearing.
+    """
+    from vibemix.coach import IM_LISTENING_FRAGMENT
+    from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+
+    out = build_system_instruction("intermediate", "hype")
+    body_idx = out.index(HYPE_INTERMEDIATE)
+    grammar_idx = out.index(CITATION_GRAMMAR_BLOCK)
+    fragment_idx = out.index(IM_LISTENING_FRAGMENT)
+
+    assert body_idx < grammar_idx < fragment_idx, (
+        f"append order drift: body={body_idx} grammar={grammar_idx} fragment={fragment_idx}"
+    )
+
+
+def test_opt_out_listening_fallback_alone() -> None:
+    """include_listening_fallback=False suppresses the fragment but keeps the grammar.
+
+    Backward-compat with Phase 18 callers that want the grammar block but not
+    the Plan 20-02 fail-soft addition.
+    """
+    from vibemix.coach import IM_LISTENING_FRAGMENT
+    from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
+
+    out = build_system_instruction(include_listening_fallback=False)
+    assert IM_LISTENING_FRAGMENT not in out
+    assert CITATION_GRAMMAR_BLOCK in out
+
+
+def test_double_opt_out_byte_identical_to_cell() -> None:
+    """include_citation_grammar=False AND include_listening_fallback=False
+    returns the underlying cell constant byte-for-byte. This is the path
+    persona.SYSTEM_INSTRUCTION uses to keep the v4-byte-identity invariant."""
+    out = build_system_instruction(
+        "intermediate",
+        "hype",
+        include_citation_grammar=False,
+        include_listening_fallback=False,
+    )
+    assert out == HYPE_INTERMEDIATE
+
+
+def test_invalid_skill_still_raises() -> None:
+    """Sanity — adding the new kwarg must not change ValueError surface."""
+    with pytest.raises(ValueError, match="unknown skill"):
+        build_system_instruction("nonsense", "hype", include_listening_fallback=True)
+
+
+def test_persona_system_instruction_still_byte_equal_to_hype_intermediate() -> None:
+    """persona.SYSTEM_INSTRUCTION === HYPE_INTERMEDIATE — byte-identity invariant.
+
+    Pins the v4-port contract through the Plan 20-02 dispatcher change. If the
+    persona opt-out drifts, the import-time assert in persona.py fires AND
+    this test fails — double safety net.
+    """
+    from vibemix.agent.persona import SYSTEM_INSTRUCTION
+
+    assert SYSTEM_INSTRUCTION == HYPE_INTERMEDIATE

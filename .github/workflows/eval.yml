@@ -1,0 +1,126 @@
+name: Eval Gate
+
+# Phase 27 Plan 04 — autonomous-proxy hallucination gate.
+#
+# PR runs use VCR.py cassettes ($0 — record_mode=none).
+# Nightly canary runs against real Gemini API + refreshes cassettes
+# (record_mode=new_episodes).
+#
+# Pitfall P46: this workflow MUST NOT POST/PUT to apple/signpath
+# endpoints. The audit step below grep-asserts that contract.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  schedule:
+    - cron: '0 5 * * *'  # nightly 5am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write          # nightly canary commits per-run scorecards
+  pull-requests: write     # PR comment posting
+
+jobs:
+  eval:
+    if: "!contains(github.event.pull_request.title, '[skip-eval]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache eval corpus
+        uses: actions/cache@v4
+        with:
+          path: eval/corpus/sessions
+          key: corpus-${{ hashFiles('eval/corpus/manifest.json') }}
+
+      - name: Verify corpus integrity
+        run: |
+          uv run python -c "from scripts.eval.corpus_manifest import validate_manifest; from pathlib import Path; r=validate_manifest(Path('eval/corpus/manifest.json')); assert r['valid'], r"
+
+      - name: Setup uv + Python
+        uses: astral-sh/setup-uv@v3
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: uv sync --group dev
+
+      - name: Audit no Apple/SignPath POST/PUT (Pitfall P46)
+        run: |
+          # The workflow MUST NOT POST/PUT to apple/signpath endpoints.
+          # Grep checks the workflow file itself + any invoked scripts.
+          ! grep -rEn "(POST|PUT|curl.*(-X|--request)).*?(apple|signpath|developer\.apple\.com|notarytool|app-store-connect|app\.signpath\.io)" .github/workflows/eval.yml scripts/eval/ 2>/dev/null || \
+            ( echo "P46 VIOLATION: workflow / eval scripts attempt apple/signpath POST/PUT" && exit 1 )
+
+      - name: Run replay harness (PR mode — Flash only)
+        if: github.event_name == 'pull_request'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VCR_RECORD_MODE: none
+        run: |
+          uv run python -m scripts.eval.replay_harness \
+            --corpus eval/corpus/sessions \
+            --judges gemini-3-flash \
+            --threshold-lock eval/THRESHOLD-LOCK.md \
+            --output .planning/eval-runs/${{ github.sha }}/
+
+      - name: Run replay harness (nightly canary — Pro + Flash)
+        if: github.event_name == 'schedule'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VCR_RECORD_MODE: new_episodes
+        run: |
+          uv run python -m scripts.eval.replay_harness \
+            --corpus eval/corpus/sessions \
+            --judges gemini-3-pro,gemini-3-flash \
+            --threshold-lock eval/THRESHOLD-LOCK.md \
+            --output .planning/eval-runs/${{ github.sha }}/
+
+      - name: Post scorecard to PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '.planning/eval-runs/${{ github.sha }}/scorecard.md';
+            if (!fs.existsSync(path)) {
+              console.log('no scorecard generated');
+              return;
+            }
+            const card = fs.readFileSync(path, 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: card.length > 60000
+                ? card.slice(0, 59000) + '\n\n_(truncated; full report in eval-runs/<sha>/scorecard.md)_'
+                : card
+            });
+
+      - name: Commit eval-run artifact (nightly only)
+        if: github.event_name == 'schedule'
+        run: |
+          git config user.name "vibemix-eval-bot"
+          git config user.email "noreply@vibemix.dev"
+          git add .planning/eval-runs/
+          git commit -m "eval: nightly canary $(date +%Y-%m-%d)" || true
+          git push || true
+
+      - name: AIza scrub on cassettes (Plan 02 + Pitfall LATENCY-15 cross-check)
+        if: always()
+        run: |
+          ! grep -rE "AIza[A-Za-z0-9_-]{35}" tests/eval/cassettes/ 2>/dev/null || \
+            ( echo "Pitfall LATENCY-15 VIOLATION: AIza key in VCR cassette" && exit 1 )
+
+      - name: "Threshold-lowering diff guard (Pitfall tampering)"
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          # Detect any threshold edit in the PR (raised flag for human review;
+          # not an automatic failure — legitimate threshold changes happen).
+          if git diff origin/${{ github.base_ref }}...HEAD -- eval/THRESHOLD-LOCK.md | grep -E "^[-+].*_min:|^[-+].*_max:" | grep -v "^---\|^+++"; then
+            echo "WARNING: threshold edit detected in PR — human reviewer must confirm both judges re-ran"
+          fi

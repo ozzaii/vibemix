@@ -29,6 +29,8 @@ import jsonschema
 
 # Import the wrapper module + bring it into local scope for introspection.
 from vibemix.ui_bus import (
+    ChapterRegionPayload,
+    DrillPayload,
     CalibrationAudioResult,
     CalibrationDeviceList,
     CalibrationListDevices,
@@ -42,14 +44,41 @@ from vibemix.ui_bus import (
     CalibrationStartMidiListen,
     CalibrationUserHeardTone,
     CalibrationWindowList,
+    DebriefChapterList,
+    DebriefCitationSummary,
+    DebriefCitationTooltip,
+    DebriefCitationTooltipReq,
+    DebriefDrills,
+    DebriefError,
+    DebriefEventTimeline,
+    DebriefSessionLoaded,
+    DebriefTldrAudio,
     DeviceInfo,
     IpcBoot,
     IpcError,
     LevelPair,
+    LibraryConfidence,
+    LibraryImport,
+    LibraryImportCancel,
+    LibraryImportProgress,
+    LibrarySearchRequest,
+    LibrarySearchResult,
+    LibrarySimilarRequest,
+    LibrarySimilarResult,
+    LibraryStalenessAction,
+    LibraryStalenessNudge,
     MascotMoodChange,
     MetersTriple,
     PermissionCheck,
     PermissionState,
+    ProfileConsentState,
+    ProfileDelete,
+    ProfileDeleteAck,
+    ProfileRegenerate,
+    ProfileRegenerateResult,
+    ProfileSetConsent,
+    ProfileView,
+    ProfileViewResult,
     RecordingSummary,
     RecordingsDelete,
     RecordingsDeleteAck,
@@ -58,7 +87,9 @@ from vibemix.ui_bus import (
     RecordingsList,
     RecordingsListResult,
     RecordingsUsage,
+    SessionCitation,
     SessionMute,
+    SessionOverlayHighlight,
     SessionSnapshot,
     SettingsGet,
     SettingsSet,
@@ -222,6 +253,25 @@ def _minimal_examples() -> list[tuple[str, object]]:
             ),
         ),
         ("RecordingsUsage", RecordingsUsage.make(sessions=12, bytes_total=3656838349)),
+        # Phase 20-04 — citation diagnostics
+        (
+            "SessionCitation",
+            SessionCitation.make(
+                slop_ratio=0.12,
+                stripped_rate_15s=0.07,
+                last_unverified_response=None,
+                bypass_active=False,
+            ),
+        ),
+        # Phase 24-02 — overlay-highlight
+        (
+            "SessionOverlayHighlight",
+            SessionOverlayHighlight.make(
+                element_id="waveform_a",
+                color="amber",
+                duration_ms=1300,
+            ),
+        ),
         ("RecordingsEvents", RecordingsEvents.make(session_dir="20260513-210410")),
         (
             "RecordingsEventsResult",
@@ -238,6 +288,180 @@ def _minimal_examples() -> list[tuple[str, object]]:
                 ],
             ),
         ),
+        # Phase 25 Plan 25-03 — DEBRIEF architectural slot (3 reservations)
+        (
+            "DebriefSessionLoaded",
+            DebriefSessionLoaded.make(
+                session_id="20260513-210410",
+                started_at=1715616250.0,
+                duration_s=5040.0,
+            ),
+        ),
+        (
+            "DebriefCitationSummary",
+            DebriefCitationSummary.make(
+                total=120, valid=95, stripped=20, bypassed=5
+            ),
+        ),
+        (
+            "DebriefEventTimeline",
+            DebriefEventTimeline.make(
+                events=(
+                    {"t": 0.0, "kind": "session_start"},
+                    {"t": 3.21, "kind": "trigger"},
+                ),
+            ),
+        ),
+        # Phase 29 Plan 29-03 — DEBRIEF v2.1 additive wrappers
+        (
+            "DebriefChapterList",
+            DebriefChapterList.make(
+                chapters=(
+                    ChapterRegionPayload(
+                        id="track-01",
+                        start=0.0,
+                        end=300.0,
+                        label="Track 1: Opening",
+                        kind="track",
+                        citation_event_id="ev:TRACK_CHANGE@00:00",
+                    ),
+                ),
+                derived_at="2026-05-15T11:21:39.656+00:00",
+            ),
+        ),
+        (
+            "DebriefTldrAudio",
+            DebriefTldrAudio.make(
+                audio_relative_path="debrief_tldr.mp3",
+                duration_s=75.0,
+                tldr_sha256="a" * 64,
+                mime_type="audio/mpeg",
+            ),
+        ),
+        (
+            "DebriefDrills",
+            DebriefDrills.make(
+                drills=tuple(
+                    DrillPayload(
+                        situation=f"Drill {i} situation",
+                        behavior=f"Behavior [ev:MIX_MOVE@01:0{i}]",
+                        impact=f"Impact [ev:PHASE@01:1{i}]",
+                        action_recommended=f"Action [track:t{i}]",
+                        citation=f"[ev:MIX_MOVE@01:0{i}]",
+                    )
+                    for i in range(3)
+                ),
+            ),
+        ),
+        (
+            "DebriefCitationTooltipReq",
+            DebriefCitationTooltipReq.make(event_id="ev:MIX_MOVE@01:23"),
+        ),
+        (
+            "DebriefCitationTooltip",
+            DebriefCitationTooltip.make(
+                event_id="ev:MIX_MOVE@01:23",
+                evidence_text="A_filter boost at 1:23",
+                timestamp=83.0,
+                found=True,
+            ),
+        ),
+        (
+            "DebriefError",
+            DebriefError.make(
+                reason="session_too_short",
+                message="Session is 120s; need >= 300s.",
+            ),
+        ),
+        # Phase 28 Plan 09 — Library IPC
+        (
+            "LibraryImport",
+            LibraryImport.make(path="/tmp/lib.xml"),
+        ),
+        (
+            "LibraryImportProgress",
+            LibraryImportProgress.make(
+                total=10,
+                done=5,
+                current_track_name="Artist — Track",
+                cache_hits=3,
+            ),
+        ),
+        ("LibraryImportCancel", LibraryImportCancel.make()),
+        (
+            "LibrarySearchRequest",
+            LibrarySearchRequest.make(query="acid techno", k=10),
+        ),
+        (
+            "LibrarySearchResult",
+            LibrarySearchResult.make(
+                query="acid techno",
+                matches=(
+                    {
+                        "track_id": "t1",
+                        "title": "X",
+                        "artist": "Y",
+                        "bpm": 138.0,
+                        "confidence": 0.87,
+                        "snippet": "X — Y",
+                    },
+                ),
+                cache_hit=False,
+            ),
+        ),
+        (
+            "LibraryConfidence",
+            LibraryConfidence.make(
+                track_id="t1",
+                cosine=0.85,
+                decision="cited",
+                event_id="ev-1",
+            ),
+        ),
+        (
+            "LibraryStalenessNudge",
+            LibraryStalenessNudge.make(age_days=45, snoozed_until_ts=None),
+        ),
+        (
+            "LibraryStalenessAction",
+            LibraryStalenessAction.make(action="snooze_7d"),
+        ),
+        (
+            "LibrarySimilarRequest",
+            LibrarySimilarRequest.make(track_id="t1", k=10),
+        ),
+        (
+            "LibrarySimilarResult",
+            LibrarySimilarResult.make(
+                track_id="t1",
+                results=(
+                    {
+                        "track_id": "t2",
+                        "similarity": 0.82,
+                        "title": "Z",
+                        "artist": "W",
+                        "bpm": 140.0,
+                    },
+                ),
+            ),
+        ),
+        # Phase 32 — long-term DJ profile wrappers (PROFILE-04/05/07)
+        ("ProfileSetConsent", ProfileSetConsent.make(consent=False)),
+        ("ProfileConsentState", ProfileConsentState.make(consent=False)),
+        ("ProfileView", ProfileView.make()),
+        (
+            "ProfileViewResult",
+            ProfileViewResult.make(profile=None, bytes=0, consent=False),
+        ),
+        ("ProfileRegenerate", ProfileRegenerate.make()),
+        (
+            "ProfileRegenerateResult",
+            ProfileRegenerateResult.make(
+                ok=False, profile=None, error="consent_off"
+            ),
+        ),
+        ("ProfileDelete", ProfileDelete.make()),
+        ("ProfileDeleteAck", ProfileDeleteAck.make(ok=True, error=None)),
     ]
 
 

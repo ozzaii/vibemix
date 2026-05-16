@@ -1,0 +1,29 @@
+# vibemix healthz cron — Day-Zero watchdog
+#
+# Install on the Bravoh server (Kaan-action — see
+# .planning/KAAN-ACTION-LEGAL.md §OPS-11-CRON).
+#
+# Polls api.altidus.world/healthz every 5 minutes. On non-200, posts a
+# Discord webhook alert.
+#
+# Required environment (set in /etc/cron.d/vibemix or systemd-cron unit):
+#   PATH=/usr/local/bin:/usr/bin:/bin
+#   DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/<id>/<token>
+#
+# Install:
+#   sudo cp scripts/dayzero/healthz_cron.example /etc/cron.d/vibemix-healthz
+#   sudo chmod 0644 /etc/cron.d/vibemix-healthz
+#   sudo systemctl restart cron   # or: service cron reload
+#
+# The script runs --max-iterations 1 so each cron tick is a single
+# request; cron itself supplies the cadence.
+
+PATH=/usr/local/bin:/usr/bin:/bin
+DISCORD_WEBHOOK_URL=
+
+*/5 * * * * vibemix /opt/vibemix/scripts/dayzero/healthz_check.sh \
+    --target https://api.altidus.world/healthz \
+    --max-iterations 1 \
+    --interval 0 \
+    --webhook-url "$DISCORD_WEBHOOK_URL" \
+    >/var/log/vibemix-healthz.log 2>&1
