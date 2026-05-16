@@ -31,7 +31,7 @@
 - [ ] **LAT-06**: Gemini Embedding 2 GA migration + MRL 768-dim truncation in `sqlite-vec` / numpy index — Phase 28 library index 4× smaller on disk; bit-identical top-K parity test preserved
 - [ ] **LAT-07**: Flex inference tier routing for library indexing, debrief generation, eval-corpus replay (50% cost cut on batch paths); live coach stays Standard
 - [ ] **LAT-08**: `thinking_level=MINIMAL` (or `thinking=False`) enforced on live path — `LiveCoachClient` rejects override at runtime (avoids 7s+ TTFT regression)
-- [ ] **LAT-09**: 1-2 day Gemini 3.1 Flash Live spike with Proactive Audio enabled on real DJ clip — verdict written to `spikes/gemini-3-1-flash-live-music.md`; defer-to-v3.x toggle if it grounds, sealed-no if it doesn't
+- [x] **LAT-09**: 1-2 day Gemini 3.1 Flash Live spike with Proactive Audio enabled on real DJ clip — verdict written to `spikes/gemini-3-1-flash-live-music.md`; defer-to-v3.x toggle if it grounds, sealed-no if it doesn't
 
 ### Hallucination Gate v3 — Hybrid (GATE)
 
