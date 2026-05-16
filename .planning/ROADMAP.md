@@ -106,8 +106,8 @@ Plans:
 - [x] 42-02-PLAN.md — Threshold recalibration tooling: recalibrate_thresholds.py + ±0.10 tolerance band + THRESHOLD-RECALIBRATION-LOG.md + eval.yml --check-real-corpus mode (GATE-04)
 - [x] 42-03-PLAN.md — Ear-test protocol + capture surface: EAR-TEST-PROTOCOL.md + JSON Schema + debrief window toggle + check_ear_test.sh + KAAN-ACTION §GATE-05 (GATE-05, GATE-07)
 - [x] 42-04-PLAN.md — check_gate.sh hybrid wire-in: bash gate combining 7-nightly + ear-test + cut_release.sh Gate 2b insertion + P85 reminder line removal (GATE-06)
-- [ ] 42-05-PLAN.md — P85 override retirement: Decision Log entry + delete test_phase_16_override_expiry.py + positive-assertion test_gate_42_hybrid_in_force.py + STATE.md annotation (GATE-08)
-- [ ] 42-06-PLAN.md — Public eval docs: eval/README.md + threshold-mirror tests + ear-test log content redaction privacy contract test (GATE-09)
+- [x] 42-05-PLAN.md — P85 override retirement: Decision Log entry + delete test_phase_16_override_expiry.py + positive-assertion test_gate_42_hybrid_in_force.py + STATE.md annotation (GATE-08)
+- [x] 42-06-PLAN.md — Public eval docs: eval/README.md + threshold-mirror tests + ear-test log content redaction privacy contract test (GATE-09)
 ```
 
 **Wave structure:** Wave 1 (42-01) → Wave 2 (42-02, 42-03) → Wave 3 (42-04) → Wave 4 (42-05) → Wave 5 (42-06)

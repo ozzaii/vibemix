@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: Wave 3 in flight — 42-04 closes GATE-06 (hybrid release gate plumbing wired into cut_release.sh)
-last_updated: "2026-05-16T18:33:00.000Z"
+status: Phase 42 complete — v3.0 hybrid hallucination gate fully scaffolded (Plans 42-01 → 42-06 all shipped); GATE-09 closes the public-facing eval/README.md surface (eval/README.md + 21 new tests).
+last_updated: "2026-05-16T15:32:21Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 19
-  completed_plans: 18
-  percent: 36
+  completed_plans: 19
+  percent: 50
 ---
 
 # vibemix — State
@@ -34,9 +34,9 @@ progress:
 
 ## Current Position
 
-Phase: 42 — Hallucination Gate v3 Hybrid (in progress)
-Plan: 42-01 + 42-02 + 42-03 + 42-04 complete; 42-05 / 42-06 outstanding
-Status: Wave 3 in flight — 42-04 closes GATE-06 (hybrid release gate plumbing wired into cut_release.sh)
+Phase: 42 — Hallucination Gate v3 Hybrid (COMPLETE)
+Plan: 42-01 + 42-02 + 42-03 + 42-04 + 42-05 + 42-06 all complete
+Status: Phase 42 fully shipped — v3.0 hybrid hallucination gate engineering-complete; OSS contributors can re-run the fast-lane gate locally via documented one-liner. Outstanding Kaan-discharge items (§GATE-01, §GATE-02, §GATE-03, §GATE-05) tracked in KAAN-ACTION-LEGAL.md.
 Last activity: 2026-05-16
 
 ## Performance Metrics
@@ -61,6 +61,7 @@ Last activity: 2026-05-16
 | Phase 40 P04 | 11 | - tasks | - files |
 | Phase 41 P06 | 30min | 4 tasks | 8 files |
 | Phase 42 P03 | 14 | 3 tasks | 15 files |
+| Phase 42 P06 | 7min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,10 @@ Last activity: 2026-05-16
 - **Plan 42-03 — `signed_by` enum locked to `[kaan]` at JSON Schema level** (2026-05-16) — Single-DJ regime is the v3.0 ship gate; cross-DJ sign-off requires schema bump + check_ear_test.sh update (deferred to v3.x per Plan 42 CONTEXT).
 - **Plan 42-03 — 30-min minimum enforced at JSON Schema level (`duration_s >= 1800`)** (2026-05-16) — Writer is the only producer of logs, so the bash gate trusts the schema rather than re-checking; avoids contract drift between writer + gate.
 - **Plan 42-03 — `schema.json` co-located with logs under `eval/ear-test-logs/`** (2026-05-16) — Writer + bash gate import paths stay trivially relative; bash gate skips `schema.json` by basename when globbing `*.json` so it does not pollute the log enumeration.
+- **Plan 42-06 — Anti-slop manifesto link target = project root README.md** (2026-05-16) — CONTEXT D-GATE-09's "cross-link to the anti-slop manifesto" satisfied via existing `../README.md#what-it-does` ("A real DJ friend in your ear — no AI slop") rather than creating a new `docs/ASLOP-MANIFESTO.md`. Existing public surface satisfies the contract without doc proliferation.
+- **Plan 42-06 — Privacy tests skip-cleanly (not vacuous-true) when no ear-test logs exist** (2026-05-16) — `pytest.skip` with informative message surfaces the §GATE-05 outstanding state in CI output. Contract still holds and will fire once logs land. Avoids false-positive green coverage.
+- **Plan 42-06 — Threshold mirror via parametrized 2-decimal normalization** (2026-05-16) — README locked values formatted as `{value:.2f}` and asserted substring-present per key (`f1_min`, `substance_min`, `cited_cosine_min`, `bypass_max`, `per_genre_f1_min`). Catches both numeric drift AND format drift in the README table.
+- **Plan 42-06 — Rubric-leak sentinel derivation at test-time** (2026-05-16) — sentinels read from `judge_pro.md` + `judge_flash.md` first-meaningful-chunk (post-YAML frontmatter, ≥40 chars). Self-updating against rubric evolution; removes Phase 27's documented hardcoded-sentinel maintenance burden.
 
 ### Decisions Locked (v2.1 — shipped)
 
