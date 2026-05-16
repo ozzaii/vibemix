@@ -21,7 +21,9 @@
 #   bash scripts/launch/cut_release.sh v2.1.0-rc1
 #
 # Output on PASS: prints the exact `gh release create` command Kaan should
-# run; does NOT execute it. Includes Phase 16 override expiry reminder (P85).
+# run; does NOT execute it. Confirms the Phase 42 hybrid hallucination
+# gate (GATE-06) is green — supersedes the v2.1 P85 override regime
+# (the autonomous-only ear-test bypass is formally retired in Plan 42-05).
 #
 # HARD GUARD: even with `--really` / `--real`, this script NEVER invokes
 # `gh release create` autonomously. That's the load-bearing safety property.
@@ -81,6 +83,15 @@ else
       fi
     done
   fi
+fi
+echo
+
+# ── Gate 2b: hybrid hallucination gate (Phase 42 / GATE-06) ────────────
+echo "[Gate 2b] check_gate.sh — 7-day nightly proxy + ear-test (Phase 42)"
+if bash "${REPO_ROOT}/scripts/release/check_gate.sh" >/dev/null 2>&1; then
+  pass "check_gate.sh — hybrid gate green"
+else
+  fail "check_gate.sh — hybrid gate FAILED (nightly proxy and/or ear-test). Run 'bash ${REPO_ROOT}/scripts/release/check_gate.sh' for the structured blocker."
 fi
 echo
 
@@ -156,9 +167,7 @@ cat <<EOF
 EOF
 echo
 echo "  Reminders (DO NOT skip):"
-echo "    [P85] Phase 16 override cleanup reminder — remove the Phase 16"
-echo "          ear-test memory override post-v2.1 RC bake. See"
-echo "          .planning/STATE.md \"Phase 16 ear-test memory override\" line."
+echo "    [GATE-06] Hybrid hallucination gate (Phase 42) PASSED — 7-day nightly proxy + ear-test both green."
 echo "    [P83] Cut as ${TAG} (RC, --draft). Do NOT cut as v1.0.0 until"
 echo "          ~2-week RC bake completes (separate phase)."
 echo "    [SHIP-CUT] See KAAN-ACTION-LEGAL.md §SHIP for the full publish runbook."
