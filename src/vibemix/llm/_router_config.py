@@ -39,3 +39,13 @@ _ROUTES: dict[str, tuple[str, ServiceTier | None]] = {
     "library_auto_tag": ("gemini-3-flash-preview", ServiceTier.FLEX),
     "embedding": ("gemini-embedding-2", ServiceTier.FLEX),
 }
+
+# Plan 41-05 LAT-06 — GA-rename probe candidates for the embedding model.
+# These literals live here (the only allowlisted file) so the GA-rename
+# auto-bump can iterate them at runtime without tripping the grep gate.
+# Order MUST be ``GA-renamed first, legacy second`` so we land on the
+# canonical id as soon as the rename ships.
+EMBEDDING_GA_CANDIDATES: tuple[str, ...] = (
+    "gemini-embedding-002",
+    "gemini-embedding-2",
+)

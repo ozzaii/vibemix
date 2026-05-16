@@ -66,10 +66,24 @@ logger = logging.getLogger(__name__)
 # Plan 41-01: resolved via the model router (path: "embedding"). CRITICAL —
 # this id flows into the LibraryEmbedder cache-key SHA256. Any model rename
 # MUST be coordinated with EXCERPT_STRATEGY_VERSION (Plan 41-05 owns that).
+# Plan 41-05: GEMINI_EMBEDDING_MODEL_GA_CANDIDATES below is the probe-time
+# override; this constant is the router-resolved default for non-probe paths.
 GEMINI_EMBEDDING_MODEL = resolve("embedding")[0]
+
+# Plan 41-05 LAT-06 — GA-rename auto-bump probe candidates.
+# Sourced from `_router_config.EMBEDDING_GA_CANDIDATES` (the only allowlisted
+# location for raw Gemini model literals). Re-exported here for backward
+# compatibility with downstream consumers that import from `library.embed`.
+from vibemix.llm._router_config import EMBEDDING_GA_CANDIDATES as GEMINI_EMBEDDING_MODEL_GA_CANDIDATES
 
 # Bump to invalidate ALL cached embeddings. Format: vN-<strategy-name>.
 EXCERPT_STRATEGY_VERSION = "v1-3excerpt-mean"
+
+# Plan 41-05 — version bump that runs the moment the GA-rename probe
+# resolves to the GA-renamed candidate (first entry of EMBEDDING_GA_CANDIDATES
+# in `_router_config.py`). The new cache-key bytes diverge from the legacy
+# key, forcing the lazy re-embed migration path.
+EXCERPT_STRATEGY_VERSION_GA_RENAME = "v2-3excerpt-mean-emb2-ga"
 
 # Gemini Embedding 2 hard audio cap. P54.
 AUDIO_CAP_SECONDS = 180
@@ -88,10 +102,13 @@ EMBED_CACHE_DB_PATH = Path.home() / ".cache" / "vibemix" / "embeddings.db"
 __all__ = [
     "LibraryEmbedder",
     "GEMINI_EMBEDDING_MODEL",
+    "GEMINI_EMBEDDING_MODEL_GA_CANDIDATES",
     "EXCERPT_STRATEGY_VERSION",
+    "EXCERPT_STRATEGY_VERSION_GA_RENAME",
     "EMBEDDING_DIM",
     "AUDIO_CAP_SECONDS",
     "EMBED_CACHE_DB_PATH",
+    "_probe_ga_model_id",
 ]
 
 
@@ -140,6 +157,97 @@ def _init_cache_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+# ─── GA-rename probe ──────────────────────────────────────────────────────────
+
+
+def _probe_ga_model_id(
+    client: genai.Client,
+    recorder: object | None = None,
+) -> tuple[str, str]:
+    """Probe Gemini for the canonical Embedding 2 model id (Plan 41-05).
+
+    Tries ``GEMINI_EMBEDDING_MODEL_GA_CANDIDATES`` in order. The first
+    candidate that returns a valid embedding for a tiny canary text becomes
+    the runtime model id. If the GA-renamed candidate (the first entry of the
+    tuple) succeeds, the strategy version bumps to
+    ``EXCERPT_STRATEGY_VERSION_GA_RENAME`` so cache keys invalidate. If the
+    legacy fallback (second entry) succeeds, the version stays at the v2.1
+    default so existing cache rows continue to hit.
+
+    Returns ``(model_id, excerpt_strategy_version)``.
+
+    Raises ``RuntimeError`` if ALL candidates fail — caller decides whether
+    to fall back to module defaults or surface the outage to the user.
+
+    The optional ``recorder`` is anything that exposes
+    ``log_event(name, **kwargs)`` (matches ``VoiceRecorder``); when present
+    we emit an ``embedding_model_probe`` event with the candidate list,
+    chosen id, version, and probe duration.
+    """
+    import time as _time
+
+    started = _time.perf_counter()
+    canary = "vibemix probe"
+    candidates_tried: list[str] = []
+
+    for candidate in GEMINI_EMBEDDING_MODEL_GA_CANDIDATES:
+        candidates_tried.append(candidate)
+        try:
+            result = client.models.embed_content(
+                model=candidate,
+                contents=canary,
+                config=types.EmbedContentConfig(
+                    output_dimensionality=EMBEDDING_DIM,
+                ),
+            )
+        except Exception as exc:
+            logger.info(
+                "Embedding GA probe: candidate %r failed (%s); trying next.",
+                candidate,
+                exc,
+            )
+            continue
+
+        if result is None or not getattr(result, "embeddings", None):
+            logger.info(
+                "Embedding GA probe: candidate %r returned no embeddings; "
+                "trying next.",
+                candidate,
+            )
+            continue
+
+        # First candidate in the tuple is the GA-renamed id (by contract in
+        # `_router_config.EMBEDDING_GA_CANDIDATES`). When the probe lands on
+        # it, bump the cache-key version so cached rows invalidate cleanly.
+        is_ga_renamed = candidate == GEMINI_EMBEDDING_MODEL_GA_CANDIDATES[0]
+        version = (
+            EXCERPT_STRATEGY_VERSION_GA_RENAME
+            if is_ga_renamed
+            else EXCERPT_STRATEGY_VERSION
+        )
+        duration_ms = int((_time.perf_counter() - started) * 1000)
+        if recorder is not None:
+            try:
+                recorder.log_event(
+                    "embedding_model_probe",
+                    chosen=candidate,
+                    version=version,
+                    candidates_tried=list(candidates_tried),
+                    duration_ms=duration_ms,
+                )
+            except Exception as log_exc:  # pragma: no cover - defensive
+                logger.warning(
+                    "embedding_model_probe event emit failed: %s", log_exc
+                )
+        return candidate, version
+
+    raise RuntimeError(
+        "All GEMINI_EMBEDDING_MODEL_GA_CANDIDATES failed probe "
+        f"({list(GEMINI_EMBEDDING_MODEL_GA_CANDIDATES)!r}). "
+        "Embeddings unavailable until network / API restored."
+    )
+
+
 # ─── LibraryEmbedder ───────────────────────────────────────────────────────────
 
 
@@ -168,8 +276,12 @@ class LibraryEmbedder:
         self,
         client: genai.Client,
         cache_db: sqlite3.Connection | None = None,
+        *,
+        probe_on_init: bool = True,
+        recorder: object | None = None,
     ) -> None:
         self._client = client
+        self._recorder = recorder
         if cache_db is None:
             self._cache = _open_default_cache_db()
             self._owns_cache = True
@@ -177,6 +289,32 @@ class LibraryEmbedder:
             _init_cache_schema(cache_db)
             self._cache = cache_db
             self._owns_cache = False
+
+        # Plan 41-05 GA-rename probe.
+        # Production path: ``probe_on_init=True`` (default). Construction
+        # sends one canary embed call against the GA-renamed id first; on
+        # 404 falls back to the v2.1 legacy id without invalidating cache.
+        # On total probe failure we keep module defaults so the app can
+        # still attempt embeds (the real failure will surface on first call).
+        # Test path: ``probe_on_init=False`` preserves deterministic call
+        # counts for the existing test_embed.py suite.
+        self._model = GEMINI_EMBEDDING_MODEL
+        self._excerpt_strategy_version = EXCERPT_STRATEGY_VERSION
+        if probe_on_init:
+            try:
+                probed_model, probed_version = _probe_ga_model_id(
+                    self._client, recorder=self._recorder
+                )
+                self._model = probed_model
+                self._excerpt_strategy_version = probed_version
+            except RuntimeError as exc:
+                logger.warning(
+                    "Embedding GA probe failed (%s); falling back to module "
+                    "defaults model=%s version=%s.",
+                    exc,
+                    GEMINI_EMBEDDING_MODEL,
+                    EXCERPT_STRATEGY_VERSION,
+                )
 
     def __del__(self) -> None:  # pragma: no cover - GC path
         if getattr(self, "_owns_cache", False) and self._cache is not None:
@@ -376,9 +514,13 @@ class LibraryEmbedder:
     def _call_gemini_audio_single(
         self, clip: bytes, mime_type: str
     ) -> np.ndarray:
-        """Single audio-Part embed_content call."""
+        """Single audio-Part embed_content call.
+
+        Uses ``self._model`` (probe-derived runtime id) instead of the
+        module constant so a GA rename auto-routes without code change.
+        """
         result = self._client.models.embed_content(
-            model=GEMINI_EMBEDDING_MODEL,
+            model=self._model,
             contents=[types.Part.from_bytes(data=clip, mime_type=mime_type)],
             config=types.EmbedContentConfig(
                 output_dimensionality=EMBEDDING_DIM
@@ -395,9 +537,11 @@ class LibraryEmbedder:
 
         Per Gemini SDK 2.0.1: text mode takes a string directly, NOT a
         list. ``contents="..."`` not ``contents=["..."]``.
+
+        Uses ``self._model`` (probe-derived runtime id).
         """
         result = self._client.models.embed_content(
-            model=GEMINI_EMBEDDING_MODEL,
+            model=self._model,
             contents=text,
             config=types.EmbedContentConfig(
                 output_dimensionality=EMBEDDING_DIM
@@ -422,13 +566,19 @@ class LibraryEmbedder:
         key = track.key or "unknown"
         return f"{track.title} by {track.artist} | {bpm} BPM | key {key}"
 
-    @staticmethod
-    def _track_hash(track: TrackEntry) -> str:
+    def _track_hash(self, track: TrackEntry) -> str:
         """SHA256 of (file_bytes_or_marker || model_id || strategy_version).
 
         For local files: stream in 64KB chunks (avoid loading large mp3s).
         For streaming-only: marker derived from track_id so re-imports of
         the same streaming-only entry still cache-hit.
+
+        Plan 41-05: Uses ``self._model`` + ``self._excerpt_strategy_version``
+        (probe-derived runtime values). When the probe falls back to the
+        v2.1 legacy id, these resolve to the same bytes the v2.1 code
+        wrote, so existing cache rows continue to hit. When the probe
+        finds the GA-renamed id, the strategy version bumps and cache
+        keys diverge — forcing the lazy re-embed migration path.
         """
         h = hashlib.sha256()
         if track.filepath:
@@ -445,9 +595,9 @@ class LibraryEmbedder:
         else:
             h.update(f"<streaming>{track.track_id}".encode())
         h.update(b"||")
-        h.update(GEMINI_EMBEDDING_MODEL.encode())
+        h.update(self._model.encode())
         h.update(b"||")
-        h.update(EXCERPT_STRATEGY_VERSION.encode())
+        h.update(self._excerpt_strategy_version.encode())
         return h.hexdigest()
 
     # ─── Internal: cache get/put ──────────────────────────────────────────

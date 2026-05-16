@@ -65,7 +65,10 @@ def cache_db(tmp_path: Path) -> sqlite3.Connection:
 def embedder(
     mock_client: MagicMock, cache_db: sqlite3.Connection
 ) -> LibraryEmbedder:
-    return LibraryEmbedder(mock_client, cache_db=cache_db)
+    # ``probe_on_init=False`` keeps these Plan 28 tests deterministic.
+    # The Plan 41-05 GA-rename probe path is covered in
+    # tests/library/test_embedding_ga_probe.py.
+    return LibraryEmbedder(mock_client, cache_db=cache_db, probe_on_init=False)
 
 
 @pytest.fixture
