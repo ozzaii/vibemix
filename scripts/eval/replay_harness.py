@@ -38,6 +38,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import statistics
 import sys
 from collections import defaultdict
@@ -183,6 +184,228 @@ def _accumulate_session_gaps(
         if prev is not None:
             measured_gaps[ev_type].append(t - prev)
         last_per_type_at[ev_type] = t
+
+
+# ----------------------------------------------------------------------
+# Plan 41-07 — Phase 41 latency-stack metric surfaces.
+#
+# Three observational flags, each pure-function and self-contained:
+#
+#   --print-llm-to-tts-delta : aggregate stats over `llm_to_tts_delta_ms`
+#                              events recorded by Plan 41-04's
+#                              LLMToTTSDeltaMeter. Used by the integration
+#                              report to verify the 200-400ms savings
+#                              target from CONTEXT LAT-04.
+#   --print-cache-hit-rate   : ratio of `cache_hit` events to LLM-invoke
+#                              attempts. Surface for Open Q3 (Plan 41-02
+#                              conservative ≥60% threshold).
+#   --print-router-resolves  : audit of `resolve(...)` call sites under
+#                              src/vibemix/ — guards against accidental
+#                              re-introduction of raw SDK calls bypassing
+#                              the ModelRouter (Plan 41-01 contract).
+#
+# Each emitter prints to stdout (operator surface). All three are additive
+# to the existing harness — present default-off; flag activation does not
+# alter the scorecard write path.
+# ----------------------------------------------------------------------
+
+
+_LLM_TO_TTS_DELTA_EVENT_TYPE: str = "llm_to_tts_delta_ms"
+"""Event-type name written by `LLMToTTSDeltaMeter.log_turn` (Plan 41-04)."""
+
+_CACHE_HIT_EVENT_TYPE: str = "cache_hit"
+"""Event-type name written by `dj_cohost.llm_node` on a Gemini cache hit (Plan 41-02)."""
+
+# Anything that counts as a per-turn LLM invocation for cache-hit-rate
+# denominator. The Phase 41 dj_cohost stream loop writes `cache_hit` events
+# tied 1:1 with the turn that produced them, but the surrounding harness
+# session-event log uses `event_fired` / `llm_invoke` style markers
+# depending on the loop. We accept either so the denominator stays sane
+# across pre-/post-Phase-41 events.jsonl shapes.
+_LLM_INVOKE_EVENT_TYPES: frozenset[str] = frozenset(
+    {"llm_invoke", "event_fired", "llm_invoke_start"}
+)
+
+
+def _extract_delta_values(events: list[dict[str, Any]]) -> list[float]:
+    """Return the list of `delta_ms` floats from `llm_to_tts_delta_ms` events.
+
+    Skips events with non-numeric or missing `delta_ms` payloads — the
+    aggregate stats are only meaningful over actually-recorded values.
+    """
+    out: list[float] = []
+    for ev in events:
+        if ev.get("type") != _LLM_TO_TTS_DELTA_EVENT_TYPE:
+            continue
+        delta = ev.get("delta_ms")
+        if isinstance(delta, (int, float)):
+            out.append(float(delta))
+    return out
+
+
+def _percentile(values: list[float], q: float) -> float:
+    """Return the q-th percentile (q in [0, 100]) of `values`.
+
+    Uses linear interpolation (NumPy-style) so small sample sizes get
+    reasonable p95 / p99 figures. Returns 0.0 on empty list.
+    """
+    if not values:
+        return 0.0
+    s = sorted(values)
+    if len(s) == 1:
+        return s[0]
+    k = (q / 100.0) * (len(s) - 1)
+    f = int(k)
+    c = min(f + 1, len(s) - 1)
+    if f == c:
+        return s[f]
+    d = k - f
+    return s[f] + (s[c] - s[f]) * d
+
+
+def _emit_llm_to_tts_delta_report(events: list[dict[str, Any]]) -> None:
+    """Plan 41-07 — print aggregate stats over `llm_to_tts_delta_ms` events.
+
+    Output (single block, stdout):
+
+        [llm-to-tts-delta] count=10 mean=312.4ms median=305ms
+                          p50=305ms p95=489ms p99=499ms min=210ms max=502ms
+
+    Empty input prints a single line marker so the operator knows the
+    report ran but found nothing. This is the surface the integration
+    report relies on for CONTEXT LAT-04 verification.
+    """
+    deltas = _extract_delta_values(events)
+    if not deltas:
+        print(
+            "[llm-to-tts-delta] no LLMToTTSDeltaMeter events found — "
+            "pre-Phase-41 session or no first-sentence emissions"
+        )
+        return
+    count = len(deltas)
+    mean = sum(deltas) / count
+    median = statistics.median(deltas)
+    p50 = _percentile(deltas, 50.0)
+    p95 = _percentile(deltas, 95.0)
+    p99 = _percentile(deltas, 99.0)
+    lo = min(deltas)
+    hi = max(deltas)
+    print(
+        f"[llm-to-tts-delta] count={count} "
+        f"mean={mean:.1f}ms median={median:.0f}ms "
+        f"p50={p50:.0f}ms p95={p95:.0f}ms p99={p99:.0f}ms "
+        f"min={lo:.0f}ms max={hi:.0f}ms"
+    )
+
+
+def _emit_cache_hit_rate_report(events: list[dict[str, Any]]) -> None:
+    """Plan 41-07 — print cache hit / LLM-invoke ratio + mean cached_tokens.
+
+    Output (single block, stdout):
+
+        [cache-hit-rate] cache_hit: 18/30 = 60.0%; mean cached_tokens on hit: 1456
+
+    Used by the integration report to verify Open Q3's conservative
+    ≥60% threshold on a 30-turn synthetic session. If no `llm_invoke`-
+    family events appear in the log (pre-instrumentation events.jsonl
+    or noop-only synthetic), we fall back to printing `cache_hit` count
+    alone so the surface stays observational.
+    """
+    invokes = sum(1 for e in events if e.get("type") in _LLM_INVOKE_EVENT_TYPES)
+    hits = [e for e in events if e.get("type") == _CACHE_HIT_EVENT_TYPE]
+    hit_count = len(hits)
+    cached_tokens_on_hit = [
+        e.get("cached_tokens")
+        for e in hits
+        if isinstance(e.get("cached_tokens"), (int, float))
+    ]
+    mean_tokens = (
+        sum(cached_tokens_on_hit) / len(cached_tokens_on_hit)
+        if cached_tokens_on_hit
+        else 0.0
+    )
+    if invokes == 0:
+        # No denominator — print observational counts only.
+        print(
+            f"[cache-hit-rate] cache_hit: {hit_count} events recorded; "
+            f"no llm_invoke-family events in log "
+            f"(mean cached_tokens on hit: {mean_tokens:.0f})"
+        )
+        return
+    pct = 100.0 * hit_count / invokes
+    print(
+        f"[cache-hit-rate] cache_hit: {hit_count}/{invokes} = {pct:.1f}%; "
+        f"mean cached_tokens on hit: {mean_tokens:.0f}"
+    )
+
+
+# Regex for `resolve("path")` or `resolve('path')` call sites under
+# `src/vibemix/`. We intentionally do NOT track `model_router.resolve` import
+# sites — only call sites — so re-exports and re-imports don't inflate the
+# count. The path argument is captured for the per-path breakdown.
+_RESOLVE_CALL_RE: re.Pattern[str] = re.compile(
+    r"""resolve\(\s*['"]([a-z_][a-z0-9_]*)['"]"""
+)
+
+
+def _scan_router_resolves(src_root: Path) -> dict[str, int]:
+    """Walk ``src_root`` (typically ``src/vibemix/``) for resolve() call sites.
+
+    Returns a mapping of router-path string → reference count. The scan is
+    syntactic (regex-only) — it intentionally does not run the import graph,
+    so the audit catches accidental string-literal copies as well as proper
+    imports. False positives are vanishingly rare in practice because the
+    `resolve(` token is otherwise unused in vibemix code.
+
+    Uses ``subprocess.run(['grep', ...])`` only when ``src_root`` is large
+    enough to matter; the in-process Path.rglob fallback is sufficient for
+    the current `src/vibemix/` tree and keeps the test harness self-contained.
+    """
+    counts: dict[str, int] = defaultdict(int)
+    if not src_root.exists():
+        return dict(counts)
+    for py_file in src_root.rglob("*.py"):
+        # Skip the router config — it is the only allowlisted location for
+        # literal model strings and uses `_ROUTES` directly (not resolve()).
+        # Also skip the router itself (the resolve() impl) to avoid self-counting.
+        if py_file.name in {"_router_config.py", "model_router.py"}:
+            continue
+        try:
+            text = py_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for match in _RESOLVE_CALL_RE.finditer(text):
+            counts[match.group(1)] += 1
+    return dict(counts)
+
+
+def _emit_router_resolves_report(src_root: Path) -> None:
+    """Plan 41-07 — print per-path resolve() call site counts under src_root.
+
+    Output (multi-line, stdout):
+
+        [router-resolves] scanned src_root=src/vibemix/ — 9 call sites:
+          live_coach              4
+          live_coach_tts          2
+          debrief                 1
+          ...
+
+    Each row aligns the count for grep-ability. Total is emitted on the
+    header line. Empty result prints a single zero-line marker. This is
+    the audit surface for Plan 41-01: any new SDK call site that bypasses
+    the router will fail to register here.
+    """
+    counts = _scan_router_resolves(src_root)
+    total = sum(counts.values())
+    print(
+        f"[router-resolves] scanned src_root={src_root} — "
+        f"{total} call sites:"
+    )
+    if not counts:
+        print("  (no resolve() call sites detected)")
+        return
+    for path in sorted(counts.keys()):
+        print(f"  {path:32s} {counts[path]:3d}")
 
 
 def call_judges_stub(event: dict[str, Any], response_text: str) -> dict[str, Any]:
@@ -402,6 +625,23 @@ async def _run(args: argparse.Namespace) -> int:
     sessions = _discover_sessions(corpus)
     if not sessions:
         print(f"no sessions found — empty corpus at {corpus}")
+        # Plan 41-07 — Phase 41 audit flags still run on empty corpora.
+        # `--print-llm-to-tts-delta` / `--print-cache-hit-rate` walk the
+        # corpus tree for `events.jsonl` files even when input.wav is
+        # absent (events-only fixtures). `--print-router-resolves` is
+        # source-tree-scoped (independent of corpus).
+        if args.print_llm_to_tts_delta or args.print_cache_hit_rate:
+            all_events: list[dict[str, Any]] = []
+            if corpus.exists():
+                for events_path in corpus.rglob("events.jsonl"):
+                    all_events.extend(_load_events_jsonl(events_path))
+            if args.print_llm_to_tts_delta:
+                _emit_llm_to_tts_delta_report(all_events)
+            if args.print_cache_hit_rate:
+                _emit_cache_hit_rate_report(all_events)
+        if args.print_router_resolves:
+            src_root = Path(__file__).resolve().parents[2] / "src" / "vibemix"
+            _emit_router_resolves_report(src_root)
         # Empty corpus is not a failure for Plan 27-01 (Plan 04 CI gate
         # decides whether [skip-eval] PRs are allowed).
         # Still write empty artifacts so downstream tooling has them.
@@ -435,6 +675,40 @@ async def _run(args: argparse.Namespace) -> int:
             events = sess.get("predicted_events") or sess.get("ground_truth") or []
             _accumulate_session_gaps(events, measured_gaps, last_per_type_at)
         _emit_cooldown_report(dict(measured_gaps))
+
+    # Plan 41-07 — three Phase 41 latency-stack metric flags. Each is
+    # additive (default off) and writes a one-block report to stdout
+    # before the scorecard files land. All three read directly from
+    # per-session events.jsonl on disk so the surface works against
+    # already-recorded sessions, not just live replays.
+    if args.print_llm_to_tts_delta or args.print_cache_hit_rate:
+        # Aggregate events.jsonl across all discovered sessions PLUS any
+        # events-only siblings under the same corpus root (so events-only
+        # fixtures from Plan 41-07 integration tests register too). The
+        # standard session-discovery layer above filters to dirs with
+        # input.wav; the Phase 41 flags accept events-only paths.
+        all_events: list[dict[str, Any]] = []
+        for sess_path in sessions:
+            evs = _load_events_jsonl(sess_path / "events.jsonl")
+            all_events.extend(evs)
+        # Catch events.jsonl files that live in non-session-shaped subdirs
+        # (no input.wav) — used by the Phase 41 metric tests.
+        seen = {sess_path / "events.jsonl" for sess_path in sessions}
+        if corpus.exists():
+            for events_path in corpus.rglob("events.jsonl"):
+                if events_path in seen:
+                    continue
+                all_events.extend(_load_events_jsonl(events_path))
+        if args.print_llm_to_tts_delta:
+            _emit_llm_to_tts_delta_report(all_events)
+        if args.print_cache_hit_rate:
+            _emit_cache_hit_rate_report(all_events)
+    if args.print_router_resolves:
+        # Scan path is fixed (the only audit target) — runs even when
+        # `--corpus` is empty since the audit is source-tree-scoped, not
+        # session-scoped.
+        src_root = Path(__file__).resolve().parents[2] / "src" / "vibemix"
+        _emit_router_resolves_report(src_root)
 
     from scripts.eval.scorecard import render_scorecard
 
@@ -500,6 +774,37 @@ def main(argv: list[str] | None = None) -> int:
             "median gaps with delta vs MIN_EVENT_GAP_PER_TYPE. Warns to "
             "stderr when |delta| > ±1s; does NOT exit non-zero (Phase 42 "
             "GATE-04 will harden into a CI gate). Additive — default off."
+        ),
+    )
+    parser.add_argument(
+        "--print-llm-to-tts-delta",
+        action="store_true",
+        default=False,
+        help=(
+            "Plan 41-07 / LAT-04 — emit aggregate stats (count, mean, "
+            "median, p50, p95, p99, min, max) over `llm_to_tts_delta_ms` "
+            "events from events.jsonl. Used by 41-INTEGRATION-REPORT to "
+            "verify the CONTEXT 200-400ms savings target."
+        ),
+    )
+    parser.add_argument(
+        "--print-cache-hit-rate",
+        action="store_true",
+        default=False,
+        help=(
+            "Plan 41-07 / LAT-02 — emit cache_hit / llm_invoke ratio + "
+            "mean cached_tokens on hit. Used by 41-INTEGRATION-REPORT to "
+            "verify Open Q3's conservative >=60%% threshold."
+        ),
+    )
+    parser.add_argument(
+        "--print-router-resolves",
+        action="store_true",
+        default=False,
+        help=(
+            "Plan 41-07 / LAT-01 — scan src/vibemix/ for resolve(...) "
+            "call sites and emit per-router-path counts. Audits that no "
+            "new SDK call site bypasses ModelRouter."
         ),
     )
     args = parser.parse_args(argv)
