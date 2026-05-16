@@ -8,6 +8,29 @@
 import { PrimaryPanel } from "./components/primary-panel.js";
 import { ControllerProbe, type ControllerProbeState } from "./components/controller-probe.js";
 import { Button } from "./components/button.js";
+import { registerStyle } from "./components/_style-registry.js";
+
+/* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep for the controller
+ * step. The controller-probe carries Listen Again + Skip CTAs; the
+ * scoped --glow-faint application below ensures both honour the
+ * surface-wide tactility contract on :hover and :focus-visible. */
+const CSS = `
+  .wizard-step--controller button:not([disabled]),
+  .wizard-step--controller [role="button"]:not([aria-disabled="true"]),
+  .wizard-step--controller [data-interactive] {
+    transition: box-shadow var(--motion-snap) ease-out;
+  }
+  .wizard-step--controller button:not([disabled]):hover,
+  .wizard-step--controller button:not([disabled]):focus-visible,
+  .wizard-step--controller [role="button"]:not([aria-disabled="true"]):hover,
+  .wizard-step--controller [role="button"]:not([aria-disabled="true"]):focus-visible,
+  .wizard-step--controller [data-interactive]:hover,
+  .wizard-step--controller [data-interactive]:focus-visible {
+    box-shadow: var(--glow-faint);
+  }
+`;
+
+registerStyle("wizard-step--controller", CSS);
 
 export interface Step3State {
   detectedController?: { name: string; port: string };
@@ -27,6 +50,8 @@ export interface Step3Callbacks {
 
 export function renderStep3(state: Step3State, cb: Step3Callbacks): HTMLElement {
   const body = document.createElement("div");
+  // Scope so the VIS-02 hover-glow rule above applies (Plan 43-03).
+  body.classList.add("wizard-step--controller");
 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";

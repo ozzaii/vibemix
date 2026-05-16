@@ -99,6 +99,23 @@ const CSS = `
   .wizard-intro__cta {
     margin-top: var(--sp-4);
   }
+  /* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep. The intro carries a
+   * single CTA ("Let's go"); the broad interactive selector union below
+   * applies --glow-faint on :hover + :focus-visible so the first surface
+   * the user touches already speaks CDJ Whisper tactility. */
+  .wizard-intro__cta button:not([disabled]),
+  .wizard-intro__cta [role="button"]:not([aria-disabled="true"]),
+  .wizard-intro__cta [data-interactive] {
+    transition: box-shadow var(--motion-snap) ease-out;
+  }
+  .wizard-intro__cta button:not([disabled]):hover,
+  .wizard-intro__cta button:not([disabled]):focus-visible,
+  .wizard-intro__cta [role="button"]:not([aria-disabled="true"]):hover,
+  .wizard-intro__cta [role="button"]:not([aria-disabled="true"]):focus-visible,
+  .wizard-intro__cta [data-interactive]:hover,
+  .wizard-intro__cta [data-interactive]:focus-visible {
+    box-shadow: var(--glow-faint);
+  }
   @media (prefers-reduced-motion: no-preference) {
     .wizard-intro__hero {
       animation: vmx-intro-rise 600ms ease-out both;

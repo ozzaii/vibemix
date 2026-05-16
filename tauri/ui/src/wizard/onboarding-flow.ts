@@ -22,6 +22,33 @@
  */
 
 import { OnboardingStopwatch, type OnboardingTimingEvent } from "./onboarding-stopwatch.js";
+import { registerStyle } from "./components/_style-registry.js";
+
+/* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep at the flow level.
+ *
+ * Each step's own module registers a scoped --glow-faint block; this
+ * flow-level rule is the safety net that catches anything mounted via
+ * the OnboardingFlow orchestrator on a `.wizard-flow` host. The
+ * surface contract (CONTEXT §VIS-02): every interactive element under
+ * the onboarding flow honours --glow-faint on :hover + :focus-visible
+ * with var(--motion-snap) ease-out — token-only, no hex literals. */
+const FLOW_CSS = `
+  .wizard-flow button:not([disabled]),
+  .wizard-flow [role="button"]:not([aria-disabled="true"]),
+  .wizard-flow [data-interactive] {
+    transition: box-shadow var(--motion-snap) ease-out;
+  }
+  .wizard-flow button:not([disabled]):hover,
+  .wizard-flow button:not([disabled]):focus-visible,
+  .wizard-flow [role="button"]:not([aria-disabled="true"]):hover,
+  .wizard-flow [role="button"]:not([aria-disabled="true"]):focus-visible,
+  .wizard-flow [data-interactive]:hover,
+  .wizard-flow [data-interactive]:focus-visible {
+    box-shadow: var(--glow-faint);
+  }
+`;
+
+registerStyle("wizard-flow", FLOW_CSS);
 
 export type StepName =
   | "tcc-grants"

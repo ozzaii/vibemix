@@ -31,6 +31,18 @@ export interface Step1Callbacks {
   onBack?: () => void;
 }
 
+/* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep.
+ *
+ * The `.wizard-step` block carries the shared CTA-row layout used by every
+ * step that imports from this module. Hover-glow applies --glow-faint
+ * (tokens.css) on :hover and :focus-visible to the interactive union
+ * (button:not([disabled]), [role="button"]:not([aria-disabled="true"]),
+ * [data-interactive]) so the entire wizard surface honours the VIS-02
+ * coverage contract. Transition uses var(--motion-snap) ease-out — same
+ * timing as cmp-btn so the glow lands in lockstep with colour/border
+ * cues, never out-of-sync. The Continue/Back CTAs and the inline
+ * permission "Grant" + "DENIED · open Settings" affordances all inherit
+ * via the broad selector union. */
 const CSS = `
   .wizard-step__heading {
     font-family: var(--type-display);
@@ -69,6 +81,32 @@ const CSS = `
   }
   .wizard-step__cta-row[data-back="false"] .wizard-step__back-spacer {
     display: none;
+  }
+  /* VIS-02 hover-glow sweep — Plan 43-03. Applies --glow-faint across the
+   * interactive union; appended (not overwritten) for buttons that already
+   * carry an inset-amber treatment, so the existing tactility stays intact
+   * while the on-cursor signal becomes uniform across the surface. */
+  .wizard-step__cta-row button:not([disabled]),
+  .wizard-step__cta-row [role="button"]:not([aria-disabled="true"]),
+  .wizard-step__cta-row [data-interactive],
+  .wizard-step__cards button:not([disabled]),
+  .wizard-step__cards [role="button"]:not([aria-disabled="true"]),
+  .wizard-step__cards [data-interactive] {
+    transition: box-shadow var(--motion-snap) ease-out;
+  }
+  .wizard-step__cta-row button:not([disabled]):hover,
+  .wizard-step__cta-row button:not([disabled]):focus-visible,
+  .wizard-step__cta-row [role="button"]:not([aria-disabled="true"]):hover,
+  .wizard-step__cta-row [role="button"]:not([aria-disabled="true"]):focus-visible,
+  .wizard-step__cta-row [data-interactive]:hover,
+  .wizard-step__cta-row [data-interactive]:focus-visible,
+  .wizard-step__cards button:not([disabled]):hover,
+  .wizard-step__cards button:not([disabled]):focus-visible,
+  .wizard-step__cards [role="button"]:not([aria-disabled="true"]):hover,
+  .wizard-step__cards [role="button"]:not([aria-disabled="true"]):focus-visible,
+  .wizard-step__cards [data-interactive]:hover,
+  .wizard-step__cards [data-interactive]:focus-visible {
+    box-shadow: var(--glow-faint);
   }
 `;
 

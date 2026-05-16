@@ -175,10 +175,16 @@ const CSS = `
     stroke-linecap: round;
     fill: none;
   }
-  .vmx-settings-drawer__close:hover {
+  /* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep. Appended --glow-faint
+   * comma-separated onto the existing inset treatment so the close affordance
+   * acknowledges cursor without overshouting the SETTINGS title's amber dot
+   * (the gear button restraint precedent from session/titlebar critique). */
+  .vmx-settings-drawer__close:hover,
+  .vmx-settings-drawer__close:focus-visible {
     color: var(--amber);
     border-color: var(--amber-40);
     background: rgba(255, 138, 61, 0.06);
+    box-shadow: var(--glow-faint);
   }
   .vmx-settings-drawer__body {
     flex: 1;
@@ -243,11 +249,37 @@ const CSS = `
                 background var(--motion-snap) ease-out,
                 box-shadow var(--motion-snap) ease-out;
   }
-  .vmx-settings-drawer__btn:hover {
+  /* VIS-02 — Plan 43-03. --glow-faint appended comma-separated; preserves
+   * the inset amber bleed (mock §02 .btn.on body) while applying the
+   * outer faint glow uniformly across every drawer affordance (Recheck,
+   * mascot-group buttons, library-panel actions, ear-test toggle host). */
+  .vmx-settings-drawer__btn:hover,
+  .vmx-settings-drawer__btn:focus-visible {
     color: var(--amber);
     border-color: var(--amber-40);
     background: linear-gradient(180deg, rgba(255, 138, 61, 0.06) 0%, rgba(255, 138, 61, 0.02) 100%);
-    box-shadow: inset 0 0 12px var(--amber-22);
+    box-shadow:
+      inset 0 0 12px var(--amber-22),
+      var(--glow-faint);
+  }
+  /* Surface-wide VIS-02 contract — broad interactive union; comma-
+   * separated --glow-faint so deeper child components that already
+   * register their own hover treatments (mascot-group toggle rows,
+   * performance-group toggle, library-panel rows, retention slider
+   * thumb, hotkey-capture pad) inherit the uniform tactility signal
+   * without having to fork their own rules. */
+  .vmx-settings-drawer button:not([disabled]),
+  .vmx-settings-drawer [role="button"]:not([aria-disabled="true"]),
+  .vmx-settings-drawer [data-interactive] {
+    transition: box-shadow var(--motion-snap) ease-out;
+  }
+  .vmx-settings-drawer button:not([disabled]):hover,
+  .vmx-settings-drawer button:not([disabled]):focus-visible,
+  .vmx-settings-drawer [role="button"]:not([aria-disabled="true"]):hover,
+  .vmx-settings-drawer [role="button"]:not([aria-disabled="true"]):focus-visible,
+  .vmx-settings-drawer [data-interactive]:hover,
+  .vmx-settings-drawer [data-interactive]:focus-visible {
+    box-shadow: var(--glow-faint);
   }
   .vmx-settings-drawer__modal-slot {
     position: relative;
