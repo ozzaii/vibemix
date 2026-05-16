@@ -1,0 +1,49 @@
+# Plan 41-01 / Task 3 — model-literal grep gate (LAT-01).
+#
+# Fails any PR that re-introduces a hardcoded Gemini model literal in
+# src/vibemix/ outside the single allowlisted file
+# (src/vibemix/llm/_router_config.py).
+#
+# Future SKU bumps are a one-file edit. Drift from the router seam is
+# what this workflow exists to prevent.
+
+name: Model Literal Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/vibemix/**'
+      - 'scripts/release/check_no_hardcoded_model.sh'
+      - 'tests/repo/test_model_literal_gate.py'
+      - '.github/workflows/model-literal-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/vibemix/**'
+      - 'scripts/release/check_no_hardcoded_model.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  model-literal-check:
+    name: No hardcoded Gemini model literals (LAT-01)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run grep gate (bash truth)
+        run: bash scripts/release/check_no_hardcoded_model.sh
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: pip install pytest pyyaml
+
+      - name: Run Python mirror (cross-platform parity)
+        run: python -m pytest tests/repo/test_model_literal_gate.py -v
