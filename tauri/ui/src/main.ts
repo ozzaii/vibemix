@@ -22,6 +22,17 @@ import { listen } from "@tauri-apps/api/event";
 import { initCrashBanner, showFatalBanner } from "./crash-banner.js";
 import { sendIpcRequest } from "./ipc/client.js";
 import { isIpcMessage, parseIpcMessage } from "./ipc/validator.js";
+// VIS-06 (43-06): rolling perf observer drives data-blur-perf ladder.
+// Mount-side wiring is below in boot(); unmount fires on window unload.
+// The observer is idempotent + cheap (single rAF chain), so we run it
+// for the lifetime of the webview regardless of which surface is mounted
+// (wizard vs live session) — both surfaces use the same tokens.css
+// blur primitives gated on [data-blur-perf="on"].
+import {
+  startPerfObserver,
+  stopPerfObserver,
+  type PerfHandle,
+} from "./mascot/perf-observer.js";
 import { routeSession } from "./session/router.js";
 import {
   consumeUrlParam,
@@ -152,6 +163,20 @@ async function boot(): Promise<void> {
   // @media (prefers-reduced-motion: reduce) block in tokens.css — that
   // cascade fires live on a11y toggle, no JS subscription needed here.
   applyBlurPerfPreference(await readBlurPerfPreference());
+
+  // VIS-06 (43-06): start the runtime perf observer alongside the
+  // boot-time preference. If the persisted preference already flipped
+  // the attribute "on", the observer noops on the flip path (it checks
+  // the attribute before setting). If the preference is "off" but
+  // runtime frame times degrade (integrated GPU, background load), the
+  // observer flips the attribute live and tokens.css picks up the new
+  // blur primitives on the next paint. Sticky-for-session per the
+  // T-43-06-03 mitigation in perf-observer.ts. Unmount handler wires
+  // pagehide so the rAF chain is released when the webview unloads.
+  const perfHandle: PerfHandle = startPerfObserver();
+  window.addEventListener("pagehide", () => stopPerfObserver(perfHandle), {
+    once: true,
+  });
 
   // DEV-only: `?dev=session-mock` bypasses both the wizard check and the
   // Tauri IPC bridge — mounts the live session UI with a local animator

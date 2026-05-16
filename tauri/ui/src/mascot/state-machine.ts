@@ -306,3 +306,36 @@ export function tickIdleTimeout(
   if (now - machine.lastEventAt < machine.idleTimeoutMs) return null;
   return "sleep";
 }
+
+// ── Phase 43 Plan 43-06 / VIS-05 — test-only bind-pose probe ─────────────
+
+/**
+ * Test-only synthetic "skeleton state" probe for the 30s smoke
+ * (smoke-30s.spec.ts). Returns a deterministic numeric vector keyed
+ * off the machine's current state + its priority class — the pure-
+ * function layer's equivalent of "what pose is the rig in?".
+ *
+ * The bind pose is `initialMachineState`'s `current` = "idle_breathe"
+ * + idle-class priority (20). Comparing this vector against
+ * BIND_POSE_PROBE (below) with ε=0.01 gives the idle-zero contract a
+ * pure-function test handle. Real bone-transform comparison happens
+ * at the Three.js layer in renderer.ts — out of scope for this pure
+ * module + jsdom test environment.
+ *
+ * Leading underscore signals test-only intent per existing convention.
+ */
+export function _getSkeletonProbe(machine: MachineState): {
+  state_id: string;
+  class_priority: number;
+} {
+  return {
+    state_id: machine.current,
+    class_priority: STATE_PRIORITY[machine.currentClass],
+  };
+}
+
+/** The bind-pose probe = boot-time idle_breathe @ idle priority (20). */
+export const _BIND_POSE_PROBE = Object.freeze({
+  state_id: "idle_breathe" as MascotState,
+  class_priority: STATE_PRIORITY.idle,
+});

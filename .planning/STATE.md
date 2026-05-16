@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: Wave 3 active. Demo-mode 30-event sequencer pinned + Francesco capture-day handoff package shipped + §VIS-09 dual sign-off runbook. VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed; only VIS-05/06 (Plan 43-06) remain.
-last_updated: "2026-05-16T17:15:30.000Z"
+status: PHASE 43 COMPLETE — 9/9 plans shipped. All VIS-01..09 closed engineering-side. Mood pool runtime (43-06) + perf observer + 30s smoke + blur-perf ladder finalize the Wave 3 closeout. Kaan-discharge items remaining: §VIS-04 (Mixamo source clips), §VIS-09 (Francesco capture day).
+last_updated: "2026-05-16T17:25:00.000Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 28
-  completed_plans: 27
-  percent: 50
+  completed_plans: 28
+  percent: 67
 ---
 
 # vibemix — State
