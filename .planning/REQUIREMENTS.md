@@ -67,8 +67,8 @@
 - [ ] **LAUNCH-06**: `bravoh` GitHub org standup — resolve Bravoh Enterprise billing flag (per `signpath-application.md`), create org, members provisioned; ready to receive transfer (SHIP-TRANSFER pre-stage)
 - [ ] **LAUNCH-07**: SHIP-TWEET 5-channel copy review + sign-off — Kaan + Francesco mutual approval on `scripts/dayzero/launch_copy/{twitter,instagram,linkedin,reddit,discord}.txt`; no AI-slop language, "real tool not toy" framing
 - [ ] **LAUNCH-08**: Discord auto-provision dry-run — `scripts/dayzero/discord_provision.py --dry-run` complete; Bravoh Discord bot token sourced + stored in GH secret; channels + roles defined; OPS-09 ready for live execution
-- [ ] **LAUNCH-09**: Outreach calendar finalized — DJ TechTools + DDJ Tips + Mixmag editorial pitches drafted; r/DJs + r/Beatmatch + r/edmproduction Show HN cross-post plan; DJ TechTools Discord T-3 soft-launch slot reserved
-- [ ] **LAUNCH-10**: Launch sequence T-7 → T+30 doc — T-7 pre-seed 15-20 stars from dev network, T-3 DJ TechTools Discord soft-launch, T-0 Show HN early-morning ET + cross-post, T+24h maintainer-answers-every-comment commitment, T+72h Substack "how we built it", T+7d "week-1 numbers" transparency post, T+30 SHIP-V1-DECISION review
+- [x] **LAUNCH-09**: Outreach calendar finalized — DJ TechTools + DDJ Tips + Mixmag editorial pitches drafted; r/DJs + r/Beatmatch + r/edmproduction Show HN cross-post plan; DJ TechTools Discord T-3 soft-launch slot reserved
+- [x] **LAUNCH-10**: Launch sequence T-7 → T+30 doc — T-7 pre-seed 15-20 stars from dev network, T-3 DJ TechTools Discord soft-launch, T-0 Show HN early-morning ET + cross-post, T+24h maintainer-answers-every-comment commitment, T+72h Substack "how we built it", T+7d "week-1 numbers" transparency post, T+30 SHIP-V1-DECISION review
 
 ### External Discharge + Public RC Publish (SHIP)
 
