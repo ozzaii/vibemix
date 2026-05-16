@@ -559,6 +559,15 @@ class DJCoHostAgent(Agent):
         # Plan 19-05 — record first-chunk arrival exactly once per turn for
         # the TTFT meter. Skipped when no meter wired (Phase 4 backward-compat).
         first_chunk_recorded = False
+        # ---- Plan 41-02 telemetry — Plan 41-04 may refactor this loop further ----
+        # Surface Gemini's UsageMetadata.cached_content_token_count to
+        # events.jsonl on every chunk that reports a non-zero hit. The
+        # SDK emits the same usage_metadata snapshot on multiple chunks
+        # within one stream, so dedupe per-turn against the LAST emitted
+        # value to keep the log line count proportional to interesting
+        # state-changes, not chunk arrivals.
+        last_cache_hit_emitted: int = 0
+        # ---- end Plan 41-02 telemetry block ----
         try:
             stream = await self._genai_client.aio.models.generate_content_stream(
                 model=LLM_MODEL,
@@ -567,6 +576,31 @@ class DJCoHostAgent(Agent):
             )
             async for chunk in stream:
                 txt = getattr(chunk, "text", None) or ""
+                # ---- Plan 41-02 cache_hit telemetry ---------------------
+                # Inspect usage_metadata BEFORE the empty-text continue —
+                # the chunk that carries the final UsageMetadata may have
+                # no text payload but still reports the cache-hit token
+                # count for the whole stream.
+                usage = getattr(chunk, "usage_metadata", None)
+                if usage is not None:
+                    cached_tokens = (
+                        getattr(usage, "cached_content_token_count", None) or 0
+                    )
+                    if cached_tokens > 0 and cached_tokens != last_cache_hit_emitted:
+                        try:
+                            self._recorder.log_event(
+                                "cache_hit",
+                                cached_tokens=cached_tokens,
+                                model=LLM_MODEL,
+                                path="live_coach",
+                                cache_state=cache_state,
+                            )
+                        except Exception:
+                            # best-effort; never let telemetry write
+                            # failures break the LLM stream consumer
+                            pass
+                        last_cache_hit_emitted = cached_tokens
+                # ---- end Plan 41-02 cache_hit telemetry -----------------
                 if not txt:
                     continue
                 if not first_chunk_recorded and self._ttft_meter is not None:
