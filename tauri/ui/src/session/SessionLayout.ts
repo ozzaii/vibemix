@@ -134,6 +134,13 @@ export interface Mounted {
   groundedFalseSinceMs: number | null;
 }
 
+/* VIS-02 (43-02): hover-glow contract is owned per-component by the
+ * children mounted into this layout (titlebar / rocker / picker /
+ * status-bar / cohost retry / meter). SessionLayout itself carries no
+ * <button>, <a>, [role="button"] or [data-interactive] in its own CSS —
+ * the screws + grid are passive ornaments. This comment is the audit-
+ * trail anchor so a grep for `VIS-02` in src/session/ surfaces every
+ * file in the sweep. */
 const LAYOUT_CSS = `
   .vmx-session {
     --col-left: 320px;

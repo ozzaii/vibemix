@@ -9,6 +9,11 @@
  * ipc.status.recheck. Pure-function — the callback is the only outgoing
  * channel; the component never knows about IPC. */
 
+/* VIS-02 (43-02): --glow-faint on hover/focus-visible per CONTEXT.
+ * Clickable badges + the recheck tooltip button both gain the faint
+ * amber halo on interactive states; non-clickable badges intentionally
+ * stay quiet (no action to acknowledge). */
+
 import { registerStyle } from "./_style-registry.js";
 
 export type BadgeState = "ok" | "connecting" | "down" | null;
@@ -73,7 +78,17 @@ const CSS = `
     transition: color var(--motion-snap) ease-out;
   }
   .vmx-statusbar__badge[data-clickable="true"] { cursor: pointer; }
-  .vmx-statusbar__badge[data-clickable="true"]:hover { color: var(--silk-65); }
+  /* VIS-02 (43-02) — clickable badges (the "down"/"denied" recovery
+   * surface) gain --glow-faint on hover/focus-visible so the recovery
+   * affordance reads through the silk-40 baseline. Non-clickable
+   * badges (disabled) intentionally stay quiet — they have no action
+   * to acknowledge. */
+  .vmx-statusbar__badge[data-clickable="true"]:hover,
+  .vmx-statusbar__badge[data-clickable="true"]:focus-visible {
+    color: var(--silk-65);
+    box-shadow: var(--glow-faint);
+  }
+  .vmx-statusbar__badge[data-clickable="true"]:focus-visible { outline: none; }
   .vmx-statusbar__led {
     display: inline-block;
     width: 6px;
@@ -230,13 +245,20 @@ const CSS = `
     transition: border-color var(--motion-snap) ease-out,
                 box-shadow var(--motion-snap) ease-out;
   }
-  .vmx-statusbar__tooltip-btn:hover {
+  /* VIS-02 (43-02) — Recheck button keeps its hot amber inset stack
+   * AND additively gains --glow-faint as an outer halo so the click
+   * affordance reads at-a-glance during error recovery (the moment
+   * users most need the cue). :focus-visible mirrors hover for kbd. */
+  .vmx-statusbar__tooltip-btn:hover,
+  .vmx-statusbar__tooltip-btn:focus-visible {
     border-color: var(--amber);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
       inset 0 -1px 0 var(--amber-65),
-      inset 0 0 18px var(--amber-40);
+      inset 0 0 18px var(--amber-40),
+      var(--glow-faint);
   }
+  .vmx-statusbar__tooltip-btn:focus-visible { outline: none; }
   @keyframes vmx-statusbar-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.45; }

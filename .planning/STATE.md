@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: Plans 43-05 + 43-08 both shipped. Phase 43 Wave 2 closing — Mixamo retarget scaffold + §VIS-04 runbook (43-05) + hero storyboard 8-cut re-mock + cut-count gate (43-08). VIS-04 + VIS-08 closed.
+status: Plans 43-01, 43-02, 43-04, 43-05, 43-07, 43-08 SHIPPED. 6/9 plans complete. Latest = 43-02 (session + mascot-overlay HIGH-findings-closed, hover-glow sweep, Playwright spec scaffold). VIS-04 + VIS-08 + VIS-03 + VIS-07 + VIS-02 (partial) + VIS-01 (partial) closed.
 last_updated: "2026-05-16T16:55:00Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 28
-  completed_plans: 24
-  percent: 52
+  completed_plans: 25
+  percent: 54
 ---
 
 # vibemix — State
@@ -35,8 +35,8 @@ progress:
 ## Current Position
 
 Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 2 closing)
-Plan: 43-01 / 43-04 / 43-07 / 43-05 / 43-08 COMPLETE. In flight: 43-02 (session + mascot-overlay closure), 43-03 (wizard + calibration closure). Remaining: 43-06 (mood pool runtime + perf), 43-09 (Francesco handoff package).
-Status: Wave 1 + half of Wave 2 shipped. VIS-01 (scaffold), VIS-03 (meter), VIS-04 (retarget scaffold + §VIS-04 runbook), VIS-07 (doc drift), VIS-08 (storyboard re-mock) all closed engineering-side. Pending: VIS-01 closure (43-02/03), VIS-02 (hover sweep), VIS-05 (mood pool runtime), VIS-06 (perf), VIS-09 (Francesco handoff).
+Plan: 43-01, 43-02, 43-04, 43-05, 43-07, 43-08 COMPLETE (6/9). In flight: 43-03 (wizard + calibration closure). Remaining: 43-06 (mood pool runtime + perf), 43-09 (Francesco handoff).
+Status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned. VIS-01 (partial), VIS-02 (partial), VIS-03, VIS-04 (scaffold), VIS-07, VIS-08 closed.
 Last activity: 2026-05-16
 
 ## Performance Metrics

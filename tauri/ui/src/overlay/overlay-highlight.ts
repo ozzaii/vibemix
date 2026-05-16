@@ -11,6 +11,12 @@
 // receivership lives in main.ts or in session/SessionLayout.ts — that's
 // Plan 24-03's job. Plan 24-02 ships the standalone module that anyone
 // can import and call `startOverlayHighlightListener()` on).
+//
+// VIS-02 (43-02) hover-glow scope note: this module is an IPC gateway,
+// no DOM. The actual overlay ring (overlay.html + overlay-runtime.ts)
+// is `pointer-events: none` and click-through at the OS level — there
+// is no element to hover. The hover-glow sweep is correctly scoped to
+// the session window's interactive components only.
 
 import { invoke } from "@tauri-apps/api/core";
 

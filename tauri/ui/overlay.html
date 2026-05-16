@@ -25,9 +25,24 @@
       overlay.rs — no inline JS timer needed; the CSS animation runs
       once and the OS window closes underneath it.
     -->
+    <!-- VIS-02 (43-02): tokens.css linked so the ring colour resolves
+         from the CDJ-Whisper palette (--amber + LED palette) at runtime.
+         Previously the overlay window inlined #f59e0b as a fallback —
+         that was a non-token literal AND the wrong amber (mocks use
+         #ff8a3d). overlay-runtime.ts now reads tokens via
+         getComputedStyle(documentElement) and writes a var() reference
+         to --ring-color when the resolved string isn't available. -->
+    <link rel="stylesheet" href="/src/tokens.css" />
     <style>
+      /* VIS-02 (43-02) — Phase 24 transparent-overlay invariant override.
+         tokens.css ships a v5 cinematic body background + body::before
+         film-grain that would opaque-out the desktop composition path.
+         The mascot overlay window uses the same override pattern; mirror
+         it here so the click-feedback ring still composites onto the
+         desktop instead of a dark vignette. */
       html, body {
         background: transparent !important;
+        background-image: none !important;
         margin: 0;
         padding: 0;
         width: 100%;
@@ -39,14 +54,20 @@
            the click-through flag propagates. */
         pointer-events: none;
       }
+      body::before { display: none !important; }
+      /* VIS-02 (43-02) — ring fallback now references the --amber token
+         (resolved by tokens.css) instead of an inline #f59e0b literal.
+         overlay-runtime.ts overrides --ring-color at boot with the
+         resolved colour or var() reference; this rule is the no-JS
+         safety net. */
       .ring {
         position: absolute;
         inset: 4px;
         border-radius: 18px;
-        border: 3px solid var(--ring-color, #f59e0b);
+        border: 3px solid var(--ring-color, var(--amber));
         box-shadow:
-          0 0 12px 2px var(--ring-color, #f59e0b),
-          inset 0 0 8px 1px var(--ring-color, #f59e0b);
+          0 0 12px 2px var(--ring-color, var(--amber)),
+          inset 0 0 8px 1px var(--ring-color, var(--amber));
         opacity: 0;
         animation: ring-pulse var(--ring-duration, 1300ms) ease-in-out 1 forwards;
       }

@@ -9,6 +9,11 @@
  * to a flat amber-disc seal; chevron is a JetBrains Mono caret that lifts
  * to amber on open. */
 
+/* VIS-02 (43-02): --glow-faint on hover/focus-visible per CONTEXT.
+ * Row + option both carry the faint amber halo on interactive states;
+ * closes session-audit finding M-02 (inactive opt :hover was previously
+ * inconsistent with the row trigger which already gained a glow). */
+
 import { registerStyle } from "./_style-registry.js";
 
 export interface PickerOption {
@@ -56,13 +61,22 @@ const CSS = `
                 background var(--motion-snap) ease-out,
                 box-shadow var(--motion-snap) ease-out;
   }
-  .vmx-picker__row:hover {
+  /* VIS-02 (43-02) — picker row carries an additive --glow-faint on
+   * hover+focus-visible alongside its pre-existing 10px amber inset
+   * shadow. The outer halo lifts the row off the silk-22 frame the same
+   * way the rocker does, keeping the affordance vocabulary uniform. */
+  .vmx-picker__row:hover,
+  .vmx-picker__row:focus-visible {
     color: var(--silk);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-      0 0 10px var(--amber-22);
+      0 0 10px var(--amber-22),
+      var(--glow-faint);
   }
+  /* Picker row owns the outer halo above — kill the body-level
+   * 2px amber outline so we don't stack two focus rings. */
+  .vmx-picker__row:focus-visible { outline: none; }
   .vmx-picker[data-open="true"] .vmx-picker__row {
     color: var(--amber);
     background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
@@ -216,11 +230,21 @@ const CSS = `
     border-radius: 1px;
     transition: color 120ms ease-out, background 120ms ease-out, text-shadow 120ms ease-out;
   }
-  .vmx-picker__opt:hover {
+  /* VIS-02 (43-02) — closes M-02. Previously the inactive opt :hover
+   * relied on colour + background lift alone; the active-row variant
+   * downstream already pairs --glow-faint with its tint dot, leaving
+   * an inconsistency the audit flagged as confusing during scan.
+   * Apply --glow-faint here too so the entire option row vocabulary
+   * carries a faint amber halo on hover — the active-row still gains
+   * the deeper --glow-soft glow exclusively via the dot+tint pairing. */
+  .vmx-picker__opt:hover,
+  .vmx-picker__opt:focus-visible {
     color: var(--amber);
     background: rgba(255, 138, 61, 0.06);
     text-shadow: 0 0 4px var(--amber-22);
+    box-shadow: var(--glow-faint);
   }
+  .vmx-picker__opt:focus-visible { outline: none; }
   .vmx-picker__opt[data-selected="true"] {
     color: var(--amber);
     background: rgba(255, 138, 61, 0.05);

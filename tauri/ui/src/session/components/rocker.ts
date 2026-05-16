@@ -27,6 +27,11 @@ export interface RockerProps {
   ariaLabel?: string;
 }
 
+/* VIS-02 (43-02): --glow-faint on hover/focus-visible per CONTEXT. The
+ * rocker segments are the primary interactive control in the persona
+ * panel (BEG/INT/PRO + HYPE/TEACH/COACH); closes session-audit finding
+ * H-01 by adding `box-shadow: var(--glow-faint)` to the :hover state
+ * and mirroring on :focus-visible for keyboard parity (WCAG 2.1). */
 const CSS = `
   .vmx-rocker {
     display: inline-flex;
@@ -67,7 +72,18 @@ const CSS = `
                 box-shadow var(--motion-snap) ease-out,
                 text-shadow var(--motion-snap) ease-out;
   }
-  .vmx-rocker__seg:hover { color: var(--silk); }
+  /* VIS-02 hover/focus glow — colour lift + faint amber halo so the
+   * affordance survives against the silk-22 frame (closes H-01). The
+   * :focus-visible branch mirrors :hover for keyboard reachability. */
+  .vmx-rocker__seg:hover,
+  .vmx-rocker__seg:focus-visible {
+    color: var(--silk);
+    box-shadow: var(--glow-faint);
+  }
+  /* The body-level *:focus-visible already paints a 2px amber outline +
+   * --glow-soft so we explicitly suppress the duplicate ring on the
+   * segment (its glow comes from the rule above). */
+  .vmx-rocker__seg:focus-visible { outline: none; }
   /* --- rocker variant — solid amber tile when active (used for BEG/INT/PRO etc.) --- */
   .vmx-rocker[data-variant="rocker"] .vmx-rocker__seg[data-active="true"] {
     color: var(--amber);

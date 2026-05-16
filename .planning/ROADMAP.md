@@ -132,7 +132,7 @@ Plans:
 ```
 Plans:
 - [x] 43-01-PLAN.md — UI audit driver + first audit run (session surface seed) (VIS-01)
-- [ ] 43-02-PLAN.md — UI audit closure: session + mascot overlay + hover-glow sweep (VIS-01, VIS-02)
+- [x] 43-02-PLAN.md — UI audit closure: session + mascot overlay + hover-glow sweep (VIS-01, VIS-02)
 - [ ] 43-03-PLAN.md — UI audit closure: wizard + calibration + settings + hover-glow sweep (VIS-01, VIS-02)
 - [x] 43-04-PLAN.md — meter.ts spectrum rebuild: hardware-LED-strip + amber peak hold + silk-12 grid (VIS-03)
 - [x] 43-05-PLAN.md — Mixamo retarget pipeline + 5 prep_*.glb swap-in scaffold + §VIS-04 KAAN-discharge (VIS-04)

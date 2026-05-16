@@ -27,6 +27,11 @@
  * via a `data-sticky` attribute on the transcript root; SessionLayout
  * (Wave 3) sets it false when the user manually scrolls. */
 
+/* VIS-02 (43-02): --glow-faint on hover/focus-visible per CONTEXT.
+ * The H9 retry button is the only interactive surface in the cohost
+ * panel (the panel is a read-only transcript otherwise); it carries
+ * the faint amber halo additively on top of its hot inset stack. */
+
 import { registerStyle } from "./_style-registry.js";
 
 export type CohostStatus = "LISTENING" | "TALKING" | "IDLE";
@@ -357,13 +362,21 @@ const CSS = `
     transition: border-color var(--motion-snap) ease-out,
                 box-shadow var(--motion-snap) ease-out;
   }
-  .vmx-cohost__foot-retry:hover {
+  /* VIS-02 (43-02) — retry button keeps its existing amber inset
+   * stack and additively gains --glow-faint as an outer halo on
+   * hover/focus-visible. The button only renders during the H9
+   * "couldn't reach gemini" failure window so the glow reads as a
+   * recovery affordance, not a routine hover. */
+  .vmx-cohost__foot-retry:hover,
+  .vmx-cohost__foot-retry:focus-visible {
     border-color: var(--amber);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
       inset 0 -1px 0 var(--amber-65),
-      inset 0 0 18px var(--amber-40);
+      inset 0 0 18px var(--amber-40),
+      var(--glow-faint);
   }
+  .vmx-cohost__foot-retry:focus-visible { outline: none; }
   /* MUTED pill — sits inside the cohost header next to the AVERY status
    * row. Same dome-LED + Saira-9-022 vocabulary as the titlebar pills,
    * fault-tinted. Wave 6 closes H3 "user control & freedom" — cmd+m
