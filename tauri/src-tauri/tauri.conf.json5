@@ -146,6 +146,16 @@
       // bar, restart). Update prompts are gated by `update_check_on_launch`
       // (default true) stored in tauri-plugin-store; opt-out flips it to
       // false. See tauri/src-tauri/src/updater.rs for the boot-time gate.
+      //
+      // Plan 40-05 — production key rotation
+      // The pubkey above is the 2026-05-13 dev key (Phase 18-04). Production
+      // rotation runbook lives in KAAN-ACTION-LEGAL.md §AUDIO-06. After
+      // discharge: this line is replaced with the prod key armor and the
+      // `gh secret set TAURI_UPDATER_PRIVATE_KEY` step uploads the private
+      // half. The placeholder-pubkey-gate in release.yml fires for tagged
+      // pushes ONLY (the dev key passes the gate today since it lacks the
+      // TAURI_UPDATER_PLACEHOLDER sentinel — tests/tauri/test_updater_key_rotated.py
+      // adds the dev-key-still-present gate that flips dual-mode on rotation).
       "active": true,
       "endpoints": [
         "https://api.altidus.world/vibemix/updates/{{target}}/{{arch}}/{{current_version}}"
