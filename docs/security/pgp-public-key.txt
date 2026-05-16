@@ -1,0 +1,19 @@
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Comment: vibemix security@bravoh.com — AUDIO-05 slot file
+Comment: Phase 40 / AUDIO-05 — Anti-Slop Audio Port
+
+PLACEHOLDER-VIBEMIX-AUDIO-05-PGP-NOT-YET-GENERATED
+
+This is a placeholder. The real ed25519 PGP public key for
+security@bravoh.com is generated and published via the runbook
+in KAAN-ACTION-LEGAL.md §AUDIO-05. Until then, plaintext email
+to security@bravoh.com is accepted (mark sensitive details
+[ENCRYPT ON REPLY] and we move to an encrypted thread on first
+reply).
+
+After Kaan discharges the runbook, this file is overwritten with
+the ASCII-armored ed25519 public key block exported via
+`gpg --armor --export security@bravoh.com`. The
+tests/security/test_pgp_published.py gate flips from pre-discharge
+to post-discharge mode automatically — no code change needed.
+-----END PGP PUBLIC KEY BLOCK-----

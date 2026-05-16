@@ -524,6 +524,150 @@ Sign-off by:                                   _____________________   (Kaan)
 
 ---
 
+## AUDIO-05 — Real PGP key generation + publish (post-Plan 40-05 discharge)
+
+**REQ-ID:** AUDIO-05 (supersedes SEC-06 PGP — same slot, new ID)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 40-05 scaffolded slot file)  ☐ key generated  ☐ published to keys.openpgp.org  ☐ SECURITY.md updated  ☐ legacy `.asc` removed
+**Effort:** ~5 minutes (key gen) + ~5 minutes (email-verify on keys.openpgp.org)
+**Blocking for:** Phase 40 AUDIO-05 requirement closure (engineering pre-stage ships green; this discharge flips the gate test to post-discharge mode automatically).
+
+### Why this is KAAN-action
+
+Real PGP keys carry identity attestation — only Kaan can generate one
+for `security@bravoh.com`. Autonomous agents must NOT discharge this
+(would invalidate the identity claim — Pitfall P46 hard rule).
+
+### Files involved
+
+- **Slot file:** `docs/security/pgp-public-key.txt` (created by Plan 40-05; currently contains the `PLACEHOLDER-VIBEMIX-AUDIO-05-PGP-NOT-YET-GENERATED` sentinel inside a valid PGP armor envelope).
+- **SECURITY.md:** PGP section + fingerprint table.
+- **Legacy placeholder:** `KAAN-PGP-PLACEHOLDER.asc` at repo root — removed via `git rm` during discharge.
+
+### Runbook (5 steps)
+
+```bash
+# 1. Generate ed25519 key (modern, smaller, faster verify).
+#    No passphrase for the OSS security@ inbox key.
+gpg --quick-gen-key 'Bravoh Security <security@bravoh.com>' ed25519 default 0
+
+# 2. Get the fingerprint (copy this into SECURITY.md table).
+gpg --list-keys security@bravoh.com
+# → look for the 40-char hex fingerprint on the second line
+
+# 3. Export ASCII-armored public key, overwriting the placeholder slot file.
+gpg --armor --export security@bravoh.com > docs/security/pgp-public-key.txt
+
+# 4. Publish to keys.openpgp.org (HKPS — requires email verification).
+gpg --send-keys --keyserver hkps://keys.openpgp.org <FINGERPRINT>
+# → keys.openpgp.org sends a verification email to security@bravoh.com
+# → click the link in that email to make the key searchable by email
+
+# 5. SECURITY.md cleanup + legacy file removal.
+# - Replace `PLACEHOLDER-FINGERPRINT-NOT-REAL` with the real fingerprint
+# - Replace `placeholder — Kaan-action` with `live`
+# - Remove the "This is a placeholder key." paragraph
+git rm KAAN-PGP-PLACEHOLDER.asc
+git add docs/security/pgp-public-key.txt SECURITY.md
+git commit -m "chore(security): publish real PGP key for security@bravoh.com (AUDIO-05)"
+```
+
+### Discharge checklist
+
+When the runbook is complete, the following invariants must hold (the
+gate test `tests/security/test_pgp_published.py` enforces them):
+
+- [ ] `docs/security/pgp-public-key.txt` no longer contains `PLACEHOLDER-VIBEMIX-AUDIO-05-PGP-NOT-YET-GENERATED`.
+- [ ] `docs/security/pgp-public-key.txt` contains a valid `-----BEGIN PGP PUBLIC KEY BLOCK-----` armor envelope with ≥200 chars of body.
+- [ ] `docs/security/pgp-public-key.txt` contains NO `-----BEGIN PGP PRIVATE KEY BLOCK-----` (only the public half ever lives in the repo).
+- [ ] `SECURITY.md` no longer references `KAAN-PGP-PLACEHOLDER.asc`.
+- [ ] `SECURITY.md` no longer contains `PLACEHOLDER-FINGERPRINT-NOT-REAL`.
+- [ ] `KAAN-PGP-PLACEHOLDER.asc` no longer exists at repo root.
+- [ ] The key is searchable via `gpg --keyserver hkps://keys.openpgp.org --search security@bravoh.com` (after email-verify click).
+
+### Sign-off block
+
+```
+AUDIO-05 KEY GEN on:     _____________________   (date)
+AUDIO-05 FINGERPRINT:    _____________________   (real fingerprint)
+AUDIO-05 PUBLISHED on:   _____________________   (date keys.openpgp.org confirmed)
+SECURITY.md updated:     _____________________   (commit hash)
+Legacy .asc removed:     _____________________   (commit hash)
+Sign-off by:             _____________________   (Kaan signature)
+```
+
+---
+
+## AUDIO-06 — Tauri ed25519 updater key rotation (post-Plan 40-05 discharge)
+
+**REQ-ID:** AUDIO-06 (supersedes the §4 stub — same slot, new ID)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 40-05 scaffolded comment block)  ☐ keypair generated  ☐ pubkey in tauri.conf.json5  ☐ private half in GH secret  ☐ rehearsal run green
+**Effort:** ~10 minutes
+**Blocking for:** First tagged release that needs auto-update signatures (the `placeholder-pubkey-gate` job in `release.yml` fires only on tagged pushes).
+
+### Why this is KAAN-action
+
+The private half of the updater keypair must never touch the repo. Only
+Kaan can run `tauri signer generate` on his machine, copy the public half
+into `tauri.conf.json5`, and upload the private half as a GitHub Secret
+via `gh secret set`. Autonomous agents could only ever scaffold the
+rotation — not perform it.
+
+### Files involved
+
+- **`tauri/src-tauri/tauri.conf.json5`:** `plugins.updater.pubkey` field (currently the 2026-05-13 dev key from Phase 18-04).
+- **GitHub Secret:** `TAURI_UPDATER_PRIVATE_KEY` (base64-encoded private half).
+- **`.github/workflows/release.yml`:** `placeholder-pubkey-gate` job (already wired; fires on tagged pushes only).
+
+### Runbook (4 steps)
+
+```bash
+# 1. Generate new keypair locally (no password — matches Phase 18 setup,
+#    Tauri CI signing tolerates passwordless via TAURI_UPDATER_KEY_PASSWORD="").
+npx @tauri-apps/cli signer generate \
+    -w ~/.tauri/vibemix_updater_prod.key \
+    --no-password
+
+# 2. Read the public half; paste into tauri.conf.json5.
+cat ~/.tauri/vibemix_updater_prod.key.pub
+# → replace the pubkey value at tauri/src-tauri/tauri.conf.json5
+#   plugins.updater.pubkey (the 2026-05-13 dev-key string starting
+#   "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk0QThGNkNFNDJFNjQ4N0Q...")
+
+# 3. Base64-encode the private half and store as GH secret.
+base64 -i ~/.tauri/vibemix_updater_prod.key | gh secret set TAURI_UPDATER_PRIVATE_KEY
+
+# 4. Rehearse via workflow_dispatch (the placeholder-pubkey-gate skips
+#    on non-tag pushes, so a dispatch run exercises the build path).
+gh workflow run release.yml --ref main
+# → confirm the "Build macOS" + "Build Windows" jobs reach the signing
+#   step without "minisign signature verification failed" errors.
+```
+
+### Discharge checklist
+
+When the runbook is complete, the following invariants must hold (the
+gate test `tests/tauri/test_updater_key_rotated.py` enforces them):
+
+- [ ] `tauri/src-tauri/tauri.conf.json5` no longer contains the dev-key fingerprint `94A8F6CE42E6487D`.
+- [ ] `plugins.updater.pubkey` decodes via base64 to a string starting with `untrusted comment: minisign public key:`.
+- [ ] `gh secret list` shows `TAURI_UPDATER_PRIVATE_KEY` present (with the recent updated date).
+- [ ] A `workflow_dispatch` rehearsal run of `release.yml` completes the signing step without errors.
+- [ ] `.github/workflows/release.yml::placeholder-pubkey-gate` job still exists (Pitfall 6 regression guard — RESEARCH §State of the Art).
+
+### Sign-off block
+
+```
+AUDIO-06 KEYPAIR GEN on:     _____________________   (date)
+AUDIO-06 PUBKEY ROTATED on:  _____________________   (commit hash)
+AUDIO-06 GH SECRET SET on:   _____________________   (gh secret set output OK)
+AUDIO-06 REHEARSAL on:       _____________________   (workflow run URL)
+Sign-off by:                 _____________________   (Kaan signature)
+```
+
+---
+
 ## INSTALL-VM-RUN — Fresh-VM rehearsal real execution (Phase 33 / Plan 33-08)
 
 **Owner:** Kaan

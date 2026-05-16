@@ -25,18 +25,21 @@ until we've coordinated disclosure.
 
 ### PGP
 
-Encrypted reports preferred. Use the public key in
-[`KAAN-PGP-PLACEHOLDER.asc`](./KAAN-PGP-PLACEHOLDER.asc) at the repo root.
+Encrypted reports preferred. The public key lives in
+[`docs/security/pgp-public-key.txt`](./docs/security/pgp-public-key.txt).
 
 **This is a placeholder key.** Kaan Özkan generates and signs the real key
-on first vulnerability report — see `KAAN-ACTION-LEGAL.md` for the
-generation runbook. Until then, plaintext email to `security@bravoh.com`
-is accepted, but please mark sensitive details `[ENCRYPT ON REPLY]` and
-we'll move to encrypted thread immediately.
+on first vulnerability report — see `KAAN-ACTION-LEGAL.md §AUDIO-05` for
+the generation runbook. Until then, plaintext email to
+`security@bravoh.com` is accepted, but please mark sensitive details
+`[ENCRYPT ON REPLY]` and we'll move to encrypted thread immediately.
 
 | Key | Fingerprint | Status |
 |-----|-------------|--------|
-| `KAAN-PGP-PLACEHOLDER.asc` | `PLACEHOLDER-FINGERPRINT-NOT-REAL` | placeholder — Kaan-action |
+| `docs/security/pgp-public-key.txt` | `PLACEHOLDER-FINGERPRINT-NOT-REAL` | placeholder — Kaan-action |
+
+> After discharge, the key is also searchable via
+> `gpg --keyserver hkps://keys.openpgp.org --search security@bravoh.com`.
 
 ## Supported versions
 
