@@ -42,14 +42,21 @@ from vibemix.audio import (
 
 
 def test_engine_constants_match_v4() -> None:
-    """Engine tuning constants — v4:127-133 (the FT profile retune from v3)."""
+    """Engine tuning constants — v4:127-133 (the FT profile retune from v3).
+
+    HEARTBEAT_SEC re-tuned by Plan 40-04 / AUDIO-03 from 70.0 → 45.0 to match
+    the v4 chat-tested 2026-05-11 "harikaydı" baseline (memory:
+    project_v4_canonical_baseline). The OLD 70s was a v4-shipped-file literal
+    that diverged from the chat-tested ear-test value; locked target is the
+    chat-tested baseline.
+    """
     assert SILENT_RMS == 0.012
     assert LOW_RMS == 0.040
     assert PEAK_RMS == 0.110
     assert AUDIBLE_DEBOUNCE_SEC == 0.6
     assert SILENCE_DEBOUNCE_SEC == 1.2
     assert EVENT_GLOBAL_MIN_GAP == 10.0  # retuned post-2026-05-11 — "let the music breathe"
-    assert HEARTBEAT_SEC == 70.0  # retuned post-2026-05-11
+    assert HEARTBEAT_SEC == 45.0  # Plan 40-04 — was 70.0; v4 chat-tested 2026-05-11 baseline
 
 
 def test_io_constants_match_v4() -> None:
@@ -75,14 +82,22 @@ def test_mic_gating_constants_match_v4() -> None:
 
 
 def test_event_gap_dict_shape_and_values() -> None:
-    """MIN_EVENT_GAP_PER_TYPE dict — v4:134-142 + Phase 17 SENSE-12 extension.
+    """MIN_EVENT_GAP_PER_TYPE dict — v4:134-142 + Phase 17 SENSE-12 / Phase 30
+    SENSE-17/18 extensions + Plan 40-04 re-tune.
 
     Phase 17 Plan 02 added three kick-side event types (KICK_SWAP,
     SUB_LAYER_ARRIVAL, KICK_DENSITY_SHIFT) per CONTEXT D-cooldown LOCKED rule
     "matches G-followup-1". Plan 17-03 added the paired breakdown / re-entry
     pair (BREAKDOWN_KICK_KILL, REENTRY_KICK_LAND). Plan 17-04 added
-    PHRASE_BOUNDARY (sixth Wave-2 detector). The v4 entries below MUST stay
-    pinned at v4 values.
+    PHRASE_BOUNDARY (sixth Wave-2 detector). Phase 30 SENSE-17/18 added
+    DISTORTION_CLIMB and ACID_LINE_ENTRY (Hard Tek genre-specific detectors).
+
+    Plan 40-04 / AUDIO-03 re-tuned the v4 baseline entries to match the
+    chat-tested 2026-05-11 "harikaydı" session ear-test:
+        TRACK_CHANGE 6 → 5, PHASE 18 → 10, LAYER_ARRIVAL 16 → 10,
+        MIX_MOVE 20 → 14, HEARTBEAT 70 → 45.
+    Phase 17 SENSE-12 / Phase 30 SENSE-17/18 detector cooldowns and MIC /
+    MANUAL UNCHANGED.
     """
     assert set(MIN_EVENT_GAP_PER_TYPE.keys()) == {
         "TRACK_CHANGE",
@@ -101,20 +116,32 @@ def test_event_gap_dict_shape_and_values() -> None:
         "REENTRY_KICK_LAND",
         # Phase 17 SENSE-14 — phrase-boundary structural detector (Plan 17-04)
         "PHRASE_BOUNDARY",
+        # Phase 30 SENSE-17/18 — Hard Tek genre-specific detectors
+        "DISTORTION_CLIMB",
+        "ACID_LINE_ENTRY",
     }
-    assert MIN_EVENT_GAP_PER_TYPE["TRACK_CHANGE"] == 6.0
-    assert MIN_EVENT_GAP_PER_TYPE["PHASE"] == 18.0
-    assert MIN_EVENT_GAP_PER_TYPE["LAYER_ARRIVAL"] == 16.0
-    assert MIN_EVENT_GAP_PER_TYPE["MIX_MOVE"] == 20.0
-    assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == 70.0
-    assert MIN_EVENT_GAP_PER_TYPE["MIC"] == 3.0
-    assert MIN_EVENT_GAP_PER_TYPE["MANUAL"] == 1.5
-    # Plan 17-03 paired-detector cooldowns
+    # Plan 40-04 re-tuned v4 baseline entries (v4 2026-05-11 ear-test).
+    assert MIN_EVENT_GAP_PER_TYPE["TRACK_CHANGE"] == 5.0  # Plan 40-04 — was 6.0
+    assert MIN_EVENT_GAP_PER_TYPE["PHASE"] == 10.0  # Plan 40-04 — was 18.0
+    assert MIN_EVENT_GAP_PER_TYPE["LAYER_ARRIVAL"] == 10.0  # Plan 40-04 — was 16.0
+    assert MIN_EVENT_GAP_PER_TYPE["MIX_MOVE"] == 14.0  # Plan 40-04 — was 20.0
+    assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == 45.0  # Plan 40-04 — was 70.0
+    assert MIN_EVENT_GAP_PER_TYPE["MIC"] == 3.0  # unchanged
+    assert MIN_EVENT_GAP_PER_TYPE["MANUAL"] == 1.5  # unchanged
+    # Plan 17-02 kick-side detector cooldowns — UNCHANGED by Plan 40-04
+    assert MIN_EVENT_GAP_PER_TYPE["KICK_SWAP"] == 14.0
+    assert MIN_EVENT_GAP_PER_TYPE["SUB_LAYER_ARRIVAL"] == 16.0
+    assert MIN_EVENT_GAP_PER_TYPE["KICK_DENSITY_SHIFT"] == 18.0
+    # Plan 17-03 paired-detector cooldowns — UNCHANGED by Plan 40-04
     assert MIN_EVENT_GAP_PER_TYPE["BREAKDOWN_KICK_KILL"] == 20.0
     assert MIN_EVENT_GAP_PER_TYPE["REENTRY_KICK_LAND"] == 12.0
-    # Plan 17-04 phrase-boundary cooldown
+    # Plan 17-04 phrase-boundary cooldown — UNCHANGED by Plan 40-04
     assert MIN_EVENT_GAP_PER_TYPE["PHRASE_BOUNDARY"] == 24.0
+    # Phase 30 SENSE-17/18 — UNCHANGED by Plan 40-04
+    assert MIN_EVENT_GAP_PER_TYPE["DISTORTION_CLIMB"] == 6.0
+    assert MIN_EVENT_GAP_PER_TYPE["ACID_LINE_ENTRY"] == 8.0
     # HEARTBEAT key should reference the HEARTBEAT_SEC module-level constant
+    # (identity, not value — preserves the source-of-truth coupling).
     assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == HEARTBEAT_SEC
 
 

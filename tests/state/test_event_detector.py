@@ -6,15 +6,16 @@ the clock deterministically. The ``_state`` helper builds a MusicState with
 "music truly playing" defaults so tests opt INTO restrictive conditions
 (silent / bpm-out-of-range) rather than setting them every time.
 
-Constants under test (imported from vibemix.audio.constants — v4 verbatim):
+Constants under test (imported from vibemix.audio.constants — v4 baseline
+with Plan 40-04 / AUDIO-03 re-tune to the v4 chat-tested 2026-05-11 ear-test):
     MUSIC_PRESENCE_MIN_SECONDS = 4.0
     BPM_VALID_MIN              = 100.0
     BPM_VALID_MAX              = 180.0
     EVENT_GLOBAL_MIN_GAP       = 10.0
-    HEARTBEAT_SEC              = 70.0
+    HEARTBEAT_SEC              = 45.0   # Plan 40-04 — was 70.0
     TRACK_CHANGE_MIN_CONFIDENCE = 0.5
-    MIN_EVENT_GAP_PER_TYPE = {TRACK_CHANGE: 6.0, PHASE: 18.0, LAYER_ARRIVAL: 16.0,
-                              MIX_MOVE: 20.0, HEARTBEAT: 70.0, MIC: 3.0, MANUAL: 1.5}
+    MIN_EVENT_GAP_PER_TYPE = {TRACK_CHANGE: 5.0, PHASE: 10.0, LAYER_ARRIVAL: 10.0,
+                              MIX_MOVE: 14.0, HEARTBEAT: 45.0, MIC: 3.0, MANUAL: 1.5}
 """
 
 from __future__ import annotations
@@ -270,7 +271,7 @@ def test_track_change_does_not_refire_for_same_title(mocker):
     assert ev1.type == "TRACK_CHANGE"
     # Now last_audible_track == "X", so same title diff is false.
     # Move time forward past all cooldowns:
-    t.return_value = 1200.0  # way past 6s TRACK_CHANGE + 10s global
+    t.return_value = 1200.0  # way past 5s TRACK_CHANGE + 10s global (Plan 40-04)
     ev2 = d.detect(ms, kaan_just_spoke=False, manual=False)
     # ev2 may be a HEARTBEAT (which is allowed), but cannot be TRACK_CHANGE for the same title.
     assert ev2 is None or ev2.type != "TRACK_CHANGE"
@@ -327,7 +328,7 @@ def test_layer_arrival_fires_on_mid_jump(mocker):
     t = _prime_music_playing(d, ms, mocker)
     # Prime: one tick at sustained-audible time, sets sig=(0.30, 0.30); does NOT fire.
     d.detect(ms, kaan_just_spoke=False, manual=False)
-    # Move forward past LAYER_ARRIVAL cooldown (16.0s) AND global (10s):
+    # Move forward past LAYER_ARRIVAL cooldown (10.0s, Plan 40-04) AND global (10s):
     t.return_value = 1030.0
     # Now spike mid by 0.20 (> 0.15 threshold) with rms > LOW_RMS (0.040).
     ms.bands = {"sub": 0.2, "low": 0.2, "mid": 0.5, "high": 0.3}
