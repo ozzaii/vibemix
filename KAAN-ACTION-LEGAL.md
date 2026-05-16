@@ -826,3 +826,236 @@ INSTALL-VM-RUN  Windows 10:   _____ s  (target ≤ 60)
 INSTALL-VM-RUN  Windows 11:   _____ s  (target ≤ 60)
 Sign-off by:    _____________________   (Kaan signature)
 ```
+
+---
+
+## §GATE-01 — Ack-bank quota refresh (20 → 40 OPUS files)
+
+**REQ-ID:** GATE-01 (Phase 42-01)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 42-01 ships resume wrapper)  ☐ key in env  ☐ run complete  ☐ AIza scan green
+**Effort:** ~5 minutes once free-tier reset window opens
+**Blocking for:** GATE-04 threshold recalibration (Plan 42-02) running against a 40/40 ack-bank-complete eval.
+
+### Why this is KAAN-action
+
+Gemini TTS free-tier quota refresh requires Kaan's personal API key
+(`GEMINI_API_KEY`). Phase 27-08 / LATENCY-15 scaffolded the batch
+generator with skip-existing idempotency; 20 of the 40 OPUS entries
+landed before the free-tier window closed (the residual
+`ACK-BANK-REMAINING-20` set). Plan 42-01 ships the resume wrapper that
+lists the missing entries + gates subprocess invocation behind
+`--really`. The ~$0.10 spend itself is Kaan-discharge — autonomous
+agents NEVER export `GEMINI_API_KEY` (Pitfall LATENCY-15).
+
+### Files involved
+
+- **Resume wrapper:** `scripts/eval/generate_ack_audio_resume.py` (Plan 42-01).
+- **Underlying batch generator:** `scripts/generate_ack_audio.py` (Phase 27-08; already idempotent via skip-existing).
+- **Manifest:** `assets/ack_bank/manifest.json` (40 entries, 5 buckets × 8 ids).
+- **OPUS output root:** `src/vibemix/audio/ack_bank/<bucket>/<id>.opus`.
+
+### Kaan oneliner
+
+```bash
+GEMINI_API_KEY=... uv run python scripts/eval/generate_ack_audio_resume.py --really
+```
+
+### Verification
+
+```bash
+# Inventory must show 0 missing entries after the run:
+uv run python scripts/eval/generate_ack_audio_resume.py --dry-run | grep "missing: 0"
+
+# Closeout suite must pass (Phase 27-08 audit + Plan 40 AIza scan):
+uv run pytest tests/runtime_closeouts/test_ack_bank_real_audio.py \
+              tests/runtime_closeouts/test_ack_bank_aiza_scan.py
+```
+
+### What unblocks
+
+- GATE-04 threshold recalibration (Plan 42-02) — the 2-judge eval runs
+  against a full 40/40 ack-bank and the F1 numbers reflect realistic
+  acknowledgement-coverage instead of partial-coverage degradation.
+
+### Sign-off block
+
+```
+GATE-01 RUN on:           _____________________   (date)
+Entries generated:        _____________________   (NN / 20)
+AIza scan green:          _____________________   (yes / no)
+Closeout pytest green:    _____________________   (yes / no)
+Sign-off by:              _____________________   (Kaan signature)
+```
+
+---
+
+## §GATE-02 — VCR cassette population (one-time)
+
+**REQ-ID:** GATE-02 (Phase 42-01)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 42-01 ships record-mode helper)  ☐ key in env  ☐ run complete  ☐ CI green with VCR_RECORD_MODE=none
+**Effort:** ~10 minutes for the run; cassette bytes commit-via-LFS not required (cassettes are deterministic JSON < 100 KB each)
+**Blocking for:** PR-mode CI eval gate no longer requiring `GEMINI_API_KEY` (today the secret is referenced in `.github/workflows/eval.yml`; cassettes make this $0).
+
+### Why this is KAAN-action
+
+VCR cassette population requires a real `GEMINI_API_KEY` so the
+recorded interactions reflect real Gemini Pro + Flash judge responses.
+One-time ~$1-2 spend across the Phase 27 eval test suite. After
+cassettes land, CI replays them at $0 — the autonomous proxy gate
+becomes secret-free on PR mode.
+
+### Files involved
+
+- **Recorder helper:** `scripts/eval/record_cassettes.py` (Plan 42-01).
+- **Cassette output dir:** `tests/eval/cassettes/` (Phase 27-04; `.gitkeep` marker present).
+- **VCR-decorated tests (discovered by the helper):**
+  - `tests/eval/test_judge_pro_rubric.py`
+  - `tests/eval/test_judge_flash_rubric.py`
+  - `tests/eval/test_cited_relevance.py`
+  - `tests/eval/test_substance_metric.py`
+
+### Kaan oneliner
+
+```bash
+GEMINI_API_KEY=... uv run python scripts/eval/record_cassettes.py \
+    --really --record-mode new_episodes
+```
+
+### Verification
+
+```bash
+# Cassettes dir must be non-empty after the run:
+ls tests/eval/cassettes/
+
+# CI eval gate must pass against the recorded cassettes (no API key needed):
+VCR_RECORD_MODE=none uv run pytest tests/eval/test_judge_pro_rubric.py \
+    tests/eval/test_judge_flash_rubric.py tests/eval/test_cited_relevance.py \
+    tests/eval/test_substance_metric.py -q
+
+# Nightly canary CI dispatch (cassettes mode):
+gh workflow run "Eval Gate"
+```
+
+### What unblocks
+
+- PR-mode eval workflow no longer requires `GEMINI_API_KEY` secret access
+  (cassettes replay at $0).
+- Nightly canary becomes the sole consumer of the real key (for new-episodes
+  drift detection) — narrows the blast radius of an accidental key leak.
+
+### Sign-off block
+
+```
+GATE-02 RUN on:           _____________________   (date)
+Cassettes recorded:       _____________________   (NN tests covered)
+PR-mode CI green:         _____________________   (workflow run URL)
+Nightly canary green:     _____________________   (workflow run URL)
+Sign-off by:              _____________________   (Kaan signature)
+```
+
+---
+
+## §GATE-03 — Real-corpus DJ session WAVs (6 × 30-min, 200 MB git-LFS)
+
+**REQ-ID:** GATE-03 (Phase 42-01)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 42-01 ships LFS layout + MANIFEST/LICENSES templates)  ☐ 6 sources curated  ☐ ffmpeg-normalized  ☐ git lfs committed
+**Effort:** ~2 hours (curation + license check + ffmpeg pass + commit)
+**Blocking for:** GATE-04 real-corpus threshold recalibration (Plan 42-02 `--check-real-corpus` mode no longer 0-sessions-warns).
+
+### Why this is KAAN-action
+
+200 MB of public-domain / CC0 DJ session audio needs human curation:
+license check per source, genre balance across ≥2 genres (≥3 ideally
+per CONTEXT EVAL-03), ffmpeg normalization to 16kHz mono, and the
+final `git lfs add` + commit. Plan 42-01 ships the LFS scaffold
+(`.gitattributes` LFS rule for `eval/corpus/sessions/**/*.wav` already
+present from Phase 27-03, plus `MANIFEST.md` and `LICENSES.md`
+templates with placeholder slots for the 6 sessions). The WAV bytes
+themselves are Kaan-discharge — autonomous agents NEVER fetch / commit
+third-party audio (license risk).
+
+### Files involved
+
+- **LFS rule:** `.gitattributes` line for `eval/corpus/sessions/**/*.wav` (already present).
+- **Sessions root:** `eval/corpus/sessions/<id>/audio.wav` for each of:
+  `hard_tek_01`, `hard_tek_02`, `techno_01`, `techno_02`, `house_01`, `house_02`.
+- **Human-readable manifest:** `eval/corpus/MANIFEST.md` (Plan 42-01).
+- **Structured manifest:** `eval/corpus/manifest.json` (Phase 27-03 — update `source` field per session post-curation).
+- **License records:** `eval/corpus/LICENSES.md` (Plan 42-01 expanded schema).
+
+### Kaan steps (6)
+
+1. **Source curation.** Pick 6 sessions across ≥2 genres
+   (`hard_tek`/`techno`/`house`) from archive.org / CCMixter / FMA
+   Electronic. **Public-domain or CC0 only** — CC-BY is also acceptable
+   if attribution slot is filled.
+2. **ffmpeg normalize.** For each source file:
+   ```bash
+   ffmpeg -i raw_<id>.wav -ac 1 -ar 16000 \
+       eval/corpus/sessions/<id>/audio.wav
+   ```
+3. **Fill manifests.**
+   - `eval/corpus/MANIFEST.md`: complete the 7-field block per session
+     (Session ID / Genre / Duration / Source URL / License / Attribution
+     / SHA256).
+   - `eval/corpus/LICENSES.md`: fill the 6-field block per session
+     (Source URL / License / Attribution / Retrieval date / ffmpeg
+     normalize / SHA256).
+   - `eval/corpus/manifest.json`: update each session's `source` field
+     from `TBD-*` to the real source identifier.
+4. **Track LFS.** (Idempotent — rule already in `.gitattributes` from
+   Phase 27-03; this step is a no-op if rule survives.)
+   ```bash
+   git lfs track "eval/corpus/sessions/**/*.wav"
+   ```
+5. **Stage + commit.**
+   ```bash
+   git add eval/corpus/sessions/*/audio.wav \
+       eval/corpus/MANIFEST.md eval/corpus/LICENSES.md \
+       eval/corpus/manifest.json
+   git commit -m "corpus(42-01): GATE-03 real DJ session WAVs (200 MB LFS)"
+   ```
+6. **Verify.** Run the verification block below.
+
+### Verification
+
+```bash
+# Structured manifest must validate:
+uv run python -c "from scripts.eval.corpus_manifest import validate_manifest; \
+                  from pathlib import Path; \
+                  r=validate_manifest(Path('eval/corpus/manifest.json')); \
+                  assert r['valid'], r"
+
+# Diversity gate must pass:
+uv run pytest tests/eval/test_corpus_diversity_gate.py -q
+
+# Total LFS bytes ≈ 200 MB:
+du -sh eval/corpus/sessions/
+
+# Six LFS-tracked WAVs visible:
+git lfs ls-files | grep "eval/corpus/sessions" | wc -l   # → 6
+```
+
+### What unblocks
+
+- GATE-04 real-corpus threshold recalibration (Plan 42-02
+  `--check-real-corpus` no longer 0-sessions-warns).
+- `scripts/release/check_ear_test.sh` (Plan 42-03) reading the
+  populated manifest at gate time satisfies the `≥2 genres` invariant
+  on a real corpus.
+
+### Sign-off block
+
+```
+GATE-03 SOURCED on:       _____________________   (date)
+Genres represented:       _____________________   (hard_tek, techno, house — at least 2)
+Total WAV bytes:          _____________________   (~200 MB)
+ffmpeg normalize OK:      _____________________   (6 / 6)
+LICENSES.md filled:       _____________________   (6 / 6)
+MANIFEST.md filled:       _____________________   (6 / 6)
+git lfs commit hash:      _____________________
+Sign-off by:              _____________________   (Kaan signature)
+```
