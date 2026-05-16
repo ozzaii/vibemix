@@ -4,7 +4,7 @@
 
 <h1 align="center">vibemix</h1>
 
-<p align="center"><em>An AI co-host for your DJ set. Open source. Mac + Windows.</em></p>
+<p align="center"><em>the only AI co-host that actually listens to your set</em></p>
 
 <!-- vibemix:hero-start sha256=PLACEHOLDER path=docs/assets/demo.mp4 -->
 <!-- Phase 35 ASSETS-07 + Phase 39 SHIP-02: the 30s demo film lands at
@@ -19,6 +19,14 @@
   </video>
 </p>
 <!-- vibemix:hero-end -->
+
+## No AI slop
+
+vibemix is a real DJ friend in your ear. It reacts to the actual audio coming out of your master, what's on your DJ software's screen right now, and the controller move you just made — not a generic "AI assistant" voice riffing on the word "drop". If a hype-man can't tell you that the kick came in two bars early, you don't want it talking over your set.
+
+Built by DJs. The reactions are tuned against real sessions on rekordbox, Serato, Traktor, and djay Pro — not against a benchmark. Cuts that land late, hallucinated track names, and small-talk filler all fail the grading bar before any release ships.
+
+Your audio doesn't leave your machine without you knowing. vibemix is open source under Apache 2.0, runs on Mac + Windows, and the only network calls go to Bravoh's Gemini proxy at `api.altidus.world` — analyzed in flight, never stored. Recordings stay local under `recordings/<session>/` with a 7-day default retention you can change in Settings. Read the FAQ for the long version.
 
 <p align="center">
   <img alt="release" src="https://img.shields.io/github/v/release/bravoh/vibemix?style=flat-square&color=ff8a3d" />
