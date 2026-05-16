@@ -62,6 +62,7 @@ from vibemix.audio import (
     snapshot_wav,
 )
 from vibemix.coach import CitationLinter, StrippedRateTracker
+from vibemix.llm.thinking_gate import validate_live_config
 from vibemix.prompts import build_parts_description, build_system_instruction, filter_for_slop
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
@@ -282,6 +283,15 @@ class DJCoHostAgent(Agent):
             temperature=1.0,
             max_output_tokens=220,
         )
+        # Plan 41-03 / LAT-08 — second gate, defense in depth. llm_factory
+        # already runs validate_live_config; the agent re-runs it against
+        # the actual _gen_cfg used per-turn so any future construction
+        # path that bypasses the factory (test fixtures, mood rebuilds)
+        # still hits the invariant. Runs ONCE per agent boot — zero
+        # per-turn overhead (the per-turn cached_content branch in
+        # llm_node uses its own pre-validated thinking_level="minimal"
+        # literal, identical to this _gen_cfg, so it inherits the gate).
+        validate_live_config(self._gen_cfg)
 
     def set_next_event(self, ev: Event) -> None:
         self._pending_event = ev

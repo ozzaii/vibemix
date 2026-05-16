@@ -15,16 +15,27 @@ from google.genai import types
 from livekit.plugins import google as google_plugin
 
 from vibemix.agent.config import LLM_MODEL
+from vibemix.llm.thinking_gate import validate_live_config
 
 
 def _build_direct(api_key: str) -> google_plugin.LLM:
     """Phase 4 verbatim — port of v4:1983-1989."""
-    return google_plugin.LLM(
-        model=LLM_MODEL,
-        api_key=api_key,
+    # Plan 41-03 / LAT-08 — validate the live-coach config before
+    # constructing the LLM wrapper. Zero per-turn cost: this runs once
+    # per agent boot. Any future config-mutation seam that bypasses this
+    # factory still hits the second gate inside DJCoHostAgent.__init__.
+    gen_cfg = types.GenerateContentConfig(
         temperature=1.0,
         thinking_config=types.ThinkingConfig(thinking_level="minimal"),
         max_output_tokens=220,
+    )
+    validate_live_config(gen_cfg)
+    return google_plugin.LLM(
+        model=LLM_MODEL,
+        api_key=api_key,
+        temperature=gen_cfg.temperature,
+        thinking_config=gen_cfg.thinking_config,
+        max_output_tokens=gen_cfg.max_output_tokens,
     )
 
 
@@ -39,6 +50,14 @@ def _build_proxy(proxy_base_url: str, jwt: str) -> google_plugin.LLM:
     validation path; the proxy ignores x-goog-api-key entirely (auth is via
     the Bearer JWT in the Authorization header).
     """
+    # Plan 41-03 / LAT-08 — same gate as the direct path. Proxy mode must
+    # not bypass the live-coach invariants.
+    gen_cfg = types.GenerateContentConfig(
+        temperature=1.0,
+        thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+        max_output_tokens=220,
+    )
+    validate_live_config(gen_cfg)
     return google_plugin.LLM(
         model=LLM_MODEL,
         api_key="vibemix-proxy",
@@ -47,9 +66,9 @@ def _build_proxy(proxy_base_url: str, jwt: str) -> google_plugin.LLM:
             headers={"Authorization": f"Bearer {jwt}"},
             timeout=120_000,
         ),
-        temperature=1.0,
-        thinking_config=types.ThinkingConfig(thinking_level="minimal"),
-        max_output_tokens=220,
+        temperature=gen_cfg.temperature,
+        thinking_config=gen_cfg.thinking_config,
+        max_output_tokens=gen_cfg.max_output_tokens,
     )
 
 
