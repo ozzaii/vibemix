@@ -23,7 +23,7 @@
 
 **Critical path:** Apple Dev Agreement (Francesco) + SignPath OSS (Kaan, ~1-week SLA) gate the public RC publish in P45. P40-P44 parallelize around the external clock.
 
-### Phase 40 — Anti-Slop Audio Port
+### Phase 40: Anti-Slop Audio Port
 
 **Goal:** Close the biggest engineering anti-slop gap — Gemini now hears Kaan's voice (mic as 2nd Part) and gets a 3s structural preview (source-file lookahead as 3rd Part); event cooldowns re-tuned to v4 chat-tested intuition. Pre-stage independent KAAN-ACTION items (PGP, Tauri updater key, BlackHole fresh-Mac probe).
 
@@ -37,7 +37,7 @@
 4. PGP key published to `keys.openpgp.org`; Tauri ed25519 updater key rotated to production; BlackHole probe fresh-Mac walk passes.
 5. v4 "harikaydı" baseline regression — ear-test pass on ≥1 real Kaan DJ session (Coach + Hype modes).
 
-### Phase 41 — Gemini SKU Upgrade + Latency Stack v2
+### Phase 41: Gemini SKU Upgrade + Latency Stack v2
 
 **Goal:** Adopt 2026 Gemini deltas — ModelRouter seam, implicit caching, LLM→TTS pipe-through, 3.1 Flash TTS, Embedding 2 GA, Flex tier for batch paths. Target: end-to-end latency 5-10s → 3-5s; perceived latency 0-2s with P40 lookahead offset.
 
@@ -52,7 +52,7 @@
 5. Flex tier billing visible on next batch run (library re-index, eval-corpus replay); €/mo CI gate stays under €50.
 6. 3.1 Flash Live spike verdict written (`spikes/gemini-3-1-flash-live-music.md`) — go/no-go on optional v3.x toggle.
 
-### Phase 42 — Hallucination Gate v3 — Hybrid
+### Phase 42: Hallucination Gate v3 — Hybrid
 
 **Goal:** Adopt hybrid gate — Phase 27 autonomous proxy fast-lane (PR + nightly canary) + Kaan-ear release-cut veto. P85 override formally retired; corpus + thresholds calibrated against real audio; ear-test capture wired into debrief.
 
@@ -67,7 +67,7 @@
 5. P85 Decision Log entry committed; `cut_release.sh` reminder lines removed; `test_phase_16_override_expiry.py` retired or refactored.
 6. `eval/README.md` public-facing documentation drafted (redacts ear-test log content while documenting protocol).
 
-### Phase 43 — Visual Ship Lock
+### Phase 43: Visual Ship Lock
 
 **Goal:** Lock CDJ Whisper UI to FL-Studio-grade polish; replace 5 mascot stub animations with Mixamo retargets; pre-produce 30s hero demo for launch hero. Three internal waves (UI / mascot / demo prep), critique→execute loop spanning the phase.
 
@@ -82,7 +82,7 @@
 5. Hero demo storyboard re-aligned to CDJ Whisper v5; pre-production package (shot list + capture plan + demo-mode config) handed off to Francesco.
 6. Memory + doc drift cleaned — `project_mascot_as_vtuber_personality_surface` updated to "Neon Rebel"; storyboard mocks aligned.
 
-### Phase 44 — Launch Positioning + Pre-stage
+### Phase 44: Launch Positioning + Pre-stage
 
 **Goal:** README launch-ready; EvidenceRegistry citation strip visible in live UI (anti-slop receipts on screen); Bravoh funnel CTA placed; bravoh GH org stood up; SHIP-TWEET copy locked; Discord provisioning + outreach calendar finalized. Every pre-stage item discharged that doesn't require external clock.
 
@@ -97,7 +97,7 @@
 5. SHIP-TWEET copy files signed off (Kaan + Francesco mutual approval) for all 5 channels (twitter/instagram/linkedin/reddit/discord).
 6. Discord provision dry-run completes without errors; outreach calendar (DJ TechTools + DDJ Tips + Mixmag + Reddit + Discord T-3 soft-launch) populated.
 
-### Phase 45 — External Discharge + Public RC Publish
+### Phase 45: External Discharge + Public RC Publish
 
 **Goal:** Apple Dev Agreement + SignPath OSS approvals land → cascading discharge (DIST-19 sign+verify → INSTALL-VM matrix → INSTALL-60S → SHIP-CUT v3.0.0-rc1) → social publish + Discord + repo transfer + 24h monitoring rotation → ~2-week bake → SHIP-V1-DECISION. KAAN-ACTION-LEGAL critical path.
 
