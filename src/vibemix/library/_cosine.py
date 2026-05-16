@@ -33,6 +33,21 @@ import numpy as np
 # Locked at 768 per CONTEXT D-cost-balanced and RESEARCH Open Q9.
 # Gemini Embedding 2 supports MRL truncation to 768/1536/3072; we ship 768.
 # Bumping this constant requires a cache invalidation (EXCERPT_STRATEGY_VERSION).
+#
+# Plan 41-05 rollback note (LAT-06):
+#     If production telemetry surfaces top-K parity drift between v1
+#     (full-precision 3072) and v2 (768-truncated) — e.g. citation
+#     quality regresses or "what's playing" grounding hallucinates more
+#     than the v2.1 baseline — the documented rollback path is:
+#         1. Bump EMBEDDING_DIM 768 → 1024.
+#         2. Bump embed.EXCERPT_STRATEGY_VERSION (so cache invalidates).
+#         3. Re-run tests/library/test_embeddings_parity.py with the
+#            new dim — recall threshold of >=9/10 positions identical
+#            for >=8/10 queries must still pass.
+#         4. Run scripts/library/migrate_embeddings_2.py --re-embed-all
+#            against affected user libraries (or rely on lazy first-launch
+#            re-embed once the version bump ships).
+#     Storage impact: ~33% larger index per row (768 → 1024 = +33%).
 EMBEDDING_DIM = 768
 
 
