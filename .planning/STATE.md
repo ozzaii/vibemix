@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: completed
-last_updated: "2026-05-16T16:28:42.401Z"
+status: in_progress
+last_updated: "2026-05-16T16:30:00.000Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 28
-  completed_plans: 20
-  percent: 50
+  completed_plans: 23
+  percent: 58
 ---
 
 # vibemix — State
@@ -34,9 +34,9 @@ progress:
 
 ## Current Position
 
-Phase: 42 — Hallucination Gate v3 Hybrid (COMPLETE)
-Plan: 42-01 + 42-02 + 42-03 + 42-04 + 42-05 + 42-06 all complete
-Status: Phase 42 fully shipped — v3.0 hybrid hallucination gate engineering-complete; OSS contributors can re-run the fast-lane gate locally via documented one-liner. Outstanding Kaan-discharge items (§GATE-01, §GATE-02, §GATE-03, §GATE-05) tracked in KAAN-ACTION-LEGAL.md.
+Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave A)
+Plan: 43-01 COMPLETE (UI audit driver + first audit run on session surface, VIS-01 scaffold). Remaining: 43-02 (session + mascot-overlay closure), 43-03 (wizard + calibration closure), 43-04 (meter rebuild — closes H-03 HIGH gating 43-02), 43-05/06/07 (Wave B mascot animation), 43-08/09 (Wave C hero demo pre-prod).
+Status: Tier-1 UI audit driver shipped — `scripts/launch/run_ui_audit.py` locks the 4-surface allowlist (session / mascot-overlay / wizard / calibration), writes `UI-REVIEW-<surface>.md` skeletons; first audit pass on the session window seeded with 3 HIGH + 3 MEDIUM + 2 LOW real findings (rocker hover gap, titlebar hover gap, meter gradient vs CDJ-Whisper LED-strip). 5/5 driver tests passing.
 Last activity: 2026-05-16
 
 ## Performance Metrics

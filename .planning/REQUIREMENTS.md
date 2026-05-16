@@ -47,7 +47,7 @@
 
 ### Visual Ship Lock (VIS)
 
-- [ ] **VIS-01**: Tier-1 surface audit — session window, mascot overlay, wizard surfaces (6 onboarding steps), calibration / first-run — every interactive element passes paired `gsd-ui-checker` + `gsd-ui-auditor` with zero HIGH findings (critique→execute loop until green)
+- [x] **VIS-01**: Tier-1 surface audit — session window, mascot overlay, wizard surfaces (6 onboarding steps), calibration / first-run — every interactive element passes paired `gsd-ui-checker` + `gsd-ui-auditor` with zero HIGH findings (critique→execute loop until green)
 - [ ] **VIS-02**: Hover-state coverage sweep — every interactive element gets `--glow-faint` outer halo on hover; pinned via visual-regression test
 - [x] **VIS-03**: `session/components/meter.ts` spectrum rebuild — hardware-LED-strip aesthetic with amber peak hold, silk-12 minor grid lines (replace web-app gradient)
 - [ ] **VIS-04**: 5 `prep_*.glb` placeholder replacements via Mixamo retargets (ASSETS-MESHY-A/B + ASSETS-MIXAMO-RIG + ASSETS-PREP-REPLACE); total mascot bundle stays ≤ 25MB cap; per-clip 400KB-1.2MB
