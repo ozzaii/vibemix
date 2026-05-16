@@ -41,7 +41,7 @@
 
 ```
 Plans:
-- [ ] 40-01-PLAN.md — Mic as 2nd Gemini Part + ring buffer + AI-talk zero-fill (AUDIO-01)
+- [x] 40-01-PLAN.md — Mic as 2nd Gemini Part + ring buffer + AI-talk zero-fill (AUDIO-01) — 2 tasks GREEN; 13 new tests + 99 regression-clean; `mic_part_attached`/`mic_part_skipped` events emit; Plan 40-03 Part 3 attach point at `dj_cohost.py:417`
 - [ ] 40-02-PLAN.md — LookaheadProvider port from cohost_v4_tr.py (AUDIO-02)
 - [ ] 40-03-PLAN.md — 3rd Gemini Part wire-in + 'NOT YET HEARD' prompt labeling (AUDIO-02, AUDIO-04)
 - [ ] 40-04-PLAN.md — Event cooldown re-tune + replay-harness --print-cooldowns (AUDIO-03)

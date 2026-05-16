@@ -13,7 +13,7 @@
 
 ### Anti-Slop Audio Path (AUDIO)
 
-- [ ] **AUDIO-01**: Mic audio sent as separate 2nd Gemini multimodal Part — `mic_audio_buf` (12s ring) attached when KAAN_SPOKE event fires (per `cohost_v4.py:1791-1813` pattern; closes shipped `dj_cohost.py:332-340` gap where mic was labeled but absent)
+- [x] **AUDIO-01**: Mic audio sent as separate 2nd Gemini multimodal Part — `mic_audio_buf` (12s ring) attached when KAAN_SPOKE event fires (per `cohost_v4.py:1791-1813` pattern; closes shipped `dj_cohost.py:332-340` gap where mic was labeled but absent) — **Plan 40-01 GREEN** (2026-05-16). 13 new tests pinning 1/2/3-Part contract + Pitfall 1 zero-fill + ring shape; 99 existing DJCoHostAgent tests regression-clean. Part 2 attach at `src/vibemix/agent/dj_cohost.py:417`. Three new constants in `src/vibemix/audio/constants.py` (MIC_AUDIO_PART_SECONDS / _RECENCY_S / _PRESENCE_RMS). `mic_part_attached` / `mic_part_skipped` recorder events for diagnostics.
 - [ ] **AUDIO-02**: 3s file-based source-track lookahead pipeline — `nowplaying-cli` + `mdfind` + `ffmpeg` extracts next 3s from track file on disk, attached as 3rd Gemini Part (per `cohost_v4_tr.py:624-779` `LookaheadProvider`); graceful skip on streaming-only tracks
 - [ ] **AUDIO-03**: Event cooldowns re-tuned to v4 chat-tested values — `MIN_EVENT_GAP_PER_TYPE`: PHASE 18→10s, LAYER_ARRIVAL 16→10s, MIX_MOVE 20→14s, HEARTBEAT 70→45s, TRACK_CHANGE 6→5s
 - [ ] **AUDIO-04**: Prompt template documents the 3-Part contract — Part 1 = live BlackHole mix (audience perspective, all mix moves applied), Part 2 = mic (when present), Part 3 = source-file lookahead labeled `NOT YET HEARD BY AUDIENCE`
@@ -150,7 +150,7 @@ Explicit exclusions for v3.0. Documented to prevent scope creep.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUDIO-01..07 | Phase 40 | Pending |
+| AUDIO-01..07 | Phase 40 | AUDIO-01 GREEN (40-01); AUDIO-05/06 pre-stage GREEN (40-05); 4 remaining (AUDIO-02/03/04/07) |
 | LAT-01..09 | Phase 41 | Pending |
 | GATE-01..09 | Phase 42 | Pending |
 | VIS-01..09 | Phase 43 | Pending |
