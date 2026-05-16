@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: in_progress
-last_updated: "2026-05-16T16:30:00.000Z"
+status: Session + mascot-overlay Tier-1 audits closed at status HIGH-findings-closed (Plan 43-02). VIS-02 hover-glow sweep applied across 5 session components (rocker / titlebar settings / picker / status-bar clickable badges + recheck btn / cohost retry btn) — 20 --glow-faint reference sites; zero hex literals in src/session/components/ + src/overlay/. Playwright hover-glow.spec.ts scaffolded (4 tests); UI-REVIEW-mascot-overlay.md created + closed (3 HIGH closed via overlay.html tokens.css link + overlay-runtime.ts hex→getComputedStyle migration). Wizard + calibration closure (VIS-02 second half) owned by Plan 43-03.
+last_updated: "2026-05-16T16:55:00Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 28
-  completed_plans: 23
-  percent: 58
+  completed_plans: 24
+  percent: 51
 ---
 
 # vibemix — State
@@ -34,9 +34,9 @@ progress:
 
 ## Current Position
 
-Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave A)
-Plan: 43-01 COMPLETE (UI audit driver + first audit run on session surface, VIS-01 scaffold). Remaining: 43-02 (session + mascot-overlay closure), 43-03 (wizard + calibration closure), 43-04 (meter rebuild — closes H-03 HIGH gating 43-02), 43-05/06/07 (Wave B mascot animation), 43-08/09 (Wave C hero demo pre-prod).
-Status: Tier-1 UI audit driver shipped — `scripts/launch/run_ui_audit.py` locks the 4-surface allowlist (session / mascot-overlay / wizard / calibration), writes `UI-REVIEW-<surface>.md` skeletons; first audit pass on the session window seeded with 3 HIGH + 3 MEDIUM + 2 LOW real findings (rocker hover gap, titlebar hover gap, meter gradient vs CDJ-Whisper LED-strip). 5/5 driver tests passing.
+Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 2)
+Plan: 43-01 + 43-02 + 43-04 + 43-07 COMPLETE. Remaining: 43-03 (wizard + calibration closure — VIS-02 second half), 43-05/06 (Wave 2/3 mascot animation), 43-08/09 (Wave 3 hero demo pre-prod).
+Status: Session + mascot-overlay Tier-1 audits closed at HIGH-findings-closed (Plan 43-02). Hover-glow sweep complete: 20 --glow-faint reference sites across src/session/ + src/overlay/ + src/mascot/chrome.css; zero hex literals in scope. Playwright hover-glow.spec.ts scaffolded (4 tests). UI-REVIEW-mascot-overlay.md created and closed (3 HIGH closed via tokens.css link into overlay.html + overlay-runtime.ts hex→getComputedStyle resolver). Existing Vitest suite stays green (30/30: session.tokens + mascot.chrome).
 Last activity: 2026-05-16
 
 ## Performance Metrics
