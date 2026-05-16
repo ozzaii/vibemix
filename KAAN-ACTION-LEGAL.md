@@ -1150,3 +1150,117 @@ GATE-05 SESSION-2 SLOP:     _____________________   (none / list)
 check_ear_test.sh exit 0:   _____________________   (yes / no)
 Sign-off by:                _____________________   (Kaan signature)
 ```
+
+---
+
+## §VIS-04 — Mixamo account login + 5 clip downloads + retarget run
+
+**REQ-ID:** VIS-04 (Phase 43-05)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 43-05 ships retarget pipeline + bundle size gate + clip source manifest)  ☐ Mixamo login complete  ☐ 5 clips downloaded  ☐ 5 retargets run  ☐ `check_bundle_size.sh` exit 0
+**Effort:** ~30 min Mixamo browsing + 5 downloads + ~5 min per retarget run = ~1 h total
+**Blocking for:** VIS-05 mood pool runtime validation (Plan 43-06) running against real retargets instead of placeholders; v3.0 ship-cut gate (Phase 45) — the visual ship lock cannot pass with placeholder GLBs in the bundle.
+
+### Why this is KAAN-action
+
+Mixamo (adobe.com) requires a personal Adobe ID login + browser session for clip download. Autonomous agents cannot create Adobe accounts or operate the Mixamo preview/download UI. Per CONTEXT §VIS-04: "Engineering ships retarget script + size gate + placeholder→real swap-in CI step. Kaan-discharge: actual Mixamo account login + 5 clip downloads."
+
+Per the CDJ Whisper aesthetic constraint (CONTEXT `<specifics>`): "the Neon Rebel mascot mood for the celebrate clip should feel like a Pioneer CDJ headbob, NOT a generic VTuber dance" — only Kaan can apply that aesthetic judgment when picking among Mixamo variants. The script picks slots; Kaan picks energies.
+
+### Files involved
+
+- **Retarget pipeline:** `scripts/mascot/retarget_to_neon_rebel.py` (Plan 43-05 Task 1).
+- **Bundle size gate:** `scripts/mascot/check_bundle_size.sh` (Plan 43-05 Task 2 — two-tier: 25 MB total + 400 KB–1200 KB per-clip).
+- **Source manifest:** `scripts/mascot/MIXAMO-CLIP-SOURCES.md` (Plan 43-05 Task 2 — selection guidance for Kaan; Pioneer-CDJ-headbob aesthetic surfaced).
+- **Target rig (locked):** `tauri/ui/assets/mascot/character.glb` (Neon Rebel; per memory `project_mascot_as_vtuber_personality_surface`).
+- **Output slots (replace placeholders):** `tauri/ui/assets/mascot/animations/prep_*.glb` × 5.
+- **Placeholder origin doc:** `tauri/ui/assets/mascot/animations/PLACEHOLDER_NOTE.md` (Phase 22 lineage + idle-zero contract).
+
+### Kaan steps
+
+1. **Open Mixamo.** Visit <https://www.mixamo.com/> and log in with the personal Adobe ID.
+2. **Download 5 clips** per `scripts/mascot/MIXAMO-CLIP-SOURCES.md`:
+   - Idle → `prep_settle`
+   - Talk_short → `prep_head_turn_left`
+   - Talk_long → `prep_head_turn_right`
+   - Celebrate → `prep_lean_in_hyped` (apply CDJ-headbob aesthetic — reserved energy, not vtuber dance)
+   - Headbob → `prep_lean_in_neutral`
+   - Format: glTF Binary (.glb); Skin: "Without Skin" if offered (the rig comes from `character.glb`).
+3. **Stage downloads:** save to `~/Downloads/mixamo_<slot>.glb` for each (the runbook's one-liners assume that filename convention).
+4. **Run 5 retargets** (one per clip):
+   ```bash
+   uv run python scripts/mascot/retarget_to_neon_rebel.py \
+       --source ~/Downloads/mixamo_idle.glb --slot prep_settle --really
+   uv run python scripts/mascot/retarget_to_neon_rebel.py \
+       --source ~/Downloads/mixamo_talk_short.glb --slot prep_head_turn_left --really
+   uv run python scripts/mascot/retarget_to_neon_rebel.py \
+       --source ~/Downloads/mixamo_talk_long.glb --slot prep_head_turn_right --really
+   uv run python scripts/mascot/retarget_to_neon_rebel.py \
+       --source ~/Downloads/mixamo_celebrate.glb --slot prep_lean_in_hyped --really
+   uv run python scripts/mascot/retarget_to_neon_rebel.py \
+       --source ~/Downloads/mixamo_headbob.glb --slot prep_lean_in_neutral --really
+   ```
+
+   The Plan 43-05 scaffold ships the CLI + size-band gate + draco shell-out wiring; the **skeleton-remap call** inside `retarget()` is `NotImplementedError` and exit code 3. Two implementation paths to fill in during discharge:
+
+   **(a) pygltflib path** — Python-native, preferred for simple skinned-mesh inputs. `uv pip install pygltflib`, then implement the joint remap inside `retarget()` (load source.glb → walk source skeleton hierarchy → match to rig joint names → apply animation channels onto rig joints → write single-clip GLB).
+
+   **(b) Blender headless path** — fallback when (a) can't handle blend-weight transfer cleanly:
+   ```bash
+   blender --background --python scripts/mascot/retarget_blender.py -- \
+       --source ~/Downloads/mixamo_idle.glb \
+       --slot prep_settle \
+       --rig tauri/ui/assets/mascot/character.glb
+   ```
+   `retarget_blender.py` is authored at discharge time too — it imports `bpy`, loads source + rig, runs the standard skeleton-retarget operator, exports the result.
+5. **Tune draco** if any clip falls outside the 400 KB – 1200 KB band — the script's stderr names the flag to tune (`--draco.compressionLevel 1..10`; default 7). Lower the level for clips below 400 KB; raise it for clips above 1200 KB.
+6. **Run the bundle gate:**
+   ```bash
+   bash scripts/mascot/check_bundle_size.sh
+   ```
+   Expected: `PASS: bundle <= 25 MB AND prep_*.glb per-clip 400 KB - 1200 KB`. Exit 0.
+7. **Visual sanity check** — the load-bearing aesthetic judgment:
+   - Open the running dev build (`npm run dev` in `tauri/ui/`).
+   - Trigger each persona (Hype-man / Teacher / Coach) and watch the mascot.
+   - On `Celebrate`: confirm it feels like a Pioneer-CDJ headbob, NOT vtuber dance. If any clip feels "AI slop" / "vtuber slop", re-pick the Mixamo source and re-run the retarget for that slot.
+   - Specifically reject: jazz hands, body twirl, hip pop, exaggerated weight-shift, full-arm dance.
+8. **Commit the retargeted GLBs:**
+   ```bash
+   git add tauri/ui/assets/mascot/animations/prep_*.glb
+   git commit -m "mascot(43-05): VIS-04 real Mixamo retargets (5 clips, Neon Rebel rig)"
+   ```
+
+### Verification
+
+```bash
+# Bundle gate (both tiers green):
+bash scripts/mascot/check_bundle_size.sh
+
+# Per-clip inventory (5 files, each 400 KB – 1200 KB):
+ls -lh tauri/ui/assets/mascot/animations/prep_*.glb
+
+# Plan 43-05 pytest suite (engineering tests must still pass post-swap):
+uv run pytest tests/mascot/ -q
+
+# Existing mascot Vitest specs (TS-side idle-zero contract, additive layer):
+cd tauri/ui && npx vitest run src/mascot --reporter=min
+```
+
+### What unblocks
+
+- **VIS-05** mood pool runtime validation (Plan 43-06) — running against real retargets instead of placeholders gives the 30 s persona smoke its actual ship-quality signal.
+- **v3.0 ship-cut gate** (Phase 45) — the visual ship lock cannot pass with placeholder GLBs in the bundle.
+- **Hero demo capture** (Phase 43-08/09 + Francesco-discharge) — the mascot's celebrate moment in the storyboard's cut 7 needs the real Pioneer-CDJ-headbob clip to read on camera.
+
+### Sign-off block
+
+```
+VIS-04 MIXAMO LOGIN on:        _____________________   (date)
+VIS-04 CLIPS DOWNLOADED:        _____________________   (count / 5)
+VIS-04 RETARGETS RUN:           _____________________   (count / 5)
+VIS-04 BUNDLE SIZE (post-run):  _____________________   (MB; target ≤ 25)
+VIS-04 PER-CLIP BAND HELD:      _____________________   (yes / no — all 5 in 400 KB - 1200 KB)
+VIS-04 CDJ-HEADBOB FEEL OK:     _____________________   (yes / no — Kaan ear/eye judgment)
+check_bundle_size.sh exit 0:    _____________________   (yes / no)
+Sign-off by:                    _____________________   (Kaan signature)
+```

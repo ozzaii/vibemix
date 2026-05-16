@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: Plan 43-08 complete — hero demo storyboard re-mocked to 8-cut 30s sequence per CONTEXT §VIS-08; UI chip overlays in cuts 2-6 inline-rendered with CDJ Whisper v5; end-card carries open-source CTA; ≤8 cut hard gate + 6-test pytest spec wired. Closes VIS-08; unblocks Plan 43-09.
-last_updated: "2026-05-16T16:49:00Z"
+status: Plans 43-05 + 43-08 both shipped. Phase 43 Wave 2 closing — Mixamo retarget scaffold + §VIS-04 runbook (43-05) + hero storyboard 8-cut re-mock + cut-count gate (43-08). VIS-04 + VIS-08 closed.
+last_updated: "2026-05-16T16:55:00Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
@@ -34,9 +34,9 @@ progress:
 
 ## Current Position
 
-Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave C)
-Plan: 43-08 COMPLETE (Hero demo storyboard v5 re-mock — 8-cut shot list + ≤8 cut hard gate via scripts/launch/check_cut_count.py, VIS-08). Prior: 43-01 (audit driver), 43-04 (meter rebuild), 43-07 (storyboard fonts + palette gate). Remaining: 43-02/03 (Wave A surface closures), 43-05/06 (Wave B mascot animation), 43-09 (Wave C Francesco handoff package).
-Status: Storyboard re-mocked to 8 cuts in CONTEXT-specified sequence; UI chip overlays in cuts 2-6 inline-rendered with CDJ Whisper v5 (wizard welcome, calibration meter, session shell, AI caption pop, EvidenceRegistry chip strip); end-card carries open-source CTA "open-source · MIT · github.com/bravoh/vibemix"; cut-count gate + palette gate both exit 0; 12/12 launch-prep pytests pass.
+Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 2 closing)
+Plan: 43-01 / 43-04 / 43-07 / 43-05 / 43-08 COMPLETE. In flight: 43-02 (session + mascot-overlay closure), 43-03 (wizard + calibration closure). Remaining: 43-06 (mood pool runtime + perf), 43-09 (Francesco handoff package).
+Status: Wave 1 + half of Wave 2 shipped. VIS-01 (scaffold), VIS-03 (meter), VIS-04 (retarget scaffold + §VIS-04 runbook), VIS-07 (doc drift), VIS-08 (storyboard re-mock) all closed engineering-side. Pending: VIS-01 closure (43-02/03), VIS-02 (hover sweep), VIS-05 (mood pool runtime), VIS-06 (perf), VIS-09 (Francesco handoff).
 Last activity: 2026-05-16
 
 ## Performance Metrics
@@ -65,6 +65,7 @@ Last activity: 2026-05-16
 | Phase 43 P04 | 11m 48s | 3 tasks | 6 files |
 | Phase 43 P07 | 14m 11s | 3 tasks | 7 files |
 | Phase 43 P08 | 14m 57s | 2 tasks | 3 files |
+| Phase 43 P05 | 14m 02s | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ Last activity: 2026-05-16
 - **Plan 42-06 — Privacy tests skip-cleanly (not vacuous-true) when no ear-test logs exist** (2026-05-16) — `pytest.skip` with informative message surfaces the §GATE-05 outstanding state in CI output. Contract still holds and will fire once logs land. Avoids false-positive green coverage.
 - **Plan 42-06 — Threshold mirror via parametrized 2-decimal normalization** (2026-05-16) — README locked values formatted as `{value:.2f}` and asserted substring-present per key (`f1_min`, `substance_min`, `cited_cosine_min`, `bypass_max`, `per_genre_f1_min`). Catches both numeric drift AND format drift in the README table.
 - **Plan 42-06 — Rubric-leak sentinel derivation at test-time** (2026-05-16) — sentinels read from `judge_pro.md` + `judge_flash.md` first-meaningful-chunk (post-YAML frontmatter, ≥40 chars). Self-updating against rubric evolution; removes Phase 27's documented hardcoded-sentinel maintenance burden.
+- **Plan 43-05 — Output dir default = `tauri/ui/assets/mascot/animations/`** (2026-05-16) — CONTEXT §VIS-04 named `tauri/ui/public/mascot/` but no files exist there; existing 5 placeholders + manifest.json + `asset-loader.ts` `s.startsWith('prep_')` convention live in `assets/mascot/animations/`. Default matches reality; `--output-dir` flag still lets Kaan override.
+- **Plan 43-05 — Retarget remap stays `NotImplementedError` in plan; two paths in §VIS-04** (2026-05-16) — Scaffold ships CLI + slot taxonomy + draco shell-out + size-band predicate + file-existence guard fully functional, but the load-bearing skeleton remap is intentionally not implemented. §VIS-04 runbook documents pygltflib (preferred) + blender headless (fallback) — Kaan picks at discharge time once Mixamo source clips are downloaded.
+- **Plan 43-05 — Bundle-gate two-tier with placeholder-permissive exit-2** (2026-05-16) — Tier 1 delegates to existing Phase 31 25 MB cap (no duplication); Tier 2 adds prep_*.glb 400 KB-1200 KB band check. Today's placeholders (44-56 KB) intentionally fail Tier 2 with exit 2, which is the visible signal that §VIS-04 discharge is still pending. Test asserts `{0, 2}` not strict 0.
 
 ### Decisions Locked (v2.1 — shipped)
 
