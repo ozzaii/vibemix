@@ -12,7 +12,15 @@
  * Dragability: `data-tauri-drag-region` on .mascot-window lets you grab
  * the window anywhere in its rect (the character is the visible target;
  * empty pixels still drag because the OS-level window is opaque to
- * pointer events while transparent visually). */
+ * pointer events while transparent visually).
+ *
+ * VIS-02 (43-02) hover-glow scope note: the mascot overlay window
+ * carries NO interactive DOM (no <button>, <a>, [role="button"] or
+ * [data-interactive] — the canvas itself is `pointer-events: none`
+ * and the only "interaction" is the OS-level drag on .mascot-window).
+ * Per the audit, the surface is intentionally exempt from the hover-
+ * glow sweep — there is no element to hover, only a character to
+ * watch. Closure recorded in UI-REVIEW-mascot-overlay.md iteration 1. */
 
 .mascot-window {
   position: relative;

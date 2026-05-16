@@ -6,27 +6,52 @@
 // custom properties on the ring div. The Rust side schedules window close
 // after duration_ms, so this script does NOT manage lifetime — it only
 // configures the animation.
+//
+// VIS-02 (43-02) token-only contract — the 4 ring colours are sourced
+// from tokens.css at runtime via getComputedStyle(documentElement). The
+// 4 hex literals previously inlined here were duplicates of --amber /
+// --led-fault / --led-ok / (the unused 'blue' slot). When tokens.css
+// shifts the CDJ-Whisper palette, the overlay ring follows automatically
+// instead of drifting silently. Allowlist semantics survive: any
+// non-matched key returns the resolved --amber.
 
 const params = new URLSearchParams(window.location.search);
 
-// Aligned with the CDJ-Whisper token palette so the overlay ring reads
-// against the same colour vocabulary as the rest of the surface. The
-// amber matches --amber (#ff8a3d); fault / ok use the LED palette;
-// blue is reserved (no current consumer, kept as a named slot).
-const COLOR_AMBER = "#ff8a3d";
-const COLOR_MAP: Record<string, string> = {
-  amber: COLOR_AMBER,
-  red: "#d4413a",
-  green: "#6dd44a",
-  blue: "#4898ff",
+/** Token name per allowlisted ring colour. Note: the overlay webview
+ *  loads tokens.css indirectly via the entry HTML's <link>, so by the
+ *  time this module runs the CSS custom properties resolve. We keep a
+ *  literal-free fallback by computing the value at boot. */
+const TOKEN_FOR_KEY: Record<string, string> = {
+  amber: "--amber",
+  red: "--led-fault",
+  green: "--led-ok",
+  // Reserved slot — kept as a named entry for future consumers; resolves
+  // to --silk so a stray `?color=blue` request degrades gracefully into
+  // the silk palette rather than a hard-coded literal.
+  blue: "--silk",
 };
 
+function resolveTokenValue(token: string): string {
+  // The webview rasterises tokens.css before our module runs (link in
+  // overlay.html); getComputedStyle reads the resolved string. Trim
+  // because CSS variable bodies often carry a leading space.
+  if (typeof document === "undefined" || !document.documentElement) return "";
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(token)
+    .trim();
+}
+
 function resolveColor(raw: string | null): string {
-  if (!raw) return COLOR_AMBER;
-  const key = raw.toLowerCase();
-  // Allowlist-only: refuse arbitrary CSS color injection. Falls back
-  // to amber for any unknown token.
-  return COLOR_MAP[key] ?? COLOR_AMBER;
+  // Allowlist-only: refuse arbitrary CSS color injection. Unknown keys
+  // (including raw=null) fall through to the amber token.
+  const key = (raw ?? "amber").toLowerCase();
+  const tokenName = TOKEN_FOR_KEY[key] ?? "--amber";
+  const value = resolveTokenValue(tokenName);
+  // Defensive: if tokens.css has not yet cascaded (e.g. webview boot
+  // race), fall back to a var() reference so the CSS engine resolves
+  // on the next paint cycle. The `var()` body is the token name itself
+  // — no inline literal — so the token-only contract holds.
+  return value || `var(${tokenName})`;
 }
 
 function resolveDuration(raw: string | null): number {

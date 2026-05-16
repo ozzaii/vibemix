@@ -150,11 +150,22 @@ const CSS = `
   /* Critique pass 2 (2026-05-14): hover + active states are now tonal,
    * not chromatic. Previous full amber background + inset glow made the
    * gear louder than the LIVE pill — a drawer-open chrome cue should
-   * never outshine the always-on status indicator. */
-  .vmx-titlebar__settings:hover {
+   * never outshine the always-on status indicator.
+   *
+   * VIS-02 (43-02) — closes session-audit H-02 by adding a damped
+   * --glow-faint on hover/focus-visible. The tonal colour + silk-22
+   * border-poke remain; the new outer halo is the smallest amber signal
+   * in tokens.css (0 0 5px var(--amber-22)) so the gear acknowledges
+   * the cursor without competing with the always-on LIVE pill. */
+  .vmx-titlebar__settings:hover,
+  .vmx-titlebar__settings:focus-visible {
     color: var(--silk);
     border-color: var(--silk-22);
+    box-shadow: var(--glow-faint);
   }
+  /* Suppress the body-level *:focus-visible outline+glow-soft on the
+   * gear; the rule above is the authoritative focus signal. */
+  .vmx-titlebar__settings:focus-visible { outline: none; }
   .vmx-titlebar__settings[data-active="true"] {
     color: var(--amber);
     border-color: var(--amber-40);
