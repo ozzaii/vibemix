@@ -37,6 +37,21 @@
 4. PGP key published to `keys.openpgp.org`; Tauri ed25519 updater key rotated to production; BlackHole probe fresh-Mac walk passes.
 5. v4 "harikaydı" baseline regression — ear-test pass on ≥1 real Kaan DJ session (Coach + Hype modes).
 
+**Plans:** 6 plans
+
+```
+Plans:
+- [ ] 40-01-PLAN.md — Mic as 2nd Gemini Part + ring buffer + AI-talk zero-fill (AUDIO-01)
+- [ ] 40-02-PLAN.md — LookaheadProvider port from cohost_v4_tr.py (AUDIO-02)
+- [ ] 40-03-PLAN.md — 3rd Gemini Part wire-in + 'NOT YET HEARD' prompt labeling (AUDIO-02, AUDIO-04)
+- [ ] 40-04-PLAN.md — Event cooldown re-tune + replay-harness --print-cooldowns (AUDIO-03)
+- [ ] 40-05-PLAN.md — PGP + Tauri updater key pre-stage scaffolding (AUDIO-05, AUDIO-06)
+- [ ] 40-06-PLAN.md — BlackHole probe structured-event emission + Pitfall 5 retry (AUDIO-07)
+```
+
+**Wave structure:** Wave 1 (40-01, 40-05) → Wave 2 (40-02, 40-04, 40-06) → Wave 3 (40-03)
+
+
 ### Phase 41: Gemini SKU Upgrade + Latency Stack v2
 
 **Goal:** Adopt 2026 Gemini deltas — ModelRouter seam, implicit caching, LLM→TTS pipe-through, 3.1 Flash TTS, Embedding 2 GA, Flex tier for batch paths. Target: end-to-end latency 5-10s → 3-5s; perceived latency 0-2s with P40 lookahead offset.
