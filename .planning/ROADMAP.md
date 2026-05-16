@@ -67,6 +67,22 @@ Plans:
 5. Flex tier billing visible on next batch run (library re-index, eval-corpus replay); €/mo CI gate stays under €50.
 6. 3.1 Flash Live spike verdict written (`spikes/gemini-3-1-flash-live-music.md`) — go/no-go on optional v3.x toggle.
 
+**Plans:** 7 plans
+
+```
+Plans:
+- [ ] 41-01-PLAN.md — ModelRouter seam + config + CI grep gate (LAT-01, LAT-07)
+- [ ] 41-02-PLAN.md — GeminiContextCache cleanup: TTL 3600s, mutation-driven refresh, cache_hit telemetry (LAT-02, LAT-03)
+- [ ] 41-03-PLAN.md — thinking_level=MINIMAL runtime gate + FLEX-on-live defense (LAT-08)
+- [ ] 41-04-PLAN.md — LLM→TTS streaming pipe-through + dual-phase gate + 3.1 Flash TTS audio-tag DSL (LAT-04, LAT-05)
+- [ ] 41-05-PLAN.md — Embedding 2 GA probe + auto-bump + 768-dim parity test + migration script (LAT-06)
+- [ ] 41-06-PLAN.md — Gemini 3.1 Flash Live spike framework + Kaan-action discharge runbook (LAT-09)
+- [ ] 41-07-PLAN.md — End-to-end integration test + replay harness metrics + 41-INTEGRATION-REPORT.md (LAT-01..09)
+```
+
+**Wave structure:** Wave 1 (41-01, 41-05) → Wave 2 (41-02, 41-03, 41-04, 41-06) → Wave 3 (41-07)
+
+
 ### Phase 42: Hallucination Gate v3 — Hybrid
 
 **Goal:** Adopt hybrid gate — Phase 27 autonomous proxy fast-lane (PR + nightly canary) + Kaan-ear release-cut veto. P85 override formally retired; corpus + thresholds calibrated against real audio; ear-test capture wired into debrief.
