@@ -55,7 +55,11 @@ def test_blackhole_absent_surfaces_install_button(monkeypatch: pytest.MonkeyPatc
         {"name": "AirPods Pro", "max_output_channels": 2},
         {"name": "Built-in Output", "max_output_channels": 2},
     ])
-    result = blackhole_probe.probe_blackhole()
+    # ``retry_on_missing=False`` keeps the test fast — Phase 40 / AUDIO-07
+    # added a default 1.5s CoreAudio fresh-boot retry that the genuinely-
+    # absent path doesn't need to exercise here (the retry semantics are
+    # pinned in ``test_blackhole_probe_events.py``).
+    result = blackhole_probe.probe_blackhole(retry_on_missing=False)
     assert result["installed"] is False
     assert result["device_name"] is None
 
@@ -68,7 +72,8 @@ def test_blackhole_query_failure_returns_absent(monkeypatch: pytest.MonkeyPatch)
         raise RuntimeError("CoreAudio not available")
 
     monkeypatch.setattr(sd, "query_devices", _boom)
-    result = blackhole_probe.probe_blackhole()
+    # Same retry skip as above — keeps the test fast.
+    result = blackhole_probe.probe_blackhole(retry_on_missing=False)
     assert result["installed"] is False
     assert result["device_name"] is None
 

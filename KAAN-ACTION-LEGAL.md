@@ -668,6 +668,112 @@ Sign-off by:                 _____________________   (Kaan signature)
 
 ---
 
+## AUDIO-07 — Fresh-Mac BlackHole probe walk-through (post-Plan 40-06 discharge)
+
+**REQ-ID:** AUDIO-07
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 40-06 shipped emit hooks + Pitfall 5 retry)  ☐ fresh-account walk done  ☐ events.jsonl artifact captured  ☐ Sign-off
+**Effort:** ~15 minutes on a Mac with a spare user account (no BlackHole installed) — covers full wizard click-through + post-install re-probe.
+
+### Why this is KAAN-action
+
+The probe engineering surface (event emission + Pitfall 5 fresh-boot
+race defense) is fully scaffolded by Plan 40-06 and pinned by the
+`tests/install/test_blackhole_probe_events.py` suite. What stays
+KAAN-action is the end-to-end install-funnel walk on a Mac that has
+never seen BlackHole — only Kaan can run that on his own hardware
+(autonomous agents have no fresh-Mac user account to step through, no
+way to click an external installer, no way to verify the post-install
+events.jsonl artifact qualitatively against real DJ ear).
+
+### Pre-requisites
+
+- A Mac (any supported macOS version — 12.3 / 14 / 15).
+- A spare user account on that Mac with **no BlackHole installed**
+  (or a fresh user via System Settings → Users & Groups → Add User).
+  An existing account that already has BlackHole works only after
+  `sudo /usr/local/bin/BlackHole-uninstaller` is run first.
+- vibemix installer or dev build available on disk.
+
+### Walk-through (4 steps)
+
+1. **Pre-walk sanity check.** Log into the fresh user account. Confirm
+   `system_profiler SPAudioDataType | grep -i blackhole` prints
+   nothing. Launch vibemix.
+
+2. **Wizard step — probe-missing path.** The wizard should land on
+   the "Install BlackHole 2ch" affordance. Watch the running
+   session's `events.jsonl` (locate via the session-dir log; typical
+   path is `~/Library/Application Support/vibemix/sessions/<UUID>/events.jsonl`).
+
+   Expected event sequence so far:
+   ```
+   {"t": ..., "kind": "audio.probe.missing", "device_name": null}
+   ```
+
+3. **Wizard step — CTA click.** Click "Install BlackHole" in the
+   wizard. The OS default browser must open
+   `https://existential.audio/blackhole/`. Immediately re-read
+   `events.jsonl` — expected next line:
+   ```
+   {"t": ..., "kind": "audio.probe.cta_fired", "cta": "blackhole_install_link_opened", "url": "https://existential.audio/blackhole/"}
+   ```
+
+4. **External install + re-probe.** Download and install BlackHole 2ch
+   from the official site. Return to vibemix and either (a) click the
+   wizard's "I've installed it, retry" affordance, or (b) restart the
+   sidecar. The probe should now detect the device; expected next
+   line in `events.jsonl`:
+   ```
+   {"t": ..., "kind": "audio.probe.detected", "device_name": "BlackHole 2ch"}
+   ```
+
+### Pitfall 5 sanity (optional — covered by automated tests but worth
+eyeballing once on real hardware)
+
+After installing BlackHole, **reboot the Mac** and re-launch vibemix
+within 5-10 seconds of the desktop appearing (i.e. before CoreAudio
+has fully enumerated devices). The Plan 40-06 retry guard should
+prevent a spurious `audio.probe.missing` → `audio.probe.cta_fired`
+sequence — the probe sleeps 1.5s and re-queries before declaring
+missing. The events.jsonl should show ONLY:
+```
+{"t": ..., "kind": "audio.probe.detected", "device_name": "BlackHole 2ch"}
+```
+If you see a `missing` event followed seconds later by `detected` on
+this fresh-boot run, the Pitfall 5 retry isn't firing — open a bug.
+
+### Discharge checklist
+
+When the walk is complete, the following must hold:
+
+- [ ] `events.jsonl` from the fresh-account walk contains all three
+      `audio.probe.*` event kinds in the order:
+      `missing` → `cta_fired` → `detected`.
+- [ ] The `cta_fired` event's `url` field equals
+      `https://existential.audio/blackhole/` exactly (no trailing
+      query strings, no protocol downgrade).
+- [ ] The OS default browser opened to the install URL on CTA click.
+- [ ] Post-install re-probe surfaced `audio.probe.detected` with a
+      non-null `device_name` containing the substring `"BlackHole"`.
+- [ ] Pitfall 5 fresh-boot retry was visually confirmed (no spurious
+      missing → detected sequence on cold-boot probe).
+- [ ] Captured `events.jsonl` artifact attached to the sign-off block
+      (link or path).
+
+### Sign-off block
+
+```
+AUDIO-07 PRE-WALK CHECK on:    _____________________   (date)
+AUDIO-07 FRESH-USER ACCOUNT:   _____________________   (account name on Mac)
+AUDIO-07 MAC OS VERSION:       _____________________   (12.3 / 14 / 15)
+AUDIO-07 EVENTS.JSONL ARTIFACT:_____________________   (path or link)
+AUDIO-07 PITFALL-5 RETRY OK:   _____________________   (yes / no — single detected event after fresh boot)
+Sign-off by:                   _____________________   (Kaan signature)
+```
+
+---
+
 ## INSTALL-VM-RUN — Fresh-VM rehearsal real execution (Phase 33 / Plan 33-08)
 
 **Owner:** Kaan
