@@ -49,6 +49,7 @@ from livekit.agents import Agent, ModelSettings
 from livekit.agents import llm as agents_llm
 from livekit.agents import tts as agents_tts
 
+from vibemix.agent._streaming_pipe import find_sentence_end, passes_head_gate
 from vibemix.agent.ack_bank import BUCKET_FOR_EVENT
 from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL
@@ -64,6 +65,7 @@ from vibemix.audio import (
 from vibemix.coach import CitationLinter, StrippedRateTracker
 from vibemix.llm.thinking_gate import validate_live_config
 from vibemix.prompts import build_parts_description, build_system_instruction, filter_for_slop
+from vibemix.runtime.llm_to_tts_delta_meter import LLMToTTSDeltaMeter
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
 from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
@@ -111,6 +113,22 @@ DEFAULT_MOOD = "hype-man"
 # ring animation timing. Matches the Rust overlay.html CSS keyframe.
 OVERLAY_DURATION_MS: int = 1300
 OVERLAY_COLOR: str = "amber"
+
+# Plan 41-04 — silence-pad payload pushed to ``PlaybackQueue`` when a
+# speculatively-emitted head is invalidated by the post-stream gate
+# (slop / citation_failure). 500ms of 24kHz int16 mono zero-fill ==
+# 24000 bytes. The pad replaces the audio that would have been the
+# trailing slop; the LiveKit OPUS pipeline plays it as ~half a second of
+# audible silence — a perceptible "cut" rather than a hard click.
+#
+# Per Pitfall 8: if the LiveKit TTS path has already committed the head
+# audio frames into the OPUS encoder, the silence-pad APPENDS to the
+# queue — it does NOT preempt frames already in flight. The realistic
+# user experience is "head plays, then a brief silence where the slop
+# would have been". The cleaner cancel (mid-utterance cut) is documented
+# as a known degrade — see CONTEXT.md Open Q2.
+SILENCE_PAD_MS: int = 500
+SILENCE_PAD_BYTES: int = 24000 * 2 * SILENCE_PAD_MS // 1000  # 24kHz * 2B * 0.5s = 24000B
 
 
 def _resolve_prompt_cell(mood: str | None = None) -> str:
@@ -240,6 +258,13 @@ class DJCoHostAgent(Agent):
         # records the first non-empty stream chunk timestamp; the rolling
         # average feeds AckBank.should_fire(rolling_ttft_avg_ms=...).
         self._ttft_meter: TTFTMeter | None = ttft_meter
+        # Plan 41-04 / LAT-04 — per-turn (event_fired → first_sentence
+        # _yielded) delta meter. Always-on (unlike _ttft_meter which is
+        # optional). Records via :meth:`llm_node` at the speculative head
+        # emit point; emits ``llm_to_tts_delta_ms`` to events.jsonl when
+        # a head was yielded. Skip path (no head emitted — short
+        # response / suppression / strip) writes no event.
+        self._llm_to_tts_meter: LLMToTTSDeltaMeter = LLMToTTSDeltaMeter()
         # Plan 20-01 — citation linter chokepoint. All four kwargs default
         # None; the wired path runs iff ALL FOUR are non-None. ``_linter_wired``
         # is computed once at __init__ to avoid four None-checks on every
@@ -300,6 +325,11 @@ class DJCoHostAgent(Agent):
         # preempted via CancelGate or failed via TimeoutError).
         if self._ttft_meter is not None:
             self._ttft_meter.record_event_fired()
+        # Plan 41-04 / LAT-04 — arm the LLM→TTS delta meter at the same
+        # boundary so its event_fired_at matches the TTFT meter's. Both
+        # meters share the (event_fired, first_*_at) baseline; only the
+        # measured RHS differs (first_chunk vs first_sentence_yielded).
+        self._llm_to_tts_meter.start_turn()
 
     async def llm_node(
         self,
@@ -559,11 +589,33 @@ class DJCoHostAgent(Agent):
             f"screen={'yes' if screen_jpeg else 'no'} dump={invoke_dir.name}"
         )
 
-        # Phase 10: BUFFER chunks until the stream completes, then run the
-        # silence + slop gate. Yield chunks only if both gates pass.
-        # See module docstring for the latency-vs-correctness rationale.
+        # === Plan 41-04 streaming pipe-through (LAT-04) ===
+        # Refactor: replace buffer-then-yield with streaming sentence-
+        # boundary yield + dual-phase gate. The head is yielded
+        # SPECULATIVELY as soon as ``find_sentence_end`` returns a
+        # boundary AND ``passes_head_gate`` clears the head text. The
+        # tail then streams as-it-arrives.
+        #
+        # ``buffered_chunks`` is still maintained so the post-stream
+        # legacy emit path (citation linter + suppression) keeps its
+        # contract for non-speculative paths (head never fired, short
+        # response, suppression). When a head was speculatively yielded,
+        # the post-stream gates run on ``full_text`` — if they fail, a
+        # silence-pad frame is pushed to ``self._playback`` (cancel-on-
+        # trailing-slop per Open Q2 auto-resolution; Pitfall 8 fallback
+        # documented below).
+        #
+        # Streaming pipe state:
+        #   accum             — running concat of chunk text since last
+        #                       boundary scan; reset (cleared) on first
+        #                       boundary, then unused (tail streams).
+        #   head_yielded      — True iff the speculative head was emitted.
+        #                       Drives post-stream branching (cancel-with-
+        #                       silence-pad vs legacy emit-from-buffer).
         full_text = ""
         buffered_chunks: list[str] = []
+        accum = ""
+        head_yielded = False
         t_start = time.time()
         llm_err: str | None = None
         # Plan 19-05 — record first-chunk arrival exactly once per turn for
@@ -619,9 +671,51 @@ class DJCoHostAgent(Agent):
                 print(txt, end="", flush=True)
                 full_text += txt
                 buffered_chunks.append(txt)
+                # Plan 41-04 — speculative head emit. Run only while we
+                # haven't yet committed to a streaming yield path. Once
+                # ``head_yielded`` is True we stream subsequent chunks
+                # as-they-arrive (the speculative commitment is the
+                # binding signal — trailing audio just keeps the listener
+                # in flow). The legacy buffered_chunks list is still
+                # populated for post-stream citation linting on the full
+                # response text.
+                if not head_yielded:
+                    accum += txt
+                    end_idx = find_sentence_end(accum)
+                    if end_idx is not None:
+                        head = accum[:end_idx]
+                        if passes_head_gate(head):
+                            head_yielded = True
+                            self._llm_to_tts_meter.record_first_sentence()
+                            yield head
+                            # Any trailing portion of ``accum`` past the
+                            # boundary becomes the first trailing chunk
+                            # — yield it now so the stream stays
+                            # contiguous.
+                            tail_remainder = accum[end_idx:]
+                            if tail_remainder:
+                                yield tail_remainder
+                            accum = ""
+                        # else: head failed the gate — silence-token or
+                        # slop prefix. SUPPRESS the speculative emit
+                        # entirely; the post-stream silence/slop pipeline
+                        # is the authority and will fire the appropriate
+                        # suppression event. Keep accumulating into accum
+                        # so a later sentence boundary could still fire
+                        # on cleaner trailing text (unlikely in practice
+                        # but it's the correct boundary semantics).
+                elif head_yielded:
+                    # Stream trailing chunks as-they-arrive. The head
+                    # already bound the speculative path; trailing audio
+                    # streams without further boundary gating. The post-
+                    # stream gate (citation linter) is the authority for
+                    # cancel-with-silence-pad if the full response is
+                    # invalid.
+                    yield txt
         except Exception as e:
             llm_err = repr(e)
             print(f"\n[llm err] {e}", file=sys.stderr)
+        # === end Plan 41-04 streaming pipe-through ===
 
         print()
         elapsed = time.time() - t_start
@@ -686,6 +780,31 @@ class DJCoHostAgent(Agent):
         citation_lint_reason: str | None = None
         citation_lint_missing_payload: list[list[str]] | None = None
 
+        # Plan 41-04 — cancel-with-silence-pad on speculative-emit failure.
+        # When ``head_yielded`` is True AND the post-stream gate fails
+        # (silence / slop / citation_failure), push a 500ms zero-fill
+        # frame into the playback queue (when wired) and emit a
+        # ``streaming_cancel`` event. This is the Open Q2 auto-
+        # resolution; the LiveKit cancel-race fallback (Pitfall 8) is
+        # documented in the module — head may play through to completion
+        # if frames are already in the OPUS encoder when we push the pad.
+        def _push_silence_pad_and_cancel(reason: str) -> None:
+            try:
+                if self._playback is not None:
+                    self._playback.push(b"\x00" * SILENCE_PAD_BYTES)
+            except Exception as _e:
+                print(f"[silence-pad err] {_e}", file=sys.stderr)
+            try:
+                self._recorder.log_event(
+                    "streaming_cancel",
+                    reason=reason,
+                    head_yielded=True,
+                    response_chars=len(full_text),
+                    latency_s=round(elapsed, 2),
+                )
+            except Exception:
+                pass
+
         if suppression == "silence":
             self._recorder.log_event(
                 "silence_short_circuit",
@@ -694,6 +813,8 @@ class DJCoHostAgent(Agent):
                 latency_s=round(elapsed, 2),
             )
             print("[ai_text] <silence/> (suppressed)", flush=True)
+            if head_yielded:
+                _push_silence_pad_and_cancel("silence")
         elif suppression == "slop":
             self._recorder.log_event(
                 "slop_suppressed",
@@ -703,6 +824,8 @@ class DJCoHostAgent(Agent):
                 latency_s=round(elapsed, 2),
             )
             print(f"[ai_text] <slop suppressed: {slop_matches}>", flush=True)
+            if head_yielded:
+                _push_silence_pad_and_cancel("slop")
         else:
             # Plan 20-01 — citation linter chokepoint runs HERE, after the
             # silence/slop gate, before yielding chunks. The wired path
@@ -729,8 +852,13 @@ class DJCoHostAgent(Agent):
 
                 if lint_result.valid:
                     citation_action = "emit"
-                    for txt in buffered_chunks:
-                        yield txt
+                    # Plan 41-04 — head_yielded means the streaming pipe
+                    # already emitted the head + trailing chunks
+                    # in-flight; the legacy re-yield from buffered_chunks
+                    # would duplicate audio. Skip it.
+                    if not head_yielded:
+                        for txt in buffered_chunks:
+                            yield txt
                     if self._stripped_tracker is not None:
                         self._stripped_tracker.record(False)
                     if stripped:
@@ -752,8 +880,12 @@ class DJCoHostAgent(Agent):
                     )
                     if bypass_active:
                         citation_action = "bypass"
-                        for txt in buffered_chunks:
-                            yield txt
+                        # Plan 41-04 — same head_yielded guard as the
+                        # valid path: chunks already in-flight, no
+                        # re-yield from buffer.
+                        if not head_yielded:
+                            for txt in buffered_chunks:
+                                yield txt
                         # Bypass means we did NOT strip — tracker records
                         # the actual outcome (False = "we let it through").
                         if self._stripped_tracker is not None:
@@ -779,7 +911,15 @@ class DJCoHostAgent(Agent):
                         citation_action = "strip"
                         ack_bucket: str | None = None
                         ack_sample_idx: int | None = None
-                        if ev is not None and ev.type in BUCKET_FOR_EVENT:
+                        # Plan 41-04 — when ``head_yielded`` is True the
+                        # speculative head is already in flight; we
+                        # cannot un-yield it. Fire cancel-with-silence-
+                        # pad + ``streaming_cancel`` instead of the
+                        # ack-bank substitution (ack would overlap the
+                        # head audio — worse than a clean pad).
+                        if head_yielded:
+                            _push_silence_pad_and_cancel("citation_failure")
+                        elif ev is not None and ev.type in BUCKET_FOR_EVENT:
                             try:
                                 bucket, pcm, sample_idx = (
                                     self._ack_bank.pick_for_event(ev)
@@ -822,8 +962,12 @@ class DJCoHostAgent(Agent):
                 # path (history append + log event). Byte-identical to the
                 # pre-Plan-20 behavior (locked by
                 # tests/agent/test_dj_cohost.py + test_dj_cohost_silence_*).
-                for txt in buffered_chunks:
-                    yield txt
+                # Plan 41-04 — when ``head_yielded`` is True the streaming
+                # path already emitted the chunks in-flight; skip the
+                # buffer re-yield to avoid duplicate audio.
+                if not head_yielded:
+                    for txt in buffered_chunks:
+                        yield txt
                 if stripped:
                     print(f"[ai_text] {stripped!r}", flush=True)
                     self._recorder.log_event(
@@ -898,6 +1042,10 @@ class DJCoHostAgent(Agent):
                         "citation_lint_reason": citation_lint_reason,
                         "citation_lint_missing": citation_lint_missing_payload,
                         "citation_action": citation_action,
+                        # Plan 41-04 — streaming-pipe outcome. True iff
+                        # the speculative head was emitted before stream
+                        # completion; False on suppression/short-response.
+                        "head_yielded": head_yielded,
                     },
                     indent=2,
                     ensure_ascii=False,
@@ -905,6 +1053,20 @@ class DJCoHostAgent(Agent):
             )
         except Exception:
             pass
+
+        # Plan 41-04 — emit llm_to_tts_delta_ms event (skip when no head
+        # was yielded — keeps the per-turn metric stream tight).
+        try:
+            self._llm_to_tts_meter.log_turn(
+                self._recorder,
+                extra={
+                    "event": ev_tag,
+                    "response_id": response_id,
+                    "head_yielded": head_yielded,
+                },
+            )
+        except Exception as _e:
+            print(f"[delta-meter err] {_e}", file=sys.stderr)
 
     async def invalidate_cache(self) -> None:
         """Invalidate the context cache — Plan 19-03 cancel-aware chokepoint.
