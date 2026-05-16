@@ -64,3 +64,31 @@ Extra items in the left set:
 **Why deferred:** Persona path is not in Plan 40-01's scope. Drift is expected — Phases 18-20+ intentionally evolved the system prompt beyond v4 baseline. Test is now an outdated byte-identity gate.
 
 **Fix when ready:** Either delete the test (persona no longer byte-identical post-Phase-18) or update the expected baseline.
+
+---
+
+## DEFERRED-40-04-01: `test_each_session_has_events_jsonl_file` missing corpus fixture
+
+**Discovered by:** Plan 40-04 verification sweep (`pytest tests/eval/`).
+
+**Symptom:** `tests/eval/test_corpus_diversity_gate.py::test_each_session_has_events_jsonl_file` fails with `AssertionError: missing events.jsonl in eval/corpus/sessions/hard_tek_01`.
+
+**Confirmed pre-existing:** The `eval/corpus/sessions/hard_tek_01/` directory was scaffolded with `input.wav` + `genre.txt` + `responses/` but the `events.jsonl` ground-truth labels have not been written yet. Plan 40-04 touched neither the corpus dir nor this test.
+
+**Why deferred:** Corpus labeling is a separate workstream (eval harness Phase 27 / 31 corpus-build plans). Plan 40-04's scope is constants + replay-harness tooling; adding a label file would be an unrelated content commit.
+
+**Fix when ready:** Either (a) commit a real labeled `eval/corpus/sessions/hard_tek_01/events.jsonl` (preferred — closes the diversity-gate); or (b) commit a placeholder `events.jsonl` with `{}` per line and a `WIP_LABELS=true` flag the diversity-gate test honors.
+
+---
+
+## DEFERRED-40-04-02: `tests/eval/fixtures/synthetic_session/genre.txt` regenerated as untracked
+
+**Discovered by:** Plan 40-04 task-2 commit sweep.
+
+**Symptom:** `git status` shows `tests/eval/fixtures/synthetic_session/genre.txt` as untracked after `pytest tests/eval/` runs. The conftest autouse fixture `synthetic_session_fixture_dir` regenerates the file but it's not in `.gitignore`'s `!tests/eval/fixtures/synthetic_session/` allowlist alongside `events.jsonl`.
+
+**Confirmed pre-existing:** Reproduces on `main` without Plan 40-04 changes — the conftest pattern has always emitted this file. Plan 27-01 committed `events.jsonl` and `.gitignore`'d the rest implicitly.
+
+**Why deferred:** Out of Plan 40-04's scope — touching `.gitignore` to whitelist `genre.txt` is a Phase 27 housekeeping fix.
+
+**Fix when ready:** Either (a) add `!tests/eval/fixtures/synthetic_session/genre.txt` to `.gitignore` and `git add` the file once; or (b) extend `tests/eval/conftest.py::_ensure_synth_session` to write `genre.txt` only when missing AND mark it as a fresh-clone bootstrap file (matches current behavior — no change needed, just whitelist).
