@@ -102,7 +102,7 @@ Plans:
 
 ```
 Plans:
-- [ ] 42-01-PLAN.md — Corpus scaffolding: ack-bank resume helper + VCR cassette recorder + git-LFS corpus layout + KAAN-ACTION §GATE-01/02/03 runbooks (GATE-01, GATE-02, GATE-03)
+- [x] 42-01-PLAN.md — Corpus scaffolding: ack-bank resume helper + VCR cassette recorder + git-LFS corpus layout + KAAN-ACTION §GATE-01/02/03 runbooks (GATE-01, GATE-02, GATE-03)
 - [ ] 42-02-PLAN.md — Threshold recalibration tooling: recalibrate_thresholds.py + ±0.10 tolerance band + THRESHOLD-RECALIBRATION-LOG.md + eval.yml --check-real-corpus mode (GATE-04)
 - [ ] 42-03-PLAN.md — Ear-test protocol + capture surface: EAR-TEST-PROTOCOL.md + JSON Schema + debrief window toggle + check_ear_test.sh + KAAN-ACTION §GATE-05 (GATE-05, GATE-07)
 - [ ] 42-04-PLAN.md — check_gate.sh hybrid wire-in: bash gate combining 7-nightly + ear-test + cut_release.sh Gate 2b insertion + P85 reminder line removal (GATE-06)

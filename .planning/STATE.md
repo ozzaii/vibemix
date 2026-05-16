@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
 status: verifying
-last_updated: "2026-05-16T13:49:17.779Z"
+last_updated: "2026-05-16T14:41:03.573Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 13
-  completed_plans: 9
+  total_plans: 19
+  completed_plans: 13
   percent: 17
 ---
 
