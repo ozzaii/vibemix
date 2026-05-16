@@ -87,6 +87,12 @@ recordings/
 # in tree so CI doesn't depend on the regeneration path).
 !tests/eval/fixtures/synthetic_session/events.jsonl
 
+# DO ship the Phase 41 Plan 07 latency-stack synthetic 30-turn fixture
+# (events.jsonl with llm_to_tts_delta_ms + cache_hit + event_fired rows;
+# kept in tree so the 41-INTEGRATION-REPORT measurements reproduce
+# deterministically without depending on a recorded live session).
+!tests/eval/fixtures/phase_41_synthetic/turn_run/events.jsonl
+
 # DO ship the Phase 29 Plan 00 debrief test fixtures (sample events +
 # voice.wav + evidence_registry). Real-session-derived but trimmed to 20
 # events + 5s silent audio; checked in so every developer machine can
