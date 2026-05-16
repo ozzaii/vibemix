@@ -138,7 +138,7 @@ Plans:
 - [ ] 43-05-PLAN.md — Mixamo retarget pipeline + 5 prep_*.glb swap-in scaffold + §VIS-04 KAAN-discharge (VIS-04)
 - [ ] 43-06-PLAN.md — Mood pool runtime validation (3 personas, 30s smoke) + integrated-GPU perf gate (VIS-05, VIS-06)
 - [x] 43-07-PLAN.md — Memory + storyboard doc drift cleanup: DJ bat→Neon Rebel; Workbench/DSEG7→Saira/Geist (VIS-07)
-- [ ] 43-08-PLAN.md — Hero demo storyboard v5 re-mock: 8-cut shot list + chip overlay frames + ≤8 cuts gate (VIS-08)
+- [x] 43-08-PLAN.md — Hero demo storyboard v5 re-mock: 8-cut shot list + chip overlay frames + ≤8 cuts gate (VIS-08)
 - [ ] 43-09-PLAN.md — Francesco pre-production handoff package + demo-mode sequencer + §VIS-09 discharge (VIS-09)
 ```
 
