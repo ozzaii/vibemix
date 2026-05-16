@@ -38,7 +38,9 @@ import argparse
 import asyncio
 import json
 import os
+import statistics
 import sys
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -91,6 +93,96 @@ def _load_events_jsonl(path: Path) -> list[dict[str, Any]]:
             continue
         out.append(json.loads(line))
     return out
+
+
+# ----------------------------------------------------------------------
+# Plan 40-04 / AUDIO-03 — --print-cooldowns observational mode.
+# Emits per-type measured median inter-event gaps with delta-from-locked
+# (MIN_EVENT_GAP_PER_TYPE) report to stderr. WARNING line fires when
+# |delta| > 1.0s (observational only — does NOT exit non-zero; Phase 42
+# GATE-04 hardens this into a CI exit-non-zero gate once the real-corpus
+# baseline is signed). Lazy-import the constants module so the harness CLI
+# startup path stays import-cheap on the default code path.
+# ----------------------------------------------------------------------
+
+# Wall-clock tolerance for the observational WARNING (per CONTEXT §Replay
+# harness validation — "measured within ±1s of locked values").
+COOLDOWN_REPORT_TOLERANCE_S: float = 1.0
+
+
+def _emit_cooldown_report(measured_gaps: dict[str, list[float]]) -> None:
+    """Format and emit the per-type measured-gap report to stderr.
+
+    Pure function — takes the accumulator dict (event_type → list[gap_s])
+    and writes the structured report. Skips event types with empty gap
+    lists (single-fire types have no inter-event gap to report). On a
+    fully empty accumulator emits a single "no events recorded" marker.
+
+    Format (per row, fixed-width for grep-ability):
+        ``{ev_type:24s} median_gap={median:6.2f}s expected_min={expected:5.2f}s delta={delta:+6.2f}s``
+
+    WARNING line follows when |delta| > COOLDOWN_REPORT_TOLERANCE_S
+    (strictly greater — edge case at exactly the tolerance is silent).
+    """
+    from vibemix.audio.constants import (
+        EVENT_GLOBAL_MIN_GAP,
+        MIN_EVENT_GAP_PER_TYPE,
+    )
+
+    # Filter to types that actually have inter-event gap measurements.
+    populated = {k: v for k, v in measured_gaps.items() if v}
+
+    if not populated:
+        print(
+            "[cooldown-report] no events recorded — empty accumulator",
+            file=sys.stderr,
+        )
+        return
+
+    print("[cooldown-report] measured inter-event gaps:", file=sys.stderr)
+    for ev_type in sorted(populated.keys()):
+        gaps = populated[ev_type]
+        median = float(statistics.median(gaps))
+        expected = float(
+            MIN_EVENT_GAP_PER_TYPE.get(ev_type, EVENT_GLOBAL_MIN_GAP)
+        )
+        delta = median - expected
+        print(
+            f"  {ev_type:24s} median_gap={median:6.2f}s "
+            f"expected_min={expected:5.2f}s delta={delta:+6.2f}s",
+            file=sys.stderr,
+        )
+        if abs(delta) > COOLDOWN_REPORT_TOLERANCE_S:
+            print(
+                f"  WARNING: {ev_type} measured gap outside ±{COOLDOWN_REPORT_TOLERANCE_S:.1f}s "
+                f"of locked value ({expected:.2f}s)",
+                file=sys.stderr,
+            )
+
+
+def _accumulate_session_gaps(
+    events: list[dict[str, Any]],
+    measured_gaps: dict[str, list[float]],
+    last_per_type_at: dict[str, float],
+) -> None:
+    """Walk an events list (sorted by t_session ascending) and append
+    inter-event gaps per type to the accumulator.
+
+    Mutates measured_gaps + last_per_type_at in place — caller owns the
+    accumulators so they can span multiple sessions. The first event of
+    each type in each session has no predecessor: we seed last_per_type_at
+    but do NOT append a zero-gap (the report would otherwise pollute the
+    median with bootstrap zeros).
+    """
+    for ev in sorted(events, key=lambda e: float(e.get("t_session", 0.0))):
+        ev_type = ev.get("type")
+        if not ev_type:
+            continue
+        t = float(ev.get("t_session", 0.0))
+        prev = last_per_type_at.get(ev_type)
+        if prev is not None:
+            measured_gaps[ev_type].append(t - prev)
+        last_per_type_at[ev_type] = t
 
 
 def call_judges_stub(event: dict[str, Any], response_text: str) -> dict[str, Any]:
@@ -330,6 +422,20 @@ async def _run(args: argparse.Namespace) -> int:
         *(replay_one_session(s, args.judges) for s in sessions)
     )
 
+    # Plan 40-04 — cooldown-report accumulator. Off by default (zero
+    # overhead on the standard scorecard path); gated by --print-cooldowns.
+    # Emitted BEFORE the scorecard files are written so the operator sees
+    # the gap report alongside the F1 / substance summary.
+    if args.print_cooldowns:
+        measured_gaps: dict[str, list[float]] = defaultdict(list)
+        for sess in results:
+            # Reset per-session last_per_type_at so cross-session boundaries
+            # don't synthesize a fake "gap" spanning end-of-A to start-of-B.
+            last_per_type_at: dict[str, float] = {}
+            events = sess.get("predicted_events") or sess.get("ground_truth") or []
+            _accumulate_session_gaps(events, measured_gaps, last_per_type_at)
+        _emit_cooldown_report(dict(measured_gaps))
+
     from scripts.eval.scorecard import render_scorecard
 
     thresholds = _load_thresholds(args.threshold_lock)
@@ -384,6 +490,17 @@ def main(argv: list[str] | None = None) -> int:
         type=str,
         default="none",
         help="VCR.py record mode passed to Plan 02 judges via VCR_RECORD_MODE env var.",
+    )
+    parser.add_argument(
+        "--print-cooldowns",
+        action="store_true",
+        default=False,
+        help=(
+            "Plan 40-04 / AUDIO-03 — emit per-type measured inter-event "
+            "median gaps with delta vs MIN_EVENT_GAP_PER_TYPE. Warns to "
+            "stderr when |delta| > ±1s; does NOT exit non-zero (Phase 42 "
+            "GATE-04 will harden into a CI gate). Additive — default off."
+        ),
     )
     args = parser.parse_args(argv)
 
