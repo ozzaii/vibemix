@@ -73,11 +73,13 @@ def test_hype_intermediate_byte_identical_to_v4_invariant_holds_for_default_mood
     v4-byte-identity invariant is preserved at the cell-constant level via
     the double opt-out (matches the persona.SYSTEM_INSTRUCTION call shape).
     """
+    # Plan 41-04 — triple opt-out now includes include_tag_dsl=False.
     out_default_optout = build_system_instruction(
         "intermediate",
         "hype",
         include_citation_grammar=False,
         include_listening_fallback=False,
+        include_tag_dsl=False,
     )
     out_explicit_default_mood = build_system_instruction(
         "intermediate",
@@ -85,6 +87,7 @@ def test_hype_intermediate_byte_identical_to_v4_invariant_holds_for_default_mood
         mood="hype-man",
         include_citation_grammar=False,
         include_listening_fallback=False,
+        include_tag_dsl=False,
     )
     # Both must equal the pinned HYPE_INTERMEDIATE golden.
     assert out_default_optout == HYPE_INTERMEDIATE

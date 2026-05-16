@@ -133,6 +133,70 @@ SILENCE over an invented citation. "Trust the audio, cite when you can,
 stay silent when you can't."
 """
 
+# ---------------------------------------------------------------------------
+# Plan 41-04 LAT-05 — TTS audio-tag DSL (Gemini 3.1 Flash TTS)
+#
+# Six expressivity tags that the LLM emits inline as part of its response
+# text; Gemini 3.1 Flash TTS reads them at synthesis time as expressive
+# directives (volume, cadence, pitch). The block lives AFTER the citation
+# grammar block in the system instruction so the LLM learns the citation
+# shape first (load-bearing for grounding) and tag-expressivity second.
+#
+# Tag intents (locked):
+#   [whisper] — lowered volume, intimate (insider tips, sotto voce)
+#   [laugh]   — pre-recorded laughter overlay (sparingly; shared jokes)
+#   [fast]    — accelerated cadence (track drops, urgent calls)
+#   [slow]    — drawn-out cadence (emotional anchors, deep grooves)
+#   [excited] — pitched-up, energetic (PHASE events, build hits)
+#   [chill]   — relaxed, low-key (warmup phase, ambient sections)
+#
+# Anti-prompt-injection (T-41-04-05): the DSL block is a fixed string —
+# no interpolation, no user input can mutate it. Persona overlays opt in
+# via the default ``include_tag_dsl=True`` parameter on
+# build_system_instruction; per-mood opt-out is the explicit False arg.
+# Unknown tags (e.g. ``[invented_tag]``) — pass-through or strip behavior
+# pinned via VCR cassette in ``tests/llm/test_tts_3_1.py``; whichever
+# shape Gemini 3.1 Flash TTS captures is the canonical contract.
+# ---------------------------------------------------------------------------
+
+TTS_TAGS: tuple[str, ...] = (
+    "[whisper]",
+    "[laugh]",
+    "[fast]",
+    "[slow]",
+    "[excited]",
+    "[chill]",
+)
+
+TTS_TAG_DSL_BLOCK: str = """
+
+--- TTS AUDIO TAGS (Gemini 3.1 Flash TTS — expressivity DSL) ---
+
+Inline these tags AT THE START of any reply you want spoken with non-
+default expressivity. The tag scope is the rest of the line; one tag
+per reply is the norm. Use sparingly — tag-stuffing reads as theatrical
+("AI announcer voice"), the opposite of "real DJ friend in your ear".
+
+  [whisper] insider tip — lowered volume, intimate. Use for sotto voce
+            calls ("[whisper] that loop's a sleeper").
+  [laugh]   shared inside joke — pre-recorded laughter overlay. Use
+            rarely; reserved for moments where a real friend would
+            laugh out loud ("[laugh] yeah that bassline got me good").
+  [fast]    urgent cadence — accelerated. Use for hyped drops or
+            warning calls ("[fast] DROP HERE — kick comes in 2 bars").
+  [slow]    drawn-out cadence — emotional anchors, deep grooves
+            ("[slow] feel that bassline settling in").
+  [excited] pitched-up, energetic — PHASE event hits, build resolutions
+            ("[excited] THAT'S the drop right there").
+  [chill]   relaxed, low-key — warmup phase, ambient sections, late-set
+            wind-downs ("[chill] easy now, just floating").
+
+Default (no tag) is the casual studio-friend voice — natural, brief,
+no theatrics. Most replies should be tagless. Reach for a tag when the
+moment WARRANTS it — a hush before a drop, a laugh at a wild blend.
+"""
+
+
 _ANTI_SLOP_FOOTER = f"""
 
 --- ANTI-SLOP SUBSTRATE (mandatory across every reply) ---
@@ -550,6 +614,7 @@ def build_system_instruction(
     *,
     include_citation_grammar: bool = True,
     include_listening_fallback: bool = True,
+    include_tag_dsl: bool = True,
 ) -> str:
     """Return the prompt cell body for ``(skill, mode)`` rendered with ``mood``.
 
@@ -579,6 +644,15 @@ def build_system_instruction(
             ``vibemix.agent.persona`` together with
             ``include_citation_grammar=False`` to preserve the v4-byte-
             identity invariant on ``SYSTEM_INSTRUCTION``.
+        include_tag_dsl: Plan 41-04 LAT-05 — when True (default), the
+            :data:`TTS_TAG_DSL_BLOCK` (Gemini 3.1 Flash TTS expressivity
+            tags) is appended after the fail-soft fragment. The live
+            agent uses the default so every coach turn knows the 6-tag
+            DSL. When False the block is suppressed — used by
+            ``vibemix.agent.persona`` together with
+            ``include_citation_grammar=False`` /
+            ``include_listening_fallback=False`` to preserve the
+            v4-byte-identity invariant on ``SYSTEM_INSTRUCTION``.
 
     Returns:
         The prompt string for the requested cell, with ``{mood_persona}``
@@ -637,5 +711,13 @@ def build_system_instruction(
     # ``include_citation_grammar=False`` (used by persona.SYSTEM_INSTRUCTION).
     if include_listening_fallback:
         body = body + IM_LISTENING_FRAGMENT
+
+    # Plan 41-04 LAT-05 — append the TTS tag DSL block. The block starts
+    # with its own ``\n\n`` separator (matches CITATION_GRAMMAR_BLOCK
+    # pattern) so it lands after the fail-soft fragment with the same
+    # paragraph break. Default-on so every live coach turn sees the 6-
+    # tag DSL; persona overlays / v4-byte-identity callers opt out.
+    if include_tag_dsl:
+        body = body + TTS_TAG_DSL_BLOCK
 
     return body

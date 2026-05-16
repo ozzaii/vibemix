@@ -165,12 +165,16 @@ def test_prompt_01_hype_intermediate_byte_identical_to_persona() -> None:
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     assert HYPE_INTERMEDIATE == SYSTEM_INSTRUCTION
+    # Plan 41-04 LAT-05 — third opt-out (include_tag_dsl=False) added to
+    # the byte-identity triple-opt-out. The persona re-export uses the
+    # same triple so SYSTEM_INSTRUCTION stays byte-identical to v4.
     assert (
         build_system_instruction(
             "intermediate",
             "hype",
             include_citation_grammar=False,
             include_listening_fallback=False,
+            include_tag_dsl=False,
         )
         == SYSTEM_INSTRUCTION
     )
@@ -233,6 +237,7 @@ def test_prompt_01_dispatcher_returns_right_cell(skill: str, mode: str, expected
             mode,
             include_citation_grammar=False,
             include_listening_fallback=False,
+            include_tag_dsl=False,
         )
         == expected_body
     )
@@ -413,25 +418,27 @@ def test_p_grammar_block_appended_to_every_cell(skill: str, mode: str) -> None:
 def test_q_v4_byte_identity_preserved_at_constant_level() -> None:
     """Test Q — HYPE_INTERMEDIATE constant string is byte-identical to the v4
     SYSTEM_INSTRUCTION (Phase 4 invariant + load-bearing IP per CLAUDE.md).
-    The grammar block + the Plan 20-02 fail-soft fragment are appended via
-    the dispatcher; the underlying constant body is untouched. Double opt-out
-    (include_citation_grammar=False + include_listening_fallback=False)
-    returns byte-identical to the constant."""
+    The grammar block + the Plan 20-02 fail-soft fragment + the Plan 41-04
+    TTS tag DSL block are appended via the dispatcher; the underlying
+    constant body is untouched. Triple opt-out
+    (include_citation_grammar=False + include_listening_fallback=False +
+    include_tag_dsl=False) returns byte-identical to the constant."""
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     # Constant unchanged
     assert HYPE_INTERMEDIATE == SYSTEM_INSTRUCTION
-    # Double opt-out returns the constant byte-for-byte
+    # Triple opt-out returns the constant byte-for-byte
     assert (
         build_system_instruction(
             "intermediate",
             "hype",
             include_citation_grammar=False,
             include_listening_fallback=False,
+            include_tag_dsl=False,
         )
         == HYPE_INTERMEDIATE
     )
-    # Default path is a strict superset (constant + grammar + fragment)
+    # Default path is a strict superset (constant + grammar + fragment + tag DSL)
     default_out = build_system_instruction("intermediate", "hype")
     assert default_out.startswith(HYPE_INTERMEDIATE)
     assert len(default_out) > len(HYPE_INTERMEDIATE)
@@ -544,13 +551,16 @@ def test_opt_out_listening_fallback_alone() -> None:
 
 def test_double_opt_out_byte_identical_to_cell() -> None:
     """include_citation_grammar=False AND include_listening_fallback=False
-    returns the underlying cell constant byte-for-byte. This is the path
-    persona.SYSTEM_INSTRUCTION uses to keep the v4-byte-identity invariant."""
+    AND include_tag_dsl=False returns the underlying cell constant
+    byte-for-byte. This is the triple-opt-out persona.SYSTEM_INSTRUCTION
+    uses to keep the v4-byte-identity invariant green after Plan 41-04
+    added the TTS tag DSL block to the default append path."""
     out = build_system_instruction(
         "intermediate",
         "hype",
         include_citation_grammar=False,
         include_listening_fallback=False,
+        include_tag_dsl=False,
     )
     assert out == HYPE_INTERMEDIATE
 
