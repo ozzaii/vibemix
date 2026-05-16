@@ -78,7 +78,7 @@ Last activity: 2026-05-16
 - **Phase numbering CONTINUED** from v2.0 — v2.1 closed at Phase 39. v2.2 starts at Phase 40 (no `--reset-phase-numbers`).
 - **13-phase decomposition P27–P39** with build-order: parallel cluster A (27+28+29+30+34) → sequential B (31→32→35) → external-gated (38→33→36) → ship prep (37→39). Executed as planned.
 - **`gsd-autonomous fully` mode** applied at milestone close — every Kaan-action item discharged autonomously EXCEPT two legal-capacity carveouts (DIST-09 + DIST-11). P46 hard rule + CI Bash + PowerShell audit grep enforces.
-- **Phase 16 ear-test memory override accepted for v2.1 only** — Phase 27 autonomous proxy gate substituted. Override EXPIRES post-v2.1 (P85 enforced in Phase 39-08). v2.2 must re-route hallucination-gate strategy.
+- **Phase 16 ear-test memory override [RETIRED post-v2.1]** — replaced by v3.0 hybrid gate (Phase 42). See .planning/decisions/P85-OVERRIDE-RETIRED.md. Phase 27 autonomous proxy = fast lane; Kaan ear-test = slow lane (release-cut Gate 2b veto).
 - **Universal2 sidecar = target-triple convention NOT lipo-merge** — research-corrected (Phase 27-06); eliminates Rosetta prompt on Apple Silicon.
 - **Phase 31 4-layer mascot = ADDITIVE EXTENSION** (P47) — all v2.0 mascot tests port verbatim; grep gate enforces.
 - **DJ profile NEVER per-turn prompt prefix** (P60) — lives in `GeminiContextCache`; jsonschema `additionalProperties: false` blocks track titles (P51); default-OFF consent.
