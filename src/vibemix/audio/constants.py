@@ -58,14 +58,20 @@ SILENCE_DEBOUNCE_SEC = 1.2  # v4:131 — debounce audible→silent
 EVENT_GLOBAL_MIN_GAP = (
     10.0  # v4:132 — global cooldown ("let the music breathe", retuned post-chat-log)
 )
-HEARTBEAT_SEC = 70.0  # v4:133 — heartbeat event cadence (retuned post-chat-log)
+# Plan 40-04 / AUDIO-03 — was 70.0; v4 chat-tested 2026-05-11 baseline
+# ("harikaydı" session). See project memory project_v4_canonical_baseline.
+# The OLD 70s value was a v4-shipped-file literal that diverged from the
+# chat-tested ear-test; locked target is the chat-tested baseline.
+HEARTBEAT_SEC = 45.0
 
-MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 extension
-    "TRACK_CHANGE": 6.0,
-    "PHASE": 18.0,
-    "LAYER_ARRIVAL": 16.0,
-    "MIX_MOVE": 20.0,
-    "HEARTBEAT": HEARTBEAT_SEC,
+MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 + Plan 40-04 retune
+    # Plan 40-04 — v4 chat-tested 2026-05-11 baseline (was 6/18/16/20/70).
+    # Phase 17/30 detector cooldowns below UNCHANGED.
+    "TRACK_CHANGE": 5.0,    # Plan 40-04 — was 6.0; v4 2026-05-11 baseline
+    "PHASE": 10.0,          # Plan 40-04 — was 18.0; v4 2026-05-11 baseline
+    "LAYER_ARRIVAL": 10.0,  # Plan 40-04 — was 16.0; v4 2026-05-11 baseline
+    "MIX_MOVE": 14.0,       # Plan 40-04 — was 20.0; v4 2026-05-11 baseline
+    "HEARTBEAT": HEARTBEAT_SEC,  # Plan 40-04 — flows from HEARTBEAT_SEC (45.0)
     "MIC": 3.0,
     "MANUAL": 1.5,
     # Phase 17 SENSE-12 — kick-side cross-genre detectors (per CONTEXT D-cooldown
