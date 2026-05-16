@@ -55,7 +55,7 @@
 - [ ] **VIS-06**: Mascot overlay perf — `data-blur-perf` honored on integrated GPU; `backdrop-filter` fallback ladder tested on Intel UHD + M1 base; 60fps p99 maintained
 - [x] **VIS-07**: Memory + doc drift cleanup — `project_mascot_as_vtuber_personality_surface` memory updated from "DJ bat" → "Neon Rebel"; storyboard vocabulary (`vibemix-cinematic-storyboard.html`) aligned to CDJ Whisper v5 (Saira + glass, not Workbench + DSEG7)
 - [x] **VIS-08**: Hero demo storyboard v5 alignment — re-mock UI chip overlay frames in `mocks/vibemix-cinematic-storyboard.html` to match shipped CDJ Whisper v5; finalize cut script + 8-cut shot list (≤8 cuts gate)
-- [ ] **VIS-09**: Pre-production package handed to Francesco — shot list, audio capture plan (Gemini voice + ambient + headphone return separate), vibemix demo-mode config (deterministic event sequence for repeatable takes), 1080p+ 60fps 48kHz spec
+- [x] **VIS-09**: Pre-production package handed to Francesco — shot list, audio capture plan (Gemini voice + ambient + headphone return separate), vibemix demo-mode config (deterministic event sequence for repeatable takes), 1080p+ 60fps 48kHz spec
 
 ### Launch Positioning + Pre-stage (LAUNCH)
 

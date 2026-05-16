@@ -1264,3 +1264,104 @@ VIS-04 CDJ-HEADBOB FEEL OK:     _____________________   (yes / no — Kaan ear/e
 check_bundle_size.sh exit 0:    _____________________   (yes / no)
 Sign-off by:                    _____________________   (Kaan signature)
 ```
+
+---
+
+## §VIS-09 — Francesco capture day discharge
+
+**REQ-ID:** VIS-09 (Phase 43-09)
+**Owner:** Francesco (capture day) + Kaan (verification of footage + aesthetic sign-off)
+**Status:** ☐ pre-discharge (Plan 43-09 ships handoff package + demo-mode sequencer)  ☐ pre-production review with Francesco  ☐ capture day complete  ☐ footage reviewed by Kaan  ☐ final cut signed off
+**Effort:** ~1 day pre-production review + ~1 day shoot + ~2 days edit
+**Blocking for:** Phase 44 (Launch Pre-stage) README hero artefact (the `demo.mp4` referenced from the README) + Phase 45 (External Discharge) social-publish demo video.
+
+### Why this is Francesco-discharge
+
+vibemix is a real-world product — the hero demo requires real DJ hands on a real Pioneer DDJ-FLX4, in a real room with real lighting. None of this can be automated. Francesco owns capture day as cofounder per CONTEXT — engineering ships the deterministic playback environment (demo-mode sequencer + storyboard + shot list + audio capture plan); Francesco brings the booth, the cameras, and the DJ ear.
+
+Per CONTEXT specifics: *"Mascot in cut 7 should feel like a Pioneer CDJ headbob, NOT a generic VTuber dance"* — that aesthetic gate closes on qualitative judgment, not on engineering output. Kaan + Francesco sign off jointly post-shoot.
+
+### Files involved
+
+- **Shot list:** [`docs/launch-prep/SHOT-LIST.md`](docs/launch-prep/SHOT-LIST.md) (Plan 43-09 Task 2)
+- **Audio capture plan:** [`docs/launch-prep/AUDIO-CAPTURE.md`](docs/launch-prep/AUDIO-CAPTURE.md) (Plan 43-09 Task 2)
+- **Demo-mode config:** [`docs/launch-prep/DEMO-MODE-CONFIG.md`](docs/launch-prep/DEMO-MODE-CONFIG.md) (Plan 43-09 Task 2)
+- **Handoff index:** [`docs/launch-prep/README.md`](docs/launch-prep/README.md) (Plan 43-09 Task 2)
+- **Demo-mode sequencer:** [`src/vibemix/runtime/demo_mode.py`](src/vibemix/runtime/demo_mode.py) (Plan 43-09 Task 1) — 30-event deterministic sequence; anchors at 2:33 kick_swap / 4:50 layer_drop / 6:00 track_end.
+- **Demo-mode pytest pins:** [`tests/runtime/test_demo_mode_sequence.py`](tests/runtime/test_demo_mode_sequence.py) (Plan 43-09 Task 1) — 10/10 pins green guarantees the sequence is bit-identical across takes.
+- **Storyboard mock (8 cuts):** [`mocks/vibemix-cinematic-storyboard.html`](mocks/vibemix-cinematic-storyboard.html) (Plan 43-08)
+- **Cut count gate:** [`scripts/launch/check_cut_count.py`](scripts/launch/check_cut_count.py)
+- **Visual baseline (CDJ Whisper locked):** [`mocks/vibemix-direction-final.html`](mocks/vibemix-direction-final.html)
+- **Output location:** `docs/launch-prep/takes/take_NN/` (gitignored; final master `demo.mp4` referenced from the Phase 44 README hero).
+
+### Francesco steps
+
+1. **Pre-production review (1 day before shoot, with Kaan):**
+   - Walk the shot list ([`SHOT-LIST.md`](docs/launch-prep/SHOT-LIST.md)) end-to-end; confirm cut sequence + B-roll feasibility against the booth.
+   - Confirm the 3-track audio capture chain ([`AUDIO-CAPTURE.md`](docs/launch-prep/AUDIO-CAPTURE.md)) — line-out from headphone amp for Gemini voice; off-axis room mic; Y-cable on headphone monitor.
+   - Test-run vibemix demo-mode locally: `vibemix --demo-mode start` plays the 30-event sequence end-to-end. Confirm the mascot reacts at 2:33 (kick_swap → celebrate) and 4:50 (layer_drop → teacher line).
+
+2. **Capture day prep:**
+   - Set up booth with Pioneer DDJ-FLX4 + headphones + ambient mic + cameras (1080p+ 60fps+).
+   - Mount the vibemix demo-mode display visible to camera 1 (screen-cap or external monitor).
+   - Stage the clapboard (visual + audio slate; single source).
+
+3. **Per take:**
+   - `vibemix --demo-mode reset` before each take — cursor back to step 0.
+   - Slate (clapboard) for sync. Visible on all cameras + audible on all 3 audio tracks.
+   - Roll all recorders (3 audio tracks + cameras + vibemix's own session.wav auto-captures when demo-mode starts).
+   - Run `vibemix --demo-mode start`; the deterministic 30-event sequence plays across 6:00.
+   - Capture the planned cuts during playback; cut 1 + cut 7 are real-world camera angles, cuts 2-6 + 8 are screen-cap (composited in post).
+   - End take; review playback; confirm clapboard transient is present at the head of all 4 audio sources; copy `session.wav` into the take folder.
+
+4. **Pickup B-roll:**
+   - Cut 1 (DJ hands on FLX4 in dim room) — separate camera setup; ≥ 5 angles.
+   - Cut 7 (mascot celebrate full-frame) — screen-cap during demo-mode (mascot animation fires at the 2:33 kick_swap anchor).
+
+5. **Edit:**
+   - Sync the 4 audio sources via clapboard transient (3 mics + vibemix `session.wav`).
+   - Cut to 8 cuts per the [`SHOT-LIST.md`](docs/launch-prep/SHOT-LIST.md) timing budget (~30s total runtime).
+   - Final master at 1080p+ / 60fps+ / 48kHz; export `demo.mp4` for the Phase 44 README hero.
+
+### Verification
+
+```bash
+# Pre-shoot: demo-mode sequencer integrity (RED-fail if anchors moved):
+uv run pytest tests/runtime/test_demo_mode_sequence.py -q
+
+# Pre-shoot: shot list ↔ storyboard cut count parity:
+uv run python scripts/launch/check_cut_count.py    # exit 0 (== 8 cuts)
+grep -cE "^\| [1-8] \|" docs/launch-prep/SHOT-LIST.md   # 8
+
+# Pre-shoot: handoff docs are all in place:
+test -f docs/launch-prep/SHOT-LIST.md
+test -f docs/launch-prep/AUDIO-CAPTURE.md
+test -f docs/launch-prep/DEMO-MODE-CONFIG.md
+test -f docs/launch-prep/README.md
+
+# Post-shoot: footage spec check (Kaan reviews):
+ffprobe take_01_master.mp4 2>&1 | grep -E "1920x1080|3840x2160|fps=60|48000 Hz"
+
+# Post-shoot: no regression in the broader runtime suite:
+uv run pytest tests/runtime/ -q
+```
+
+### What unblocks
+
+- **Phase 44 README hero artefact** — the `demo.mp4` referenced in the launch-pre-stage README is the output of this capture day.
+- **Phase 45 external discharge** — Instagram / Twitter / TikTok cuts derive from the master.
+- **`gsd-autonomous fully` ship gate** — Kaan's anti-slop quality bar (per CLAUDE.md `Quality bar` constraint) is satisfied only when the hero demo *reads* like "real DJ friend in your ear", not "voice assistant doing music commentary".
+
+### Sign-off block
+
+```
+VIS-09 PRE-PROD REVIEW on:     _____________________   (date — with Kaan + Francesco)
+VIS-09 CAPTURE DAY on:          _____________________   (date)
+VIS-09 TAKES SHOT:              _____________________   (count)
+VIS-09 AV SPEC HELD:            _____________________   (yes / no — 1080p+ / 60fps+ / 48kHz)
+VIS-09 PIONEER-HEADBOB FEEL OK: _____________________   (yes / no — Kaan judgment on mascot cut 7)
+VIS-09 CDJ WHISPER PALETTE OK:  _____________________   (yes / no — 5 warm blacks + single amber)
+VIS-09 FINAL CUT SIGNED:        _____________________   (date)
+Sign-off by (Francesco):        _____________________
+Sign-off by (Kaan):             _____________________
+```

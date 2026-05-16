@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: Plans 43-01, 43-02, 43-04, 43-05, 43-07, 43-08 SHIPPED. 6/9 plans complete. Latest = 43-02 (session + mascot-overlay HIGH-findings-closed, hover-glow sweep, Playwright spec scaffold). VIS-04 + VIS-08 + VIS-03 + VIS-07 + VIS-02 (partial) + VIS-01 (partial) closed.
-last_updated: "2026-05-16T16:55:00Z"
+status: Wave 3 active. Demo-mode 30-event sequencer pinned + Francesco capture-day handoff package shipped + §VIS-09 dual sign-off runbook. VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed; only VIS-05/06 (Plan 43-06) remain.
+last_updated: "2026-05-16T17:15:30.000Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 28
-  completed_plans: 25
-  percent: 54
+  completed_plans: 27
+  percent: 50
 ---
 
 # vibemix — State
@@ -34,9 +34,9 @@ progress:
 
 ## Current Position
 
-Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 2 closing)
-Plan: 43-01, 43-02, 43-04, 43-05, 43-07, 43-08 COMPLETE (6/9). In flight: 43-03 (wizard + calibration closure). Remaining: 43-06 (mood pool runtime + perf), 43-09 (Francesco handoff).
-Status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned. VIS-01 (partial), VIS-02 (partial), VIS-03, VIS-04 (scaffold), VIS-07, VIS-08 closed.
+Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 3 active)
+Plan: 43-01, 43-02, 43-03, 43-04, 43-05, 43-07, 43-08, 43-09 COMPLETE (8/9). Remaining: 43-06 (mood pool runtime + perf).
+Status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed.
 Last activity: 2026-05-16
 
 ## Performance Metrics
