@@ -1,0 +1,58 @@
+[
+  {
+    "number": 11,
+    "title": "[crash] Tauri panics when MIDI scan finds no device on first boot",
+    "createdAt": "2026-05-08T14:00:00Z",
+    "closedAt": null,
+    "state": "OPEN",
+    "labels": [{"name": "crash"}, {"name": "midi"}]
+  },
+  {
+    "number": 12,
+    "title": "[crash] Audio device drop-out causes async stream panic on macOS 14",
+    "createdAt": "2026-05-09T09:30:00Z",
+    "closedAt": "2026-05-12T14:00:00Z",
+    "state": "CLOSED",
+    "labels": [{"name": "crash"}, {"name": "audio"}]
+  },
+  {
+    "number": 13,
+    "title": "Wizard step 3 button alignment off on Windows 11",
+    "createdAt": "2026-05-10T11:00:00Z",
+    "closedAt": "2026-05-11T08:00:00Z",
+    "state": "CLOSED",
+    "labels": [{"name": "ui"}, {"name": "windows"}]
+  },
+  {
+    "number": 14,
+    "title": "Pioneer DDJ-FLX4 jog wheel CC mapping off-by-one",
+    "createdAt": "2026-05-11T07:00:00Z",
+    "closedAt": null,
+    "state": "OPEN",
+    "labels": [{"name": "midi"}, {"name": "enhancement"}]
+  },
+  {
+    "number": 15,
+    "title": "Mascot overlay clips on portrait monitor",
+    "createdAt": "2026-05-12T19:00:00Z",
+    "closedAt": "2026-05-13T20:00:00Z",
+    "state": "CLOSED",
+    "labels": [{"name": "ui"}, {"name": "mascot"}]
+  },
+  {
+    "number": 16,
+    "title": "Italian translation typo in onboarding step 1",
+    "createdAt": "2026-05-13T13:00:00Z",
+    "closedAt": "2026-05-13T16:00:00Z",
+    "state": "CLOSED",
+    "labels": [{"name": "i18n"}]
+  },
+  {
+    "number": 17,
+    "title": "API key not reading from env on first launch (regression?)",
+    "createdAt": "2026-05-14T09:00:00Z",
+    "closedAt": null,
+    "state": "OPEN",
+    "labels": [{"name": "config"}]
+  }
+]

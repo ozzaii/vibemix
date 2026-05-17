@@ -84,7 +84,7 @@
 - [ ] **SHIP-10**: SHIP-TRANSFER — repo transfer to `bravoh/vibemix` via `gh api repos/.../transfer`
 - [ ] **SHIP-11**: SHIP-ROTATE — 24h monitoring rotation execution per `docs/launch-rotation.md`
 - [ ] **SHIP-12**: INSTALL-DEFENDER — Windows SmartScreen reputation propagation observed (passive, 1-2 wk post-signed release)
-- [ ] **SHIP-13**: SHIP-V1-DECISION — Kaan signs off after RC1 ~2-week bake: cut `v1.0.0` / cycle `v3.0.0-rc2` / pause
+- [~] **SHIP-13**: SHIP-V1-DECISION — Kaan signs off after RC1 ~2-week bake: cut `v1.0.0` / cycle `v3.0.0-rc2` / pause _(engineering scaffolding complete via 45-04: audit_ship_v1_decision.py + decision template + synthetic fixtures; awaiting T+30 Kaan-discharge)_
 
 ---
 
@@ -155,7 +155,7 @@ Explicit exclusions for v3.0. Documented to prevent scope creep.
 | GATE-01..09 | Phase 42 | Pending |
 | VIS-01..09 | Phase 43 | Pending |
 | LAUNCH-01..10 | Phase 44 | LAUNCH-01/02/03/04/05/06/07/08/09/10 GREEN (44-01/02/03/04/05/06/07); ALL CLOSED |
-| SHIP-01..13 | Phase 45 | Pending |
+| SHIP-01..13 | Phase 45 | SHIP-11 GREEN (45-05); SHIP-13 engineering GREEN (45-04 — audit + template + fixtures shipped, awaiting T+30 discharge); 11 remaining |
 
 **Coverage:**
 - v3.0 requirements: 57 total

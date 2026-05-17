@@ -1,0 +1,15 @@
+{
+  "session_id": "synth-post-rc1-techno-001",
+  "started_at": "2026-05-05T20:00:00Z",
+  "duration_s": 3600,
+  "genre": "techno",
+  "slop_flags": {
+    "felt_slop": false,
+    "felt_scripted": false,
+    "felt_late": false,
+    "felt_generic": false
+  },
+  "free_form": "Felt grounded throughout. Reactions tied to specific drops + filter sweeps. No false positives.",
+  "signed_by": "kaan",
+  "signed_at": "2026-05-05T21:05:00Z"
+}
