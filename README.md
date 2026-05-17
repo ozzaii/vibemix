@@ -36,6 +36,13 @@ Your audio doesn't leave your machine without you knowing. vibemix is open sourc
   <img alt="stars" src="https://img.shields.io/github/stars/bravoh/vibemix?style=flat-square" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/bravoh/vibemix/actions/workflows/dep-audit.yml"><img alt="uv lock status" src="https://img.shields.io/github/actions/workflow/status/bravoh/vibemix/dep-audit.yml?label=uv%20lock&branch=main&style=flat-square" /></a>
+  <a href="https://github.com/bravoh/vibemix/actions/workflows/dep-audit.yml"><img alt="cargo-deny" src="https://img.shields.io/github/actions/workflow/status/bravoh/vibemix/dep-audit.yml?label=cargo-deny&branch=main&event=push&style=flat-square" /></a>
+  <a href="https://github.com/bravoh/vibemix/actions/workflows/dep-audit.yml"><img alt="npm-audit" src="https://img.shields.io/github/actions/workflow/status/bravoh/vibemix/dep-audit.yml?label=npm-audit&branch=main&event=push&style=flat-square" /></a>
+  <a href="https://github.com/bravoh/vibemix/actions/workflows/sbom.yml"><img alt="CycloneDX SBOM" src="https://img.shields.io/github/actions/workflow/status/bravoh/vibemix/sbom.yml?label=CycloneDX%20SBOM&branch=main&style=flat-square" /></a>
+</p>
+
 ---
 
 **A real DJ friend in your ear — no AI slop.** vibemix listens to your master output, watches your DJ software's screen, ingests your controller, and talks back into your headphones in a way that's grounded in what you actually just did. Not generic "AI assistant" commentary. Not hallucinated track names. Not late reactions to events that already passed. Built by [Bravoh](https://altidus.world) and released open-source as the warm-up for our main launch.

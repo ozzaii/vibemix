@@ -1,0 +1,90 @@
+# Phase 46 / DEPS-10 — Dependabot config.
+#
+# 4 ecosystems, weekly cadence, security-only majors (manual review for
+# any major version bump). Auto-merge is NOT configured — every PR
+# goes through review per CONTEXT § Dependabot decision.
+#
+# Plan 05 SHA-pins all GH Actions; Dependabot's github-actions ecosystem
+# surfaces version bumps as PRs that rewrite the trailing `# v<semver>`
+# comment + the SHA. pinact's --apply mode re-resolves the SHA on
+# merge.
+
+version: 2
+
+updates:
+  # ----- Python (uv-managed) ---------------------------------------
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Istanbul"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(python)"
+    # Security patches: surfaced. Majors: human-only.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+
+  # ----- Rust (Cargo) ----------------------------------------------
+  - package-ecosystem: "cargo"
+    directory: "/tauri/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Istanbul"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "rust"
+    commit-message:
+      prefix: "deps(rust)"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+
+  # ----- JavaScript (npm) ------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/tauri/ui"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Istanbul"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "deps(js)"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+
+  # ----- GitHub Actions (SHA-pinned via pinact) --------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Istanbul"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "deps(actions)"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"

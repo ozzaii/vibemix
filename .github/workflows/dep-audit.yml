@@ -40,6 +40,10 @@ on:
       - 'docs/AUDIT.md'
   workflow_dispatch:
 
+concurrency:
+  group: dep-audit-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
