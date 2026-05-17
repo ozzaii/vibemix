@@ -3,7 +3,7 @@
 **Milestone:** v3.1 Distribution-Ready Pass
 **Goal:** Make vibemix install-and-run anywhere — true one-click on Win + Mac with audited/pinned deps and the mascot fully visible across all emotional states — verified by Kaan's end-to-end pass on his MacBook.
 **Created:** 2026-05-17
-**Status:** Draft (pending roadmap mapping)
+**Status:** Mapped (roadmap scaffolded 2026-05-17)
 
 Categories scoped to the 5 milestone target features:
 - **DEPS** — Dependency audit / pin / lockfile / SBOM / license
@@ -111,15 +111,68 @@ REQ-IDs continue alphabetically; numbering restarts per category since these are
 
 ## Traceability
 
-| REQ-ID | Phase | Status |
-|--------|-------|--------|
-| DEPS-01..10 | Phase 46 | not started |
-| MASCOT-01..08 | Phase 47 | not started |
-| OPP-01..06 | Phase 48 | not started |
-| INSTALL-01..10 | Phase 49 | not started |
-| E2E-01..10 | Phase 50 | not started |
+**Coverage: 44 / 44 v3.1 REQ-IDs mapped ✓ (no orphans, no duplicates).**
 
-Roadmap will fill in phase numbers + verification refs after roadmapper run.
+| REQ-ID | Phase | Status | Verification |
+|--------|-------|--------|--------------|
+| DEPS-01 | Phase 46 — Dependency Audit + Lockfile + AUDIT.md | not started | hermetic `uv sync --locked` in `python:3.12-slim-bookworm` container; CI green |
+| DEPS-02 | Phase 46 | not started | `cargo-deny check` green with license allowlist + GPL ban |
+| DEPS-03 | Phase 46 | not started | frozen lockfile install in CI; npm-audit PR comment |
+| DEPS-04 | Phase 46 | not started | `docs/AUDIT.md` 3-table surface present with rating column |
+| DEPS-05 | Phase 46 | not started | `scripts/audit/check_audit_freshness.sh` fails PR with stale AUDIT.md |
+| DEPS-06 | Phase 46 | not started | CycloneDX + SPDX SBOMs both on GH release assets |
+| DEPS-07 | Phase 46 | not started | `pinact` audit shows all GH Actions SHA-pinned |
+| DEPS-08 | Phase 46 | not started | dep-cull decision in `docs/AUDIT.md` § Decisions |
+| DEPS-09 | Phase 46 | not started | 4 dep-health badges live in README + CI status wired |
+| DEPS-10 | Phase 46 | not started | Dependabot weekly-cadence config for 4 ecosystems |
+| MASCOT-01 | Phase 47 — Mascot Real GLB Land + Full Emotion Coverage | not started | 23 real GLBs at enumerated slot paths; file-size band 400 KB – 1200 KB per clip |
+| MASCOT-02 | Phase 47 | not started | Mixamo provenance manifest in-repo; `.fbx` sources gitignored |
+| MASCOT-03 | Phase 47 | not started | `scripts/mascot/check_bundle_size.sh` Tier-1 exit 0 with real GLBs |
+| MASCOT-04 | Phase 47 | not started | `pools.ts` `clipName` mapping no placeholder regressions |
+| MASCOT-05 | Phase 47 | not started | 4-layer × 7-event vitest coverage matrix green |
+| MASCOT-06 | Phase 47 | not started | `persona_smoke.sh` + `docs/mascot/persona_smoke.webm` committed |
+| MASCOT-07 | Phase 47 | not started | README hero GLB render passes `check_readme_hero_lock.py` |
+| MASCOT-08 | Phase 47 | not started | CI grep gate `! grep -rn "mascot.html" tests/ e2e/ scripts/ci/` green |
+| OPP-01 | Phase 48 — New-Dep + Integration Opportunity Scan | not started | `docs/dep-opportunities/2026-05-scan.md` exists with candidate inventory |
+| OPP-02 | Phase 48 | not started | 4-color rubric applied to every candidate |
+| OPP-03 | Phase 48 | not started | exclusion set quoted verbatim; constraint-violators auto-Red |
+| OPP-04 | Phase 48 | not started | ADR sidecar `.planning/decisions/DEP-OPP-<N>-<slug>.md` per Green adoption |
+| OPP-05 | Phase 48 | not started | zero (or near-zero) new runtime deps documented; Yellow → v3-buckets/ |
+| OPP-06 | Phase 48 | not started | OBS browser-source mascot path docs-only in README + `docs/integrations/obs-browser-source.md` |
+| INSTALL-01 | Phase 49 — Win + Mac One-Click Installer Chain | not started | clean Mac DMG → wizard → ≤60s session-ready (fresh-VM matrix) |
+| INSTALL-02 | Phase 49 | not started | clean Win EXE → wizard → ≤60s session-ready (fresh-VM matrix) |
+| INSTALL-03 | Phase 49 | not started | OS-mandated friction forewarning UX; anti-slop blocklist green |
+| INSTALL-04 | Phase 49 | not started | `fetch_drivers.{sh,ps1}` + `driver_manifest.json` SHA-256 verified |
+| INSTALL-05 | Phase 49 | not started | `companion-sign` release.yml stage between BUILD + SIGN; verifier gate |
+| INSTALL-06 | Phase 49 | not started | Tauri MSI target + `INSTALL_READY` stopwatch + 60s CI gate |
+| INSTALL-07 | Phase 49 | not started | uninstall path preserves user library / debrief unless clean-uninstall opt-in |
+| INSTALL-08 | Phase 49 | not started | wizard a11y green (keyboard / screen-reader / WCAG-AA) |
+| INSTALL-09 | Phase 49 | not started | routing config (Multi-Output Device / Win default-device) automated; kernel-mode install never silenced |
+| INSTALL-10 | Phase 49 | not started | BlackHole 48 kHz post-install probe green per memory `project_v4_canonical_baseline` |
+| E2E-01 | Phase 50 — End-to-End MacBook + OS-Matrix Pass | not started | `tests/e2e/macbook/` harness installs SHIPPED `.dmg`; `report.html` produced |
+| E2E-02 | Phase 50 | not started | 50a Kaan-ear + 50b OS-matrix smoke (≥2/5 configs) both required for milestone close |
+| E2E-03 | Phase 50 | not started | Playwright + pixelmatch `maxDiffPixelRatio: 0.02` on real GLB baselines |
+| E2E-04 | Phase 50 | not started | audio-loopback fixture VCR cassette (v3.0 GATE-02 pinned, zero live Gemini) |
+| E2E-05 | Phase 50 | not started | `check_gate.sh` Gate 2b green before pass marked PASS |
+| E2E-06 | Phase 50 | not started | Nielsen 10 + paired gsd-ui-checker + gsd-ui-auditor zero HIGH on Tier-1 |
+| E2E-07 | Phase 50 | not started | `docs/e2e/2026-05-walk.webm` committed (LFS or <25 MB) |
+| E2E-08 | Phase 50 | not started | `cut_release.sh` Gate 6b blocks publish on FAIL dimension |
+| E2E-09 | Phase 50 | not started | pytest fixture asserts zero writes to off-limits paths per memory `feedback_privacy_scope_narrow` |
+| E2E-10 | Phase 50 | not started | anti-slop blocklist green on every `report.html` |
+
+### Build-order dependencies (from ROADMAP.md)
+
+- Phases 46 + 47 run in PARALLEL (zero shared files).
+- Phase 48 depends on Phase 46 (`dep_ratings.json` schema).
+- Phase 49 depends on Phase 46 + Phase 48 (companion pulls only Green-rated deps).
+- Phase 50 depends on Phase 47 (real GLBs for visual snapshots) + Phase 49 (built signed `.dmg`).
+
+### Soft Kaan-discharge gates (autonomous mode continues; KAAN-ACTION-LEGAL surface)
+
+- **§VIS-04** (Phase 47) — Mixamo Adobe-account walk for 23 retargeted clips. Engineering ships placeholders + CLI scaffold; Kaan discharges asset selection.
+- **§INSTALL-COMPANION-SIGN** (Phase 49) — companion driver Authenticode on Win via SignPath OSS Foundation cert (same cert v3.0 SHIP-CUT awaits). Engineering ships release.yml stage + verifier; Kaan discharges at SignPath approval time.
+- **§INSTALL-VM-RUN** (Phase 49 / Phase 50) — fresh-VM matrix real execution. Engineering ships `install_vm_matrix.sh --check-60s`; Kaan discharges real-VM rehearsal.
+- **§E2E-50A-WALK** (Phase 50) — Kaan's MacBook walk per memory `project_phase_16_kaan_dj_testing`. Engineering ships harness + report.html scaffolding; Kaan discharges walk + screencast.
 
 ---
-*Last updated: 2026-05-17 — initial v3.1 requirements drafted per research synthesis*
+*Last updated: 2026-05-17 — traceability filled in by `gsd-roadmapper`. 44 / 44 REQ-IDs mapped to 5 phases (P46–P50). Roadmap at `.planning/ROADMAP.md`.*

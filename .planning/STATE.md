@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Distribution-Ready Pass
 status: planning
-last_updated: "2026-05-17T11:44:00.853Z"
+last_updated: "2026-05-17T12:00:00.000Z"
 last_activity: 2026-05-17
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -15,7 +15,7 @@ progress:
 
 # vibemix — State
 
-**Last updated:** 2026-05-17 — v3.0 "Clean OSS Ship" SHIPPED engineering-complete via `/gsd:complete-milestone`. 6 phases (P40-P45), 57/57 REQ-IDs satisfied. Tag `v3.0` created LOCAL ONLY. Awaiting `/gsd:new-milestone` for v3.x scope per Kaan-driven strategic conversation (memory `project_v2_planning_active`).
+**Last updated:** 2026-05-17 — v3.1 "Distribution-Ready Pass" roadmap scaffolded via `gsd-roadmapper`. 5 phases (P46–P50), 44 v3.1 REQ-IDs mapped 100%, next: `/gsd:plan-phase 46` to kick off engineering. Engineering proceeds in PARALLEL with v3.0 external clock (Apple Dev + SignPath ~1-week SLA) — does NOT wait for SHIP-CUT.
 
 ---
 
@@ -25,21 +25,29 @@ See: .planning/PROJECT.md (updated 2026-05-17 after v3.0 milestone close)
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Planning next milestone — v3.x scope open per memory `project_v2_planning_active` (Kaan drives commit).
+- **Current focus:** v3.1 Distribution-Ready Pass — one-click install Win+Mac + dep audit/pin + new-dep opportunity scan + e2e MacBook pass + mascot real GLBs.
 - **Last shipped:** v3.0 Clean OSS Ship — 2026-05-17 (status: `tech_debt` accepted; awaiting external clock for public RC publish).
 - **Project mode:** standard.
 - **Granularity:** fine.
 - **Model profile:** quality (all agents on Opus, all checkpoints on).
-- **Autonomy mode:** `gsd-autonomous fully` — every blocker + human-needed item discharged autonomously, only privacy rule + destructive risk + legal-capacity carveouts (Apple Dev Agreement + SignPath OSS) still pause.
+- **Autonomy mode:** `gsd-autonomous fully` — every blocker + human-needed item discharged autonomously, only privacy rule + destructive risk + legal-capacity carveouts (Apple Dev Agreement + SignPath OSS) still pause. Soft Kaan-discharge gates (§VIS-04 Mixamo retargets, companion-driver signing) surface to KAAN-ACTION-LEGAL but do NOT pause work.
 
 ---
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-05-17 — Milestone v3.1 started
+**Milestone:** v3.1 Distribution-Ready Pass
+**Next Phase:** Phase 46 — Dependency Audit + Lockfile + AUDIT.md
+**Plan:** —
+**Status:** Roadmap scaffolded, ready for `/gsd:plan-phase 46`
+**Last activity:** 2026-05-17 — Roadmap v3.1 written; 5 phases (P46–P50) derived from 44 REQ-IDs with 100% coverage; build-order locked (46 ↕ 47 parallel → 48 → 49 → 50)
+
+**v3.1 Progress (counter reset to milestone start):**
+
+```
+Phases:  0 / 5    ░░░░░░░░░░░░░░░░░░░░  0%
+Plans:   0 / TBD  ░░░░░░░░░░░░░░░░░░░░  0%
+```
 
 ## Performance Metrics
 
@@ -48,150 +56,91 @@ Last activity: 2026-05-17 — Milestone v3.1 started
 | Phases complete (v0.1.0) | 14 / 14 |
 | Phases complete (v2.0) | 10 / 12 code-shipped (2 deferred to Kaan-action) |
 | Phases complete (v2.1) | 13 / 13 engineering-green (4 carry `human_needed` carveouts: Phase 33 / 35 / 38 / 39) |
-| Plans complete (v2.1) | 96 / 96 |
-| v2.0 REQ-IDs mapped | 94 / 94 ✓ (archived) |
-| v2.1 REQ-IDs mapped | 105 / 105 ✓ (100% coverage, no orphans) |
-| v2.1 REQ-IDs engineering-satisfied | 105 / 105 (100%) |
-| v2.1 carveouts deferred to KAAN-ACTION-LEGAL | 15 (legal-capacity P46 × 2 + customer-facing publish × 6 + real-hardware × 4 + real-asset × 2 + post-approval × 1) |
-| v2.1 cross-phase integration seams WIRED | 5 / 5 |
-| v2.1 phase-scope tests added | 633 (on top of v2.0 1961 baseline) |
-| v2.1 commits since `v2.0` tag | 225 |
-| v2.1 LOC delta | +114,845 / -69,617 across 947 files (net ~+45k) |
-| v2.1 git tag | `v2.1.0` (annotated, LOCAL ONLY — not pushed) |
+| Phases complete (v3.0) | 6 / 6 engineering-green (all 6 carry `human_needed` verification carveouts → KAAN-ACTION-LEGAL §SHIP-01..13) |
+| Phases complete (v3.1) | 0 / 5 |
+| Plans complete (v3.0) | 41 / 41 |
+| Plans complete (v3.1) | 0 / TBD |
+| v3.0 REQ-IDs mapped + satisfied | 57 / 57 ✓ (100% coverage, no orphans) |
+| v3.1 REQ-IDs mapped | 44 / 44 ✓ (100% coverage, no orphans) |
+| v3.0 cross-phase integration seams WIRED | 3 / 3 |
+| v3.0 commits since `v2.1.0` tag | 250 |
+| v3.0 LOC delta | +62,215 / -1,029 across 529 files (net ~+61k) |
+| v3.0 git tag | `v3.0` (annotated, LOCAL ONLY — not pushed) |
+| v3.0 carveouts deferred to KAAN-ACTION-LEGAL | 22 (legal capacity P46 × 2 + customer-facing publish × 8 + real-hardware × 3 + real-asset × 1 + corpus × 4 + spike × 1 + sign-off × 2 + visual-regression-test × 1) |
 
 ---
-| Phase 40 P04 | 11 | - tasks | - files |
-| Phase 41 P06 | 30min | 4 tasks | 8 files |
-| Phase 42 P03 | 14 | 3 tasks | 15 files |
-| Phase 42 P06 | 7min | 3 tasks | 3 files |
-| Phase 43 P04 | 11m 48s | 3 tasks | 6 files |
-| Phase 43 P07 | 14m 11s | 3 tasks | 7 files |
-| Phase 43 P08 | 14m 57s | 2 tasks | 3 files |
-| Phase 43 P05 | 14m 02s | 3 tasks | 8 files |
-| Phase 44-launch-positioning-pre-stage P01 | 10min | 2 tasks | 3 files |
-| Phase 44-launch-positioning-pre-stage P02 | ~1h | 3 tasks | 19 files |
-| Phase 45 P02 | 45min | 3 tasks | 5 files |
-| Phase 45-external-discharge-public-rc-publish P04 | 28min | 3 tasks | 10 files |
-| Phase 45-external-discharge-public-rc-publish P06 | 45min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
-### Decisions Locked (v3.0 — in progress)
+### v3.1 Roadmap Decisions Locked (2026-05-17)
 
-- **Plan 40-01 — `AudioBuffer` reuse over new `MicAudioRing` class** (2026-05-16) — CONTEXT.md's `MicAudioRing` name was permitted but the PLAN `<interfaces>` + RESEARCH "Alternatives Considered" recommended verbatim `AudioBuffer(seconds=12.0, sr=INPUT_SR_TARGET)` reuse to match `cohost_v4.py:2257`. Anti-DRY subclass avoided.
-- **Plan 40-01 — Zero-fill at sounddevice callback boundary, not in `llm_node`** (2026-05-16) — Pitfall 1 (self-triggered KAAN_SPOKE loop) is real. Filtering in `llm_node` still lets the AI's own voice contaminate the mic ring. The callback-boundary zero-fill is load-bearing IP and keeps every downstream consumer clean. v4:2278-2296 verbatim pattern.
-- **Plan 40-01 — Three-gate Part 2 decision computed once per turn** (2026-05-16) — Snapshot + RMS reused for both prompt-suffix wording and structured log line. Avoids double-work on the LLM hot path.
-- **Plan 42-03 — `signed_by` enum locked to `[kaan]` at JSON Schema level** (2026-05-16) — Single-DJ regime is the v3.0 ship gate; cross-DJ sign-off requires schema bump + check_ear_test.sh update (deferred to v3.x per Plan 42 CONTEXT).
-- **Plan 42-03 — 30-min minimum enforced at JSON Schema level (`duration_s >= 1800`)** (2026-05-16) — Writer is the only producer of logs, so the bash gate trusts the schema rather than re-checking; avoids contract drift between writer + gate.
-- **Plan 42-03 — `schema.json` co-located with logs under `eval/ear-test-logs/`** (2026-05-16) — Writer + bash gate import paths stay trivially relative; bash gate skips `schema.json` by basename when globbing `*.json` so it does not pollute the log enumeration.
-- **Plan 42-06 — Anti-slop manifesto link target = project root README.md** (2026-05-16) — CONTEXT D-GATE-09's "cross-link to the anti-slop manifesto" satisfied via existing `../README.md#what-it-does` ("A real DJ friend in your ear — no AI slop") rather than creating a new `docs/ASLOP-MANIFESTO.md`. Existing public surface satisfies the contract without doc proliferation.
-- **Plan 42-06 — Privacy tests skip-cleanly (not vacuous-true) when no ear-test logs exist** (2026-05-16) — `pytest.skip` with informative message surfaces the §GATE-05 outstanding state in CI output. Contract still holds and will fire once logs land. Avoids false-positive green coverage.
-- **Plan 42-06 — Threshold mirror via parametrized 2-decimal normalization** (2026-05-16) — README locked values formatted as `{value:.2f}` and asserted substring-present per key (`f1_min`, `substance_min`, `cited_cosine_min`, `bypass_max`, `per_genre_f1_min`). Catches both numeric drift AND format drift in the README table.
-- **Plan 42-06 — Rubric-leak sentinel derivation at test-time** (2026-05-16) — sentinels read from `judge_pro.md` + `judge_flash.md` first-meaningful-chunk (post-YAML frontmatter, ≥40 chars). Self-updating against rubric evolution; removes Phase 27's documented hardcoded-sentinel maintenance burden.
-- **Plan 43-05 — Output dir default = `tauri/ui/assets/mascot/animations/`** (2026-05-16) — CONTEXT §VIS-04 named `tauri/ui/public/mascot/` but no files exist there; existing 5 placeholders + manifest.json + `asset-loader.ts` `s.startsWith('prep_')` convention live in `assets/mascot/animations/`. Default matches reality; `--output-dir` flag still lets Kaan override.
-- **Plan 43-05 — Retarget remap stays `NotImplementedError` in plan; two paths in §VIS-04** (2026-05-16) — Scaffold ships CLI + slot taxonomy + draco shell-out + size-band predicate + file-existence guard fully functional, but the load-bearing skeleton remap is intentionally not implemented. §VIS-04 runbook documents pygltflib (preferred) + blender headless (fallback) — Kaan picks at discharge time once Mixamo source clips are downloaded.
-- **Plan 43-05 — Bundle-gate two-tier with placeholder-permissive exit-2** (2026-05-16) — Tier 1 delegates to existing Phase 31 25 MB cap (no duplication); Tier 2 adds prep_*.glb 400 KB-1200 KB band check. Today's placeholders (44-56 KB) intentionally fail Tier 2 with exit 2, which is the visible signal that §VIS-04 discharge is still pending. Test asserts `{0, 2}` not strict 0.
-- **Plan 44-01 — README hero one-liner gate is case-sensitive + exact-count=1, anchor + blocklist gates case-insensitive** (2026-05-16) — Locked tagline "the only AI co-host that actually listens to your set" enforced verbatim (1 occurrence exact); case-sensitivity catches Francesco-reword drift, exact-count catches copy-paste duplicates. Anchor phrases (`real DJ friend in your ear`, `built by DJs`, `your audio doesn't leave`, `open source`/`open-source`, `Mac + Windows`) + AI-slop blocklist gates (15 tokens + `\bdeeply\s+\w+` regex) stay case-insensitive — anchor phrases naturally vary in sentence casing, blocklist must catch any casing. `scripts/launch/check_readme_hero_lock.py` is now the single source of truth for the blocklist; future plans (44-05 SHIP-TWEET) import `_AI_SLOP_BLOCKLIST` rather than redeclaring.
-- **Plan 44-01 — "## No AI slop" H2 inserted between `<!-- vibemix:hero-end -->` and badge row** (2026-05-16) — Section is the explicit anti-slop value-prop, earns the H2 slot ahead of badges + Install. The existing inline `**A real DJ friend in your ear — no AI slop.**` paragraph below the badges remains as editorial voice — anchor phrase coverage is intentionally redundant (lock script only requires presence, not uniqueness).
-- **Plan 44-02 — Controller grid is sourced-of-truth-by-grep from `src/vibemix/midi/controllers/*.json`; legacy table drift CLOSED** (2026-05-17) — Prior README listed 10 controllers (Pioneer FLX6/FLX10/1000/SX3/XDJ-RX3/Numark Party Mix Live/Hercules Inpulse 300/500) that have ZERO mapping in the canonical JSON profile set, plus referenced 10 PNG paths that never existed in git (only `.gitkeep` was committed under `docs/assets/controllers/`). Plan 44-02 replaced the legacy table with the canonical 10 from `src/vibemix/midi/controllers/*.json` (Pioneer DDJ-200/400/FLX4/REV1, NI Traktor Kontrol S2/S4, Denon DJ MC6000/7000, Numark Mixtrack Platinum FX / Pro FX) + shipped 10 SVG wordmark placeholders under canonical slug filenames. Future controller add/remove that updates the JSON without updating the README grid fails CI.
-- **Plan 44-02 — A11y blocklist copied verbatim (not imported) from 44-01 hero-lock per CONTEXT §Claude's discretion** (2026-05-17) — Single-source via import would entangle the two scripts' lifecycles (a future blocklist edit on 44-01's side would silently change a11y semantics here); tested-copy-with-canonical-tokens-pinned guards drift in both directions independently. `tests/launch/test_readme_grids_a11y.py::test_blocklist_pins_canonical_tokens` mirrors 44-01's same-name test, asserting subset rather than equality so deliberate planner-approved adds/removes don't break either gate.
-- **Plan 44-02 — 16 SVG wordmark placeholders shipped (not just 6 DJ-software) per Rule 2 missing-functionality** (2026-05-17) — Plan suggested keeping 2 existing controller logo PNGs ("DDJ-FLX4 + DDJ-400 may already have real logos — confirm via existing `docs/assets/controllers/` ls"). Verification showed NO real assets existed — only `.gitkeep`. Generated 10 controller SVG placeholders + 6 DJ-software SVG placeholders = 16 total. README now has zero dead `<img src>` references.
-- **Plan 45-04 — SHIP-V1-DECISION audit hermetic-by-default; --live mode env-gated** (2026-05-17) — `--fixtures DIR` is the CI / dev mode (synthetic-telemetry under `tests/release/fixtures/synthetic_telemetry/`); `--live` is Kaan-discharge mode at T+30 only (requires `GITHUB_TOKEN`, exits 2 with documented stderr otherwise). All 20 tests run hermetic via `monkeypatch.setattr(mod.subprocess, "run", ...)` + `monkeypatch.setattr(mod.urllib.request, "urlopen", ...)`. No live network in CI; no `requests`/`httpx` added (stdlib `urllib.request` only).
-- **Plan 45-04 — Audit pre-fills 4 of 5 rubric "Current" cells; Anti-slop community-reports stays `<manual>`** (2026-05-17) — Community-report signal arrives via Discord / GH discussions / Twitter (no single auditable source). Audit substitutes Downloads / Uptime% / Slop-incidents / Open-crash count; Kaan manually fills the 5th cell at T+30 per Plan 45-06 §SHIP-13 runbook.
-- **Plan 45-04 — Plan 42-06 privacy contract preserved at audit boundary** (2026-05-17) — `ear-test-logs/*.json` fields `free_form` + `session_id` + `signed_at` are read by the aggregator but NEVER substituted into the rendered decision report. Audit emits only aggregate counts (felt_slop count, felt_scripted count, genres covered). Verified: `grep` of synthetic fixtures' free-form text against rendered output returns 0 matches (T-45-04-02 mitigation).
-- **Plan 45-04 — `_generated_by:` provenance HTML comment in rendered reports (T-45-04-03 mitigation)** (2026-05-17) — Anti-repudiation: the decision report carries an audit-tool version + ISO-8601 timestamp comment below the H1 so future readers can distinguish "audit ran" from "Kaan hand-filled". Pattern reusable for future v3.x / v4 decision-of-record docs.
-- **Plan 45-06 — KAAN-ACTION-LEGAL §SHIP-01..13 cookbook uses canonical 8-block §LAUNCH-08 format** (2026-05-17) — H2 header + REQ-ID/Owner/Status + Effort + Blocking-for + Why-this-is-X-action + Pre-requisites + Discharge commands + Verification + Post-discharge + Unblocks + Sign-off block. Same shape as Phase 44-06 §LAUNCH-08 so operator already knows the visual language. Test accepts both H3-subheading (`### Pre-requisites`) and colon-suffix-inline (`Pre-requisites:`) variants via variant-tuple match — the canonical mix in the existing file uses H3 style.
-- **Plan 45-06 — Tag-regex bump flagged as §SHIP-07 PREREQUISITE, NOT executed in this plan** (2026-05-17) — `scripts/launch/cut_release.sh` line 44 ships `TAG_REGEX='^v2\.1\.0-rc[0-9]+$'` from Phase 39 v2.1 carryover; v3.0 SHIP-CUT requires `'^v3\.0\.0-rc[0-9]+$'`. One-line sed documented in §SHIP-07 Pre-requisites with its own commit message template; ships as its own commit at Kaan-discharge time so the cut commit stays clean. `tests/repo/test_cut_release_invokes_bravoh_server.py::test_tag_regex_unchanged_in_this_plan` confirms 45-06 did NOT modify the regex.
-- **Plan 45-06 — §SHIP-11 cross-links docs/launch-rotation.md §SHIP-11 (Plan 45-05) as operational source-of-truth** (2026-05-17) — Does NOT duplicate the shift table or triage tree or 7-monitoring-source list inside KAAN-ACTION-LEGAL. Single-source-of-truth rule honored; eyes-on operator follows the cross-reference. `test_section_cites_required_cross_ref[§SHIP-11]` pins that the cross-link is present + the target file exists on disk.
-- **Plan 45-06 — §SHIP-12 framed as passive observation, no commands** (2026-05-17) — Windows SmartScreen reputation propagation is unobservable from command line — discharge is Day 1/3/7/14/21/28 probe schedule + observation log at `eval/smartscreen-observations/<date>.md`. First-clear date feeds §SHIP-13 decision tree as one of 8 audit inputs. The "no commands" framing is honest about the constraint rather than inventing automation theatre.
-- **Plan 45-06 — Test marker variant-tuple per logical block** (2026-05-17) — Rule 1 auto-fix during Task 2. Original test hard-coded `Pre-requisites:` / `Verification:` / `Post-discharge:` / `Unblocks:` as required substrings, but the canonical §LAUNCH-08 format mixes `### Pre-requisites` (H3 subheading) with bold inline labels — neither shape carries a colon-suffix line on its own. Replaced single-string markers with variant tuples: each test accepts ANY of `### Pre-requisites`, `Pre-requisites:`, `**Pre-requisites:**`. Same accommodation for Verification / Post-discharge / Unblocks / Discharge commands.
+- **5-phase decomposition P46–P50** with build-order: parallel cluster (46 + 47) → sequential cluster (48 → 49 → 50). Phase 46 + 47 share zero files. Phase 48 gated on Phase 46 `dep_ratings.json` schema. Phase 49 gated on Phase 46 + Phase 48 (companion pulls Green-rated deps only). Phase 50 gated on Phase 47 (real GLBs for visual snapshots) + Phase 49 (built signed `.dmg`).
+- **Phase numbering CONTINUED** from v3.0 — v3.0 closed at Phase 45. v3.1 starts at Phase 46 (no `--reset-phase-numbers` semantics).
+- **Five v3.0 invariants preserved** in every v3.1 phase: POC immutability (`cohost*.py`, `mascot.html` byte-identical to v2.0 tag), ModelRouter seam (zero new hardcoded model literals; CI grep gate extended to v3.1 artifacts), anti-slop blocklist (15-token + `\bdeeply\s+\w+` regex; grep target paths extended to `docs/AUDIT.md`, `docs/dep-opportunities/`, installer wizard copy, e2e report.html), privacy rule (project-scoped FS only; e2e harness asserts zero writes to off-limits paths per `feedback_privacy_scope_narrow`), 3-IPC-reservation contract (zero new IPC wrappers; v3.1 is build-time / test-harness / asset-only).
+- **`gsd-autonomous fully` mode applied** — engineering proceeds unblocked in PARALLEL with v3.0 external clock (Apple Dev + SignPath ~1-week SLA). Soft Kaan-discharge gates surface to KAAN-ACTION-LEGAL but do NOT pause work: §VIS-04 Mixamo Adobe-account walk (Phase 47) ships placeholders + scaffolds; §INSTALL-COMPANION-SIGN companion-driver Authenticode (Phase 49) ships `companion-sign` release.yml stage + verifier, awaits same SignPath OSS Foundation cert v3.0 SHIP-CUT awaits.
+- **Worktree-subagent Step-0 invariant** mandated for every Phase 46–50 plan per memory `feedback_worktree_must_sync_main_first` — every subagent prompt skeleton MUST include `git fetch origin main && git merge origin/main --no-edit` Step-0 block. Plan-checker rejects any plan lacking this. (Phase 40 worktree-isolation learning: stale base = ~161k-line regression on merge.)
+- **Phase 50 split: 50a Kaan-ear (subjective) + 50b OS-matrix smoke (objective)** per memory `project_phase_16_kaan_dj_testing` — NOT a formal 30-session replay harness; Kaan walks his MacBook with real DJ-set audio. 50b automates ≥ 2 of {macOS 12.3 Intel, 14 AS, 15 AS, Win 10, Win 11}.
+- **Mascot scope locked to single VTuber character (Neon Rebel)** per memory `project_mascot_as_vtuber_personality_surface` — `/hatch` user-gen pipeline is v2.x stretch, NOT v3.1.
+- **No CLAP / no multi-provider AI** per memory `feedback_no_clap_use_gemini_embedding` + `feedback_no_scope_creep_clean_utility` — Phase 48 opportunity scan auto-flags any constraint-violating candidate Red.
+- **BlackHole 48 kHz format requirement** per memory `project_v4_canonical_baseline` — Phase 49 post-install probe confirms default at INSTALL-10.
+- **One-click install ≤ 60s ceiling** per memory `project_one_click_install_hard_req` — Phase 49 INSTALL-06 wires `INSTALL_READY` event with elapsed wall-clock; CI gate fails if median exceeds 60s on SHIP-04 fresh-VM matrix; driver install step lands INSIDE the envelope via parallelized driver pull during app extract, NOT by ceiling expansion.
 
-### Decisions Locked (v2.1 — shipped)
+### Decisions Locked (v3.0 — shipped, see v3.0-ROADMAP.md for full list)
 
-- **Phase numbering CONTINUED** from v2.0 — v2.1 closed at Phase 39. v2.2 starts at Phase 40 (no `--reset-phase-numbers`).
-- **13-phase decomposition P27–P39** with build-order: parallel cluster A (27+28+29+30+34) → sequential B (31→32→35) → external-gated (38→33→36) → ship prep (37→39). Executed as planned.
-- **`gsd-autonomous fully` mode** applied at milestone close — every Kaan-action item discharged autonomously EXCEPT two legal-capacity carveouts (DIST-09 + DIST-11). P46 hard rule + CI Bash + PowerShell audit grep enforces.
-- **Phase 16 ear-test memory override [RETIRED post-v2.1]** — replaced by v3.0 hybrid gate (Phase 42). See .planning/decisions/P85-OVERRIDE-RETIRED.md. Phase 27 autonomous proxy = fast lane; Kaan ear-test = slow lane (release-cut Gate 2b veto).
-- **Universal2 sidecar = target-triple convention NOT lipo-merge** — research-corrected (Phase 27-06); eliminates Rosetta prompt on Apple Silicon.
-- **Phase 31 4-layer mascot = ADDITIVE EXTENSION** (P47) — all v2.0 mascot tests port verbatim; grep gate enforces.
-- **DJ profile NEVER per-turn prompt prefix** (P60) — lives in `GeminiContextCache`; jsonschema `additionalProperties: false` blocks track titles (P51); default-OFF consent.
-- **Track-to-track similarity USER-ASKED-only** (LIBRARY-14 anti-feature guard) — physically gated to CLI + `ipc.library.similar_request`; never auto-surfaces.
-- **POC files BYTE-IDENTICAL to v2.0 tag** — `cohost*.py`, `mascot.html`, `cohost.streaming.py.bak`; Phase 37-06 immutability gate enforces.
-- **Honest RC labeling** — `v2.1.0-rc1` not premature `v1.0.0`; v1.0.0 decision deferred to Kaan post-2-week bake (SHIP-V1-DECISION).
+All Phase 40–45 decisions remain locked. Highlights:
 
-### Decisions Locked (v0.1.0 + v2.0 — see prior STATE.md history)
+- Mic-as-Part-2 + lookahead-as-Part-3 closes "AI invents what Kaan said" + "AI reacts after the moment passed" hallucination classes (Phase 40).
+- ModelRouter config-driven seam with zero hardcoded model literals + ServiceTier.FLEX on batch paths + STANDARD pinned to live coach (Phase 41).
+- Hybrid hallucination gate: autonomous proxy fast-lane (PR + 7 nightly canary) + Kaan-ear release-cut veto via `check_gate.sh` Gate 2b; P85 Phase 16 ear-test override formally retired (Phase 42).
+- CDJ Whisper visual lock: Tier-1 surfaces zero HIGH findings; hardware-LED-strip meter rebuild; 22-site `--glow-faint` hover-glow sweep (Phase 43).
+- README hero "the only AI co-host that actually listens to your set" verbatim lock + EvidenceRegistry citation strip in live UI + Bravoh waitlist toggle default-OFF UTM-tracked (Phase 44).
+- KAAN-ACTION-LEGAL §SHIP-01..13 discharge cookbook ships 13 runbooks in canonical 8-block format; `audit_ship_v1_decision.py` (610 lines) pre-fills 4/5 rubric cells from GH releases + Bravoh healthz + ear-test logs + GH issues at T+30 (Phase 45).
 
-All Phase 1–26 decisions remain locked. Highlights:
+### Decisions Locked (v0.1.0 + v2.0 + v2.1 — see prior STATE.md history)
+
+All Phase 1–39 decisions remain locked. Highlights preserved:
 
 - 3-process architecture (Tauri shell + Python sidecar + FastAPI proxy on `api.altidus.world`).
 - Bundle ID `world.bravoh.vibemix` LOCKED (Pitfall P63) — Phase 33-07 CI grep enforces.
-- AIza leak gate held: 0 / 482 files match at v2.0 close + 0 new bytes in v2.1 (gitleaks Phase 34-01).
+- AIza leak gate held: 0 / 482 files match at v2.0 close + 0 new bytes in v2.1 + 0 new bytes in v3.0 (gitleaks Phase 34-01).
 - macOS 12.3+ / Windows 10/11. Linux excluded.
 - Apache 2.0 + DCO license; signing via Apple Developer ID + SignPath OSS.
 - Gemini-only AI (no Anthropic / OpenAI / Ollama / CLAP / OpenL3 / MERT / sentence-transformers / torch).
 - Three.js (single 3D engine); vanilla TS in `tauri/ui/src/` (NOT React); WaveSurfer.js for Phase 29 debrief timeline.
+- POC files BYTE-IDENTICAL to v2.0 tag — `cohost*.py`, `mascot.html`, `cohost.streaming.py.bak`; Phase 37-06 immutability gate enforces.
 
-### Deferred Items (v3.0 close — 2026-05-17)
+### Deferred Items (v3.0 close — 2026-05-17, carry forward to v3.1)
 
-Acknowledged per `gsd-autonomous fully` mode at v3.0 milestone close 2026-05-17. All 6 are `human_needed` verification gaps that are by-design Kaan-action under the autonomy mode (legal-capacity carveouts + real-hardware ear-tests). Engineering ships green; runbooks live in `KAAN-ACTION-LEGAL.md`.
+Acknowledged per `gsd-autonomous fully` mode at v3.0 milestone close 2026-05-17. v3.1 closes some of these as pre-stage discharges complete (especially AUDIO-07 BlackHole probe via Phase 49 wizard, VIS-04 Mixamo retargets via Phase 47, INSTALL-VM-RUN / INSTALL-60S-CHECK via Phase 49 + Phase 50).
 
-| Category | Item | Status |
-|----------|------|--------|
-| verification_gap | 40-VERIFICATION.md (Phase 40 Anti-Slop Audio Port — AUDIO-05 PGP + AUDIO-06 Tauri key + AUDIO-07 BlackHole probe + ear-test) | human_needed |
-| verification_gap | 41-VERIFICATION.md (Phase 41 Gemini SKU + Latency v2 — TTFT p95 ear-test + LAT-09 spike verdict + FLEX live-billing) | human_needed |
-| verification_gap | 42-VERIFICATION.md (Phase 42 Hybrid Gate — ACK-BANK-REMAINING-20 + EVAL-VCR-CASSETTES + EVAL-CORPUS-WAVS + ear-test logs) | human_needed |
-| verification_gap | 43-VERIFICATION.md (Phase 43 Visual Ship Lock — §VIS-04 Mixamo retargets + capture day) | human_needed |
-| verification_gap | 44-VERIFICATION.md (Phase 44 Launch Pre-stage — 6+10 logo swaps + bravoh GH org standup + SHIP-TWEET sign-off + Discord live-execute) | human_needed |
-| verification_gap | 45-VERIFICATION.md (Phase 45 External Discharge — Apple Dev + SignPath + Bravoh-server + SHIP-CUT/TWEET/DISCORD/TRANSFER/ROTATE + SmartScreen + SHIP-V1-DECISION) | human_needed |
+| Category | Item | Status at v3.1 start |
+|----------|------|----------------------|
+| verification_gap | 40-VERIFICATION.md (AUDIO-05 PGP + AUDIO-06 Tauri key + AUDIO-07 BlackHole probe + ear-test) | human_needed; AUDIO-07 closes via Phase 49 wizard |
+| verification_gap | 41-VERIFICATION.md (TTFT p95 ear-test + LAT-09 spike + FLEX live-billing) | human_needed |
+| verification_gap | 42-VERIFICATION.md (ACK-BANK-REMAINING-20 + EVAL-VCR-CASSETTES + EVAL-CORPUS-WAVS + ear-test logs) | human_needed |
+| verification_gap | 43-VERIFICATION.md (§VIS-04 Mixamo retargets + capture day) | human_needed; §VIS-04 closes via Phase 47 |
+| verification_gap | 44-VERIFICATION.md (6+10 logo swaps + bravoh GH org standup + SHIP-TWEET sign-off + Discord live-execute) | human_needed |
+| verification_gap | 45-VERIFICATION.md (Apple Dev + SignPath + Bravoh-server + SHIP-CUT/TWEET/DISCORD/TRANSFER/ROTATE + SmartScreen + SHIP-V1-DECISION) | human_needed; external clock |
 
-Known deferred items at close: 6 (see KAAN-ACTION-LEGAL.md for §AUDIO-05..07, §LAT-09, §GATE-01..05, §VIS-04, §LAUNCH-03/04/06/07/08, §SHIP-01..13 discharge cookbooks).
+### v3.1 Anticipated Kaan-Action Surface (will route to KAAN-ACTION-LEGAL during execution)
 
-### Deferred Items (v2.1 carryover — 15 carveouts — KAAN-ACTION-LEGAL.md)
-
-Categorized per `gsd-autonomous fully` mode at v2.1 milestone close 2026-05-16:
-
-| Category | Item | Status |
-|----------|------|--------|
-| legal_capacity_carveouts (P46) | DIST-09 (Apple Dev Agreement update — Francesco) | deferred |
-| legal_capacity_carveouts (P46) | DIST-11 (SignPath OSS Foundation — Kaan, ~1-week SLA) | deferred |
-| post_approval_mechanical | DIST-19 (sign+verify smoke on first signed binary) | deferred |
-| post_approval_mechanical | SEC-06-PGP (real PGP key for security@bravoh.com) | deferred |
-| post_approval_mechanical | TAURI-UPDATER-KEY (real ed25519 updater key) | deferred |
-| real_hardware_carveouts | INSTALL-VM-RUN (fresh-VM rehearsal real execution) | deferred |
-| real_hardware_carveouts | INSTALL-60S-CHECK (stopwatch onboarding ≤60s per VM) | deferred |
-| real_hardware_carveouts | INSTALL-BLACKHOLE-PROBE (real Mac probe) | deferred |
-| real_hardware_carveouts | INSTALL-DEFENDER (Defender SmartScreen reputation propagation — external 1-2 wk) | deferred |
-| customer_facing_publishes | SHIP-CUT (gh release create v2.1.0-rc1 --draft) | deferred |
-| customer_facing_publishes | SHIP-TWEET (4-channel social publish) | deferred |
-| customer_facing_publishes | SHIP-DISCORD (#announcements launch post) | deferred |
-| customer_facing_publishes | SHIP-TRANSFER (repo transfer to bravoh/vibemix org) | deferred |
-| customer_facing_publishes | SHIP-ROTATE (24h monitoring rotation execution) | deferred |
-| customer_facing_publishes | SHIP-V1-DECISION (cut v1.0.0 / RC2 / pause after ~2-week bake) | deferred |
-| real_asset_production | ASSETS-PROD-GLB (5 real Meshy/Hunyuan3D + Mixamo-rigged GLBs) | deferred |
-| real_asset_production | ASSETS-PROD-DEMO (30s demo.mp4 ffmpeg cut + README hero refresh) | deferred |
-| ops_real_execution | OPS-09-RUN (run discord_provision.py against real Discord) | deferred |
-| ops_real_execution | OPS-10-RUN (real 100 RPS prod load test — coordination required) | deferred |
-| ops_real_execution | OPS-11-CRON (healthz cron install on Bravoh server) | deferred |
-| ops_real_execution | OPS-12-OUTREACH (manual aligned-community outreach 15+ stars) | deferred |
-| ops_real_execution | OPS-13-EXECUTE (run launch_trigger.sh --publish on launch day) | deferred |
-| ops_real_execution | OPS-14-SERVER (Bravoh server /vibemix/updates/upload + healthz deploy) | deferred |
-| bug_acceptance | HARDTEK-CORPUS-001 (real Hard Tek anchor-track curation; synthetic fixtures cover CI) | accepted in-scope cleanup |
-| bug_acceptance | ACK-BANK-REMAINING-20 (20 of 40 Achird OPUS pending Gemini quota reset, ~$0.10) | accepted in-scope cleanup |
-| bug_acceptance | EVAL-VCR-CASSETTES (one-time VCR_RECORD_MODE=new_episodes population) | accepted in-scope cleanup |
-| bug_acceptance | EVAL-CORPUS-WAVS (6 × 30-min public-domain DJ session WAV downloads — 200 MB git-LFS) | accepted in-scope cleanup |
-| bug_acceptance | BRAVOH-PROXY-PROBE (Bravoh proxy Wave 0 real-host probe; MOCK_PROXY_FOR_DEV=1 in dev) | accepted in-scope cleanup |
-| bug_acceptance | AUDIT-VM (scripts/integration_audit.py on fresh VM — depends on Phase 33 + Phase 38 external clock) | accepted in-scope cleanup |
-| bug_acceptance | AUDIT-SIGN-VERIFY (signed-binary verifier on real artifacts — depends on Phase 38 secrets) | accepted in-scope cleanup |
+- **§VIS-04** (Phase 47) — Mixamo Adobe-account walk: download 23 retargeted clips from Mixamo + Kaan-aesthetic selection. Engineering ships scaffolds + placeholders; Kaan discharges asset selection.
+- **§INSTALL-COMPANION-SIGN** (Phase 49) — companion driver Authenticode signing on Win via SignPath OSS Foundation cert (same cert v3.0 SHIP-CUT awaits). Engineering ships `companion-sign` release.yml stage + verifier; Kaan discharges at SignPath approval time.
+- **§INSTALL-VM-RUN** (Phase 49 / Phase 50) — fresh-VM matrix real execution on Kaan's hardware. Engineering ships `install_vm_matrix.sh --check-60s` harness; Kaan discharges real-VM rehearsal.
+- **§E2E-50A-WALK** (Phase 50) — Kaan's real-MacBook walk per memory `project_phase_16_kaan_dj_testing`. Engineering ships harness + report.html scaffolding; Kaan discharges the walk + screencast.
 
 ### Blockers
 
-- **Apple Developer Program Agreement update** — Francesco-action, P46 legal-capacity. Blocks SHIP-CUT (real `gh release create`) and any signed-binary CI leg until discharged.
-- **SignPath OSS Foundation approval** — Kaan-action, ~1-week SLA, P46 legal-capacity. Blocks Windows-signing CI leg + SHIP-CUT.
-- No engineering-side blockers at v2.1 close. v2.2 can scaffold and execute in parallel with the external clock.
+- **None engineering-side at v3.1 start.** All 5 phases parallelize around the v3.0 external clock.
+- **External clock (v3.0 carryover, does NOT block v3.1):** Apple Developer Program Agreement update (Francesco, P46 legal-capacity) + SignPath OSS Foundation approval (Kaan, ~1-week SLA, P46 legal-capacity). When approvals land, the SignPath cert also satisfies Phase 49 §INSTALL-COMPANION-SIGN.
 
-### Risks (v2.1 critical pitfalls — closed at milestone)
+### Risks (v3.1 top 5 pitfalls — to mitigate during plan-time)
 
-All 11 critical pitfalls (P42–P52) mitigated in shipped code. P46 (legal-capacity autonomous-discharge attempt) is the only ongoing live rule — CI Bash + PowerShell audit grep against POST/PUT to apple/signpath endpoints (Phase 27-04 + Phase 34-05 + Phase 38-06). P85 (Phase 16 ear-test override expiry) tracked for v2.2 hallucination-gate strategy.
+1. **Stale `pip freeze` from Kaan's `.venv` ships as lockfile** (Phase 46) — bakes unused transitives, drifts off v3.0 GATE-02 VCR cassette pin. Mitigation: hermetic `python:3.12-slim-bookworm` container regen + `pip-deptree --reverse` prune gate.
+2. **Silent BlackHole / VB-CABLE auto-install trips macOS endpoint security / Win driver-signature UAC** (Phase 49) — produces "system extension blocked" modal that breaks one-click req. Mitigation: re-scope to "detect + one-tap fallback"; routing config (Multi-Output Device) is what gets automated, not kernel-mode install; wizard copy anticipates OS modal as expected step.
+3. **"It works on Kaan's MacBook" trap** (Phase 50) — e2e validates only Apple-Silicon Sonoma, ignores macOS 12.3 Intel + Win matrix. Mitigation: split 50a Kaan-ear + 50b OS-matrix smoke (objective, ≥ 2 of 5 configs); 50b prerequisite for milestone close.
+4. **Mascot tests built around `mascot.html` easter egg instead of v3.0 Tauri+Three.js production** (Phase 47) — emotion coverage appears green while real surface ships with placeholder GLBs (v0.1.0-rc1 "mascot chrome strip" bug class). Mitigation: e2e mascot tests target Tauri WebviewWindow only; CI grep gate `! grep -rn "mascot.html" tests/ e2e/ scripts/ci/`.
+5. **Anti-slop blocklist false-trips on installer / wizard / dep-audit copy** (Phases 46 / 48 / 49 / 50) — temptation to relax corrodes v3.0 anti-slop thesis. Mitigation: vocabulary substitution dictionary at `docs/internal/copy-substitutions.md` ("seamless → one-tap", "robust → tested", "leverage → use"); NEVER relax the gate.
 
 ---
 
@@ -199,23 +148,17 @@ All 11 critical pitfalls (P42–P52) mitigated in shipped code. P46 (legal-capac
 
 ### Last Session
 
-- 2026-05-17 — Plan 45-02 complete: `scripts/launch/launch_trigger.sh` orchestrator + `scripts/dayzero/launch_copy/cadence_index.json` (5-channel × 4-stage matrix) + 22-test pin in `tests/launch/test_launch_trigger_orchestration.py`. Dry-run-default; `--live` requires triple-env (LAUNCH_REAL=1 + GITHUB_TOKEN + DISCORD_WEBHOOK_URL); pre-publish slop gate via `check_no_ai_slop.py`; sign-off footer gate (literal Kaan + Francesco signature: per Plan 44-05 lock); JSONL audit at `dist/launch-runs/<UTC>.jsonl` (Plan 45-04 SHIP-V1-DECISION consumes). GH Actions `::error::` annotation on failure. 3 atomic commits: 1686c60 (RED) + d2e8c00 (Task 2 GREEN dry-run+audit) + e4e751b (Task 3 GREEN --live triple-env + footer). Closes SHIP-08. Plan 45-06 §SHIP-08 runbook will cite the literal discharge command.
-- 2026-05-17 — Plan 45-04 complete: SHIP-V1-DECISION audit script + decision template + 5 synthetic-telemetry fixtures shipped (SHIP-13 engineering scaffolding). `scripts/release/audit_ship_v1_decision.py` (610 lines) — argparse CLI with `--fixtures DIR` (CI / dev hermetic mode) + `--live` (T+30 Kaan-discharge: gh subprocess for GH releases + issues, stdlib urllib for Bravoh healthz, CSV fallback). `docs/SHIP-V1-DECISION-TEMPLATE.md` is the locked schema (4 evidence sections + 5-row Kaan-discharge rubric + 3-way decision checkbox + sign-off block). 20/20 tests GREEN; zero real network in CI. Threat-model mitigations T-45-04-{01..05} (numeric-only substitution, ear-test PII never leaked, _generated_by provenance comment, read-only gh argv, atomic tempfile+os.replace write) all enforced via tests + code. Plan 42-06 privacy contract preserved at the audit boundary (aggregate counts only; zero free_form text leakage). Plan 45-06 §SHIP-13 runbook ready to cite literal T+30 invocation. Commits: c822baa (test RED) + c3185ab (feat GREEN: fixture-mode + --live + 5 synthetic fixtures) + 8838f55 (feat GREEN: gh CLI preflight Rule 2). Closes SHIP-13 engineering (awaiting T+30 discharge).
-- 2026-05-16 — Plan 43-08 complete: hero demo storyboard re-mocked to 8-cut 30s sequence per CONTEXT §VIS-08; UI chip overlays in cuts 2-6 inline-rendered with CDJ Whisper v5 (wizard welcome, calibration meter, session shell, AI caption pop, EvidenceRegistry chip strip); end-card carries `open-source · MIT · github.com/bravoh/vibemix` star-funnel CTA; ≤8 cut hard gate wired via `scripts/launch/check_cut_count.py` + 6-test pytest spec; 12/12 launch-prep pytests green. Commits: c1877ed (test RED) + 6e7dd06 (feat GREEN) + f53cb9f (storyboard re-mock). Closes VIS-08; unblocks Plan 43-09 (Francesco handoff package).
-- 2026-05-16 — Plan 43-07 complete: mascot memory snapped to "Neon Rebel"; storyboard mock migrated from Workbench + DSEG7 to Saira + Geist Mono on the 5-warm-blacks + 1-amber CDJ Whisper palette; `scripts/launch/check_storyboard_palette.py` + 6-test pytest spec wired as drift-prevention gate. Commits: 4054536 + 2e4c1eb (test RED) + 927f79f (feat GREEN). Closes VIS-07.
-- 2026-05-16 — Plan 42-04 complete: `scripts/release/check_gate.sh` (hybrid hallucination gate combining last-7 nightly proxy scorecards from `.planning/eval-runs/` AND `check_ear_test.sh`) + wired Gate 2b into `scripts/launch/cut_release.sh` + retired v2.1 P85 reminder echo lines. 22 tests added (14 bash-gate + 8 cut_release wire-in; 21 pass + 1 conditional jq-missing skip). Phase 39 regression baselines preserved (test_g5_poc_files_untouched + test_bundle_id_locked green; verify_signed.py call still in Gate 2). Closes GATE-06 (hybrid release gate plumbing); GATE-08 partially advanced (echo-line removal; Plan 42-05 owns the test-file retirement + P85-OVERRIDE-RETIRED.md decision-log). Commits: 4a77b4d + c204318.
-- 2026-05-16 — Plan 42-03 complete: ear-test protocol doc + JSON Schema + Python capture writer + Phase 29 debrief toggle UI + `check_ear_test.sh` release gate + §GATE-05 Kaan-discharge runbook. 41 tests added (40 pass + 1 conditional jq-missing skip); Phase 29 105-test debrief suite still green. Closes GATE-05 (protocol) + GATE-07 (capture); unblocks Plan 42-04 `check_gate.sh` Gate-2.
-- 2026-05-16 — v2.1 The Unified Cut SHIPPED + archived via `/gsd:complete-milestone`. 13 phases shipped engineering-green; 105/105 REQ-IDs satisfied; 5/5 integration seams WIRED. 15 carveouts in KAAN-ACTION-LEGAL.md. Local annotated git tag `v2.1.0` created (NOT pushed — Kaan publishes when ready). Status: `tech_debt` accepted per `gsd-autonomous fully` mode.
-- 2026-05-16 — Phase 39 verified + Phase 37 integration audit + Section 8 gsd-audit-milestone extension confirmed WIRED + tech_debt verdict. v2.1-MILESTONE-AUDIT.md frozen at 105/105 engineering satisfied.
-- 2026-05-15 — Phases 27–38 shipped (waves of 1-3 phases per day per `gsd-autonomous fully` execution cadence).
+- 2026-05-17 — v3.1 "Distribution-Ready Pass" roadmap scaffolded via `gsd-roadmapper` under `gsd-autonomous fully` mode. 5 phases (P46–P50) derived from 44 v3.1 REQ-IDs (DEPS × 10 / MASCOT × 8 / OPP × 6 / INSTALL × 10 / E2E × 10) with 100% coverage. Build-order locked: 46 ↕ 47 parallel → 48 (gated on 46) → 49 (gated on 46 + 48) → 50 (gated on 47 + 49). Five v3.0 invariants preserved (POC immutability + ModelRouter seam + anti-slop blocklist + privacy rule + 3-IPC contract). Soft Kaan-discharge gates (§VIS-04 + §INSTALL-COMPANION-SIGN) routed to KAAN-ACTION-LEGAL but do NOT pause work. STATE.md reset to v3.1 counters. REQUIREMENTS.md traceability confirmed against intended phase mapping.
+- 2026-05-17 — Plan 45-02 + Plan 45-04 + Plan 43-08 + Plan 43-07 + Plan 42-04 + Plan 42-03 sealed; v2.1 The Unified Cut SHIPPED + archived; v3.0 Clean OSS Ship SHIPPED + archived (see prior STATE.md history blocks in v3.0-ROADMAP.md for detail).
 
 ### Next Session
 
-- **`/gsd:new-milestone` to scaffold v2.2** — Phase 16 ear-test override expires; choose either restored Kaan-ear-only gate OR permanent autonomous proxy adoption.
-- **Track external clock**: Apple Developer Program Agreement update (Francesco) + SignPath OSS Foundation application (Kaan) discharge gates the v2.1.0-rc1 public publish — NEVER autonomously discharged per P46.
-- **Once approvals land**: discharge KAAN-ACTION-LEGAL sequence — DIST-09 + DIST-11 → DIST-19 sign+verify smoke → Phase 33 real-VM matrix (INSTALL-VM-RUN + INSTALL-60S-CHECK + INSTALL-BLACKHOLE-PROBE) → Phase 38 signed-binary verifier → Phase 39 §SHIP customer-facing publishes (SHIP-CUT / SHIP-TWEET / SHIP-DISCORD / SHIP-TRANSFER / SHIP-ROTATE) → SHIP-V1-DECISION after ~2-week bake.
-- **Re-run integration audit** after each carveout discharge: `python scripts/integration_audit.py --write-milestone-audit .planning/v2.1-MILESTONE-AUDIT.md --force`.
+- **`/gsd:plan-phase 46`** to decompose Phase 46 Dependency Audit + Lockfile + AUDIT.md into plans. Independent — runs in parallel with Phase 47 planning if Kaan wants concurrent kickoff.
+- **`/gsd:plan-phase 47`** can run in parallel — Mascot Real GLB Land + Full Emotion Coverage. Shares zero files with Phase 46. Soft §VIS-04 Kaan-discharge surface noted; engineering proceeds with scaffolds.
+- **Phase 48 / 49 / 50 plan kickoff** deferred until Phase 46 (dep_ratings.json schema) lands; Phase 49 additionally waits for Phase 48 scan output; Phase 50 waits for Phase 47 GLBs + Phase 49 signed `.dmg`.
+- **Track external clock**: Apple Developer Program Agreement update (Francesco) + SignPath OSS Foundation application (Kaan) discharge gates v3.0 SHIP-CUT — v3.1 does NOT wait. When approvals land, SignPath cert simultaneously unlocks Phase 49 §INSTALL-COMPANION-SIGN.
+- **Soft Kaan-discharge gates to surface in KAAN-ACTION-LEGAL during execution**: §VIS-04 Mixamo retargets (Phase 47), §INSTALL-COMPANION-SIGN companion-driver Authenticode (Phase 49), §INSTALL-VM-RUN fresh-VM rehearsal (Phase 49 / 50), §E2E-50A-WALK Kaan's MacBook walk (Phase 50).
 
 ---
 
-*State managed by gsd-complete-milestone at 2026-05-16 (v2.1 The Unified Cut archived — engineering-complete; KAAN-ACTION-LEGAL discharge gates public RC).*
+*State managed by gsd-roadmapper at 2026-05-17 (v3.1 "Distribution-Ready Pass" scaffolded; engineering ready to begin Phase 46 + Phase 47 in parallel).*
