@@ -2688,3 +2688,623 @@ SHIP-07 EYEBALL PASS:                _____________________   (yes/no — title +
 SHIP-07 PUBLIC PUBLISH on:           _____________________   (date — draft flipped off via GH UI)
 Sign-off by (Kaan):                  _____________________
 ```
+
+## §SHIP-08 — SHIP-TWEET 5-channel social publish (KAAN-ACTION)
+
+**REQ-ID:** SHIP-08 (Phase 45 / Plan 45-02)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge  ☐ §SHIP-07 GREEN (public release URL live)  ☐ launch-copy signature footers locked (Plan 44-05)  ☐ 4 cadence-stage invocations fired  ☐ dist/launch-runs/<UTC>.jsonl records 14 channel:stage pairs
+
+**Effort:** ~30 seconds active execution per stage × 4 stages = ~2 minutes total compute. Spread across 24h calendar window (T-30 / T+0 / T+5h / T+24h) — each stage fires at its scheduled moment per `scripts/dayzero/launch_copy/cadence_index.json`.
+
+**Blocking for:** §SHIP-09 (SHIP-DISCORD #announcements post — the Discord cadence rides on the same trigger), §SHIP-11 (SHIP-ROTATE 24h monitoring window starts at T+0 launch_trigger fire), §SHIP-13 (SHIP-V1-DECISION audit reads from `dist/launch-runs/` jsonls).
+
+### Why this is KAAN-action
+
+`launch_trigger.sh --live` writes to public social channels (Twitter, Instagram, LinkedIn, Reddit, Discord). The `--live` flag is the kill switch — `LAUNCH_REAL=1` env var enforces double-confirmation that this is the real publish, not a dry-run. Per CLAUDE.md privacy + secrets discipline, autonomous agents NEVER hold Twitter/Instagram/Reddit posting tokens. Kaan's machine sources the OAuth tokens at runtime.
+
+### Pre-requisites
+
+- §SHIP-07 GREEN: public release URL is live + flipped off draft.
+- Plan 44-05 sign-off footer + AI-slop gate green across all 5 launch-copy files (`scripts/dayzero/launch_copy/{twitter,instagram,linkedin,reddit,discord}.txt`).
+- `scripts/launch/launch_trigger.sh` exists + executable (Plan 45-02).
+- `scripts/dayzero/launch_copy/cadence_index.json` reflects the per-stage per-channel routing (Plan 45-02).
+- OAuth tokens posted to GH secrets:
+  - Twitter / X: `TWITTER_API_KEY`, `TWITTER_API_SECRET`, `TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_TOKEN_SECRET`.
+  - Instagram: `INSTAGRAM_ACCESS_TOKEN`.
+  - LinkedIn: `LINKEDIN_ACCESS_TOKEN`.
+  - Reddit: `REDDIT_USERNAME`, `REDDIT_PASSWORD`, `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`.
+  - Discord: `DISCORD_WEBHOOK_URL` (announcements channel webhook).
+- GH CLI auth ready (`gh auth status` exit 0) so `GITHUB_TOKEN=$(gh auth token)` resolves.
+
+### Discharge commands
+
+```bash
+# Pre-flight (run once before the cadence fires):
+gh auth status
+export LAUNCH_REAL=1
+export GITHUB_TOKEN="$(gh auth token)"
+export DISCORD_WEBHOOK_URL="<announcements-webhook-from-GH-secret>"
+# Twitter / Instagram / LinkedIn / Reddit OAuth tokens are sourced by
+# scripts/launch/publish_social_posts.py from GH secrets in CI mode;
+# for local execution, also export them:
+#   export TWITTER_API_KEY=... TWITTER_API_SECRET=...
+#   export INSTAGRAM_ACCESS_TOKEN=... LINKEDIN_ACCESS_TOKEN=...
+#   export REDDIT_USERNAME=... REDDIT_PASSWORD=...
+#   export REDDIT_CLIENT_ID=... REDDIT_CLIENT_SECRET=...
+
+# Stage 1: T-30 — 30 minutes before launch hour (Twitter + Instagram + Discord)
+bash scripts/launch/launch_trigger.sh --live --phase T-30
+
+# Stage 2: T+0 — the launch moment itself (Twitter + Instagram + LinkedIn + Reddit + Discord)
+bash scripts/launch/launch_trigger.sh --live --phase T+0
+
+# Stage 3: T+5h — mid-day amplification (Twitter + Discord only per cadence_index.json)
+bash scripts/launch/launch_trigger.sh --live --phase T+5h
+
+# Stage 4: T+24h — one-day-later recap (Twitter + Instagram + LinkedIn + Discord)
+bash scripts/launch/launch_trigger.sh --live --phase T+24h
+```
+
+### Verification
+
+```bash
+# 1. Each stage logs to dist/launch-runs/<UTC>.jsonl — confirm one per stage:
+ls -1 dist/launch-runs/*.jsonl | wc -l
+# → expected: 4 (one jsonl per stage; matches the 4 invocations above)
+
+# 2. Per-channel per-stage publish accounting:
+cat dist/launch-runs/*.jsonl \
+    | jq -r 'select(.mode=="live") | .channel + ":" + .stage' \
+    | sort -u
+# → expected: the channel:stage pairs from cadence_index.json non-null cells:
+#   discord:T+0, discord:T+24h, discord:T+5h, discord:T-30,
+#   instagram:T+0, instagram:T+24h, instagram:T-30,
+#   linkedin:T+0, linkedin:T+24h,
+#   reddit:T+0,
+#   twitter:T+0, twitter:T+24h, twitter:T+5h, twitter:T-30
+#   = 14 unique pairs
+
+# 3. Per-stage publish was not silently dry-run — `mode=="live"` flag set:
+jq 'select(.mode != "live") | .channel + ":" + .stage' dist/launch-runs/*.jsonl
+# → expected: empty (zero non-live records when LAUNCH_REAL=1 set)
+
+# 4. Twitter / Instagram / LinkedIn / Reddit / Discord posts visible on
+#    the live accounts:
+#    → https://twitter.com/<bravoh-handle>
+#    → https://www.instagram.com/<bravoh-handle>/
+#    → https://www.linkedin.com/company/bravoh
+#    → https://reddit.com/user/<bravoh-handle>/submitted
+#    → Discord #announcements channel
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-08` in REQUIREMENTS.md.
+- Archive the 4 jsonl logs under `dist/launch-runs/v3.0.0-rc1/` (rename or copy from the UTC-stamped names — keeps them grouped by release).
+- Update §SHIP-09 status to ☑ T+0 stage fired — Discord launch post lands here.
+- Update §SHIP-11 status to ☑ T+0 fired — 24h rotation clock starts.
+
+### Unblocks
+
+- **§SHIP-09** — SHIP-DISCORD #announcements post is one of the 14 channel:stage pairs (T+0 row).
+- **§SHIP-11** — 24h monitoring rotation begins T+0..T+24h per `docs/launch-rotation.md §SHIP-11`.
+- **§SHIP-13** — T+30 audit reads `dist/launch-runs/*.jsonl` for engagement metrics.
+- **Roadmap success criterion** — "5-channel social publish discharged across 4 cadence stages" row goes green.
+
+### Sign-off block
+
+```
+SHIP-08 LAUNCH_REAL EXPORTED on:     _____________________   (date — env var set in Kaan's shell)
+SHIP-08 OAUTH TOKENS VERIFIED:       _____________________   (yes/no — all 11+ env vars resolve)
+SHIP-08 T-30 STAGE FIRED on:         _____________________   (timestamp — wall-clock T-30 invocation)
+SHIP-08 T+0  STAGE FIRED on:         _____________________   (timestamp — launch moment)
+SHIP-08 T+5h STAGE FIRED on:         _____________________   (timestamp — mid-day amplification)
+SHIP-08 T+24h STAGE FIRED on:        _____________________   (timestamp — one-day recap)
+SHIP-08 14 PAIRS RECORDED:           _____________________   (yes/no — jq channel:stage sort -u count)
+SHIP-08 ZERO DRY-RUN RECORDS:        _____________________   (yes/no — `mode != "live"` count is 0)
+Sign-off by (Kaan):                  _____________________
+```
+
+## §SHIP-09 — SHIP-DISCORD #announcements launch post + provision-live (KAAN-ACTION)
+
+**REQ-ID:** SHIP-09 (Phase 45)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge  ☐ §SHIP-07 GREEN  ☐ §LAUNCH-08 GUILD CREATED + BOT TOKEN SOURCED  ☐ provision-live one-time fired (5 roles + 9 channels)  ☐ #announcements launch post fired  ☐ idempotency re-run shows 14 skips
+
+**Effort:** ~10 minutes — provision-live is one command (one-shot, idempotent); launch post is one command. Most time is eyes-on verification in Discord.
+
+**Blocking for:** §SHIP-11 (24h rotation watches Discord #bugs + #announcements engagement).
+
+### Why this is KAAN-action
+
+`BRAVOH_DISCORD_BOT_TOKEN` lives in Kaan's environment + GH secrets per §LAUNCH-08 — autonomous agents never hold it. Both invocations write to the real Discord guild; both require `--live` / `--real` explicit opt-in flags per the Phase 44-06 ergonomics rule. The dry-run paths are the engineering test surface; live discharge is operator-only.
+
+### Pre-requisites
+
+- §SHIP-07 GREEN: public release URL exists (the launch post links to it).
+- §LAUNCH-08 fully signed off: guild created + bot token in `BRAVOH_DISCORD_BOT_TOKEN` env var + GH secret set + dry-run green against real guild ID.
+- `scripts/dayzero/discord_provision.py` exists (Phase 44-06).
+- `scripts/launch/post_discord_launch.py` exists (Phase 36).
+- Guild ID captured (numeric, 18-19 digits — recorded in §LAUNCH-08 sign-off block).
+
+### Discharge commands
+
+```bash
+# Pre-flight:
+export BRAVOH_DISCORD_BOT_TOKEN='<from-GH-secret-or-1Password>'
+export LAUNCH_REAL=1
+
+# 1. Provision-live — one-shot, idempotent (re-running prints 14 skips
+#    instead of 14 creates). Already done as part of §LAUNCH-08 discharge,
+#    re-run here to confirm idempotency before the launch post:
+LAUNCH_REAL=1 uv run python scripts/dayzero/discord_provision.py \
+    --live --guild-id <numeric-guild-id>
+# → expected if first time: 5 × "[done] created role" + 9 × "[done] created channel"
+# → expected if re-run: 14 × "[skip] role exists"/"[skip] channel exists"
+
+# 2. Post the launch announcement to #announcements channel:
+LAUNCH_REAL=1 uv run python scripts/launch/post_discord_launch.py --real
+# → reads the v3.0.0-rc1 launch copy from
+#   scripts/dayzero/launch_copy/discord.txt (Plan 44-05 locked),
+#   substitutes the public release URL from §SHIP-07,
+#   posts via webhook (or via bot token to channel ID — script handles both)
+# → prints the resulting message URL on success
+```
+
+### Verification
+
+```bash
+# 1. Idempotency confirmed — re-run provision shows 14 skips:
+LAUNCH_REAL=1 uv run python scripts/dayzero/discord_provision.py \
+    --live --guild-id <numeric-guild-id> | grep -c "^\[skip\]"
+# → expected: 14
+
+# 2. Token-source audit:
+LAUNCH_REAL=1 uv run python scripts/dayzero/discord_provision.py \
+    --live --guild-id <numeric-guild-id> 2>&1 | grep "bot token source"
+# → expected: "[live] bot token source: BRAVOH_DISCORD_BOT_TOKEN"
+
+# 3. Eyes-on the Discord guild — #announcements channel shows the launch post:
+#    → message body cites the public release URL from §SHIP-07
+#    → embed renders (if scripts/launch/post_discord_launch.py uses embed payload)
+#    → no @everyone / @here ping (we explicitly do NOT spam pings — Plan 44-05 rule)
+
+# 4. Post-publish — Discord #announcements engagement is one of the
+#    surfaces §SHIP-11 monitoring watches; record initial message ID for
+#    later reference:
+#    → right-click message in Discord → Copy Message Link → record in §SHIP-09 sign-off.
+
+# 5. Engineering gates still green:
+uv run pytest tests/dayzero/test_discord_provision_dryrun.py tests/dayzero/test_discord_provision.py -v
+# → green (Phase 44-06 baseline preserved)
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-09` in REQUIREMENTS.md.
+- Record the launch-post Discord message URL in §SHIP-09 sign-off block.
+- Update §SHIP-11 status to ☑ Discord launch surface live (rotation watches it).
+
+### Unblocks
+
+- **§SHIP-11** — 24h rotation monitors Discord #bugs + #announcements engagement as one of the 7 monitoring sources per `docs/launch-rotation.md §SHIP-11`.
+- **Community surface fully live** — README community link, onboarding docs, LAUNCH-SEQUENCE T-0 row all resolve to a real Discord with a real launch post.
+- **Roadmap success criterion** — "Discord #announcements launch post fired live" row goes green.
+
+### Sign-off block
+
+```
+SHIP-09 PROVISION-LIVE IDEMPOTENT:   _____________________   (yes — re-run prints 14 [skip] lines)
+SHIP-09 TOKEN SOURCE CONFIRMED:      _____________________   (yes — BRAVOH_DISCORD_BOT_TOKEN env var was used)
+SHIP-09 LAUNCH POST FIRED on:        _____________________   (timestamp — `post_discord_launch.py --real` ran)
+SHIP-09 LAUNCH POST MESSAGE URL:     _____________________   (https://discord.com/channels/.../...)
+SHIP-09 RELEASE URL IN POST:         _____________________   (yes — message body cites §SHIP-07 release URL)
+SHIP-09 NO @EVERYONE / @HERE PINGS:  _____________________   (yes — Plan 44-05 anti-spam rule honored)
+Sign-off by (Kaan):                  _____________________
+```
+
+## §SHIP-10 — SHIP-TRANSFER repo handoff to bravoh/vibemix (KAAN-ACTION)
+
+**REQ-ID:** SHIP-10 (Phase 45)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge  ☐ §SHIP-07 GREEN  ☐ check_bravoh_org_ready.sh exit 0  ☐ `gh api -X POST` transfer fired  ☐ new URL resolves to bravoh/vibemix  ☐ webhooks + CI secrets re-mapped to new repo
+
+**Effort:** ~30 minutes total. The transfer itself is one `gh api` command; the bulk of the time is post-transfer cleanup (re-mapping CI secrets, updating README badges, updating Tauri updater URL if it pointed at the old repo).
+
+**Blocking for:** None — this is a one-way action that closes out the pre-launch repo identity. After this fires, the repo lives at `github.com/bravoh/vibemix` permanently.
+
+### Why this is KAAN-action
+
+Repo transfer is the highest-privilege manual command in the entire publish cascade. The literal command is intentionally not parameterized into a script — Kaan eyeballs it before pressing return (T-45-06-04 threat model: elevation-of-privilege mitigation). The destination `bravoh` org must exist + Kaan must have admin on both sides (source ozzaii personal + destination bravoh org).
+
+### Pre-requisites
+
+- §SHIP-07 GREEN: public release `v3.0.0-rc1` exists on the pre-transfer URL `github.com/ozzaii/vibemix/releases/tag/v3.0.0-rc1`. GitHub preserves release URLs across transfers (redirects), but the cut belongs on the pre-transfer identity for audit clarity.
+- Bravoh GH org `bravoh` exists + Kaan is an admin (verified via `bash scripts/launch/check_bravoh_org_ready.sh` per Phase 44-06).
+- All 5 launch-copy posts (§SHIP-08) already fired — re-running them after transfer would duplicate.
+- Tauri updater target URL audited: `tauri/src-tauri/tauri.conf.json` updater section should point at `api.altidus.world/vibemix/updates/latest.json` (Bravoh-side, not GH-pages), so the transfer doesn't break the auto-updater. Confirm:
+  ```bash
+  jq '.tauri.updater.endpoints' tauri/src-tauri/tauri.conf.json
+  # → expected: array containing "https://api.altidus.world/vibemix/updates/latest.json"
+  ```
+
+### Discharge commands
+
+```bash
+# Pre-flight: confirm Bravoh org standup is complete
+bash scripts/launch/check_bravoh_org_ready.sh
+# → exit 0 (Phase 44-06 polling gate; checks Bravoh org exists +
+#   teams created + Kaan admin)
+
+# Resolve the current owner (should be "ozzaii" pre-transfer):
+CURRENT_OWNER="$(gh repo view --json owner --jq .owner.login)"
+echo "Current owner: $CURRENT_OWNER"
+# → expected: "ozzaii"
+
+# THE TRANSFER COMMAND (literal — Kaan eyeballs before return):
+gh api -X POST repos/$CURRENT_OWNER/vibemix/transfer -f new_owner=bravoh
+
+# GitHub responds 202 Accepted (async transfer); the new owner has 7 days
+# to accept via email confirmation. Kaan as bravoh org admin clicks the
+# confirmation email — once accepted, the redirect is in place.
+```
+
+### Verification
+
+```bash
+# 1. Direct API check — new owner is "bravoh":
+gh repo view bravoh/vibemix --json owner --jq .owner.login
+# → expected: "bravoh"
+
+# 2. Redirect in place — old URL forwards to new:
+curl -fsSLI https://github.com/ozzaii/vibemix | grep -i "^location:"
+# → expected: location: https://github.com/bravoh/vibemix
+
+# 3. Release URLs preserved (the §SHIP-07 release-page URL still works
+#    via redirect):
+curl -fsSL https://api.github.com/repos/ozzaii/vibemix/releases/tags/v3.0.0-rc1 \
+    | jq .html_url
+# → expected: "https://github.com/bravoh/vibemix/releases/tag/v3.0.0-rc1"
+
+# 4. CI secrets — GH transfers org-level secrets but NOT user-level ones
+#    that the old workflow inherited. Re-post any user-scoped secrets to
+#    the bravoh-org level:
+gh secret list --repo bravoh/vibemix
+# → eyeball the list; re-post any missing secrets that were on ozzaii:
+gh secret set APPLE_DEVELOPER_ID --repo bravoh/vibemix --body "<value>"
+# (...and the other Apple + SignPath + Discord + social tokens as needed)
+
+# 5. Tauri auto-updater still resolves — the Bravoh-side latest.json
+#    doesn't care about the GH URL, so this is a smoke check:
+curl -fsSL https://api.altidus.world/vibemix/updates/latest.json | jq .version
+# → expected: "v3.0.0-rc1"
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-10` in REQUIREMENTS.md.
+- Record the transfer-accept timestamp + new repo URL in `.planning/STATE.md`.
+- Update README badges if any were `ozzaii/vibemix`-prefixed:
+  ```bash
+  rg "ozzaii/vibemix" README.md
+  # → eyeball; if any found, sed to bravoh/vibemix + commit on the new repo
+  ```
+
+### Unblocks
+
+- **§SHIP-11** — Rotation watches the post-transfer URL (bravoh/vibemix issues + PRs).
+- **§SHIP-13** — T+30 audit reads telemetry from the post-transfer release URL.
+- **Repo identity is final** — onboarding docs, GitHub topics, README badges all reference the canonical `bravoh/vibemix` location.
+
+### Sign-off block
+
+```
+SHIP-10 ORG-READY GATE PASS on:      _____________________   (date — `check_bravoh_org_ready.sh` exit 0)
+SHIP-10 PRE-TRANSFER OWNER:          _____________________   (expected "ozzaii")
+SHIP-10 TRANSFER FIRED on:           _____________________   (timestamp — `gh api -X POST ... transfer` returned 202)
+SHIP-10 ACCEPTED VIA EMAIL on:       _____________________   (date — Kaan clicked the bravoh-side confirmation link)
+SHIP-10 NEW OWNER VERIFIED:          _____________________   (date — `gh repo view bravoh/vibemix` returned bravoh)
+SHIP-10 REDIRECT GREEN:              _____________________   (date — old URL forwards to new)
+SHIP-10 CI SECRETS RE-MAPPED:        _____________________   (date — bravoh-side secrets posted)
+SHIP-10 TAURI UPDATER UNAFFECTED:    _____________________   (yes — api.altidus.world resolution still green)
+Sign-off by (Kaan):                  _____________________
+```
+
+## §SHIP-11 — SHIP-ROTATE 24h monitoring rotation (KAAN-ACTION)
+
+**REQ-ID:** SHIP-11 (Phase 45 / Plan 45-05)
+**Owner:** Kaan (solo rotation for v3.0)
+**Status:** ☐ pre-discharge  ☐ §SHIP-07 GREEN  ☐ §SHIP-08 T+0 GREEN  ☐ §SHIP-09 GREEN  ☐ 4 × 6h shifts executed  ☐ shift handoff notes posted per docs/launch-rotation.md
+
+**Effort:** 24 hours of intermittent attention. Per shift, ~10-15 minutes per check-in × ~4 check-ins per shift = ~60 minutes active work per 6h shift. Sleep-shift T+18..T+24 is alerts-only (GH Actions email + Discord pings).
+
+**Blocking for:** §SHIP-13 (T+30 SHIP-V1-DECISION audit reads rotation handoff notes).
+
+### Why this is KAAN-action
+
+The operational source-of-truth for shift schedule + triage decision tree + 7 monitoring sources lives at `docs/launch-rotation.md §SHIP-11` (Plan 45-05). This runbook section is the discharge handle — it points operators at the rotation doc and tracks per-shift sign-off here. Per memory `feedback_no_scope_creep_clean_utility`, v3.0 is single-rotator (Kaan); v3.x may add Francesco/Momo.
+
+### Pre-requisites
+
+- §SHIP-07 GREEN: public release live (rotation starts at the T+0 publish moment).
+- §SHIP-08 T+0 stage GREEN: social publish fired (gives the public an entry-point to discover the release).
+- §SHIP-09 GREEN: Discord #announcements post landed (one of the 7 monitoring sources).
+- `docs/launch-rotation.md` carries the §SHIP-11 24h schedule + triage tree + 7 monitoring sources list (Plan 45-05 — must exist on disk before this discharge).
+- Bravoh server `healthz` cron heartbeating (§SHIP-06) — rotation monitors uptime.
+
+### Discharge commands
+
+```bash
+# The rotation has no single command — it's a 24h watch window. Each
+# shift has the same structure per docs/launch-rotation.md §SHIP-11:
+
+# Shift 1: T+0..T+6h (Kaan European morning, 08:00-14:00 CET)
+# Shift 2: T+6..T+12h (Kaan European afternoon, 14:00-20:00 CET)
+# Shift 3: T+12..T+18h (Kaan European evening, 20:00-02:00 CET)
+# Shift 4: T+18..T+24h (Kaan sleep-shift, alerts-only — GH Actions email +
+#          Discord pings on #bugs / #announcements)
+
+# Per shift, run the 7 monitoring spot-checks per docs/launch-rotation.md:
+#   1. GitHub Actions runs — `gh run list --workflow=release.yml --limit 5`
+#   2. Bravoh healthz uptime — `curl -fsSL https://api.altidus.world/vibemix/healthz | jq .ok`
+#   3. GH issues opened since T+0 — `gh issue list --repo bravoh/vibemix --search "created:>$(date -u -d '6 hours ago' +%Y-%m-%dT%H:%M:%S)"`
+#   4. Discord #bugs channel — eyes-on
+#   5. Discord #announcements engagement — eyes-on
+#   6. Twitter mentions — eyes-on
+#   7. README download counts — `gh release view v3.0.0-rc1 --json assets --jq '.assets[] | {name, download_count}'`
+
+# Per shift, record handoff notes by appending to docs/launch-rotation.md
+# §SHIP-11 shift-log table (one row per shift):
+#   | shift | start | end | issues | crashes | api_key_rate_limit_hits | bravoh_healthz_uptime | call |
+```
+
+### Verification
+
+```bash
+# 1. docs/launch-rotation.md §SHIP-11 shift-log carries 4 rows:
+grep -A 100 "^## §SHIP-11" docs/launch-rotation.md \
+    | grep -cE "^\| shift-[1-4] \|"
+# → expected: 4 (one per shift)
+
+# 2. Bravoh healthz uptime over the 24h window (post-rotation summary):
+ssh altidus "journalctl -t vibemix-healthz --since 'T+0 timestamp' --until 'T+24h timestamp' | wc -l"
+# → expected: ≥288 (24h × 12 hits/hour = 288 minimum given 5-min cron)
+
+# 3. Sign-off block in docs/launch-rotation.md §SHIP-11 filled (every
+#    shift row has a "call" cell — green / yellow / red):
+grep -A 50 "^## §SHIP-11" docs/launch-rotation.md \
+    | grep -cE "(green|yellow|red)"
+# → expected: ≥4 (one per shift)
+
+# 4. No unresolved P0/P1 issues at T+24h:
+gh issue list --repo bravoh/vibemix --label "P0,P1" --state open
+# → expected: empty (or escalation path engaged per triage decision tree)
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-11` in REQUIREMENTS.md.
+- Final shift handoff: post the 24h summary to Discord #announcements (free-form, not a launch-copy file).
+- Update `.planning/STATE.md` with the 24h roll-up metrics (issues opened/closed/escalated, healthz uptime %, crash reports if any).
+
+### Unblocks
+
+- **§SHIP-13** — T+30 audit reads the §SHIP-11 shift-log table + STATE.md 24h metrics.
+- **Roadmap success criterion** — "24h post-launch monitoring rotation executed without P0 unresolved" row goes green.
+
+### Sign-off block
+
+```
+SHIP-11 ROTATION DOC EXISTS:         _____________________   (yes — docs/launch-rotation.md §SHIP-11 from Plan 45-05)
+SHIP-11 SHIFT-1 (T+0..T+6h) on:      _____________________   (call: green/yellow/red)
+SHIP-11 SHIFT-2 (T+6..T+12h) on:     _____________________   (call: green/yellow/red)
+SHIP-11 SHIFT-3 (T+12..T+18h) on:    _____________________   (call: green/yellow/red)
+SHIP-11 SHIFT-4 (T+18..T+24h) on:    _____________________   (call: green/yellow/red — sleep-shift alerts-only)
+SHIP-11 P0/P1 ISSUES AT T+24h:       _____________________   (count — expected 0)
+SHIP-11 HEALTHZ UPTIME OVER 24h:     _____________________   (% — expected ≥99.5%)
+SHIP-11 ROLL-UP POSTED on:           _____________________   (date — Discord #announcements 24h summary)
+Sign-off by (Kaan):                  _____________________
+```
+
+## §SHIP-12 — INSTALL-DEFENDER SmartScreen reputation observation (KAAN-ACTION — passive)
+
+**REQ-ID:** SHIP-12 (Phase 45)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge  ☐ §SHIP-07 GREEN  ☐ first-week observation captured  ☐ first-SmartScreen-warning-gone date recorded
+
+**Effort:** Passive — 1-2 weeks elapsed time. Zero active execution; the discharge is documenting what was observed.
+
+**Blocking for:** §SHIP-13 (T+30 audit pulls SmartScreen status as one of the bake-in signals).
+
+### Why this is KAAN-action
+
+Windows SmartScreen reputation accrues against the SignPath signing identity (§SHIP-02) as users download + run the signed binary. For brand-new signing identities, Microsoft Defender SmartScreen shows a "Windows protected your PC" warning on first-run until ~thousands of installs accumulate. There is NO command to fast-track this — it's purely passive observation. Kaan documents the first date a fresh Win 11 install no longer hits the warning. This is a known-unknown calibration data point for §SHIP-13.
+
+### Pre-requisites
+
+- §SHIP-07 GREEN: public release published — that's the moment the reputation clock starts.
+- §SHIP-02 GREEN: SignPath-signed Windows binary in the wild — without this signing identity, SmartScreen behavior is "untrusted publisher" not "no reputation yet" (worse case).
+- A fresh Win 11 VM available for periodic re-test (per `tart` image in §SHIP-04 matrix).
+
+### Discharge commands
+
+```bash
+# No commands. The discharge is a checklist + observation log:
+
+# Day 1, Day 3, Day 7, Day 14, Day 21, Day 28 (or earlier if signal clears):
+#   1. tart clone the fresh win-11 image:
+#      tart clone ghcr.io/cirruslabs/windows-server-2022:latest smartscreen-probe-$(date +%Y%m%d)
+#   2. tart run smartscreen-probe-... (boot the VM)
+#   3. In the VM, open a browser → navigate to the release page (post-§SHIP-10 transfer:
+#      https://github.com/bravoh/vibemix/releases/tag/v3.0.0-rc1)
+#   4. Download vibemix-*.msi (or .exe)
+#   5. Double-click to run
+#   6. OBSERVE: does Defender SmartScreen show "Windows protected your PC"?
+#      → YES = reputation still propagating; record date + screenshot
+#      → NO  = reputation reached threshold; record date as "first-clear date"
+#   7. Append result to eval/smartscreen-observations/$(date +%Y-%m-%d).md:
+#      - date, win-11 build, SmartScreen verdict, screenshot path
+#   8. Destroy the probe VM: tart delete smartscreen-probe-...
+```
+
+### Verification
+
+```bash
+# 1. Observation log exists with ≥1 entry per probe day:
+ls eval/smartscreen-observations/ | wc -l
+# → expected: ≥4 entries (Day 1 + 3 + 7 + 14 minimum)
+
+# 2. Each entry carries the 5 fields (date, win-11 build, verdict,
+#    screenshot path, signing identity used):
+for f in eval/smartscreen-observations/*.md; do
+  echo "--- $f ---"
+  grep -E "^(date|win-11 build|smartscreen verdict|screenshot|signing identity):" "$f" | wc -l
+done
+# → expected: 5 per file
+
+# 3. First-clear date documented (the moment "no SmartScreen warning"
+#    flips from never-true to true):
+grep -l "smartscreen verdict: no warning" eval/smartscreen-observations/*.md \
+    | head -1 \
+    | xargs -I{} grep "^date:" {}
+# → expected: a date string (or empty if SmartScreen hasn't cleared yet by §SHIP-13)
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-12` in REQUIREMENTS.md (regardless of clear/not-clear — the discharge is observation, not outcome).
+- Record the first-clear date (or "not yet cleared at T+30") in `.planning/STATE.md`.
+- Feed the §SHIP-13 audit script with the SmartScreen status as one of its decision inputs.
+
+### Unblocks
+
+- **§SHIP-13** — T+30 SHIP-V1-DECISION audit pulls SmartScreen status. If still showing warnings, the decision tree biases toward "cycle to v3.0.0-rc2 with same SignPath identity" rather than "cut v1.0.0".
+- **Future SignPath identity stability** — first-clear date informs how long subsequent releases under the same identity need to bake.
+
+### Sign-off block
+
+```
+SHIP-12 DAY-1 PROBE on:              _____________________   (date — smartscreen verdict: warning / no warning)
+SHIP-12 DAY-3 PROBE on:              _____________________   (date — smartscreen verdict: ...)
+SHIP-12 DAY-7 PROBE on:              _____________________   (date — smartscreen verdict: ...)
+SHIP-12 DAY-14 PROBE on:             _____________________   (date — smartscreen verdict: ...)
+SHIP-12 FIRST-CLEAR DATE:            _____________________   (date — first probe with "no warning"; or "not cleared by T+30")
+SHIP-12 OBSERVATION LOG PATH:        _____________________   (eval/smartscreen-observations/)
+Sign-off by (Kaan):                  _____________________
+```
+
+## §SHIP-13 — SHIP-V1-DECISION T+30 audit + Kaan sign-off (KAAN-ACTION)
+
+**REQ-ID:** SHIP-13 (Phase 45 / Plan 45-04)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge  ☐ §SHIP-07..§SHIP-12 dispositioned  ☐ 30 calendar days elapsed since §SHIP-07 publish  ☐ `audit_ship_v1_decision.py --live` run  ☐ `.planning/decisions/v3.0-SHIP-V1-DECISION.md` generated  ☐ Kaan reads + checks one of 3 boxes + signs off
+
+**Effort:** ~2 hours total — ~5 minutes to run the audit script + ~90 minutes for Kaan to read the report + 30-day perspective + decision rationale + sign-off.
+
+**Blocking for:** v3.0 milestone close. This is the terminal step of the publish cascade — either vibemix cuts v1.0.0, cycles to v3.0.0-rc2, or pauses.
+
+### Why this is KAAN-action
+
+The decision is a product call, not a metric threshold. The audit script (`scripts/release/audit_ship_v1_decision.py` — Plan 45-04) reads the 14-day telemetry roll-up + the §SHIP-11 rotation handoff notes + the §SHIP-12 SmartScreen log + GitHub issues + ear-test feedback, but the WHICH-OF-3-BOXES call is Kaan's eyes + product memory (`feedback_no_scope_creep_clean_utility`, `project_anti_slop_grounded_gemini_thesis`, `project_phase_16_kaan_dj_testing`).
+
+### Pre-requisites
+
+- §SHIP-07..§SHIP-12 all signed off (every checkbox above filled in their respective sign-off blocks).
+- 30 calendar days elapsed since the §SHIP-07 PUBLIC PUBLISH timestamp (not 30 days since the draft was created — measure from the moment the public could install it).
+- `scripts/release/audit_ship_v1_decision.py` exists + executable (Plan 45-04).
+- `docs/SHIP-V1-DECISION-TEMPLATE.md` exists (Plan 45-04 schema).
+- GitHub API reachable via `gh auth token`.
+- Bravoh healthz stats endpoint live: `https://api.altidus.world/vibemix/healthz/stats` (rollup endpoint, not just the per-hit `/healthz`).
+- `eval/ear-test-logs/` has any post-RC ear-test entries Kaan ran during the bake period.
+
+### Discharge commands
+
+```bash
+# Pre-flight:
+export GITHUB_TOKEN="$(gh auth token)"
+
+# 1. Generate the audit report — reads 14d telemetry + writes the decision template:
+GITHUB_TOKEN="$(gh auth token)" uv run python scripts/release/audit_ship_v1_decision.py \
+    --live \
+    --release-tag v3.0.0-rc1 \
+    --bravoh-healthz-stats-url https://api.altidus.world/vibemix/healthz/stats \
+    --output .planning/decisions/v3.0-SHIP-V1-DECISION.md
+# → reads:
+#   • GH release download counts (gh api .../releases/tags/v3.0.0-rc1)
+#   • GH issues opened since T+0 (severity rollup via labels)
+#   • crash-report issues (label = "crash")
+#   • Bravoh healthz cron uptime (last 14d, target ≥99.5%)
+#   • eval/ear-test-logs/ post-RC entries (any new ear-test logs)
+#   • §SHIP-11 rotation handoff table from docs/launch-rotation.md
+#   • §SHIP-12 SmartScreen observation log
+#   • dist/launch-runs/*.jsonl engagement metrics
+# → writes the report at the --output path, pre-filled with metrics +
+#   the 3 decision checkboxes (cut v1.0.0 / cycle v3.0.0-rc2 / pause)
+
+# 2. Read the report — Kaan opens it, eyeballs each section:
+${EDITOR:-vim} .planning/decisions/v3.0-SHIP-V1-DECISION.md
+
+# 3. Kaan checks ONE of the 3 decision boxes in the report + writes
+#    rationale + signs off.
+
+# 4. Commit the signed decision:
+git add .planning/decisions/v3.0-SHIP-V1-DECISION.md
+git commit -m "decision(v3.0): SHIP-V1-DECISION sign-off — <cut-v1.0.0 / cycle-rc2 / pause>"
+```
+
+### Verification
+
+```bash
+# 1. Decision file exists:
+[ -f .planning/decisions/v3.0-SHIP-V1-DECISION.md ] && echo "exists" || echo "missing"
+# → expected: exists
+
+# 2. Exactly one of the 3 decision boxes is checked:
+grep -cE "^\s*-\s*\[x\]\s+(cut v1\.0\.0|cycle to v3\.0\.0-rc2|pause)" \
+     .planning/decisions/v3.0-SHIP-V1-DECISION.md
+# → expected: 1
+
+# 3. Kaan sign-off line filled (not the underscore placeholder):
+grep "^Sign-off by (Kaan):" .planning/decisions/v3.0-SHIP-V1-DECISION.md
+# → expected: contains a date + name, NOT underscores
+
+# 4. Rationale section has content (>500 chars — forces actual reasoning,
+#    not a one-liner):
+awk '/^## Rationale/,/^## /' .planning/decisions/v3.0-SHIP-V1-DECISION.md \
+    | wc -c
+# → expected: ≥500
+
+# 5. All 8 audit inputs present in the report:
+grep -cE "^## (Download Counts|GH Issues|Crash Reports|Healthz Uptime|Ear-Test|Rotation Handoffs|SmartScreen|Launch Engagement)" \
+     .planning/decisions/v3.0-SHIP-V1-DECISION.md
+# → expected: 8
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-13` in REQUIREMENTS.md.
+- Update `.planning/STATE.md` with the decision outcome + commit SHA of the signed decision file.
+- If decision = "cut v1.0.0": fire the v1.0.0 cut cascade (separate plan in v3.1 milestone).
+- If decision = "cycle to v3.0.0-rc2": kick the v3.0.0-rc2 cut cycle (new SHIP-07 invocation with `--tag v3.0.0-rc2`).
+- If decision = "pause": post a #announcements update in Discord with the rationale + next-checkpoint date.
+- Close the v3.0 milestone in `.planning/ROADMAP.md`.
+
+### Unblocks
+
+- **v3.0 milestone closure** — this is the terminal step.
+- **v3.x roadmap kickoff** — next-milestone planning unblocks once the v3.0 decision is on record.
+
+### Sign-off block
+
+```
+SHIP-13 30-DAY GATE on:              _____________________   (date — 30 cal days after §SHIP-07 PUBLIC PUBLISH)
+SHIP-13 AUDIT SCRIPT RAN on:         _____________________   (date — `audit_ship_v1_decision.py --live` ran)
+SHIP-13 REPORT PATH:                 _____________________   (.planning/decisions/v3.0-SHIP-V1-DECISION.md)
+SHIP-13 DECISION:                    _____________________   (one of: cut v1.0.0 / cycle v3.0.0-rc2 / pause)
+SHIP-13 RATIONALE COMMITTED on:      _____________________   (date — signed decision file in git)
+SHIP-13 DOWNSTREAM ACTION KICKED:    _____________________   (date — v1.0.0-cut OR v3.0.0-rc2-cut OR pause-post)
+SHIP-13 v3.0 MILESTONE CLOSED on:    _____________________   (date — ROADMAP.md update)
+Sign-off by (Kaan):                  _____________________
+```
+
