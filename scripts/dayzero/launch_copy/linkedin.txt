@@ -9,3 +9,8 @@ Why open-source? Two reasons:
 2. Warmup. Bravoh's bigger product (AI Artist OS) launches in March. vibemix proves the grounded-AI thesis with a narrow, polished utility first.
 
 github.com/bravoh-ai/vibemix
+
+---
+Kaan signature:     ____  (date: ____)
+Francesco signature: ____  (date: ____)
+Locked for: v3.0.0-rc1 launch

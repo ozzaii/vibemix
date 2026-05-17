@@ -59,16 +59,16 @@
 
 ### Launch Positioning + Pre-stage (LAUNCH)
 
-- [ ] **LAUNCH-01**: README rewrite — "the only AI co-host that actually listens to your set" frontloaded above the fold; one-line opinionated pitch; hero artefact (static + demo.mp4 reference); "no AI slop" hook section; "built by DJs, runs on your machine, your audio doesn't leave it without you knowing" positioning
+- [x] **LAUNCH-01**: README rewrite — "the only AI co-host that actually listens to your set" frontloaded above the fold; one-line opinionated pitch; hero artefact (static + demo.mp4 reference); "no AI slop" hook section; "built by DJs, runs on your machine, your audio doesn't leave it without you knowing" positioning
 - [ ] **LAUNCH-02**: `EvidenceRegistry` citation strip surfaced in live UI — every AI reaction shows 2-3 word evidence tag (e.g. `[kick swap @ 2:33]`); click tag → debrief window opens with waveform region highlight; closes anti-slop receipts gap from §6.2 white-space
 - [ ] **LAUNCH-03**: DJ-software-logo grid in README — rekordbox, Serato, Traktor, djay Pro, VirtualDJ, Mixxx; "works alongside whatever DJ app you already use" framing
 - [ ] **LAUNCH-04**: Supported-controllers grid finalized — 10 mapped controllers with logos + "calibrate any other" callout for generic-MIDI fallback
 - [ ] **LAUNCH-05**: In-app Bravoh funnel CTA — debrief window optional "join Bravoh waitlist" toggle; subtle, opt-in, not gating; signed-out telemetry default-off; UTM-tracked link to `bravoh.com/waitlist`
 - [ ] **LAUNCH-06**: `bravoh` GitHub org standup — resolve Bravoh Enterprise billing flag (per `signpath-application.md`), create org, members provisioned; ready to receive transfer (SHIP-TRANSFER pre-stage)
-- [ ] **LAUNCH-07**: SHIP-TWEET 5-channel copy review + sign-off — Kaan + Francesco mutual approval on `scripts/dayzero/launch_copy/{twitter,instagram,linkedin,reddit,discord}.txt`; no AI-slop language, "real tool not toy" framing
+- [x] **LAUNCH-07**: SHIP-TWEET 5-channel copy review + sign-off — Kaan + Francesco mutual approval on `scripts/dayzero/launch_copy/{twitter,instagram,linkedin,reddit,discord}.txt`; no AI-slop language, "real tool not toy" framing
 - [ ] **LAUNCH-08**: Discord auto-provision dry-run — `scripts/dayzero/discord_provision.py --dry-run` complete; Bravoh Discord bot token sourced + stored in GH secret; channels + roles defined; OPS-09 ready for live execution
-- [ ] **LAUNCH-09**: Outreach calendar finalized — DJ TechTools + DDJ Tips + Mixmag editorial pitches drafted; r/DJs + r/Beatmatch + r/edmproduction Show HN cross-post plan; DJ TechTools Discord T-3 soft-launch slot reserved
-- [ ] **LAUNCH-10**: Launch sequence T-7 → T+30 doc — T-7 pre-seed 15-20 stars from dev network, T-3 DJ TechTools Discord soft-launch, T-0 Show HN early-morning ET + cross-post, T+24h maintainer-answers-every-comment commitment, T+72h Substack "how we built it", T+7d "week-1 numbers" transparency post, T+30 SHIP-V1-DECISION review
+- [x] **LAUNCH-09**: Outreach calendar finalized — DJ TechTools + DDJ Tips + Mixmag editorial pitches drafted; r/DJs + r/Beatmatch + r/edmproduction Show HN cross-post plan; DJ TechTools Discord T-3 soft-launch slot reserved
+- [x] **LAUNCH-10**: Launch sequence T-7 → T+30 doc — T-7 pre-seed 15-20 stars from dev network, T-3 DJ TechTools Discord soft-launch, T-0 Show HN early-morning ET + cross-post, T+24h maintainer-answers-every-comment commitment, T+72h Substack "how we built it", T+7d "week-1 numbers" transparency post, T+30 SHIP-V1-DECISION review
 
 ### External Discharge + Public RC Publish (SHIP)
 

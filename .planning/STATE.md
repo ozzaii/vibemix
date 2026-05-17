@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
-status: PHASE 43 COMPLETE — 9/9 plans shipped. All VIS-01..09 closed engineering-side. Mood pool runtime (43-06) + perf observer + 30s smoke + blur-perf ladder finalize the Wave 3 closeout. Kaan-discharge items remaining: §VIS-04 (Mixamo source clips), §VIS-09 (Francesco capture day).
-last_updated: "2026-05-16T17:25:00.000Z"
+status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped; LAUNCH-01 closed.
+last_updated: "2026-05-17T06:23:12.712Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 28
-  completed_plans: 28
+  completed_phases: 4
+  total_plans: 35
+  completed_plans: 31
   percent: 67
 ---
 
@@ -34,9 +34,9 @@ progress:
 
 ## Current Position
 
-Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 3 active)
-Plan: 43-01, 43-02, 43-03, 43-04, 43-05, 43-07, 43-08, 43-09 COMPLETE (8/9). Remaining: 43-06 (mood pool runtime + perf).
-Status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed.
+Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 3 active) + Phase 44 — Launch Positioning + Pre-stage (IN PROGRESS — Wave A active)
+Plan: 43-01, 43-02, 43-03, 43-04, 43-05, 43-07, 43-08, 43-09 COMPLETE (8/9). Remaining: 43-06 (mood pool runtime + perf). Phase 44: 44-01 COMPLETE (1/7) — LAUNCH-01 closed. Remaining: 44-02 through 44-07.
+Status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped; LAUNCH-01 closed.
 Last activity: 2026-05-16
 
 ## Performance Metrics
@@ -66,6 +66,7 @@ Last activity: 2026-05-16
 | Phase 43 P07 | 14m 11s | 3 tasks | 7 files |
 | Phase 43 P08 | 14m 57s | 2 tasks | 3 files |
 | Phase 43 P05 | 14m 02s | 3 tasks | 8 files |
+| Phase 44-launch-positioning-pre-stage P01 | 10min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,8 @@ Last activity: 2026-05-16
 - **Plan 43-05 — Output dir default = `tauri/ui/assets/mascot/animations/`** (2026-05-16) — CONTEXT §VIS-04 named `tauri/ui/public/mascot/` but no files exist there; existing 5 placeholders + manifest.json + `asset-loader.ts` `s.startsWith('prep_')` convention live in `assets/mascot/animations/`. Default matches reality; `--output-dir` flag still lets Kaan override.
 - **Plan 43-05 — Retarget remap stays `NotImplementedError` in plan; two paths in §VIS-04** (2026-05-16) — Scaffold ships CLI + slot taxonomy + draco shell-out + size-band predicate + file-existence guard fully functional, but the load-bearing skeleton remap is intentionally not implemented. §VIS-04 runbook documents pygltflib (preferred) + blender headless (fallback) — Kaan picks at discharge time once Mixamo source clips are downloaded.
 - **Plan 43-05 — Bundle-gate two-tier with placeholder-permissive exit-2** (2026-05-16) — Tier 1 delegates to existing Phase 31 25 MB cap (no duplication); Tier 2 adds prep_*.glb 400 KB-1200 KB band check. Today's placeholders (44-56 KB) intentionally fail Tier 2 with exit 2, which is the visible signal that §VIS-04 discharge is still pending. Test asserts `{0, 2}` not strict 0.
+- **Plan 44-01 — README hero one-liner gate is case-sensitive + exact-count=1, anchor + blocklist gates case-insensitive** (2026-05-16) — Locked tagline "the only AI co-host that actually listens to your set" enforced verbatim (1 occurrence exact); case-sensitivity catches Francesco-reword drift, exact-count catches copy-paste duplicates. Anchor phrases (`real DJ friend in your ear`, `built by DJs`, `your audio doesn't leave`, `open source`/`open-source`, `Mac + Windows`) + AI-slop blocklist gates (15 tokens + `\bdeeply\s+\w+` regex) stay case-insensitive — anchor phrases naturally vary in sentence casing, blocklist must catch any casing. `scripts/launch/check_readme_hero_lock.py` is now the single source of truth for the blocklist; future plans (44-05 SHIP-TWEET) import `_AI_SLOP_BLOCKLIST` rather than redeclaring.
+- **Plan 44-01 — "## No AI slop" H2 inserted between `<!-- vibemix:hero-end -->` and badge row** (2026-05-16) — Section is the explicit anti-slop value-prop, earns the H2 slot ahead of badges + Install. The existing inline `**A real DJ friend in your ear — no AI slop.**` paragraph below the badges remains as editorial voice — anchor phrase coverage is intentionally redundant (lock script only requires presence, not uniqueness).
 
 ### Decisions Locked (v2.1 — shipped)
 

@@ -1365,3 +1365,111 @@ VIS-09 FINAL CUT SIGNED:        _____________________   (date)
 Sign-off by (Francesco):        _____________________
 Sign-off by (Kaan):             _____________________
 ```
+
+---
+
+## §LAUNCH-07 — SHIP-TWEET 5-channel copy sign-off
+
+**REQ-ID:** LAUNCH-07 (Phase 44-05)
+**Owner:** Kaan + Francesco (mutual)
+**Status:** ☐ all 5 files engineering-green (`uv run pytest tests/launch/test_no_ai_slop.py`)  ☐ Kaan signature on all 5  ☐ Francesco signature on all 5  ☐ `Locked for: v3.0.0-rc1 launch` tag confirms
+**Effort:** ~60 seconds once Francesco responds — fill 5 signature blanks + 5 date blanks + 1 commit
+**Blocking for:** Phase 45 SHIP-08 SHIP-TWEET live publish (`scripts/launch/publish_social_posts.py` reads these files at T-0; without mutual sign-off the publish step refuses).
+
+### Why this is KAAN-action
+
+Francesco sign-off is a human-credibility lock — engineering can't fake
+Francesco's signature any more than it can fake Kaan's. The grep gate
+(`scripts/launch/check_no_ai_slop.py`) catches AI-slop drift + anchor
+absence + signature-marker absence, but the SIGNATURE VALUES themselves
+(blank `____` placeholders) deliberately stay blank from engineering's
+side. Plan 44-05 ships:
+
+- The 5 copy files with the 4-line sign-off footer block at the bottom
+- The 16-token AI-slop blocklist + 5 anchor phrases gate
+- This runbook
+
+The two-line discharge below is the only thing humans need to do.
+
+### Files involved
+
+- **Copy files (5 channels, in publish order):**
+  - `scripts/dayzero/launch_copy/twitter.txt`
+  - `scripts/dayzero/launch_copy/instagram.txt`
+  - `scripts/dayzero/launch_copy/linkedin.txt`
+  - `scripts/dayzero/launch_copy/reddit.txt`
+  - `scripts/dayzero/launch_copy/discord.txt`
+- **Engineering gate (CI):** `scripts/launch/check_no_ai_slop.py`
+  + `tests/launch/test_no_ai_slop.py`
+- **Publish step (Phase 45 consumer):** `scripts/launch/publish_social_posts.py`
+
+### Kaan oneliner
+
+```bash
+# 1. Read each file end-to-end one last time:
+for f in scripts/dayzero/launch_copy/{twitter,instagram,linkedin,reddit,discord}.txt; do
+    echo "=== $f ==="; cat "$f"; echo
+done
+
+# 2. Open each file, sign the two blanks (Kaan + Francesco) with date:
+#    BEFORE:  Kaan signature:     ____  (date: ____)
+#    AFTER:   Kaan signature:     Kaan Özkan  (date: 2026-MM-DD)
+#    BEFORE:  Francesco signature: ____  (date: ____)
+#    AFTER:   Francesco signature: Francesco <surname>  (date: 2026-MM-DD)
+#    (Francesco's reply email / DM is the audit trail — paste his name
+#     and the date he replied; the grep gate doesn't validate the
+#     signature VALUES, just that the marker lines stay present.)
+
+# 3. Verify engineering gate still green AFTER signing:
+uv run pytest tests/launch/test_no_ai_slop.py -v
+uv run python scripts/launch/check_no_ai_slop.py
+
+# 4. Commit the lock:
+git add scripts/dayzero/launch_copy/*.txt
+git commit -m "lock(launch): SHIP-TWEET 5-channel copy locked v3.0.0-rc1"
+```
+
+### Verification
+
+```bash
+# Engineering gate must stay green AFTER signatures land
+# (signatures replace placeholders; markers stay):
+uv run pytest tests/launch/test_no_ai_slop.py -v
+
+# Each of the 5 files must carry both signature markers (post-signing
+# the placeholders are gone but the marker LINES persist):
+grep -l "Kaan signature:" scripts/dayzero/launch_copy/*.txt | wc -l
+# → expected: 5
+
+grep -l "Francesco signature:" scripts/dayzero/launch_copy/*.txt | wc -l
+# → expected: 5
+
+# Each file must still tag the locked version:
+grep -c "Locked for: v3.0.0-rc1 launch" scripts/dayzero/launch_copy/*.txt
+# → expected: each file = 1
+```
+
+### What unblocks
+
+- **Phase 45 SHIP-08 SHIP-TWEET live publish** —
+  `scripts/launch/publish_social_posts.py --really` reads these 5
+  files at T-0 (per the LAUNCH-SEQUENCE doc) and posts to twitter /
+  instagram / linkedin / reddit / discord. Without the mutual lock,
+  the publish step gates closed.
+- **§ROADMAP Phase 44 success criterion 5** —
+  "SHIP-TWEET copy files signed off (Kaan + Francesco mutual approval)
+  for all 5 channels (twitter/instagram/linkedin/reddit/discord)."
+  Engineering has shipped all 5 + the gate + this runbook; the
+  mutual-sign discharge closes the row.
+
+### Sign-off block
+
+```
+LAUNCH-07 ENGINEERING GREEN on:    _____________________   (date — pytest + check script both green)
+LAUNCH-07 KAAN READ-THROUGH on:    _____________________   (date — Kaan re-read all 5 end-to-end)
+LAUNCH-07 FRANCESCO REPLY on:      _____________________   (date — Francesco's "OK to ship" email/DM)
+LAUNCH-07 SIGNATURES COMMITTED:    _____________________   (yes / no — `lock(launch): ...` commit hash)
+LAUNCH-07 LOCKED VERSION TAG:      _____________________   (v3.0.0-rc1 expected)
+Sign-off by (Kaan):                _____________________
+Sign-off by (Francesco):           _____________________
+```

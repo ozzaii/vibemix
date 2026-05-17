@@ -1,0 +1,19 @@
+[#announcements]
+
+vibemix is live — a free, open-source AI co-host that listens to your live DJ sets.
+
+real DJ friend in your ear, not voice-assistant slop. built by DJs, runs locally on Mac + Windows, and your audio doesn't leave your machine without you knowing.
+
+→ listens to master output (BlackHole on mac, WASAPI loopback on win)
+→ watches djay Pro / Rekordbox
+→ reads MIDI from ~10 mapped controllers (DDJ-FLX4 out of box)
+→ reacts in real-time as hype-man (party) or coach (feedback)
+
+Show us your sets in #showcase. Bugs in #bugs. Pulls welcome.
+
+github.com/bravoh-ai/vibemix
+
+---
+Kaan signature:     ____  (date: ____)
+Francesco signature: ____  (date: ____)
+Locked for: v3.0.0-rc1 launch

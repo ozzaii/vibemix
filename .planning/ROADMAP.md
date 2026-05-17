@@ -163,13 +163,13 @@ Plans:
 
 ```
 Plans:
-- [ ] 44-01-PLAN.md — README hero rewrite + 'no AI slop' hook section (LAUNCH-01)
+- [x] 44-01-PLAN.md — README hero rewrite + 'no AI slop' hook section (LAUNCH-01)
 - [ ] 44-02-PLAN.md — DJ-software grid + controller grid + a11y check (LAUNCH-03, LAUNCH-04)
 - [ ] 44-03-PLAN.md — EvidenceRegistry citation strip in live UI + tag→debrief deep link (LAUNCH-02)
 - [ ] 44-04-PLAN.md — Bravoh waitlist toggle in debrief settings (LAUNCH-05)
-- [ ] 44-05-PLAN.md — SHIP-TWEET 5-channel copy lock + AI-slop grep gate + §LAUNCH-07 runbook (LAUNCH-07)
+- [x] 44-05-PLAN.md — SHIP-TWEET 5-channel copy lock + AI-slop grep gate + §LAUNCH-07 runbook (LAUNCH-07)
 - [ ] 44-06-PLAN.md — Bravoh GH org standup + Discord auto-provision dry-run lock + check scripts (LAUNCH-06, LAUNCH-08)
-- [ ] 44-07-PLAN.md — Outreach calendar + launch sequence T-7 → T+30 doc (LAUNCH-09, LAUNCH-10)
+- [x] 44-07-PLAN.md — Outreach calendar + launch sequence T-7 → T+30 doc (LAUNCH-09, LAUNCH-10)
 ```
 
 **Wave structure:** Wave 1 (44-01, 44-03, 44-04, 44-05, 44-07) → Wave 2 (44-02 [depends 44-01], 44-06 [depends 44-05])
