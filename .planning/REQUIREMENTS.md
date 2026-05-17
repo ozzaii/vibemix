@@ -60,7 +60,7 @@
 ### Launch Positioning + Pre-stage (LAUNCH)
 
 - [x] **LAUNCH-01**: README rewrite — "the only AI co-host that actually listens to your set" frontloaded above the fold; one-line opinionated pitch; hero artefact (static + demo.mp4 reference); "no AI slop" hook section; "built by DJs, runs on your machine, your audio doesn't leave it without you knowing" positioning
-- [ ] **LAUNCH-02**: `EvidenceRegistry` citation strip surfaced in live UI — every AI reaction shows 2-3 word evidence tag (e.g. `[kick swap @ 2:33]`); click tag → debrief window opens with waveform region highlight; closes anti-slop receipts gap from §6.2 white-space
+- [x] **LAUNCH-02**: `EvidenceRegistry` citation strip surfaced in live UI — every AI reaction shows 2-3 word evidence tag (e.g. `[kick swap @ 2:33]`); click tag → debrief window opens with waveform region highlight; closes anti-slop receipts gap from §6.2 white-space (44-03 / 8de6649; new SessionCohostReaction IPC + citation-strip.ts component + Tauri deep_link extension + timeline.ts region highlight)
 - [x] **LAUNCH-03**: DJ-software-logo grid in README — rekordbox, Serato, Traktor, djay Pro, VirtualDJ, Mixxx; "works alongside whatever DJ app you already use" framing (44-02 / 0bc7b73; placeholders via §LAUNCH-03 real-logo discharge)
 - [x] **LAUNCH-04**: Supported-controllers grid finalized — 10 mapped controllers with logos + "calibrate any other" callout for generic-MIDI fallback (44-02 / 0bc7b73; reconciled to canonical 10 from src/vibemix/midi/controllers/*.json; placeholders via §LAUNCH-04 real-logo discharge)
 - [ ] **LAUNCH-05**: In-app Bravoh funnel CTA — debrief window optional "join Bravoh waitlist" toggle; subtle, opt-in, not gating; signed-out telemetry default-off; UTM-tracked link to `bravoh.com/waitlist`
@@ -154,7 +154,7 @@ Explicit exclusions for v3.0. Documented to prevent scope creep.
 | LAT-01..09 | Phase 41 | Pending |
 | GATE-01..09 | Phase 42 | Pending |
 | VIS-01..09 | Phase 43 | Pending |
-| LAUNCH-01..10 | Phase 44 | Pending |
+| LAUNCH-01..10 | Phase 44 | LAUNCH-01/02/03/04/07/09/10 GREEN (44-01/02/03/05/07); 3 remaining (LAUNCH-05/06/08) |
 | SHIP-01..13 | Phase 45 | Pending |
 
 **Coverage:**
