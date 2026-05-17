@@ -1473,3 +1473,236 @@ LAUNCH-07 LOCKED VERSION TAG:      _____________________   (v3.0.0-rc1 expected)
 Sign-off by (Kaan):                _____________________
 Sign-off by (Francesco):           _____________________
 ```
+
+---
+
+## §LAUNCH-03 — DJ-software real logo upload
+
+**REQ-ID:** LAUNCH-03 (Phase 44-02)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 44-02 shipped 6 wordmark SVG placeholders + a11y gate)  ☐ 6 real logos sourced trademark-compliant  ☐ 6 files dropped into `docs/assets/dj-software/`  ☐ `<img src>` references in README confirmed (no rename needed if filenames preserved)  ☐ a11y gate stays green
+**Effort:** ~20 minutes once logos sourced (download + optimize + drop)
+**Blocking for:** Public launch polish — placeholders are functional but Bravoh's first OSS surface deserves real brand logos before the SHIP-TWEET cross-post fires.
+
+### Why this is KAAN-action
+
+Sourcing trademark-compliant DJ-software logos requires human judgement
+on which press-kit / brand-guidelines page to lift from for each app
+(rekordbox via Pioneer/AlphaTheta press kit, Serato via Serato Press
+Hub, Traktor via Native Instruments brand portal, djay Pro via Algoriddim
+press assets, VirtualDJ via Atomix brand page, Mixxx via the OSS project
+repo — Apache 2.0 already-compatible with vibemix). Each vendor has
+different attribution rules; an autonomous agent can't make that legal
+call. Plan 44-02 ships:
+
+- 6 SVG wordmark placeholders under `docs/assets/dj-software/<slug>.svg`
+  (rekordbox / serato / traktor / djay-pro / virtualdj / mixxx)
+- `scripts/launch/check_readme_grids_a11y.py` 4-gate CI enforcement
+  (alt-text + cell count + balance + slop-free) so a real-logo swap
+  can't accidentally break the README structure
+- This runbook
+
+The discharge is purely asset swap — no code touched.
+
+### Files involved
+
+- **Placeholders (6, to be replaced):**
+  - `docs/assets/dj-software/rekordbox.svg`
+  - `docs/assets/dj-software/serato.svg`
+  - `docs/assets/dj-software/traktor.svg`
+  - `docs/assets/dj-software/djay-pro.svg`
+  - `docs/assets/dj-software/virtualdj.svg`
+  - `docs/assets/dj-software/mixxx.svg`
+- **README reference (no edit needed if filenames preserved):** `README.md` "## Works alongside whatever DJ app you already use" section.
+- **CI gate (stays in place):** `scripts/launch/check_readme_grids_a11y.py` + `tests/launch/test_readme_grids_a11y.py`.
+
+### Kaan oneliner
+
+```bash
+# 1. Source each logo from the vendor's press / brand portal:
+#    - rekordbox      → https://rekordbox.com (Pioneer/AlphaTheta press kit)
+#    - Serato         → https://serato.com/press
+#    - Traktor        → https://www.native-instruments.com/brand
+#    - djay Pro       → https://www.algoriddim.com/press
+#    - VirtualDJ      → https://www.virtualdj.com (Atomix brand page)
+#    - Mixxx          → https://github.com/mixxxdj/mixxx (Apache 2.0 — vendored logo OK)
+
+# 2. Optimize to <=10KB SVG (preferred) or PNG at 200x80px transparent bg.
+#    SVG via `svgo`; PNG via `pngquant --quality 65-80`.
+
+# 3. Drop each file at the same path with the same slug filename
+#    (so the README <img src> URLs don't need editing):
+#      docs/assets/dj-software/rekordbox.svg
+#      docs/assets/dj-software/serato.svg
+#      ... (six total)
+
+# 4. Re-run the a11y gate to confirm nothing broke:
+uv run pytest tests/launch/test_readme_grids_a11y.py -v
+uv run python scripts/launch/check_readme_grids_a11y.py
+
+# 5. Commit:
+git add docs/assets/dj-software/*.svg docs/assets/dj-software/*.png
+git commit -m "assets(launch): swap DJ-software placeholders for real trademark-compliant logos (LAUNCH-03)"
+```
+
+### Verification
+
+```bash
+# Six files still present under the same slug path (PNG accepted instead of SVG):
+ls docs/assets/dj-software/{rekordbox,serato,traktor,djay-pro,virtualdj,mixxx}.* | wc -l
+# → expected: 6
+
+# README references still resolve (no broken <img src>):
+grep -E 'src="docs/assets/dj-software/' README.md | wc -l
+# → expected: 6
+
+# a11y gate still green after swap:
+uv run pytest tests/launch/test_readme_grids_a11y.py -v
+
+# Each new asset is reasonably small (under 50KB — sanity check):
+for f in docs/assets/dj-software/*.{svg,png}; do
+    [ -f "$f" ] && wc -c < "$f" | awk -v f="$f" '$1 > 51200 {print "OVERSIZED:", f, $1, "bytes"}'
+done
+```
+
+### What unblocks
+
+- **§ROADMAP Phase 44 success criterion 3 polish layer** —
+  "DJ-software grid + controllers grid render in README; alt-text +
+  accessibility checks pass." Engineering closed the gate; real-logo
+  swap closes the brand-polish row.
+- **SHIP-TWEET visual surface** — the "Works alongside whatever DJ app
+  you already use" section is one of the screenshots Francesco's
+  twitter / IG / linkedin posts reference. Real logos here = real
+  credibility in the cross-post hero shot.
+
+### Sign-off block
+
+```
+LAUNCH-03 ENGINEERING GREEN on:    _____________________   (date — placeholders + a11y gate both shipped 44-02)
+LAUNCH-03 LOGOS SOURCED on:        _____________________   (date — 6 trademark-compliant assets downloaded)
+LAUNCH-03 OPTIMIZE PASS on:        _____________________   (date — svgo / pngquant run)
+LAUNCH-03 ASSETS COMMITTED:        _____________________   (yes / no — assets(launch) commit hash)
+LAUNCH-03 a11y GATE GREEN POST:    _____________________   (yes / no — re-run after swap)
+Sign-off by (Kaan):                _____________________
+```
+
+---
+
+## §LAUNCH-04 — Controller real logo upload
+
+**REQ-ID:** LAUNCH-04 (Phase 44-02)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 44-02 shipped 10 wordmark SVG placeholders + a11y gate + canonical-10 reconciliation against `src/vibemix/midi/controllers/*.json`)  ☐ 10 real controller product shots sourced (vendor press kits)  ☐ 10 files dropped into `docs/assets/controllers/`  ☐ `<img src>` references in README confirmed  ☐ a11y gate stays green
+**Effort:** ~30 minutes once vendor press-kit access lined up (download + crop + optimize)
+**Blocking for:** Public launch polish — same asset-swap pattern as §LAUNCH-03; placeholders are functional but real product photography raises "this works with my controller" credibility.
+
+### Why this is KAAN-action
+
+Controller product photography sourcing is identical to the §LAUNCH-03
+problem at higher volume (10 vs 6), and requires vendor-press-kit
+account access (Pioneer/AlphaTheta DJ portal, Native Instruments brand
+portal, Denon DJ press kit, Numark press kit) plus the same per-vendor
+trademark-attribution judgement. The 44-02 legacy-table reconciliation
+already closed the harder problem (drift between README controllers
+list and `src/vibemix/midi/controllers/*.json`); this discharge is
+purely the visual polish layer.
+
+Note: prior to Plan 44-02 the README's "Supported controllers" table
+referenced PNGs at `docs/assets/controllers/pioneer_ddj_*.png` for
+controllers that were never mapped (FLX6/FLX10/1000/SX3/XDJ-RX3, etc.)
+— those PNGs never existed (only `.gitkeep` was ever committed). Plan
+44-02 closed the drift by replacing the legacy table with the canonical
+10 controllers from the JSON profile set, each with a placeholder SVG
+under the canonical slug filename. So this discharge has a clean
+ground state to swap against.
+
+### Files involved
+
+- **Placeholders (10, to be replaced):**
+  - `docs/assets/controllers/ddj-200.svg`
+  - `docs/assets/controllers/ddj-400.svg`
+  - `docs/assets/controllers/ddj-flx4.svg`
+  - `docs/assets/controllers/ddj-rev1.svg`
+  - `docs/assets/controllers/kontrol-s2.svg`
+  - `docs/assets/controllers/kontrol-s4.svg`
+  - `docs/assets/controllers/mc-6000.svg`
+  - `docs/assets/controllers/mc-7000.svg`
+  - `docs/assets/controllers/mixtrack-platinum-fx.svg`
+  - `docs/assets/controllers/mixtrack-pro-fx.svg`
+- **Source of truth (do NOT edit during asset swap):** `src/vibemix/midi/controllers/*.json` — the 10 canonical profiles. Adding / removing a controller here requires a planner decision + README grid update + new placeholder/asset, NOT a "while I'm here" tweak during this discharge.
+- **README reference (no edit needed if filenames preserved):** `README.md` "## Supported controllers" section.
+- **CI gate (stays in place):** `scripts/launch/check_readme_grids_a11y.py` + `tests/launch/test_readme_grids_a11y.py` (the controllers-grid half of the same gate that enforces §LAUNCH-03).
+
+### Kaan oneliner
+
+```bash
+# 1. Source each product shot from the vendor's press kit:
+#    - Pioneer DDJ-200 / DDJ-400 / DDJ-FLX4 / DDJ-REV1 → Pioneer/AlphaTheta DJ press portal
+#    - NI Traktor Kontrol S2 / S4                       → Native Instruments brand portal
+#    - Denon DJ MC6000 / MC7000                         → Denon DJ press kit
+#    - Numark Mixtrack Platinum FX / Pro FX             → Numark press kit
+
+# 2. Crop to a consistent aspect ratio (top-down product shot preferred for grid uniformity);
+#    optimize to PNG <=80KB at 360x180 source (200px display width is README-render-size).
+#    Use `pngquant --quality 70-85` for size, `oxipng -o4` for final lossless pass.
+
+# 3. Drop each file at the same slug path. SVG OR PNG both legal —
+#    if swapping to PNG, also delete the .svg placeholder + update the
+#    README <img src> extension (one Edit per cell, 10 cells total):
+#      docs/assets/controllers/ddj-200.png       (replaces ddj-200.svg)
+#      docs/assets/controllers/ddj-400.png
+#      ... (ten total)
+
+# 4. Re-run the a11y gate:
+uv run pytest tests/launch/test_readme_grids_a11y.py -v
+uv run python scripts/launch/check_readme_grids_a11y.py
+
+# 5. Commit:
+git add docs/assets/controllers/*.{svg,png} README.md
+git commit -m "assets(launch): swap controller placeholders for real product photography (LAUNCH-04)"
+```
+
+### Verification
+
+```bash
+# Ten files still present under the canonical slug paths:
+for slug in ddj-200 ddj-400 ddj-flx4 ddj-rev1 kontrol-s2 kontrol-s4 mc-6000 mc-7000 mixtrack-platinum-fx mixtrack-pro-fx; do
+    ls docs/assets/controllers/${slug}.* 2>/dev/null | head -1
+done | wc -l
+# → expected: 10
+
+# README references still resolve (no broken <img src>):
+grep -E 'src="docs/assets/controllers/' README.md | wc -l
+# → expected: 10
+
+# Canonical 10 still matches src-of-truth:
+ls src/vibemix/midi/controllers/*.json | wc -l
+# → expected: 10  (same count as README grid)
+
+# a11y gate still green:
+uv run pytest tests/launch/test_readme_grids_a11y.py -v
+```
+
+### What unblocks
+
+- **§ROADMAP Phase 44 success criterion 3 polish layer (same as §LAUNCH-03)** —
+  the "controllers grid renders" row is engineering-green already;
+  real-photo swap closes the visual-credibility layer.
+- **Outreach calendar credibility** — DJ TechTools / DDJ Tips / Mixmag
+  editorial pitches reference vibemix's controller support breadth as
+  the news hook ("10 mapped controllers out of the box, generic-MIDI
+  fallback for everything else"). Real product shots in the
+  "Supported controllers" grid let those editors lift the screenshot
+  for their post without falling back to a placeholder.
+
+### Sign-off block
+
+```
+LAUNCH-04 ENGINEERING GREEN on:    _____________________   (date — 10 placeholders + a11y gate + canonical-10 reconciliation shipped 44-02)
+LAUNCH-04 ASSETS SOURCED on:       _____________________   (date — 10 product shots downloaded from vendor press kits)
+LAUNCH-04 CROP + OPTIMIZE on:      _____________________   (date — pngquant / oxipng run)
+LAUNCH-04 ASSETS COMMITTED:        _____________________   (yes / no — assets(launch) commit hash)
+LAUNCH-04 a11y GATE GREEN POST:    _____________________   (yes / no — re-run after swap)
+Sign-off by (Kaan):                _____________________
+```
