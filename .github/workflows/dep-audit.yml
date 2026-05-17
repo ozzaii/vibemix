@@ -167,3 +167,23 @@ jobs:
 
       - name: Run generator in --check mode
         run: python scripts/audit/gen_audit_md.py --check
+
+  dep-cull-verify:
+    name: Dep-cull verification (DEPS-08)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ripgrep
+        run: sudo apt-get install -y ripgrep
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pyyaml + jsonschema for the test
+        run: pip install pyyaml jsonschema
+
+      - name: Run dep-cull verification test
+        run: python -m pytest tests/audit/test_dep_cull_complete.py -x --tb=short

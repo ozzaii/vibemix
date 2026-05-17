@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vibemix/vibemix/blob/main/scripts/audit/dep_ratings_schema.json",
+  "title": "vibemix dep_ratings.yaml schema",
+  "description": "Phase 46 / DEPS-04 — validates the structure of scripts/audit/dep_ratings.yaml. Each ecosystem maps package names to a rating + rationale.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["python", "rust", "js"],
+  "properties": {
+    "python": { "$ref": "#/$defs/ecosystem" },
+    "rust":   { "$ref": "#/$defs/ecosystem" },
+    "js":     { "$ref": "#/$defs/ecosystem" },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "date", "target", "action", "rationale"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "date": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "target": { "type": "string" },
+          "action": {
+            "type": "string",
+            "enum": ["removed", "retained-as-transitive", "cull-deferred", "cull-blocked"]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 20
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ecosystem": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/rating_entry" }
+    },
+    "rating_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rating", "rationale"],
+      "properties": {
+        "rating": {
+          "type": "string",
+          "enum": ["green", "yellow", "red"]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 600
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -55,11 +55,16 @@ def test_license_deny_contains_gpl_family():
     assert not missing, f"deny list missing GPL family: {missing}"
 
 
-def test_dep_audit_workflow_has_three_jobs():
+def test_dep_audit_workflow_has_required_jobs():
+    # Plan 02 ships uv-regen-diff (Plan 01) + cargo-deny + npm-audit-pr-comment.
+    # Later plans (03/04/05) extend the workflow with additional jobs; this
+    # test asserts the Plan-02-required jobs are present without forbidding
+    # additions.
     d = yaml.safe_load(DEP_AUDIT_YML.read_text())
     jobs = set(d["jobs"].keys())
-    assert jobs == {"uv-regen-diff", "cargo-deny", "npm-audit-pr-comment"}, \
-        f"unexpected job set: {jobs}"
+    required = {"uv-regen-diff", "cargo-deny", "npm-audit-pr-comment"}
+    missing = required - jobs
+    assert not missing, f"required Plan-02 jobs missing: {missing}"
 
 
 def test_npm_audit_job_has_pr_comment_permission():

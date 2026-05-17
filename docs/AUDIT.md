@@ -32,7 +32,7 @@
 | `livekit` | 1.1.7 | see uv.lock | WebRTC client; transitively pulls av + aiortc. Prebuilt wheels for Mac+Win64. | 🟡 Yellow |  |
 | `livekit-agents` | 1.5.8 | see uv.lock | Gemini Live API wrapper (cohost_v2/lk variants). Pure-Python. | 🟢 Green |  |
 | `livekit-plugins-google` | 1.5.8 | see uv.lock | LiveKit Gemini adapter — the seam through which all Gemini Live audio flows. | 🟢 Green |  |
-| `livekit-plugins-openai` | 1.5.8 | see uv.lock | [CULL-CANDIDATE: Plan 04] LiveKit OpenAI adapter; vibemix is Gemini-only (CLAUDE.md). Pending Plan 04 dep-cull pass. | 🟡 Yellow |  |
+| `livekit-plugins-openai` | 1.5.8 | see uv.lock | [CULL-BLOCKED] Used by src/vibemix/agent/tts_chain.py for the proxy TTS fallback chain. Cannot remove without rewiring the TTS chain — out of scope for Phase 46. | 🟡 Yellow |  |
 | `mido` | 1.3.3 | see uv.lock | MIDI message parsing (DDJ-FLX4 controller decode). Pure-Python. | 🟢 Green |  |
 | `mss` | 10.2.0 | see uv.lock | Win32 screen capture (CoreGraphics on Mac uses ScreenCaptureKit). Pure-Python. | 🟢 Green |  |
 | `numpy` | 2.4.4 | see uv.lock | Audio math (RMS / FFT / BPM autocorr). Prebuilt wheels Mac arm64+x86_64 + Win64. | 🟡 Yellow |  |
@@ -107,6 +107,43 @@
 
 Per-dep deferral / cull decisions land here. Plan 04 of Phase 46
 populates the dep-cull entries; future re-justifications append.
+
+
+### cull-blocked-livekit-plugins-openai
+
+**Date:** 2026-05-18  
+**Target:** `livekit-plugins-openai`  
+**Action:** cull-blocked
+
+Cull blocked: src/vibemix/agent/tts_chain.py:25 imports
+`from livekit.plugins.openai import tts as _openai_tts_mod` for the
+proxy TTS fallback chain. Test files (tests/agent/test_proxy_client.py,
+tests/agent/test_config.py, tests/agent/test_tts_chain.py) also reference
+the same surface. Removal requires rewiring the TTS chain — out of scope
+for Phase 46. Tracked as Kaan-action surface item.
+
+
+### defer-google-cloud-speech
+
+**Date:** 2026-05-18  
+**Target:** `google-cloud-speech`  
+**Action:** retained-as-transitive
+
+Retained as transitive of livekit-plugins-google. Zero direct imports
+under src/vibemix/ verified via `rg "from google\.cloud\.speech"`.
+Removing would require an upstream livekit-plugins-google change.
+Tracked for follow-up when upstream drops the dep.
+
+
+### defer-google-cloud-texttospeech
+
+**Date:** 2026-05-18  
+**Target:** `google-cloud-texttospeech`  
+**Action:** retained-as-transitive
+
+Same as google-cloud-speech — transitive of livekit-plugins-google,
+zero direct imports verified via `rg "from google\.cloud\.texttospeech"`,
+retained until upstream drops the dep.
 
 
 ## GitHub Actions

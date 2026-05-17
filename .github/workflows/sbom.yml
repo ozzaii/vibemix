@@ -57,3 +57,51 @@ jobs:
           name: sbom-spdx-json
           path: sbom.spdx.json
           retention-days: 90
+
+  cyclonedx-sbom:
+    name: cyclonedx SBOM (Python + Rust + JS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate CycloneDX SBOMs
+        run: bash scripts/audit/gen_cyclonedx.sh
+
+      - name: Validate CycloneDX JSON
+        run: |
+          set -euo pipefail
+          for f in dist/sbom/vibemix.cdx.json dist/sbom/vibemix.python.cdx.json dist/sbom/vibemix.rust.cdx.json dist/sbom/vibemix.js.cdx.json; do
+            python -c "import json; d = json.load(open('$f')); assert d.get('bomFormat') == 'CycloneDX', f'bad bomFormat in $f'; print(f'  ok: $f ({len(d.get(\"components\", []))} components)')"
+          done
+
+      - name: Upload CycloneDX SBOM(s) as release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/sbom/vibemix.cdx.json
+            dist/sbom/vibemix.python.cdx.json
+            dist/sbom/vibemix.rust.cdx.json
+            dist/sbom/vibemix.js.cdx.json
+          fail_on_unmatched_files: true
+
+      - name: Upload CycloneDX SBOMs as workflow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cdx-json
+          path: dist/sbom/*.cdx.json
+          retention-days: 90

@@ -33,7 +33,7 @@ python:
     rationale: "LiveKit Gemini adapter — the seam through which all Gemini Live audio flows."
   livekit-plugins-openai:
     rating: yellow
-    rationale: "[CULL-CANDIDATE: Plan 04] LiveKit OpenAI adapter; vibemix is Gemini-only (CLAUDE.md). Pending Plan 04 dep-cull pass."
+    rationale: "[CULL-BLOCKED] Used by src/vibemix/agent/tts_chain.py for the proxy TTS fallback chain. Cannot remove without rewiring the TTS chain — out of scope for Phase 46."
   livekit:
     rating: yellow
     rationale: "WebRTC client; transitively pulls av + aiortc. Prebuilt wheels for Mac+Win64."
@@ -218,3 +218,33 @@ js:
   vite-plugin-static-copy:
     rating: green
     rationale: "Vite plugin to copy mascot bundle assets into dist. Build-time only."
+
+decisions:
+  - id: cull-blocked-livekit-plugins-openai
+    date: "2026-05-18"
+    target: livekit-plugins-openai
+    action: cull-blocked
+    rationale: |
+      Cull blocked: src/vibemix/agent/tts_chain.py:25 imports
+      `from livekit.plugins.openai import tts as _openai_tts_mod` for the
+      proxy TTS fallback chain. Test files (tests/agent/test_proxy_client.py,
+      tests/agent/test_config.py, tests/agent/test_tts_chain.py) also reference
+      the same surface. Removal requires rewiring the TTS chain — out of scope
+      for Phase 46. Tracked as Kaan-action surface item.
+  - id: defer-google-cloud-speech
+    date: "2026-05-18"
+    target: google-cloud-speech
+    action: retained-as-transitive
+    rationale: |
+      Retained as transitive of livekit-plugins-google. Zero direct imports
+      under src/vibemix/ verified via `rg "from google\.cloud\.speech"`.
+      Removing would require an upstream livekit-plugins-google change.
+      Tracked for follow-up when upstream drops the dep.
+  - id: defer-google-cloud-texttospeech
+    date: "2026-05-18"
+    target: google-cloud-texttospeech
+    action: retained-as-transitive
+    rationale: |
+      Same as google-cloud-speech — transitive of livekit-plugins-google,
+      zero direct imports verified via `rg "from google\.cloud\.texttospeech"`,
+      retained until upstream drops the dep.
