@@ -94,11 +94,87 @@ log() {
     fi
 }
 
-# --- --check-60s gate-only mode (Task 3 wires this — stub for Task 2) -------
+# --- --check-60s gate-only mode (SHIP-05) -----------------------------------
 
 if [[ "$CHECK_60S" -eq 1 ]]; then
-    echo "[install-vm] --check-60s not yet implemented (Task 3)" >&2
-    exit 1
+    # Reads the most recent run.json under RUNS_ROOT and exits non-zero if any
+    # row exceeded its max_onboarding_ms; emits BLOCKED_BY=install-vm on stderr
+    # for cut_release.sh-friendly grep. Absent RUNS_ROOT → exit 1 with hint.
+    # All-skipped → exit 0 with WARN (CONTEXT §INSTALL-VM autonomous-degraded
+    # semantics; full discharge requires all 5 images per §SHIP-04 runbook).
+    if [[ ! -d "$RUNS_ROOT" ]]; then
+        echo "[install-vm] no runs found — run 'install_vm_matrix.sh --live' first" >&2
+        exit 1
+    fi
+    LATEST_RUN_JSON=$(find "$RUNS_ROOT" -maxdepth 2 -name run.json -type f \
+        -exec stat -f '%m %N' {} \; 2>/dev/null \
+        | sort -nr | head -1 | cut -d' ' -f2-)
+    if [[ -z "$LATEST_RUN_JSON" || ! -f "$LATEST_RUN_JSON" ]]; then
+        echo "[install-vm] no runs found — run 'install_vm_matrix.sh --live' first" >&2
+        exit 1
+    fi
+
+    # Pipe gate through python3. The gate writes its OK / WARN summary to
+    # stdout (captured + replayed via log() so we honour --quiet) and writes
+    # BLOCKED messages directly to stderr (visible regardless of --quiet).
+    # We capture exit code via a separate `; echo $?` trick because command
+    # substitution opens a subshell and `|| GATE_RC=$?` would assign in that
+    # subshell, not the parent.
+    GATE_STDOUT_AND_RC=$(
+        python3 - "$LATEST_RUN_JSON" <<'PYGATE'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+rows = data.get("rows", [])
+total = len(rows)
+ok_rows = [r for r in rows if r.get("status") == "ok"]
+skipped = [r for r in rows if r.get("status") == "skipped"]
+failed = [r for r in rows if r.get("status") == "failed"]
+exceeded = [r for r in ok_rows if r.get("exceeded_max_ms")]
+
+blockers = []
+for r in failed:
+    blockers.append(
+        f"BLOCKED_BY=install-vm: row {r['os']}-{r['version']} status=failed"
+    )
+for r in exceeded:
+    max_ms = r.get("max_onboarding_ms", 60000)
+    blockers.append(
+        f"[install-vm] BLOCKED — row {r['os']}-{r['version']} took "
+        f"{r['total_ms']}ms (max: {max_ms}ms) "
+        f"[BLOCKED_BY=install-vm]"
+    )
+
+if blockers:
+    for b in blockers:
+        print(b, file=sys.stderr)
+    sys.exit(1)
+
+if total > 0 and len(skipped) == total:
+    print(
+        "[install-vm] WARN — all rows skipped; --check-60s "
+        "autonomous-degraded pass (full discharge requires all 5 images "
+        "per §SHIP-04)"
+    )
+    sys.exit(0)
+
+max_observed = max((r.get("total_ms") or 0) for r in ok_rows) if ok_rows else 0
+ok_count = len(ok_rows)
+print(
+    f"[install-vm] OK — {ok_count}/{total} rows under 60000ms "
+    f"(max observed: {max_observed}ms)"
+)
+sys.exit(0)
+PYGATE
+        echo "__GATE_RC__=$?"
+    )
+    # Split GATE_STDOUT_AND_RC into the python stdout and the trailing exit code.
+    GATE_RC=$(printf '%s' "$GATE_STDOUT_AND_RC" | grep -oE '__GATE_RC__=[0-9]+$' | tail -1 | cut -d= -f2)
+    GATE_RC="${GATE_RC:-0}"
+    GATE_STDOUT=$(printf '%s' "$GATE_STDOUT_AND_RC" | sed -E '$s/__GATE_RC__=[0-9]+$//' | sed -E '/^$/d')
+    if [[ -n "$GATE_STDOUT" ]]; then
+        log "$GATE_STDOUT"
+    fi
+    exit "$GATE_RC"
 fi
 
 # --- main matrix execution path ---------------------------------------------
