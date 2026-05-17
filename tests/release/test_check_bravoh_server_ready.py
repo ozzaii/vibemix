@@ -363,12 +363,27 @@ def test_11_quiet_suppresses_stdout(mock_server):
 
 def test_12_max_time_10_in_every_curl_invocation():
     text = PROBE.read_text(encoding="utf-8")
-    # Count curl invocations. Every one must include `--max-time 10` to prevent
-    # indefinite hangs (T-45-03-02 mitigation).
-    curl_lines = [
-        ln for ln in text.splitlines()
-        if "curl " in ln and not ln.strip().startswith("#")
-    ]
+    # Only match REAL curl invocations — exclude:
+    #   - comments (start with #)
+    #   - `command -v curl` existence checks
+    #   - shell error messages containing the word "curl"
+    # A real invocation starts with `curl ` then a curl flag (`-s`, `-S`, etc.).
+    import re
+    curl_call = re.compile(r"(^|[\s\(`=])curl\s+-[A-Za-z]")
+    curl_lines = []
+    for ln in text.splitlines():
+        stripped = ln.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if "command -v curl" in ln:
+            continue
+        # Strip out string literals inside `echo "..."` / `echo '...'` so a
+        # diagnostic message containing the word `curl` doesn't trip the
+        # detector. Only the actual command position is relevant.
+        if re.match(r'^\s*echo\b', ln):
+            continue
+        if curl_call.search(ln):
+            curl_lines.append(ln)
     assert curl_lines, "probe must invoke curl at least once"
     for ln in curl_lines:
         assert "--max-time" in ln, (
