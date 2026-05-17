@@ -155,7 +155,7 @@ Explicit exclusions for v3.0. Documented to prevent scope creep.
 | GATE-01..09 | Phase 42 | Pending |
 | VIS-01..09 | Phase 43 | Pending |
 | LAUNCH-01..10 | Phase 44 | LAUNCH-01/02/03/04/05/06/07/08/09/10 GREEN (44-01/02/03/04/05/06/07); ALL CLOSED |
-| SHIP-01..13 | Phase 45 | SHIP-11 GREEN (45-05); SHIP-13 engineering GREEN (45-04 — audit + template + fixtures shipped, awaiting T+30 discharge); 11 remaining |
+| SHIP-01..13 | Phase 45 | SHIP-11 GREEN (45-05); SHIP-13 engineering GREEN (45-04 — audit + template + fixtures shipped, awaiting T+30 discharge); Plan 45-06 ALL 13 KAAN-ACTION-LEGAL §SHIP-NN discharge runbooks GREEN (cookbook complete — every SHIP-* requirement has documented owner + prerequisites + literal commands + verification + sign-off); 13 awaiting external-clock + operator discharge per cookbook |
 
 **Coverage:**
 - v3.0 requirements: 57 total

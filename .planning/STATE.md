@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
 status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped (44-01 / LAUNCH-01). DJ-software 6-cell grid + canonical-10 controllers grid reconciled to src/vibemix/midi/controllers/*.json + 4-gate a11y CI (alt + count + balance + slop) + §LAUNCH-03 + §LAUNCH-04 Kaan-discharge runbooks shipped (44-02 / LAUNCH-03 + LAUNCH-04). EvidenceRegistry citation strip surfaced in live UI + click→debrief deep-link + 2s region highlight shipped (44-03 / LAUNCH-02) — new SessionCohostReaction IPC + token-driven amber chip strip + Tauri open_debrief_window deep_link extension. Bravoh waitlist opt-in toggle shipped in debrief window (44-04 / LAUNCH-05) — ConfigStore.bravoh_waitlist_opt_in field + mountBravohWaitlistToggle component + verbatim UTM URL grep-gate + token-driven faint-amber-glow active state; subtle, opt-in only, default OFF, no signed-out telemetry.
-last_updated: "2026-05-17T08:15:00.000Z"
+last_updated: "2026-05-17T08:28:49.797Z"
 last_activity: 2026-05-17
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 41
-  completed_plans: 39
-  percent: 95
+  completed_plans: 41
+  percent: 100
 ---
 
 # vibemix — State
@@ -34,8 +34,8 @@ progress:
 
 ## Current Position
 
-Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 3 active) + Phase 44 — Launch Positioning + Pre-stage (ENGINEERING COMPLETE — all 7 plans shipped) + Phase 45 — External Discharge + Public RC Publish (IN PROGRESS — Wave 1 active)
-Plan: 43-01, 43-02, 43-03, 43-04, 43-05, 43-07, 43-08, 43-09 COMPLETE (8/9). Remaining: 43-06 (mood pool runtime + perf). Phase 44: 44-01 + 44-02 + 44-03 + 44-04 + 44-05 + 44-06 + 44-07 COMPLETE (7/7) — LAUNCH-01..10 ALL closed engineering-green. Phase 45: 45-04 + 45-05 COMPLETE (Wave 1 partial — SHIP-13 engineering scaffolding + SHIP-11 24h rotation augment); 45-01 + 45-02 + 45-03 in-flight; 45-06 awaiting Wave-1 completion.
+Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 3 active) + Phase 44 — Launch Positioning + Pre-stage (ENGINEERING COMPLETE — all 7 plans shipped) + Phase 45 — External Discharge + Public RC Publish (ENGINEERING COMPLETE — all 6 plans shipped, awaiting external clock: Apple Dev + SignPath OSS)
+Plan: 43-01, 43-02, 43-03, 43-04, 43-05, 43-07, 43-08, 43-09 COMPLETE (8/9). Remaining: 43-06 (mood pool runtime + perf). Phase 44: 44-01 + 44-02 + 44-03 + 44-04 + 44-05 + 44-06 + 44-07 COMPLETE (7/7) — LAUNCH-01..10 ALL closed engineering-green. Phase 45: 45-01 + 45-02 + 45-03 + 45-04 + 45-05 + 45-06 COMPLETE (6/6) — ENGINEERING COMPLETE. SHIP-01..13 all have engineering scaffolding (45-01..05) + KAAN-ACTION-LEGAL §SHIP-NN discharge runbooks (45-06). Awaiting external clock: Apple Dev Agreement (Francesco — §SHIP-01) + SignPath OSS Foundation approval (Kaan — §SHIP-02).
 Status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped (44-01 / LAUNCH-01). DJ-software 6-cell grid + canonical-10 controllers grid reconciled to src/vibemix/midi/controllers/*.json + 4-gate a11y CI (alt + count + balance + slop) + §LAUNCH-03 + §LAUNCH-04 Kaan-discharge runbooks shipped (44-02 / LAUNCH-03 + LAUNCH-04). EvidenceRegistry citation strip surfaced in live UI + click→debrief deep-link + 2s region highlight shipped (44-03 / LAUNCH-02) — new SessionCohostReaction IPC + token-driven amber chip strip + Tauri open_debrief_window deep_link extension. Bravoh waitlist opt-in toggle shipped in debrief window (44-04 / LAUNCH-05) — ConfigStore.bravoh_waitlist_opt_in field + mountBravohWaitlistToggle component + verbatim UTM URL grep-gate + token-driven faint-amber-glow active state; subtle, opt-in only, default OFF, no signed-out telemetry.
 Last activity: 2026-05-17
 
@@ -70,6 +70,7 @@ Last activity: 2026-05-17
 | Phase 44-launch-positioning-pre-stage P02 | ~1h | 3 tasks | 19 files |
 | Phase 45 P02 | 45min | 3 tasks | 5 files |
 | Phase 45-external-discharge-public-rc-publish P04 | 28min | 3 tasks | 10 files |
+| Phase 45-external-discharge-public-rc-publish P06 | 45min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,11 @@ Last activity: 2026-05-17
 - **Plan 45-04 — Audit pre-fills 4 of 5 rubric "Current" cells; Anti-slop community-reports stays `<manual>`** (2026-05-17) — Community-report signal arrives via Discord / GH discussions / Twitter (no single auditable source). Audit substitutes Downloads / Uptime% / Slop-incidents / Open-crash count; Kaan manually fills the 5th cell at T+30 per Plan 45-06 §SHIP-13 runbook.
 - **Plan 45-04 — Plan 42-06 privacy contract preserved at audit boundary** (2026-05-17) — `ear-test-logs/*.json` fields `free_form` + `session_id` + `signed_at` are read by the aggregator but NEVER substituted into the rendered decision report. Audit emits only aggregate counts (felt_slop count, felt_scripted count, genres covered). Verified: `grep` of synthetic fixtures' free-form text against rendered output returns 0 matches (T-45-04-02 mitigation).
 - **Plan 45-04 — `_generated_by:` provenance HTML comment in rendered reports (T-45-04-03 mitigation)** (2026-05-17) — Anti-repudiation: the decision report carries an audit-tool version + ISO-8601 timestamp comment below the H1 so future readers can distinguish "audit ran" from "Kaan hand-filled". Pattern reusable for future v3.x / v4 decision-of-record docs.
+- **Plan 45-06 — KAAN-ACTION-LEGAL §SHIP-01..13 cookbook uses canonical 8-block §LAUNCH-08 format** (2026-05-17) — H2 header + REQ-ID/Owner/Status + Effort + Blocking-for + Why-this-is-X-action + Pre-requisites + Discharge commands + Verification + Post-discharge + Unblocks + Sign-off block. Same shape as Phase 44-06 §LAUNCH-08 so operator already knows the visual language. Test accepts both H3-subheading (`### Pre-requisites`) and colon-suffix-inline (`Pre-requisites:`) variants via variant-tuple match — the canonical mix in the existing file uses H3 style.
+- **Plan 45-06 — Tag-regex bump flagged as §SHIP-07 PREREQUISITE, NOT executed in this plan** (2026-05-17) — `scripts/launch/cut_release.sh` line 44 ships `TAG_REGEX='^v2\.1\.0-rc[0-9]+$'` from Phase 39 v2.1 carryover; v3.0 SHIP-CUT requires `'^v3\.0\.0-rc[0-9]+$'`. One-line sed documented in §SHIP-07 Pre-requisites with its own commit message template; ships as its own commit at Kaan-discharge time so the cut commit stays clean. `tests/repo/test_cut_release_invokes_bravoh_server.py::test_tag_regex_unchanged_in_this_plan` confirms 45-06 did NOT modify the regex.
+- **Plan 45-06 — §SHIP-11 cross-links docs/launch-rotation.md §SHIP-11 (Plan 45-05) as operational source-of-truth** (2026-05-17) — Does NOT duplicate the shift table or triage tree or 7-monitoring-source list inside KAAN-ACTION-LEGAL. Single-source-of-truth rule honored; eyes-on operator follows the cross-reference. `test_section_cites_required_cross_ref[§SHIP-11]` pins that the cross-link is present + the target file exists on disk.
+- **Plan 45-06 — §SHIP-12 framed as passive observation, no commands** (2026-05-17) — Windows SmartScreen reputation propagation is unobservable from command line — discharge is Day 1/3/7/14/21/28 probe schedule + observation log at `eval/smartscreen-observations/<date>.md`. First-clear date feeds §SHIP-13 decision tree as one of 8 audit inputs. The "no commands" framing is honest about the constraint rather than inventing automation theatre.
+- **Plan 45-06 — Test marker variant-tuple per logical block** (2026-05-17) — Rule 1 auto-fix during Task 2. Original test hard-coded `Pre-requisites:` / `Verification:` / `Post-discharge:` / `Unblocks:` as required substrings, but the canonical §LAUNCH-08 format mixes `### Pre-requisites` (H3 subheading) with bold inline labels — neither shape carries a colon-suffix line on its own. Replaced single-string markers with variant tuples: each test accepts ANY of `### Pre-requisites`, `Pre-requisites:`, `**Pre-requisites:**`. Same accommodation for Verification / Post-discharge / Unblocks / Discharge commands.
 
 ### Decisions Locked (v2.1 — shipped)
 
