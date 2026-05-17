@@ -100,3 +100,92 @@ At T+24, hand off to `docs/day-zero-rota.md` async cadence (4h-block primary che
 - `KAAN-ACTION-LEGAL.md §SHIP` — all customer-facing publish actions
 - `scripts/dayzero/seed_stars.md` — P59 aligned-community sourcing
 - `docs/post-launch-playbook.md` — broader post-launch playbook
+
+## §SHIP-11 — v3.0 24h Monitoring Rotation (4 × 6h shifts, Kaan solo)
+
+**Phase 45 / SHIP-11 / KAAN-ACTION-LEGAL §SHIP-11**
+
+The v3.0 launch uses a simpler rotation than v2.1's hourly table: 4 shifts × 6h each, all Kaan (Francesco + Momo deferred to v3.x). Launch slot: T+0 = 09:00 CET (HN sweet spot + EU morning + US wake-up).
+
+### Shift table
+
+| Shift | CET window | T-offset | Focus | Primary signals |
+|---|---|---|---|---|
+| Shift 1 (EU morning) | 08:00 – 14:00 | T+0 → T+6 | Cut + flip release; Discord launch post; HN front-page check; first-hour Issues triage | GH issues label triage; HN front-page rank; Discord #bugs |
+| Shift 2 (EU afternoon) | 14:00 – 20:00 | T+6 → T+12 | US wake-up wave; first install-fail reports; first ear-test reactions | Discord #bugs (fresh-VM installs); GH issues label `install`; Bravoh healthz |
+| Shift 3 (EU evening) | 20:00 – 02:00 | T+12 → T+18 | US prime time; Discord live engagement; first community-mascot reactions | Discord #show-and-tell + #bugs; GH issues; star velocity sample |
+| Shift 4 (sleep / alerts) | 02:00 – 08:00 | T+18 → T+24 | Sleep; on alert only via GH Actions email + Discord ping | Showstopper-only pager |
+
+### Triage decision tree
+
+```
+Signal arrives → categorize:
+
+├── Comment volume spike (Discord, GH issues, HN)
+│   └── Triage within the hour: label, react, reply with anchor message
+│
+├── Crash report (issue labelled `crash` OR Discord #bugs upload)
+│   ├── Reproducible? → patch decision
+│   │   ├── Hotfix path (single-file fix, no breaking) → cut v3.0.0-rc1.1
+│   │   └── Multi-file or regression → RC2 cycle (record in SHIP-V1-DECISION)
+│   └── Not reproducible → request session.jsonl + events.jsonl from reporter
+│
+├── API key rate-limit (Bravoh proxy >80% capacity)
+│   ├── Spot-check via `bash scripts/dayzero/healthz_check.sh --target https://api.altidus.world/vibemix/healthz --max-iterations 1 --interval 0`
+│   ├── Coordinate with Musa (Bravoh proxy on-call) to autoscale or raise rate limits
+│   └── If unable to resolve in 15 min → post Discord `[notice] vibemix proxy queue active`
+│
+└── Bravoh server down (healthz 5xx, /vibemix/updates/latest.json 5xx)
+    ├── Run `bash scripts/release/check_bravoh_server_ready.sh` for structured BLOCKED_BY line
+    ├── Escalate to Bravoh team (Slack #bravoh-vibemix)
+    ├── Post Discord `[notice] vibemix updater check intermittent — investigating`
+    └── If down >30 min → pin a banner in README + freeze announcements
+```
+
+### Monitoring signal sources (per shift, every hour)
+
+1. **GH Actions email** — any failed workflow alerts to Kaan.
+2. **GH issues** — `gh issue list --state open --label triage` — respond within the shift.
+3. **Discord #bugs** — scroll messages since last check, react to OK, escalate red flags.
+4. **Bravoh healthz** — `bash scripts/dayzero/healthz_check.sh --target https://api.altidus.world/vibemix/healthz --max-iterations 1 --interval 0` (returns 200 or escalate per tree).
+5. **Bravoh server contract probe** — `bash scripts/release/check_bravoh_server_ready.sh` (Plan 45-03) — green = all 3 updater endpoints up + healthz fresh.
+6. **Star velocity sample** — `gh api /repos/bravoh/vibemix --jq .stargazers_count` — log delta vs previous shift.
+7. **Fresh-VM install issues** — HIGHEST PRIORITY per project memory `one-click-install-hard-req`. Any "vibemix doesn't open on first launch" report → top of queue.
+
+### Handoff format (Discord #vibemix-rota or self-note)
+
+End of each shift, Kaan posts (or notes-to-self):
+
+```
+Shift <N> handoff (T+<offset>)
+Open issues:        <N>
+Open Discord:       <M> threads, <K> red flags
+Stars delta:        +<X> since previous shift
+healthz:            OK / WARN / FAIL
+Bravoh server:      OK / WARN / FAIL (BLOCKED_BY line if FAIL)
+Notes:              <one-line summary>
+Next watch:         <bullet points if any>
+```
+
+### Post-24h transition
+
+At T+24, hand off to async monitoring per the `## Post-24h transition` section above. The bake observation period (~2 weeks) runs in parallel with normal vibemix dev cadence; SHIP-13 (Plan 45-04) audit fires at T+30.
+
+### Sign-off block
+
+```
+SHIP-11 ENGINEERING GREEN on:   _____________  (Plan 45-05 §SHIP-11 augment shipped)
+SHIP-11 SHIFT 1 COMPLETE on:    _____________  (T+0 → T+6 — cut + launch post + first-hour triage)
+SHIP-11 SHIFT 2 COMPLETE on:    _____________  (T+6 → T+12 — US wake-up wave triage)
+SHIP-11 SHIFT 3 COMPLETE on:    _____________  (T+12 → T+18 — US prime time triage)
+SHIP-11 SHIFT 4 COMPLETE on:    _____________  (T+18 → T+24 — sleep + alerts-only)
+SHIP-11 T+24 HANDOFF on:        _____________  (handed off to async + bake-observation period)
+Sign-off by (Kaan):             _____________
+```
+
+### References
+
+- `KAAN-ACTION-LEGAL.md §SHIP-11` — Kaan-discharge runbook (Plan 45-06).
+- `scripts/release/check_bravoh_server_ready.sh` — Plan 45-03 server contract probe.
+- `scripts/dayzero/healthz_check.sh` — Phase 36 healthz watchdog.
+- Memory `project_one_click_install_hard_req` — fresh-VM install issues = top priority signal.
