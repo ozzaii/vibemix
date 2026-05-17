@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
 status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped; LAUNCH-01 closed.
-last_updated: "2026-05-16T17:45:26.978Z"
+last_updated: "2026-05-17T06:23:12.712Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 35
-  completed_plans: 29
+  completed_plans: 31
   percent: 67
 ---
 
