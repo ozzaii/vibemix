@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: null
-milestone_name: null
-status: v3.0 "Clean OSS Ship" SHIPPED 2026-05-17 (engineering-complete; tech_debt accepted). 6 phases shipped engineering-green; 57/57 v3.0 REQ-IDs satisfied; 22 carveouts deferred to KAAN-ACTION-LEGAL discharge cookbook. Local annotated git tag `v3.0` created (NOT pushed — public RC publish awaits Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) per §SHIP-01/02 cookbook). Next milestone scaffolds via `/gsd:new-milestone` when Kaan opens v3.x scope.
-last_updated: "2026-05-17T09:00:00.000Z"
+milestone: v3.1
+milestone_name: Distribution-Ready Pass
+status: planning
+last_updated: "2026-05-17T11:44:00.853Z"
 last_activity: 2026-05-17
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 41
-  completed_plans: 41
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # vibemix — State
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-05-17 after v3.0 milestone close)
 
 ## Current Position
 
-Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 3 active) + Phase 44 — Launch Positioning + Pre-stage (ENGINEERING COMPLETE — all 7 plans shipped) + Phase 45 — External Discharge + Public RC Publish (ENGINEERING COMPLETE — all 6 plans shipped, awaiting external clock: Apple Dev + SignPath OSS)
-Plan: 43-01, 43-02, 43-03, 43-04, 43-05, 43-07, 43-08, 43-09 COMPLETE (8/9). Remaining: 43-06 (mood pool runtime + perf). Phase 44: 44-01 + 44-02 + 44-03 + 44-04 + 44-05 + 44-06 + 44-07 COMPLETE (7/7) — LAUNCH-01..10 ALL closed engineering-green. Phase 45: 45-01 + 45-02 + 45-03 + 45-04 + 45-05 + 45-06 COMPLETE (6/6) — ENGINEERING COMPLETE. SHIP-01..13 all have engineering scaffolding (45-01..05) + KAAN-ACTION-LEGAL §SHIP-NN discharge runbooks (45-06). Awaiting external clock: Apple Dev Agreement (Francesco — §SHIP-01) + SignPath OSS Foundation approval (Kaan — §SHIP-02).
-Status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped (44-01 / LAUNCH-01). DJ-software 6-cell grid + canonical-10 controllers grid reconciled to src/vibemix/midi/controllers/*.json + 4-gate a11y CI (alt + count + balance + slop) + §LAUNCH-03 + §LAUNCH-04 Kaan-discharge runbooks shipped (44-02 / LAUNCH-03 + LAUNCH-04). EvidenceRegistry citation strip surfaced in live UI + click→debrief deep-link + 2s region highlight shipped (44-03 / LAUNCH-02) — new SessionCohostReaction IPC + token-driven amber chip strip + Tauri open_debrief_window deep_link extension. Bravoh waitlist opt-in toggle shipped in debrief window (44-04 / LAUNCH-05) — ConfigStore.bravoh_waitlist_opt_in field + mountBravohWaitlistToggle component + verbatim UTM URL grep-gate + token-driven faint-amber-glow active state; subtle, opt-in only, default OFF, no signed-out telemetry.
-Last activity: 2026-05-17
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-17 — Milestone v3.1 started
 
 ## Performance Metrics
 

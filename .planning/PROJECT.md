@@ -10,7 +10,16 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: None — awaiting `/gsd:new-milestone` (v3.x)
+## Current Milestone: v3.1 Distribution-Ready Pass
+
+**Goal:** Make vibemix install-and-run anywhere — true one-click on Win + Mac with audited/pinned deps and the mascot fully visible across all emotional states — verified by Kaan's end-to-end pass on his MacBook.
+
+**Target features:**
+- **One-click install scripts (Win + Mac)** — single-action installer that auto-pulls all runtime deps (sidecar bundle, BlackHole/VB-CABLE virtual audio routing, MIDI prerequisites), configures audio devices, and lands on a ready-to-run app — zero terminal commands.
+- **System requirements + dep audit/pin** — every Python runtime dep + Tauri/native dep pinned with rationale, license check, install-impact rating (green/yellow/red per `project_one_click_install_hard_req`), unused/stale deps culled.
+- **New dep + integration opportunity scan** — research pass surfacing what should be added to widen real-world compatibility (DJ software / OS edge cases / hardware), with explicit green/yellow/red ratings; only the green ones land in v3.1.
+- **End-to-end MacBook pass (functional + visual + aesthetic + usability)** — Kaan runs the full app on his MacBook with a real set, validates every flow + CDJ-Whisper visual surface + mascot emotion coverage; release-blocking issues surface as gap-closure items.
+- **Mascot fully visible with all emotions wired** — Base + Emotion + Anticipation + Reaction state-machine layers cover every event class, GLB assets land real (not placeholder), mascot is visible on every supported window/screen-share path.
 
 **Last shipped:** v3.0 "Clean OSS Ship" — 2026-05-17 (status: `tech_debt` accepted; KAAN-ACTION-LEGAL §SHIP-01..13 cookbook pending external clock for public RC publish).
 
@@ -315,4 +324,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-17 after v3.0 milestone close. 6 phases shipped engineering-green under `gsd-autonomous fully` mode. 57/57 v3.0 REQ-IDs engineering-satisfied; 22 carveouts deferred to KAAN-ACTION-LEGAL discharge cookbook. Critical path remains the external clock — Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) to discharge SHIP-CUT v3.0.0-rc1. Next milestone scaffolds via `/gsd:new-milestone` when Kaan opens v3.x scope per memory `project_v2_planning_active`.*
+*Last updated: 2026-05-17 — v3.1 "Distribution-Ready Pass" scaffolded via `/gsd:autonomous fully`. Scope: Win+Mac one-click install, dep audit/pin + new-dep opportunity scan, end-to-end MacBook pass (functional + visual + aesthetic + usability), mascot full emotion coverage with real GLBs. External clock for v3.0 SHIP-CUT (Apple Dev + SignPath) remains independent — v3.1 can ship engineering-complete in parallel and feed straight into the v3.0 cookbook once approvals land.*
