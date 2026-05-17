@@ -1,0 +1,16 @@
+{
+  "_doc": "vibemix SHIP-TWEET cadence matrix — Phase 45 SHIP-08. Per-channel × per-stage source file. scripts/launch/launch_trigger.sh consumes this at runtime. null = no publish for that channel × stage (matches LAUNCH-SEQUENCE.md cadence — e.g. Reddit only fires at T+0 to avoid karma-farming patterns).",
+  "version": 1,
+  "stages": ["T-30", "T+0", "T+5h", "T+24h"],
+  "channels": {
+    "twitter":   {"T-30": "twitter.txt",   "T+0": "twitter.txt",   "T+5h": "twitter.txt",   "T+24h": "twitter.txt"},
+    "instagram": {"T-30": "instagram.txt", "T+0": "instagram.txt", "T+5h": null,            "T+24h": "instagram.txt"},
+    "linkedin":  {"T-30": null,            "T+0": "linkedin.txt",  "T+5h": null,            "T+24h": "linkedin.txt"},
+    "reddit":    {"T-30": null,            "T+0": "reddit.txt",    "T+5h": null,            "T+24h": null},
+    "discord":   {"T-30": "discord.txt",   "T+0": "discord.txt",   "T+5h": "discord.txt",   "T+24h": "discord.txt"}
+  },
+  "_routing": {
+    "twitter|instagram|linkedin|reddit": "delegated to scripts/launch/publish_social_posts.py with --channel <name>",
+    "discord": "delegated to scripts/launch/post_discord_launch.py"
+  }
+}
