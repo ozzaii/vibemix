@@ -1,8 +1,11 @@
-# Phase 46 / DEPS-01 — Dependency audit gate.
+# Phase 46 / DEPS-01,02,03 — Dependency audit gate.
 #
-# Hermetic Python lockfile regen + drift detection. Plan 02 adds
-# cargo-deny + npm-audit jobs. Plan 03 adds the AUDIT.md freshness gate.
-# Plan 04 adds CycloneDX SBOM job. Plan 05 adds pinact audit job.
+# Hermetic Python lockfile regen + drift detection (DEPS-01).
+# cargo-deny license policy (DEPS-02).
+# npm-audit PR comment (DEPS-03).
+# Plan 03 adds the AUDIT.md freshness gate.
+# Plan 04 adds CycloneDX SBOM job + dep-cull verify.
+# Plan 05 adds pinact audit job.
 #
 # Pitfall 1: `pip freeze` from `.venv` is REJECTED — only the hermetic
 # docker-uv path is allowed to mutate uv.lock.
@@ -17,12 +20,22 @@ on:
       - 'uv.lock'
       - 'scripts/audit/**'
       - '.github/workflows/dep-audit.yml'
+      - 'tauri/src-tauri/Cargo.toml'
+      - 'tauri/src-tauri/Cargo.lock'
+      - 'tauri/src-tauri/deny.toml'
+      - 'tauri/ui/package.json'
+      - 'tauri/ui/package-lock.json'
   push:
     branches: [main]
     paths:
       - 'pyproject.toml'
       - 'uv.lock'
       - 'scripts/audit/**'
+      - 'tauri/src-tauri/Cargo.toml'
+      - 'tauri/src-tauri/Cargo.lock'
+      - 'tauri/src-tauri/deny.toml'
+      - 'tauri/ui/package.json'
+      - 'tauri/ui/package-lock.json'
   workflow_dispatch:
 
 permissions:
@@ -47,3 +60,79 @@ jobs:
             exit 1
           fi
           echo "uv.lock is byte-stable against pyproject.toml — DEPS-01 OK"
+
+  cargo-deny:
+    name: cargo-deny license policy (DEPS-02)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tauri/src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deny (pinned)
+        run: cargo install cargo-deny --version 0.16.1 --locked --force
+
+      - name: Run cargo-deny check (licenses + bans + sources + advisories)
+        run: cargo deny --all-features check
+
+  npm-audit-pr-comment:
+    name: npm-audit PR comment (DEPS-03)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tauri/ui/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run npm audit
+        id: audit
+        run: |
+          bash scripts/audit/npm_audit_pr_comment.sh > /tmp/comment.md
+          {
+            echo 'comment<<EOF'
+            cat /tmp/comment.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post or update PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `${{ steps.audit.outputs.comment }}`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.startsWith('## npm audit (tauri/ui'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
