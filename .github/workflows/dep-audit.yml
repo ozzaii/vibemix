@@ -1,0 +1,49 @@
+# Phase 46 / DEPS-01 — Dependency audit gate.
+#
+# Hermetic Python lockfile regen + drift detection. Plan 02 adds
+# cargo-deny + npm-audit jobs. Plan 03 adds the AUDIT.md freshness gate.
+# Plan 04 adds CycloneDX SBOM job. Plan 05 adds pinact audit job.
+#
+# Pitfall 1: `pip freeze` from `.venv` is REJECTED — only the hermetic
+# docker-uv path is allowed to mutate uv.lock.
+
+name: Dependency Audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'scripts/audit/**'
+      - '.github/workflows/dep-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'scripts/audit/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  uv-regen-diff:
+    name: Hermetic uv.lock regen + drift check (DEPS-01)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run hermetic regen script
+        run: bash scripts/audit/regen_uv_lock.sh
+
+      - name: Fail on lockfile drift
+        run: |
+          set -euo pipefail
+          if ! git diff --exit-code uv.lock; then
+            echo "::error::uv.lock drifted after hermetic regen — re-run scripts/audit/regen_uv_lock.sh locally and commit the result"
+            exit 1
+          fi
+          echo "uv.lock is byte-stable against pyproject.toml — DEPS-01 OK"
