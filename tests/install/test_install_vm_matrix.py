@@ -229,6 +229,7 @@ def test_8_live_without_tart_exits_3(tmp_path: Path):
         "mkdir",
         "mv",
         "date",
+        "dirname",
         "sed",
         "grep",
         "awk",
