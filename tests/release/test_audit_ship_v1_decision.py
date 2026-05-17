@@ -250,6 +250,7 @@ def test_11_fixture_mode_substitutes_all_placeholders(tmp_path):
         "<oldest_age_days>",
         "<release_tag>",
         "<YYYY-MM-DD>",
+        "<audit_date>",
         "<published_at>",
     ]
     for tok in forbidden_in_evidence:
@@ -431,9 +432,11 @@ def test_16_live_mode_uses_gh_subprocess(monkeypatch, tmp_path):
         for method in ("POST", "PATCH", "DELETE"):
             assert method not in cmd, f"--live must NEVER mutate GH: {cmd}"
         joined = " ".join(cmd)
-        if "releases" in joined:
+        # gh CLI command shape: `gh api ... releases/...` for releases,
+        # `gh issue list ...` for issues. Match either.
+        if "releases" in joined or "release" in joined:
             payload = canned_release
-        elif "issues" in joined:
+        elif "issue" in joined or "issues" in joined:
             payload = canned_issues
         else:
             raise AssertionError(f"Unexpected gh invocation: {cmd}")
@@ -573,11 +576,13 @@ def test_18_gh_actions_emits_notice_annotation(monkeypatch, tmp_path, capsys):
     )
     assert rc == 0
     captured = capsys.readouterr()
-    assert "::notice::" in captured.out, (
-        "GH Actions must receive a ::notice:: annotation on completion."
+    # GH Actions accepts either bare `::notice::msg` or `::notice title=X::msg`.
+    # Both must include the literal `::notice` token at the start of a line.
+    assert "::notice" in captured.out, (
+        "GH Actions must receive a ::notice annotation on completion."
     )
     assert str(out_path) in captured.out, (
-        "::notice:: must include the output path."
+        "::notice annotation must include the output path."
     )
 
 
