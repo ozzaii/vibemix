@@ -4,49 +4,72 @@
 Idempotently scaffolds the `vibemix` Discord server with the agreed role
 + channel layout. By default runs in DRY-RUN: prints the planned actions
 without touching Discord. `--live` actually performs the operations and
-requires `DISCORD_BOT_TOKEN` in the environment.
+requires a Discord bot token in the environment.
 
 The script is autonomous-safe — re-running against a partially or fully
 provisioned server is a no-op for the entries that already exist.
 
-Roles    : founder, contributor, DJ, lurker
-Channels : #announcements, #help, #show-and-tell, #controllers,
-           #ai-misbehavior, #dev
+Single source of truth for roles + channels:
 
-Usage (dry-run, default):
+    scripts/dayzero/discord_taxonomy.json
+
+That file is loaded at module-import time. To change the taxonomy, edit
+the JSON; do NOT edit constants in this file. The taxonomy lock is
+covered by `tests/dayzero/test_discord_provision_dryrun.py` (LAUNCH-08).
+
+Bot token resolution order (LAUNCH-08 Bravoh-naming preference):
+
+    1. BRAVOH_DISCORD_BOT_TOKEN  ← preferred, Bravoh-managed secret
+    2. DISCORD_BOT_TOKEN         ← legacy, kept for Phase 36 back-compat
+
+Usage (dry-run, default — zero network, zero discord.py dependency):
+
     python scripts/dayzero/discord_provision.py
 
 Usage (live):
-    export DISCORD_BOT_TOKEN=<bot-token>
+
+    export BRAVOH_DISCORD_BOT_TOKEN=<bot-token>
     python scripts/dayzero/discord_provision.py --live --guild-id <id>
 
 The `discord.py` dependency is imported lazily — dry-run mode does NOT
-require it.
+require it, so a fresh checkout without the optional dep installed can
+still run the dry-run plan + assert the taxonomy.
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Optional
 
 
 # ---------------------------------------------------------------------------
-# Target state
+# Target state — single source of truth = discord_taxonomy.json
 # ---------------------------------------------------------------------------
 
-TARGET_ROLES: tuple[str, ...] = ("founder", "contributor", "DJ", "lurker")
-TARGET_CHANNELS: tuple[str, ...] = (
-    "announcements",
-    "help",
-    "show-and-tell",
-    "controllers",
-    "ai-misbehavior",
-    "dev",
-)
-GUILD_NAME: str = "vibemix"
+TAXONOMY_PATH: Path = Path(__file__).parent / "discord_taxonomy.json"
+
+
+def _load_taxonomy(
+    path: Path = TAXONOMY_PATH,
+) -> tuple[tuple[str, ...], tuple[str, ...], str]:
+    """Read the taxonomy JSON and return (roles, channels, guild_name).
+
+    Kept as a module-level function (not a dataclass) so the test suite
+    can monkeypatch it cleanly without touching module-level state.
+    """
+    data = json.loads(path.read_text(encoding="utf-8"))
+    roles = tuple(data["roles"])
+    channels = tuple(data["channels"])
+    guild_name = data.get("guild_name", "vibemix")
+    return roles, channels, guild_name
+
+
+TARGET_ROLES, TARGET_CHANNELS, GUILD_NAME = _load_taxonomy()
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +120,29 @@ def diff_plan(
             c for c in TARGET_CHANNELS if c in existing_channel_set
         ],
     )
+
+
+# ---------------------------------------------------------------------------
+# Bot-token resolution (LAUNCH-08: Bravoh-naming preferred)
+# ---------------------------------------------------------------------------
+
+PREFERRED_TOKEN_ENV = "BRAVOH_DISCORD_BOT_TOKEN"
+LEGACY_TOKEN_ENV = "DISCORD_BOT_TOKEN"
+
+
+def _resolve_bot_token() -> tuple[Optional[str], Optional[str]]:
+    """Return (token, source_env_name).
+
+    Order: BRAVOH_DISCORD_BOT_TOKEN first, DISCORD_BOT_TOKEN fallback.
+    Both unset → (None, None).
+    """
+    bravoh = os.environ.get(PREFERRED_TOKEN_ENV)
+    if bravoh:
+        return bravoh, PREFERRED_TOKEN_ENV
+    legacy = os.environ.get(LEGACY_TOKEN_ENV)
+    if legacy:
+        return legacy, LEGACY_TOKEN_ENV
+    return None, None
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +227,10 @@ def _build_argparser() -> argparse.ArgumentParser:
     p.add_argument(
         "--live",
         action="store_true",
-        help="Actually create roles/channels (requires DISCORD_BOT_TOKEN env)",
+        help=(
+            "Actually create roles/channels (requires "
+            "BRAVOH_DISCORD_BOT_TOKEN or DISCORD_BOT_TOKEN env)"
+        ),
     )
     p.add_argument(
         "--guild-id",
@@ -196,24 +245,43 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = _build_argparser().parse_args(argv)
 
     if not args.live:
-        # Dry-run: print the plan assuming a fresh server.
+        # Dry-run: print the plan assuming a fresh server. Pure local
+        # computation — no network, no discord.py import.
         plan = diff_plan(existing_roles=[], existing_channels=[])
         print(f"[plan] guild name target: {GUILD_NAME}")
+        print(f"[plan] taxonomy source: {TAXONOMY_PATH}")
+        print(
+            f"[plan] roles target ({len(TARGET_ROLES)}): "
+            f"{', '.join(TARGET_ROLES)}"
+        )
+        print(
+            f"[plan] channels target ({len(TARGET_CHANNELS)}): "
+            f"{', '.join('#' + c for c in TARGET_CHANNELS)}"
+        )
         for line in plan.as_lines():
             print(line)
         print(
             "[plan] DRY-RUN complete. Re-run with --live and "
-            "DISCORD_BOT_TOKEN to apply.",
+            "BRAVOH_DISCORD_BOT_TOKEN (or legacy DISCORD_BOT_TOKEN) to apply.",
         )
         return 0
 
-    token = os.environ.get("DISCORD_BOT_TOKEN")
+    token, source = _resolve_bot_token()
     if not token:
         print(
-            "ERROR: DISCORD_BOT_TOKEN env var is required for --live.",
+            f"ERROR: {PREFERRED_TOKEN_ENV} (or legacy "
+            f"{LEGACY_TOKEN_ENV}) env var is required for --live.",
             file=sys.stderr,
         )
         return 2
+
+    # Diagnostic surface for tests + audit: surfaces which env var
+    # supplied the token without leaking the token value itself.
+    if os.environ.get("DISCORD_PROVISION_DIAG_TOKEN_SOURCE") == "1":
+        print(f"[live] bot token sourced from: {source}", file=sys.stderr)
+    # Always log the source name (not the token) in normal --live runs
+    # so audit logs are self-explanatory.
+    print(f"[live] bot token source: {source}")
 
     if args.guild_id is None:
         print(
