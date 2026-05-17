@@ -15,6 +15,14 @@ separately:
 
 Determinism is preserved by mocking ``ipc_bus`` as an AsyncMock — no live
 WebSocket, no live AX, no live Tauri invoke.
+
+Phase 44-03 / LAUNCH-02 — the agent now ALSO emits an
+``ipc.session.cohost-reaction`` envelope alongside every overlay-highlight
+broadcast (same emit-or-bypass gate). The assertions in this file filter
+``bus.emits`` to overlay-only entries via ``_overlay_only(bus)`` so the
+overlay-publish invariants stay testable in isolation; the cohost-reaction
+emit path has its own dedicated coverage in
+``tests/agent/test_citation_strip_emit.py``.
 """
 
 from __future__ import annotations
@@ -63,6 +71,17 @@ class _FakeIpcBus:
 
     async def emit(self, msg: dict) -> None:
         self.emits.append(msg)
+
+
+def _overlay_only(bus: "_FakeIpcBus") -> list[dict]:
+    """Filter ``bus.emits`` to overlay-highlight envelopes only.
+
+    Plan 44-03 added an ``ipc.session.cohost-reaction`` emit on the same
+    citation-action gate; this helper isolates the overlay-publish slice
+    so the Phase 24-02 invariants stay testable without coupling to the
+    additive launch-marketing surface.
+    """
+    return [e for e in bus.emits if e.get("type") == "ipc.session.overlay-highlight"]
 
 
 def _build_state() -> MusicState:
@@ -152,9 +171,10 @@ def test_legacy_emit_publishes_overlay_for_screen_citation(mocker, tmp_path) -> 
     agent.set_next_event(ev)
     _drive(agent)
 
-    assert len(bus.emits) == 1
-    payload = bus.emits[0]["payload"]
-    assert bus.emits[0]["type"] == "ipc.session.overlay-highlight"
+    overlays = _overlay_only(bus)
+    assert len(overlays) == 1
+    payload = overlays[0]["payload"]
+    assert overlays[0]["type"] == "ipc.session.overlay-highlight"
     assert payload["element_id"] == "waveform_a"
     assert payload["color"] == "amber"
     assert payload["duration_ms"] == 1300
@@ -183,8 +203,9 @@ def test_wired_valid_publishes_overlay(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     _drive(agent)
 
-    assert len(bus.emits) == 1
-    assert bus.emits[0]["payload"]["element_id"] == "deck_a_low_eq"
+    overlays = _overlay_only(bus)
+    assert len(overlays) == 1
+    assert overlays[0]["payload"]["element_id"] == "deck_a_low_eq"
 
 
 # --------------------------------------------------------------------------
@@ -239,7 +260,10 @@ def test_no_screen_citation_no_publish(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     _drive(agent)
 
-    assert len(bus.emits) == 0
+    # Plan 44-03: overlay-highlight is the surface under test here — the
+    # additive cohost-reaction emission may also fire (when citation_action
+    # admits it) but is exercised separately in test_citation_strip_emit.py.
+    assert len(_overlay_only(bus)) == 0
 
 
 # --------------------------------------------------------------------------
@@ -289,8 +313,9 @@ def test_multi_atom_citation_publishes_each_screen(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     _drive(agent)
 
-    assert len(bus.emits) == 1
-    assert bus.emits[0]["payload"]["element_id"] == "waveform_a"
+    overlays = _overlay_only(bus)
+    assert len(overlays) == 1
+    assert overlays[0]["payload"]["element_id"] == "waveform_a"
 
 
 # --------------------------------------------------------------------------
@@ -322,8 +347,9 @@ def test_two_screen_citations_publish_both(mocker, tmp_path) -> None:
     agent.set_next_event(ev)
     _drive(agent)
 
-    assert len(bus.emits) == 2
-    element_ids = {e["payload"]["element_id"] for e in bus.emits}
+    overlays = _overlay_only(bus)
+    assert len(overlays) == 2
+    element_ids = {e["payload"]["element_id"] for e in overlays}
     assert element_ids == {"deck_a_low_eq", "deck_b_mid_eq"}
 
 

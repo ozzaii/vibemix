@@ -55,6 +55,10 @@ from vibemix.ui_bus.schemas.library import (
     LibraryStalenessActionPayload,
     LibraryStalenessNudgePayload,
 )
+from vibemix.ui_bus.schemas.cohost_reaction import (
+    CitationChipPayload,
+    SessionCohostReactionPayload,
+)
 from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
 from vibemix.ui_bus.schemas.profile import (
     ProfileConsentStatePayload,
@@ -1350,6 +1354,76 @@ class SessionOverlayHighlight:
         """Convenience: serialize + reparse to a plain dict for ipc_bus.emit
         callers that prefer not to JSON-roundtrip themselves. Mirrors the
         coach.py SessionCitation publish pattern."""
+        return json.loads(self.to_json())
+
+
+# ---------------------------------------------------------------------------
+# Phase 44 Plan 44-03 — cohost reaction broadcast (LAUNCH-02)
+# ---------------------------------------------------------------------------
+# Sidecar → shell. Fired once per AI reaction the DJCoHostAgent emits to
+# the user (post citation-linter, post slop-filter). Carries the reaction
+# text + LLM event tag + the parsed structured citation_strip. The live
+# session UI (tauri/ui/src/session/components/citation-strip.ts) renders
+# the chip strip below the matching transcript line; clicking a chip
+# invokes ``open_debrief_window`` with a ``deep_link`` payload.
+#
+# Anti-slop product principle made visible (LAUNCH-02 §6.2 white-space):
+# every reaction the user hears carries on-screen receipts. Replaces
+# nothing — the chips are an additive surface beneath the existing
+# transcript stream.
+
+
+@dataclass(frozen=True, slots=True)
+class SessionCohostReaction:
+    type: Literal["ipc.session.cohost-reaction"]
+    ts: str
+    payload: SessionCohostReactionPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        text: str,
+        event_id: str,
+        citation_strip: list[dict] | tuple[CitationChipPayload, ...],
+    ) -> SessionCohostReaction:
+        """Construct a wrapper from raw fields.
+
+        Accepts ``citation_strip`` as either a list-of-dicts (the form
+        produced by ``vibemix.agent.dj_cohost._build_citation_strip``)
+        or as an already-built tuple of :class:`CitationChipPayload`.
+        The list-of-dicts path constructs payload entries with explicit
+        kwargs so a misshapen dict trips a TypeError at construction
+        instead of slipping through to the wire.
+        """
+        chips: tuple[CitationChipPayload, ...]
+        if isinstance(citation_strip, list):
+            chips = tuple(
+                CitationChipPayload(
+                    event_id=c["event_id"],
+                    verb=c["verb"],
+                    timestamp_s=float(c["timestamp_s"]),
+                )
+                for c in citation_strip
+            )
+        else:
+            chips = tuple(citation_strip)
+        return cls(
+            type="ipc.session.cohost-reaction",
+            ts=_now_iso(),
+            payload=SessionCohostReactionPayload(
+                text=text,
+                event_id=event_id,
+                citation_strip=chips,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+    def to_dict(self) -> dict:
+        """Convenience: serialize + reparse to a plain dict for ipc_bus.emit
+        callers — mirrors the SessionOverlayHighlight.to_dict() pattern."""
         return json.loads(self.to_json())
 
 

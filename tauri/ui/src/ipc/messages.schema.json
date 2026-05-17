@@ -113,6 +113,9 @@
       "$ref": "#/definitions/SessionOverlayHighlight"
     },
     {
+      "$ref": "#/definitions/SessionCohostReaction"
+    },
+    {
       "$ref": "#/definitions/DebriefSessionLoaded"
     },
     {
@@ -1866,6 +1869,75 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 8000
+            }
+          }
+        }
+      }
+    },
+    "SessionCohostReaction": {
+      "$comment": "Phase 44-03 / LAUNCH-02 — Sidecar → shell. Fired once per AI reaction the DJCoHostAgent emits to the user (post citation-linter, post slop-filter). Carries reaction text + LLM event tag + the parsed structured citation_strip. The live session UI renders a chip strip below the matching transcript line; clicking a chip invokes open_debrief_window with a deep_link payload pointing at the chip's timestamp. citation_strip is an empty array (NEVER null) when no atom resolves to a registry observation — keeps the TS consumer type stable.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "ts",
+        "payload"
+      ],
+      "properties": {
+        "type": {
+          "const": "ipc.session.cohost-reaction"
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "event_id",
+            "citation_strip"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 2048
+            },
+            "event_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "citation_strip": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "event_id",
+                  "verb",
+                  "timestamp_s"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "verb": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32
+                  },
+                  "timestamp_s": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              }
             }
           }
         }

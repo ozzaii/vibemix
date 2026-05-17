@@ -124,6 +124,8 @@ from vibemix.ui_bus.messages import (
     SessionCitation,
     # Phase 24-02 — overlay-highlight
     SessionOverlayHighlight,
+    # Phase 44-03 — cohost reaction broadcast (LAUNCH-02)
+    SessionCohostReaction,
     # Phase 25 Plan 25-03 — DEBRIEF architectural slot
     DebriefSessionLoaded,
     DebriefCitationSummary,
@@ -163,6 +165,10 @@ from vibemix.ui_bus.schemas.debrief import (
     DebriefSessionLoadedPayload,
     DebriefTldrAudioPayload,
     DrillPayload,
+)
+from vibemix.ui_bus.schemas.cohost_reaction import (
+    CitationChipPayload,
+    SessionCohostReactionPayload,
 )
 from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
 from vibemix.ui_bus.validator import parse_message, validate_message
@@ -240,6 +246,10 @@ __all__ = [
     # Phase 24-02
     "SessionOverlayHighlight",
     "SessionOverlayHighlightPayload",
+    # Phase 44-03 — cohost reaction broadcast (LAUNCH-02)
+    "CitationChipPayload",
+    "SessionCohostReaction",
+    "SessionCohostReactionPayload",
     # Phase 25 Plan 25-03 — DEBRIEF architectural slot
     "DebriefCitationSummary",
     "DebriefCitationSummaryPayload",

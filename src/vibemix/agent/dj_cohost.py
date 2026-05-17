@@ -69,7 +69,7 @@ from vibemix.runtime.llm_to_tts_delta_meter import LLMToTTSDeltaMeter
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
 from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
-from vibemix.ui_bus import SessionOverlayHighlight
+from vibemix.ui_bus import SessionCohostReaction, SessionOverlayHighlight
 
 if TYPE_CHECKING:  # pragma: no cover — typing-only
     from vibemix.agent.ack_bank import AckBank
@@ -129,6 +129,108 @@ OVERLAY_COLOR: str = "amber"
 # as a known degrade — see CONTEXT.md Open Q2.
 SILENCE_PAD_MS: int = 500
 SILENCE_PAD_BYTES: int = 24000 * 2 * SILENCE_PAD_MS // 1000  # 24kHz * 2B * 0.5s = 24000B
+
+# Plan 44-03 / LAUNCH-02 — citation-strip chip cap. The live UI renders a
+# small `[<verb> @ <mm:ss>]` chip per cited evidence event below each AI
+# reaction; capping at 3 keeps the strip readable when the LLM packs a turn
+# with citations. Per CONTEXT.md: "2-3 word evidence tag" — implies a small
+# chip count. The cap is enforced at the structured-payload boundary
+# (_build_citation_strip), NOT in the renderer — the wire stays clean.
+CITATION_STRIP_MAX_CHIPS: int = 3
+
+# Plan 44-03 / LAUNCH-02 — verb word cap. The KEY portion of an `ev:KEY@t`
+# citation atom is upper-snake-case (e.g. `KICK_SWAP`, `BAND_SHIFT_HIGH`).
+# We split on `_`, lowercase, take the first 1-3 tokens. Multi-token KEYS
+# (`BAND_SHIFT_HIGH` → "band shift") get trimmed to keep chip width tight.
+CITATION_VERB_MAX_WORDS: int = 3
+
+
+def _build_citation_strip(
+    *,
+    reaction_text: str,
+    registry: EvidenceRegistry,
+) -> list[dict]:
+    """Build the structured chip-strip payload for an AI reaction.
+
+    Plan 44-03 / LAUNCH-02. Parses citation atoms off ``reaction_text``
+    using the existing ``parse_citations`` grammar (EvidenceRegistry's
+    locked EBNF), looks each atom up in the registry, and returns a list
+    of `{event_id, verb, timestamp_s}` dicts ready for the WS broadcast.
+
+    Contract (pinned by tests/agent/test_citation_strip_emit.py):
+
+    * ``event_id`` — the full citation atom prefixed with source, e.g.
+      ``"ev:KICK_SWAP@45.2"``. The UI uses this as the click→debrief
+      deep-link key (the debrief timeline resolves it back to a region).
+    * ``verb`` — 1-3 word lowercase label derived from the KEY portion
+      of the atom body (``KICK_SWAP@45.2`` → ``"kick swap"``). Cap at
+      3 words to keep chip text terse.
+    * ``timestamp_s`` — the recorded session-relative time at which the
+      registry observed the event. Sourced from the registry, NOT
+      parsed from the citation body (anti-hallucination: the body is
+      the LLM's claim; the registry is the truth).
+
+    Cap: at most ``CITATION_STRIP_MAX_CHIPS`` chips per reaction; chips
+    beyond the cap are dropped silently (first-in-text-wins).
+
+    Anti-hallucination rule (LAUNCH-02 white-space §6.2): citations that
+    do NOT resolve to a registry observation are dropped — NO chip is
+    emitted for an invented citation. Empty input → empty list (not
+    None) so the WS payload type stays stable across reactions.
+
+    Sources currently supported for chip derivation: ``ev``, ``mix``,
+    ``midi``. Other sources (``aud``, ``track``, ``screen``, ``tend``)
+    parse correctly but do not yield chips — they're either too noisy
+    (``aud``) or carry no obvious DJ-action verb (``track``). v2.x may
+    widen this set; v1 stays narrow per the "no scope creep" rule.
+
+    Args:
+        reaction_text: The full AI reaction text returned by the LLM
+            (post-stream-completion, pre-emit). May contain zero or
+            many bracketed citation atoms in the locked EBNF grammar.
+        registry: The live :class:`EvidenceRegistry` (snapshot is taken
+            internally — caller does not need to snapshot first).
+
+    Returns:
+        Ordered list (text order) of chip dicts. Empty list when no
+        citation atom resolves to a registry observation. Never None.
+    """
+    snapshot = registry.snapshot()
+    chips: list[dict] = []
+    for source, body in parse_citations(reaction_text):
+        if len(chips) >= CITATION_STRIP_MAX_CHIPS:
+            break  # cap reached — drop the rest silently
+        # Source allow-list — only sources with a clear "DJ action" verb
+        # yield UI chips. Quiet sources (aud/screen/tend) parse but do
+        # not surface as user-visible evidence tags.
+        if source not in ("ev", "mix", "midi"):
+            continue
+        # Registry lookup uses the body verbatim (KEY@t form). Drop the
+        # chip when the registry has no matching observation — closes
+        # "invented timestamps" hallucination class. Body is the full
+        # body string (e.g. "KICK_SWAP@45.2"), used as the registry key.
+        inner = snapshot.get(source, {})
+        timestamps = inner.get(body)
+        if not timestamps:
+            continue  # citation parsed but not grounded → no chip
+        # Use the FIRST recorded timestamp for the chip — multiple writes
+        # at the same key would arrive from cooldown bypass paths, but
+        # the first is the authoritative "when did this event fire".
+        timestamp_s = float(timestamps[0])
+        # Derive verb from the KEY portion of the body. Body shape is
+        # ``KEY@t`` for ev/aud/midi; partition on "@" so a missing "@"
+        # (defensive: future grammar drift) falls back to the full body.
+        key, _, _ = body.partition("@")
+        verb_tokens = key.lower().split("_")
+        verb = " ".join(verb_tokens[:CITATION_VERB_MAX_WORDS])
+        chips.append(
+            {
+                "event_id": f"{source}:{body}",
+                "verb": verb,
+                "timestamp_s": timestamp_s,
+            }
+        )
+    return chips
 
 
 def _resolve_prompt_cell(mood: str | None = None) -> str:
@@ -1011,6 +1113,38 @@ class DJCoHostAgent(Agent):
                     await self._ipc_bus.emit(msg.to_dict())
             except Exception as e:  # noqa: BLE001 — best-effort telemetry
                 print(f"\n[overlay publish err] {e}", file=sys.stderr)
+
+        # ---- Plan 44-03 / LAUNCH-02 — cohost-reaction broadcast ----
+        # Same guard as overlay-highlight: fire only when the user actually
+        # heard the reaction (citation_action in {emit, bypass}). When the
+        # linter stripped the text or suppression beat the linter to it,
+        # no chips fire — chips below a silent reaction would be ghost UI.
+        # When the registry is None (Phase 4 backward-compat path) or has
+        # no matching observations, `citation_strip` is an empty list and
+        # the message still fires — the UI then renders the transcript
+        # line without a chip strip beneath it (correct behavior, not a
+        # missed broadcast).
+        # Best-effort: any exception in chip building OR the bus emit is
+        # logged + swallowed; the LLM response path must NEVER crash on
+        # the launch-marketing surface (T-18-04-03-style mitigation).
+        if self._ipc_bus is not None and citation_action in ("emit", "bypass"):
+            try:
+                strip = (
+                    _build_citation_strip(
+                        reaction_text=full_text,
+                        registry=self._registry,
+                    )
+                    if self._registry is not None
+                    else []
+                )
+                reaction_msg = SessionCohostReaction.make(
+                    text=full_text,
+                    event_id=ev_tag,
+                    citation_strip=strip,
+                )
+                await self._ipc_bus.emit(reaction_msg.to_dict())
+            except Exception as e:  # noqa: BLE001 — best-effort telemetry
+                print(f"\n[cohost-reaction publish err] {e}", file=sys.stderr)
 
         # ---- Per-invocation dump (always written, even on suppression) ----
         try:

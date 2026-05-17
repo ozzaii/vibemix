@@ -88,6 +88,7 @@ from vibemix.ui_bus import (
     RecordingsListResult,
     RecordingsUsage,
     SessionCitation,
+    SessionCohostReaction,
     SessionMute,
     SessionOverlayHighlight,
     SessionSnapshot,
@@ -270,6 +271,21 @@ def _minimal_examples() -> list[tuple[str, object]]:
                 element_id="waveform_a",
                 color="amber",
                 duration_ms=1300,
+            ),
+        ),
+        # Phase 44-03 — cohost reaction broadcast (LAUNCH-02)
+        (
+            "SessionCohostReaction",
+            SessionCohostReaction.make(
+                text="sick [ev:KICK_SWAP@45.2] kick swap",
+                event_id="HEARTBEAT",
+                citation_strip=[
+                    {
+                        "event_id": "ev:KICK_SWAP@45.2",
+                        "verb": "kick swap",
+                        "timestamp_s": 45.2,
+                    }
+                ],
             ),
         ),
         ("RecordingsEvents", RecordingsEvents.make(session_dir="20260513-210410")),
