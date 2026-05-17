@@ -1,0 +1,23 @@
+{
+  "_comment": "LAUNCH-08 — vibemix Discord taxonomy lock. Single source of truth read by discord_provision.py at module load. MERGED canonical set: preserves all Phase 36-era channels + roles, adds CONTEXT §LAUNCH-08 additions. Edits here flow through to dry-run + live execution; tests/dayzero/test_discord_provision_dryrun.py pins counts (5 roles + 9 channels).",
+  "_merge_resolution": "CONTEXT §LAUNCH-08 listed roles=[member, moderator, kaan, francesco] + channels=[general, help, showcase, announcements, bugs]. Personal roles @kaan/@francesco collapse to existing 'founder'. @member collapses to existing 'lurker'. @moderator is new. All existing Phase 36 channels preserved (no regressions): announcements/help/show-and-tell/controllers/ai-misbehavior/dev. CONTEXT additions: general/bugs/showcase.",
+  "guild_name": "vibemix",
+  "roles": [
+    "founder",
+    "contributor",
+    "DJ",
+    "lurker",
+    "moderator"
+  ],
+  "channels": [
+    "announcements",
+    "general",
+    "help",
+    "show-and-tell",
+    "controllers",
+    "ai-misbehavior",
+    "dev",
+    "bugs",
+    "showcase"
+  ]
+}

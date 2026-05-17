@@ -33,17 +33,29 @@ def _load_module():
 
 
 def test_target_state_matches_requirements():
-    """OPS-09 contract: 4 roles + 6 channels per CONTEXT.md."""
+    """LAUNCH-08 contract: 5 roles + 9 channels per discord_taxonomy.json
+    (merged from CONTEXT §LAUNCH-08 + Phase 36 in-script set — see
+    `tests/dayzero/test_discord_provision_dryrun.py` for the merge
+    resolution and the canonical lock)."""
     mod = _load_module()
-    assert mod.TARGET_ROLES == ("founder", "contributor", "DJ", "lurker")
-    assert mod.TARGET_CHANNELS == (
+    assert set(mod.TARGET_ROLES) == {
+        "founder",
+        "contributor",
+        "DJ",
+        "lurker",
+        "moderator",
+    }
+    assert set(mod.TARGET_CHANNELS) == {
         "announcements",
+        "general",
         "help",
         "show-and-tell",
         "controllers",
         "ai-misbehavior",
         "dev",
-    )
+        "bugs",
+        "showcase",
+    }
 
 
 def test_discord_provision_idempotent_when_all_exist():
@@ -65,10 +77,16 @@ def test_discord_provision_idempotent_partial():
         existing_roles=["founder"],
         existing_channels=["announcements"],
     )
-    # founder skipped; rest planned.
+    # founder skipped; rest planned (post-LAUNCH-08 merged taxonomy:
+    # 5 roles total → 4 remaining after founder skip).
     assert "founder" not in plan.roles_to_create
     assert "founder" in plan.roles_existing
-    assert set(plan.roles_to_create) == {"contributor", "DJ", "lurker"}
+    assert set(plan.roles_to_create) == {
+        "contributor",
+        "DJ",
+        "lurker",
+        "moderator",
+    }
 
     assert "announcements" not in plan.channels_to_create
     assert "announcements" in plan.channels_existing
@@ -101,8 +119,13 @@ def test_discord_provision_dry_run_default_cli():
 
 
 def test_discord_provision_token_env_required_for_live():
-    """--live without DISCORD_BOT_TOKEN must exit 2."""
-    env = {k: v for k, v in os.environ.items() if k != "DISCORD_BOT_TOKEN"}
+    """--live without BRAVOH_DISCORD_BOT_TOKEN (or legacy
+    DISCORD_BOT_TOKEN) must exit 2."""
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("DISCORD_BOT_TOKEN", "BRAVOH_DISCORD_BOT_TOKEN")
+    }
     proc = subprocess.run(
         [sys.executable, str(SCRIPT), "--live", "--guild-id", "123"],
         capture_output=True,
@@ -110,6 +133,8 @@ def test_discord_provision_token_env_required_for_live():
         env=env,
     )
     assert proc.returncode == 2
+    # New error message names BRAVOH var first (preferred), legacy second.
+    assert "BRAVOH_DISCORD_BOT_TOKEN" in proc.stderr
     assert "DISCORD_BOT_TOKEN" in proc.stderr
 
 
@@ -137,14 +162,22 @@ def test_apply_plan_live_calls_only_missing_entries(monkeypatch):
     actions = asyncio.run(mod.apply_plan_live(plan, FakeGuild()))
 
     assert "founder" not in create_role_calls
-    assert set(create_role_calls) == {"contributor", "DJ", "lurker"}
+    assert set(create_role_calls) == {
+        "contributor",
+        "DJ",
+        "lurker",
+        "moderator",
+    }
 
     assert "announcements" not in create_channel_calls
     assert set(create_channel_calls) == {
+        "general",
         "help",
         "show-and-tell",
         "controllers",
         "ai-misbehavior",
         "dev",
+        "bugs",
+        "showcase",
     }
     assert any("[done]" in a for a in actions)
