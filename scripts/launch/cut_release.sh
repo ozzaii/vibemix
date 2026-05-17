@@ -10,12 +10,15 @@
 # invocation is a Kaan-action (see KAAN-ACTION-LEGAL.md §SHIP-CUT).
 #
 # Pre-flight gates (ALL must pass):
-#   1. Tag prefix regex `^v2\.1\.0-rc[0-9]+$` (P83 — no premature v1.0.0).
-#   2. `verify_signed.py --require-signed` for every dist/*.{dmg,msi,exe,pkg}.
-#   3. `pytest tests/repo/test_readme_hero_hash_sync.py` (Phase 35).
-#   4. `.planning/v2.1-MILESTONE-AUDIT.md` exists + frontmatter verdict WIRED.
-#   5. `pytest tests/repo/test_g5_poc_files_untouched.py` (Phase 37 / AUDIT-06).
-#   6. `pytest tests/security/test_bundle_id_locked.py` (Phase 33 / P63).
+#   1.  Tag prefix regex `^v2\.1\.0-rc[0-9]+$` (P83 — no premature v1.0.0).
+#   2.  `verify_signed.py --require-signed` for every dist/*.{dmg,msi,exe,pkg}.
+#   2b. `check_gate.sh` — Phase 42 hybrid hallucination gate (GATE-06).
+#   3.  `pytest tests/repo/test_readme_hero_hash_sync.py` (Phase 35).
+#   4.  `.planning/v2.1-MILESTONE-AUDIT.md` exists + frontmatter verdict WIRED.
+#   5.  `pytest tests/repo/test_g5_poc_files_untouched.py` (Phase 37 / AUDIT-06).
+#   5b. `check_bravoh_server_ready.sh` — 3-endpoint Bravoh server probe
+#       (Plan 45-03 / SHIP-06 / OPS-14).
+#   6.  `pytest tests/security/test_bundle_id_locked.py` (Phase 33 / P63).
 #
 # Usage:
 #   bash scripts/launch/cut_release.sh v2.1.0-rc1
@@ -125,6 +128,15 @@ if ${PYTHON} -m pytest "${REPO_ROOT}/tests/repo/test_g5_poc_files_untouched.py" 
   pass "tests/repo/test_g5_poc_files_untouched.py"
 else
   fail "tests/repo/test_g5_poc_files_untouched.py — POC drift detected"
+fi
+echo
+
+# ── Gate 5b: Bravoh server ready (Plan 45-03 / SHIP-06 / OPS-14) ───────
+echo "[Gate 5b] check_bravoh_server_ready.sh — 3-endpoint probe + healthz freshness (Plan 45-03)"
+if bash "${REPO_ROOT}/scripts/release/check_bravoh_server_ready.sh" --quiet >/dev/null 2>&1; then
+  pass "check_bravoh_server_ready.sh — 3/3 endpoints OK + healthz fresh"
+else
+  fail "check_bravoh_server_ready.sh — Bravoh server gate FAILED. Run 'bash ${REPO_ROOT}/scripts/release/check_bravoh_server_ready.sh' for the BLOCKED_BY line."
 fi
 echo
 
