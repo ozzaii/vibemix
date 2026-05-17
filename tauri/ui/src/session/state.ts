@@ -22,6 +22,7 @@
 import type { PhaseChunk } from "./components/phase-tape.js";
 import type { MidiEvent } from "./components/event-ribbon.js";
 import type { TranscriptLine, CohostStatus } from "./components/cohost.js";
+import type { CitationChip } from "./components/citation-strip.js";
 
 export interface LevelPair {
   rms: number;
@@ -76,6 +77,24 @@ export interface SettingsView {
   lighter_blur: boolean;
 }
 
+/** Phase 44-03 / LAUNCH-02 — per-reaction citation strip payload.
+ *  Mirrors the backend `SessionCohostReaction` IPC message. The
+ *  ws-bridge appends one entry per `ipc.session.cohost-reaction` push;
+ *  the render-loop joins these to the corresponding transcript line
+ *  by `ts` so the chips render under the right reaction. */
+export interface CohostReaction {
+  /** ISO-8601 UTC timestamp from the wire envelope — the join key. */
+  ts: string;
+  /** Reaction text the user heard (carries citation atoms verbatim). */
+  text: string;
+  /** LLM event tag (e.g. `"HEARTBEAT"`, `"KAAN_SPOKE"`). Stable id
+   *  for diff/scroll behaviour in the render loop. */
+  event_id: string;
+  /** Ordered list of chips — empty (NEVER null) when no citation atom
+   *  in the reaction text resolved to a registry observation. */
+  citation_strip: CitationChip[];
+}
+
 export interface SessionState {
   meters: MetersTriple;
   phase: PhaseChunk[];
@@ -85,6 +104,9 @@ export interface SessionState {
   dropPredBars: number | null;
   transcript: TranscriptLine[];
   midiEvents: MidiEvent[];
+  /** Plan 44-03 / LAUNCH-02 — append-only ring of cohost reactions
+   *  with their citation strips. Capped at REACTIONS_RING_CAP. */
+  reactions: CohostReaction[];
   track: TrackInfo | null;
   status: StatusFlags;
   settings: SettingsView;
@@ -99,6 +121,9 @@ export interface SessionState {
 
 export const TRANSCRIPT_RING_CAP = 200;
 export const MIDI_EVENT_RING_CAP = 12;
+/** Plan 44-03 / LAUNCH-02 — reactions ring cap. Matches transcript cap
+ *  so a 200-line transcript never has chip-strip gaps from rotation. */
+export const REACTIONS_RING_CAP = 200;
 
 /** Default state — every field present so the render-loop never reads
  *  `undefined`. Mirrors SessionLayout.defaultState() for the overlapping
@@ -118,6 +143,7 @@ function makeDefault(): SessionState {
     dropPredBars: null,
     transcript: [],
     midiEvents: [],
+    reactions: [],
     track: null,
     status: {
       livekit: null,
@@ -193,6 +219,20 @@ export function appendMidiEvents(
       ? merged.slice(merged.length - MIDI_EVENT_RING_CAP)
       : merged;
   currentState = { ...currentState, midiEvents: trimmed };
+  return trimmed;
+}
+
+/** Plan 44-03 / LAUNCH-02 — append a cohost reaction (with its
+ *  citation strip) to the reactions ring. Caps at REACTIONS_RING_CAP
+ *  the same way transcript caps so the two rings rotate in lockstep
+ *  and the render-loop's text↔chip join key (`ts`) doesn't dangle. */
+export function appendReaction(reaction: CohostReaction): CohostReaction[] {
+  const merged = currentState.reactions.concat([reaction]);
+  const trimmed =
+    merged.length > REACTIONS_RING_CAP
+      ? merged.slice(merged.length - REACTIONS_RING_CAP)
+      : merged;
+  currentState = { ...currentState, reactions: trimmed };
   return trimmed;
 }
 
