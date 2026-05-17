@@ -17,11 +17,19 @@ on:
       - 'scripts/release/check_no_hardcoded_model.sh'
       - 'tests/repo/test_model_literal_gate.py'
       - '.github/workflows/model-literal-check.yml'
+      # Phase 46 / DEPS-04: extended scan target — AUDIT.md generator
+      # output + dep-opportunities surface MUST NOT inline model literals.
+      - 'docs/AUDIT.md'
+      - 'scripts/audit/**'
+      - 'docs/dep-opportunities/**'
   push:
     branches: [main]
     paths:
       - 'src/vibemix/**'
       - 'scripts/release/check_no_hardcoded_model.sh'
+      - 'docs/AUDIT.md'
+      - 'scripts/audit/**'
+      - 'docs/dep-opportunities/**'
   workflow_dispatch:
 
 permissions:

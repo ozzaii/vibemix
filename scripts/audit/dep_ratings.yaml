@@ -1,0 +1,220 @@
+# DEPS-04 — hand-authored ratings + rationale side-file.
+# gen_audit_md.py reads this and joins it against the auto-extracted
+# version + license from the lockfiles to produce docs/AUDIT.md.
+#
+# rating values: green | yellow | red
+#   green  = pure-wheel/pure-JS/pure-Rust crate, zero native build
+#            steps in the installer happy path
+#   yellow = native dep with prebuilt wheels for Mac arm64+x86_64 AND
+#            Win64, or Rust crate with `cc`/system lib that is satisfied
+#            by the build chain; user-invisible
+#   red    = requires system extension/driver/manual brew/winget,
+#            or any installer prompt the user must consent to
+#
+# Driver-level deps (BlackHole, VB-CABLE, system MIDI) are NOT here —
+# they are Phase 49 installer-companion concerns. This file rates the
+# Python/Rust/JS package surface only.
+
+python:
+  google-genai:
+    rating: green
+    rationale: "Gemini-only AI surface (CLAUDE.md hard rule). Pure-Python; no native build."
+  httpx:
+    rating: green
+    rationale: "HTTP client used by google-genai + livekit-agents transitives."
+  keyring:
+    rating: yellow
+    rationale: "Native macOS Keychain / Windows Credential Locker integration via pure-Python ctypes; no compile step."
+  livekit-agents:
+    rating: green
+    rationale: "Gemini Live API wrapper (cohost_v2/lk variants). Pure-Python."
+  livekit-plugins-google:
+    rating: green
+    rationale: "LiveKit Gemini adapter — the seam through which all Gemini Live audio flows."
+  livekit-plugins-openai:
+    rating: yellow
+    rationale: "[CULL-CANDIDATE: Plan 04] LiveKit OpenAI adapter; vibemix is Gemini-only (CLAUDE.md). Pending Plan 04 dep-cull pass."
+  livekit:
+    rating: yellow
+    rationale: "WebRTC client; transitively pulls av + aiortc. Prebuilt wheels for Mac+Win64."
+  numpy:
+    rating: yellow
+    rationale: "Audio math (RMS / FFT / BPM autocorr). Prebuilt wheels Mac arm64+x86_64 + Win64."
+  scipy:
+    rating: yellow
+    rationale: "scipy.signal.resample_poly for 48kHz to 16kHz. Prebuilt wheels all platforms."
+  sounddevice:
+    rating: yellow
+    rationale: "CoreAudio (Mac) + WASAPI (Win) bridge. Pure-Python over CFFI; system PortAudio resolved by the installer."
+  mido:
+    rating: green
+    rationale: "MIDI message parsing (DDJ-FLX4 controller decode). Pure-Python."
+  python-rtmidi:
+    rating: yellow
+    rationale: "Low-level MIDI I/O (mido backend). Prebuilt wheels Mac+Win64."
+  pyrekordbox:
+    rating: yellow
+    rationale: "Rekordbox collection.xml parser. Installed with --no-deps (CONTEXT D-01); SQLCipher path dormant; stdlib-sqlite3 fallback."
+  bidict:
+    rating: green
+    rationale: "pyrekordbox transitive (declared explicitly per --no-deps recipe). Pure-Python."
+  construct:
+    rating: green
+    rationale: "pyrekordbox transitive — ANLZ binary parser. Pure-Python."
+  SQLAlchemy:
+    rating: yellow
+    rationale: "pyrekordbox transitive — required for db6 import chain even when SQLCipher dormant. Prebuilt wheels all platforms."
+  psutil:
+    rating: yellow
+    rationale: "pyrekordbox transitive — Rekordbox process discovery. Prebuilt wheels all platforms."
+  python-dateutil:
+    rating: green
+    rationale: "pyrekordbox transitive — date parsing. Pure-Python."
+  mss:
+    rating: green
+    rationale: "Win32 screen capture (CoreGraphics on Mac uses ScreenCaptureKit). Pure-Python."
+  pillow:
+    rating: yellow
+    rationale: "PIL image resize/crop before sending screenshot to Gemini. Prebuilt wheels all platforms."
+  pyjwt:
+    rating: green
+    rationale: "JWT decode for LiveKit room token verification. Pure-Python."
+  jsonschema:
+    rating: green
+    rationale: "JSON-schema validation (IPC schema gate, dep_ratings_schema). Pure-Python."
+  websockets:
+    rating: green
+    rationale: "Mascot bus WebSocket server + LiveKit internals dep. Pure-Python."
+  python-dotenv:
+    rating: green
+    rationale: "load_dotenv() for GEMINI_API_KEY ingest. Pure-Python."
+  pyobjc-core:
+    rating: yellow
+    rationale: "PyObjC bridge for macOS APIs. macOS-only (sys_platform guard). Prebuilt wheels."
+  pyobjc-framework-Cocoa:
+    rating: yellow
+    rationale: "Cocoa framework bindings (macOS-only). Prebuilt wheels."
+  pyobjc-framework-Quartz:
+    rating: yellow
+    rationale: "Quartz window listing for djay-Pro window crop (macOS-only). Prebuilt wheels."
+  pyobjc-framework-ScreenCaptureKit:
+    rating: yellow
+    rationale: "ScreenCaptureKit bindings for Phase 8 macOS capture path. Prebuilt wheels."
+  pyobjc-framework-AVFoundation:
+    rating: yellow
+    rationale: "AVFoundation bindings (macOS-only). Prebuilt wheels."
+  pyaudiowpatch:
+    rating: yellow
+    rationale: "PyAudio fork with WASAPI loopback (Win-only). Prebuilt wheels."
+  pywin32:
+    rating: yellow
+    rationale: "Win32 API bindings (Win-only). Prebuilt wheels."
+  winsdk:
+    rating: yellow
+    rationale: "Windows SDK Python projections — MediaRemote MMC equivalent on Win (Win-only)."
+  sqlite-vec:
+    rating: yellow
+    rationale: "Vector ANN extension for sqlite — Phase 28 library intelligence. Prebuilt loadable extension."
+
+rust:
+  tauri:
+    rating: yellow
+    rationale: "Desktop shell framework. Mac/Win supported with native toolchains; build chain is installer-invisible."
+  tauri-build:
+    rating: yellow
+    rationale: "Tauri's build-script crate. Build-time only — does not ship in the binary."
+  serde:
+    rating: green
+    rationale: "Serialization. Compile-time codegen; no runtime native deps."
+  serde_json:
+    rating: green
+    rationale: "JSON path for IPC payloads. Compile-time codegen."
+  tokio:
+    rating: yellow
+    rationale: "Async runtime. Native syscalls but no system-extension install."
+  tokio-tungstenite:
+    rating: green
+    rationale: "WebSocket client/server over tokio. Pure-Rust, no system deps."
+  futures-util:
+    rating: green
+    rationale: "Futures helper traits. Pure-Rust."
+  tracing:
+    rating: green
+    rationale: "Structured logging. Pure-Rust."
+  dirs-next:
+    rating: green
+    rationale: "Cross-platform user-dirs resolution (config, cache). Pure-Rust."
+  file-rotate:
+    rating: green
+    rationale: "Log file rotation. Pure-Rust."
+  tauri-plugin-fs:
+    rating: green
+    rationale: "Tauri FS access plugin. Build-time + native bindings; installer-invisible."
+  tauri-plugin-shell:
+    rating: green
+    rationale: "Tauri shell-out plugin (open-link). Build-time + native bindings."
+  tauri-plugin-store:
+    rating: green
+    rationale: "Tauri KV store plugin. Pure-Rust."
+  tauri-plugin-process:
+    rating: green
+    rationale: "Tauri process-control plugin (restart-app). Pure-Rust."
+  tauri-plugin-updater:
+    rating: green
+    rationale: "Tauri auto-updater plugin. Pure-Rust + signed-update gate."
+  tauri-plugin-global-shortcut:
+    rating: yellow
+    rationale: "Tauri global hotkey plugin (Cmd+; mascot toggle). Native OS hotkey APIs; prebuilt."
+  tauri-plugin-positioner:
+    rating: green
+    rationale: "Tauri window-positioning helper. Pure-Rust."
+
+js:
+  three:
+    rating: green
+    rationale: "WebGL 3D library — mascot rig render path. Pure-JS, zero native deps."
+  '@tauri-apps/api':
+    rating: green
+    rationale: "Tauri JS bridge — pure-TS bindings to Rust IPC."
+  '@tauri-apps/plugin-shell':
+    rating: green
+    rationale: "Shell-out plugin (open-link). Pure-TS bindings."
+  '@tauri-apps/plugin-store':
+    rating: green
+    rationale: "Tauri persistent KV store. Pure-TS bindings."
+  typescript:
+    rating: green
+    rationale: "Build-time only — does not ship in the binary."
+  vite:
+    rating: green
+    rationale: "Build tool. Build-time only."
+  vitest:
+    rating: green
+    rationale: "Test runner. Dev only."
+  ajv:
+    rating: green
+    rationale: "JSON-schema validation (IPC schema gate). Pure-JS."
+  ajv-formats:
+    rating: green
+    rationale: "ajv format validators."
+  jsdom:
+    rating: green
+    rationale: "DOM emulator for vitest. Dev only."
+  json-schema-to-typescript:
+    rating: green
+    rationale: "IPC schema to TS codegen. Build-time only."
+  '@gltf-transform/cli':
+    rating: green
+    rationale: "GLB optimization CLI for mascot bundle. Build-time only."
+  '@gltf-transform/core':
+    rating: green
+    rationale: "GLB transform library."
+  '@types/three':
+    rating: green
+    rationale: "TS type declarations for three. Dev only."
+  gltf-pipeline:
+    rating: green
+    rationale: "GLB compression pipeline. Build-time only."
+  vite-plugin-static-copy:
+    rating: green
+    rationale: "Vite plugin to copy mascot bundle assets into dist. Build-time only."

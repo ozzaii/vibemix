@@ -224,6 +224,69 @@ def check_launch_copy(launch_dir: Path, *, quiet: bool = False) -> int:
     return 0
 
 
+def _repo_root() -> Path:
+    """Resolve repo root from this file's location."""
+    return Path(__file__).resolve().parents[2]
+
+
+def check_audit_md_scan(*, quiet: bool = False) -> int:
+    """Phase 46 / DEPS-04 — blocklist + 'deeply <word>' gate against
+    docs/AUDIT.md + scripts/audit/** + docs/dep-opportunities/** + README.md.
+
+    Skips the presence / signature / anchor gates (those are SHIP-TWEET
+    specific). Only the slop blocklist + deeply regex apply.
+    """
+    repo = _repo_root()
+    files: list[Path] = [
+        repo / "docs" / "AUDIT.md",
+        repo / "scripts" / "audit" / "dep_ratings.yaml",
+        repo / "README.md",
+    ]
+    files += sorted((repo / "scripts" / "audit").glob("*.py"))
+    files += sorted((repo / "scripts" / "audit").glob("*.sh"))
+    dep_opps = repo / "docs" / "dep-opportunities"
+    if dep_opps.exists():
+        files += sorted(dep_opps.glob("*.md"))
+
+    slop_hits: list[str] = []
+    deeply_hits: list[str] = []
+
+    for fpath in files:
+        if not fpath.exists():
+            continue
+        try:
+            text = fpath.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        text_lower = text.lower()
+        rel = fpath.relative_to(repo)
+        for token in AI_SLOP_BLOCKLIST:
+            if token.lower() in text_lower:
+                slop_hits.append(f"{rel}: '{token}'")
+        for hit in _DEEPLY_RE.findall(text):
+            deeply_hits.append(f"{rel}: '{hit}'")
+
+    if slop_hits or deeply_hits:
+        if not quiet:
+            print("FAIL: DEPS-04 audit-md scan", file=sys.stderr)
+            if slop_hits:
+                print(
+                    "  AI_SLOP_BLOCKLIST gate: " + ", ".join(slop_hits),
+                    file=sys.stderr,
+                )
+            if deeply_hits:
+                print(
+                    "  AI_SLOP_DEEPLY gate: " + ", ".join(deeply_hits),
+                    file=sys.stderr,
+                )
+        return 1
+
+    if not quiet:
+        n = len([f for f in files if f.exists()])
+        print(f"PASS: DEPS-04 audit-md scan — {n} files scanned, 0 slop hits")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -236,11 +299,23 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--audit-md",
+        action="store_true",
+        help=(
+            "DEPS-04 mode: scan docs/AUDIT.md + scripts/audit/** + "
+            "docs/dep-opportunities/** + README.md for the AI-slop "
+            "blocklist + 'deeply <word>' regex only (skips the "
+            "SHIP-TWEET presence/signature/anchor gates)."
+        ),
+    )
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress stdout/stderr (CI piping mode).",
     )
     args = parser.parse_args(argv)
+    if args.audit_md:
+        return check_audit_md_scan(quiet=args.quiet)
     return check_launch_copy(args.dir, quiet=args.quiet)
 
 

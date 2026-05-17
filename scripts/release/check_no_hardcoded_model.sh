@@ -36,46 +36,57 @@ set -euo pipefail
 # never inlines a model id, only consumes _ROUTES from _router_config.py.
 ALLOWLIST_PATH="src/vibemix/llm/_router_config.py"
 
-SCOPE_DIR="src/vibemix"
+# Phase 46 / DEPS-04 — scan target expanded to include AUDIT.md +
+# scripts/audit/ (where the AUDIT.md generator lives) + the future
+# docs/dep-opportunities/ surface (Phase 48 pre-emptive coverage).
+SCOPE_DIRS=(
+  "src/vibemix"
+  "docs/AUDIT.md"
+  "scripts/audit"
+  "docs/dep-opportunities"
+)
 
 # Regex matches every banned literal pattern. Escape dots inside the
 # bracketed alternation. Use POSIX extended regex (grep -E).
 PATTERN='gemini-3-flash|gemini-3-pro|gemini-embedding-|gemini-3\.1-flash|gemini-2\.5-flash|gemini-3\.1-flash-live'
 
-if [ ! -d "${SCOPE_DIR}" ]; then
-  echo "::error::Plan 41-01 gate: scope dir ${SCOPE_DIR} missing" >&2
-  exit 1
-fi
-
-# Build the file list — every *.py under src/vibemix/ except the allowlist.
-# Use find + grep so a missing file doesn't abort the pipeline.
 violations=0
 
-while IFS= read -r -d '' file; do
-  # Normalize path for allowlist comparison — find prints paths starting
-  # with ./ when run from the repo root with `find . -path …`, so strip
-  # any leading ./ before comparing.
-  rel="${file#./}"
+scan_file() {
+  local rel="$1"
   if [ "${rel}" = "${ALLOWLIST_PATH}" ]; then
-    continue
+    return 0
   fi
-  # grep -n prints "lineno:line" for each match; -E enables extended regex.
   if matches=$(grep -nE "${PATTERN}" "${rel}" 2>/dev/null); then
     while IFS= read -r m; do
       lineno="${m%%:*}"
       line="${m#*:}"
-      # GitHub Actions annotation — surfaces inline in the PR diff view.
-      printf '::error file=%s,line=%s::Plan 41-01: hardcoded Gemini model literal — route via vibemix.llm.model_router.resolve() instead. Line: %s\n' \
+      printf '::error file=%s,line=%s::DEPS-04 / Plan 41-01: hardcoded Gemini model literal — route via vibemix.llm.model_router.resolve() instead. Line: %s\n' \
         "${rel}" "${lineno}" "${line}" >&2
       violations=$((violations + 1))
     done <<< "${matches}"
   fi
-done < <(find "${SCOPE_DIR}" -type f -name '*.py' -print0)
+}
+
+for scope in "${SCOPE_DIRS[@]}"; do
+  if [ ! -e "${scope}" ]; then
+    # docs/dep-opportunities/ may not exist yet — pre-emptive coverage.
+    continue
+  fi
+  if [ -d "${scope}" ]; then
+    while IFS= read -r -d '' file; do
+      rel="${file#./}"
+      scan_file "${rel}"
+    done < <(find "${scope}" -type f \( -name '*.py' -o -name '*.md' -o -name '*.yaml' -o -name '*.yml' -o -name '*.sh' -o -name '*.json' \) -print0)
+  else
+    scan_file "${scope}"
+  fi
+done
 
 if [ "${violations}" -ne 0 ]; then
-  echo "::error::Plan 41-01 gate: ${violations} hardcoded Gemini model literal(s) found in ${SCOPE_DIR}/ — see annotations above. Allowlist: ${ALLOWLIST_PATH}." >&2
+  echo "::error::DEPS-04 / Plan 41-01 gate: ${violations} hardcoded Gemini model literal(s) found in scanned paths — see annotations above. Allowlist: ${ALLOWLIST_PATH}." >&2
   exit 1
 fi
 
-echo "Plan 41-01 gate: clean — no hardcoded Gemini model literals in ${SCOPE_DIR}/ outside ${ALLOWLIST_PATH}."
+echo "DEPS-04 / Plan 41-01 gate: clean — no hardcoded Gemini model literals in scanned paths (${SCOPE_DIRS[*]}) outside ${ALLOWLIST_PATH}."
 exit 0

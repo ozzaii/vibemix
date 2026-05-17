@@ -25,6 +25,7 @@ on:
       - 'tauri/src-tauri/deny.toml'
       - 'tauri/ui/package.json'
       - 'tauri/ui/package-lock.json'
+      - 'docs/AUDIT.md'
   push:
     branches: [main]
     paths:
@@ -36,6 +37,7 @@ on:
       - 'tauri/src-tauri/deny.toml'
       - 'tauri/ui/package.json'
       - 'tauri/ui/package-lock.json'
+      - 'docs/AUDIT.md'
   workflow_dispatch:
 
 permissions:
@@ -136,3 +138,32 @@ jobs:
                 body,
               });
             }
+
+  audit-md-freshness:
+    name: AUDIT.md freshness gate (DEPS-05)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history — git log -1 needs commit-time
+
+      - name: Run freshness gate
+        run: bash scripts/audit/check_audit_freshness.sh
+
+  audit-md-gen-check:
+    name: AUDIT.md generator drift (DEPS-04)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pyyaml
+        run: pip install pyyaml
+
+      - name: Run generator in --check mode
+        run: python scripts/audit/gen_audit_md.py --check
