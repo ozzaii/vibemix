@@ -433,3 +433,114 @@
   font-size: 12px;
   color: var(--amber-2, #d4a74f);
 }
+
+/* ---------------------------------------------------------------------------
+ * Plan 44-04 / LAUNCH-05 — Bravoh waitlist opt-in toggle.
+ *
+ * Sits in its own debrief.html section host. Token-driven CDJ Whisper
+ * styling — faint amber glow on the active row, no shiny gradients
+ * (memory `project_visual_direction_cdj_whisper`). Subtitle copy stays
+ * silk-60 so the row reads as ambient context, not a sales pitch.
+ * --------------------------------------------------------------------------- */
+
+.vmx-debrief-bravoh-host {
+  margin-top: 16px;
+}
+
+.vmx-bravoh-waitlist-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--black-2, #211d18);
+  border: 1px solid var(--black-3, #2b2622);
+  border-radius: 6px;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.vmx-bravoh-waitlist-row[data-opt-in="true"] {
+  border-color: var(--amber-3, #966f2f);
+  /* Faint amber glow — restraint over shine (CDJ Whisper) */
+  box-shadow: var(--glow-faint, 0 0 5px rgba(255, 138, 61, 0.22));
+}
+
+.vmx-bravoh-waitlist-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--silk-90, #f0eee8);
+}
+
+.vmx-bravoh-waitlist-checkbox {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--silk-40, #6b665d);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.vmx-bravoh-waitlist-checkbox:hover,
+.vmx-bravoh-waitlist-checkbox:focus-visible {
+  border-color: var(--amber-2, #d4a74f);
+  outline: none;
+}
+
+.vmx-bravoh-waitlist-checkbox:checked {
+  border-color: var(--amber-2, #d4a74f);
+  background: var(--amber-2, #d4a74f);
+}
+
+.vmx-bravoh-waitlist-checkbox:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--black-1, #181612);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.vmx-bravoh-waitlist-label {
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  color: var(--silk-90, #f0eee8);
+}
+
+.vmx-bravoh-waitlist-subtitle {
+  margin: 0;
+  padding-left: 26px; /* aligns under the label, past the checkbox */
+  font-size: 12px;
+  color: var(--silk-60, #99948a);
+  line-height: 1.4;
+}
+
+.vmx-bravoh-waitlist-link {
+  margin-left: 26px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--amber-1, #e5be62);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  width: fit-content;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.vmx-bravoh-waitlist-link:hover,
+.vmx-bravoh-waitlist-link:focus-visible {
+  color: var(--amber-2, #d4a74f);
+  border-bottom-color: var(--amber-3, #966f2f);
+  outline: none;
+}

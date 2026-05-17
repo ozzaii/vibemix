@@ -16,6 +16,10 @@ import {
   mountEarTestToggle,
   type EarTestSubmission,
 } from "./components/ear-test-toggle.js";
+import {
+  mountBravohWaitlistToggle,
+  type BravohWaitlistToggleHandle,
+} from "./components/bravoh-waitlist-toggle.js";
 import { showErrorBanner } from "./components/error-banner.js";
 import { DebriefWsClient } from "./ws-client.js";
 
@@ -44,6 +48,9 @@ const drillsEl = document.getElementById("vmx-debrief-drills-list");
 const tldrEl = document.getElementById("vmx-debrief-tldr-player");
 const waveformEl = document.getElementById("vmx-debrief-waveform");
 const earTestToggleEl = document.getElementById("vmx-debrief-ear-test-toggle");
+const bravohWaitlistToggleEl = document.getElementById(
+  "vmx-debrief-bravoh-waitlist-toggle",
+);
 
 if (!sessionDir) {
   if (errorBanner) {
@@ -198,3 +205,90 @@ if (!sessionDir) {
 
   client.connect();
 }
+
+// ---------------------------------------------------------------------------
+// Plan 44-04 / LAUNCH-05 — Bravoh waitlist toggle mount
+//
+// Independent of the debrief WS session — the toggle reads/writes a
+// user-level config field (config_store.bravoh_waitlist_opt_in, Plan
+// 44-04 Task 1) and only affects whether a subtle link to the canonical
+// Bravoh waitlist URL is visible in the debrief surface.
+//
+// Persistence boundary:
+//   - On mount, read initial state via Tauri IPC `read_bravoh_waitlist_opt_in`
+//     (falls back to OFF when the runtime isn't present — e.g. vitest,
+//     `vite dev`, or pre-IPC-wiring builds).
+//   - On user toggle, persist via `write_bravoh_waitlist_opt_in`. Failure
+//     surfaces via the error banner; the toggle state is rolled back so
+//     the UI stays consistent with disk.
+//
+// Anti-scope-creep (memory `feedback_no_scope_creep_clean_utility`):
+//   - No analytics fire. The IPC call is local-only — it writes
+//     `bravoh_waitlist_opt_in: bool` to config_store via the sidecar.
+//   - No second IPC for "diagnostic event" — the contract is "the
+//     config-write IS the diagnostic". Avoids a second telemetry surface.
+// ---------------------------------------------------------------------------
+
+(async () => {
+  if (!bravohWaitlistToggleEl) return;
+
+  // Tauri invoke shim — kept loose so the file remains importable in
+  // dev / vitest where `@tauri-apps/api/core` may not resolve.
+  type InvokeFn = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
+  let invokeFn: InvokeFn | null = null;
+  try {
+    const core = await import("@tauri-apps/api/core");
+    // Two-step cast through `unknown` — Tauri's invoke is generic; we
+    // narrow at each call site below.
+    invokeFn = core.invoke as unknown as InvokeFn;
+  } catch {
+    // Not running under Tauri (dev / test) — invokeFn stays null,
+    // initial state stays OFF, onToggle is a no-op write.
+  }
+
+  // Read initial state — graceful fallback to OFF when the runtime is
+  // absent OR the Rust command isn't yet wired (treat as "user has
+  // never opted in", which is the default-OFF contract).
+  let initialOptIn = false;
+  if (invokeFn) {
+    try {
+      const value = await invokeFn<unknown>("read_bravoh_waitlist_opt_in");
+      if (typeof value === "boolean") {
+        initialOptIn = value;
+      }
+    } catch {
+      // Command not yet wired on the Rust side — keep default OFF.
+    }
+  }
+
+  const localInvoke = invokeFn;
+  let handle: BravohWaitlistToggleHandle | null = null;
+  handle = mountBravohWaitlistToggle(bravohWaitlistToggleEl, {
+    initialOptIn,
+    onToggle: (next: boolean): void => {
+      // Persist via Tauri IPC. Rollback the toggle on failure so the
+      // visible state stays consistent with disk.
+      if (!localInvoke) return;
+      void (async () => {
+        try {
+          await localInvoke<void>("write_bravoh_waitlist_opt_in", {
+            value: next,
+          });
+        } catch (err) {
+          // Roll back via the imperative setter (does NOT re-fire
+          // onToggle, so we avoid a write loop).
+          handle?.setOptIn(!next);
+          if (errorBanner) {
+            showErrorBanner(
+              errorBanner,
+              "tldr_generation_failed",
+              `Couldn't save Bravoh waitlist preference: ${String(
+                (err as Error)?.message ?? err,
+              )}`,
+            );
+          }
+        }
+      })();
+    },
+  });
+})();
