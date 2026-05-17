@@ -1706,3 +1706,263 @@ LAUNCH-04 ASSETS COMMITTED:        _____________________   (yes / no — assets(
 LAUNCH-04 a11y GATE GREEN POST:    _____________________   (yes / no — re-run after swap)
 Sign-off by (Kaan):                _____________________
 ```
+
+---
+
+## §LAUNCH-06 — Bravoh GH org standup
+
+**REQ-ID:** LAUNCH-06 (Phase 44-06)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 44-06 shipped polling gate + this runbook)  ☐ Bravoh Enterprise billing flag resolved  ☐ `bravoh` org created on github.com  ☐ Kaan + Francesco invited as owners  ☐ `bash scripts/launch/check_bravoh_org_ready.sh` exit 0
+**Effort:** ~10 minutes once Bravoh Enterprise billing flag clears (the billing-flag resolution itself can take 1–3 business days on first-time GH Enterprise org creation — start early)
+**Blocking for:** Phase 45 SHIP-TRANSFER (`gh repo transfer ozai/dj-set-ai bravoh/vibemix`) + the `bravoh/vibemix` URLs that the README install instructions, the SHIP-TWEET copy, and every onboarding doc reference become live destinations instead of 404s.
+
+### Why this is KAAN-action
+
+`gh org create` requires a session with org-create scope against
+Kaan's GH account + the Bravoh Enterprise billing context. Autonomous
+agents NEVER hold GH tokens with `admin:org` or `write:org` scope (see
+the broader privacy-rule discipline in CLAUDE.md). The Bravoh
+Enterprise billing flag is a one-time admin-panel resolution that
+requires Kaan's Bravoh-billing login — the engineering agent has no
+path to that surface.
+
+Plan 44-06 ships the pre-stage:
+
+- `scripts/launch/check_bravoh_org_ready.sh` — polls
+  `https://api.github.com/orgs/bravoh` and exits 0 once the org
+  exists (gh-first, curl fallback; the public-org existence check is
+  unauth-readable so Plan 45 SHIP-TRANSFER consumers don't need GH
+  tokens just to verify the gate).
+- This runbook.
+
+The 4-line discharge below is the only thing Kaan needs to do.
+
+### Files involved
+
+- **Polling gate (engineering):** `scripts/launch/check_bravoh_org_ready.sh`
+  + `tests/launch/test_check_bravoh_org_ready.py` (Plan 44-06).
+- **Plan 45 consumer:** `scripts/launch/ship_transfer.sh` (or
+  equivalent — Plan 45 ships the actual `gh repo transfer` call;
+  this runbook is its upstream gate).
+- **External references that flip from 404 to live after this
+  discharge:**
+  - `README.md` install URLs (Plan 44-01 hero block + 44-02 grid
+    sections reference `github.com/bravoh/vibemix/releases`)
+  - `scripts/dayzero/launch_copy/*.txt` (Plan 44-05 SHIP-TWEET copy
+    references the same)
+  - `docs/launch-prep/LAUNCH-SEQUENCE.md` T-0 row (Plan 44-07)
+
+### Kaan oneliner
+
+```bash
+# 1. Resolve Bravoh Enterprise billing flag (one-time, ~1–3 business days
+#    if first-time GH Enterprise org). Surface: github.com/enterprises/bravoh
+#    → Billing & licensing → resolve any outstanding flags. If Bravoh has
+#    no Enterprise account yet, this collapses to "create a free GH org"
+#    on Kaan's personal account, which is fine for the open-source
+#    vibemix repo (Bravoh-paid Enterprise can adopt later).
+#    Cross-ref: `signpath-application.md` for the broader Bravoh-credentials
+#    context (same billing surface).
+
+# 2. Create the org (KAAN-VERIFY: exact GH org-create endpoint depends on
+#    Bravoh's GH plan tier — Enterprise admins use the admin panel UI,
+#    free-tier creates via UI at github.com/account/organizations/new):
+#    Free-tier UI path:
+#      → https://github.com/account/organizations/new
+#      → name: bravoh, contact email: kaan@bravoh.com, plan: free
+#    Enterprise CLI path (if applicable):
+#      gh api -X POST /admin/organizations \
+#          -f login=bravoh -f admin=kaanozk -f profile_name='Bravoh'
+
+# 3. Invite Kaan + Francesco as owners:
+gh api -X PUT "orgs/bravoh/memberships/kaanozk"     -f role=admin
+gh api -X PUT "orgs/bravoh/memberships/francescotural" -f role=admin
+
+# 4. Verify the gate flips:
+bash scripts/launch/check_bravoh_org_ready.sh
+# → expected: "OK: org 'bravoh' exists on github.com"; exit 0
+```
+
+### Verification
+
+```bash
+# Gate script must return exit 0:
+bash scripts/launch/check_bravoh_org_ready.sh && echo "LAUNCH-06 GATE GREEN"
+
+# Polling test suite (offline invariants) must stay green:
+uv run pytest tests/launch/test_check_bravoh_org_ready.py -v -m "not network"
+
+# Live network smokes (opt-in; require internet):
+uv run pytest tests/launch/test_check_bravoh_org_ready.py -v -m network
+
+# Manual: org owners include both Kaan and Francesco:
+gh api orgs/bravoh/members --jq '.[].login' | sort
+# → expected: kaanozk, francescotural (at minimum)
+```
+
+### What unblocks
+
+- **Phase 45 SHIP-TRANSFER** — the canonical
+  `gh repo transfer ozai/dj-set-ai bravoh/vibemix` call. Plan 45
+  ships the transfer script + the watch-for-redirect-stability gate
+  + the post-transfer `git remote set-url` for Kaan's local clones;
+  none of those can run before this org exists.
+- **README install URLs go live** — Plan 44-01's hero block already
+  references `github.com/bravoh/vibemix/releases/latest/download/...`
+  for the Mac DMG + Windows MSI. Those URLs 404 today; they become
+  live download targets the moment Plan 45 SHIP-TRANSFER lands the
+  repo into `bravoh/vibemix` AND the v3.0.0-rc1 release ships.
+- **§ROADMAP Phase 44 success criterion 4** —
+  "`bravoh` GitHub org exists (engineering ships readiness check +
+  runbook; org creation = Kaan-discharge)." Engineering side is
+  green via this plan; the org-creation discharge closes the row.
+
+### Sign-off block
+
+```
+LAUNCH-06 ENGINEERING GREEN on:    _____________________   (date — Plan 44-06 polling gate + runbook shipped)
+LAUNCH-06 BILLING FLAG RESOLVED:   _____________________   (date — Bravoh Enterprise billing flag cleared)
+LAUNCH-06 ORG CREATED on:          _____________________   (date — `bravoh` org exists at github.com/bravoh)
+LAUNCH-06 OWNERS INVITED:          _____________________   (yes / no — Kaan + Francesco both org admins)
+LAUNCH-06 GATE GREEN (rc=0):       _____________________   (date — `bash scripts/launch/check_bravoh_org_ready.sh` exits 0)
+Sign-off by (Kaan):                _____________________
+```
+
+---
+
+## §LAUNCH-08 — Discord live-execution discharge
+
+**REQ-ID:** LAUNCH-08 (Phase 44-06)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge (Plan 44-06 locked taxonomy + dry-run zero-network + this runbook)  ☐ Bravoh-vibemix Discord guild created  ☐ `BRAVOH_DISCORD_BOT_TOKEN` sourced from Bravoh Discord Developer Portal  ☐ GH secret `BRAVOH_DISCORD_BOT_TOKEN` set  ☐ dry-run green against real guild ID  ☐ `--live` execution complete (5 roles + 9 channels created)
+**Effort:** ~15 minutes (guild create + token source + dry-run + live execute)
+**Blocking for:** Phase 45 SHIP-DISCORD (#announcements launch post via `scripts/launch/post_discord_launch.py`) + the broader community surface that every onboarding doc + LAUNCH-SEQUENCE T-0 row references.
+
+### Why this is KAAN-action
+
+Bot-token sourcing requires the Bravoh Discord admin seat — only
+Kaan holds that. Live `--live` execution against a real Discord guild
+requires the token in environment + the guild ID. Per the privacy +
+secrets discipline (CLAUDE.md), autonomous agents NEVER hold a real
+Discord bot token (the dry-run path is built specifically so the
+engineering surface ships without ever needing one).
+
+Plan 44-06 ships:
+
+- `scripts/dayzero/discord_taxonomy.json` — single source of truth
+  for the 5 roles + 9 channels merged canonical set (the merge
+  resolution is embedded in the JSON's `_merge_resolution` field).
+- `scripts/dayzero/discord_provision.py` — refactored to read the
+  taxonomy JSON at module load; defaults to dry-run; supports both
+  `BRAVOH_DISCORD_BOT_TOKEN` (preferred) and `DISCORD_BOT_TOKEN`
+  (legacy) env vars; logs `[live] bot token source: <ENV_NAME>` for
+  audit (never logs the token value).
+- `tests/dayzero/test_discord_provision_dryrun.py` — pins
+  taxonomy.json contract + dry-run zero-network + dry-run zero-SDK
+  + token-preference behavior.
+- This runbook.
+
+The 5-step discharge below is the only thing Kaan needs to do.
+
+### Files involved
+
+- **Taxonomy lock:** `scripts/dayzero/discord_taxonomy.json` (Plan 44-06).
+- **Provision script:** `scripts/dayzero/discord_provision.py` (Plan 44-06).
+- **Dry-run + token-preference gate:**
+  `tests/dayzero/test_discord_provision_dryrun.py` (Plan 44-06).
+- **Legacy idempotency + diff gate:**
+  `tests/dayzero/test_discord_provision.py` (Phase 36 baseline,
+  taxonomy updated in 44-06).
+- **Phase 45 consumer:** `scripts/launch/post_discord_launch.py`
+  (Phase 45 SHIP-DISCORD).
+
+### Kaan oneliner
+
+```bash
+# 1. Create the Bravoh-vibemix Discord guild
+#    → Bravoh Discord admin panel → New Server
+#    → name: vibemix, region: closest to Bravoh team
+#    → grab the numeric guild ID (right-click server icon → Copy Server ID
+#       requires Developer Mode enabled in Discord settings)
+
+# 2. Source the bot token
+#    → https://discord.com/developers/applications → New Application
+#    → name: vibemix-bot, owner: Bravoh team
+#    → Bot tab → Add Bot → Reset Token → copy
+#    → OAuth2 → URL Generator → scopes: bot
+#    → Bot permissions: Manage Roles + Manage Channels (minimum
+#       required for the provision script's create_role +
+#       create_text_channel calls)
+#    → Visit the generated URL → invite the bot into the vibemix guild
+
+export BRAVOH_DISCORD_BOT_TOKEN='<paste-token-here>'
+
+# 3. Persist into GH secret (Plan 45 SHIP-DISCORD reads this in CI):
+gh secret set BRAVOH_DISCORD_BOT_TOKEN --body "$BRAVOH_DISCORD_BOT_TOKEN"
+
+# 4. Dry-run verify (no API call; pins taxonomy + plan):
+uv run python scripts/dayzero/discord_provision.py
+# → expected: prints 5 roles + 9 channels + "DRY-RUN complete"
+
+# 5. Live execute against the real guild:
+uv run python scripts/dayzero/discord_provision.py \
+    --live --guild-id <numeric-guild-id>
+# → expected: prints "[live] bot token source: BRAVOH_DISCORD_BOT_TOKEN"
+#   then "[done] created role <X>" × 5 and "[done] created channel #<Y>" × 9
+#   (idempotent: re-running prints "[skip] role exists" / "[skip] channel exists")
+```
+
+### Verification
+
+```bash
+# Engineering gates must stay green AFTER the live run:
+uv run pytest tests/dayzero/test_discord_provision_dryrun.py -v
+uv run pytest tests/dayzero/test_discord_provision.py -v
+
+# Manual guild inspection — open the Discord server and confirm:
+#   Roles tab → founder, contributor, DJ, lurker, moderator (5)
+#   Channels list → announcements, general, help, show-and-tell,
+#                   controllers, ai-misbehavior, dev, bugs, showcase (9)
+
+# Idempotency smoke — re-run --live and confirm zero new entries:
+uv run python scripts/dayzero/discord_provision.py \
+    --live --guild-id <numeric-guild-id> | grep -c "^\[skip\]"
+# → expected: 14 (5 roles + 9 channels all skipped)
+
+# Token-source audit — confirm BRAVOH var was the source:
+uv run python scripts/dayzero/discord_provision.py \
+    --live --guild-id <numeric-guild-id> 2>&1 | \
+    grep "bot token source"
+# → expected: "[live] bot token source: BRAVOH_DISCORD_BOT_TOKEN"
+```
+
+### What unblocks
+
+- **Phase 45 SHIP-DISCORD** — the canonical #announcements launch
+  post via `scripts/launch/post_discord_launch.py --really`. That
+  script reads `BRAVOH_DISCORD_BOT_TOKEN` from GH secrets at T-0 and
+  posts the v3.0.0-rc1 launch announcement; without the provisioned
+  guild + secret, the publish step gates closed.
+- **Community surface goes live** — onboarding docs, README community
+  section, LAUNCH-SEQUENCE T-3 DJ TechTools Discord cross-pollination
+  + T-0 announcement post all reference a real Discord invite. That
+  invite only works once the guild exists + the bot is in.
+- **§ROADMAP Phase 44 success criterion 6** —
+  "Discord provision dry-run completes without errors (live execution
+  = Kaan-discharge)." Engineering side green via Plan 44-06
+  (dry-run pinned + taxonomy locked + zero-network asserted); the
+  live-execution discharge closes the row.
+
+### Sign-off block
+
+```
+LAUNCH-08 ENGINEERING GREEN on:    _____________________   (date — Plan 44-06 taxonomy + dry-run + token-preference + runbook shipped)
+LAUNCH-08 GUILD CREATED on:        _____________________   (date — vibemix Discord server exists; ID recorded)
+LAUNCH-08 BOT TOKEN SOURCED on:    _____________________   (date — token in Kaan-local env + GH secret set)
+LAUNCH-08 GUILD ID:                _____________________   (numeric — record for Plan 45 SHIP-DISCORD reference)
+LAUNCH-08 GH SECRET SET:           _____________________   (yes / no — `gh secret list | grep BRAVOH_DISCORD_BOT_TOKEN`)
+LAUNCH-08 DRY-RUN GREEN:           _____________________   (date — `discord_provision.py` dry-run exit 0)
+LAUNCH-08 LIVE EXECUTE COMPLETE:   _____________________   (date — 5 roles + 9 channels created, idempotent re-run shows 14 skips)
+Sign-off by (Kaan):                _____________________
+```
