@@ -81,10 +81,16 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# err() — write to stderr. (Task 3 adds GITHUB_ACTIONS ::error:: annotation.)
+# err() — write to stderr; if GITHUB_ACTIONS=true, also emit ::error::
+# annotation line on stdout (matches cut_release.sh / check_gate.sh
+# convention so GH Actions surface failure inline on the PR).
 # ---------------------------------------------------------------------------
 err() {
-  echo "$*" >&2
+  local msg="$*"
+  echo "${msg}" >&2
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    echo "::error::${msg}"
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -161,12 +167,22 @@ if [[ "${phase_ok}" -eq 0 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# --live precondition: LAUNCH_REAL=1 (Task 2). GITHUB_TOKEN +
-# DISCORD_WEBHOOK_URL checks added in Task 3.
+# --live precondition: triple-env (LAUNCH_REAL=1 + GITHUB_TOKEN +
+# DISCORD_WEBHOOK_URL). Failure modes are named per KAAN-ACTION-LEGAL.md
+# §SHIP-08 so an autonomous trigger surfaces the missing prerequisite
+# clearly instead of partial publish.
 # ---------------------------------------------------------------------------
 if [[ "${LIVE}" -eq 1 ]]; then
   if [[ "${LAUNCH_REAL:-}" != "1" ]]; then
     err "[launch_trigger] --live requires LAUNCH_REAL=1 env (matches publish_social_posts + post_discord_launch convention)"
+    exit 2
+  fi
+  if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+    err "[launch_trigger] --live requires GITHUB_TOKEN env (KAAN-ACTION-LEGAL.md §SHIP-08)"
+    exit 2
+  fi
+  if [[ -z "${DISCORD_WEBHOOK_URL:-}" ]]; then
+    err "[launch_trigger] --live requires DISCORD_WEBHOOK_URL env (KAAN-ACTION-LEGAL.md §SHIP-08)"
     exit 2
   fi
 fi
@@ -211,7 +227,39 @@ if [[ ${SLOP_EXIT} -ne 0 ]]; then
   exit 2
 fi
 
-# (Task 3 adds the sign-off footer gate here, between slop check and audit setup.)
+# ---------------------------------------------------------------------------
+# Pre-publish gate: sign-off footer (Plan 44-05 lock).
+# Each of the 5 launch_copy/*.txt files MUST carry both
+# `Kaan signature:` and `Francesco signature:` markers (the literal
+# strings check_no_ai_slop.py enforces as Gate 2 — single source of
+# truth). check_no_ai_slop.py already pins this when invoked against
+# the canonical scripts/dayzero/launch_copy directory; this gate
+# re-asserts when --copy-dir overrides the canonical location so
+# downstream test fixtures (or future copy moves) can't bypass the
+# lock by pointing at a different dir.
+# ---------------------------------------------------------------------------
+SIGNOFF_FAILURES=()
+for fname in twitter.txt instagram.txt linkedin.txt reddit.txt discord.txt; do
+  fpath="${COPY_DIR}/${fname}"
+  if [[ ! -f "${fpath}" ]]; then
+    SIGNOFF_FAILURES+=("${fname} (file missing)")
+    continue
+  fi
+  if ! grep -q "Kaan signature:" "${fpath}"; then
+    SIGNOFF_FAILURES+=("${fname} (missing 'Kaan signature:')")
+    continue
+  fi
+  if ! grep -q "Francesco signature:" "${fpath}"; then
+    SIGNOFF_FAILURES+=("${fname} (missing 'Francesco signature:')")
+  fi
+done
+
+if [[ ${#SIGNOFF_FAILURES[@]} -gt 0 ]]; then
+  for failure in "${SIGNOFF_FAILURES[@]}"; do
+    err "[launch_trigger] sign-off footer missing in ${failure} — Plan 44-05 contract broken"
+  done
+  exit 2
+fi
 
 # ---------------------------------------------------------------------------
 # Audit log setup — VIBEMIX_LAUNCH_RUN_DIR overrides default for tests.
