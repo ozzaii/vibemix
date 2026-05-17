@@ -187,3 +187,13 @@ jobs:
 
       - name: Run dep-cull verification test
         run: python -m pytest tests/audit/test_dep_cull_complete.py -x --tb=short
+
+  pinact-audit:
+    name: GH Actions SHA pinning (DEPS-07)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run pinact --check
+        run: bash scripts/audit/run_pinact.sh --check

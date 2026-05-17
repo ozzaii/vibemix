@@ -1,0 +1,23 @@
+# Phase 46 / DEPS-07 — pinact v3.x configuration.
+#
+# Strategy: pin every `uses:` to a full 40-char Git SHA + preserve the
+# human-readable version as a trailing comment. Dependabot (Plan 06)
+# reads the comment to surface upgrade PRs; pinact rewrites the SHA
+# when Dependabot's PR is merged.
+
+version: 3
+
+files:
+  - pattern: ".github/workflows/*.yml"
+  - pattern: ".github/workflows/*.yaml"
+  - pattern: ".github/actions/*/action.yml"
+  - pattern: ".github/actions/*/action.yaml"
+
+# Always use the full 40-char SHA, never a short SHA.
+is_full_version: true
+
+# Do NOT shorten to major-version tag (`@v4` is a tag, not a SHA).
+use_major_version_tag: false
+
+# Local composite actions — no SHA pin available.
+ignore_actions: []
