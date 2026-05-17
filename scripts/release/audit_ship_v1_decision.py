@@ -158,6 +158,25 @@ def load_ear_test_logs_from_ear_test_dir(directory: Path) -> list[dict[str, Any]
 # ----------------------------------------------------------------------
 
 
+def _require_gh_cli() -> None:
+    """Friendly preflight: `gh` must be on PATH for --live mode."""
+    cmd = ["gh", "--version"]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError as e:
+        raise RuntimeError(
+            "[audit] --live requires the GitHub CLI (`gh`) on PATH. "
+            "Install via `brew install gh` (macOS) or "
+            "https://cli.github.com/manual/installation (other). "
+            "See KAAN-ACTION-LEGAL.md §SHIP-13."
+        ) from e
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"[audit] `gh --version` failed (rc={result.returncode}); "
+            "is the gh CLI properly installed?"
+        )
+
+
 def load_live_release(release_tag: str) -> dict[str, Any]:
     """Pull release telemetry via `gh api`. Read-only."""
     # READ-ONLY: no --method POST/PATCH/DELETE.
@@ -514,6 +533,19 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+        # Skip the gh preflight when subprocess.run is monkeypatched (tests):
+        # the patched callable bypasses real PATH lookup. We only need the
+        # preflight to give a friendly error on real Kaan-run discharge.
+        try:
+            _require_gh_cli()
+        except RuntimeError as e:
+            # Soft-failure: if gh preflight raises a real install error, surface it.
+            # In tests where subprocess.run is patched, the patched stub answers
+            # gh --version normally so the preflight never raises.
+            err = str(e)
+            if "FileNotFoundError" in err or "requires the GitHub CLI" in err:
+                print(err, file=sys.stderr)
+                return 2
         release = load_live_release(args.release_tag)
         published_at = _parse_iso8601(release.get("published_at", ""))
         since_iso = (

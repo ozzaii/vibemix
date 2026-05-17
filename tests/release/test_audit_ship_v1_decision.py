@@ -432,8 +432,13 @@ def test_16_live_mode_uses_gh_subprocess(monkeypatch, tmp_path):
         for method in ("POST", "PATCH", "DELETE"):
             assert method not in cmd, f"--live must NEVER mutate GH: {cmd}"
         joined = " ".join(cmd)
-        # gh CLI command shape: `gh api ... releases/...` for releases,
-        # `gh issue list ...` for issues. Match either.
+        # gh CLI command shape: `gh --version` preflight, `gh api .../releases/...`
+        # for releases, `gh issue list ...` for issues. Match all three.
+        if "--version" in joined:
+            payload_str = "gh version 2.50.0 (test-stub)"
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout=payload_str, stderr=""
+            )
         if "releases" in joined or "release" in joined:
             payload = canned_release
         elif "issue" in joined or "issues" in joined:
@@ -479,6 +484,10 @@ def test_17_live_mode_url_to_csv_fallback(monkeypatch, tmp_path):
     # Stub gh subprocess (re-used from Test 16 shape, kept minimal).
     def fake_subprocess_run(cmd, *args, **kwargs):
         joined = " ".join(cmd)
+        if "--version" in joined:
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="gh version 2.50.0 (test-stub)", stderr=""
+            )
         if "releases" in joined:
             payload = {
                 "tag_name": "v3.0.0-rc1",
@@ -633,6 +642,10 @@ def test_20_idempotent_under_live_mode_with_patched_subprocess(monkeypatch, tmp_
 
     def fake_subprocess_run(cmd, *args, **kwargs):
         joined = " ".join(cmd)
+        if "--version" in joined:
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="gh version 2.50.0 (test-stub)", stderr=""
+            )
         if "releases" in joined:
             payload = canned_release
         else:
