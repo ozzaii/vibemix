@@ -197,7 +197,7 @@ Plans:
 - [ ] 45-01-PLAN.md — tart-based INSTALL-VM matrix runner + 60s onboarding gate (SHIP-04, SHIP-05)
 - [ ] 45-02-PLAN.md — launch_trigger.sh orchestration + cadence_index.json T-30 / T+0 / T+5h / T+24h (SHIP-08)
 - [ ] 45-03-PLAN.md — check_bravoh_server_ready.sh 3-endpoint probe + cut_release.sh Gate 5b wire-in (SHIP-06)
-- [ ] 45-04-PLAN.md — SHIP-V1-DECISION audit script + decision template + synthetic-telemetry fixtures (SHIP-13)
+- [x] 45-04-PLAN.md — SHIP-V1-DECISION audit script + decision template + synthetic-telemetry fixtures (SHIP-13)
 - [ ] 45-05-PLAN.md — docs/launch-rotation.md §SHIP-11 augment — 24h solo rotation + triage decision tree (SHIP-11)
 - [ ] 45-06-PLAN.md — KAAN-ACTION-LEGAL.md §SHIP-01..13 discharge cookbook (SHIP-01..13 all)
 ```

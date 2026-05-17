@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
 status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped (44-01 / LAUNCH-01). DJ-software 6-cell grid + canonical-10 controllers grid reconciled to src/vibemix/midi/controllers/*.json + 4-gate a11y CI (alt + count + balance + slop) + §LAUNCH-03 + §LAUNCH-04 Kaan-discharge runbooks shipped (44-02 / LAUNCH-03 + LAUNCH-04). EvidenceRegistry citation strip surfaced in live UI + click→debrief deep-link + 2s region highlight shipped (44-03 / LAUNCH-02) — new SessionCohostReaction IPC + token-driven amber chip strip + Tauri open_debrief_window deep_link extension. Bravoh waitlist opt-in toggle shipped in debrief window (44-04 / LAUNCH-05) — ConfigStore.bravoh_waitlist_opt_in field + mountBravohWaitlistToggle component + verbatim UTM URL grep-gate + token-driven faint-amber-glow active state; subtle, opt-in only, default OFF, no signed-out telemetry.
-last_updated: "2026-05-17T07:10:58.000Z"
+last_updated: "2026-05-17T08:10:00.000Z"
 last_activity: 2026-05-17
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 35
-  completed_plans: 35
-  percent: 83
+  total_plans: 41
+  completed_plans: 37
+  percent: 90
 ---
 
 # vibemix — State
@@ -34,8 +34,8 @@ progress:
 
 ## Current Position
 
-Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 3 active) + Phase 44 — Launch Positioning + Pre-stage (ENGINEERING COMPLETE — all 7 plans shipped)
-Plan: 43-01, 43-02, 43-03, 43-04, 43-05, 43-07, 43-08, 43-09 COMPLETE (8/9). Remaining: 43-06 (mood pool runtime + perf). Phase 44: 44-01 + 44-02 + 44-03 + 44-04 + 44-05 + 44-06 + 44-07 COMPLETE (7/7) — LAUNCH-01..10 ALL closed engineering-green. Phase 44 ready for Kaan-discharge handoff (Apple Dev + SignPath + GH org creation + Discord live + outreach + launch sequence) → Phase 45.
+Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 3 active) + Phase 44 — Launch Positioning + Pre-stage (ENGINEERING COMPLETE — all 7 plans shipped) + Phase 45 — External Discharge + Public RC Publish (IN PROGRESS — Wave 1 active)
+Plan: 43-01, 43-02, 43-03, 43-04, 43-05, 43-07, 43-08, 43-09 COMPLETE (8/9). Remaining: 43-06 (mood pool runtime + perf). Phase 44: 44-01 + 44-02 + 44-03 + 44-04 + 44-05 + 44-06 + 44-07 COMPLETE (7/7) — LAUNCH-01..10 ALL closed engineering-green. Phase 45: 45-04 + 45-05 COMPLETE (Wave 1 partial — SHIP-13 engineering scaffolding + SHIP-11 24h rotation augment); 45-01 + 45-02 + 45-03 in-flight; 45-06 awaiting Wave-1 completion.
 Status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped (44-01 / LAUNCH-01). DJ-software 6-cell grid + canonical-10 controllers grid reconciled to src/vibemix/midi/controllers/*.json + 4-gate a11y CI (alt + count + balance + slop) + §LAUNCH-03 + §LAUNCH-04 Kaan-discharge runbooks shipped (44-02 / LAUNCH-03 + LAUNCH-04). EvidenceRegistry citation strip surfaced in live UI + click→debrief deep-link + 2s region highlight shipped (44-03 / LAUNCH-02) — new SessionCohostReaction IPC + token-driven amber chip strip + Tauri open_debrief_window deep_link extension. Bravoh waitlist opt-in toggle shipped in debrief window (44-04 / LAUNCH-05) — ConfigStore.bravoh_waitlist_opt_in field + mountBravohWaitlistToggle component + verbatim UTM URL grep-gate + token-driven faint-amber-glow active state; subtle, opt-in only, default OFF, no signed-out telemetry.
 Last activity: 2026-05-17
 
@@ -68,6 +68,7 @@ Last activity: 2026-05-17
 | Phase 43 P05 | 14m 02s | 3 tasks | 8 files |
 | Phase 44-launch-positioning-pre-stage P01 | 10min | 2 tasks | 3 files |
 | Phase 44-launch-positioning-pre-stage P02 | ~1h | 3 tasks | 19 files |
+| Phase 45-external-discharge-public-rc-publish P04 | 28min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,10 @@ Last activity: 2026-05-17
 - **Plan 44-02 — Controller grid is sourced-of-truth-by-grep from `src/vibemix/midi/controllers/*.json`; legacy table drift CLOSED** (2026-05-17) — Prior README listed 10 controllers (Pioneer FLX6/FLX10/1000/SX3/XDJ-RX3/Numark Party Mix Live/Hercules Inpulse 300/500) that have ZERO mapping in the canonical JSON profile set, plus referenced 10 PNG paths that never existed in git (only `.gitkeep` was committed under `docs/assets/controllers/`). Plan 44-02 replaced the legacy table with the canonical 10 from `src/vibemix/midi/controllers/*.json` (Pioneer DDJ-200/400/FLX4/REV1, NI Traktor Kontrol S2/S4, Denon DJ MC6000/7000, Numark Mixtrack Platinum FX / Pro FX) + shipped 10 SVG wordmark placeholders under canonical slug filenames. Future controller add/remove that updates the JSON without updating the README grid fails CI.
 - **Plan 44-02 — A11y blocklist copied verbatim (not imported) from 44-01 hero-lock per CONTEXT §Claude's discretion** (2026-05-17) — Single-source via import would entangle the two scripts' lifecycles (a future blocklist edit on 44-01's side would silently change a11y semantics here); tested-copy-with-canonical-tokens-pinned guards drift in both directions independently. `tests/launch/test_readme_grids_a11y.py::test_blocklist_pins_canonical_tokens` mirrors 44-01's same-name test, asserting subset rather than equality so deliberate planner-approved adds/removes don't break either gate.
 - **Plan 44-02 — 16 SVG wordmark placeholders shipped (not just 6 DJ-software) per Rule 2 missing-functionality** (2026-05-17) — Plan suggested keeping 2 existing controller logo PNGs ("DDJ-FLX4 + DDJ-400 may already have real logos — confirm via existing `docs/assets/controllers/` ls"). Verification showed NO real assets existed — only `.gitkeep`. Generated 10 controller SVG placeholders + 6 DJ-software SVG placeholders = 16 total. README now has zero dead `<img src>` references.
+- **Plan 45-04 — SHIP-V1-DECISION audit hermetic-by-default; --live mode env-gated** (2026-05-17) — `--fixtures DIR` is the CI / dev mode (synthetic-telemetry under `tests/release/fixtures/synthetic_telemetry/`); `--live` is Kaan-discharge mode at T+30 only (requires `GITHUB_TOKEN`, exits 2 with documented stderr otherwise). All 20 tests run hermetic via `monkeypatch.setattr(mod.subprocess, "run", ...)` + `monkeypatch.setattr(mod.urllib.request, "urlopen", ...)`. No live network in CI; no `requests`/`httpx` added (stdlib `urllib.request` only).
+- **Plan 45-04 — Audit pre-fills 4 of 5 rubric "Current" cells; Anti-slop community-reports stays `<manual>`** (2026-05-17) — Community-report signal arrives via Discord / GH discussions / Twitter (no single auditable source). Audit substitutes Downloads / Uptime% / Slop-incidents / Open-crash count; Kaan manually fills the 5th cell at T+30 per Plan 45-06 §SHIP-13 runbook.
+- **Plan 45-04 — Plan 42-06 privacy contract preserved at audit boundary** (2026-05-17) — `ear-test-logs/*.json` fields `free_form` + `session_id` + `signed_at` are read by the aggregator but NEVER substituted into the rendered decision report. Audit emits only aggregate counts (felt_slop count, felt_scripted count, genres covered). Verified: `grep` of synthetic fixtures' free-form text against rendered output returns 0 matches (T-45-04-02 mitigation).
+- **Plan 45-04 — `_generated_by:` provenance HTML comment in rendered reports (T-45-04-03 mitigation)** (2026-05-17) — Anti-repudiation: the decision report carries an audit-tool version + ISO-8601 timestamp comment below the H1 so future readers can distinguish "audit ran" from "Kaan hand-filled". Pattern reusable for future v3.x / v4 decision-of-record docs.
 
 ### Decisions Locked (v2.1 — shipped)
 
@@ -170,6 +175,7 @@ All 11 critical pitfalls (P42–P52) mitigated in shipped code. P46 (legal-capac
 
 ### Last Session
 
+- 2026-05-17 — Plan 45-04 complete: SHIP-V1-DECISION audit script + decision template + 5 synthetic-telemetry fixtures shipped (SHIP-13 engineering scaffolding). `scripts/release/audit_ship_v1_decision.py` (610 lines) — argparse CLI with `--fixtures DIR` (CI / dev hermetic mode) + `--live` (T+30 Kaan-discharge: gh subprocess for GH releases + issues, stdlib urllib for Bravoh healthz, CSV fallback). `docs/SHIP-V1-DECISION-TEMPLATE.md` is the locked schema (4 evidence sections + 5-row Kaan-discharge rubric + 3-way decision checkbox + sign-off block). 20/20 tests GREEN; zero real network in CI. Threat-model mitigations T-45-04-{01..05} (numeric-only substitution, ear-test PII never leaked, _generated_by provenance comment, read-only gh argv, atomic tempfile+os.replace write) all enforced via tests + code. Plan 42-06 privacy contract preserved at the audit boundary (aggregate counts only; zero free_form text leakage). Plan 45-06 §SHIP-13 runbook ready to cite literal T+30 invocation. Commits: c822baa (test RED) + c3185ab (feat GREEN: fixture-mode + --live + 5 synthetic fixtures) + 8838f55 (feat GREEN: gh CLI preflight Rule 2). Closes SHIP-13 engineering (awaiting T+30 discharge).
 - 2026-05-16 — Plan 43-08 complete: hero demo storyboard re-mocked to 8-cut 30s sequence per CONTEXT §VIS-08; UI chip overlays in cuts 2-6 inline-rendered with CDJ Whisper v5 (wizard welcome, calibration meter, session shell, AI caption pop, EvidenceRegistry chip strip); end-card carries `open-source · MIT · github.com/bravoh/vibemix` star-funnel CTA; ≤8 cut hard gate wired via `scripts/launch/check_cut_count.py` + 6-test pytest spec; 12/12 launch-prep pytests green. Commits: c1877ed (test RED) + 6e7dd06 (feat GREEN) + f53cb9f (storyboard re-mock). Closes VIS-08; unblocks Plan 43-09 (Francesco handoff package).
 - 2026-05-16 — Plan 43-07 complete: mascot memory snapped to "Neon Rebel"; storyboard mock migrated from Workbench + DSEG7 to Saira + Geist Mono on the 5-warm-blacks + 1-amber CDJ Whisper palette; `scripts/launch/check_storyboard_palette.py` + 6-test pytest spec wired as drift-prevention gate. Commits: 4054536 + 2e4c1eb (test RED) + 927f79f (feat GREEN). Closes VIS-07.
 - 2026-05-16 — Plan 42-04 complete: `scripts/release/check_gate.sh` (hybrid hallucination gate combining last-7 nightly proxy scorecards from `.planning/eval-runs/` AND `check_ear_test.sh`) + wired Gate 2b into `scripts/launch/cut_release.sh` + retired v2.1 P85 reminder echo lines. 22 tests added (14 bash-gate + 8 cut_release wire-in; 21 pass + 1 conditional jq-missing skip). Phase 39 regression baselines preserved (test_g5_poc_files_untouched + test_bundle_id_locked green; verify_signed.py call still in Gate 2). Closes GATE-06 (hybrid release gate plumbing); GATE-08 partially advanced (echo-line removal; Plan 42-05 owns the test-file retirement + P85-OVERRIDE-RETIRED.md decision-log). Commits: 4a77b4d + c204318.
