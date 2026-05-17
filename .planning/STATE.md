@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Distribution-Ready Pass
-status: planning
-last_updated: "2026-05-17T12:00:00.000Z"
-last_activity: 2026-05-17
+status: "Roadmap scaffolded, ready for `/gsd:plan-phase 46`"
+last_updated: "2026-05-17T21:15:01.465Z"
+last_activity: 2026-05-17 — Roadmap v3.1 written; 5 phases (P46–P50) derived from 44 REQ-IDs with 100% coverage; build-order locked (46 ↕ 47 parallel → 48 → 49 → 50)
 progress:
   total_phases: 5
   completed_phases: 0
@@ -71,6 +71,14 @@ Plans:   0 / TBD  ░░░░░░░░░░░░░░░░░░░░  
 ---
 
 ## Accumulated Context
+
+### Phase 46 Kaan-Action Surface (2026-05-18, deferred per `gsd-autonomous fully` mode)
+
+Two engineering-green-with-deferral items from Phase 46 — neither blocks Phase 47 (MASCOT) or Phase 48 (dep-opportunity scan); both are documented in `docs/AUDIT.md` § Decisions and `scripts/audit/dep_ratings.yaml::decisions[]` for the long-lived paper trail.
+
+- **DEPS-07: pinact mechanical `--apply` deferred to CI**. `.pinact.yaml` + `scripts/audit/run_pinact.sh` + `dep-audit.yml::pinact-audit` job committed; mechanical SHA-pin rewrite of `.github/workflows/*.yml` deferred to first PR-triggered run (no pinact binary on local executor; no Go toolchain to bootstrap). Test `test_every_uses_is_sha_pinned` marked `xfail` with `strict=False` so future apply-pass that flips it green does not surprise-fail. **To close**: `brew install pinact && bash scripts/audit/run_pinact.sh --apply` then review + commit the SHA-churn diff, OR let the first CI PR surface the exact tag refs needing rewrite.
+
+- **DEPS-08: `livekit-plugins-openai` cull is CULL-BLOCKED**. `rg` found direct imports at `src/vibemix/agent/tts_chain.py:25` (`from livekit.plugins.openai import tts as _openai_tts_mod`) plus 3 test files (`tests/agent/test_proxy_client.py`, `tests/agent/test_config.py`, `tests/agent/test_tts_chain.py`). Removal requires rewiring the TTS proxy fallback chain — explicitly out-of-scope for Phase 46. `google-cloud-speech` + `google-cloud-texttospeech` are pure transitives of livekit-plugins-google with zero direct imports; retained-as-transitive (no Kaan-action needed there). **To close `livekit-plugins-openai`**: open a focused refactor phase post-v3.1 that rewires `tts_chain.py` to drop the OpenAI adapter path.
 
 ### v3.1 Roadmap Decisions Locked (2026-05-17)
 
