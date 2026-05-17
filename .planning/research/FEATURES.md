@@ -1,483 +1,490 @@
-<!-- refreshed: 2026-05-14 for milestone v2.0 -->
-# Feature Research — v2.0 Research-Driven Ship
+<!-- refreshed: 2026-05-17 for milestone v3.1 -->
+# Feature Research — v3.1 Distribution-Ready Pass
 
-**Domain:** AI live co-host for DJs (open-source, Gemini-only, Mac+Win)
-**Researched:** 2026-05-14
-**Confidence:** HIGH — derives from 12 deep-research v2-bucket artifacts (~28,000 words) + the validated v0.1.0 codebase (Phases 1–14 shipped). Confidence is lower on items still gated on a Kaan ear-test (predictive firing, KICK_SWAP thresholds, the inline emote-tag spike) and on Mixxx OSC (currently a draft PR upstream).
+**Domain:** vibemix v3.1 — distribution polish for the v3.0 engineering-complete OSS RC (Win + Mac one-click install, dep audit/pin, MacBook end-to-end pass, mascot full emotion coverage, new-dep opportunity scan)
+**Researched:** 2026-05-17
+**Confidence:** HIGH on category structure + dependency graph on existing v3.0 surface; HIGH on mascot emotion enumeration (anchored to shipped v2.1 4-layer state machine + Plutchik 8-primary set); MEDIUM on Windows install-flow expectations (VB-CABLE driver-signature prompt is OS-mandated, not removable); MEDIUM on the dep-opportunity scan outcomes (Mixxx OSC + 30-controller transpile are confirmed v3.x candidates per `project_v2_open_candidates`, but green/yellow/red ratings need a small parallel research pass to confirm).
 
-## Domain Framing — Where v2.0 Sits
+---
 
-The shipping product (Phases 1–14) already demonstrates "AI co-host that reacts to a DJ set." The v2.0 milestone is **not greenfield** — it's the move from "reacts" to "reacts in-bar, never hallucinates, with a viral demo arsenal." Three forces drive the v2.0 feature set:
+## Domain Framing — Where v3.1 Sits
 
-1. **The anti-slop thesis goes from prompt to enforcement.** Live and debrief outputs become citation-tagged; the linter is the post-processor that turns "trust the audio" from a rule into a contract.
-2. **Latency stops being a passive constraint.** Predictive firing + cancel-and-refire + ack bank + mascot anticipation compress the perceived voice-to-voice gap below the Doherty Threshold (400ms). v4's 5–10s window becomes a sub-2s actual / sub-300ms perceived experience.
-3. **The viral demo becomes the engineering critical path.** djay Pro overlay highlight is not a polish item — it's the seven-day spike whose successful filming feeds the IG/Reddit/HN wave that earns the 500–1000+ GitHub stars. Everything before "ship" is shaped to make Beat A / B / C filmable.
+v3.0 closed engineering-complete on 2026-05-17. Every shipping product surface — anti-slop audio path (mic-as-Part-2 + lookahead-as-Part-3), latency stack v2 (ModelRouter + implicit caching + LLM→TTS streaming + Embedding 2 MRL), hybrid hallucination gate, CDJ-Whisper visual lock on Tier-1 surfaces, README hero verbatim lock, EvidenceRegistry citation strip, KAAN-ACTION-LEGAL §SHIP-01..13 discharge cookbook — is in the repo. **The product itself is finished. v3.1 is not new product scope.**
 
-Cross-software integrations (Mixxx OSC, Pyrekordbox XML, 10-SKU MIDI library) and coaching/memory (post-session debrief, drills, profile) feed the same grounding contract: every Gemini claim has to point at a real event, a real MIDI move, a real track in the user's library, or a real tendency in their long-term profile. None of those primitives exist in shipping AI-for-DJ tools today; together they're the wedge.
+What v3.1 is doing instead: closing the gap between "Kaan's machine runs this" and "anyone on a clean Mac or Windows box can run this." That gap has five distinct shapes, mapped one-to-one to the milestone's target features:
 
-The 12 v2-bucket research artifacts mapped seven feature categories. Each category below is read as a unit by the roadmapper to decide phase decomposition; the dependencies + complexity hints lock the build order.
+1. **INSTALL** — `project_one_click_install_hard_req` says the install path is HARD requirement: app opens → auto-downloads deps → configures audio → ready. v2.1 Phase 33 shipped the TCC permissions wizard + BlackHole probe + onboarding stopwatch + bundle-ID lock. v3.0 Phase 45 SHIP-04/05 scaffolded the fresh-VM matrix runner (`tart`) but real-VM execution is gated on signed binaries (SHIP-01/02 external clock). **v3.1's job** is to turn the install path into a single visible double-click from `.dmg`/`.msi` to a running app with zero terminal commands AND validate it actually works on a clean machine.
+
+2. **DEPS** — v2.1 Phase 34 shipped `gitleaks` + `pip-audit` + `osv-scanner` + `cargo-audit` + `cargo-deny` + `syft` SBOM + signed-binary verifier + STRIDE-lite + telemetry-opt-in default-OFF + capability allowlist lint. The CI machinery exists. **v3.1's job** is to make "are these deps healthy/current/secure" answerable in <2min by surfacing the existing machinery's output — pinned versions, license, install-impact rating, dep diff bot, AUDIT.md as a single human-readable surface.
+
+3. **TEST** — v3.0 Phase 42 established the hybrid hallucination gate (autonomous proxy fast-lane + Kaan-ear release-cut veto via `check_gate.sh` Gate 2b). `project_phase_16_kaan_dj_testing` pins the hallucination gate to Kaan's personal DJ-set testing — NOT a 30-session formal harness. **v3.1's job** is broader than the hallucination gate alone: it's Kaan running the *full* product end-to-end on his MacBook — install, calibration wizard, first session, mascot emotion coverage, debrief UI, library intel, every CDJ-Whisper surface — and validating it as if he were a first-time user. Visual + aesthetic + usability dimensions, not just functional.
+
+4. **MASCOT** — v2.1 Phase 31 shipped the 4-layer additive state machine (Base + Emotion + Anticipation + Reaction). v3.0 VIS-04 scaffolded the Mixamo retarget pipeline but the 5 `prep_*.glb` clips remain placeholders pending Kaan's Adobe-account-gated Mixamo download + Kaan-aesthetic Pioneer-CDJ-headbob selection. v3.0 VIS-05 ran the mood→animation pool runtime validation against the existing clip set (Hype-man / Teacher / Coach 30s smoke). **v3.1's job** is to land the actual emotion-clip set across all four layers — not just placeholders — so the mascot is *fully visible* with the right state-machine response to every event class. This is the only v3.1 feature that adds real authored content; everything else is polish/audit/test.
+
+5. **OPPORTUNITY-SCAN** — `project_v2_open_candidates` confirms Mixxx OSC + map transpile + pyrekordbox + Gemini Embedding 2 + post-session debrief as v2.x; ProDJ Link + stems + CLAP as deferred. v3.x candidate scope in PROJECT.md lists Mixxx OSC adapter + Mixxx map transpiler + 10→30+ controller library + pyrekordbox + multi-session debrief + library coach drill packs as confirmed open candidates. **v3.1's research-pass job** is a small parallel scan to confirm WHICH integrations widen real-world compatibility enough to land in v3.1 itself (vs roll forward to v3.2). Only green-rated ones (low install-impact, high coverage) make v3.1. The scan is the deliverable — actual integrations land in their own phases.
+
+The thread connecting all five: v3.0 left every back-end pipeline ready. v3.1 closes the operator-facing surface that turns "ready" into "shippable."
 
 ---
 
 ## Feature Landscape by Category
 
-> **Reading guide for the roadmapper.** Every feature traces to a v2-bucket source. **Complexity** is engineering-days (E) where known. **Depends on (existing)** = shipped in Phases 1–14; **Depends on (v2)** = same-milestone prerequisite. Anti-features have a stated reason and "what to do instead".
+> **Reading guide for the roadmapper.** Every category traces to one of the 5 milestone target features in PROJECT.md. **Complexity** uses `single-day plan` (≤1 E-day; `gsd-quick` candidate) / `multi-day phase` (2-5 E-days; standard `/gsd-execute-phase`) / `epic` (>5 E-days; split into multiple plans within a phase). Dependencies on existing v3.0 features are explicit. Anti-features have stated alternatives — no scope creep tolerated per `feedback_no_scope_creep_clean_utility`.
 
 ---
 
-### Category 1 — Detection & Grounding
+### Category 1 — INSTALL: One-Click Install (Win + Mac)
 
-**Thesis:** Anti-slop is solved by data, not by better prompting. Detection gives Gemini specific events to react to; the linter enforces that every claim cites one. Library intelligence + cross-mode citations close the long tail.
+**Thesis:** "One-click" on Mac is genuinely one click after the `.dmg` is opened (Homebrew-equivalent cask install of BlackHole + bundled sidecar + first-launch wizard). "One-click" on Windows is one click + one OS-mandated driver-signature security prompt for VB-CABLE — the Windows audio driver UAC dialog cannot be suppressed by ANY installer per VB-Audio forum confirmation. v3.1's job is to make those flows visible, monitored (`onboarding-stopwatch.ts` already shipped), and survive the fresh-VM matrix (tart runner from SHIP-04 already scaffolded).
 
 #### Table Stakes
 
 | Feature | Why Expected | Complexity | Depends on |
 |---|---|---|---|
-| **Generalized event detector v1 — 6 cross-genre detectors** (`KICK_SWAP` / `SUB_LAYER_ARRIVAL` / `BREAKDOWN_KICK_KILL` / `REENTRY_KICK_LAND` / `KICK_DENSITY_SHIFT` / `PHRASE_BOUNDARY`) | Kaan's "feels surface-level" critique post hard-tek session diagnosed v4's `LAYER_ARRIVAL` as genre-blind. These six detectors are the minimum to make hard-tek (and by extension techno, house, DnB) reactions ground in the moment that defines the bar. | M (~5 E-days) | Existing: v4 `EventDetector` + `AudioBuffer.snapshot_features` extension (kick-band centroid / harmonic ratio / crest factor) + `MusicState.phrase_position` (autocorr-derived). |
-| **Citation grammar in prompts** (`[ev:KICK_SWAP@04:22]` / `[aud:peak_rms@04:22]` / `[midi:deckA_filter:23@04:22]` / `[track:"..."]`) | Without grammar in the prompt, Gemini doesn't emit tokens to lint. Seeded into system instruction at v2.0 launch; live linter enforces in v2.0 follow-on. | S (1 E-day, prompt-only) | Existing: 6-cell prompt matrix + TurnHistory (Phase 10). |
-| **Cross-software MIDI grounding (10 controllers)** — DDJ-FLX4 + 9 others, magnitude-aware EQ moves | Already in scope at v0.1.0 but the v2.0 absorption confirms 10-SKU library + `MidiMapLoader` + generic-MIDI fallback ships as the *spine* of cross-platform grounding. The MIDI controller is the universal layer that works the same across every DJ app. | M (~5 E-days) | Existing: Phase 9 (FLX4 verified, 9 SKUs ship by JSON). |
+| **Signed `.dmg` + signed `.msi`/`.exe` artifacts** download from `releases/latest` | Without it, macOS Gatekeeper / Windows SmartScreen rejects → 0% install conversion. Engineering-side completely done (v2.1 Phase 38 + v3.0 Phase 45). v3.1 just walks SHIP-01/02 cookbook + DIST-19 verification on the resulting artifacts. | single-day plan (post-external-clock) | v3.0: SHIP-01 (Apple Dev Agreement) + SHIP-02 (SignPath OSS) + SHIP-03 (DIST-19 verify). |
+| **First-launch wizard end-to-end walk** — `.dmg`/`.msi` open → app launches → wizard runs probes (BlackHole / VB-CABLE / TCC / MIDI / Gemini proxy reachability) → user lands on a configured live-mode session with mascot visible | The hard requirement per `project_one_click_install_hard_req`. The wizard exists (v2.1 Phase 33), but v3.1 validates it on clean hardware end-to-end with `onboarding-stopwatch.ts` confirming ≤60s. | single-day plan (SHIP-04/05 cookbook real run) | v3.0: SHIP-04 (`tart` matrix runner) + SHIP-05 (60s gate). v2.1: TCC wizard + BlackHole probe + bundle-ID lock. |
+| **BlackHole 2ch auto-detect-and-prompt** — wizard detects missing BlackHole, opens "click here to install" CTA, launches Homebrew install if available, falls back to direct `.pkg` download + open if not, polls for device-list appearance | BlackHole `brew install --cask blackhole-2ch` is the path-of-least-resistance on Macs that already have Homebrew. Fresh Macs without Homebrew need `.pkg` fallback. Either way the wizard waits for `sounddevice` to see the device. v3.0 §AUDIO-07 Kaan-discharge already walks fresh-Mac → CTA fires; v3.1 wires the Homebrew-first / `.pkg`-fallback decision tree into the CTA action. | single-day plan | v3.0: AUDIO-07 fresh-Mac probe. v2.1: BlackHole probe in install wizard. |
+| **VB-CABLE auto-prompt + driver-signature dialog framing** (Windows) — wizard detects missing VB-CABLE, runs `VBCABLE_Setup_x64.exe -i -h`, shows user a forewarning that "Windows will ask permission to install an audio driver — click Yes" because the UAC + driver-signing dialog CANNOT be suppressed by any installer flag per VB-Audio forum | The unavoidable Windows install asterisk. Forewarning the user reframes the prompt from "scary unexpected UAC" to "expected step in vibemix setup." First-class UX move that turns a friction point into a trust signal ("we told you it was coming"). | single-day plan | None (greenfield wording + sequencer). |
+| **Generic-MIDI fallback path on no-controller-detected** | Already exists from v2.0 Phase 9. v3.1 just confirms the wizard surfaces it gracefully and the user can advance without a controller plugged in. | single-day plan | v2.0: Phase 9 generic-MIDI fallback. |
+| **App opens to a configured-and-ready state** — wizard exit lands on session-ready with default mode (Hype-man / Coach via prompt matrix) + default Beginner skill level + mascot visible + Bravoh proxy connected | "Configured-and-ready" is the user-perceived definition of "one-click." Anything that ends at a config screen instead of a working session = failed. | single-day plan | v2.1 Phase 33 wizard exit-flow; v3.0 Phase 44 Bravoh proxy connection. |
+| **Onboarding stopwatch confirms ≤60s** end-to-end on every VM in the matrix (macOS 12.3 / 14 / 15 + Win 10 / 11) | The stated bar from v2.1. SHIP-05 makes it a release gate. Without it, "one-click <60s" claim in README is unverified marketing. | single-day plan (SHIP-05 real run) | v3.0: SHIP-05 `--check-60s` sub-gate. v2.1: `onboarding-stopwatch.ts`. |
 
 #### Differentiators
 
 | Feature | Value Proposition | Complexity | Depends on |
 |---|---|---|---|
-| **Citation linter (live + debrief, cross-mode)** — stdlib `re`, in-memory Evidence registry, sentence-level for debrief, response-level for live (ack-bank fallback) | The technical implementation of the anti-slop thesis. No competing AI-for-DJ tool grounds claims this way. Slop-ratio telemetry is itself a trust signal surfaced in UI. | M (~3–5 E-days) | v2: citation grammar + Evidence registry hook from EventDetector / MusicState / ControllerState / TrackInfo. Existing: anti-slop filter + scorecard (Phase 10). |
-| **Library intelligence — Gemini Embedding 2 + sqlite-vec + Bravoh pipeline port** | First product to read a DJ's own library and say "track X you played last week fits here" — grounded in their actual collection, not a generic recommender. Closes the "Gemini hallucinates a track name" failure mode entirely (track citations must come from imported library). | H (~7 E-days) | v2: Pyrekordbox XML import (the library source). Existing: Phase 5 proxy quota for embed calls. |
-| **Hard Tek deep-genre detector overlay** (`ACID_LINE_ENTRY`, plus tuned KICK_SWAP thresholds against 7-10 reference tracks) | Kaan's primary practice. Closes the "AI says 'lead synth' when it's a 303 sweep" hallucination class. Marketed in the demo film and Hard Tek subculture wedge. | M (~3 E-days, tuning-heavy) | v2: Generalized event detector v1 (acid overlay slots onto it). |
-| **Genre auto-classifier via Gemini Embedding 2 nearest-neighbor** | One-shot at session start + on `TRACK_CHANGE`, classifies against hand-curated 40-anchor library shipped in binary. ~$0.0001 per classification. Routes the per-genre detector roster atomically without session restart. | M (~2 E-days post-library-intel) | v2: Library intelligence (uses the same embed-call infrastructure). |
+| **Single-binary sidecar (universal2 + AOT)** — no Python interpreter shipping separately; user double-clicks app and Python is invisible | v2.1 Phase 27-06 already shipped universal2 sidecar (target-triple convention, PKG archive embedded in last merged slice). v3.1 just confirms the install-impact rating is GREEN and the README's "no Python needed" claim is verifiable on a fresh VM. | single-day plan (audit only) | v2.1: Universal2 sidecar (Phase 27-06). |
+| **First-session demo button** — wizard final step offers "play 60s of canned audio to see vibemix react before you DJ" (uses deterministic 30-event demo-mode sequencer from v3.0 VIS-09) | The visceral proof that vibemix actually works before the user commits to a real set. Lowers "did I install this right?" anxiety. v3.0 VIS-09 already built the deterministic sequencer for Francesco's hero-demo capture; v3.1 reuses it as a user-facing first-session bootstrap. | multi-day phase (2-3 E-days incl. wiring + UI hookup) | v3.0: VIS-09 deterministic demo-mode sequencer. v2.1: Phase 33 wizard exit-flow. |
+| **Uninstall path that actually cleans up** — Mac `/Applications/vibemix.app` drag-to-trash + `~/Library/Application Support/vibemix` removal CTA; Win `appwiz.cpl` clean removal + `%APPDATA%\vibemix` removal CTA; BlackHole / VB-CABLE explicitly NOT auto-removed (user may want them for other apps) | Most one-click installers ship without uninstallers. Shipping a clean uninstall path that telegraphs respect for the user's system (we don't touch BlackHole/VB-CABLE because you may want them for OBS, Reaper, etc.) is a polish signal that lands on Reddit comments and HN threads. | single-day plan | None (greenfield wording + script). |
+| **Wizard a11y pass** — keyboard nav, screen reader labels, high-contrast palette already from CDJ Whisper, focus rings | Disability-aware open-source DJ tools are rare. The wizard is the only mandatory surface every user hits; a11y here is a moral floor AND a Reddit-comment trust signal. v3.0 Phase 44 a11y gate already covers README controller grid; extending it to the wizard is straightforward. | single-day plan | v3.0: Phase 44 4-gate a11y CI scaffolding. |
 
 #### Anti-Features
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---|---|---|---|
-| **CLAP / OpenL3 / MERT for audio understanding** | Industry "standard" for music embedding, recommended by external research. | Kaan rejected: vibemix is Gemini-only; multimodal embedding 2 covers it. Bundling 50–200MB ML models blows the one-click install budget. | Gemini Embedding 2 — natively multimodal, free tier covers most libraries, no model bundling. |
-| **mem0 / vector DB for long-term DJ profile** | "Modern AI memory" pattern. | Solves the wrong problem — DJ tendencies are summarisable in 2KB JSON, not retrievable factoids. Adds Qdrant/Chroma dep, breaks one-click install. | Structured JSON profile (~2 KB, ≤10 tendencies, Gemini regenerates each session, injected verbatim into next session's prompt). |
-| **30-session formal eval harness with LLM scorer** | Standard ML eval discipline. | Phase 16 is **Kaan's DJ ear**, not a formal suite (per memory `project_phase_16_kaan_dj_testing`). Building the harness eats 2–3 weeks against a 4-week marketing window. | Kaan listens to his own session recordings + scrubs to detector fires. Tuning harness CSV (`scripts/tune_hard_tek_detectors.py`) gives him the audit surface; no F1 score required. |
-| **Live-mode partial citation enforcement** (strip half a 2-sentence response) | Sentence-level is the standard linter granularity. | A 1-of-2 stripped sentence in live mode leaves a fragment ("Yeah."). Worse than the unstripped response. | Response-level enforcement in live: if no valid citation anywhere, drop entire reply, fall back to pre-canned ack from Bucket A. Sentence-level only for debrief/library/genre. |
-| **Streaming-incremental citation linting** | "Optimize the linter, save 50ms." | The full lint pass is ~3ms on a 2-sentence response — invisible against 1500ms LLM TTFT. Implementation complexity > the saving. | Lint synchronously between LLM-complete and TTS-start. |
+| **Bundle BlackHole / VB-CABLE inside the vibemix installer** | "Truly zero clicks, even the audio driver." | Re-distribution of BlackHole MIT (allowed) + VB-CABLE EULA (forbids redistribution without contract). Even ignoring the EULA, Windows driver-signature prompt fires regardless of who delivers the binary — bundling doesn't suppress it. Bundling adds 5-15MB and version-pinning headaches. | Auto-prompt + download + run the official installer with forewarning. User experiences one extra UAC prompt; we stay license-clean. |
+| **Auto-update channel with silent installs** | "Modern app UX." | Adds Tauri updater key escrow + signing CI surface + privacy concerns (silent install of an audio-listening app is the kind of thing that lands on /r/privacy). v3.0 AUDIO-06 already established the updater-key rotation cookbook but didn't ship silent-update. | Tauri's normal `tauri-plugin-updater` user-confirm-then-install flow. User retains the agency. |
+| **`.deb` / `.AppImage` / Linux bundling** | "OSS-friendly multi-platform." | `project_one_click_install_hard_req` + Linux Out-of-Scope decision in PROJECT.md. DJ-on-Linux audience is small; engineering cost doubles. | Document Linux as Out of Scope in README; accept the PRs from community contributors as a v3.x stretch only if a Linux-DJ surfaces with a working patch. |
+| **30-session install rehearsal across hardware** | "Empirical stability on the long tail." | The fresh-VM matrix (macOS 12.3 / 14 / 15 + Win 10 / 11) is the 5-config matrix. Beyond that is diminishing-returns + opens an infinite well of "is M1 Air 8GB different from M2 Pro 16GB?" testing. | Kaan's MacBook + 5-config tart matrix is the floor. Real hardware variance surfaces post-launch via day-zero ops (Phase 36) Discord triage. |
+| **Cross-platform "one binary"** (e.g., Electron forge full-uniform path) | "Less Tauri vs PyInstaller plumbing." | Locks us into Electron's RAM tax + Chromium update treadmill. Tauri's reason-to-exist is that exact tradeoff. | Stay on Tauri shell + Python sidecar; the sidecar is universal2 on Mac + arch64 on Win — close enough. |
+| **macOS App Store distribution** | "Reach + trust signal." | Sandbox + entitlements review on an audio-capture app that reads MediaRemote API + screen-shares djay Pro window = a multi-month review battle. Apple's stance on apps that observe other apps' UI has been historically negative. Sandboxing would also disable `mss` screen-capture path. | Direct `.dmg` distribution from GitHub releases. SHIP-04 fresh-VM matrix is the Gatekeeper validation. |
 
-**Research notes:** [G-genre-taxonomy.md](v2-buckets/G-genre-taxonomy.md) (per-genre event catalogs), [G-followup-1-hard-tek-dsp.md](v2-buckets/G-followup-1-hard-tek-dsp.md) (KICK_SWAP DSP recipe + 10 tuning tracks + per-genre detector dispatch), [E-followup-1-citation-linter.md](v2-buckets/E-followup-1-citation-linter.md) (grammar + EBNF + Python `CitationLinter`), [F-library-intelligence.md](v2-buckets/F-library-intelligence.md) (Gemini Embedding 2 + sqlite-vec + chunk strategy), [B-industry-integrations.md](v2-buckets/B-industry-integrations.md) (MIDI as universal layer).
+**Research notes:**
+- BlackHole Homebrew cask path: [`brew install --cask blackhole-2ch`](https://formulae.brew.sh/cask/blackhole-2ch) — current version 0.6.1, MIT-licensed, redistribution OK.
+- VB-CABLE silent-install flags `-i -h` work but the Windows driver-signature security dialog is OS-enforced and cannot be suppressed — confirmed in [VB-Audio forum t=1909](https://forum.vb-audio.com/viewtopic.php?t=1909) and [t=1766](https://forum.vb-audio.com/viewtopic.php?t=1766).
+- Tauri Windows installer: WiX MSI + NSIS `.exe` paths shipped from [Tauri docs](https://v2.tauri.app/distribute/windows-installer/); WebView2 bootstrap embedded by default. Tauri's native installer wizard already handles VBSCRIPT + WebView2 + C++ Build Tools detection.
+- v2.1 Phase 33 install hardening (TCC wizard + BlackHole probe + onboarding stopwatch + bundle-ID lock) — shipped.
+- v3.0 SHIP-04/05 (tart fresh-VM matrix + ≤60s gate) — scaffold GREEN, real-VM run pending external clock (SHIP-01/02).
 
 ---
 
-### Category 2 — Latency & Liveness
+### Category 2 — DEPS: Dep Audit/Pin Surface
 
-**Thesis:** Cascade is the latency floor, not native audio. The fix is layered cover-up of Gemini's 1.5–3s TTFT — make T+150ms the perceived first reaction by combining a pre-canned ack, mascot anticipation, and overlay ring before the LLM finishes.
+**Thesis:** v2.1 Phase 34 shipped every audit *tool*. v3.1 surfaces the audit *output* as a single human-readable artifact answerable in <2min. The CI machinery already produces gitleaks + pip-audit + osv-scanner + cargo-audit + cargo-deny reports; `syft` already generates SBOM; STRIDE-lite + SECURITY.md exist. The job is consolidation, badging, and an `AUDIT.md` that someone reviewing the OSS project can read in 2 minutes and conclude "yes, these deps are healthy, current, secure, license-clean."
 
 #### Table Stakes
 
 | Feature | Why Expected | Complexity | Depends on |
 |---|---|---|---|
-| **Pre-canned ack bank** (~40 OPUS samples organised by event class — drop_hit / track_change / mix_move / silence_break / generic_filler) | Sub-100ms first sound is the difference between "alive" and "voice assistant doing music commentary." Industry-standard backchanneling pattern (Retell, Vapi, Google Duplex). | S (~2 E-days; generation offline once, runtime is disk-read + PlaybackQueue) | Existing: PlaybackQueue (Phase 4), VoiceRecorder (Phase 2). |
-| **Prompt diet + Gemini context caching** (audio 18s→6s for non-PHASE events; drop screen on `MIX_MOVE`/`HEARTBEAT`; cached_content for system instruction with 1024-token floor) | Cheapest TTFT win (500–1500ms) with zero anti-slop regression. Caching's 1024-token floor needs deliberate padding — verified in A-followup-1. | S (~2 E-days) | Existing: cascade LLM path in `DJCoHostAgent.llm_node` (Phase 4). |
+| **Every Python + Rust + Tauri runtime dep pinned in lockfile** with rationale + license + install-impact rating (green/yellow/red per `project_one_click_install_hard_req`) | Required for reproducible builds + license compliance + security-audit answer. Many of these already pinned via `requirements.txt` / `Cargo.lock` / `package-lock.json`; v3.1 adds the human-readable rationale column. | multi-day phase (2-3 E-days incl. dep-by-dep review + AUDIT.md authoring) | v2.1: Phase 34 audit tools shipped. |
+| **`AUDIT.md` as single human-readable surface** — table of dep / version / license / install-impact / "why we have it" — committed at repo root, linked from README | The "answerable in <2min" surface. Reviewers (potential OSS contributors, security folks, package maintainers) want one URL not a CI dashboard hunt. | single-day plan | v2.1: Phase 34 audit machinery output. |
+| **CI badges in README** — gitleaks ✓ / pip-audit ✓ / osv-scanner ✓ / cargo-audit ✓ / SBOM published / signed-binary verified | Standard OSS trust signal. Reviewers/contributors evaluate trust by README badges; if our CI green-lights all of them, putting badges on README turns invisible CI into visible trust. | single-day plan | v2.1: Phase 34 CI workflow outputs. |
+| **Stale-dep / outdated-dep nightly bot** — Dependabot or Renovate configured to surface deps > 6 months stale + auto-PR security patches | OSS-standard hygiene. GitHub's free Dependabot covers Python + Rust + JS. Without it, `AUDIT.md` rots silently. | single-day plan | None (Dependabot config). |
+| **`unused-deps` sweep + cull** — actually-imported deps survive; transitive-only or aspirational deps removed | The v3.0 close noted that `openai==2.36.0` is installed as a livekit-agents transitive dep but unused directly. `google-cloud-speech` + `google-cloud-texttospeech` are installed but not directly imported. Each unused dep = bigger sidecar, bigger SBOM noise, longer install. | single-day plan | None (sweep against current `.venv`). |
+| **SBOM published as release artifact** — `syft` SBOM generated on tag-push, attached to `gh release` as `vibemix-vN.N.N-sbom.spdx.json` | Standard supply-chain hygiene per [Mattermost SBOM audit guide](https://mattermost.com/blog/how-to-audit-a-security-bill-of-material-sbom/) — release artifacts should ship with SBOM alongside binaries. v2.1 Phase 34 generates the SBOM; v3.1 wires it into the release.yml asset list. | single-day plan | v2.1: Phase 34 syft SBOM. v3.0: SHIP-07 release.yml. |
 
 #### Differentiators
 
 | Feature | Value Proposition | Complexity | Depends on |
 |---|---|---|---|
-| **Cancel-and-refire on higher-priority events** (`SpeechHandle.interrupt(force=True)`, empirically verified through cascade in A-followup-1) | Stale reactions kill the "real DJ friend" illusion. Cancel + re-fire when a higher-priority event arrives mid-generation keeps reactions in-bar. Capped at 1 cancel per 8s. | S (~2 E-days) | Existing: LiveKit `AgentSession` cascade (Phase 4). |
-| **Predictive drop firing** (`buildup_score > 0.7` + `phrase_boundary_in <= 2 bars` → fire `generate_reply` 2 bars early, gate playback on actual drop, cancel on 3s timeout misfire) | The biggest semantic win for fast genres. Hard Tek at 170 BPM (1.4s/bar) cannot land an in-bar reaction without prediction. Gated on Kaan's ear-test before on-by-default. | M (~5 E-days; design complete in A.md, needs the predictive watcher + mute-able PlaybackQueue sink) | v2: cancel-and-refire + Generalized event detector v1 (the predictive signal feeds off `PHRASE_BOUNDARY` + buildup heuristic). |
+| **Lockfile-diff bot on every PR** that comments dep changes (added / removed / version-bumped) in a short summary | Standard CI courtesy. Makes review faster — reviewer doesn't have to mentally diff `Cargo.lock`. Tools like `dependabot/changelog-action` and GitHub-native diff comments cover this. | single-day plan | None (Action config). |
+| **License-policy gate in CI** — `cargo-deny licenses` + `pip-licenses` allowlist of GPL-3 / Apache-2 / MIT / BSD / ISC / etc.; PR fails if a copyleft-incompatible license enters | License-clean is a v3.x consideration if Bravoh wants to consume vibemix code internally (per CLAUDE.md constraint: "Must allow Bravoh to use the same code internally if needed"). | single-day plan | v2.1: Phase 34 `cargo-deny` already in CI. |
+| **Per-dep install-impact rating surfaced in AUDIT.md** — every dep gets explicit green/yellow/red rating (e.g., `livekit-agents` = green / `pyobjc-framework-Quartz` = yellow Mac-only / `mido` + `python-rtmidi` = green optional) | Operationalizes the `project_one_click_install_hard_req` memory directive. Future PRs adding deps can be gated on "is this green?" | single-day plan (part of AUDIT.md authoring) | None (greenfield). |
+| **`AUDIT.md` link in security policy** — SECURITY.md cross-links AUDIT.md so a security-first reviewer reads them as one surface | Polish. SECURITY.md is the file security folks already open; AUDIT.md sitting next to it = no extra surface to discover. | <0.5 E-day | v2.1: SECURITY.md shipped. |
 
 #### Anti-Features
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---|---|---|---|
-| **Revert to `gemini-2.5-flash-native-audio` for the latency floor** | Native-audio claims 400ms voice-to-voice vs cascade's 1500ms+. | Kaan tested it in v2: grounding regresses badly. Native audio cannot accept the multimodal Part shape the cascade does — the whole anti-slop thesis breaks. | Stay on cascade; latency is masked by the four-layer stack, not eliminated. |
-| **Speculative pre-generation parallel sessions** (PredGen-style, 2× LLM cost) | "Doubles the perceived speed." | Doubles API cost. The 50€/mo budget can't absorb it. | Predictive firing (single session, fire 2 bars early, cancel on misfire) hits the same perceived-speed target. |
-| **Drop `thinking_level` to off entirely** | Saves 200–400ms TTFT. | Already at `"minimal"` — remaining win is small and trades against reaction quality on borderline calls. | Keep `"minimal"` until ear-test shows reactions feel rushed; revisit only if needed. |
-| **Aggressive cancel budget** (no cap, cancel on every priority bump) | "More responsive." | Wasted API cost on canceled responses. Hard Tek's 12s/phrase rhythm means an unchecked cancel rate could 3× the per-user budget. | Cap at 1 cancel per 8s (soft); 30/hour hard cap with telemetry. |
+| **Add Snyk / Black Duck / Dependency-Track enterprise SBOM analysis** | "Enterprise-grade audit." | These are paid tools designed for enterprise consumption. Free Dependabot + GitHub's built-in vulnerability scanning covers >90% of what an OSS project needs. Adding paid tooling adds a vendor dep + a new cost line + reviewer cognitive load. | Free Dependabot + GitHub's vulnerability alerts + the existing `gitleaks` / `pip-audit` / `osv-scanner` / `cargo-audit` stack. |
+| **Build an internal vulnerability dashboard** | "Single pane of glass." | OSS projects don't need internal dashboards — reviewers want public READMEs + CI badges. Building a dashboard = building a product on top of the product. | `AUDIT.md` + CI badges + Dependabot tab. |
+| **License compliance via SBOM scanning a la enterprise audit** | "Defensive against future Bravoh-internal-consumption concerns." | The CLAUDE.md constraint says vibemix needs to be Apache-2 or MIT compatible — that's a one-time license choice, not an ongoing dashboard problem. | LICENSE file at root (Apache-2 or MIT TBD per PROJECT.md) + `cargo-deny licenses` gate. |
+| **Vendoring all Python deps into the repo** | "Reproducibility without lockfile trust." | Repo size explodes + `dependabot` no longer reads them + audit tools no longer scan them. Lockfile is the right primitive. | `requirements.txt` lockfile (pinned to specific versions, hash-validated via `pip install --require-hashes`) + Cargo.lock + package-lock.json. |
+| **Auto-PR every minor version bump** | "Always latest." | Library minor bumps with audio/AI deps frequently break behavior. Auto-merging or even auto-PRing minors creates noise + risk. | Dependabot configured to PR only security patches automatically; minor/major version bumps as draft PRs for Kaan review. |
 
-**Research notes:** [A-latency.md](v2-buckets/A-latency.md) (12 latency levers + recommended stack + `interrupt(force=True)` empirical verification + caching 1024-token floor), [synthesis-viral-demo.md](v2-buckets/synthesis-viral-demo.md) §4 Latency timing diagram (T+150ms perceived-floor breakdown).
+**Research notes:**
+- v2.1 Phase 34 already shipped `gitleaks` + `pip-audit` + `osv-scanner` + `cargo-audit` + `cargo-deny` + `syft` SBOM + STRIDE-lite + SECURITY.md.
+- [Mattermost SBOM audit guide](https://mattermost.com/blog/how-to-audit-a-security-bill-of-material-sbom/) confirms SBOM-with-release pattern.
+- [dep-scan v5.1.4](https://securityonline.info/dep-scan-fully-open-source-security-audit-for-project-dependencies/) is OSS alternative if the existing stack misses gaps; likely not needed.
+- The full OSS hygiene reference stack: Dependabot + GitHub Actions + lockfile + CI badges in README + SBOM-with-release is the consensus pattern (covered by [SPDX open-source tools](https://spdx.dev/tools/open-source-tools/)).
 
 ---
 
-### Category 3 — Personality & Anticipation
+### Category 3 — TEST: End-to-End MacBook Pass
 
-**Thesis:** Mascot v0.1.0 is single-layer; the "feels alive" gap is structural. Four-layer additive blending (mood + anticipation + speak + effect) + beat-coupled procedural idle + inline emote-tag vocab raises the bar from "decoration" to "live indicator of what the system actually saw."
+**Thesis:** v3.0 Phase 42 locked the hallucination gate to Kaan's ear via `check_gate.sh` Gate 2b. v3.1 broadens the gate to *every* operator-facing dimension: functional flows, CDJ-Whisper visual surfaces, mascot emotion coverage in live use, debrief UI ergonomics, library intel "what's playing?" search responsiveness, install-wizard a11y. Kaan acts as the first-time user, NOT the developer who built the thing. Per `project_phase_16_kaan_dj_testing`, this is Kaan's DJ ear extended to the full product — NOT a formal usability lab study or 30-session replay harness.
 
 #### Table Stakes
 
 | Feature | Why Expected | Complexity | Depends on |
 |---|---|---|---|
-| **Mascot anticipation layer (1-above-mood, simplified)** — `prep_lean_in_hyped` / `prep_lean_in_neutral` / `prep_head_turn` clips, fire at event-detect (T+50ms), crossfade to talk_loop on first TTS audio | The highest-leverage perceived-latency mask (400–1200ms covered). Without it, the mascot looks frozen during the 1500ms Gemini round-trip and the user assumes the app crashed. Ships ahead of the full 4-layer rewrite. | S (~3 E-days; 1 day Gemini text-channel timing spike + 2 days impl + assets) | Existing: mascot Three.js renderer (Phase 13), event-dispatcher. |
-| **Beat-coupled procedural hip-bob driven by BPM + RMS** | Already 80% wired (Phase 13 accepts bpm + downbeat_phase + bpmConfidence ≥ 0.6). The missing piece is a continuous additive bone-subset overlay on `Hips`, not a clip swap. Reads as "moves WITH me." | S (~2 E-days) | Existing: Phase 13 mascot + Phase 6 BPM + phrase_position from v2 PHRASE_BOUNDARY detector. |
+| **Functional flow walk** — install wizard → first session → live mode (Hype/Coach × Beginner/Intermediate/Pro) → mascot reacts → mic-as-Part-2 grounds reactions → debrief opens → drill cards → library search → uninstall | Every shipping surface gets a Kaan-as-user walk. This is the v3.1 release-cut bar. Pass = engineering ships v3.1; fail = gap-closure items routed back to specific phases. | multi-day phase (3-5 E-days Kaan-time, calendar-blocking) | v3.0 + v2.1 + v2.0 shipping surfaces. |
+| **Visual + aesthetic critique pass** — every CDJ-Whisper Tier-1 surface re-walked by Kaan-as-user (session / mascot overlay / wizard / calibration / debrief) with paired `gsd-ui-checker` + `gsd-ui-auditor` re-run | v3.0 Phase 43 closed VIS-01 at zero HIGH findings BUT that was a developer walk against mocks + composable components. v3.1 re-walk is "live on real hardware running a real session" which surfaces a different class of issues (rendering perf on integrated GPU at 1440p, font rendering on retina vs non-retina, mascot framerate when ML inference is hot, etc.). | single-day plan (re-run of ui-checker + ui-auditor against running app) | v3.0: Phase 43 VIS-01 Tier-1 surfaces. |
+| **Mascot emotion coverage check** — Kaan triggers every event class while observing mascot; confirms each emotion lands at the right time with the right layer-stack response (e.g., TRACK_CHANGE should not look the same as DROP) | The mascot is the single largest non-Kaan piece of authored content; coverage is the hard verifiable test. See Category 4 for the actual emotion enumeration. | multi-day phase (2 E-days; bundled with Category 4 emotion-asset land) | v2.1: Phase 31 4-layer state machine. v3.0: VIS-05 mood→animation pool validation. |
+| **Usability heuristic pass against Nielsen 10** — visibility of system status / match between system + real world / user control + freedom / consistency / error prevention / recognition rather than recall / flexibility / aesthetic minimalist / help recover from errors / docs | Standard usability heuristics applied as a checklist by Kaan-as-user. Lightweight version of a UX audit — no academic rigor, just "did anything feel broken or wrong?" | single-day plan | Kaan-time + Nielsen 10 checklist. |
+| **Hallucination gate re-run via `check_gate.sh` Gate 2b** — Kaan signs ear-test log per v3.0 GATE-05 protocol (≥2 sessions ≥2 genres in 14d window) | The shipped Phase 42 hybrid regime. v3.1 doesn't change the gate; it walks the discharge runbook now that the audio-path closes (mic-as-Part-2 + lookahead-as-Part-3 are LIVE on Kaan's MacBook). | multi-day phase (≥2 sessions ≥30min each + log capture) | v3.0: GATE-05 ear-test protocol + GATE-06 `check_gate.sh`. |
+| **Gap-closure routing** — every fail surfaces as a tracked item routed back to a v3.1 plan or deferred to v3.2 with reason | The audit-trail. Without it, fails get hand-waved away and v3.1 ships with the same gaps the test was designed to catch. | <0.5 E-day (PROJECT.md or STATE.md tracking surface) | None (greenfield routing convention). |
 
 #### Differentiators
 
 | Feature | Value Proposition | Complexity | Depends on |
 |---|---|---|---|
-| **4-layer additive state machine** (mood + anticipation + speak/reaction + effect, layered via Three.js `AnimationUtils.makeClipAdditive`) | The full structural fix for "same emote every time." Cross-layer overlaps are the entire point — mood layer keeps breathing alive even mid-react. Costs +1–2ms/frame on M2. | H (~14 E-days incl. refactor + asset commissioning + vitest port) | v2: Mascot anticipation layer (proves the 1-above-mood shape works first). |
-| **Inline emote-tag vocabulary (15 tags + 1 mood-set tag)** — `[hype]` / `[chill]` / `[teach]` / `[surprise]` / `[nod_yes]` / `[gesture_deck_a]` / `[lean_listen]` / `[silent]` etc., stripped from TTS, mapped via `emotionMap` to states | Open-LLM-VTuber pattern adapted to DJ context. Lets Gemini drive mascot expression per turn instead of one default-per-event-type. Requires the layered architecture and the text-channel-timing spike. | M (~5 E-days post-spike) | v2: 4-layer state machine + 1-day spike on Gemini Live text-channel ordering (Bucket D A3 risk). |
-| **Amplitude-banded talk variants** (`talk_loop_calm` / `talk_loop_normal` / `talk_loop_energetic` selected per emote tag) | 80% of the "alive mouth" feel at 10% of the cost of ARKit blendshape re-rigging. Mixamo strip-blendshapes constraint forces this path; the constraint is the feature. | S (~1 E-day code + asset cost) | v2: 4-layer state machine + emote-tag vocab. |
+| **Capture screen-recording of the entire walk** — every Kaan-test session records the screen + voice + mascot for later review or for the demo film capture | Doubles up: usability evidence + raw footage Francesco can mine for the launch wave. The deterministic-demo-mode sequencer from v3.0 VIS-09 is one path; live-set recording is the complementary path. | single-day plan (existing macOS screen-recorder or `ffmpeg -f avfoundation`) | None (greenfield). |
+| **"First-time user" framing checklist** — before each walk, Kaan sets cognitive frame to "I just downloaded this; I don't know how it works" to surface affordance gaps | The hardest part of a maintainer's own usability test is escaping the curse-of-knowledge. A pre-walk frame-set checklist (acknowledge "I built this; I know where everything is; pretend I don't") shifts what gets flagged. | <0.5 E-day | None (greenfield convention). |
+| **Compare-to-mocks pass** — every Tier-1 surface compared side-by-side against `mocks/vibemix-app-ui.html` + `mocks/vibemix-cinematic-storyboard.html` for visual drift | The mocks are the design contract. v3.0 Phase 43 closed against them, but live-running pixel exact alignment vs developer-tool inspection are different signals. | single-day plan | v3.0: Phase 43 mocks-as-contract. |
 
 #### Anti-Features
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---|---|---|---|
-| **ARKit / Oculus viseme blendshapes for procedural lip-sync** | "Realistic mouth motion." | Mixamo stripped blendshape export in 2020; re-rigging is 2–3 weeks + uncanny-valley risk on the current stylised mascot. | Amplitude-banded talk variants (3 clips, 1 E-day). |
-| **Live2D / anime-style 2D mascot rig** | "More expressive face." | Locks demographic (anime overlap with bedroom-DJ audience is real but narrow). Abandons the stylised-abstract head approach that dodges uncanny valley. | Body-language-first stylised 3D rig (current direction); commission 8 new clips for ~$1500–2000. |
-| **Multi-mascot user-gen ("/hatch")** | Long-term retention play, "design your own pet." | v2.x stretch per memory (`project_mascot_as_vtuber_personality_surface`). Adds asset pipeline + safety/moderation surface. Not v2.0 scope. | Single mascot (DJ bat placeholder), mood variation on same rig. |
-| **Procedural jaw bone rotation driven by AudioAnalyser** | "Cheap lip-sync without re-rigging." | Reads as "puppet flapping jaw" — generic, not stylised. Worth re-evaluating as a v2.x polish layer once core 4-layer ships. | Defer to v2.x; let talk variants carry expressiveness in v2.0. |
+| **Formal 30-session DJ replay harness with LLM scorer** | Standard ML eval discipline. | Per `project_phase_16_kaan_dj_testing` + v3.0 GATE-08 (P85 override RETIRED), Phase 16 is Kaan's DJ ear, NOT a formal suite. v3.1 broadens to full-product, not just hallucination — even more reason NOT to formalize. | Kaan's MacBook + Nielsen 10 heuristic checklist + GATE-05 ear-test protocol. |
+| **Recruit external usability testers (5-7 DJs)** | "Standard usability test sample size." | The Bravoh public launch wave window opens once SHIP-01/02 land; spending 2-3 weeks recruiting + scheduling DJs slips the wave. Post-launch via day-zero ops Discord gives this for free. | Kaan + post-launch Discord triage. External tester onboarding is a v3.2+ consideration. |
+| **A/B test multiple onboarding flows** | "Optimize conversion." | No baseline traffic yet (RC not public). A/B testing needs a denominator. | Ship one flow, measure post-launch via day-zero ops dashboard. |
+| **Quantified usability metrics (SUS / NASA-TLX / time-on-task)** | "Defensible against design critique." | Adds measurement overhead to Kaan's walk. Kaan's gut signal + Nielsen 10 + heuristic checklist gives 80% of the value with 10% of the overhead. | Heuristic checklist only. |
+| **Test on every macOS version** | "Coverage." | tart fresh-VM matrix already covers 12.3 / 14 / 15 in SHIP-04. Beyond that = diminishing returns. Kaan's MacBook is the *operator-experience* test, not the *compat matrix* test. | Kaan's MacBook (current macOS) + tart matrix (3 versions). |
+| **Test on a borrowed Windows machine alongside MacBook** | "Cross-platform parity." | v3.1's MacBook end-to-end pass is specifically the MacBook walk. Windows is covered by SHIP-04 tart fresh-VM matrix (Win 10 / 11) automated; live operator walk on Windows is a v3.2 candidate if SHIP-04 surfaces real friction. | tart fresh-VM matrix handles Windows; defer live-Win operator walk to v3.2. |
 
-**Research notes:** [D-mascot-emotion.md](v2-buckets/D-mascot-emotion.md) (4-layer architecture, anticipation recipe, emote tag vocab, Mixamo blendshape constraint), [synthesis-viral-demo.md](v2-buckets/synthesis-viral-demo.md) §1 Storyboard table (mascot beats integrated with overlay + ack).
+**Research notes:**
+- v3.0 GATE-05 ear-test protocol + JSON Schema + debrief capture surface (Phase 42-03) — ready for re-use.
+- v3.0 Phase 43 VIS-01 paired `gsd-ui-checker` + `gsd-ui-auditor` walk on Tier-1 surfaces — re-usable.
+- Nielsen 10 heuristics — public, no source needed.
+- `project_phase_16_kaan_dj_testing` memory locks the "Kaan's ear, not formal suite" rule.
 
 ---
 
-### Category 4 — Cross-Software Integration
+### Category 4 — MASCOT: Full Emotion Coverage With Real GLBs
 
-**Thesis:** Mixxx is the only DJ platform with a real-time deck-state surface — and OSC is currently a draft PR upstream. djay Pro Mac is the only viral-demo-tractable overlay target. The MIDI controller is the cross-platform telemetry layer that works the same across every DJ app. Pyrekordbox XML is the durable library path (SQLCipher key extraction broken post-Rekordbox 6.6.5).
+**Thesis:** v2.1 Phase 31 shipped the 4-layer additive state machine; v3.0 VIS-04 scaffolded the Mixamo retarget pipeline; v3.0 VIS-05 validated the mood→animation pool runtime against placeholder clips. **The clips themselves are still placeholders.** v3.1's job is to land the actual emotion-clip set per layer so the mascot is fully visible across every event class. Per `project_mascot_as_vtuber_personality_surface`: single VTuber-style 3D character ("Neon Rebel"), mood variation on the same rig — NOT multi-character `/hatch`.
 
-#### Table Stakes
+The shipped 4-layer architecture has fixed slot names (Base / Emotion / Anticipation / Reaction). v3.1 enumerates the specific emotions that get GLB assets per layer. Anchored to Plutchik's 8-primary-emotion set adapted for DJ-context (joy / anticipation are over-represented; sadness / fear / disgust are under-represented because DJing is performative, not emotional in the negative-valence sense), modulated by the existing v2.1 Hype-man / Teacher / Coach persona pools.
+
+#### Table Stakes — The Emotion Enumeration (must land in v3.1)
+
+The mascot is "fully visible" when these specific clips exist as real GLBs and the state machine resolves to them on the right event class. Numbers prefixed with the layer name.
+
+**Layer 1 — BASE / IDLE** (always playing; mood-coupled hip-bob from BPM + RMS)
+- `base_idle_calm` — pre-set, between-track, head bobbing at ~30% intensity (default startup state)
+- `base_idle_groove` — in-set, music playing, bobbing at ~70% intensity (most common live state)
+- `base_idle_peak` — drop / energy peak, full body movement at 100% intensity (the "lit" state)
+
+**Layer 2 — EMOTION / MOOD** (long-duration; 30s-2min cycles; persona-pool-resolved)
+- `emo_hype` — Hype-man persona, high-arousal positive (joy + anticipation Plutchik combo = optimism)
+- `emo_neutral_teach` — Teacher persona, calm-attentive (trust)
+- `emo_coach` — Coach persona, focused-analytical (anticipation)
+- `emo_focused` — high-attention listening pose, used when KAAN_SPOKE fires (mirrors the mic-as-Part-2 grounding contract — mascot LOOKS like it's listening)
+- `emo_neutral_silent` — silent-RMS state, low-stim idle (the v3.0 Beat C "AI shuts up when there's nothing to say" visual)
+
+**Layer 3 — ANTICIPATION** (short-duration; fires on event-detect at T+50ms; covers the 400-1200ms Gemini TTFT window) — These are the existing 5 `prep_*.glb` slots from v3.0 VIS-04, awaiting Kaan-aesthetic Pioneer-CDJ-headbob selection from Mixamo
+- `prep_lean_in_hyped` — DROP / PEAK predicted, body leans forward + head turns toward decks
+- `prep_lean_in_neutral` — PHASE / LAYER_ARRIVAL predicted, mild lean + attentive pose
+- `prep_head_turn` — TRACK_CHANGE predicted, head-turn-toward-deck-of-incoming-track (cross-references audible-deck detection)
+- `prep_listen_focus` — KAAN_SPOKE predicted (mic onset), turns head toward Kaan + cups ear stylized
+- `prep_breath` — pre-MIX_MOVE breathing pose, used when controller-significance crosses threshold but the move hasn't completed
+
+**Layer 4 — REACTION** (short-duration; fires at TTS-start; modulated by inline emote tags from Gemini per v2.1 emote-tag vocab if shipped)
+- `react_nod_yes` — affirming feedback, "you nailed that" or "yeah that's the move"
+- `react_surprise` — DROP landed, eyebrows-up open-mouth pose
+- `react_laugh` — Hype-man mode, joy-amplified
+- `react_point_deck_a` — gesture at deck A (cross-references audible-deck = A)
+- `react_point_deck_b` — gesture at deck B
+- `react_facepalm` — Coach mode, mistake-acknowledged (gentle, not mocking — Coach persona is supportive)
+- `react_shrug` — Coach mode, "I don't know, your call"
+- `react_eyes_closed_feel` — energy-peak feel-the-music pose, used when AI is silent but the music is sub-bass peaking
+- `react_chill` — low-energy moment, sip-from-cup type pose
+- `react_silent` — explicit "no reaction" gesture (subtle stillness), used to underscore the anti-slop principle that the mascot can BE silent
+
+**Total v3.1 emotion-clip target:** 3 Base + 5 Emotion + 5 Anticipation + 10 Reaction = **23 GLB clips**.
 
 | Feature | Why Expected | Complexity | Depends on |
 |---|---|---|---|
-| **10-SKU MIDI controller library + `MidiMapLoader`** — DDJ-FLX4 (verified) / FLX6 / FLX10 / SX3 / 400 / 1000 / XDJ-RX3 / Numark Party Mix Live / Mixstream Pro+ / Hercules Inpulse 300 + 500 | Cross-platform grounding spine. The B-bucket research found bedroom-DJ controllers are concentrated in ~5 SKUs; covering 10 hits ~80%. JSON-per-SKU + auto-detect by port-name substring. | M (~5 E-days; FLX4 verified, others Mixxx-XML-derived) | Existing: Phase 9 (`vibemix.midi/` package, `ControllerState`, generic-MIDI fallback, 2s hot-plug watcher). |
-| **Pyrekordbox XML one-shot import** — file picker → SQLite cache → fuzzy title/artist/BPM lookup | The durable path. Pioneer obfuscated the SQLCipher key starting Rekordbox 6.6.5, breaking automatic master.db reads. XML export is unencrypted and works for every Rekordbox version. | S (~3 E-days; ~150 LOC parser + 4-tier fuzzy lookup) | None (greenfield); writes to `~/Library/Application Support/vibemix/library/rekordbox.db`. |
-| **djay Pro Mac overlay highlight (12 elements)** — hand-mapped percentage-of-window JSON + AX refinement when available + amber-ring Canvas 2D overlay window | The viral demo anchor. djay is the only major DJ app where AX returns useful UI element data (Rekordbox + Serato render to canvas). 12 elements covers >80% of likely "point at X" utterances in a 30s cut. AX call must run in Rust parent (not sidecar — issue #8329). | M (~5–7 E-days incl. window-tracker + element map + overlay window) | Existing: Tauri shell, mascot_window.rs builder pattern, `cohost_v4.py:224-246` djay-window finder logic. |
+| **23-clip mascot emotion set with real GLBs (not placeholders)** | The mascot is "fully visible" criterion. Without these, the 4-layer state machine has nothing to resolve to. | epic (>5 E-days; gated on Kaan-aesthetic selection per `project_mascot_as_vtuber_personality_surface` + Adobe-account Mixamo download per KAAN-ACTION-LEGAL §VIS-04) | v2.1: Phase 31 4-layer state machine + AnimationUtils.makeClipAdditive. v3.0: VIS-04 retarget pipeline + bundle-size gate ≤25MB. |
+| **MANIFEST update wiring every clip to the right event class** — `react_nod_yes` → `KICK_SWAP` praise reaction; `react_point_deck_a` → audible-deck=A `MIX_MOVE`; `prep_head_turn` → predicted `TRACK_CHANGE`; etc. | The actual emotion-to-event mapping. Phase 31 supports it architecturally; v3.1 fills the mapping table. | multi-day phase | v2.1: Phase 31 MANIFEST schema. v3.0: VIS-05 mood→animation pool. |
+| **Bundle size ≤25MB enforced via `check_bundle_size.sh`** | v3.0 VIS-04 already shipped the two-tier gate (per-clip 400KB-1.2MB / total ≤25MB). v3.1 just confirms 23 real clips fit the envelope. | <0.5 E-day | v3.0: VIS-04 bundle-size gate. |
+| **Mascot visible on every supported window/screen-share path** — mascot overlay window survives djay Pro full-screen, second-monitor extend, OBS browser-source `ws://127.0.0.1:8765` path, mascot.html standalone | The "fully visible" sub-criterion covers paths-of-display not just emotional states. v2.1 mascot overlay window already shipped; v3.1 confirms all paths still work with the full clip set loaded. | single-day plan (verification only) | v2.1: mascot overlay window. v2.0: `ws://127.0.0.1:8765` bus. |
+| **30s smoke test per persona** — Hype-man / Teacher / Coach 30s walk with the full clip set; bone-level "idle-zero" contract test passes | v3.0 VIS-05 ran this against placeholder clips. v3.1 re-runs with real clips. | single-day plan | v3.0: VIS-05 mood→animation pool runtime validation. |
 
 #### Differentiators
 
 | Feature | Value Proposition | Complexity | Depends on |
 |---|---|---|---|
-| **Generic-MIDI fallback that observes without inferring** | Conservative auto-classification: detect knobs + buttons by activity, NEVER auto-assign roles. Surface picker UI after 5 min of observation. Closes "controller not supported" gracefully without producing confidently-wrong "Deck B EQ killed" claims. | S (~1 E-day) | Existing: Phase 9 generic fallback foundation. |
-| **Mixxx OSC bridge (opt-in, feature-flagged)** behind `--enable-mixxx-osc` for users running PR #14388 custom build | Mixxx is the only DJ app with a real-time deck-state surface, and the free-software DJ community is the right cultural audience for OSS vibemix. Ship behind flag in v2.0; promote to first-class if PR merges. | S (~2 E-days; ~190 LOC `MixxxBus` using `python-osc==1.10.2`) | None (greenfield). |
+| **Inline emote-tag vocabulary integration** (per v2.1 v2 deferred feature) — Gemini emits `[nod_yes]` / `[shrug]` / `[point_deck_a]` etc. in TTS text channel, parsed before TTS speak, mapped to reaction-layer clips | v2.1 deferred the emote-tag vocab; v3.1 with 10 reaction clips now has the inventory for it. BUT it's gated on the v2.x Gemini text-channel-timing spike (D-bucket A3 risk). If the spike doesn't land in v3.1, defer to v3.2. | multi-day phase (2 E-days incl. spike + parser + tag→clip dispatch) | v2.1 v2 emote-tag vocab; Gemini text-channel timing spike. |
+| **Mascot per-persona timing tuning** — Hype-man reacts faster (T+30ms), Teacher delays (T+200ms for "thinking face" affordance), Coach is paced (T+150ms) | Polish that telegraphs persona-specific personality. Cheap to implement once clip set lands. | single-day plan | v2.1: Phase 31 4-layer state machine. |
+| **Mascot "fully visible" in the README hero asset** — render a still of the mascot from the v3.1 clip set as the README banner alongside the verbatim-locked "the only AI co-host that actually listens to your set" hero text | Brand surface tied to the hero copy. The mascot becomes recognizable. | single-day plan (post-clip-set-land) | v3.0: LAUNCH-01 hero text. |
+| **Mascot-only OBS-browser-source easter-egg path documented** — README 2-line callout that `mascot.html` works as a standalone OBS scene element | Already supported by v2.0 `ws://127.0.0.1:8765` bus + v2.1 mascot.html keeping the bus contract. Just documentation. | <0.5 E-day | v2.0: ws bus. v2.1: mascot.html. |
 
 #### Anti-Features
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---|---|---|---|
-| **Pioneer ProDJ Link CDJ integration** | "Full per-deck telemetry including phrase data from CDJ-3000." | Wrong market — requires Pioneer CDJ hardware on an Ethernet LAN. Bedroom DJs run controllers, not CDJs. Install friction (JVM bridge + open-beat-control jar) is brutal. | Skip entirely. Optional add-on if a CDJ Pro SKU ever ships. |
-| **Native Rekordbox/Serato/Traktor real-time API hooks** | "Every DJ app should work." | Algoriddim, Pioneer, Serato, Native Instruments all refuse to ship third-party APIs. Decompiling / dylib injection crosses the EULA red line. | Audio + screen + MIDI grounding (the current cross-platform path). Mixxx is the only platform with a real surface; everything else stays on the universal path. |
-| **VirtualDJ OSC bridge in v2.0** | "Best per-deck subscribe-on-change of all closed apps." | Gated behind paid Pro license — small slice of bedroom DJs. Worth a parallel `vdj_osc.py` only if VDJ Pro user demand emerges post-launch. | Defer to v2.x demand-driven. |
-| **Mapping transpiler (read Mixxx XML, emit Rekordbox/Serato/djay mapping files)** | "Cross-app mapping management." | Write-side is undocumented binary formats (Serato `.tsi`, djay `.djmap`). Out of scope; competes with Bome MIDI Translator. | Ship per-controller JSON in vibemix's own format. Users keep DJ-app mappings unchanged; vibemix parallel-listens. |
-| **Rekordbox / Serato overlay highlight in v2.0** | "DJ majority uses these." | Canvas-rendered UIs return empty AX trees; only template matching works, and it's brittle/slow at multi-scale. Ships v1.2 fast-follow per the B-bucket. | Lead the viral demo on djay Pro Mac. Frame copy as platform-agnostic ("AI that watches your set"). |
-| **djay UI redesign auto-detection** | "Coord map breaks on major djay version bump." | Auto-version-walking adds a fragile maintenance surface. | Version-pin the map (`djay_pro_5.json`), detect version via `CFBundleShortVersionString`, fall back to nearest-known map with a warning logged. |
+| **`/hatch` user-generated mascots in v3.1** | "Engagement / retention play." | Explicitly v3.x stretch per memory `project_mascot_as_vtuber_personality_surface` + v3.0 Out-of-Scope. Adds asset-pipeline + safety/moderation + Imagen-or-Hunyuan3D dep. | Single mascot + mood variation on same rig (the v3.1 23-clip set). |
+| **Re-rolling Neon Rebel mascot** | "Mascot doesn't feel right yet." | v3.0 Out-of-Scope lists this explicitly. Re-rolling is a v3.x refresh if Hunyuan3D + AccuRIG 2 + Kaan's gut decide. Re-rolling mid-v3.1 = restart the entire 4-layer animation work. | Ship as-is; v3.x refresh is a future consideration. |
+| **More than 23 clips in v3.1** | "Richer emotion vocabulary." | 23 is already calibrated against bundle-size ≤25MB. Going to 30+ requires re-tier of per-clip target or longer download. | Cap at 23 for v3.1; v3.2 expansion candidates are micro-expressions (eye darts, eyebrow-only reactions) that fit in smaller per-clip budgets. |
+| **Procedural lip-sync via AudioAnalyser jaw-bone rotation** | "Cheap lip-sync." | Per v2.0 Category 3 anti-feature: reads as "puppet flapping jaw" — generic, not stylised. Defer to v2.x polish layer per existing decision. | Amplitude-banded talk variants (3 clips); already part of v2.1 design. |
+| **ARKit blendshape lip-sync** | "Realistic mouth motion." | Mixamo strip blendshapes constraint per v2.1 anti-feature; re-rigging is 2-3 weeks + uncanny-valley risk. | Body-language-first stylised rig (current direction). |
+| **2D Live2D version for "lighter weight"** | "Smaller bundle / wider compat." | Locks demographic + abandons the stylised-3D approach + adds a parallel render pipeline. | Stay on Three.js 3D rig; ≤25MB bundle is fine. |
+| **Mascot speaks instead of (or in addition to) the AI voice** | "More mascot presence." | The AI voice IS the mascot's voice. Adding a second voice channel breaks the audio contract + privacy guarantees (only one voice in the room). | Mascot is silent visual; voice stays Gemini TTS. |
 
-**Research notes:** [B-industry-integrations.md](v2-buckets/B-industry-integrations.md) (per-platform deep dives, tractability matrix, ProDJ Link demotion), [B-followup-1-v11-integration-spec.md](v2-buckets/B-followup-1-v11-integration-spec.md) (MixxxBus 190-LOC spec, Pyrekordbox XML schema + fuzzy match, 10-SKU JSON layout + Sync note 0x58 vs 0x60 resolution), [C-ui-overlay.md](v2-buckets/C-ui-overlay.md) (djay overlay approach hybrid (a)+(b), element vocabulary, Tauri #8329 mitigation, 30s storyboard).
+**Research notes:**
+- v2.1 Phase 31 4-layer additive state machine (Base + Emotion + Anticipation + Reaction) — shipped.
+- v3.0 VIS-04 Mixamo retarget pipeline scaffolded; KAAN-ACTION-LEGAL §VIS-04 awaiting Kaan Adobe-account Mixamo download + aesthetic selection.
+- v3.0 VIS-05 mood→animation pool runtime validation against placeholder clips — passed; will re-pass with real clips.
+- Plutchik 8-primary emotions (joy / trust / fear / surprise / sadness / disgust / anger / anticipation) anchored from [Plutchik's Wheel reference](https://www.6seconds.org/2025/02/06/plutchik-wheel-emotions/) — used selectively (joy / trust / surprise / anticipation are DJ-appropriate; sadness / fear / disgust / anger are minimized or omitted because DJing is performative not negative-valence).
+- VTuber expression patterns from [VTubeStudio Expressions wiki](https://github.com/DenchiSoft/VTubeStudio/wiki/Expressions-(a.k.a.-Stickers-or-Emotes)) and [11 VTuber Expressions](https://vtuberart.com/11-amazing-vtuber-expressions-a-must-have-for-your-model/) — body-language equivalents adopted.
+- `project_mascot_as_vtuber_personality_surface` memory: single VTuber-style 3D character ("Neon Rebel"), mood variation on the same rig. `/hatch` user-gen explicitly deferred.
 
 ---
 
-### Category 5 — Coaching & Memory
+### Category 5 — OPPORTUNITY-SCAN: New Dep/Integration Opportunities
 
-**Thesis:** Real teaching = identify-cause-correct loops tied to timestamps. The debrief is where actual coaching lives (live is too latency-constrained for long-form). Long-term DJ profile is structured summary, not vector retrieval.
+**Thesis:** This is a research-pass output, not an engineering category. v3.1's deliverable is a green/yellow/red rating across confirmed v3.x candidates + a small set of new candidates surfaced by the install-readiness review. Only GREEN-rated integrations actually land in v3.1; YELLOW + RED defer to v3.2 or backlog with explicit reasons.
 
-#### Table Stakes
+The confirmed candidates from `project_v2_open_candidates` + PROJECT.md `Active` section already form the universe. v3.1's scan rates them on the `project_one_click_install_hard_req` install-impact axis (does adding this break or threaten one-click?) and on adoption-impact (does this widen real-world compatibility meaningfully?).
 
-| Feature | Why Expected | Complexity | Depends on |
+#### Table Stakes — What MUST be in the scan output
+
+| Item | Why Expected | Complexity | Depends on |
 |---|---|---|---|
-| **Post-session debrief (chaptered review + voiced TL;DR + 3 drills + clickable timeline)** — single Gemini call per session, ~$0.05–0.15 per debrief, SBI for critique + STAR-AR for drills (NOT sandwich) | Live mode can't teach (1–2 sentences max). Debrief is where deliberate practice closes. Strava-pattern chapter cards + Whoop-pattern auto-detection + Synthesia-pattern scrub markers. Voiced TL;DR optional (off by default for Pros). | H (~7 E-days; Gemini prompt + UI surface + scrub bar + 3-drill cards) | Existing: VoiceRecorder per-session `input.wav` / `voice.wav` / `events.jsonl` (Phase 2/15). v2: citation linter (sentence-level for chapters). |
-| **3-drill cap with "pin to next session" CTA** | Research consensus (Curious Lion, The Geeky Leader): more drills = less stickiness. 3 is the hard cap. "Pin to next session" closes the deliberate-practice loop by injecting drill context into next session's live-mode prompt. | S (~1 E-day; structured drill card spec, profile.active_drills field) | v2: Post-session debrief. |
-| **Long-term DJ profile (~2 KB structured JSON, ≤10 tendencies, regenerated each session)** | Structural summary at session end, injected verbatim (~600–800 tokens) into next session's system prompt. Rejected mem0 / vector DB — DJ tendencies aren't retrievable factoids, they're summarisable invariants. | S (~2 E-days; profile schema + regeneration prompt + live-prompt injection) | v2: Post-session debrief (generates the profile). |
+| **Mixxx OSC adapter rating** — UDP `:7777` subscribe, maps to existing `MusicState` schema, GPL-2 IPC-only (no GPL-2 linkage = no license contamination), gated on Mixxx PR #14388 status | Mixxx is the only DJ app with a real-time deck-state surface, AND the free-software DJ community is the right cultural audience for OSS vibemix. Rating likely GREEN if PR merged or YELLOW if still feature-flagged. | single-day plan (rating only) | None (research output). |
+| **10→30+ controller library via Mixxx map transpile rating** — offline build-time XML+JS → vibemix semantic event JSON; separate `vibemix-maps` GPL-2 repo; core consumes as data (no license contamination) | Closes the "10 controllers" promise; unlocks ~80% of OSS DJ TAM. Rating likely GREEN-with-caveat — transpiler is a one-time build job, end-user impact is zero. | single-day plan | None (research output). |
+| **pyrekordbox integration rating** — beyond the v2.0 XML-import already shipped, what about reading Rekordbox cache for "what's hot in your library this week" priors? | The library-side grounding hasn't been pushed beyond import. Adding read-only Rekordbox cue/loop/grid-marker priors would let Gemini cite "you set a cue at this exact point yesterday." | single-day plan | v2.0: pyrekordbox XML import. |
+| **DJ software coverage scan** — for the canonical 10 controllers + 6 DJ apps in LAUNCH-04, what's the actual coverage gap? Which DJ apps don't yet have any vibemix surface? | Surface the gap so we know where to push v3.2 or v3.x. Likely Rekordbox + Serato Studio + Traktor are gaps. | single-day plan | v3.0: LAUNCH-04 controllers + DJ-app grids. |
+| **OS edge-case scan** — macOS 12.3 still supported? Win 10 EOL implications? ARM-only Mac install path? | Operational scope check. Apple drops 12.3 support sometime in 2026-2027 per typical EOL; vibemix should know the runway. | single-day plan | v3.0: SHIP-04 fresh-VM matrix. |
+| **Hardware coverage scan** — Pioneer DDJ-FLX4 / FLX6 / FLX10 / SX3 / 400 / 1000 / XDJ-RX3 / Numark Party Mix Live / Mixstream Pro+ / Hercules Inpulse 300 + 500. What's missing? Denon Engine DJ controllers? Reloop? | The shipped MIDI library (LAUNCH-04) is canonical 10. Reloop + Denon are notable gaps for European + US prosumer DJs respectively. Rating each as GREEN (Mixxx map exists → transpile path) / YELLOW (proprietary mapping only) / RED (no public mapping). | single-day plan | v3.0: LAUNCH-04 canonical 10. |
+| **Final v3.1 dep-add list (GREEN-only)** — explicitly enumerated, with green rating rationale per dep | Anti-creep guardrail. Without an explicit final list, v3.1 implementation could pull in YELLOW deps under "but it's also good for users." | <0.5 E-day | All above. |
 
 #### Differentiators
 
 | Feature | Value Proposition | Complexity | Depends on |
 |---|---|---|---|
-| **Skill-ladder critique (Beginner / Intermediate / Pro)** changes WHAT gets flagged, not just wording | Beginner = mechanical (beatmatch drift, phrase entry, mic bleed). Intermediate = phrasing + energy curve + harmonic. Pro = micro-craft (filter timing within bar, EQ kill placement). Same prompt scaffolding, different lenses. | S (~1 E-day; per-level templates in `vibemix/prompts/`) | Existing: 6-cell prompt matrix (Phase 10). v2: post-session debrief (the critique surface). |
-| **Library-aware drill cards** ("3 tracks from your library that fix this") below each drill's SUCCESS criterion | Closes the cross-bucket arrow: debrief diagnoses → library intelligence proposes. Filtered by Camelot compatibility + recency. Promotes drills from advice to actionable practice. | S (~1 E-day post-library-intelligence) | v2: Library intelligence + post-session debrief. |
-| **Per-session slop ratio surfaced in debrief UI** ("kept 47 of 52 reactions; 5 dropped for not citing real events") | Transparency feature — turns anti-slop discipline into a visible product signal. The kind of trust-building that differentiates from generic AI commentary. | S (<1 E-day, derived telemetry) | v2: citation linter telemetry. |
+| **OBS browser-source integration callout** (mascot path) — README + docs/integrations.md two-paragraph "use mascot.html as an OBS browser source for streaming overlay" | Free differentiator. The infrastructure exists (v2.0 `ws://127.0.0.1:8765` bus + v2.1 mascot.html preservation). Zero engineering, pure docs. | <0.5 E-day | v2.0: ws bus. v2.1: mascot.html. |
+| **`obs-websocket-py` uplink rating** — backlog item in PROJECT.md; would let vibemix events trigger OBS scene switches / lower-third subtitles | Rating only in v3.1; if GREEN it lands in v3.2. Streamer-DJ audience (the IG/Twitch crossover demographic) is a real differentiator wedge. | single-day plan (rating only) | None (research output). |
+| **Beat This! Rust sidecar rating** — backlog item in PROJECT.md; non-Gemini beat-grid, closes "AI reacts off-beat" hallucination class; gated on install-size budget | If install-size budget allows (Rust sidecar likely 10-20MB), the off-beat hallucination class is the next-after-mic-as-Part-2 grounding lift. | single-day plan (rating only) | None (research output). |
+| **Curriculum-mode lesson packs rating** — per user level (Beginner / Intermediate / Pro); coach drill packs | Already a v3.x candidate. The scan confirms it's coherent with the v3.1 install-readiness theme or defers explicitly. Likely defers (not install-related). | single-day plan | None (research output). |
 
 #### Anti-Features
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---|---|---|---|
-| **Full-set voiced playback (15+ minute debrief read aloud)** | "Listen-while-you-cook UX." | Long-form voiced has no skim affordance. Whoop / Strava users skim text first, dive into ~1 section. Voiced past 90s feels worse than reading. | 60–90s voiced TL;DR at the top + chapter-card text body. |
-| **Feedback sandwich** (positive-corrective-positive) | "Soft critique pedagogy." | Research-rejected — Radical Candor + Faculty Focus + PMC clinical paper all show it's ineffective; corrective-positive-positive lands better. | SBI (Situation-Behavior-Impact) for critique + STAR-AR for drills. |
-| **Per-note / per-bar accuracy scoring** (Synthesia piano pattern) | "Quantified feedback." | DJing is performative, not "correct/incorrect" — applying a scoring rubric forces a wrong model. | Identify-cause-correct loops + clickable timeline scrub. |
-| **Ask-Tell-Ask interactive turn-taking in debrief** | "Reflective coaching." | Requires multi-turn Gemini calls inside the debrief — 3× cost + UI complexity. Out of v2 scope. | Defer to v2.x stretch; ship one-shot debrief at v2.0. |
-| **Chain-of-Verification for every claim** (regenerate the debrief, verify each claim, discard inconsistent ones) | "Better grounding." | 2× Gemini cost; right shape for v2.x "deep debrief" opt-in but overkill for default. | Citation linter at sentence level catches 90%+ of unsourced claims at ~30–80ms cost. CoVe deferred. |
-| **Auto-debrief on every session ≥1 min** | "Reduce friction." | Spends Gemini budget on sessions users don't care to review. | Auto-trigger only if session > 15 min; user-click otherwise. |
-| **Streaks / XP gamification** (Duolingo pattern) | "Engagement loop." | Reads as patronising to Pros; gross-fit for DJ identity. | Skill-ladder critique (Beginner/Intermediate/Pro) — the seriousness the user wants. |
-| **mem0 / motorhead / Qdrant for long-term memory** | "Personal-AI memory infrastructure." | DJ tendencies fit in 2 KB; retrieval is not the problem. Adds vector-DB dep + breaks one-click install. | Structured JSON profile + verbatim prompt injection. |
-| **30-session formal eval harness for the debrief** | Standard ML eval. | Phase 16 is Kaan's DJ ear (memory directive). Don't auto-build the harness. | Tuning CSV + Kaan's session-recording audit (already exists from VoiceRecorder). |
+| **Add ProDJ Link in v3.1** | "Pro/touring DJ coverage." | Already RED per v3.0 Out-of-Scope: 80-200MB install bloat + Pioneer CDJ hardware requirement + JVM bridge. The opportunity-scan output should re-affirm RED. | Skip entirely. v3.2+ only if a CDJ-Pro SKU emerges with real demand. |
+| **Add stem separation (Demucs / Spleeter)** | "Per-stem grounding." | Already RED per v3.0 Out-of-Scope: install bloat + compute-heavy + explicit anti-scope-creep decision. The opportunity-scan output should re-affirm RED. | Skip entirely. |
+| **Add CLAP / MERT / OpenL3** | "Better music embedding." | Already RED per `feedback_no_clap_use_gemini_embedding`. The opportunity-scan output should re-affirm RED. | Skip entirely; Gemini Embedding 2 covers it. |
+| **Add a second LLM provider as fallback** | "Multi-provider resilience." | Already RED per `feedback_no_scope_creep_clean_utility` + Bravoh-is-Gemini-only constraint. Adding OpenAI/Anthropic SDK doubles maintenance surface + breaks the cost model. | Stay Gemini-only; the OpenRouter TTS fallback chain already in v4 POC is the only non-Gemini path and it's TTS-only. |
+| **Add DAW integration (Logic / Ableton / FL)** | "Next conquest beyond DJ software." | Already RED per v3.0 Out-of-Scope. v3.2+ deliberate decision, not v3.1 scope-creep. | Skip entirely; defer to milestone-after-v3.1 if at all. |
+| **Add mobile companion app** | "Multi-surface UX." | Desktop-only constraint in PROJECT.md. | Skip entirely. |
+| **Add real-time stream-to-Twitch hook** | "Streamer-DJ wedge." | Already RED per v3.0 Out-of-Scope. The OBS browser-source path covers the streamer use-case without engineering cost. | OBS browser-source path (differentiator above). |
 
-**Research notes:** [E-debrief-pedagogy.md](v2-buckets/E-debrief-pedagogy.md) (DJ teaching pedagogy synthesis, debrief UX patterns, profile architecture rejecting mem0, anti-slop tone calibration).
-
----
-
-### Category 6 — Ship & Distribution
-
-**Thesis:** v0.1.0 milestone partially shipped (Phases 1–14); the v2.0 absorption pulls the remaining ship infrastructure (recording browser, UAT, sign+notarize, GitHub release matrix, day-zero ops) into this milestone alongside the research-driven features. Day-Zero Operations and Hallucination Verification Gate (Kaan DJ ear test) are the load-bearing release gates.
-
-#### Table Stakes
-
-| Feature | Why Expected | Complexity | Depends on |
-|---|---|---|---|
-| **Recording browser + retention enforcement** — per-session dir with `input.wav` / `voice.wav` / `events.jsonl` + UI list + delete + retention cap (configurable; default 30 days) | The VoiceRecorder already writes per-session under `recordings/`. The browser is the missing UX surface — open Finder/Explorer to session, replay AI voice, delete. Without retention enforcement, disk fills silently. | M (~2 E-days; UI surface + retention cron) | Existing: VoiceRecorder (Phase 2/15). |
-| **Apple Developer ID sign + notarize + DMG** | macOS Gatekeeper rejects unsigned binaries → 0% install conversion. Kaan has the Developer ID; Issuer ID is the open blocker (Phase 18 absorbed). | S (~1 E-day once Issuer ID lands) | Existing: Phase 18 P01–05 partially shipped. |
-| **SignPath Foundation Windows MSI** | Same Gatekeeper analogue (SmartScreen). SignPath OSS cert is free for OSS projects; application has ~1-week SLA — must be filed day-1 of v2.0 milestone (Phase 1 carry-forward in STATE.md). | M (~2 E-days post-cert + 3 weeks lead time on the application) | None (Kaan-blocked operationally). |
-| **GitHub release matrix** (mac arm64 + intel + win x86_64 + win arm64, single tag per cut, real changelog) | Phase 18 absorbed. Auto-built via CI matrix on tag push. | M (~2 E-days CI work) | v2: Sign + notarize discipline (above). |
-| **README full rewrite + branding + social assets** — hero PNG + architecture SVG + demo GIF placeholder + 8 controller logos grid + 12-question FAQ + value-prop paragraph above the fold | The repo is the front door for 100% of organic discovery. Phase 19 absorbed. Repo description + topics tags optimised for search. Privacy/cost/Linux/Gemini-Live FAQ pre-seeded. | M (~3 E-days; mostly content) | Existing: Phase 19 partially shipped (architecture SVG + hero PNG done in commit `137240b`). |
-| **Day-Zero Operations** — fresh-machine rehearsal (clean macOS VM + Windows VM), install playbook, post-launch playbook (rate limit + Bravoh proxy load, support triage) | Phase 20 absorbed. Without a fresh-VM rehearsal, day-one users hit BlackHole / TCC / signing edge cases nobody anticipated. | M (~3 E-days; rehearsal + playbook authoring) | v2: Sign + notarize + release matrix. |
-| **Hallucination Verification Gate (Kaan DJ ear test)** — Kaan runs 3–5 real DJ sessions with v2.0 features active, judges by feel | The hard release gate. Per memory `project_phase_16_kaan_dj_testing`: NOT a formal eval suite, Kaan's personal testing. Tuning CSV from `scripts/tune_hard_tek_detectors.py` is the audit surface. | M (~3 E-days Kaan-time, calendar-blocking) | v2: Generalized event detector + citation linter + mascot anticipation + ack bank (the surfaces under test). |
-
-#### Differentiators
-
-| Feature | Value Proposition | Complexity | Depends on |
-|---|---|---|---|
-| **One-click install <60s promise on README** (delivered via DMG + MSI + auto-deps + wizard) | The hard requirement per memory `project_one_click_install_hard_req`. Every dep choice is green/yellow/red rated for install impact (BlackHole = yellow but unavoidable on Mac audio capture; SignPath = green for end users). | S | Existing: Phase 11 calibration wizard (auto-detect devices + permission checks). |
-| **Free for end users via Bravoh-managed proxy** (per-client rate limit, no API key entry) | Friction kills virality; cost is treated as marketing. Proxy already shipped (Phase 5 — JWT HS256 + Redis quota at api.altidus.world). | (shipped) | Existing: Phase 5. |
-| **Polished README sexification** — branded hero banner, install GIFs, screenshots gallery, feature matrix (Beginner/Intermediate/Pro × Hype/Coach), CONTRIBUTING.md with controller-mapping contribution path | The repo doubles as the brand surface. CONTRIBUTING controller-mapping path is the most-likely external PR vector (community contributes SKUs vibemix lacks). | M | v2: README rewrite + 10-SKU MIDI library (Category 4). |
-
-#### Anti-Features
-
-| Feature | Why Requested | Why Problematic | Alternative |
-|---|---|---|---|
-| **User-supplied Gemini API keys** | "Reduce our cost." | Friction kills virality (memory `feedback_no_scope_creep_clean_utility`). Bravoh-side proxy handles cost as marketing spend. | Bravoh proxy with per-client rate limit (Phase 5 shipped). |
-| **30-session formal hallucination eval** | Standard ML release gate. | Kaan's DJ ear is the explicit test per memory. Building the harness costs 2–3 weeks. | Kaan-driven session audit + tuning CSV. |
-| **Linux support** | "Niche OSS audience." | Doubles platform-engineering cost. DJ Linux audience is small. | macOS + Windows only in v2.0; Linux explicitly excluded. |
-| **Custom voice cloning** | "Brand-distinct AI voice." | Bravoh-only stack; Gemini TTS prebuilt voices cover the matrix. Cloning adds privacy + safety surface. | Gemini TTS prebuilt voices (Achird default; male/female switchable). |
-| **Real-time stream-to-Twitch/YouTube hook** | "Live broadcast integration." | Out of scope; recording for later sharing is enough. | Session recordings already exist; user shares clips post-hoc. |
-| **Auto-update channel with silent installs** | "Modern app UX." | Adds Tauri updater complexity + signing key escrow. Out of v2.0 scope. | Tagged GitHub releases; user downloads new DMG/MSI when bumped. |
-| **Anonymous telemetry without explicit consent** | "Product analytics." | Privacy-paranoid DJs would block on this. | Local-only events.jsonl per session; opt-in telemetry is a v2.x consideration. |
-| **Skipping Day-Zero rehearsal "to save time"** | "Beta ship + iterate." | First-impression DJ apps that crash at day-zero hit ~5% retention. | Phase 20 fresh-VM rehearsal is mandatory before tag-push. |
-
-**Research notes:** [project_v0_1_0_rc1_open_bugs](memory file), [project_phase_16_kaan_dj_testing](memory file), [project_one_click_install_hard_req](memory file), Phase 18+19+20 plans in `.planning/phases/` (already drafted).
-
----
-
-### Category 7 — Viral Wave
-
-**Thesis:** The viral demo is not a feature, it's the engineering critical path. Beat A (point-at-knob) + Beat B (anticipation lean-in) + Beat C (3-second silence) = three viral assets each scrolled-content-ready on their own. Cross-platform copywriting is pre-seeded; pre-seeded FAQ in comments closes the trust loop.
-
-#### Table Stakes
-
-| Feature | Why Expected | Complexity | Depends on |
-|---|---|---|---|
-| **30-second viral demo film** — single take or curated multi-take edit; djay Pro 5 in 2-deck mode; CDJ Whisper color direction; Kaan + DDJ-FLX4 + HD25 headphones | One filmable cut feeds Twitter / IG Reels (IT + EN) / Reddit / HN. 6+ takes per beat; edit magic into the cut. | M (~2 E-days post-feature-complete) | v2: djay overlay + mascot anticipation + ack bank (the three signature beats need all three present simultaneously). |
-| **Twitter thread (5 posts)** — technical breakdown, Beat A hero image, code snippets, GitHub link | Twitter is the engineering-credibility channel. Thread structure mirrors how Cursor/Pi shipped their viral moments. | S (~1 E-day; content) | v2: 30s demo film. |
-| **IG Reels (IT + EN) — vertical 9:16 recut** — Kaan's face top third + djay screen + mascot bottom two-thirds, caption-baked | The cinematic channel + Italian community wedge. Bravoh's 140k-view real is the same account leverage. | S (~1 E-day; reframe + caption + bilingual copy) | v2: 30s demo film. |
-| **Reddit r/Beatmatch + r/DJs thread** — Beat C silence hero + open-source angle + 60-second-install promise | The DJ-community-credibility channel. Leads with Beat C (the anti-slop reveal) because the community is exhausted by AI slop. | S (~1 E-day; content + pre-seeded FAQ) | v2: 30s demo film. |
-| **Hacker News Show HN post** — Beat A hero + engineering breakdown of the grounding stack + Tauri #8329 mitigation as a real story | The hacker-credibility channel. Leads with the engineering: 4 grounding signals + cascade tradeoff + sidecar AX inheritance mitigation. | S (~1 E-day; content) | v2: 30s demo film. |
-| **Pre-seeded FAQ in comments** — privacy / cost / no-Linux / no-Gemini-Live / djay-only-launch / how-it-doesn't-hallucinate (8–12 questions across all four channels) | The first 20 comments make-or-break the thread momentum. Kaan + Francesco rotate answering; canned-but-honest replies that close the trust loop fast. | S (~0.5 E-days) | v2: All four channel posts. |
-
-#### Differentiators
-
-| Feature | Value Proposition | Complexity | Depends on |
-|---|---|---|---|
-| **Beat A — "AI points at the knob" hero frame at 0:09** — amber ring on Deck A mid EQ, mascot in talk pose, caption-baked "Mids are stacking on A — cut 'em 3 to 4 dB" | The screenshot that captions itself. Single image works on Twitter / Reddit / IG without context. Cursor-autocomplete-moment shape. | (part of demo) | v2: djay overlay. |
-| **Beat B — "AI anticipation lean-in" frame at 0:07** — mascot already in `prep_lean_in_hyped` pose ~50–150ms before voice arrives | The "huh — wait, what?" beat for viewers exhausted by reactive AI. Frames AI as predictive, not reactive — ChatGPT Voice / Pi orb shape but anticipating the *world* not its own processing. | (part of demo) | v2: Mascot anticipation. |
-| **Beat C — 3-second silence at 0:22–25** — AI says nothing; mascot keeps idle-bobbing; no overlay; subtitle in post: "The AI shuts up when there's nothing to say" | The anti-slop reveal. Pi-vs-ChatGPT-Voice "silence as feature" axis. The frame that proves the positive frames are real. | (part of demo) | v2: Citation linter live-mode strip + ack bank fallback (the actual technical reason silence happens). |
-| **Paired ring + linker** (filter knob + play/cue zone connected by thin amber line at 0:14–18) | One signature spatial trick that sells "AI sees relationships between controls," not just "names things." | (part of demo) | v2: djay overlay 12-element vocabulary + ring rendering supports multi-element with connectors. |
-| **GitHub stars ticker on outro frame** (0:29–30) | Social proof in motion at the CTA moment. Records pre-launch 15+ stars from friends/dev network for visible ticking. | (part of demo) | v2: Day-Zero seed wave from friends + ARRAY community (per PROJECT.md). |
-
-#### Anti-Features
-
-| Feature | Why Requested | Why Problematic | Alternative |
-|---|---|---|---|
-| **Overpromise "works on every DJ app"** in copy | "Broader appeal." | First Reddit comment: "but I use Rekordbox" → trust collapses. | Frame copy as platform-agnostic ("AI that watches your set"); README explicitly lists djay-overlay as v2.0 with Rekordbox-overlay v1.2 fast-follow. |
-| **Real-time AI demo without pre-scripted beats** | "Authentic / no editing tricks." | The AI is real-time during filming but Kaan doesn't pre-know which knob it'll point at. Multi-take + magic-take edit is industry-standard for product demos. | Multi-take strategy; honest about edit but never about behaviour. AI is real; the curation is curated. |
-| **Flashing UI / constant ring fires during demo** | "More AI presence." | Reads as AI slop — the opposite of the thesis. | 8s cooldown per element; at most one ring per 3s utterance; deliberate silence beat at 0:22–25. |
-| **Influencer / sponsored-post launch** | "Paid amplification." | Wrong audience cue — open-source-DJ community filters out paid promo. | Organic Francesco-DJ-network outreach + small (€50–100) IG/TikTok ads + ARRAY community + Bravoh-team friends seeded. |
-| **Auto-translation of pre-seeded FAQ** | "All locales." | Loses Kaan/Francesco's voice. Reddit/HN reads as translated-AI-copy. | English + Italian (Kaan + Francesco's actual languages) hand-written. Other locales emerge organically post-launch. |
-| **Demo film delayed to v2.1 "for polish"** | "Ship clean utility first, market later." | The Bravoh public launch wave window is the 4-week post-v2.0 window. Slipping the demo blows the wave. | Treat the demo film as the engineering critical path. 7-day spike day-1 of v2.0 close. Buffer day on day 7 for film. |
-
-**Research notes:** [synthesis-viral-demo.md](v2-buckets/synthesis-viral-demo.md) (full 30s storyboard table, three signature beats, 7-day engineering critical path, per-platform post angles, risk register).
+**Research notes:**
+- `project_v2_open_candidates` memory: confirmed Mixxx OSC + map transpile + pyrekordbox + Gemini Embedding 2 + post-session debrief; deferred ProDJ Link + stems + CLAP; backlog OBS / Sonic Pi / ai-remixmate / `/hatch`.
+- PROJECT.md `Active` section: v3.x candidate scope already enumerated.
+- v3.0 LAUNCH-03 + LAUNCH-04: canonical 10 controllers + 6 DJ-software grid established baseline.
+- Confidence on the actual GREEN/YELLOW/RED ratings is MEDIUM until the small parallel scan runs — this category outputs the *framework* + *target list*, not the final ratings. The ratings themselves are a single-day plan in v3.1 itself.
 
 ---
 
 ## Cross-Category Dependency Graph
 
 ```
-Category 1: Detection & Grounding
-    Generalized event detector v1 (6 detectors)
-        └──> required by Category 2 (predictive firing reads PHRASE_BOUNDARY)
-        └──> required by Category 5 (debrief grounds claims in event types)
-        └──> required by Category 7 (Beat A spatial reactions need detector-event-tied points)
-    Citation grammar in prompts
-        └──> required by Citation linter (v2.0 follow-on)
-        └──> required by Category 5 (debrief sentence-level enforcement)
-    Library intelligence (Gemini Embedding 2 + sqlite-vec)
-        └──requires──> Pyrekordbox XML import (Category 4)
-        └──> required by Category 5 (library-aware drill cards)
+Category 1: INSTALL
+    Signed artifacts (SHIP-01/02 + DIST-19)
+        └──gates──> Category 1 fresh-VM matrix run (SHIP-04/05)
+        └──gates──> Category 3 MacBook end-to-end pass (need a real installable artifact to test)
+    BlackHole auto-prompt + Homebrew fallback
+        └──extends──> v2.1 Phase 33 install wizard
+    VB-CABLE auto-prompt + driver-prompt forewarning
+        └──extends──> v2.1 Phase 33 install wizard
+    First-launch wizard end-to-end + ≤60s gate
+        └──requires──> All install prereqs landing (signed binaries + virtual audio path + TCC + MIDI fallback)
+        └──provides──> Category 3 functional flow walk starting state
+    Onboarding-stopwatch ≤60s gate
+        └──provides──> README "<60s install" claim verification
 
-Category 2: Latency & Liveness
-    Pre-canned ack bank
-        └──> required by Category 3 mascot anticipation (T+150ms audible signal)
-        └──> required by Category 7 Beat B (ack lands while voice hasn't arrived)
-    Cancel-and-refire
-        └──requires──> Generalized event detector v1 (priority-aware events)
-    Predictive drop firing
-        └──requires──> Cancel-and-refire + Generalized event detector v1
-        └──gated by──> Kaan ear-test (v2.0 ship-on-by-default decision)
+Category 2: DEPS
+    AUDIT.md authoring
+        └──consumes──> v2.1 Phase 34 audit machinery (existing CI output)
+        └──provides──> Category 1 install-impact rating evidence
+    CI badges in README
+        └──extends──> v3.0 LAUNCH-01 README
+    SBOM-with-release
+        └──extends──> v3.0 SHIP-07 release.yml
+    Lockfile-diff bot + Dependabot
+        └──parallel──> independent CI surfaces
 
-Category 3: Personality & Anticipation
-    Mascot anticipation layer (1-above-mood)
-        └──> required by Category 7 Beat B (the visible-before-voice anticipation)
-    4-layer additive state machine
-        └──requires──> Mascot anticipation layer (proves shape first)
-    Inline emote-tag vocabulary
-        └──requires──> 4-layer state machine + Gemini text-channel timing spike
+Category 3: TEST
+    Functional flow walk
+        └──requires──> Category 1 first-launch wizard end-to-end + Category 4 mascot emotion set landed
+        └──gates──> v3.1 release-cut
+    Visual + aesthetic critique
+        └──reuses──> v3.0 Phase 43 paired ui-checker + ui-auditor
+    Mascot emotion coverage check
+        └──requires──> Category 4 23-clip emotion set landed
+    Usability heuristic pass (Nielsen 10)
+        └──parallel──> independent Kaan-time pass
+    Hallucination gate re-run (check_gate.sh Gate 2b)
+        └──reuses──> v3.0 Phase 42 GATE-05/06 protocol + script
+    Gap-closure routing
+        └──output-of──> All above; feeds back to v3.1 plan-list or v3.2 scope
 
-Category 4: Cross-Software Integration
-    10-SKU MIDI controller library
-        └──> already shipped (Phase 9)
-    Pyrekordbox XML import
-        └──> required by Category 1 Library intelligence (the source data)
-        └──> required by Category 5 library-aware drills
-    djay Pro Mac overlay highlight
-        └──requires──> Tauri parent-side AX call (mitigates issue #8329)
-        └──> required by Category 7 Beat A (the point-at-knob frame)
-    Mixxx OSC bridge
-        └──parallel──> independent feature-flagged path
+Category 4: MASCOT
+    23-clip emotion set
+        └──requires──> Kaan-aesthetic Mixamo selection (KAAN-ACTION-LEGAL §VIS-04 discharge)
+        └──requires──> v2.1 Phase 31 4-layer state machine (existing)
+        └──requires──> v3.0 VIS-04 retarget pipeline + bundle-size gate (existing)
+        └──provides──> Category 3 mascot emotion coverage test surface
+    MANIFEST update wiring
+        └──requires──> 23-clip set landed
+        └──extends──> v2.1 Phase 31 MANIFEST schema
+    Inline emote-tag vocab integration (differentiator)
+        └──requires──> 23-clip set + Gemini text-channel-timing spike
+        └──gates-on──> spike landing in v3.1 vs deferring to v3.2
 
-Category 5: Coaching & Memory
-    Post-session debrief
-        └──requires──> Citation linter (sentence-level chapter enforcement)
-        └──requires──> Generalized event detector v1 (events.jsonl provides citation anchors)
-        └──> generates Long-term DJ profile
-    Long-term DJ profile
-        └──requires──> Post-session debrief
-        └──injects-into──> Next session's live system prompt
-    Library-aware drill cards
-        └──requires──> Library intelligence + Post-session debrief
-
-Category 6: Ship & Distribution
-    Hallucination Verification Gate (Kaan DJ ear test)
-        └──gates──> v2.0 release
-        └──tests──> Generalized event detector v1 + Citation linter + Mascot anticipation + Ack bank
-    Apple Developer ID sign + Windows MSI + GitHub release matrix
-        └──parallel──> Kaan-blocked on Issuer ID + SignPath OSS application
-    Day-Zero Operations rehearsal
-        └──gates──> v2.0 release
-        └──requires──> All ship-infrastructure features above
-
-Category 7: Viral Wave
-    30s viral demo film
-        └──requires──> djay Pro Mac overlay + Mascot anticipation + Ack bank (all three for Beat A/B/C simultaneously)
-        └──requires──> Generalized event detector v1 (grounded reactions during filming)
-    Four channel posts (Twitter / IG / Reddit / HN)
-        └──requires──> 30s viral demo film
+Category 5: OPPORTUNITY-SCAN
+    Mixxx OSC + map transpile + pyrekordbox + Beat This! + curriculum-mode ratings
+        └──output-of──> v3.1 research pass; informs v3.2 milestone scope
+    OBS browser-source callout
+        └──reuses──> v2.0 ws bus + v2.1 mascot.html preservation
+    Final GREEN-only v3.1 dep-add list
+        └──output-of──> All above; gates what actually lands in v3.1 phases
 ```
 
 ### Cross-Category Conflicts
 
-- **Predictive firing × Cancel-and-refire budget:** Both consume Gemini API budget. Cap predictive fires at 1 per 12s + cancels at 1 per 8s + 30/hour hard cap.
-- **Emote-tag vocab × Live latency:** Emote tag must arrive on Gemini text channel BEFORE TTS audio for the anticipation to fire on time. 1-day spike before committing to the inline-tag approach (Bucket D A3 risk). Fallback: event-detector-driven anticipation (loses fine-grained variety but still hits T+50ms).
-- **djay overlay × Tauri sidecar AX (#8329):** AX call must run in Rust parent, not Python sidecar. Architectural constraint that ripples through Window-tracker design + IPC schema (overlay element names cross WS bus as already-resolved screen rects).
-- **Library intelligence cost × Bravoh proxy quota:** Library indexing on free tier requires BYO Gemini key (user's free-tier RPM covers it). Live queries through proxy quota. Documented in onboarding wizard.
-- **Mascot 4-layer × Mascot anticipation:** Don't ship full 4-layer in v2.0 — anticipation layer alone is the "1-above-mood" simplified subset. Full 4-layer is v2.x polish epic.
+- **Category 4 mascot clip-set land × Category 3 MacBook test**: Category 3's mascot emotion coverage check requires Category 4's clips landed first. Phase ordering must put Category 4 before Category 3's mascot section (functional flow walk + visual critique can run in parallel with mascot clip-land; only the mascot-specific test gates).
+- **Category 1 signed artifacts × Category 3 functional flow walk**: Category 3 needs a real installable to test. Without SHIP-01/02 (external clock), Category 3 can run on a *dev build* but the v3.1 release-cut gate stays open until signed-binary Category 3 walk passes. Recommended: Category 3 dev-build walk happens in v3.1 phases; signed-binary walk happens as part of SHIP-04 discharge cookbook execution (post-external-clock).
+- **Category 4 emote-tag vocab integration × Gemini Live spike timing**: The v2.1-deferred emote-tag vocab depends on Gemini text-channel timing behavior (Bucket D A3 risk). v3.1 should NOT block on the spike — ship 23 clips as table stakes; emote-tag integration is a differentiator that lands only if the spike succeeds early.
+- **Category 5 dep-add list × `feedback_no_scope_creep_clean_utility`**: The scan output MUST default to RED for anything that violates one-click-install or adds non-Gemini AI providers. Even if a dep looks "good" on adoption-impact, install-impact veto wins.
 
 ---
 
-## v2.0 Cut Recommendation
+## v3.1 Cut Recommendation
 
-### Launch With (v2.0)
+### Launch With (v3.1)
 
-Ruthless minimum that closes "feels surface-level" + ships the viral demo arsenal.
+Ruthless minimum that turns engineering-complete v3.0 into shippable v3.1.
 
-- [ ] **Generalized event detector v1** (6 detectors: KICK_SWAP / SUB_LAYER_ARRIVAL / BREAKDOWN_KICK_KILL / REENTRY_KICK_LAND / KICK_DENSITY_SHIFT / PHRASE_BOUNDARY) — closes the surface-level critique
-- [ ] **Latency stack v1** — prompt diet + Gemini caching + pre-canned ack bank + cancel-and-refire — sub-2s actual / sub-300ms perceived
-- [ ] **Mascot anticipation layer** (1-above-mood simplified) + beat-coupled hip-bob — 400–1200ms perceived mask
-- [ ] **Citation grammar in prompts** (prompt-only, no enforcement yet) — seeds corpus for live linter
-- [ ] **Citation linter v1.1 — live mode** (strict response-level + ack-bank fallback) — anti-slop enforcement starts
-- [ ] **djay Pro Mac overlay highlight** (12 elements + window tracker + overlay window) — viral demo anchor
-- [ ] **Pyrekordbox XML one-shot import** — library source
-- [ ] **10-SKU MIDI controller library** (already shipped Phase 9; add JSON-per-SKU + auto-detect polish)
-- [ ] **Hard Tek detector tuning** against 7-10 reference tracks — Kaan ear-test gate
-- [ ] **Recording browser + retention enforcement** — absorbed from v0.1.0 Phase 15
-- [ ] **Apple Developer ID sign + notarize + DMG + SignPath Windows MSI + GitHub release matrix** — absorbed from v0.1.0 Phase 18
-- [ ] **README full rewrite + branding + social assets** — absorbed from v0.1.0 Phase 19
-- [ ] **Day-Zero Operations rehearsal** — absorbed from v0.1.0 Phase 20
-- [ ] **Hallucination Verification Gate (Kaan DJ ear test)** — release gate
-- [ ] **30-second viral demo film + 4 channel posts** — IG/Reddit/HN/Twitter
-- [ ] **Pre-seeded FAQ + Kaan/Francesco answer rotation**
+- [ ] **INSTALL: Signed `.dmg` + `.msi` discharged via SHIP-01/02 cookbook** — post-external-clock walk
+- [ ] **INSTALL: First-launch wizard end-to-end with BlackHole / VB-CABLE auto-prompts** — Homebrew-first + `.pkg` fallback on Mac; `-i -h` + forewarning on Win
+- [ ] **INSTALL: Onboarding-stopwatch ≤60s** confirmed on tart matrix (macOS 12.3 / 14 / 15 + Win 10 / 11)
+- [ ] **INSTALL: First-session demo button** (differentiator that lifts user confidence; reuses VIS-09 deterministic sequencer)
+- [ ] **DEPS: AUDIT.md at repo root** with full pinned-dep table + license + install-impact rating + rationale
+- [ ] **DEPS: CI badges in README** (gitleaks / pip-audit / osv-scanner / cargo-audit / SBOM / signed-binary)
+- [ ] **DEPS: SBOM-with-release** attached as `gh release` asset
+- [ ] **DEPS: Dependabot configured** for security patches auto-PR; minor/major draft only
+- [ ] **DEPS: Unused-dep cull** (drop `openai`, `google-cloud-speech`, `google-cloud-texttospeech` if unused after audit)
+- [ ] **TEST: Kaan functional flow walk** (install wizard → first session → all 6 prompt-matrix cells → debrief → library search → uninstall)
+- [ ] **TEST: Visual + aesthetic critique pass** (paired ui-checker + ui-auditor on running app)
+- [ ] **TEST: Mascot emotion coverage check** (per Category 4 23-clip set)
+- [ ] **TEST: Nielsen 10 usability heuristic pass**
+- [ ] **TEST: Hallucination gate re-run via check_gate.sh Gate 2b** (≥2 sessions ≥2 genres in 14d window per GATE-05)
+- [ ] **TEST: Gap-closure routing** for every fail
+- [ ] **MASCOT: 23-clip emotion set landed** (3 Base + 5 Emotion + 5 Anticipation + 10 Reaction)
+- [ ] **MASCOT: MANIFEST update wiring** every clip to its event class
+- [ ] **MASCOT: bundle-size ≤25MB** confirmed
+- [ ] **MASCOT: visible on every supported window/screen-share path** (overlay window, OBS browser-source, standalone mascot.html)
+- [ ] **OPPORTUNITY-SCAN: Mixxx OSC + map transpile + pyrekordbox + Beat This! + curriculum-mode** ratings
+- [ ] **OPPORTUNITY-SCAN: DJ-software + OS + hardware coverage gap rating**
+- [ ] **OPPORTUNITY-SCAN: Final GREEN-only v3.1 dep-add list** (with explicit anti-creep RED reaffirmations)
+- [ ] **OPPORTUNITY-SCAN: OBS browser-source callout** docs/README
 
-### Add After v2.0 (v2.1 polish / fast-follow)
+### Add After v3.1 (v3.2 fast-follow candidates)
 
-Features explicitly out of v2.0 but on the immediate runway.
+Features explicitly out of v3.1 but on the immediate runway.
 
-- [ ] **Predictive drop firing** — gated on Kaan ear-test with v2.0 baseline
-- [ ] **4-layer mascot additive state machine** — full structural rewrite
-- [ ] **Inline emote-tag vocabulary (15 tags)** — post text-channel-timing spike
-- [ ] **Post-session debrief MVP** (chaptered + voiced TL;DR + 3 drills + clickable timeline)
-- [ ] **Long-term DJ profile** — generated by debrief, injected into live
-- [ ] **Cross-mode citation enforcement** — extend live linter to debrief + library + genre
-- [ ] **Mixxx OSC bridge** behind `--enable-mixxx-osc` flag (or first-class if PR #14388 merges)
-- [ ] **Library intelligence v1** (file watcher → embed → query, basic mode)
-- [ ] **Library-aware drill cards** ("3 tracks from your library that fix this")
+- [ ] **Inline emote-tag vocab integration** — if Gemini text-channel-timing spike lands clean; reaction-layer clips already in v3.1
+- [ ] **Mixxx OSC adapter implementation** — if scan rates GREEN
+- [ ] **Mixxx map transpile → 30+ controllers** — if scan rates GREEN-with-caveat
+- [ ] **Beat This! Rust sidecar** — if install-size budget allows + scan rates GREEN
+- [ ] **Live operator-walk on Windows** — if SHIP-04 tart matrix surfaces real friction
+- [ ] **pyrekordbox deeper integration** (cue/loop/grid priors) — beyond v2.0 XML import
+- [ ] **Curriculum-mode lesson packs**
+- [ ] **`obs-websocket-py` uplink** — if streamer-DJ demand emerges
 
-### Future Consideration (v2.2+)
+### Future Consideration (v3.3+)
 
-Features that need infrastructure beyond v2.0/v2.1 ship.
+Features that need infrastructure or signal beyond v3.1/v3.2 ship.
 
-- [ ] **Library intelligence v2** (Gemini Embedding 2 + sqlite-vec full pipeline, "what should I play next?" + "is this transition rough?" live queries)
-- [ ] **Rekordbox / Serato overlay** via template matching
-- [ ] **Genre expansion** — Techno → Tech House → DnB → Trance → UKG → Trap → Disco (~1 weekend per genre with v2.0 architecture)
-- [ ] **VirtualDJ OSC bridge** (gated on Pro-user demand signal)
-- [ ] **Windows overlay parity** (DPI + fullscreen Spaces)
-- [ ] **Mascot procedural mouth from audio amplitude** (3 talk variants)
-- [ ] **Genre auto-classifier via Gemini Embedding 2** (depends on library intelligence)
-- [ ] **"/hatch" user-generated mascots** (v2.x stretch per memory)
-- [ ] **Cross-session corpus for prompt-tuning** (slop-ratio-stripped sentence clustering)
+- [ ] **`/hatch` user-gen mascot pipeline** — v2.x stretch per memory
+- [ ] **`v1.0.0` cut** — gated on T+30 SHIP-V1-DECISION audit
+- [ ] **Re-rolling Neon Rebel mascot** — v3.x refresh if Hunyuan3D + AccuRIG 2 + Kaan's gut decide
+- [ ] **External usability tester recruit** — 5-7 DJs post-launch via Discord
+- [ ] **Multi-language UI** — defer; English-only in v1.x
 
 ---
 
-## Feature Prioritization Matrix (v2.0 in-scope only)
+## Feature Prioritization Matrix (v3.1 in-scope only)
 
 | Feature | User Value | Implementation Cost | Priority |
 |---|---|---|---|
-| Generalized event detector v1 | HIGH (closes surface-level) | MEDIUM (~5d) | P1 |
-| Pre-canned ack bank | HIGH (alive-feel mandatory) | LOW (~2d) | P1 |
-| Prompt diet + caching | MEDIUM (TTFT win) | LOW (~2d) | P1 |
-| Mascot anticipation layer | HIGH (perceived-latency mask) | LOW–MEDIUM (~3d) | P1 |
-| Citation grammar in prompts | MEDIUM (seeds linter corpus) | LOW (~1d) | P1 |
-| Citation linter (live mode) | HIGH (anti-slop enforcement) | MEDIUM (~3–5d) | P1 |
-| djay Pro Mac overlay (12 elements) | HIGH (viral anchor) | MEDIUM–HIGH (~5–7d) | P1 |
-| Pyrekordbox XML import | MEDIUM (library source) | LOW (~3d) | P1 |
-| 10-SKU MIDI library polish | LOW–MEDIUM (already exists) | LOW (~2d) | P1 |
-| Hard Tek detector tuning | MEDIUM (Kaan-specific, demo-critical) | MEDIUM (~3d) | P1 |
-| Recording browser + retention | MEDIUM (UX surface) | MEDIUM (~2d) | P1 |
-| Sign + notarize + DMG/MSI + release matrix | HIGH (zero-install conversion otherwise) | MEDIUM (~3d engineering + cert leads) | P1 |
-| README + branding + social assets | HIGH (organic discovery) | MEDIUM (~3d content) | P1 |
-| Day-Zero Operations rehearsal | HIGH (day-one retention) | MEDIUM (~3d) | P1 |
-| Hallucination Verification Gate | HIGH (release gate) | MEDIUM (~3d Kaan-time) | P1 |
-| 30s viral demo film | HIGH (engineering critical path) | MEDIUM (~2d post-feature-complete) | P1 |
-| 4 channel posts + pre-seeded FAQ | HIGH (launch wave) | LOW–MEDIUM (~2d) | P1 |
-| Cancel-and-refire | MEDIUM (in-bar reaction quality) | LOW (~2d) | P1–P2 |
-| Mixxx OSC bridge (feature-flagged) | LOW–MEDIUM (Mixxx-only) | LOW (~2d) | P2 |
+| INSTALL: Signed artifacts + first-launch wizard end-to-end | HIGH (zero-install conversion otherwise) | LOW (post-external-clock walk only) | P1 |
+| INSTALL: BlackHole / VB-CABLE auto-prompt + forewarning | HIGH (avoids "scary UAC" friction) | LOW (~1d sequencer + copy) | P1 |
+| INSTALL: ≤60s onboarding-stopwatch gate | HIGH (README claim verification) | LOW (real-VM run + assertion) | P1 |
+| INSTALL: First-session demo button | MEDIUM (lowers anxiety, reuses VIS-09) | MEDIUM (~2-3d wiring) | P1 |
+| DEPS: AUDIT.md + CI badges + SBOM-with-release | HIGH (trust signal + reviewer surface) | LOW (~2-3d consolidation) | P1 |
+| DEPS: Unused-dep cull | MEDIUM (smaller install + cleaner SBOM) | LOW (~0.5d sweep) | P1 |
+| DEPS: Lockfile-diff bot + Dependabot | MEDIUM (review velocity) | LOW (~1d config) | P2 |
+| TEST: Functional flow walk | HIGH (release-cut gate) | MEDIUM (~3-5d Kaan-time) | P1 |
+| TEST: Visual + aesthetic critique | HIGH (catches live-rendering issues) | LOW (~1d re-run) | P1 |
+| TEST: Mascot emotion coverage check | HIGH (gates "fully visible" claim) | LOW (~1d if clip-set ready) | P1 |
+| TEST: Nielsen 10 heuristic pass | MEDIUM (UX gap detection) | LOW (~0.5d checklist) | P1 |
+| TEST: Hallucination gate re-run | HIGH (ship gate per Phase 42) | MEDIUM (≥2 sessions calendar-blocking) | P1 |
+| MASCOT: 23-clip emotion set landed | HIGH (the v3.1 hard authored-content lift) | HIGH (>5d epic; Mixamo + Kaan-aesthetic gate) | P1 |
+| MASCOT: MANIFEST update + bundle-size gate | HIGH (state machine wiring) | LOW (~1d post-clip-set) | P1 |
+| MASCOT: Per-persona timing tuning | LOW (polish) | LOW (~0.5d) | P2 |
+| MASCOT: README hero asset render | MEDIUM (brand surface) | LOW (~0.5d post-clip-set) | P2 |
+| OPPORTUNITY-SCAN: GREEN/YELLOW/RED ratings on confirmed candidates | HIGH (v3.2 scope-setting) | LOW (~2d research pass) | P1 |
+| OPPORTUNITY-SCAN: OBS browser-source callout | LOW (free differentiator via docs) | LOW (<0.5d docs) | P2 |
+| OPPORTUNITY-SCAN: Final GREEN-only dep-add list | HIGH (anti-creep guardrail) | LOW (<0.5d output) | P1 |
 
 **Priority key:**
-- **P1**: Must have for v2.0 ship — the demo film and the ear-test gate depend on these.
-- **P2**: Should have, ship if schedule allows — Mixxx OSC behind flag.
-- **P3**: Defer to v2.x — predictive firing, full 4-layer mascot, emote-tag vocab, debrief, library intelligence v2.
+- **P1**: Must have for v3.1 ship — every milestone target feature has at least one P1 representative.
+- **P2**: Should have, ship if schedule allows — polish + differentiators.
+- **P3**: Defer to v3.2+ — explicitly enumerated in "Add After v3.1" above.
 
 ---
 
 ## Sources
 
-### v2-bucket research artifacts (primary, HIGH confidence)
-
-- [`v2-buckets/SYNTHESIS.md`](v2-buckets/SYNTHESIS.md) — integration layer + 5 strategic calls + priority matrix
-- [`v2-buckets/A-latency.md`](v2-buckets/A-latency.md) (incl. `A-followup-1-cancel-and-caching` content) — latency engineering, `interrupt(force=True)` empirical verification, prompt caching 1024-token floor
-- [`v2-buckets/B-industry-integrations.md`](v2-buckets/B-industry-integrations.md) — per-platform tractability matrix, ProDJ Link demotion, MIDI as universal layer
-- [`v2-buckets/B-followup-1-v11-integration-spec.md`](v2-buckets/B-followup-1-v11-integration-spec.md) — MixxxBus 190-LOC spec, Pyrekordbox XML schema, 10-SKU JSON layout, Sync note 0x58 vs 0x60
-- [`v2-buckets/C-ui-overlay.md`](v2-buckets/C-ui-overlay.md) — djay overlay hybrid approach, element vocabulary, Tauri #8329 mitigation, 30s storyboard
-- [`v2-buckets/D-mascot-emotion.md`](v2-buckets/D-mascot-emotion.md) — 4-layer architecture, anticipation recipe, emote tag vocab, Mixamo blendshape constraint, latency-budget cover-up
-- [`v2-buckets/E-debrief-pedagogy.md`](v2-buckets/E-debrief-pedagogy.md) — DJ teaching pedagogy synthesis, debrief UX patterns (Strava + Whoop + Synthesia + iZotope), profile architecture rejecting mem0, anti-slop tone
-- [`v2-buckets/E-followup-1-citation-linter.md`](v2-buckets/E-followup-1-citation-linter.md) — citation grammar EBNF, regex enforcement, Python `CitationLinter` class, per-mode prompt templates, telemetry surface
-- [`v2-buckets/F-library-intelligence.md`](v2-buckets/F-library-intelligence.md) — Gemini Embedding 2 audio cap (80s empirical), sqlite-vec vs alternatives, Bravoh pipeline 80% portable, drop+breakdown chunk strategy, cost projection
-- [`v2-buckets/G-genre-taxonomy.md`](v2-buckets/G-genre-taxonomy.md) — Per-genre event catalogs (Hard Tek + 6 others), phrase awareness, genre auto-classifier
-- [`v2-buckets/G-followup-1-hard-tek-dsp.md`](v2-buckets/G-followup-1-hard-tek-dsp.md) — 8 Hard Tek detectors with DSP recipes + 10 reference tracks + tuning harness + per-genre dispatch architecture
-- [`v2-buckets/synthesis-viral-demo.md`](v2-buckets/synthesis-viral-demo.md) — 30s storyboard table, three signature beats, 7-day engineering critical path, per-platform post angles, risk register
-
 ### Project state (already-shipped baseline)
 
-- [`.planning/PROJECT.md`](../PROJECT.md) — v2.0 milestone definition, 12 target features
-- [`.planning/STATE.md`](../STATE.md) — Phases 1–14 shipped, decisions locked, Phase 15+ remaining
-- `cohost_v4.py` — canonical v4 baseline (POC reference per memory)
+- [`.planning/PROJECT.md`](../PROJECT.md) — v3.1 milestone definition, 5 target features
+- [`.planning/research/v3-shipped/FEATURES.md`](v3-shipped/FEATURES.md) — v2.0 feature research; anti-features inherited
+- [`.planning/milestones/v3.0-REQUIREMENTS.md`](../milestones/v3.0-REQUIREMENTS.md) — REQ-ID closure; v3.1 builds on AUDIO/LAT/GATE/VIS/LAUNCH/SHIP-* completion
+- `cohost_v4.py` — canonical v4 baseline (POC reference per memory `project_v4_canonical_baseline`)
+- Mocks: `mocks/vibemix-app-ui.html`, `mocks/vibemix-cinematic-storyboard.html`, `mocks/vibemix-direction-final.html`
 
 ### Memory directives (constraints driving anti-features)
 
-- `feedback_no_clap_use_gemini_embedding` — Gemini-only, no CLAP/MERT
-- `project_phase_16_kaan_dj_testing` — Kaan's DJ ear, not formal harness
-- `project_one_click_install_hard_req` — every dep choice rated green/yellow/red
-- `feedback_no_scope_creep_clean_utility` — clean utility only, BYO-key forbidden
-- `project_anti_slop_grounded_gemini_thesis` — central product principle
-- `project_v0_1_0_rc1_open_bugs` — Phases 15–20 absorbed into v2.0
+- `project_one_click_install_hard_req` — install path is HARD requirement; every dep choice rated green/yellow/red
+- `feedback_no_scope_creep_clean_utility` — OUT: stem separation, CLAP, multi-provider AI, enterprise features
+- `project_mascot_as_vtuber_personality_surface` — single VTuber-style 3D character "Neon Rebel"; `/hatch` deferred
+- `project_phase_16_kaan_dj_testing` — Kaan's DJ ear, NOT formal harness
+- `feedback_no_clap_use_gemini_embedding` — Gemini Embedding 2 only
+- `project_v2_open_candidates` — v3.x candidate inventory + confirmed/deferred/backlog ratings
+- `project_anti_slop_grounded_gemini_thesis` — central product principle preserved
+- `project_visual_direction_cdj_whisper` — CDJ-Whisper UI direction held through v3.1
+
+### External research
+
+- BlackHole Homebrew cask: [`brew install --cask blackhole-2ch`](https://formulae.brew.sh/cask/blackhole-2ch) — 0.6.1 current, MIT-licensed
+- BlackHole upstream: [GitHub ExistentialAudio/BlackHole](https://github.com/existentialaudio/blackhole)
+- VB-CABLE silent install: [VB-Audio forum t=1909](https://forum.vb-audio.com/viewtopic.php?t=1909), [t=1766](https://forum.vb-audio.com/viewtopic.php?t=1766), [VB-Audio cable product page](https://vb-audio.com/Cable/) — `-i -h` flags work; Windows driver-signature prompt is OS-mandated
+- Tauri Windows installer: [Tauri v2 docs Windows Installer](https://v2.tauri.app/distribute/windows-installer/) — WiX MSI + NSIS, WebView2 bootstrap embedded
+- Tauri v2 prerequisites: [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/)
+- SBOM audit practice: [Mattermost SBOM audit guide](https://mattermost.com/blog/how-to-audit-a-security-bill-of-material-sbom/), [SPDX open-source tools](https://spdx.dev/tools/open-source-tools/)
+- Plutchik 8-emotion wheel: [Six Seconds Plutchik's Wheel](https://www.6seconds.org/2025/02/06/plutchik-wheel-emotions/), [Positive Psychology Emotion Wheel](https://positivepsychology.com/emotion-wheel/)
+- VTuber expression conventions: [VTubeStudio Expressions wiki](https://github.com/DenchiSoft/VTubeStudio/wiki/Expressions-(a.k.a.-Stickers-or-Emotes)), [11 VTuber Expressions](https://vtuberart.com/11-amazing-vtuber-expressions-a-must-have-for-your-model/)
 
 ---
 
-*Feature research for: vibemix v2.0 Research-Driven Ship milestone*
-*Researched: 2026-05-14*
-*Confidence: HIGH on category structure + complexity hints + dependencies; MEDIUM on predictive firing / emote-tag spike (both gated on near-term experiments)*
+*Feature research for: vibemix v3.1 Distribution-Ready Pass milestone*
+*Researched: 2026-05-17*
+*Confidence: HIGH on category structure + dependency graph + mascot emotion enumeration; MEDIUM on Windows install-flow framing (driver-signature prompt is OS-mandated) and on opportunity-scan rating outcomes (final ratings produced by the scan itself in v3.1, not pre-determined here).*

@@ -1,232 +1,191 @@
-# Project Research Summary
+# Project Research Summary — v3.1 Distribution-Ready Pass
 
-**Project:** vibemix — AI DJ Co-Host
-**Milestone:** v2.0 Research-Driven Ship
-**Domain:** Cross-platform real-time AI desktop app (audio + screen + MIDI + LLM/TTS streaming) extending a shipped v0.1.0 base with a 12-bucket research-driven feature set + absorbed v0.1.0 ship infrastructure
-**Researched:** 2026-05-14
-**Confidence:** **HIGH** — anchored to 12 deep v2-bucket research artifacts (~28,000 words), the validated Phase 1–14 baseline (cohost_v4.py + shipping sidecar), and direct repo verification of livekit-agents 1.5.8 + google-genai 2.0.1 source. **MEDIUM** on the still-unresolved spikes (Gemini text-channel ordering for inline emote tags; AX-from-Rust-parent on installed binaries; sqlite-vec Windows wheel).
-
----
+**Project:** vibemix (AI DJ Co-Host)
+**Domain:** Cross-platform desktop AI distribution polish — Win + Mac one-click install, dep audit/pin, e2e MacBook validation, mascot real-asset land, narrow-scope OSS utility
+**Researched:** 2026-05-17
+**Confidence:** HIGH
 
 ## Executive Summary
 
-v2.0 is **not greenfield**. It is the strict additive layer on top of the already-shipped 3-process architecture (Tauri Rust shell + PyInstaller `--onedir` Python sidecar + remote FastAPI proxy on api.altidus.world). Phases 1–14 of v0.1.0 shipped the runtime, the wizard, the cascade Gemini path, the 19-message IPC schema, the mascot single-layer, and the v4-derived `MusicState`/`EventDetector`/`AICoach` core. v2.0 absorbs outstanding v0.1.0 ship work (recording browser, sign + notarize, GitHub release matrix, README rewrite, Day-Zero ops) into a single bulky milestone alongside the research-driven feature set. **No new processes. No new providers. No new frameworks. 5 new pip deps. 0 new Rust crates. 0 new npm packages.** The bundle grows from 242 MB to ~290 MB on Windows, well under the 350 MB hard cap.
+v3.0 closed engineering-complete on 2026-05-17 — anti-slop audio path, latency stack v2, hybrid hallucination gate, CDJ-Whisper visual lock, README hero verbatim lock, EvidenceRegistry citation strip, and the KAAN-ACTION-LEGAL §SHIP-01..13 discharge cookbook are all in the repo. **The product itself is finished.** v3.1 is NOT new product scope — it is the distribution-polish layer that closes the gap between "Kaan's machine runs this" and "anyone on a clean Mac or Windows box can run this." Five target features map 1:1 to milestone scope: (1) one-click install Win+Mac, (2) dep audit/pin/lockfile/SBOM, (3) new-dep opportunity scan, (4) end-to-end MacBook pass, (5) mascot real GLBs with full emotion coverage.
 
-The thesis is three compounded systems. **System 1: the latency stack** — `SpeechHandle.interrupt(force=True)` empirically verified, Gemini context caching with 1024-token-floor padding, ~40-sample OPUS ack bank, predictive firing gated 2 bars early, mascot anticipation layer — compresses sub-2s actual voice-to-voice to sub-300ms perceived first reaction. **System 2: the anti-slop stack** — citation grammar (`[ev:KICK_SWAP@t]` / `[aud:...]` / `[midi:...]` / `[track:...]`) baked into Gemini's system prompt, in-memory Evidence registry, stdlib `re` linter that strips response-level in live (ack-bank fallback) and sentence-level in debrief — makes "trust the audio" a contract instead of a prompt rule. **System 3: the viral demo stack** — djay Pro Mac AX overlay (12 hand-mapped pointable elements) + mascot anticipation lean-in + ack bank — yields three filmable beats (point-at-knob, anticipation-before-voice, 3-seconds-of-silence) feeding one 30s cut that anchors Twitter / IG / Reddit / HN posts. The viral demo is **the engineering critical path**, not a polish item.
+The 4 research agents converged on a tight, opinionated recommendation: **zero new runtime AI deps, zero new IPC wrappers, zero new processes, every change either build-time / CI-time / test-time / asset-only.** Bundle stays under the 350 MB hard cap (Win +~6 MB VB-CABLE optional bundle; Mac detect-and-guide pattern). The mascot lands 23 GLB clips (3 Base + 5 Emotion + 5 Anticipation + 10 Reaction) anchored to the existing v2.1 4-layer additive state machine. Every dep choice carries an explicit green/yellow/red install-impact rating per memory `project_one_click_install_hard_req`. Two unavoidable OS-mandated friction points are reframed as forewarning UX rather than engineering problems: the Windows driver-signature security prompt (cannot be suppressed per VB-Audio confirmation) and the macOS BlackHole system-extension approval (cannot be silent-installed by Apple design).
 
-The risks are bounded but concrete. **The hard gate is the Hallucination Verification Gate** — Kaan's DJ ear (per memory `project_phase_16_kaan_dj_testing`), NOT a 30-session formal eval harness. **The single-point-of-failure is the Apple Issuer ID** — supplied 2026-05-14, but Apple Developer Program Agreement update is outstanding (Francesco-action-required). **The architectural rule is AX-from-Rust-parent, never from sidecar** (Tauri #8329). **The economic rule is cap cancel-and-refire at 1 per 8s + 30 per session** or the 50€/mo per-user proxy budget breaks under Hard-Tek bursty events. **The two YELLOW items in the install footprint** — sqlite-vec Windows wheel absent + ffmpeg LGPL bundling on Windows (+20MB) — both have well-precedented workarounds (numpy fallback for sqlite-vec; gyan.dev LGPL build for ffmpeg). The full PITFALLS.md catalogs 41 distinct v2.0-specific failure modes with concrete prevention strategies — phases must encode the preventions, not the pitfalls.
-
----
+The principal risk is **silent regression of the v3.0 engineering surface** while polishing distribution. The pitfalls catalogue 44 specific tripwires — top of the list: stale-`pip freeze`-from-Kaan-venv shipping unused deps into the lockfile; the "MacBook-only" trap that validates only Apple-Silicon Sonoma and rubber-stamps a build that fails on macOS 12.3 Intel; mascot tests built around the `mascot.html` easter egg instead of the v3.0 Tauri+Three.js production surface; the anti-slop blocklist false-tripping on installer prose and tempting a gate relaxation. Every pitfall has a grep-able plan-phase warning sign + a constraint-preserving prevention. The five v3.0 invariants — POC immutability, ModelRouter seam, anti-slop blocklist, privacy rule, IPC contract — are respected by every proposal and verified by the architecture research. v3.1 engineers in parallel with v3.0's external clock (Apple Dev + SignPath ~1-week SLA); when approvals land, v3.1 feeds straight into the v3.0 SHIP-CUT cookbook.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The shipped v0.1.0 stack stays put. v2.0 is a **strict additive layer** with 5 new pip deps, 0 new Rust crates, 0 new npm packages. Every new dep is rated 🟢 GREEN or 🟡 YELLOW on the one-click-install scale (per memory `project_one_click_install_hard_req`). Total bundle growth: +~12 MB on Mac, +~32 MB on Windows (including ffmpeg). All under 350 MB hard cap.
+v3.1 is **strictly additive on the v3.0 baseline** — no row in the v3.0 stack changes. Net runtime delta: zero. Net dev/CI/test delta: 4 dev-only tools, 5 mascot asset files, and one bundled Win installer payload. See `.planning/research/STACK.md` for the full pin table.
 
-**v0.1.0 baseline (DO NOT change):** Python 3.12, livekit-agents 1.5.8, livekit-plugins-google 1.5.8, google-genai 2.0.1, sounddevice 0.5.5 (Mac BlackHole), PyAudioWPatch 0.2.12.8 (Windows WASAPI loopback), numpy 2.4.4 + scipy 1.17.1, mido 1.3.3, pyobjc-framework-ScreenCaptureKit 12.1, pillow 12.2.0, websockets 16.0, hand-written `@dataclass(frozen=True, slots=True)` + jsonschema Draft-07 (**NO pydantic** per Phase 6 D-Area-4.4), PyInstaller 6.20.0 `--onedir`, Tauri 2.x + Vite 6 + Vitest 2, tauri-plugin-shell 2.3 + tauri-plugin-store 2.4, FastAPI 0.115 + slowapi + Redis 7+ + PyJWT for the Bravoh-proxy, CDJ Whisper v5 tokens.css + Saira + JetBrains Mono.
+**Core additions:**
+- **`uv==0.11.14`** (Apache-2.0/MIT): cross-platform universal Python lockfile — CI fails fast on lock drift via `uv sync --locked`. Dev/CI only.
+- **`cyclonedx-python==7.3.0`** (Apache-2.0): CycloneDX SBOM alongside existing syft SPDX. CI only.
+- **`tauri-plugin-playwright==0.1.0`** (MIT, dev-dep, gated under `[features] test`): native-webview Playwright bridge for e2e. **0.1.0 maturity flagged for plan-time spike; fallback is `tauri-driver` (pre-alpha) or WebView2-only on Win.**
+- **`@playwright/test==1.50.x`** + **`pixelmatch==7.1.0`**: visual-regression assertions with `maxDiffPixelRatio: 0.02`.
+- **`pinact` v3.x**: GH Actions SHA pinning.
+- **Mixamo + Adobe auto-rigger** (free, royalty-free commercial): production mascot retargeting — already scaffolded at `scripts/mascot/` (Phase 43-05). Rejects Ready Player Me (ARKit blendshape mismatch), Auto-Rig Pro ($40 paid), AccuRIG (FBX/USD only).
+- **VB-CABLE NSIS `/S` silent install bundled inside Inno Setup `[Run]` section** (Win only, ~6 MB). EULA-redistribution gate flagged for plan-time legal confirm; fallback Mac-style detect-and-guide.
+- **`cargo-deny` `deny.toml`** (already in v3.0 CI): tighten with license allowlist (Apache-2.0/MIT/BSD/ISC/Unicode-DFS-2016/MPL-2.0) + GPL bans.
 
-**v2.0 additions (5 new pip deps + 0 Rust + 0 npm):**
-- **pyrekordbox 0.4.4** (MIT, pure Python, 250 KB) — Rekordbox `collection.xml` parser; XML path only, SQLCipher path skipped (broken post-Rekordbox 6.6.5)
-- **sqlite-vec 0.1.9** (MIT, ~500 KB ext, Mac/Linux wheels ✅, **Windows: numpy fallback**) — embedded vector store for Gemini Embedding 2 over user's library
-- **pydub 0.25.1** (MIT, 50 KB) — MP3 transcoding for Gemini Embedding 2 (AAC/M4A/FLAC → MP3 since Embedding 2 only accepts MP3/WAV)
-- **mutagen 1.47.0** (GPL-2.0, 250 KB) — ID3/Vorbis/MP4 tag reader; GPL-as-imported-package pattern, disclosed in `LICENSE-3RD-PARTY.md`
-- **watchdog 6.0.0** (Apache 2.0, 150 KB) — cross-platform file watcher (FSEvents on Mac, ReadDirectoryChangesW on Windows)
-
-**Bundled binaries:** ffmpeg LGPL static (Windows only, +20 MB; macOS uses native `afconvert` fallback), 40 OPUS ack samples (+5 MB), 8 new mascot GLBs (+6 MB), djay Pro v5 element coord map (+5 KB), 10 controller JSONs (+50 KB).
-
-**Locked anti-stack (memory-enforced — do not propose):** CLAP / OpenL3 / MERT (Gemini-only product per `feedback_no_clap_use_gemini_embedding`); mem0 / vector DB for DJ profile (~2KB JSON is the design); multi-provider LLM abstraction; stem separation; Pioneer ProDJ Link (wrong market); Mixxx OSC as a v2.0 hard ship (PR #14388 still draft upstream — ship behind `--enable-mixxx-osc` flag if at all); Rekordbox SQLCipher path; Mixamo ARKit blendshape lip-sync; pydantic in IPC layer.
-
-See `.planning/research/STACK.md` for the full per-capability breakdown + license audit + install-impact matrix + plan-checker verification checklist.
+**Explicit non-additions (REJECTED in opportunity-scan):** Loopback Audio, Dante Via, Soundflower, Pioneer ProDJ Link / cdj-link-py, CLAP/MERT/OpenL3, stem separators, additional LLM providers, `testdriver.ai`, Poetry/Pipenv, Linux support, DAW integration, Mixxx OSC (DEFERRED v3.x), Beat This! Rust crate (DEFERRED v3.x).
 
 ### Expected Features
 
-The 12 v2-bucket research artifacts mapped seven feature categories. The v2.0 cut is a **ruthless minimum** that closes the "feels surface-level" critique AND ships the viral demo arsenal.
+**Must have (table stakes):**
+- Signed `.dmg` + signed `.msi`/`.exe` from `releases/latest` (gates on SHIP-01/02 external clock).
+- First-launch wizard end-to-end walk: install → probes (BlackHole/VB-CABLE/TCC/MIDI/Bravoh proxy) → session-ready ≤60s.
+- BlackHole 2ch auto-detect-and-prompt Mac (Homebrew-first / `.pkg`-fallback) + VB-CABLE auto-prompt Win with forewarning copy.
+- Every Python+Rust+Tauri runtime dep pinned in `uv.lock`/`Cargo.lock`/`package-lock.json` with rationale + license + install-impact in `docs/AUDIT.md`.
+- 23 mascot GLB clips covering Base(3)+Emotion(5)+Anticipation(5)+Reaction(10), wired to 4-layer state machine across every event class.
+- E2E MacBook walk: functional + visual + aesthetic + usability + hallucination dimensions with gap-closure routing.
+- Onboarding stopwatch ≤60s validated on SHIP-04 fresh-VM matrix (macOS 12.3/14/15 + Win 10/11).
 
-**Must have (table stakes — v2.0 P1):**
-- **Generalized event detector v1** — 6 cross-genre detectors (`KICK_SWAP`, `SUB_LAYER_ARRIVAL`, `BREAKDOWN_KICK_KILL`, `REENTRY_KICK_LAND`, `KICK_DENSITY_SHIFT`, `PHRASE_BOUNDARY`)
-- **Latency stack v1** — prompt diet + Gemini caching with 1024-token-floor padding + 40-sample OPUS ack bank + cancel-and-refire (`SpeechHandle.interrupt(force=True)`)
-- **Mascot anticipation layer (1-above-mood simplified)** + beat-coupled hip-bob
-- **Citation grammar in prompts** (prompt-only seeding v1.0) → **Citation linter live-mode enforcement** (response-level strip + ack-bank fallback)
-- **djay Pro Mac overlay highlight** (12 hand-mapped elements + AX-from-Rust-parent)
-- **Pyrekordbox XML one-shot import**
-- **10-SKU MIDI controller library + `MidiMapLoader`**
-- **Hard Tek detector tuning** against 7-10 reference tracks
-- **Ship infrastructure absorbed from v0.1.0:** Recording browser + retention enforcement, Apple Developer ID sign + notarize + DMG, SignPath OSS Windows MSI, GitHub release matrix, README full rewrite + branding + social assets, Day-Zero ops fresh-VM rehearsal
-- **Hallucination Verification Gate (Kaan's DJ ear)** — hard release gate
-- **30s viral demo film + 4 channel posts** (Twitter / IG IT+EN / Reddit / HN)
+**Should have (competitive):**
+- First-session demo button reusing v3.0 VIS-09 deterministic 30-event sequencer.
+- Single-binary universal2 sidecar audited GREEN ("no Python needed" verifiable on fresh VM).
+- `AUDIT.md` + CI badges + Dependabot + lockfile-diff bot on PRs.
+- License-policy gate via `cargo-deny licenses` allowlist.
+- Inline emote-tag vocab integration (gated on v2.1 v2 text-channel-timing spike; defer to v3.2 if spike fails).
+- Mascot README hero render alongside locked verbatim hero text.
+- OBS browser-source mascot-path callout in README.
 
-**Should have (competitive — v2.0 P2):**
-- **Mixxx OSC bridge** behind `--enable-mixxx-osc` flag (~2 E-days, ~190 LOC)
+**Defer (v3.2+ or v3.x):** `/hatch` user-gen mascot, Mixxx OSC adapter, controller map transpiler, 10→30 controller library, multi-session debrief arc, Beat This! Rust sidecar, `obs-websocket-py` event uplink, external usability testers, A/B onboarding flows, quantified SUS/NASA-TLX metrics.
 
-**Defer to v2.1+ (explicitly OUT of v2.0):**
-- **Predictive drop firing** — gated on Kaan ear-test with v2.0 baseline
-- **4-layer mascot additive state machine** — full structural rewrite (~14 E-days); v2.0 ships only the anticipation-layer subset
-- **Inline emote-tag vocabulary (15 tags)** — gated on 1-day Gemini text-channel-timing spike
-- **Post-session debrief MVP** — chaptered + voiced TL;DR + 3 drills + clickable timeline
-- **Long-term DJ profile** — ~2KB JSON regenerated each session
-- **Cross-mode citation enforcement** — extend live linter to debrief + library + genre sentence-level
-- **Library intelligence v1** (file watcher → Gemini Embedding 2 → sqlite-vec query)
-- **Library-aware drill cards**
-- **Rekordbox / Serato overlay** via template matching, Windows overlay parity, VirtualDJ OSC, genre expansion
-
-See `.planning/research/FEATURES.md` for the 7-category catalog.
+**Anti-features (REJECTED to preserve clean-utility constraint):** Bundle BlackHole `.pkg` redistribution, auto-update silent installs, Linux/`.deb`/`.AppImage`, macOS App Store distribution, 30-session formal hallucination harness, Snyk/Black Duck enterprise SBOM tooling, vendoring all Python deps.
 
 ### Architecture Approach
 
-v2.0 adds ~10 feature buckets to the already-shipped 3-process Tauri + Python-sidecar + remote-FastAPI architecture. **One process boundary, four kinds of work.** Tauri shell (Rust) owns OS-permission-bound work + window/overlay geometry — AX bridge lives HERE, not in sidecar (Tauri #8329). Python sidecar owns audio/DSP/AI/state. Bravoh proxy owns Gemini key + rate limit. **No new process types** — debrief is a sidecar `--debrief <dir>` FLAG, not a daemon. **The overlay is a SECOND Tauri WebviewWindow** (`label="overlay"`), not a new app.
+v3.1 lives at three existing roots — `installer/`, `scripts/release/`, `tauri/ui/assets/mascot/animations/` — plus three new generated/test surfaces (`docs/AUDIT.md`, `docs/dep-opportunities/`, `tests/e2e/macbook/`). **Zero new processes. Zero new IPC messages. Zero changes to the runtime sidecar↔Tauri contract.**
 
-**Major components added:**
+**Major components:**
+1. **Installer companion chain** (`installer/companion/fetch_drivers.{sh,ps1}` + `audio_config.py` + `driver_manifest.json` + `onboarding_copy.json`) — post-install driver fetch from official vendor URLs, SHA-256 verified, runs vendor-signed installers; codesigned by Bravoh cert via new `companion-sign` release.yml stage between BUILD and SIGN.
+2. **Dep audit surface** (`docs/AUDIT.md` + `scripts/audit/dep_audit.py` + `dep_ratings.json` + `check_audit_freshness.sh` + `.github/workflows/dep-audit.yml`) — generator consumes existing lockfiles, emits committed markdown 3-table; CI freshness gate fails PR if lockfile newer than AUDIT.md.
+3. **Dep-opportunity scan** (`docs/dep-opportunities/<UTC>-scan.md` + `scripts/audit/scan_opportunities.py` + ADR sidecar `.planning/decisions/DEP-OPP-<N>-<slug>.md`) — dated discovery artifact, 4-color rubric (Red-constraint/Red-risk/Yellow-defer/Green-adopt), explicit exclusion-set upfront.
+4. **E2E MacBook harness** (`tests/e2e/macbook/test_*.py` + `scripts/e2e/run_macbook_pass.sh` + `__snapshots__/` + `docs/e2e/MACBOOK-PASS-PROTOCOL.md` + `scripts/e2e/check_e2e_report.sh`) — installs SHIPPED `.dmg` to `/Applications`, launches with debug logging, runs 4 pytest suites, emits report.html. **Splits into 5a Kaan-aesthetic-ear pass (subjective) + 5b OS-matrix smoke (objective, ≥2 of 5 configs).**
+5. **Mascot real-GLB swap** (drop-in at existing `tauri/ui/assets/mascot/animations/prep_*.glb` slot paths) — pure asset operation, zero state-machine code change, 23-clip enumeration anchored to Plutchik 8-primary set adapted for DJ-context, bundle stays within 25 MB Tier-1 cap via draco retune (preferred) or 30 MB cap bump with audit trail (fallback).
 
-1. **`src/vibemix/grounding/`** — `EvidenceRegistry` (in-memory dict `(source, key) → list[t_session]`), `CitationLinter` (stdlib `re` + regex catalog + per-mode strip semantics + telemetry), per-mode prompt fragments.
-2. **`src/vibemix/events/genres/`** — `GenreRouter` + `hard_tek.py` with 8 detectors using shared `_impl/` DSP primitives. Baseline detectors stay verbatim from v4 when no genre-specific detector fires.
-3. **`src/vibemix/latency/`** — `AckBank`, `CachedLLM`, `BuildupPredictor`, `interrupt.py` wrapper.
-4. **`src/vibemix/library/`** — `RekordboxLibrary`, `embed.py` (80% Bravoh verbatim), `LibraryStore` (sqlite-vec + numpy fallback), `watcher.py`, `metadata.py`, `camelot.py`.
-5. **`src/vibemix/overlay/`** + **`tauri/src-tauri/src/ax_bridge.rs`** + **`tauri/src-tauri/src/overlay_window.rs`** + **`tauri/ui/src/overlay/`** — element vocabulary parser (12 IDs), coord_map loader, AX query via Rust parent over IPC, transparent always-on-top Canvas 2D ring renderer. Mac-only in v2.0.
-6. **`src/vibemix/debrief/`** (sibling sidecar mode, architectural slot only) — `--debrief <dir>` flag spawns separate child process on WS bus port 8766.
-7. **`src/vibemix/mascot/anticipation.py`** + **`tauri/ui/src/mascot/`** modifications — sidecar fires `ipc.mascot.tick` with anticipation field at T=0 (BEFORE Gemini); shell mascot adopts 4-layer additive structure (mood + anticipation + speak + effect).
-
-**The IPC schema is the load-bearing contract.** Schema count moves from 19 → 38 messages. `scripts/check_ipc_schema.py` drift gate updates from `assert wrapper_count == 19` to `assert wrapper_count == 38`. 19 new messages cover: typed event surfacing, citation telemetry, ack/predicted/cancel-refire visibility (3), overlay highlight/dismiss/window_bounds/ax_position (4), library import + lookup + embed progress (6), debrief start/status/result (3), mascot.tick promotion (1), session-event (1).
-
-**Invariants preserved (non-negotiable):** MusicState single writer @10Hz; `_HAS_*` feature-flag pattern; no pydantic in `src/vibemix/ui_bus/`; AIza scan @ build time 0 matches; bundle ID `world.bravoh.vibemix` locked; `cohost_v4.py` POC files NEVER touched; LiveKit `session.output.audio` assigned BEFORE `session.start`; `allow_interruptions=False` at session level (`interrupt(force=True)` is the programmatic backdoor).
-
-See `.planning/research/ARCHITECTURE.md` for the full module/class map + 3 trace walks + cross-process race-condition catalog.
+**Build order:** Phase A (parallel A1 dep-audit + A2 mascot) → Phase B (opportunity scan) → Phase C (installer) → Phase D (e2e). A2 must precede D for visual snapshots; C must precede D since e2e drives shipped DMG.
 
 ### Critical Pitfalls
 
-PITFALLS.md catalogs **41 v2.0-specific failure modes**: 9 Critical, 9 High, 13 Medium, 5 Low, 5 Cross-Cutting. The top 5 that MUST be encoded into phase plans:
+44 pitfalls catalogued; top 5 by release-blocking impact:
 
-1. **AX call from Python sidecar instead of Rust parent (Pitfall 3, Critical)** — Tauri #8329. **Prevention:** AX/Quartz call lives in Rust parent; codebase grep gate fails CI if AX called from Python.
-2. **Cancel-and-refire blows the 50€/mo per-user proxy budget (Pitfall 1, Critical).** **Prevention:** Hard cap `CANCEL_COOLDOWN_S = 8.0`; soft cap 30 cancels per session; telemetry assertion auto-disables for the session.
-3. **Citation linter strips entire live response → sustained silence streak (Pitfall 2, Critical).** **Prevention:** Telemetry guard — if `stripped_rate_15s > 0.4`, next response BYPASSES linter with `[unverified]` log marker.
-4. **Mascot anticipation fires on misfire → false-positive lean-in then nothing (Pitfall 9, Critical).** **Prevention:** 2.5s anticipation timeout crossfades prep → `prep_settle`; cancel-aware crossfade; linter-aware crossfade.
-5. **Apple Developer ID + agreement gating notarytool (Pitfall 5, Critical).** **Status:** Issuer ID `3f60cc6b-df70-4ff8-9ceb-865dac6c1b4b` supplied; URMDRP5M3P key matches but Apple Developer Program Agreement update is outstanding (Francesco-action). Deferred to Kaan-action-required surface.
+1. **Stale `pip freeze` from Kaan's `.venv` ships as lockfile** — bakes unused transitives (`google-cloud-speech`, `google-cloud-texttospeech`, `openai`) + drifts off v3.0 GATE-02 VCR cassette pin. **Prevention:** lock in clean `python:3.12-slim-bookworm` container; `requirements.in` (curated) vs `requirements.lock` (resolved); `pip-deptree --reverse` prune gate.
+2. **Silent BlackHole/VB-CABLE auto-install trips macOS endpoint security / Win driver-signature UAC** — produces "system extension blocked" modal that breaks HARD one-click req. **Prevention:** re-scope to "detect + one-tap fallback"; routing config (Multi-Output Device) is what gets automated, not kernel-mode install; wizard copy anticipates OS modal as expected step; verify BlackHole 48 kHz format post-install per memory `project_v4_canonical_baseline`.
+3. **"It works on Kaan's MacBook" trap** — e2e validates only Apple-Silicon Sonoma, ignores macOS 12.3 Intel + Win matrix. **Prevention:** split target feature #4 into #4a Kaan-ear (subjective) + #4b OS-matrix smoke (objective, ≥2 of {12.3 Intel, 14 AS, 15 AS, Win 10, Win 11}); #4b prerequisite for milestone close; commit screencast.
+4. **Mascot tests built around `mascot.html` easter egg instead of v3.0 Tauri+Three.js production** — emotion coverage appears green while real surface ships with placeholder GLBs (v0.1.0-rc1 "mascot chrome strip" bug class). **Prevention:** e2e mascot tests target Tauri WebviewWindow only; CI grep gate `! grep -rn "mascot.html" tests/ e2e/ scripts/ci/`; 4-layer × 7-event-type coverage matrix; vitest snapshot on transparent wrapper background.
+5. **Anti-slop blocklist false-trips on installer/wizard/dep-audit copy** — 15-token blocklist + `\bdeeply\s+\w+` regex fires on legitimate installer prose; temptation to relax corrodes v3.0 anti-slop thesis. **Prevention:** vocabulary substitution dictionary at `docs/internal/copy-substitutions.md` ("seamless → one-tap", "robust → tested", "leverage → use"); plan-checker pre-commit runs `check_no_slop.py` on every PLAN.md/wizard copy/e2e report; **never** relax the gate.
 
-See `.planning/research/PITFALLS.md` for the full 41-pitfall catalog.
-
----
+**Other high-severity:** Dep-opportunity scan recommends Linux-only or multi-provider AI dep (mitigation: scan plan quotes exclusion set verbatim + 4-color rubric with auto-red constraint-violation rule); VB-CABLE EULA bundled-redistribution clause (mitigation: post-install fetch fallback); worktree-isolated subagents start from stale base per memory `feedback_worktree_must_sync_main_first` (mitigation: Step-0 `git merge origin/main` invariant in every subagent prompt).
 
 ## Implications for Roadmap
 
-Recommended decomposition is **12 phases** (P15–P26 continuing from v0.1.0 Phase 14 close). Critical-path total: ~10-12 weeks engineering with 2 calendar weeks of parallel bundles. Phase ordering by criticality means the binary becomes shippable from P21 (sign + release) onwards.
+5-phase structure aligned 1:1 with PROJECT.md milestone scope, dependency-aware order:
 
-### Phase 15: Recording Browser + Retention Enforcement
-Cheap, no upstream dependencies — knock it out first. Standard file-system UI pattern.
+### Phase 46: Dep Audit + Lockfile + AUDIT.md
+**Rationale:** Independent; establishes `scripts/audit/` + `dep_ratings.json` schema that downstream phases append to. Cheapest; warm-up. Parallel with Phase 47.
+**Delivers:** `uv.lock` hermetic-container generated; CycloneDX SBOM; `pinact` SHA-pinning; `cargo-deny` license allowlist; `docs/AUDIT.md` 3-table surface; CI freshness gate; dep-cull pass on `livekit-plugins-openai` + `google-cloud-speech` + `google-cloud-texttospeech` if non-transitive; README badges; Dependabot.
+**Addresses:** FEATURES Category 2 (DEPS); target feature #2.
 
-### Phase 16: Hallucination Verification Gate (Kaan's DJ Ear Test)
-Calendar-blocking; gates all downstream tuning. NOT a 30-session formal eval suite per memory.
+### Phase 47: Mascot Real GLB Land + Emotion Coverage Wiring
+**Rationale:** Independent; parallel with Phase 46. **Must precede Phase 50** so visual snapshots baseline against real assets. Gated on KAAN-ACTION-LEGAL §VIS-04.
+**Delivers:** 23 GLB clips retargeted via existing Phase 43-05 Mixamo+Adobe CLI; MANIFEST emotion-to-event mapping; bundle gate flips exit-2 → exit-0 via draco retune (or 30 MB bump fallback); 30s persona smoke; mascot README hero render.
+**Addresses:** FEATURES Category 4 (MASCOT); target feature #5; closes v3.0 §VIS-04 pre-stage.
 
-### Phase 17 (parallel with P18): Hard Tek Detectors v1 + GenreRouter + MusicState Extension
-Single biggest grounding win. 6 cross-genre detectors locked. PROJECT.md ↔ G-followup count contradiction (6 vs 8) — recommended: 6 baseline + 2 hard-tek overlay as Wave 2.
+### Phase 48: Dep-Opportunity Scan
+**Rationale:** Depends on Phase 46 `dep_ratings.json` schema. Informs Phase 49 installer.
+**Delivers:** `docs/dep-opportunities/2026-05-scan.md` rating v3.x candidates (Mixxx OSC, map transpiler, pyrekordbox depth, DJ-software coverage gaps, hardware controller gaps, OS edge cases); 4-color rubric; exclusion-set upfront; ADRs per green adoption; OBS browser-source docs callout. Likely outcome: zero new runtime deps.
+**Addresses:** FEATURES Category 5 (OPPORTUNITY-SCAN); target feature #3.
 
-### Phase 18 (parallel with P17): Evidence Registry + Citation Grammar in Prompts (v1.0 prompt-only)
-Technical implementation of anti-slop. Ships prompt-only-no-enforcement to seed corpus.
+### Phase 49: One-Click Installer Chain (Win + Mac)
+**Rationale:** Depends on Phase 46 + Phase 48. Most expensive; longest tail. Must complete BEFORE Phase 50.
+**Delivers:** `installer/companion/fetch_drivers.{sh,ps1}` + `driver_manifest.json` + `audio_config.py`; wizard CTA cards with vendor download links + UAC forewarning; Inno Setup `[Run]` VB-CABLE `/S` (EULA-permitting) or detect-and-guide fallback; Tauri MSI target; uninstall path; a11y pass; SHIP-04 fresh-VM matrix real-run + SHIP-05 ≤60s gate.
+**Addresses:** FEATURES Category 1 (INSTALL); target feature #1; closes SHIP-04 + SHIP-05 + AUDIO-07.
 
-### Phase 19: Latency Stack v1 (Ack Bank + Cached Content + Cancel-and-Refire)
-Sub-100ms first sound via ack bank. Cancel-cooldown cap from Day 1.
-
-### Phase 20: Citation Linter ENFORCEMENT (Live Mode, Response-Level + Ack-Fallback)
-Telemetry guard for strip-rate bypass. Depends on P18 + P19.
-
-### Phase 21: Sign + Notarize + GitHub Release Matrix
-Binary shippable AT PHASE CLOSE — any phase past this can be cut to v2.0.1 if launch timeline at risk.
-
-### Phase 22 (parallel with P23): Mascot Anticipation Layer + Beat-Coupled Hip-Bob
-Highest-leverage perceived-latency mask (400-1200ms covered).
-
-### Phase 23 (parallel with P22): 10-SKU MIDI Controller Library + MidiMapLoader
-Cross-platform grounding spine. Verified sniff data for 9 unverified SKUs.
-
-### Phase 24: djay Pro Mac Overlay Highlight (12 Elements + AX-from-Rust-Parent)
-Viral demo Beat A anchor. Mac-only in v2.0. Day-1 AX feasibility spike required.
-
-### Phase 25: Pyrekordbox XML One-Shot Import + Fuzzy Lookup
-Durable library source (post-SQLCipher breakage). 4-tier confidence ladder fuzzy lookup.
-
-### Phase 26: README Full Rewrite + Branding + Social Assets + Day-Zero Ops + Viral Demo Film + Channel Posts
-Composite launch phase. All assets ship together at the launch moment.
+### Phase 50: End-to-End MacBook Pass (Split 5a + 5b)
+**Rationale:** Last in order. Depends on Phase 47 (real GLBs) + Phase 49 (built DMG). **Must split per Pitfall 3.**
+**Delivers (50a Kaan-ear, subjective):** functional flow walk; CDJ Whisper visual + aesthetic re-walk with paired gsd-ui-checker + gsd-ui-auditor; Nielsen 10 heuristic checklist; hallucination gate re-run via `check_gate.sh` Gate 2b; screencast committed; gap-closure routing.
+**Delivers (50b OS-matrix, objective):** automated install/launch/first-event/shutdown on ≥2 of {macOS 12.3 Intel, 14 AS, 15 AS, Win 10, Win 11} via existing `tart` matrix; report.html PASS/FAIL per dimension; CI gate via `check_e2e_report.sh` Gate 6b in `cut_release.sh`.
+**Addresses:** FEATURES Category 3 (TEST); target feature #4.
 
 ### Phase Ordering Rationale
-
-- **Critical-path order: P15 → P16 → P17||P18 → P19 → P20 → P21 → P22||P23 → P24 → P25 → P26.** Two parallel bundles (P17||P18, P22||P23). Binary shippable from P21.
-- **Phase 16 is calendar-blocking** — its tuning gates detector + ack + linter + anticipation phases.
-- **P18 ships v1.0 prompt-only-no-enforcement** so Gemini learns grammar in prod → P20 enforces.
-- **AX bridge has hardware-rig requirement** — ship later (P24) when binaries pipeline stable.
-- **Library intelligence + post-session debrief explicitly v2.1+** — v2.0 ships only the architectural slot for debrief (sidecar `--debrief` flag + port 8766 + IPC reservations).
+- 46+47 parallel: share zero files; 46 unblocks 48; 47 must precede 50.
+- 48 after 46: appends to `dep_ratings.json` schema.
+- 49 after 46+48: installer companion pulls only green-rated deps.
+- 50 last: validates SHIPPED `.dmg` + real GLBs.
+- All five respect: zero new IPC wrappers; POC immutability; ModelRouter seam; anti-slop blocklist (extended grep target paths for 4 new artifact globs); privacy rule (project-scoped FS only).
 
 ### Research Flags
 
-**Needs `/gsd-research-phase` at planning time:** P17 (detector count contradiction), P22 (text-channel timing spike pre-phase), P24 (AX-from-Rust-parent feasibility spike on signed bundle), P25 (pyrekordbox SQLCipher dep verification), P26 (demo film storyboard validation).
+**Needs research (plan-time):**
+- **Phase 49 (Installer):** `tauri-plugin-playwright==0.1.0` maturity 1-day spike; VB-CABLE EULA legal review; macOS 16 + Win 11 24H2 matrix additions; companion script signing semantics on Win (`.ps1` Authenticode via SignPath).
+- **Phase 50 (E2E):** Pixelmatch SSIM threshold calibration on Retina M-series; e2e audio-loopback fixture timing-sensitivity with recorded WAV vs live PIE; macOS 12.3 FileVault edge case in `installer -pkg` flow.
+- **Phase 47 (Mascot):** real GLB animation track naming vs placeholder — `pools.ts` may need one-line `clipName` mapping update; inline emote-tag vocab gated on v2.1 v2 Gemini text-channel-timing spike.
 
-**Skip research (standard patterns):** P15, P18, P19, P20, P21, P23 — all implementation-ready from research artifacts.
-
-### Cross-Document Contradictions Flagged
-
-1. **Debrief timing:** PROJECT.md lists as v2.0 table-stakes; FEATURES.md cuts to v2.1. **Recommended call:** ship architectural slot in v2.0 (sidecar --debrief flag + port 8766 + IPC reservations) without UI surface; full UI feature in v2.1.
-2. **Event detector count:** PROJECT.md says 6 baseline; G-followup says 8 (6 baseline + 2 hard-tek overlay). **Recommended call:** 6 baseline in P17 v2.0; 2 hard-tek overlay (`DISTORTION_CLIMB`, `ACID_LINE_ENTRY`) as Wave 2 of P17, ear-test-gated, deferred to v2.1 if timeline at risk.
-
----
+**Standard patterns (skip extra research):**
+- **Phase 46:** `uv` + `cyclonedx-python` + `pinact` + `cargo-deny` well-documented; HIGH confidence.
+- **Phase 48:** constraint enumeration + scan rubric are documentation/process; HIGH confidence on zero-new-runtime-deps outcome.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | **HIGH** | 5 new deps all verified on PyPI; sqlite-vec Windows wheel gap has documented numpy fallback. One YELLOW (ffmpeg LGPL on Win, +20MB) with industry-standard precedent. License audit clean. |
-| Features | **HIGH** | 7-category catalog + complexity hints + dependency graph. **MEDIUM** on spike-gated items. PROJECT.md ↔ FEATURES.md contradictions flagged. |
-| Architecture | **HIGH** | Existing-architecture surface verified; 19 → 38 IPC delta enumerated; 3 trace walks. **MEDIUM** on AX bridge + debrief sibling sidecar (first-time-integrated). |
-| Pitfalls | **HIGH** | 41 v2.0-specific pitfalls + concrete prevention strategy per pitfall + pitfall-to-phase mapping. |
+| Stack | HIGH | Direct PyPI/crates.io/official-source verification 2026-05-17. MEDIUM on `tauri-plugin-playwright==0.1.0` (flagged spike). MEDIUM on Mixamo asset selection (Kaan-aesthetic). |
+| Features | HIGH | 1:1 mapped to PROJECT.md scope; anchored to shipped v2.1 + v3.0 surfaces. MEDIUM on Windows install-flow (driver-signature prompt OS-mandated, reframed as UX). |
+| Architecture | HIGH | Verified against `.planning/codebase/ARCHITECTURE.md`, release.yml, IPC schema, mascot module tree. MEDIUM on new-component placements (first-time integrations, well-sited). LOW on bundled-driver signing semantics (KAAN-ACTION-LEGAL timing). |
+| Pitfalls | HIGH | Anchored to v3-shipped P1–P41 + 44 v3.1-specific tripwires with grep-able warning signs. |
 
-**Overall confidence:** **HIGH** — the v2-bucket research swarm did the heavy lifting; the 4 GSD research files integrate it into actionable artifacts; the spike-gated items have documented fallback paths that don't block v2.0 ship.
+**Overall confidence:** HIGH
 
 ### Gaps to Address
-
-- **PROJECT.md ↔ FEATURES.md contradiction on debrief:** Ship architectural slot in v2.0, full feature in v2.1.
-- **PROJECT.md ↔ FEATURES.md contradiction on detector count:** 6 baseline in v2.0 P17, 2 hard-tek overlay as Wave 2.
-- **Predictive firing default:** Gated on Kaan ear-test after first 3 sessions.
-- **Inline emote-tag vocab:** 1-day spike pre-Phase 22.
-- **AX-from-Rust-parent on installed bundle:** Day-1 spike of Phase 24.
-- **sqlite-vec Windows wheel:** Re-check PyPI at Phase 25/26 kickoff.
-- **`pyrekordbox==0.4.4` install dep tree:** Verify at Phase 25 plan-time.
-- **`cached_content` field forwarded through `livekit-plugins-google`:** Plan-checker smoke test at Phase 19.
-- **Bravoh-side proxy capacity under viral 10× spike:** Load test in Phase 26.
-- **Phase 16 sample-size of 1:** Stretch — Francesco + 5-tester beta pool.
-- **Apple Developer Program Agreement update:** Francesco-action-required.
-
----
+- **VB-CABLE EULA bundled-redistribution clause** — plan-time legal review; fallback Mac-style detect-and-guide.
+- **`tauri-plugin-playwright==0.1.0` production stability** — 1-day spike at Phase 50 plan time; fallback `tauri-driver` or WebView2-only Win e2e + Kaan-manual Mac walk. **Do NOT block v3.1 on this.**
+- **macOS 16 release date relative to v3.1 ship** — verify at SHIP-04 real-run time.
+- **VIS-04 Adobe-account Mixamo download** — KAAN-ACTION-LEGAL discharge; autonomous mode defers to Kaan-action-required surface but continues unblocked work.
+- **`livekit-plugins-openai` cull decision** — verify `uv pip tree` for hard transitive dep.
+- **23-clip emotion enumeration vs Mixamo library availability** — Kaan-aesthetic selection has latitude to swap intent labels if needed.
+- **Worktree-isolated subagent base-sync invariant** — every Phase 46-50 subagent prompt MUST include Step-0 `git merge origin/main` per memory `feedback_worktree_must_sync_main_first`.
 
 ## Sources
 
-### Primary (HIGH confidence)
+### Primary (HIGH)
+- `.planning/research/STACK.md` §XI — tool pin verification PyPI/crates.io 2026-05-17.
+- `.planning/research/FEATURES.md` — shipped v2.1+v3.0 surfaces; Plutchik 8-primary reference; VTuber expression patterns.
+- `.planning/research/ARCHITECTURE.md` §IX — codebase/ARCHITECTURE.md, release.yml, install_vm_matrix, IPC schema, mascot module tree, tauri.conf.json5 bundle-ID lock.
+- `.planning/research/PITFALLS.md` — v3-shipped P1–P41 + 44 v3.1-specific.
+- PROJECT.md (post-v3.0 close).
 
-- `.planning/research/STACK.md`, `FEATURES.md`, `ARCHITECTURE.md`, `PITFALLS.md`
-- `.planning/research/v2-buckets/SYNTHESIS.md` + 11 deep v2-bucket artifacts
-- `.planning/PROJECT.md`, `.planning/STATE.md`
-- `cohost_v4.py` (canonical port baseline)
-- `livekit-agents==1.5.8` source verification — `interrupt(force=True)` empirically verified
-- `google-genai==2.0.1` source verification — `caches.create()` + `cached_content`
+### Secondary (MEDIUM)
+- v3.0 source-of-truth: release.yml, Cargo.toml, pyproject.toml, installer/windows/vibemix-installer.iss, scripts/dist/install_vm_matrix.{sh,json}, scripts/mascot/check_bundle_size.sh, tauri/ui/src/mascot/state-machine.ts.
+- KAAN-ACTION-LEGAL §SHIP-01..13 cookbook 8-block format.
+- v3.0 milestone archive (ROADMAP / REQUIREMENTS / MILESTONE-AUDIT).
+- Inno Setup silent-install ref; NSIS silent-install ref; BlackHole Wiki; Tauri 2 WebDriver docs; Playwright visual comparison docs; MoCap/Tripo3D Mixamo alternative reviews.
 
-### Memory anchors (locked decisions — load-bearing constraints)
+### Tertiary (LOW — plan-time validation)
+- `tauri-plugin-playwright==0.1.0` production stability.
+- VB-CABLE EULA bundled-redistribution clause (vb-audio.com terms).
+- VB-Audio forum UAC + driver-signature dialog suppressability.
+- macOS 16 release date vs v3.1 ship.
+- Bundled-driver signing semantics on Windows under SignPath OSS Foundation cert.
 
-- `project_v2_open_candidates`, `feedback_no_clap_use_gemini_embedding`, `project_one_click_install_hard_req`, `feedback_no_scope_creep_clean_utility`, `project_v4_canonical_baseline`, `project_phase_16_kaan_dj_testing`, `project_v0_1_0_rc1_open_bugs`, `project_anti_slop_grounded_gemini_thesis`, `project_mascot_as_vtuber_personality_surface`, `project_visual_direction_cdj_whisper`, `feedback_privacy_scope_narrow`, `feedback_autonomous_no_grey_area_pause` (extended to defer-blockers)
-
-### Secondary (MEDIUM confidence — external sources)
-
-- [Tauri #8329](https://github.com/tauri-apps/tauri/issues/8329), [#11488](https://github.com/tauri-apps/tauri/issues/11488), [#11461](https://github.com/tauri-apps/tauri/issues/11461)
-- [PyPI — pyrekordbox 0.4.4](https://pypi.org/project/pyrekordbox/), [sqlite-vec 0.1.9](https://pypi.org/project/sqlite-vec/), [pydub 0.25.1](https://pypi.org/project/pydub/), [mutagen 1.47.0](https://pypi.org/project/mutagen/), [watchdog 6.0.0](https://pypi.org/project/watchdog/)
-- [Gemini context caching support matrix](https://ai.google.dev/gemini-api/docs/caching)
-- [Three.js makeClipAdditive docs](https://threejs.org/docs/#api/en/animation/AnimationUtils)
-- [Apple notarytool docs](https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution)
-
-### Tertiary (LOW confidence — flag for plan-time validation)
-
-- sqlite-vec Windows wheel availability at planning time
-- `pyrekordbox==0.4.4` SQLCipher dep tree (might need `--no-deps`)
-- ffmpeg LGPL static build pinning for Windows
-- AX-from-Rust-parent feasibility on installed code-signed bundle
-- Gemini text-channel ordering vs TTS audio chunks (1-day spike pre-Phase 22)
+### Memory anchors (cite in plan-checker)
+- `project_one_click_install_hard_req` — green/yellow/red dep rating.
+- `feedback_no_clap_use_gemini_embedding` — Gemini-only embedding.
+- `feedback_no_scope_creep_clean_utility` — no multi-provider, no stems, no enterprise, no DAW.
+- `project_mascot_as_vtuber_personality_surface` — single VTuber 3D char; /hatch v2.x stretch.
+- `project_visual_direction_cdj_whisper` — visual baseline.
+- `project_v2_open_candidates` — confirmed/deferred/backlog inventory.
+- `feedback_autonomous_no_grey_area_pause` — autonomous discharge; Kaan-action carveouts.
+- `feedback_privacy_scope_narrow` — narrow rule (LLM-transcript paths only); project FS access fine.
+- `feedback_worktree_must_sync_main_first` — Phase 40 worktree-isolation learning.
+- `project_phase_16_kaan_dj_testing` — Kaan's DJ ear, not formal suite.
+- `project_v4_canonical_baseline` — BlackHole 48 kHz format requirement.
+- `project_v0_1_0_rc1_open_bugs` — mascot chrome strip regression class.
+- `project_github_star_goal` — 500+ floor.
+- `project_anti_slop_grounded_gemini_thesis` — 15-token + `\bdeeply\s+\w+` blocklist; never relax.
 
 ---
-
-*Research synthesis completed: 2026-05-14*
-*Ready for `/gsd-roadmapper` decomposition: yes*
-*Suggested phase count: 12 (P15-P26), critical path ~10-12 weeks engineering, two parallel bundles (P17||P18, P22||P23), shippable from P21 close*
+*Research completed: 2026-05-17*
+*Ready for roadmap: yes*
