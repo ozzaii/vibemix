@@ -46,6 +46,29 @@ Your audio doesn't leave your machine without you knowing. vibemix is open sourc
 
 ---
 
+## Works alongside whatever DJ app you already use
+
+vibemix doesn't care which DJ app you run — it listens to the master output, watches the screen, and reads your controller. Confirmed working with:
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/assets/dj-software/rekordbox.svg" alt="rekordbox logo" width="160" /><br/><sub>rekordbox</sub></td>
+    <td align="center"><img src="docs/assets/dj-software/serato.svg" alt="Serato logo" width="160" /><br/><sub>Serato</sub></td>
+    <td align="center"><img src="docs/assets/dj-software/traktor.svg" alt="Traktor logo" width="160" /><br/><sub>Traktor</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/dj-software/djay-pro.svg" alt="djay Pro logo" width="160" /><br/><sub>djay Pro</sub></td>
+    <td align="center"><img src="docs/assets/dj-software/virtualdj.svg" alt="VirtualDJ logo" width="160" /><br/><sub>VirtualDJ</sub></td>
+    <td align="center"><img src="docs/assets/dj-software/mixxx.svg" alt="Mixxx logo" width="160" /><br/><sub>Mixxx</sub></td>
+  </tr>
+</table>
+
+Don't see your app? vibemix listens to the audio coming out of your machine — anything routed through BlackHole (Mac) or WASAPI loopback (Windows) is fair game. The grounding stack (audio + screen + MIDI) is app-agnostic.
+
+<!-- Logos are placeholder wordmarks per KAAN-ACTION-LEGAL.md §LAUNCH-03 — real trademark-compliant logos land via Kaan-discharge before public launch. -->
+
+---
+
 ## Install
 
 | OS | Download |
@@ -98,17 +121,29 @@ Each cell speaks a different vocabulary on purpose. Beginner is encouragement-he
 
 ## Supported controllers
 
-Out-of-the-box mappings for 10 controllers. Anything else uses the generic positional fallback — see [docs/midi-mapping.md](docs/midi-mapping.md) to calibrate or contribute a mapping.
+Out-of-the-box mappings for 10 controllers, sourced verbatim from [`src/vibemix/midi/controllers/`](src/vibemix/midi/controllers/). Anything else uses the generic positional fallback — see [docs/midi-mapping.md](docs/midi-mapping.md) to calibrate or contribute a mapping.
 
-| | |
-|---|---|
-| <img src="docs/assets/controllers/pioneer_ddj_flx4.png" width="200" /><br/>**Pioneer DDJ-FLX4** | <img src="docs/assets/controllers/pioneer_ddj_400.png" width="200" /><br/>**Pioneer DDJ-400** |
-| <img src="docs/assets/controllers/pioneer_ddj_flx6.png" width="200" /><br/>**Pioneer DDJ-FLX6** | <img src="docs/assets/controllers/pioneer_ddj_flx10.png" width="200" /><br/>**Pioneer DDJ-FLX10** |
-| <img src="docs/assets/controllers/pioneer_ddj_1000.png" width="200" /><br/>**Pioneer DDJ-1000** | <img src="docs/assets/controllers/pioneer_ddj_sx3.png" width="200" /><br/>**Pioneer DDJ-SX3** |
-| <img src="docs/assets/controllers/pioneer_xdj_rx3.png" width="200" /><br/>**Pioneer XDJ-RX3** | <img src="docs/assets/controllers/numark_party_mix_live.png" width="200" /><br/>**Numark Party Mix Live** |
-| <img src="docs/assets/controllers/hercules_inpulse_300.png" width="200" /><br/>**Hercules DJControl Inpulse 300** | <img src="docs/assets/controllers/hercules_inpulse_500.png" width="200" /><br/>**Hercules DJControl Inpulse 500** |
+<table>
+  <tr>
+    <td align="center"><img src="docs/assets/controllers/ddj-200.svg" alt="Pioneer DDJ-200" width="180" /><br/><sub><b>Pioneer DDJ-200</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/ddj-400.svg" alt="Pioneer DDJ-400" width="180" /><br/><sub><b>Pioneer DDJ-400</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/ddj-flx4.svg" alt="Pioneer DDJ-FLX4" width="180" /><br/><sub><b>Pioneer DDJ-FLX4</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/ddj-rev1.svg" alt="Pioneer DDJ-REV1" width="180" /><br/><sub><b>Pioneer DDJ-REV1</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/kontrol-s2.svg" alt="Native Instruments Traktor Kontrol S2" width="180" /><br/><sub><b>NI Traktor Kontrol S2</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/controllers/kontrol-s4.svg" alt="Native Instruments Traktor Kontrol S4" width="180" /><br/><sub><b>NI Traktor Kontrol S4</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/mc-6000.svg" alt="Denon DJ MC6000" width="180" /><br/><sub><b>Denon DJ MC6000</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/mc-7000.svg" alt="Denon DJ MC7000" width="180" /><br/><sub><b>Denon DJ MC7000</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/mixtrack-platinum-fx.svg" alt="Numark Mixtrack Platinum FX" width="180" /><br/><sub><b>Numark Mixtrack Platinum FX</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/mixtrack-pro-fx.svg" alt="Numark Mixtrack Pro FX" width="180" /><br/><sub><b>Numark Mixtrack Pro FX</b></sub></td>
+  </tr>
+</table>
 
 Calibrate any other controller — see [docs/midi-mapping.md](docs/midi-mapping.md).
+
+<!-- Controller logos are placeholder wordmarks per KAAN-ACTION-LEGAL.md §LAUNCH-04 — real trademark-compliant logos land via Kaan-discharge before public launch. The canonical 10 controller set is locked against `src/vibemix/midi/controllers/*.json`; any drift between this grid and that JSON profile set fails `scripts/launch/check_readme_grids_a11y.py`. -->
+
 
 ### Don't see your controller?
 
