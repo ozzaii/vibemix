@@ -19,6 +19,17 @@ dist/
 !tests/dist/
 !tests/dist/**
 
+# Phase 45-02 — dist/launch-runs/ is the SHIP-08 JSONL audit dir
+# (Plan 45-04 SHIP-V1-DECISION reads from it). Whitelist the dir + its
+# .gitkeep so a fresh clone always has the directory; .jsonl runtime
+# output stays ignored by the generic dist/ rule via the negation
+# below.
+!dist/
+dist/*
+!dist/launch-runs/
+dist/launch-runs/*
+!dist/launch-runs/.gitkeep
+
 # Virtual environments
 .venv/
 venv/
