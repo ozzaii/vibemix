@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
 status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped; LAUNCH-01 closed.
-last_updated: "2026-05-17T06:23:12.712Z"
+last_updated: "2026-05-17T06:37:50.398Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 35
-  completed_plans: 31
+  completed_plans: 32
   percent: 67
 ---
 
@@ -34,10 +34,10 @@ progress:
 
 ## Current Position
 
-Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 3 active) + Phase 44 — Launch Positioning + Pre-stage (IN PROGRESS — Wave A active)
-Plan: 43-01, 43-02, 43-03, 43-04, 43-05, 43-07, 43-08, 43-09 COMPLETE (8/9). Remaining: 43-06 (mood pool runtime + perf). Phase 44: 44-01 COMPLETE (1/7) — LAUNCH-01 closed. Remaining: 44-02 through 44-07.
-Status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped; LAUNCH-01 closed.
-Last activity: 2026-05-16
+Phase: 43 — Visual Ship Lock (IN PROGRESS — Wave 3 active) + Phase 44 — Launch Positioning + Pre-stage (IN PROGRESS — Wave A + C active)
+Plan: 43-01, 43-02, 43-03, 43-04, 43-05, 43-07, 43-08, 43-09 COMPLETE (8/9). Remaining: 43-06 (mood pool runtime + perf). Phase 44: 44-01 + 44-02 + 44-05 + 44-07 COMPLETE (4/7) — LAUNCH-01, LAUNCH-03, LAUNCH-04, LAUNCH-07, LAUNCH-09, LAUNCH-10 closed engineering-green. Remaining: 44-03 (LAUNCH-02 EvidenceRegistry strip), 44-04 (LAUNCH-05 Bravoh waitlist toggle), 44-06 (LAUNCH-06 + LAUNCH-08 GH org + Discord).
+Status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped (44-01 / LAUNCH-01). DJ-software 6-cell grid + canonical-10 controllers grid reconciled to src/vibemix/midi/controllers/*.json + 4-gate a11y CI (alt + count + balance + slop) + §LAUNCH-03 + §LAUNCH-04 Kaan-discharge runbooks shipped (44-02 / LAUNCH-03 + LAUNCH-04).
+Last activity: 2026-05-17
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Last activity: 2026-05-16
 | Phase 43 P08 | 14m 57s | 2 tasks | 3 files |
 | Phase 43 P05 | 14m 02s | 3 tasks | 8 files |
 | Phase 44-launch-positioning-pre-stage P01 | 10min | 2 tasks | 3 files |
+| Phase 44-launch-positioning-pre-stage P02 | ~1h | 3 tasks | 19 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,9 @@ Last activity: 2026-05-16
 - **Plan 43-05 — Bundle-gate two-tier with placeholder-permissive exit-2** (2026-05-16) — Tier 1 delegates to existing Phase 31 25 MB cap (no duplication); Tier 2 adds prep_*.glb 400 KB-1200 KB band check. Today's placeholders (44-56 KB) intentionally fail Tier 2 with exit 2, which is the visible signal that §VIS-04 discharge is still pending. Test asserts `{0, 2}` not strict 0.
 - **Plan 44-01 — README hero one-liner gate is case-sensitive + exact-count=1, anchor + blocklist gates case-insensitive** (2026-05-16) — Locked tagline "the only AI co-host that actually listens to your set" enforced verbatim (1 occurrence exact); case-sensitivity catches Francesco-reword drift, exact-count catches copy-paste duplicates. Anchor phrases (`real DJ friend in your ear`, `built by DJs`, `your audio doesn't leave`, `open source`/`open-source`, `Mac + Windows`) + AI-slop blocklist gates (15 tokens + `\bdeeply\s+\w+` regex) stay case-insensitive — anchor phrases naturally vary in sentence casing, blocklist must catch any casing. `scripts/launch/check_readme_hero_lock.py` is now the single source of truth for the blocklist; future plans (44-05 SHIP-TWEET) import `_AI_SLOP_BLOCKLIST` rather than redeclaring.
 - **Plan 44-01 — "## No AI slop" H2 inserted between `<!-- vibemix:hero-end -->` and badge row** (2026-05-16) — Section is the explicit anti-slop value-prop, earns the H2 slot ahead of badges + Install. The existing inline `**A real DJ friend in your ear — no AI slop.**` paragraph below the badges remains as editorial voice — anchor phrase coverage is intentionally redundant (lock script only requires presence, not uniqueness).
+- **Plan 44-02 — Controller grid is sourced-of-truth-by-grep from `src/vibemix/midi/controllers/*.json`; legacy table drift CLOSED** (2026-05-17) — Prior README listed 10 controllers (Pioneer FLX6/FLX10/1000/SX3/XDJ-RX3/Numark Party Mix Live/Hercules Inpulse 300/500) that have ZERO mapping in the canonical JSON profile set, plus referenced 10 PNG paths that never existed in git (only `.gitkeep` was committed under `docs/assets/controllers/`). Plan 44-02 replaced the legacy table with the canonical 10 from `src/vibemix/midi/controllers/*.json` (Pioneer DDJ-200/400/FLX4/REV1, NI Traktor Kontrol S2/S4, Denon DJ MC6000/7000, Numark Mixtrack Platinum FX / Pro FX) + shipped 10 SVG wordmark placeholders under canonical slug filenames. Future controller add/remove that updates the JSON without updating the README grid fails CI.
+- **Plan 44-02 — A11y blocklist copied verbatim (not imported) from 44-01 hero-lock per CONTEXT §Claude's discretion** (2026-05-17) — Single-source via import would entangle the two scripts' lifecycles (a future blocklist edit on 44-01's side would silently change a11y semantics here); tested-copy-with-canonical-tokens-pinned guards drift in both directions independently. `tests/launch/test_readme_grids_a11y.py::test_blocklist_pins_canonical_tokens` mirrors 44-01's same-name test, asserting subset rather than equality so deliberate planner-approved adds/removes don't break either gate.
+- **Plan 44-02 — 16 SVG wordmark placeholders shipped (not just 6 DJ-software) per Rule 2 missing-functionality** (2026-05-17) — Plan suggested keeping 2 existing controller logo PNGs ("DDJ-FLX4 + DDJ-400 may already have real logos — confirm via existing `docs/assets/controllers/` ls"). Verification showed NO real assets existed — only `.gitkeep`. Generated 10 controller SVG placeholders + 6 DJ-software SVG placeholders = 16 total. README now has zero dead `<img src>` references.
 
 ### Decisions Locked (v2.1 — shipped)
 
