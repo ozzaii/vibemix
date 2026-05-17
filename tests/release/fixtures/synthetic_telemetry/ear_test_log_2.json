@@ -1,0 +1,15 @@
+{
+  "session_id": "synth-post-rc1-hardtek-002",
+  "started_at": "2026-05-12T22:00:00Z",
+  "duration_s": 4200,
+  "genre": "hard_tek",
+  "slop_flags": {
+    "felt_slop": true,
+    "felt_scripted": false,
+    "felt_late": true,
+    "felt_generic": false
+  },
+  "free_form": "Two reactions in the breakdown section felt generic-tier — could apply to any breakdown. One late by ~4s.",
+  "signed_by": "kaan",
+  "signed_at": "2026-05-12T23:15:00Z"
+}

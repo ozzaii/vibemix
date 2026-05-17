@@ -1,0 +1,42 @@
+{
+  "_doc": "vibemix INSTALL-VM matrix — Phase 45 SHIP-04 / SHIP-05. Add or remove OS rows here; install_vm_matrix.sh consumes this file at runtime so additions are data, not code.",
+  "version": 1,
+  "default_max_onboarding_ms": 60000,
+  "rows": [
+    {
+      "os": "macos",
+      "version": "12.3",
+      "tart_image": "ghcr.io/cirruslabs/macos-monterey-base:latest",
+      "expected_steps": ["intro", "permissions", "output-device", "controller", "first-reaction"],
+      "max_onboarding_ms": 60000
+    },
+    {
+      "os": "macos",
+      "version": "14",
+      "tart_image": "ghcr.io/cirruslabs/macos-sonoma-base:latest",
+      "expected_steps": ["intro", "permissions", "output-device", "controller", "first-reaction"],
+      "max_onboarding_ms": 60000
+    },
+    {
+      "os": "macos",
+      "version": "15",
+      "tart_image": "ghcr.io/cirruslabs/macos-sequoia-base:latest",
+      "expected_steps": ["intro", "permissions", "output-device", "controller", "first-reaction"],
+      "max_onboarding_ms": 60000
+    },
+    {
+      "os": "windows",
+      "version": "10",
+      "tart_image": "ghcr.io/cirruslabs/windows-10-base:latest",
+      "expected_steps": ["intro", "permissions", "output-device", "controller", "first-reaction"],
+      "max_onboarding_ms": 60000
+    },
+    {
+      "os": "windows",
+      "version": "11",
+      "tart_image": "ghcr.io/cirruslabs/windows-11-base:latest",
+      "expected_steps": ["intro", "permissions", "output-device", "controller", "first-reaction"],
+      "max_onboarding_ms": 60000
+    }
+  ]
+}
