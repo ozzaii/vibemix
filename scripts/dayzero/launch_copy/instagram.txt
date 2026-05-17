@@ -9,3 +9,8 @@ mac + windows. one-click. local-first.
 link in bio → github.com/bravoh-ai/vibemix
 
 #dj #ai #opensource #bravoh #djtools
+
+---
+Kaan signature:     ____  (date: ____)
+Francesco signature: ____  (date: ____)
+Locked for: v3.0.0-rc1 launch

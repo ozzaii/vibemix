@@ -24,3 +24,8 @@ Privacy: audio/MIDI/screen never leaves your machine. Only Gemini API calls go o
 Free. MIT. github.com/bravoh-ai/vibemix
 
 Feedback welcome. Built by a 25yo Turkish DJ + indie team.
+
+---
+Kaan signature:     ____  (date: ____)
+Francesco signature: ____  (date: ____)
+Locked for: v3.0.0-rc1 launch

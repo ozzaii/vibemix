@@ -8,3 +8,8 @@ vibemix is live — free, open-source AI DJ co-host for your live sets
 mac + windows, one-click install, your sets stay local.
 
 github.com/bravoh-ai/vibemix
+
+---
+Kaan signature:     ____  (date: ____)
+Francesco signature: ____  (date: ____)
+Locked for: v3.0.0-rc1 launch
