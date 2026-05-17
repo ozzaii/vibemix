@@ -36,3 +36,22 @@ entry: where found + symptom + recommended owner-phase.
 * **Recommended:** Playwright setup is a Phase 45 launch-readiness
   item; recording-browser timeouts are likely flaky-fixture issues
   worth a dedicated `/gsd-debug` pass.
+
+### Tauri build — `capability with identifier 'default' already exists`
+
+* **Found during:** 44-03 execution (`cargo check --manifest-path
+  tauri/src-tauri/Cargo.toml` for the Rust deep-link extension).
+* **Symptom:** Tauri build script fails with `capability with
+  identifier 'default' already exists` during the
+  `vibemix-b463f81372af9d15/build-script-build` step.
+* **Pre-existing:** confirmed by stashing my Rust changes and
+  re-running cargo check — same error.
+* **Out-of-scope for 44-03:** the Rust source for the deep-link
+  extension is syntactically clean (no compiler errors on the new
+  code itself); the failing surface is the Tauri capability
+  manifest config. Phase 39 / Phase 40 plumbing probably introduced
+  a duplicate `default` capability via the `capabilities/` directory.
+* **Recommended:** /gsd-quick pass on `tauri/src-tauri/capabilities/`
+  to dedupe the `default` capability file (or rename the duplicate).
+  The deep-link change in 44-03 is structurally good and will
+  compile once the capability conflict is resolved.

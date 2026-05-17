@@ -144,6 +144,23 @@
   background: rgba(212, 167, 79, 0.50);
 }
 
+/* Phase 44-03 / LAUNCH-02 — citation deep-link highlight pulse. Applied
+ * for ~2s when the user clicks a chip in the live session UI's cohost
+ * stream and the debrief window scrolls the matching region into view.
+ * The pulse uses the existing amber accent at higher alpha + an outer
+ * --glow-soft halo so the target reads as "this is where the chip points"
+ * without permanently re-tinting the region. */
+.vmx-debrief-region--highlight {
+  background: rgba(212, 167, 79, 0.65);
+  box-shadow: var(--glow-soft, 0 0 6px rgba(255, 138, 61, 0.40), 0 0 14px rgba(255, 138, 61, 0.22));
+  animation: vmx-debrief-region-pulse 1.4s ease-out;
+}
+
+@keyframes vmx-debrief-region-pulse {
+  0%   { background: rgba(212, 167, 79, 0.85); }
+  100% { background: rgba(212, 167, 79, 0.65); }
+}
+
 .vmx-debrief-drills {
   grid-area: drills;
 }

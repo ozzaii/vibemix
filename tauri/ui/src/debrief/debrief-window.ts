@@ -151,10 +151,50 @@ if (!sessionDir) {
       event.listen("sidecar-debrief-crashed", () => {
         if (errorBanner) showErrorBanner(errorBanner, "sidecar_crashed");
       });
+      // Phase 44-03 / LAUNCH-02 — focus-existing deep-link channel.
+      // When a chip is clicked in the live session UI AND a debrief
+      // window is already open, the Rust side `open_debrief_window`
+      // emits this event instead of re-mounting the window. The
+      // payload mirrors the URL-deep-link shape ({eventId, timestampS})
+      // so the same `vmx-debrief-deeplink` listener path serves both
+      // surfaces. Re-dispatching as a window-scoped CustomEvent keeps
+      // the timeline component's listener simple.
+      event.listen("vmx-debrief-deeplink", (ev: { payload: unknown }) => {
+        window.dispatchEvent(
+          new CustomEvent("vmx-debrief-deeplink", { detail: ev.payload }),
+        );
+      });
     } catch {
       // Not running under Tauri (dev / test).
     }
   })();
+
+  // Phase 44-03 / LAUNCH-02 — fresh-mount deep-link channel. When the
+  // debrief window opens via a chip-click, the Rust side appends
+  // `&deepLinkEventId=...&deepLinkTimestampS=...` to the webview URL.
+  // We dispatch the CustomEvent AFTER the timeline mounts (waveformEl
+  // chapter-list callback above), but since the chapter-list arrives
+  // asynchronously over the ws bus, we delay the deep-link dispatch
+  // until the FIRST chapter-list event has fired (so the timeline
+  // exists in the DOM and can match the region).
+  const deepLinkEventId = params.get("deepLinkEventId");
+  const deepLinkTimestampS = params.get("deepLinkTimestampS");
+  if (deepLinkEventId && deepLinkTimestampS) {
+    const payload = {
+      eventId: decodeURIComponent(deepLinkEventId),
+      timestampS: Number(deepLinkTimestampS),
+    };
+    client.addEventListener("chapter-list", () => {
+      // Fire on the next microtask so mountTimelinePlaceholder has had
+      // a chance to attach its `vmx-debrief-deeplink` listener (same
+      // tick as the callback above).
+      queueMicrotask(() => {
+        window.dispatchEvent(
+          new CustomEvent("vmx-debrief-deeplink", { detail: payload }),
+        );
+      });
+    });
+  }
 
   client.connect();
 }

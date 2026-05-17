@@ -23,6 +23,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
@@ -31,6 +32,29 @@ use crate::recordings;
 use crate::sidecar;
 
 pub const DEBRIEF_WINDOW_LABEL: &str = "debrief";
+
+/// Phase 44-03 / LAUNCH-02 — optional deep-link payload that scrolls the
+/// debrief timeline to a specific evidence event on window open. When
+/// present, we forward the payload to the webview via the URL query
+/// string (`&deepLinkEventId=...&deepLinkTimestampS=...`) so the JS
+/// `debrief-window.ts` boot can dispatch a `vmx-debrief-deeplink`
+/// custom event after the timeline mounts.
+///
+/// Forwarding via URL keeps the contract stateless — no extra IPC plumbing,
+/// no Tauri state to lifecycle-manage; the URL is the deep-link channel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebriefDeepLink {
+    /// Stable citation atom in source-prefixed form (e.g. `"ev:KICK_SWAP@45.2"`).
+    /// The debrief timeline uses this as the region lookup key.
+    /// Wire field name (from JS / event payload): `eventId`.
+    pub event_id: String,
+    /// Session-relative timestamp in seconds. Float so sub-second
+    /// precision survives the wire (the click-target chip displays
+    /// `mm:ss`, but the highlight scroll is precise).
+    /// Wire field name (from JS / event payload): `timestampS`.
+    pub timestamp_s: f64,
+}
 
 const DEFAULT_WIDTH: f64 = 1280.0;
 const DEFAULT_HEIGHT: f64 = 720.0;
@@ -56,10 +80,18 @@ impl Default for DebriefSidecarHandle {
 /// `session_dir` may be either an absolute path under the recordings
 /// root OR a bare session-id basename (e.g. `"20260515-112139"`). Both
 /// forms canonicalize and validate via `recordings::validate_under_root`.
+///
+/// `deep_link` (Phase 44-03 / LAUNCH-02) is optional — when present,
+/// the debrief webview scrolls its timeline to `deep_link.timestamp_s`
+/// and dispatches a `vmx-debrief-deeplink` event so the timeline
+/// component highlights the corresponding region. The payload is
+/// forwarded via the webview URL query string so no extra IPC channel
+/// is needed (the URL is the deep-link channel).
 #[tauri::command]
 pub async fn open_debrief_window(
     app: AppHandle,
     session_dir: String,
+    deep_link: Option<DebriefDeepLink>,
 ) -> Result<(), String> {
     // 1. Validate the path BEFORE doing any work.
     let root = recordings::resolve_recordings_root()?;
@@ -72,9 +104,15 @@ pub async fn open_debrief_window(
         .map_err(|e| format!("invalid session dir: {e}"))?;
     let safe_str = safe.to_string_lossy().to_string();
 
-    // 2. Focus-existing — at most one debrief window at a time.
+    // 2. Focus-existing — at most one debrief window at a time. When the
+    // window is already open AND a deep_link is requested, emit the
+    // payload as a one-shot event so the in-window listener can scroll
+    // even without a fresh mount (matches the focus-existing intent).
     if let Some(existing) = app.get_webview_window(DEBRIEF_WINDOW_LABEL) {
         let _ = existing.set_focus();
+        if let Some(dl) = deep_link {
+            let _ = app.emit("vmx-debrief-deeplink", dl);
+        }
         return Ok(());
     }
 
@@ -104,7 +142,17 @@ pub async fn open_debrief_window(
     // session-dir path (spaces, +, %, ?, =) so the renderer's URLSearchParams
     // round-trip works. The full path was already canonicalized + validated.
     let url_encoded = percent_encode_path(&safe_str);
-    let url = format!("debrief.html?session={url_encoded}");
+    // Phase 44-03 / LAUNCH-02 — append deep-link parameters when present.
+    // The webview reads these off URLSearchParams at boot and dispatches
+    // the `vmx-debrief-deeplink` event after the timeline mounts.
+    let url = match &deep_link {
+        Some(dl) => format!(
+            "debrief.html?session={url_encoded}&deepLinkEventId={ev}&deepLinkTimestampS={ts}",
+            ev = percent_encode_path(&dl.event_id),
+            ts = dl.timestamp_s,
+        ),
+        None => format!("debrief.html?session={url_encoded}"),
+    };
     let window = WebviewWindowBuilder::new(
         &app,
         DEBRIEF_WINDOW_LABEL,

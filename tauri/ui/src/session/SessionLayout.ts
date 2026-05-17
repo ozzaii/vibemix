@@ -33,8 +33,10 @@ import {
   renderCohostPanel,
   setCohost,
   type CohostStatus,
+  type ReactionsByTs,
   type TranscriptLine,
 } from "./components/cohost.js";
+import type { CitationChip } from "./components/citation-strip.js";
 import { renderStatusBar, type BadgeState } from "./components/status-bar.js";
 import { SCREW_SVG } from "./icons/screw.svg.js";
 import { HEADPHONES_SVG } from "./icons/headphones.svg.js";
@@ -77,6 +79,14 @@ export interface SessionState {
      *  grounding-failure threshold elapses. Layout passes this through to
      *  the cohost panel verbatim. */
     onRetry?: () => void;
+    /** Phase 44-03 / LAUNCH-02 — citation chip strips keyed by
+     *  transcript line `ts`. Optional; missing keys render the
+     *  transcript line without a chip strip. */
+    reactions?: ReactionsByTs;
+    /** Phase 44-03 / LAUNCH-02 — chip click handler. Layout passes this
+     *  through to the cohost panel verbatim; the render-loop projection
+     *  builds the actual debrief-deep-link invoke. */
+    onChipClick?: (chip: CitationChip) => void;
   };
   status: {
     livekit: BadgeState;
@@ -605,8 +615,13 @@ export function renderSessionFrame(mounted: Mounted, next: SessionState): void {
   // mutations are cheap and rebuilt unconditionally inside setCohost.
   // muted + failureElapsedMs are also part of the diff trigger so the
   // hot-path picks up cmd+m presses and crossings of the 5s threshold.
+  // Phase 44-03 / LAUNCH-02 — also diff on reactions map ref so a new
+  // chip-strip arriving via ipc.session.cohost-reaction repaints the
+  // transcript (the render-loop projects a fresh ReactionsByTs map
+  // every tick, but the ref only changes when reactions length changes).
   const cohostTranscriptChanged =
-    mounted.current.cohost.transcript !== next.cohost.transcript;
+    mounted.current.cohost.transcript !== next.cohost.transcript ||
+    mounted.current.cohost.reactions !== next.cohost.reactions;
   const cohostStatusChanged =
     mounted.current.cohost.status !== next.cohost.status ||
     mounted.current.cohost.grounded !== next.cohost.grounded ||

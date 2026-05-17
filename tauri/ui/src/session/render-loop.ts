@@ -22,7 +22,12 @@ import type {
   SessionState as LayoutSessionState,
 } from "./SessionLayout.js";
 import { getSessionState, setSessionState } from "./state.js";
-import type { SessionState as BridgeSessionState } from "./state.js";
+import type {
+  CohostReaction,
+  SessionState as BridgeSessionState,
+} from "./state.js";
+import type { ReactionsByTs } from "./components/cohost.js";
+import type { CitationChip } from "./components/citation-strip.js";
 
 let rafHandle: number | null = null;
 let mountedRef: Mounted | null = null;
@@ -40,6 +45,68 @@ function cohostRetryHandler(): void {
     // eslint-disable-next-line no-console
     console.warn("[render-loop] cohost retry restart_sidecar failed:", err);
   });
+}
+
+/** Phase 44-03 / LAUNCH-02 — chip-click handler. Invokes the Tauri
+ *  `open_debrief_window` command with a deep-link payload pointing at
+ *  the chip's event. The live session UI does NOT carry its own
+ *  session_dir field today (the session is the "right now we're
+ *  recording" view), so we pass an empty string + let the Rust side
+ *  fall back to "latest recording" via `validate_under_root`.
+ *
+ *  Best-effort wiring — a chip-click failure (debrief window already
+ *  open, recordings root missing, validation reject) is logged but
+ *  never crashes the live UI. The chip remains useful as a visible
+ *  receipt even when the click target isn't yet wired end-to-end. */
+function cohostChipClickHandler(chip: CitationChip): void {
+  // For now the live session passes the empty session_dir (TODO: thread
+  // through SessionSnapshot.session_dir once Phase 45 wires it). The
+  // Rust side's `validate_under_root` rejects empty paths today, so the
+  // chip-click in a live session window logs an error and is a no-op
+  // until the wiring is complete. Recorded-session chip-clicks (when
+  // the debrief window is the chip-clicker's parent, v2.x) carry the
+  // session_dir already.
+  void invoke("open_debrief_window", {
+    sessionDir: "",
+    deepLink: {
+      eventId: chip.event_id,
+      timestampS: chip.timestamp_s,
+    },
+  }).catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.warn("[render-loop] chip-click open_debrief_window failed:", err);
+  });
+}
+
+/** Phase 44-03 / LAUNCH-02 — project the bridge's append-only reactions
+ *  ring onto the ReactionsByTs map shape that the cohost panel expects.
+ *  O(N) over the ring (capped at 200), called once per render tick.
+ *  Returns the SHARED empty map when no reactions exist so the cohost
+ *  panel's diff path can ref-compare.
+ *
+ *  Cached by reactions-ref so a tick with no new reactions returns the
+ *  SAME map instance — SessionLayout's diff path checks ref equality
+ *  on `cohost.reactions` to gate the transcript repaint. Without this
+ *  cache the chip-strip rebuilds on every rAF tick (60×/sec) which
+ *  would tank perf on long transcripts. */
+const EMPTY_REACTIONS_PROJECTION: ReactionsByTs = new Map();
+let _reactionsCacheKey: readonly CohostReaction[] | null = null;
+let _reactionsCacheValue: ReactionsByTs = EMPTY_REACTIONS_PROJECTION;
+function projectReactions(reactions: readonly CohostReaction[]): ReactionsByTs {
+  if (reactions.length === 0) return EMPTY_REACTIONS_PROJECTION;
+  if (reactions === _reactionsCacheKey) return _reactionsCacheValue;
+  const out = new Map<string, readonly CitationChip[]>();
+  for (const r of reactions) {
+    // When two reactions share a ts (sub-ms collision — extremely rare
+    // but possible at high reaction cadence), the LAST one wins. The
+    // chip strip surfaces the freshest evidence; older chips for the
+    // same ts are dropped silently rather than concatenated (which
+    // would risk a chip overflow on a single transcript line).
+    out.set(r.ts, r.citation_strip);
+  }
+  _reactionsCacheKey = reactions;
+  _reactionsCacheValue = out;
+  return out;
 }
 
 // Dev-mode frame-time tracking
@@ -146,6 +213,9 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       // since a sustained ungrounded state is functionally the same as
       // a sidecar-down condition.
       onRetry: cohostRetryHandler,
+      // Phase 44-03 / LAUNCH-02 — citation chip wiring.
+      reactions: projectReactions(s.reactions),
+      onChipClick: cohostChipClickHandler,
     },
     status: {
       livekit: s.status.livekit,

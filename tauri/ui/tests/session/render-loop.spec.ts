@@ -97,6 +97,7 @@ describe("renderSessionFrame — CSS variable hot path", () => {
         dropPredBars: 8,
         transcript: [],
         midiEvents: [],
+        reactions: [],
         track: null,
         status: {
           livekit: "ok",
@@ -149,6 +150,7 @@ describe("renderSessionFrame — CSS variable hot path", () => {
       dropPredBars: null,
       transcript: [],
       midiEvents: [],
+      reactions: [],
       track: null,
       status: { livekit: null, gemini: null, midi: null, screen: null },
       settings: {
@@ -193,6 +195,7 @@ describe("renderSessionFrame — CSS variable hot path", () => {
       dropPredBars: null,
       transcript: [],
       midiEvents: [],
+      reactions: [],
       track: null,
       status: { livekit: null, gemini: null, midi: null, screen: null },
       settings: {
@@ -317,6 +320,7 @@ describe("layout projection", () => {
       dropPredBars: null,
       transcript: [],
       midiEvents: [],
+      reactions: [],
       track: null,
       status: {
         livekit: "ok" as const,
@@ -364,6 +368,7 @@ describe("layout projection", () => {
       dropPredBars: null,
       transcript: [],
       midiEvents: [],
+      reactions: [],
       track: null,
       status: { livekit: null, gemini: null, midi: null, screen: null },
       settings: {

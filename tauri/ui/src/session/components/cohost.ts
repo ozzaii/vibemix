@@ -33,6 +33,10 @@
  * the faint amber halo additively on top of its hot inset stack. */
 
 import { registerStyle } from "./_style-registry.js";
+import {
+  renderCitationStrip,
+  type CitationChip,
+} from "./citation-strip.js";
 
 export type CohostStatus = "LISTENING" | "TALKING" | "IDLE";
 
@@ -41,6 +45,12 @@ export interface TranscriptLine {
   text: string;
   ts: string;
 }
+
+/** Phase 44-03 / LAUNCH-02 — per-reaction citation chips keyed by
+ *  transcript line `ts`. The cohost panel receives a map (not an
+ *  array) so the chip-strip render is O(1) per transcript line — a
+ *  full transcript walk on every rAF tick would be O(N×M) otherwise. */
+export type ReactionsByTs = ReadonlyMap<string, readonly CitationChip[]>;
 
 export interface CohostPanelProps {
   status: CohostStatus;
@@ -64,7 +74,21 @@ export interface CohostPanelProps {
    *  (currently `restart_sidecar`; a dedicated `ipc.cohost.reconnect` is
    *  a TODO). */
   onRetry?: () => void;
+  /** Phase 44-03 / LAUNCH-02 — citation chip strips keyed by transcript
+   *  line `ts`. Optional + defaults to an empty map; missing keys just
+   *  render the transcript line without chips (backward compat with
+   *  callers that don't yet wire reactions). */
+  reactions?: ReactionsByTs;
+  /** Phase 44-03 / LAUNCH-02 — chip click handler. Wired by the caller
+   *  to `invoke("open_debrief_window", { sessionDir, deepLink })`. When
+   *  undefined the chip still renders but click is a no-op (defensive —
+   *  the strip should never crash if the wiring is incomplete). */
+  onChipClick?: (chip: CitationChip) => void;
 }
+
+/** Empty reactions sentinel — shared singleton so renderCohostPanel
+ *  defaults don't allocate a fresh Map every call. */
+const EMPTY_REACTIONS: ReactionsByTs = new Map();
 
 const MAX_TRANSCRIPT_LINES = 200;
 const FADED_WINDOW = 5;
@@ -430,7 +454,13 @@ export function renderCohostPanel(props: CohostPanelProps): HTMLElement {
 
   root.append(buildTopStrip());
   root.append(buildHeader(props.status, props.muted ?? false));
-  root.append(buildTranscript(props.transcript));
+  root.append(
+    buildTranscript(
+      props.transcript,
+      props.reactions ?? EMPTY_REACTIONS,
+      props.onChipClick,
+    ),
+  );
   root.append(
     buildFoot(
       props.grounded,
@@ -527,17 +557,26 @@ function titleForStatus(status: CohostStatus): string {
   }
 }
 
-function buildTranscript(lines: TranscriptLine[]): HTMLElement {
+function buildTranscript(
+  lines: TranscriptLine[],
+  reactions: ReactionsByTs,
+  onChipClick: ((chip: CitationChip) => void) | undefined,
+): HTMLElement {
   const t = document.createElement("div");
   t.className = "vmx-cohost__transcript";
   t.dataset.sticky = "true";
   t.setAttribute("role", "log");
   t.setAttribute("aria-live", "polite");
-  populateTranscript(t, lines);
+  populateTranscript(t, lines, reactions, onChipClick);
   return t;
 }
 
-function populateTranscript(el: HTMLElement, lines: TranscriptLine[]): void {
+function populateTranscript(
+  el: HTMLElement,
+  lines: TranscriptLine[],
+  reactions: ReactionsByTs,
+  onChipClick: ((chip: CitationChip) => void) | undefined,
+): void {
   // Cap to last MAX_TRANSCRIPT_LINES. Tier: last line `.now`, next FADED_WINDOW
   // are `.faded`, everything older is `.old`.
   const capped = lines.slice(-MAX_TRANSCRIPT_LINES);
@@ -562,6 +601,25 @@ function populateTranscript(el: HTMLElement, lines: TranscriptLine[]): void {
     body.textContent = line.text;
     msg.append(body);
     el.append(msg);
+
+    // Phase 44-03 / LAUNCH-02 — chip strip below AI reactions only.
+    // User + system lines never carry citations. The strip mounts as a
+    // sibling of .vmx-cohost__msg so the renderer can hot-swap chips
+    // independently of the message body if needed (v2.x). For v1 the
+    // chip strip is rebuilt alongside the transcript via setCohost().
+    if (line.role === "ai") {
+      const chips = reactions.get(line.ts);
+      if (chips && chips.length > 0) {
+        const strip = renderCitationStrip({
+          chips: chips as CitationChip[],
+          // Defensive: a missing handler renders the chip but no-ops on
+          // click — the ws-bridge gate is the source of truth for chip
+          // visibility; click wiring lives in the caller (SessionLayout).
+          onChipClick: onChipClick ?? (() => {}),
+        });
+        if (strip) el.append(strip);
+      }
+    }
   });
 }
 
@@ -689,12 +747,19 @@ export function setCohost(el: HTMLElement, props: CohostPanelProps): void {
   }
 
   // Transcript — rebuild lines. Preserve scroll-anchor if not sticky.
+  // Phase 44-03 / LAUNCH-02 — chip strips rebuild alongside transcript
+  // since populateTranscript() now interleaves them under AI messages.
   const tr = el.querySelector<HTMLElement>(".vmx-cohost__transcript");
   if (tr) {
     const sticky = tr.dataset.sticky !== "false";
     const prevScrollTop = tr.scrollTop;
     tr.replaceChildren();
-    populateTranscript(tr, props.transcript);
+    populateTranscript(
+      tr,
+      props.transcript,
+      props.reactions ?? EMPTY_REACTIONS,
+      props.onChipClick,
+    );
     if (sticky) tr.scrollTop = tr.scrollHeight;
     else tr.scrollTop = prevScrollTop;
   }
