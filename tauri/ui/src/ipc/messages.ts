@@ -40,6 +40,7 @@ export type VibemixIPCMessages =
   | RecordingsEvents
   | RecordingsEventsResult
   | SessionOverlayHighlight
+  | SessionCohostReaction
   | DebriefSessionLoaded
   | DebriefCitationSummary
   | DebriefEventTimeline
@@ -407,6 +408,55 @@ export interface SessionOverlayHighlight {
     element_id: string;
     color: "amber" | "red" | "green" | "blue";
     duration_ms: number;
+  };
+}
+export interface SessionCohostReaction {
+  type: "ipc.session.cohost-reaction";
+  ts: string;
+  payload: {
+    text: string;
+    event_id: string;
+    /**
+     * @maxItems 3
+     */
+    citation_strip:
+      | []
+      | [
+          {
+            event_id: string;
+            verb: string;
+            timestamp_s: number;
+          }
+        ]
+      | [
+          {
+            event_id: string;
+            verb: string;
+            timestamp_s: number;
+          },
+          {
+            event_id: string;
+            verb: string;
+            timestamp_s: number;
+          }
+        ]
+      | [
+          {
+            event_id: string;
+            verb: string;
+            timestamp_s: number;
+          },
+          {
+            event_id: string;
+            verb: string;
+            timestamp_s: number;
+          },
+          {
+            event_id: string;
+            verb: string;
+            timestamp_s: number;
+          }
+        ];
   };
 }
 export interface DebriefSessionLoaded {

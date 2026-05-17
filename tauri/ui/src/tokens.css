@@ -198,6 +198,25 @@
   --amber-78:      rgba(255, 138, 61, 0.78); /* warm gradient stop B */
   --amber-deep-85: rgba(255, 90, 26, 0.85);  /* clip gradient stop B */
 
+  /* --- citation-strip — LAUNCH-02 (Phase 44 Plan 44-03) ---
+   * Semantic tokens for the live UI citation chip surface. Each AI
+   * reaction in the cohost stream renders a tiny `[<verb> @ <mm:ss>]`
+   * chip per cited evidence event. The chip is a click-target →
+   * opens debrief window scrolled to the timestamp. Resting state =
+   * restrained (faint glow, low-alpha amber); hover/focus = soft glow.
+   * 20/80 rule: chips inherit the strip's small surface footprint;
+   * the dominant tone stays silk/glass, the chip carries the only
+   * amber accent in the cohost transcript body.
+   *
+   * Anti-slop principle (frontend-enforcement skill): chip color
+   * MUST come from these tokens — components never declare amber hex.
+   * If a future variant needs a different accent, it lands here. */
+  --c-citation-chip-fg: var(--amber-pale);
+  --c-citation-chip-bg: rgba(255, 138, 61, 0.04); /* subtle amber wash on glass */
+  --c-citation-chip-border: var(--amber-22);
+  --c-citation-chip-border-hover: var(--amber-40);
+  --c-citation-chip-bg-hover: rgba(255, 138, 61, 0.09); /* press-up amber wash */
+
   /* --- Motion budget (retained from Phase 11 + v5 border sweep) --- */
   --motion-snap: 150ms;
   --motion-transition: 200ms;

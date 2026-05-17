@@ -33,6 +33,7 @@
 import { emitIpc, subscribeIpc } from "../ipc/client.js";
 import type {
   RecordingsUsage,
+  SessionCohostReaction,
   SessionSnapshot,
   SessionMute,
   SettingsState,
@@ -41,6 +42,7 @@ import type {
 import { setRecordingsSlice } from "../settings/state.js";
 import {
   appendMidiEvents,
+  appendReaction,
   appendTranscript,
   getSessionState,
   setSessionState,
@@ -48,6 +50,7 @@ import {
 import type { LevelPair, MascotMood, MetersTriple } from "./state.js";
 import type { PhaseChunk } from "./components/phase-tape.js";
 import type { MidiEvent } from "./components/event-ribbon.js";
+import type { CitationChip } from "./components/citation-strip.js";
 
 /** Wire payload shape mirrors src/ipc/messages.ts SessionSnapshot. We
  *  re-declare narrow shapes here so the bridge can be unit-tested against
@@ -129,6 +132,21 @@ interface WireRecordingsUsagePayload {
   bytes_total: number;
 }
 
+// Phase 44-03 / LAUNCH-02 — cohost-reaction push. Sidecar broadcasts once
+// per AI reaction the user actually heard, carrying the structured
+// citation_strip derived from the EvidenceRegistry. Mirror of the
+// Python SessionCohostReactionPayload — kept as a local narrow shape so
+// the bridge can be unit-tested without round-tripping through ajv.
+interface WireCohostReactionPayload {
+  text: string;
+  event_id: string;
+  citation_strip: Array<{
+    event_id: string;
+    verb: string;
+    timestamp_s: number;
+  }>;
+}
+
 // WR-04 in 14-REVIEW.md — keep this allowlist in sync with the
 // SettingsSet schema enum at messages.schema.json:529 and the Python
 // SettingsSetPayload.field Literal at src/vibemix/ui_bus/messages.py.
@@ -198,6 +216,23 @@ export async function initSessionBridge(): Promise<{
   unsubs.push(
     await subscribeIpc<RecordingsUsage>("ipc.recordings.usage", (msg) =>
       applyRecordingsUsage(msg.payload as unknown as WireRecordingsUsagePayload),
+    ),
+  );
+
+  // Phase 44-03 / LAUNCH-02 — cohost-reaction push. Sidecar broadcasts
+  // one envelope per AI reaction the user heard, carrying the parsed
+  // citation_strip. We forward the ENTIRE envelope (ts + payload) so
+  // the render-loop can join chips to the matching transcript line by
+  // wire timestamp (the transcript_delta on SessionSnapshot carries
+  // the same ts shape — both come from _now_iso() on the sidecar).
+  unsubs.push(
+    await subscribeIpc<SessionCohostReaction>(
+      "ipc.session.cohost-reaction",
+      (msg) =>
+        applyCohostReaction(
+          msg.ts,
+          msg.payload as unknown as WireCohostReactionPayload,
+        ),
     ),
   );
 
@@ -367,6 +402,45 @@ export function applyMuteAck(p: WireMutePayload): void {
 export function applyRecordingsUsage(p: WireRecordingsUsagePayload): void {
   setRecordingsSlice({
     usage: { sessions: p.sessions, bytes_total: p.bytes_total },
+  });
+}
+
+/** Phase 44-03 / LAUNCH-02 — apply a cohost-reaction push. Appends a
+ *  new entry to the reactions ring; the render-loop pairs it to the
+ *  matching transcript line by `ts` so the chip strip renders under
+ *  the right reaction. Exported for vitest coverage.
+ *
+ *  Defensively narrows each chip — a malformed wire payload (e.g.
+ *  missing verb on one chip from a future-out-of-sync sidecar) is
+ *  filtered out at this boundary rather than crashing the renderer
+ *  downstream. Matches the narrowMood pattern used elsewhere in this
+ *  file (T-13-03-01-style mitigation). */
+export function applyCohostReaction(
+  ts: string,
+  p: WireCohostReactionPayload,
+): void {
+  const chips: CitationChip[] = [];
+  for (const c of p.citation_strip) {
+    if (
+      typeof c.event_id === "string" &&
+      c.event_id.length > 0 &&
+      typeof c.verb === "string" &&
+      c.verb.length > 0 &&
+      typeof c.timestamp_s === "number" &&
+      Number.isFinite(c.timestamp_s)
+    ) {
+      chips.push({
+        event_id: c.event_id,
+        verb: c.verb,
+        timestamp_s: c.timestamp_s,
+      });
+    }
+  }
+  appendReaction({
+    ts,
+    text: p.text,
+    event_id: p.event_id,
+    citation_strip: chips,
   });
 }
 

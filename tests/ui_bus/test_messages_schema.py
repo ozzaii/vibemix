@@ -66,6 +66,7 @@ from vibemix.ui_bus import (
     LibraryStalenessNudge,
     MascotMoodChange,
     SessionCitation,
+    SessionCohostReaction,
     SessionOverlayHighlight,
     MetersTriple,
     PermissionCheck,
@@ -293,6 +294,21 @@ def _make_examples() -> list[tuple[str, object]]:
                 duration_ms=1300,
             ),
         ),
+        # Phase 44-03 — cohost reaction broadcast (LAUNCH-02)
+        (
+            "SessionCohostReaction",
+            SessionCohostReaction.make(
+                text="sick [ev:KICK_SWAP@45.2] kick swap",
+                event_id="HEARTBEAT",
+                citation_strip=[
+                    {
+                        "event_id": "ev:KICK_SWAP@45.2",
+                        "verb": "kick swap",
+                        "timestamp_s": 45.2,
+                    }
+                ],
+            ),
+        ),
         # Phase 25 Plan 25-03 — DEBRIEF architectural slot (3 reservations)
         (
             "DebriefSessionLoaded",
@@ -501,8 +517,10 @@ def test_example_count_matches_schema_oneof() -> None:
     Phase 32 Plans 32-04..05 add 8 profile.* schemas (ProfileSetConsent,
     ProfileConsentState, ProfileView, ProfileViewResult, ProfileRegenerate,
     ProfileRegenerateResult, ProfileDelete, ProfileDeleteAck) → 63.
+    Phase 44 Plan 44-03 adds 1 (SessionCohostReaction — LAUNCH-02 anti-slop
+    citation strip broadcast) → 64.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 63
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 64
 
 
 @pytest.mark.parametrize(
@@ -524,7 +542,7 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_63() -> None:
+def test_schema_oneof_count_is_64() -> None:
     """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
     (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
     7 recordings.* families → 34; Phase 20-04 adds 1 (SessionCitation) → 35;
@@ -533,7 +551,9 @@ def test_schema_oneof_count_is_63() -> None:
     adds 10 library.* messages → 49; Phase 29 Plan 29-03 adds 6 DEBRIEF v2.1
     additive wrappers → 55; Phase 32 Plans 32-04..05 add 8 profile.*
     messages (set_consent/consent_state/view/view_result/regenerate/
-    regenerate_result/delete/delete_ack) → 63.
+    regenerate_result/delete/delete_ack) → 63. Phase 44 Plan 44-03 adds 1
+    (SessionCohostReaction — LAUNCH-02 anti-slop citation strip
+    broadcast) → 64.
 
     ``definitions`` count grows alongside oneOf since every new wrapper
     adds one entry to both. ``LevelPair`` is a shared helper ref'd from
@@ -541,8 +561,8 @@ def test_schema_oneof_count_is_63() -> None:
     (so it counts in ``definitions`` but not in ``oneOf``); the skew
     between the two counts stays at 1.
     """
-    assert len(_SCHEMA["oneOf"]) == 63
-    assert len(_SCHEMA["definitions"]) == 64
+    assert len(_SCHEMA["oneOf"]) == 64
+    assert len(_SCHEMA["definitions"]) == 65
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

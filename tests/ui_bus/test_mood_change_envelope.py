@@ -119,9 +119,10 @@ def test_count_parity_holds_after_addition():
     36 → 39 (+3 DEBRIEF architectural-slot reservations). Plan 28-09 grew
     both 39 → 49 (+10 library.* families). Plan 29-03 grew both 49 → 55
     (+6 DEBRIEF v2.1 additive wrappers). Plan 32-04/05 grew both 55 → 63
-    (+8 profile.* families). The check_ipc_schema.py invariant is what
-    fails the CI build if either side regresses, so we assert it here
-    directly.
+    (+8 profile.* families). Plan 44-03 grows both 63 → 64 (+1
+    SessionCohostReaction — LAUNCH-02). The check_ipc_schema.py invariant
+    is what fails the CI build if either side regresses, so we assert it
+    here directly.
     """
     from vibemix.ui_bus import messages as ui_bus_messages
 
@@ -140,9 +141,9 @@ def test_count_parity_holds_after_addition():
     schema = json.loads(schema_path.read_text())
     oneof_count = len(schema["oneOf"])
 
-    assert wrapper_count == oneof_count == 63, (
+    assert wrapper_count == oneof_count == 64, (
         f"count parity violated: wrappers={wrapper_count} vs oneOf={oneof_count}; "
-        "expected both 63 after Plan 32-05"
+        "expected both 64 after Plan 44-03"
     )
 
 
