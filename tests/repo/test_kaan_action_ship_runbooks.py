@@ -71,16 +71,20 @@ AI_SLOP_BLOCKLIST: tuple[str, ...] = (
 # "deeply <word>" regex — same construction the slop checker flags.
 _DEEPLY_RE = re.compile(r"\bdeeply\s+\w+", re.IGNORECASE)
 
-# Canonical 8-block markers — every §SHIP-NN section must contain each of
-# these substrings somewhere between its H2 and the next H2.
-REQUIRED_BLOCK_MARKERS: tuple[str, ...] = (
-    "Pre-requisites:",
-    # Accept both "Discharge command:" (singular) and "Discharge commands:"
-    # (plural) — older sections use plural, single-command sections may
-    # use singular. We assert via regex below.
-    "Verification:",
-    "Post-discharge:",
-    "Unblocks:",
+# Canonical 8-block markers — every §SHIP-NN section must contain each
+# logical block. The canonical §LAUNCH-08 / §GATE-* style mixes H3
+# headings (`### Pre-requisites`) and bold-prefixed inline labels
+# (`**Status:**`) — so each marker is a tuple of accepted spellings.
+# A section passes if ANY variant in the tuple appears in its body.
+REQUIRED_BLOCK_MARKERS: tuple[tuple[str, ...], ...] = (
+    # Pre-requisites block: explicit subheading OR inline "Pre-requisites:"
+    ("### Pre-requisites", "Pre-requisites:", "**Pre-requisites:**"),
+    # Verification block: subheading OR colon-suffix.
+    ("### Verification", "Verification:"),
+    # Post-discharge block: subheading OR inline.
+    ("### Post-discharge", "Post-discharge:"),
+    # Unblocks block: "### Unblocks" or "### What unblocks" or colon form.
+    ("### Unblocks", "### What unblocks", "Unblocks:"),
     # Sign-off block is checked separately (asserts `_____` placeholder
     # plus `Sign-off by` line).
 )
@@ -177,13 +181,19 @@ def test_ship_nn_h2_order_is_chronological():
 def test_each_section_has_canonical_blocks():
     bodies = _section_bodies()
     missing: list[str] = []
-    discharge_re = re.compile(r"Discharge commands?:")
+    # Accept "### Discharge commands", "### Discharge command", or the
+    # colon-suffixed inline forms.
+    discharge_re = re.compile(
+        r"(?:###\s+Discharge commands?\b|Discharge commands?:)"
+    )
     for sec, body in bodies.items():
-        for marker in REQUIRED_BLOCK_MARKERS:
-            if marker not in body:
-                missing.append(f"{sec}: missing '{marker}'")
+        for variants in REQUIRED_BLOCK_MARKERS:
+            if not any(v in body for v in variants):
+                missing.append(
+                    f"{sec}: missing any of {variants}"
+                )
         if not discharge_re.search(body):
-            missing.append(f"{sec}: missing 'Discharge command(s):'")
+            missing.append(f"{sec}: missing 'Discharge command(s)' block")
     assert not missing, "Section block markers missing:\n  " + "\n  ".join(
         missing
     )

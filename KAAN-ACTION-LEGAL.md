@@ -1966,3 +1966,725 @@ LAUNCH-08 DRY-RUN GREEN:           _____________________   (date — `discord_pr
 LAUNCH-08 LIVE EXECUTE COMPLETE:   _____________________   (date — 5 roles + 9 channels created, idempotent re-run shows 14 skips)
 Sign-off by (Kaan):                _____________________
 ```
+
+## §SHIP-01 — Apple Developer Program agreement (FRANCESCO-ACTION)
+
+**REQ-ID:** SHIP-01 (Phase 45)
+**Owner:** Francesco
+**Status:** ☐ pre-discharge  ☐ Apple Developer Program enrollment complete  ☐ paid annual fee posted ($99 USD)  ☐ Team ID captured  ☐ Developer ID Application cert generated  ☐ Developer ID Installer cert generated  ☐ App-specific notarization password generated  ☐ all 3 secrets posted to GH secrets
+
+**Effort:** ~30 minutes web flow + Apple's ~24h account-activation SLA. The activation SLA is the critical path — start this the day Francesco gets the email confirming legal capacity to sign for Bravoh.
+
+**Blocking for:** §SHIP-03 (DIST-19 signed-binary smoke), §SHIP-04 (INSTALL-VM matrix), §SHIP-07 (SHIP-CUT). Without Apple-signed binaries, Mac users hit Gatekeeper and the launch is dead in the water.
+
+### Why this is FRANCESCO-action
+
+Bravoh as a legal entity holds the Apple Developer Program seat. Francesco is the signatory of record for the company — Kaan can't enroll on Bravoh's behalf without Francesco's eyes on the Apple legal agreements. Per CLAUDE.md privacy + secrets discipline, autonomous agents never hold an Apple Developer Program login.
+
+### Pre-requisites
+
+- Bravoh legal entity registered (already true).
+- Francesco logged in to https://developer.apple.com with the Bravoh-team Apple ID.
+- Bravoh credit card on file for the $99 annual fee.
+
+### Discharge commands
+
+```bash
+# 1. Enroll Bravoh as a Developer Program member
+#    → https://developer.apple.com/programs/enroll/
+#    → entity type: Organization
+#    → D-U-N-S number: <Bravoh D-U-N-S>
+#    → legal entity name: Bravoh <legal suffix per registration>
+#    → pay $99 USD annual fee
+#    → wait for Apple's "Welcome to the Apple Developer Program" email
+#      (account activation: typically 24h)
+
+# 2. Capture the Team ID (10-char alphanumeric)
+#    → developer.apple.com → Account → Membership
+#    → copy the Team ID into a secure note
+
+# 3. Generate Developer ID Application cert
+#    → Account → Certificates → "+" → Developer ID Application
+#    → upload CSR generated locally with:
+#      openssl req -new -newkey rsa:2048 -nodes \
+#          -keyout vibemix-developer-id-application.key \
+#          -out vibemix-developer-id-application.csr \
+#          -subj "/CN=Bravoh Developer ID Application/O=Bravoh/C=<country>"
+#    → download .cer; import into Keychain Access on Francesco's Mac
+
+# 4. Generate Developer ID Installer cert (for .pkg installers)
+#    → same flow, choose "Developer ID Installer" type
+
+# 5. Generate app-specific password for notarization
+#    → appleid.apple.com → Sign-In and Security → App-Specific Passwords
+#    → label: vibemix-notarization
+#    → copy the 16-char password
+
+# 6. Post the 3 GH secrets (run on Kaan's machine via Francesco-shared values):
+gh secret set APPLE_DEVELOPER_ID --body "<Team ID>"
+gh secret set APPLE_TEAM_ID --body "<Team ID>"
+gh secret set APPLE_NOTARIZATION_PASSWORD --body "<app-specific password>"
+
+# Note: actual cert .p12 + private key for signing are posted as:
+gh secret set APPLE_CERTIFICATE_P12_BASE64 --body "$(base64 < cert.p12)"
+gh secret set APPLE_CERTIFICATE_PASSWORD --body "<p12 export password>"
+```
+
+### Verification
+
+```bash
+# 1. GH secrets visible:
+gh secret list | grep -E "APPLE_(DEVELOPER_ID|TEAM_ID|NOTARIZATION_PASSWORD|CERTIFICATE_P12_BASE64|CERTIFICATE_PASSWORD)"
+# → expected: 5 lines
+
+# 2. Developer ID cert visible in Apple Developer account:
+#    → developer.apple.com → Account → Certificates → see "Developer ID Application" + "Developer ID Installer" rows
+
+# 3. Notarization smoke (after first signed binary builds in §SHIP-03):
+xcrun notarytool history --apple-id <bravoh-apple-id> --team-id $APPLE_TEAM_ID --password $APPLE_NOTARIZATION_PASSWORD
+# → expected: lists past notarization attempts (or empty list if first run)
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-01` in REQUIREMENTS.md.
+- Record Team ID in `.planning/STATE.md` decisions section.
+- Update §SHIP-03 status to ☑ pre-req met.
+
+### Unblocks
+
+- **§SHIP-03** — DIST-19 signed-binary smoke can now run.
+- **§SHIP-04** — INSTALL-VM matrix has signed binaries to walk through.
+- **§SHIP-07** — SHIP-CUT can attach signed `.dmg` / `.pkg` artifacts.
+- **Roadmap Phase 45 success criterion** — "Mac binary signed + notarized" row goes green.
+
+### Sign-off block
+
+```
+SHIP-01 ENROLLMENT POSTED on:        _____________________   (date — Francesco hits "enroll" on developer.apple.com)
+SHIP-01 ACCOUNT ACTIVATED on:        _____________________   (date — Apple welcome email received)
+SHIP-01 TEAM ID:                     _____________________   (10-char alphanumeric)
+SHIP-01 DEV-ID APP CERT GEN on:      _____________________   (date)
+SHIP-01 DEV-ID INSTALLER CERT GEN:   _____________________   (date)
+SHIP-01 NOTARIZATION PW GEN on:      _____________________   (date)
+SHIP-01 GH SECRETS POSTED on:        _____________________   (date — 5 secrets visible via `gh secret list`)
+Sign-off by (Francesco):             _____________________
+Counter-sign by (Kaan):              _____________________
+```
+
+## §SHIP-02 — SignPath OSS Foundation approval (KAAN-ACTION)
+
+**REQ-ID:** SHIP-02 (Phase 45)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge  ☐ SignPath OSS Foundation application submitted  ☐ ~1-week SLA wait  ☐ SignPath signing token issued  ☐ token posted to GH secrets
+
+**Effort:** ~15 minutes form fill + SignPath's ~1-week SLA. Submit the SAME day §SHIP-01 enrollment kicks off so the two external clocks run in parallel.
+
+**Blocking for:** §SHIP-03 (DIST-19 signed-binary smoke on Windows side), §SHIP-04 (INSTALL-VM matrix needs signed `.msi`), §SHIP-07 (SHIP-CUT attaches signed Windows artifacts), §SHIP-12 (INSTALL-DEFENDER SmartScreen reputation can only accrue against a SignPath-signed binary).
+
+### Why this is KAAN-action
+
+SignPath OSS Foundation tier is free for open-source projects but requires per-project approval. Kaan is the GitHub-account holder of `ozzaii/vibemix` (pre-transfer) so the application has to come from his identity. Once approved, the signing token is provisioned to a GitHub Actions workflow — no manual ceremony per release.
+
+### Pre-requisites
+
+- §SHIP-01 not strictly required (these two run in parallel), but recommend submitting on the same day so SignPath SLA + Apple SLA overlap.
+- Vibemix repo public (already true).
+- README has explicit OSS license badge (Apache-2.0 — already locked Phase 44-01).
+
+### Discharge commands
+
+```bash
+# 1. Open the OSS Foundation application
+#    → https://signpath.org/foundation
+#    → "Apply Now" → fill the form:
+#      • Project name: vibemix
+#      • Repo URL: https://github.com/ozzaii/vibemix (pre-transfer) or
+#                  https://github.com/bravoh/vibemix (post-transfer — both
+#                  work; SignPath re-binds on transfer)
+#      • License: Apache-2.0
+#      • Project description: "AI co-host for live DJ sets — listens to
+#         your master output, watches your DJ software's screen, ingests
+#         controller actions over MIDI, reacts in your ear. macOS +
+#         Windows. Built by DJs."
+#      • Lead maintainer: Kaan Özkan (Bravoh founder)
+#      • Why OSS-Foundation tier: "Vibemix is Apache-2.0 open source.
+#         Windows binary signing is free for OSS via SignPath Foundation."
+
+# 2. Submit + wait
+#    → SignPath SLA is ~1 week. Watch inbox for approval email from
+#      SignPath team@signpath.io.
+#    → If 14 days pass with no reply, escalate via signpath.org/contact.
+
+# 3. Once approved, SignPath provisions an org + a signing policy.
+#    → Log in to https://signpath.io/manage/<your-org>
+#    → Settings → API Tokens → Generate Token
+#    → scope: signing-request:submit + artifact:download
+#    → copy the token
+
+# 4. Post to GH secret (CI workflow reads this at every build):
+gh secret set SIGNPATH_SIGNING_TOKEN --body "<paste-token-here>"
+gh secret set SIGNPATH_ORGANIZATION_ID --body "<org-id-from-signpath-dashboard>"
+gh secret set SIGNPATH_PROJECT_SLUG --body "vibemix"
+gh secret set SIGNPATH_SIGNING_POLICY_SLUG --body "release-signing"
+```
+
+### Verification
+
+```bash
+# 1. GH secrets visible:
+gh secret list | grep SIGNPATH
+# → expected: 4 lines (SIGNING_TOKEN, ORGANIZATION_ID, PROJECT_SLUG, SIGNING_POLICY_SLUG)
+
+# 2. SignPath dashboard shows a project named "vibemix" with status "Active":
+#    → https://signpath.io/manage/<your-org>/projects
+
+# 3. Token scope check — confirm the issued token can submit + download:
+curl -fsSL -H "Authorization: Bearer $SIGNPATH_SIGNING_TOKEN" \
+    "https://app.signpath.io/api/v1/$SIGNPATH_ORGANIZATION_ID/projects" \
+    | jq '.[] | select(.slug=="vibemix") | .slug'
+# → expected: "vibemix"
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-02` in REQUIREMENTS.md.
+- Record approval-email date + token-issue date in `.planning/STATE.md`.
+- Update §SHIP-03 status to ☑ pre-req met (combined with §SHIP-01).
+
+### Unblocks
+
+- **§SHIP-03** — Windows side of DIST-19 verification gains a signed .msi to verify.
+- **§SHIP-04** — INSTALL-VM matrix walks Windows VMs with a SignPath-signed installer.
+- **§SHIP-07** — SHIP-CUT attaches signed `dist/*.msi` / `dist/*.exe` to the release.
+- **§SHIP-12** — INSTALL-DEFENDER SmartScreen reputation can begin accruing.
+
+### Sign-off block
+
+```
+SHIP-02 APPLICATION SUBMITTED on:    _____________________   (date — form submitted to signpath.org/foundation)
+SHIP-02 APPROVAL EMAIL on:           _____________________   (date — SignPath approval email received)
+SHIP-02 ORG SLUG:                    _____________________   (signpath.io org identifier)
+SHIP-02 PROJECT SLUG:                _____________________   (should be "vibemix")
+SHIP-02 SIGNING POLICY SLUG:         _____________________   (e.g. "release-signing")
+SHIP-02 TOKEN GENERATED on:          _____________________   (date)
+SHIP-02 GH SECRETS POSTED on:        _____________________   (date — 4 secrets visible via `gh secret list`)
+Sign-off by (Kaan):                  _____________________
+```
+
+## §SHIP-03 — DIST-19 signed-binary smoke (KAAN-ACTION)
+
+**REQ-ID:** SHIP-03 / DIST-19 (Phase 27/34 baseline, Phase 45 discharge)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge  ☐ §SHIP-01 GREEN  ☐ §SHIP-02 GREEN  ☐ release.yml workflow dispatched  ☐ artifacts downloaded  ☐ verify_signed.py exits 0 on all 4 artifact shapes
+
+**Effort:** ~30 minutes — dispatch the workflow, wait for the runner (~10-15 min Mac + Windows build matrix), download artifacts, run verifier.
+
+**Blocking for:** §SHIP-04 (INSTALL-VM matrix needs verified signed binaries as inputs), §SHIP-07 (SHIP-CUT Gate 5 — `verify_signed.py --require-signed`).
+
+### Why this is KAAN-action
+
+Workflow dispatch is a GH-write action against the repo — Kaan as repo admin holds the only seat that can trigger it without a tag push. The verify step itself is plain CLI but the artifacts must come from the real CI build, not a local build, so the signed-with-real-certs proof carries forward.
+
+### Pre-requisites
+
+- §SHIP-01 GREEN: `gh secret list | grep APPLE_` returns 5 lines.
+- §SHIP-02 GREEN: `gh secret list | grep SIGNPATH` returns 4 lines.
+- `scripts/dist/verify_signed.py` ships `--require-signed` flag (Phase 27 + 34 — already present).
+- `scripts/dist/sign_macos.sh`, `sign_windows.ps1`, `sign_manifest.sh` shipped Phase 34.
+
+### Discharge commands
+
+```bash
+# 1. Dispatch the release workflow (builds signed Mac + Win binaries on
+#    main HEAD without cutting a release yet):
+gh workflow run release.yml --ref main
+
+# 2. Watch the run land + complete:
+gh run list --workflow=release.yml --limit 1
+# → grab the run ID
+gh run watch <run-id>
+# → expected: green check across the macos-13 + macos-14 + windows-latest legs
+
+# 3. Download the artifacts to dist/:
+mkdir -p dist
+gh run download <run-id> --dir dist/
+# → expected: dist/{vibemix-*.dmg, vibemix-*.pkg, vibemix-*.msi, vibemix-*.exe}
+
+# 4. Verify each artifact carries a real signature:
+for art in dist/*.dmg dist/*.pkg dist/*.msi dist/*.exe; do
+  [ -f "$art" ] || continue
+  echo "--- verifying $art ---"
+  uv run python scripts/dist/verify_signed.py --artifact "$art" --require-signed
+done
+```
+
+### Verification
+
+```bash
+# 1. All 4 artifact shapes present:
+ls dist/*.dmg dist/*.pkg dist/*.msi dist/*.exe 2>/dev/null | wc -l
+# → expected: 4 (or more if multi-arch Mac)
+
+# 2. Each artifact passes signed verification with NO warnings:
+for art in dist/*.dmg dist/*.pkg dist/*.msi dist/*.exe; do
+  uv run python scripts/dist/verify_signed.py --artifact "$art" --require-signed \
+    && echo "$art: SIGNED OK" || echo "$art: SIGNATURE FAIL"
+done
+# → expected: 4 × "SIGNED OK"
+
+# 3. Mac notarization stapled:
+spctl --assess --type install dist/vibemix-*.dmg 2>&1 | grep "accepted"
+# → expected: "accepted, source=Notarized Developer ID"
+
+# 4. Windows signature trust chain:
+osslsigncode verify dist/vibemix-*.msi 2>&1 | grep -E "Signature verification: ok"
+# → expected: present (uses SignPath chain)
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-03` and `[x] DIST-19` in REQUIREMENTS.md.
+- Record the dispatched run ID + artifact SHA-256 hashes in `.planning/STATE.md`.
+- Tag the workflow run ID in §SHIP-07 sign-off block as the "last clean signed build" reference.
+
+### Unblocks
+
+- **§SHIP-04** — INSTALL-VM matrix has signed binaries to walk fresh VMs through.
+- **§SHIP-07** — SHIP-CUT Gate 5 (`verify_signed.py --require-signed` per `cut_release.sh`) passes.
+- **Roadmap success criterion** — "DIST-19 verified against real signed binary" row goes green.
+
+### Sign-off block
+
+```
+SHIP-03 WORKFLOW DISPATCHED on:      _____________________   (date — `gh workflow run release.yml`)
+SHIP-03 RUN ID:                      _____________________   (gh run identifier)
+SHIP-03 BUILD GREEN on:              _____________________   (date — all matrix legs green)
+SHIP-03 ARTIFACTS DOWNLOADED on:     _____________________   (date)
+SHIP-03 VERIFY_SIGNED PASS:          _____________________   (4 × SIGNED OK)
+SHIP-03 NOTARIZATION STAPLED:        _____________________   (yes — spctl accepted)
+SHIP-03 SIGNPATH CHAIN OK:           _____________________   (yes — osslsigncode verify ok)
+Sign-off by (Kaan):                  _____________________
+```
+
+## §SHIP-04 — INSTALL-VM matrix discharge (KAAN-ACTION)
+
+**REQ-ID:** SHIP-04 (Phase 45 / Plan 45-01)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge  ☐ §SHIP-03 GREEN  ☐ tart images present (macOS 12.3 / 14 / 15 + Win 10 / 11)  ☐ live run captured  ☐ all 5 OS legs green  ☐ 60s gate passes
+
+**Effort:** ~90 minutes total — tart spins each VM, install_vm_matrix.sh drives the wizard, screenshots collect, 60s gate evaluates. Most of the time is VM cold-start across 5 images.
+
+**Blocking for:** §SHIP-05 (INSTALL-60S contract), §SHIP-07 (SHIP-CUT cannot proceed without fresh-VM proof per the one-click-install hard requirement).
+
+### Why this is KAAN-action
+
+`tart` driving VMs requires the Apple Silicon host's local privileges (Virtualization.framework). Live screen capture + wizard-step screenshots persist to `dist/install-vm-runs/<run-id>/` on Kaan's machine. Kaan is the operator of record because the one-click-install bar is his memory rule — anyone else running the matrix can't make the green/red call on whether the experience clears the bar.
+
+### Pre-requisites
+
+- §SHIP-03 GREEN: `dist/*.dmg`, `dist/*.pkg`, `dist/*.msi`, `dist/*.exe` all present + signed.
+- `tart list` shows all 5 target VMs (macos-12.3, macos-14, macos-15, win-10, win-11). Missing images SKIP with a warning per `install_vm_matrix.sh` autonomous-degradation rule, but full discharge requires all 5.
+- `scripts/dist/install_vm_matrix.json` reflects the OS list to run.
+- `scripts/dist/install_vm_matrix.sh` exists (Plan 45-01) and is executable (`chmod +x`).
+- The onboarding stopwatch (`tauri/ui/src/wizard/onboarding-stopwatch.ts`) writes to `~/.vibemix/install-vm-timing.json` when the `VIBEMIX_INSTALL_VM_RUN=1` env flag is set inside the VM — verify this is wired before the live run (Phase 33 INSTALL-05 baseline).
+
+### Discharge commands
+
+```bash
+# 1. Pre-flight: tart inventory
+tart list
+# → expected: 5 rows for macos-12.3, macos-14, macos-15, win-10, win-11
+# → if any missing, pull them first:
+#    tart pull ghcr.io/cirruslabs/macos-sonoma-base:latest
+#    (or whichever the matrix JSON references)
+
+# 2. Live discharge — record under a UTC-stamped run-id:
+RUN_ID="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+bash scripts/dist/install_vm_matrix.sh --live --run-id "$RUN_ID"
+
+# → For each OS the runner:
+#    a. clones the base image
+#    b. attaches the freshly-signed binary from dist/
+#    c. injects VIBEMIX_INSTALL_VM_RUN=1 so onboarding-stopwatch dumps
+#       timing to ~/.vibemix/install-vm-timing.json inside the VM
+#    d. drives the wizard (TCC → audio probe → controller probe → ready)
+#    e. captures install-vm-<os>-<version>-{wizard-step-1..3,session-live}.png
+#       to dist/install-vm-runs/$RUN_ID/
+#    f. records timing JSON back to dist/install-vm-runs/$RUN_ID/<os>/
+
+# 3. Inspect outputs:
+ls dist/install-vm-runs/$RUN_ID/
+# → expected: 5 OS subdirs + run.json index
+
+cat dist/install-vm-runs/$RUN_ID/run.json | jq '.runs[] | {os, status, install_seconds}'
+# → expected: 5 entries with status="passed" + install_seconds < 60
+```
+
+### Verification
+
+```bash
+# 1. 60s gate — gates §SHIP-05:
+bash scripts/dist/install_vm_matrix.sh --check-60s
+# → exits 0 if every OS leg of the latest run completed in ≤60s
+# → exits non-zero with diagnostics if any leg exceeded
+
+# 2. Screenshot manifest sanity:
+find dist/install-vm-runs/$RUN_ID -name "install-vm-*.png" | wc -l
+# → expected: 5 OS × 4 wizard-steps = 20 PNGs minimum
+
+# 3. Per-OS install timing sanity:
+for os_dir in dist/install-vm-runs/$RUN_ID/*/; do
+  os="$(basename "$os_dir")"
+  jq -r '.install_seconds' "$os_dir/timing.json" \
+    | awk -v os="$os" '{printf "%s: %.1fs\n", os, $1}'
+done
+# → expected: 5 lines, each under 60.0s
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-04` in REQUIREMENTS.md.
+- Commit `dist/install-vm-runs/$RUN_ID/run.json` + per-OS timing.json into the repo (PNGs go to release-artifacts storage, not the repo, per repo-scrub rules).
+- Update `.planning/STATE.md` with the run-id + 5 timing values.
+
+### Unblocks
+
+- **§SHIP-05** — INSTALL-60S contract verified by the same `--check-60s` invocation.
+- **§SHIP-07** — SHIP-CUT cut_release.sh can advance past the one-click-install gate.
+- **Roadmap success criterion** — "INSTALL-VM matrix discharged across 5 OS images" row goes green.
+
+### Sign-off block
+
+```
+SHIP-04 TART INVENTORY VERIFIED on:  _____________________   (date — `tart list` shows 5/5 images)
+SHIP-04 LIVE RUN STARTED on:         _____________________   (date — VIBEMIX_INSTALL_VM_RUN=1 captured timing)
+SHIP-04 RUN ID:                      _____________________   (UTC timestamp passed to --run-id)
+SHIP-04 ALL 5 OS LEGS GREEN:         _____________________   (yes/no — run.json status field)
+SHIP-04 60s GATE PASS:               _____________________   (date — `--check-60s` exit 0)
+SHIP-04 SCREENSHOTS COMPLETE:        _____________________   (count — expected ≥20)
+Sign-off by (Kaan):                  _____________________
+```
+
+## §SHIP-05 — INSTALL-60S onboarding-stopwatch contract (KAAN-ACTION)
+
+**REQ-ID:** SHIP-05 (Phase 45 / Plan 45-01)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge  ☐ §SHIP-04 GREEN  ☐ `--check-60s` gate exits 0  ☐ Kaan-eyes-on confirmation against a fresh personal-Mac install
+
+**Effort:** ~10 minutes verification beyond §SHIP-04 — the gate is already run as part of the matrix discharge. This section documents the CONTRACT (≤60s end-to-end) so future changes can't silently degrade.
+
+**Blocking for:** §SHIP-07 (SHIP-CUT — one-click-install hard requirement gate-keeps the cut).
+
+### Why this is KAAN-action
+
+The 60-second bar is Kaan's product memory (`project_one_click_install_hard_req`). The matrix runner enforces it mechanically via `--check-60s`, but the eyes-on confirmation against an actual fresh Mac (not a tart-cloned VM) is the trust anchor. If `--check-60s` passes but the fresh-Mac walk feels janky, Kaan blocks the cut — that judgement call sits with him.
+
+### Pre-requisites
+
+- §SHIP-04 GREEN: matrix run completed, timing.json dumped per OS.
+- One bare-metal fresh Mac available for the eyes-on walk (any Apple Silicon Mac freshly imaged or with vibemix uninstalled + `~/.vibemix/` purged).
+
+### Discharge commands
+
+```bash
+# 1. Gate run — same invocation as §SHIP-04, asserts ≤60s contract:
+bash scripts/dist/install_vm_matrix.sh --check-60s
+# → exits 0 if every OS leg of the latest matrix run completed in ≤60s
+
+# 2. Eyes-on fresh-Mac walk (no script — Kaan does this manually with a
+#    stopwatch app open):
+#    a. Open the freshly-signed dist/vibemix-*.dmg
+#    b. Drag vibemix to /Applications
+#    c. Launch from /Applications/vibemix.app
+#    d. Start stopwatch when the first wizard screen appears
+#    e. Click through: TCC permissions → audio device pick → controller probe → "ready" screen
+#    f. Stop the stopwatch when "ready" lands
+# → expected: ≤60 seconds wall-clock from wizard-screen-1 to ready
+
+# 3. If the eyes-on walk feels janky despite the gate passing, capture
+#    notes to eval/onboarding-feedback/<UTC>.md — that file feeds the
+#    SHIP-V1-DECISION audit at T+30 (§SHIP-13).
+```
+
+### Verification
+
+```bash
+# 1. Re-run the gate after eyes-on:
+bash scripts/dist/install_vm_matrix.sh --check-60s
+# → exit 0
+
+# 2. Confirm the timing JSON shape:
+jq '.os, .install_seconds, .wizard_steps_seen' \
+   dist/install-vm-runs/$(ls -1t dist/install-vm-runs/ | head -1)/macos-15/timing.json
+# → expected: "macos-15", a number < 60, ≥4 wizard step names
+
+# 3. Eyes-on stopwatch read recorded in
+#    eval/onboarding-feedback/<UTC>.md with the wall-clock seconds.
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-05` in REQUIREMENTS.md.
+- Append the eyes-on stopwatch value (seconds + pass/fail call) to
+  `eval/onboarding-feedback/<UTC>.md`.
+
+### Unblocks
+
+- **§SHIP-07** — the one-click-install hard requirement bar is verified.
+- **Roadmap success criterion** — "Fresh-machine install ≤60s end-to-end" row goes green.
+
+### Sign-off block
+
+```
+SHIP-05 GATE-RUN GREEN on:           _____________________   (date — `--check-60s` exit 0)
+SHIP-05 EYES-ON WALK DATE:           _____________________   (date — fresh-Mac stopwatch walk)
+SHIP-05 EYES-ON STOPWATCH:           _____________________   (seconds — wall-clock from wizard-1 to ready)
+SHIP-05 EYES-ON FEEL:                _____________________   (pass / fail — Kaan's call)
+SHIP-05 FEEDBACK FILE:               _____________________   (path to eval/onboarding-feedback/<UTC>.md)
+Sign-off by (Kaan):                  _____________________
+```
+
+## §SHIP-06 — Bravoh server endpoints + healthz cron (BRAVOH-TEAM-ACTION)
+
+**REQ-ID:** SHIP-06 / OPS-14-SERVER (Phase 45 / Plan 45-03)
+**Owner:** Bravoh team (deploys); Kaan verifies
+**Status:** ☐ pre-discharge  ☐ 3 endpoints deployed to https://api.altidus.world  ☐ healthz cron heartbeating every 5 minutes  ☐ `check_bravoh_server_ready.sh` exits 0
+
+**Effort:** ~half-day for the Bravoh-backend team to wire the 3 endpoints + cron. Kaan-side verification is ~5 minutes once they signal "ready".
+
+**Blocking for:** §SHIP-07 (SHIP-CUT Gate 5b — `check_bravoh_server_ready.sh` is invoked by `cut_release.sh`).
+
+### Why this is BRAVOH-TEAM-action
+
+Endpoints live on the Bravoh backend (separate repo: `/var/www/bravoh-backend/`). The vibemix repo's contribution is the verification harness (`scripts/release/check_bravoh_server_ready.sh`) + this runbook as the handoff document.
+
+### Pre-requisites
+
+- Bravoh backend repo has a working FastAPI app at `/var/www/bravoh-backend/`.
+- DNS for `api.altidus.world` resolves to the Bravoh backend host (already true).
+- `pm2` available on the host for cron scheduling.
+
+### Discharge commands
+
+```bash
+# === Bravoh-team side (on the Bravoh backend host) ===
+
+# 1. Implement the 3 endpoints in the Bravoh FastAPI app:
+#    • POST /vibemix/updates/upload     — accept signed binary uploads
+#                                          from the GH release workflow
+#    • GET  /vibemix/updates/latest.json — return the manifest the Tauri
+#                                          updater polls
+#    • GET  /vibemix/healthz             — return {"ok": true, "ts": ...}
+
+# 2. Deploy the change:
+ssh altidus
+cd /var/www/bravoh-backend/
+git pull origin main
+source .venv/bin/activate
+pip install -r requirements.txt
+pm2 restart bravoh-api
+
+# 3. Wire the healthz cron — every 5 minutes hit /vibemix/healthz and
+#    record the response into a metrics store:
+crontab -l > /tmp/cron.bak
+echo "*/5 * * * * curl -s -m 5 https://api.altidus.world/vibemix/healthz | logger -t vibemix-healthz" >> /tmp/cron.bak
+crontab /tmp/cron.bak
+
+# 4. Smoke-test from anywhere with internet:
+curl -fsSL https://api.altidus.world/vibemix/healthz
+# → expected: {"ok": true, "ts": <unix timestamp>}
+
+# === Kaan-side verification (from the vibemix repo on Kaan's Mac) ===
+
+# 5. Run the verifier:
+bash scripts/release/check_bravoh_server_ready.sh
+# → 3-endpoint probe:
+#    • POST /vibemix/updates/upload  (with a tiny dummy payload)
+#    • GET  /vibemix/updates/latest.json
+#    • GET  /vibemix/healthz
+# → exits 0 if all 3 responsive
+```
+
+### Verification
+
+```bash
+# 1. Direct endpoint hits (matches what check_bravoh_server_ready.sh runs):
+curl -fsSL https://api.altidus.world/vibemix/healthz | jq .ok
+# → expected: true
+
+curl -fsSL https://api.altidus.world/vibemix/updates/latest.json | jq 'keys'
+# → expected: array including "version", "url", "signature", "platform"
+
+curl -fsSL -X POST https://api.altidus.world/vibemix/updates/upload \
+    -H "Content-Type: application/json" \
+    -d '{"probe": true}' | jq .status
+# → expected: "rejected-probe" or "accepted" (probe-mode response)
+
+# 2. Healthz cron heartbeating — wait 6 minutes after enabling cron then:
+ssh altidus "journalctl -t vibemix-healthz --since '10 minutes ago' | wc -l"
+# → expected: ≥1 (at least one cron hit logged in last 10 min)
+
+# 3. Wire-in test — confirms cut_release.sh calls the verifier:
+uv run pytest tests/repo/test_cut_release_invokes_bravoh_server.py -v
+# → green (Plan 45-03 baseline; must still pass post-discharge)
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-06` and `[x] OPS-14-SERVER` in REQUIREMENTS.md.
+- Bravoh team logs the deploy hash + cron-enable timestamp in their internal handoff.
+- Update §SHIP-07 status to ☑ Bravoh-server pre-req met.
+
+### Unblocks
+
+- **§SHIP-07** — SHIP-CUT Gate 5b (`check_bravoh_server_ready.sh`) passes.
+- **Tauri auto-updater path** — the v3.0 binary in users' hands actually has a live updater target.
+- **Roadmap success criterion** — "Bravoh-server endpoints live + healthz cron heartbeating" row goes green.
+
+### Sign-off block
+
+```
+SHIP-06 ENDPOINTS DEPLOYED on:       _____________________   (date — Bravoh team `pm2 restart bravoh-api` post-merge)
+SHIP-06 HEALTHZ CRON ENABLED on:     _____________________   (date — */5 * * * * cron added)
+SHIP-06 SMOKE GREEN on:              _____________________   (date — curl /vibemix/healthz returns ok=true)
+SHIP-06 KAAN VERIFIER PASS on:       _____________________   (date — check_bravoh_server_ready.sh exit 0)
+SHIP-06 WIRE-IN TEST PASS:           _____________________   (date — test_cut_release_invokes_bravoh_server.py green)
+Sign-off by (Bravoh-team-lead):      _____________________
+Counter-sign by (Kaan):              _____________________
+```
+
+## §SHIP-07 — SHIP-CUT public RC draft (KAAN-ACTION)
+
+**REQ-ID:** SHIP-07 (Phase 45 / Plan 45-02 + Plan 45-03)
+**Owner:** Kaan
+**Status:** ☐ pre-discharge  ☐ §SHIP-03 GREEN  ☐ §SHIP-04 GREEN  ☐ §SHIP-05 GREEN  ☐ §SHIP-06 GREEN  ☐ tag-regex bumped  ☐ cut_release.sh exits 0 across all 6 gates  ☐ `gh release create v3.0.0-rc1 --draft` succeeds
+
+**Effort:** ~15 minutes once all prerequisites are green. The cut itself is one `cut_release.sh` invocation + one `gh release create` invocation; most of the time was pre-spent in §SHIP-01..06.
+
+**Blocking for:** §SHIP-08 (SHIP-TWEET — social publish wants a tagged release URL), §SHIP-09 (SHIP-DISCORD — same), §SHIP-10 (SHIP-TRANSFER — clean cut on `main` before the repo flips owners), §SHIP-11 (SHIP-ROTATE — 24h monitoring keys on the public RC's first traffic), §SHIP-12 (INSTALL-DEFENDER — SmartScreen reputation only starts after a real public release), §SHIP-13 (SHIP-V1-DECISION — the T+30 audit reads from the cut tag).
+
+### Why this is KAAN-action
+
+`gh release create` writes to the public GitHub repo with the production tag. The command is small but the consequence is the most visible action of the entire phase — once the draft flips to `--draft=false` (via the GH UI), the universe knows vibemix shipped. Kaan's eyes confirm release notes + attached artifacts before that publish click.
+
+### Pre-requisites
+
+- §SHIP-03 GREEN: `dist/*.dmg`, `dist/*.pkg`, `dist/*.msi`, `dist/*.exe` all signed + verified.
+- §SHIP-04 GREEN: INSTALL-VM matrix discharged + screenshots captured.
+- §SHIP-05 GREEN: 60s onboarding-stopwatch contract met.
+- §SHIP-06 GREEN: Bravoh server endpoints live, `check_bravoh_server_ready.sh` exit 0.
+- **Pre-requisite — tag-regex bump:** `scripts/launch/cut_release.sh` line 44 currently ships `TAG_REGEX='^v2\.1\.0-rc[0-9]+$'` from the Phase 39 v2.1 carryover. v3.0 needs `'^v3\.0\.0-rc[0-9]+$'`. This is a one-line `sed` to be executed by Kaan (or via a one-line follow-up PR) BEFORE invoking the cut:
+
+  ```bash
+  sed -i.bak "s|TAG_REGEX='\\^v2\\\\.1\\\\.0-rc\\[0-9\\]+\\$'|TAG_REGEX='\\^v3\\\\.0\\\\.0-rc\\[0-9\\]+\\$'|" \
+      scripts/launch/cut_release.sh
+  rm scripts/launch/cut_release.sh.bak
+  uv run pytest tests/repo/test_cut_release_invokes_check_gate.py \
+                 tests/repo/test_cut_release_invokes_bravoh_server.py -v
+  # → both green (gates 2b + 5b wiring untouched)
+  git add scripts/launch/cut_release.sh
+  git commit -m "chore(45-07-prep): bump cut_release.sh tag regex v2.1.0-rc → v3.0.0-rc1 for SHIP-CUT"
+  ```
+
+  This is a deliberate prerequisite (not a deviation): the regex change ships as its own commit so the cut commit stays clean.
+- `scripts/launch/populate_changelog.py` ran to produce `dist/release-notes.md` (or the equivalent path).
+
+### Discharge commands
+
+```bash
+# 0. Tag-regex bump (see Pre-requisites above) — must happen before step 1.
+
+# 1. Run cut_release.sh — exercises all 6 gates:
+bash scripts/launch/cut_release.sh v3.0.0-rc1
+# → Gate 1: tag matches new regex ^v3\.0\.0-rc[0-9]+$  → pass
+# → Gate 2: no-hardcoded-model gate (Phase 41-01)
+# → Gate 2b: hybrid hallucination gate (Phase 42)
+# → Gate 3: launch-copy AI-slop clean (Phase 44-05)
+# → Gate 4: launch-docs drift check (Phase 44-07)
+# → Gate 5: dist artifacts signed + verified (Phase 27/34 verify_signed.py)
+# → Gate 5b: Bravoh server ready (Plan 45-03 check_bravoh_server_ready.sh)
+# → final: prints the `gh release create` command for human review
+
+# 2. Generate release notes if not already present:
+uv run python scripts/launch/populate_changelog.py --tag v3.0.0-rc1 --output dist/release-notes.md
+
+# 3. Create the DRAFT release (note: --draft means it's NOT live yet —
+#    Kaan flips to non-draft via GH UI after eyeballing):
+gh release create v3.0.0-rc1 \
+    --draft \
+    --target main \
+    --title "vibemix v3.0.0-rc1 — public release candidate" \
+    --notes-file dist/release-notes.md \
+    dist/*.dmg dist/*.pkg dist/*.msi dist/*.exe
+
+# 4. Eyeball the draft on github.com/ozzaii/vibemix/releases/tag/v3.0.0-rc1
+#    Confirm: title + notes + 4 artifact shapes all present.
+#    Confirm: download counts start at 0 (we haven't published yet).
+
+# 5. Flip to public via GH UI:
+#    → "Edit release" → uncheck "Set as a pre-release" / "Save as draft"
+#       → "Publish release"
+#    Equivalent CLI (skips the UI eyeball — discouraged for the first
+#    public cut):
+#    gh release edit v3.0.0-rc1 --draft=false --prerelease
+```
+
+### Verification
+
+```bash
+# 1. All 6 gates passed in cut_release.sh — exit code 0:
+echo $?
+# → 0
+
+# 2. Draft release exists with the right artifacts:
+gh release view v3.0.0-rc1 --json assets --jq '.assets[].name' | sort
+# → expected: 4 lines (dmg, pkg, msi, exe — or more if multi-arch Mac)
+
+# 3. The release notes file contains the v3.0 anchor phrases (sanity):
+grep -E "real DJ friend in your ear|built by DJs|open[- ]source|Mac \+ Windows" \
+      dist/release-notes.md | wc -l
+# → expected: ≥3 (anchor phrases per Plan 44-05 sign-off footer rule)
+
+# 4. After publish-click — release is live:
+curl -fsSL https://api.github.com/repos/ozzaii/vibemix/releases/tags/v3.0.0-rc1 \
+    | jq '{draft, prerelease, published_at}'
+# → expected: {"draft": false, "prerelease": true, "published_at": "<ISO timestamp>"}
+
+# 5. The first install via curl-pipe-sh works against the public artifact URL
+#    (validates Tauri updater can fetch the latest.json after Bravoh server pulls
+#    from the public release):
+curl -fsSL https://api.altidus.world/vibemix/updates/latest.json | jq .version
+# → expected: "v3.0.0-rc1"
+```
+
+### Post-discharge
+
+- Mark `[x] SHIP-07` in REQUIREMENTS.md.
+- Record the cut commit SHA + release-tag UTC timestamp in `.planning/STATE.md`.
+- Update §SHIP-08 status to ☑ pre-req met — social publish can fire.
+- Update §SHIP-10 status to ☑ pre-req met — repo transfer can run.
+
+### Unblocks
+
+- **§SHIP-08** — SHIP-TWEET 5-channel social publish has a public release URL to point to.
+- **§SHIP-09** — SHIP-DISCORD #announcements post can include the public release URL.
+- **§SHIP-10** — Repo transfer to bravoh-vibemix can proceed (cut belongs on the pre-transfer URL; transfer happens AFTER cut).
+- **§SHIP-11** — 24h monitoring rotation starts when this lands.
+- **§SHIP-12** — Windows SmartScreen reputation clock starts on the public binary.
+- **§SHIP-13** — T+30 SHIP-V1-DECISION audit reads from this release-tag's telemetry.
+
+### Sign-off block
+
+```
+SHIP-07 TAG-REGEX BUMPED on:         _____________________   (date — sed + commit)
+SHIP-07 CUT_RELEASE GREEN on:        _____________________   (date — `bash cut_release.sh v3.0.0-rc1` exit 0)
+SHIP-07 ALL 6 GATES GREEN:           _____________________   (gate 1 / 2 / 2b / 3 / 4 / 5 / 5b — all pass)
+SHIP-07 RELEASE NOTES GENERATED:     _____________________   (date — `populate_changelog.py` ran)
+SHIP-07 DRAFT RELEASE CREATED on:    _____________________   (date — `gh release create --draft` returned URL)
+SHIP-07 RELEASE URL:                 _____________________   (https://github.com/.../releases/tag/v3.0.0-rc1)
+SHIP-07 ASSETS ATTACHED:             _____________________   (count — expected ≥4)
+SHIP-07 EYEBALL PASS:                _____________________   (yes/no — title + notes + assets all look right)
+SHIP-07 PUBLIC PUBLISH on:           _____________________   (date — draft flipped off via GH UI)
+Sign-off by (Kaan):                  _____________________
+```
