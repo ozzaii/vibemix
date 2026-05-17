@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.0
-milestone_name: Clean OSS Ship
-status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped (44-01 / LAUNCH-01). DJ-software 6-cell grid + canonical-10 controllers grid reconciled to src/vibemix/midi/controllers/*.json + 4-gate a11y CI (alt + count + balance + slop) + §LAUNCH-03 + §LAUNCH-04 Kaan-discharge runbooks shipped (44-02 / LAUNCH-03 + LAUNCH-04). EvidenceRegistry citation strip surfaced in live UI + click→debrief deep-link + 2s region highlight shipped (44-03 / LAUNCH-02) — new SessionCohostReaction IPC + token-driven amber chip strip + Tauri open_debrief_window deep_link extension. Bravoh waitlist opt-in toggle shipped in debrief window (44-04 / LAUNCH-05) — ConfigStore.bravoh_waitlist_opt_in field + mountBravohWaitlistToggle component + verbatim UTM URL grep-gate + token-driven faint-amber-glow active state; subtle, opt-in only, default OFF, no signed-out telemetry.
-last_updated: "2026-05-17T08:28:49.797Z"
+milestone: null
+milestone_name: null
+status: v3.0 "Clean OSS Ship" SHIPPED 2026-05-17 (engineering-complete; tech_debt accepted). 6 phases shipped engineering-green; 57/57 v3.0 REQ-IDs satisfied; 22 carveouts deferred to KAAN-ACTION-LEGAL discharge cookbook. Local annotated git tag `v3.0` created (NOT pushed — public RC publish awaits Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) per §SHIP-01/02 cookbook). Next milestone scaffolds via `/gsd:new-milestone` when Kaan opens v3.x scope.
+last_updated: "2026-05-17T09:00:00.000Z"
 last_activity: 2026-05-17
 progress:
   total_phases: 6
@@ -15,16 +15,18 @@ progress:
 
 # vibemix — State
 
-**Last updated:** 2026-05-16 — v3.0 "Clean OSS Ship" milestone scaffolded. 6 phases (P40-P45), 57 REQ-IDs across 6 categories (AUDIO / LAT / GATE / VIS / LAUNCH / SHIP). Awaiting `/gsd:discuss-phase 40` or `/gsd:plan-phase 40` to start engineering.
+**Last updated:** 2026-05-17 — v3.0 "Clean OSS Ship" SHIPPED engineering-complete via `/gsd:complete-milestone`. 6 phases (P40-P45), 57/57 REQ-IDs satisfied. Tag `v3.0` created LOCAL ONLY. Awaiting `/gsd:new-milestone` for v3.x scope per Kaan-driven strategic conversation (memory `project_v2_planning_active`).
 
 ---
 
 ## Project Reference
 
+See: .planning/PROJECT.md (updated 2026-05-17 after v3.0 milestone close)
+
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** v3.0 — Clean OSS Ship (planning).
-- **Last shipped:** v2.1 The Unified Cut — 2026-05-16 (status: `tech_debt` accepted).
+- **Current focus:** Planning next milestone — v3.x scope open per memory `project_v2_planning_active` (Kaan drives commit).
+- **Last shipped:** v3.0 Clean OSS Ship — 2026-05-17 (status: `tech_debt` accepted; awaiting external clock for public RC publish).
 - **Project mode:** standard.
 - **Granularity:** fine.
 - **Model profile:** quality (all agents on Opus, all checkpoints on).
@@ -129,9 +131,24 @@ All Phase 1–26 decisions remain locked. Highlights:
 - Gemini-only AI (no Anthropic / OpenAI / Ollama / CLAP / OpenL3 / MERT / sentence-transformers / torch).
 - Three.js (single 3D engine); vanilla TS in `tauri/ui/src/` (NOT React); WaveSurfer.js for Phase 29 debrief timeline.
 
-### Deferred Items (15 carveouts — KAAN-ACTION-LEGAL.md)
+### Deferred Items (v3.0 close — 2026-05-17)
 
-Categorized per `gsd-autonomous fully` mode at milestone close 2026-05-16:
+Acknowledged per `gsd-autonomous fully` mode at v3.0 milestone close 2026-05-17. All 6 are `human_needed` verification gaps that are by-design Kaan-action under the autonomy mode (legal-capacity carveouts + real-hardware ear-tests). Engineering ships green; runbooks live in `KAAN-ACTION-LEGAL.md`.
+
+| Category | Item | Status |
+|----------|------|--------|
+| verification_gap | 40-VERIFICATION.md (Phase 40 Anti-Slop Audio Port — AUDIO-05 PGP + AUDIO-06 Tauri key + AUDIO-07 BlackHole probe + ear-test) | human_needed |
+| verification_gap | 41-VERIFICATION.md (Phase 41 Gemini SKU + Latency v2 — TTFT p95 ear-test + LAT-09 spike verdict + FLEX live-billing) | human_needed |
+| verification_gap | 42-VERIFICATION.md (Phase 42 Hybrid Gate — ACK-BANK-REMAINING-20 + EVAL-VCR-CASSETTES + EVAL-CORPUS-WAVS + ear-test logs) | human_needed |
+| verification_gap | 43-VERIFICATION.md (Phase 43 Visual Ship Lock — §VIS-04 Mixamo retargets + capture day) | human_needed |
+| verification_gap | 44-VERIFICATION.md (Phase 44 Launch Pre-stage — 6+10 logo swaps + bravoh GH org standup + SHIP-TWEET sign-off + Discord live-execute) | human_needed |
+| verification_gap | 45-VERIFICATION.md (Phase 45 External Discharge — Apple Dev + SignPath + Bravoh-server + SHIP-CUT/TWEET/DISCORD/TRANSFER/ROTATE + SmartScreen + SHIP-V1-DECISION) | human_needed |
+
+Known deferred items at close: 6 (see KAAN-ACTION-LEGAL.md for §AUDIO-05..07, §LAT-09, §GATE-01..05, §VIS-04, §LAUNCH-03/04/06/07/08, §SHIP-01..13 discharge cookbooks).
+
+### Deferred Items (v2.1 carryover — 15 carveouts — KAAN-ACTION-LEGAL.md)
+
+Categorized per `gsd-autonomous fully` mode at v2.1 milestone close 2026-05-16:
 
 | Category | Item | Status |
 |----------|------|--------|

@@ -10,26 +10,29 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v3.0 — Clean OSS Ship
+## Current Milestone: None — awaiting `/gsd:new-milestone` (v3.x)
 
-**Goal:** Ship vibemix as a clean, useful, value-bringing open-source product — 500-1000+ GitHub stars in 30 days, warm the Bravoh waitlist, anti-slop credibility lock.
+**Last shipped:** v3.0 "Clean OSS Ship" — 2026-05-17 (status: `tech_debt` accepted; KAAN-ACTION-LEGAL §SHIP-01..13 cookbook pending external clock for public RC publish).
 
-**Target features:**
+(v3.0 shipped 2026-05-17. v2.1 "The Unified Cut" shipped 2026-05-16. v2.0 shipped 2026-05-14. v0.1.0 shipped 2026-05-13. Full archives in `.planning/milestones/`.)
 
-- Anti-slop audio path port — mic-as-2nd-Gemini-Part + 3s file-based source-track lookahead + cooldown re-tune to v4 chat-tested values; pre-stage independent KAAN-ACTION items (PGP key, Tauri updater key, BlackHole fresh-Mac probe)
-- Gemini SKU upgrade + latency stack v2 — `ModelRouter` seam, implicit caching, LLM→TTS pipe-through, 3.1 Flash TTS, Embedding 2 GA + MRL 768-dim, Flex tier for batch paths; 3.1 Flash Live music spike
-- Hallucination gate v3 — hybrid (Phase 27 autonomous proxy fast-lane + Kaan-ear release-cut veto); P85 override formally retired; corpus + thresholds calibrated against real audio
-- Visual ship lock — CDJ Whisper UI Tier-1 polish (gsd-ui-checker + auditor zero-HIGH); 5 mascot stub animations → real Mixamo retargets; hero demo pre-production
-- Launch positioning + pre-stage — README "the only AI co-host that actually listens to your set" frontload + EvidenceRegistry citation strip in live UI + DJ-app + controllers grid + bravoh GH org standup + 5-channel copy lock + outreach calendar
-- Public RC publish via external clock discharge — Apple Dev Agreement (Francesco) + SignPath OSS (Kaan) → DIST-19 sign+verify → VM matrix → SHIP-CUT v3.0.0-rc1 → SHIP-V1-DECISION after ~2-week bake
+<details>
+<summary>📦 v3.0 Clean OSS Ship (shipped 2026-05-17, status <code>tech_debt</code>) — archived narrative</summary>
 
-**Phase numbering:** Continues from Phase 40 (P40-P45). v2.1 ended at Phase 39.
+6 phases shipped engineering-green under `gsd-autonomous fully` mode. 41 plans, 250 commits since `v2.1.0` tag, net ~+61k LOC across `src/vibemix/`, `tauri/`, `scripts/`, `tests/`, `docs/`, `eval/`. 57 / 57 v3.0 REQ-IDs engineering-satisfied. 22 carveouts deferred to KAAN-ACTION-LEGAL (legal capacity P46 × 2 + customer-facing publishes × 8 + real-hardware × 3 + real-asset × 1 + corpus × 4 + spike × 1 + sign-off × 2 + visual-regression-test × 1). All 3 integration seams + 5 flows audited.
 
-**Critical path:** Apple Dev Agreement (Francesco) + SignPath OSS (Kaan, ~1-week SLA) gate the public RC publish in Phase 45. P40-P44 engineering parallelizes around the external clock — when approvals land, SHIP-CUT is one-button.
+**Highlights:**
 
-**Research basis:** `.planning/research/v3-buckets/{A-external-world, B-gemini-capabilities, C-internal-state, D-gate-and-visual}.md` — 4-bucket parallel swarm 2026-05-16.
+- **Anti-slop audio path closed (Phase 40)** — Mic-as-Part-2 (12s ring + AI-talk zero-fill at sounddevice callback boundary) + lookahead-as-Part-3 (3s `NOT YET HEARD BY AUDIENCE` from source file via ffmpeg+mdfind+nowplaying-cli). Closes "AI invents what Kaan said" + "AI reacts after the moment passed" hallucination classes. v4 chat-tested cooldowns re-tuned (PHASE 18→10s, LAYER_ARRIVAL 16→10s, MIX_MOVE 20→14s, HEARTBEAT 70→45s, TRACK_CHANGE 6→5s).
+- **Latency stack v2 (Phase 41)** — `ModelRouter` config-driven seam with zero hardcoded model literals (CI grep gate); ServiceTier.FLEX wired for debrief / library auto-tag / embedding (50% cost cut on batch paths); live coach pinned Standard + thinking=MINIMAL; LLM→TTS streaming pipe with bracket-depth-aware sentence boundary; 3.1 Flash TTS 6-tag DSL.
+- **Hybrid hallucination gate (Phase 42)** — Autonomous proxy fast-lane (PR + 7 nightly canary) + Kaan-ear release-cut veto wired via `check_gate.sh` Gate 2b in `cut_release.sh`. P85 Phase 16 ear-test override formally retired (`P85-OVERRIDE-RETIRED.md` Decision Log). Public `eval/README.md` documents regime + redacts ear-test session content per `feedback_privacy_scope_narrow`.
+- **CDJ Whisper visual lock (Phase 43)** — Tier-1 surfaces (session, mascot overlay, wizard, calibration) pass paired `gsd-ui-checker` + `gsd-ui-auditor` with zero HIGH findings; 22-site `--glow-faint` hover-glow sweep; hardware-LED-strip meter rebuild (16 segments, amber peak-hold with 1.2s decay, silk-12 grid); Mixamo retarget pipeline scaffolded; 8-cut 30s storyboard re-mock with chip overlays.
+- **Launch positioning pre-staged (Phase 44)** — README hero locked verbatim to "the only AI co-host that actually listens to your set" with 3-gate CI lock + AI-slop blocklist (15 tokens + `\bdeeply\s+\w+` regex); EvidenceRegistry citation strip in live UI (click → debrief 2s region highlight); Bravoh waitlist toggle (UTM-tracked, opt-in, default-OFF, no signed-out telemetry); 16 SVG wordmark placeholders (6 DJ-software + 10 canonical controllers); outreach calendar + T-7 → T+30 launch sequence locked.
+- **External discharge cookbook (Phase 45)** — KAAN-ACTION-LEGAL §SHIP-01..13 ships 13 discharge runbooks in canonical 8-block format covering Apple Dev / SignPath / Bravoh-server / SHIP-CUT / 5-channel social / Discord / repo transfer / 24h rotation / SmartScreen / SHIP-V1-DECISION. `audit_ship_v1_decision.py` (610 lines) pre-fills 4 of 5 rubric "Current" cells from GH releases + Bravoh healthz + ear-test logs + GH issues at T+30; SHIP-CUT is one-button after approvals land.
 
-(v2.1 "The Unified Cut" shipped 2026-05-16, status `tech_debt`. v2.0 shipped 2026-05-14. v0.1.0 shipped 2026-05-13. Full archives in `.planning/milestones/`.)
+Full archive: `.planning/milestones/v3.0-ROADMAP.md` · Requirements: `.planning/milestones/v3.0-REQUIREMENTS.md` · Audit: `.planning/milestones/v3.0-MILESTONE-AUDIT.md`.
+
+</details>
 
 <details>
 <summary>📦 v2.1 The Unified Cut (shipped 2026-05-16, status <code>tech_debt</code>) — archived narrative</summary>
@@ -134,92 +137,96 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 - ✓ Mascot WebSocket bus (canvas sprite reacts to RMS at 30Hz) — `mascot.html`
 - ✓ Voice-aware mic gating (mic muted during AI talk) — `MicBuffer`
 
+<!-- v3.0 shipped 2026-05-17 — Clean OSS Ship engineering-complete. -->
+
+- ✓ Mic-as-Part-2 Gemini multimodal contract (12s ring + AI-talk zero-fill at sounddevice callback boundary) — v3.0 (Phase 40 / AUDIO-01)
+- ✓ Lookahead-as-Part-3 (3s `NOT YET HEARD BY AUDIENCE` via ffmpeg+mdfind+nowplaying-cli; graceful skip on streaming-only) — v3.0 (Phase 40 / AUDIO-02 + AUDIO-04)
+- ✓ Event cooldowns re-tuned to v4 chat-tested values (PHASE 10s, LAYER_ARRIVAL 10s, MIX_MOVE 14s, HEARTBEAT 45s, TRACK_CHANGE 5s) — v3.0 (Phase 40 / AUDIO-03)
+- ✓ `ModelRouter` config-driven seam + zero hardcoded model literals (CI grep gate) — v3.0 (Phase 41 / LAT-01)
+- ✓ Implicit caching default-on + 60min explicit cache TTL + EvidenceRegistry-mutation-driven refresh + cache_hit telemetry — v3.0 (Phase 41 / LAT-02 + LAT-03)
+- ✓ LLM→TTS streaming pipe-through with bracket-depth-aware sentence boundary + 3.1 Flash TTS 6-tag DSL — v3.0 (Phase 41 / LAT-04 + LAT-05)
+- ✓ Gemini Embedding 2 GA + MRL 768-dim + 4× smaller library index + bit-identical top-K parity — v3.0 (Phase 41 / LAT-06)
+- ✓ ServiceTier.FLEX routing for batch paths (debrief / library_auto_tag / embedding) + STANDARD pinned to live coach — v3.0 (Phase 41 / LAT-07)
+- ✓ `thinking_level=MINIMAL` enforced on live path + FLEX-on-live Pitfall 3 defense — v3.0 (Phase 41 / LAT-08)
+- ✓ Hybrid hallucination gate — autonomous proxy fast-lane (PR + 7 nightly canary) + Kaan-ear release-cut veto via `check_gate.sh` Gate 2b — v3.0 (Phase 42 / GATE-06)
+- ✓ Ear-test protocol + JSON Schema + debrief capture surface + 30min/≥2-genre/14d-window release gate — v3.0 (Phase 42 / GATE-05 + GATE-07)
+- ✓ P85 Phase 16 ear-test override formally retired + Decision Log committed — v3.0 (Phase 42 / GATE-08)
+- ✓ Public `eval/README.md` with threshold-mirror tests + ear-test content redaction privacy contract — v3.0 (Phase 42 / GATE-09)
+- ✓ Tier-1 UI surfaces zero HIGH findings (paired gsd-ui-checker + gsd-ui-auditor) + 22-site `--glow-faint` hover-glow sweep — v3.0 (Phase 43 / VIS-01)
+- ✓ Hardware-LED-strip meter rebuild (16 segments, amber peak-hold 1.2s decay, silk-12 grid) — v3.0 (Phase 43 / VIS-03)
+- ✓ Mood→animation pool runtime validation (Hype-man / Teacher / Coach 30s smoke) + integrated-GPU 60fps p99 perf — v3.0 (Phase 43 / VIS-05 + VIS-06)
+- ✓ Memory + doc drift cleaned ("DJ bat" → "Neon Rebel"; storyboard Workbench/DSEG7 → Saira/Geist on 5-warm-blacks + 1-amber palette) — v3.0 (Phase 43 / VIS-07)
+- ✓ Hero demo storyboard 8-cut 30s v5 + ≤8-cut CI gate + chip overlays in cuts 2-6 — v3.0 (Phase 43 / VIS-08)
+- ✓ Francesco pre-production handoff (deterministic 30-event demo-mode sequencer + 4-doc package + §VIS-09 runbook) — v3.0 (Phase 43 / VIS-09)
+- ✓ README hero "the only AI co-host that actually listens to your set" verbatim lock + "No AI slop" H2 + 3-gate CI lock + AI-slop blocklist — v3.0 (Phase 44 / LAUNCH-01)
+- ✓ EvidenceRegistry citation strip in live UI + tag→debrief deep-link + 2s waveform region highlight — v3.0 (Phase 44 / LAUNCH-02)
+- ✓ DJ-software 6-cell grid + canonical-10 controllers grid (reconciled to `midi/controllers/*.json`) + 4-gate a11y CI + 16 SVG placeholders — v3.0 (Phase 44 / LAUNCH-03 + LAUNCH-04)
+- ✓ Bravoh waitlist toggle (UTM-tracked, opt-in, default-OFF, no signed-out telemetry) — v3.0 (Phase 44 / LAUNCH-05)
+- ✓ Outreach calendar (DJ TechTools + DDJ Tips + Mixmag + r/DJs + r/Beatmatch + r/edmproduction) + T-7 → T+30 launch sequence + `check_launch_docs.py` CI gate — v3.0 (Phase 44 / LAUNCH-09 + LAUNCH-10)
+- ✓ `launch_trigger.sh` 5-channel × 4-stage cadence orchestrator + `--live` triple-env gate + sign-off footer gate + JSONL audit — v3.0 (Phase 45 / SHIP-08)
+- ✓ `check_bravoh_server_ready.sh` 3-endpoint probe + `cut_release.sh` Gate 5b wire-in — v3.0 (Phase 45 / SHIP-06 engineering)
+- ✓ `audit_ship_v1_decision.py` (610 lines) + `SHIP-V1-DECISION-TEMPLATE.md` + 5 synthetic fixtures + 20 hermetic tests + T-45-04-{01..05} threat mitigations — v3.0 (Phase 45 / SHIP-13 engineering)
+- ✓ `docs/launch-rotation.md` §SHIP-11 24h solo rotation + 7-monitoring-source list + triage decision tree — v3.0 (Phase 45 / SHIP-11 engineering)
+- ✓ KAAN-ACTION-LEGAL §SHIP-01..13 discharge cookbook (canonical 8-block format) — v3.0 (Phase 45 / 45-06)
+
 ### Active
 
-<!-- v1 scope for the shipping open-source product. -->
+<!-- v3.x candidate scope — strategic conversation is open per memory `project_v2_planning_active`; do NOT auto-create next milestone. Kaan drives. -->
 
-**Architecture & Audio I/O**
+**Pending external clock — v3.0 RC publish (KAAN-ACTION-LEGAL §SHIP-01..13)**
 
-- [ ] Consolidate three cohost variants into one shipping product (`cohost.py` / `cohost_v2.py` / `cohost_lk.py` → `vibemix`)
-- [ ] LiveKit-pipelined architecture (rooms/agents/tracks) with **Gemini 3 Flash multimodal in + Gemini TTS streaming out** as the AI path (NOT Gemini Live Native Audio)
-- [ ] Auto-detect master output device cross-platform (no hardcoded BlackHole assumption)
-- [ ] Output destination picker — headphones (in-ear) or speakers
-- [ ] Drop headphone-cue listening from the audio path (Gemini gets confused)
+- [ ] Apple Dev Agreement update signed by Francesco (SHIP-01 / P46 legal-capacity)
+- [ ] SignPath OSS Foundation approval received (SHIP-02 / P46 legal-capacity, ~1-week SLA)
+- [ ] DIST-19 signed-binary smoke + `verify_signed.py --require-signed` (SHIP-03)
+- [ ] INSTALL-VM-RUN fresh-VM matrix (macOS 12.3/14/15 + Win 10/11) + INSTALL-60S-CHECK (SHIP-04 + SHIP-05)
+- [ ] Bravoh server `/vibemix/updates/*` + `/vibemix/healthz` + `*/5 * * * *` cron (SHIP-06)
+- [ ] `gh release create v3.0.0-rc1 --draft` after `cut_release.sh` 6-gate green + tag-regex bump prerequisite (SHIP-07)
+- [ ] `launch_trigger.sh --live` 5-channel social publish on T-30 / T+0 / T+5 / T+24h cadence (SHIP-08)
+- [ ] Discord #announcements + `discord_provision.py --real` execution (SHIP-09)
+- [ ] Repo transfer to `bravoh/vibemix` (SHIP-10) — depends on LAUNCH-06 bravoh GH org standup
+- [ ] 24h monitoring rotation execution per `docs/launch-rotation.md` (SHIP-11)
+- [ ] Windows SmartScreen reputation propagation observation (SHIP-12 — passive, 1-2 wk post-signed release)
+- [ ] SHIP-V1-DECISION T+30 audit + Kaan 3-way sign-off (cut v1.0.0 / cycle RC2 / pause) (SHIP-13)
 
-**Cross-platform**
+**Pre-stage discharges (v3.0 carryover)**
 
-- [ ] macOS audio capture via system loopback (BlackHole or equivalent virtual cable, auto-detected)
-- [ ] Windows audio capture via WASAPI loopback
-- [ ] macOS screen capture (Quartz/ScreenCaptureKit window picker)
-- [ ] Windows screen capture (win32 window enumeration + capture)
-- [ ] Cross-platform window picker UI (pick your DJ app from the running windows)
-- [ ] Cross-platform MIDI via `mido` + `python-rtmidi`
+- [ ] AUDIO-05 PGP key for `security@bravoh.com` published to `keys.openpgp.org` (Kaan custody)
+- [ ] AUDIO-06 Tauri ed25519 updater key rotated to production value (Kaan custody + GH secret)
+- [ ] AUDIO-07 BlackHole probe fresh-Mac walk (fresh macOS user account)
+- [ ] LAT-09 Gemini 3.1 Flash Live music spike verdict (real 5-min DJ clip + offline listen)
+- [ ] GATE-01 ack-bank 20/40 (Gemini TTS quota reset, ~$0.10)
+- [ ] GATE-02 VCR cassettes populated via `VCR_RECORD_MODE=new_episodes`
+- [ ] GATE-03 6 × 30-min DJ session WAVs in git-LFS corpus (200 MB)
+- [ ] GATE-05 ear-test session execution (≥2 sessions ≥2 genres in 14d window)
+- [ ] VIS-04 5 Mixamo retargets for prep_*.glb placeholders (Adobe-account download + Kaan-aesthetic selection)
+- [ ] LAUNCH-03 / LAUNCH-04 real DJ-software + controller logos (16 SVG placeholders → real assets)
+- [ ] LAUNCH-06 bravoh GH org standup (Bravoh Enterprise billing flag resolve)
+- [ ] LAUNCH-07 SHIP-TWEET Kaan + Francesco mutual sign-off
+- [ ] LAUNCH-08 Discord live execution (`discord_provision.py --real`)
 
-**MIDI Controller Library**
+**v3.x candidate scope (confirmed per memory `project_v2_open_candidates` — Kaan drives commit to milestone)**
 
-- [ ] Curated controller mappings for ~10 popular models: DDJ-FLX4, DDJ-400, DDJ-FLX6, DDJ-FLX10, DDJ-1000, DDJ-SX3, XDJ-RX3, Numark Party Mix Live, Hercules DJControl Inpulse 300, Hercules DJControl Inpulse 500
-- [ ] Each mapping: EQ low/mid/high knobs, channel faders, crossfader, play/cue/sync buttons, hotcue pads, filter knobs, tempo faders, jog wheel events
-- [ ] Magnitude-aware EQ events (capture the *delta*, not just "user moved knob"), so prompts can convey "slight high boost" vs "kill the lows"
-- [ ] Generic-MIDI fallback for unmapped controllers (works but with less semantic context)
-- [ ] Controller auto-detection on app launch
+- [ ] Mixxx OSC adapter — vibemix subscribes to UDP `:7777`, maps to existing `MusicState` schema (GPL-2 IPC-only)
+- [ ] Mixxx controller map transpiler — offline build-time XML+JS → vibemix semantic event JSON; separate `vibemix-maps` GPL-2 repo; core consumes as data
+- [ ] 10 → 30+ controller library via Mixxx map corpus ingest (closes "10 controllers" promise; unlocks ~80% OSS DJ TAM)
+- [ ] pyrekordbox integration — confirmed v3.x candidate per memory
+- [ ] Post-session debrief depth — multi-session arc, weekly progress summary, energy-arc taxonomy lift
+- [ ] Library coach drill packs — "harmonic mixing pratiği için library'nde bu 5 track Am ↔ C sırayla mix'le"
+- [ ] Curriculum-mode lesson packs per user level (Beginner / Intermediate / Pro)
+- [ ] Multimodal "sounds like this" library search from live 30s phrase window (Gemini Embedding 2 multimodal RAG)
+- [ ] Phase 16 ear-test memory override choice (restored Kaan-ear-only gate OR permanent autonomous proxy adoption — Kaan drives at next-milestone scaffold)
 
-**User Experience**
+**v3.x backlog (deferred / opt-in)**
 
-- [ ] Three user modes — Beginner / Intermediate / Pro — each with its own prompt template
-- [ ] Two interaction modes — Hype-man (party energy) / Coach (feedback on mixes, EQ choices, transitions)
-- [ ] Voice picker — male or female (Gemini TTS prebuilt voices)
-- [ ] Genre picker at session start — electronic / techno / house / pop / etc. — used to calibrate phase-detection thresholds
-- [ ] Genre-agnostic RMS calibration (research-backed approach that works across genres, not just acid/techno)
-- [ ] Calibration wizard on first run (one-click setup, system finds devices, asks for permissions)
+- [ ] `/hatch` user-gen mascot pipeline — Imagen / Hunyuan3D user-uploaded image → custom 3D mascot (Codex Pets pattern)
+- [ ] OBS browser source mascot path — README 2-line update (mascot.html already serves on `ws://127.0.0.1:8765`)
+- [ ] `obs-websocket-py` uplink — vibemix events → OBS scene switch / lower-third subtitle
+- [ ] Beat This! via Rust sidecar — non-Gemini beat-grid, closes "AI reacts off-beat" hallucination class; gated on install-size budget
 
-**Prompting & Grounding**
+<!-- Legacy v1/v2 active scope (cross-platform, MIDI library, UX, prompting, distribution, GitHub presence, launch funnel) shipped across v0.1.0 → v2.0 → v2.1 → v3.0. See `.planning/milestones/v3.0-REQUIREMENTS.md` traceability table for full REQ-ID closure. -->
 
-- [ ] Absolute set-timeline awareness in prompts ("you're at 2:44; drop happened at 2:33")
-- [ ] Surrounding-data prompt strategy: feed Gemini the RMS values + recent events + timing, let *it* form the reaction. Don't tell it "DROP HAPPENED REACT!"
-- [ ] Magnitude-aware EQ/fader context (small adjustment vs big push)
-- [ ] Hallucination verification before open-source release — every shipped reaction grounded in real audio/MIDI/screen events
 
-**Distribution & Branding**
-
-- [ ] One-click installer — macOS notarized DMG (Apple Developer account exists) + Windows signed installer
-- [ ] Free for end users — Bravoh-managed Gemini API key in environment, no key entry required
-- [ ] API-usage abuse protection (rate-limit, quota cap per anonymous client) so we don't get drained
-- [ ] Polished UI/UX inside the app — calibration wizard, mode/voice/genre pickers, no AI-slop aesthetics
-- [ ] **Reactive mascot (Avery) — first-class feature, not decoration.** Lives on screen, reacts physically to MIDI events: covers ears on bass-kill, squints on high-EQ slam, leans with crossfader, puffs up on bass-push, freezes on pause, bounces on the beat, zips mouth shut during vocal sections, punches air on hot-cue. Inspired by OpenAI Pets / Tamagotchi — a live indicator of what the system actually saw, so the user feels the system *listening*. Pose vocabulary documented and named (idle/alert/speaking/squint/cover-ears/puff-up/wavy/lean/punch/freeze/bounce/zipped/shocked/dancing/sleeping/winking).
-- [ ] **Dedicated polish phase — FL-Studio-quality UI bar.** Not a final-week sweep; an explicit phase that lifts every surface to pro-audio-software realism (think FL Studio, Ableton, Bitwig, Native Instruments). Knob/fader physics, controller-grade hierarchy, dense data without overwhelm, no "looks like a web app" residue. Critique → execute → critique → execute loop within the phase, with `gsd-ui-checker` + `gsd-ui-auditor` runs between iterations until the bar is hit.
-
-**GitHub Presence — "Maximum Sexification"**
-
-The GitHub repo is the front door for 100% of organic discovery. It must read like a real product launch, not a code dump.
-
-- [ ] Branded hero banner at top of README (custom artwork — vibemix wordmark + tagline + screen of the app in action; not a generic logo placeholder)
-- [ ] One-paragraph value prop above the fold (clear, no jargon, hooks DJ at "co-host that actually reacts to your set")
-- [ ] Hero demo video / GIF — 30-45s cinematic edit: real DJ playing → AI reacting in real-time over headphones (subtitled), drop/build/transition reactions visible on screen
-- [ ] Installation section — one-click download buttons for macOS + Windows, install GIFs, "from clone to running in <60s" promise
-- [ ] Feature matrix — beginner/intermediate/pro × hype-man/coach, with example reactions per cell
-- [ ] Supported controllers grid — logos/photos of all 10 mapped controllers + "calibrate any other" callout
-- [ ] Screenshots gallery — calibration wizard, mode picker, voice picker, in-session UI, recording browser
-- [ ] "How it works" diagram — clean architecture sketch (audio in → events → Gemini → voice out), not Mermaid-default ugly
-- [ ] FAQ — 8-12 questions: privacy, what data leaves your machine, cost, why no Linux, why no Gemini Live, etc.
-- [ ] "Built by Bravoh" footer + link to the Bravoh waitlist (the funnel)
-- [ ] Badges row — build status, latest release, license, platform, stars, Discord (optional)
-- [ ] CONTRIBUTING.md — controller-mapping contribution path (the most likely external PR), prompt-template contribution path
-- [ ] CODE_OF_CONDUCT.md, SECURITY.md, LICENSE — table-stakes OSS hygiene
-- [ ] Issue templates — bug / feature / new-controller-request
-- [ ] Releases page — every binary cut tagged with a real changelog, not auto-generated noise
-- [ ] Social preview image — custom OG image that looks slick when shared on X/Discord/Slack
-- [ ] Repo description + topics tags optimised for search (`dj`, `livekit`, `gemini`, `ai-assistant`, `audio`, `midi`, `pioneer-ddj`, `realtime-ai`)
-- [ ] No "rough edges" visible in the public repo — no `_test_*.py` scratch files, no `.bak` files, no committed `.env`, no large binaries (mascot sprites move to release assets or get rebuilt cleanly)
-
-**Launch Funnel**
-
-- [ ] Marketing-ready demo cinematic (Kaan + Francesco DJ session, edited; vibemix doing transitions feedback; Gemini speaking over)
-- [ ] Open-source release on `github.com/bravoh/vibemix` (GitHub Enterprise under bravoh org)
-- [ ] Pre-launch seed: 15+ stars from friends/dev network on day 1 (Kaan, Francesco, Momo + dev contacts + ARRAY community)
-- [ ] Organic content push (Instagram/X/TikTok reels — Francesco's cinematic shoot + Kaan's controller demos)
-- [ ] 50-100 € IG/TikTok ads → drive to repo download
-- [ ] Outreach to DJ network (Francesco's connections — alignment, label contacts) + DJ-software vendors (e.g. Algoriddim/djay Pro team)
-- [ ] Email collector on download (Instagram lead magnet pattern: comment → DM with link → email capture → routes into Bravoh waitlist at public launch)
+<!-- Launch funnel scope shipped via v3.0 Phase 44 + Phase 45 (README hero lock + EvidenceRegistry citation strip + Bravoh waitlist toggle + outreach calendar + 5-channel social publish orchestrator). Day-zero ops automation (Phase 36 v2.1) covers the remaining funnel mechanics (Discord auto-provision, 100 RPS load test, healthz watchdog). Marketing-ready demo cinematic awaits Francesco capture day per §VIS-09 runbook. -->
 
 ### Out of Scope
 
@@ -237,13 +244,19 @@ The GitHub repo is the front door for 100% of organic discovery. It must read li
 
 ## Context
 
-**Where this comes from.** The codebase started as a personal Friday-night hobby experiment — Kaan wanted an AI co-host while DJing on his DDJ-FLX4. Three iterations explored different architectures: `cohost.py` (heuristic triggers + Gemini 3 Flash multimodal), `cohost_lk.py` (LiveKit + Gemini 2.5 Native Audio realtime), `cohost_v2.py` (single-source-of-truth `MusicState` + EventDetector + audible-deck detection). All run, all have rough edges. The Native Audio realtime path showed worse grounding than the explicit Flash + TTS path despite more architectural plumbing — hence the v1 architectural decision to keep LiveKit's *pipeline* (rooms/agents/tracks/streaming) but swap the brain to Flash + TTS.
+**Where this comes from.** The codebase started as a personal Friday-night hobby experiment — Kaan wanted an AI co-host while DJing on his DDJ-FLX4. Three iterations explored different architectures: `cohost.py` (heuristic triggers + Gemini 3 Flash multimodal), `cohost_lk.py` (LiveKit + Gemini 2.5 Native Audio realtime), `cohost_v2.py` (single-source-of-truth `MusicState` + EventDetector + audible-deck detection). The v4 line (`cohost_v4.py` / `cohost_v4_tr.py`) became the canonical baseline — OpenRouter-primary TTS chain, tuned v4 chat-tested cooldowns, "trust the audio" anti-hallucination rule, BlackHole 48kHz format requirement, file-based 3s lookahead pattern. Phase 2–13 lifted FROM v4 into the `vibemix` package.
 
 **Why open-source now.** Bravoh (the AI Artist Operating System) has a 140k-view reel on the project's Instagram account and a Closed Beta running since March 1, 2026. The DJ co-host is a fast-shipping, narrowly-scoped, demo-able artefact that lives downstream of Bravoh's positioning ("we build cool AI for musicians, here's a free taste") — it is the marketing wedge that turns "interested" into "watching the Bravoh waitlist".
 
+**Current state (post-v3.0 close, 2026-05-17).** Engineering-complete OSS RC. 4 milestones shipped (v0.1.0 / v2.0 / v2.1 / v3.0). 41 phases total. v3.0 added ~+61k LOC, 250 commits, 529 files changed. 57/57 v3.0 REQ-IDs engineering-satisfied (100%); 22 carveouts deferred to KAAN-ACTION-LEGAL per `gsd-autonomous fully` mode. Anti-slop thesis hardened: mic-as-Part-2 + lookahead-as-Part-3 + hybrid hallucination gate + EvidenceRegistry citation strip in live UI. CDJ Whisper UI Tier-1 surfaces pass paired auditor+checker with zero HIGH findings. Local `v3.0` tag created (NOT pushed). Awaiting external clock: Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) to discharge SHIP-CUT v3.0.0-rc1.
+
 **Existing user.** Kaan, primarily — the codebase started as his Friday-night experiment. The open-source release expands to "any DJ with a controller + a DJ software running on mac or windows" — beginner curiosity to pro feedback-loop.
 
-**Stack baseline.** Python 3.12+ (current `.venv` is 3.14), LiveKit Agents framework, `google-genai`, `sounddevice` (mac) / WASAPI bindings (Windows), `mido` + `python-rtmidi`, `numpy` + `scipy` for DSP, `mss` / Quartz / win32 for screen capture. Heavy reliance on Gemini 3 family (Flash for inference, TTS for voice).
+**Stack baseline.** Python 3.12+ (current `.venv` is 3.14), LiveKit Agents framework, `google-genai`, `sounddevice` (mac) / WASAPI bindings (Windows), `mido` + `python-rtmidi`, `numpy` + `scipy` for DSP, `mss` / Quartz / win32 for screen capture. Heavy reliance on Gemini 3 family (Flash for inference, 3.1 Flash TTS for voice, Embedding 2 for library/RAG). Tauri shell + Python sidecar + FastAPI proxy on `api.altidus.world`. SQLite-vec (Mac) / numpy (Win) for library index.
+
+**Open user feedback themes.** None yet — v3.0 not publicly shipped (engineering-complete; awaits Apple Dev + SignPath approvals). Anti-slop ship-gate satisfied by Phase 16 ear-test (memory override RETIRED post-v2.1) → Phase 42 hybrid regime (autonomous proxy + Kaan ear-test). T+30 SHIP-V1-DECISION audit will be first real user-signal moment.
+
+**Known technical debt at close.** Tauri capability missing for drag (v0.1.0-rc1 carryover); mascot chrome strip + sidecar bundle schema path (v0.1.0-rc1 carryover); TCC list-population (v0.1.0-rc1 carryover); ack-bank 20/40 (Gemini quota); VCR cassettes (one-time population); 6 × 30-min corpus WAVs (200 MB git-LFS); Bravoh proxy probe still `MOCK_PROXY_FOR_DEV=1` pending Wave 0 real-host probe.
 
 ## Constraints
 
@@ -261,18 +274,28 @@ The GitHub repo is the front door for 100% of organic discovery. It must read li
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Product name = **vibemix**, repo = `bravoh/vibemix` | Distinct enough to be its own thing, "mix" hooks the DJ semantic, GitHub Enterprise being set up under bravoh org | — Pending |
-| **macOS + Windows in v1**, no Linux | Doubles addressable market vs mac-only; Linux is small DJ audience and tripled platform-engineering cost | — Pending |
-| **LiveKit pipeline + Gemini 3 Flash + Gemini TTS streaming** as default AI path | Kaan tested Gemini Live Native Audio (`cohost_v2.py`) — grounding was worse than explicit Flash + TTS (`cohost.py`) despite more plumbing. LiveKit architecture (rooms/agents/tracks/streaming) is loved; only the brain swaps. | — Pending |
-| **Curated 10-controller MIDI library** + generic fallback | Covers the ~80% of mid-tier DJs (Pioneer DDJ family + Numark + Hercules) without forcing every user through a calibration wizard | — Pending |
-| **Master-output-only audio**, no headphone cue | Gemini conflates cue with master and produces wrong reactions — Kaan confirmed | — Pending |
-| **3 user modes × 2 interaction modes** (Beginner/Intermediate/Pro × Hype-man/Coach) | Wide audience coverage with a small prompt-template matrix | — Pending |
-| **Bravoh-managed API key**, free for end users | Friction kills virality; we treat cost as marketing spend | — Pending |
-| **Genre picker at session start** | Phase-detection (drop/build/breakdown) thresholds depend heavily on genre; "auto-detect genre" is research-grade and would block shipping | — Pending |
-| **Open-source as Bravoh's first OSS** | Marketing wedge ahead of Bravoh public launch; gets attention, builds trust, funnels to waitlist | — Pending |
-| **Workflow profile: Fine granularity, all Opus, all checkpoints on** | Kaan's directive: "do your deep research, don't go blind into coding, all checkpoints will be every agent will be Opus". Enforced via `models.*=opus` (all 6 phase types) + `model_overrides.<agent>=opus` (33 agents) in `.planning/config.json` — belt-and-braces, no agent can fall back to a smaller model. | — Pending |
-| **Critique → execute → critique → execute loop per phase** | Kaan's directive: every phase runs a quality loop, not a one-shot. plan-checker before execute, verifier after execute, ui-checker/ui-auditor between polish iterations, code-reviewer on output. Continue iterating until the gate passes. Enforced via `workflow.plan_check=true`, `workflow.verifier=true`, `workflow.code_review=true`, `workflow.ui_safety_gate=true` already in config. | — Pending |
-| **Reactive mascot as v1 feature, dedicated polish phase** | The mascot isn't just brand decoration — it's the visual feedback loop that telegraphs back what the system saw. Inspired by OpenAI Pets, lives in-app, reacts to MIDI/audio in real time. Polish to FL-Studio UI quality is its own phase, not a final-week sweep — a critique→execute loop runs until the realism bar is hit. | — Pending |
+| Product name = **vibemix**, repo = `bravoh/vibemix` | Distinct enough to be its own thing, "mix" hooks the DJ semantic, GitHub Enterprise being set up under bravoh org | ✓ Good — LAUNCH-06 bravoh GH org pending, repo transfer SHIP-10 cookbook ready |
+| **macOS + Windows in v1**, no Linux | Doubles addressable market vs mac-only; Linux is small DJ audience and tripled platform-engineering cost | ✓ Good |
+| **LiveKit pipeline + Gemini 3 Flash + Gemini TTS streaming** as default AI path | Kaan tested Gemini Live Native Audio (`cohost_v2.py`) — grounding was worse than explicit Flash + TTS (`cohost.py`) despite more plumbing. LiveKit architecture (rooms/agents/tracks/streaming) is loved; only the brain swaps. | ✓ Good — LAT-09 3.1 Flash Live spike still pending as v3.x opt-in toggle question |
+| **Curated 10-controller MIDI library** + generic fallback | Covers the ~80% of mid-tier DJs (Pioneer DDJ family + Numark + Hercules) without forcing every user through a calibration wizard | ✓ Good — canonical 10 reconciled to `midi/controllers/*.json` (LAUNCH-04); v3.x Mixxx map transpile unlocks 30+ |
+| **Master-output-only audio**, no headphone cue | Gemini conflates cue with master and produces wrong reactions — Kaan confirmed | ✓ Good |
+| **3 user modes × 2 interaction modes** (Beginner/Intermediate/Pro × Hype-man/Coach) | Wide audience coverage with a small prompt-template matrix | ✓ Good |
+| **Bravoh-managed API key**, free for end users | Friction kills virality; we treat cost as marketing spend | ✓ Good — Bravoh proxy with per-client rate limit; €50/month CI gate stays under budget |
+| **Genre picker at session start** | Phase-detection (drop/build/breakdown) thresholds depend heavily on genre; "auto-detect genre" is research-grade and would block shipping | ✓ Good |
+| **Open-source as Bravoh's first OSS** | Marketing wedge ahead of Bravoh public launch; gets attention, builds trust, funnels to waitlist | — Pending public RC publish (KAAN-ACTION-LEGAL §SHIP-07) |
+| **Workflow profile: Fine granularity, all Opus, all checkpoints on** | Kaan's directive: "do your deep research, don't go blind into coding, all checkpoints will be every agent will be Opus". | ✓ Good — `gsd-autonomous fully` mode validated across 4 milestones |
+| **Critique → execute → critique → execute loop per phase** | Kaan's directive: every phase runs a quality loop, not a one-shot. plan-checker before execute, verifier after execute, ui-checker/ui-auditor between polish iterations, code-reviewer on output. | ✓ Good — Phase 43 visual lock proved the loop end-to-end (zero HIGH findings on Tier-1 surfaces) |
+| **Reactive mascot as v1 feature, dedicated polish phase** | The mascot isn't just brand decoration — it's the visual feedback loop that telegraphs back what the system saw. Inspired by OpenAI Pets, lives in-app, reacts to MIDI/audio in real time. | ✓ Good — VTuber-style 3D character "Neon Rebel"; 4-layer mascot full additive state machine in production (Phase 31 v2.1); §VIS-04 Mixamo retargets pending |
+| **One-click install is a HARD requirement** | Memory `project_one_click_install_hard_req` — Mac+Win, app opens → auto-downloads deps → configures audio → ready. Every dep choice rated green/yellow/red on install impact. | ✓ Good — Phase 33 v2.1 install hardening shipped (TCC wizard + BlackHole probe + onboarding stopwatch); INSTALL-VM-RUN real execution pending external clock |
+| **No scope creep — clean utility only** | Memory `feedback_no_scope_creep_clean_utility` — OUT: stem separation, CLAP, multi-provider AI, enterprise features. Optimize for "minimum useful surface" not feature parity. | ✓ Good — every v3.0 phase respected the constraint; no Demucs / no CLAP / no ProDJ Link / no DAW |
+| **Anti-slop thesis: grounded Gemini, not better prompting** (v3.0 lock) | Memory `project_anti_slop_grounded_gemini_thesis` — every feature evaluated by "what hallucination class does it close?". Grounding stack: audio + screen + MIDI + now-playing + Rekordbox priors + Gemini Embedding 2 + session memory + mic-as-Part-2 + lookahead-as-Part-3 + EvidenceRegistry citation strip in live UI. | ✓ Good — Phase 40 closed "AI invents what Kaan said" + "AI reacts after the moment passed" classes; Phase 44-03 surfaces citations on-screen |
+| **Hybrid hallucination gate** (v3.0 lock) | Phase 27 autonomous proxy fast-lane (PR + 7 nightly canary) + Kaan-ear release-cut veto. P85 Phase 16 ear-test override formally retired. | ✓ Good — `check_gate.sh` Gate 2b wired in `cut_release.sh`; `.planning/decisions/P85-OVERRIDE-RETIRED.md` committed |
+| **POC files byte-identical to v2.0 tag** | `cohost*.py`, `mascot.html`, `cohost.streaming.py.bak` — trusted intuition preserved as reference. Phase 37-06 immutability gate enforces. | ✓ Good — preserved through v2.1 + v3.0 |
+| **Honest RC labeling** (v3.0 lock) | `v3.0.0-rc1` not premature `v1.0.0`; v1.0.0 decision deferred to Kaan post-2-week bake per SHIP-V1-DECISION audit at T+30. | ✓ Good — `audit_ship_v1_decision.py` (Plan 45-04) ships 3-way decision template |
+| **`gsd-autonomous fully` mode** | Memory `feedback_autonomous_no_grey_area_pause` — recommended grey-area answers + defer blockers (not pause) into Kaan-action-required surface. Continue with unblocked work. Only destructive risk + privacy rule still pause. Legal-capacity (P46) + customer-facing publish + real-hardware + real-asset = explicit autonomy carveouts. | ✓ Good — applied through v2.1 + v3.0; 22 v3.0 carveouts routed cleanly to KAAN-ACTION-LEGAL §SHIP-NN cookbook |
+| **No CLAP — Gemini Embedding 2 only** | Memory `feedback_no_clap_use_gemini_embedding` — vibemix is Gemini-only; CLAP/MERT/OpenL3 forbidden even when research recommends. | ✓ Good — Embedding 2 GA + MRL 768-dim shipped (LAT-06); 4× smaller library index |
+| **Visual direction: CDJ Whisper** | Memory `project_visual_direction_cdj_whisper` — Pioneer-grade hardware in library mode. 5 warm blacks, single amber accent (4 intensities), tactility via faint glow not faux-3D bevels, Geist + Fraunces typeface, readability + restraint. | ✓ Good — Phase 43 Tier-1 surfaces locked; hardware-LED-strip meter rebuild; 22-site `--glow-faint` hover-glow sweep; storyboard migrated to Saira + Geist |
+| **Bravoh waitlist toggle: subtle, opt-in, default-OFF** (v3.0 lock) | Funnel integrity over conversion lift — Kaan rejects pushy CTAs. No signed-out telemetry. UTM-tracked link. | ✓ Good — Plan 44-04 `ConfigStore.bravoh_waitlist_opt_in` + verbatim UTM URL grep-gate + token-driven faint-amber-glow active state |
 
 ## Evolution
 
@@ -292,4 +315,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-16 — v3.0 "Clean OSS Ship" milestone scaffolded via `/gsd:new-milestone` after 4-bucket research swarm. 6 phases (P40-P45), 57 REQ-IDs. Critical path: Apple Dev Agreement (Francesco) + SignPath OSS (Kaan) gate public RC publish in P45. P40-P44 engineering parallelizes around the external clock.*
+*Last updated: 2026-05-17 after v3.0 milestone close. 6 phases shipped engineering-green under `gsd-autonomous fully` mode. 57/57 v3.0 REQ-IDs engineering-satisfied; 22 carveouts deferred to KAAN-ACTION-LEGAL discharge cookbook. Critical path remains the external clock — Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) to discharge SHIP-CUT v3.0.0-rc1. Next milestone scaffolds via `/gsd:new-milestone` when Kaan opens v3.x scope per memory `project_v2_planning_active`.*

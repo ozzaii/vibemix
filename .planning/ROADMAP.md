@@ -1,8 +1,8 @@
 # vibemix — Roadmap
 
 **Project:** vibemix — AI DJ Co-Host
-**Current milestone:** **v3.0 — Clean OSS Ship** (active, scaffolded 2026-05-16)
-**Last shipped:** v2.1 The Unified Cut — 2026-05-16 (status: `tech_debt` accepted — KAAN-ACTION-LEGAL pending RC publish)
+**Last shipped:** v3.0 Clean OSS Ship — 2026-05-17 (status: `tech_debt` accepted — KAAN-ACTION-LEGAL pending public RC publish)
+**Current milestone:** None — `/gsd:new-milestone` to scaffold v3.x
 
 ---
 
@@ -11,213 +11,7 @@
 - ✅ **v0.1.0 MVP Foundation** — Phases 1–14 (shipped 2026-05-13) — see `.planning/milestones/v0.1.0/`
 - ✅ **v2.0 Research-Driven Ship** — Phases 15–26 (shipped 2026-05-14, tech_debt accepted) — see `.planning/milestones/v2.0-ROADMAP.md`
 - ✅ **v2.1 The Unified Cut** — Phases 27–39 (shipped 2026-05-16, tech_debt accepted) — see `.planning/milestones/v2.1-ROADMAP.md`
-- 🚧 **v3.0 Clean OSS Ship** — Phases 40–45 (planning, 2026-05-16) — see below
-
----
-
-## v3.0 Clean OSS Ship — Active
-
-**Goal:** Ship vibemix as a clean, useful, value-bringing open-source product — 500-1000+ GitHub stars in 30 days, warm the Bravoh waitlist, anti-slop credibility lock.
-
-**Research basis:** 4-bucket parallel swarm — `.planning/research/v3-buckets/{A-external-world, B-gemini-capabilities, C-internal-state, D-gate-and-visual}.md`.
-
-**Critical path:** Apple Dev Agreement (Francesco) + SignPath OSS (Kaan, ~1-week SLA) gate the public RC publish in P45. P40-P44 parallelize around the external clock.
-
-### Phase 40: Anti-Slop Audio Port
-
-**Goal:** Close the biggest engineering anti-slop gap — Gemini now hears Kaan's voice (mic as 2nd Part) and gets a 3s structural preview (source-file lookahead as 3rd Part); event cooldowns re-tuned to v4 chat-tested intuition. Pre-stage independent KAAN-ACTION items (PGP, Tauri updater key, BlackHole fresh-Mac probe).
-
-**Requirements:** AUDIO-01..07
-
-**Success criteria:**
-
-1. KAAN_SPOKE events trigger a 3-Part Gemini request when local file available — Part 1: BlackHole 7s, Part 2: mic 12s, Part 3: source-file lookahead 3s. Prompt explicitly labels Parts.
-2. Streaming-track sessions (no local file) gracefully degrade to 2-Part (live mix + mic) with zero ffmpeg errors logged.
-3. Event cooldowns (PHASE / LAYER_ARRIVAL / MIX_MOVE / HEARTBEAT / TRACK_CHANGE) measured in `replay_harness.py` match v4 chat-tested values within ±1s.
-4. PGP key published to `keys.openpgp.org`; Tauri ed25519 updater key rotated to production; BlackHole probe fresh-Mac walk passes.
-5. v4 "harikaydı" baseline regression — ear-test pass on ≥1 real Kaan DJ session (Coach + Hype modes).
-
-**Plans:** 6 plans
-
-```
-Plans:
-- [x] 40-01-PLAN.md — Mic as 2nd Gemini Part + ring buffer + AI-talk zero-fill (AUDIO-01) — GREEN; 13 new tests, 99 regression-clean, mic_part_attached/skipped events emit
-- [x] 40-02-PLAN.md — LookaheadProvider port from cohost_v4_tr.py (AUDIO-02) — GREEN; per-session provider with ffmpeg + mdfind + nowplaying-cli pipeline, 8 hermetic tests, graceful-degrade on streaming-only sources
-- [x] 40-03-PLAN.md — 3rd Gemini Part wire-in + 'NOT YET HEARD' prompt labeling (AUDIO-02, AUDIO-04) — GREEN; 12 new tests, 3-Part additive contract + anti-prediction guard pinned
-- [x] 40-04-PLAN.md — Event cooldown re-tune + replay-harness --print-cooldowns (AUDIO-03)
-- [x] 40-05-PLAN.md — PGP + Tauri updater key pre-stage scaffolding (AUDIO-05, AUDIO-06) — engineering pre-stage GREEN; Kaan-discharge runbooks in `KAAN-ACTION-LEGAL.md`
-- [x] 40-06-PLAN.md — BlackHole probe structured-event emission + Pitfall 5 retry (AUDIO-07) — GREEN; 12 new tests, probe emits audio.probe.{detected,missing,cta_fired} events
-```
-
-**Wave structure:** Wave 1 (40-01, 40-05) → Wave 2 (40-02, 40-04, 40-06) → Wave 3 (40-03)
-
-
-### Phase 41: Gemini SKU Upgrade + Latency Stack v2
-
-**Goal:** Adopt 2026 Gemini deltas — ModelRouter seam, implicit caching, LLM→TTS pipe-through, 3.1 Flash TTS, Embedding 2 GA, Flex tier for batch paths. Target: end-to-end latency 5-10s → 3-5s; perceived latency 0-2s with P40 lookahead offset.
-
-**Requirements:** LAT-01..09
-
-**Success criteria:**
-
-1. `ModelRouter` config-driven — zero hardcoded `gemini-3-flash` (CI grep gate); per-path SKU + tier wired (live coach Standard 3-Flash, debrief Flex 3.1-Pro, library auto-tag Flex 3-Flash, embedding Flex Embedding-2).
-2. TTFT p95 < 500ms on live coach (tracked via existing `TTFTMeter`).
-3. LLM first sentence streams to TTS with measured 200-400ms perceived savings (TTFT→first-TTS-chunk delta logged).
-4. Embedding 2 GA + MRL 768-dim — P28 index 4× smaller on disk; bit-identical top-K parity test passes.
-5. Flex tier billing visible on next batch run (library re-index, eval-corpus replay); €/mo CI gate stays under €50.
-6. 3.1 Flash Live spike verdict written (`spikes/gemini-3-1-flash-live-music.md`) — go/no-go on optional v3.x toggle.
-
-**Plans:** 7 plans
-
-```
-Plans:
-- [x] 41-01-PLAN.md — ModelRouter seam + config + CI grep gate (LAT-01, LAT-07)
-- [ ] 41-02-PLAN.md — GeminiContextCache cleanup: TTL 3600s, mutation-driven refresh, cache_hit telemetry (LAT-02, LAT-03)
-- [ ] 41-03-PLAN.md — thinking_level=MINIMAL runtime gate + FLEX-on-live defense (LAT-08)
-- [ ] 41-04-PLAN.md — LLM→TTS streaming pipe-through + dual-phase gate + 3.1 Flash TTS audio-tag DSL (LAT-04, LAT-05)
-- [x] 41-05-PLAN.md — Embedding 2 GA probe + auto-bump + 768-dim parity test + migration script (LAT-06)
-- [x] 41-06-PLAN.md — Gemini 3.1 Flash Live spike framework + Kaan-action discharge runbook (LAT-09)
-- [ ] 41-07-PLAN.md — End-to-end integration test + replay harness metrics + 41-INTEGRATION-REPORT.md (LAT-01..09)
-```
-
-**Wave structure:** Wave 1 (41-01, 41-05) → Wave 2 (41-02, 41-03, 41-04, 41-06) → Wave 3 (41-07)
-
-
-### Phase 42: Hallucination Gate v3 — Hybrid
-
-**Goal:** Adopt hybrid gate — Phase 27 autonomous proxy fast-lane (PR + nightly canary) + Kaan-ear release-cut veto. P85 override formally retired; corpus + thresholds calibrated against real audio; ear-test capture wired into debrief.
-
-**Requirements:** GATE-01..09
-
-**Success criteria:**
-
-1. 40/40 Achird OPUS files in ack-bank; VCR cassettes populated; 6 × 30-min DJ session WAVs in git-LFS corpus.
-2. Threshold-lock values calibrated against real corpus — measured F1 within ±0.10 of locked values, OR thresholds re-locked with audit trail.
-3. `scripts/release/check_gate.sh` enforces "7 consecutive nightly proxy-green + signed ear-test within 14d" before SHIP-CUT gate-2 passes.
-4. Ear-test capture surface in debrief window writes `eval/ear-test-logs/<session>.json` with structured "what felt slop?" payload.
-5. P85 Decision Log entry committed; `cut_release.sh` reminder lines removed; `test_phase_16_override_expiry.py` retired or refactored.
-6. `eval/README.md` public-facing documentation drafted (redacts ear-test log content while documenting protocol).
-
-**Plans:** 6 plans
-
-```
-Plans:
-- [x] 42-01-PLAN.md — Corpus scaffolding: ack-bank resume helper + VCR cassette recorder + git-LFS corpus layout + KAAN-ACTION §GATE-01/02/03 runbooks (GATE-01, GATE-02, GATE-03)
-- [x] 42-02-PLAN.md — Threshold recalibration tooling: recalibrate_thresholds.py + ±0.10 tolerance band + THRESHOLD-RECALIBRATION-LOG.md + eval.yml --check-real-corpus mode (GATE-04)
-- [x] 42-03-PLAN.md — Ear-test protocol + capture surface: EAR-TEST-PROTOCOL.md + JSON Schema + debrief window toggle + check_ear_test.sh + KAAN-ACTION §GATE-05 (GATE-05, GATE-07)
-- [x] 42-04-PLAN.md — check_gate.sh hybrid wire-in: bash gate combining 7-nightly + ear-test + cut_release.sh Gate 2b insertion + P85 reminder line removal (GATE-06)
-- [x] 42-05-PLAN.md — P85 override retirement: Decision Log entry + delete test_phase_16_override_expiry.py + positive-assertion test_gate_42_hybrid_in_force.py + STATE.md annotation (GATE-08)
-- [x] 42-06-PLAN.md — Public eval docs: eval/README.md + threshold-mirror tests + ear-test log content redaction privacy contract test (GATE-09)
-```
-
-**Wave structure:** Wave 1 (42-01) → Wave 2 (42-02, 42-03) → Wave 3 (42-04) → Wave 4 (42-05) → Wave 5 (42-06)
-
-### Phase 43: Visual Ship Lock
-
-**Goal:** Lock CDJ Whisper UI to FL-Studio-grade polish; replace 5 mascot stub animations with Mixamo retargets; pre-produce 30s hero demo for launch hero. Three internal waves (UI / mascot / demo prep), critique→execute loop spanning the phase.
-
-**Requirements:** VIS-01..09
-
-**Success criteria:**
-
-1. Tier-1 surfaces (session, mascot overlay, wizard, calibration) pass paired `gsd-ui-checker` + `gsd-ui-auditor` with zero HIGH findings after critique→execute loop.
-2. `session/components/meter.ts` spectrum rebuild ships — hardware-LED-strip aesthetic with amber peak hold.
-3. 5 `prep_*.glb` placeholders replaced with real Mixamo retargets (400KB-1.2MB each); bundle stays ≤ 25MB.
-4. Mood→animation pool runtime validation green — 30s smoke per persona (Hype-man / Teacher / Coach) with crossfades; idle-zero contract bone-level tests pass.
-5. Hero demo storyboard re-aligned to CDJ Whisper v5; pre-production package (shot list + capture plan + demo-mode config) handed off to Francesco.
-6. Memory + doc drift cleaned — `project_mascot_as_vtuber_personality_surface` updated to "Neon Rebel"; storyboard mocks aligned.
-
-**Plans:** 9 plans
-
-```
-Plans:
-- [x] 43-01-PLAN.md — UI audit driver + first audit run (session surface seed) (VIS-01)
-- [x] 43-02-PLAN.md — UI audit closure: session + mascot overlay + hover-glow sweep (VIS-01, VIS-02)
-- [x] 43-03-PLAN.md — UI audit closure: wizard + calibration + settings + hover-glow sweep (VIS-01, VIS-02)
-- [x] 43-04-PLAN.md — meter.ts spectrum rebuild: hardware-LED-strip + amber peak hold + silk-12 grid (VIS-03)
-- [x] 43-05-PLAN.md — Mixamo retarget pipeline + 5 prep_*.glb swap-in scaffold + §VIS-04 KAAN-discharge (VIS-04)
-- [x] 43-06-PLAN.md — Mood pool runtime validation (3 personas, 30s smoke) + integrated-GPU perf gate (VIS-05, VIS-06)
-- [x] 43-07-PLAN.md — Memory + storyboard doc drift cleanup: DJ bat→Neon Rebel; Workbench/DSEG7→Saira/Geist (VIS-07)
-- [x] 43-08-PLAN.md — Hero demo storyboard v5 re-mock: 8-cut shot list + chip overlay frames + ≤8 cuts gate (VIS-08)
-- [x] 43-09-PLAN.md — Francesco pre-production handoff package + demo-mode sequencer + §VIS-09 discharge (VIS-09)
-```
-
-**Wave structure:** Wave 1 (43-01, 43-04, 43-07) → Wave 2 (43-02, 43-03, 43-05, 43-08) → Wave 3 (43-06, 43-09)
-
-### Phase 44: Launch Positioning + Pre-stage
-
-**Goal:** README launch-ready; EvidenceRegistry citation strip visible in live UI (anti-slop receipts on screen); Bravoh funnel CTA placed; bravoh GH org stood up; SHIP-TWEET copy locked; Discord provisioning + outreach calendar finalized. Every pre-stage item discharged that doesn't require external clock.
-
-**Requirements:** LAUNCH-01..10
-
-**Success criteria:**
-
-1. README hero section frontloads "the only AI co-host that actually listens to your set"; one-line pitch above fold; static screenshot or GIF in place (demo.mp4 references resolvable post-shoot).
-2. Live UI shows 2-3 word evidence tag per AI reaction (`[kick swap @ 2:33]`); click → debrief opens with waveform region highlight.
-3. DJ-software grid + controllers grid render in README; alt-text + accessibility checks pass.
-4. `bravoh` GitHub org exists; billing flag resolved; ready to receive transfer.
-5. SHIP-TWEET copy files signed off (Kaan + Francesco mutual approval) for all 5 channels (twitter/instagram/linkedin/reddit/discord).
-6. Discord provision dry-run completes without errors; outreach calendar (DJ TechTools + DDJ Tips + Mixmag + Reddit + Discord T-3 soft-launch) populated.
-
-**Plans:** 7 plans
-
-```
-Plans:
-- [x] 44-01-PLAN.md — README hero rewrite + 'no AI slop' hook section (LAUNCH-01)
-- [x] 44-02-PLAN.md — DJ-software grid + controller grid + a11y check (LAUNCH-03, LAUNCH-04)
-- [x] 44-03-PLAN.md — EvidenceRegistry citation strip in live UI + tag→debrief deep link (LAUNCH-02)
-- [x] 44-04-PLAN.md — Bravoh waitlist toggle in debrief settings (LAUNCH-05)
-- [x] 44-05-PLAN.md — SHIP-TWEET 5-channel copy lock + AI-slop grep gate + §LAUNCH-07 runbook (LAUNCH-07)
-- [x] 44-06-PLAN.md — Bravoh GH org standup + Discord auto-provision dry-run lock + check scripts (LAUNCH-06, LAUNCH-08)
-- [x] 44-07-PLAN.md — Outreach calendar + launch sequence T-7 → T+30 doc (LAUNCH-09, LAUNCH-10)
-```
-
-**Wave structure:** Wave 1 (44-01, 44-03, 44-04, 44-05, 44-07) → Wave 2 (44-02 [depends 44-01], 44-06 [depends 44-05])
-
-### Phase 45: External Discharge + Public RC Publish
-
-**Goal:** Apple Dev Agreement + SignPath OSS approvals land → cascading discharge (DIST-19 sign+verify → INSTALL-VM matrix → INSTALL-60S → SHIP-CUT v3.0.0-rc1) → social publish + Discord + repo transfer + 24h monitoring rotation → ~2-week bake → SHIP-V1-DECISION. KAAN-ACTION-LEGAL critical path.
-
-**Requirements:** SHIP-01..13
-
-**Success criteria:**
-
-1. Apple Developer Program Agreement signed by Francesco; macOS signing secrets populated in GH.
-2. SignPath OSS Foundation approval received; Windows signing secrets populated in GH.
-3. First signed binaries produced (DMG + MSI); `scripts/verify_signed.py --require-signed` smoke passes.
-4. INSTALL-VM-RUN matrix green on macOS 12.3 / 14 / 15 + Win 10 / 11; onboarding ≤60s per VM.
-5. Bravoh `POST /vibemix/updates/upload` + `GET /vibemix/updates/latest.json` + `GET /vibemix/healthz` endpoints live with `*/5 * * * *` cron.
-6. `gh release create v3.0.0-rc1 --draft` executed; 5-channel social publish complete; #announcements Discord post live; repo transferred to `bravoh/vibemix`; 24h rotation executed.
-7. ~2-week bake observation period — Kaan signs SHIP-V1-DECISION (cut v1.0.0 / cycle RC2 / pause).
-
-**Plans:** 6 plans
-
-```
-Plans:
-- [x] 45-01-PLAN.md — tart-based INSTALL-VM matrix runner + 60s onboarding gate (SHIP-04, SHIP-05)
-- [x] 45-02-PLAN.md — launch_trigger.sh orchestration + cadence_index.json T-30 / T+0 / T+5h / T+24h (SHIP-08)
-- [x] 45-03-PLAN.md — check_bravoh_server_ready.sh 3-endpoint probe + cut_release.sh Gate 5b wire-in (SHIP-06)
-- [x] 45-04-PLAN.md — SHIP-V1-DECISION audit script + decision template + synthetic-telemetry fixtures (SHIP-13)
-- [x] 45-05-PLAN.md — docs/launch-rotation.md §SHIP-11 augment — 24h solo rotation + triage decision tree (SHIP-11)
-- [x] 45-06-PLAN.md — KAAN-ACTION-LEGAL.md §SHIP-01..13 discharge cookbook (SHIP-01..13 all)
-```
-
-**Wave structure:** Wave 1 (45-01, 45-02, 45-03, 45-04, 45-05 — independent engineering scaffolding) → Wave 2 (45-06 — KAAN-ACTION-LEGAL §SHIP-01..13 runbook append; depends on Wave 1 commits for command-reference accuracy)
-
-### Sequencing
-
-```
-P40 (Audio Port) ──┬─→ P42 (Hybrid Gate) ──┐
-                   │                        │
-P41 (Latency v2) ──┤                        ├─→ P44 (Launch Pre-stage) ──→ P45 (External + Publish)
-                   │                        │
-                   └────→ P43 (Visual) ─────┘
-```
-
-- **P40 + P41 parallel** — independent (audio path vs model layer).
-- **P42 + P43 parallel after P40** — gate calibration depends on stable audio path; visual is independent of audio.
-- **P44 after P43** — launch positioning needs final UI for screenshots + hero demo references.
-- **P45 cascades** when Apple + SignPath approvals land — submit both Day 1 of v3.0.
+- ✅ **v3.0 Clean OSS Ship** — Phases 40–45 (shipped 2026-05-17, tech_debt accepted) — see `.planning/milestones/v3.0-ROADMAP.md`
 
 ---
 
@@ -262,6 +56,24 @@ Full archive: `.planning/milestones/v2.1-ROADMAP.md` · Requirements: `.planning
 
 </details>
 
+<details>
+<summary>✅ v3.0 Clean OSS Ship (Phases 40–45) — SHIPPED 2026-05-17 (tech_debt accepted)</summary>
+
+6 phases shipped engineering-green under `gsd-autonomous fully` mode. 41 plans, 250 commits since `v2.1.0` tag, net ~+61k LOC across `src/vibemix/`, `tauri/`, `scripts/`, `tests/`, `docs/`, `eval/`. 57 / 57 v3.0 REQ-IDs engineering-satisfied. All 3 integration seams + 5 flows audited.
+
+- [x] Phase 40: Anti-Slop Audio Port (6/6 plans) — completed 2026-05-16 (AUDIO-01..04 GREEN; AUDIO-05/06/07 = KAAN-ACTION-LEGAL)
+- [x] Phase 41: Gemini SKU Upgrade + Latency Stack v2 (7/7 plans) — completed 2026-05-16 (LAT-01..08 GREEN; LAT-09 spike = KAAN-ACTION-PROXY)
+- [x] Phase 42: Hallucination Gate v3 — Hybrid (6/6 plans) — completed 2026-05-16 (GATE-05..09 GREEN; GATE-01/02/03/04 corpus = KAAN-ACTION-LEGAL)
+- [x] Phase 43: Visual Ship Lock (9/9 plans) — completed 2026-05-16 (VIS-01..09 GREEN; VIS-04 Mixamo retargets = KAAN-ACTION-LEGAL)
+- [x] Phase 44: Launch Positioning + Pre-stage (7/7 plans) — completed 2026-05-17 (LAUNCH-01..10 GREEN; LAUNCH-03/04/06/07/08 = KAAN-ACTION-LEGAL)
+- [x] Phase 45: External Discharge + Public RC Publish (6/6 plans) — completed 2026-05-17 (SHIP-08/11/13 engineering GREEN; SHIP-01..13 cookbook in KAAN-ACTION-LEGAL)
+
+**Critical path at close:** External clock — Apple Dev Agreement (Francesco, P46) + SignPath OSS Foundation (Kaan, ~1-week SLA, P46) gate the public RC publish. After approvals land, SHIP-CUT v3.0.0-rc1 is one-button via the §SHIP-01..13 discharge cookbook (45-06).
+
+Full archive: `.planning/milestones/v3.0-ROADMAP.md` · Requirements: `.planning/milestones/v3.0-REQUIREMENTS.md` · Audit: `.planning/milestones/v3.0-MILESTONE-AUDIT.md`
+
+</details>
+
 ---
 
 ## Progress
@@ -271,8 +83,8 @@ Full archive: `.planning/milestones/v2.1-ROADMAP.md` · Requirements: `.planning
 | v0.1.0 MVP Foundation | 1–14 | ✅ Shipped | 2026-05-13 |
 | v2.0 Research-Driven Ship | 15–26 | ✅ Shipped (tech_debt) | 2026-05-14 |
 | v2.1 The Unified Cut | 27–39 | ✅ Shipped (tech_debt) | 2026-05-16 |
-| **v3.0 Clean OSS Ship** | **40–45** | **🚧 Planning** | — |
+| v3.0 Clean OSS Ship | 40–45 | ✅ Shipped (tech_debt) | 2026-05-17 |
 
 ---
 
-*Roadmap updated 2026-05-16 via `/gsd:new-milestone` — v3.0 scoped after 4-bucket research swarm. 6 phases (P40-P45), 57 REQ-IDs, critical path = external clock (Apple Dev Agreement + SignPath OSS).*
+*Roadmap updated 2026-05-17 via `/gsd:complete-milestone` — v3.0 "Clean OSS Ship" engineering-complete; KAAN-ACTION-LEGAL §SHIP-01..13 discharge cookbook ready for external clock + operator execution. Next milestone scaffolds via `/gsd:new-milestone` when Kaan opens v3.x scope.*
