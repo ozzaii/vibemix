@@ -190,6 +190,20 @@ Plans:
 6. `gh release create v3.0.0-rc1 --draft` executed; 5-channel social publish complete; #announcements Discord post live; repo transferred to `bravoh/vibemix`; 24h rotation executed.
 7. ~2-week bake observation period — Kaan signs SHIP-V1-DECISION (cut v1.0.0 / cycle RC2 / pause).
 
+**Plans:** 6 plans
+
+```
+Plans:
+- [ ] 45-01-PLAN.md — tart-based INSTALL-VM matrix runner + 60s onboarding gate (SHIP-04, SHIP-05)
+- [ ] 45-02-PLAN.md — launch_trigger.sh orchestration + cadence_index.json T-30 / T+0 / T+5h / T+24h (SHIP-08)
+- [ ] 45-03-PLAN.md — check_bravoh_server_ready.sh 3-endpoint probe + cut_release.sh Gate 5b wire-in (SHIP-06)
+- [ ] 45-04-PLAN.md — SHIP-V1-DECISION audit script + decision template + synthetic-telemetry fixtures (SHIP-13)
+- [ ] 45-05-PLAN.md — docs/launch-rotation.md §SHIP-11 augment — 24h solo rotation + triage decision tree (SHIP-11)
+- [ ] 45-06-PLAN.md — KAAN-ACTION-LEGAL.md §SHIP-01..13 discharge cookbook (SHIP-01..13 all)
+```
+
+**Wave structure:** Wave 1 (45-01, 45-02, 45-03, 45-04, 45-05 — independent engineering scaffolding) → Wave 2 (45-06 — KAAN-ACTION-LEGAL §SHIP-01..13 runbook append; depends on Wave 1 commits for command-reference accuracy)
+
 ### Sequencing
 
 ```
