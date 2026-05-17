@@ -79,7 +79,7 @@
 - [ ] **SHIP-05**: INSTALL-60S-CHECK — `onboarding-stopwatch.ts` confirms ≤60s end-to-end onboarding on every VM
 - [ ] **SHIP-06**: OPS-14-SERVER — Bravoh team deploys `POST /vibemix/updates/upload` + `GET /vibemix/updates/latest.json` + `GET /vibemix/healthz`; healthz cron `*/5 * * * *` on Bravoh server; auto-update + monitoring live
 - [ ] **SHIP-07**: SHIP-CUT — `gh release create v3.0.0-rc1 --draft` after `cut_release.sh` 6-gate green (Gate-2 signed-binary check flips green from SHIP-03)
-- [ ] **SHIP-08**: SHIP-TWEET — 5-channel social publish via `launch_trigger.sh --publish` on T-30 / T+0 / T+5 / T+24h cadence
+- [x] **SHIP-08**: SHIP-TWEET — 5-channel social publish via `launch_trigger.sh --publish` on T-30 / T+0 / T+5 / T+24h cadence
 - [ ] **SHIP-09**: SHIP-DISCORD — #announcements launch post + `discord_provision.py --real` execution
 - [ ] **SHIP-10**: SHIP-TRANSFER — repo transfer to `bravoh/vibemix` via `gh api repos/.../transfer`
 - [ ] **SHIP-11**: SHIP-ROTATE — 24h monitoring rotation execution per `docs/launch-rotation.md`

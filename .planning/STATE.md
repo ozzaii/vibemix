@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Clean OSS Ship
 status: Session + overlay HIGH-findings-closed; 20 --glow-faint sites; storyboard 8-cut re-mock + cut-count gate; Mixamo retarget scaffold + §VIS-04 runbook; meter LED-strip rebuild; doc drift cleaned; Francesco capture-day handoff package shipped (4 docs + demo-mode 30-event sequencer + §VIS-09 dual sign-off runbook). VIS-01, VIS-02, VIS-03, VIS-04 (scaffold), VIS-07, VIS-08, VIS-09 closed. README hero one-liner locked + "No AI slop" hook section + 3-gate CI lock shipped (44-01 / LAUNCH-01). DJ-software 6-cell grid + canonical-10 controllers grid reconciled to src/vibemix/midi/controllers/*.json + 4-gate a11y CI (alt + count + balance + slop) + §LAUNCH-03 + §LAUNCH-04 Kaan-discharge runbooks shipped (44-02 / LAUNCH-03 + LAUNCH-04). EvidenceRegistry citation strip surfaced in live UI + click→debrief deep-link + 2s region highlight shipped (44-03 / LAUNCH-02) — new SessionCohostReaction IPC + token-driven amber chip strip + Tauri open_debrief_window deep_link extension. Bravoh waitlist opt-in toggle shipped in debrief window (44-04 / LAUNCH-05) — ConfigStore.bravoh_waitlist_opt_in field + mountBravohWaitlistToggle component + verbatim UTM URL grep-gate + token-driven faint-amber-glow active state; subtle, opt-in only, default OFF, no signed-out telemetry.
-last_updated: "2026-05-17T07:10:58.000Z"
+last_updated: "2026-05-17T07:59:56.153Z"
 last_activity: 2026-05-17
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 35
-  completed_plans: 35
+  total_plans: 41
+  completed_plans: 38
   percent: 83
 ---
 
@@ -68,6 +68,7 @@ Last activity: 2026-05-17
 | Phase 43 P05 | 14m 02s | 3 tasks | 8 files |
 | Phase 44-launch-positioning-pre-stage P01 | 10min | 2 tasks | 3 files |
 | Phase 44-launch-positioning-pre-stage P02 | ~1h | 3 tasks | 19 files |
+| Phase 45 P02 | 45min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -170,6 +171,7 @@ All 11 critical pitfalls (P42–P52) mitigated in shipped code. P46 (legal-capac
 
 ### Last Session
 
+- 2026-05-17 — Plan 45-02 complete: `scripts/launch/launch_trigger.sh` orchestrator + `scripts/dayzero/launch_copy/cadence_index.json` (5-channel × 4-stage matrix) + 22-test pin in `tests/launch/test_launch_trigger_orchestration.py`. Dry-run-default; `--live` requires triple-env (LAUNCH_REAL=1 + GITHUB_TOKEN + DISCORD_WEBHOOK_URL); pre-publish slop gate via `check_no_ai_slop.py`; sign-off footer gate (literal Kaan + Francesco signature: per Plan 44-05 lock); JSONL audit at `dist/launch-runs/<UTC>.jsonl` (Plan 45-04 SHIP-V1-DECISION consumes). GH Actions `::error::` annotation on failure. 3 atomic commits: 1686c60 (RED) + d2e8c00 (Task 2 GREEN dry-run+audit) + e4e751b (Task 3 GREEN --live triple-env + footer). Closes SHIP-08. Plan 45-06 §SHIP-08 runbook will cite the literal discharge command.
 - 2026-05-16 — Plan 43-08 complete: hero demo storyboard re-mocked to 8-cut 30s sequence per CONTEXT §VIS-08; UI chip overlays in cuts 2-6 inline-rendered with CDJ Whisper v5 (wizard welcome, calibration meter, session shell, AI caption pop, EvidenceRegistry chip strip); end-card carries `open-source · MIT · github.com/bravoh/vibemix` star-funnel CTA; ≤8 cut hard gate wired via `scripts/launch/check_cut_count.py` + 6-test pytest spec; 12/12 launch-prep pytests green. Commits: c1877ed (test RED) + 6e7dd06 (feat GREEN) + f53cb9f (storyboard re-mock). Closes VIS-08; unblocks Plan 43-09 (Francesco handoff package).
 - 2026-05-16 — Plan 43-07 complete: mascot memory snapped to "Neon Rebel"; storyboard mock migrated from Workbench + DSEG7 to Saira + Geist Mono on the 5-warm-blacks + 1-amber CDJ Whisper palette; `scripts/launch/check_storyboard_palette.py` + 6-test pytest spec wired as drift-prevention gate. Commits: 4054536 + 2e4c1eb (test RED) + 927f79f (feat GREEN). Closes VIS-07.
 - 2026-05-16 — Plan 42-04 complete: `scripts/release/check_gate.sh` (hybrid hallucination gate combining last-7 nightly proxy scorecards from `.planning/eval-runs/` AND `check_ear_test.sh`) + wired Gate 2b into `scripts/launch/cut_release.sh` + retired v2.1 P85 reminder echo lines. 22 tests added (14 bash-gate + 8 cut_release wire-in; 21 pass + 1 conditional jq-missing skip). Phase 39 regression baselines preserved (test_g5_poc_files_untouched + test_bundle_id_locked green; verify_signed.py call still in Gate 2). Closes GATE-06 (hybrid release gate plumbing); GATE-08 partially advanced (echo-line removal; Plan 42-05 owns the test-file retirement + P85-OVERRIDE-RETIRED.md decision-log). Commits: 4a77b4d + c204318.
