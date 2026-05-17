@@ -63,7 +63,7 @@
 - [x] **LAUNCH-02**: `EvidenceRegistry` citation strip surfaced in live UI — every AI reaction shows 2-3 word evidence tag (e.g. `[kick swap @ 2:33]`); click tag → debrief window opens with waveform region highlight; closes anti-slop receipts gap from §6.2 white-space (44-03 / 8de6649; new SessionCohostReaction IPC + citation-strip.ts component + Tauri deep_link extension + timeline.ts region highlight)
 - [x] **LAUNCH-03**: DJ-software-logo grid in README — rekordbox, Serato, Traktor, djay Pro, VirtualDJ, Mixxx; "works alongside whatever DJ app you already use" framing (44-02 / 0bc7b73; placeholders via §LAUNCH-03 real-logo discharge)
 - [x] **LAUNCH-04**: Supported-controllers grid finalized — 10 mapped controllers with logos + "calibrate any other" callout for generic-MIDI fallback (44-02 / 0bc7b73; reconciled to canonical 10 from src/vibemix/midi/controllers/*.json; placeholders via §LAUNCH-04 real-logo discharge)
-- [ ] **LAUNCH-05**: In-app Bravoh funnel CTA — debrief window optional "join Bravoh waitlist" toggle; subtle, opt-in, not gating; signed-out telemetry default-off; UTM-tracked link to `bravoh.com/waitlist`
+- [x] **LAUNCH-05**: In-app Bravoh funnel CTA — debrief window optional "join Bravoh waitlist" toggle; subtle, opt-in, not gating; signed-out telemetry default-off; UTM-tracked link to `bravoh.com/waitlist` (44-04 / 43cfc5a; ConfigStore.bravoh_waitlist_opt_in field + mountBravohWaitlistToggle component + verbatim UTM URL grep-gate)
 - [x] **LAUNCH-06**: `bravoh` GitHub org standup — resolve Bravoh Enterprise billing flag (per `signpath-application.md`), create org, members provisioned; ready to receive transfer (SHIP-TRANSFER pre-stage)
 - [x] **LAUNCH-07**: SHIP-TWEET 5-channel copy review + sign-off — Kaan + Francesco mutual approval on `scripts/dayzero/launch_copy/{twitter,instagram,linkedin,reddit,discord}.txt`; no AI-slop language, "real tool not toy" framing
 - [x] **LAUNCH-08**: Discord auto-provision dry-run — `scripts/dayzero/discord_provision.py --dry-run` complete; Bravoh Discord bot token sourced + stored in GH secret; channels + roles defined; OPS-09 ready for live execution
@@ -154,7 +154,7 @@ Explicit exclusions for v3.0. Documented to prevent scope creep.
 | LAT-01..09 | Phase 41 | Pending |
 | GATE-01..09 | Phase 42 | Pending |
 | VIS-01..09 | Phase 43 | Pending |
-| LAUNCH-01..10 | Phase 44 | LAUNCH-01/02/03/04/07/09/10 GREEN (44-01/02/03/05/07); 3 remaining (LAUNCH-05/06/08) |
+| LAUNCH-01..10 | Phase 44 | LAUNCH-01/02/03/04/05/06/07/08/09/10 GREEN (44-01/02/03/04/05/06/07); ALL CLOSED |
 | SHIP-01..13 | Phase 45 | Pending |
 
 **Coverage:**
