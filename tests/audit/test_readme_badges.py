@@ -26,7 +26,7 @@ def test_readme_exists():
 
 def test_all_required_badge_labels_present():
     text = README.read_text()
-    missing = [l for l in REQUIRED_BADGE_LABELS if l not in text]
+    missing = [label for label in REQUIRED_BADGE_LABELS if label not in text]
     assert not missing, f"missing dep-health badge labels: {missing}"
 
 
