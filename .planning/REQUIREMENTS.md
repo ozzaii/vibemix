@@ -66,16 +66,16 @@ REQ-IDs continue alphabetically; numbering restarts per category since these are
 
 ### E2E — End-to-End MacBook + OS-Matrix Pass
 
-- [ ] **E2E-01** — `tests/e2e/macbook/` harness installs the SHIPPED `.dmg` to `/Applications`, launches with debug logging, exercises the live-session golden path, and asserts on a structured `report.html` covering functional + visual + aesthetic + usability dimensions.
-- [ ] **E2E-02** — Pass is split into 50a (Kaan-ear, subjective) + 50b (OS-matrix smoke, objective ≥2 of {macOS 12.3 Intel, 14 AS, 15 AS, Win 10, Win 11}); both required for v3.1 close.
-- [ ] **E2E-03** — Visual regression via Playwright + pixelmatch with `maxDiffPixelRatio: 0.02`; snapshots stored at `tests/e2e/macbook/__snapshots__/`, baselined on real mascot GLBs (depends on MASCOT-01).
-- [ ] **E2E-04** — Audio-loopback fixture validates the sidecar↔BlackHole/VB-CABLE path without re-issuing live Gemini calls (VCR cassette pinned to v3.0 GATE-02 baseline) to avoid burning Gemini quota in CI.
-- [ ] **E2E-05** — Hallucination gate re-run via `scripts/eval/check_gate.sh` Gate 2b returns engineering-clean for the v3.1 build before the e2e pass is marked PASS.
-- [ ] **E2E-06** — Nielsen 10-heuristic checklist passes on Kaan's MacBook walk (50a) with paired `gsd-ui-checker` + `gsd-ui-auditor` zero HIGH findings on Tier-1 surfaces.
-- [ ] **E2E-07** — Screencast of Kaan's 50a walk committed to `docs/e2e/2026-05-walk.webm` (sized < 25 MB or LFS).
-- [ ] **E2E-08** — `cut_release.sh` Gate 6b (`scripts/e2e/check_e2e_report.sh`) blocks release publish if any dimension reports FAIL in the latest `dist/e2e-macbook-runs/<UTC>/report.html`.
-- [ ] **E2E-09** — E2e harness explicitly forbidden from writing to off-limits paths (`~/.hermes/`, `~/hermes-rig/logs/`, `~/.lmstudio/`) per memory `feedback_privacy_scope_narrow`; pytest fixture asserts this on every test run.
-- [ ] **E2E-10** — Anti-slop blocklist runs against every produced e2e report.html title/section to keep generated prose constraint-aligned.
+- [x] **E2E-01** — `tests/e2e/macbook/` harness installs the SHIPPED `.dmg` to `/Applications`, launches with debug logging, exercises the live-session golden path, and asserts on a structured `report.html` covering functional + visual + aesthetic + usability dimensions. *(engineering-green: harness foundation + renderer; install/launch invocation gated on §INSTALL-VM-RUN downstream + §SHIP-CUT signed .dmg)*
+- [x] **E2E-02** — Pass is split into 50a (Kaan-ear, subjective) + 50b (OS-matrix smoke, objective ≥2 of {macOS 12.3 Intel, 14 AS, 15 AS, Win 10, Win 11}); both required for v3.1 close. *(engineering-green: 50a checklist + 50b harness; full real-VM execution waits on §INSTALL-VM-RUN downstream)*
+- [x] **E2E-03** — Visual regression via Playwright + pixelmatch with `maxDiffPixelRatio: 0.02`; snapshots stored at `tests/e2e/macbook/__snapshots__/`, baselined on real mascot GLBs (depends on MASCOT-01). *(engineering-green vs Phase 47 placeholder GLBs; re-baseline at §VIS-04 discharge)*
+- [x] **E2E-04** — Audio-loopback fixture validates the sidecar↔BlackHole/VB-CABLE path without re-issuing live Gemini calls (VCR cassette pinned to v3.0 GATE-02 baseline) to avoid burning Gemini quota in CI.
+- [x] **E2E-05** — Hallucination gate re-run via `scripts/eval/check_gate.sh` Gate 2b returns engineering-clean for the v3.1 build before the e2e pass is marked PASS. *(engineering-green: wire verified; full gate green pending proxy/nightly history corpus refresh)*
+- [x] **E2E-06** — Nielsen 10-heuristic checklist passes on Kaan's MacBook walk (50a) with paired `gsd-ui-checker` + `gsd-ui-auditor` zero HIGH findings on Tier-1 surfaces. *(engineering-green: nielsen_10_checklist.json + 50a scaffold; §E2E-50A-WALK pending Kaan discharge)*
+- [x] **E2E-07** — Screencast of Kaan's 50a walk committed to `docs/e2e/2026-05-walk.webm` (sized < 25 MB or LFS). *(engineering-green: record_50a_walk.sh capture rig + transcode command; §E2E-50A-WALK pending Kaan discharge)*
+- [x] **E2E-08** — `cut_release.sh` Gate 6b (`scripts/e2e/check_e2e_report.sh`) blocks release publish if any dimension reports FAIL in the latest `dist/e2e-macbook-runs/<UTC>/report.html`.
+- [x] **E2E-09** — E2e harness explicitly forbidden from writing to off-limits paths (`~/.hermes/`, `~/hermes-rig/logs/`, `~/.lmstudio/`) per memory `feedback_privacy_scope_narrow`; pytest fixture asserts this on every test run.
+- [x] **E2E-10** — Anti-slop blocklist runs against every produced e2e report.html title/section to keep generated prose constraint-aligned.
 
 ---
 

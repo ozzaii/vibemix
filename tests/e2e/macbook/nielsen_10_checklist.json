@@ -1,0 +1,107 @@
+{
+  "version": "1.0.0",
+  "phase": "50",
+  "scope": "Tier-1 surfaces only (library, live-session, settings) per REQ E2E-06",
+  "heuristics": [
+    {
+      "id": 1,
+      "name": "Visibility of system status",
+      "tier": 1,
+      "prompts": {
+        "library": "Does the library page show audio routing + session state at all times?",
+        "live-session": "Is the mic-gate / AI-talk / cooldown state always visible?",
+        "settings": "Does each change show a success/error indicator within 200ms?"
+      }
+    },
+    {
+      "id": 2,
+      "name": "Match between system and the real world",
+      "tier": 1,
+      "prompts": {
+        "library": "Are track titles + artist names rendered as the DJ sees them in djay Pro / rekordbox?",
+        "live-session": "Do mascot reactions reference real DJ vocabulary (drop, blend, build, deck A/B)?",
+        "settings": "Are toggles labeled in user-DJ language, not internal jargon?"
+      }
+    },
+    {
+      "id": 3,
+      "name": "User control and freedom",
+      "tier": 1,
+      "prompts": {
+        "library": "Can the user undo a session-deletion within 5s?",
+        "live-session": "Is there a clear way to mute the AI mid-session without quitting?",
+        "settings": "Can the user revert to defaults from a single control?"
+      }
+    },
+    {
+      "id": 4,
+      "name": "Consistency and standards",
+      "tier": 1,
+      "prompts": {
+        "library": "Do hover / focus / active states match the CDJ Whisper direction?",
+        "live-session": "Is the mascot's amber accent the only chromatic accent on screen?",
+        "settings": "Do toggles, sliders, and select inputs follow the same spacing scale?"
+      }
+    },
+    {
+      "id": 5,
+      "name": "Error prevention",
+      "tier": 1,
+      "prompts": {
+        "library": "Is destructive action (delete session) gated behind a confirm?",
+        "live-session": "If BlackHole is missing, does the page block with a guided fix rather than crashing?",
+        "settings": "Are mutually-exclusive settings disabled inline rather than allowed-then-rejected?"
+      }
+    },
+    {
+      "id": 6,
+      "name": "Recognition rather than recall",
+      "tier": 1,
+      "prompts": {
+        "library": "Are session previews thumbnailed so the user picks visually, not by remembering names?",
+        "live-session": "Is the active deck (A or B) shown by visual position, not just a letter?",
+        "settings": "Are keyboard shortcuts listed inline next to each action?"
+      }
+    },
+    {
+      "id": 7,
+      "name": "Flexibility and efficiency of use",
+      "tier": 1,
+      "prompts": {
+        "library": "Are recent sessions reachable in one click?",
+        "live-session": "Is there a one-key mute / unmute for the AI?",
+        "settings": "Can power users edit settings via JSON if they prefer?"
+      }
+    },
+    {
+      "id": 8,
+      "name": "Aesthetic and minimalist design",
+      "tier": 1,
+      "prompts": {
+        "library": "Does the page show only the next action and the session list — no marketing copy?",
+        "live-session": "Is every on-screen element load-bearing during a set?",
+        "settings": "Is each setting one short label + one control — no help-text bloat?"
+      }
+    },
+    {
+      "id": 9,
+      "name": "Help users recognize, diagnose, and recover from errors",
+      "tier": 1,
+      "prompts": {
+        "library": "Does a corrupt session show a one-line cause + one-action recovery?",
+        "live-session": "Does an audio-disconnect surface within 500ms with a one-action fix?",
+        "settings": "Do save failures show what the user typed + how to fix it?"
+      }
+    },
+    {
+      "id": 10,
+      "name": "Help and documentation",
+      "tier": 1,
+      "prompts": {
+        "library": "Is the README link visible on the empty-state page?",
+        "live-session": "Is help reachable without leaving the active session?",
+        "settings": "Does each non-obvious setting have one tooltip sentence (not a paragraph)?"
+      }
+    }
+  ]
+}

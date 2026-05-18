@@ -72,6 +72,26 @@ Plans:  26 / TBD  ████████░░░░░░░░░░░░  
 
 ## Accumulated Context
 
+### Phase 50 Outcome (2026-05-18, engineering-green)
+
+v3.1 end-to-end MacBook + OS-matrix pass landed engineering-green. All 10 E2E REQ-IDs covered across 6 plans. Headline artifacts:
+
+- **`tests/e2e/macbook/`** — canonical harness root per ARCHITECTURE.md § 4. 5-dimension dataclasses (Functional / Visual / Aesthetic / Usability / Hallucination) + worst-of overall status; Jinja2 `report_template.html` implementing 50-UI-SPEC.md verbatim (Geist Mono, 10-token palette, locked section labels)
+- **Privacy fixture** — session-autouse `_privacy_guard` in `conftest.py` asserts zero file-count growth in `~/.hermes/` / `~/hermes-rig/logs/` / `~/.lmstudio/` on every test session (memory `feedback_privacy_scope_narrow`)
+- **Anti-slop sibling** — `scripts/audit/check_no_slop_e2e.py` imports `AI_SLOP_BLOCKLIST` from canonical via `importlib`; scoped to `dist/e2e-macbook-runs/**/report.html`; 6 tested cases (clean / banned / word-boundary / no-report / missing-dir / canonical-import)
+- **Visual regression** — Playwright + pixelmatch `maxDiffPixelRatio: 0.02` (REQ E2E-03 verbatim); persona-smoke + library-page + live-session specs target Tauri+Three.js production surfaces; baselines = Phase 47 placeholder GLBs (re-baseline at §VIS-04 discharge); CI-tolerant skips on Tauri dev-server unreachable per PITFALLS § 8
+- **Audio loopback** — `audio_loopback_fixture.py` + VCR cassette at `tests/e2e/macbook/cassettes/gate_02_v3_0_baseline.yaml` (pinned to v3.0 GATE-02 baseline; zero live Gemini calls); AST-based ModelRouter seam-check rejects `gemini-N` SKU literals in executable code
+- **48 kHz probe** — `test_blackhole_48khz_probe.py` re-asserts Phase 49 INSTALL-10 contract (48000 → ok, 44100 → fail, missing → fail); memory `project_v4_canonical_baseline`
+- **Gate 6b** — `scripts/e2e/check_e2e_report.sh` (POSIX bash + grep + sed; 4 tested cases); wired into `scripts/launch/cut_release.sh` immediately after Gate 2b; blocks release publish on any dimension FAIL
+- **50b OS-matrix smoke** — `os_matrix_smoke.py` composes Phase 49 `install_vm_matrix.sh --check-e2e`; 4-step smoke (install / launch / first-event / shutdown); dry-run wire-check across all 5 OS configs; Tart-image-required configs SKIPPED-with-reason
+- **50a Kaan-walk scaffold** — `50a_kaan_walk_checklist.md` (10 steps + PASS/FAIL marks) + `nielsen_10_checklist.json` (10 heuristics × Tier-1 surfaces) + `scripts/e2e/record_50a_walk.sh` (macOS screencast + ffmpeg transcode); per memory `project_phase_16_kaan_dj_testing` — Kaan-ear, NOT 30-session harness
+
+**Test verification:** 18 e2e tests added; harness foundation tests green (7 pass), audio fixtures green-or-skipped (4 skipped per CI-tolerant fallbacks), Gate 2b rerun + OS-matrix smoke green (3 pass + 1 skip), anti-slop sibling green (6 pass), Gate 6b bash test green (4/4 cases).
+
+**Kaan-action surface (deferred for v3.1 close):**
+1. **§E2E-50A-WALK** — Kaan executes the 50a walk on his MacBook + real DJ-set audio + records `docs/e2e/2026-05-walk.webm` per checklist at `tests/e2e/macbook/50a_kaan_walk_checklist.md`
+2. **§INSTALL-VM-RUN downstream** (carry-forward from Phase 49) — 50b real-VM execution on all 5 OS configs (engineering ships dry-run + 2 reachable configs; full execution waits on Tart images + §INSTALL-COMPANION-SIGN)
+
 ### Phase 49 Outcome (2026-05-18, engineering-green)
 
 v3.1 one-click installer chain landed engineering-green. All 10 INSTALL REQ-IDs covered across 6 plans. 68 tests pass. Headline artifacts:
