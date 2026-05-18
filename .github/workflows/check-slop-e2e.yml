@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+# Phase 50 / E2E — Anti-slop sibling-gate wire for dist/e2e-macbook-runs/**/report.html
+#
+# Mirrors the Phase 47 / Phase 48 sibling-script CI precedent. Runs e2e report
+# generation first (so a report.html exists), then the sibling gate. CI no-ops
+# gracefully if no runs are produced (e.g., when the harness is skipped).
+#
+# Action SHAs are pinned per the Phase 46 pinact policy.
+
+name: anti-slop-e2e
+
+on:
+  pull_request:
+    paths:
+      - "tests/e2e/macbook/**"
+      - "scripts/audit/check_no_slop_e2e.py"
+      - ".github/workflows/check-slop-e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tests/e2e/macbook/**"
+      - "scripts/audit/check_no_slop_e2e.py"
+
+jobs:
+  check-slop-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
+      - name: Set up Python
+        uses: actions/setup-python@39cd14951b08e74b54015e9e001cdefcf80e669f  # v5.1.1
+        with:
+          python-version: "3.12"
+      - name: Install runtime deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install jinja2 pytest
+      - name: Generate sample report.html via renderer smoke test
+        run: |
+          python -m pytest tests/e2e/macbook/test_report_render.py -q
+      - name: Anti-slop sibling gate
+        run: |
+          python scripts/audit/check_no_slop_e2e.py
