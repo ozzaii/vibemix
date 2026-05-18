@@ -74,3 +74,46 @@ repo) for the canonical workflow.
 These files are LIVE-LOADED via `tauri/ui/assets/mascot/manifest.json`.
 Removal breaks the mascot anticipation surface. The replacement workflow
 is drop-in by same-name overwrite, not delete-then-add.
+
+---
+
+## Phase 47 / MASCOT-01 — 23 new family-slot placeholders
+
+On top of the 5 legacy `prep_*` Phase-22-02 placeholders, Phase 47 adds 23
+new placeholders covering the 4-layer additive state machine families:
+
+- **Base (3):** `base_idle.glb`, `base_breathe.glb`, `base_sway.glb`
+- **Emotion (5):** `emotion_joy.glb`, `emotion_trust.glb`, `emotion_surprise.glb`, `emotion_anticipation.glb`, `emotion_focus.glb`
+- **Anticipation NEW (5):** `prep_kick.glb`, `prep_breakdown.glb`, `prep_drop.glb`, `prep_layer.glb`, `prep_mix.glb` (distinct from the 5 legacy `prep_*`)
+- **Reaction (10):** `react_kick_swap.glb`, `react_sub_layer.glb`, `react_breakdown.glb`, `react_reentry.glb`, `react_phrase_boundary.glb`, `react_distortion_climb.glb`, `react_acid_line.glb`, `react_mix_in.glb`, `react_mix_out.glb`, `react_hype_peak.glb`
+
+### Seeding
+
+Run from repo root to (re)create the 23 placeholders by aliasing
+`prep_settle.glb`:
+
+```bash
+uv run python scripts/mascot/seed_phase_47_placeholders.py
+```
+
+Idempotent — safe to re-run. Skips slots already discharged with a real
+retarget (file size >= per-family floor).
+
+### Real-asset replacement
+
+Same workflow as Phase 22-02: Kaan downloads Mixamo source `.fbx` per
+`scripts/mascot/MIXAMO-CLIP-SOURCES.md` § Phase 47 family sections, then runs:
+
+```bash
+uv run python scripts/mascot/retarget_to_neon_rebel.py \
+    --slot <slot> --source ~/Downloads/mixamo_<slot>.glb --really
+```
+
+Bundle gate `scripts/mascot/check_bundle_size.sh` flips green when every
+placeholder is replaced with a real retarget that falls inside the
+per-family size band.
+
+### Provenance
+
+Source `.fbx` files staged in `assets/mascot/source/` (gitignored); manifest
+at `assets/mascot/source/MANIFEST.yaml` tracks discharge state per slot.

@@ -181,6 +181,121 @@
       "states": [
         "prep_settle"
       ]
+    },
+    {
+      "file": "animations/base_idle.glb",
+      "clip": "base_idle",
+      "states": ["base_idle"]
+    },
+    {
+      "file": "animations/base_breathe.glb",
+      "clip": "base_breathe",
+      "states": ["base_breathe"]
+    },
+    {
+      "file": "animations/base_sway.glb",
+      "clip": "base_sway",
+      "states": ["base_sway"]
+    },
+    {
+      "file": "animations/emotion_joy.glb",
+      "clip": "emotion_joy",
+      "states": ["emotion_joy"]
+    },
+    {
+      "file": "animations/emotion_trust.glb",
+      "clip": "emotion_trust",
+      "states": ["emotion_trust"]
+    },
+    {
+      "file": "animations/emotion_surprise.glb",
+      "clip": "emotion_surprise",
+      "states": ["emotion_surprise"]
+    },
+    {
+      "file": "animations/emotion_anticipation.glb",
+      "clip": "emotion_anticipation",
+      "states": ["emotion_anticipation"]
+    },
+    {
+      "file": "animations/emotion_focus.glb",
+      "clip": "emotion_focus",
+      "states": ["emotion_focus"]
+    },
+    {
+      "file": "animations/prep_kick.glb",
+      "clip": "prep_kick",
+      "states": ["prep_kick"]
+    },
+    {
+      "file": "animations/prep_breakdown.glb",
+      "clip": "prep_breakdown",
+      "states": ["prep_breakdown"]
+    },
+    {
+      "file": "animations/prep_drop.glb",
+      "clip": "prep_drop",
+      "states": ["prep_drop"]
+    },
+    {
+      "file": "animations/prep_layer.glb",
+      "clip": "prep_layer",
+      "states": ["prep_layer"]
+    },
+    {
+      "file": "animations/prep_mix.glb",
+      "clip": "prep_mix",
+      "states": ["prep_mix"]
+    },
+    {
+      "file": "animations/react_kick_swap.glb",
+      "clip": "react_kick_swap",
+      "states": ["react_kick_swap"]
+    },
+    {
+      "file": "animations/react_sub_layer.glb",
+      "clip": "react_sub_layer",
+      "states": ["react_sub_layer"]
+    },
+    {
+      "file": "animations/react_breakdown.glb",
+      "clip": "react_breakdown",
+      "states": ["react_breakdown"]
+    },
+    {
+      "file": "animations/react_reentry.glb",
+      "clip": "react_reentry",
+      "states": ["react_reentry"]
+    },
+    {
+      "file": "animations/react_phrase_boundary.glb",
+      "clip": "react_phrase_boundary",
+      "states": ["react_phrase_boundary"]
+    },
+    {
+      "file": "animations/react_distortion_climb.glb",
+      "clip": "react_distortion_climb",
+      "states": ["react_distortion_climb"]
+    },
+    {
+      "file": "animations/react_acid_line.glb",
+      "clip": "react_acid_line",
+      "states": ["react_acid_line"]
+    },
+    {
+      "file": "animations/react_mix_in.glb",
+      "clip": "react_mix_in",
+      "states": ["react_mix_in"]
+    },
+    {
+      "file": "animations/react_mix_out.glb",
+      "clip": "react_mix_out",
+      "states": ["react_mix_out"]
+    },
+    {
+      "file": "animations/react_hype_peak.glb",
+      "clip": "react_hype_peak",
+      "states": ["react_hype_peak"]
     }
   ],
   "bundle_bytes_target": 26214400,
