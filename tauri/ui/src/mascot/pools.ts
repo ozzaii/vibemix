@@ -102,3 +102,73 @@ export function getPoolForMood(mood: string): readonly PoolEntry[] {
   }
   return MOOD_POOLS[mood as MoodKey];
 }
+
+// ── Phase 47 / MASCOT-04 — 4 sibling clipKind → slot maps ─────────────
+//
+// EXTENDS the existing KIND_TO_SLOT (which is locked by pools.test.ts
+// grep gate § VIS-05). The 4 maps below register Phase 47 family slots
+// for the 4-layer additive state machine (Base / Emotion / Anticipation
+// / Reaction). Slot stems match the on-disk GLB file names AND the
+// internal Three.js AnimationClip.name set by retarget_to_neon_rebel.py.
+
+import type {
+  BaseClip,
+  EmotionClip,
+  AnticipationClip,
+  ReactionClip,
+} from "./types.js";
+
+/** Base layer (low priority) — 3 looping baseline clips. */
+export const BASE_CLIP_TO_SLOT: Readonly<Record<BaseClip, string>> =
+  Object.freeze({
+    base_idle: "base_idle",
+    base_breathe: "base_breathe",
+    base_sway: "base_sway",
+  });
+
+/** Emotion layer (priority 60) — 5 Phase 47 emotion clips. */
+export const EMOTION_CLIP_TO_SLOT: Readonly<Record<EmotionClip, string>> =
+  Object.freeze({
+    emotion_joy: "emotion_joy",
+    emotion_trust: "emotion_trust",
+    emotion_surprise: "emotion_surprise",
+    emotion_anticipation: "emotion_anticipation",
+    emotion_focus: "emotion_focus",
+  });
+
+/** Anticipation layer (priority 70) — 5 NEW prep_* event-class clips.
+ *  Note: distinct from the legacy `prep_lean_in_*` / `prep_head_turn_*` /
+ *  `prep_settle` slots in KIND_TO_SLOT — those stay for backward-compat. */
+export const ANTICIPATION_CLIP_TO_SLOT: Readonly<
+  Record<AnticipationClip, string>
+> = Object.freeze({
+  prep_kick: "prep_kick",
+  prep_breakdown: "prep_breakdown",
+  prep_drop: "prep_drop",
+  prep_layer: "prep_layer",
+  prep_mix: "prep_mix",
+});
+
+/** Reaction layer (priority 80) — 10 Phase 47 one-shot reaction clips. */
+export const REACTION_CLIP_TO_SLOT: Readonly<Record<ReactionClip, string>> =
+  Object.freeze({
+    react_kick_swap: "react_kick_swap",
+    react_sub_layer: "react_sub_layer",
+    react_breakdown: "react_breakdown",
+    react_reentry: "react_reentry",
+    react_phrase_boundary: "react_phrase_boundary",
+    react_distortion_climb: "react_distortion_climb",
+    react_acid_line: "react_acid_line",
+    react_mix_in: "react_mix_in",
+    react_mix_out: "react_mix_out",
+    react_hype_peak: "react_hype_peak",
+  });
+
+/** Combined Phase 47 slot inventory (23 entries). Used by Plan 04 bundle
+ *  gate per-family expansion + Plan 05 manifest.json animation entries. */
+export const PHASE_47_ALL_SLOTS: readonly string[] = Object.freeze([
+  ...Object.values(BASE_CLIP_TO_SLOT),
+  ...Object.values(EMOTION_CLIP_TO_SLOT),
+  ...Object.values(ANTICIPATION_CLIP_TO_SLOT),
+  ...Object.values(REACTION_CLIP_TO_SLOT),
+]);

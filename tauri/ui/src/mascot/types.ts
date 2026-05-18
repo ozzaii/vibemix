@@ -259,3 +259,78 @@ export const MASCOT_REACTIONS: readonly MascotReaction[] = Object.freeze([
   "headbang",
   "surprised",
 ]);
+
+// ── Phase 47 / MASCOT-04 — New clip-kind unions for 4-layer additive surface ──
+// Per .planning/phases/47-*/47-CONTEXT.md § Pools.ts Update Strategy: these
+// unions extend the type system WITHOUT modifying the existing Phase 43
+// ClipKind union (which is locked by pools.test.ts grep gate § VIS-05).
+
+/** Base layer (low priority) — 3 looping baseline clips. */
+export type BaseClip = "base_idle" | "base_breathe" | "base_sway";
+
+/** Emotion layer (priority 60) — 5 Phase 47 taxonomy emotion clips. */
+export type EmotionClip =
+  | "emotion_joy"
+  | "emotion_trust"
+  | "emotion_surprise"
+  | "emotion_anticipation"
+  | "emotion_focus";
+
+/** Anticipation layer (priority 70) — 5 NEW Phase 47 event-class prep clips.
+ *  Separate from the legacy `prep_lean_in_*` / `prep_head_turn_*` / `prep_settle`
+ *  Phase-22-02 slots which stay for backward-compat. */
+export type AnticipationClip =
+  | "prep_kick"
+  | "prep_breakdown"
+  | "prep_drop"
+  | "prep_layer"
+  | "prep_mix";
+
+/** Reaction layer (priority 80) — 10 Phase 47 one-shot reaction clips. */
+export type ReactionClip =
+  | "react_kick_swap"
+  | "react_sub_layer"
+  | "react_breakdown"
+  | "react_reentry"
+  | "react_phrase_boundary"
+  | "react_distortion_climb"
+  | "react_acid_line"
+  | "react_mix_in"
+  | "react_mix_out"
+  | "react_hype_peak";
+
+// Phase 47 — refreshed emotion + reaction taxonomies (sibling to v2.0 placeholders)
+export const PHASE_47_EMOTIONS: readonly EmotionClip[] = Object.freeze([
+  "emotion_joy",
+  "emotion_trust",
+  "emotion_surprise",
+  "emotion_anticipation",
+  "emotion_focus",
+]);
+
+export const PHASE_47_REACTIONS: readonly ReactionClip[] = Object.freeze([
+  "react_kick_swap",
+  "react_sub_layer",
+  "react_breakdown",
+  "react_reentry",
+  "react_phrase_boundary",
+  "react_distortion_climb",
+  "react_acid_line",
+  "react_mix_in",
+  "react_mix_out",
+  "react_hype_peak",
+]);
+
+export const PHASE_47_ANTICIPATIONS: readonly AnticipationClip[] = Object.freeze([
+  "prep_kick",
+  "prep_breakdown",
+  "prep_drop",
+  "prep_layer",
+  "prep_mix",
+]);
+
+export const PHASE_47_BASES: readonly BaseClip[] = Object.freeze([
+  "base_idle",
+  "base_breathe",
+  "base_sway",
+]);
