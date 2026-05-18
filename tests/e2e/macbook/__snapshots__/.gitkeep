@@ -1,0 +1,3 @@
+# Phase 50 — visual-regression snapshot dir.
+# Baselines land here on first `npx playwright test --update-snapshots` run.
+# Re-baseline trigger: §VIS-04 real-asset discharge (Kaan-action).
