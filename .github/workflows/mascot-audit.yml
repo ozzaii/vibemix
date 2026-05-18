@@ -1,0 +1,97 @@
+name: Mascot audit (Phase 47 acceptance signal)
+
+# Aggregates every Phase 47 audit job into one CI workflow:
+# - bundle gate (per-family size bands + 25 MB cap)
+# - manifest completeness (assets/mascot/source/MANIFEST.yaml <-> on-disk)
+# - anti-slop grep gate (Phase 47 sibling script — narrowly scoped to
+#   Phase 47 mascot artifacts; check_no_ai_slop.py stays pinned to
+#   scripts/dayzero/launch_copy/ per its single-source-of-truth contract)
+# - mascot-tauri-only grep gate (no mascot.html in tests/e2e/scripts/ci/)
+# - vitest event-coverage-matrix (4-layer x 15-event matrix)
+#
+# Until VIS-04 Kaan-discharge replaces placeholders with real Mixamo
+# retargets, the bundle gate expected-fails (placeholders sit below the
+# per-family floor). The non-zero exit is the discharge reminder.
+# All other gates green at Phase 47 ship.
+
+on:
+  pull_request:
+    paths:
+      - "scripts/mascot/**"
+      - "tauri/ui/src/mascot/**"
+      - "tauri/ui/assets/mascot/**"
+      - "docs/mascot/**"
+      - "assets/mascot/**"
+      - ".github/workflows/mascot-audit.yml"
+  push:
+    branches:
+      - main
+
+jobs:
+  mascot-bundle-gate:
+    runs-on: ubuntu-latest
+    # NON-BLOCKING until VIS-04 discharged — placeholders fail Tier 2
+    # by design (per scripts/mascot/check_bundle_size.sh header).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run bundle gate
+        run: bash scripts/mascot/check_bundle_size.sh
+        continue-on-error: true
+
+  mascot-manifest-completeness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pyyaml
+        run: pip install pyyaml
+      - name: Run manifest completeness check
+        run: python3 scripts/mascot/check_manifest_complete.py
+
+  mascot-anti-slop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Phase 47 anti-slop grep gate
+        # Phase 47 sibling script — scopes the 16-token blocklist + the
+        # \bdeeply\s+\w+ regex to Phase 47 mascot artifacts. The canonical
+        # scripts/launch/check_no_ai_slop.py stays pinned to
+        # scripts/dayzero/launch_copy/ (CONTEXT §specifics single-source-of-truth).
+        run: python3 scripts/mascot/check_no_ai_slop_phase47.py
+
+  mascot-tauri-only-grep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Grep gate — mascot.html absent from test surfaces
+        run: |
+          # Allowlists POC-immutability gates that name mascot.html as a
+          # PROTECTED file (opposite of the Pitfall 4 regression class).
+          set -uo pipefail
+          MATCHES=$(grep -rln \
+              --include="*.py" --include="*.ts" --include="*.tsx" \
+              --include="*.js" --include="*.sh" --include="*.yml" \
+              --exclude-dir=__pycache__ \
+              "mascot.html" \
+              tests/ e2e/ scripts/ci/ 2>/dev/null || true)
+          OFFENDERS=$(echo "$MATCHES" | grep -v -E '/(test_g5_poc_files_untouched\.py|test_repo_scrub\.py|test_pipeline\.py|test_phase05_verification\.py|test_no_api_key_surface\.py|test_ci_grep_gates\.py)$' || true)
+          if [ -n "$OFFENDERS" ]; then
+            echo "FAIL: mascot.html referenced in tests/e2e/scripts/ci/:"
+            echo "$OFFENDERS"
+            exit 1
+          fi
+          echo "OK: mascot.html grep gate green"
+
+  mascot-event-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install + test
+        run: |
+          cd tauri/ui
+          npm ci
+          npm test -- event-coverage-matrix pools anticipation

@@ -1,0 +1,60 @@
+name: Mascot tests target Tauri+Three.js (Phase 47 / MASCOT-08)
+
+# Closes Pitfall 4 — prevents the regression class where mascot test
+# suites are wired around the mascot.html standalone easter-egg surface
+# while the Tauri+Three.js production mascot ships with placeholder GLBs.
+# See .planning/research/PITFALLS.md § Pitfall 4 + memory
+# project_v0_1_0_rc1_open_bugs ("mascot chrome strip" regression class).
+#
+# The grep target is intentionally narrow: tests/, e2e/, scripts/ci/.
+# mascot.html itself is preserved byte-identical to v2.0 tag (Phase 37-06
+# POC immutability gate at poc-immutability-check.yml — separate gate).
+
+on:
+  pull_request:
+    paths:
+      - "tests/**"
+      - "e2e/**"
+      - "scripts/ci/**"
+      - "scripts/mascot/**"
+      - "tauri/ui/src/mascot/**"
+      - ".github/workflows/mascot-tauri-only.yml"
+  push:
+    branches:
+      - main
+
+jobs:
+  mascot-tauri-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Grep gate — mascot.html MUST NOT appear in tests/ e2e/ scripts/ci/
+        run: |
+          # `grep -rln` lists files with matches; we then filter out the
+          # allowlist of POC-immutability gates that legitimately name
+          # mascot.html as a PROTECTED file (the OPPOSITE of the Pitfall 4
+          # regression class). Anything left after filtering is a real
+          # Pitfall 4 violation.
+          set -uo pipefail
+          MATCHES=$(grep -rln \
+              --include="*.py" --include="*.ts" --include="*.tsx" \
+              --include="*.js" --include="*.sh" --include="*.yml" \
+              --exclude-dir=__pycache__ \
+              "mascot.html" \
+              tests/ e2e/ scripts/ci/ 2>/dev/null || true)
+          OFFENDERS=$(echo "$MATCHES" | grep -v -E '/(test_g5_poc_files_untouched\.py|test_repo_scrub\.py|test_pipeline\.py|test_phase05_verification\.py|test_no_api_key_surface\.py|test_ci_grep_gates\.py)$' || true)
+          if [ -n "$OFFENDERS" ]; then
+            echo ""
+            echo "FAIL: mascot.html referenced in test/ci surface:"
+            echo "$OFFENDERS"
+            echo ""
+            echo "mascot.html is the standalone easter-egg surface; Phase 47 tests"
+            echo "MUST target the Tauri+Three.js production surface via Playwright"
+            echo "at tauri/ui/dist/. See .planning/research/PITFALLS.md § Pitfall 4."
+            echo ""
+            echo "Allowlisted POC-immutability gates: test_g5_poc_files_untouched.py,"
+            echo "test_repo_scrub.py, test_pipeline.py, test_ci_grep_gates.py."
+            exit 1
+          fi
+          echo "OK: mascot.html grep gate green — Phase 47 tests target Tauri+Three.js production surface"
