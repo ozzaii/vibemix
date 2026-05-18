@@ -98,6 +98,15 @@ else
 fi
 echo
 
+# ── Gate 6b: e2e harness dimension-FAIL block (Phase 50 / E2E-08) ──────
+echo "[Gate 6b] check_e2e_report.sh — blocks on FAIL in dist/e2e-macbook-runs/"
+if bash "${REPO_ROOT}/scripts/e2e/check_e2e_report.sh" >/dev/null 2>&1; then
+  pass "check_e2e_report.sh — latest e2e run all dimensions PASS / PARTIAL / SKIPPED"
+else
+  fail "check_e2e_report.sh — latest e2e run reports FAIL on at least one dimension. Run 'bash ${REPO_ROOT}/scripts/e2e/check_e2e_report.sh' for the dimension breakdown."
+fi
+echo
+
 # ── Gate 3: README hero hash sync ──────────────────────────────────────
 echo "[Gate 3] README hero hash sync (Phase 35)"
 if ${PYTHON} -m pytest "${REPO_ROOT}/tests/repo/test_readme_hero_hash_sync.py" -q --no-header >/dev/null 2>&1; then
