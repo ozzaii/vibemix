@@ -18,6 +18,10 @@ dist/
 !scripts/dist/**
 !tests/dist/
 !tests/dist/**
+# Phase 49 — wizard copy sync helper at scripts/build/ would be caught by
+# the generic ``build/`` rule above. Whitelist explicitly.
+!scripts/build/
+!scripts/build/**
 
 # Phase 45-02 — dist/launch-runs/ is the SHIP-08 JSONL audit dir
 # (Plan 45-04 SHIP-V1-DECISION reads from it). Whitelist the dir + its

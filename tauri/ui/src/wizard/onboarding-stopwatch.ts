@@ -96,3 +96,49 @@ export class OnboardingStopwatch {
     };
   }
 }
+
+/* Phase 49 Plan 03 — INSTALL_READY emit helper.
+ *
+ * Wizard step-driver-fetch.ts calls this when the driver-fetch + parallel
+ * probes all complete. Emits `audio.probe.install_ready` event with the
+ * per-step breakdown + total elapsed ms + auto_install_attempted flag.
+ *
+ * Payload is consumed by:
+ *   - scripts/dist/install_vm_matrix.sh --check-60s (Plan 49-05): asserts
+ *     median across fresh-VM matrix ≤ 60000 ms (CI gate).
+ *   - tests/dist/test_60s_gate.py: behavioral tests of the gate.
+ *
+ * IPC contract invariant: this reuses the `audio.probe.*` event family —
+ * specifically a NEW event type `audio.probe.install_ready` with the
+ * payload below. The base `audio.probe.detected` / `audio.probe.missing` /
+ * `audio.probe.cta_fired` event types from v3.0 stay byte-identical. The
+ * additive payload field `auto_install_attempted` is also added to those
+ * existing event types (Plan 49-03 Task 7 in blackhole_probe.py).
+ */
+
+export interface InstallReadyPayload {
+  elapsed_ms: number;
+  per_step: Record<string, number>;
+  auto_install_attempted: boolean;
+}
+
+export async function emitInstallReadyEvent(
+  perStep: Record<string, number>,
+  autoInstallAttempted: boolean,
+): Promise<void> {
+  const elapsed = Object.values(perStep).reduce((a, b) => a + b, 0);
+  const payload: InstallReadyPayload = {
+    elapsed_ms: elapsed,
+    per_step: perStep,
+    auto_install_attempted: autoInstallAttempted,
+  };
+  try {
+    // Lazy-import to avoid a hard dep at module init (test envs without
+    // Tauri shouldn't crash on import).
+    const { emit } = await import("@tauri-apps/api/event");
+    await emit("audio.probe.install_ready", payload);
+  } catch {
+    // Tauri unavailable (test env) — no-op. The stopwatch readout is
+    // still useful even without IPC.
+  }
+}

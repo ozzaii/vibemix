@@ -77,6 +77,28 @@ class BlackHoleProbeResult(TypedDict):
 EmitEvent = Callable[[str, dict], None]
 
 
+# Phase 49 Plan 03 — additive payload extension.
+#
+# The companion-driven INSTALL flow (Plan 49-01..06) needs the wizard to
+# track whether the auto-driver-fetch was attempted on this probe cycle.
+# This is a NEW optional payload field that callers may set on the
+# emit_event() payload dict. It does NOT change the event types — the
+# three existing kinds (audio.probe.detected / .missing / .cta_fired)
+# stay byte-identical. The wizard reads payload.get("auto_install_attempted",
+# False) when rendering Step §DriverFetch fallback copy.
+#
+# Schema (additive, optional):
+#   {
+#     "installed": bool,
+#     "device_name": str | None,
+#     "auto_install_attempted": bool,   # NEW — Phase 49
+#     ...
+#   }
+#
+# Payload remains free-form (dict[str, Any]) — TypedDict left unchanged.
+PROBE_PAYLOAD_AUTO_INSTALL_KEY = "auto_install_attempted"
+
+
 def _query_devices() -> list[dict[str, Any]]:
     """Indirection point — tests monkeypatch ``sounddevice.query_devices``
     via the existing ``mock_sounddevice`` fixture. Returns an empty list

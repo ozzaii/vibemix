@@ -47,6 +47,13 @@ export type WizardStep =
   | "permissions"
   | "audio"
   | "controller"
+  // Phase 49 — new step types for the one-click install chain.
+  // Registered as types here; the render-switch below routes them.
+  // Full integration into the step-strip ordering is plan-49-04 (Inno
+  // Setup + DMG firstrun hook ties them to install lifecycle).
+  | "forewarning"
+  | "driver-fetch"
+  | "format-check"
   | "profile-consent"
   | "telemetry-consent"
   | "smoke-test"
