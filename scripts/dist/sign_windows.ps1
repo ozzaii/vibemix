@@ -40,7 +40,7 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$MsiPath,
 
     [Parameter(Mandatory = $false)]
@@ -59,10 +59,44 @@ param(
     [string]$ArtifactConfigSlug = "vibemix-binaries",
 
     [Parameter(Mandatory = $false)]
-    [string]$OutputDir = ".\dist\signed-binaries"
+    [string]$OutputDir = ".\dist\signed-binaries",
+
+    # Phase 49 Plan 02 — Companion-signing submission-manifest emit mode.
+    # When -Companion is supplied, the script emits a SignPath companion
+    # submission manifest (JSON) listing installer/companion/*.ps1 and *.py
+    # as separate artifacts with artifact-configuration-slug=companion-script,
+    # then exits 0 WITHOUT submitting. The main release.yml SIGN stage
+    # consumes the emitted manifest. The existing happy-path code below is
+    # preserved byte-identical when the switch is absent.
+    [switch]$Companion
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($Companion) {
+    Write-Host "── companion-sign mode (Phase 49 INSTALL-05) ──"
+    $companionDir = "installer/companion"
+    if (-not (Test-Path $companionDir)) {
+        Write-Error "MISSING: $companionDir"
+        exit 1
+    }
+    $artifacts = Get-ChildItem -Path $companionDir -Include "*.ps1", "*.py" -File -Recurse |
+        ForEach-Object { @{ path = $_.FullName -replace [regex]::Escape((Resolve-Path .).Path + [IO.Path]::DirectorySeparatorChar), ""; configuration_slug = "companion-script" } }
+    $manifest = @{
+        version = "1.0.0"
+        artifacts = $artifacts
+        notes = "Phase 49 §INSTALL-COMPANION-SIGN — companion-script SignPath submission manifest. Each artifact submitted separately."
+    }
+    $manifestPath = "signpath-companion-manifest.json"
+    $manifest | ConvertTo-Json -Depth 5 | Out-File -FilePath $manifestPath -Encoding utf8
+    Write-Host "Wrote companion manifest: $manifestPath ($(($artifacts | Measure-Object).Count) artifacts)"
+    exit 0
+}
+
+if ([string]::IsNullOrWhiteSpace($MsiPath)) {
+    Write-Error "sign_windows.ps1: -MsiPath required when -Companion not supplied."
+    exit 3
+}
 
 # ---------------------------------------------------------------------------
 # Step 1 — Validate required parameters.

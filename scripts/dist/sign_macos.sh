@@ -120,10 +120,12 @@ Bundle ID is world.bravoh.vibemix (LOCKED).
 USAGE
 }
 
+COMPANION=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --dry-run)            DRY_RUN=1; shift ;;
         --skip-dmg)           SKIP_DMG=1; shift ;;
+        --companion)          COMPANION=1; shift ;;
         --keychain-profile)   KEYCHAIN_PROFILE="$2"; shift 2 ;;
         --output-dir)         OUTPUT_DIR="$2"; shift 2 ;;
         -h|--help)            usage; exit 0 ;;
@@ -131,6 +133,35 @@ while [[ $# -gt 0 ]]; do
         *)                    APP="$1"; shift ;;
     esac
 done
+
+# Phase 49 Plan 02 — Companion-script signing short-circuit.
+# When --companion is supplied, codesign every file in installer/companion/
+# under the same Developer ID identity used for the main app bundle.
+# The existing happy-path code below is preserved byte-identical when the
+# flag is absent.
+if [[ $COMPANION -eq 1 ]]; then
+    log "── companion-sign mode (Phase 49 INSTALL-05) ──"
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log "DRY-RUN — listing files that would be codesigned:"
+        find "$REPO_ROOT/installer/companion" -maxdepth 1 -type f \
+            \( -name "*.sh" -o -name "*.py" \) | while read -r f; do
+            log "  would sign: $f"
+        done
+        exit 0
+    fi
+    : "${APPLE_DEVELOPER_ID:?missing APPLE_DEVELOPER_ID for companion-sign}"
+    while IFS= read -r f; do
+        log "codesign: $f"
+        codesign --force --options runtime --sign "$APPLE_DEVELOPER_ID" \
+            --timestamp "$f" || {
+            log "FAIL: codesign $f"
+            exit 1
+        }
+    done < <(find "$REPO_ROOT/installer/companion" -maxdepth 1 -type f \
+        \( -name "*.sh" -o -name "*.py" \))
+    log "── companion-sign complete ──"
+    exit 0
+fi
 
 if [[ -z "$APP" ]]; then
     APP="$REPO_ROOT/dist/vibemix-core/vibemix-core.app"

@@ -1,0 +1,140 @@
+# companion-sign.yml — Phase 49 companion-script signing stage.
+#
+# Bravoh-codesigns the post-install companion scripts at `installer/companion/`
+# before the main release pipeline reaches its SIGN stage. This stage runs in
+# parallel with the existing main `build-{macos,windows}` jobs and gates the
+# `release-publish` job indirectly via the verifier `scripts/audit/check_companion_signing.sh`.
+#
+# Per Phase 49 Plan 02 + INSTALL-05.
+#
+# Kaan-action surface: §INSTALL-COMPANION-SIGN — SignPath cert discharge gates
+# the actual production signing. Until discharge, this workflow runs the
+# verifier in WARNING mode (non-fatal on branches; fatal on tag builds).
+
+name: Companion sign
+
+on:
+  push:
+    tags: [v*]
+    branches: [main]
+  pull_request:
+    paths:
+      - "installer/companion/**"
+      - ".github/workflows/companion-sign.yml"
+      - "scripts/audit/check_companion_signing.sh"
+      - "scripts/dist/sign_macos.sh"
+      - "scripts/dist/sign_windows.ps1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  companion-sign-macos:
+    name: Sign macOS companion scripts
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate companion files exist
+        run: |
+          set -euo pipefail
+          for f in installer/companion/fetch_drivers.sh installer/companion/audio_config.py installer/companion/onboarding_copy.json installer/companion/driver_manifest.json; do
+            test -f "$f" || { echo "MISSING: $f" >&2; exit 1; }
+          done
+
+      - name: Codesign companion scripts (Bravoh Developer ID)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}
+        run: |
+          set -euo pipefail
+          bash scripts/dist/sign_macos.sh --companion
+
+      - name: Codesign (dry-run on non-tag builds)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          echo "Non-tag build — companion signing runs in DRY-RUN mode."
+          bash scripts/dist/sign_macos.sh --companion --dry-run || true
+
+      - name: Upload signed companion artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-mac
+          path: installer/companion/*
+
+  companion-sign-windows:
+    name: Sign Windows companion scripts
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate companion files exist
+        shell: pwsh
+        run: |
+          $files = @(
+            "installer/companion/fetch_drivers.ps1",
+            "installer/companion/audio_config.py",
+            "installer/companion/onboarding_copy.json",
+            "installer/companion/driver_manifest.json"
+          )
+          foreach ($f in $files) {
+            if (-not (Test-Path $f)) { Write-Error "MISSING: $f"; exit 1 }
+          }
+
+      - name: Emit SignPath companion submission manifest
+        shell: pwsh
+        run: |
+          pwsh scripts/dist/sign_windows.ps1 -Companion
+
+      - name: Submit companion to SignPath (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORG_ID: ${{ secrets.SIGNPATH_ORG_ID }}
+          SIGNPATH_PROJECT_SLUG: vibemix-companion
+          SIGNPATH_SIGNING_POLICY_SLUG: companion-script
+        shell: pwsh
+        run: |
+          # SignPath GH Action SHA-pinned per Phase 46 invariant. Kaan-action
+          # §INSTALL-COMPANION-SIGN gates the actual cert; this step warns +
+          # exits 0 if the cert is not yet provisioned.
+          if (-not $env:SIGNPATH_API_TOKEN) {
+            Write-Warning "SIGNPATH_API_TOKEN not provisioned — §INSTALL-COMPANION-SIGN undischarged."
+            Write-Output "::warning::SignPath cert pending Kaan-action §INSTALL-COMPANION-SIGN"
+            exit 0
+          }
+          Write-Output "SignPath submission deferred to signpath/github-action-submit-signing-request (pinned in release.yml main path)."
+
+      - name: Upload signed companion artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-win
+          path: installer/companion/*
+
+  verify-companion-signatures:
+    name: Verify companion signatures
+    needs: [companion-sign-macos, companion-sign-windows]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download signed companion artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: signed-companion/
+
+      - name: Run verifier gate
+        env:
+          GITHUB_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          bash scripts/audit/check_companion_signing.sh
+
+      - name: Upload verifier report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-signing-report
+          path: report-companion-signing.json
