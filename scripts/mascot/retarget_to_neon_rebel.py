@@ -80,9 +80,65 @@ SLOT_MAPPINGS: tuple[SlotMapping, ...] = (
     SlotMapping("Headbob", "prep_lean_in_neutral", "Pioneer-CDJ headbob baseline"),
 )
 
+# Phase 47 / MASCOT-02 — Slot family taxonomy (28 total = 5 legacy_prep + 23 new
+# family slots). Per memory `project_mascot_as_vtuber_personality_surface`: single
+# VTuber Neon Rebel rig; `/hatch` user-gen is v2.x stretch. Per-family size bands
+# carry forward into scripts/mascot/check_bundle_size.sh Tier 2 prefix routing.
+SLOT_FAMILIES: dict[str, dict] = {
+    "legacy_prep": {
+        "slots": [
+            "prep_settle",
+            "prep_head_turn_left",
+            "prep_head_turn_right",
+            "prep_lean_in_hyped",
+            "prep_lean_in_neutral",
+        ],
+        "size_band_kb": (400, 1200),
+    },
+    "base": {
+        "slots": ["base_idle", "base_breathe", "base_sway"],
+        "size_band_kb": (200, 600),
+    },
+    "emotion": {
+        "slots": [
+            "emotion_joy",
+            "emotion_trust",
+            "emotion_surprise",
+            "emotion_anticipation",
+            "emotion_focus",
+        ],
+        "size_band_kb": (300, 900),
+    },
+    "anticipation": {
+        # NEW Phase 47 prep_* event-class slots — distinct from legacy_prep.
+        "slots": ["prep_kick", "prep_breakdown", "prep_drop", "prep_layer", "prep_mix"],
+        "size_band_kb": (400, 1200),
+    },
+    "reaction": {
+        "slots": [
+            "react_kick_swap",
+            "react_sub_layer",
+            "react_breakdown",
+            "react_reentry",
+            "react_phrase_boundary",
+            "react_distortion_climb",
+            "react_acid_line",
+            "react_mix_in",
+            "react_mix_out",
+            "react_hype_peak",
+        ],
+        "size_band_kb": (400, 1200),
+    },
+}
+
+# Slot → family reverse map (28 entries total).
+VALID_SLOTS: dict[str, str] = {
+    s: family for family, info in SLOT_FAMILIES.items() for s in info["slots"]
+}
+
 
 def verify_size_band(file_size_bytes: int) -> bool:
-    """Return True iff ``file_size_bytes`` lies in the 400KB-1.2MB band.
+    """Return True iff ``file_size_bytes`` lies in the legacy 400KB-1.2MB band.
 
     Per CONTEXT §VIS-04 a draco-compressed retarget output must land in
     this band. Below 400KB suggests the clip is degenerate (no
@@ -91,6 +147,21 @@ def verify_size_band(file_size_bytes: int) -> bool:
     total cap once all 5 slots populate.
     """
     return _MIN_BYTES <= file_size_bytes <= _MAX_BYTES
+
+
+def verify_size_band_for_slot(slot: str, file_size_bytes: int) -> bool:
+    """Phase 47 / MASCOT-02 per-family size band check.
+
+    Looks up the slot's family and asserts ``file_size_bytes`` is in that
+    family's band. Falls back to the legacy 400-1200 KB band if the slot
+    is not declared in SLOT_FAMILIES (which is itself an error condition —
+    every shipped slot should appear in SLOT_FAMILIES).
+    """
+    family = VALID_SLOTS.get(slot)
+    if family is None:
+        return verify_size_band(file_size_bytes)
+    min_kb, max_kb = SLOT_FAMILIES[family]["size_band_kb"]
+    return (min_kb * 1024) <= file_size_bytes <= (max_kb * 1024)
 
 
 def compress_draco(input_glb: Path, output_glb: Path) -> None:
@@ -165,8 +236,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--slot",
-        choices=[m.output_slot for m in SLOT_MAPPINGS],
-        help="Target slot file in the mascot animations dir",
+        choices=sorted(VALID_SLOTS.keys()),
+        help="Target slot file in the mascot animations dir (28 slots across 5 families)",
+    )
+    parser.add_argument(
+        "--slot-family",
+        choices=sorted(SLOT_FAMILIES.keys()),
+        help=(
+            "Phase 47 — batch mode: run retarget against every slot in the family "
+            "(assumes ~/Downloads/mixamo_<slot>.glb naming convention per slot)."
+        ),
     )
     parser.add_argument(
         "--rig",

@@ -1,0 +1,250 @@
+# Mascot source-asset provenance manifest (Phase 47 / MASCOT-02).
+#
+# Tracks the original .fbx files downloaded from Mixamo per slot.
+# Raw .fbx files are gitignored (Mixamo license: Adobe-account-only,
+# no redistribution); this manifest is in-repo for the audit trail.
+#
+# Schema:
+#   slots:
+#     - slot: <slot stem matching scripts/mascot/retarget_to_neon_rebel.py SLOT_FAMILIES>
+#       family: <legacy_prep | base | emotion | anticipation | reaction>
+#       mixamo_search_term: <Mixamo search query Kaan used>
+#       downloaded_at: <ISO-8601 UTC timestamp or null when still placeholder>
+#       sha256_source: <hex digest of source .fbx, or null when placeholder>
+#       draco_level: <0-10 compression level used by retarget CLI>
+#       output_bytes: <size of final .glb, or null when placeholder>
+#       status: <placeholder | retargeted>
+#
+# Status transitions: placeholder -> retargeted (when Kaan runs the CLI with --really)
+# and the CLI updates the row in-place.
+schema_version: 1
+slots:
+  # Legacy prep_* family (Phase 22-02 placeholders — pre-existing, Kaan may discharge separately)
+  - slot: prep_settle
+    family: legacy_prep
+    mixamo_search_term: "Standing Idle or Breathing Idle"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 7
+    output_bytes: null
+    status: placeholder
+  - slot: prep_head_turn_left
+    family: legacy_prep
+    mixamo_search_term: "Talking or Talking Casually"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 7
+    output_bytes: null
+    status: placeholder
+  - slot: prep_head_turn_right
+    family: legacy_prep
+    mixamo_search_term: "Talking 2 or Explaining"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 7
+    output_bytes: null
+    status: placeholder
+  - slot: prep_lean_in_hyped
+    family: legacy_prep
+    mixamo_search_term: "Salute or Cheering — Pioneer-CDJ headbob aesthetic"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 7
+    output_bytes: null
+    status: placeholder
+  - slot: prep_lean_in_neutral
+    family: legacy_prep
+    mixamo_search_term: "Headbob or Macarena Dance first 4s"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 7
+    output_bytes: null
+    status: placeholder
+  # Base family (3 looping baseline clips — Phase 47 NEW)
+  - slot: base_idle
+    family: base
+    mixamo_search_term: "Standing Idle Relaxed"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 9
+    output_bytes: null
+    status: placeholder
+  - slot: base_breathe
+    family: base
+    mixamo_search_term: "Breathing Idle"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 9
+    output_bytes: null
+    status: placeholder
+  - slot: base_sway
+    family: base
+    mixamo_search_term: "Subtle Sway"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 9
+    output_bytes: null
+    status: placeholder
+  # Emotion family (5 priority-60 emotion clips — Phase 47 NEW)
+  - slot: emotion_joy
+    family: emotion
+    mixamo_search_term: "Happy Idle — restrained, no clapping"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: emotion_trust
+    family: emotion
+    mixamo_search_term: "Nodding Confidently"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: emotion_surprise
+    family: emotion
+    mixamo_search_term: "Surprised Mild"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: emotion_anticipation
+    family: emotion
+    mixamo_search_term: "Listening Forward Lean"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: emotion_focus
+    family: emotion
+    mixamo_search_term: "Concentrated Idle"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  # Anticipation family (5 event-class-specific prep clips — Phase 47 NEW)
+  - slot: prep_kick
+    family: anticipation
+    mixamo_search_term: "Ready Stance Slight Headbob"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: prep_breakdown
+    family: anticipation
+    mixamo_search_term: "Settling Calm"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: prep_drop
+    family: anticipation
+    mixamo_search_term: "Coiled Tension Forward"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: prep_layer
+    family: anticipation
+    mixamo_search_term: "Listening Head Tilt"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: prep_mix
+    family: anticipation
+    mixamo_search_term: "Subtle Sway Anticipation"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  # Reaction family (10 priority-80 one-shots — Phase 47 NEW)
+  - slot: react_kick_swap
+    family: reaction
+    mixamo_search_term: "Short Head Nod"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: react_sub_layer
+    family: reaction
+    mixamo_search_term: "Eyebrow Raise Subtle"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: react_breakdown
+    family: reaction
+    mixamo_search_term: "Slow Bow Head"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: react_reentry
+    family: reaction
+    mixamo_search_term: "Head Lift Slight Smile"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: react_phrase_boundary
+    family: reaction
+    mixamo_search_term: "Quick Headbob 8-count"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: react_distortion_climb
+    family: reaction
+    mixamo_search_term: "Building Tension Shoulder Roll"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: react_acid_line
+    family: reaction
+    mixamo_search_term: "Wry Smile Tilt"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: react_mix_in
+    family: reaction
+    mixamo_search_term: "Approving Nod Forward"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: react_mix_out
+    family: reaction
+    mixamo_search_term: "Glance Aside Subtle"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder
+  - slot: react_hype_peak
+    family: reaction
+    mixamo_search_term: "Reserved Hype Headbang"
+    downloaded_at: null
+    sha256_source: null
+    draco_level: 8
+    output_bytes: null
+    status: placeholder

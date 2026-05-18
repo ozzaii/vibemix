@@ -194,3 +194,9 @@ tuning_runs/
 # Phase 36 — Day-1 star sourcing log. Contains personal GitHub handles +
 # contact info; never commit. Protocol lives in scripts/dayzero/seed_stars.md.
 scripts/dayzero/seed_stars.log
+
+# Phase 47 / MASCOT-02 — Mixamo source .fbx / .glb files (Adobe-account
+# license, no redistribution). MANIFEST.yaml is the in-repo provenance log.
+assets/mascot/source/*.fbx
+assets/mascot/source/*.glb
+!assets/mascot/source/MANIFEST.yaml
