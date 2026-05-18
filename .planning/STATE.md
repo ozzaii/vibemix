@@ -2,52 +2,44 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Distribution-Ready Pass
-status: "Phase 49 (INSTALL) engineering-green; Phase 50 (E2E) ready to dispatch"
-last_updated: "2026-05-18T13:00:00.000Z"
-last_activity: 2026-05-18 — Phase 49 (Win+Mac One-Click Installer Chain) engineering-green; 6/6 plans + VERIFICATION.md + REVIEW.md (clean) + UI-REVIEW.md (3.67/4) committed; 10/10 INSTALL REQ-IDs covered; 68 tests pass; companion-sign workflow + verifier + Inno Setup [Run]+[Code]+[UninstallRun] + DMG firstrun hook + 60s simulated gate (median 41 000ms) + anti-slop sibling + uninstall preserve-default; Phase 50 (E2E) unblocked
+status: Shipped (tech_debt accepted — 7 Kaan-action carveouts on external clock)
+last_updated: "2026-05-18T11:25:00.000Z"
+last_activity: 2026-05-18 — Milestone v3.1 completed and archived
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 26
-  completed_plans: 26
-  percent: 80
+  completed_phases: 5
+  total_plans: 32
+  completed_plans: 32
+  percent: 100
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-17 — v3.1 "Distribution-Ready Pass" roadmap scaffolded via `gsd-roadmapper`. 5 phases (P46–P50), 44 v3.1 REQ-IDs mapped 100%, next: `/gsd:plan-phase 46` to kick off engineering. Engineering proceeds in PARALLEL with v3.0 external clock (Apple Dev + SignPath ~1-week SLA) — does NOT wait for SHIP-CUT.
+**Last updated:** 2026-05-18 — v3.1 "Distribution-Ready Pass" milestone shipped (engineering-complete; tech_debt accepted). 5 phases (P46–P50), 44/44 REQ-IDs engineering-green, 7 Kaan-action carveouts deferred (external-clock dependent). Next: `/gsd:new-milestone` once Kaan decides scope.
 
 ---
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-17 after v3.0 milestone close)
+See: .planning/PROJECT.md (updated 2026-05-18 after v3.1 milestone close)
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** v3.1 Distribution-Ready Pass — one-click install Win+Mac + dep audit/pin + new-dep opportunity scan + e2e MacBook pass + mascot real GLBs.
-- **Last shipped:** v3.0 Clean OSS Ship — 2026-05-17 (status: `tech_debt` accepted; awaiting external clock for public RC publish).
+- **Current focus:** Planning next milestone (post-v3.1 strategic conversation open; Kaan drives).
+- **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts on external clock).
 - **Project mode:** standard.
 - **Granularity:** fine.
 - **Model profile:** quality (all agents on Opus, all checkpoints on).
-- **Autonomy mode:** `gsd-autonomous fully` — every blocker + human-needed item discharged autonomously, only privacy rule + destructive risk + legal-capacity carveouts (Apple Dev Agreement + SignPath OSS) still pause. Soft Kaan-discharge gates (§VIS-04 Mixamo retargets, companion-driver signing) surface to KAAN-ACTION-LEGAL but do NOT pause work.
+- **Autonomy mode:** `gsd-autonomous fully` — every blocker + human-needed item discharged autonomously, only privacy rule + destructive risk + legal-capacity carveouts (Apple Dev Agreement + SignPath OSS) still pause. Soft Kaan-discharge gates (§VIS-04 Mixamo retargets, companion-driver signing, real-VM walk) surface to KAAN-ACTION but do NOT pause work.
 
 ---
 
 ## Current Position
 
-**Milestone:** v3.1 Distribution-Ready Pass
-**Next Phase:** Phase 50 — End-to-End MacBook + OS-Matrix Pass (E2E)
-**Plan:** —
-**Status:** Phase 49 engineering-green (6/6 plans); Phase 50 (E2E) ready to dispatch
-**Last activity:** 2026-05-18 — Phase 49 complete; 6 plans + VERIFICATION + REVIEW (clean) + UI-REVIEW (3.67/4) committed; all INSTALL-01..10 engineering-green; 68 tests pass; companion-sign workflow + verifier + Inno Setup integration; Phase 50 unblocked
-
-**v3.1 Progress:**
-
-```
-Phases:  4 / 5    ████████████████░░░░  80%
-Plans:  26 / TBD  ████████░░░░░░░░░░░░  (P46: 6 + P47: 8 + P48: 6 + P49: 6 plans)
-```
+Phase: Milestone v3.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-18 — Milestone v3.1 completed and archived
 
 ## Performance Metrics
 
@@ -55,18 +47,23 @@ Plans:  26 / TBD  ████████░░░░░░░░░░░░  
 |--------|-------|
 | Phases complete (v0.1.0) | 14 / 14 |
 | Phases complete (v2.0) | 10 / 12 code-shipped (2 deferred to Kaan-action) |
-| Phases complete (v2.1) | 13 / 13 engineering-green (4 carry `human_needed` carveouts: Phase 33 / 35 / 38 / 39) |
-| Phases complete (v3.0) | 6 / 6 engineering-green (all 6 carry `human_needed` verification carveouts → KAAN-ACTION-LEGAL §SHIP-01..13) |
-| Phases complete (v3.1) | 4 / 5 |
+| Phases complete (v2.1) | 13 / 13 engineering-green |
+| Phases complete (v3.0) | 6 / 6 engineering-green (22 carveouts → KAAN-ACTION-LEGAL §SHIP-01..13) |
+| Phases complete (v3.1) | 5 / 5 engineering-green (7 carveouts on external clock) |
 | Plans complete (v3.0) | 41 / 41 |
-| Plans complete (v3.1) | 26 / TBD |
+| Plans complete (v3.1) | 32 / 32 |
 | v3.0 REQ-IDs mapped + satisfied | 57 / 57 ✓ (100% coverage, no orphans) |
-| v3.1 REQ-IDs mapped | 44 / 44 ✓ (100% coverage, no orphans) |
+| v3.1 REQ-IDs mapped + satisfied | 44 / 44 ✓ (100% coverage, no orphans) |
 | v3.0 cross-phase integration seams WIRED | 3 / 3 |
+| v3.1 cross-phase integration seams WIRED | 5 / 5 |
 | v3.0 commits since `v2.1.0` tag | 250 |
+| v3.1 commits since `v3.0` tag | 61 |
 | v3.0 LOC delta | +62,215 / -1,029 across 529 files (net ~+61k) |
+| v3.1 LOC delta | +57,597 / -2,541 across 382 files (net ~+55k) |
 | v3.0 git tag | `v3.0` (annotated, LOCAL ONLY — not pushed) |
-| v3.0 carveouts deferred to KAAN-ACTION-LEGAL | 22 (legal capacity P46 × 2 + customer-facing publish × 8 + real-hardware × 3 + real-asset × 1 + corpus × 4 + spike × 1 + sign-off × 2 + visual-regression-test × 1) |
+| v3.1 git tag | `v3.1` (pending milestone-close commit; LOCAL ONLY when created — not pushed) |
+| v3.0 carveouts deferred to KAAN-ACTION-LEGAL | 22 |
+| v3.1 carveouts deferred to KAAN-ACTION | 7 (SignPath cert + Tart VM walk + Kaan MacBook walk + Mixamo Adobe walk + VB-Audio email + 2 dep-audit documented decisions) |
 
 ---
 
@@ -89,6 +86,7 @@ v3.1 end-to-end MacBook + OS-matrix pass landed engineering-green. All 10 E2E RE
 **Test verification:** 18 e2e tests added; harness foundation tests green (7 pass), audio fixtures green-or-skipped (4 skipped per CI-tolerant fallbacks), Gate 2b rerun + OS-matrix smoke green (3 pass + 1 skip), anti-slop sibling green (6 pass), Gate 6b bash test green (4/4 cases).
 
 **Kaan-action surface (deferred for v3.1 close):**
+
 1. **§E2E-50A-WALK** — Kaan executes the 50a walk on his MacBook + real DJ-set audio + records `docs/e2e/2026-05-walk.webm` per checklist at `tests/e2e/macbook/50a_kaan_walk_checklist.md`
 2. **§INSTALL-VM-RUN downstream** (carry-forward from Phase 49) — 50b real-VM execution on all 5 OS configs (engineering ships dry-run + 2 reachable configs; full execution waits on Tart images + §INSTALL-COMPANION-SIGN)
 
@@ -112,6 +110,7 @@ v3.1 one-click installer chain landed engineering-green. All 10 INSTALL REQ-IDs 
 **UI review:** 3.67 / 4 overall — Visual Hierarchy 4/4, Color/Contrast 4/4, Typography 4/4, Motion 3/4 (stopwatch tween should extract to tokens.css), Copy 4/4, A11y 3/4 (focus trap on uninstall dialog deferred to Phase 50).
 
 **Kaan-action surface (deferred):**
+
 1. §INSTALL-COMPANION-SIGN — SignPath OSS Foundation cert grant
 2. §INSTALL-VM-RUN — real Tart VM rehearsal on SHIP-04 5-row matrix
 3. §SHIP-CONTACT-VBAUDIO — Kaan emails VB-Audio for OEM redistribution permission (future optimization)
@@ -193,12 +192,26 @@ Acknowledged per `gsd-autonomous fully` mode at v3.0 milestone close 2026-05-17.
 | verification_gap | 44-VERIFICATION.md (6+10 logo swaps + bravoh GH org standup + SHIP-TWEET sign-off + Discord live-execute) | human_needed |
 | verification_gap | 45-VERIFICATION.md (Apple Dev + SignPath + Bravoh-server + SHIP-CUT/TWEET/DISCORD/TRANSFER/ROTATE + SmartScreen + SHIP-V1-DECISION) | human_needed; external clock |
 
-### v3.1 Anticipated Kaan-Action Surface (will route to KAAN-ACTION-LEGAL during execution)
+### Deferred Items (v3.1 close — 2026-05-18, carry forward as Kaan-action external clock)
 
-- **§VIS-04** (Phase 47) — Mixamo Adobe-account walk: download 23 retargeted clips from Mixamo + Kaan-aesthetic selection. Engineering ships scaffolds + placeholders; Kaan discharges asset selection.
-- **§INSTALL-COMPANION-SIGN** (Phase 49) — companion driver Authenticode signing on Win via SignPath OSS Foundation cert (same cert v3.0 SHIP-CUT awaits). Engineering ships `companion-sign` release.yml stage + verifier; Kaan discharges at SignPath approval time.
-- **§INSTALL-VM-RUN** (Phase 49 / Phase 50) — fresh-VM matrix real execution on Kaan's hardware. Engineering ships `install_vm_matrix.sh --check-60s` harness; Kaan discharges real-VM rehearsal.
-- **§E2E-50A-WALK** (Phase 50) — Kaan's real-MacBook walk per memory `project_phase_16_kaan_dj_testing`. Engineering ships harness + report.html scaffolding; Kaan discharges the walk + screencast.
+Acknowledged per `gsd-autonomous fully` mode at v3.1 milestone close 2026-05-18. All 7 are external-clock dependent; critical-path discharge order: §INSTALL-COMPANION-SIGN → §INSTALL-VM-RUN → §E2E-50A-WALK; §VIS-04 + §VIS-05 (Mixamo) independent and parallel; §SHIP-CONTACT-VBAUDIO + 2 dep-audit decisions independent.
+
+| Category | Item | Status |
+|----------|------|--------|
+| ship-blocker | §INSTALL-COMPANION-SIGN — SignPath OSS Foundation cert grant for companion `.ps1` + `.py` Authenticode | external_clock (same cert as v3.0 SHIP-CUT) |
+| ship-blocker | §INSTALL-VM-RUN — Real Tart VM execution macOS 12.3 / 14 / 15 + Win 10 / 11 | gated on §INSTALL-COMPANION-SIGN |
+| kaan-walk | §E2E-50A-WALK — Kaan's MacBook walk + record `docs/e2e/2026-05-walk.webm` via `scripts/e2e/record_50a_walk.sh` | gated on §INSTALL-VM-RUN |
+| asset-discharge | §VIS-04 — 28 Mixamo retargets via Adobe-account walk (Phase 47 scaffold ready) | independent (parallel) |
+| asset-discharge | §VIS-05 — 5 pre-existing legacy_prep_* slot retargets (bundle with §VIS-04) | independent (parallel) |
+| ship-optimization | §SHIP-CONTACT-VBAUDIO — VB-Audio OEM/bundle redistribution email | independent (future Win optimization) |
+| tech-debt | DEPS-07 — pinact mechanical SHA rewrite via `brew install pinact && bash scripts/audit/run_pinact.sh --apply` OR first CI run | tech_debt (docs/AUDIT.md § Decisions) |
+| tech-debt | DEPS-08 — `livekit-plugins-openai` cull blocked by `tts_chain.py:25` direct imports; scheduled post-v3.1 TTS proxy fallback chain refactor | tech_debt (docs/AUDIT.md § Decisions) |
+
+### v3.1 → v3.x Anticipated Carry-Forward (will route to next milestone scope)
+
+- **TTS proxy fallback chain refactor** — closes DEPS-08 cull-blocked path; isolates `livekit-plugins-openai` behind a swappable proxy seam.
+- **Real-asset re-baseline** — Phase 47 placeholder GLB visual regression baselines flip to real Mixamo retargets at §VIS-04 discharge; Playwright snapshots re-record.
+- **Real-VM walk validation** — Phase 49 + 50 simulated medians (41,000 ms) validate against real hardware once Tart images + SignPath cert both land.
 
 ### Blockers
 
@@ -219,17 +232,19 @@ Acknowledged per `gsd-autonomous fully` mode at v3.0 milestone close 2026-05-17.
 
 ### Last Session
 
-- 2026-05-17 — v3.1 "Distribution-Ready Pass" roadmap scaffolded via `gsd-roadmapper` under `gsd-autonomous fully` mode. 5 phases (P46–P50) derived from 44 v3.1 REQ-IDs (DEPS × 10 / MASCOT × 8 / OPP × 6 / INSTALL × 10 / E2E × 10) with 100% coverage. Build-order locked: 46 ↕ 47 parallel → 48 (gated on 46) → 49 (gated on 46 + 48) → 50 (gated on 47 + 49). Five v3.0 invariants preserved (POC immutability + ModelRouter seam + anti-slop blocklist + privacy rule + 3-IPC contract). Soft Kaan-discharge gates (§VIS-04 + §INSTALL-COMPANION-SIGN) routed to KAAN-ACTION-LEGAL but do NOT pause work. STATE.md reset to v3.1 counters. REQUIREMENTS.md traceability confirmed against intended phase mapping.
-- 2026-05-17 — Plan 45-02 + Plan 45-04 + Plan 43-08 + Plan 43-07 + Plan 42-04 + Plan 42-03 sealed; v2.1 The Unified Cut SHIPPED + archived; v3.0 Clean OSS Ship SHIPPED + archived (see prior STATE.md history blocks in v3.0-ROADMAP.md for detail).
+- 2026-05-18 — v3.1 "Distribution-Ready Pass" milestone SHIPPED + archived under `gsd-autonomous fully` mode. 5 phases (P46–P50) shipped engineering-green; 32 plans landed; 44/44 v3.1 REQ-IDs satisfied (100% coverage, zero orphans); 61 commits since `v3.0` tag with net ~+55k LOC across `installer/`, `tauri/`, `scripts/`, `tests/`, `docs/`, `.github/workflows/`. Audit status `tech_debt` accepted (precedent: v2.1 + v3.0 both shipped same way). 7 Kaan-action carveouts routed to Deferred Items above; all external-clock dependent. MILESTONES.md entry written, ROADMAP.md collapsed to one-line summary with link, REQUIREMENTS.md archived to milestones/v3.1-REQUIREMENTS.md, PROJECT.md updated with v3.1 narrative + Validated requirements + carryover-pending items, STATE.md status flipped to shipped.
+- 2026-05-17 — v3.1 roadmap scaffolded via `gsd-roadmapper`; v2.1 + v3.0 SHIPPED + archived (see prior STATE.md history blocks in v3.0-ROADMAP.md + v3.1-ROADMAP.md).
 
 ### Next Session
 
-- **`/gsd:plan-phase 46`** to decompose Phase 46 Dependency Audit + Lockfile + AUDIT.md into plans. Independent — runs in parallel with Phase 47 planning if Kaan wants concurrent kickoff.
-- **`/gsd:plan-phase 47`** can run in parallel — Mascot Real GLB Land + Full Emotion Coverage. Shares zero files with Phase 46. Soft §VIS-04 Kaan-discharge surface noted; engineering proceeds with scaffolds.
-- **Phase 48 / 49 / 50 plan kickoff** deferred until Phase 46 (dep_ratings.json schema) lands; Phase 49 additionally waits for Phase 48 scan output; Phase 50 waits for Phase 47 GLBs + Phase 49 signed `.dmg`.
-- **Track external clock**: Apple Developer Program Agreement update (Francesco) + SignPath OSS Foundation application (Kaan) discharge gates v3.0 SHIP-CUT — v3.1 does NOT wait. When approvals land, SignPath cert simultaneously unlocks Phase 49 §INSTALL-COMPANION-SIGN.
-- **Soft Kaan-discharge gates to surface in KAAN-ACTION-LEGAL during execution**: §VIS-04 Mixamo retargets (Phase 47), §INSTALL-COMPANION-SIGN companion-driver Authenticode (Phase 49), §INSTALL-VM-RUN fresh-VM rehearsal (Phase 49 / 50), §E2E-50A-WALK Kaan's MacBook walk (Phase 50).
+- **`/gsd:new-milestone`** to scope next milestone — strategic conversation open per memory `project_v2_planning_active`; Kaan drives. Likely scope candidates per memory `project_v2_open_candidates`: Mixxx OSC + map transpile, pyrekordbox integration depth, post-session debrief multi-session arc, library coach drill packs, multimodal "sounds like this" library search.
+- **Track external clock (v3.0 + v3.1 share the same one)**: Apple Developer Program Agreement update (Francesco) + SignPath OSS Foundation approval (Kaan, ~1-week SLA). SignPath cert simultaneously unlocks v3.0 SHIP-CUT AND v3.1 §INSTALL-COMPANION-SIGN. Both ship as a single discharge wave once approvals land.
+- **Critical-path Kaan-action discharge order** (post-external-clock): §INSTALL-COMPANION-SIGN → §INSTALL-VM-RUN → §E2E-50A-WALK; §VIS-04 + §VIS-05 (Mixamo Adobe walk) run in parallel; §SHIP-CONTACT-VBAUDIO is optional future Win optimization.
 
 ---
 
-*State managed by gsd-roadmapper at 2026-05-17 (v3.1 "Distribution-Ready Pass" scaffolded; engineering ready to begin Phase 46 + Phase 47 in parallel).*
+*State managed by gsd-complete-milestone at 2026-05-18 (v3.1 "Distribution-Ready Pass" SHIPPED + archived; awaiting `/gsd:new-milestone` for next milestone scope).*
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

@@ -4,6 +4,50 @@ Living history of shipped milestones. One entry per milestone, newest first. Det
 
 ---
 
+## v3.1 — Distribution-Ready Pass
+
+**Shipped:** 2026-05-18 (engineering-complete; `tech_debt` accepted — 7 Kaan-action carveouts ride the v3.0 external clock per `gsd-autonomous fully` mode)
+**Phases:** 5 (46 — 50) | **Plans:** 32 | **Mode:** `gsd-autonomous fully`
+**Git range:** `v3.0` (2026-05-17) → `HEAD` (2026-05-18) — 61 commits, 382 files, +57,597 / -2,541
+**Audit:** `.planning/milestones/v3.1-MILESTONE-AUDIT.md` (tech_debt accepted, 44/44 reqs, 5/5 phases, 5/5 integration, 4/4 flows)
+**Known deferred items at close: 7** (see STATE.md Deferred Items — all 7 are `human_needed` external-clock carveouts: §INSTALL-COMPANION-SIGN, §INSTALL-VM-RUN, §SHIP-CONTACT-VBAUDIO, §E2E-50A-WALK, §VIS-04, §VIS-05, DEPS-07/DEPS-08 documented decisions).
+
+### Key Accomplishments
+
+1. **Dependency audit + lockfile shipped** — hermetic `uv.lock` regen in `python:3.12-slim-bookworm` container; `cargo-deny` license allowlist with GPL ban; CycloneDX + SPDX SBOMs on release assets; `docs/AUDIT.md` 3-table surface with green/yellow/red install-impact ratings; freshness gate fails any PR with stale AUDIT.md; Dependabot wired for 4 ecosystems with weekly cadence. 45 passing + 1 xfail (pinact mechanical rewrite deferred to CI).
+2. **Mascot real-GLB-land scaffolded** — retarget CLI extended from 5 to 28 slots across 5 families (Base / Emotion / Anticipation / Reaction / legacy_prep); MANIFEST.yaml provenance schema + MIXAMO-CLIP-SOURCES.md selection guidance; 23 placeholder GLB stubs at slot paths so dev loader doesn't 404; EVENT_LAYER_PRIORITY_MAP single-source-of-truth for 15 event classes × 4-layer state machine; 63 Python + 177 TypeScript tests pass.
+3. **Opportunity scan locked steady state** — `docs/dep-opportunities/2026-05-scan.md` rates 24 candidates under 4-color rubric (1 Green / 8 Yellow / 9 Red-constraint / 6 Red-risk); ADR sidecar for the one green-adopt (OBS browser-source docs-only); 8 Yellow stubs carry forward to `.planning/research/v3-buckets/`; zero new runtime deps introduced; exclusion-set memories quoted verbatim.
+4. **Win + Mac one-click installer chain live** — Inno Setup `[Run]` + `[Code]` license dialog for VB-CABLE silent install; `fetch_drivers.{sh,ps1}` + `driver_manifest.json` with SHA-256 verify; `companion-sign` workflow + verifier (SignPath cert pending Kaan discharge); `INSTALL_READY` event with 60s CI gate (median 41,000 ms across SHIP-04 simulated matrix, p95 52,000 ms); BlackHole 48 kHz post-install probe; WCAG-AA a11y on wizard; uninstall preserves user data unless opt-in clean. 68 passing + 1 platform-gated skip.
+5. **End-to-end MacBook + OS-matrix harness shipped** — `tests/e2e/macbook/` with privacy-fixture asserting zero off-limits writes; Playwright + pixelmatch at `maxDiffPixelRatio: 0.02` baselined on Phase 47 placeholders; audio-loopback VCR cassette pinned to v3.0 GATE-02 (zero live Gemini); Gate 6b wired into `cut_release.sh`; 50a Kaan-walk checklist + Nielsen 10 + screencast capture rig; 50b OS-matrix smoke composes Phase 49 `install_vm_matrix.sh`. 16 passing + 5 CI-tolerant skips.
+
+### Status
+
+- 44 / 44 v3.1 REQ-IDs engineering-satisfied (100% coverage).
+- 7 Kaan-action carveouts deferred to STATE.md, all external-clock dependent: §INSTALL-COMPANION-SIGN (SignPath cert) → unblocks §INSTALL-VM-RUN (real Tart VM) → enables §E2E-50A-WALK full pass; §VIS-04 (28 Mixamo retargets via Adobe walk) + §VIS-05 (5 legacy_prep follow-up); §SHIP-CONTACT-VBAUDIO (future OEM optimization); DEPS-07 pinact mechanical-rewrite + DEPS-08 livekit-plugins-openai cull both documented in `docs/AUDIT.md § Decisions`.
+- Local annotated git tag `v3.1` to be created on milestone-close commit (NOT pushed — Kaan publishes after external discharges land per §SHIP-CUT cookbook in v3.0).
+
+### Carveouts at close (`gsd-autonomous fully` mode)
+
+Critical-path discharge order (per audit):
+1. §INSTALL-COMPANION-SIGN — SignPath OSS Foundation cert grant (Authenticode for `.ps1` + `.py`).
+2. §INSTALL-VM-RUN — Real Tart VM execution on macOS 12.3 / 14 / 15 + Win 10 / 11.
+3. §E2E-50A-WALK — Kaan's MacBook walk with real DJ-set audio; `docs/e2e/2026-05-walk.webm` capture.
+4. §VIS-04 / §VIS-05 — Mixamo Adobe-account retarget walk (independent of 1-3, runs in parallel).
+5. §SHIP-CONTACT-VBAUDIO — VB-Audio OEM redistribution email (future Win optimization).
+
+### Tech Debt Acknowledged
+
+- DEPS-07: pinact binary unavailable on local executor; mechanical SHA rewrite deferred to first CI run.
+- DEPS-08: `livekit-plugins-openai` cull blocked by direct imports in `src/vibemix/agent/tts_chain.py` + 3 test files; documented for a focused TTS proxy fallback refactor post-v3.1.
+
+### Archives
+
+- Roadmap: `.planning/milestones/v3.1-ROADMAP.md`
+- Requirements: `.planning/milestones/v3.1-REQUIREMENTS.md`
+- Audit: `.planning/milestones/v3.1-MILESTONE-AUDIT.md`
+
+---
+
 ## v3.0 — Clean OSS Ship
 
 **Shipped:** 2026-05-17 (engineering-complete; `tech_debt` accepted — KAAN-ACTION-LEGAL discharges pending external clock for public RC publish)

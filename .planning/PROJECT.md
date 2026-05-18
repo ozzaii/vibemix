@@ -10,20 +10,28 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v3.1 Distribution-Ready Pass
+## Current Milestone: Planning next milestone
 
-**Goal:** Make vibemix install-and-run anywhere — true one-click on Win + Mac with audited/pinned deps and the mascot fully visible across all emotional states — verified by Kaan's end-to-end pass on his MacBook.
+**Last shipped:** v3.1 "Distribution-Ready Pass" — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts ride the v3.0 external clock per `gsd-autonomous fully` mode).
 
-**Target features:**
-- **One-click install scripts (Win + Mac)** — single-action installer that auto-pulls all runtime deps (sidecar bundle, BlackHole/VB-CABLE virtual audio routing, MIDI prerequisites), configures audio devices, and lands on a ready-to-run app — zero terminal commands.
-- **System requirements + dep audit/pin** — every Python runtime dep + Tauri/native dep pinned with rationale, license check, install-impact rating (green/yellow/red per `project_one_click_install_hard_req`), unused/stale deps culled.
-- **New dep + integration opportunity scan** — research pass surfacing what should be added to widen real-world compatibility (DJ software / OS edge cases / hardware), with explicit green/yellow/red ratings; only the green ones land in v3.1.
-- **End-to-end MacBook pass (functional + visual + aesthetic + usability)** — Kaan runs the full app on his MacBook with a real set, validates every flow + CDJ-Whisper visual surface + mascot emotion coverage; release-blocking issues surface as gap-closure items.
-- **Mascot fully visible with all emotions wired** — Base + Emotion + Anticipation + Reaction state-machine layers cover every event class, GLB assets land real (not placeholder), mascot is visible on every supported window/screen-share path.
+(v3.1 shipped 2026-05-18. v3.0 "Clean OSS Ship" shipped 2026-05-17. v2.1 "The Unified Cut" shipped 2026-05-16. v2.0 shipped 2026-05-14. v0.1.0 shipped 2026-05-13. Full archives in `.planning/milestones/`.)
 
-**Last shipped:** v3.0 "Clean OSS Ship" — 2026-05-17 (status: `tech_debt` accepted; KAAN-ACTION-LEGAL §SHIP-01..13 cookbook pending external clock for public RC publish).
+<details>
+<summary>📦 v3.1 Distribution-Ready Pass (shipped 2026-05-18, status <code>tech_debt</code>) — archived narrative</summary>
 
-(v3.0 shipped 2026-05-17. v2.1 "The Unified Cut" shipped 2026-05-16. v2.0 shipped 2026-05-14. v0.1.0 shipped 2026-05-13. Full archives in `.planning/milestones/`.)
+5 phases shipped engineering-green under `gsd-autonomous fully` mode. 32 plans, 61 commits since `v3.0` tag, net ~+57.5k LOC across `installer/`, `tauri/`, `scripts/`, `tests/`, `docs/`, `.github/workflows/`. 44 / 44 v3.1 REQ-IDs engineering-satisfied. 7 Kaan-action carveouts deferred to KAAN-ACTION surface (external-clock dependent — SignPath cert, Tart VM walk, Adobe Mixamo walk, Kaan-ear MacBook pass, VB-Audio OEM email). All 5 cross-phase integration seams audited WIRED.
+
+**Highlights:**
+
+- **Dependency audit + lockfile shipped (Phase 46)** — hermetic `uv.lock` regen in `python:3.12-slim-bookworm`; `cargo-deny` license allowlist with GPL ban; CycloneDX + SPDX SBOMs on release assets; `docs/AUDIT.md` 3-table surface with green/yellow/red install-impact ratings; freshness gate fails any PR with stale AUDIT.md; Dependabot wired for 4 ecosystems. 45 passing + 1 xfail (pinact mechanical rewrite deferred to CI).
+- **Mascot real-GLB-land scaffolded (Phase 47)** — retarget CLI extended from 5 to 28 slots across 5 families; MANIFEST.yaml provenance schema + MIXAMO-CLIP-SOURCES.md selection guidance; 23 placeholder GLB stubs at slot paths so dev loader doesn't 404; EVENT_LAYER_PRIORITY_MAP single-source-of-truth for 15 event classes × 4-layer state machine; 63 Python + 177 TypeScript tests pass. §VIS-04 Mixamo discharge pending.
+- **Opportunity scan locked steady state (Phase 48)** — `docs/dep-opportunities/2026-05-scan.md` rates 24 candidates (1G / 8Y / 9R-constraint / 6R-risk); ADR sidecar for the one green-adopt (OBS browser-source docs-only); 8 Yellow stubs in `.planning/research/v3-buckets/`; zero new runtime deps introduced; exclusion-set memories quoted verbatim.
+- **Win + Mac one-click installer chain live (Phase 49)** — Inno Setup `[Run]` + `[Code]` license dialog for VB-CABLE silent install; `fetch_drivers.{sh,ps1}` + `driver_manifest.json` with SHA-256 verify; `companion-sign` workflow + verifier (SignPath cert pending Kaan discharge); `INSTALL_READY` event with 60s CI gate (median 41,000 ms across simulated SHIP-04 matrix); BlackHole 48 kHz post-install probe; WCAG-AA a11y on wizard; uninstall preserves user data unless opt-in clean. 68 passing + 1 platform-gated skip.
+- **End-to-end MacBook + OS-matrix harness shipped (Phase 50)** — `tests/e2e/macbook/` with privacy-fixture asserting zero off-limits writes; Playwright + pixelmatch at `maxDiffPixelRatio: 0.02` baselined on Phase 47 placeholders; audio-loopback VCR cassette pinned to v3.0 GATE-02 (zero live Gemini); Gate 6b wired into `cut_release.sh`; 50a Kaan-walk checklist + Nielsen 10 + screencast capture rig; 50b OS-matrix smoke composes Phase 49 `install_vm_matrix.sh`. 16 passing + 5 CI-tolerant skips.
+
+Full archive: `.planning/milestones/v3.1-ROADMAP.md` · Requirements: `.planning/milestones/v3.1-REQUIREMENTS.md` · Audit: `.planning/milestones/v3.1-MILESTONE-AUDIT.md`.
+
+</details>
 
 <details>
 <summary>📦 v3.0 Clean OSS Ship (shipped 2026-05-17, status <code>tech_debt</code>) — archived narrative</summary>
@@ -178,11 +186,23 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 - ✓ `docs/launch-rotation.md` §SHIP-11 24h solo rotation + 7-monitoring-source list + triage decision tree — v3.0 (Phase 45 / SHIP-11 engineering)
 - ✓ KAAN-ACTION-LEGAL §SHIP-01..13 discharge cookbook (canonical 8-block format) — v3.0 (Phase 45 / 45-06)
 
+<!-- v3.1 shipped 2026-05-18 — Distribution-Ready Pass engineering-complete. -->
+
+- ✓ Hermetic `uv.lock` regen in `python:3.12-slim-bookworm` + cargo-deny GPL ban + frozen npm CI + dep-cull docs/AUDIT.md § Decisions — v3.1 (Phase 46 / DEPS-01..03 + DEPS-08)
+- ✓ `docs/AUDIT.md` 3-table surface (Python / Rust / JS) with green/yellow/red install-impact + freshness gate via git log commit-time + CycloneDX + SPDX SBOMs + pinact audit scaffold + 4 dep-health badges + Dependabot 4-ecosystem weekly cadence — v3.1 (Phase 46 / DEPS-04..07 + DEPS-09 + DEPS-10)
+- ✓ Retarget CLI extended 5 → 28 slots across 5 families + MANIFEST.yaml provenance schema + MIXAMO-CLIP-SOURCES.md + 23 placeholder GLB stubs + Phase 47 pools + EVENT_LAYER_PRIORITY_MAP (15 event classes × 4 layers) — v3.1 (Phase 47 / MASCOT-01..05)
+- ✓ Bundle gate Tier-2 per-family bands + draco retune target (~23.2 MB / 25 MB cap) + persona-smoke harness with WebM screencast + README hero PNG/WebM scaffold + mascot.html grep-gate (6-file allowlist) + mascot-audit.yml CI aggregation — v3.1 (Phase 47 / MASCOT-06..08)
+- ✓ `docs/dep-opportunities/2026-05-scan.md` rates 24 candidates under 4-color rubric (1G / 8Y / 9R-constraint / 6R-risk) + ADR sidecar for OBS browser-source docs-only + 8 Yellow stubs in `.planning/research/v3-buckets/` + zero new runtime deps + exclusion-set memories quoted verbatim — v3.1 (Phase 48 / OPP-01..06)
+- ✓ Inno Setup `[Run]` + `[Code]` license dialog for VB-CABLE silent install + `fetch_drivers.{sh,ps1}` + `driver_manifest.json` SHA-256 verify + `companion-sign.yml` workflow + verifier + `audio_config.py --configure-routing` Multi-Output Device (Mac) + WASAPI default (Win) + BlackHole 48 kHz post-install probe — v3.1 (Phase 49 / INSTALL-02 + INSTALL-04 + INSTALL-05 + INSTALL-09 + INSTALL-10)
+- ✓ `INSTALL_READY` event + 60s CI gate (median 41,000 ms / 60,000 ms budget across SHIP-04 simulated matrix) + forewarning copy passes anti-slop sibling-script + WCAG-AA a11y on wizard 3-step surface + uninstall preserves recordings/debriefs/ghost_calibration unless --clean opt-in — v3.1 (Phase 49 / INSTALL-01 + INSTALL-03 + INSTALL-06..08)
+- ✓ `tests/e2e/macbook/` harness foundation + Jinja2 report.html + privacy fixture asserting zero writes to `~/.hermes/` / `~/hermes-rig/logs/` / `~/.lmstudio/` + audio-loopback VCR cassette pinned to v3.0 GATE-02 (zero live Gemini) + Playwright + pixelmatch `maxDiffPixelRatio: 0.02` against Phase 47 placeholder baselines — v3.1 (Phase 50 / E2E-01 + E2E-03 + E2E-04 + E2E-09)
+- ✓ Gate 6b wired immediately after Gate 2b in `cut_release.sh` + 50a Kaan-walk checklist + nielsen_10_checklist.json × Tier-1 surfaces + macOS-only screencast capture rig (`record_50a_walk.sh`) + 50b OS-matrix smoke composing Phase 49 `install_vm_matrix.sh` + anti-slop sibling-script scoped to `dist/e2e-macbook-runs/**/report.html` — v3.1 (Phase 50 / E2E-02 + E2E-05..08 + E2E-10)
+
 ### Active
 
 <!-- v3.x candidate scope — strategic conversation is open per memory `project_v2_planning_active`; do NOT auto-create next milestone. Kaan drives. -->
 
-**Pending external clock — v3.0 RC publish (KAAN-ACTION-LEGAL §SHIP-01..13)**
+**Pending external clock — v3.0 + v3.1 RC publish (KAAN-ACTION-LEGAL §SHIP + §INSTALL + §VIS + §E2E)**
 
 - [ ] Apple Dev Agreement update signed by Francesco (SHIP-01 / P46 legal-capacity)
 - [ ] SignPath OSS Foundation approval received (SHIP-02 / P46 legal-capacity, ~1-week SLA)
@@ -207,11 +227,21 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 - [ ] GATE-02 VCR cassettes populated via `VCR_RECORD_MODE=new_episodes`
 - [ ] GATE-03 6 × 30-min DJ session WAVs in git-LFS corpus (200 MB)
 - [ ] GATE-05 ear-test session execution (≥2 sessions ≥2 genres in 14d window)
-- [ ] VIS-04 5 Mixamo retargets for prep_*.glb placeholders (Adobe-account download + Kaan-aesthetic selection)
 - [ ] LAUNCH-03 / LAUNCH-04 real DJ-software + controller logos (16 SVG placeholders → real assets)
 - [ ] LAUNCH-06 bravoh GH org standup (Bravoh Enterprise billing flag resolve)
 - [ ] LAUNCH-07 SHIP-TWEET Kaan + Francesco mutual sign-off
 - [ ] LAUNCH-08 Discord live execution (`discord_provision.py --real`)
+
+**Pre-stage discharges (v3.1 carryover)**
+
+- [ ] §INSTALL-COMPANION-SIGN — SignPath OSS Foundation cert grant for companion `.ps1` + `.py` Authenticode submission (v3.1 / Phase 49)
+- [ ] §INSTALL-VM-RUN — Real Tart VM execution on macOS 12.3 / 14 / 15 + Win 10 / 11 (depends on §INSTALL-COMPANION-SIGN) (v3.1 / Phase 49 + Phase 50)
+- [ ] §E2E-50A-WALK — Kaan walks `tests/e2e/macbook/50a_kaan_walk_checklist.md` on MacBook with real DJ-set audio; records `docs/e2e/2026-05-walk.webm` via `scripts/e2e/record_50a_walk.sh` (v3.1 / Phase 50)
+- [ ] §VIS-04 — 28 Mixamo retargets via Adobe-account walk + per-family `retarget_to_neon_rebel.py --really` (v3.0 carryover + v3.1 Phase 47; independent of SignPath path)
+- [ ] §VIS-05 — 5 pre-existing legacy_prep_* slot retargets (bundle with §VIS-04 discharge) (v3.1 / Phase 47)
+- [ ] §SHIP-CONTACT-VBAUDIO — Kaan emails VB-Audio for OEM/bundle redistribution permission (future Win installer optimization) (v3.1 / Phase 49)
+- [ ] DEPS-07 — `pinact` mechanical SHA rewrite of `.github/workflows/*.yml` (closes via `brew install pinact && bash scripts/audit/run_pinact.sh --apply` OR first CI run) (v3.1 / Phase 46)
+- [ ] DEPS-08 — `livekit-plugins-openai` cull blocked by direct imports at `src/vibemix/agent/tts_chain.py:25`; TTS proxy fallback chain refactor scheduled post-v3.1 (v3.1 / Phase 46)
 
 **v3.x candidate scope (confirmed per memory `project_v2_open_candidates` — Kaan drives commit to milestone)**
 
@@ -257,7 +287,7 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 
 **Why open-source now.** Bravoh (the AI Artist Operating System) has a 140k-view reel on the project's Instagram account and a Closed Beta running since March 1, 2026. The DJ co-host is a fast-shipping, narrowly-scoped, demo-able artefact that lives downstream of Bravoh's positioning ("we build cool AI for musicians, here's a free taste") — it is the marketing wedge that turns "interested" into "watching the Bravoh waitlist".
 
-**Current state (post-v3.0 close, 2026-05-17).** Engineering-complete OSS RC. 4 milestones shipped (v0.1.0 / v2.0 / v2.1 / v3.0). 41 phases total. v3.0 added ~+61k LOC, 250 commits, 529 files changed. 57/57 v3.0 REQ-IDs engineering-satisfied (100%); 22 carveouts deferred to KAAN-ACTION-LEGAL per `gsd-autonomous fully` mode. Anti-slop thesis hardened: mic-as-Part-2 + lookahead-as-Part-3 + hybrid hallucination gate + EvidenceRegistry citation strip in live UI. CDJ Whisper UI Tier-1 surfaces pass paired auditor+checker with zero HIGH findings. Local `v3.0` tag created (NOT pushed). Awaiting external clock: Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) to discharge SHIP-CUT v3.0.0-rc1.
+**Current state (post-v3.1 close, 2026-05-18).** Distribution-ready engineering-complete. 5 milestones shipped (v0.1.0 / v2.0 / v2.1 / v3.0 / v3.1). 46 phases total. v3.1 added ~+57.5k LOC, 61 commits, 382 files changed since `v3.0` tag. 44/44 v3.1 REQ-IDs engineering-satisfied (100%); 7 carveouts deferred to KAAN-ACTION external surface per `gsd-autonomous fully` mode — all external-clock dependent (SignPath cert, Tart VM walk, Adobe Mixamo, Kaan-ear MacBook pass, VB-Audio OEM email, pinact binary). Installer chain ships one-click on Win + Mac with 41,000 ms median onboarding (60,000 ms budget); dep audit chain enforces hermetic lockfile + license allowlist + SBOMs + freshness gate; mascot scaffolded for full emotion coverage (28 slots × 4 layers, real GLB land pending Mixamo walk); e2e harness has audio-loopback VCR cassette + visual regression + privacy fixture + Gate 6b in `cut_release.sh`. Local `v3.0` tag created (NOT pushed); `v3.1` tag pending milestone-close commit. Awaiting external clock: Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) gates BOTH v3.0 SHIP-CUT and v3.1 companion-driver signing — v3.1 ride-along publishes after v3.0 lands.
 
 **Existing user.** Kaan, primarily — the codebase started as his Friday-night experiment. The open-source release expands to "any DJ with a controller + a DJ software running on mac or windows" — beginner curiosity to pro feedback-loop.
 
@@ -324,4 +354,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-17 — v3.1 "Distribution-Ready Pass" scaffolded via `/gsd:autonomous fully`. Scope: Win+Mac one-click install, dep audit/pin + new-dep opportunity scan, end-to-end MacBook pass (functional + visual + aesthetic + usability), mascot full emotion coverage with real GLBs. External clock for v3.0 SHIP-CUT (Apple Dev + SignPath) remains independent — v3.1 can ship engineering-complete in parallel and feed straight into the v3.0 cookbook once approvals land.*
+*Last updated: 2026-05-18 — v3.1 "Distribution-Ready Pass" shipped engineering-complete via `/gsd:autonomous fully`. 5 phases (46–50), 32 plans, 44/44 REQs green, 7 Kaan-action carveouts deferred to external-clock surface. Critical-path discharge order: §INSTALL-COMPANION-SIGN → §INSTALL-VM-RUN → §E2E-50A-WALK; §VIS-04 + §VIS-05 (Mixamo) run in parallel. Next milestone TBD via `/gsd:new-milestone` once Kaan decides scope (likely post-public-RC user-signal milestone).*
