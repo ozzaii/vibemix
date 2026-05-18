@@ -329,3 +329,127 @@ function runRequest(
   }
   return { plan, machine: nextMachine };
 }
+
+// ── Phase 47 / MASCOT-05 — 4-layer additive event fanout ──────────────
+//
+// Declarative event-class → 4-layer fanout map. Reads cleanly + serves as
+// single source of truth for "when EVENT X fires, which mascot layers
+// react?". Tested by tauri/ui/src/mascot/__tests__/event-coverage-matrix.test.ts.
+//
+// Anchored to Phase 47 / CONTEXT.md § State-Machine Wiring (verbatim copy
+// to keep this module the canonical record). KAAN_SPOKE is empty by
+// design — talk-block rule per Phase 13 STATE_PRIORITY = mascot stays on
+// Base during user speech.
+
+import type {
+  BaseClip,
+  EmotionClip,
+  AnticipationClip,
+  ReactionClip,
+} from "./types.js";
+
+/** v2.0 EventDetector event classes + Phase 30 Hard Tek detectors.
+ *  Total: 15 event classes (matches src/vibemix/agent/event_detector.py). */
+export type EventClass =
+  | "TRACK_CHANGE"
+  | "PHASE"
+  | "LAYER_ARRIVAL"
+  | "MIX_MOVE"
+  | "HEARTBEAT"
+  | "KAAN_SPOKE"
+  | "MANUAL"
+  | "DISTORTION_CLIMB"
+  | "ACID_LINE_ENTRY"
+  | "KICK_SWAP"
+  | "SUB_LAYER_ARRIVAL"
+  | "BREAKDOWN_KICK_KILL"
+  | "REENTRY_KICK_LAND"
+  | "KICK_DENSITY_SHIFT"
+  | "PHRASE_BOUNDARY";
+
+export interface LayerFanout {
+  base?: BaseClip;
+  emotion?: EmotionClip;
+  anticipation?: AnticipationClip;
+  reaction?: ReactionClip;
+}
+
+export const EVENT_LAYER_PRIORITY_MAP: Readonly<
+  Record<EventClass, LayerFanout>
+> = Object.freeze({
+  TRACK_CHANGE: {
+    emotion: "emotion_focus",
+    anticipation: "prep_mix",
+    reaction: "react_mix_in",
+  },
+  PHASE: { emotion: "emotion_anticipation", anticipation: "prep_breakdown" },
+  LAYER_ARRIVAL: { emotion: "emotion_surprise", reaction: "react_sub_layer" },
+  MIX_MOVE: { reaction: "react_mix_in" },
+  HEARTBEAT: { base: "base_breathe" },
+  KAAN_SPOKE: {}, // talk-block rule — mascot stays on Base
+  MANUAL: { reaction: "react_hype_peak" }, // caller-driven; default to peak
+  DISTORTION_CLIMB: { reaction: "react_distortion_climb" },
+  ACID_LINE_ENTRY: { reaction: "react_acid_line" },
+  KICK_SWAP: { reaction: "react_kick_swap" },
+  SUB_LAYER_ARRIVAL: { reaction: "react_sub_layer" },
+  BREAKDOWN_KICK_KILL: {
+    anticipation: "prep_breakdown",
+    reaction: "react_breakdown",
+  },
+  REENTRY_KICK_LAND: { reaction: "react_reentry" },
+  KICK_DENSITY_SHIFT: { emotion: "emotion_focus" },
+  PHRASE_BOUNDARY: { reaction: "react_phrase_boundary" },
+});
+
+/** Layer-instance bundle passed to dispatchEvent47. Caller (typically the
+ *  Tauri webview index.ts) constructs all four and threads them through.
+ *  Each layer's actual class import is intentionally NOT bound here —
+ *  this module stays decoupled from concrete layer constructors so it
+ *  remains test-friendly (vitest passes mock objects with the methods below). */
+export interface MascotLayerBundle47 {
+  base: { schedule(clip: BaseClip, now_ms: number): void };
+  emotion: { update(clip: EmotionClip | null, now_ms: number): void };
+  anticipation: { update(clip: AnticipationClip | null, now_ms: number): void };
+  reaction: { fire(clip: ReactionClip, now_ms: number): void };
+}
+
+/**
+ * Phase 47 / MASCOT-05 — dispatch an event class to the 4-layer additive state machine.
+ *
+ * Reads EVENT_LAYER_PRIORITY_MAP[event] and invokes the appropriate
+ * .schedule/.update/.fire on each layer in priority order
+ * (base → emotion → anticipation → reaction).
+ *
+ * Returns the set of layer keys that received a non-null fanout (used
+ * by the vitest coverage matrix as the assertion target).
+ *
+ * Naming: dispatchEvent47 (not dispatchEvent) to avoid colliding with the
+ * pre-existing v2.0 envelope-dispatcher in this module.
+ */
+export function dispatchEvent47(
+  event: EventClass,
+  layers: MascotLayerBundle47,
+  now_ms: number,
+): ReadonlyArray<keyof LayerFanout> {
+  const fanout = EVENT_LAYER_PRIORITY_MAP[event];
+  const fired: Array<keyof LayerFanout> = [];
+
+  if (fanout.base !== undefined) {
+    layers.base.schedule(fanout.base, now_ms);
+    fired.push("base");
+  }
+  if (fanout.emotion !== undefined) {
+    layers.emotion.update(fanout.emotion, now_ms);
+    fired.push("emotion");
+  }
+  if (fanout.anticipation !== undefined) {
+    layers.anticipation.update(fanout.anticipation, now_ms);
+    fired.push("anticipation");
+  }
+  if (fanout.reaction !== undefined) {
+    layers.reaction.fire(fanout.reaction, now_ms);
+    fired.push("reaction");
+  }
+
+  return Object.freeze(fired);
+}
