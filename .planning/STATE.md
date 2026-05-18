@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Distribution-Ready Pass
-status: "Phase 48 (OPP) engineering-green; Phase 49 (INSTALL) ready to dispatch"
-last_updated: "2026-05-18T11:00:00.000Z"
-last_activity: 2026-05-18 — Phase 48 (New-Dep + Integration Opportunity Scan) engineering-green; 6/6 plans + VERIFICATION.md + SUMMARY.md committed; OPP-01..06 covered; 1 green-adopt (OBS docs-only) + 8 yellow-defer stubs + 0 new runtime deps; Phase 49 unblocked
+status: "Phase 49 (INSTALL) engineering-green; Phase 50 (E2E) ready to dispatch"
+last_updated: "2026-05-18T13:00:00.000Z"
+last_activity: 2026-05-18 — Phase 49 (Win+Mac One-Click Installer Chain) engineering-green; 6/6 plans + VERIFICATION.md + REVIEW.md (clean) + UI-REVIEW.md (3.67/4) committed; 10/10 INSTALL REQ-IDs covered; 68 tests pass; companion-sign workflow + verifier + Inno Setup [Run]+[Code]+[UninstallRun] + DMG firstrun hook + 60s simulated gate (median 41 000ms) + anti-slop sibling + uninstall preserve-default; Phase 50 (E2E) unblocked
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 20
-  completed_plans: 20
-  percent: 60
+  completed_phases: 4
+  total_plans: 26
+  completed_plans: 26
+  percent: 80
 ---
 
 # vibemix — State
@@ -37,16 +37,16 @@ See: .planning/PROJECT.md (updated 2026-05-17 after v3.0 milestone close)
 ## Current Position
 
 **Milestone:** v3.1 Distribution-Ready Pass
-**Next Phase:** Phase 49 — Win + Mac One-Click Installer Chain (INSTALL)
+**Next Phase:** Phase 50 — End-to-End MacBook + OS-Matrix Pass (E2E)
 **Plan:** —
-**Status:** Phase 48 engineering-green (6/6 plans); Phase 49 (INSTALL) ready to dispatch
-**Last activity:** 2026-05-18 — Phase 48 complete; 6 plans + SUMMARY.md committed; all OPP-01..06 engineering-green; zero new runtime deps; Phase 49 unblocked
+**Status:** Phase 49 engineering-green (6/6 plans); Phase 50 (E2E) ready to dispatch
+**Last activity:** 2026-05-18 — Phase 49 complete; 6 plans + VERIFICATION + REVIEW (clean) + UI-REVIEW (3.67/4) committed; all INSTALL-01..10 engineering-green; 68 tests pass; companion-sign workflow + verifier + Inno Setup integration; Phase 50 unblocked
 
 **v3.1 Progress:**
 
 ```
-Phases:  3 / 5    ████████████░░░░░░░░  60%
-Plans:  20 / TBD  ██████░░░░░░░░░░░░░░  (P46: 6 plans + P47: 8 plans + P48: 6 plans)
+Phases:  4 / 5    ████████████████░░░░  80%
+Plans:  26 / TBD  ████████░░░░░░░░░░░░  (P46: 6 + P47: 8 + P48: 6 + P49: 6 plans)
 ```
 
 ## Performance Metrics
@@ -57,9 +57,9 @@ Plans:  20 / TBD  ██████░░░░░░░░░░░░░░  
 | Phases complete (v2.0) | 10 / 12 code-shipped (2 deferred to Kaan-action) |
 | Phases complete (v2.1) | 13 / 13 engineering-green (4 carry `human_needed` carveouts: Phase 33 / 35 / 38 / 39) |
 | Phases complete (v3.0) | 6 / 6 engineering-green (all 6 carry `human_needed` verification carveouts → KAAN-ACTION-LEGAL §SHIP-01..13) |
-| Phases complete (v3.1) | 3 / 5 |
+| Phases complete (v3.1) | 4 / 5 |
 | Plans complete (v3.0) | 41 / 41 |
-| Plans complete (v3.1) | 20 / TBD |
+| Plans complete (v3.1) | 26 / TBD |
 | v3.0 REQ-IDs mapped + satisfied | 57 / 57 ✓ (100% coverage, no orphans) |
 | v3.1 REQ-IDs mapped | 44 / 44 ✓ (100% coverage, no orphans) |
 | v3.0 cross-phase integration seams WIRED | 3 / 3 |
@@ -71,6 +71,30 @@ Plans:  20 / TBD  ██████░░░░░░░░░░░░░░  
 ---
 
 ## Accumulated Context
+
+### Phase 49 Outcome (2026-05-18, engineering-green)
+
+v3.1 one-click installer chain landed engineering-green. All 10 INSTALL REQ-IDs covered across 6 plans. 68 tests pass. Headline artifacts:
+
+- **`installer/companion/`** — `fetch_drivers.{sh,ps1}` + `driver_manifest.json` (SHA-256 placeholder pending §INSTALL-COMPANION-SIGN discharge) + `audio_config.py` (Mac CoreAudio + Win WASAPI 48 kHz probe + Multi-Output Device / default-playback routing) + `onboarding_copy.json` (single source-of-truth for wizard strings) + `uninstall.{sh,ps1}` (preserve-default + --clean opt-in)
+- **`.github/workflows/companion-sign.yml`** — new parallel signing stage with Mac codesign + Win SignPath submission scaffold + cross-runner verifier gate
+- **`scripts/audit/check_companion_signing.sh`** — tag-vs-branch fail-mode verifier; PLACEHOLDER_ SHA-256 emits §INSTALL-COMPANION-SIGN warning
+- **Inno Setup integration** — `installer/windows/vibemix-installer.iss` extended with [Files] companion bundle + [Run] fetch_drivers.ps1 invocation + [UninstallRun] preserve-default + [Code] VB-CABLE license dialog gating InitializeSetup
+- **DMG first-launch hook** — `installer/macos/firstrun_companion.sh` (Mac DMG cannot legally bundle BlackHole .pkg; deferred to first launch)
+- **Tauri commands** — `tauri/src-tauri/src/wizard_cmds.rs` exposes `run_companion_fetch` + `run_audio_config` + `open_audio_settings`; `capabilities/default.json` `shell:allow-execute` extended (ZERO new permission identifier)
+- **Wizard 3 new steps** — `step-forewarning.ts` (OS forewarning), `step-driver-fetch.ts` (companion orchestration + INSTALL_READY emit), `step-48k-probe.ts` (48 kHz format probe + fix-it CTA); all read from `copy.ts` typed loader; zero inline strings + zero hex literals gated by tests
+- **Uninstall dialog** — `uninstall-dialog.ts` with preserve-default + clean opt-in checkbox + destructive border-color tint
+- **VM matrix gate** — `scripts/dist/install_vm_matrix.sh --simulate --check-60s` produces synthetic run.json from `simulated_runs` stubs; `scripts/dist/check_60s_gate.py` computes median + p95; median across 5 SHIP-04 rows = 41 000 ms (well under 60 000 ms budget)
+- **Anti-slop sibling** — `scripts/audit/check_no_slop_install.py` imports `AI_SLOP_BLOCKLIST` from `scripts/launch/check_no_ai_slop.py` (parent unchanged per sibling-pattern invariant); clean across 10 Phase 49 targets; `docs/internal/copy-substitutions.md` documents 20+ forbidden tokens
+
+**Code review:** status `clean` — 0 critical, 2 warnings (pre-existing cargo build issue + audio_config regex parse fragility), 4 info findings (all Phase 50 polish, none block closure).
+
+**UI review:** 3.67 / 4 overall — Visual Hierarchy 4/4, Color/Contrast 4/4, Typography 4/4, Motion 3/4 (stopwatch tween should extract to tokens.css), Copy 4/4, A11y 3/4 (focus trap on uninstall dialog deferred to Phase 50).
+
+**Kaan-action surface (deferred):**
+1. §INSTALL-COMPANION-SIGN — SignPath OSS Foundation cert grant
+2. §INSTALL-VM-RUN — real Tart VM rehearsal on SHIP-04 5-row matrix
+3. §SHIP-CONTACT-VBAUDIO — Kaan emails VB-Audio for OEM redistribution permission (future optimization)
 
 ### Phase 48 Outcome (2026-05-18, engineering-green)
 
