@@ -368,7 +368,7 @@ These are the items that **block clean v3 ship** with no graceful workaround:
 7. **OPS-14-SERVER** — Bravoh team must deploy `POST /vibemix/updates/upload` + `GET /vibemix/updates/latest.json` + `GET /vibemix/healthz`. Auto-update + healthz monitoring non-functional until live. Bravoh-team dependency.
 8. **SHIP-CUT** — Gate-2 of `cut_release.sh` currently fails ("no .dmg/.pkg/.msi/.exe artifacts in dist/"); cascades from DIST-09 + DIST-11.
 
-**Critical path:** items 1+2 unlock 7-of-8 P0s. Item 3 is the only standalone engineering P0 — no external blocker, can ship Day 1 of v3. Items 4+5 need Kaan asset-production time but no external clock.
+**Critical path:** items 1+2 enable 7-of-8 P0s. Item 3 is the only standalone engineering P0 — no external blocker, can ship Day 1 of v3. Items 4+5 need Kaan asset-production time but no external clock.
 
 ---
 

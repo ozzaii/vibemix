@@ -75,7 +75,7 @@ GA on 2026-04-22 via Gemini API + Vertex AI. Three details that change v3 option
 
 **c) Per-modality token rate is steep for audio.** Tokencost reports $6.50/M audio tokens for Embedding 2 ([tokencost.app](https://tokencost.app/blog/gemini-embedding-2-pricing)). At 25 tokens/sec, embedding one 120s track = 3000 tokens = ~$0.0195. A 1000-track library = ~$19.50, one-time. Acceptable for the €50/mo end-user budget; library indexing batched via Flex (50% off) brings it to ~$10.
 
-**New v3 use cases unlocked by GA + multimodal-RAG production patterns** (cite: Nuuly, Harvey, Supermemory — case studies in the [developers blog](https://developers.googleblog.com/building-with-gemini-embedding-2/)):
+**New v3 use cases enabled by GA + multimodal-RAG production patterns** (cite: Nuuly, Harvey, Supermemory — case studies in the [developers blog](https://developers.googleblog.com/building-with-gemini-embedding-2/)):
 - **"Sounds like this" library search from a live phrase** — embed a 30s window of the current track, top-K against the user's pre-indexed library, surface 3 harmonically-compatible candidates to the coach. New v3 feature, phase-level effort.
 - **Cross-modal "vibe matches my mood" search** — embed the screen capture + recent mic transcript jointly, retrieve tracks. Stretch.
 - **Session-moment retrieval for debrief** — embed each event window + audio, search "show me my best transitions" semantically. Drop-in extension of P29.
@@ -129,7 +129,7 @@ vibemix is Gemini-only, so this section is bounded by "what can run *alongside* 
 | **Harmonic compatibility / key detection** | Camelot-wheel-based commercial software (Mixed In Key, Serato, Rekordbox) — no breakthrough open algorithm in 2026. | **Pre-compute offline** via Gemini-embedding-2 nearest-neighbor or via Rekordbox XML import (already v2.0 P25). | Don't ship a key-detector. Import the user's existing one. |
 | **Onset detection / phase change** | librosa + numpy already in vibemix POCs. Sufficient. | YES — already shipped. | No change. |
 
-**Net SOTA implication for v3:** Beat This! via Rust sidecar is the single highest-leverage outside-Gemini addition — gives the trigger layer a non-Gemini beat-grid for the first time, closes the "AI reacts off-beat" hallucination class. Phase-level effort. Defer to v3.x if one-click-install bar slips.
+**Net SOTA implication for v3:** Beat This! via Rust sidecar is the single highest-impact outside-Gemini addition — gives the trigger layer a non-Gemini beat-grid for the first time, closes the "AI reacts off-beat" hallucination class. Phase-level effort. Defer to v3.x if one-click-install bar slips.
 
 ---
 
