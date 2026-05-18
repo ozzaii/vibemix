@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Distribution-Ready Pass
-status: "Roadmap scaffolded, ready for `/gsd:plan-phase 46`"
-last_updated: "2026-05-17T21:15:01.465Z"
-last_activity: 2026-05-17 — Roadmap v3.1 written; 5 phases (P46–P50) derived from 44 REQ-IDs with 100% coverage; build-order locked (46 ↕ 47 parallel → 48 → 49 → 50)
+status: "Phase 46 + 47 engineering-green; Phase 48 (OPP) ready to dispatch"
+last_updated: "2026-05-18T10:30:00.000Z"
+last_activity: 2026-05-18 — Phase 47 (Mascot Real GLB Land + Full Emotion Coverage) complete; 8/8 plans + SUMMARY.md committed; all MASCOT-01..08 engineering-green; §VIS-04 Mixamo retargets deferred to Kaan-action surface (expected)
 progress:
   total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 2
+  total_plans: 14
+  completed_plans: 14
+  percent: 40
 ---
 
 # vibemix — State
@@ -37,16 +37,16 @@ See: .planning/PROJECT.md (updated 2026-05-17 after v3.0 milestone close)
 ## Current Position
 
 **Milestone:** v3.1 Distribution-Ready Pass
-**Next Phase:** Phase 46 — Dependency Audit + Lockfile + AUDIT.md
+**Next Phase:** Phase 48 — Dep-Opportunity Scan (OPP)
 **Plan:** —
-**Status:** Roadmap scaffolded, ready for `/gsd:plan-phase 46`
-**Last activity:** 2026-05-17 — Roadmap v3.1 written; 5 phases (P46–P50) derived from 44 REQ-IDs with 100% coverage; build-order locked (46 ↕ 47 parallel → 48 → 49 → 50)
+**Status:** Phase 46 + 47 engineering-green; Phase 48 (OPP) ready to dispatch (depends on Phase 46 schema, not Phase 47)
+**Last activity:** 2026-05-18 — Phase 47 complete; 8/8 plans + SUMMARY.md committed; all MASCOT-01..08 engineering-green; §VIS-04 deferred to Kaan-action surface
 
-**v3.1 Progress (counter reset to milestone start):**
+**v3.1 Progress:**
 
 ```
-Phases:  0 / 5    ░░░░░░░░░░░░░░░░░░░░  0%
-Plans:   0 / TBD  ░░░░░░░░░░░░░░░░░░░░  0%
+Phases:  2 / 5    ████████░░░░░░░░░░░░  40%
+Plans:  14 / TBD  ████░░░░░░░░░░░░░░░░  (P46: 6 plans + P47: 8 plans)
 ```
 
 ## Performance Metrics
@@ -71,6 +71,12 @@ Plans:   0 / TBD  ░░░░░░░░░░░░░░░░░░░░  
 ---
 
 ## Accumulated Context
+
+### Phase 47 Kaan-Action Surface (2026-05-18, deferred per `gsd-autonomous fully` mode)
+
+One engineering-green-with-deferral item from Phase 47 — does NOT block Phase 48 (OPP) or any other v3.1 phase. Phase 50 visual-snapshot tests will hit the placeholder GLBs gracefully until discharge.
+
+- **§VIS-04: 28 Mixamo Adobe-account retargets deferred to Kaan-action**. Engineering ships the full scaffold: 28-slot retarget CLI (`scripts/mascot/retarget_to_neon_rebel.py` — 5 families × per-family size bands), `assets/mascot/source/MANIFEST.yaml` audit-trail schema (28 placeholder rows), `MIXAMO-CLIP-SOURCES.md` with 18 new selection-guidance rows + per-family aesthetic guardrails (Pioneer-CDJ headbob; hands near body; static-foot-grounded; ~120 BPM equivalent), 23 placeholder GLBs at `tauri/ui/assets/mascot/animations/` (44 KB stubs aliasing prep_settle.glb), `docs/mascot/BUNDLE-DECISION.md` documenting draco-first / 30 MB bump-fallback. Bundle gate at `scripts/mascot/check_bundle_size.sh` exits 2 (Tier 2 placeholder fail) by design — `continue-on-error: true` in `mascot-audit.yml` until discharge. **To close**: (1) Mixamo Adobe-account walk per `scripts/mascot/MIXAMO-CLIP-SOURCES.md`; (2) `~/Downloads/mixamo_<slot>.glb` per slot; (3) `uv run python scripts/mascot/retarget_to_neon_rebel.py --slot-family <family> --really` per family; (4) `bash scripts/mascot/render_readme_hero.sh` regenerates README hero PNG+WebM after `react_hype_peak.glb` ships real Mixamo content. Bundle gate flips to exit 0 on full discharge.
 
 ### Phase 46 Kaan-Action Surface (2026-05-18, deferred per `gsd-autonomous fully` mode)
 
