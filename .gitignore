@@ -204,3 +204,6 @@ scripts/dayzero/seed_stars.log
 assets/mascot/source/*.fbx
 assets/mascot/source/*.glb
 !assets/mascot/source/MANIFEST.yaml
+
+# Impeccable critique snapshots — local dev tooling; regenerated per run.
+.impeccable/
