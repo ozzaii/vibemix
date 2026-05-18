@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Distribution-Ready Pass
-status: "Phase 46 + 47 engineering-green; Phase 48 (OPP) ready to dispatch"
-last_updated: "2026-05-18T10:30:00.000Z"
-last_activity: 2026-05-18 — Phase 47 (Mascot Real GLB Land + Full Emotion Coverage) complete; 8/8 plans + SUMMARY.md committed; all MASCOT-01..08 engineering-green; §VIS-04 Mixamo retargets deferred to Kaan-action surface (expected)
+status: "Phase 48 (OPP) engineering-green; Phase 49 (INSTALL) ready to dispatch"
+last_updated: "2026-05-18T11:00:00.000Z"
+last_activity: 2026-05-18 — Phase 48 (New-Dep + Integration Opportunity Scan) engineering-green; 6/6 plans + VERIFICATION.md + SUMMARY.md committed; OPP-01..06 covered; 1 green-adopt (OBS docs-only) + 8 yellow-defer stubs + 0 new runtime deps; Phase 49 unblocked
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 14
-  completed_plans: 14
-  percent: 40
+  completed_phases: 3
+  total_plans: 20
+  completed_plans: 20
+  percent: 60
 ---
 
 # vibemix — State
@@ -37,16 +37,16 @@ See: .planning/PROJECT.md (updated 2026-05-17 after v3.0 milestone close)
 ## Current Position
 
 **Milestone:** v3.1 Distribution-Ready Pass
-**Next Phase:** Phase 48 — Dep-Opportunity Scan (OPP)
+**Next Phase:** Phase 49 — Win + Mac One-Click Installer Chain (INSTALL)
 **Plan:** —
-**Status:** Phase 46 + 47 engineering-green; Phase 48 (OPP) ready to dispatch (depends on Phase 46 schema, not Phase 47)
-**Last activity:** 2026-05-18 — Phase 47 complete; 8/8 plans + SUMMARY.md committed; all MASCOT-01..08 engineering-green; §VIS-04 deferred to Kaan-action surface
+**Status:** Phase 48 engineering-green (6/6 plans); Phase 49 (INSTALL) ready to dispatch
+**Last activity:** 2026-05-18 — Phase 48 complete; 6 plans + SUMMARY.md committed; all OPP-01..06 engineering-green; zero new runtime deps; Phase 49 unblocked
 
 **v3.1 Progress:**
 
 ```
-Phases:  2 / 5    ████████░░░░░░░░░░░░  40%
-Plans:  14 / TBD  ████░░░░░░░░░░░░░░░░  (P46: 6 plans + P47: 8 plans)
+Phases:  3 / 5    ████████████░░░░░░░░  60%
+Plans:  20 / TBD  ██████░░░░░░░░░░░░░░  (P46: 6 plans + P47: 8 plans + P48: 6 plans)
 ```
 
 ## Performance Metrics
@@ -57,9 +57,9 @@ Plans:  14 / TBD  ████░░░░░░░░░░░░░░░░  
 | Phases complete (v2.0) | 10 / 12 code-shipped (2 deferred to Kaan-action) |
 | Phases complete (v2.1) | 13 / 13 engineering-green (4 carry `human_needed` carveouts: Phase 33 / 35 / 38 / 39) |
 | Phases complete (v3.0) | 6 / 6 engineering-green (all 6 carry `human_needed` verification carveouts → KAAN-ACTION-LEGAL §SHIP-01..13) |
-| Phases complete (v3.1) | 0 / 5 |
+| Phases complete (v3.1) | 3 / 5 |
 | Plans complete (v3.0) | 41 / 41 |
-| Plans complete (v3.1) | 0 / TBD |
+| Plans complete (v3.1) | 20 / TBD |
 | v3.0 REQ-IDs mapped + satisfied | 57 / 57 ✓ (100% coverage, no orphans) |
 | v3.1 REQ-IDs mapped | 44 / 44 ✓ (100% coverage, no orphans) |
 | v3.0 cross-phase integration seams WIRED | 3 / 3 |
@@ -71,6 +71,19 @@ Plans:  14 / TBD  ████░░░░░░░░░░░░░░░░  
 ---
 
 ## Accumulated Context
+
+### Phase 48 Outcome (2026-05-18, engineering-green)
+
+v3.1 opportunity scan landed via `docs/dep-opportunities/2026-05-scan.md` with 24 candidates under the 4-color rubric. Headline:
+
+| Bucket | Count | Surface |
+|---|---|---|
+| Green-adopt | 1 | docs-only (OBS browser-source via existing Tauri webview port 8765 + mascot bus) |
+| Yellow-defer | 8 | `.planning/research/v3-buckets/v3.x-*.md` stubs |
+| Red-constraint | 9 | none (CLAP / MERT / OpenL3 / OpenAI / Anthropic / Demucs / Spleeter / DAW APIs / Linux-only) |
+| Red-risk | 6 | none (ProDJ Link / cdj-link-py / Dante Via / Loopback Audio / Soundflower / Auto-Rig Pro) |
+
+**Net runtime-dep delta for v3.1: 0.** Phase 49 installer companion reads `scripts/audit/dep_ratings.yaml::opportunity_evaluations` to confirm OBS is docs-only (negative confirmation); positive companion pins (BlackHole + VB-CABLE) stay Phase 49 internal. No Kaan-action surface from Phase 48.
 
 ### Phase 47 Kaan-Action Surface (2026-05-18, deferred per `gsd-autonomous fully` mode)
 
