@@ -111,6 +111,14 @@ Source: "..\..\dist\vibemix\*"; DestDir: "{app}"; Flags: ignoreversion recursesu
 ; Ship the LICENSE inside the install dir so it's visible without launching
 ; the app (Apache 2.0 §4(d) — "give recipients a copy of this License").
 Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+; Phase 49 — companion driver-fetch + audio-config + uninstall scripts.
+; Bundled under {app}\installer\companion\ so the [Run] entry below can
+; invoke fetch_drivers.ps1 with a path stable across the install lifetime.
+Source: "..\..\installer\companion\fetch_drivers.ps1"; DestDir: "{app}\installer\companion"; Flags: ignoreversion
+Source: "..\..\installer\companion\audio_config.py"; DestDir: "{app}\installer\companion"; Flags: ignoreversion
+Source: "..\..\installer\companion\driver_manifest.json"; DestDir: "{app}\installer\companion"; Flags: ignoreversion
+Source: "..\..\installer\companion\onboarding_copy.json"; DestDir: "{app}\installer\companion"; Flags: ignoreversion
+Source: "..\..\installer\companion\uninstall.ps1"; DestDir: "{app}\installer\companion"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -118,9 +126,28 @@ Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
+; Phase 49 — companion driver fetch (VB-CABLE). Invoked AFTER main install
+; extracts the [Files] payload, BEFORE the postinstall launch entry below.
+; The script is silent/hidden + waituntilterminated so the wizard can show
+; its driver-fetch progress (Plan 49-03 step-driver-fetch.ts) while this
+; runs. Status message visible to the user during the wait.
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\installer\companion\fetch_drivers.ps1"" -Auto"; \
+  Flags: shellexec waituntilterminated runhidden; \
+  StatusMsg: "Installing audio driver (VB-CABLE)..."
 ; Post-install launch — checked by default, dismissable. Mirrors macOS DMG
 ; "Open the app" affordance.
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+; Phase 49 — companion uninstall. Preserve-default mode (does NOT pass
+; -Clean) — recordings + debriefs survive standard uninstall per
+; INSTALL-07. Wizard uninstall-dialog.ts (Plan 49-06) is the only path
+; that can opt-in to the destructive -Clean mode.
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\installer\companion\uninstall.ps1"""; \
+  Flags: shellexec waituntilterminated runhidden; \
+  RunOnceId: "VibemixUninstallCompanion"
 
 [UninstallDelete]
 ; Sweep the per-user config dir on uninstall. {userappdata} expands to the
@@ -183,9 +210,38 @@ begin
   end;
 end;
 
+{ ------------------------------------------------------------------------- }
+{ Phase 49 INSTALL-03 — VB-CABLE license acknowledgment.                    }
+{                                                                           }
+{ The companion driver fetch downloads VB-CABLE from vb-audio.com at        }
+{ install time. VB-Audio's EULA is freeware-with-attribution. We surface a  }
+{ YES/NO dialog so the user explicitly accepts before the [Run] section     }
+{ fires fetch_drivers.ps1.                                                  }
+{                                                                           }
+{ Copy is short + specific (anti-slop blocklist gate doesn't apply to       }
+{ Inno Setup compile-time strings, but tone matches docs/internal/          }
+{ copy-substitutions.md anyway).                                            }
+{ ------------------------------------------------------------------------- }
+
+function CheckVbCableLicense(): Boolean;
+var
+  Response: Integer;
+begin
+  Response := MsgBox(
+    'vibemix uses VB-CABLE — a virtual audio cable from VB-Audio. ' +
+    'It is freeware-with-attribution. The installer downloads it from ' +
+    'vb-audio.com and verifies the file before running it.' #13#10 #13#10 +
+    'Click YES to accept VB-Audio''s terms and continue.' #13#10 +
+    'Click NO to cancel the vibemix install.',
+    mbConfirmation, MB_YESNO);
+  Result := Response = IDYES;
+end;
+
 function InitializeSetup(): Boolean;
 begin
   Result := CheckVcppRuntime();
+  if Result then
+    Result := CheckVbCableLicense();
 end;
 
 { End of [Code] section. }

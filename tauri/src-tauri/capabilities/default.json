@@ -23,7 +23,12 @@
     {
       "identifier": "shell:allow-execute",
       "allow": [
-        { "name": "binaries/vibemix-core", "sidecar": true, "args": [{ "validator": "^--(wizard|session|debrief)$" }, { "validator": "^\\d{8}-\\d{6}$" }] }
+        { "name": "binaries/vibemix-core", "sidecar": true, "args": [{ "validator": "^--(wizard|session|debrief)$" }, { "validator": "^\\d{8}-\\d{6}$" }] },
+        { "name": "bash", "cmd": "bash", "args": [{ "validator": ".*fetch_drivers\\.sh$" }, { "validator": "^--(dry-run|auto|check-syntax)$" }] },
+        { "name": "powershell", "cmd": "powershell.exe", "args": [{ "validator": "^-NoProfile$" }, { "validator": "^-ExecutionPolicy$" }, { "validator": "^Bypass$" }, { "validator": "^-File$" }, { "validator": ".*fetch_drivers\\.ps1$" }, { "validator": "^-(Auto|DryRun)$" }] },
+        { "name": "python3", "cmd": "python3", "args": [{ "validator": ".*audio_config\\.py$" }, { "validator": "^--(probe-48k|configure-routing|probe-only|remove-routing)$" }] },
+        { "name": "open", "cmd": "open", "args": [{ "validator": "^-a$" }, { "validator": "^Audio MIDI Setup$" }] },
+        { "name": "control", "cmd": "control.exe", "args": [{ "validator": "^mmsys\\.cpl,,\\d+$" }] }
       ]
     },
     {

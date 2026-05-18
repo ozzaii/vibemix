@@ -28,6 +28,7 @@ mod recordings;
 mod sidecar;
 mod tray;
 mod updater;
+mod wizard_cmds;
 mod ws_client;
 
 use std::fs;
@@ -87,6 +88,10 @@ fn main() {
             recordings::open_input_wav,
             overlay::show_overlay_highlight,
             debrief_window::open_debrief_window,
+            // Phase 49 — wizard install-chain commands.
+            wizard_cmds::run_companion_fetch,
+            wizard_cmds::run_audio_config,
+            wizard_cmds::open_audio_settings,
         ])
         .manage(SidecarHandle::default())
         .manage(DebriefSidecarHandle::default())
