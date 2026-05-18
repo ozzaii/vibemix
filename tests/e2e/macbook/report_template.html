@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>vibemix e2e — {{ run.run_id }}</title>
+<style>
+  :root {
+    --bg: #0A0A0A;
+    --bg-card: #141414;
+    --border: #222;
+    --text: #E8E8E8;
+    --text-dim: #777;
+    --accent: #F2A03D;
+    --ok: #73C47B;
+    --fail: #E15555;
+    --warn: #E0B341;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --font-h1: 18px;
+    --font-h2: 14px;
+    --font-body: 13px;
+    --font-caption: 11px;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Geist Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--font-body);
+    line-height: 1.5;
+  }
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: var(--space-5);
+  }
+  .head {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: var(--space-4);
+    margin-bottom: var(--space-6);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .head h1 {
+    margin: 0 0 var(--space-2) 0;
+    font-size: var(--font-h1);
+    font-weight: 600;
+  }
+  .head .meta {
+    color: var(--text-dim);
+    font-size: var(--font-caption);
+  }
+  .pill {
+    padding: var(--space-1) var(--space-3);
+    border-radius: 3px;
+    font-weight: 600;
+    font-size: var(--font-h2);
+    letter-spacing: 0.5px;
+  }
+  .pill.PASS { background: var(--ok); color: #000; }
+  .pill.FAIL { background: var(--fail); color: #fff; }
+  .pill.PARTIAL { background: var(--warn); color: #000; }
+  .pill.SKIPPED { background: var(--text-dim); color: #000; }
+  .row {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-2);
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+  .row .label {
+    flex: 0 0 140px;
+    font-weight: 500;
+    font-size: var(--font-h2);
+  }
+  .row .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .row.PASS .dot { background: var(--ok); }
+  .row.FAIL .dot { background: var(--fail); }
+  .row.PARTIAL .dot { background: var(--warn); }
+  .row.SKIPPED .dot { background: var(--text-dim); }
+  .row .status {
+    flex: 0 0 60px;
+    font-weight: 500;
+  }
+  .row .summary {
+    flex: 1;
+    color: var(--text-dim);
+  }
+  .invariants {
+    margin-top: var(--space-5);
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+  .invariants div {
+    font-size: var(--font-caption);
+    color: var(--text-dim);
+    margin: var(--space-1) 0;
+  }
+  .invariants .ok-mark { color: var(--ok); }
+  details {
+    margin: var(--space-2) 0;
+    padding-left: var(--space-5);
+  }
+  details summary {
+    cursor: pointer;
+    color: var(--accent);
+    font-size: var(--font-caption);
+  }
+  details .detail-item {
+    font-size: var(--font-caption);
+    padding: var(--space-1) 0;
+    color: var(--text-dim);
+  }
+  details .detail-item.ok { color: var(--text); }
+  .accent-underline {
+    width: 32px;
+    height: 2px;
+    background: var(--accent);
+    margin-top: var(--space-2);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>vibemix e2e &mdash; {{ run.run_id }}</h1>
+      <div class="meta">
+        build: {{ run.build_sha or "(unknown)" }} &middot;
+        dmg: {{ run.dmg_path or "(none)" }} &middot;
+        duration: {{ "%.1f"|format(run.duration_s) }}s
+      </div>
+      <div class="accent-underline"></div>
+    </div>
+    <span class="pill {{ run.overall_status() }}">{{ run.overall_status() }}</span>
+  </div>
+
+  {% for dim in run.dimensions %}
+  <div class="row {{ dim.status }}">
+    <span class="dot"></span>
+    <span class="label">{{ dim.name }}</span>
+    <span class="status">{{ dim.status }}</span>
+    <span class="summary">{{ dim.passed }}/{{ dim.total }} &middot; {{ dim.summary }}</span>
+  </div>
+  {% if dim.details %}
+  <details>
+    <summary>{{ dim.name }} details ({{ dim.details|length }})</summary>
+    {% for d in dim.details %}
+    <div class="detail-item {{ 'ok' if d.ok else '' }}">
+      {{ "OK " if d.ok else "FAIL " }}&middot; {{ d.label }}
+    </div>
+    {% endfor %}
+  </details>
+  {% endif %}
+  {% endfor %}
+
+  <div class="invariants">
+    <div>
+      <span class="ok-mark">{{ "OK" if run.privacy_ok else "FAIL" }}</span>
+      &middot; Privacy fixture: {{ "0 writes to off-limits paths" if run.privacy_ok else "off-limits write detected" }}
+    </div>
+    <div>
+      <span class="ok-mark">{{ "OK" if run.anti_slop_ok else "FAIL" }}</span>
+      &middot; Anti-slop: {{ "report.html clean" if run.anti_slop_ok else "banned token found" }}
+    </div>
+  </div>
+</div>
+</body>
+</html>
