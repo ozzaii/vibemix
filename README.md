@@ -185,6 +185,12 @@ vibemix runs entirely on your machine. The only network calls go to Bravoh's pro
 
 ---
 
+## Streaming integrations
+
+**OBS Studio (browser-source).** vibemix's mascot canvas can render directly inside an OBS scene as a transparent overlay. Point the OBS Browser source at the local mascot route and the mascot reacts to your live session in real time. Full setup steps live in [docs/integrations/obs-browser-source.md](docs/integrations/obs-browser-source.md).
+
+---
+
 ## FAQ
 
 ### 1. What is vibemix?
