@@ -1,7 +1,16 @@
 {
-  "_doc": "vibemix INSTALL-VM matrix — Phase 45 SHIP-04 / SHIP-05. Add or remove OS rows here; install_vm_matrix.sh consumes this file at runtime so additions are data, not code.",
+  "_doc": "vibemix INSTALL-VM matrix — Phase 45 SHIP-04 / SHIP-05 / Phase 49. Add or remove OS rows here; install_vm_matrix.sh consumes this file at runtime so additions are data, not code.",
   "version": 1,
   "default_max_onboarding_ms": 60000,
+  "onboarding_ms_budget": 60000,
+  "simulated_runs": {
+    "_doc": "Phase 49 — placeholder onboarding_ms per row used by --simulate mode in CI rehearsal. Real-VM execution (§INSTALL-VM-RUN Kaan-action) replaces these values at SignPath cert discharge time.",
+    "macos-12.3": { "onboarding_ms": 52000, "auto_install_attempted": true },
+    "macos-14": { "onboarding_ms": 38000, "auto_install_attempted": true },
+    "macos-15": { "onboarding_ms": 35000, "auto_install_attempted": true },
+    "windows-10": { "onboarding_ms": 48000, "auto_install_attempted": true },
+    "windows-11": { "onboarding_ms": 41000, "auto_install_attempted": true }
+  },
   "rows": [
     {
       "os": "macos",

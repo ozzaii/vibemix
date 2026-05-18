@@ -37,6 +37,7 @@ MATRIX_JSON="${REPO_ROOT}/scripts/dist/install_vm_matrix.json"
 RUN_ID=""
 LIVE=0
 CHECK_60S=0
+SIMULATE=0
 QUIET=0
 RUNS_ROOT="${REPO_ROOT}/dist/install-vm-runs"
 
@@ -72,6 +73,10 @@ while [[ $# -gt 0 ]]; do
             CHECK_60S=1
             shift
             ;;
+        --simulate)
+            SIMULATE=1
+            shift
+            ;;
         --quiet)
             QUIET=1
             shift
@@ -93,6 +98,55 @@ log() {
         echo "$@"
     fi
 }
+
+# --- --simulate mode (Phase 49 CI rehearsal) --------------------------------
+#
+# Reads `simulated_runs` block from install_vm_matrix.json and writes a
+# synthetic run.json with the same shape a real run would produce. Used by
+# CI on PR / branch builds where real Tart VMs are unavailable. Real-VM
+# execution gated on Kaan-action §INSTALL-VM-RUN.
+
+if [[ "$SIMULATE" -eq 1 ]]; then
+    SIM_RUN_ID="${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-sim}"
+    SIM_DIR="${RUNS_ROOT}/${SIM_RUN_ID}"
+    mkdir -p "$SIM_DIR"
+    SIM_RUN_JSON="${SIM_DIR}/run.json"
+    python3 - "$MATRIX_JSON" "$SIM_RUN_JSON" <<'PYSIM'
+import json, sys
+matrix = json.load(open(sys.argv[1], encoding="utf-8"))
+sim_runs = matrix.get("simulated_runs", {})
+rows = []
+for name, payload in sim_runs.items():
+    if name == "_doc":
+        continue
+    rows.append({
+        "name": name,
+        "os": name.split("-")[0],
+        "version": name.split("-", 1)[1] if "-" in name else "",
+        "status": "ok",
+        "total_ms": payload.get("onboarding_ms", 0),
+        "onboarding_ms": payload.get("onboarding_ms", 0),
+        "max_onboarding_ms": matrix.get("onboarding_ms_budget", 60000),
+        "exceeded_max_ms": payload.get("onboarding_ms", 0) > matrix.get("onboarding_ms_budget", 60000),
+        "auto_install_attempted": payload.get("auto_install_attempted", True),
+        "simulated": True,
+    })
+out = {
+    "run_id": "${SIM_RUN_ID}",
+    "simulated": True,
+    "rows": rows,
+    "onboarding_ms_budget": matrix.get("onboarding_ms_budget", 60000),
+}
+with open(sys.argv[2], "w", encoding="utf-8") as f:
+    json.dump(out, f, indent=2)
+PYSIM
+    REF_TYPE="${GITHUB_REF_TYPE:-branch}"
+    if [[ "$REF_TYPE" == "tag" ]]; then
+        log "[install-vm] WARN — --simulate used on tag build; §INSTALL-VM-RUN undischarged"
+        echo "::warning::§INSTALL-VM-RUN undischarged — tag build used simulated_runs stubs" >&2
+    fi
+    log "[install-vm] simulated run written to $SIM_RUN_JSON"
+fi
 
 # --- --check-60s gate-only mode (SHIP-05) -----------------------------------
 

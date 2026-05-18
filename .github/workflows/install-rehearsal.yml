@@ -41,3 +41,18 @@ jobs:
           set -euo pipefail
           pip install pytest
           python -m pytest tests/install/test_rehearsal_scaffold.py -v
+
+      # Phase 49 — 60s onboarding gate (simulated on CI; real-VM gated on
+      # Kaan-action §INSTALL-VM-RUN).
+      - name: Check 60s onboarding gate (simulated)
+        env:
+          GITHUB_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          bash scripts/dist/install_vm_matrix.sh --simulate --check-60s
+
+      # Phase 49 — companion fetch + manifest + 60s-gate test suite.
+      - name: Companion + 60s test suite
+        run: |
+          set -euo pipefail
+          python -m pytest tests/install/test_driver_manifest_schema.py tests/install/test_audio_config.py tests/install/test_iss_companion_run.py tests/install/test_dmg_postinstall_hook.py tests/dist/test_60s_gate.py tests/audit/test_companion_signing_gate.py -v
