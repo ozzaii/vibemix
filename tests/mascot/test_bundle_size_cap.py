@@ -45,12 +45,24 @@ def test_bundle_script_delegates_to_phase31_gate():
 
 
 def test_per_clip_band_constants_match_context():
-    """CONTEXT §VIS-04 band: 400 KB minimum, 1200 KB (1.2 MB) maximum."""
+    """CONTEXT §VIS-04 band: 400 KB minimum, 1200 KB (1.2 MB) maximum.
+
+    Phase 47 / MASCOT-03 widened this to per-family bands (sourced from
+    band_for_prefix). The 400/1200 KB band still covers prep_*/react_*;
+    base_* and emotion_* slots use narrower bands declared in the same
+    case statement. This test pins the prep+react band as the canonical
+    Phase 43 / §VIS-04 contract.
+    """
     body = _SCRIPT.read_text(encoding="utf-8")
-    # Min floor — 400 * 1024.
-    assert "400 * 1024" in body, "min band 400 * 1024 missing from wrapper"
-    # Max ceiling — 1200 * 1024.
-    assert "1200 * 1024" in body, "max band 1200 * 1024 missing from wrapper"
+    # prep+react band — 400 KB - 1200 KB (Phase 47 prefix routing).
+    assert 'prep) echo "400 1200"' in body, (
+        "prep band 400-1200 KB missing from wrapper "
+        "(check_bundle_size.sh band_for_prefix() case)"
+    )
+    assert 'react) echo "400 1200"' in body, (
+        "react band 400-1200 KB missing from wrapper "
+        "(check_bundle_size.sh band_for_prefix() case)"
+    )
 
 
 def test_bundle_script_invokable_and_prints_both_tiers():

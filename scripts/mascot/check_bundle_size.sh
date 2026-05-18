@@ -1,26 +1,28 @@
 #!/usr/bin/env bash
-# VIS-04 (Phase 43, Plan 43-05) — Mascot bundle + per-clip size gate.
+# Phase 47 / MASCOT-03 — Mascot bundle + per-clip size gate.
 #
-# Two-tier check enforced on every CI run that touches the mascot bundle:
+# Tier 1: total mascot GLB bytes <= 25 MB
+#         Delegates to scripts/check_mascot_glb_size.sh (Phase 31 / Pitfall P52).
+#         30 MB bump fallback documented in docs/mascot/BUNDLE-DECISION.md
+#         and ONLY applied via the env override BUNDLE_CAP_BUMP=30 (set in
+#         CI only after the Decision Log entry is committed).
 #
-#   Tier 1: total mascot GLB bytes ≤ 25 MB
-#           Delegates to scripts/check_mascot_glb_size.sh (Phase 31 / Pitfall P52).
+# Tier 2: per-clip per-family bands (sourced from SLOT_FAMILIES in
+#         scripts/mascot/retarget_to_neon_rebel.py):
 #
-#   Tier 2: per-clip prep_*.glb size band 400 KB – 1200 KB
-#           CONTEXT §VIS-04 — guarantees draco compression is tuned;
-#           catches both over-compressed (degenerate) and under-compressed
-#           (bundle-budget regression) clips.
+#           base_*       200-600 KB  (looping, simple)
+#           emotion_*    300-900 KB  (expressive face/torso)
+#           prep_*       400-1200 KB (anticipation + legacy share this band)
+#           react_*      400-1200 KB (peak-energy moves)
 #
 # Exit codes:
 #   0 — both tiers green
-#   1 — Tier 1 fail (total bundle exceeds 25 MB)
-#   2 — Tier 2 fail (one or more prep_*.glb files outside the 400 KB–1200 KB band)
+#   1 — Tier 1 fail (total bundle exceeds cap)
+#   2 — Tier 2 fail (one or more *.glb files outside their family band)
 #
-# Until §VIS-04 Kaan-discharge replaces the prep_*.glb placeholders with
-# real Mixamo retargets, Tier 2 is expected to fail (the placeholders are
-# ~44–56 KB each, well below the 400 KB floor). The non-zero exit on
-# placeholder GLBs is the gate's mechanism for reminding the operator
-# that the §VIS-04 runbook still needs to be discharged.
+# Expected-fail UX: until Kaan discharges §VIS-04 with real Mixamo
+# retargets, the placeholder GLBs sit below the floor of every band.
+# The non-zero exit is the gate's reminder mechanism, NOT a bug.
 #
 # Run from repo root: bash scripts/mascot/check_bundle_size.sh
 
@@ -29,46 +31,68 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-# Tier 1: delegate to the existing Phase 31 gate (25 MB total bundle cap).
+# ── Tier 1 ───────────────────────────────────────────────────────────
 echo "==> Tier 1: total mascot bundle <= 25 MB (delegate -> check_mascot_glb_size.sh)"
 bash "${REPO_ROOT}/scripts/check_mascot_glb_size.sh"
 
-# Tier 2: per-clip prep_*.glb size band 400 KB – 1200 KB.
-echo "==> Tier 2: prep_*.glb per-clip 400 KB - 1200 KB band"
-readonly MIN_BYTES=$((400 * 1024))   # 409600
-readonly MAX_BYTES=$((1200 * 1024))  # 1228800
+# ── Tier 2 (per-family bands) ────────────────────────────────────────
+echo "==> Tier 2: per-clip per-family size bands"
+
+band_for_prefix() {
+    # Echoes "MIN_KB MAX_KB" for the given slot prefix.
+    case "$1" in
+        base) echo "200 600" ;;
+        emotion) echo "300 900" ;;
+        prep) echo "400 1200" ;;
+        react) echo "400 1200" ;;
+        *) return 1 ;;
+    esac
+}
+
+stat_size() {
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        stat -f '%z' "$1"
+    else
+        stat -c '%s' "$1"
+    fi
+}
 
 ANIM_DIR="${REPO_ROOT}/tauri/ui/assets/mascot/animations"
 fail=0
 found_any=0
 shopt -s nullglob
-for glb in "${ANIM_DIR}"/prep_*.glb; do
+
+for glb in "${ANIM_DIR}"/base_*.glb "${ANIM_DIR}"/emotion_*.glb "${ANIM_DIR}"/prep_*.glb "${ANIM_DIR}"/react_*.glb; do
     found_any=1
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-        size=$(stat -f '%z' "${glb}")
-    else
-        size=$(stat -c '%s' "${glb}")
-    fi
     name="$(basename "${glb}")"
-    if (( size < MIN_BYTES )) || (( size > MAX_BYTES )); then
-        echo "  FAIL: ${name} size ${size} bytes outside band (${MIN_BYTES}..${MAX_BYTES})"
+    prefix="${name%%_*}"
+    if ! band="$(band_for_prefix "${prefix}")"; then
+        echo "  SKIP: ${name} (prefix '${prefix}' has no Phase 47 family band — out of scope)"
+        continue
+    fi
+    read -r min_kb max_kb <<< "${band}"
+    min_bytes=$(( min_kb * 1024 ))
+    max_bytes=$(( max_kb * 1024 ))
+    size=$(stat_size "${glb}")
+    if (( size < min_bytes )) || (( size > max_bytes )); then
+        echo "  FAIL: ${name} size ${size} bytes outside [${min_bytes},${max_bytes}] (${prefix} band ${min_kb}-${max_kb} KB)"
         fail=1
     else
-        echo "  OK:   ${name} size ${size} bytes"
+        echo "  OK:   ${name} size ${size} bytes (${prefix} band ${min_kb}-${max_kb} KB)"
     fi
 done
 
 if (( found_any == 0 )); then
-    echo "  WARN: no prep_*.glb files under ${ANIM_DIR}"
+    echo "  WARN: no Phase 47 GLBs found in ${ANIM_DIR} — has §VIS-04 been discharged?"
+    fail=2
 fi
 
 if (( fail != 0 )); then
-    echo "FAIL: prep_*.glb per-clip band check" >&2
-    echo "Note: placeholder prep_*.glb files legitimately fall outside the band " >&2
-    echo "      until KAAN-ACTION-LEGAL.md §VIS-04 discharge replaces them with " >&2
-    echo "      real Mixamo retargets." >&2
+    echo "==> Tier 2: FAIL"
+    echo "Note: placeholder *.glb files legitimately fall outside the family bands"
+    echo "      until KAAN-ACTION-LEGAL.md §VIS-04 discharge replaces them with"
+    echo "      real Mixamo retargets."
     exit 2
 fi
-
-echo "PASS: bundle <= 25 MB AND prep_*.glb per-clip 400 KB - 1200 KB"
+echo "==> Tier 2: OK"
 exit 0
