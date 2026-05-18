@@ -1,42 +1,91 @@
-/* Phase 29 Plan 29-05 — CDJ Whisper styling for the post-session debrief window. */
+/* debrief.css — CDJ Whisper v5 styling for the post-session debrief window.
+ *
+ * Polychrome migration (2026-05-19) replaced the pre-v5 design system
+ * shipped with Phase 29. The original file referenced tokens that don't
+ * exist in tokens.css (--black-1, --amber-2, --silk-90, --font-display
+ * = Fraunces) so every property fell back to baked-in hex literals.
+ * The /impeccable critique on 2026-05-19 flagged this as the single
+ * largest consistency defect — the user's last memory of every session
+ * read as "different product" because the debrief shipped Fraunces serif
+ * + Geist body + 8px radii + SaaS card-grid drills + 120ms hover
+ * transitions, while every other surface sat on the v5 contract.
+ *
+ * This rewrite migrates EVERY rule to the v5 token vocabulary:
+ *   - Fraunces / Geist → --type-display / --type-body (both Saira)
+ *   - --black-1/2/3 → --void-2 / --glass-2 / --glass-edge
+ *   - --silk-50/60/80/90 → --silk-22 / --silk-40 / --silk-65 / --silk
+ *   - --amber-1/2/3 → --amber-pale / --amber / --amber-40
+ *   - 8px / 4px radii → --rad-md (6px) / --rad-sm (2px)
+ *   - 120ms transitions → --motion-snap (150ms)
+ *   - 3-column drill grid → vertical stack of glass tiles
+ *
+ * The .vmx-drill / .vmx-debrief-tldr / .vmx-debrief-timeline panels
+ * inline the .vmx-tile recipe (glass-2 bg + 1px glass-edge border + inset
+ * bezel) rather than depending on the utility class — components don't
+ * need to be edited; only the CSS surface changes.
+ *
+ * The peak-end emotional moment lives here (last surface before the
+ * Bravoh waitlist opt-in). The visual contract MUST match the wizard +
+ * session deck so the user's final glance reads as one product.
+ */
+
+/* === Root + titlebar =================================================== */
 
 .vmx-debrief-root {
   min-height: 100vh;
-  background: var(--black-1, #181612);
-  color: var(--silk-90, #f0eee8);
-  font-family: var(--font-body, "Geist", system-ui, sans-serif);
+  color: var(--silk);
+  font-family: var(--type-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  /* Body background comes from tokens.css :root cascade (cinematic
+   * vignette + rave washes + film grain). No override here — the debrief
+   * inherits the same atmospheric surface as every other window. */
 }
 
 .vmx-debrief-titlebar {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--black-3, #2b2622);
+  padding: 0 var(--sp-5);
+  height: var(--titlebar-h);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border-bottom: 1px solid var(--glass-edge);
+  -webkit-app-region: drag;
   user-select: none;
 }
 
 .vmx-debrief-title {
-  font-family: var(--font-display, "Fraunces", "Times New Roman", serif);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 700;
   font-size: 18px;
-  letter-spacing: 0.02em;
-  color: var(--amber-2, #d4a74f);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--silk);
+  line-height: 1;
 }
 
 .vmx-debrief-session {
-  font-size: 12px;
-  color: var(--silk-60, #99948a);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--silk-40);
   font-variant-numeric: tabular-nums;
 }
 
 .vmx-debrief-section-title {
-  font-family: var(--font-display, "Fraunces", "Times New Roman", serif);
-  font-size: 13px;
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--silk-60, #99948a);
-  margin: 0 0 12px;
+  letter-spacing: 0.22em;
+  color: var(--silk-40);
+  margin: 0 0 var(--sp-3);
 }
+
+/* === Layout grid ======================================================= */
 
 .vmx-debrief-layout {
   display: grid;
@@ -46,15 +95,23 @@
     "sidebar tldr"
     "sidebar main"
     "drills drills";
-  gap: 16px;
-  padding: 20px;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
 }
+
+/* === Sidebar (chapter list) ============================================ */
 
 .vmx-debrief-sidebar {
   grid-area: sidebar;
-  padding: 16px;
-  background: var(--black-2, #211d18);
-  border-radius: 8px;
+  padding: var(--sp-4);
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
   max-height: 70vh;
   overflow-y: auto;
 }
@@ -66,7 +123,7 @@
 }
 
 .vmx-debrief-chapter {
-  margin-bottom: 6px;
+  margin-bottom: var(--sp-1);
 }
 
 .vmx-debrief-chapter-btn {
@@ -74,52 +131,65 @@
   text-align: left;
   background: transparent;
   border: 1px solid transparent;
-  color: var(--silk-80, #c9c3b8);
-  padding: 8px 10px;
-  border-radius: 6px;
+  color: var(--silk-65);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--rad-sm);
   cursor: pointer;
   font-family: inherit;
   font-size: 13px;
-  transition: color 120ms ease, border-color 120ms ease;
+  font-variation-settings: "wdth" 100, "wght" 400;
+  transition: color var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out;
 }
 
-.vmx-debrief-chapter-btn:hover {
-  color: var(--amber-1, #e5be62);
-  border-color: var(--amber-3, #966f2f);
+.vmx-debrief-chapter-btn:hover,
+.vmx-debrief-chapter-btn:focus-visible {
+  color: var(--amber);
+  border-color: var(--amber-40);
+  outline: none;
+}
+
+/* === TLDR + Timeline panels ============================================ */
+
+.vmx-debrief-tldr,
+.vmx-debrief-timeline {
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+  padding: var(--sp-4);
 }
 
 .vmx-debrief-tldr {
   grid-area: tldr;
-  background: var(--black-2, #211d18);
-  border-radius: 8px;
-  padding: 16px;
+}
+
+.vmx-debrief-timeline {
+  grid-area: main;
+  min-height: 140px;
 }
 
 .vmx-debrief-tldr-audio {
   width: 100%;
-  margin-top: 8px;
+  margin-top: var(--sp-2);
 }
 
 .vmx-debrief-tldr-meta {
   margin: 0;
   font-size: 12px;
-  color: var(--silk-60, #99948a);
-}
-
-.vmx-debrief-timeline {
-  grid-area: main;
-  background: var(--black-2, #211d18);
-  border-radius: 8px;
-  padding: 16px;
-  min-height: 140px;
+  color: var(--silk-40);
 }
 
 .vmx-debrief-timeline-placeholder {
   position: relative;
   height: 96px;
   width: 100%;
-  background: var(--black-3, #2b2622);
-  border-radius: 4px;
+  background: var(--glass-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-sm);
   overflow: hidden;
 }
 
@@ -127,76 +197,96 @@
   position: absolute;
   top: 8px;
   bottom: 8px;
-  background: rgba(212, 167, 79, 0.30);  /* amber-3 @ 30% */
-  border: 1px solid var(--amber-3, #966f2f);
-  border-radius: 3px;
+  background: var(--amber-22);
+  border: 1px solid var(--amber-40);
+  border-radius: var(--rad-sm);
   cursor: pointer;
-  color: var(--silk-90, #f0eee8);
+  color: var(--silk);
+  font-family: var(--type-mono);
   font-size: 11px;
-  padding: 0 4px;
+  letter-spacing: 0.04em;
+  padding: 0 var(--sp-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: background 120ms ease;
+  transition: background var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out;
 }
 
-.vmx-debrief-region:hover {
-  background: rgba(212, 167, 79, 0.50);
+.vmx-debrief-region:hover,
+.vmx-debrief-region:focus-visible {
+  background: var(--amber-40);
+  border-color: var(--amber);
+  outline: none;
 }
 
 /* Phase 44-03 / LAUNCH-02 — citation deep-link highlight pulse. Applied
- * for ~2s when the user clicks a chip in the live session UI's cohost
+ * for ~1.4s when the user clicks a chip in the live session UI's cohost
  * stream and the debrief window scrolls the matching region into view.
- * The pulse uses the existing amber accent at higher alpha + an outer
- * --glow-soft halo so the target reads as "this is where the chip points"
- * without permanently re-tinting the region. */
+ * The pulse uses --amber-65 + --glow-soft so the target reads as "this
+ * is where the chip points" without permanently re-tinting the region. */
 .vmx-debrief-region--highlight {
-  background: rgba(212, 167, 79, 0.65);
-  box-shadow: var(--glow-soft, 0 0 6px rgba(255, 138, 61, 0.40), 0 0 14px rgba(255, 138, 61, 0.22));
-  animation: vmx-debrief-region-pulse 1.4s ease-out;
+  background: var(--amber-65);
+  box-shadow: var(--glow-soft);
+  animation: vmx-debrief-region-pulse 1400ms ease-out;
 }
 
 @keyframes vmx-debrief-region-pulse {
-  0%   { background: rgba(212, 167, 79, 0.85); }
-  100% { background: rgba(212, 167, 79, 0.65); }
+  0%   { background: var(--amber); }
+  100% { background: var(--amber-65); }
 }
+
+/* === Drills (vertical stack — no SaaS card grid) ======================== */
 
 .vmx-debrief-drills {
   grid-area: drills;
 }
 
 .vmx-debrief-drills-list {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  /* Vertical stack of glass tiles. The pre-v5 3-column grid was the
+   * "identical card grid" anti-pattern — at 1 or 2 drills it read as
+   * ragged; at 3 drills it read as a SaaS analytics dashboard. The
+   * stack is one drill per row, each carrying the .vmx-tile recipe. */
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
 }
 
 .vmx-drill {
-  background: var(--black-2, #211d18);
-  border-radius: 8px;
-  padding: 16px;
-  border: 1px solid var(--black-3, #2b2622);
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+  padding: var(--sp-4);
 }
 
 .vmx-drill-title {
-  font-family: var(--font-display, "Fraunces", "Times New Roman", serif);
-  font-size: 14px;
-  margin: 0 0 12px;
-  color: var(--silk-80, #c9c3b8);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  margin: 0 0 var(--sp-3);
+  color: var(--silk-65);
 }
 
 .vmx-drill-fields {
-  margin: 0 0 12px;
+  margin: 0 0 var(--sp-3);
   font-size: 13px;
 }
 
 .vmx-drill-fields dt {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
   font-weight: 600;
-  color: var(--silk-60, #99948a);
+  color: var(--silk-40);
   text-transform: uppercase;
   font-size: 10px;
-  letter-spacing: 0.06em;
-  margin-top: 8px;
+  letter-spacing: 0.22em;
+  margin-top: var(--sp-2);
 }
 
 .vmx-drill-fields dt:first-child {
@@ -205,263 +295,339 @@
 
 .vmx-drill-fields dd {
   margin: 2px 0 0;
-  color: var(--silk-90, #f0eee8);
+  color: var(--silk);
 }
 
+/* Drill citation chip reuses the citation-strip semantic tokens defined
+ * in tokens.css (LAUNCH-02 block) — so any future retune of citation-chip
+ * tone happens in ONE place and propagates to the live session and the
+ * debrief drills together. */
 .vmx-drill-citation {
-  background: transparent;
-  border: 1px solid var(--amber-3, #966f2f);
-  color: var(--amber-2, #d4a74f);
+  background: var(--c-citation-chip-bg);
+  border: 1px solid var(--c-citation-chip-border);
+  color: var(--c-citation-chip-fg);
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--rad-sm);
   cursor: pointer;
-  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-family: var(--type-mono);
   font-size: 11px;
-  transition: color 120ms ease, border-color 120ms ease;
+  letter-spacing: 0.04em;
+  transition: color var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out, background var(--motion-snap) ease-out;
 }
 
-.vmx-drill-citation:hover {
-  color: var(--amber-1, #e5be62);
-  border-color: var(--amber-1, #e5be62);
+.vmx-drill-citation:hover,
+.vmx-drill-citation:focus-visible {
+  color: var(--amber);
+  border-color: var(--c-citation-chip-border-hover);
+  background: var(--c-citation-chip-bg-hover);
+  outline: none;
 }
+
+/* === Skeletons + error banner + tooltip ================================ */
 
 .vmx-debrief-skeleton {
   margin: 0;
-  color: var(--silk-50, #807a70);
+  color: var(--silk-22);
   font-size: 12px;
   font-style: italic;
 }
 
 .vmx-debrief-error-banner {
   position: fixed;
-  top: 12px;
+  top: var(--sp-3);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--black-3, #2b2622);
-  border: 1px solid #c44a3a;
-  border-radius: 6px;
-  padding: 12px 16px;
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--led-fault);
+  border-radius: var(--rad-md);
+  padding: var(--sp-3) var(--sp-4);
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
   align-items: center;
   max-width: 80vw;
   z-index: 100;
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
 }
 
 .vmx-debrief-error-text {
   margin: 0;
-  color: var(--silk-90, #f0eee8);
+  color: var(--silk);
   font-size: 13px;
 }
 
 .vmx-debrief-error-dismiss {
   background: transparent;
-  border: 1px solid var(--silk-40, #6b665d);
-  color: var(--silk-80, #c9c3b8);
-  padding: 4px 12px;
-  border-radius: 4px;
+  border: 1px solid var(--silk-22);
+  color: var(--silk-65);
+  padding: 4px var(--sp-3);
+  border-radius: var(--rad-sm);
   cursor: pointer;
   font-size: 12px;
+  transition: color var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out;
+}
+
+.vmx-debrief-error-dismiss:hover,
+.vmx-debrief-error-dismiss:focus-visible {
+  color: var(--silk);
+  border-color: var(--silk-40);
+  outline: none;
 }
 
 .vmx-debrief-tooltip {
   position: absolute;
   z-index: 200;
-  background: var(--black-2, #211d18);
-  border: 1px solid var(--amber-3, #966f2f);
-  border-radius: 4px;
-  padding: 10px 12px;
+  background: var(--glass-3);
+  backdrop-filter: var(--blur-glass-display);
+  -webkit-backdrop-filter: var(--blur-glass-display);
+  border: 1px solid var(--amber-40);
+  border-radius: var(--rad-sm);
+  padding: var(--sp-3);
   max-width: 320px;
   opacity: 1;
-  transition: opacity 200ms ease;
+  transition: opacity var(--motion-transition) ease-out;
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    var(--glow-faint);
 }
 
 .vmx-debrief-tooltip-evidence {
   margin: 0;
-  color: var(--amber-2, #d4a74f);
+  color: var(--amber);
   font-size: 13px;
 }
 
 .vmx-debrief-tooltip-ts {
   margin: 4px 0 0;
-  color: var(--silk-60, #99948a);
+  color: var(--silk-40);
+  font-family: var(--type-mono);
   font-size: 11px;
+  letter-spacing: 0.08em;
   font-variant-numeric: tabular-nums;
 }
 
 .vmx-debrief-tooltip-empty {
   margin: 0;
-  color: var(--silk-50, #807a70);
+  color: var(--silk-22);
   font-size: 12px;
   font-style: italic;
 }
 
-/* Plan 42-03 — ear-test sign-off toggle + form. CDJ Whisper amber-on-black,
-   no new colors. Tactility via amber border tone shifts on hover/focus,
-   not faux-3D bevels. */
+/* === Ear-test sign-off (Plan 42-03) ==================================== */
 
 .vmx-debrief-ear-test {
   grid-column: 1 / -1;
-  padding: 0 4px;
+  padding: 0 var(--sp-1);
+  margin-top: var(--sp-3);
 }
 
 .vmx-debrief-ear-test-toggle {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
 .vmx-debrief-ear-test-toggle-btn {
   align-self: flex-start;
-  background: transparent;
-  border: 1px solid var(--amber-3, #966f2f);
-  color: var(--amber-2, #d4a74f);
-  padding: 8px 14px;
-  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+  border: 1px solid var(--amber-40);
+  color: var(--amber);
+  padding: 9px 24px;
+  border-radius: var(--rad-sm);
   cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  transition: color 120ms ease, border-color 120ms ease;
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-shadow: 0 0 4px var(--amber-65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 var(--amber-40),
+    inset 0 0 14px var(--amber-22),
+    0 0 0 1px rgba(255, 138, 61, 0.14);
+  transition: background var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out;
 }
 
 .vmx-debrief-ear-test-toggle-btn:hover,
 .vmx-debrief-ear-test-toggle-btn:focus-visible {
-  color: var(--amber-1, #e5be62);
-  border-color: var(--amber-1, #e5be62);
+  border-color: var(--amber);
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.14) 0%, rgba(255, 138, 61, 0.04) 100%);
   outline: none;
 }
 
 .vmx-debrief-ear-test-toggle-btn[disabled] {
   cursor: default;
-  color: var(--silk-60, #99948a);
-  border-color: var(--silk-40, #6b665d);
+  background: transparent;
+  color: var(--silk-22);
+  border-color: var(--silk-22);
+  box-shadow: none;
+  text-shadow: none;
 }
 
 .vmx-debrief-ear-test-form {
-  background: var(--black-2, #211d18);
-  border: 1px solid var(--black-3, #2b2622);
-  border-radius: 8px;
-  padding: 16px;
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  padding: var(--sp-4);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-3);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
 }
 
 .vmx-debrief-ear-test-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
-  color: var(--silk-60, #99948a);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 10px;
+  color: var(--silk-40);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.22em;
 }
 
 .vmx-debrief-ear-test-genre,
 .vmx-debrief-ear-test-notes {
-  background: var(--black-1, #181612);
-  border: 1px solid var(--black-3, #2b2622);
-  color: var(--silk-90, #f0eee8);
-  padding: 8px 10px;
-  border-radius: 6px;
-  font-family: inherit;
+  background: var(--glass-3);
+  border: 1px solid var(--glass-edge);
+  color: var(--silk);
+  padding: 8px var(--sp-3);
+  border-radius: var(--rad-md);
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 100, "wght" 400;
   font-size: 13px;
   text-transform: none;
   letter-spacing: 0;
+  transition: border-color var(--motion-snap) ease-out, box-shadow var(--motion-snap) ease-out;
 }
 
 .vmx-debrief-ear-test-genre:focus,
-.vmx-debrief-ear-test-notes:focus {
-  border-color: var(--amber-3, #966f2f);
+.vmx-debrief-ear-test-notes:focus,
+.vmx-debrief-ear-test-genre:focus-visible,
+.vmx-debrief-ear-test-notes:focus-visible {
+  border-color: var(--amber);
+  box-shadow: var(--glow-soft);
   outline: none;
 }
 
 .vmx-debrief-ear-test-flags {
-  border: 1px solid var(--black-3, #2b2622);
-  border-radius: 6px;
-  padding: 12px;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  padding: var(--sp-3);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  color: var(--silk-80, #c9c3b8);
+  gap: var(--sp-2);
+  color: var(--silk-65);
   font-size: 13px;
 }
 
 .vmx-debrief-ear-test-flags legend {
   padding: 0 6px;
-  font-size: 11px;
-  color: var(--silk-60, #99948a);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 10px;
+  color: var(--silk-40);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.22em;
 }
 
 .vmx-debrief-ear-test-flag {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   cursor: pointer;
 }
 
 .vmx-debrief-ear-test-submit {
   align-self: flex-start;
-  background: transparent;
-  border: 1px solid var(--amber-2, #d4a74f);
-  color: var(--amber-1, #e5be62);
-  padding: 8px 18px;
-  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+  border: 1px solid var(--amber-40);
+  color: var(--amber);
+  padding: 9px 24px;
+  border-radius: var(--rad-sm);
   cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  transition: color 120ms ease, border-color 120ms ease;
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-shadow: 0 0 4px var(--amber-65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 var(--amber-40),
+    inset 0 0 14px var(--amber-22),
+    0 0 0 1px rgba(255, 138, 61, 0.14);
+  transition: background var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out;
 }
 
 .vmx-debrief-ear-test-submit:hover,
 .vmx-debrief-ear-test-submit:focus-visible {
-  color: var(--silk-90, #f0eee8);
-  border-color: var(--silk-90, #f0eee8);
+  border-color: var(--amber);
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.14) 0%, rgba(255, 138, 61, 0.04) 100%);
   outline: none;
 }
 
 .vmx-debrief-ear-test-submit[disabled] {
   cursor: default;
-  color: var(--silk-60, #99948a);
-  border-color: var(--silk-40, #6b665d);
+  background: transparent;
+  color: var(--silk-22);
+  border-color: var(--silk-22);
+  box-shadow: none;
+  text-shadow: none;
 }
 
 .vmx-debrief-ear-test-confirmation {
   margin: 0;
-  font-size: 12px;
-  color: var(--amber-2, #d4a74f);
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--led-ok);
 }
 
-/* ---------------------------------------------------------------------------
- * Plan 44-04 / LAUNCH-05 — Bravoh waitlist opt-in toggle.
- *
- * Sits in its own debrief.html section host. Token-driven CDJ Whisper
- * styling — faint amber glow on the active row, no shiny gradients
- * (memory `project_visual_direction_cdj_whisper`). Subtitle copy stays
- * silk-60 so the row reads as ambient context, not a sales pitch.
- * --------------------------------------------------------------------------- */
+/* === Bravoh waitlist opt-in (Plan 44-04 / LAUNCH-05) ===================
+ * Sits in its own debrief.html section host. The conversion-funnel
+ * surface for vibemix → Bravoh. Stays opt-in and quiet — faint amber
+ * outline shows when the row is opted-in, subtitle copy stays silk-40
+ * so the row reads as ambient context, not a sales pitch. */
 
 .vmx-debrief-bravoh-host {
-  margin-top: 16px;
+  margin-top: var(--sp-4);
 }
 
 .vmx-bravoh-waitlist-row {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px 14px;
-  background: var(--black-2, #211d18);
-  border: 1px solid var(--black-3, #2b2622);
-  border-radius: 6px;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+  transition: border-color var(--motion-transition) ease-out, box-shadow var(--motion-transition) ease-out;
 }
 
 .vmx-bravoh-waitlist-row[data-opt-in="true"] {
-  border-color: var(--amber-3, #966f2f);
-  /* Faint amber glow — restraint over shine (CDJ Whisper) */
-  box-shadow: var(--glow-faint, 0 0 5px rgba(255, 138, 61, 0.22));
+  border-color: var(--amber-40);
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    var(--glow-faint);
 }
 
 .vmx-bravoh-waitlist-toggle-label {
@@ -470,9 +636,9 @@
   gap: 10px;
   cursor: pointer;
   user-select: none;
-  font-family: inherit;
+  font-family: var(--type-body);
   font-size: 13px;
-  color: var(--silk-90, #f0eee8);
+  color: var(--silk);
 }
 
 .vmx-bravoh-waitlist-checkbox {
@@ -480,24 +646,24 @@
   width: 16px;
   height: 16px;
   margin: 0;
-  border: 1px solid var(--silk-40, #6b665d);
-  border-radius: 3px;
+  border: 1px solid var(--silk-22);
+  border-radius: var(--rad-sm);
   background: transparent;
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition: border-color var(--motion-snap) ease-out, background var(--motion-snap) ease-out;
 }
 
 .vmx-bravoh-waitlist-checkbox:hover,
 .vmx-bravoh-waitlist-checkbox:focus-visible {
-  border-color: var(--amber-2, #d4a74f);
+  border-color: var(--amber);
   outline: none;
 }
 
 .vmx-bravoh-waitlist-checkbox:checked {
-  border-color: var(--amber-2, #d4a74f);
-  background: var(--amber-2, #d4a74f);
+  border-color: var(--amber);
+  background: var(--amber);
 }
 
 .vmx-bravoh-waitlist-checkbox:checked::after {
@@ -507,40 +673,42 @@
   top: 1px;
   width: 4px;
   height: 8px;
-  border: solid var(--black-1, #181612);
+  border: solid var(--void-1);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
 
 .vmx-bravoh-waitlist-label {
-  font-family: inherit;
+  font-family: var(--type-body);
   font-size: 13px;
   letter-spacing: 0.01em;
-  color: var(--silk-90, #f0eee8);
+  color: var(--silk);
 }
 
 .vmx-bravoh-waitlist-subtitle {
   margin: 0;
-  padding-left: 26px; /* aligns under the label, past the checkbox */
+  padding-left: 26px;
   font-size: 12px;
-  color: var(--silk-60, #99948a);
+  color: var(--silk-40);
   line-height: 1.4;
 }
 
 .vmx-bravoh-waitlist-link {
   margin-left: 26px;
   margin-top: 4px;
-  font-size: 12px;
-  color: var(--amber-1, #e5be62);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--amber-pale);
   text-decoration: none;
   border-bottom: 1px solid transparent;
   width: fit-content;
-  transition: color 120ms ease, border-color 120ms ease;
+  transition: color var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out;
 }
 
 .vmx-bravoh-waitlist-link:hover,
 .vmx-bravoh-waitlist-link:focus-visible {
-  color: var(--amber-2, #d4a74f);
-  border-bottom-color: var(--amber-3, #966f2f);
+  color: var(--amber);
+  border-bottom-color: var(--amber-40);
   outline: none;
 }
