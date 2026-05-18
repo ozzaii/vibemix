@@ -191,12 +191,39 @@
   --seg-hi-15:  rgba(255, 255, 255, 0.15);  /* safe seg inset highlight */
   --seg-hi-18:  rgba(255, 255, 255, 0.18);  /* clip seg inset highlight */
   --peak-hi-35: rgba(255, 255, 255, 0.35);  /* peak lozenge top edge highlight */
-  /* Amber gradient stops — second-stop alpha mixes for safe/warm/clip
-   * seg gradients. Names mirror the existing --amber-pale / --amber /
-   * --amber-deep base hues with explicit alpha suffix. */
-  --amber-pale-70: rgba(255, 184, 138, 0.7); /* safe gradient stop B */
+  /* Amber gradient stop — second-stop alpha mix for the warm seg
+   * gradient. Polychrome migration (2026-05-19) dropped the safe and
+   * clip amber stops; those zones now read green and magenta via the
+   * --meter-* spectrum block below. */
   --amber-78:      rgba(255, 138, 61, 0.78); /* warm gradient stop B */
-  --amber-deep-85: rgba(255, 90, 26, 0.85);  /* clip gradient stop B */
+
+  /* --- meter polychrome spectrum — decision #2 (2026-05-19) ---
+   * Pioneer-mapping the safe → warm → clip ladder to green → amber →
+   * magenta. The single polychrome surface in v5 — every other surface
+   * stays silk/amber/glass per the One-Amber Rule. This breaks the
+   * second-order category-reflex ("AI tool with dark mode + one amber"
+   * = Linear/Vercel/Railway family) by binding a third color into the
+   * surface a DJ glances at the most: the master meter strip.
+   *
+   * Names mirror the existing --amber-NN / --amber-pale-NN convention
+   * so meter.ts stays token-only (the VIS-03 zero-rgba()-literal
+   * contract still holds — meter.test.ts test #6).
+   *
+   * Mood block polychrome (HYPE/TEACH/COACH) follows; those tokens land
+   * in a sibling block when that surface is rebuilt. */
+  /* Safe (segments 1-5) — green family, anchored to --led-ok */
+  --meter-safe:        #6dd44a;                       /* base lit color */
+  --meter-safe-pale:   #9de882;                       /* gradient stop A (top) */
+  --meter-safe-pale-70: rgba(157, 232, 130, 0.7);     /* gradient stop B (bottom) */
+  --meter-safe-22:     rgba(109, 212, 74, 0.22);      /* outer glow alpha */
+  /* Warm (segments 6-13) — amber family, reuses existing --amber / --amber-78 / --amber-40 */
+  /* Clip (segments 14-16) — magenta family */
+  --meter-clip:        #ff2d8f;                       /* base lit color (gradient stop A) */
+  --meter-clip-deep:   #d91464;                       /* deep magenta base */
+  --meter-clip-deep-85: rgba(217, 20, 100, 0.85);     /* gradient stop B */
+  --meter-clip-22:     rgba(255, 45, 143, 0.22);      /* outer glow alpha (inner stop) */
+  --meter-clip-40:     rgba(255, 45, 143, 0.40);      /* outer glow alpha (outer stop) */
+  --meter-clip-glow:   0 0 6px var(--meter-clip-40), 0 0 14px var(--meter-clip-22);
 
   /* --- citation-strip — LAUNCH-02 (Phase 44 Plan 44-03) ---
    * Semantic tokens for the live UI citation chip surface. Each AI

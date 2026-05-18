@@ -13,10 +13,18 @@
  *   block for the semantic alpha names this module consumes.
  *
  * Each meter is 56px wide × 200px tall: a --glass-3 frame with 16
- * stacked LED segments running a Pioneer-CDJ amber ladder (safe at the
- * bottom in --amber-pale, warm through the body in --amber, clip at the
- * top in --amber-deep) plus a separate peak-hold needle that floats
- * above the current level.
+ * stacked LED segments running a Pioneer-CDJ polychrome ladder (safe at
+ * the bottom in --meter-safe green, warm through the body in --amber,
+ * clip at the top in --meter-clip magenta) plus a separate peak-hold
+ * needle that floats above the current level.
+ *
+ * Polychrome rebrand (2026-05-19): the meter is the single polychrome
+ * surface in v5 — it broke the all-amber monotone deliberately to push
+ * past the "AI tool with dark mode + one amber" second-order category
+ * reflex. Mood block follows; everything else stays silk/amber/glass per
+ * the One-Amber Rule. The peak needle stays amber — it is the single
+ * visceral CDJ Whisper signal and the polychrome lives in the ladder,
+ * not the floater.
  *
  * Layout-thrash-free update path: the caller writes a single CSS custom
  * property to the meter root — `--meter-rms` (0..1) and `--meter-peak`
@@ -87,18 +95,20 @@ const CSS = `
                 opacity var(--motion-snap) ease-out;
     opacity: 0.85;
   }
-  /* v5 ladder — Pioneer-CDJ style. Amber gradient from deep at the top
-   * (clip) to mid in the body to pale near the bottom (safe). A single
-   * green hairline marks the safe/warm boundary (segment 5). */
+  /* v5 polychrome ladder — Pioneer-CDJ style. Green at the bottom (safe),
+   * amber through the body (warm), magenta at the top (clip). The color
+   * transition IS the band marker — the v4 green hairline at segment 5
+   * was redundant in the polychrome world and was deleted with this
+   * migration. */
   .vmx-meter__seg[data-lit="true"] {
     opacity: 1;
     box-shadow: none;
   }
   .vmx-meter__seg[data-zone="safe"][data-lit="true"] {
-    background: linear-gradient(180deg, var(--amber-pale), var(--amber-pale-70));
+    background: linear-gradient(180deg, var(--meter-safe-pale), var(--meter-safe-pale-70));
     box-shadow:
       inset 0 0 0 0.5px var(--seg-hi-15),
-      0 0 3px var(--amber-22);
+      0 0 3px var(--meter-safe-22);
   }
   .vmx-meter__seg[data-zone="warm"][data-lit="true"] {
     background: linear-gradient(180deg, var(--amber), var(--amber-78));
@@ -107,23 +117,10 @@ const CSS = `
       0 0 4px var(--amber-40);
   }
   .vmx-meter__seg[data-zone="clip"][data-lit="true"] {
-    background: linear-gradient(180deg, var(--amber-deep), var(--amber-deep-85));
+    background: linear-gradient(180deg, var(--meter-clip), var(--meter-clip-deep-85));
     box-shadow:
       inset 0 0 0 0.5px var(--seg-hi-18),
-      var(--glow-soft);
-  }
-  /* Green hairline marker at segment 5 — the safe/warm boundary */
-  .vmx-meter__seg[data-index="5"]::after {
-    content: '';
-    position: absolute;
-    left: -1px;
-    right: -1px;
-    bottom: -2px;
-    height: 1px;
-    background: var(--led-ok);
-    box-shadow: 0 0 3px var(--led-ok);
-    opacity: 0.7;
-    pointer-events: none;
+      var(--meter-clip-glow);
   }
   /* Faint scale tick on every fourth segment — reads as machined
    * detail on the bezel, never competes with lit segments. VIS-03
