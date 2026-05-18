@@ -7,7 +7,7 @@
  *   - Settings gear has aria-label + title with shortcut hint.
  *   - Status-bar badges (livekit/gemini/midi/screen) each have a title
  *     attribute describing their state.
- *   - Cohost AVERY status row has title + aria-label per state.
+ *   - Cohost status row has title + aria-label per state.
  *   - Cohost foot has title narrating grounded / warming / failed.
  *   - First-session hint chip mounts when localStorage flag is unset
  *     and dismisses after the auto-dismiss timeout.
@@ -116,7 +116,7 @@ describe("Status bar tooltips (H6)", () => {
 });
 
 describe("Cohost tooltips (H6)", () => {
-  it("AVERY status row has title + aria-label per state", () => {
+  it("status row has title + aria-label per state", () => {
     const panel = renderCohostPanel({
       status: "TALKING",
       transcript: [],
@@ -125,7 +125,6 @@ describe("Cohost tooltips (H6)", () => {
     });
     host().append(panel);
     const status = panel.querySelector<HTMLElement>(".vmx-cohost__status");
-    expect(status?.getAttribute("title")).toContain("AVERY");
     expect(status?.getAttribute("title")).toContain("talking");
     expect(status?.getAttribute("aria-label")).toBe(
       status?.getAttribute("title"),

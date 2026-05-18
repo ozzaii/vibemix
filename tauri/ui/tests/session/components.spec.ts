@@ -301,10 +301,14 @@ describe("renderCohostPanel", () => {
     });
     host().append(panel);
     expect(panel.querySelector(".vmx-cohost__mascot")).toBeNull();
-    // The header still mounts and carries the AVERY chip + status.
+    // The header still mounts and carries the status row (no name span;
+    // AVERY moniker dropped — cohost is name-less, vibemix-as-instrument).
     const header = panel.querySelector<HTMLElement>(".vmx-cohost__header");
     expect(header).toBeTruthy();
-    expect(panel.querySelector(".vmx-cohost__name")?.textContent).toBe("AVERY");
+    expect(panel.querySelector(".vmx-cohost__name")).toBeNull();
+    expect(
+      panel.querySelector<HTMLElement>(".vmx-cohost__status")?.dataset.state,
+    ).toBe("LISTENING");
   });
 });
 

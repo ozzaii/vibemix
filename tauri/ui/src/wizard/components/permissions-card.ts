@@ -110,7 +110,7 @@ const COPY: Record<PermissionKind, { label: string; sub: string }> = {
   },
   microphone: {
     label: "MICROPHONE",
-    sub: "lets you talk back to avery — turn off mid-set anytime",
+    sub: "lets you talk back. turn off mid-set anytime.",
   },
 };
 

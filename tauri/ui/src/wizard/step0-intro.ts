@@ -9,8 +9,8 @@
  *   - Three-line hero. Saira wdth 82 wght 800 at 64-72px for the wordmark
  *     stack; wdth 82 wght 600 for the third line, em-rule-bracketed in
  *     --silk-65 (mock pattern).
- *   - Single amber accent: the "A" of "VIBEMIX" gets the lead glyph
- *     treatment (matches cohost AVERY signature).
+ *   - Single amber accent: the "V" of "VIBEMIX" gets the lead glyph
+ *     treatment (one amber moment per panel, see DESIGN.md §5).
  *   - Single "[ Let's go ]" CTA at the bottom. Secondary visual treatment
  *     (mock-verbatim button armed state from button.ts).
  *
@@ -65,7 +65,7 @@ const CSS = `
     align-items: baseline;
     gap: 1px;
   }
-  /* The "V" gets the AVERY-style amber lead — single accent moment. */
+  /* The "V" gets the amber lead. Single accent moment per DESIGN.md §5. */
   .wizard-intro__wordmark-lead {
     color: var(--amber);
     font-variation-settings: "wdth" 82, "wght" 800;

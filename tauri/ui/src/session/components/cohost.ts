@@ -17,7 +17,7 @@
  * callers but is unused in render.
  *
  * Components:
- *   - "AVERY" Workbench 13px name + LISTENING/TALKING/IDLE status row
+ *   - LISTENING/TALKING/IDLE status row with optional MUTED pill
  *     (single horizontal row, left-aligned, no leading bubble)
  *   - Tiered transcript (.now / .faded / .old)
  *   - Foot strip: GROUNDED / WARMING UP indicator (latency-free)
@@ -58,7 +58,7 @@ export interface CohostPanelProps {
   latencyMs: number | null;
   grounded: boolean;
   /** Push-to-mute state. When true, an inline "● MUTED" pill sits next to
-   *  the AVERY status row so the mute is visible without scanning to the
+   *  the status row so the mute is visible without scanning to the
    *  banner above the transcript. Wave 6 (impeccable critique) — closes
    *  H3 "user control & freedom" by giving cmd+m a clear visual ack.
    *  Defaults to false on existing callers via the destructure below. */
@@ -166,27 +166,6 @@ const CSS = `
     display: flex;
     flex-direction: column;
     gap: 3px;
-  }
-  /* AVERY — display-weight character moniker, not a label. The first
-   * letter gets a pale highlight (mock §03 type specimen treatment)
-   * so the name reads as a co-host's signature, not status text. */
-  .vmx-cohost__name {
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 82, "wght" 700;
-    font-size: 17px;
-    color: var(--silk);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    line-height: 1;
-    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
-    display: inline-flex;
-    align-items: baseline;
-    gap: 1px;
-  }
-  .vmx-cohost__name__lead {
-    color: var(--amber);
-    font-variation-settings: "wdth" 82, "wght" 800;
-    text-shadow: 0 0 6px var(--amber-40), 0 0 14px var(--amber-22);
   }
   .vmx-cohost__status {
     font-family: var(--type-display);
@@ -401,7 +380,7 @@ const CSS = `
       var(--glow-faint);
   }
   .vmx-cohost__foot-retry:focus-visible { outline: none; }
-  /* MUTED pill — sits inside the cohost header next to the AVERY status
+  /* MUTED pill — sits inside the cohost header next to the status
    * row. Same dome-LED + Saira-9-022 vocabulary as the titlebar pills,
    * fault-tinted. Wave 6 closes H3 "user control & freedom" — cmd+m
    * gets a visible ack without scanning to the banner. */
@@ -489,20 +468,11 @@ function buildHeader(status: CohostStatus, muted: boolean): HTMLElement {
   const head = document.createElement("header");
   head.className = "vmx-cohost__header";
 
-  // Phase 13-03: mascot bubble dropped — the AVERY chip is the only header
-  // content now. The mascot lives in the always-on-top overlay window.
+  // Phase 13-03: mascot bubble dropped. The status row (LED + label) is
+  // the only header content; the mascot lives in the always-on-top
+  // overlay window.
   const meta = document.createElement("div");
   meta.className = "vmx-cohost__meta";
-  // AVERY rendered as a display moniker — first letter highlighted in
-  // amber as the character's accent stroke.
-  const name = document.createElement("span");
-  name.className = "vmx-cohost__name";
-  const lead = document.createElement("span");
-  lead.className = "vmx-cohost__name__lead";
-  lead.textContent = "A";
-  const rest = document.createElement("span");
-  rest.textContent = "VERY";
-  name.append(lead, rest);
   const statusEl = document.createElement("span");
   statusEl.className = "vmx-cohost__status";
   statusEl.dataset.state = status;
@@ -516,7 +486,7 @@ function buildHeader(status: CohostStatus, muted: boolean): HTMLElement {
   const lbl = document.createElement("span");
   lbl.textContent = status;
   statusEl.append(led, lbl);
-  meta.append(name, statusEl);
+  meta.append(statusEl);
   head.append(meta);
 
   // Wave 6 (H3) — inline MUTED pill. Renders only when muted=true.
@@ -549,11 +519,11 @@ function buildMutedPill(): HTMLElement {
 function titleForStatus(status: CohostStatus): string {
   switch (status) {
     case "LISTENING":
-      return "AVERY is listening to the room";
+      return "listening to the room";
     case "TALKING":
-      return "AVERY is talking. mic auto-gated until they finish.";
+      return "talking. mic auto-gated until done.";
     case "IDLE":
-      return "AVERY is idle. waiting for an event to react to.";
+      return "idle. waiting for an event to react to.";
   }
 }
 

@@ -41,7 +41,7 @@ describe("cohost transcript header — Phase 13 mascot drop", () => {
     }
   });
 
-  it("header keeps the AVERY name + status row only", () => {
+  it("header keeps the status row only (no name span)", () => {
     const panel = renderCohostPanel({
       status: "TALKING",
       transcript: [],
@@ -51,12 +51,13 @@ describe("cohost transcript header — Phase 13 mascot drop", () => {
     host().append(panel);
     const header = panel.querySelector<HTMLElement>(".vmx-cohost__header");
     expect(header).toBeTruthy();
-    // Exactly one .vmx-cohost__meta child carrying AVERY + status, no
-    // sibling mascot div.
+    // Exactly one .vmx-cohost__meta child carrying the status row.
+    // No sibling mascot div, no name span (AVERY moniker dropped —
+    // cohost is name-less, vibemix-as-instrument).
     const metaChildren = header!.querySelectorAll(":scope > *");
     expect(metaChildren).toHaveLength(1);
     expect(metaChildren[0]?.classList.contains("vmx-cohost__meta")).toBe(true);
-    expect(panel.querySelector(".vmx-cohost__name")?.textContent).toBe("AVERY");
+    expect(panel.querySelector(".vmx-cohost__name")).toBeNull();
     expect(
       panel.querySelector<HTMLElement>(".vmx-cohost__status")?.dataset.state,
     ).toBe("TALKING");

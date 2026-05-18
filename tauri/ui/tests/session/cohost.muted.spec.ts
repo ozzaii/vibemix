@@ -43,7 +43,7 @@ describe("cohost MUTED pill — Wave 6 H3", () => {
     const pill = panel.querySelector<HTMLElement>(".vmx-cohost__muted-pill");
     expect(pill).toBeTruthy();
     expect(pill?.textContent).toContain("MUTED");
-    // Sits inside the cohost header next to AVERY (not in a separate slot).
+    // Sits inside the cohost header next to the status row (not in a separate slot).
     expect(pill?.closest(".vmx-cohost__header")).toBeTruthy();
   });
 

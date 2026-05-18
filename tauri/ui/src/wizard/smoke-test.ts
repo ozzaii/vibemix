@@ -1,7 +1,7 @@
 /* smoke-test.ts — final wizard surface after Step 3 passes (UI-SPEC §11 / CDJ Whisper v5).
  *
  * Heading "WIZARD COMPLETE" in --amber with composite --glow-soft glow.
- * Body "playing one greeting from avery to test your headphones…".
+ * Body "playing a short greeting to test your headphones…".
  * Center: 96×96 LED pulse disc (Phase 13 mascot lives as overlay window,
  * not embedded here — this is the deck-LED placeholder).
  * 3-bar audio meter at static 50% (Wave 3 mock; Wave 4 wires real RMS).
@@ -117,7 +117,7 @@ export function renderSmokeTest(state: SmokeTestState, cb: SmokeTestCallbacks): 
   const sub = document.createElement("p");
   sub.className = "smoke-test__body";
   // UI-SPEC §Smoke Test "Body" — VERBATIM
-  sub.textContent = "playing one greeting from avery to test your headphones…";
+  sub.textContent = "playing a short greeting to test your headphones…";
 
   const pulse = document.createElement("div");
   pulse.className = "smoke-test__pulse";
@@ -135,7 +135,7 @@ export function renderSmokeTest(state: SmokeTestState, cb: SmokeTestCallbacks): 
   const replay = document.createElement("div");
   replay.className = "smoke-test__replay";
   // UI-SPEC §Smoke Test "Replay link" — VERBATIM
-  replay.textContent = "didn't hear avery? ";
+  replay.textContent = "didn't hear it? ";
   const replayLink = document.createElement("button");
   replayLink.type = "button";
   replayLink.className = "smoke-test__replay-link";

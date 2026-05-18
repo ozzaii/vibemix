@@ -189,7 +189,15 @@ const LAYOUT_CSS = `
     grid-template-columns: var(--col-left) var(--col-center) var(--col-right);
     gap: var(--gap-col);
     padding: 32px; /* mock-verbatim — no v5 spacing equivalent for 32 */
-    overflow: hidden;
+    /* Body has overflow: hidden globally (tokens.css line 274). Below 1100px
+     * the @media rule collapses to a single column and the right column's
+     * content stacks vertically — without overflow-y: auto + min-height: 0
+     * here, anything below the viewport gets clipped and is unreachable.
+     * overscroll-behavior: contain so wheel events don't leak to the OS. */
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    overscroll-behavior: contain;
     align-items: start;
   }
   .vmx-session__col {
@@ -733,7 +741,7 @@ export function defaultState(): SessionState {
       hotkey: "⌘⇧M",
       errors: {},
     },
-    persona: { skill: "INT", interaction: "HYPE", mood: "HYPE", voice: "avery", genre: "techno" },
+    persona: { skill: "INT", interaction: "HYPE", mood: "HYPE", voice: "kore", genre: "techno" },
     output: { device: "MacBook Pro Speakers", profile: "HP" },
   };
 }
