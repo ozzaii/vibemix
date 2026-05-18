@@ -248,3 +248,10 @@ decisions:
       Same as google-cloud-speech — transitive of livekit-plugins-google,
       zero direct imports verified via `rg "from google\.cloud\.texttospeech"`,
       retained until upstream drops the dep.
+
+# Phase 48 / OPP — Opportunity evaluations.
+# Rows added by Plan 48-02 from docs/dep-opportunities/2026-05-scan.md.
+# Schema: scripts/audit/dep_ratings_schema.json $defs.opportunity_entry.
+# Phase 49 installer companion reads ONLY green-adopt rows for fetchable
+# drivers (and confirms docs-only OBS row is NOT a fetchable dep).
+opportunity_evaluations: []
