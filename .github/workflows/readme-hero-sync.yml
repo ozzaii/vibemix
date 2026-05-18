@@ -42,3 +42,13 @@ jobs:
 
       - name: Run hash sync check
         run: python scripts/check_readme_hero_hash.py
+
+      - name: Phase 47 / MASCOT-07 — assert hero render assets exist
+        run: |
+          test -f docs/assets/readme-hero.png || (echo "missing docs/assets/readme-hero.png" && exit 1)
+          test -f docs/assets/readme-hero.webm || (echo "missing docs/assets/readme-hero.webm" && exit 1)
+          png_bytes=$(stat -c '%s' docs/assets/readme-hero.png)
+          webm_bytes=$(stat -c '%s' docs/assets/readme-hero.webm)
+          [ "$png_bytes" -le $((50 * 1024)) ] || (echo "readme-hero.png exceeds 50 KB ($png_bytes bytes)" && exit 1)
+          [ "$webm_bytes" -le $((100 * 1024)) ] || (echo "readme-hero.webm exceeds 100 KB ($webm_bytes bytes)" && exit 1)
+          echo "Phase 47 hero assets present + within size guards"
