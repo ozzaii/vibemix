@@ -26,6 +26,9 @@ on:
       - 'tauri/ui/package.json'
       - 'tauri/ui/package-lock.json'
       - 'docs/AUDIT.md'
+      - 'docs/dep-opportunities/**'
+      - 'docs/integrations/**'
+      - '.planning/decisions/DEP-OPP-*.md'
   push:
     branches: [main]
     paths:
@@ -38,6 +41,9 @@ on:
       - 'tauri/ui/package.json'
       - 'tauri/ui/package-lock.json'
       - 'docs/AUDIT.md'
+      - 'docs/dep-opportunities/**'
+      - 'docs/integrations/**'
+      - '.planning/decisions/DEP-OPP-*.md'
   workflow_dispatch:
 
 concurrency:
@@ -201,3 +207,29 @@ jobs:
 
       - name: Run pinact --check
         run: bash scripts/audit/run_pinact.sh --check
+
+  opp-scan-validate:
+    name: Opportunity-scan validate + anti-slop (OPP-03)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pyyaml + jsonschema
+        run: pip install pyyaml jsonschema
+
+      - name: Run opp-scan validator (md<->yaml parity + auto-Red + ADR-exists)
+        run: python scripts/audit/scan_opportunities.py
+
+      - name: Run anti-slop sibling checker (docs/dep-opportunities/)
+        run: python scripts/audit/check_no_slop_opp.py
+
+      - name: Run anti-slop sweep on docs/integrations/
+        run: python scripts/audit/check_no_slop_opp.py --dir docs/integrations
+
+      - name: Run anti-slop sweep on Yellow-defer stubs
+        run: python scripts/audit/check_no_slop_opp.py --dir .planning/research/v3-buckets
