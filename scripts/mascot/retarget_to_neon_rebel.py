@@ -302,12 +302,19 @@ def main(argv: list[str] | None = None) -> int:
         out = retarget(args.source, args.rig, args.slot, args.output_dir)
         compress_draco(out, out)
         size = out.stat().st_size
-        if not verify_size_band(size):
+        # Phase 47 / MASCOT-02 — assert per-family size band (not the legacy
+        # 400-1200 band for every slot). Base slots target 200-600 KB, emotion
+        # 300-900 KB, anticipation+reaction+legacy_prep 400-1200 KB.
+        if not verify_size_band_for_slot(args.slot, size):
+            family = VALID_SLOTS.get(args.slot, "unknown")
+            band_kb = SLOT_FAMILIES.get(family, {}).get("size_band_kb", (400, 1200))
+            min_b = band_kb[0] * 1024
+            max_b = band_kb[1] * 1024
             print(
                 f"ERROR: output {out} size {size} bytes outside the "
-                f"{_MIN_BYTES}..{_MAX_BYTES} band; tune the gltf-pipeline "
-                f"draco flag (--draco.compressionLevel 1..10, default 7) "
-                f"and re-run.",
+                f"{min_b}..{max_b} byte band for family '{family}'; tune the "
+                f"gltf-pipeline draco flag (--draco.compressionLevel 1..10, "
+                f"default 7) and re-run.",
                 file=sys.stderr,
             )
             return 1
