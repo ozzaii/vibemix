@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.e2e.macbook.audio_loopback_fixture import audio_loopback_recorder  # noqa: F401
 from tests.e2e.macbook.dimensions import EeRun, make_run_id
 from tests.e2e.macbook.render_report import render
 
