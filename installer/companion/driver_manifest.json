@@ -1,0 +1,27 @@
+{
+  "$schema": "https://github.com/ozzaii/vibemix/blob/main/installer/companion/driver_manifest.schema.json",
+  "version": "1.0.0",
+  "drivers": {
+    "blackhole_2ch": {
+      "platform": "darwin",
+      "vendor": "ExistentialAudio",
+      "version": "0.6.0",
+      "url": "https://existential.audio/blackhole/BlackHole2ch.v0.6.0.pkg",
+      "sha256": "PLACEHOLDER_REAL_SHA256_TO_BE_POPULATED_AT_SIGNPATH_DISCHARGE_64HEX",
+      "vendor_signed": true,
+      "license": "GPL-3.0",
+      "license_ack_text": "BlackHole is licensed GPL-3.0. By installing, you agree to its terms — see https://existential.audio/blackhole/."
+    },
+    "vb_cable": {
+      "platform": "win32",
+      "vendor": "VB-Audio",
+      "version": "1.0.4.3",
+      "url": "https://vb-audio.com/Cable/VBCABLE_Driver_Pack43.zip",
+      "sha256": "PLACEHOLDER_REAL_SHA256_TO_BE_POPULATED_AT_SIGNPATH_DISCHARGE_64HEX",
+      "vendor_signed": true,
+      "license": "Donationware",
+      "license_ack_text": "VB-CABLE is freeware-with-attribution from VB-Audio. By installing, you agree to its terms — see https://vb-audio.com/Cable/.",
+      "silent_flag": "/S"
+    }
+  }
+}
