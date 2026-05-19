@@ -69,15 +69,22 @@ afterEach(() => {
 });
 
 describe("MascotGroup rendering", () => {
-  it("renders the group with MASCOT title + 1 toggle + 3 mood pills", () => {
+  it("renders the group with MASCOT title + 2 toggles (enable + click-through) + 3 mood pills", () => {
     const group = renderMascotGroup();
     document.body.append(group);
     // Group header text comes from the shared SettingsGroup wrapper.
     expect(
       group.querySelector(".vmx-settings-group__header")?.textContent,
     ).toContain("MASCOT");
-    // One rocker (click-through), one mood-pills container with 3 pills.
-    expect(group.querySelectorAll(".vmx-rocker").length).toBe(1);
+    // Two rockers since 2026-05-19 mascot-opt-in: ENABLE (experimental) +
+    // CLICK-THROUGH. Plus the mood pills container with 3 pills.
+    expect(group.querySelectorAll(".vmx-rocker").length).toBe(2);
+    expect(
+      group.querySelector('.vmx-rocker[aria-label="enable mascot overlay"]'),
+    ).toBeTruthy();
+    expect(
+      group.querySelector('.vmx-rocker[aria-label="click-through"]'),
+    ).toBeTruthy();
     const pills = group.querySelectorAll(".vmx-mascot-pill");
     expect(pills.length).toBe(3);
     const labels = Array.from(pills).map((p) => p.textContent);
@@ -105,23 +112,33 @@ describe("MascotGroup rendering", () => {
     }
   });
 
-  it("reflects SessionState.settings.click_through=true on the ON rocker segment", () => {
+  it("reflects SessionState.settings.click_through=true on the click-through rocker ON segment", () => {
     setClickThrough(true);
     const group = renderMascotGroup();
     document.body.append(group);
-    const segs = Array.from(
-      group.querySelectorAll<HTMLElement>(".vmx-rocker__seg"),
+    // Scope to the click-through rocker; the new ENABLE rocker also has
+    // OFF/ON segments and would match an unscoped query.
+    const ctRocker = group.querySelector<HTMLElement>(
+      '.vmx-rocker[aria-label="click-through"]',
     );
-    const onSeg = segs.find((s) => s.dataset.id === "on");
-    const offSeg = segs.find((s) => s.dataset.id === "off");
+    expect(ctRocker).toBeTruthy();
+    const onSeg = ctRocker!.querySelector<HTMLElement>(
+      '.vmx-rocker__seg[data-id="on"]',
+    );
+    const offSeg = ctRocker!.querySelector<HTMLElement>(
+      '.vmx-rocker__seg[data-id="off"]',
+    );
     expect(onSeg?.dataset.active).toBe("true");
     expect(offSeg?.dataset.active).toBe("false");
   });
 
-  it("default state: click_through=false → OFF segment active, mood=hype-man → HYPE-MAN pill active", () => {
+  it("default state: click_through=false → click-through OFF segment active, mood=hype-man → HYPE-MAN pill active", () => {
     const group = renderMascotGroup();
     document.body.append(group);
-    const offSeg = group.querySelector<HTMLElement>(
+    const ctRocker = group.querySelector<HTMLElement>(
+      '.vmx-rocker[aria-label="click-through"]',
+    );
+    const offSeg = ctRocker!.querySelector<HTMLElement>(
       '.vmx-rocker__seg[data-id="off"]',
     );
     expect(offSeg?.dataset.active).toBe("true");
@@ -129,6 +146,19 @@ describe("MascotGroup rendering", () => {
       '.vmx-mascot-pill[data-id="hype-man"]',
     );
     expect(hypePill?.dataset.active).toBe("true");
+  });
+
+  it("ENABLE rocker default state: OFF segment active (2026-05-19 opt-in default)", () => {
+    const group = renderMascotGroup();
+    document.body.append(group);
+    const enableRocker = group.querySelector<HTMLElement>(
+      '.vmx-rocker[aria-label="enable mascot overlay"]',
+    );
+    expect(enableRocker).toBeTruthy();
+    const offSeg = enableRocker!.querySelector<HTMLElement>(
+      '.vmx-rocker__seg[data-id="off"]',
+    );
+    expect(offSeg?.dataset.active).toBe("true");
   });
 });
 
@@ -159,6 +189,10 @@ describe("MascotGroup IPC wiring", () => {
   it("clicking the already-active pill does NOT fire emitIpc (idempotency)", async () => {
     const group = renderMascotGroup();
     document.body.append(group);
+    // Drop the read_mascot_window_state seed call from mount before
+    // asserting on the click handler (the seed is unrelated to pill
+    // idempotency; clearing means the click's effect is unambiguous).
+    invokeMock.mockClear();
     const hypePill = group.querySelector<HTMLButtonElement>(
       '.vmx-mascot-pill[data-id="hype-man"]',
     );
@@ -170,7 +204,10 @@ describe("MascotGroup IPC wiring", () => {
   it("toggling click-through ON invokes set_mascot_click_through(true) AND emits ipc.settings.set { field: 'click_through', value: true }", async () => {
     const group = renderMascotGroup();
     document.body.append(group);
-    const onSeg = group.querySelector<HTMLButtonElement>(
+    const ctRocker = group.querySelector<HTMLElement>(
+      '.vmx-rocker[aria-label="click-through"]',
+    );
+    const onSeg = ctRocker!.querySelector<HTMLButtonElement>(
       '.vmx-rocker__seg[data-id="on"]',
     );
     expect(onSeg).toBeTruthy();
@@ -201,7 +238,10 @@ describe("MascotGroup IPC wiring", () => {
     setClickThrough(true);
     const group = renderMascotGroup();
     document.body.append(group);
-    const offSeg = group.querySelector<HTMLButtonElement>(
+    const ctRocker = group.querySelector<HTMLElement>(
+      '.vmx-rocker[aria-label="click-through"]',
+    );
+    const offSeg = ctRocker!.querySelector<HTMLButtonElement>(
       '.vmx-rocker__seg[data-id="off"]',
     );
     offSeg!.click();
@@ -210,6 +250,61 @@ describe("MascotGroup IPC wiring", () => {
       (c) => c[0] === "set_mascot_click_through",
     );
     expect(tauriCall![1]).toEqual({ enabled: false });
+  });
+
+  it("toggling ENABLE ON invokes set_mascot_visible(true) — NO sidecar emitIpc (visibility lives in Rust config only)", async () => {
+    const group = renderMascotGroup();
+    document.body.append(group);
+    const enableRocker = group.querySelector<HTMLElement>(
+      '.vmx-rocker[aria-label="enable mascot overlay"]',
+    );
+    const onSeg = enableRocker!.querySelector<HTMLButtonElement>(
+      '.vmx-rocker__seg[data-id="on"]',
+    );
+    onSeg!.click();
+    await new Promise<void>((r) => setTimeout(r, 0));
+
+    const tauriCall = invokeMock.mock.calls.find(
+      (c) => c[0] === "set_mascot_visible",
+    );
+    expect(tauriCall).toBeTruthy();
+    expect(tauriCall![1]).toEqual({ visible: true });
+
+    // 2026-05-19 mascot-opt-in: visibility is Rust-only, no sidecar
+    // persistence. Confirm we do NOT round-trip through forward_ipc.
+    const ipcVisibleCall = invokeMock.mock.calls.find((c) => {
+      if (c[0] !== "forward_ipc_to_sidecar") return false;
+      const msg = (c[1] as { message: { payload: { field?: string } } })
+        ?.message;
+      return msg?.payload?.field === "mascot_visible" || msg?.payload?.field === "visible";
+    });
+    expect(ipcVisibleCall).toBeUndefined();
+  });
+
+  it("ENABLE rocker seeds from read_mascot_window_state on mount", async () => {
+    // Persisted state says visible=true; the rocker should flip to ON
+    // after the async seed completes.
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "read_mascot_window_state") {
+        return { visible: true, click_through: false };
+      }
+      return undefined;
+    });
+    const group = renderMascotGroup();
+    document.body.append(group);
+    // Flush the async seed microtask.
+    await new Promise<void>((r) => setTimeout(r, 0));
+    const enableRocker = group.querySelector<HTMLElement>(
+      '.vmx-rocker[aria-label="enable mascot overlay"]',
+    );
+    const onSeg = enableRocker!.querySelector<HTMLElement>(
+      '.vmx-rocker__seg[data-id="on"]',
+    );
+    const offSeg = enableRocker!.querySelector<HTMLElement>(
+      '.vmx-rocker__seg[data-id="off"]',
+    );
+    expect(onSeg?.dataset.active).toBe("true");
+    expect(offSeg?.dataset.active).toBe("false");
   });
 });
 

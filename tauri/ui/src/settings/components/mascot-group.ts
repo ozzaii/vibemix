@@ -1,6 +1,13 @@
 /* Phase 13-03 — Settings drawer MASCOT group (Plan 13-03 Task 2).
+ * Three rows since 2026-05-19 (mascot-opt-in decision #3).
  *
- * Two rows:
+ *   - ENABLE (EXPERIMENTAL): binary rocker (OFF | ON). Surfaces the
+ *     Rust-side `MascotWindowState.visible` flag. Default OFF as of
+ *     2026-05-19 — the mascot ships as opt-in experimental until the
+ *     placeholder character art is replaced. Wired directly to the
+ *     `set_mascot_visible` Tauri command; the Rust-side handler lazy-
+ *     creates the overlay window on first enable so no app restart is
+ *     needed. Initial state is seeded async from `read_mascot_window_state`.
  *   - CLICK-THROUGH: binary rocker (OFF | ON). When ON, the mascot
  *     overlay window passes pointer events through to the app beneath
  *     (Plan 13-02 wires the actual `set_mascot_click_through` Tauri
@@ -11,6 +18,9 @@
  *     rocker (no flat fills).
  *
  * IPC wiring:
+ *   - enable rocker            → invoke('set_mascot_visible', { visible })
+ *                              (no sidecar persistence — visibility lives
+ *                               in Rust-side config.json only)
  *   - mood pill click          → emitIpc('ipc.settings.set', { field: 'mood', value })
  *   - click-through rocker     → invoke('set_mascot_click_through', { enabled })
  *                              + emitIpc('ipc.settings.set', { field: 'click_through', value })
@@ -152,6 +162,59 @@ export function renderMascotGroup(): HTMLElement {
 function buildMascotGroup(): MascotGroupHandle {
   const settings = getSessionState().settings;
 
+  // --- ENABLE (EXPERIMENTAL) row ------------------------------------------
+  // 2026-05-19 mascot-opt-in decision. Reads the Rust-side
+  // MascotWindowState.visible (NOT in SessionState — visibility lives in
+  // config.json only, not the sidecar settings store). Optimistic OFF
+  // default; the async read below flips to ON if the user has previously
+  // enabled the mascot.
+  const visRow = document.createElement("div");
+  visRow.className = "vmx-mascot-row";
+  const visLabel = document.createElement("div");
+  visLabel.className = "vmx-mascot-row__label";
+  visLabel.textContent = "ENABLE (EXPERIMENTAL)";
+  visRow.append(visLabel);
+
+  const visRocker = renderRocker({
+    ariaLabel: "enable mascot overlay",
+    variant: "rocker",
+    options: [
+      { id: "off", label: "OFF" },
+      { id: "on", label: "ON" },
+    ],
+    active: "off",
+    onChange: (id) => {
+      const visible = id === "on";
+      void applyVisibleChange(visible);
+    },
+  });
+  visRow.append(visRocker);
+
+  // Seed the rocker from persisted Rust state. If the user previously
+  // enabled the mascot, flip the rocker to ON without rebuilding.
+  void (async () => {
+    try {
+      const state = await invoke<{ visible: boolean }>(
+        "read_mascot_window_state",
+      );
+      if (state.visible) {
+        visRocker
+          .querySelectorAll<HTMLElement>(".vmx-rocker__seg")
+          .forEach((seg) => {
+            const wantActive = seg.dataset.id === "on";
+            seg.dataset.active = wantActive ? "true" : "false";
+            seg.setAttribute("aria-checked", wantActive ? "true" : "false");
+          });
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[mascot-group] read_mascot_window_state invoke failed:",
+        err,
+      );
+    }
+  })();
+
   // --- CLICK-THROUGH row ---------------------------------------------------
   const ctRow = document.createElement("div");
   ctRow.className = "vmx-mascot-row";
@@ -210,7 +273,7 @@ function buildMascotGroup(): MascotGroupHandle {
   // --- Group wrapper -------------------------------------------------------
   const group = renderSettingsGroup({
     header: "MASCOT",
-    children: [ctRow, moodRow],
+    children: [visRow, ctRow, moodRow],
   });
   group.setAttribute("data-component", "mascot-group");
 
@@ -243,6 +306,19 @@ async function applyMoodChange(mood: MascotMood): Promise<void> {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("[mascot-group] mood emitIpc failed:", err);
+  }
+}
+
+async function applyVisibleChange(visible: boolean): Promise<void> {
+  // 2026-05-19 mascot-opt-in: visibility lives in Rust-side config.json
+  // only — no sidecar persistence, no emitIpc. The Rust handler lazy-
+  // creates the overlay window on first enable so no app restart is
+  // needed (config.rs::set_mascot_visible).
+  try {
+    await invoke("set_mascot_visible", { visible });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[mascot-group] set_mascot_visible invoke failed:", err);
   }
 }
 

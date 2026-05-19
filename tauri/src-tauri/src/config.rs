@@ -12,11 +12,26 @@
 //! ## Phase 13 Plan 02 — Mascot window state
 //!
 //! A second top-level key `mascot_window` stores the overlay window's
-//! geometry, visibility, and click-through bool. Defaults match
-//! 13-CONTEXT Open Q 1: `visible: true` (mascot shown on first launch)
-//! and `click_through: false` (drag-positionable, NOT click-through).
-//! Position fields are `Option<i32>` because first launch has no saved
-//! position — `mascot_window.rs` picks a default top-right offset.
+//! geometry, visibility, and click-through bool. Position fields are
+//! `Option<i32>` because first launch has no saved position —
+//! `mascot_window.rs` picks a default top-right offset.
+//!
+//! Defaults: `visible: false` (opt-in experimental, see 2026-05-19
+//! mascot-opt-in decision below) and `click_through: false`
+//! (drag-positionable, NOT click-through).
+//!
+//! ## 2026-05-19 — Mascot opt-in (decision #3 from /impeccable critique)
+//!
+//! The original Phase 13 default was `visible: true` — every user got
+//! the mascot overlay on first launch. The 2026-05-19 critique flipped
+//! this for rc1: the mascot ships as opt-in experimental. The character
+//! art is a placeholder ("DJ bat") and shipping incomplete signature
+//! features in screenshots hurts the launch surface. The default is now
+//! `visible: false`; users enable via Settings → Mascot → "ENABLE".
+//!
+//! Lazy creation: `set_mascot_visible(true)` will build the window
+//! on-demand if it doesn't exist (first toggle after a hidden launch),
+//! so enabling does NOT require an app restart.
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
@@ -56,8 +71,8 @@ pub struct FirstRunState {
 /// `0,0` — `mascot_window::create_mascot_window` substitutes a top-right
 /// default offset when these are `None`.
 ///
-/// Defaults per 13-CONTEXT Open Q 1:
-///   - `visible: true` (mascot is shown on first launch)
+/// Defaults (2026-05-19 mascot-opt-in — see module-level doc):
+///   - `visible: false` (mascot hidden on first launch; opt-in via Settings)
 ///   - `click_through: false` (drag-positionable; click-through is opt-in via Settings)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MascotWindowState {
@@ -76,7 +91,7 @@ impl Default for MascotWindowState {
             y: None,
             width: None,
             height: None,
-            visible: true,
+            visible: false,
             click_through: false,
         }
     }
@@ -191,10 +206,15 @@ pub async fn set_mascot_visible(app: AppHandle, visible: bool) -> Result<(), Str
         } else {
             window.hide().map_err(|e| format!("hide failed: {e}"))?;
         }
+    } else if visible {
+        // 2026-05-19 mascot-opt-in: lazy-create on first enable after a
+        // hidden launch. `state.visible` is already saved as true above,
+        // so `create_mascot_window`'s `if !state.visible { return Ok(None) }`
+        // gate passes. Without this branch, the user would have to restart
+        // the app to bring the mascot in after flipping the Settings toggle.
+        crate::mascot_window::create_mascot_window(&app)
+            .map_err(|e| format!("lazy create failed: {e}"))?;
     }
-    // If the window doesn't exist yet (e.g. first toggle after a hidden
-    // launch where create_mascot_window early-returned), the visible
-    // flag still persists — next app launch will build the window.
     Ok(())
 }
 
@@ -224,10 +244,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn mascot_window_state_defaults_match_context_open_q1() {
-        // 13-CONTEXT Open Q 1: click-through OFF default + mascot visible on first launch.
+    fn mascot_window_state_defaults_match_opt_in_decision() {
+        // 2026-05-19 mascot-opt-in (decision #3 from /impeccable critique):
+        // mascot is hidden on first launch — opt-in experimental until the
+        // placeholder character art is replaced. Click-through stays OFF
+        // (draggable when enabled).
         let s = MascotWindowState::default();
-        assert!(s.visible, "mascot must be visible on first launch");
+        assert!(!s.visible, "mascot must be hidden on first launch (opt-in)");
         assert!(!s.click_through, "click-through must be OFF default (draggable)");
         assert!(s.x.is_none() && s.y.is_none(), "no saved position on first launch");
         assert!(s.width.is_none() && s.height.is_none(), "no saved size on first launch");
