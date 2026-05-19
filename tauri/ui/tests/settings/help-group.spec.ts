@@ -56,6 +56,10 @@ afterEach(() => {
 
 describe("HelpGroup standalone (H10)", () => {
   it("renders the HELP header and the expected row labels", () => {
+    // 2026-05-19 /impeccable critique round 4 (Kaan: H10 final): added
+    // DOCS row above the audio-routing checklist; renamed GITHUB row
+    // to SOURCE so the two intents (read the guide vs browse the code)
+    // are distinguishable in the help surface.
     const group = HelpGroup();
     document.body.append(group);
     const header = group.querySelector(".vmx-settings-group__header");
@@ -65,32 +69,36 @@ describe("HelpGroup standalone (H10)", () => {
       group.querySelectorAll<HTMLElement>(".vmx-help-row__label"),
     ).map((el) => el.textContent);
     expect(labels).toContain("KEYBOARD SHORTCUTS");
+    expect(labels).toContain("DOCS");
     expect(labels).toContain("TROUBLESHOOT AUDIO");
     expect(labels).toContain("BLACKHOLE ROUTED?");
     expect(labels).toContain("SCREEN RECORDING?");
     expect(labels).toContain("DJAY PRO RUNNING?");
-    expect(labels).toContain("GITHUB");
+    expect(labels).toContain("SOURCE");
     expect(labels).toContain("ABOUT");
   });
 
-  it("GITHUB row carries the public repo URL in its title", () => {
+  it("DOCS + SOURCE rows both route to the public repo URL", () => {
     const group = HelpGroup();
     document.body.append(group);
     const rows = Array.from(
       group.querySelectorAll<HTMLElement>(".vmx-help-row"),
     );
-    const github = rows.find((r) =>
-      r
-        .querySelector(".vmx-help-row__label")
-        ?.textContent?.includes("GITHUB"),
+    const docs = rows.find((r) =>
+      r.querySelector(".vmx-help-row__label")?.textContent?.includes("DOCS"),
     );
-    expect(github).toBeTruthy();
-    expect(github?.getAttribute("title")).toContain("github");
-    expect(github?.getAttribute("aria-label")).toContain("github");
-    // Subtext shows the repo path.
-    const sub = github?.querySelector(".vmx-help-row__sub")?.textContent;
+    expect(docs).toBeTruthy();
+    expect(docs?.getAttribute("title")).toContain("docs");
+    expect(docs?.getAttribute("aria-label")).toContain("docs");
+
+    const source = rows.find((r) =>
+      r.querySelector(".vmx-help-row__label")?.textContent?.includes("SOURCE"),
+    );
+    expect(source).toBeTruthy();
+    expect(source?.getAttribute("title")).toContain("github");
+    expect(source?.getAttribute("aria-label")).toContain("github");
+    const sub = source?.querySelector(".vmx-help-row__sub")?.textContent;
     expect(sub).toContain("bravoh-ai/vibemix");
-    // And the constant is what we expect.
     expect(GITHUB_REPO_URL).toBe("https://github.com/bravoh-ai/vibemix");
   });
 

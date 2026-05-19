@@ -58,6 +58,20 @@ function cohostRetryHandler(): void {
  *  open, recordings root missing, validation reject) is logged but
  *  never crashes the live UI. The chip remains useful as a visible
  *  receipt even when the click target isn't yet wired end-to-end. */
+/** 2026-05-19 /impeccable critique round 4 (Kaan: "OVERHAUL"): live
+ *  cohost is a glance surface, so the full transcript history lives
+ *  in the debrief window. This handler opens the debrief with no
+ *  deep-link so the user lands at the latest moment. Same fire-and-
+ *  forget contract as the chip handler — failures log only. */
+function cohostOpenAllHandler(): void {
+  void invoke("open_debrief_window", {
+    sessionDir: "",
+  }).catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.warn("[render-loop] see-all open_debrief_window failed:", err);
+  });
+}
+
 function cohostChipClickHandler(chip: CitationChip): void {
   // For now the live session passes the empty session_dir (TODO: thread
   // through SessionSnapshot.session_dir once Phase 45 wires it). The
@@ -216,6 +230,10 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       // Phase 44-03 / LAUNCH-02 — citation chip wiring.
       reactions: projectReactions(s.reactions),
       onChipClick: cohostChipClickHandler,
+      // 2026-05-19 /impeccable critique round 4 (Kaan: "OVERHAUL"):
+      // "see all <N> reactions" footer routes to the debrief window
+      // with no deep-link so the user lands at the latest moment.
+      onOpenAllReactions: cohostOpenAllHandler,
     },
     status: {
       livekit: s.status.livekit,

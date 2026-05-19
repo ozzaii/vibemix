@@ -231,19 +231,16 @@ function openShortcuts(): void {
   mountShortcutsOverlay();
 }
 
-/** Open the public GitHub repo. The URL is NOT in the Tauri capability
- *  allowlist today; the invoke call will reject. We console.warn and
- *  carry a TODO — when the allowlist gets the entry, this just works. */
+/** 2026-05-19 /impeccable critique round 4 (Kaan: H10 final): the
+ *  GitHub URL has been in the Tauri capability allowlist since
+ *  default.json line 42. The earlier TODO is stale — this just works.
+ *  Used both by the SOURCE row (repo home) and the DOCS row (same
+ *  URL today; the README lives at the repo root). */
 function openGithubRepo(): void {
-  // TODO(phase-17): add { "url": GITHUB_REPO_URL } to
-  // tauri/src-tauri/capabilities/default.json under shell:allow-open.
   void invoke("plugin:shell|open", { path: GITHUB_REPO_URL }).catch(
     (err: unknown) => {
       // eslint-disable-next-line no-console
-      console.warn(
-        "[help-group] github open failed (capability allowlist?):",
-        err,
-      );
+      console.warn("[help-group] github open failed:", err);
     },
   );
 }
@@ -280,6 +277,23 @@ export function HelpGroup(props: HelpGroupProps = {}): HTMLElement {
       ariaLabel: "open keyboard shortcuts overlay",
       title: "open the keyboard shortcuts overlay",
       onClick: openShortcuts,
+    }),
+  );
+
+  // 2026-05-19 /impeccable critique round 4 (Kaan: H10 final): DOCS
+  // row added above the audio-routing checklist so the user reaches
+  // the GitHub README via a single click. Same URL as GITHUB SOURCE
+  // below — the README is the entry point and lives at repo root.
+  // Two rows, two intents: docs (read the guide) vs source (browse
+  // the code). Both routed through the existing capability allowlist.
+  body.append(
+    buildRow({
+      label: "DOCS",
+      sub: "guide + troubleshooting",
+      chev: "↗",
+      ariaLabel: "open vibemix docs in your browser",
+      title: "open the vibemix docs (README + troubleshooting) on github",
+      onClick: openGithubRepo,
     }),
   );
 
@@ -326,7 +340,7 @@ export function HelpGroup(props: HelpGroupProps = {}): HTMLElement {
 
   body.append(
     buildRow({
-      label: "GITHUB",
+      label: "SOURCE",
       sub: "bravoh-ai/vibemix",
       chev: "↗",
       ariaLabel: "open vibemix github repository",

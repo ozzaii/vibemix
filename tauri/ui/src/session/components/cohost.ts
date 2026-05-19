@@ -84,14 +84,29 @@ export interface CohostPanelProps {
    *  undefined the chip still renders but click is a no-op (defensive —
    *  the strip should never crash if the wiring is incomplete). */
   onChipClick?: (chip: CitationChip) => void;
+  /** 2026-05-19 critique round 4 (Kaan): "see all <N> reactions ↗"
+   *  footer link that routes to the debrief. The live cohost is now a
+   *  glance surface (last 3 reactions), not a scroll surface. Callers
+   *  wire this to invoke("open_debrief_window", { sessionDir }) so the
+   *  full log lives only in the dedicated debrief context.
+   *  Optional + omitted → footer link doesn't render. */
+  onOpenAllReactions?: () => void;
 }
 
 /** Empty reactions sentinel — shared singleton so renderCohostPanel
  *  defaults don't allocate a fresh Map every call. */
 const EMPTY_REACTIONS: ReactionsByTs = new Map();
 
-const MAX_TRANSCRIPT_LINES = 200;
-const FADED_WINDOW = 5;
+/** Live transcript cap. Round 4 critique (Kaan: "SEXIFY / OVERHAUL"):
+ *  the live cohost panel is a GLANCE surface, not a chat surface. DJs
+ *  in flow don't read 200-line scroll panes between MIDI moves; they
+ *  glance for the latest reaction. The full log lives in the debrief
+ *  window where reading is the mode. 3 lines = current reaction + the
+ *  prior two as faded peers; older history is dropped from the live
+ *  view entirely. The state ring still keeps the full transcript in
+ *  memory so the debrief receives every line. */
+const MAX_LIVE_TRANSCRIPT_LINES = 3;
+const FADED_WINDOW = 2;
 
 const CSS = `
   .vmx-cohost {
@@ -431,6 +446,44 @@ const CSS = `
       inset 0 1px 0 rgba(255, 255, 255, 0.3);
     animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
   }
+  /* 2026-05-19 /impeccable critique round 4 (Kaan: "SEXIFY / OVERHAUL"):
+   * "see all <N> reactions ↗" footer link. The live cohost panel is
+   * now a glance surface (latest reaction + 2 faded peers); the full
+   * 200-line log lives in the debrief window. This link is the bridge.
+   * Reads quiet at idle (silk-40 mono) and lifts to amber-pale on
+   * hover via the citation-chip vocabulary so it pattern-matches with
+   * the chip strip above. Renders only when the transcript carries
+   * lines we're hiding. */
+  .vmx-cohost__see-all {
+    padding: 6px var(--sp-4) 8px;
+    border-top: 1px solid var(--glass-edge);
+    background: rgba(0, 0, 0, 0.35);
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .vmx-cohost__see-all[data-empty="true"] { display: none; }
+  .vmx-cohost__see-all-link {
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--silk-40);
+    background: transparent;
+    border: 0;
+    padding: 2px 4px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: color var(--motion-snap) ease-out,
+                text-shadow var(--motion-snap) ease-out;
+  }
+  .vmx-cohost__see-all-link:hover,
+  .vmx-cohost__see-all-link:focus-visible {
+    color: var(--amber-pale);
+    text-shadow: 0 0 4px var(--amber-22);
+    outline: none;
+  }
 `;
 
 registerStyle("vmx-cohost", CSS);
@@ -459,6 +512,12 @@ export function renderCohostPanel(props: CohostPanelProps): HTMLElement {
     ),
   );
   root.append(
+    buildSeeAllLink(
+      props.transcript.length,
+      props.onOpenAllReactions,
+    ),
+  );
+  root.append(
     buildFoot(
       props.grounded,
       props.failureElapsedMs ?? null,
@@ -467,6 +526,43 @@ export function renderCohostPanel(props: CohostPanelProps): HTMLElement {
   );
 
   return root;
+}
+
+/** 2026-05-19 critique round 4 (Kaan: "SEXIFY / OVERHAUL"): footer
+ *  link routing to the debrief window. Renders only when the
+ *  transcript carries more lines than the live view shows AND a
+ *  click handler is wired. When either condition is false the link
+ *  doesn't render — keeps the surface quiet on a fresh session. */
+function buildSeeAllLink(
+  totalReactions: number,
+  onOpen: (() => void) | undefined,
+): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "vmx-cohost__see-all";
+  wrap.dataset.role = "see-all";
+  const hiddenCount = Math.max(0, totalReactions - MAX_LIVE_TRANSCRIPT_LINES);
+  if (!onOpen || hiddenCount === 0) {
+    wrap.dataset.empty = "true";
+    return wrap;
+  }
+  const link = document.createElement("button");
+  link.type = "button";
+  link.className = "vmx-cohost__see-all-link";
+  link.textContent = `see all ${totalReactions} reactions ↗`;
+  link.setAttribute(
+    "title",
+    `open the debrief window to scroll through every reaction this session (${totalReactions} total)`,
+  );
+  link.setAttribute(
+    "aria-label",
+    `open debrief: see all ${totalReactions} reactions`,
+  );
+  link.addEventListener("click", (e) => {
+    e.preventDefault();
+    onOpen();
+  });
+  wrap.append(link);
+  return wrap;
 }
 
 function buildTopStrip(): HTMLElement {
@@ -565,9 +661,11 @@ function populateTranscript(
   reactions: ReactionsByTs,
   onChipClick: ((chip: CitationChip) => void) | undefined,
 ): void {
-  // Cap to last MAX_TRANSCRIPT_LINES. Tier: last line `.now`, next FADED_WINDOW
-  // are `.faded`, everything older is `.old`.
-  const capped = lines.slice(-MAX_TRANSCRIPT_LINES);
+  // Cap to last MAX_LIVE_TRANSCRIPT_LINES. Tier: last line `.now`, next
+  // FADED_WINDOW are `.faded`. Round 4 critique: the live view is a
+  // glance surface, not a scroll. Older history is reachable via the
+  // "see all <N> reactions ↗" footer link routed to the debrief.
+  const capped = lines.slice(-MAX_LIVE_TRANSCRIPT_LINES);
   const total = capped.length;
   capped.forEach((line, idx) => {
     const msg = document.createElement("div");
@@ -756,5 +854,18 @@ export function setCohost(el: HTMLElement, props: CohostPanelProps): void {
     );
     if (sticky) tr.scrollTop = tr.scrollHeight;
     else tr.scrollTop = prevScrollTop;
+  }
+
+  // 2026-05-19 critique round 4 (Kaan): "see all <N>" footer link
+  // diff-render. Replaces in-place so the count keeps step with the
+  // transcript ring. Reuses buildSeeAllLink so the empty-state +
+  // click-wire logic doesn't duplicate.
+  const existingSeeAll = el.querySelector<HTMLElement>(".vmx-cohost__see-all");
+  if (existingSeeAll) {
+    const fresh = buildSeeAllLink(
+      props.transcript.length,
+      props.onOpenAllReactions,
+    );
+    existingSeeAll.replaceWith(fresh);
   }
 }

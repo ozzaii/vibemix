@@ -210,7 +210,13 @@ describe("renderEventRibbon", () => {
 // === Cohost transcript =======================================================
 
 describe("renderCohostPanel", () => {
-  it("renders all lines up to 200; last has .now tier, lines 2-6 from end faded", () => {
+  it("caps live transcript to MAX_LIVE_TRANSCRIPT_LINES (3); last has .now tier, prior 2 are .faded", () => {
+    // 2026-05-19 /impeccable critique round 4 (Kaan: "OVERHAUL"): live
+    // transcript is now a glance surface, capped at 3 lines. Full
+    // 200-line history lives in the debrief window only — the cohost
+    // panel renders the latest reaction + 2 faded peers + a "see all"
+    // footer link. State ring still holds every line so the debrief
+    // receives everything.
     const lines: TranscriptLine[] = Array.from({ length: 200 }, (_, i) => ({
       role: "ai",
       text: `line-${i}`,
@@ -224,19 +230,15 @@ describe("renderCohostPanel", () => {
     });
     host().append(panel);
     const msgs = panel.querySelectorAll<HTMLElement>(".vmx-cohost__msg");
-    expect(msgs).toHaveLength(200);
-    // Last line = .now
+    expect(msgs).toHaveLength(3);
     const last = msgs[msgs.length - 1];
     expect(last?.dataset.tier).toBe("now");
-    // Lines at index 199-5 .. 199-1 (i.e. positions 194-198) should be `.faded`
-    for (let i = msgs.length - 6; i <= msgs.length - 2; i++) {
-      expect(msgs[i]?.dataset.tier).toBe("faded");
-    }
-    // Anything older than 5 from the end is `.old`
-    expect(msgs[100]?.dataset.tier).toBe("old");
+    expect(msgs[0]?.dataset.tier).toBe("faded");
+    expect(msgs[1]?.dataset.tier).toBe("faded");
+    expect(last?.textContent).toContain("line-199");
   });
 
-  it("caps transcript to MAX_TRANSCRIPT_LINES (200) when more provided", () => {
+  it("caps live transcript to 3 lines regardless of input length", () => {
     const lines: TranscriptLine[] = Array.from({ length: 250 }, (_, i) => ({
       role: "ai",
       text: `line-${i}`,
@@ -251,7 +253,53 @@ describe("renderCohostPanel", () => {
     host().append(panel);
     expect(
       panel.querySelectorAll<HTMLElement>(".vmx-cohost__msg").length,
-    ).toBe(200);
+    ).toBe(3);
+  });
+
+  it("renders the see-all footer link when transcript exceeds the cap + handler is wired", () => {
+    const lines: TranscriptLine[] = Array.from({ length: 12 }, (_, i) => ({
+      role: "ai",
+      text: `line-${i}`,
+      ts: "00:00:00",
+    }));
+    let opened = 0;
+    const panel = renderCohostPanel({
+      status: "LISTENING",
+      transcript: lines,
+      latencyMs: null,
+      grounded: true,
+      onOpenAllReactions: () => {
+        opened++;
+      },
+    });
+    host().append(panel);
+    const seeAll = panel.querySelector<HTMLElement>(".vmx-cohost__see-all");
+    expect(seeAll).toBeTruthy();
+    expect(seeAll?.dataset.empty).toBeUndefined();
+    const link = panel.querySelector<HTMLButtonElement>(
+      ".vmx-cohost__see-all-link",
+    );
+    expect(link?.textContent).toContain("12 reactions");
+    link?.click();
+    expect(opened).toBe(1);
+  });
+
+  it("see-all footer is hidden when transcript fits inside the live cap", () => {
+    const lines: TranscriptLine[] = Array.from({ length: 2 }, (_, i) => ({
+      role: "ai",
+      text: `line-${i}`,
+      ts: "",
+    }));
+    const panel = renderCohostPanel({
+      status: "LISTENING",
+      transcript: lines,
+      latencyMs: null,
+      grounded: true,
+      onOpenAllReactions: () => {},
+    });
+    host().append(panel);
+    const seeAll = panel.querySelector<HTMLElement>(".vmx-cohost__see-all");
+    expect(seeAll?.dataset.empty).toBe("true");
   });
 
   // Critique 2026-05-14: the foot now renders LED + label only — the

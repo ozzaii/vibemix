@@ -87,6 +87,11 @@ export interface SessionState {
      *  through to the cohost panel verbatim; the render-loop projection
      *  builds the actual debrief-deep-link invoke. */
     onChipClick?: (chip: CitationChip) => void;
+    /** 2026-05-19 /impeccable critique round 4 (Kaan) — "see all <N>
+     *  reactions ↗" footer link routes here. The render-loop projection
+     *  wires this to invoke("open_debrief_window") so the full
+     *  transcript lives only in the debrief context. */
+    onOpenAllReactions?: () => void;
   };
   status: {
     livekit: BadgeState;
@@ -345,6 +350,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
     muted: state.status.muted,
     failureElapsedMs: null,
     onRetry: state.cohost.onRetry,
+    onOpenAllReactions: state.cohost.onOpenAllReactions,
   });
   rightCol.append(cohost);
   grid.append(rightCol);
@@ -423,6 +429,38 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
  *  has scrolled up; preserve position. Plan §1 — 40px. */
 const SCROLL_THRESHOLD_PX = 40;
 
+/** Voice profile abstraction (2026-05-19 critique round 4).
+ *  The persona panel surfaces 3 profiles (CALM / WARM / GRUFF) while
+ *  the IPC payload + state.persona.voice still carries the Gemini
+ *  codename. This mapping is the only place the abstraction lives;
+ *  the settings drawer Power panel can override to a specific
+ *  codename if a power user wants the underlying name.
+ *
+ *  Default codename per profile (tuned for the AI co-host voice
+ *  feel, not for technical fidelity):
+ *    CALM  → kore   (calm + warm character)
+ *    WARM  → aoede  (smooth + melodic character)
+ *    GRUFF → fenrir (rough + edged character) */
+const VOICE_PROFILE_TO_CODE: Readonly<Record<string, string>> = {
+  CALM: "kore",
+  WARM: "aoede",
+  GRUFF: "fenrir",
+};
+const VOICE_CODE_TO_PROFILE: Readonly<Record<string, string>> = {
+  // Each codename rolls up into the closest profile so a Power-user
+  // who picks "puck" in the drawer still sees the live picker land
+  // on its nearest profile rather than failing to render.
+  kore: "CALM", leda: "CALM", orus: "CALM", zephyr: "CALM",
+  aoede: "WARM", puck: "WARM",
+  fenrir: "GRUFF", charon: "GRUFF",
+};
+function voiceCodeToProfile(code: string): string {
+  return VOICE_CODE_TO_PROFILE[code] ?? "CALM";
+}
+export function voiceProfileToCode(profile: string): string {
+  return VOICE_PROFILE_TO_CODE[profile] ?? "kore";
+}
+
 /** Map the active mood to a 1-line DJ-vocabulary caption.
  *  Round 3 critique lift (H6): users shouldn't have to remember what
  *  HYPE / TEACH / COACH each do. The caption renders under the rocker
@@ -494,22 +532,19 @@ function buildPersonaPanelBody(state: SessionState): HTMLElement {
   wrap.append(
     renderPicker({
       label: "VOICE",
-      value: state.persona.voice,
+      value: voiceCodeToProfile(state.persona.voice),
       avatar: true,
       autoPill: true,
-      // 2026-05-19 /impeccable critique fix: Gemini voice codenames
-      // have zero priors for a DJ. Added one-word character descriptors
-      // via the PickerOption.sub field so the user can pick by feel
-      // rather than by random sample.
+      // 2026-05-19 /impeccable critique round 4 (Kaan: "SEXIFY"):
+      // collapsed 8 mythological Gemini codenames into 3 named
+      // profiles. The IPC payload still carries the underlying
+      // codename (kore / aoede / fenrir) — only the user-facing
+      // surface uses the profile abstraction. Codename → profile
+      // mapping in voiceCodeToProfile + voiceProfileToCode below.
       options: [
-        { id: "kore", label: "kore", sub: "calm, warm" },
-        { id: "puck", label: "puck", sub: "bright, playful" },
-        { id: "charon", label: "charon", sub: "deep, grounded" },
-        { id: "fenrir", label: "fenrir", sub: "rough, edged" },
-        { id: "aoede", label: "aoede", sub: "smooth, melodic" },
-        { id: "leda", label: "leda", sub: "clear, neutral" },
-        { id: "orus", label: "orus", sub: "steady, dry" },
-        { id: "zephyr", label: "zephyr", sub: "soft, airy" },
+        { id: "CALM",  label: "CALM",  sub: "calm, watchful" },
+        { id: "WARM",  label: "WARM",  sub: "warm, never sleepy" },
+        { id: "GRUFF", label: "GRUFF", sub: "rough, cutting" },
       ],
     }),
   );
