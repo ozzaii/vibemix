@@ -14,7 +14,7 @@
     "build:mascot": "node scripts/build-mascot-bundle.mjs"
   },
   "dependencies": {
-    "three": "^0.170.0"
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@gltf-transform/cli": "^4.0.0",
