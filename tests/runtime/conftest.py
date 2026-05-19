@@ -93,8 +93,9 @@ def fake_event(music_state):
 
 
 # ---------------------------------------------------------------------------
-# Plan 19-05 — fixtures for ack_bank / cancel_gate / ttft_meter / playback
-# wiring tests in test_coach_ack_wiring.py + test_coach_cancel_wiring.py.
+# Latency-stack fixtures (cancel_gate / ttft_meter / playback). The
+# ack_bank fixture was retired alongside the placeholder OPUS clip
+# system — see test_coach_cancel_wiring.py for the surviving wired path.
 # ---------------------------------------------------------------------------
 
 
@@ -104,20 +105,6 @@ def fake_playback():
     p = MagicMock()
     p.push = MagicMock()
     return p
-
-
-@pytest.fixture
-def fake_ack_bank():
-    """AckBank stub — should_fire returns (False, 'ttft_ok') by default;
-    pick_for_event returns a deterministic placeholder ndarray."""
-    import numpy as np
-
-    bank = MagicMock()
-    bank.should_fire = MagicMock(return_value=(False, "ttft_ok"))
-    bank.pick_for_event = MagicMock(
-        return_value=("drop_hit", np.zeros(2400, dtype=np.int16), 0)
-    )
-    return bank
 
 
 @pytest.fixture
@@ -133,7 +120,7 @@ def fake_cancel_gate():
 @pytest.fixture
 def fake_ttft_meter():
     """TTFTMeter stub — rolling_avg_ms returns the sentinel 1500.0 by default
-    so the should_fire TTFT gate passes (>800ms)."""
+    so any UI-side TTFT display has a deterministic value."""
     meter = MagicMock()
     meter.rolling_avg_ms = MagicMock(return_value=1500.0)
     return meter

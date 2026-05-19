@@ -102,28 +102,32 @@ def test_wire07_dj_cohost_agent_receives_stripped_rate_tracker_kwarg(
     )
 
 
-def test_wire08_dj_cohost_agent_receives_ack_bank_kwarg(main_src: str) -> None:
-    """W08: DJCoHostAgent(...) call contains ack_bank=ack_bank kwarg. The
-    AckBank instance is already constructed at line ~444 for the coach_loop
-    wiring; Plan 20-05 threads the SAME instance into the agent's
-    citation-strip path."""
-    # The agent kwarg must appear distinct from coach_loop's ack_bank=ack_bank
-    # call site — check for "ack_bank=ack_bank" appearing at least twice.
-    assert main_src.count("ack_bank=ack_bank") >= 2, (
-        "ack_bank=ack_bank must appear in BOTH DJCoHostAgent(...) AND coach_loop(...)"
+def test_wire08_ack_bank_retired_from_main(main_src: str) -> None:
+    """W08: The placeholder ack-bank surface (pre-recorded "yeah/oh/nice"
+    OPUS clips) was retired alongside the cohost_v3/v4 POC reference. No
+    AckBank construction, import, or kwarg threading must remain in
+    main()."""
+    assert "AckBank" not in main_src, (
+        "AckBank reference leaked back into __main__.py — the placeholder "
+        "ack-bank surface is retired (English clips fought the Turkish "
+        "persona + anti-slop thesis)"
+    )
+    assert "ack_bank=" not in main_src, (
+        "ack_bank=... kwarg leaked back into __main__.py wiring"
     )
 
 
 def test_wire09_dj_cohost_agent_receives_playback_kwarg(main_src: str) -> None:
     """W09: DJCoHostAgent(...) call contains playback=playback kwarg.
 
-    `playback=playback` already appears twice in the file (BufferRegistry
-    constructor at line ~353 + coach_loop call at line ~508). Plan 20-05
-    adds a third occurrence on the DJCoHostAgent constructor.
+    `playback=playback` appears twice in the file (BufferRegistry
+    constructor + DJCoHostAgent constructor). Pre-ack-bank-retirement
+    coach_loop also got the same instance; coach_loop no longer needs
+    it, so two occurrences is the new minimum.
     """
-    assert main_src.count("playback=playback") >= 3, (
+    assert main_src.count("playback=playback") >= 2, (
         "playback=playback must appear in DJCoHostAgent(...) "
-        "in ADDITION to BufferRegistry(...) and coach_loop(...)"
+        "in ADDITION to BufferRegistry(...)"
     )
 
 

@@ -1,18 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
-"""DJCoHostAgent.llm_node — Plan 20-01 Task 2 wiring.
+"""DJCoHostAgent.llm_node — Plan 20-01 Task 2 wiring (post-ack-bank).
 
-Pins the 4-kwarg wiring (citation_linter, stripped_rate_tracker, ack_bank,
+Pins the 3-kwarg wiring (citation_linter, stripped_rate_tracker,
 playback) for the post-stream citation gate. Contract:
 
-- All four None (default) → legacy Phase 18/19 path is byte-identical
-  (no linter check, no [unverified] log, no ack fallback).
-- All four non-None ("wired" mode) → post-stream gate runs after silence/
+- All three None (default) → legacy Phase 18/19 path is byte-identical
+  (no linter check, no [unverified] log).
+- All three non-None ("wired" mode) → post-stream gate runs after silence/
   slop suppression. Decision ladder: valid → emit + record(False); invalid
   + bypass → emit + record(False) + citation_bypass log; invalid + strip →
-  no emit + ack-bank PCM push + citation_strip log + record(True).
+  no emit + citation_strip log + record(True). Silence is the strip
+  substitute — the pre-recorded ack-bank surface was retired.
 - History append on bypass (text was emitted, no-repeat history must
   reflect it) but NOT on strip (no text emitted = nothing to repeat).
-- Unknown event class on strip path → ack_bucket=None, no ack played.
 """
 
 from __future__ import annotations
@@ -84,7 +84,12 @@ def _build_agent_legacy(mocker, tmp_path: Path):
 
 
 def _build_agent_wired(mocker, tmp_path: Path, registry: EvidenceRegistry):
-    """Phase 20 wired construction: all 4 new kwargs supplied + registry."""
+    """Phase 20 wired construction: linter kwargs supplied + registry.
+
+    (The ack_bank slot was retired with the placeholder OPUS clips —
+    citation strips now go silent rather than substituting a
+    pre-recorded ack.)
+    """
     mocker.patch.object(Agent, "__init__", return_value=None)
     state = _build_state()
     recorder = _FakeRecorder(tmp_path)
@@ -92,10 +97,6 @@ def _build_agent_wired(mocker, tmp_path: Path, registry: EvidenceRegistry):
 
     linter = CitationLinter()
     tracker = StrippedRateTracker()
-    ack_bank = mocker.MagicMock()
-    # Default pick_for_event return — overridden per-test as needed.
-    fake_pcm = np.zeros(1024, dtype=np.int16)
-    ack_bank.pick_for_event.return_value = ("generic_filler", fake_pcm, 3)
     playback = mocker.MagicMock()
 
     agent = DJCoHostAgent(
@@ -109,10 +110,9 @@ def _build_agent_wired(mocker, tmp_path: Path, registry: EvidenceRegistry):
         evidence_registry=registry,
         citation_linter=linter,
         stripped_rate_tracker=tracker,
-        ack_bank=ack_bank,
         playback=playback,
     )
-    return agent, genai_client, recorder, state, linter, tracker, ack_bank, playback
+    return agent, genai_client, recorder, state, linter, tracker, playback
 
 
 def _drive(agent: DJCoHostAgent) -> list[str]:
@@ -169,7 +169,7 @@ def test_valid_response_passes_through_when_wired(mocker, tmp_path) -> None:
     ai_text logged. No strip, no bypass, no ack."""
     registry = EvidenceRegistry()
     registry.write("ev", "KICK_SWAP", 45.2)
-    agent, gen, recorder, state, _, tracker, ack_bank, playback = _build_agent_wired(
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -189,21 +189,26 @@ def test_valid_response_passes_through_when_wired(mocker, tmp_path) -> None:
     assert "citation_bypass" not in kinds
     # Tracker was told the response was NOT stripped.
     assert tracker.rate() == 0.0
-    # Ack bank never consulted on valid path.
-    ack_bank.pick_for_event.assert_not_called()
+    # Valid path does not push any audio to the playback queue.
     playback.push.assert_not_called()
 
 
 # --------------------------------------------------------------------------
-# (c) Invalid response strips and fires ack
+# (c) Invalid response strips silently (ack-bank substitution retired)
 # --------------------------------------------------------------------------
 
 
-def test_invalid_response_strips_and_fires_ack(mocker, tmp_path) -> None:
-    """Wired + invalid citation → no chunks yielded + ack_bank.pick_for_event
-    called + playback.push called + citation_strip logged."""
+def test_invalid_response_strips_silently(mocker, tmp_path) -> None:
+    """Wired + invalid citation → no chunks yielded, no audio substitute,
+    citation_strip logged.
+
+    Pre-2026-05-19 the strip path injected a pre-recorded ack clip from
+    AckBank. That surface was retired with the placeholder OPUS clip
+    system; silence is the cleanest substitute and matches the persona's
+    "if you have NOTHING grounded to say, say NOTHING" rule.
+    """
     registry = EvidenceRegistry()  # empty — citation will not match
-    agent, gen, recorder, state, _, tracker, ack_bank, playback = _build_agent_wired(
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -218,12 +223,8 @@ def test_invalid_response_strips_and_fires_ack(mocker, tmp_path) -> None:
 
     # No chunks yielded — strip path.
     assert chunks == []
-    # Ack-bank fired with the pending event.
-    ack_bank.pick_for_event.assert_called_once_with(ev)
-    # Playback got the ack PCM bytes.
-    playback.push.assert_called_once()
-    push_arg = playback.push.call_args.args[0]
-    assert isinstance(push_arg, bytes)
+    # No audio substitute pushed (silence is the strip substitute).
+    playback.push.assert_not_called()
     # citation_strip logged.
     kinds = [k for k, _ in recorder.events]
     assert "citation_strip" in kinds
@@ -249,7 +250,7 @@ def test_invalid_response_strips_and_fires_ack(mocker, tmp_path) -> None:
 def test_no_citations_response_strips(mocker, tmp_path) -> None:
     """Wired + uncited reply → strip (no_citations reason)."""
     registry = EvidenceRegistry()
-    agent, gen, recorder, state, _, tracker, ack_bank, playback = _build_agent_wired(
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -267,8 +268,8 @@ def test_no_citations_response_strips(mocker, tmp_path) -> None:
     assert "citation_strip" in kinds
     strip_log = next(f for k, f in recorder.events if k == "citation_strip")
     assert strip_log["reason"] == "no_citations"
-    ack_bank.pick_for_event.assert_called_once_with(ev)
-    playback.push.assert_called_once()
+    # No ack substitute fires on the strip path post-retirement.
+    playback.push.assert_not_called()
     assert tracker.rate() == 1.0
 
 
@@ -281,7 +282,7 @@ def test_bypass_emits_with_unverified_marker(mocker, tmp_path, capsys) -> None:
     """Force tracker.should_bypass()→True; invalid response → chunks YIELDED,
     citation_bypass logged, stdout contains '[ai_text:unverified]'."""
     registry = EvidenceRegistry()
-    agent, gen, recorder, state, _, tracker, ack_bank, playback = _build_agent_wired(
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -311,8 +312,7 @@ def test_bypass_emits_with_unverified_marker(mocker, tmp_path, capsys) -> None:
     assert bypass_log["response_id"].startswith("0001_")
     assert "unverified" in bypass_log["raw_text"]
     assert bypass_log["reason"] == "invalid_atoms"
-    # Ack NOT fired on bypass — we emitted text instead.
-    ack_bank.pick_for_event.assert_not_called()
+    # No audio pushed on bypass — we emitted text instead.
     playback.push.assert_not_called()
     # Stdout marker.
     captured = capsys.readouterr().out
@@ -320,15 +320,16 @@ def test_bypass_emits_with_unverified_marker(mocker, tmp_path, capsys) -> None:
 
 
 # --------------------------------------------------------------------------
-# (f) Strip path with unknown event class → ack_bucket=None
+# (f) Strip path with unknown event class — strips silently regardless
 # --------------------------------------------------------------------------
 
 
 def test_strip_path_with_unknown_event_class(mocker, tmp_path) -> None:
-    """ev.type='WEIRD' not in BUCKET_FOR_EVENT → strip still happens but no
-    ack played and citation_strip log records ack_bucket=None."""
+    """Unknown ev.type still goes through the strip path; with ack-bank
+    retired, the event-class bucket mapping no longer matters — every
+    strip is silent, regardless of event type."""
     registry = EvidenceRegistry()
-    agent, gen, recorder, state, _, tracker, ack_bank, playback = _build_agent_wired(
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -337,20 +338,18 @@ def test_strip_path_with_unknown_event_class(mocker, tmp_path) -> None:
         return_value=_async_iter(["[ev:GHOST@1.0] junk"])
     )
 
-    # Construct event with an event type not in BUCKET_FOR_EVENT.
     ev = Event(type="WEIRD", state=state, extra={})
     agent.set_next_event(ev)
     chunks = _drive(agent)
 
     assert chunks == []  # strip
-    # ack_bank NOT called (event type unknown to bucket map).
-    ack_bank.pick_for_event.assert_not_called()
+    # No audio substitute, no matter the event class.
     playback.push.assert_not_called()
-    # citation_strip logged with ack_bucket=None.
     kinds = [k for k, _ in recorder.events]
     assert "citation_strip" in kinds
     strip_log = next(f for k, f in recorder.events if k == "citation_strip")
-    assert strip_log["ack_bucket"] is None
+    # The strip log no longer carries the legacy ack_bucket field.
+    assert "ack_bucket" not in strip_log
     # Tracker still recorded the strip.
     assert tracker.rate() == 1.0
 
@@ -364,7 +363,7 @@ def test_history_appended_on_bypass_not_on_strip(mocker, tmp_path) -> None:
     """_ai_text_history grows on bypass (text was emitted) but NOT on strip
     (no text emitted = nothing to repeat)."""
     registry = EvidenceRegistry()
-    agent, gen, recorder, state, _, tracker, ack_bank, playback = _build_agent_wired(
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")

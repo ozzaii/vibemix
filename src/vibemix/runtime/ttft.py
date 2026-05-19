@@ -2,20 +2,18 @@
 """TTFTMeter — Plan 19-05 Task 1.
 
 Rolling-average meter for Gemini Time-To-First-Token (TTFT) measurements.
-The coach loop reads ``rolling_avg_ms()`` and feeds it to
-``AckBank.should_fire(rolling_ttft_avg_ms=...)`` so an ack only fires when
-Gemini is slow enough that the user perceives a gap (LATENCY-04 gate at
-800ms).
+The coach loop reads ``rolling_avg_ms()`` for diagnostics and the
+mascot-mood polling surface. Originally fed the ack-bank
+``should_fire(rolling_ttft_avg_ms=...)`` LATENCY-04 gate; ack-bank has
+since been retired (pre-recorded English filler clips fought the
+anti-slop thesis) so the meter is now read-only telemetry.
 
 Design choices:
 
   * **Default sentinel = 1500.0 ms.** When the meter has never seen a
-    sample (cold session), ``rolling_avg_ms()`` returns 1500.0 — strictly
-    greater than ``ACK_TTFT_GATE_MS`` (800.0). This means the FIRST event
-    after warmup CAN fire an ack while Gemini is still cold and the user
-    is waiting on the first response. Without the sentinel, the bank
-    would be silent on the very first event because there's no prior
-    measurement to gate against.
+    sample (cold session), ``rolling_avg_ms()`` returns 1500.0 — a
+    deliberate "treat the cold session as slow" sentinel so any UI
+    surface that displays the average doesn't show a misleading 0ms.
   * **Window = 8 samples.** Bounded deque so memory is constant and stale
     samples (e.g. from a network hiccup 30 seconds ago) eventually fall
     out of the average.

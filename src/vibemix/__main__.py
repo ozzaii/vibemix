@@ -64,7 +64,6 @@ from vibemix.agent import (
     get_or_create_install_uuid,
     get_or_refresh_jwt,
 )
-from vibemix.agent.ack_bank import AckBank
 from vibemix.agent.cache import GeminiContextCache
 from vibemix.coach import (
     STRIPPED_RATE_THRESHOLD,
@@ -617,15 +616,13 @@ async def main() -> None:
         tts_inst = build_tts_chain(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
         print(f"-> tts:   {OPENROUTER_TTS_MODEL} via proxy (voice={VOICE})")
 
-    # ---- Plan 19-05 — Phase 19 latency-stack wiring ----
-    # Construct the four primitives BEFORE the agent so we can pass
-    # cache + ttft_meter into DJCoHostAgent and ack_bank + cancel_gate
-    # + ttft_meter + playback into coach_loop.
+    # ---- Phase 19 latency-stack wiring (ack_bank retired) ----
+    # Pre-recorded ack/filler clips ("yeah/oh/nice") were removed —
+    # they injected English placeholders into Turkish sessions and the
+    # whole "premade reactions" surface fights the anti-slop thesis.
+    # Reactions now come only from Gemini; silence is the substitute on
+    # citation-stripped responses.
     ttft_meter = TTFTMeter()
-    # suppress_fire=True until Turkish ack clips ship — English placeholders
-    # would inject "yeah/nice/oh" before a Turkish reaction. Flip to False
-    # once src/vibemix/audio/ack_bank/*/ has TR-recorded OPUS files.
-    ack_bank = AckBank(suppress_fire=True)
     cancel_gate = CancelGate()
     # Plan 32-02 / PROFILE-03 — load long-term DJ profile into the cache body.
     # P60: profile lives in the CACHE, never in the per-turn prompt. If the
@@ -750,7 +747,6 @@ async def main() -> None:
         evidence_registry=evidence_registry,
         citation_linter=citation_linter,
         stripped_rate_tracker=stripped_rate_tracker,
-        ack_bank=ack_bank,
         playback=playback,
         # Plan 32-03 / PROFILE-04 — same dict already injected into the cache
         # body via render_profile_for_cache above. Stored on the agent for
@@ -867,7 +863,6 @@ async def main() -> None:
             manual_trigger,
             trigger_state,
             stop_event,
-            ack_bank=ack_bank,
             cancel_gate=cancel_gate,
             ttft_meter=ttft_meter,
             playback=playback,

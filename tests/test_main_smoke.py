@@ -755,13 +755,20 @@ def test_main_genre_unknown_sys_exits(monkeypatch):
 # smoke harness is broken.
 
 
-def test_smoke_07_main_imports_cache_and_ack_primitives() -> None:
-    """SMOKE-07: __main__.py imports the four Plan 19-05 wiring symbols
-    (GeminiContextCache + AckBank + CancelGate + TTFTMeter)."""
+def test_smoke_07_main_imports_cache_and_latency_primitives() -> None:
+    """SMOKE-07: __main__.py imports the post-ack-bank wiring symbols
+    (GeminiContextCache + CancelGate + TTFTMeter).
+
+    The AckBank surface was retired with the placeholder OPUS clips, so
+    this test now asserts it is NOT importable from __main__.
+    """
     from vibemix import __main__ as main_mod
 
     assert hasattr(main_mod, "GeminiContextCache"), "missing GeminiContextCache import"
-    assert hasattr(main_mod, "AckBank"), "missing AckBank import"
+    assert not hasattr(main_mod, "AckBank"), (
+        "AckBank import leaked back into __main__.py — the placeholder "
+        "ack-bank surface is retired"
+    )
     assert hasattr(main_mod, "CancelGate"), "missing CancelGate import"
     assert hasattr(main_mod, "TTFTMeter"), "missing TTFTMeter import"
     assert hasattr(main_mod, "SYSTEM_INSTRUCTION"), "missing SYSTEM_INSTRUCTION import"
@@ -806,11 +813,17 @@ def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> 
     # Agent gets cache + ttft_meter kwargs
     assert "cache=cache" in src, "DJCoHostAgent must receive cache=cache kwarg"
     assert "ttft_meter=ttft_meter" in src, "DJCoHostAgent must receive ttft_meter=ttft_meter kwarg"
-    # coach_loop gets ack_bank + cancel_gate + ttft_meter + playback
-    assert "ack_bank=ack_bank" in src, "coach_loop must receive ack_bank kwarg"
+    # coach_loop gets cancel_gate + ttft_meter + playback (no ack_bank
+    # since the placeholder surface is retired).
+    assert "ack_bank=" not in src, (
+        "ack_bank= kwarg leaked back into __main__.py wiring"
+    )
     assert "cancel_gate=cancel_gate" in src, "coach_loop must receive cancel_gate kwarg"
     assert "playback=playback" in src, "coach_loop must receive playback kwarg"
-    # Construction order — TTFTMeter + AckBank + CancelGate before agent
+    # Construction order — TTFTMeter + CancelGate before agent. AckBank
+    # is explicitly NOT instantiated anymore.
     assert "TTFTMeter()" in src, "TTFTMeter not instantiated"
-    assert "AckBank(suppress_fire=" in src, "AckBank not instantiated"
+    assert "AckBank(" not in src, (
+        "AckBank constructor leaked back into __main__.py"
+    )
     assert "CancelGate()" in src, "CancelGate not instantiated"

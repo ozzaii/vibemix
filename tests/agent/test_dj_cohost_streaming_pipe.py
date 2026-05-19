@@ -109,9 +109,6 @@ def _build_agent_wired(mocker, tmp_path: Path, registry: EvidenceRegistry):
 
     linter = CitationLinter()
     tracker = StrippedRateTracker()
-    ack_bank = mocker.MagicMock()
-    fake_pcm = np.zeros(1024, dtype=np.int16)
-    ack_bank.pick_for_event.return_value = ("generic_filler", fake_pcm, 3)
     playback = mocker.MagicMock()
 
     agent = DJCoHostAgent(
@@ -125,10 +122,9 @@ def _build_agent_wired(mocker, tmp_path: Path, registry: EvidenceRegistry):
         evidence_registry=registry,
         citation_linter=linter,
         stripped_rate_tracker=tracker,
-        ack_bank=ack_bank,
         playback=playback,
     )
-    return agent, genai_client, recorder, state, tracker, ack_bank, playback
+    return agent, genai_client, recorder, state, tracker, playback
 
 
 def _drive(agent: DJCoHostAgent) -> list[str]:
@@ -239,7 +235,7 @@ def test_citation_failure_after_head_emits_cancel(mocker, tmp_path) -> None:
     linter → PlaybackQueue.push called with silence-pad PCM + a
     ``streaming_cancel`` event with reason ``citation_failure``."""
     registry = EvidenceRegistry()  # empty — every citation will miss
-    agent, gen, recorder, state, _, _, playback = _build_agent_wired(
+    agent, gen, recorder, state, _, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -277,7 +273,7 @@ def test_citation_failure_no_head_emitted_full_suppress(mocker, tmp_path) -> Non
     emitted; full text fails citation linter → standard strip path; no
     silence-pad needed (nothing to cancel)."""
     registry = EvidenceRegistry()
-    agent, gen, recorder, state, _, _, playback = _build_agent_wired(
+    agent, gen, recorder, state, _, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -304,7 +300,7 @@ def test_citation_pass_no_head_yields_after_stream(mocker, tmp_path) -> None:
     stream completes via the legacy emit branch (head never fired)."""
     registry = EvidenceRegistry()
     registry.write("ev", "KICK_SWAP", 45.2)
-    agent, gen, recorder, state, _, _, playback = _build_agent_wired(
+    agent, gen, recorder, state, _, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")

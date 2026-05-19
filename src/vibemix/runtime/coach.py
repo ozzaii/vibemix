@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""coach_loop — verbatim port of cohost_v4.py:1754-1852, with Plan 19-05
-runtime wiring for AckBank + CancelGate + TTFTMeter + PlaybackQueue, plus
-Plan 20-04 periodic ipc.session.citation publish to the Tauri Settings →
+"""coach_loop — verbatim port of cohost_v4.py:1754-1852, with the
+post-ack_bank latency-stack wiring (CancelGate + TTFTMeter + PlaybackQueue)
+and Plan 20-04 periodic ipc.session.citation publish to the Tauri Settings →
 Diagnostics surface (GROUND-06 anti-slop telemetry channel).
 
 Polls MusicState for events at 10Hz, fires AI reactions via
@@ -19,23 +19,24 @@ write is REQUIRED — Phase 3 invariant says ``state_refresh_loop`` is the
 only writer to MusicState; this one mic-detection write is the sole
 locked exception (v4:1800-1801).
 
-Plan 19-05 wiring (additive — backward compatible):
-- ``ack_bank``, ``cancel_gate``, ``ttft_meter``, ``playback`` are NEW kwargs
-  with default None. When ALL non-None, the wired path runs:
-    1. cancel-and-refire: if a stale in-flight handle exists in
-       ``trigger_state``, query CancelGate.try_cancel(handle, incoming,
-       in_flight). On True: ``await agent.invalidate_cache()`` so the refire
-       starts with a fresh cached prefix.
-    2. ack pre-fire: ``ack_bank.should_fire(rolling_ttft_avg_ms,
-       last_ack_at, last_response_at, cancel_cooldown_active)``. On True:
-       ``ack_bank.pick_for_event(ev) → playback.push(pcm.tobytes())`` and
-       ``recorder.log_event("ack_fire", bucket=, sample_index=, reason=)``.
-    3. ``session.generate_reply(allow_interruptions=True)`` — flips True so
-       the SpeechHandle.interrupt(force=True) chokepoint inside CancelGate
-       can actually preempt the playout.
-- When ANY of the four kwargs is None, the legacy path runs verbatim with
+Wiring (additive — backward compatible):
+- ``cancel_gate``, ``ttft_meter``, ``playback`` are NEW kwargs with
+  default None. When ALL non-None, the wired path runs cancel-and-refire:
+  if a stale in-flight handle exists in ``trigger_state``, query
+  CancelGate.try_cancel(handle, incoming, in_flight). On True:
+  ``await agent.invalidate_cache()`` so the refire starts with a fresh
+  cached prefix; then
+  ``session.generate_reply(allow_interruptions=True)`` — flips True so
+  the SpeechHandle.interrupt(force=True) chokepoint inside CancelGate
+  can actually preempt the playout.
+- When ANY kwarg is None, the legacy path runs verbatim with
   ``allow_interruptions=False`` to preserve the byte-identical Phase 4
   contract for existing callers / tests.
+
+(The ack-bank pre-fire branch was retired with the placeholder OPUS
+clips — pre-recorded "yeah/oh/nice" reactions injected English
+placeholders into Turkish sessions and fought the anti-slop thesis.
+Latency is now mitigated by the cache + ModelRouter alone.)
 
 Plan 20-04 wiring (additive — backward compatible):
 - ``ipc_bus`` + ``citation_telemetry`` are NEW kwargs with default None.
@@ -60,7 +61,6 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from vibemix.audio import AI_TALK_THRESHOLD, MIC_TALK_THRESHOLD, Levels, VoiceRecorder
-from vibemix.runtime.cancel import CANCEL_COOLDOWN_S
 from vibemix.state import EventDetector, MusicState
 from vibemix.ui_bus import SessionCitation
 
@@ -68,7 +68,6 @@ if TYPE_CHECKING:
     from livekit.agents import AgentSession
 
     from vibemix.agent import DJCoHostAgent
-    from vibemix.agent.ack_bank import AckBank
     from vibemix.audio import PlaybackQueue
     from vibemix.runtime.cancel import CancelGate
     from vibemix.runtime.ttft import TTFTMeter
@@ -91,7 +90,6 @@ async def coach_loop(
     trigger_state: dict,
     stop_event: asyncio.Event,
     *,
-    ack_bank: AckBank | None = None,
     cancel_gate: CancelGate | None = None,
     ttft_meter: TTFTMeter | None = None,
     playback: PlaybackQueue | None = None,
@@ -114,8 +112,7 @@ async def coach_loop(
     mic_silence_since = 0.0
 
     wired = (
-        ack_bank is not None
-        and cancel_gate is not None
+        cancel_gate is not None
         and ttft_meter is not None
         and playback is not None
     )
@@ -213,7 +210,7 @@ async def coach_loop(
             )
 
             if wired:
-                # ---- Plan 19-05 — cancel-and-refire on stale in-flight ----
+                # ---- cancel-and-refire on stale in-flight ----
                 # Reachable when the prior tick's wait_for_playout TimeoutError'd
                 # but left in_flight_handle/in_flight_ev populated. Also the
                 # seam v2.x asynchronous fan-in will use.
@@ -224,28 +221,6 @@ async def coach_loop(
                         await agent.invalidate_cache()
                         trigger_state["in_flight_handle"] = None
                         trigger_state["in_flight_ev"] = None
-
-                # ---- Plan 19-05 — ack pre-fire ----
-                cancel_cooldown_active = (
-                    cancel_gate.last_cancel_at != 0.0
-                    and (time.monotonic() - cancel_gate.last_cancel_at) < CANCEL_COOLDOWN_S
-                )
-                fire, reason = ack_bank.should_fire(
-                    rolling_ttft_avg_ms=ttft_meter.rolling_avg_ms(),
-                    last_ack_at=trigger_state.get("last_ack_at"),
-                    last_response_at=trigger_state.get("last_response_at"),
-                    cancel_cooldown_active=cancel_cooldown_active,
-                )
-                if fire:
-                    bucket, pcm, sample_idx = ack_bank.pick_for_event(ev)
-                    playback.push(pcm.tobytes())
-                    trigger_state["last_ack_at"] = time.monotonic()
-                    recorder.log_event(
-                        "ack_fire",
-                        bucket=bucket,
-                        sample_index=sample_idx,
-                        reason=reason,
-                    )
 
             # Hand the event to the agent so llm_node can build the grounded
             # multimodal prompt (text evidence + audio Part + screen Part).

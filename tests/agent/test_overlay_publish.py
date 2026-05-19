@@ -31,7 +31,6 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 from livekit.agents import Agent
 
 from vibemix.agent import DJCoHostAgent
@@ -125,13 +124,6 @@ def _build_agent(
     if wired:
         kwargs["citation_linter"] = CitationLinter()
         kwargs["stripped_rate_tracker"] = StrippedRateTracker()
-        kwargs["ack_bank"] = mocker.MagicMock()
-        fake_pcm = np.zeros(1024, dtype=np.int16)
-        kwargs["ack_bank"].pick_for_event.return_value = (
-            "generic_filler",
-            fake_pcm,
-            3,
-        )
         kwargs["playback"] = mocker.MagicMock()
     if ipc_bus is not None:
         kwargs["ipc_bus"] = ipc_bus

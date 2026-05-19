@@ -18,7 +18,7 @@ and a new breach can fire again.
 
 Concurrency: NOT thread-safe. The coach loop is single-threaded asyncio;
 every ``record`` / ``rate`` / ``should_bypass`` call happens on the event
-loop. Same contract as ``vibemix.agent.ack_bank.AckBank``.
+loop.
 """
 
 from __future__ import annotations

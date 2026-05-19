@@ -50,7 +50,6 @@ from livekit.agents import llm as agents_llm
 from livekit.agents import tts as agents_tts
 
 from vibemix.agent._streaming_pipe import find_sentence_end, passes_head_gate
-from vibemix.agent.ack_bank import BUCKET_FOR_EVENT
 from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL
 from vibemix.audio import (
@@ -72,7 +71,6 @@ from vibemix.state.coach import ACK_ELIGIBLE_EVENTS
 from vibemix.ui_bus import SessionCohostReaction, SessionOverlayHighlight
 
 if TYPE_CHECKING:  # pragma: no cover — typing-only
-    from vibemix.agent.ack_bank import AckBank
     from vibemix.audio.buffers import PlaybackQueue
     from vibemix.audio.lookahead import LookaheadProvider
     from vibemix.runtime.ws_bus import IpcBus
@@ -285,7 +283,6 @@ class DJCoHostAgent(Agent):
         # guarantee for the existing tests/agent/test_dj_cohost.py suite.
         citation_linter: CitationLinter | None = None,
         stripped_rate_tracker: StrippedRateTracker | None = None,
-        ack_bank: "AckBank | None" = None,
         playback: "PlaybackQueue | None" = None,
         # Plan 24-02 — overlay-highlight publish path. Default None
         # preserves backward compat (no overlay events). When non-None,
@@ -373,11 +370,10 @@ class DJCoHostAgent(Agent):
         # turn (the gate runs in the LLM hot-path).
         self._linter: CitationLinter | None = citation_linter
         self._stripped_tracker: StrippedRateTracker | None = stripped_rate_tracker
-        self._ack_bank: "AckBank | None" = ack_bank
         self._playback: "PlaybackQueue | None" = playback
         self._linter_wired: bool = all(
             x is not None
-            for x in (citation_linter, stripped_rate_tracker, ack_bank, playback)
+            for x in (citation_linter, stripped_rate_tracker, playback)
         )
         # Plan 24-02 — overlay-highlight publish path. Wired iff non-None.
         self._ipc_bus: "IpcBus | None" = ipc_bus
@@ -941,9 +937,10 @@ class DJCoHostAgent(Agent):
             #   2. invalid + bypass → emit anyway + record(False) +
             #      citation_bypass log + "[ai_text:unverified]" stdout.
             #      Bypass is one-shot per breach window (T-20-01-02).
-            #   3. invalid + strip → DO NOT yield + ack-bank PCM push
-            #      (when ev.type ∈ BUCKET_FOR_EVENT) + record(True) +
+            #   3. invalid + strip → DO NOT yield + record(True) +
             #      citation_strip log. silence > invented citation.
+            #      (The pre-recorded ack-bank substitution was retired —
+            #      see the strip block below.)
             if self._linter_wired and self._linter is not None:
                 lint_result = self._linter.check(
                     full_text, snapshot, mode="live"
@@ -1008,38 +1005,17 @@ class DJCoHostAgent(Agent):
                         if stripped:
                             self._ai_text_history.append(stripped[:140])
                     else:
-                        # Strip path — no chunks yielded, ack-bank PCM
-                        # injected if the event class is in the bucket map.
+                        # Strip path — no chunks yielded. Pre-recorded
+                        # ack substitution is retired (English placeholder
+                        # clips fought the anti-slop thesis and the
+                        # Turkish persona). On head_yielded turns the
+                        # speculative head is already in flight, so we
+                        # cancel with a silence pad to mask the
+                        # mid-utterance cut. Otherwise this strip is
+                        # exactly the persona's "say NOTHING" path.
                         citation_action = "strip"
-                        ack_bucket: str | None = None
-                        ack_sample_idx: int | None = None
-                        # Plan 41-04 — when ``head_yielded`` is True the
-                        # speculative head is already in flight; we
-                        # cannot un-yield it. Fire cancel-with-silence-
-                        # pad + ``streaming_cancel`` instead of the
-                        # ack-bank substitution (ack would overlap the
-                        # head audio — worse than a clean pad).
                         if head_yielded:
                             _push_silence_pad_and_cancel("citation_failure")
-                        elif ev is not None and ev.type in BUCKET_FOR_EVENT:
-                            try:
-                                bucket, pcm, sample_idx = (
-                                    self._ack_bank.pick_for_event(ev)
-                                    if self._ack_bank is not None
-                                    else (None, None, None)
-                                )
-                                if (
-                                    bucket is not None
-                                    and pcm is not None
-                                    and self._playback is not None
-                                ):
-                                    self._playback.push(pcm.tobytes())
-                                    ack_bucket = bucket
-                                    ack_sample_idx = sample_idx
-                            except Exception as _e:
-                                print(
-                                    f"[ack err] {_e}", file=sys.stderr
-                                )
                         if self._stripped_tracker is not None:
                             self._stripped_tracker.record(True)
                         self._recorder.log_event(
@@ -1048,13 +1024,10 @@ class DJCoHostAgent(Agent):
                             raw_text=full_text,
                             missing=citation_lint_missing_payload,
                             reason=lint_result.reason,
-                            ack_bucket=ack_bucket,
-                            ack_sample_index=ack_sample_idx,
                             latency_s=round(elapsed, 2),
                         )
                         print(
-                            f"[ai_text:stripped] reason={lint_result.reason} "
-                            f"ack={ack_bucket}",
+                            f"[ai_text:stripped] reason={lint_result.reason}",
                             flush=True,
                         )
                         # History NOT appended — nothing was emitted.

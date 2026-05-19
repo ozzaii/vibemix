@@ -86,13 +86,13 @@ def test_record_event_fired_overwrites_pending() -> None:
     assert meter.samples_count() == 1
 
 
-def test_default_ms_passes_ack_gate() -> None:
-    """Sentinel default_ms (1500.0) MUST be greater than ACK_TTFT_GATE_MS (800.0)
-    so the first event of a session can fire an ack."""
-    from vibemix.agent.ack_bank import ACK_TTFT_GATE_MS
-
+def test_default_ms_reads_above_cold_thresholds() -> None:
+    """Cold-session sentinel (1500.0) reads strictly above the legacy
+    800ms ack-gate threshold. The ack-bank gate itself has been retired,
+    but the sentinel still signals "treat the cold session as slow" to
+    any UI surface that displays the rolling average."""
     meter = TTFTMeter()
-    assert meter.rolling_avg_ms() > ACK_TTFT_GATE_MS
+    assert meter.rolling_avg_ms() > 800.0
 
 
 def test_uses_injected_time_fn() -> None:
