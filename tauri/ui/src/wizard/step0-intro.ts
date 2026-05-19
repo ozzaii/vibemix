@@ -116,12 +116,17 @@ const CSS = `
   .wizard-intro__cta [data-interactive]:focus-visible {
     box-shadow: var(--glow-faint);
   }
+  /* 2026-05-19 /impeccable critique fix: intro animation cut from 600ms
+   * to --motion-step (250ms) and the CTA stagger from 200ms to 80ms so
+   * the open-and-boot moment stays inside the motion budget. The prior
+   * 600ms rise read as splash-screen, which PRODUCT.md anti-references
+   * explicitly call out: "It opens, it boots, it works." */
   @media (prefers-reduced-motion: no-preference) {
     .wizard-intro__hero {
-      animation: vmx-intro-rise 600ms ease-out both;
+      animation: vmx-intro-rise var(--motion-step) ease-out both;
     }
     .wizard-intro__cta {
-      animation: vmx-intro-rise 600ms ease-out 200ms both;
+      animation: vmx-intro-rise var(--motion-step) ease-out 80ms both;
     }
   }
   @keyframes vmx-intro-rise {

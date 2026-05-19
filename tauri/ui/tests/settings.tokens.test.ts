@@ -2,9 +2,11 @@
  *
  * Unskipped by Plan 14-04 once the settings drawer migration to v5
  * primitives landed. Asserts every settings consumer renders free of
- * legacy shim tokens, that SettingsDrawer has `.border-anim` as its
- * first child, and that the NEW PerformanceGroup component renders the
- * off/on toggle states with the v5 amber backlight in the on state.
+ * legacy shim tokens, that the SettingsDrawer ships WITHOUT a
+ * .border-anim (2026-05-19 /impeccable critique — sweep is restricted
+ * to the session deck only), and that the NEW PerformanceGroup
+ * component renders the off/on toggle states with the v5 amber
+ * backlight in the on state.
  *
  * Detector reused from tokens.legacy-detect.test.ts so the bash gate and
  * the vitest gate stay byte-aligned (Pitfall 6 — RESEARCH.md).
@@ -37,7 +39,14 @@ describe("settings surface tokens (wave 3)", () => {
     expect(containsLegacyToken(renderedHtmlPlusStyles(host))).toBe(false);
   });
 
-  it("SettingsDrawer has .border-anim as the drawer aside's first child", async () => {
+  it("SettingsDrawer ships WITHOUT a .border-anim sweep (one-amber rule)", async () => {
+    // 2026-05-19 /impeccable critique fix: DESIGN.md §5 restricts the
+    // amber border sweep to the session deck only. Opening the drawer
+    // over the session view previously put two concurrent sweeps in the
+    // same field plus the drop-chip beat-pulse, the cohost LED, and the
+    // meter peak — six+ amber elements competing for attention. The
+    // drawer now reads as quiet glass; the only amber on it is the
+    // PerformanceGroup toggle on-state.
     const { mountSettingsDrawer, _resetDrawerForTests } = await import(
       "../src/settings/SettingsDrawer.js"
     );
@@ -45,13 +54,10 @@ describe("settings surface tokens (wave 3)", () => {
     const host = document.createElement("div");
     document.body.append(host);
     mountSettingsDrawer(host);
-    // The mount appends backdrop + drawer + modalSlot into host; the
-    // drawer is the second top-level child (aside.vmx-settings-drawer).
     const drawer = host.querySelector<HTMLElement>("aside.vmx-settings-drawer");
     expect(drawer).not.toBeNull();
-    expect(drawer?.firstElementChild?.classList.contains("border-anim")).toBe(
-      true,
-    );
+    // No descendant carries the border-anim class anywhere in the drawer.
+    expect(drawer?.querySelector(".border-anim")).toBeNull();
   });
 
   it("retention-slider renders without legacy token refs", async () => {

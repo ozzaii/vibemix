@@ -111,8 +111,11 @@ const CSS = `
     flex-direction: column;
     overflow: hidden;
   }
-  /* z-index discipline — keep header + body above .border-anim (z 4). */
-  .vmx-settings-drawer > :not(.border-anim) {
+  /* z-index discipline kept as a defensive baseline even after the
+   * .border-anim removal (2026-05-19) so any future glass overlay in
+   * the drawer composites below header + body without us re-discovering
+   * the stacking issue. */
+  .vmx-settings-drawer > * {
     position: relative;
     z-index: 5;
   }
@@ -348,13 +351,11 @@ export function mountSettingsDrawer(root: HTMLElement): void {
   drawer.setAttribute("aria-label", "settings");
   drawer.setAttribute("role", "complementary");
 
-  // v5 animated border — first child of the drawer glass. tokens.css:302
-  // .border-anim handles the conic-gradient + mask-composite at z-index 4;
-  // children promoted to z-index 5 above via the descendant selector in CSS.
-  const borderAnim = document.createElement("div");
-  borderAnim.className = "border-anim";
-  borderAnim.setAttribute("aria-hidden", "true");
-  drawer.append(borderAnim);
+  // 2026-05-19 /impeccable critique fix: the drawer no longer mounts a
+  // .border-anim sweep. DESIGN.md §5 restricts the 22s amber sweep to
+  // the session deck only — opening the drawer over the session view
+  // previously put two concurrent sweeps in the same field, violating
+  // the One-Amber rule the v5 distill was built around.
 
   // Header
   const header = document.createElement("div");
