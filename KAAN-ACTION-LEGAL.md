@@ -827,6 +827,59 @@ INSTALL-VM-RUN  Windows 11:   _____ s  (target ≤ 60)
 Sign-off by:    _____________________   (Kaan signature)
 ```
 
+### Parallels quickstart (Win 11 only, ~20 min) — Kaan's MacBook
+
+Use when the full 5-row tart matrix is overkill and a single Win-side smoke
+is enough to flip the "drop-in install works on Windows" claim from claimed
+to verified. Kaan ships a Parallels license; this path uses it.
+
+1. **Get the installer.** Either:
+   - Wait for a tagged release → grab `vibemix-Setup-<ver>-x64.exe` from
+     the GH release page; OR
+   - Build locally from the current main:
+     ```bash
+     # On the host MacBook
+     cd ~/projects/dj-set-ai
+     # Win cross-build is CI-only on Mac; for a local smoke, either grab the
+     # latest `install-rehearsal.yml` artifact OR run `release.yml` against a
+     # disposable tag (e.g. `v0-rehearsal-$(date +%Y%m%d)`).
+     gh run download <run-id> --name vibemix-windows-x64-installer
+     ```
+
+2. **Provision a fresh Win 11 VM in Parallels.**
+   - Parallels → File → New → Install Windows 11 (Express install OK).
+   - 4 vCPU / 8 GB RAM / 64 GB disk minimum.
+   - Once Windows lands at the desktop, take a snapshot named
+     `clean-postinstall` — every retry starts from this snapshot.
+
+3. **Drag-and-drop the installer into the VM** (Parallels shared folder or
+   plain Cmd+drag onto the VM window). Resist the urge to pre-install
+   VB-CABLE or any other dep — the install flow MUST handle that itself.
+
+4. **Stopwatch the smoke.** Start timing the moment you double-click
+   `vibemix-Setup-<ver>-x64.exe`. Stop when the first-launch wizard says
+   "Ready" (or the equivalent end-of-onboarding screen). Target ≤ 60 s
+   per INSTALL-05.
+
+5. **Sanity checks before signing off:**
+   - SmartScreen prompt: should show "Bravoh OZAI Bilişim" or the
+     SignPath cert subject — NOT "unknown publisher".
+   - VB-CABLE: fetched from `vb-audio.com`, installed silently, audible
+     in Win sound settings as a playback device.
+   - vibemix launches at end of wizard; no Python traceback in
+     `%APPDATA%\vibemix\install.log`.
+   - Audio test: pick VB-CABLE as the system output, play any track,
+     vibemix UI should show music levels rising.
+
+6. **Record the result** in the sign-off block above. If failure: revert
+   to `clean-postinstall` snapshot, attach `install.log` to a GitHub
+   issue, do NOT re-run blindly.
+
+This covers the "Windows drop-in works" claim that the v3.1 close hook
+flagged as unverified on real hardware. macOS 12.3 / 14 / 15 rows still
+need tart (or a separate Mac VM tool); they are nice-to-have, not ship
+blockers for a `gsd-autonomous fully` close.
+
 ---
 
 ## §GATE-01 — Ack-bank quota refresh (20 → 40 OPUS files)

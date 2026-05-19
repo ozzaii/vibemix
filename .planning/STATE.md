@@ -138,7 +138,7 @@ One engineering-green-with-deferral item from Phase 47 — does NOT block Phase 
 
 Two engineering-green-with-deferral items from Phase 46 — neither blocks Phase 47 (MASCOT) or Phase 48 (dep-opportunity scan); both are documented in `docs/AUDIT.md` § Decisions and `scripts/audit/dep_ratings.yaml::decisions[]` for the long-lived paper trail.
 
-- **DEPS-07: pinact mechanical `--apply` deferred to CI**. `.pinact.yaml` + `scripts/audit/run_pinact.sh` + `dep-audit.yml::pinact-audit` job committed; mechanical SHA-pin rewrite of `.github/workflows/*.yml` deferred to first PR-triggered run (no pinact binary on local executor; no Go toolchain to bootstrap). Test `test_every_uses_is_sha_pinned` marked `xfail` with `strict=False` so future apply-pass that flips it green does not surprise-fail. **To close**: `brew install pinact && bash scripts/audit/run_pinact.sh --apply` then review + commit the SHA-churn diff, OR let the first CI PR surface the exact tag refs needing rewrite.
+- **DEPS-07: DISCHARGED 2026-05-19** (commit `f164c5c`). `brew install pinact` + `bash scripts/audit/run_pinact.sh --apply` rewrote 19 workflow files to the SHA + version-comment form. `dtolnay/rust-toolchain@stable` exempted via `.pinact.yaml::ignore_actions` (branch ref convention — pinning gives no real supply-chain hardening since the toolchain is fetched from rust-lang.org regardless). Upstream typo `signpath/github-action-submit-signing-request@v1.2.0` corrected to `@v1.2` (no v1.2.0 tag exists in the action's repo). `test_every_uses_is_sha_pinned` xfail removed — now passes green. Companion test rebases in `tests/security/test_sbom_workflow_shape.py` + `test_release_yml_signing_skips.py`.
 
 - **DEPS-08: `livekit-plugins-openai` cull is CULL-BLOCKED**. `rg` found direct imports at `src/vibemix/agent/tts_chain.py:25` (`from livekit.plugins.openai import tts as _openai_tts_mod`) plus 3 test files (`tests/agent/test_proxy_client.py`, `tests/agent/test_config.py`, `tests/agent/test_tts_chain.py`). Removal requires rewiring the TTS proxy fallback chain — explicitly out-of-scope for Phase 46. `google-cloud-speech` + `google-cloud-texttospeech` are pure transitives of livekit-plugins-google with zero direct imports; retained-as-transitive (no Kaan-action needed there). **To close `livekit-plugins-openai`**: open a focused refactor phase post-v3.1 that rewires `tts_chain.py` to drop the OpenAI adapter path.
 
@@ -203,8 +203,9 @@ Acknowledged per `gsd-autonomous fully` mode at v3.1 milestone close 2026-05-18.
 | kaan-walk | §E2E-50A-WALK — Kaan's MacBook walk + record `docs/e2e/2026-05-walk.webm` via `scripts/e2e/record_50a_walk.sh` | gated on §INSTALL-VM-RUN |
 | asset-discharge | §VIS-04 — 28 Mixamo retargets via Adobe-account walk (Phase 47 scaffold ready) | independent (parallel) |
 | asset-discharge | §VIS-05 — 5 pre-existing legacy_prep_* slot retargets (bundle with §VIS-04) | independent (parallel) |
-| ship-optimization | §SHIP-CONTACT-VBAUDIO — VB-Audio OEM/bundle redistribution email | independent (future Win optimization) |
-| tech-debt | DEPS-07 — pinact mechanical SHA rewrite via `brew install pinact && bash scripts/audit/run_pinact.sh --apply` OR first CI run | tech_debt (docs/AUDIT.md § Decisions) |
+| ship-optimization | §SHIP-CONTACT-VBAUDIO — VB-Audio OEM/bundle redistribution email | email drafted at `.planning/decisions/SHIP-CONTACT-VBAUDIO.md` (Kaan-action: send) |
+| install-walk | §INSTALL-VM-RUN — Parallels Win 11 quickstart added to `KAAN-ACTION-LEGAL.md::INSTALL-VM-RUN` | runbook ready; Kaan executes when Parallels is up |
+| tech-debt | ~~DEPS-07~~ — DISCHARGED 2026-05-19 (commit `f164c5c`); 19 workflows SHA-pinned via pinact `--apply`, `dtolnay/rust-toolchain@stable` exempted | closed |
 | tech-debt | DEPS-08 — `livekit-plugins-openai` cull blocked by `tts_chain.py:25` direct imports; scheduled post-v3.1 TTS proxy fallback chain refactor | tech_debt (docs/AUDIT.md § Decisions) |
 
 ### v3.1 → v3.x Anticipated Carry-Forward (will route to next milestone scope)
