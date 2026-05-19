@@ -880,6 +880,27 @@ flagged as unverified on real hardware. macOS 12.3 / 14 / 15 rows still
 need tart (or a separate Mac VM tool); they are nice-to-have, not ship
 blockers for a `gsd-autonomous fully` close.
 
+### Build the installer inside the VM (when CI is unavailable)
+
+If GH Actions billing is locked OR you just want a one-shot local build,
+`scripts/win/build_local.ps1` reproduces `release.yml::build-windows`
+entirely on the Win VM. First-time prereq install (one PowerShell line):
+
+```powershell
+winget install Python.Python.3.12 OpenJS.NodeJS.LTS Rustlang.Rustup JRSoftware.InnoSetup astral-sh.uv
+rustup default stable
+```
+
+Then from a `git clone` of the repo inside the VM:
+
+```powershell
+pwsh scripts\win\build_local.ps1
+```
+
+Output: `installer\windows\output\vibemix-installer.exe` (unsigned —
+SmartScreen will show "unrecognized app" until SignPath cert + first
+release SmartScreen reputation accrues; that's expected for the smoke).
+
 ---
 
 ## §GATE-01 — Ack-bank quota refresh (20 → 40 OPUS files)
