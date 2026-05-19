@@ -1,18 +1,14 @@
 """DEPS-07 — assert every `uses:` line in every .github/workflows/*.yml
 is SHA-pinned (40-char hex) and not a floating tag ref.
 
-Phase 46 Plan 05 Task 3 deferred the mechanical pinact rewrite to CI
-(local executor did not have pinact installed). The strict gate test is
-marked xfail with reason; .pinact.yaml + run_pinact.sh + the CI audit
-job are committed. First CI run on a PR that touches workflows will
-either pass clean or surface the remaining tag refs for a follow-up
-pinact --apply commit.
+Discharged 2026-05-19: `bash scripts/audit/run_pinact.sh --apply` ran
+clean against every workflow except the `dtolnay/rust-toolchain@stable`
+convention (a branch ref that resolves to rust-lang.org's stable channel
+regardless of action SHA — listed in `.pinact.yaml::ignore_actions`).
 """
 
 import re
 from pathlib import Path
-
-import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 WORKFLOWS_DIR = REPO / ".github" / "workflows"
@@ -67,16 +63,19 @@ def test_run_pinact_script_exists():
         "scripts/audit/run_pinact.sh must exist and be executable"
 
 
-@pytest.mark.xfail(
-    reason="DEPS-07 mechanical pinact --apply deferred to CI — Plan 05 Task 3 deferral",
-    strict=False,
-)
+# Branch refs that intentionally bypass SHA-pinning (mirrors .pinact.yaml).
+_IGNORE = {("dtolnay/rust-toolchain", "stable")}
+
+
 def test_every_uses_is_sha_pinned():
     violations = []
     for wf, lineno, line in iter_uses_lines():
         if SHA_PIN_RE.match(line):
             continue
-        if TAG_REF_RE.match(line):
+        m = TAG_REF_RE.match(line)
+        if m and (m.group(1), m.group(2)) in _IGNORE:
+            continue
+        if m:
             violations.append(f"{wf.name}:{lineno}: {line.strip()}")
     if violations:
         raise AssertionError(

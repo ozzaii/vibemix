@@ -35,7 +35,7 @@ jobs:
     name: Sign macOS companion scripts
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Validate companion files exist
         run: |
@@ -59,7 +59,7 @@ jobs:
           bash scripts/dist/sign_macos.sh --companion --dry-run || true
 
       - name: Upload signed companion artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: companion-mac
           path: installer/companion/*
@@ -68,7 +68,7 @@ jobs:
     name: Sign Windows companion scripts
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Validate companion files exist
         shell: pwsh
@@ -108,7 +108,7 @@ jobs:
           Write-Output "SignPath submission deferred to signpath/github-action-submit-signing-request (pinned in release.yml main path)."
 
       - name: Upload signed companion artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: companion-win
           path: installer/companion/*
@@ -118,10 +118,10 @@ jobs:
     needs: [companion-sign-macos, companion-sign-windows]
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Download signed companion artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: signed-companion/
 
@@ -134,7 +134,7 @@ jobs:
 
       - name: Upload verifier report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: companion-signing-report
           path: report-companion-signing.json

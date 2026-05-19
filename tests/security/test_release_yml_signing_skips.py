@@ -95,14 +95,21 @@ def test_release_yml_signpath_skip_step_exists(workflow_text: str):
 
 
 def test_release_yml_signpath_action_pinned_version(workflow_text: str):
-    """The SignPath GH Action must be pinned to a version (not @main)."""
+    """The SignPath GH Action must be SHA-pinned (post-DEPS-07 discharge)."""
     m = re.search(
         r"uses:\s*signpath/github-action-submit-signing-request@(\S+)",
         workflow_text,
     )
     assert m is not None, "SignPath GH Action reference not found"
-    version = m.group(1)
-    assert version.startswith("v"), f"SignPath action not pinned to a vN.N.N tag: {version}"
+    ref = m.group(1)
+    # Post-DEPS-07: refs are 40-char SHA, version tag carried in trailing comment.
+    assert re.fullmatch(r"[0-9a-f]{40}", ref), (
+        f"SignPath action must be SHA-pinned (got {ref!r}); see pinact discharge"
+    )
+    assert re.search(
+        r"signpath/github-action-submit-signing-request@[0-9a-f]{40}\s+#\s+v\d",
+        workflow_text,
+    ), "SignPath action SHA must carry a trailing `# vN.N` version comment"
 
 
 def test_release_yml_signpath_sign_step_guarded_by_signing_available(workflow_yaml):

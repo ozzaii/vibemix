@@ -19,5 +19,10 @@ is_full_version: true
 # Do NOT shorten to major-version tag (`@v4` is a tag, not a SHA).
 use_major_version_tag: false
 
-# Local composite actions — no SHA pin available.
-ignore_actions: []
+# Actions that intentionally use a branch/moving ref (not pinnable to SHA).
+# dtolnay/rust-toolchain@stable is the convention for Rust workflows — the
+# underlying toolchain is fetched dynamically from rust-lang.org regardless
+# of the action SHA, so SHA-pinning gives no real supply-chain hardening.
+ignore_actions:
+  - name: dtolnay/rust-toolchain
+    ref: stable

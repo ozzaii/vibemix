@@ -26,12 +26,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           lfs: true
 
       - name: Cache eval corpus
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: eval/corpus/sessions
           key: corpus-${{ hashFiles('eval/corpus/manifest.json') }}
@@ -41,7 +41,7 @@ jobs:
           uv run python -c "from scripts.eval.corpus_manifest import validate_manifest; from pathlib import Path; r=validate_manifest(Path('eval/corpus/manifest.json')); assert r['valid'], r"
 
       - name: Setup uv + Python
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3.2.4
         with:
           python-version: '3.12'
 
@@ -96,7 +96,7 @@ jobs:
 
       - name: Post scorecard to PR
         if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const fs = require('fs');

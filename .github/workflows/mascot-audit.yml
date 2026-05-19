@@ -34,7 +34,7 @@ jobs:
     # by design (per scripts/mascot/check_bundle_size.sh header).
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Run bundle gate
         run: bash scripts/mascot/check_bundle_size.sh
         continue-on-error: true
@@ -42,7 +42,7 @@ jobs:
   mascot-manifest-completeness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install pyyaml
         run: pip install pyyaml
       - name: Run manifest completeness check
@@ -51,7 +51,7 @@ jobs:
   mascot-anti-slop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Run Phase 47 anti-slop grep gate
         # Phase 47 sibling script — scopes the 16-token blocklist + the
         # \bdeeply\s+\w+ regex to Phase 47 mascot artifacts. The canonical
@@ -62,7 +62,7 @@ jobs:
   mascot-tauri-only-grep:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Grep gate — mascot.html absent from test surfaces
         run: |
           # Allowlists POC-immutability gates that name mascot.html as a
@@ -85,9 +85,9 @@ jobs:
   mascot-event-coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
       - name: Install + test

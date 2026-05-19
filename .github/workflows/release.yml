@@ -16,7 +16,7 @@
 #                 then `cargo tauri build` against the Tauri wrapper.
 #   2. SIGN     — macOS: `scripts/dist/sign_macos.sh` (Plan 18-02 chain:
 #                 codesign + create-dmg + notarytool + stapler)
-#                 Windows: `signpath/github-action-submit-signing-request@v1.2.0`
+#                 Windows: `signpath/github-action-submit-signing-request@v1.2`
 #                 (Plan 18-03 SignPath OSS flow).
 #   3. PACKAGE  — macOS: DMG produced by sign_macos.sh stage 4.
 #                 Windows: `iscc installer/windows/vibemix-installer.iss`
@@ -87,7 +87,7 @@ jobs:
     name: Audit — no Apple/SignPath POST/PUT (P46)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Grep for forbidden POST/PUT to Apple/SignPath/notarytool
         run: |
           set -euo pipefail
@@ -149,7 +149,7 @@ jobs:
     # the audit fires on tag pushes + workflow_dispatch rehearsals.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Assert single canonical password env var name
         # Matches ACTUAL env-var usage patterns (env: KEY:, ${{ secrets.KEY }},
@@ -229,7 +229,7 @@ jobs:
     # keypair. Tagged releases MUST have the real pubkey baked in.
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Verify pubkey is not the Phase 18-04 placeholder
         run: |
           set -e
@@ -273,17 +273,17 @@ jobs:
       SIGNING_AVAILABLE: ${{ needs.detect-signing-mode.outputs.signing_available }}
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3.2.4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -375,7 +375,7 @@ jobs:
       # separate release assets (no lipo-merge — see RESEARCH §Critical
       # Correction).
       - name: Upload macOS artifacts (mock or signed) — ${{ matrix.arch }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: macos-artifacts-${{ matrix.arch }}
           path: |
@@ -395,17 +395,17 @@ jobs:
       SIGNING_AVAILABLE: ${{ needs.detect-signing-mode.outputs.signing_available }}
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3.2.4
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -442,7 +442,7 @@ jobs:
       - name: BUILD — Upload unsigned binaries for SignPath request
         if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
         id: upload-unsigned
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: vibemix-binaries-unsigned
           path: |
@@ -467,7 +467,7 @@ jobs:
 
       - name: SIGN — Submit signing request to SignPath
         if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
-        uses: signpath/github-action-submit-signing-request@v1.2.0
+        uses: signpath/github-action-submit-signing-request@4f13d373e8f0cd8d3c0465ff4877feff27aed2ae # v1.2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
@@ -517,7 +517,7 @@ jobs:
 
       # ---- Stage 5 — UPLOAD artifact ----------------------------------------
       - name: Upload Windows artifacts (mock or signed)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: windows-artifacts
           path: |
@@ -542,14 +542,14 @@ jobs:
     needs: [detect-signing-mode, build-macos, build-windows]
     if: startsWith(github.ref, 'refs/tags/v') && needs.detect-signing-mode.outputs.signing_available == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: release-artifacts/
 
@@ -596,14 +596,14 @@ jobs:
     # from a fork. Phase 38 DIST-17 adds the verifier gate.
     if: startsWith(github.ref, 'refs/tags/v') && needs.detect-signing-mode.outputs.signing_available == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: release-artifacts/
 
@@ -655,7 +655,7 @@ jobs:
           fi
 
       - name: PUBLISH — Create GitHub Release (draft) with all signed artifacts
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: |
             release-artifacts/macos-artifacts-arm64/vibemix-*.dmg
