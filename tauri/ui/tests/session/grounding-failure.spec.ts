@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe("Cohost grounding-failure recovery (H9)", () => {
-  it("grounded=false + elapsed < 5s → shows WARMING UP, no retry", () => {
+  it("grounded=false + elapsed < 5s → shows TUNING IN, no retry", () => {
     const panel = renderCohostPanel({
       status: "IDLE",
       transcript: [],
@@ -49,7 +49,7 @@ describe("Cohost grounding-failure recovery (H9)", () => {
     host().append(panel);
     const foot = panel.querySelector<HTMLElement>(".vmx-cohost__foot");
     expect(foot?.dataset.failed).toBe("false");
-    expect(foot?.textContent).toContain("WARMING UP");
+    expect(foot?.textContent).toContain("TUNING IN");
     expect(panel.querySelector(".vmx-cohost__foot-retry")).toBeNull();
   });
 
@@ -83,7 +83,7 @@ describe("Cohost grounding-failure recovery (H9)", () => {
     const foot = panel.querySelector<HTMLElement>(".vmx-cohost__foot");
     expect(foot?.dataset.grounded).toBe("true");
     expect(foot?.dataset.failed).toBe("false");
-    expect(foot?.textContent).toContain("GROUNDED");
+    expect(foot?.textContent).toContain("READING THE ROOM");
     expect(panel.querySelector(".vmx-cohost__foot-retry")).toBeNull();
   });
 
@@ -165,7 +165,7 @@ describe("SessionLayout grounding-failure timer (H9)", () => {
     mountSessionLayout(root, initial);
     const foot = root.querySelector<HTMLElement>(".vmx-cohost__foot");
     expect(foot?.dataset.failed).toBe("false");
-    expect(foot?.textContent).toContain("WARMING UP");
+    expect(foot?.textContent).toContain("TUNING IN");
   });
 
   it("after >= 5s of grounded=false the foot flips to failure copy", () => {
@@ -211,7 +211,7 @@ describe("SessionLayout grounding-failure timer (H9)", () => {
     renderSessionFrame(mounted, unground);
     expect(mounted.groundedFalseSinceMs).toBe(t0 + 10_000);
 
-    // Foot is still WARMING UP at this point — only just flipped.
+    // Foot is still TUNING IN at this point. only just flipped.
     const foot = root.querySelector<HTMLElement>(".vmx-cohost__foot");
     expect(foot?.dataset.failed).toBe("false");
   });

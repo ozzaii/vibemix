@@ -58,7 +58,7 @@ export function renderStepProfileConsent(
 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
-  heading.textContent = "STEP 4 / 4 · PROFILE";
+  heading.textContent = "STEP 4 / 5 · PROFILE";
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";

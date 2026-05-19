@@ -141,17 +141,19 @@ const CSS = `
     text-shadow: 0 0 4px var(--amber-22);
   }
   .vmx-cohost__topstrip-tag::before {
-    /* 2026-05-19 /impeccable critique fix: demoted --glow-strong to
-     * --glow-soft. DESIGN.md §4 reserves --glow-strong for the primary
-     * action button at hover/press. An always-on dome on the cohost
-     * top-strip is an idle status indicator, not a brand action. */
+    /* 2026-05-19 /impeccable critique fix round 2: the cohost top-strip
+     * dome no longer pulses. In steady-state (LISTENING) it was running
+     * the same 1.4s breath as the timecode LIVE pip, putting two
+     * synchronized amber pulses on the same screen with no semantic
+     * difference. The LIVE pip is the canonical "vibemix is here"
+     * signal — the top-strip dome reads as a state badge ("AI COHOST"
+     * is on this panel), static is enough. */
     content: '';
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--amber);
     box-shadow: var(--glow-soft);
-    animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
   }
   .vmx-cohost__topstrip-meta {
     font-family: var(--type-mono);
@@ -657,20 +659,26 @@ function buildFoot(
   return foot;
 }
 
+// 2026-05-19 /impeccable critique fix round 2: "GROUNDED ON AUDIO +
+// SCREEN" was Bravoh-internal anti-hallucination jargon visible 99% of
+// the live session. Rewrote to DJ-vocabulary: the cohost is "READING
+// THE ROOM" when it's listening + watching + ready to react. Same
+// semantic ("I have your master + djay window + I'm paying attention")
+// in a phrase a DJ would use about another DJ.
 function footLabelFor(grounded: boolean, failed: boolean): string {
-  if (grounded) return "GROUNDED ON AUDIO + SCREEN";
+  if (grounded) return "READING THE ROOM";
   if (failed) return "COULDN'T REACH GEMINI";
-  return "WARMING UP";
+  return "TUNING IN";
 }
 
 function footTooltipFor(grounded: boolean, failed: boolean): string {
   if (grounded) {
-    return "grounded on audio + screen capture. cohost can hear you.";
+    return "vibemix is listening to your master output and watching your DJ window.";
   }
   if (failed) {
     return "couldn't reach gemini. press retry to reconnect.";
   }
-  return "warming up. initializing audio + screen capture.";
+  return "tuning in. initializing audio + screen capture.";
 }
 
 /** Idempotent hot-update. Rebuilds transcript content but preserves the

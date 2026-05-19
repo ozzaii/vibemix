@@ -335,9 +335,9 @@ function titleForPill(
     state === "ok" ? "ok" : state === "down" ? "down" : "off";
   switch (key) {
     case "live":
-      if (state === "ok") return "LIVE — vibemix is listening";
-      if (state === "down") return "LIVE — session disconnected";
-      return "LIVE — session not yet started";
+      if (state === "ok") return "LIVE · vibemix is listening";
+      if (state === "down") return "LIVE · session disconnected";
+      return "LIVE · session not yet started";
     case "rec":
       return `recording · ${stateWord}`;
     case "sys":

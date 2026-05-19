@@ -77,7 +77,7 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
   // UI-SPEC §Step 2 H1 — VERBATIM
-  heading.textContent = "STEP 2 / 3 · OUTPUT DEVICE";
+  heading.textContent = "STEP 2 / 5 · OUTPUT DEVICE";
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
@@ -134,7 +134,7 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
         allWindows: state.windowPickerMode === "enum" ? [
           { id: "djay", name: "djay Pro AI" },
           { id: "rekordbox", name: "Rekordbox" },
-          { id: "chrome", name: "Chrome — gmail" },
+          { id: "chrome", name: "Chrome · gmail" },
         ] : undefined,
         onSelect: () => cb.onSelectWindow(),
         onPickDifferent: cb.onPickDifferent,

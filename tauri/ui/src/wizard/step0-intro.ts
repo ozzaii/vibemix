@@ -119,17 +119,17 @@ const CSS = `
   .wizard-intro__cta [data-interactive]:focus-visible {
     box-shadow: var(--glow-faint);
   }
-  /* 2026-05-19 /impeccable critique fix: intro animation cut from 600ms
-   * to --motion-step (250ms) and the CTA stagger from 200ms to 80ms so
-   * the open-and-boot moment stays inside the motion budget. The prior
-   * 600ms rise read as splash-screen, which PRODUCT.md anti-references
-   * explicitly call out: "It opens, it boots, it works." */
+  /* 2026-05-19 /impeccable critique fix round 2: at 80ms stagger the
+   * CTA appeared almost simultaneously with the hero — the staircase
+   * was so compressed it read as a single ease-in instead of a
+   * sequence. Dropped the stagger entirely so the hero + CTA boot
+   * together. PRODUCT.md anti-references the splash-screen pattern:
+   * "It opens, it boots, it works." Two elements arriving on the
+   * same beat lands cleaner than three frames apart. */
   @media (prefers-reduced-motion: no-preference) {
-    .wizard-intro__hero {
-      animation: vmx-intro-rise var(--motion-step) ease-out both;
-    }
+    .wizard-intro__hero,
     .wizard-intro__cta {
-      animation: vmx-intro-rise var(--motion-step) ease-out 80ms both;
+      animation: vmx-intro-rise var(--motion-step) ease-out both;
     }
   }
   @keyframes vmx-intro-rise {

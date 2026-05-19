@@ -131,7 +131,11 @@ describe("Cohost tooltips (H6)", () => {
     );
   });
 
-  it("foot has title narrating grounded state", () => {
+  it("foot has title narrating listening state", () => {
+    // 2026-05-19 /impeccable critique fix: "GROUNDED ON AUDIO + SCREEN"
+    // (Bravoh-internal anti-hallucination jargon) renamed to a phrase
+    // a DJ would use. Tooltip now narrates the listening/watching
+    // behaviour without the "grounded" engineer-speak.
     const grounded = renderCohostPanel({
       status: "LISTENING",
       transcript: [],
@@ -140,11 +144,11 @@ describe("Cohost tooltips (H6)", () => {
     });
     host().append(grounded);
     const foot = grounded.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.getAttribute("title")).toContain("grounded");
-    expect(foot?.getAttribute("title")).toContain("audio");
+    expect(foot?.getAttribute("title")).toContain("listening");
+    expect(foot?.getAttribute("title")).toContain("watching");
   });
 
-  it("foot has title narrating warming-up state", () => {
+  it("foot has title narrating tuning-in state", () => {
     const warming = renderCohostPanel({
       status: "IDLE",
       transcript: [],
@@ -153,7 +157,7 @@ describe("Cohost tooltips (H6)", () => {
     });
     host().append(warming);
     const foot = warming.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.getAttribute("title")).toContain("warming up");
+    expect(foot?.getAttribute("title")).toContain("tuning in");
   });
 });
 

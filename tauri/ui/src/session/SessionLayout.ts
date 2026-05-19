@@ -460,15 +460,19 @@ function buildPersonaPanelBody(state: SessionState): HTMLElement {
       value: state.persona.voice,
       avatar: true,
       autoPill: true,
+      // 2026-05-19 /impeccable critique fix: Gemini voice codenames
+      // have zero priors for a DJ. Added one-word character descriptors
+      // via the PickerOption.sub field so the user can pick by feel
+      // rather than by random sample.
       options: [
-        { id: "kore", label: "kore" },
-        { id: "puck", label: "puck" },
-        { id: "charon", label: "charon" },
-        { id: "fenrir", label: "fenrir" },
-        { id: "aoede", label: "aoede" },
-        { id: "leda", label: "leda" },
-        { id: "orus", label: "orus" },
-        { id: "zephyr", label: "zephyr" },
+        { id: "kore", label: "kore", sub: "calm, warm" },
+        { id: "puck", label: "puck", sub: "bright, playful" },
+        { id: "charon", label: "charon", sub: "deep, grounded" },
+        { id: "fenrir", label: "fenrir", sub: "rough, edged" },
+        { id: "aoede", label: "aoede", sub: "smooth, melodic" },
+        { id: "leda", label: "leda", sub: "clear, neutral" },
+        { id: "orus", label: "orus", sub: "steady, dry" },
+        { id: "zephyr", label: "zephyr", sub: "soft, airy" },
       ],
     }),
   );

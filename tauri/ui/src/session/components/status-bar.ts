@@ -439,6 +439,6 @@ function titleForBadge(key: BadgeKey, state: string): string {
   if (state === "ok") return `${label} · connected`;
   if (state === "connecting") return `${label} · connecting…`;
   if (state === "denied") return `${label} · permission denied`;
-  if (state === "down") return `${label} · disconnected — click for recovery`;
+  if (state === "down") return `${label} · disconnected · click for recovery`;
   return `${label} · off`;
 }

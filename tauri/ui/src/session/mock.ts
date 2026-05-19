@@ -1,8 +1,8 @@
-/* Phase 12 dev-only — `?dev=session-mock` entry point.
+/* Phase 12 dev-only · `?dev=session-mock` entry point.
  *
  * Mounts the live session DOM + settings drawer with a fake state animator
  * so Vite dev (no Tauri runtime) shows the Phase 12 UI moving. Skips the
- * IPC bridge (Tauri invoke/listen would fail in pure-browser dev) — every
+ * IPC bridge (Tauri invoke/listen would fail in pure-browser dev) · every
  * snapshot is synthesised locally.
  *
  * Activated from `main.ts` when `?dev=session-mock` is in the URL. The
@@ -78,7 +78,7 @@ function tick(): void {
   const now = performance.now();
   const elapsed = now - startedAtMs;
 
-  // Meters — three independent sine waves so the UI feels alive.
+  // Meters · three independent sine waves so the UI feels alive.
   const musicRms = sineRMS(elapsed, 0.6, 0.42, 0.28);
   const voiceRms = sineRMS(elapsed, 0.25, 0.15, 0.45);
   const micRms = sineRMS(elapsed, 1.1, 0.05, 0.08);
@@ -111,7 +111,7 @@ function tick(): void {
     clockText: tsHHMMSS(elapsed),
   });
 
-  // Drop countdown — cycles 16 → 0 → null → 16 every ~32s
+  // Drop countdown · cycles 16 → 0 → null → 16 every ~32s
   const dropCycle = Math.floor(elapsed / 2000) % 18;
   if (dropCycle <= 16) {
     dropBars = 16 - dropCycle;
@@ -140,7 +140,7 @@ function tick(): void {
 
 /** Mount the live session UI in mock mode and start the animator.
  *
- * Skips initSessionBridge() — pure-browser Vite dev has no Tauri runtime
+ * Skips initSessionBridge() · pure-browser Vite dev has no Tauri runtime
  * to talk to. Instead, the local animator drives SessionState directly. */
 export async function routeSessionMock(rootEl?: HTMLElement): Promise<void> {
   const root =
@@ -174,7 +174,7 @@ export async function routeSessionMock(rootEl?: HTMLElement): Promise<void> {
 
   // eslint-disable-next-line no-console
   console.log(
-    "[session-mock] mounted — synthetic state at 60 fps. Click the gear (top-right) to open Settings.",
+    "[session-mock] mounted · synthetic state at 60 fps. Click the gear (top-right) to open Settings.",
   );
 
   // Expose a console handle so Kaan can poke the state if he wants.

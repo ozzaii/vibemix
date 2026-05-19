@@ -164,11 +164,16 @@ function indexOf(step: WizardStep): number {
 
 function stepStripFor(current: WizardStep): HTMLElement {
   const idx = indexOf(current);
+  // 2026-05-19 /impeccable critique fix: indicator was 4 dots for a
+  // 5-step flow; telemetry-consent had no dot and shipped its own
+  // "STEP 5/5" header, breaking the denominator across surfaces.
+  // Added telemetry-consent so the strip + header count agree.
   const stepsConfig: Array<{ id: WizardStep; label: string }> = [
     { id: "permissions", label: "permissions" },
     { id: "audio", label: "device" },
     { id: "controller", label: "controller" },
     { id: "profile-consent", label: "profile" },
+    { id: "telemetry-consent", label: "telemetry" },
   ];
   return StepIndicator({
     steps: stepsConfig.map((s, i) => {

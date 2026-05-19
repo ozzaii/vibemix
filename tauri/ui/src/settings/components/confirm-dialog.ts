@@ -50,8 +50,13 @@ const CSS = `
     from { opacity: 0; }
     to { opacity: 1; }
   }
-  /* Dialog — sealed glass-1 popover with the border-anim sweep so even
-   * a modal moment carries the v5 "sign of life" character. */
+  /* 2026-05-19 /impeccable critique fix: dialog previously mounted its
+   * own .border-anim sweep + a 0 24px 60px hero shadow that exceeded
+   * the documented .vmx-tile[data-tile="hero"] recipe by 50%. DESIGN.md
+   * §5 restricts the sweep to the session deck only; §4 specifies the
+   * single hero recipe is 0 16px 36px rgba(0,0,0,0.5). The dialog now
+   * matches the prescribed hero shape and uses ease-out (not cubic-
+   * bezier) per DESIGN.md §6 motion budget. */
   .vmx-confirm__dialog {
     position: relative;
     width: 360px;
@@ -64,7 +69,7 @@ const CSS = `
     overflow: hidden;
     box-shadow:
       inset 0 1px 0 var(--glass-top),
-      0 24px 60px rgba(0, 0, 0, 0.85),
+      0 16px 36px rgba(0, 0, 0, 0.5),
       0 0 0 1px rgba(255, 255, 255, 0.018);
     padding: var(--sp-5) var(--sp-5) var(--sp-4);
     display: flex;
@@ -72,14 +77,13 @@ const CSS = `
     gap: var(--sp-3);
     font-family: var(--type-body);
     color: var(--silk);
-    animation: vmx-confirm-rise 220ms cubic-bezier(0.16, 0.84, 0.32, 1);
+    animation: vmx-confirm-rise var(--motion-step) ease-out;
   }
   @keyframes vmx-confirm-rise {
-    from { transform: translateY(8px) scale(0.985); opacity: 0; }
-    to   { transform: translateY(0) scale(1); opacity: 1; }
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
   .vmx-confirm__dialog > * { position: relative; z-index: 1; }
-  .vmx-confirm__dialog > .border-anim { z-index: 4; }
   .vmx-confirm__heading {
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 700;
@@ -202,12 +206,11 @@ export function renderConfirmDialog(props: ConfirmDialogProps): HTMLElement {
   dialog.className = "vmx-confirm__dialog";
   if (props.variant === "danger") dialog.dataset.variant = "danger";
 
-  // v5 "sign of life" border-anim — even the modal moment carries the
-  // slow amber light traveling the perimeter.
-  const sweep = document.createElement("div");
-  sweep.className = "border-anim slow";
-  sweep.setAttribute("aria-hidden", "true");
-  dialog.append(sweep);
+  // 2026-05-19 /impeccable critique fix: dialog no longer mounts a
+  // .border-anim sweep. DESIGN.md §5 restricts the 22s amber sweep
+  // to the session deck only. The dialog reads as a hero-tier glass
+  // surface via the .vmx-tile[data-tile="hero"]-class shadow recipe
+  // applied directly to .vmx-confirm__dialog above.
 
   const heading = document.createElement("div");
   heading.className = "vmx-confirm__heading";

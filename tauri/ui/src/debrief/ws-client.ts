@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-// Plan 29-05 Task 1 — vanilla WS client for the debrief window.
+// Plan 29-05 Task 1 · vanilla WS client for the debrief window.
 //
 // Connects to ws://127.0.0.1:8766 (Plan 29-02 sidecar), validates each
 // inbound frame against the source-of-truth schema via the ajv-generated
 // validator, and dispatches typed CustomEvents on an EventTarget. Retries
 // the connection up to 3 times with exponential backoff (sidecar is
-// one-shot per window — long disconnects mean it crashed).
+// one-shot per window · long disconnects mean it crashed).
 
 import { stripDrillFields } from "./stripper-roundtrip.js";
 
@@ -77,7 +77,7 @@ export class DebriefWsClient extends EventTarget {
     this.ws.send(JSON.stringify(frame));
   }
 
-  // Plan 42-03 — dev-mode fallback path for ear-test sign-off. In real
+  // Plan 42-03 · dev-mode fallback path for ear-test sign-off. In real
   // desktop builds the Tauri IPC channel handles writes; this WS path
   // is exercised by `npm run dev` only.
   sendEarTestSubmit(payload: Record<string, unknown>): void {
@@ -155,7 +155,7 @@ export class DebriefWsClient extends EventTarget {
       if (totalStripped > 0) {
         // eslint-disable-next-line no-console
         console.warn(
-          `[debrief] WARNING: backend emitted ${totalStripped} uncited sentences in drills — filtered for safety`,
+          `[debrief] WARNING: backend emitted ${totalStripped} uncited sentences in drills · filtered for safety`,
         );
         this.dispatchEvent(
           new CustomEvent("renderer-strip", {

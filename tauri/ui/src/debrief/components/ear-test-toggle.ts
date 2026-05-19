@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Plan 42-03 Task 2 — ear-test sign-off toggle (debrief window).
+// Plan 42-03 Task 2 · ear-test sign-off toggle (debrief window).
 //
 // Wired into the Phase 29 debrief window per D-GATE-07. Renders an
 // opt-in toggle: when ON, a form expands with the 4 slop-flag
@@ -8,13 +8,13 @@
 // (`src/vibemix/debrief/ear_test_capture.py::write_ear_test_log`) via
 // Tauri IPC, with a DebriefWsClient fallback for dev mode.
 //
-// Copy is Turkish-mix per CLAUDE.md tone — single-DJ regime (signed_by
+// Copy is Turkish-mix per CLAUDE.md tone · single-DJ regime (signed_by
 // pinned to "kaan" in the schema).
 
 import { showErrorBanner } from "./error-banner.js";
 
 // ---------------------------------------------------------------------------
-// Types — mirror eval/ear-test-logs/schema.json
+// Types · mirror eval/ear-test-logs/schema.json
 // ---------------------------------------------------------------------------
 
 export type EarTestGenre =
@@ -51,7 +51,7 @@ export interface EarTestMountPayload {
   genre: EarTestGenre | string;
 }
 
-// Tauri IPC shim — keeps the file importable in dev/test without the
+// Tauri IPC shim · keeps the file importable in dev/test without the
 // Tauri runtime.
 interface TauriWindow {
   __TAURI__?: {
@@ -59,7 +59,7 @@ interface TauriWindow {
   };
 }
 
-// Optional WS fallback — passed by the bootstrap when dev-mode capture
+// Optional WS fallback · passed by the bootstrap when dev-mode capture
 // goes via the existing 8766 channel.
 export interface EarTestWsSink {
   send: (msg: { kind: "ear-test-submit"; payload: EarTestSubmission }) => void;
@@ -274,5 +274,5 @@ async function handleSubmit(
     options.wsSink.send({ kind: "ear-test-submit", payload: submission });
     return;
   }
-  throw new Error("no submission channel — Tauri IPC and WS sink both absent");
+  throw new Error("no submission channel · Tauri IPC and WS sink both absent");
 }

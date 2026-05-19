@@ -35,12 +35,21 @@ const CSS = `
     padding: var(--sp-4) var(--sp-5);
     margin-bottom: var(--sp-4);
   }
+  /* 2026-05-19 /impeccable critique fix: banner used to stack four
+   * concurrent amber signals — alert-tile border + glow + amber
+   * heading + amber heading text-shadow + amber install button +
+   * amber glyph drop-shadow. DESIGN.md "One Amber Rule" allows ONE
+   * breathing amber per panel. The alert-tile shell already carries
+   * the dominant amber moment (border + outer glow); the install
+   * button is the call-to-action amber. The glyph drop-shadow and
+   * the amber heading text-shadow are removed; the heading drops
+   * to silk so the user reads "BlackHole banner = alert state"
+   * via the tile shell, not via amber-stacked-on-amber typography. */
   .cmp-bh-banner__glyph {
     color: var(--amber);
     display: flex;
     align-items: center;
     justify-content: center;
-    filter: drop-shadow(0 0 3px var(--amber-22));
   }
   .cmp-bh-banner__text {
     display: flex;
@@ -53,8 +62,8 @@ const CSS = `
     font-size: 11px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--amber);
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), 0 0 6px var(--amber-40);
+    color: var(--silk);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .cmp-bh-banner__body {
     font-family: var(--type-body);

@@ -146,14 +146,13 @@ const CSS = `
     line-height: 1;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
-  .vmx-settings-drawer__title::before {
-    content: '';
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--amber);
-    box-shadow: 0 0 4px var(--amber), 0 0 8px var(--amber-40);
-  }
+  /* 2026-05-19 /impeccable critique fix round 2: drawer title amber
+   * dot dropped entirely. When the drawer is open the user already
+   * sees the gear button in amber-active state in the titlebar plus
+   * every group header in the drawer — adding another amber dot at
+   * the drawer title was the third concurrent amber signal in a
+   * panel that should carry one. The "SETTINGS" caps + tracking is
+   * enough heading affordance. */
   .vmx-settings-drawer__close {
     width: 30px;
     height: 30px;

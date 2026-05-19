@@ -22,6 +22,12 @@ export interface TimecodeProps {
 
 const CSS = `
   .vmx-timecode {
+    /* 2026-05-19 /impeccable critique fix: hero shadow lifted to the
+     * documented .vmx-tile[data-tile="hero"] recipe — 0 16px 36px
+     * rgba(0,0,0,0.5) — instead of the bespoke 0 24px 60px stack that
+     * was 50% heavier than DESIGN.md §4 prescribes. Timecode is the
+     * single hero panel in the session view; the recipe must match
+     * what tokens.css publishes for that role. */
     position: relative;
     background: var(--glass-1);
     backdrop-filter: var(--blur-glass);
@@ -31,8 +37,8 @@ const CSS = `
     padding: var(--sp-5) var(--sp-5) var(--sp-4);
     box-shadow:
       inset 0 1px 0 var(--glass-top),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.65),
-      0 24px 60px rgba(0, 0, 0, 0.65),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+      0 16px 36px rgba(0, 0, 0, 0.5),
       0 0 0 1px rgba(255, 255, 255, 0.018);
     overflow: hidden;
     display: flex;

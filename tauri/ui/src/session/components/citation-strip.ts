@@ -158,11 +158,11 @@ export function renderCitationStrip(
     btn.textContent = `[${chip.verb} @ ${mmss}]`;
     btn.setAttribute(
       "aria-label",
-      `evidence: ${chip.verb} at ${mmss} — click to open debrief`,
+      `evidence: ${chip.verb} at ${mmss} · click to open debrief`,
     );
     btn.setAttribute(
       "title",
-      `${chip.verb} @ ${mmss} — open debrief at this moment`,
+      `${chip.verb} @ ${mmss} · open debrief at this moment`,
     );
     btn.addEventListener("click", (e) => {
       e.preventDefault();

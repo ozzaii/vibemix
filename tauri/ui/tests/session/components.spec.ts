@@ -258,7 +258,12 @@ describe("renderCohostPanel", () => {
   // amber tabular-mono latency readout was retired (anti-slop, real DJs
   // don't read latency). Latency stays on the prop interface for a
   // future Settings → Debug pane.
-  it("foot shows GROUNDED (LED + label only, no latency readout) when grounded=true", () => {
+  it("foot shows READING THE ROOM (LED + label only, no latency readout) when grounded=true", () => {
+    // 2026-05-19 /impeccable critique fix round 2: "GROUNDED ON AUDIO
+    // + SCREEN" was Bravoh-internal anti-hallucination jargon visible
+    // 99% of the live session. Renamed to a DJ-vocabulary phrase that
+    // signals "the cohost is paying attention" without the engineer
+    // language. The grounded boolean prop is unchanged.
     const panel = renderCohostPanel({
       status: "LISTENING",
       transcript: [],
@@ -269,12 +274,12 @@ describe("renderCohostPanel", () => {
     const foot = panel.querySelector<HTMLElement>(".vmx-cohost__foot");
     expect(foot?.dataset.grounded).toBe("true");
     expect(foot?.querySelector(".vmx-cohost__foot-lbl")?.textContent).toBe(
-      "GROUNDED ON AUDIO + SCREEN",
+      "READING THE ROOM",
     );
     expect(foot?.querySelector(".vmx-cohost__foot-latency")).toBeNull();
   });
 
-  it("foot shows WARMING UP when grounded=false", () => {
+  it("foot shows TUNING IN when grounded=false", () => {
     const panel = renderCohostPanel({
       status: "IDLE",
       transcript: [],
@@ -285,7 +290,7 @@ describe("renderCohostPanel", () => {
     const foot = panel.querySelector<HTMLElement>(".vmx-cohost__foot");
     expect(foot?.dataset.grounded).toBe("false");
     expect(foot?.querySelector(".vmx-cohost__foot-lbl")?.textContent).toBe(
-      "WARMING UP",
+      "TUNING IN",
     );
   });
 

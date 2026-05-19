@@ -1,4 +1,4 @@
-/* Phase 11 Wave 2 — crash banner subscription.
+/* Phase 11 Wave 2 · crash banner subscription.
  *
  * Subscribes to the Rust shell's lifecycle events:
  *   - "sidecar-crashed"  fired after 4th consecutive non-zero exit
@@ -10,7 +10,7 @@
  * the supervisor loop has exited; Wave 4 wires the actual respawn path.
  *
  * Anti-pattern guard: this file MUST NOT open its own WebSocket. The
- * webview is forbidden from talking to localhost:8765 directly — the
+ * webview is forbidden from talking to localhost:8765 directly · the
  * Rust shell is the single client.
  */
 
@@ -69,9 +69,9 @@ export function initCrashBanner(): void {
   const restartBtn = document.getElementById("crash-restart") as HTMLButtonElement | null;
 
   if (!banner || !errLine || !restartBtn) {
-    // Wave 2 placeholder DOM is missing — defensive guard so Wave 3
+    // Wave 2 placeholder DOM is missing · defensive guard so Wave 3
     // re-arranging the DOM doesn't crash the module on load.
-    console.warn("[crash-banner] DOM elements missing — banner inert");
+    console.warn("[crash-banner] DOM elements missing · banner inert");
     return;
   }
 
@@ -91,7 +91,7 @@ export function initCrashBanner(): void {
 
   // ws-state: "unreachable" fires after ~30s of failed reconnects to
   // 127.0.0.1:8765 (ws_client.rs UNREACHABLE_AFTER). On "connected" the
-  // sidecar is fine again — clear the banner unless a separate crash
+  // sidecar is fine again · clear the banner unless a separate crash
   // event has set it for a different reason.
   listen<string>("ws-state", (event) => {
     if (event.payload === "unreachable") {
