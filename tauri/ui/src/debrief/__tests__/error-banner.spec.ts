@@ -12,7 +12,7 @@ afterEach(() => {
 describe("error-banner reason→copy map", () => {
   it("events_missing → user copy", () => {
     expect(reasonToCopy("events_missing")).toBe(
-      "This session has no event data — try a longer recording.",
+      "This session has no event data. Try a longer recording.",
     );
   });
 

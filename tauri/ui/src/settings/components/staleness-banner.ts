@@ -29,8 +29,8 @@ export function renderStalenessBanner(): StalenessBannerHandle {
   root.setAttribute("role", "status");
   root.innerHTML = `
     <span class="vmx-staleness-text">
-      Library is <em class="vmx-staleness-age">…</em> old —
-      re-import to keep me grounded.
+      Library is <em class="vmx-staleness-age">…</em> old.
+      Re-import to keep me grounded.
     </span>
     <div class="vmx-staleness-actions">
       <button type="button" class="vmx-staleness-dismiss">Dismiss</button>

@@ -73,7 +73,7 @@ describe("handlePermissionLost", () => {
     });
     watcher.observe("microphone", "denied");
     expect(pauseCalls).toBe(1);
-    expect(toastCopy).toBe("Microphone access lost — paused");
+    expect(toastCopy).toBe("Microphone access lost · paused");
     expect(reGrantFor).toBe("microphone");
   });
 

@@ -264,15 +264,15 @@ The wizard step strip and the bottom status bar both run at full width, full hai
 
 ### Signature: The Border Sweep
 
-A conic-gradient amber ring traveling around the perimeter of the session deck panel, 22 seconds per revolution. Renders via `mask-composite: exclude` to clip into a 1px-thick stroke. **Restricted to the session deck only** — wizard tiles and the cohost panel previously carried duplicate sweeps and the 2026-05-14 critique flagged the result as anxiety, not sign-of-life. The mascot overlay window carries a 32-second reverse-direction variant (`.slow.rev`) so the two sweeps never sync up visually.
+A conic-gradient amber ring traveling around the perimeter of the session deck panel, 22 seconds per revolution. Renders via `mask-composite: exclude` to clip into a 1px-thick stroke. **Restricted to the session deck only.** Wizard tiles, cohost panel, settings drawer, and the timecode hero previously carried duplicate sweeps; the 2026-05-14 + 2026-05-19 critiques each flagged the result as anxiety, not sign-of-life. There is no `.slow.rev` mascot variant — see the mascot section below.
 
-The sweep is frozen entirely under `prefers-reduced-motion: reduce` — opacity drops to 0.6 and the animation pauses. This is the canonical motion behavior.
+The sweep is frozen entirely under `prefers-reduced-motion: reduce`. Opacity drops to 0.6 and the animation pauses. This is the canonical motion behavior.
 
 ### Signature: The Mascot Overlay
 
-A 320×420 transparent always-on-top webview window hosting a Three.js WebGL scene. Single VTuber-style 3D character (placeholder "DJ bat") with mood-driven state machine. Sits in its own window, not embedded — Phase 13 collapsed the wizard's mascot-corner column when this surface moved out.
+A 320×420 transparent always-on-top webview window hosting a Three.js WebGL scene. Single VTuber-style 3D character (placeholder "DJ bat") with mood-driven state machine. Sits in its own window, not embedded; Phase 13 collapsed the wizard's mascot-corner column when this surface moved out.
 
-The mascot window carries the only `.border-anim.slow.rev` instance in the system. It wraps a thin `.mascot-window` glass-3 chrome with `blur-glass-display` backdrop and an amber bottom-edge undertone. `body` background is forced `transparent !important` so the WebGL canvas composites over the desktop.
+**The mascot window is fully transparent.** `body` is `transparent !important` and `.mascot-window` carries `background: transparent; border: none; box-shadow: none;`. No chrome, no rim-light, no second border-sweep. The 2026-05-15 direction (Kaan's "fully transparent" feedback) is the canonical contract: the WebGL canvas composites directly over the desktop, the character IS the surface. Class hooks for an earlier rim-light variant (`.border-anim.slow.rev`, `.mascot-window__top-label`, `.mascot-window__state-caption`) remain in markup as `display: none` so HMR + Vitest fixtures don't break, but they render nothing in production. The 2026-05-19 critique caught this as a contract drift; this entry resolves the drift in favor of the implementation.
 
 ## 6. Do's and Don'ts
 

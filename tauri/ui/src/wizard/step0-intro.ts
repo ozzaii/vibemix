@@ -65,13 +65,16 @@ const CSS = `
     align-items: baseline;
     gap: 1px;
   }
-  /* The "V" gets the amber lead. Single accent moment per DESIGN.md §5. */
+  /* The "V" gets the amber lead. Single accent moment per DESIGN.md §5.
+   * 2026-05-19 /impeccable critique fix: dropped the second outer
+   * glow (0 0 28px var(--amber-22)). Two stacked outer halos on a
+   * single 68px character was the closest the wizard came to
+   * splash-screen feel — DESIGN.md §4 reserves the larger halo for
+   * primary action button hover/press. Single 12px halo is enough. */
   .wizard-intro__wordmark-lead {
     color: var(--amber);
     font-variation-settings: "wdth" 82, "wght" 800;
-    text-shadow:
-      0 0 12px var(--amber-40),
-      0 0 28px var(--amber-22);
+    text-shadow: 0 0 12px var(--amber-40);
   }
   .wizard-intro__phrase {
     font-variation-settings: "wdth" 82, "wght" 700;

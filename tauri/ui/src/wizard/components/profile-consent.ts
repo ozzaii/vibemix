@@ -142,7 +142,7 @@ export function renderProfileConsentCard(props: ProfileConsentProps): HTMLElemen
     const name = document.createElement("span");
     name.className = "vmx-profile-consent__field-name";
     name.textContent = f.name;
-    row.append(name, document.createTextNode(` — ${f.desc}`));
+    row.append(name, document.createTextNode(` · ${f.desc}`));
     fieldList.append(row);
   }
   root.append(fieldList);

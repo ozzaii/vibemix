@@ -128,7 +128,9 @@ describe("citation-strip — LAUNCH-02 contract", () => {
     // re-source.
     expect(css).toMatch(/var\(--c-citation-chip-fg\)/);
     expect(css).toMatch(/var\(--c-citation-chip-bg\)/);
-    expect(css).toMatch(/var\(--glow-faint\)/);
+    // 2026-05-19 /impeccable critique fix: resting --glow-faint dropped
+    // (sustained amber wash on 30+ chip transcripts). Hover/focus still
+    // lifts to --glow-soft.
     expect(css).toMatch(/var\(--glow-soft\)/);
   });
 });

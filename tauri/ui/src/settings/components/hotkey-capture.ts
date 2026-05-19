@@ -178,7 +178,7 @@ registerStyle("vmx-hotkey-capture", CSS);
  *  elsewhere. Wire form (`cmd+shift+m`) is what we emit; this is the
  *  display surface. */
 function prettyCombo(combo: string): string {
-  if (!combo) return "—";
+  if (!combo) return "·";
   const parts = combo.toLowerCase().split("+");
   const macSymbols: Record<string, string> = {
     cmd: "⌘",

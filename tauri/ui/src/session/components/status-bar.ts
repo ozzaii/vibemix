@@ -417,10 +417,10 @@ function buildTooltip(key: BadgeKey, props: StatusBarProps): HTMLElement {
 
 function defaultErrorMsg(key: BadgeKey): string {
   switch (key) {
-    case "livekit": return "livekit session disconnected — recheck route";
-    case "gemini": return "gemini api unreachable — recheck network + key";
-    case "midi": return "no midi controllers detected — plug one in";
-    case "screen": return "screen-capture permission denied — open system settings";
+    case "livekit": return "livekit session disconnected. recheck route";
+    case "gemini": return "gemini api unreachable. recheck network + key";
+    case "midi": return "no midi controllers detected. plug one in";
+    case "screen": return "screen-capture permission denied. open system settings";
   }
 }
 

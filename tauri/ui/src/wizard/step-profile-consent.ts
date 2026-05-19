@@ -63,7 +63,7 @@ export function renderStepProfileConsent(
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
   subtitle.textContent =
-    "let vibemix learn your style — coaching gets sharper over time.";
+    "let vibemix learn your style. coaching gets sharper over time.";
 
   body.append(heading, subtitle);
 

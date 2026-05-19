@@ -137,7 +137,11 @@ const CSS = `
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-transform: lowercase;
+    /* 2026-05-19 /impeccable critique fix: forced lowercase on row
+     * labels and dropdown options was the SaaS/dev-tool fingerprint
+     * (Vercel, Cron, Linear). Pioneer hardware labels carry their
+     * source casing. Device names like "MacBook Pro Speakers" and
+     * proper-name voices ("Aoede", "Charon") now render natively. */
     color: inherit;
   }
   .vmx-picker__auto {
@@ -184,10 +188,13 @@ const CSS = `
     -webkit-backdrop-filter: var(--blur-glass);
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-sm);
+    /* 2026-05-19 /impeccable critique fix: popover triple-shadow
+     * collapsed to single drop. DESIGN.md §4 hero recipe is one
+     * 0 16px 36px shadow + one 1px outer ring — anything beyond
+     * that drifts toward Material-3 elevation. */
     box-shadow:
       inset 0 1px 0 var(--glass-top),
-      0 16px 40px rgba(0, 0, 0, 0.7),
-      0 4px 16px rgba(0, 0, 0, 0.35),
+      0 16px 36px rgba(0, 0, 0, 0.55),
       0 0 0 1px rgba(255, 255, 255, 0.018);
     padding: 4px;
     opacity: 0;
@@ -225,7 +232,6 @@ const CSS = `
     letter-spacing: 0.04em;
     line-height: 1;
     text-align: left;
-    text-transform: lowercase;
     cursor: pointer;
     border-radius: 1px;
     transition: color 120ms ease-out, background 120ms ease-out, text-shadow 120ms ease-out;

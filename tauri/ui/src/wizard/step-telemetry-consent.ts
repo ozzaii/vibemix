@@ -69,7 +69,7 @@ export function renderStepTelemetryConsent(
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
   subtitle.textContent =
-    "help vibemix get better — anonymous diagnostics, off by default.";
+    "help vibemix get better. anonymous diagnostics, off by default.";
 
   body.append(heading, subtitle);
 

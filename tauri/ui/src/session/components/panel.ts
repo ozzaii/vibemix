@@ -25,6 +25,13 @@ export interface PanelProps {
 
 const CSS = `
   .vmx-panel {
+    /* 2026-05-19 /impeccable critique fix: panel previously carried the
+     * hero-tier drop shadow + outer ring (the documented
+     * [data-tile=hero] recipe), but EVERY vmx-panel in the session
+     * view consumed it (PERSONA, OUTPUT, AUDIO IN), stacking five hero
+     * shadows on one screen. DESIGN.md §4 restricts the drop to a single
+     * hero panel per view. Demoted to inset-bezel only; the timecode
+     * keeps the one allowed hero drop in the session view. */
     position: relative;
     background: var(--glass-2);
     backdrop-filter: var(--blur-glass-light);
@@ -33,9 +40,7 @@ const CSS = `
     border-radius: var(--rad-md);
     box-shadow:
       inset 0 1px 0 var(--glass-top),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-      0 16px 36px rgba(0, 0, 0, 0.5),
-      0 0 0 1px rgba(255, 255, 255, 0.018);
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
     overflow: hidden;
   }
   .vmx-panel > * { position: relative; z-index: 1; }

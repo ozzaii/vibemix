@@ -36,7 +36,7 @@ export const BRAVOH_WAITLIST_URL =
 
 const TOGGLE_LABEL = "Join Bravoh waitlist (optional)";
 const TOGGLE_SUBTITLE =
-  "vibemix is built by Bravoh — get notified when the main product opens.";
+  "vibemix is built by Bravoh. Get notified when the main product opens.";
 const LINK_TEXT = "Join the Bravoh waitlist →";
 
 // ---------------------------------------------------------------------------

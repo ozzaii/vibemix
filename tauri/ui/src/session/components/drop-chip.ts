@@ -34,7 +34,13 @@ const CSS = `
       inset 0 0 14px var(--amber-22),
       0 0 0 1px rgba(255, 138, 61, 0.14);
     position: relative;
-    animation: vmx-drop-pulse var(--bpm-period-ms, 500ms) ease-in-out infinite;
+    /* 2026-05-19 /impeccable critique fix: dropped the panel-wide
+     * vmx-drop-pulse animation. At 130 BPM the chip pulsed every
+     * ~462ms in the same field as the timecode LIVE blink (1.4s) and
+     * the perimeter sweep (22s) — three concurrent breathing tempos
+     * competing in peripheral vision. The 4-beat pip row already
+     * carries the BPM signal as a CDJ-style sync indicator, which is
+     * the more distinctive of the two. */
   }
   /* 4-beat pip row — a small bar of dots cycling on the BPM period
    * (one full 4-beat cycle every 4 × --bpm-period-ms). Quiet but
@@ -111,22 +117,6 @@ const CSS = `
   .vmx-drop-chip[data-bars="0"] .vmx-drop-chip__arrow {
     color: var(--rec);
     text-shadow: 0 0 6px rgba(212, 65, 58, 0.45);
-  }
-  @keyframes vmx-drop-pulse {
-    0%, 100% {
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.06),
-        inset 0 -1px 0 var(--amber-40),
-        inset 0 0 14px var(--amber-22),
-        0 0 0 1px rgba(255, 138, 61, 0.14);
-    }
-    50% {
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        inset 0 -1px 0 var(--amber-65),
-        inset 0 0 20px var(--amber-40),
-        0 0 0 1px rgba(255, 138, 61, 0.24);
-    }
   }
   @keyframes vmx-drop-rec-flash {
     0% { transform: scale(1); }

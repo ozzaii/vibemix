@@ -317,8 +317,8 @@ export function NonDjConfirm(props: NonDjConfirmProps): HTMLElement {
   body.className = "cmp-window-picker__modal-body";
   // UI-SPEC §Step 2 "Non-DJ confirm body" — VERBATIM template
   body.textContent =
-    "vibemix works best with djay, rekordbox, serato, traktor, virtualdj — " +
-    `continue with ${props.appName} anyway?`;
+    "vibemix works best with djay, rekordbox, serato, traktor, virtualdj. " +
+    `Continue with ${props.appName} anyway?`;
   const actions = document.createElement("div");
   actions.className = "cmp-window-picker__modal-actions";
   actions.append(

@@ -45,7 +45,7 @@ export async function renderLibraryPanel(
       <div class="vmx-library-progress-track" aria-hidden="true">
         <div class="vmx-library-progress-fill"></div>
       </div>
-      <div class="vmx-library-progress-label">— / —</div>
+      <div class="vmx-library-progress-label">· / ·</div>
       <button type="button" class="vmx-library-cancel-btn">Cancel</button>
     </div>
     <div class="vmx-library-status" aria-live="polite"></div>

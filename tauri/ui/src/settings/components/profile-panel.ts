@@ -148,8 +148,8 @@ const CSS = `
     color: var(--amber);
   }
   .vmx-profile-panel__btn[data-variant="danger"]:hover:not(:disabled) {
-    border-color: var(--led-fault, #d4413a);
-    color: var(--led-fault, #d4413a);
+    border-color: var(--led-fault);
+    color: var(--led-fault);
   }
   .vmx-profile-panel__btn:disabled {
     opacity: 0.4;
@@ -184,7 +184,7 @@ const CSS = `
     min-height: 1em;
   }
   .vmx-profile-panel__status[data-error="true"] {
-    color: var(--led-fault, #d4413a);
+    color: var(--led-fault);
   }
 `;
 
@@ -194,11 +194,11 @@ const VIEW_TIMEOUT_MS = 5_000;
 const REGENERATE_TIMEOUT_MS = 15_000;
 
 function fmtValue(v: unknown): string {
-  if (v === null || v === undefined) return "—";
-  if (Array.isArray(v)) return v.length === 0 ? "—" : v.join(", ");
+  if (v === null || v === undefined) return "·";
+  if (Array.isArray(v)) return v.length === 0 ? "·" : v.join(", ");
   if (typeof v === "object") {
     const entries = Object.entries(v as Record<string, unknown>);
-    if (entries.length === 0) return "—";
+    if (entries.length === 0) return "·";
     return entries.map(([k, vv]) => `${k}: ${String(vv)}`).join("\n");
   }
   if (typeof v === "number") return Number.isInteger(v) ? `${v}` : v.toFixed(1);

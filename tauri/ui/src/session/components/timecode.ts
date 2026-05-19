@@ -53,7 +53,6 @@ const CSS = `
     z-index: 0;
   }
   .vmx-timecode > * { position: relative; z-index: 1; }
-  .vmx-timecode > .border-anim { z-index: 4; }
 
   /* Top strip — live tag + session label */
   .vmx-timecode__top {
@@ -78,12 +77,16 @@ const CSS = `
     line-height: 1;
   }
   .vmx-timecode__live::before {
+    /* 2026-05-19 /impeccable critique fix: demoted --glow-strong to
+     * --glow-soft. DESIGN.md §4 reserves --glow-strong for the primary
+     * action button at hover/press. The LIVE pip is an always-on idle
+     * indicator, not a brand action. */
     content: '';
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--amber);
-    box-shadow: var(--glow-strong);
+    box-shadow: var(--glow-soft);
     animation: vmx-timecode-live-blink 1.4s ease-in-out infinite;
   }
   @keyframes vmx-timecode-live-blink {
@@ -255,11 +258,11 @@ export function renderTimecode(props: TimecodeProps): HTMLElement {
   const root = document.createElement("div");
   root.className = "vmx-timecode";
 
-  // v5 "sign of life" — slow amber light sweeping the perimeter.
-  const sweep = document.createElement("div");
-  sweep.className = "border-anim";
-  sweep.setAttribute("aria-hidden", "true");
-  root.append(sweep);
+  // 2026-05-19 /impeccable critique fix: timecode previously mounted its
+  // own .border-anim sweep here, putting TWO concurrent perimeter sweeps
+  // on the session deck (the outer one comes from SessionLayout). DESIGN.md
+  // §5 restricts the sweep to the session deck only — the timecode lives
+  // INSIDE that deck, so the deck's sweep is its sweep.
 
   // Top strip
   const top = document.createElement("div");

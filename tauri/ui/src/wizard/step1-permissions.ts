@@ -44,13 +44,23 @@ export interface Step1Callbacks {
  * permission "Grant" + "DENIED · open Settings" affordances all inherit
  * via the broad selector union. */
 const CSS = `
+  /* 2026-05-19 /impeccable critique fix: wizard step heading was
+   * color: var(--amber) with --glow-soft on every step. Inherited by
+   * every wizard surface, so amber filled the section heading AND the
+   * BlackHole banner heading AND the active step-indicator dot — three
+   * concurrent amber signals on the same screen. DESIGN.md §2 reserves
+   * amber for the deck-light (focus rings, citation chips, sweeps,
+   * alert glow), not section headings. Demoted to silk; the engraved
+   * text-shadow stays so the heading still reads as machined into the
+   * deck face. Active step-indicator dot remains the sole amber signal
+   * on the wizard chrome. */
   .wizard-step__heading {
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 700;
     font-size: 22px;
     letter-spacing: 0.04em;
-    color: var(--amber);
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), var(--glow-soft);
+    color: var(--silk);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
     line-height: 1.1;
     margin: 0 0 var(--sp-2);
     text-transform: uppercase;

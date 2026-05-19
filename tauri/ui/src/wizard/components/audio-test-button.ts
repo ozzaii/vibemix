@@ -213,9 +213,9 @@ registerStyle("cmp-audio-test", CSS);
 const LABEL: Record<AudioTestState, string> = {
   idle: "▶ PLAY 1 kHz TEST",
   playing: "■ PLAYING…",
-  passed: "✓ HEARD IT — PASSED",
-  failed: "✕ DIDN'T HEAR — RETRY",
-  "programmatic-failed": "✕ DIDN'T HEAR — RETRY",
+  passed: "✓ HEARD IT · PASSED",
+  failed: "✕ DIDN'T HEAR · RETRY",
+  "programmatic-failed": "✕ DIDN'T HEAR · RETRY",
 };
 
 export function AudioTestButton(props: AudioTestButtonProps): HTMLElement {

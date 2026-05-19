@@ -171,10 +171,14 @@ const CSS = `
       0 0 0 1px rgba(0, 0, 0, 0.45);
     cursor: pointer;
     padding: 0;
+    /* 2026-05-19 /impeccable critique fix: dropped transform from the
+     * transition list along with the scale(1.08) hover. DESIGN.md §6
+     * bans spring/elastic motion; the Pioneer reference doesn't zoom
+     * its knobs on hover. The amber border + amber glow on hover
+     * carries the affordance without the scale. */
     transition: background var(--motion-snap) ease-out,
                 border-color var(--motion-snap) ease-out,
-                box-shadow var(--motion-snap) ease-out,
-                transform var(--motion-snap) ease-out;
+                box-shadow var(--motion-snap) ease-out;
   }
   .vmx-retention__knob:hover {
     border-color: var(--amber-40);
@@ -182,7 +186,6 @@ const CSS = `
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
       inset 0 -1px 0 rgba(0, 0, 0, 0.55),
       0 0 6px var(--amber-22);
-    transform: scale(1.08);
   }
   .vmx-retention__knob[data-active="true"] {
     background: var(--amber);

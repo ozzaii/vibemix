@@ -95,6 +95,12 @@ const FADED_WINDOW = 5;
 
 const CSS = `
   .vmx-cohost {
+    /* 2026-05-19 /impeccable critique fix: cohost previously stacked
+     * its own 0 24px 60px drop on top of panel.ts and timecode.ts
+     * shadows — five hero shadows in one view. DESIGN.md §4: one hero
+     * drop per view. Cohost is a transcript surface, not the visual
+     * center of gravity; timecode keeps the single drop. Demoted to
+     * inset-bezel only. */
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -107,8 +113,7 @@ const CSS = `
     overflow: hidden;
     box-shadow:
       inset 0 1px 0 var(--glass-top),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.5),
-      0 24px 60px rgba(0, 0, 0, 0.55);
+      inset 0 -1px 0 rgba(0, 0, 0, 0.5);
   }
   .vmx-cohost__topstrip {
     padding: 8px var(--sp-4);
@@ -136,12 +141,16 @@ const CSS = `
     text-shadow: 0 0 4px var(--amber-22);
   }
   .vmx-cohost__topstrip-tag::before {
+    /* 2026-05-19 /impeccable critique fix: demoted --glow-strong to
+     * --glow-soft. DESIGN.md §4 reserves --glow-strong for the primary
+     * action button at hover/press. An always-on dome on the cohost
+     * top-strip is an idle status indicator, not a brand action. */
     content: '';
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--amber);
-    box-shadow: var(--glow-strong);
+    box-shadow: var(--glow-soft);
     animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
   }
   .vmx-cohost__topstrip-meta {
@@ -268,12 +277,19 @@ const CSS = `
     color: var(--silk-40);
   }
   .vmx-cohost__ts {
+    /* 2026-05-19 /impeccable critique fix: dropped the
+     * rgba(255, 138, 61, 0.05) amber wash on every transcript
+     * timestamp pill. Over a 30-line transcript that was a sustained
+     * amber tint on the entire reading surface, drifting the cohost
+     * panel toward "amber decoration" instead of "amber as rare
+     * deck-light." Pill now reads against the dark display glass
+     * with just the silk-12 hairline border. */
     display: inline-block;
     font-family: var(--type-mono);
     font-size: 9px;
     letter-spacing: 0.18em;
     color: var(--silk-40);
-    background: rgba(255, 138, 61, 0.05);
+    background: transparent;
     border: 1px solid var(--silk-12);
     padding: 1px 5px;
     border-radius: var(--rad-sm);

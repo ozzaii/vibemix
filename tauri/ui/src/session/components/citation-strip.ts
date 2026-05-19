@@ -15,7 +15,8 @@
  * Design contract (CDJ Whisper + frontend-enforcement skill):
  *   - Token-driven CSS only — `--c-citation-chip-*` semantic tokens
  *     from tokens.css (added in the same plan). No hex / non-black rgba.
- *   - Resting glow = `--glow-faint` (5px amber-22 halo, restrained).
+ *   - Resting glow = none (2026-05-19 critique: 30+ chip halos
+ *     cumulated to amber decoration on the transcript surface).
  *   - Hover/focus glow = `--glow-soft` (amber-40 + amber-22).
  *   - 20/80 rule: chips are the ONLY amber accent in the cohost
  *     transcript body — dominant tone stays silk/glass.
@@ -80,9 +81,12 @@ const CSS = `
     letter-spacing: 0.04em;
     line-height: 1;
     text-transform: lowercase;
-    /* Resting glow — restrained per CDJ Whisper v5: a single faint
-     * amber halo at 22% alpha. Hover/focus lifts to --glow-soft. */
-    box-shadow: var(--glow-faint);
+    /* 2026-05-19 /impeccable critique fix: resting glow dropped. Over
+     * a transcript of 30+ AI reactions, the permanent --glow-faint
+     * halo on every chip cumulates into a sustained amber wash on the
+     * cohost transcript — the exact "amber decoration not deck-light"
+     * regression the v5 distill cuts against. Hover/focus still lifts
+     * to --glow-soft so the affordance reads on interaction. */
     cursor: pointer;
     transition: border-color var(--motion-snap) ease-out,
                 background var(--motion-snap) ease-out,
@@ -102,7 +106,7 @@ const CSS = `
     /* Inset press feedback — subtle, matches the existing CDJ panel
      * inset language. Black inset works against the amber wash. */
     box-shadow:
-      var(--glow-faint),
+      var(--glow-soft),
       inset 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 `;

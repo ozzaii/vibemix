@@ -864,7 +864,7 @@ async function completeWizard(): Promise<void> {
     const detail = err instanceof Error ? err.message : String(err);
     const retry = window.confirm(
       `Setup couldn't be saved (${detail}).\n\nRetry now? Cancel to continue ` +
-      `without saving — vibemix will re-open the wizard on next launch.`,
+      `without saving. vibemix will re-open the wizard on next launch.`,
     );
     if (retry) {
       await completeWizard();

@@ -24,11 +24,11 @@ let animatorHandle: number | null = null;
 let startedAtMs = 0;
 
 const TRANSCRIPT_TEXTS: string[] = [
-  "warming up — listening for the room",
+  "warming up, listening for the room",
   "okay this groove's settling in",
-  "filter swell coming — eyes on the build",
+  "filter swell coming, eyes on the build",
   "drop in 8 bars, lock in",
-  "nice — clean drop, crowd's with you",
+  "nice. clean drop, crowd's with you",
   "EQ that low-mid back when you bring the vocal",
   "great call swapping decks here",
   "tempo's drifting a touch, sync it back",

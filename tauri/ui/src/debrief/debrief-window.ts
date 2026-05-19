@@ -39,7 +39,7 @@ const sessionId = sessionDir.split("/").pop() ?? "session";
 // Surface the session id in the titlebar.
 const titleEl = document.getElementById("vmx-debrief-session");
 if (titleEl) titleEl.textContent = sessionId;
-document.title = `Debrief — ${sessionId}`;
+document.title = `Debrief · ${sessionId}`;
 
 const errorBanner = document.getElementById("vmx-debrief-error-banner");
 const tooltip = document.getElementById("vmx-debrief-tooltip");

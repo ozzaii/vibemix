@@ -70,7 +70,7 @@ export function tccDeepLinkFor(
  */
 const COPY: Record<TccPermission, string> = {
   microphone:
-    "vibemix listens to your master output so it can react to the music. Mic stays local — nothing is uploaded unless you talk back.",
+    "vibemix listens to your master output so it can react to the music. Mic stays local. Nothing is uploaded unless you talk back.",
   "screen-recording":
     "vibemix watches your DJ software window to ground reactions in what you actually see. Nothing is recorded to disk.",
   accessibility:

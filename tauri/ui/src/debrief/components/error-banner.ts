@@ -13,11 +13,11 @@ export type DebriefErrorReason =
 
 const REASON_COPY: Record<DebriefErrorReason, string> = {
   events_missing:
-    "This session has no event data — try a longer recording.",
+    "This session has no event data. Try a longer recording.",
   session_too_short:
     "Session is too short for a meaningful debrief (need ≥ 5 minutes).",
   invalid_session_dir:
-    "That recording can't be opened — its location doesn't match the expected layout.",
+    "That recording can't be opened. Its location doesn't match the expected layout.",
   sidecar_crashed: "Debrief crashed unexpectedly. Try reopening.",
   tldr_generation_failed:
     "Couldn't generate the voiced summary. Try refreshing.",
