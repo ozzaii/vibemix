@@ -17,6 +17,7 @@ Style follows ``tests/test_license.py`` (the repo-level test template).
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -162,15 +163,21 @@ def test_no_tracked_file_above_one_mb_outside_lfs() -> None:
     )
 
 
-def test_gitattributes_declares_glb_lfs_rule() -> None:
-    """``.gitattributes`` routes ``*.glb`` through git-lfs."""
+def test_gitattributes_no_lfs_rules() -> None:
+    """git-lfs removed 2026-05-19 — `.gitattributes` carries no LFS routing.
+
+    History demoted via `git lfs migrate export --everything`. Working-tree
+    total (~23 MB) fits comfortably under GitHub's 100 MB per-file hard
+    limit, so the external git-lfs dependency is no longer required (and
+    its data-pack billing model was exhausting at 778 unpushed commits).
+    """
     path = REPO_ROOT / ".gitattributes"
     assert path.exists(), ".gitattributes missing at repo root"
     text = path.read_text()
-    expected = "*.glb filter=lfs diff=lfs merge=lfs -text"
-    assert expected in text, (
-        f"Missing LFS rule for *.glb in .gitattributes. Expected line: "
-        f"{expected!r}"
+    pattern = re.compile(r"^\s*[^#].*filter=lfs", re.MULTILINE)
+    assert not pattern.search(text), (
+        ".gitattributes carries an LFS routing rule; expected none after the "
+        "2026-05-19 demotion."
     )
 
 

@@ -108,11 +108,16 @@ def test_licenses_md_exists() -> None:
     assert "hard_tek" in text or "Hard Tek" in text
 
 
-def test_gitattributes_lfs_for_corpus_wavs() -> None:
-    """eval/corpus/sessions/**/*.wav routes through Git LFS."""
+def test_gitattributes_lfs_removed() -> None:
+    """git-lfs was removed 2026-05-19 — no filter=lfs rules in .gitattributes.
+
+    Reason: GitHub LFS data-pack billing exhausted at 778 unpushed commits;
+    working-tree total (~23 MB) fits comfortably under GitHub's 100 MB
+    per-file hard limit. Dropping the external git-lfs dependency aligns
+    with the one-click install thesis (every external dep removed).
+    """
     text = GITATTRIBUTES.read_text(encoding="utf-8")
-    assert "eval/corpus/sessions/**/*.wav" in text
-    assert "filter=lfs" in text
+    assert "filter=lfs" not in text
 
 
 def test_source_corpus_script_help_works() -> None:

@@ -6,5 +6,5 @@
 # the simplification: fresh clones no longer need git-lfs installed, which
 # aligns with the one-click install thesis (every external dep removed).
 #
-# Do NOT re-introduce `filter=lfs` rules without explicit alignment — the
+# Do NOT re-introduce LFS-routing rules without explicit alignment — the
 # GitHub LFS data-pack billing model bit us once.

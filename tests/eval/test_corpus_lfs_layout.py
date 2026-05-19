@@ -66,16 +66,20 @@ def test_manifest_md_documents_two_genre_minimum() -> None:
     )
 
 
-def test_gitattributes_has_lfs_rule_for_corpus_wavs() -> None:
-    """`.gitattributes` must route eval/corpus/sessions/**/*.wav through LFS."""
+def test_gitattributes_no_lfs_rules() -> None:
+    """git-lfs removed 2026-05-19 — `.gitattributes` carries no LFS routing.
+
+    History demoted via `git lfs migrate export --everything`. Working-tree
+    total (~23 MB) fits comfortably under GitHub's 100 MB per-file hard
+    limit; the external git-lfs dependency is no longer required, which
+    aligns with the one-click install thesis.
+    """
     assert _GITATTRIBUTES.is_file(), f"missing {_GITATTRIBUTES}"
     body = _GITATTRIBUTES.read_text(encoding="utf-8")
-    # The literal asterisks are part of the gitattributes pathspec — escape them.
-    pattern = re.compile(
-        r"eval/corpus/sessions/\*\*/\*\.wav\s+filter=lfs", re.MULTILINE
-    )
-    assert pattern.search(body), (
-        ".gitattributes missing the LFS rule for eval/corpus/sessions/**/*.wav"
+    pattern = re.compile(r"^\s*[^#].*filter=lfs", re.MULTILINE)
+    assert not pattern.search(body), (
+        ".gitattributes carries an LFS routing rule; expected none after the "
+        "2026-05-19 demotion."
     )
 
 
