@@ -275,23 +275,27 @@ interface BadgeSpec {
 }
 
 function buildBadgeSpecs(props: StatusBarProps): BadgeSpec[] {
+  // 2026-05-19 /impeccable critique round 3: engineering vocabulary
+  // dropped from the user-facing labels. LIVEKIT → LINK, GEMINI → AI,
+  // MIDI → CONTROLLER. Internal keys + IPC payloads keep their
+  // technical names; only the displayed label shifts to DJ-register.
   return [
     {
       key: "livekit",
       state: props.livekit ?? "off",
-      label: badgeLabel("LIVEKIT", props.livekit),
+      label: badgeLabel("LINK", props.livekit),
       clickable: props.livekit === "down",
     },
     {
       key: "gemini",
       state: props.gemini ?? "off",
-      label: badgeLabel("GEMINI", props.gemini),
+      label: badgeLabel("AI", props.gemini),
       clickable: props.gemini === "down",
     },
     {
       key: "midi",
       state: props.midi == null || props.midi === 0 ? "down" : "ok",
-      label: `● MIDI · ${props.midi ?? 0}`,
+      label: `● CONTROLLER · ${props.midi ?? 0}`,
       clickable: props.midi == null || props.midi === 0,
     },
     {
@@ -417,9 +421,9 @@ function buildTooltip(key: BadgeKey, props: StatusBarProps): HTMLElement {
 
 function defaultErrorMsg(key: BadgeKey): string {
   switch (key) {
-    case "livekit": return "livekit session disconnected. recheck route";
-    case "gemini": return "gemini api unreachable. recheck network + key";
-    case "midi": return "no midi controllers detected. plug one in";
+    case "livekit": return "vibemix link to the realtime channel dropped. click to reconnect";
+    case "gemini": return "AI service unreachable. recheck network + key";
+    case "midi": return "no controllers detected. plug one in";
     case "screen": return "screen-capture permission denied. open system settings";
   }
 }
@@ -428,11 +432,15 @@ function defaultErrorMsg(key: BadgeKey): string {
  *  defaultErrorMsg() for the "down" surface but adds an "ok" + neutral
  *  variant so recognition works without clicking. */
 function titleForBadge(key: BadgeKey, state: string): string {
+  // 2026-05-19 /impeccable critique round 3: tooltip labels match the
+  // DJ-register surface vocabulary instead of the internal LiveKit /
+  // Gemini / MIDI names. Internal keys (used for IPC + recovery) keep
+  // their technical names.
   const label = (() => {
     switch (key) {
-      case "livekit": return "LiveKit";
-      case "gemini": return "Gemini";
-      case "midi": return "MIDI";
+      case "livekit": return "Realtime link";
+      case "gemini": return "AI";
+      case "midi": return "Controller";
       case "screen": return "Screen capture";
     }
   })();

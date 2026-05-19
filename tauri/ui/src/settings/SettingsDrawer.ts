@@ -133,16 +133,22 @@ const CSS = `
     border-bottom: 1px solid var(--glass-edge);
     background: rgba(0, 0, 0, 0.3);
   }
+  /* 2026-05-19 /impeccable critique round 3: dropped heading from
+   * 14px Saira 700 to 11px Saira 600 + 0.22em tracking — the drawer
+   * body label vocabulary is 9-11px throughout (every group header,
+   * every row label) and the SETTINGS title was 50% larger than its
+   * neighbors. The new size lands as a peer label, not as a
+   * separately-styled "page title." */
   .vmx-settings-drawer__title {
     display: inline-flex;
     align-items: center;
     gap: 8px;
     font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 700;
-    font-size: 14px;
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 11px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--silk);
+    color: var(--silk-65);
     line-height: 1;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
@@ -388,11 +394,20 @@ export function mountSettingsDrawer(root: HTMLElement): void {
   root.append(modalSlot);
 
   // Esc closes the drawer (only when open + no modal in flight).
+  // 2026-05-19 /impeccable critique round 3: added cmd+. / ctrl+. as a
+  // second close hotkey. cmd+. is the macOS-native "cancel/dismiss"
+  // chord (used in TextEdit, Finder, system dialogs); a DJ familiar
+  // with the platform reaches for it as a reflex. Esc keeps working.
   const onKey = (e: KeyboardEvent): void => {
     if (!getSettingsUIState().open) return;
     if (getSettingsUIState().confirmDialog) return;
     if (getSettingsUIState().hotkeyCaptureMode) return;
     if (e.key === "Escape") {
+      e.preventDefault();
+      closeSettings();
+      return;
+    }
+    if (e.key === "." && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       closeSettings();
     }

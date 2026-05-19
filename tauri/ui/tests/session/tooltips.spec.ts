@@ -105,11 +105,13 @@ describe("Status bar tooltips (H6)", () => {
     const screen = sb.querySelector<HTMLElement>(
       '.vmx-statusbar__badge[data-key="screen"]',
     );
-    expect(live?.getAttribute("title")).toContain("LiveKit");
+    // 2026-05-19 /impeccable critique round 3: engineering vocabulary
+    // (LiveKit / Gemini / MIDI) replaced with DJ-register labels.
+    expect(live?.getAttribute("title")).toContain("Realtime link");
     expect(live?.getAttribute("title")).toContain("connected");
-    expect(gemini?.getAttribute("title")).toContain("Gemini");
+    expect(gemini?.getAttribute("title")).toContain("AI");
     expect(gemini?.getAttribute("title")).toContain("disconnected");
-    expect(midi?.getAttribute("title")).toContain("MIDI");
+    expect(midi?.getAttribute("title")).toContain("Controller");
     expect(screen?.getAttribute("title")).toContain("Screen capture");
     expect(screen?.getAttribute("title")).toContain("denied");
   });

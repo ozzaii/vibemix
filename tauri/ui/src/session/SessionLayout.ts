@@ -423,6 +423,23 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
  *  has scrolled up; preserve position. Plan §1 — 40px. */
 const SCROLL_THRESHOLD_PX = 40;
 
+/** Map the active mood to a 1-line DJ-vocabulary caption.
+ *  Round 3 critique lift (H6): users shouldn't have to remember what
+ *  HYPE / TEACH / COACH each do. The caption renders under the rocker
+ *  whenever the persona-panel body is rebuilt. */
+function moodCaptionFor(mood: string): string {
+  switch (mood) {
+    case "HYPE":
+      return "talking over the build · party energy";
+    case "TEACH":
+      return "pointing out what worked · steady";
+    case "COACH":
+      return "waiting for the mix-out · analytical";
+    default:
+      return "";
+  }
+}
+
 function buildPersonaPanelBody(state: SessionState): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "vmx-session__persona-body";
@@ -453,6 +470,26 @@ function buildPersonaPanelBody(state: SessionState): HTMLElement {
       variant: "interaction",
     }),
   );
+
+  // 2026-05-19 /impeccable critique round 3 lift (H6): 1-line caption
+  // under the active mood rocker so the user doesn't have to recall
+  // what each mode means. Static lookup keyed by state.persona.mood;
+  // render-loop's snapshot rebuilds the persona body when mood flips,
+  // so the caption stays in sync without a separate subscription.
+  const moodCaption = document.createElement("div");
+  moodCaption.className = "vmx-session__mood-caption";
+  moodCaption.dataset.role = "mood-caption";
+  moodCaption.style.cssText =
+    "font-family: var(--type-body);" +
+    "font-variation-settings: 'wdth' 100, 'wght' 400;" +
+    "font-size: 11px;" +
+    "line-height: 1.35;" +
+    "color: var(--silk-40);" +
+    "letter-spacing: 0.02em;" +
+    "padding: 0 var(--sp-1);" +
+    "text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);";
+  moodCaption.textContent = moodCaptionFor(state.persona.mood);
+  wrap.append(moodCaption);
 
   wrap.append(
     renderPicker({
