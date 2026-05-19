@@ -95,19 +95,43 @@ const CSS = `
       0 0 0 1px rgba(255, 138, 61, 0.18);
     text-shadow: 0 0 4px var(--amber-65);
   }
-  /* --- interaction variant — mood block (HYPE / TEACH / COACH).
-   * Same amber-bleed-through-frost active state. The LED ornament from
-   * the prior FL-Studio variant is dropped; v5 says concentrated amber
-   * on the active tile is enough — no extra dot competing. --- */
-  .vmx-rocker[data-variant="interaction"] .vmx-rocker__seg[data-active="true"] {
-    color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+  /* --- interaction variant — mood block polychrome (decision #2 part 2).
+   * Per-id active color so the persona surface earns its information
+   * density: HYPE = magenta, TEACH = green, COACH = blue. Case-insensitive
+   * data-id selectors so the same rules cover both the session deck
+   * (uppercase IDs: HYPE/TEACH/COACH) and the settings drawer mode
+   * selector (lowercase IDs: hype/coach). The LED ornament from the
+   * prior FL-Studio variant is dropped; concentrated mood-color text +
+   * glow on the active tile is the only signal needed. --- */
+  .vmx-rocker[data-variant="interaction"] .vmx-rocker__seg[data-id="HYPE" i][data-active="true"] {
+    color: var(--mood-hype);
+    background: linear-gradient(180deg, rgba(255, 45, 143, 0.09) 0%, rgba(255, 45, 143, 0.025) 100%);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 var(--amber-40),
-      inset 0 0 14px var(--amber-22),
-      0 0 0 1px rgba(255, 138, 61, 0.14);
-    text-shadow: 0 0 4px var(--amber-65);
+      inset 0 -1px 0 var(--mood-hype-40),
+      inset 0 0 14px var(--mood-hype-22),
+      0 0 0 1px rgba(255, 45, 143, 0.14);
+    text-shadow: 0 0 4px var(--mood-hype-65);
+  }
+  .vmx-rocker[data-variant="interaction"] .vmx-rocker__seg[data-id="TEACH" i][data-active="true"] {
+    color: var(--mood-teach);
+    background: linear-gradient(180deg, rgba(109, 212, 74, 0.09) 0%, rgba(109, 212, 74, 0.025) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 var(--mood-teach-40),
+      inset 0 0 14px var(--mood-teach-22),
+      0 0 0 1px rgba(109, 212, 74, 0.14);
+    text-shadow: 0 0 4px var(--mood-teach-65);
+  }
+  .vmx-rocker[data-variant="interaction"] .vmx-rocker__seg[data-id="COACH" i][data-active="true"] {
+    color: var(--mood-coach);
+    background: linear-gradient(180deg, rgba(72, 152, 255, 0.09) 0%, rgba(72, 152, 255, 0.025) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 var(--mood-coach-40),
+      inset 0 0 14px var(--mood-coach-22),
+      0 0 0 1px rgba(72, 152, 255, 0.14);
+    text-shadow: 0 0 4px var(--mood-coach-65);
   }
   /* Legacy LED prefix kept rendering for backward-compat with the
    * existing renderRocker(variant="interaction") signature, but visually

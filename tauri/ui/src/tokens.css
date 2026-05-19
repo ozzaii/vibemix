@@ -225,6 +225,36 @@
   --meter-clip-40:     rgba(255, 45, 143, 0.40);      /* outer glow alpha (outer stop) */
   --meter-clip-glow:   0 0 6px var(--meter-clip-40), 0 0 14px var(--meter-clip-22);
 
+  /* --- mood polychrome — decision #2 / part 2 (2026-05-19) ---
+   * Companion to the meter polychrome block. The rocker "interaction"
+   * variant (HYPE / TEACH / COACH on the session deck mood block AND
+   * HYPE / COACH on the settings drawer mode selector) gets a per-id
+   * active color so the persona surface earns its information density.
+   *
+   * Mapping:
+   *   HYPE   → magenta — reuses --meter-clip family (party / push)
+   *   TEACH  → green   — reuses --meter-safe family (instruction / steady)
+   *   COACH  → blue    — anchored to --rave-cyan base hue (analytical / cool)
+   *
+   * Active rocker tiles ARE the only place mood color is rendered. The
+   * inactive segments stay silk-40 + amber on hover/focus per the rocker
+   * baseline. Switching mood swaps the lit color; nothing else moves. */
+  /* HYPE — magenta family (shares meter-clip namespace) */
+  --mood-hype:    var(--meter-clip);
+  --mood-hype-22: var(--meter-clip-22);
+  --mood-hype-40: var(--meter-clip-40);
+  --mood-hype-65: rgba(255, 45, 143, 0.65);
+  /* TEACH — green family (shares meter-safe + led-ok namespace) */
+  --mood-teach:    var(--meter-safe);
+  --mood-teach-22: var(--meter-safe-22);
+  --mood-teach-40: rgba(109, 212, 74, 0.40);
+  --mood-teach-65: rgba(109, 212, 74, 0.65);
+  /* COACH — blue family (anchored to --rave-cyan base hue, full alpha) */
+  --mood-coach:    #4898ff;
+  --mood-coach-22: rgba(72, 152, 255, 0.22);
+  --mood-coach-40: rgba(72, 152, 255, 0.40);
+  --mood-coach-65: rgba(72, 152, 255, 0.65);
+
   /* --- citation-strip — LAUNCH-02 (Phase 44 Plan 44-03) ---
    * Semantic tokens for the live UI citation chip surface. Each AI
    * reaction in the cohost stream renders a tiny `[<verb> @ <mm:ss>]`
