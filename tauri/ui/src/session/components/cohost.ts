@@ -356,21 +356,29 @@ const CSS = `
       0 0 6px rgba(109, 212, 74, 0.28),
       inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
+  /* TUNING IN: static amber LED, no pulse. The boot window is short
+   * and the LIVE pip on the titlebar is already pulsing at 1.4s as the
+   * canonical "session is alive" heartbeat (One Amber Rule + 2026-05-19
+   * remeasure Q1: avoid two parallel amber pulses at the same cadence).
+   * The amber-but-static LED reads as "warming up" without competing
+   * with the canonical pip. */
   .vmx-cohost__foot[data-grounded="false"] .vmx-cohost__foot-led {
     background: var(--amber);
     box-shadow: var(--glow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-    animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
   }
   /* Failure state — foot[data-failed="true"] swaps the amber LED to fault
    * and renders a compact retry button. Wave 6 closes H9 "error recovery"
-   * by giving the user a way out when grounding has been false for >5s. */
+   * by giving the user a way out when grounding has been false for >5s.
+   * The fault pulse runs at 0.9s (faster than the calm 1.4s LIVE pip)
+   * so the two signals are rhythmically distinguishable when the failure
+   * window overlaps with a live session. */
   .vmx-cohost__foot[data-failed="true"] .vmx-cohost__foot-led {
     background: var(--led-fault);
     box-shadow:
       0 0 3px var(--led-fault),
       0 0 6px rgba(212, 65, 58, 0.28),
       inset 0 1px 0 rgba(255, 255, 255, 0.3);
-    animation: vmx-cohost-talk-pulse 1.4s ease-in-out infinite;
+    animation: vmx-cohost-talk-pulse 0.9s ease-in-out infinite;
   }
   .vmx-cohost__foot[data-failed="true"] .vmx-cohost__foot-lbl {
     color: var(--led-fault);
@@ -463,7 +471,6 @@ const CSS = `
     display: flex;
     justify-content: flex-end;
   }
-  .vmx-cohost__see-all[data-empty="true"] { display: none; }
   .vmx-cohost__see-all-link {
     font-family: var(--type-mono);
     font-variant-numeric: tabular-nums;
@@ -483,6 +490,19 @@ const CSS = `
     color: var(--amber-pale);
     text-shadow: 0 0 4px var(--amber-22);
     outline: none;
+  }
+  /* Empty state (N === 0): the footer line stays visible but quiet, so
+   * the affordance teaches itself during the opening 30s before the
+   * first reaction lands. silk-25 reads as "this is here, just not
+   * active yet". No cursor:pointer, no hover. */
+  .vmx-cohost__see-all-empty {
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--silk-25);
+    padding: 2px 4px;
+    user-select: none;
   }
 `;
 
@@ -540,22 +560,40 @@ function buildSeeAllLink(
   const wrap = document.createElement("div");
   wrap.className = "vmx-cohost__see-all";
   wrap.dataset.role = "see-all";
-  const hiddenCount = Math.max(0, totalReactions - MAX_LIVE_TRANSCRIPT_LINES);
-  if (!onOpen || hiddenCount === 0) {
+
+  // Without a click handler we can't actually open the debrief — but
+  // the footer line is still here, just silenced, so the rail height
+  // stays stable across sessions.
+  if (!onOpen) {
     wrap.dataset.empty = "true";
+    wrap.style.visibility = "hidden";
     return wrap;
   }
+
+  // N === 0: empty-state placeholder. Teaches the affordance during
+  // the quiet opening of a session (Q3 from 2026-05-19 remeasure).
+  if (totalReactions === 0) {
+    wrap.dataset.state = "empty";
+    const ph = document.createElement("span");
+    ph.className = "vmx-cohost__see-all-empty";
+    ph.textContent = "no reactions yet · debrief opens after the first one";
+    wrap.append(ph);
+    return wrap;
+  }
+
+  wrap.dataset.state = "linked";
   const link = document.createElement("button");
   link.type = "button";
   link.className = "vmx-cohost__see-all-link";
-  link.textContent = `see all ${totalReactions} reactions ↗`;
+  const noun = totalReactions === 1 ? "reaction" : "reactions";
+  link.textContent = `see all ${totalReactions} ${noun} ↗`;
   link.setAttribute(
     "title",
     `open the debrief window to scroll through every reaction this session (${totalReactions} total)`,
   );
   link.setAttribute(
     "aria-label",
-    `open debrief: see all ${totalReactions} reactions`,
+    `open debrief: see all ${totalReactions} ${noun}`,
   );
   link.addEventListener("click", (e) => {
     e.preventDefault();

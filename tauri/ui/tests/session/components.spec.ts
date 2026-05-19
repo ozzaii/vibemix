@@ -256,7 +256,7 @@ describe("renderCohostPanel", () => {
     ).toBe(3);
   });
 
-  it("renders the see-all footer link when transcript exceeds the cap + handler is wired", () => {
+  it("renders the see-all footer link when transcript has reactions + handler is wired", () => {
     const lines: TranscriptLine[] = Array.from({ length: 12 }, (_, i) => ({
       role: "ai",
       text: `line-${i}`,
@@ -275,7 +275,7 @@ describe("renderCohostPanel", () => {
     host().append(panel);
     const seeAll = panel.querySelector<HTMLElement>(".vmx-cohost__see-all");
     expect(seeAll).toBeTruthy();
-    expect(seeAll?.dataset.empty).toBeUndefined();
+    expect(seeAll?.dataset.state).toBe("linked");
     const link = panel.querySelector<HTMLButtonElement>(
       ".vmx-cohost__see-all-link",
     );
@@ -284,7 +284,39 @@ describe("renderCohostPanel", () => {
     expect(opened).toBe(1);
   });
 
-  it("see-all footer is hidden when transcript fits inside the live cap", () => {
+  it("see-all footer renders the empty-state placeholder when N=0", () => {
+    // 2026-05-19 critique round 5 (Kaan: "unique fun young"): the
+    // affordance teaches itself during the quiet opening of a session.
+    // The footer line stays visible at silk-25 with placeholder copy
+    // so the user knows the debrief path exists before the first
+    // reaction lands.
+    const panel = renderCohostPanel({
+      status: "LISTENING",
+      transcript: [],
+      latencyMs: null,
+      grounded: true,
+      onOpenAllReactions: () => {},
+    });
+    host().append(panel);
+    const seeAll = panel.querySelector<HTMLElement>(".vmx-cohost__see-all");
+    expect(seeAll?.dataset.state).toBe("empty");
+    const placeholder = panel.querySelector<HTMLElement>(
+      ".vmx-cohost__see-all-empty",
+    );
+    expect(placeholder?.textContent).toContain("no reactions yet");
+    expect(placeholder?.textContent).toContain("debrief opens after the first one");
+    // No clickable link in empty state.
+    expect(
+      panel.querySelector<HTMLButtonElement>(".vmx-cohost__see-all-link"),
+    ).toBeNull();
+  });
+
+  it("see-all footer renders a link even when N is below the live cap (rail height stays stable)", () => {
+    // 2026-05-19 critique round 5 (Kaan: "unique fun young"): the
+    // link is always-on at N>=1 so the affordance is observable from
+    // the first reaction. Two reactions visible in the glance still
+    // get the debrief link because debrief carries audio quote +
+    // citation context the live surface drops.
     const lines: TranscriptLine[] = Array.from({ length: 2 }, (_, i) => ({
       role: "ai",
       text: `line-${i}`,
@@ -299,7 +331,30 @@ describe("renderCohostPanel", () => {
     });
     host().append(panel);
     const seeAll = panel.querySelector<HTMLElement>(".vmx-cohost__see-all");
+    expect(seeAll?.dataset.state).toBe("linked");
+    const link = panel.querySelector<HTMLButtonElement>(
+      ".vmx-cohost__see-all-link",
+    );
+    expect(link?.textContent).toContain("2 reactions");
+  });
+
+  it("see-all footer is hidden when no click handler is wired", () => {
+    const lines: TranscriptLine[] = Array.from({ length: 5 }, (_, i) => ({
+      role: "ai",
+      text: `line-${i}`,
+      ts: "",
+    }));
+    const panel = renderCohostPanel({
+      status: "LISTENING",
+      transcript: lines,
+      latencyMs: null,
+      grounded: true,
+      // onOpenAllReactions intentionally omitted.
+    });
+    host().append(panel);
+    const seeAll = panel.querySelector<HTMLElement>(".vmx-cohost__see-all");
     expect(seeAll?.dataset.empty).toBe("true");
+    expect(seeAll?.style.visibility).toBe("hidden");
   });
 
   // Critique 2026-05-14: the foot now renders LED + label only — the

@@ -464,17 +464,45 @@ export function voiceProfileToCode(profile: string): string {
 /** Map the active mood to a 1-line DJ-vocabulary caption.
  *  Round 3 critique lift (H6): users shouldn't have to remember what
  *  HYPE / TEACH / COACH each do. The caption renders under the rocker
- *  whenever the persona-panel body is rebuilt. */
+ *  whenever the persona-panel body is rebuilt.
+ *
+ *  Round 5 ("unique fun young") rewrite: verb-led, no telemetry suffix.
+ *  The caption is the cohost's behavioral signature — not a menu
+ *  description. "talks over the build" reads like a teammate, the
+ *  prior "talking over the build · party energy" read like a config
+ *  preview. */
 function moodCaptionFor(mood: string): string {
   switch (mood) {
     case "HYPE":
-      return "talking over the build · party energy";
+      return "talks over the build";
     case "TEACH":
-      return "pointing out what worked · steady";
+      return "spots what worked";
     case "COACH":
-      return "waiting for the mix-out · analytical";
+      return "waits for the mix-out";
     default:
       return "";
+  }
+}
+
+/** Mood-tinted silk for the caption. Round 5 ("unique fun young"):
+ *  silk-40 was uniform across all three moods, so the polychrome
+ *  contract on the rocker had no echo below. Each mood biases the
+ *  caption color toward its own hue: 70% silk + 30% mood at ~0.55
+ *  alpha. Still reads as "muted descriptive text", just tinted, so
+ *  the persona block feels alive without breaking the One Amber Rule. */
+function moodCaptionColor(mood: string): string {
+  switch (mood) {
+    case "HYPE":
+      // silk(214,207,199)·0.7 + magenta(255,45,143)·0.3 at 0.55
+      return "rgba(226, 158, 182, 0.55)";
+    case "TEACH":
+      // silk·0.7 + green(109,212,74)·0.3 at 0.55
+      return "rgba(182, 209, 161, 0.55)";
+    case "COACH":
+      // silk·0.7 + blue(72,152,255)·0.3 at 0.55
+      return "rgba(171, 191, 216, 0.55)";
+    default:
+      return "var(--silk-40)";
   }
 }
 
@@ -517,15 +545,17 @@ function buildPersonaPanelBody(state: SessionState): HTMLElement {
   const moodCaption = document.createElement("div");
   moodCaption.className = "vmx-session__mood-caption";
   moodCaption.dataset.role = "mood-caption";
+  moodCaption.dataset.mood = state.persona.mood;
   moodCaption.style.cssText =
     "font-family: var(--type-body);" +
     "font-variation-settings: 'wdth' 100, 'wght' 400;" +
     "font-size: 11px;" +
     "line-height: 1.35;" +
-    "color: var(--silk-40);" +
+    `color: ${moodCaptionColor(state.persona.mood)};` +
     "letter-spacing: 0.02em;" +
     "padding: 0 var(--sp-1);" +
-    "text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);";
+    "text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);" +
+    "transition: color var(--motion-step) ease-out;";
   moodCaption.textContent = moodCaptionFor(state.persona.mood);
   wrap.append(moodCaption);
 
