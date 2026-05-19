@@ -108,19 +108,30 @@ Each cell speaks a different vocabulary on purpose. Beginner is encouragement-he
 
 | Phase | Surface | What shipped |
 |---|---|---|
-| 27 | Eval Harness + v2.0 Carry-Forward Close-Out | Autonomous hallucination proxy gate + sidecar universal2 + WASAPI subscription + Achird OPUS render + FLX4 sync sniff + `register_library` 5-min orphan patch |
-| 28 | Library Intelligence v1 | Gemini Embedding 2 + sqlite-vec / numpy fallback · vibe search · "what's playing" grounding · drag-drop UI · 30-day staleness nudge |
-| 29 | Post-Session Debrief MVP UI | Chaptered review · 60–90s voiced TL;DR · 3 drills · clickable timeline · cited critique |
-| 30 | 2 Hard Tek Detectors | `DISTORTION_CLIMB` + `ACID_LINE_ENTRY` (taxonomy completion) |
-| 31 | 4-Layer Mascot Full Additive State Machine | Base + Emotion + Anticipation + Reaction (EXTENDS v2.0, never rewrites) |
-| 32 | Long-Term DJ Profile (~2KB JSON) | Post-session regen + verbatim cache-side inject + content allowlist |
-| 33 | One-Click Install Hardening | TCC pre-grant wizard + BlackHole auto-detect + fresh-VM rehearsal + sidecar polish + first-launch onboarding |
-| 34 | Open-Source Security Pass | Secret scanner + dep CVE + SBOM + STRIDE-lite + signed-binary verify + SECURITY.md + telemetry opt-in default-OFF |
-| 35 | Real GLB Animations + 30s Viral Demo Film | Meshy v6 / Hunyuan3D + Mixamo auto-rig + 5 `prep_*` replacement + ffmpeg 3-beat cut + bundled `demo.mp4` |
-| 36 | Day-Zero Ops Automation | Discord auto-provision + 100 RPS × 5min real load test + pre-seeded star coordination + launch trigger sequence + healthz live |
-| 37 | Cross-Phase Integration Audit Gate | `tests/e2e/test_seam_*` + integration audit script + orphan inventory + grey-area decision log |
-| 38 | Signing Pipeline Real Execution | Apple notarytool + SignPath GH Action wired with real secrets + post-sign verifier + Kaan local rehearsal script |
-| 39 | Public RC Cut + Ship | `cut_release.sh` 6-gate pre-flight · README hero `<video>` + feature-matrix auto-sync · 5-channel social publisher + NACK window · Discord launch flow · `sync_github_meta.sh` topics/description SoT · changelog auto-populator · 24h launch-rotation doc · Phase 16 override expiry gate |
+| 27 | Eval Harness + v2.0 Carry-Forward Close-Out (9/9 plans, 140 tests) | completed 2026-05-15 |
+| 28 | Library Intelligence v1 (9/9 plans, 258 tests) | completed 2026-05-15 |
+| 29 | Post-Session Debrief MVP UI (9/9 plans) | completed 2026-05-15 |
+| 30 | 2 Hard Tek Detectors (4/4 plans, 45 tests) | completed 2026-05-15 |
+| 31 | 4-Layer Mascot Full Additive State Machine (8/8 plans, 17 mascot tests, GLB 21.67/25 MB) | completed 2026-05-15 |
+| 32 | Long-Term DJ Profile ~2KB JSON (6/6 plans, 67 tests, P51/P53/P60 enforced) | completed 2026-05-15 |
+| 33 | One-Click Install Hardening (9/9 plans, 50 tests; INSTALL-VM-RUN = KAAN-ACTION-LEGAL) | completed 2026-05-15 |
+| 34 | Open-Source Security Pass (10/10 plans, 63 tests) | completed 2026-05-15 |
+| 35 | Real GLBs + 30s Viral Demo Film (6/6 plans, 35 tests; real assets = KAAN-ACTION-LEGAL) | completed 2026-05-15 |
+| 36 | Day-Zero Operations Automation (6/6 plans, 36 tests; 6 real-execution items = KAAN-ACTION-LEGAL) | completed 2026-05-15 |
+| 37 | Cross-Phase Integration Audit Gate (6/6 plans, 42 tests; 5/5 seams WIRED) | completed 2026-05-15 |
+| 38 | Signing Pipeline Real Execution (6/6 plans, 58 tests; DIST-09 + DIST-11 = P46 legal-capacity carveouts) | completed 2026-05-15 |
+| 39 | Public RC Cut + Ship (8/8 plans, 91 tests; §SHIP × 6 + §POST-RC-CLEANUP × 3 = KAAN-ACTION-LEGAL) | completed 2026-05-15 |
+| 40 | Anti-Slop Audio Port (6/6 plans) | completed 2026-05-16 (AUDIO-01..04 GREEN; AUDIO-05/06/07 = KAAN-ACTION-LEGAL) |
+| 41 | Gemini SKU Upgrade + Latency Stack v2 (7/7 plans) | completed 2026-05-16 (LAT-01..08 GREEN; LAT-09 spike = KAAN-ACTION-PROXY) |
+| 42 | Hallucination Gate v3 | Hybrid (6/6 plans) — completed 2026-05-16 (GATE-05..09 GREEN; GATE-01/02/03/04 corpus = KAAN-ACTION-LEGAL) |
+| 43 | Visual Ship Lock (9/9 plans) | completed 2026-05-16 (VIS-01..09 GREEN; VIS-04 Mixamo retargets = KAAN-ACTION-LEGAL) |
+| 44 | Launch Positioning + Pre-stage (7/7 plans) | completed 2026-05-17 (LAUNCH-01..10 GREEN; LAUNCH-03/04/06/07/08 = KAAN-ACTION-LEGAL) |
+| 45 | External Discharge + Public RC Publish (6/6 plans) | completed 2026-05-17 (SHIP-08/11/13 engineering GREEN; SHIP-01..13 cookbook in KAAN-ACTION-LEGAL) |
+| 46 | Dependency Audit + Lockfile + AUDIT.md (6/6 plans, 45 tests + 1 xfail; DEPS-01..06 + DEPS-09/10 GREEN; DEPS-07 pinact + DEPS-08 cull-blocked documented in AUDIT.md § Decisions) | completed 2026-05-18 |
+| 47 | Mascot Real GLB Land + Full Emotion Coverage (8/8 plans, 63 python + 177 ts tests; MASCOT-01..08 GREEN; §VIS-04 + §VIS-05 Mixamo discharge = KAAN-ACTION) | completed 2026-05-18 |
+| 48 | New-Dep + Integration Opportunity Scan (6/6 plans, 19 tests; OPP-01..06 GREEN; 24 candidates rated 1G/8Y/9R-constraint/6R-risk; OBS adopted docs-only) | completed 2026-05-18 |
+| 49 | Win + Mac One-Click Installer Chain (6/6 plans, 68 passing + 1 skip; INSTALL-01..10 GREEN; §INSTALL-COMPANION-SIGN + §INSTALL-VM-RUN + §SHIP-CONTACT-VBAUDIO = KAAN-ACTION; median 41,000 ms / 60,000 ms budget) | completed 2026-05-18 |
+| 50 | End-to-End MacBook + OS-Matrix Pass (6/6 plans, 16 passing + 5 CI-tolerant skips; E2E-01..10 GREEN; §E2E-50A-WALK + §INSTALL-VM-RUN downstream = KAAN-ACTION; Gate 6b wired into cut_release.sh) | completed 2026-05-18 |
 
 <!-- AUTO-GEN: feature-matrix END -->
 

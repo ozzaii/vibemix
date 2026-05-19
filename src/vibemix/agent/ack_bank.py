@@ -137,9 +137,15 @@ class AckBank:
         self,
         dir: Path = ACK_BANK_DIR,
         time_fn: Callable[[], float] = time.monotonic,
+        suppress_fire: bool = False,
     ) -> None:
         self._dir = dir
         self._time_fn = time_fn
+        # suppress_fire short-circuits should_fire when the bank's clip
+        # contents are out-of-policy for the current session — runtime
+        # callers set this True while Turkish-persona sessions still
+        # serve English placeholder clips. Clears when TR clips ship.
+        self._suppress_fire = suppress_fire
         self._clips: dict[str, list[np.ndarray]] = {}
         # Per-bucket rotation deque — maxlen=10 > ACKS_PER_BUCKET=8 so the
         # "available indices" set is non-empty in steady state.
@@ -160,9 +166,14 @@ class AckBank:
                     f"bucket {bucket} directory not found at {bucket_dir}"
                 )
             files = sorted(bucket_dir.glob("*.opus"))
-            if len(files) != ACKS_PER_BUCKET:
+            # 2026-05-18 — relaxed from strict `== ACKS_PER_BUCKET` so partial
+            # bucket fills (e.g. mix_move with 4/8 recorded clips) don't
+            # block the cohost from booting. The rotation logic in
+            # ``pick_for_event`` keys off ``len(self._clips[bucket])`` so a
+            # short bucket cycles its available indices instead of crashing.
+            if not files:
                 raise AckBankError(
-                    f"bucket {bucket} has {len(files)} files, expected {ACKS_PER_BUCKET}"
+                    f"bucket {bucket} has no .opus files at {bucket_dir}"
                 )
             self._clips[bucket] = [self._decode_opus(f) for f in files]
 
@@ -237,7 +248,10 @@ class AckBank:
         """
         bucket = self.bucket_for_event(ev.type)
         rot = self._rot[bucket]
-        available = [i for i in range(ACKS_PER_BUCKET) if i not in rot]
+        # Use actual bucket size — partial buckets (relaxed load above) must
+        # rotate over the indices they have, not range(ACKS_PER_BUCKET).
+        bucket_n = len(self._clips[bucket])
+        available = [i for i in range(bucket_n) if i not in rot]
         if available:
             idx = available[0]
             rot.append(idx)
@@ -289,7 +303,14 @@ class AckBank:
         them after each ack fire and Gemini response respectively.
         ``cancel_cooldown_active`` is a snapshot the caller computes from
         ``CancelGate.last_cancel_at`` + ``CANCEL_COOLDOWN_S``.
+
+        When ``suppress_fire=True`` was passed to the constructor, this
+        method short-circuits to ``(False, "suppressed")`` before any
+        gate runs — used while bank contents don't match the active
+        persona's language.
         """
+        if self._suppress_fire:
+            return (False, "suppressed")
         # Gate 1: TTFT.
         if rolling_ttft_avg_ms <= ACK_TTFT_GATE_MS:
             return (False, "ttft_ok")

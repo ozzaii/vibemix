@@ -20,7 +20,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts/dist/snapshot_capabilities.py"
-SNAPSHOT = REPO_ROOT / "tauri/src-tauri/capabilities/SNAPSHOT.json"
+SNAPSHOT = REPO_ROOT / "tauri/src-tauri/capabilities-snapshot/SNAPSHOT.json"
 DEFAULT = REPO_ROOT / "tauri/src-tauri/capabilities/default.json"
 
 

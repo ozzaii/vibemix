@@ -16,15 +16,23 @@ from vibemix.agent.config import (
 )
 
 
-def test_config_01_constants_match_v4() -> None:
-    """CONFIG-01: byte-identical strings to v4:97-104."""
+def test_config_01_constants_pinned() -> None:
+    """CONFIG-01: agent constants are pinned to the current shipped values.
+
+    Originally byte-identity to cohost_v4.py was the contract. v4 was
+    retired into ``.planning/research/v3-shipped/`` once its behavior had
+    been ported into this package, so the test now pins the
+    package-side source of truth directly. Device defaults are settable
+    per-machine via the calibration wizard; the strings here are the
+    factory values.
+    """
     assert LLM_MODEL == "gemini-3-flash-preview"
     assert TTS_MODEL == "gemini-3.1-flash-tts-preview"
     assert TTS_FALLBACK_MODEL == "gemini-2.5-flash-preview-tts"
     assert OPENROUTER_TTS_MODEL == "google/gemini-3.1-flash-tts-preview"
     assert VOICE == "Achird"
     assert INPUT_DEVICE == "BlackHole 2ch"
-    assert OUTPUT_DEVICE == "AI Capture"
+    assert OUTPUT_DEVICE == "MacBook Pro Speakers"
     assert MIC_DEVICE == "MacBook Pro Microphone"
 
 

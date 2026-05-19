@@ -109,15 +109,16 @@ def test_default_retention_7d_prunes_old_session(tmp_path: Path) -> None:
     old = _plant_session(root, "20260101-120000")
     fresh = _plant_session(root, "20260513-120000")
 
-    deleted = run_retention_sweep(
+    result = run_retention_sweep(
         root,
         retention_days=7,
         now=datetime(2026, 5, 14, 12, 0, 0),
     )
 
-    assert deleted == ["20260101-120000"], (
-        f"expected only the >7d-old dir to be pruned, got {deleted!r}"
+    assert result.deleted_names == ["20260101-120000"], (
+        f"expected only the >7d-old dir to be pruned, got {result!r}"
     )
+    assert result.bytes_pruned >= 0
     assert not old.exists(), "old session dir must be removed from disk"
     assert fresh.exists(), "≤7d-old session dir must remain on disk"
 
@@ -144,9 +145,10 @@ def test_infinite_sentinel_36500_short_circuits_without_scan(
 
     fake_scandir = MagicMock(side_effect=AssertionError("scandir must not be called"))
     with patch("vibemix.runtime.recordings_index.os.scandir", fake_scandir):
-        deleted = run_retention_sweep(root, retention_days=36500)
+        result = run_retention_sweep(root, retention_days=36500)
 
-    assert deleted == [], f"sentinel must return []; got {deleted!r}"
+    assert result.deleted_names == [], f"sentinel must return []; got {result!r}"
+    assert result.bytes_pruned == 0
     fake_scandir.assert_not_called()
 
 
@@ -181,15 +183,16 @@ def test_live_session_dir_excluded_from_sweep(tmp_path: Path) -> None:
     active_name = active_started.strftime("%Y%m%d-%H%M%S")
     active_dir = _plant_session(root, active_name)
 
-    deleted = run_retention_sweep(
+    result = run_retention_sweep(
         root,
         retention_days=1,  # cutoff = frozen_now - 1d → active session is way fresher
         now=frozen_now,
     )
 
-    assert deleted == [], (
-        f"live (active) session dir must NOT be pruned; got {deleted!r}"
+    assert result.deleted_names == [], (
+        f"live (active) session dir must NOT be pruned; got {result!r}"
     )
+    assert result.bytes_pruned == 0
     assert active_dir.exists(), "active session dir must remain on disk"
 
 

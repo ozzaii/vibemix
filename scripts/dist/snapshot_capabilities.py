@@ -2,7 +2,14 @@
 """Phase 34 / SEC-09 — Tauri capability snapshot generator.
 
 Produces a deterministic, canonical JSON representation of the current
-Tauri capability set at ``tauri/src-tauri/capabilities/SNAPSHOT.json``.
+Tauri capability set at ``tauri/src-tauri/capabilities-snapshot/SNAPSHOT.json``.
+
+The snapshot lives in a SIBLING directory to ``capabilities/`` (NOT inside
+``capabilities/`` itself) because Tauri's build-time loader scans
+``capabilities/*.json`` and errors on duplicate identifiers — and the
+snapshot is intentionally a derived copy of ``default.json`` (same
+identifier "default"). The sibling location keeps the SEC-09 audit
+invariant intact while letting ``cargo tauri build`` succeed locally.
 
 The snapshot file is committed. The CI workflow
 ``.github/workflows/capabilities-lint.yml`` regenerates the snapshot
@@ -32,7 +39,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CAP = REPO_ROOT / "tauri/src-tauri/capabilities/default.json"
-SNAPSHOT = REPO_ROOT / "tauri/src-tauri/capabilities/SNAPSHOT.json"
+SNAPSHOT = REPO_ROOT / "tauri/src-tauri/capabilities-snapshot/SNAPSHOT.json"
 
 
 def canonicalise(data: dict[str, Any]) -> dict[str, Any]:

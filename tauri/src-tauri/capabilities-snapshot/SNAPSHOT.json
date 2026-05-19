@@ -10,8 +10,12 @@
     "core:window:default",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
-    "macos-permissions:allow-check-permission",
-    "macos-permissions:allow-request-permission",
+    "macos-permissions:allow-check-accessibility-permission",
+    "macos-permissions:allow-check-microphone-permission",
+    "macos-permissions:allow-check-screen-recording-permission",
+    "macos-permissions:allow-request-accessibility-permission",
+    "macos-permissions:allow-request-microphone-permission",
+    "macos-permissions:allow-request-screen-recording-permission",
     "macos-permissions:default",
     "positioner:default",
     "process:default",
@@ -19,6 +23,30 @@
     "updater:default",
     {
       "allow": [
+        {
+          "args": [
+            {
+              "validator": ".*audio_config\\.py$"
+            },
+            {
+              "validator": "^--(probe-48k|configure-routing|probe-only|remove-routing)$"
+            }
+          ],
+          "cmd": "python3",
+          "name": "python3"
+        },
+        {
+          "args": [
+            {
+              "validator": ".*fetch_drivers\\.sh$"
+            },
+            {
+              "validator": "^--(dry-run|auto|check-syntax)$"
+            }
+          ],
+          "cmd": "bash",
+          "name": "bash"
+        },
         {
           "args": [
             {
@@ -30,6 +58,51 @@
           ],
           "name": "binaries/vibemix-core",
           "sidecar": true
+        },
+        {
+          "args": [
+            {
+              "validator": "^-NoProfile$"
+            },
+            {
+              "validator": "^-ExecutionPolicy$"
+            },
+            {
+              "validator": "^Bypass$"
+            },
+            {
+              "validator": "^-File$"
+            },
+            {
+              "validator": ".*fetch_drivers\\.ps1$"
+            },
+            {
+              "validator": "^-(Auto|DryRun)$"
+            }
+          ],
+          "cmd": "powershell.exe",
+          "name": "powershell"
+        },
+        {
+          "args": [
+            {
+              "validator": "^-a$"
+            },
+            {
+              "validator": "^Audio MIDI Setup$"
+            }
+          ],
+          "cmd": "open",
+          "name": "open"
+        },
+        {
+          "args": [
+            {
+              "validator": "^mmsys\\.cpl,,\\d+$"
+            }
+          ],
+          "cmd": "control.exe",
+          "name": "control"
         }
       ],
       "identifier": "shell:allow-execute"

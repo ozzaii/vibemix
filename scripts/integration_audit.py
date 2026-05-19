@@ -469,15 +469,49 @@ class GreyAreaEntry:
     source_file: str
 
 
+_PHASE_NAME_RE = re.compile(r"^\d{2,3}-")
+
+
+def _iter_all_phase_dirs() -> list[Path]:
+    """Yield every phase directory the project has, live + archived.
+
+    Live phases live under ``.planning/phases/<NN>-<slug>/``. At
+    milestone close they move to one of two archive layouts:
+
+    * ``.planning/milestones/<version>-phases/<NN>-<slug>/`` (current)
+    * ``.planning/milestones/<version>/phases/<NN>-<slug>/`` (legacy v0.1.0)
+
+    Either way the grey-area + changelog generators MUST see them so
+    historical decisions don't fall off the audit trail. Identification
+    rule: a "phase dir" is any directory whose basename starts with
+    ``NN-`` (two-digit phase number prefix).
+    """
+    dirs: list[Path] = []
+    live = REPO / ".planning" / "phases"
+    if live.exists():
+        dirs.extend(p for p in live.iterdir() if p.is_dir() and _PHASE_NAME_RE.match(p.name))
+    archived_root = REPO / ".planning" / "milestones"
+    if archived_root.exists():
+        for milestone in archived_root.iterdir():
+            if not milestone.is_dir():
+                continue
+            # Current layout: milestone dir IS the phases container.
+            for child in milestone.iterdir():
+                if child.is_dir() and _PHASE_NAME_RE.match(child.name):
+                    dirs.append(child)
+            # Legacy layout: a nested `phases/` subdir.
+            nested = milestone / "phases"
+            if nested.is_dir():
+                for child in nested.iterdir():
+                    if child.is_dir() and _PHASE_NAME_RE.match(child.name):
+                        dirs.append(child)
+    return sorted(set(dirs), key=lambda p: p.name)
+
+
 def collect_grey_area_decisions() -> list[GreyAreaEntry]:
     """Walk every phase SUMMARY/VERIFICATION for grey-area autonomous marks."""
     out: list[GreyAreaEntry] = []
-    phases_dir = REPO / ".planning" / "phases"
-    if not phases_dir.exists():
-        return out
-    for phase in sorted(phases_dir.iterdir()):
-        if not phase.is_dir():
-            continue
+    for phase in _iter_all_phase_dirs():
         phase_name = phase.name
         for fname in ("*-SUMMARY.md", "*-VERIFICATION.md", "*-CONTEXT.md"):
             for f in phase.glob(fname):

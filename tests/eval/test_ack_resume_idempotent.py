@@ -127,6 +127,11 @@ def test_resume_dry_run_does_not_call_gemini(
 
     monkeypatch.setattr(mod.subprocess, "run", _explode)
 
+    # Snapshot before — other tests in the run may have imported google.genai
+    # through vibemix.agent already. The contract under test is that the
+    # dry-run wrapper itself doesn't import it as a side effect.
+    genai_loaded_before = "google.genai" in sys.modules
+
     rc = main(
         [
             "--dry-run",
@@ -137,8 +142,10 @@ def test_resume_dry_run_does_not_call_gemini(
         ]
     )
     assert rc == 0
-    # google.genai must not appear in sys.modules as a side-effect of the call.
-    assert "google.genai" not in sys.modules
+    # The wrapper must not import google.genai as a side-effect of the call.
+    # (If it was already loaded by a prior test, that's not the wrapper's fault.)
+    if not genai_loaded_before:
+        assert "google.genai" not in sys.modules
 
 
 def test_resume_default_mode_is_dry_run(

@@ -29,7 +29,6 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
 use crate::recordings;
-use crate::sidecar;
 
 pub const DEBRIEF_WINDOW_LABEL: &str = "debrief";
 

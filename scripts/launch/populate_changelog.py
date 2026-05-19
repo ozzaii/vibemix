@@ -27,14 +27,44 @@ TEMPLATE = REPO_ROOT / "scripts" / "launch" / "changelog_template.md"
 SUMMARY_FILE_RE = re.compile(r"^(\d+)-SUMMARY\.md$")
 
 
+_PHASE_DIR_RE = re.compile(r"^\d{2,3}-")
+
+
+def _all_phase_dirs() -> list[Path]:
+    """Live + archived phase dirs.
+
+    Live: ``.planning/phases/<NN>-<slug>/``.
+    Archived (current): ``.planning/milestones/<version>-phases/<NN>-<slug>/``.
+    Archived (legacy v0.1.0): ``.planning/milestones/<version>/phases/<NN>-<slug>/``.
+
+    A "phase dir" is identified by an ``NN-`` basename prefix so we
+    don't sweep up milestone metadata files.
+    """
+    dirs: list[Path] = []
+    if PHASES_DIR.exists():
+        dirs.extend(
+            p for p in PHASES_DIR.iterdir() if p.is_dir() and _PHASE_DIR_RE.match(p.name)
+        )
+    archived_root = REPO_ROOT / ".planning" / "milestones"
+    if archived_root.exists():
+        for milestone in archived_root.iterdir():
+            if not milestone.is_dir():
+                continue
+            for child in milestone.iterdir():
+                if child.is_dir() and _PHASE_DIR_RE.match(child.name):
+                    dirs.append(child)
+            nested = milestone / "phases"
+            if nested.is_dir():
+                for child in nested.iterdir():
+                    if child.is_dir() and _PHASE_DIR_RE.match(child.name):
+                        dirs.append(child)
+    return sorted(set(dirs), key=lambda p: p.name)
+
+
 def find_phase_summaries(min_phase: int = 27) -> list[Path]:
     """Return phase summary files for Phase {min_phase}+ in ascending order."""
     out: list[tuple[int, Path]] = []
-    if not PHASES_DIR.exists():
-        return []
-    for sub in sorted(PHASES_DIR.iterdir()):
-        if not sub.is_dir():
-            continue
+    for sub in _all_phase_dirs():
         for f in sub.iterdir():
             m = SUMMARY_FILE_RE.match(f.name)
             if not m:

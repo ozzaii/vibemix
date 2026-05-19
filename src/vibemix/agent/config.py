@@ -43,5 +43,5 @@ VOICE: str = "Achird"
 
 # ---- Device names (v4:101-103) ----
 INPUT_DEVICE: str = "BlackHole 2ch"
-OUTPUT_DEVICE: str = "AI Capture"  # v4:102 — Multi-Output: External Headphones + BlackHole 16ch (OBS picks BH16ch). Phase 11 calibration wizard will surface this.
+OUTPUT_DEVICE: str = "MacBook Pro Speakers"  # 2026-05-18 — Kaan's pick for tonight (was "AI Capture" aggregate, switched to laptop speakers).
 MIC_DEVICE: str = "MacBook Pro Microphone"

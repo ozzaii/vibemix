@@ -46,14 +46,26 @@ def test_debrief_port_constant_is_8766():
 
 
 def test_run_debrief_sidecar_logs_banner_with_session_dir(caplog):
-    """Path argument surfaces in the banner log; port reservation noted."""
+    """Path argument surfaces in the banner log; port reservation noted.
+
+    The real orchestrator (`vibemix.debrief.main.run`) is stubbed out so
+    we only assert on the banner emitted by ``_run_debrief_sidecar`` itself.
+    Phase 29 Plan 02 added the orchestrator call; before it the function
+    was banner-only — keeping the test scoped to the banner means it
+    doesn't break every time the orchestrator gains a new INFO log.
+    """
     with caplog.at_level(logging.INFO, logger="vibemix.debrief"):
-        _run_debrief_sidecar("/tmp/sessions/abc")
-    messages = [r.getMessage() for r in caplog.records if r.name == "vibemix.debrief"]
-    assert len(messages) == 1
-    assert "session_dir='/tmp/sessions/abc'" in messages[0]
-    assert "port 8766" in messages[0]
-    assert "v2.0 architectural slot" in messages[0]
+        with patch("vibemix.debrief.main.run") as orch:
+            orch.return_value = None
+            _run_debrief_sidecar("/tmp/sessions/abc")
+    banner_msgs = [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == "vibemix.debrief" and r.getMessage().startswith("[debrief] starting sidecar")
+    ]
+    assert len(banner_msgs) == 1
+    assert "/tmp/sessions/abc" in banner_msgs[0]
+    assert "port 8766" in banner_msgs[0]
 
 
 def test_run_debrief_sidecar_logs_banner_without_session_dir(caplog):
@@ -67,12 +79,19 @@ def test_run_debrief_sidecar_logs_banner_without_session_dir(caplog):
 
 
 def test_cli_entry_routes_debrief_to_sidecar(caplog):
-    """``cli_entry(["--debrief", ...])`` routes into _run_debrief_sidecar and returns."""
+    """``cli_entry(["--debrief", ...])`` routes into _run_debrief_sidecar and
+    returns without spinning up the main runtime. The DEBRIEF orchestrator
+    is stubbed to a no-op so its internal ``asyncio.run`` calls don't leak
+    into the assertion — the contract under test is "cli_entry does NOT
+    call ``vibemix.__main__.asyncio.run``", not "the orchestrator is
+    asyncio-free internally".
+    """
     with caplog.at_level(logging.INFO, logger="vibemix.debrief"):
-        # Must not raise; must not call asyncio.run (that would engage main()).
-        with patch("vibemix.__main__.asyncio.run") as mock_run:
-            cli_entry(["--debrief", "test-session-dir"])
-            assert mock_run.call_count == 0
+        with patch("vibemix.debrief.main.run") as orch:
+            orch.return_value = None
+            with patch("vibemix.__main__.asyncio.run") as mock_run:
+                cli_entry(["--debrief", "test-session-dir"])
+                assert mock_run.call_count == 0
     messages = [r.getMessage() for r in caplog.records if r.name == "vibemix.debrief"]
     assert any("test-session-dir" in m for m in messages)
 

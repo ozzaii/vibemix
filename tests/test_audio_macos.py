@@ -192,17 +192,44 @@ def test_open_passthrough_output_pre_open_guard(mocker: MockerFixture, make_back
     assert out_mock.call_count == 0
 
 
-def test_open_voice_output_pre_open_guard(mocker: MockerFixture, make_backend) -> None:
-    """Voice output respects pre-open sample-rate guard."""
+def test_open_voice_output_resamples_instead_of_raising(
+    mocker: MockerFixture, make_backend
+) -> None:
+    """2026-05-18 — voice output no longer raises on rate mismatch.
+
+    Aggregate devices (AI Capture stacking on top of BlackHole, AirPods at
+    44.1k) refuse 24kHz Gemini TTS opens, so the backend now opens the
+    stream at the device's native rate and wraps the source callback with
+    either an integer-ratio np.repeat upsample or a scipy resample_poly.
+    The pre-open guard remains only for capture / passthrough / mic paths
+    where the upstream pipeline assumes lock-step rates.
+    """
     mocker.patch(
         "vibemix.platform._audio_macos.sd.query_devices",
         return_value={"default_samplerate": 44100.0, "name": "Headphones"},
     )
-    out_mock = mocker.patch("vibemix.platform._audio_macos.sd.RawOutputStream")
+    fake_stream = MagicMock()
+    fake_stream.samplerate = 44100  # what PortAudio actually negotiated
+    out_mock = mocker.patch(
+        "vibemix.platform._audio_macos.sd.RawOutputStream",
+        return_value=fake_stream,
+    )
+
     backend = make_backend()
-    with pytest.raises(SampleRateMismatchError):
-        backend.open_voice_output(0, sample_rate=24000, block_size=1024, callback=lambda *a: None)
-    assert out_mock.call_count == 0
+    handle = backend.open_voice_output(
+        0, sample_rate=24000, block_size=1024, callback=lambda *a: None
+    )
+
+    # Backend wraps the raw sd.RawOutputStream in an _SoundDeviceStreamHandle.
+    assert handle is not None
+    out_mock.assert_called_once()
+    # Stream was opened at the device's native rate, not the requested 24kHz.
+    call_kwargs = out_mock.call_args.kwargs
+    assert call_kwargs["samplerate"] == 44100
+    # Wrapped callback differs from the user-supplied lambda — backend
+    # injected the resample shim.
+    assert callable(call_kwargs["callback"])
+    fake_stream.start.assert_called_once()
 
 
 def test_open_mic_capture_pre_open_guard(mocker: MockerFixture, make_backend) -> None:

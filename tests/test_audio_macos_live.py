@@ -74,15 +74,18 @@ def test_blackhole_device_present_at_48khz_or_raises() -> None:
 
 
 def test_open_voice_output_completes_without_real_audio_device() -> None:
-    """Try opening voice output to External Headphones (or fallback). Returns
-    a handle satisfying AudioStream Protocol; close immediately."""
+    """Verify find_device can locate any output device on Kaan's machine —
+    "External Headphones" → "Headphones" → "MacBook Pro Speakers" fallback
+    chain so the live smoke survives custom-named headphone devices
+    (HEADPHONEMG, AIDJ Aggregate, etc.).
+    """
     backend = _make_backend()
-    try:
-        idx = backend.find_device("External Headphones", "output")
-    except RuntimeError:
-        # Fallback: any output device on the system
-        idx = backend.find_device("Headphones", "output")
-
-    # We don't actually want to open a real audio stream in CI / live smoke.
-    # Just verify find_device worked.
+    for candidate in ("External Headphones", "Headphones", "MacBook Pro Speakers"):
+        try:
+            idx = backend.find_device(candidate, "output")
+            break
+        except RuntimeError:
+            continue
+    else:  # pragma: no cover — every Mac has built-in speakers
+        pytest.skip("no recognizable output device on this Mac")
     assert idx >= 0

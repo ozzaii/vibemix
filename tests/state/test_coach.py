@@ -223,10 +223,13 @@ def _ev(type_: str, extra: dict | None = None) -> Event:
 
 
 def test_task_kaan_spoke_exact_string():
+    """2026-05-18 — word-count clauses dropped from prompts; Gemini routinely
+    blew past the budget and the clause was just noise. Reactions stay
+    short by `style:` rules in the system instruction, not per-prompt budget."""
     out = AICoach.task_for_event(_ev("KAAN_SPOKE"))
     assert (
         out
-        == "Kaan just SPOKE — answer him directly, friend tone, 6-15 words. Not a music reaction."
+        == "Kaan just SPOKE — answer him directly, friend tone. Short. Not a music reaction."
     )
 
 
@@ -234,7 +237,7 @@ def test_task_manual_exact_string():
     out = AICoach.task_for_event(_ev("MANUAL"))
     assert out == (
         "Kaan hit his trigger — react with substance to ONE concrete thing "
-        "(audible event or recent move). 12-18 words."
+        "(audible event or recent move)."
     )
 
 
@@ -244,7 +247,7 @@ def test_task_track_change_no_prev_track():
     assert "Track flipped." in out
     assert "(was:" not in out
     assert "React to the NEW track's vibe vs the previous" in out
-    assert "Past tense." in out
+    assert "heavier, weirder, darker, more euphoric?" in out
 
 
 def test_task_track_change_with_prev_track():
@@ -256,7 +259,7 @@ def test_task_track_change_with_prev_track():
 def test_task_phase_exact_format():
     out = AICoach.task_for_event(_ev("PHASE", {"prev_phase": "groove", "new_phase": "drop"}))
     assert "Phase shifted: groove→drop." in out
-    assert "10-14 words" in out
+    assert "FEELS like, not the label." in out
 
 
 def test_task_phase_fallback_when_extras_missing():
@@ -269,7 +272,7 @@ def test_task_layer_arrival_exact_string():
     out = AICoach.task_for_event(_ev("LAYER_ARRIVAL"))
     assert out == (
         "A new sonic layer arrived — synth lead, hi-hat layer, vocal, "
-        "riff, pad. Name what arrived and how it feels. 10-14 words."
+        "riff, pad. Name what arrived and how it feels."
     )
 
 
@@ -291,13 +294,13 @@ def test_task_heartbeat_LOAD_BEARING_anti_silence_clause():
     assert out == (
         "Steady stretch. ONE sharp observation about the SOUND right "
         "now — groove, texture, what the track is doing musically. "
-        "8-12 words. Always reply with something fresh; don't go silent."
+        "Always reply with something fresh; don't go silent."
     )
 
 
 def test_task_fallback_unknown_type():
     out = AICoach.task_for_event(_ev("UNKNOWN_TYPE"))
-    assert out == "React naturally. 10-14 words."
+    assert out == "React naturally."
 
 
 # ---------- build_prompt: format wrapper ----------

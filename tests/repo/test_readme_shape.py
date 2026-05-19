@@ -44,17 +44,21 @@ def test_readme_references_asset(readme_text: str, ref: str) -> None:
     assert ref in readme_text, f"README missing reference to {ref}"
 
 
+# The canonical 10-controller set, locked against the JSON profiles in
+# ``src/vibemix/midi/controllers/`` (the actual source of truth for what
+# ships out-of-the-box). The earlier list named aspirational controllers
+# that never had mapping files — kept the README from being able to pass.
 REQUIRED_CONTROLLERS = [
-    "DDJ-FLX4",
+    "DDJ-200",
     "DDJ-400",
-    "DDJ-FLX6",
-    "DDJ-FLX10",
-    "DDJ-1000",
-    "DDJ-SX3",
-    "XDJ-RX3",
-    "Numark Party Mix Live",
-    "Hercules DJControl Inpulse 300",
-    "Hercules DJControl Inpulse 500",
+    "DDJ-FLX4",
+    "DDJ-REV1",
+    "Kontrol S2",
+    "Kontrol S4",
+    "MC6000",
+    "MC7000",
+    "Mixtrack Platinum FX",
+    "Mixtrack Pro FX",
 ]
 
 

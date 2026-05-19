@@ -315,22 +315,106 @@ class AudioMacOS:
         block_size: int,
         callback: AudioCallback,
     ) -> AudioStream:
-        """Open AI voice output (sd.RawOutputStream @ int16 mono — to headphones)."""
-        assert_device_sample_rate(device_index, sample_rate)
+        """Open AI voice output (sd.RawOutputStream @ int16 mono — to headphones).
+
+        2026-05-18 — Aggregate devices (e.g. AI Capture sitting on top of
+        BlackHole) often refuse rates below 44.1 kHz, so a 24 kHz Gemini
+        TTS stream can't open the device at its requested rate. When the
+        device's native rate is an integer multiple of the requested
+        rate, open the stream at the device rate and wrap the source
+        callback so it sees the source rate (it pulls source-rate bytes
+        from PlaybackQueue) while the OS sees device-rate audio (we
+        upsample by integer N via ``np.repeat`` — sample-and-hold, no
+        scipy needed, fine for monophonic voice).
+        """
+        import numpy as np  # noqa: PLC0415
+
+        info = sd.query_devices(device_index)
+        device_sr = int(info["default_samplerate"])
+        if device_sr == sample_rate:
+            open_sr = sample_rate
+            wrapped = callback
+        elif device_sr % sample_rate == 0:
+            ratio = device_sr // sample_rate
+            open_sr = device_sr
+            # The source callback (in __main__.py:_voice_callback_factory) is
+            # ``outdata[:] = playback.pull(frames * 2)``. It assumes frame-
+            # count matches its native source rate. So we pull
+            # ``frames // ratio`` source frames worth of bytes, decode int16
+            # mono, np.repeat by ratio, and write to outdata at device rate.
+            def upsampling_wrapper(outdata, frames, time_info, status):
+                src_frames = frames // ratio
+                src_bytes = bytearray(src_frames * 2)  # mono int16
+
+                class _SrcView:
+                    def __setitem__(self, _key, val):
+                        # callback signature: outdata[:] = bytes
+                        # We capture into src_bytes.
+                        n = len(val)
+                        src_bytes[:n] = val
+                        # Zero-fill if source produced less than requested.
+                        if n < src_frames * 2:
+                            for i in range(n, src_frames * 2):
+                                src_bytes[i] = 0
+
+                callback(_SrcView(), src_frames, time_info, status)
+                src_arr = np.frombuffer(src_bytes, dtype=np.int16)
+                up = np.repeat(src_arr, ratio)
+                # outdata is a buffer of total bytes = frames * 2 (mono int16)
+                outdata[:] = up.tobytes()
+
+            wrapped = upsampling_wrapper
+        else:
+            # Non-integer ratio (e.g. 44100/24000) — use scipy resample_poly
+            # so the user isn't forced to flip Audio MIDI Setup.
+            from math import gcd  # noqa: PLC0415
+
+            from scipy.signal import resample_poly  # noqa: PLC0415
+
+            g = gcd(device_sr, sample_rate)
+            up = device_sr // g
+            down = sample_rate // g
+            open_sr = device_sr
+
+            def resample_wrapper(outdata, frames, time_info, status):
+                src_frames = (frames * down) // up
+                src_bytes = bytearray(src_frames * 2)
+
+                class _SrcView:
+                    def __setitem__(self, _key, val):
+                        n = len(val)
+                        src_bytes[:n] = val
+                        if n < src_frames * 2:
+                            for i in range(n, src_frames * 2):
+                                src_bytes[i] = 0
+
+                callback(_SrcView(), src_frames, time_info, status)
+                src_arr = np.frombuffer(src_bytes, dtype=np.int16).astype(np.float32)
+                out_f = resample_poly(src_arr, up, down)
+                out_i = np.clip(out_f, -32768, 32767).astype(np.int16)
+                # Pad or trim to exact frame count expected by sd.
+                if len(out_i) < frames:
+                    out_i = np.pad(out_i, (0, frames - len(out_i)))
+                elif len(out_i) > frames:
+                    out_i = out_i[:frames]
+                outdata[:] = out_i.tobytes()
+
+            wrapped = resample_wrapper
+
         stream = sd.RawOutputStream(
             device=device_index,
-            samplerate=sample_rate,
+            samplerate=open_sr,
             channels=1,
             dtype="int16",
-            blocksize=block_size,
+            blocksize=int(block_size * (open_sr / sample_rate)),
             latency="low",
-            callback=callback,
+            callback=wrapped,
         )
-        if int(stream.samplerate) != sample_rate:
+        if int(stream.samplerate) != open_sr:
             negotiated = int(stream.samplerate)
             stream.close()
             raise SampleRateMismatchError(
-                f"PortAudio negotiated {negotiated}Hz vs requested {sample_rate}Hz on "
+                f"PortAudio negotiated {negotiated}Hz vs requested {open_sr}Hz on "
                 f"voice output device {device_index!r}."
             )
         stream.start()

@@ -185,33 +185,32 @@ class AICoach:
         t = ev.type
         if t == "KAAN_SPOKE":
             return (
-                "Kaan just SPOKE — answer him directly, friend tone, 6-15 words. "
+                "Kaan just SPOKE — answer him directly, friend tone. Short. "
                 "Not a music reaction."
             )
         if t == "MANUAL":
             return (
                 "Kaan hit his trigger — react with substance to ONE concrete thing "
-                "(audible event or recent move). 12-18 words."
+                "(audible event or recent move)."
             )
         if t == "TRACK_CHANGE":
             prev = ev.extra.get("prev_track")
             prev_clause = f" (was: {prev!r})" if prev else ""
             return (
                 f"Track flipped{prev_clause}. React to the NEW track's vibe vs "
-                "the previous — heavier, weirder, darker, more euphoric? "
-                "12-18 words. Past tense."
+                "the previous — heavier, weirder, darker, more euphoric?"
             )
         if t == "PHASE":
             new = ev.extra.get("new_phase", "?")
             prev = ev.extra.get("prev_phase", "?")
             return (
                 f"Phase shifted: {prev}→{new}. React to what the new section "
-                "FEELS like, not the label. 10-14 words."
+                "FEELS like, not the label."
             )
         if t == "LAYER_ARRIVAL":
             return (
                 "A new sonic layer arrived — synth lead, hi-hat layer, vocal, "
-                "riff, pad. Name what arrived and how it feels. 10-14 words."
+                "riff, pad. Name what arrived and how it feels."
             )
         if t == "MIX_MOVE":
             mv = ", ".join(ev.extra.get("moves", []))
@@ -220,7 +219,7 @@ class AICoach:
                 "Listen to the AUDIO and describe the SONIC EFFECT — how "
                 "the music CHANGED in sound (bass dropped out, highs scooped, "
                 "space opened up, vocal pierced through). Do NOT name "
-                "faders/EQs/knobs/decks/controls. Past tense, 8-12 words. "
+                "faders/EQs/knobs/decks/controls. "
                 "If the audio didn't actually change, output a single space "
                 "to stay silent."
             )
@@ -228,9 +227,9 @@ class AICoach:
             return (
                 "Steady stretch. ONE sharp observation about the SOUND right "
                 "now — groove, texture, what the track is doing musically. "
-                "8-12 words. Always reply with something fresh; don't go silent."
+                "Always reply with something fresh; don't go silent."
             )
-        return "React naturally. 10-14 words."
+        return "React naturally."
 
     @staticmethod
     def build_prompt(

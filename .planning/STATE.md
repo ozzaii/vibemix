@@ -161,7 +161,7 @@ All Phase 40–45 decisions remain locked. Highlights:
 
 - Mic-as-Part-2 + lookahead-as-Part-3 closes "AI invents what Kaan said" + "AI reacts after the moment passed" hallucination classes (Phase 40).
 - ModelRouter config-driven seam with zero hardcoded model literals + ServiceTier.FLEX on batch paths + STANDARD pinned to live coach (Phase 41).
-- Hybrid hallucination gate: autonomous proxy fast-lane (PR + 7 nightly canary) + Kaan-ear release-cut veto via `check_gate.sh` Gate 2b; P85 Phase 16 ear-test override formally retired (Phase 42).
+- Hybrid hallucination gate: autonomous proxy fast-lane (PR + 7 nightly canary) + Kaan-ear release-cut veto via `check_gate.sh` Gate 2b; **P85 Phase 16 ear-test memory override is RETIRED** (Phase 42) — see [.planning/decisions/P85-OVERRIDE-RETIRED.md](.planning/decisions/P85-OVERRIDE-RETIRED.md) for the audit-trail entry that documents the retirement (annotate-not-delete per Plan 42-05 Task 1).
 - CDJ Whisper visual lock: Tier-1 surfaces zero HIGH findings; hardware-LED-strip meter rebuild; 22-site `--glow-faint` hover-glow sweep (Phase 43).
 - README hero "the only AI co-host that actually listens to your set" verbatim lock + EvidenceRegistry citation strip in live UI + Bravoh waitlist toggle default-OFF UTM-tracked (Phase 44).
 - KAAN-ACTION-LEGAL §SHIP-01..13 discharge cookbook ships 13 runbooks in canonical 8-block format; `audit_ship_v1_decision.py` (610 lines) pre-fills 4/5 rubric cells from GH releases + Bravoh healthz + ear-test logs + GH issues at T+30 (Phase 45).

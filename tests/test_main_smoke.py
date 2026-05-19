@@ -247,12 +247,13 @@ def _patch_runtime_for_fast_smoke(mocker, tasks_seen: list):
 
 def _patch_voice_recorder(mocker, tmp_path):
     """Use a tmp_path-rooted VoiceRecorder so the test doesn't pollute the
-    project's recordings/ folder."""
+    project's recordings/ folder. Accepts and discards any kwargs main()
+    happens to pass (currently ``root=``) so the override always wins."""
     import vibemix.__main__ as main_mod
 
     real_vr = main_mod.VoiceRecorder
 
-    def factory():
+    def factory(*_a, **_kw):
         return real_vr(root=tmp_path / "recordings")
 
     mocker.patch.object(main_mod, "VoiceRecorder", factory)
@@ -423,14 +424,21 @@ def test_smoke_05_cleanup_closes_all_streams(monkeypatch, mocker, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# SMOKE-06 — POC files diff-untouched (cohost_v4.py byte-identical)
+# SMOKE-06 — POC files diff-untouched (cohost_v2.py byte-identical)
 # ---------------------------------------------------------------------------
 
 
 def test_smoke_06_poc_files_untouched_during_smoke(monkeypatch, mocker, tmp_path):
     """SMOKE-06: running the smoke does NOT touch any POC file. Hash
-    cohost_v4.py before and after, assert equality."""
-    poc = Path("cohost_v4.py")
+    cohost_v2.py before and after, assert equality.
+
+    (Pre-2026-05-19 this hashed cohost_v4.py. v4 was retired into
+    ``.planning/research/v3-shipped/``; v2 is the oldest still-tracked
+    POC variant and is the one most likely to be accidentally edited
+    during a smoke since it shares many symbol names with the vibemix
+    package.)
+    """
+    poc = Path("cohost_v2.py")
     before = hashlib.sha256(poc.read_bytes()).hexdigest()
 
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
@@ -458,7 +466,7 @@ def test_smoke_06_poc_files_untouched_during_smoke(monkeypatch, mocker, tmp_path
     asyncio.run(driver())
 
     after = hashlib.sha256(poc.read_bytes()).hexdigest()
-    assert before == after, "cohost_v4.py was modified during the smoke test"
+    assert before == after, "cohost_v2.py was modified during the smoke test"
 
 
 # ---------------------------------------------------------------------------
@@ -804,5 +812,5 @@ def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> 
     assert "playback=playback" in src, "coach_loop must receive playback kwarg"
     # Construction order — TTFTMeter + AckBank + CancelGate before agent
     assert "TTFTMeter()" in src, "TTFTMeter not instantiated"
-    assert "AckBank()" in src, "AckBank not instantiated"
+    assert "AckBank(suppress_fire=" in src, "AckBank not instantiated"
     assert "CancelGate()" in src, "CancelGate not instantiated"

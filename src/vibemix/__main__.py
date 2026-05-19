@@ -622,7 +622,10 @@ async def main() -> None:
     # cache + ttft_meter into DJCoHostAgent and ack_bank + cancel_gate
     # + ttft_meter + playback into coach_loop.
     ttft_meter = TTFTMeter()
-    ack_bank = AckBank()  # eager-loads 40 OPUS files; raises AckBankError on bad shape
+    # suppress_fire=True until Turkish ack clips ship — English placeholders
+    # would inject "yeah/nice/oh" before a Turkish reaction. Flip to False
+    # once src/vibemix/audio/ack_bank/*/ has TR-recorded OPUS files.
+    ack_bank = AckBank(suppress_fire=True)
     cancel_gate = CancelGate()
     # Plan 32-02 / PROFILE-03 — load long-term DJ profile into the cache body.
     # P60: profile lives in the CACHE, never in the per-turn prompt. If the

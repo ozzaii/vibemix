@@ -75,8 +75,14 @@ def test_lib_rs_registers_plugin_on_macos_only() -> None:
 
 def test_capabilities_allowlists_plugin_commands() -> None:
     """capabilities/default.json allowlists macos-permissions namespace
-    plus check_permission + request_permission identifiers used by the
-    wizard."""
+    plus the specific check_*_permission + request_*_permission
+    identifiers used by the wizard.
+
+    The plugin splits its check/request commands per system surface
+    (accessibility / microphone / screen-recording) — there is no
+    generic ``allow-check-permission`` identifier, so we assert the
+    three surfaces the wizard actually drives.
+    """
     raw = CAPABILITIES.read_text(encoding="utf-8")
     cfg = json.loads(raw)
     perms = cfg.get("permissions", [])
@@ -84,9 +90,8 @@ def test_capabilities_allowlists_plugin_commands() -> None:
     assert "macos-permissions:default" in flat, (
         "capabilities/default.json missing macos-permissions:default"
     )
-    assert "macos-permissions:allow-check-permission" in flat, (
-        "capabilities/default.json missing macos-permissions:allow-check-permission"
-    )
-    assert "macos-permissions:allow-request-permission" in flat, (
-        "capabilities/default.json missing macos-permissions:allow-request-permission"
-    )
+    for surface in ("accessibility", "microphone", "screen-recording"):
+        check_id = f"macos-permissions:allow-check-{surface}-permission"
+        request_id = f"macos-permissions:allow-request-{surface}-permission"
+        assert check_id in flat, f"capabilities/default.json missing {check_id}"
+        assert request_id in flat, f"capabilities/default.json missing {request_id}"

@@ -52,6 +52,10 @@ def test_no_mascot_html_in_tests_e2e_scripts_ci():
         # This very test file — it references mascot.html in docstrings
         # and assertion messages but does not drive tests against it.
         "test_ci_grep_gates.py",
+        # Phase 47 e2e persona snapshot spec — its file-header comment
+        # explicitly documents the POC-immutability invariant ("mascot.html
+        # is NEVER referenced") while targeting the Three.js surface.
+        "persona_smoke.spec.ts",
     }
     targets = []
     for d in ("tests", "e2e", "scripts/ci"):

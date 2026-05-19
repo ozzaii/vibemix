@@ -29,6 +29,8 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
+use crate::config;
+
 const MAX_RESTARTS: u32 = 3;
 
 /// Target triple of the bundled sidecar. Matches the per-triple directory
@@ -90,6 +92,7 @@ pub async fn spawn_sidecar_with_watchdog(
         rotate => Arc::new(Mutex::new(rotate)),
     };
 
+    let mut wizard_mode = wizard_mode;
     let mut restart_count: u32 = 0;
     loop {
         // First attempt fires immediately; retries sleep so the OS releases
@@ -101,13 +104,14 @@ pub async fn spawn_sidecar_with_watchdog(
         let sidecar_bin = resolve_sidecar_path(&app)
             .map_err(|e| format!("sidecar lookup failed: {e}"))?;
         let mut cmd = app.shell().command(&sidecar_bin);
-        // Phase 12 Wave 3 — post-wizard launches spawn the sidecar with
-        // `--session` so SessionLoop registers its ipc.session.* handlers.
+        // 2026-05-18 — `--session` routes to a Phase 12 W2 structural stub
+        // that never wires Gemini/LiveKit. Per __main__.py docstring the
+        // real cohost lives in the flag-less `main()` branch (verbatim port
+        // of cohost_v4.py:1925-2080). Drop the flag for post-wizard launches
+        // until session_loop owns the snapshot path (v3.2 scope).
         // Wizard launches keep `--wizard` (Phase 11 wave 4 behaviour).
         if wizard_mode {
             cmd = cmd.args(["--wizard"]);
-        } else {
-            cmd = cmd.args(["--session"]);
         }
 
         let (mut rx, child) = cmd
@@ -159,6 +163,25 @@ pub async fn spawn_sidecar_with_watchdog(
         }
 
         if exit_code == 0 {
+            // Post-wizard handoff: if we were running the wizard pass and it
+            // wrote `first_run_completed: true` before exiting, the next
+            // sidecar incarnation must run in `--session` mode so the main
+            // UI gets its ipc.session.* handlers. Without this re-spawn the
+            // shell sits on "loading vibemix…" forever after the wizard,
+            // then the WS goes unreachable and the crash banner fires.
+            if wizard_mode && !config::is_first_run(&app) {
+                wizard_mode = false;
+                restart_count = 0;
+                app.emit(
+                    "sidecar-state",
+                    serde_json::json!({
+                        "state": "restarting",
+                        "reason": "wizard-handoff",
+                    }),
+                )
+                .ok();
+                continue;
+            }
             app.emit("sidecar-state", serde_json::json!({ "state": "stopped" }))
                 .ok();
             return Ok(());

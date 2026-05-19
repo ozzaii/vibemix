@@ -18,8 +18,12 @@
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
     "macos-permissions:default",
-    "macos-permissions:allow-check-permission",
-    "macos-permissions:allow-request-permission",
+    "macos-permissions:allow-check-accessibility-permission",
+    "macos-permissions:allow-check-microphone-permission",
+    "macos-permissions:allow-check-screen-recording-permission",
+    "macos-permissions:allow-request-accessibility-permission",
+    "macos-permissions:allow-request-microphone-permission",
+    "macos-permissions:allow-request-screen-recording-permission",
     {
       "identifier": "shell:allow-execute",
       "allow": [

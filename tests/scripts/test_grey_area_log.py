@@ -67,16 +67,16 @@ def test_grey_area_scan_emits_required_columns() -> None:
 
 def test_grey_area_log_includes_at_least_one_real_phase_entry() -> None:
     """v2.1 phases use gsd-autonomous fully — the scan MUST surface ≥1
-    real entry from a real .planning/phases/* file."""
+    real entry from a real phase file (live ``.planning/phases/*`` OR
+    archived ``.planning/milestones/<version>-phases/*``)."""
     body = _run()
     lines = body.splitlines()
     # header + separator + ≥1 data row
     assert len(lines) >= 3, f"empty grey-area log:\n{body}"
-    # Every data row references a real .planning/phases/* file path.
     data_rows = lines[2:]
-    assert any(".planning/phases/" in r for r in data_rows), (
-        "data rows must point to phase files"
-    )
+    assert any(
+        ".planning/phases/" in r or ".planning/milestones/" in r for r in data_rows
+    ), "data rows must point to phase files (live or archived milestone dir)"
 
 
 def test_grey_area_log_reversible_field_uses_yes_no_question() -> None:

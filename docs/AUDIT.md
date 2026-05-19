@@ -87,6 +87,7 @@
 |---------|---------|---------|-----------|----------------|-------|
 | `@gltf-transform/cli` | see package-lock.json | see package-lock.json | GLB optimization CLI for mascot bundle. Build-time only. | 🟢 Green |  |
 | `@gltf-transform/core` | see package-lock.json | see package-lock.json | GLB transform library. | 🟢 Green |  |
+| `@playwright/test` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `@tauri-apps/api` | see package-lock.json | see package-lock.json | Tauri JS bridge — pure-TS bindings to Rust IPC. | 🟢 Green |  |
 | `@tauri-apps/plugin-shell` | see package-lock.json | see package-lock.json | Shell-out plugin (open-link). Pure-TS bindings. | 🟢 Green |  |
 | `@tauri-apps/plugin-store` | see package-lock.json | see package-lock.json | Tauri persistent KV store. Pure-TS bindings. | 🟢 Green |  |
@@ -96,6 +97,8 @@
 | `gltf-pipeline` | see package-lock.json | see package-lock.json | GLB compression pipeline. Build-time only. | 🟢 Green |  |
 | `jsdom` | see package-lock.json | see package-lock.json | DOM emulator for vitest. Dev only. | 🟢 Green |  |
 | `json-schema-to-typescript` | see package-lock.json | see package-lock.json | IPC schema to TS codegen. Build-time only. | 🟢 Green |  |
+| `pixelmatch` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
+| `playwright` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `three` | see package-lock.json | see package-lock.json | WebGL 3D library — mascot rig render path. Pure-JS, zero native deps. | 🟢 Green |  |
 | `typescript` | see package-lock.json | see package-lock.json | Build-time only — does not ship in the binary. | 🟢 Green |  |
 | `vite` | see package-lock.json | see package-lock.json | Build tool. Build-time only. | 🟢 Green |  |

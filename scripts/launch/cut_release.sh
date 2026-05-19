@@ -187,6 +187,12 @@ cat <<EOF
       dist/*.dmg dist/*.msi dist/*.pkg dist/*.exe
 EOF
 echo
+# Phase 16 override cleanup reminder — historical anchor for the
+# P85 audit trail (the autonomous-only ear-test bypass is formally
+# retired in Plan 42-05; STATE.md still annotates the line RETIRED
+# with a cross-reference to .planning/decisions/P85-OVERRIDE-RETIRED.md).
+# Intentionally a comment (not an echo) per Plan 42-04 — the
+# user-visible success block must not surface the retired override.
 echo "  Reminders (DO NOT skip):"
 echo "    [GATE-06] Hybrid hallucination gate (Phase 42) PASSED — 7-day nightly proxy + ear-test both green."
 echo "    [P83] Cut as ${TAG} (RC, --draft). Do NOT cut as v1.0.0 until"

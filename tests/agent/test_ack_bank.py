@@ -140,16 +140,39 @@ def test_constructor_raises_on_missing_bucket(populated_bank_dir):
     assert "drop_hit" in str(excinfo.value)
 
 
-def test_constructor_raises_on_wrong_count(populated_bank_dir):
-    from vibemix.agent.ack_bank import AckBank, AckBankError
+def test_constructor_accepts_partial_bucket(populated_bank_dir):
+    """2026-05-18 — bucket gate relaxed from strict ``== ACKS_PER_BUCKET``
+    so partial fills (e.g. mix_move with 4/8 recorded clips) don't block
+    the cohost from booting. Rotation in ``pick_for_event`` keys off
+    ``len(self._clips[bucket])`` and cycles only the indices present.
+    """
+    from vibemix.agent.ack_bank import AckBank
 
     victim = sorted((populated_bank_dir / "mix_move").glob("*.opus"))[0]
     victim.unlink()
 
+    bank = AckBank(dir=populated_bank_dir)
+    assert len(bank._clips["mix_move"]) == 7
+    # The remaining 4 buckets retain their full 8.
+    for bucket in ("drop_hit", "track_change", "silence_break", "generic_filler"):
+        assert len(bank._clips[bucket]) == 8
+
+
+def test_constructor_raises_on_empty_bucket(populated_bank_dir):
+    """A bucket directory that exists but has zero .opus files still raises —
+    relaxed gate accepts partial, not empty (an empty bucket would
+    crash pick_for_event with an IndexError).
+    """
+    from vibemix.agent.ack_bank import AckBank, AckBankError
+
+    target = populated_bank_dir / "mix_move"
+    for f in target.glob("*.opus"):
+        f.unlink()
+
     with pytest.raises(AckBankError) as excinfo:
         AckBank(dir=populated_bank_dir)
-    msg = str(excinfo.value)
-    assert "has 7 files" in msg
+    assert "mix_move" in str(excinfo.value)
+    assert "no .opus files" in str(excinfo.value)
 
 
 def test_decoded_pcm_is_int16_mono_24khz(populated_bank_dir):
@@ -286,6 +309,24 @@ def test_should_fire_uses_injected_time_fn(populated_bank_dir):
     )
     assert decision is False
     assert reason == "min_gap"
+
+
+def test_should_fire_suppress_short_circuits_all_gates(populated_bank_dir):
+    """``suppress_fire=True`` short-circuits before any gate runs — used at
+    runtime while bank clips don't match the active persona's language.
+    """
+    from vibemix.agent.ack_bank import AckBank
+
+    bank = AckBank(dir=populated_bank_dir, suppress_fire=True)
+    # Inputs that would otherwise produce ``(True, "fire")`` — suppressed regardless.
+    decision, reason = bank.should_fire(
+        rolling_ttft_avg_ms=900.0,
+        last_ack_at=None,
+        last_response_at=None,
+        cancel_cooldown_active=False,
+    )
+    assert decision is False
+    assert reason == "suppressed"
 
 
 # ---------------------------------------------------------------------------
