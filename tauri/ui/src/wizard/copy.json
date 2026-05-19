@@ -4,16 +4,16 @@
     "welcome": {
       "hero_line_1": "SET UP",
       "hero_line_2": "VIBEMIX",
-      "hero_line_3": "— ONE TAP, NO TERMINAL —",
+      "hero_line_3": "ONE TAP. NO TERMINAL.",
       "primary_cta": "Let's go"
     },
     "forewarning": {
       "section_heading": "Two prompts you'll see",
-      "mac_title": "BlackHole — system audio driver",
-      "mac_body": "macOS will ask: Allow BlackHole in System Settings → Privacy & Security. This is one click — vibemix can't grant it for you, and it's the only step Apple keeps user-driven.",
-      "win_title": "VB-CABLE — virtual audio cable",
-      "win_body": "Windows will ask permission to install an audio driver — click Yes. The driver is signed by VB-Audio; vibemix verifies the SHA-256 before running it.",
-      "continue_cta": "Got it — continue",
+      "mac_title": "BlackHole: system audio driver",
+      "mac_body": "macOS will ask: Allow BlackHole in System Settings → Privacy & Security. This is one click. vibemix can't grant it for you; it's the only step Apple keeps user-driven.",
+      "win_title": "VB-CABLE: virtual audio cable",
+      "win_body": "Windows will ask permission to install an audio driver. Click Yes. The driver is signed by VB-Audio; vibemix verifies the SHA-256 before running it.",
+      "continue_cta": "Got it, continue",
       "back_cta": "Back"
     },
     "driver_fetch": {
@@ -34,7 +34,7 @@
     "format_check": {
       "heading": "Format check",
       "success": "BlackHole is set to 48 kHz · ready",
-      "fail": "BlackHole is at {measured_khz} kHz — vibemix needs 48 kHz",
+      "fail": "BlackHole is at {measured_khz} kHz. vibemix needs 48 kHz.",
       "fix_cta": "Fix it for me",
       "mac_manual": "Open Audio MIDI Setup",
       "win_manual": "Open Sound settings",

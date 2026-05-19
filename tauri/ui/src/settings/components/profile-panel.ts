@@ -299,7 +299,7 @@ export function renderProfilePanel(): ProfilePanelHandle {
       const empty = document.createElement("div");
       empty.className = "vmx-profile-panel__empty";
       empty.textContent =
-        "profile disabled — enable to let vibemix learn your style.";
+        "profile disabled. enable to let vibemix learn your style.";
       root.append(empty);
       appendStatusAndFooter();
       return;
@@ -309,7 +309,7 @@ export function renderProfilePanel(): ProfilePanelHandle {
       const empty = document.createElement("div");
       empty.className = "vmx-profile-panel__empty";
       empty.textContent =
-        "no profile yet — vibemix learns after your next session.";
+        "no profile yet. vibemix learns after your next session.";
       root.append(empty);
     } else {
       const table = document.createElement("div");
@@ -400,10 +400,10 @@ export function renderProfilePanel(): ProfilePanelHandle {
       } else {
         const reason = reply.payload.error ?? "unknown";
         if (reason === "consent_off") {
-          setStatus("consent is off — enable above to regenerate.", true);
+          setStatus("consent is off. enable above to regenerate.", true);
         } else if (reason === "insufficient_evidence") {
           setStatus(
-            "not enough session data yet — keep mixing and try again.",
+            "not enough session data yet. keep mixing and try again.",
             false,
           );
         } else {
@@ -423,7 +423,7 @@ export function renderProfilePanel(): ProfilePanelHandle {
       if (reply.payload.ok) {
         setStatus("profile deleted.");
       } else if (reply.payload.error === "not_found") {
-        setStatus("nothing to delete — no profile on disk.", false);
+        setStatus("nothing to delete. no profile on disk.", false);
       } else {
         setStatus(`delete failed: ${reply.payload.error ?? "unknown"}`, true);
       }

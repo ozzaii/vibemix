@@ -346,7 +346,7 @@ function setTitleContent(
 ): void {
   if (!track || !track.title) {
     el.dataset.empty = "true";
-    el.textContent = "— silence —";
+    el.textContent = "silence";
     return;
   }
   el.dataset.empty = "false";

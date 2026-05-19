@@ -86,7 +86,7 @@ const TOGGLE_LABEL =
   "Bu session'ı release-gate için işaretle / Rate this session for release-gate";
 
 const FORM_HEADER =
-  "Ear-test sign-off — 30min minimum, ≥2 genres in 14d window";
+  "Ear-test sign-off: 30min minimum, ≥2 genres in 14d window";
 
 // ---------------------------------------------------------------------------
 // Mount
@@ -173,7 +173,7 @@ export function mountEarTestToggle(
   const notes = document.createElement("textarea");
   notes.className = "vmx-debrief-ear-test-notes";
   notes.maxLength = 4000;
-  notes.placeholder = "Optional notes — what worked, what didn't";
+  notes.placeholder = "Optional notes: what worked, what didn't";
   notes.rows = 4;
   notesLabel.append(notes);
   formEl.append(notesLabel);
@@ -201,7 +201,7 @@ export function mountEarTestToggle(
     handleSubmit(submission, options)
       .then(() => {
         confirmation.hidden = false;
-        confirmation.textContent = `Signed off — ${submission.session_id}`;
+        confirmation.textContent = `Signed off · ${submission.session_id}`;
         // Collapse the form to mirror the existing "saved" pattern of
         // chapter-list etc.
         formEl.hidden = true;

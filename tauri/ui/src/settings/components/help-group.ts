@@ -320,7 +320,7 @@ export function HelpGroup(props: HelpGroupProps = {}): HTMLElement {
       sub: "launch djay manually",
       status: props.djay ?? "unknown",
       static: true,
-      title: "vibemix watches djay's window — launch djay to enable screen grounding",
+      title: "vibemix watches djay's window. launch djay to enable screen grounding",
     }),
   );
 
