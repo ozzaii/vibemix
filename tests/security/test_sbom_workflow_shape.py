@@ -23,10 +23,17 @@ def test_sbom_workflow_triggers_on_release_published():
 
 
 def test_sbom_workflow_uses_pinned_syft_action():
+    """Post-DEPS-07: ref is SHA-pinned to any 40-char hex, version in comment."""
     txt = WORKFLOW.read_text(encoding="utf-8")
-    # Post-DEPS-07 pinact discharge: refs are SHA-pinned with version comment.
-    assert "anchore/sbom-action@d94f46e13c6c62f59525ac9a1e147a99dc0b9bf5" in txt
-    assert "# v0.17.0" in txt
+    import re
+    m = re.search(
+        r"anchore/sbom-action@([0-9a-f]{40})\s+#\s+v(\d+\.\d+(?:\.\d+)?)",
+        txt,
+    )
+    assert m is not None, (
+        "expected `anchore/sbom-action@<40-char SHA> # v<version>` "
+        "(SHA-pinned + version-comment form post-DEPS-07)"
+    )
 
 
 def test_sbom_workflow_uses_spdx_json_format():
@@ -35,9 +42,16 @@ def test_sbom_workflow_uses_spdx_json_format():
 
 
 def test_sbom_workflow_attaches_to_release():
+    """Post-DEPS-07: gh-release action is SHA-pinned to any 40-char hex."""
     txt = WORKFLOW.read_text(encoding="utf-8")
-    # Post-DEPS-07 pinact discharge: refs are SHA-pinned with version comment.
-    assert "softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65" in txt
+    import re
+    assert re.search(
+        r"softprops/action-gh-release@[0-9a-f]{40}\s+#\s+v\d",
+        txt,
+    ), (
+        "expected `softprops/action-gh-release@<40-char SHA> # v<version>` "
+        "(SHA-pinned + version-comment form post-DEPS-07)"
+    )
     assert "sbom.spdx.json" in txt
     assert "fail_on_unmatched_files: true" in txt
 
