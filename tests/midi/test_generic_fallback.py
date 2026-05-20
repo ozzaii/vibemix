@@ -239,6 +239,46 @@ def test_generic_decode_handles_multiple_channels_and_ccs():
     assert fields == {"cc_0_42", "cc_5_42"}
 
 
+# ---------- Phase 53 BRINGUP-03 — unknown-controller bind->decode end-to-end ----------
+
+
+def test_unknown_controller_bind_decode_no_crash_end_to_end():
+    """The full graceful-fallback path for an UNMAPPED controller, as one flow:
+
+        unknown port name -> find_mapping_or_generic -> generic_midi profile
+        -> ControllerState(generic) -> handle_msg(CC + note_on)
+        -> positional generic_cc + generic_note events, no crash.
+
+    The existing tests in this file cover each piece in isolation; this pins
+    the single end-to-end bind->decode->assert flow that a real unmapped device
+    exercises (graceful fallback for controllers not in the curated library).
+    """
+    from vibemix.midi import GENERIC_MIDI_ID, find_mapping_or_generic
+
+    # 1. Bind: an unknown port resolves to the generic profile (never None).
+    profile = find_mapping_or_generic("Some Random USB MIDI Thing")
+    assert profile.id == GENERIC_MIDI_ID == "generic_midi"
+
+    # 2. Build live state from the generic profile.
+    cs = ControllerState(profile=profile)
+
+    # 3. Decode a CC + a note_on through the generic positional path — no raise.
+    cs.handle_msg(_cc(channel=0, control=42, value=100))
+    cs.handle_msg(_note_on(channel=3, note=60, velocity=100))
+
+    # 4. Positional events surfaced (channel+cc / channel+note encoded fields).
+    events = cs.events_since(0.0)
+    cc_events = [e for e in events if e.kind == "generic_cc"]
+    note_events = [e for e in events if e.kind == "generic_note"]
+    assert len(cc_events) == 1
+    assert cc_events[0].field == "cc_0_42"
+    assert len(note_events) == 1
+    assert note_events[0].field == "note_3_60"
+
+    # 5. Moves ring is populated (the coach sees positional controller activity).
+    assert cs.moves_since(0.0), "generic decode must record positional moves"
+
+
 # ---------- Pytest marker / pinned import ----------
 
 _ = pytest
