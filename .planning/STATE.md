@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: SHIP
 status: executing
-last_updated: "2026-05-20T21:37:26.357Z"
-last_activity: 2026-05-20 -- Phase 51 planning complete
+last_updated: "2026-05-21T00:00:00.000Z"
+last_activity: 2026-05-21 -- Phase 51 COMPLETE (review CLEAN, verification passed/Kaan-action soak); Phase 52 grounded
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 0
-  percent: 0
+  completed_plans: 3
+  percent: 13
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-20 — v4.0 "SHIP" roadmap RE-SPLIT from 4 phases into **8 phases (51–58)** per Kaan's directive for finer granularity. 19/19 REQ-IDs re-mapped to exactly one phase. Next: `/gsd:plan-phase 51`.
+**Last updated:** 2026-05-21 — **Phase 51 (Real-Hardware Bring-Up) COMPLETE** (3/3 plans; review CLEAN 0 HIGH/MED; verification passed — real ≥30-min live soak deferred to KAAN-ACTION). Mascot scope expanded per Kaan: LIVE-05 sharpened + LIVE-05a (many modes) → Phase 56. Genre detector requested → GENRE reqs added to Phase 52. Phase 52 context grounded. Next: plan + execute Phase 52.
 
 ---
 
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 ## Current Position
 
-Phase: 51 — Real-Hardware Bring-Up (not started)
+Phase: 52 — Audio Path + Feature Grounding (context grounded, ready to plan)
 Plan: —
-Status: Ready to execute
-Last activity: 2026-05-20 -- Phase 51 planning complete
+Status: Phase 51 complete → planning Phase 52
+Last activity: 2026-05-21 -- Phase 51 complete; Phase 52 grounded (BPM fix already landed; genre detector + psytrance profile scoped)
 
 ## Performance Metrics
 
