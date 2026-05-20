@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: SHIP
 status: executing
-last_updated: "2026-05-21T00:00:00.000Z"
-last_activity: 2026-05-21 -- Phase 51 COMPLETE (review CLEAN, verification passed/Kaan-action soak); Phase 52 grounded
+last_updated: "2026-05-21T01:00:00.000Z"
+last_activity: 2026-05-21 -- Phase 52 COMPLETE (review CLEAN, verification passed; genre detector + psytrance shipped); Phase 53/54 grounded
 progress:
   total_phases: 8
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 13
+  completed_phases: 2
+  total_plans: 7
+  completed_plans: 7
+  percent: 25
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-21 — **Phase 51 (Real-Hardware Bring-Up) COMPLETE** (3/3 plans; review CLEAN 0 HIGH/MED; verification passed — real ≥30-min live soak deferred to KAAN-ACTION). Mascot scope expanded per Kaan: LIVE-05 sharpened + LIVE-05a (many modes) → Phase 56. Genre detector requested → GENRE reqs added to Phase 52. Phase 52 context grounded. Next: plan + execute Phase 52.
+**Last updated:** 2026-05-21 — **Phase 52 (Audio Path + Feature Grounding) COMPLETE** (4/4 plans; review CLEAN; verification passed). Shipped: BPM-grounding regressions (never > 180 on harmonic-leak trace), psytrance profile, grounded DSP genre auto-detector (confidence-gated, `unknown` fallback, hysteresis, env override), genre on the ws bus. Multi-genre live drive = KAAN-ACTION. **Phase 51 also COMPLETE.** Mascot many-modes (LIVE-05a) → Phase 56. Phase 53 (controller) + 54 (hype) contexts grounded. Next: plan + execute Phase 53.
 
 ---
 
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 ## Current Position
 
-Phase: 52 — Audio Path + Feature Grounding (context grounded, ready to plan)
+Phase: 53 — Controller Live + Graceful Fallback (context grounded, ready to plan)
 Plan: —
-Status: Phase 51 complete → planning Phase 52
-Last activity: 2026-05-21 -- Phase 51 complete; Phase 52 grounded (BPM fix already landed; genre detector + psytrance profile scoped)
+Status: Phases 51+52 complete → planning Phase 53
+Last activity: 2026-05-21 -- Phase 52 complete (genre detector + psytrance shipped); Phase 53+54 contexts grounded
 
 ## Performance Metrics
 
