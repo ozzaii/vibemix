@@ -29,8 +29,38 @@ body{background:#070709;padding:40px;display:flex;flex-direction:column;gap:48px
 /* solo mode (?shot=X) — one frame, floating on a dark mat so the
    rounded corners + drop shadow read as an intentional window shot */
 body[data-solo]{padding:30px;gap:0;background:#08090c;align-items:center;justify-content:center;height:100vh;}
-body[data-solo] .frame{display:none;}
-body[data-solo] .frame.solo{display:flex;}
+body[data-solo] .frame,body[data-solo] .social{display:none;}
+body[data-solo] .solo{display:flex;}
+/* social card is a full-bleed og:image — no mat */
+body[data-solo="social"]{padding:0;background:transparent;}
+
+/* ===== SOCIAL PREVIEW CARD (og:image, 1280x640) ===== */
+.social{width:1280px;height:640px;position:relative;overflow:hidden;flex-direction:column;justify-content:center;
+  padding:0 96px;font-family:var(--type-display);color:var(--silk);
+  background:
+    radial-gradient(70% 90% at 84% 18%, rgba(255,138,61,.16), transparent 58%),
+    radial-gradient(60% 80% at 10% 95%, rgba(72,152,255,.07), transparent 60%),
+    radial-gradient(50% 70% at 95% 92%, rgba(255,45,143,.06), transparent 60%),
+    linear-gradient(150deg,#0b0d14 0%, #070809 55%, #030305 100%);}
+.social::after{content:"";position:absolute;inset:0;border:1px solid var(--glass-edge);pointer-events:none;}
+.so-kicker{font-weight:700;font-stretch:85%;font-size:18px;letter-spacing:.36em;text-transform:uppercase;color:var(--amber);margin-bottom:24px;text-shadow:var(--glow-faint);}
+.so-mark{font-weight:800;font-stretch:84%;font-size:130px;line-height:.9;letter-spacing:.02em;}
+.so-mark b{color:var(--amber);text-shadow:var(--glow-strong);}
+.so-tag{font-weight:300;font-size:37px;letter-spacing:-.01em;color:var(--silk);margin-top:18px;}
+.so-tag em{font-style:normal;color:var(--amber-pale);}
+.so-meta{margin-top:40px;display:flex;align-items:center;gap:18px;font-weight:600;font-stretch:85%;font-size:16px;letter-spacing:.2em;text-transform:uppercase;color:var(--silk-40);}
+.so-meta .d{width:5px;height:5px;border-radius:50%;background:var(--silk-25);}
+.so-by{position:absolute;bottom:40px;right:96px;font-weight:600;font-stretch:85%;font-size:15px;letter-spacing:.22em;text-transform:uppercase;color:var(--silk-40);}
+.so-by b{color:var(--amber);}
+.so-meter{position:absolute;top:0;bottom:0;right:0;width:14px;display:flex;flex-direction:column-reverse;gap:4px;padding:40px 0;}
+.so-meter i{flex:1;border-radius:1px;}
+.so-meter i.s{background:linear-gradient(90deg,var(--meter-safe-pale),var(--meter-safe));box-shadow:-2px 0 8px var(--meter-safe);}
+.so-meter i.w{background:linear-gradient(90deg,var(--amber-pale),var(--amber-78));box-shadow:-2px 0 8px var(--amber-65);}
+.so-meter i.c{background:linear-gradient(90deg,var(--meter-clip),var(--meter-clip-deep));box-shadow:-2px 0 8px var(--meter-clip);}
+.so-meter i.off{background:rgba(214,207,199,.05);}
+.so-cohost{position:absolute;top:60px;left:96px;display:flex;align-items:center;gap:11px;font-weight:700;font-stretch:85%;font-size:14px;letter-spacing:.2em;text-transform:uppercase;color:var(--silk-40);}
+.so-cohost .dome{width:9px;height:9px;border-radius:50%;background:var(--amber);box-shadow:var(--glow-soft);}
+.so-cohost .tag{color:var(--amber-pale);}
 
 /* ===== shared app shell ===== */
 .frame{
@@ -308,6 +338,19 @@ body[data-solo] .frame.solo{display:flex;}
     </div>
   </div>
   <div class="statusbar"><span class="sb-item"><span class="led ok"></span>LINK</span><span class="sb-item"><span class="led ok"></span>AI</span><span class="sb-item"><span class="led ok"></span>CONTROLLER</span><span class="sb-item"><span class="led ok"></span>SCREEN</span><span class="sb-end">recordings · local only</span></div>
+</div>
+
+<!-- SOCIAL PREVIEW CARD -->
+<div class="social" data-shot="social">
+  <div class="so-cohost"><span class="dome"></span><span class="tag">AI CO-HOST</span><span>· reading the room</span></div>
+  <div class="so-kicker">OPEN-SOURCE AI DJ CO-HOST</div>
+  <div class="so-mark"><b>V</b>IBEMIX</div>
+  <div class="so-tag">it <em>actually listens</em> to your set.</div>
+  <div class="so-meta"><span>MAC + WINDOWS</span><span class="d"></span><span>APACHE 2.0</span><span class="d"></span><span>NO AI SLOP</span></div>
+  <div class="so-by">made by <b>bravoh</b></div>
+  <div class="so-meter">
+    <i class="c"></i><i class="off"></i><i class="off"></i><i class="w"></i><i class="w"></i><i class="w"></i><i class="w"></i><i class="w"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i>
+  </div>
 </div>
 
 <script>
