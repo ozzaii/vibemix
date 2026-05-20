@@ -13,55 +13,109 @@
 - ✅ **v2.1 The Unified Cut** — Phases 27–39 (shipped 2026-05-16, tech_debt accepted) — see `.planning/milestones/v2.1-ROADMAP.md`
 - ✅ **v3.0 Clean OSS Ship** — Phases 40–45 (shipped 2026-05-17, tech_debt accepted) — see `.planning/milestones/v3.0-ROADMAP.md`
 - ✅ **v3.1 Distribution-Ready Pass** — Phases 46–50 (shipped 2026-05-18, tech_debt accepted) — see `.planning/milestones/v3.1-ROADMAP.md`
-- 🔨 **v4.0 SHIP** — Phases 51–54 (planning) — active below
+- 🔨 **v4.0 SHIP** — Phases 51–58 (planning) — active below
 
 ---
 
 ## Overview
 
-v3.1 left vibemix engineering-complete: a built Tauri app + Python sidecar, one-click installer chain, dependency-audited lockfile, full mascot scaffold, and an e2e harness — all green in CI, none of it yet driven on real hardware in a real DJ session. v4.0 closes that gap. For the first time the actual app runs on Kaan's MacBook with real audio through BlackHole and a real DDJ-FLX4 over USB. The journey: **boot it and make it stable** (Phase 51) → **make both modes feel like a real DJ friend on real audio and at peak performance** (Phase 52) → **final visual pass + close the carryover bugs + tighten first-run** (Phase 53) → **get every engineering gate green on real artifacts and document the one-button ship sequence** (Phase 54). The signed public binary itself is gated on external signatures (Apple Dev Agreement via Francesco; SignPath OSS cert) — those stay KAAN-ACTION; engineering makes the release one-button-after-signatures.
+v3.1 left vibemix engineering-complete: a built Tauri app + Python sidecar, one-click installer chain, dependency-audited lockfile, full mascot scaffold, and an e2e harness — all green in CI, none of it yet driven on real hardware in a real DJ session. v4.0 closes that gap. For the first time the actual app runs on Kaan's MacBook with real audio through BlackHole and a real DDJ-FLX4 over USB.
+
+The journey, finer-grained than the prior 4-phase cut so each real-hardware seam is its own validated checkpoint: **boot it and make it stable** (Phase 51) → **prove the audio path live and ground the features it derives** (Phase 52) → **prove the controller path live with clean fallback** (Phase 53) → **make hype mode actually fire grounded in-bar reactions on real audio** (Phase 54) → **make feedback mode coach grounded with clean citations** (Phase 55) → **hit peak performance + make the mascot react live** (Phase 56) → **final visual pass + close carryover bugs + tighten first-run** (Phase 57) → **get every engineering gate green on real artifacts and document the one-button ship** (Phase 58).
+
+Bring-up is split into THREE input seams — boot/stability, audio, controller — because real hardware already surfaced distinct breaks in each (clean startup vs the 48 kHz capture path vs MIDI ingest), and each must be independently green before the modes that consume them can be validated. The two interaction modes get their own phases because hype and feedback have different failure shapes (hype: the AI voice currently does not fire on a detected drop; feedback: citation integrity), and each is its own Kaan-ear pass.
+
+The signed public binary itself is gated on external signatures (Apple Dev Agreement via Francesco; SignPath OSS cert) — those stay KAAN-ACTION; engineering makes the release one-button-after-signatures. No phase depends on signatures landing.
 
 This is bring-up + live validation + polish + ship of an **already-built** app. No new AI providers, no new detectors, no scope creep.
 
 ## Phases
 
-**Phase Numbering:** Continues from v3.1 (closed at Phase 50). v4.0 starts at **Phase 51**. Integer phases (51, 52, …) = planned milestone work; decimal phases (e.g. 52.1) = urgent insertions if needed.
+**Phase Numbering:** Continues from v3.1 (closed at Phase 50). v4.0 starts at **Phase 51** and runs through **Phase 58**. Integer phases (51, 52, …) = planned milestone work; decimal phases (e.g. 54.1) = urgent insertions if needed.
 
-- [ ] **Phase 51: Real-Hardware Bring-Up** - Boot the app + sidecar on Kaan's Mac, reach a stable live "listening" session, fix every runtime break read from Tauri console + sidecar logs across a full-set run.
-- [ ] **Phase 52: Live-Session Validation + Latency/Performance Tuning** - Both modes produce grounded, in-bar, non-slop reactions on real audio across ≥2 genres; citation strip + mascot track real events; TTFT/dropouts/60fps tuned to budget on real HW.
-- [ ] **Phase 53: Sexify Finish** - Final Tier-1 visual pass (zero HIGH findings), close v0.1.0-rc1 carryover bugs, tighten fresh-account first-run.
-- [ ] **Phase 54: Ship Readiness** - All engineering release gates green on real artifacts, §E2E-50A-WALK discharged by driving the real app, one-button SHIP-CUT sequence documented + pre-verified with external-clock items surfaced as KAAN-ACTION.
+- [ ] **Phase 51: Real-Hardware Bring-Up** - Boot the app + sidecar on Kaan's Mac, reach a stable live "listening" session with clean startup logs, and survive a ≥30-min full-set run with zero unhandled exceptions or unbounded memory.
+- [ ] **Phase 52: Audio Path + Feature Grounding** - BlackHole 48 kHz capture is live end-to-end and every feature derived from it (levels, BPM, bands) is grounded — out-of-range values like the live BPM=200 read on a ~129 BPM track never reach the bus or UI.
+- [ ] **Phase 53: Controller Live + Graceful Fallback** - DDJ-FLX4 MIDI is ingested live during a real session and the app degrades cleanly when the controller is unplugged.
+- [ ] **Phase 54: Hype Mode Live** - On real audio, hype (party) mode actually fires grounded, in-bar, non-slop reactions — the AI voice lands on real events (drops/builds) across ≥2 genres, cooldowns/latency tuned live so nothing comes late.
+- [ ] **Phase 55: Feedback Mode Live + Citation Integrity** - On real audio, feedback (coach) mode produces grounded, in-bar, non-slop coaching across ≥2 genres, and the EvidenceRegistry citation strip reflects real session events with zero orphaned or hallucinated citations.
+- [ ] **Phase 56: Performance + Live Mascot** - TTFT within budget on real HW, no audio dropouts under live load, mascot + UI hold 60fps, and the Neon Rebel mascot reacts correctly to live audio/MIDI events in-session.
+- [ ] **Phase 57: Sexify Finish** - Final Tier-1 visual pass (zero HIGH findings), close v0.1.0-rc1 carryover bugs, tighten fresh-account first-run.
+- [ ] **Phase 58: Ship Readiness** - All engineering release gates green on real artifacts, §E2E-50A-WALK discharged by driving the real app, one-button SHIP-CUT sequence documented + pre-verified with external-clock items surfaced as KAAN-ACTION.
 
 ## Phase Details
 
 ### Phase 51: Real-Hardware Bring-Up
-**Goal**: The built app actually runs — boots to a live listening session on Kaan's MacBook, ingests real BlackHole audio and the real DDJ-FLX4, and survives a full-set run with every console/log error triaged and fixed.
+**Goal**: The built app actually runs — boots to a live listening session on Kaan's MacBook, starts up clean, and survives a full-set run with every console/log error triaged and fixed. This is the foundation: nothing downstream can be observed until the app boots and stays up on real hardware.
 **Depends on**: Nothing (first phase — everything downstream needs a running app)
-**Requirements**: BRINGUP-01, BRINGUP-02, BRINGUP-03, BRINGUP-04, BRINGUP-05
+**Requirements**: BRINGUP-01, BRINGUP-04, BRINGUP-05
 **Success Criteria** (what must be TRUE):
-  1. Launching the app on the real Mac reaches a live "listening" session with no boot crash, and the Tauri console + sidecar logs are clean of unhandled exceptions at startup.
-  2. Real master output routed through BlackHole reaches the co-host at 48 kHz and live audio levels register on-screen in real time.
-  3. The DDJ-FLX4 is ingested live during a session when plugged in, and the app degrades gracefully (no crash, clear state) when it is unplugged.
-  4. Every runtime error observed in the Tauri console + sidecar logs during a real run is triaged and fixed — a full-set run completes with zero unhandled exceptions.
-  5. A ≥30-minute continuous real session runs with no dropout, hang, or unbounded memory growth (RSS stays bounded across the run).
+  1. Launching the app on the real Mac reaches a live "listening" session with no boot crash.
+  2. The Tauri console + sidecar logs are clean at startup — no unhandled exceptions, and the ws_bus no longer emits intermittent empty `{}` frames between real frames.
+  3. Every runtime error observed in the Tauri console + sidecar logs during a real run is triaged and fixed — a full-set run completes with zero unhandled exceptions.
+  4. A ≥30-minute continuous real session runs with no dropout, hang, or unbounded memory growth (RSS stays bounded across the run).
 **Plans**: TBD
+**Known issues to fold in**: ws_bus emits intermittent empty `{}` frames between real frames (bring-up cleanliness — close here).
 
-### Phase 52: Live-Session Validation + Latency/Performance Tuning
-**Goal**: On real audio, both hype and feedback modes feel like a real DJ friend in the ear — grounded, in-bar, non-slop across ≥2 genres — with the citation strip and mascot tracking real events and performance tuned to budget on the real machine.
-**Depends on**: Phase 51 (needs a stable, running session to validate against)
-**Requirements**: LIVE-01, LIVE-02, LIVE-03, LIVE-04, LIVE-05, PERF-01, PERF-02, PERF-03
+### Phase 52: Audio Path + Feature Grounding
+**Goal**: The live audio path is proven on real hardware — master output reaches the co-host through BlackHole at 48 kHz with levels registering in real time — AND every feature derived from that audio is grounded so the AI (and the UI) never sees a value that did not happen. The live BPM=200 read on a ~129 BPM track is the canonical bug to close: out-of-range values must never reach the bus/UI.
+**Depends on**: Phase 51 (needs a stable, running session to route audio into)
+**Requirements**: BRINGUP-02
 **Success Criteria** (what must be TRUE):
-  1. In a live session, hype (party) mode produces grounded, in-time, non-slop reactions on real audio across ≥2 genres — no scripted/late/hallucinated lines (Kaan-ear pass + autonomous proxy clean).
-  2. In a live session, feedback (coach) mode produces grounded, in-time, non-slop reactions on real audio across ≥2 genres, with cooldowns and reaction latency tuned live so reactions land in-bar rather than after the moment passes.
-  3. The EvidenceRegistry citation strip reflects real session events live with zero orphaned or hallucinated citations, and the Neon Rebel mascot reacts correctly to live audio/MIDI events in-session.
-  4. TTFT (trigger → first audio out) measured on the real MacBook meets the live-path latency budget, and no audio glitches/dropouts occur in the playback path under real-session load.
-  5. The mascot + UI hold 60fps on the integrated-GPU MacBook during a live session.
+  1. Real master output routed through BlackHole reaches the co-host at 48 kHz and live audio levels register on-screen in real time (capture path confirmed live).
+  2. Derived BPM tracks the real track tempo — a ~129 BPM track reads ~129, never 200; out-of-range BPM (outside BPM_VALID_MAX) is rejected at the source and never reaches the bus or UI.
+  3. The other audio-derived features (RMS levels, frequency bands, onset density) stay within valid ranges across a full-set run — no NaN, no out-of-range spikes leaking to the UI.
+  4. With a track routed in, the on-screen level meters move in time with the music (visible, grounded feedback that capture is live and correct).
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 53: Sexify Finish
+### Phase 53: Controller Live + Graceful Fallback
+**Goal**: The DDJ-FLX4 MIDI path is proven on real hardware — controller moves are ingested live during a real session — and the app degrades cleanly to a clear, no-crash state when the controller is unplugged mid-session or absent at boot.
+**Depends on**: Phase 51 (running app to ingest into); independent of Phase 52
+**Requirements**: BRINGUP-03
+**Success Criteria** (what must be TRUE):
+  1. The DDJ-FLX4 is ingested live during a session when plugged in — real fader/knob/jog moves register in `ControllerState` and surface to the bus.
+  2. Unplugging the controller mid-session degrades gracefully — no crash, no unhandled exception, the app stays in a clear, defined state and keeps running.
+  3. Booting with the controller absent runs a full session on audio alone with no MIDI-related errors in the logs (verified graceful fallback).
+**Plans**: TBD
+
+### Phase 54: Hype Mode Live
+**Goal**: On real audio, hype (party) mode feels like a real DJ friend in the ear — and, critically, the AI voice **actually fires** on real events. Real hardware surfaced a hard bug: a detected drop produced no voice in a 32s window. Hype mode is not validated until grounded, in-bar reactions reliably land on real drops/builds across ≥2 genres, with cooldowns and latency tuned live so nothing comes late.
+**Depends on**: Phase 52 (grounded audio features are what hype reactions react to)
+**Requirements**: LIVE-01, LIVE-03
+**Success Criteria** (what must be TRUE):
+  1. On real audio, when a drop/build is detected the AI voice fires — no more dead windows where a clear event passes with no reaction (the 32s-silent-on-drop bug is closed).
+  2. Hype-mode reactions are grounded, in-time, and non-slop across ≥2 genres — no scripted, late, or hallucinated lines (Kaan-ear pass + autonomous proxy clean).
+  3. Event cooldowns and reaction latency are tuned live so reactions land in-bar rather than after the moment passes.
+  4. Across a full hype-mode set, the cadence feels alive (reactions present at the right density) — not silent stretches, not chatter.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 55: Feedback Mode Live + Citation Integrity
+**Goal**: On real audio, feedback (coach) mode coaches like a real DJ mentor — grounded, in-bar, non-slop across ≥2 genres — and every claim it makes is backed by a real event. The EvidenceRegistry citation strip is the visible proof: it must reflect real session events live with zero orphaned or hallucinated citations.
+**Depends on**: Phase 52 (grounded audio features back the coaching); benefits from Phase 54 (latency/cooldown tuning carries over)
+**Requirements**: LIVE-02, LIVE-04
+**Success Criteria** (what must be TRUE):
+  1. On real audio, feedback (coach) mode produces grounded, in-time, non-slop coaching across ≥2 genres — observations tie to things that actually happened in the set (Kaan-ear pass + autonomous proxy clean).
+  2. The EvidenceRegistry citation strip reflects real session events live — every citation maps to a real event, zero orphaned or hallucinated citations across a full-set run.
+  3. Clicking a live citation deep-links to the real event it cites (citation → debrief region highlight works on real session data, not fixtures).
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 56: Performance + Live Mascot
+**Goal**: On the real machine under live-session load, the co-host hits peak performance — reactions are fast (TTFT within budget), audio never glitches, the UI and mascot hold 60fps — and the Neon Rebel mascot is a live, correct feedback surface that telegraphs back what the system saw from real audio/MIDI events.
+**Depends on**: Phase 54 + Phase 55 (perf is measured against real reaction traffic from both modes); Phase 53 (mascot reacts to live MIDI)
+**Requirements**: PERF-01, PERF-02, PERF-03, LIVE-05
+**Success Criteria** (what must be TRUE):
+  1. TTFT (trigger → first audio out) measured on the real MacBook meets the live-path latency budget.
+  2. No audio glitches/dropouts occur in the playback path under real-session load across a full set.
+  3. The mascot + UI hold 60fps on the integrated-GPU MacBook during a live session.
+  4. The Neon Rebel mascot reacts correctly to live audio/MIDI events in-session — its state visibly tracks real drops/builds/controller moves (the visual feedback loop is grounded, not decorative).
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 57: Sexify Finish
 **Goal**: The surfaces a real user touches are polished to peak — Tier-1 live views get a final CDJ-Whisper visual pass, the v0.1.0-rc1 carryover bugs are closed, and a fresh account reaches first-session with no friction.
-**Depends on**: Phase 51 (running app to inspect); benefits from Phase 52 live observations
+**Depends on**: Phase 51 (running app to inspect); benefits from Phases 52–56 live observations
 **Requirements**: POLISH-01, POLISH-02, POLISH-03
 **Success Criteria** (what must be TRUE):
   1. Tier-1 live surfaces (session view, mascot overlay) pass a final paired ui-checker + ui-auditor visual pass with zero HIGH findings and CDJ Whisper consistency held (20/80 accent rule, textured material feel, no AI-slop typography).
@@ -70,9 +124,9 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 54: Ship Readiness
+### Phase 58: Ship Readiness
 **Goal**: Everything that does not require an external signature is green and proven — release gates pass on real artifacts, the §E2E-50A-WALK is discharged by driving the real app, and the exact one-button ship sequence is documented and pre-verified so the only thing left is the external signatures.
-**Depends on**: Phase 52 (live validation feeds Gate 2b hallucination + Gate 6b e2e report), Phase 53 (polish complete before final artifacts)
+**Depends on**: Phase 54 + Phase 55 (live validation feeds Gate 2b hallucination + Gate 6b e2e report), Phase 57 (polish complete before final artifacts)
 **Requirements**: REL-01, REL-02, REL-03
 **Success Criteria** (what must be TRUE):
   1. `cut_release.sh` 6-gate pre-flight + Gate 2b (hallucination) + Gate 6b (e2e report) all run green on real artifacts (not simulated fixtures).
@@ -87,9 +141,13 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 51. Real-Hardware Bring-Up | 0/TBD | Not started | - |
-| 52. Live-Session Validation + Latency/Performance Tuning | 0/TBD | Not started | - |
-| 53. Sexify Finish | 0/TBD | Not started | - |
-| 54. Ship Readiness | 0/TBD | Not started | - |
+| 52. Audio Path + Feature Grounding | 0/TBD | Not started | - |
+| 53. Controller Live + Graceful Fallback | 0/TBD | Not started | - |
+| 54. Hype Mode Live | 0/TBD | Not started | - |
+| 55. Feedback Mode Live + Citation Integrity | 0/TBD | Not started | - |
+| 56. Performance + Live Mascot | 0/TBD | Not started | - |
+| 57. Sexify Finish | 0/TBD | Not started | - |
+| 58. Ship Readiness | 0/TBD | Not started | - |
 
 **Coverage:** 19/19 v4.0 requirements mapped ✓ (no orphans, no duplicates)
 
@@ -168,8 +226,8 @@ Full archive: `.planning/milestones/v3.1-ROADMAP.md` · Requirements: `.planning
 | v2.1 The Unified Cut | 27–39 | ✅ Shipped (tech_debt) | 2026-05-16 |
 | v3.0 Clean OSS Ship | 40–45 | ✅ Shipped (tech_debt) | 2026-05-17 |
 | v3.1 Distribution-Ready Pass | 46–50 | ✅ Shipped (tech_debt) | 2026-05-18 |
-| v4.0 SHIP | 51–54 | 🔨 Planning | - |
+| v4.0 SHIP | 51–58 | 🔨 Planning | - |
 
 ---
 
-*Roadmap reopened 2026-05-20 for v4.0 "SHIP" (Phases 51–54) via `/gsd:new-milestone` under `gsd-autonomous fully`. Bring-up MUST come first (Phase 51) since all downstream validation depends on a running app. Live validation + performance tuning are co-observed in the same real sessions (Phase 52). External signatures (Apple Dev + SignPath) stay KAAN-ACTION — engineering makes the release one-button-after-signatures.*
+*Roadmap re-split 2026-05-20 for v4.0 "SHIP" — **8 phases (51–58)** per Kaan's directive for finer granularity than the prior 4-phase cut. Continues numbering from v3.1 (closed at Phase 50). Bring-up is split into three input seams — boot/stability (51), audio + feature grounding (52), controller (53) — so each real-hardware path is independently green before the modes that consume it are validated. The two interaction modes get dedicated phases (hype 54, feedback 55) because they have different live failure shapes; performance + live mascot land together (56) once both modes generate real reaction traffic. Real-hardware findings folded in: ws_bus empty-frame cleanup (51), live BPM=200 grounding fix (52), AI-voice-must-actually-fire (54). External signatures (Apple Dev + SignPath) stay KAAN-ACTION — engineering makes the release one-button-after-signatures; no phase depends on signatures landing.*

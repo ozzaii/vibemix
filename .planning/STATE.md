@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: SHIP
 status: planning
-last_updated: "2026-05-20T20:51:03.000Z"
+last_updated: "2026-05-20T21:30:00.000Z"
 last_activity: 2026-05-20
 progress:
-  total_phases: 4
+  total_phases: 8
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -15,22 +15,22 @@ progress:
 
 # vibemix — State
 
-**Last updated:** 2026-05-18 — v3.1 "Distribution-Ready Pass" milestone shipped (engineering-complete; tech_debt accepted). 5 phases (P46–P50), 44/44 REQ-IDs engineering-green, 7 Kaan-action carveouts deferred (external-clock dependent). Next: `/gsd:new-milestone` once Kaan decides scope.
+**Last updated:** 2026-05-20 — v4.0 "SHIP" roadmap RE-SPLIT from 4 phases into **8 phases (51–58)** per Kaan's directive for finer granularity. 19/19 REQ-IDs re-mapped to exactly one phase. Next: `/gsd:plan-phase 51`.
 
 ---
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-18 after v3.1 milestone close)
+See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Planning next milestone (post-v3.1 strategic conversation open; Kaan drives).
+- **Current focus:** v4.0 "SHIP" — real-hardware bring-up → live validation → polish → ship-readiness of an already-built app.
 - **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts on external clock).
 - **Project mode:** standard.
 - **Granularity:** fine.
 - **Model profile:** quality (all agents on Opus, all checkpoints on).
-- **Autonomy mode:** `gsd-autonomous fully` — every blocker + human-needed item discharged autonomously, only privacy rule + destructive risk + legal-capacity carveouts (Apple Dev Agreement + SignPath OSS) still pause. Soft Kaan-discharge gates (§VIS-04 Mixamo retargets, companion-driver signing, real-VM walk) surface to KAAN-ACTION but do NOT pause work.
+- **Autonomy mode:** `gsd-autonomous fully` — every blocker + human-needed item discharged autonomously, only privacy rule + destructive risk + legal-capacity carveouts (Apple Dev Agreement + SignPath OSS) still pause. Soft Kaan-discharge gates surface to KAAN-ACTION but do NOT pause work.
 
 ---
 
@@ -38,8 +38,8 @@ See: .planning/PROJECT.md (updated 2026-05-18 after v3.1 milestone close)
 
 Phase: 51 — Real-Hardware Bring-Up (not started)
 Plan: —
-Status: Roadmap locked — ready for `/gsd:plan-phase 51`
-Last activity: 2026-05-20 — v4.0 roadmap created (Phases 51–54; 19/19 REQ-IDs mapped)
+Status: Roadmap locked (8-phase split) — ready for `/gsd:plan-phase 51`
+Last activity: 2026-05-20 — v4.0 roadmap RE-SPLIT to 8 phases (51–58); 19/19 REQ-IDs re-mapped
 
 ## Performance Metrics
 
@@ -54,6 +54,8 @@ Last activity: 2026-05-20 — v4.0 roadmap created (Phases 51–54; 19/19 REQ-ID
 | Plans complete (v3.1) | 32 / 32 |
 | v3.0 REQ-IDs mapped + satisfied | 57 / 57 ✓ (100% coverage, no orphans) |
 | v3.1 REQ-IDs mapped + satisfied | 44 / 44 ✓ (100% coverage, no orphans) |
+| v4.0 REQ-IDs mapped | 19 / 19 ✓ (100% coverage, no orphans, no duplicates) |
+| v4.0 phase count | 8 (Phases 51–58) |
 | v3.0 cross-phase integration seams WIRED | 3 / 3 |
 | v3.1 cross-phase integration seams WIRED | 5 / 5 |
 | v3.0 commits since `v2.1.0` tag | 250 |
@@ -69,32 +71,44 @@ Last activity: 2026-05-20 — v4.0 roadmap created (Phases 51–54; 19/19 REQ-ID
 
 ## Accumulated Context
 
-### v4.0 Roadmap Locked (2026-05-20)
+### v4.0 Roadmap RE-SPLIT to 8 Phases (2026-05-20)
 
-v4.0 "SHIP" scoped into **4 phases (51–54)**, continuing numbering from v3.1 (closed at Phase 50). 19/19 REQ-IDs mapped to exactly one phase — 100% coverage, no orphans, no duplicates. Granularity is `fine` but the milestone is deliberately kept tight (bring-up + validation + polish + ship of an already-built app, not new feature work).
+v4.0 "SHIP" re-roadmapped from the prior 4-phase cut into **8 phases (51–58)** per Kaan's explicit directive for finer granularity. Numbering continues from v3.1 (closed at Phase 50) — NO reset. 19/19 REQ-IDs re-mapped to exactly one phase — 100% coverage, no orphans, no duplicates. The split breaks bring-up into three independent input seams and gives each interaction mode its own validation phase, so every real-hardware path is independently green before the modes that consume it are validated.
 
 | Phase | Goal | Requirements (count) | UI |
 |-------|------|----------------------|----|
-| 51 — Real-Hardware Bring-Up | Boot + stabilize the built app on the real Mac; fix runtime breaks from Tauri console + sidecar logs across a full-set run | BRINGUP-01..05 (5) | — |
-| 52 — Live-Session Validation + Latency/Performance Tuning | Both modes feel like a real DJ friend on real audio (≥2 genres); citation strip + mascot track real events; TTFT/dropouts/60fps to budget | LIVE-01..05 + PERF-01..03 (8) | yes |
-| 53 — Sexify Finish | Final Tier-1 visual pass (zero HIGH); close v0.1.0-rc1 carryover bugs; tighten fresh-account first-run | POLISH-01..03 (3) | yes |
-| 54 — Ship Readiness | All engineering gates green on real artifacts; §E2E-50A-WALK discharged; one-button SHIP-CUT documented + pre-verified | REL-01..03 (3) | — |
+| 51 — Real-Hardware Bring-Up | Boot + stabilize the built app on the real Mac; clean startup logs (incl. ws_bus empty-frame fix); ≥30-min full-set run with zero unhandled exceptions / bounded RSS | BRINGUP-01/04/05 (3) | — |
+| 52 — Audio Path + Feature Grounding | BlackHole 48 kHz capture live; ground every derived feature — fix live BPM=200-on-129BPM bug; out-of-range values never reach bus/UI | BRINGUP-02 (1) | yes |
+| 53 — Controller Live + Graceful Fallback | DDJ-FLX4 MIDI ingested live; clean degrade when unplugged / absent at boot | BRINGUP-03 (1) | — |
+| 54 — Hype Mode Live | AI voice ACTUALLY FIRES on real drops/builds (close 32s-silent-on-drop bug); grounded in-bar non-slop across ≥2 genres; cooldowns/latency tuned live | LIVE-01/03 (2) | yes |
+| 55 — Feedback Mode Live + Citation Integrity | Coach mode grounded/in-bar/non-slop across ≥2 genres; EvidenceRegistry citation strip reflects real events, zero orphaned/hallucinated citations | LIVE-02/04 (2) | yes |
+| 56 — Performance + Live Mascot | TTFT to budget; no dropouts under live load; 60fps; Neon Rebel mascot reacts correctly to live audio/MIDI | PERF-01/02/03 + LIVE-05 (4) | yes |
+| 57 — Sexify Finish | Final Tier-1 visual pass (zero HIGH); close v0.1.0-rc1 carryover bugs; tighten fresh-account first-run | POLISH-01/02/03 (3) | yes |
+| 58 — Ship Readiness | All engineering gates green on real artifacts; §E2E-50A-WALK discharged; one-button SHIP-CUT documented + pre-verified | REL-01/02/03 (3) | — |
 
-**Build-order rationale:**
-- **Phase 51 MUST be first** — every downstream validation depends on a running app. Nothing can be observed until the built Tauri app + sidecar boot to a live listening session on real hardware.
-- **Phase 52 merges LIVE + PERF** because both are co-observed in the same real sessions — latency tuning (TTFT, in-bar cooldowns) and reaction-feel tuning happen on the same audio passes; splitting them would mean re-running the same live sets twice.
-- **Phase 53 (polish)** depends on a running app to inspect (51) and benefits from live observations (52), but its work — visual pass, carryover bugs, first-run — is independent of validation outcomes.
-- **Phase 54 (ship)** is last: Gate 2b (hallucination) is fed by Phase 52 live validation; Gate 6b (e2e report) and §E2E-50A-WALK need the real app driven end-to-end; final artifacts cut after polish (53) lands.
+**Build-order rationale (8-phase):**
+- **Phase 51 MUST be first** — every downstream validation depends on a running app booting to a live listening session on real hardware with clean startup.
+- **Phases 52 + 53 are the two input seams** — audio (52) and controller (53) are independent of each other (53 needs only a running app from 51), but both must be live + grounded before any mode that consumes them is validated. Audio comes first because both modes react primarily to audio; controller is a secondary input + graceful-fallback contract.
+- **Phases 54 + 55 are the two interaction modes**, split because they have different live failure shapes: hype's hard bug is "the AI voice did not fire on a detected drop in 32s" (54); feedback's hard bug class is citation integrity (55). Each is its own Kaan-ear pass + autonomous-proxy clean. Both depend on grounded audio features (52).
+- **Phase 56 (perf + live mascot)** lands after both modes generate real reaction traffic — TTFT/dropouts/60fps are measured against real load, and the mascot is validated reacting to the live audio/MIDI events the prior phases proved.
+- **Phase 57 (polish)** depends on a running app to inspect (51) and benefits from all live observations (52–56), but its work — visual pass, carryover bugs, first-run — is independent of validation outcomes.
+- **Phase 58 (ship)** is last: Gate 2b (hallucination) is fed by Phases 54 + 55 live validation; Gate 6b (e2e report) and §E2E-50A-WALK need the real app driven end-to-end; final artifacts cut after polish (57) lands.
+
+**Real-hardware findings folded into phases as concrete success criteria / known issues:**
+- **Audio capture path is LIVE** (music level registers when a track is routed into BlackHole 2ch) → Phase 52 SC-1 confirms the live capture path.
+- **BUG: live BPM read 200 on a ~129 BPM track** (BPM_VALID_MAX=180; out-of-range value reaching bus/UI) → Phase 52 SC-2: grounding fix at the source so a ~129 track reads ~129 and out-of-range BPM never reaches bus/UI.
+- **BUG: AI voice did NOT fire in a 32s window despite a detected drop** → Phase 54 SC-1: the AI voice must actually fire on real drops/builds — the 32s-silent-on-drop bug is closed.
+- **ws_bus emits intermittent empty `{}` frames between real frames** (minor) → Phase 51 SC-2 + known-issues note: bring-up cleanliness, close here.
 
 **Locked invariants carried into v4.0 (all preserved from v3.0/v3.1):**
 - POC immutability — `cohost*.py` retired (deleted, scrub-gated); `mascot.html` byte-stable + CI `mascot-audit`. No resurrection.
 - ModelRouter seam — zero new hardcoded model literals; CI grep gate extends to v4.0 artifacts.
-- Anti-slop blocklist — 15-token + `deeply\s+\w+` regex; live reactions + any new UI copy must pass.
+- Anti-slop blocklist — 15-token + `deeply\s+\w+` regex; live reactions + any new UI copy must pass.
 - Privacy rule (`feedback_privacy_scope_narrow`) — off-limits LLM-transcript paths absolute; e2e harness asserts zero writes to `~/.hermes/` / `~/hermes-rig/logs/` / `~/.lmstudio/`. Bring-up debugging reads Tauri console + sidecar logs ONLY (vibemix's own logs), never Kaan's OZ/Hermes/local-AI surfaces.
 - Gemini-only (`feedback_no_clap_use_gemini_embedding`) — no new providers/detectors; this is bring-up, not feature work.
-- `gsd-autonomous fully` — engineering closes everything not requiring an external signature; the signed publish (Apple Dev Agreement via Francesco + SignPath OSS cert) stays KAAN-ACTION. Phase 54 makes the release one-button-after-signatures; it does NOT depend on the signatures landing.
-- Hallucination gate is hard (`project_phase_16_kaan_dj_testing`) — satisfied by Kaan's DJ ear + autonomous proxy, NOT a 30-session replay harness. No release until live reactions are confirmed grounded.
-- Frontend-enforcement skill applies to Phases 52 + 53 (UI hint: yes) — CDJ Whisper, 20/80 accent rule, textured material feel, no AI-slop typography.
+- `gsd-autonomous fully` — engineering closes everything not requiring an external signature; the signed publish (Apple Dev Agreement via Francesco + SignPath OSS cert) stays KAAN-ACTION. Phase 58 makes the release one-button-after-signatures; it does NOT depend on the signatures landing.
+- Hallucination gate is hard (`project_phase_16_kaan_dj_testing`) — satisfied by Kaan's DJ ear + autonomous proxy, NOT a 30-session replay harness. No release until live reactions (Phases 54 + 55) are confirmed grounded.
+- Frontend-enforcement skill applies to Phases 52, 54, 55, 56, 57 (UI hint: yes) — CDJ Whisper, 20/80 accent rule, textured material feel, no AI-slop typography.
 
 **Reuses already-built engineering (do NOT rebuild):** v3.1 e2e harness (`tests/e2e/macbook/`), 50a Kaan-walk checklist + `record_50a_walk.sh`, `cut_release.sh` with Gate 2b + Gate 6b wired, EvidenceRegistry citation strip, Neon Rebel 4-layer mascot state machine, BlackHole 48 kHz probe, TTFTMeter, installer/first-run wizard. v4.0 DRIVES and TUNES these on real hardware — it does not re-implement them.
 
@@ -177,13 +191,13 @@ Two engineering-green-with-deferral items from Phase 46 — neither blocks Phase
 - **5-phase decomposition P46–P50** with build-order: parallel cluster (46 + 47) → sequential cluster (48 → 49 → 50). Phase 46 + 47 share zero files. Phase 48 gated on Phase 46 `dep_ratings.json` schema. Phase 49 gated on Phase 46 + Phase 48 (companion pulls Green-rated deps only). Phase 50 gated on Phase 47 (real GLBs for visual snapshots) + Phase 49 (built signed `.dmg`).
 - **Phase numbering CONTINUED** from v3.0 — v3.0 closed at Phase 45. v3.1 starts at Phase 46 (no `--reset-phase-numbers` semantics).
 - **Five v3.0 invariants preserved** in every v3.1 phase: POC immutability (`cohost*.py`, `mascot.html` byte-identical to v2.0 tag), ModelRouter seam (zero new hardcoded model literals; CI grep gate extended to v3.1 artifacts), anti-slop blocklist (15-token + `\bdeeply\s+\w+` regex; grep target paths extended to `docs/AUDIT.md`, `docs/dep-opportunities/`, installer wizard copy, e2e report.html), privacy rule (project-scoped FS only; e2e harness asserts zero writes to off-limits paths per `feedback_privacy_scope_narrow`), 3-IPC-reservation contract (zero new IPC wrappers; v3.1 is build-time / test-harness / asset-only).
-- **`gsd-autonomous fully` mode applied** — engineering proceeds unblocked in PARALLEL with v3.0 external clock (Apple Dev + SignPath ~1-week SLA). Soft Kaan-discharge gates surface to KAAN-ACTION-LEGAL but do NOT pause work: §VIS-04 Mixamo Adobe-account walk (Phase 47) ships placeholders + scaffolds; §INSTALL-COMPANION-SIGN companion-driver Authenticode (Phase 49) ships `companion-sign` release.yml stage + verifier, awaits same SignPath OSS Foundation cert v3.0 SHIP-CUT awaits.
-- **Worktree-subagent Step-0 invariant** mandated for every Phase 46–50 plan per memory `feedback_worktree_must_sync_main_first` — every subagent prompt skeleton MUST include `git fetch origin main && git merge origin/main --no-edit` Step-0 block. Plan-checker rejects any plan lacking this. (Phase 40 worktree-isolation learning: stale base = ~161k-line regression on merge.)
-- **Phase 50 split: 50a Kaan-ear (subjective) + 50b OS-matrix smoke (objective)** per memory `project_phase_16_kaan_dj_testing` — NOT a formal 30-session replay harness; Kaan walks his MacBook with real DJ-set audio. 50b automates ≥ 2 of {macOS 12.3 Intel, 14 AS, 15 AS, Win 10, Win 11}.
-- **Mascot scope locked to single VTuber character (Neon Rebel)** per memory `project_mascot_as_vtuber_personality_surface` — `/hatch` user-gen pipeline is v2.x stretch, NOT v3.1.
-- **No CLAP / no multi-provider AI** per memory `feedback_no_clap_use_gemini_embedding` + `feedback_no_scope_creep_clean_utility` — Phase 48 opportunity scan auto-flags any constraint-violating candidate Red.
-- **BlackHole 48 kHz format requirement** per memory `project_v4_canonical_baseline` — Phase 49 post-install probe confirms default at INSTALL-10.
-- **One-click install ≤ 60s ceiling** per memory `project_one_click_install_hard_req` — Phase 49 INSTALL-06 wires `INSTALL_READY` event with elapsed wall-clock; CI gate fails if median exceeds 60s on SHIP-04 fresh-VM matrix; driver install step lands INSIDE the envelope via parallelized driver pull during app extract, NOT by ceiling expansion.
+- **`gsd-autonomous fully` mode applied** — engineering proceeds unblocked in PARALLEL with v3.0 external clock (Apple Dev + SignPath ~1-week SLA). Soft Kaan-discharge gates surface to KAAN-ACTION-LEGAL but do NOT pause work.
+- **Worktree-subagent Step-0 invariant** mandated for every plan per memory `feedback_worktree_must_sync_main_first` — every subagent prompt skeleton MUST include `git fetch origin main && git merge origin/main --no-edit` Step-0 block. Plan-checker rejects any plan lacking this. (Phase 40 worktree-isolation learning: stale base = ~161k-line regression on merge.)
+- **Phase 50 split: 50a Kaan-ear (subjective) + 50b OS-matrix smoke (objective)** per memory `project_phase_16_kaan_dj_testing` — NOT a formal 30-session replay harness; Kaan walks his MacBook with real DJ-set audio.
+- **Mascot scope locked to single VTuber character (Neon Rebel)** per memory `project_mascot_as_vtuber_personality_surface`.
+- **No CLAP / no multi-provider AI** per memory `feedback_no_clap_use_gemini_embedding` + `feedback_no_scope_creep_clean_utility`.
+- **BlackHole 48 kHz format requirement** per memory `project_v4_canonical_baseline`.
+- **One-click install ≤ 60s ceiling** per memory `project_one_click_install_hard_req`.
 
 ### Decisions Locked (v3.0 — shipped, see v3.0-ROADMAP.md for full list)
 
@@ -191,10 +205,10 @@ All Phase 40–45 decisions remain locked. Highlights:
 
 - Mic-as-Part-2 + lookahead-as-Part-3 closes "AI invents what Kaan said" + "AI reacts after the moment passed" hallucination classes (Phase 40).
 - ModelRouter config-driven seam with zero hardcoded model literals + ServiceTier.FLEX on batch paths + STANDARD pinned to live coach (Phase 41).
-- Hybrid hallucination gate: autonomous proxy fast-lane (PR + 7 nightly canary) + Kaan-ear release-cut veto via `check_gate.sh` Gate 2b; **P85 Phase 16 ear-test memory override is RETIRED** (Phase 42) — see [.planning/decisions/P85-OVERRIDE-RETIRED.md](.planning/decisions/P85-OVERRIDE-RETIRED.md) for the audit-trail entry that documents the retirement (annotate-not-delete per Plan 42-05 Task 1).
+- Hybrid hallucination gate: autonomous proxy fast-lane (PR + 7 nightly canary) + Kaan-ear release-cut veto via `check_gate.sh` Gate 2b; **P85 Phase 16 ear-test memory override is RETIRED** (Phase 42) — see [.planning/decisions/P85-OVERRIDE-RETIRED.md](.planning/decisions/P85-OVERRIDE-RETIRED.md).
 - CDJ Whisper visual lock: Tier-1 surfaces zero HIGH findings; hardware-LED-strip meter rebuild; 22-site `--glow-faint` hover-glow sweep (Phase 43).
 - README hero "the only AI co-host that actually listens to your set" verbatim lock + EvidenceRegistry citation strip in live UI + Bravoh waitlist toggle default-OFF UTM-tracked (Phase 44).
-- KAAN-ACTION-LEGAL §SHIP-01..13 discharge cookbook ships 13 runbooks in canonical 8-block format; `audit_ship_v1_decision.py` (610 lines) pre-fills 4/5 rubric cells from GH releases + Bravoh healthz + ear-test logs + GH issues at T+30 (Phase 45).
+- KAAN-ACTION-LEGAL §SHIP-01..13 discharge cookbook ships 13 runbooks in canonical 8-block format; `audit_ship_v1_decision.py` (610 lines) pre-fills 4/5 rubric cells at T+30 (Phase 45).
 
 ### Decisions Locked (v0.1.0 + v2.0 + v2.1 — see prior STATE.md history)
 
@@ -207,55 +221,35 @@ All Phase 1–39 decisions remain locked. Highlights preserved:
 - Apache 2.0 + DCO license; signing via Apple Developer ID + SignPath OSS.
 - Gemini-only AI (no Anthropic / OpenAI / Ollama / CLAP / OpenL3 / MERT / sentence-transformers / torch).
 - Three.js (single 3D engine); vanilla TS in `tauri/ui/src/` (NOT React); WaveSurfer.js for Phase 29 debrief timeline.
-- POC files BYTE-IDENTICAL to v2.0 tag — `cohost*.py`, `mascot.html`, `cohost.streaming.py.bak`; Phase 37-06 immutability gate enforces.
-
-### Deferred Items (v3.0 close — 2026-05-17, carry forward to v3.1)
-
-Acknowledged per `gsd-autonomous fully` mode at v3.0 milestone close 2026-05-17. v3.1 closes some of these as pre-stage discharges complete (especially AUDIO-07 BlackHole probe via Phase 49 wizard, VIS-04 Mixamo retargets via Phase 47, INSTALL-VM-RUN / INSTALL-60S-CHECK via Phase 49 + Phase 50).
-
-| Category | Item | Status at v3.1 start |
-|----------|------|----------------------|
-| verification_gap | 40-VERIFICATION.md (AUDIO-05 PGP + AUDIO-06 Tauri key + AUDIO-07 BlackHole probe + ear-test) | human_needed; AUDIO-07 closes via Phase 49 wizard |
-| verification_gap | 41-VERIFICATION.md (TTFT p95 ear-test + LAT-09 spike + FLEX live-billing) | human_needed |
-| verification_gap | 42-VERIFICATION.md (ACK-BANK-REMAINING-20 + EVAL-VCR-CASSETTES + EVAL-CORPUS-WAVS + ear-test logs) | human_needed |
-| verification_gap | 43-VERIFICATION.md (§VIS-04 Mixamo retargets + capture day) | human_needed; §VIS-04 closes via Phase 47 |
-| verification_gap | 44-VERIFICATION.md (6+10 logo swaps + bravoh GH org standup + SHIP-TWEET sign-off + Discord live-execute) | human_needed |
-| verification_gap | 45-VERIFICATION.md (Apple Dev + SignPath + Bravoh-server + SHIP-CUT/TWEET/DISCORD/TRANSFER/ROTATE + SmartScreen + SHIP-V1-DECISION) | human_needed; external clock |
+- POC files retired (deleted, scrub-gated); `mascot.html` byte-stable + CI `mascot-audit`.
 
 ### Deferred Items (v3.1 close — 2026-05-18, carry forward as Kaan-action external clock)
 
-Acknowledged per `gsd-autonomous fully` mode at v3.1 milestone close 2026-05-18. All 7 are external-clock dependent; critical-path discharge order: §INSTALL-COMPANION-SIGN → §INSTALL-VM-RUN → §E2E-50A-WALK; §VIS-04 + §VIS-05 (Mixamo) independent and parallel; §SHIP-CONTACT-VBAUDIO + 2 dep-audit decisions independent.
+Acknowledged per `gsd-autonomous fully` mode at v3.1 milestone close 2026-05-18. All 7 are external-clock dependent; critical-path discharge order: §INSTALL-COMPANION-SIGN → §INSTALL-VM-RUN → §E2E-50A-WALK; §VIS-04 + §VIS-05 (Mixamo) independent and parallel; §SHIP-CONTACT-VBAUDIO + 2 dep-audit decisions independent. v4.0 drives several of these to discharge: §E2E-50A-WALK is Phase 58 SC-2; the engineering-side gates feed Phase 58 SC-1.
 
 | Category | Item | Status |
 |----------|------|--------|
 | ship-blocker | §INSTALL-COMPANION-SIGN — SignPath OSS Foundation cert grant for companion `.ps1` + `.py` Authenticode | external_clock (same cert as v3.0 SHIP-CUT) |
 | ship-blocker | §INSTALL-VM-RUN — Real Tart VM execution macOS 12.3 / 14 / 15 + Win 10 / 11 | gated on §INSTALL-COMPANION-SIGN |
-| kaan-walk | §E2E-50A-WALK — Kaan's MacBook walk + record `docs/e2e/2026-05-walk.webm` via `scripts/e2e/record_50a_walk.sh` | gated on §INSTALL-VM-RUN |
+| kaan-walk | §E2E-50A-WALK — Kaan's MacBook walk + record `docs/e2e/2026-05-walk.webm` via `scripts/e2e/record_50a_walk.sh` | v4.0 Phase 58 SC-2 |
 | asset-discharge | §VIS-04 — 28 Mixamo retargets via Adobe-account walk (Phase 47 scaffold ready) | independent (parallel) |
 | asset-discharge | §VIS-05 — 5 pre-existing legacy_prep_* slot retargets (bundle with §VIS-04) | independent (parallel) |
 | ship-optimization | §SHIP-CONTACT-VBAUDIO — VB-Audio OEM/bundle redistribution email | email drafted at `.planning/decisions/SHIP-CONTACT-VBAUDIO.md` (Kaan-action: send) |
-| install-walk | §INSTALL-VM-RUN — Parallels Win 11 quickstart added to `KAAN-ACTION-LEGAL.md::INSTALL-VM-RUN` | runbook ready; Kaan executes when Parallels is up |
-| tech-debt | ~~DEPS-07~~ — DISCHARGED 2026-05-19 (commit `f164c5c`); 19 workflows SHA-pinned via pinact `--apply`, `dtolnay/rust-toolchain@stable` exempted | closed |
+| tech-debt | ~~DEPS-07~~ — DISCHARGED 2026-05-19 (commit `f164c5c`) | closed |
 | tech-debt | DEPS-08 — `livekit-plugins-openai` cull blocked by `tts_chain.py:25` direct imports; scheduled post-v3.1 TTS proxy fallback chain refactor | tech_debt (docs/AUDIT.md § Decisions) |
-
-### v3.1 → v3.x Anticipated Carry-Forward (will route to next milestone scope)
-
-- **TTS proxy fallback chain refactor** — closes DEPS-08 cull-blocked path; isolates `livekit-plugins-openai` behind a swappable proxy seam.
-- **Real-asset re-baseline** — Phase 47 placeholder GLB visual regression baselines flip to real Mixamo retargets at §VIS-04 discharge; Playwright snapshots re-record.
-- **Real-VM walk validation** — Phase 49 + 50 simulated medians (41,000 ms) validate against real hardware once Tart images + SignPath cert both land.
 
 ### Blockers
 
-- **None engineering-side at v3.1 start.** All 5 phases parallelize around the v3.0 external clock.
-- **External clock (v3.0 carryover, does NOT block v3.1):** Apple Developer Program Agreement update (Francesco, P46 legal-capacity) + SignPath OSS Foundation approval (Kaan, ~1-week SLA, P46 legal-capacity). When approvals land, the SignPath cert also satisfies Phase 49 §INSTALL-COMPANION-SIGN.
+- **None engineering-side at v4.0 start.** All 8 phases (51–58) are engineering work on real hardware; none requires an external signature.
+- **External clock (v3.0 + v3.1 carryover, does NOT block v4.0 engineering):** Apple Developer Program Agreement update (Francesco, P46 legal-capacity) + SignPath OSS Foundation approval (Kaan, ~1-week SLA, P46 legal-capacity). These gate only the literal signed publish — surfaced as KAAN-ACTION in Phase 58; the SHIP-CUT is made one-button-after-signatures. No v4.0 phase depends on signatures landing.
 
-### Risks (v3.1 top 5 pitfalls — to mitigate during plan-time)
+### Risks (v4.0 — to mitigate during plan-time)
 
-1. **Stale `pip freeze` from Kaan's `.venv` ships as lockfile** (Phase 46) — bakes unused transitives, drifts off v3.0 GATE-02 VCR cassette pin. Mitigation: hermetic `python:3.12-slim-bookworm` container regen + `pip-deptree --reverse` prune gate.
-2. **Silent BlackHole / VB-CABLE auto-install trips macOS endpoint security / Win driver-signature UAC** (Phase 49) — produces "system extension blocked" modal that breaks one-click req. Mitigation: re-scope to "detect + one-tap fallback"; routing config (Multi-Output Device) is what gets automated, not kernel-mode install; wizard copy anticipates OS modal as expected step.
-3. **"It works on Kaan's MacBook" trap** (Phase 50) — e2e validates only Apple-Silicon Sonoma, ignores macOS 12.3 Intel + Win matrix. Mitigation: split 50a Kaan-ear + 50b OS-matrix smoke (objective, ≥ 2 of 5 configs); 50b prerequisite for milestone close.
-4. **Mascot tests built around `mascot.html` easter egg instead of v3.0 Tauri+Three.js production** (Phase 47) — emotion coverage appears green while real surface ships with placeholder GLBs (v0.1.0-rc1 "mascot chrome strip" bug class). Mitigation: e2e mascot tests target Tauri WebviewWindow only; CI grep gate `! grep -rn "mascot.html" tests/ e2e/ scripts/ci/`.
-5. **Anti-slop blocklist false-trips on installer / wizard / dep-audit copy** (Phases 46 / 48 / 49 / 50) — temptation to relax corrodes v3.0 anti-slop thesis. Mitigation: vocabulary substitution dictionary at `docs/internal/copy-substitutions.md` ("seamless → one-tap", "robust → tested", "leverage → use"); NEVER relax the gate.
+1. **"It works on Kaan's MacBook" trap** — v4.0 validates only Apple-Silicon real hardware; the OS matrix (macOS 12.3 Intel + Win) stays simulated/VM-pending. Mitigation: v4.0 explicitly scopes to Kaan-ear + real-Mac; OS-matrix coverage stays the v3.1 50b smoke + KAAN-ACTION §INSTALL-VM-RUN.
+2. **Out-of-range derived features leak past the source guard** (Phase 52) — the BPM=200 bug shows feature validation is not airtight at the bus/UI boundary. Mitigation: clamp/reject at the producer, assert valid-range in the bus snapshot test, not just at the consumer.
+3. **AI-voice-fires fix masks a deeper trigger/in-flight bug** (Phase 54) — the 32s-silent-on-drop could be cooldown, in-flight lock not clearing, or generate_reply not landing. Mitigation: instrument the trigger→generate→first-audio path end-to-end before tuning constants; do not paper over with shorter cooldowns.
+4. **Privacy rule during live bring-up debugging** — reading logs to triage runtime errors must NEVER touch Kaan's OZ/Hermes/local-AI surfaces. Mitigation: bring-up debugging reads vibemix's own Tauri console + sidecar logs ONLY; off-limits paths in CLAUDE.md are absolute (`feedback_privacy_scope_narrow`).
+5. **Anti-slop blocklist false-trips on live reaction copy** (Phases 54 / 55) — temptation to relax corrodes the v3.0 anti-slop thesis. Mitigation: NEVER relax the gate; tune the prompt/grounding, not the blocklist.
 
 ---
 
@@ -263,19 +257,19 @@ Acknowledged per `gsd-autonomous fully` mode at v3.1 milestone close 2026-05-18.
 
 ### Last Session
 
-- 2026-05-18 — v3.1 "Distribution-Ready Pass" milestone SHIPPED + archived under `gsd-autonomous fully` mode. 5 phases (P46–P50) shipped engineering-green; 32 plans landed; 44/44 v3.1 REQ-IDs satisfied (100% coverage, zero orphans); 61 commits since `v3.0` tag with net ~+55k LOC across `installer/`, `tauri/`, `scripts/`, `tests/`, `docs/`, `.github/workflows/`. Audit status `tech_debt` accepted (precedent: v2.1 + v3.0 both shipped same way). 7 Kaan-action carveouts routed to Deferred Items above; all external-clock dependent. MILESTONES.md entry written, ROADMAP.md collapsed to one-line summary with link, REQUIREMENTS.md archived to milestones/v3.1-REQUIREMENTS.md, PROJECT.md updated with v3.1 narrative + Validated requirements + carryover-pending items, STATE.md status flipped to shipped.
-- 2026-05-17 — v3.1 roadmap scaffolded via `gsd-roadmapper`; v2.1 + v3.0 SHIPPED + archived (see prior STATE.md history blocks in v3.0-ROADMAP.md + v3.1-ROADMAP.md).
+- 2026-05-20 — v4.0 "SHIP" roadmap RE-SPLIT from 4 phases into **8 phases (51–58)** per Kaan's explicit directive for finer granularity. Bring-up split into three input seams (boot/stability 51, audio+grounding 52, controller 53); the two interaction modes get dedicated phases (hype 54, feedback 55); perf+live-mascot 56; sexify 57; ship 58. 19/19 REQ-IDs re-mapped to exactly one phase (100% coverage, no orphans, no duplicates). Real-hardware findings folded in: ws_bus empty-frame fix (51), live BPM=200 grounding fix (52), AI-voice-must-fire fix (54). ROADMAP.md rewritten, REQUIREMENTS.md traceability re-mapped, STATE.md total_phases → 8, Current Position → Phase 51.
+- 2026-05-20 (earlier) — v4.0 milestone started via `/gsd:new-milestone`; initial 4-phase roadmap created.
+- 2026-05-18 — v3.1 "Distribution-Ready Pass" milestone SHIPPED + archived (5 phases P46–P50, 32 plans, 44/44 REQ-IDs).
 
 ### Next Session
 
-- **`/gsd:new-milestone`** to scope next milestone — strategic conversation open per memory `project_v2_planning_active`; Kaan drives. Likely scope candidates per memory `project_v2_open_candidates`: Mixxx OSC + map transpile, pyrekordbox integration depth, post-session debrief multi-session arc, library coach drill packs, multimodal "sounds like this" library search.
-- **Track external clock (v3.0 + v3.1 share the same one)**: Apple Developer Program Agreement update (Francesco) + SignPath OSS Foundation approval (Kaan, ~1-week SLA). SignPath cert simultaneously unlocks v3.0 SHIP-CUT AND v3.1 §INSTALL-COMPANION-SIGN. Both ship as a single discharge wave once approvals land.
-- **Critical-path Kaan-action discharge order** (post-external-clock): §INSTALL-COMPANION-SIGN → §INSTALL-VM-RUN → §E2E-50A-WALK; §VIS-04 + §VIS-05 (Mixamo Adobe walk) run in parallel; §SHIP-CONTACT-VBAUDIO is optional future Win optimization.
+- **`/gsd:plan-phase 51`** — decompose Phase 51 (Real-Hardware Bring-Up) into executable plans. This is the foundation: boot the app + sidecar on the real Mac, reach a stable live listening session, clean startup logs (ws_bus empty-frame fix), survive a ≥30-min full-set run with zero unhandled exceptions / bounded RSS. Everything downstream (52–58) depends on a running app.
+- **Track external clock (v3.0 + v3.1 share the same one)**: Apple Developer Program Agreement update (Francesco) + SignPath OSS Foundation approval (Kaan, ~1-week SLA). Gates only the literal signed publish; surfaced as KAAN-ACTION in Phase 58. Engineering proceeds unblocked.
 
 ---
 
-*State managed by gsd-complete-milestone at 2026-05-18 (v3.1 "Distribution-Ready Pass" SHIPPED + archived; awaiting `/gsd:new-milestone` for next milestone scope).*
+*State managed by gsd-roadmapper at 2026-05-20 (v4.0 "SHIP" roadmap RE-SPLIT to 8 phases 51–58; ready for `/gsd:plan-phase 51`).*
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Plan the first phase with /gsd-plan-phase 51

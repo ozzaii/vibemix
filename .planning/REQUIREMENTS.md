@@ -69,23 +69,25 @@ This milestone is the first time the built app is **driven on real hardware in a
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
 | BRINGUP-01 | Phase 51 | Pending |
-| BRINGUP-02 | Phase 51 | Pending |
-| BRINGUP-03 | Phase 51 | Pending |
 | BRINGUP-04 | Phase 51 | Pending |
 | BRINGUP-05 | Phase 51 | Pending |
-| LIVE-01 | Phase 52 | Pending |
-| LIVE-02 | Phase 52 | Pending |
-| LIVE-03 | Phase 52 | Pending |
-| LIVE-04 | Phase 52 | Pending |
-| LIVE-05 | Phase 52 | Pending |
-| PERF-01 | Phase 52 | Pending |
-| PERF-02 | Phase 52 | Pending |
-| PERF-03 | Phase 52 | Pending |
-| POLISH-01 | Phase 53 | Pending |
-| POLISH-02 | Phase 53 | Pending |
-| POLISH-03 | Phase 53 | Pending |
-| REL-01 | Phase 54 | Pending |
-| REL-02 | Phase 54 | Pending |
-| REL-03 | Phase 54 | Pending |
+| BRINGUP-02 | Phase 52 | Pending |
+| BRINGUP-03 | Phase 53 | Pending |
+| LIVE-01 | Phase 54 | Pending |
+| LIVE-03 | Phase 54 | Pending |
+| LIVE-02 | Phase 55 | Pending |
+| LIVE-04 | Phase 55 | Pending |
+| PERF-01 | Phase 56 | Pending |
+| PERF-02 | Phase 56 | Pending |
+| PERF-03 | Phase 56 | Pending |
+| LIVE-05 | Phase 56 | Pending |
+| POLISH-01 | Phase 57 | Pending |
+| POLISH-02 | Phase 57 | Pending |
+| POLISH-03 | Phase 57 | Pending |
+| REL-01 | Phase 58 | Pending |
+| REL-02 | Phase 58 | Pending |
+| REL-03 | Phase 58 | Pending |
 
 **Coverage:** 19 / 19 v4.0 requirements mapped to exactly one phase ✓ (no orphans, no duplicates)
+
+**Per-phase counts:** P51=3 (BRINGUP-01/04/05) · P52=1 (BRINGUP-02) · P53=1 (BRINGUP-03) · P54=2 (LIVE-01/03) · P55=2 (LIVE-02/04) · P56=4 (PERF-01/02/03 + LIVE-05) · P57=3 (POLISH-01/02/03) · P58=3 (REL-01/02/03) = 19.
