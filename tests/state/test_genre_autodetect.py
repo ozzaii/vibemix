@@ -109,10 +109,11 @@ def test_techno_vector_scores_techno():
 
 
 def test_out_of_library_vector_scores_unknown():
-    """A vector far from every profile (90 BPM, flat bands, no spectral
-    signature) returns ('unknown', conf < gate) — no false-confident pick."""
-    bands = {"sub": 0.25, "low": 0.25, "mid": 0.25, "high": 0.25}
-    picked, conf = score_genre(90.0, bands, 3.0, _profiles())
+    """A vector genuinely far from every profile — 100 BPM, a high-band-dominant
+    spectrum (0.50 high, sparse sub) that no shipped genre exhibits, low crest —
+    returns ('unknown', conf < gate). No false-confident pick on alien audio."""
+    bands = {"sub": 0.10, "low": 0.15, "mid": 0.25, "high": 0.50}
+    picked, conf = score_genre(100.0, bands, 2.0, _profiles())
     assert picked == "unknown", f"out-of-library scored {picked} (conf {conf:.2f})"
     assert conf < GENRE_CONFIDENCE_MIN
 
@@ -127,24 +128,41 @@ def test_no_bpm_lock_scores_unknown():
 
 def test_tie_within_margin_scores_unknown():
     """When the best and second-best are within GENRE_TIE_MARGIN, the detector
-    refuses to guess and returns 'unknown' — anti-slop tie-break."""
-    # Build a synthetic 2-profile world where two profiles are deliberately
-    # near-identical, then feed the shared midpoint -> they tie.
-    a = load_profile("techno")
-    b = load_profile("house")
-    assert a is not None and b is not None
-    # A vector exactly between techno and house BPM bands + neutral bands so
-    # neither dominates. house is 118-128, techno 125-175; 126 is in both-ish.
-    bands = {"sub": 0.30, "low": 0.25, "mid": 0.18, "high": 0.10}
-    picked, conf = score_genre(126.0, bands, 5.0, [a, b])
-    # If they tie within margin -> unknown. (We assert the contract holds for a
-    # genuinely ambiguous shared point; not which of the two would have won.)
-    if picked != "unknown":
-        # Allowed only if one clearly beat the other by > margin; otherwise the
-        # tie-gate is broken.
-        s_a, _ = score_genre(126.0, bands, 5.0, [a])
-        s_b_name, s_b = score_genre(126.0, bands, 5.0, [b])
-        assert abs(s_a[1] - s_b) > GENRE_TIE_MARGIN if isinstance(s_a, tuple) else True
+    refuses to guess and returns 'unknown' — anti-slop tie-break.
+
+    Construct a 2-profile world of two near-identical clones differing only
+    slightly in band centre, then feed the exact point between them so both
+    score high and tie within the margin -> unknown."""
+    techno = load_profile("techno")
+    assert techno is not None
+    # Two clones: same everything, band centres nudged +/- a hair so the
+    # midpoint between them ties both within GENRE_TIE_MARGIN.
+    from dataclasses import replace
+
+    clone_a = replace(
+        techno,
+        name="clone_a",
+        band_signature={
+            "sub": (0.30, 0.40),
+            "low": (0.22, 0.30),
+            "mid": (0.12, 0.20),
+            "high": (0.06, 0.12),
+        },
+    )
+    clone_b = replace(
+        techno,
+        name="clone_b",
+        band_signature={
+            "sub": (0.32, 0.42),  # +0.02 centre shift
+            "low": (0.22, 0.30),
+            "mid": (0.12, 0.20),
+            "high": (0.06, 0.12),
+        },
+    )
+    # The point exactly between the two sub centres (0.36) -> equidistant.
+    bands = {"sub": 0.36, "low": 0.26, "mid": 0.16, "high": 0.09}
+    picked, conf = score_genre(140.0, bands, 5.0, [clone_a, clone_b])
+    assert picked == "unknown", f"tie did not collapse to unknown: {picked} ({conf:.3f})"
 
 
 # ---------- hysteresis: no flicker ----------
@@ -208,9 +226,18 @@ def test_set_auto_enabled_toggles():
 
 
 def test_genre_autodetect_imports_no_heavy_deps():
+    """Grep the IMPORT lines (not prose) — the module may name CLAP/MERT in its
+    docstring to explain WHY they are excluded, but must not actually import any
+    heavy audio-ML dep."""
     import vibemix.state.genre.genre_autodetect as mod
 
     with open(mod.__file__, encoding="utf-8") as f:
-        src = f.read().lower()
-    for forbidden in ("import clap", "import mert", "openl3", "import torch", "transformers"):
-        assert forbidden not in src, f"heavy dep referenced: {forbidden}"
+        import_lines = [
+            ln.strip().lower()
+            for ln in f
+            if ln.strip().startswith(("import ", "from "))
+        ]
+    forbidden = ("clap", "mert", "openl3", "torch", "transformers", "tensorflow", "librosa")
+    for ln in import_lines:
+        for dep in forbidden:
+            assert dep not in ln, f"heavy dep imported: {ln!r}"
