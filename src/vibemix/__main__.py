@@ -443,6 +443,22 @@ async def main() -> None:
     else:
         print(f"-> genre profile: {applied_genre}")
 
+    # ----- Phase 52 (GENRE-01) — env override wins over auto-detect -----
+    # The user EXPLICITLY pinned a genre only when VIBEMIX_GENRE_PROFILE is
+    # actually present in the environment AND resolved to a real profile. A
+    # DEFAULTED 'techno' (env var absent) does NOT count as a pin — auto-detect
+    # should still self-correct the active profile in that case. When env-pinned,
+    # the auto-detector still SCORES (detected_genre/genre_confidence surfaced
+    # for honesty) but _tick_once does NOT call set_active_profile.
+    from vibemix.state.genre import set_auto_enabled
+
+    env_pinned = "VIBEMIX_GENRE_PROFILE" in os.environ and applied_genre is not None
+    set_auto_enabled(not env_pinned)
+    if env_pinned:
+        print(f"-> genre auto-detect: OFF (user pinned {applied_genre})")
+    else:
+        print("-> genre auto-detect: ON (self-correcting active profile)")
+
     # --- Phase 2 audio primitives ---
     import time as _time  # local import so the test suite can mock time.time without import-time side effects
 

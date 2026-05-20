@@ -222,6 +222,69 @@ def test_set_auto_enabled_toggles():
     assert is_auto_enabled() is True
 
 
+# ---------- env override at the _tick_once boundary (Task 4) ----------
+#
+# These drive the real _tick_once gate. score_genre is monkeypatched to a
+# deterministic ('psytrance', high-conf) so we test the FLAG GATE, not the
+# scorer (the scorer's correctness is pinned above).
+
+
+def _drive_tick_with_forced_genre(monkeypatch, forced=("psytrance", 0.9)):
+    from vibemix.state import MusicState
+    from vibemix.state.genre import set_active_profile
+    from vibemix.state.refresh import _tick_once
+
+    from tests.state.test_refresh import _audible_buf, _ctrl_mock, _track_mock
+
+    # Pin the active profile to techno (the "wrong" profile for psy audio).
+    set_active_profile("techno")
+    monkeypatch.setattr("vibemix.state.refresh.score_genre", lambda *a, **k: forced)
+
+    state = MusicState()
+    hs = GenreHysteresis(current_label=forced[0])  # already committed -> writes through
+    _tick_once(
+        state,
+        _audible_buf(),
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=0.0,
+        last_audible_low=0.0,
+        bpm_cache=144.0,
+        last_bpm_at=0.0,
+        genre_hysteresis=hs,
+    )
+    return state
+
+
+def test_env_pinned_does_not_flip_active_profile_but_surfaces_detection(monkeypatch):
+    """set_auto_enabled(False) (user pinned a genre): the scorer picks psytrance
+    but the ACTIVE profile stays techno (set_active_profile NOT called), while
+    detected_genre/genre_confidence ARE still surfaced for honesty."""
+    from vibemix.state.genre import get_active_profile
+
+    set_auto_enabled(False)
+    state = _drive_tick_with_forced_genre(monkeypatch)
+
+    active = get_active_profile()
+    assert active is not None and active.name == "techno", "env pin was overridden"
+    assert state.detected_genre == "psytrance", "detection not surfaced under env pin"
+    assert state.genre_confidence == 0.9
+
+
+def test_auto_enabled_flips_active_profile_to_detected(monkeypatch):
+    """set_auto_enabled(True): the active profile DOES flip to the committed
+    detected genre (psytrance)."""
+    from vibemix.state.genre import get_active_profile
+
+    set_auto_enabled(True)
+    state = _drive_tick_with_forced_genre(monkeypatch)
+
+    active = get_active_profile()
+    assert active is not None and active.name == "psytrance", "auto-detect did not flip profile"
+    assert state.detected_genre == "psytrance"
+
+
 # ---------- no heavy deps ----------
 
 
