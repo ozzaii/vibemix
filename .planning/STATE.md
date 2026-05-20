@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Plug In And Play
 status: planning
-last_updated: "2026-05-20T20:46:50.473Z"
+last_updated: "2026-05-20T20:51:03.000Z"
 last_activity: 2026-05-20
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-05-18 after v3.1 milestone close)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 51 — Real-Hardware Bring-Up (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-20 — Milestone v3.2 started
+Status: Roadmap locked — ready for `/gsd:plan-phase 51`
+Last activity: 2026-05-20 — v3.2 roadmap created (Phases 51–54; 19/19 REQ-IDs mapped)
 
 ## Performance Metrics
 
@@ -68,6 +68,36 @@ Last activity: 2026-05-20 — Milestone v3.2 started
 ---
 
 ## Accumulated Context
+
+### v3.2 Roadmap Locked (2026-05-20)
+
+v3.2 "Plug In And Play" scoped into **4 phases (51–54)**, continuing numbering from v3.1 (closed at Phase 50). 19/19 REQ-IDs mapped to exactly one phase — 100% coverage, no orphans, no duplicates. Granularity is `fine` but the milestone is deliberately kept tight (bring-up + validation + polish + ship of an already-built app, not new feature work).
+
+| Phase | Goal | Requirements (count) | UI |
+|-------|------|----------------------|----|
+| 51 — Real-Hardware Bring-Up | Boot + stabilize the built app on the real Mac; fix runtime breaks from Tauri console + sidecar logs across a full-set run | BRINGUP-01..05 (5) | — |
+| 52 — Live-Session Validation + Latency/Performance Tuning | Both modes feel like a real DJ friend on real audio (≥2 genres); citation strip + mascot track real events; TTFT/dropouts/60fps to budget | LIVE-01..05 + PERF-01..03 (8) | yes |
+| 53 — Sexify Finish | Final Tier-1 visual pass (zero HIGH); close v0.1.0-rc1 carryover bugs; tighten fresh-account first-run | POLISH-01..03 (3) | yes |
+| 54 — Ship Readiness | All engineering gates green on real artifacts; §E2E-50A-WALK discharged; one-button SHIP-CUT documented + pre-verified | REL-01..03 (3) | — |
+
+**Build-order rationale:**
+- **Phase 51 MUST be first** — every downstream validation depends on a running app. Nothing can be observed until the built Tauri app + sidecar boot to a live listening session on real hardware.
+- **Phase 52 merges LIVE + PERF** because both are co-observed in the same real sessions — latency tuning (TTFT, in-bar cooldowns) and reaction-feel tuning happen on the same audio passes; splitting them would mean re-running the same live sets twice.
+- **Phase 53 (polish)** depends on a running app to inspect (51) and benefits from live observations (52), but its work — visual pass, carryover bugs, first-run — is independent of validation outcomes.
+- **Phase 54 (ship)** is last: Gate 2b (hallucination) is fed by Phase 52 live validation; Gate 6b (e2e report) and §E2E-50A-WALK need the real app driven end-to-end; final artifacts cut after polish (53) lands.
+
+**Locked invariants carried into v3.2 (all preserved from v3.0/v3.1):**
+- POC immutability — `cohost*.py` retired (deleted, scrub-gated); `mascot.html` byte-stable + CI `mascot-audit`. No resurrection.
+- ModelRouter seam — zero new hardcoded model literals; CI grep gate extends to v3.2 artifacts.
+- Anti-slop blocklist — 15-token + `deeply\s+\w+` regex; live reactions + any new UI copy must pass.
+- Privacy rule (`feedback_privacy_scope_narrow`) — off-limits LLM-transcript paths absolute; e2e harness asserts zero writes to `~/.hermes/` / `~/hermes-rig/logs/` / `~/.lmstudio/`. Bring-up debugging reads Tauri console + sidecar logs ONLY (vibemix's own logs), never Kaan's OZ/Hermes/local-AI surfaces.
+- Gemini-only (`feedback_no_clap_use_gemini_embedding`) — no new providers/detectors; this is bring-up, not feature work.
+- `gsd-autonomous fully` — engineering closes everything not requiring an external signature; the signed publish (Apple Dev Agreement via Francesco + SignPath OSS cert) stays KAAN-ACTION. Phase 54 makes the release one-button-after-signatures; it does NOT depend on the signatures landing.
+- Hallucination gate is hard (`project_phase_16_kaan_dj_testing`) — satisfied by Kaan's DJ ear + autonomous proxy, NOT a 30-session replay harness. No release until live reactions are confirmed grounded.
+- Frontend-enforcement skill applies to Phases 52 + 53 (UI hint: yes) — CDJ Whisper, 20/80 accent rule, textured material feel, no AI-slop typography.
+
+**Reuses already-built engineering (do NOT rebuild):** v3.1 e2e harness (`tests/e2e/macbook/`), 50a Kaan-walk checklist + `record_50a_walk.sh`, `cut_release.sh` with Gate 2b + Gate 6b wired, EvidenceRegistry citation strip, Neon Rebel 4-layer mascot state machine, BlackHole 48 kHz probe, TTFTMeter, installer/first-run wizard. v3.2 DRIVES and TUNES these on real hardware — it does not re-implement them.
+
 
 ### Phase 50 Outcome (2026-05-18, engineering-green)
 

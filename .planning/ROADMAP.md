@@ -2,7 +2,7 @@
 
 **Project:** vibemix — AI DJ Co-Host
 **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted — 7 Kaan-action carveouts ride the v3.0 external clock per `gsd-autonomous fully` mode)
-**Current milestone:** Planning next milestone
+**Current milestone:** v3.2 "Plug In And Play" — Real-Hardware Bring-Up → Public Ship (planning)
 
 ---
 
@@ -13,6 +13,85 @@
 - ✅ **v2.1 The Unified Cut** — Phases 27–39 (shipped 2026-05-16, tech_debt accepted) — see `.planning/milestones/v2.1-ROADMAP.md`
 - ✅ **v3.0 Clean OSS Ship** — Phases 40–45 (shipped 2026-05-17, tech_debt accepted) — see `.planning/milestones/v3.0-ROADMAP.md`
 - ✅ **v3.1 Distribution-Ready Pass** — Phases 46–50 (shipped 2026-05-18, tech_debt accepted) — see `.planning/milestones/v3.1-ROADMAP.md`
+- 🔨 **v3.2 Plug In And Play** — Phases 51–54 (planning) — active below
+
+---
+
+## Overview
+
+v3.1 left vibemix engineering-complete: a built Tauri app + Python sidecar, one-click installer chain, dependency-audited lockfile, full mascot scaffold, and an e2e harness — all green in CI, none of it yet driven on real hardware in a real DJ session. v3.2 closes that gap. For the first time the actual app runs on Kaan's MacBook with real audio through BlackHole and a real DDJ-FLX4 over USB. The journey: **boot it and make it stable** (Phase 51) → **make both modes feel like a real DJ friend on real audio and at peak performance** (Phase 52) → **final visual pass + close the carryover bugs + tighten first-run** (Phase 53) → **get every engineering gate green on real artifacts and document the one-button ship sequence** (Phase 54). The signed public binary itself is gated on external signatures (Apple Dev Agreement via Francesco; SignPath OSS cert) — those stay KAAN-ACTION; engineering makes the release one-button-after-signatures.
+
+This is bring-up + live validation + polish + ship of an **already-built** app. No new AI providers, no new detectors, no scope creep.
+
+## Phases
+
+**Phase Numbering:** Continues from v3.1 (closed at Phase 50). v3.2 starts at **Phase 51**. Integer phases (51, 52, …) = planned milestone work; decimal phases (e.g. 52.1) = urgent insertions if needed.
+
+- [ ] **Phase 51: Real-Hardware Bring-Up** - Boot the app + sidecar on Kaan's Mac, reach a stable live "listening" session, fix every runtime break read from Tauri console + sidecar logs across a full-set run.
+- [ ] **Phase 52: Live-Session Validation + Latency/Performance Tuning** - Both modes produce grounded, in-bar, non-slop reactions on real audio across ≥2 genres; citation strip + mascot track real events; TTFT/dropouts/60fps tuned to budget on real HW.
+- [ ] **Phase 53: Sexify Finish** - Final Tier-1 visual pass (zero HIGH findings), close v0.1.0-rc1 carryover bugs, tighten fresh-account first-run.
+- [ ] **Phase 54: Ship Readiness** - All engineering release gates green on real artifacts, §E2E-50A-WALK discharged by driving the real app, one-button SHIP-CUT sequence documented + pre-verified with external-clock items surfaced as KAAN-ACTION.
+
+## Phase Details
+
+### Phase 51: Real-Hardware Bring-Up
+**Goal**: The built app actually runs — boots to a live listening session on Kaan's MacBook, ingests real BlackHole audio and the real DDJ-FLX4, and survives a full-set run with every console/log error triaged and fixed.
+**Depends on**: Nothing (first phase — everything downstream needs a running app)
+**Requirements**: BRINGUP-01, BRINGUP-02, BRINGUP-03, BRINGUP-04, BRINGUP-05
+**Success Criteria** (what must be TRUE):
+  1. Launching the app on the real Mac reaches a live "listening" session with no boot crash, and the Tauri console + sidecar logs are clean of unhandled exceptions at startup.
+  2. Real master output routed through BlackHole reaches the co-host at 48 kHz and live audio levels register on-screen in real time.
+  3. The DDJ-FLX4 is ingested live during a session when plugged in, and the app degrades gracefully (no crash, clear state) when it is unplugged.
+  4. Every runtime error observed in the Tauri console + sidecar logs during a real run is triaged and fixed — a full-set run completes with zero unhandled exceptions.
+  5. A ≥30-minute continuous real session runs with no dropout, hang, or unbounded memory growth (RSS stays bounded across the run).
+**Plans**: TBD
+
+### Phase 52: Live-Session Validation + Latency/Performance Tuning
+**Goal**: On real audio, both hype and feedback modes feel like a real DJ friend in the ear — grounded, in-bar, non-slop across ≥2 genres — with the citation strip and mascot tracking real events and performance tuned to budget on the real machine.
+**Depends on**: Phase 51 (needs a stable, running session to validate against)
+**Requirements**: LIVE-01, LIVE-02, LIVE-03, LIVE-04, LIVE-05, PERF-01, PERF-02, PERF-03
+**Success Criteria** (what must be TRUE):
+  1. In a live session, hype (party) mode produces grounded, in-time, non-slop reactions on real audio across ≥2 genres — no scripted/late/hallucinated lines (Kaan-ear pass + autonomous proxy clean).
+  2. In a live session, feedback (coach) mode produces grounded, in-time, non-slop reactions on real audio across ≥2 genres, with cooldowns and reaction latency tuned live so reactions land in-bar rather than after the moment passes.
+  3. The EvidenceRegistry citation strip reflects real session events live with zero orphaned or hallucinated citations, and the Neon Rebel mascot reacts correctly to live audio/MIDI events in-session.
+  4. TTFT (trigger → first audio out) measured on the real MacBook meets the live-path latency budget, and no audio glitches/dropouts occur in the playback path under real-session load.
+  5. The mascot + UI hold 60fps on the integrated-GPU MacBook during a live session.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 53: Sexify Finish
+**Goal**: The surfaces a real user touches are polished to peak — Tier-1 live views get a final CDJ-Whisper visual pass, the v0.1.0-rc1 carryover bugs are closed, and a fresh account reaches first-session with no friction.
+**Depends on**: Phase 51 (running app to inspect); benefits from Phase 52 live observations
+**Requirements**: POLISH-01, POLISH-02, POLISH-03
+**Success Criteria** (what must be TRUE):
+  1. Tier-1 live surfaces (session view, mascot overlay) pass a final paired ui-checker + ui-auditor visual pass with zero HIGH findings and CDJ Whisper consistency held (20/80 accent rule, textured material feel, no AI-slop typography).
+  2. The three v0.1.0-rc1 carryover bugs are closed and verified on the real app: Tauri drag capability works, the mascot chrome strip is gone, and the TCC permissions list populates correctly.
+  3. A fresh macOS user account walks first-run → first-session with the friction points identified and tightened (no dead-ends, no confusing steps before audio is live).
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 54: Ship Readiness
+**Goal**: Everything that does not require an external signature is green and proven — release gates pass on real artifacts, the §E2E-50A-WALK is discharged by driving the real app, and the exact one-button ship sequence is documented and pre-verified so the only thing left is the external signatures.
+**Depends on**: Phase 52 (live validation feeds Gate 2b hallucination + Gate 6b e2e report), Phase 53 (polish complete before final artifacts)
+**Requirements**: REL-01, REL-02, REL-03
+**Success Criteria** (what must be TRUE):
+  1. `cut_release.sh` 6-gate pre-flight + Gate 2b (hallucination) + Gate 6b (e2e report) all run green on real artifacts (not simulated fixtures).
+  2. §E2E-50A-WALK is discharged by driving the real app end-to-end on the MacBook with real DJ-set audio, and the walk artifact (`docs/e2e/2026-05-walk.webm`) is recorded.
+  3. The external-clock items (Apple Dev Agreement, SignPath OSS cert) are surfaced as KAAN-ACTION with the exact one-button SHIP-CUT sequence documented and pre-verified — a dry-run confirms everything-but-the-signature is ready, with no engineering step left to discover after signatures land.
+**Plans**: TBD
+
+---
+
+## Progress — v3.2 Plug In And Play
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 51. Real-Hardware Bring-Up | 0/TBD | Not started | - |
+| 52. Live-Session Validation + Latency/Performance Tuning | 0/TBD | Not started | - |
+| 53. Sexify Finish | 0/TBD | Not started | - |
+| 54. Ship Readiness | 0/TBD | Not started | - |
+
+**Coverage:** 19/19 v3.2 requirements mapped ✓ (no orphans, no duplicates)
 
 ---
 
@@ -38,20 +117,6 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 <summary>✅ v2.1 The Unified Cut (Phases 27–39) — SHIPPED 2026-05-16 (tech_debt accepted)</summary>
 
 13 phases shipped engineering-green under `gsd-autonomous fully` mode. 96 plans, 633 phase-scope tests added, 225 commits since `v2.0` tag, net ~+45k LOC across `src/vibemix/`, `tauri/`, `scripts/`, `tests/`, `docs/`, `eval/`. 105 / 105 v2.1 REQ-IDs engineering-satisfied. All 5 cross-phase integration seams audited WIRED.
-
-- [x] Phase 27: Eval Harness + v2.0 Carry-Forward Close-Out (9/9 plans, 140 tests) — completed 2026-05-15
-- [x] Phase 28: Library Intelligence v1 (9/9 plans, 258 tests) — completed 2026-05-15
-- [x] Phase 29: Post-Session Debrief MVP UI (9/9 plans) — completed 2026-05-15
-- [x] Phase 30: 2 Hard Tek Detectors (4/4 plans, 45 tests) — completed 2026-05-15
-- [x] Phase 31: 4-Layer Mascot Full Additive State Machine (8/8 plans, 17 mascot tests, GLB 21.67/25 MB) — completed 2026-05-15
-- [x] Phase 32: Long-Term DJ Profile ~2KB JSON (6/6 plans, 67 tests, P51/P53/P60 enforced) — completed 2026-05-15
-- [x] Phase 33: One-Click Install Hardening (9/9 plans, 50 tests; INSTALL-VM-RUN = KAAN-ACTION-LEGAL) — completed 2026-05-15
-- [x] Phase 34: Open-Source Security Pass (10/10 plans, 63 tests) — completed 2026-05-15
-- [x] Phase 35: Real GLBs + 30s Viral Demo Film (6/6 plans, 35 tests; real assets = KAAN-ACTION-LEGAL) — completed 2026-05-15
-- [x] Phase 36: Day-Zero Operations Automation (6/6 plans, 36 tests; 6 real-execution items = KAAN-ACTION-LEGAL) — completed 2026-05-15
-- [x] Phase 37: Cross-Phase Integration Audit Gate (6/6 plans, 42 tests; 5/5 seams WIRED) — completed 2026-05-15
-- [x] Phase 38: Signing Pipeline Real Execution (6/6 plans, 58 tests; DIST-09 + DIST-11 = P46 legal-capacity carveouts) — completed 2026-05-15
-- [x] Phase 39: Public RC Cut + Ship (8/8 plans, 91 tests; §SHIP × 6 + §POST-RC-CLEANUP × 3 = KAAN-ACTION-LEGAL) — completed 2026-05-15
 
 Full archive: `.planning/milestones/v2.1-ROADMAP.md` · Requirements: `.planning/milestones/v2.1-REQUIREMENTS.md` · Audit: `.planning/milestones/v2.1-MILESTONE-AUDIT.md`
 
@@ -103,7 +168,8 @@ Full archive: `.planning/milestones/v3.1-ROADMAP.md` · Requirements: `.planning
 | v2.1 The Unified Cut | 27–39 | ✅ Shipped (tech_debt) | 2026-05-16 |
 | v3.0 Clean OSS Ship | 40–45 | ✅ Shipped (tech_debt) | 2026-05-17 |
 | v3.1 Distribution-Ready Pass | 46–50 | ✅ Shipped (tech_debt) | 2026-05-18 |
+| v3.2 Plug In And Play | 51–54 | 🔨 Planning | - |
 
 ---
 
-*Roadmap collapsed 2026-05-18 on v3.1 milestone close. Next milestone TBD via `/gsd:new-milestone` — requirements re-defined, fresh REQUIREMENTS.md generated, phases planned from there.*
+*Roadmap reopened 2026-05-20 for v3.2 "Plug In And Play" (Phases 51–54) via `/gsd:new-milestone` under `gsd-autonomous fully`. Bring-up MUST come first (Phase 51) since all downstream validation depends on a running app. Live validation + performance tuning are co-observed in the same real sessions (Phase 52). External signatures (Apple Dev + SignPath) stay KAAN-ACTION — engineering makes the release one-button-after-signatures.*

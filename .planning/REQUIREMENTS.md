@@ -68,4 +68,24 @@ This milestone is the first time the built app is **driven on real hardware in a
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| _(filled by roadmap)_ | | |
+| BRINGUP-01 | Phase 51 | Pending |
+| BRINGUP-02 | Phase 51 | Pending |
+| BRINGUP-03 | Phase 51 | Pending |
+| BRINGUP-04 | Phase 51 | Pending |
+| BRINGUP-05 | Phase 51 | Pending |
+| LIVE-01 | Phase 52 | Pending |
+| LIVE-02 | Phase 52 | Pending |
+| LIVE-03 | Phase 52 | Pending |
+| LIVE-04 | Phase 52 | Pending |
+| LIVE-05 | Phase 52 | Pending |
+| PERF-01 | Phase 52 | Pending |
+| PERF-02 | Phase 52 | Pending |
+| PERF-03 | Phase 52 | Pending |
+| POLISH-01 | Phase 53 | Pending |
+| POLISH-02 | Phase 53 | Pending |
+| POLISH-03 | Phase 53 | Pending |
+| REL-01 | Phase 54 | Pending |
+| REL-02 | Phase 54 | Pending |
+| REL-03 | Phase 54 | Pending |
+
+**Coverage:** 19 / 19 v3.2 requirements mapped to exactly one phase ✓ (no orphans, no duplicates)
