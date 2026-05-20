@@ -29,9 +29,9 @@ This milestone is the first time the built app is **driven on real hardware in a
 
 ### Live-Session Validation (LIVE)
 
-- [ ] **LIVE-01**: Hype (party) mode produces grounded, in-time, non-slop reactions on real audio across ≥2 genres.
+- [x] **LIVE-01**: Hype (party) mode produces grounded, in-time, non-slop reactions on real audio across ≥2 genres.
 - [ ] **LIVE-02**: Feedback (coach) mode produces grounded, in-time, non-slop reactions on real audio across ≥2 genres.
-- [ ] **LIVE-03**: Event cooldowns + reaction latency are tuned live so reactions land in-bar, not after the moment passes.
+- [x] **LIVE-03**: Event cooldowns + reaction latency are tuned live so reactions land in-bar, not after the moment passes.
 - [ ] **LIVE-04**: The EvidenceRegistry citation strip reflects real session events live — zero orphaned or hallucinated citations.
 - [ ] **LIVE-05**: The reactive mascot (Neon Rebel) responds correctly to live audio/MIDI events in-session — driven by the **rich signals the bus already emits** (`phase`, `mood`, `reaction_intent`, `bpm`, levels), not just the music-loudness ramp it uses today (`mascot.html` currently consumes only `music`+`voice` → 3 crude tiers).
 - [ ] **LIVE-05a**: The mascot has **many distinct modes** (Kaan directive 2026-05-21) — at minimum idle/dead-air, vibing/groove, building, drop/peak, breakdown/chill, and a speaking/emoting mode while the AI talks — each grounded in a real bus signal so a mode change always corresponds to a real musical/session event (anti-slop: no random/decorative state changes).
@@ -81,8 +81,8 @@ This milestone is the first time the built app is **driven on real hardware in a
 | GENRE-01 | Phase 52 | Pending |
 | GENRE-02 | Phase 52 | Pending |
 | BRINGUP-03 | Phase 53 | Pending |
-| LIVE-01 | Phase 54 | Pending |
-| LIVE-03 | Phase 54 | Pending |
+| LIVE-01 | Phase 54 | Complete |
+| LIVE-03 | Phase 54 | Complete |
 | LIVE-02 | Phase 55 | Pending |
 | LIVE-04 | Phase 55 | Pending |
 | PERF-01 | Phase 56 | Pending |
