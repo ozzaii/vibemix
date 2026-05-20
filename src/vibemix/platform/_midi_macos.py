@@ -168,11 +168,19 @@ class MidiMacOS:
         callable accepting a ``(kind, port, profile)`` / ``(kind, port)``
         tuple.
 
+        Phase 53 BRINGUP-03: the default callback is the SINGLE-STATE one
+        (``handle_port_change_single_state``, option B from 53-RESEARCH §Q2). It
+        mutates ``self.controller_state`` IN PLACE on connect/disconnect rather
+        than rebuilding it, so the ControllerState object ``__main__`` passes to
+        ``ws_broadcast`` + ``state_refresh_loop`` stays live across hot-plug —
+        no capture-once-then-rebuild divergence, no consumer signature change.
+        Tests can still inject their own callback via ``on_change``.
+
         Args:
             stop_event: ``asyncio.Event`` cooperative shutdown signal.
-            on_change: callback for the watcher. If None, builds a default
-                production callback bound to a ListenerHolder seeded from
-                the current ``self.controller_state``.
+            on_change: callback for the watcher. If None, builds the default
+                single-state production callback bound to a ListenerHolder
+                seeded from the current ``self.controller_state``.
             poll_seconds: sweep cadence (default 2.0 per CONTEXT).
 
         Returns:
@@ -193,7 +201,11 @@ class MidiMacOS:
                 mido_module=mido,
                 bound_port=None,
             )
-            on_change = functools.partial(_midi_common.handle_port_change, holder)
+            # Single-state default (option B): mutate self.controller_state in
+            # place so the live loops keep their reference live across hot-plug.
+            on_change = functools.partial(
+                _midi_common.handle_port_change_single_state, holder
+            )
             self._watcher_holder = holder  # retain so callers can introspect
 
         return asyncio.get_event_loop().create_task(
