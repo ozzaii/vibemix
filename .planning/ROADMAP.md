@@ -136,18 +136,18 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 
 ---
 
-## Progress — v4.0 SHIP
+## Progress
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 51. Real-Hardware Bring-Up | 0/TBD | Not started | - |
-| 52. Audio Path + Feature Grounding | 0/TBD | Not started | - |
-| 53. Controller Live + Graceful Fallback | 0/TBD | Not started | - |
-| 54. Hype Mode Live | 0/TBD | Not started | - |
-| 55. Feedback Mode Live + Citation Integrity | 0/TBD | Not started | - |
-| 56. Performance + Live Mascot | 0/TBD | Not started | - |
-| 57. Sexify Finish | 0/TBD | Not started | - |
-| 58. Ship Readiness | 0/TBD | Not started | - |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 51. Real-Hardware Bring-Up | v4.0 | 0/TBD | Not started | - |
+| 52. Audio Path + Feature Grounding | v4.0 | 0/TBD | Not started | - |
+| 53. Controller Live + Graceful Fallback | v4.0 | 0/TBD | Not started | - |
+| 54. Hype Mode Live | v4.0 | 0/TBD | Not started | - |
+| 55. Feedback Mode Live + Citation Integrity | v4.0 | 0/TBD | Not started | - |
+| 56. Performance + Live Mascot | v4.0 | 0/TBD | Not started | - |
+| 57. Sexify Finish | v4.0 | 0/TBD | Not started | - |
+| 58. Ship Readiness | v4.0 | 0/TBD | Not started | - |
 
 **Coverage:** 19/19 v4.0 requirements mapped ✓ (no orphans, no duplicates)
 
