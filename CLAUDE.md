@@ -26,15 +26,17 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 - **Hallucination grounding**: No release until verification phase confirms reactions are tied to real events. This is a hard gate.
 <!-- GSD:project-end -->
 
-> **⚠️ STALE — auto-generated map predates the package (regenerate with `/gsd-map-codebase`).**
-> The GSD-managed blocks below (Technology Stack → Architecture, sourced from
+> **⚠️ STALE — the auto-generated map below predates the package.**
+> The GSD blocks (Technology Stack → Architecture, sourced from
 > `.planning/codebase/*.md`) still describe the **retired POC era**: single-file
 > `cohost*.py` variants, "Python 3.14", and "no pyproject.toml". None of that is
 > current. Reality: a packaged project under `src/vibemix/` + `tauri/`, Python
-> **3.12** (`>=3.12,<3.13`), `pyproject.toml` + `uv.lock` at root. The POC variants
-> were pruned 2026-05-20 (see "POC Variants — RETIRED" below). Trust the
-> **Commands** section, not the auto-generated architecture description, until a
-> map regeneration refreshes these blocks.
+> **3.12** (`>=3.12,<3.13`), `pyproject.toml` + `uv.lock` at root; POC variants
+> pruned 2026-05-20 (see "POC Variants — RETIRED" below).
+> For ground truth, trust the **Commands** section above, `pyproject.toml`, and
+> the live `src/vibemix/` tree — not this block. (`/gsd-map-codebase` refreshes
+> `.planning/codebase/*.md` but does **not** re-sync these CLAUDE.md blocks;
+> they have no automated writer, so update them by hand when you refactor here.)
 
 <!-- GSD:stack-start source:codebase/STACK.md -->
 ## Technology Stack
