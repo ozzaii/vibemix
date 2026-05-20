@@ -122,7 +122,7 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
   2. The three v0.1.0-rc1 carryover bugs are closed and verified on the real app: Tauri drag capability works, the mascot chrome strip is gone, and the TCC permissions list populates correctly.
   3. A fresh macOS user account walks first-run → first-session with the friction points identified and tightened (no dead-ends, no confusing steps before audio is live).
 **Plans**: TBD
-**UI hint**: yes
+**UI hint**: yes — **use the `impeccable` skill for the visual polish pass** (Kaan directive 2026-05-21), not just the default ui-phase/ui-review.
 
 ### Phase 58: Ship Readiness
 **Goal**: Everything that does not require an external signature is green and proven — release gates pass on real artifacts, the §E2E-50A-WALK is discharged by driving the real app, and the exact one-button ship sequence is documented and pre-verified so the only thing left is the external signatures.
