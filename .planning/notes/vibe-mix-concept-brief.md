@@ -116,22 +116,41 @@ catastrophe in front of a crowd — strictly worse than the manual prep we remov
 
 ---
 
-## Open questions — answered
+## Open questions — DECIDED (Kaan, 2026-05-20)
 
-1. **Library scope → Personal library only at launch.** A hot cue is only meaningful on
-   a file you own and can load onto a controller; Spotify/Beatport/Beatsource streams
-   are DRM'd, not local, can't be cued or played from a controller. Beatport/Beatsource
-   become a *separate later discovery feature* ("fill the gap in your set"), not part of
-   the cueing core.
-2. **Prep vs. live → Prep-first, and "live mode" is NOT a Year-2 rebuild.** The live
-   surface **already exists** — it's the free OSS `vibemix` co-host. The two-product
-   spine is: **Vibe Mix (before the gig) ↔ vibemix (during the gig)**, sharing one
-   library/embedding substrate. Don't rebuild a live mode; integrate the one we shipped.
-3. **Hot cue conservatism → Strict + confidence-gated.** Downbeat / breakdown / drop
-   only at launch. Creative cueing (loop points, mash-up cues) ships after the basics
-   are bulletproof, behind the same anti-slop gate.
-4. **Positioning → Commercial BRAVOH module** (decided). Vibe Producing's prep sibling;
-   OSS vibemix is the free funnel into it. Shared substrate.
+1. **Library scope → Personal library only at launch.** ✅ LOCKED. A hot cue is only
+   meaningful on a file you own and can load onto a controller; Spotify/Beatport/
+   Beatsource streams are DRM'd, not local, can't be cued or played from a controller.
+   Beatport/Beatsource become a *separate later discovery feature* ("fill the gap in
+   your set"), not part of the cueing core.
+2. **Hot cue conservatism → Strict + confidence-gated.** ✅ LOCKED. Downbeat / breakdown
+   / drop only at launch. Creative cueing (loop points, mash-up cues) ships after the
+   basics are bulletproof, behind the same anti-slop gate.
+3. **Launch scope → "whatever we can confidently ship and test together."** ✅ LOCKED —
+   the governing principle. This is the anti-slop law applied to product scope: *don't
+   ship what you can't confidently stand behind.* It makes the build sequence
+   self-selecting — see below. Not a calendar; a confidence bar.
+4. **Prep vs. live → Prep-first; "live mode" is NOT a rebuild.** The live surface
+   **already exists** — it's the free OSS `vibemix` co-host. The two-product spine is:
+   **Vibe Mix (before the gig) ↔ vibemix (during the gig)**, sharing one library/
+   embedding substrate. Don't rebuild a live mode; integrate the one we shipped.
+5. **Positioning → Commercial BRAVOH module.** Vibe Producing's prep sibling; OSS
+   vibemix is the free funnel into it. Shared substrate.
+
+### What "confidently ship and test together" selects for
+
+The launch surface is **not pre-decided by feature ambition — it's decided by what
+passes the confidence bar when we test it together.** Concretely:
+
+- **Slice 0 (write-back spike) is the fork.** If auto-cues can be written back
+  safely (backup-first, reversible, non-destructive) and *we test it together and trust
+  it*, hot cues are in the launch. If they can't be made trustworthy, **the killer
+  feature waits** and we launch the prep MVP without it.
+- **Either outcome is a real launch.** Slice 1 (NL → vibe filter → 3-track calibrate →
+  focused re-extract → manually-orderable set) already beats "scroll 3000 files" and is
+  fully testable together. Shipping *that* confidently > shipping cues we don't trust.
+- The bar is **mutual**: "test together" = Kaan + Francesco run real sets through it and
+  it earns the same "real DJ friend" trust the live co-host is held to.
 
 ---
 
