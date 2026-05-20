@@ -22,8 +22,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // this gives the spec a stable reference to inspect call args.
 const { invokeMock } = vi.hoisted(() => {
   return {
+    // invoke() is generically Promise<T>; type the mock as Promise<unknown>
+    // so per-test mockImplementations can return command results (e.g.
+    // read_mascot_window_state) without violating an inferred Promise<void>.
     invokeMock: vi.fn(
-      async (_cmd: string, _args?: Record<string, unknown>) => {},
+      async (
+        _cmd: string,
+        _args?: Record<string, unknown>,
+      ): Promise<unknown> => undefined,
     ),
   };
 });

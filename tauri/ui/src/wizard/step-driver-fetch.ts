@@ -186,13 +186,14 @@ export function createStepDriverFetch(
   const continueBtn = Button({
     label: copy.steps.driver_fetch.continue_cta,
     variant: "primary",
-    disabled: true,
+    state: "disabled",
     onClick: callbacks.onContinue,
   });
   if (callbacks.onBack) {
     const back = Button({
       label: copy.steps.forewarning.back_cta,
-      variant: "ghost",
+      variant: "secondary",
+      state: "armed",
       onClick: callbacks.onBack,
     });
     ctaRow.append(back);

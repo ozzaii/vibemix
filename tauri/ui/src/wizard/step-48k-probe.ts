@@ -109,7 +109,7 @@ export function createStep48kProbe(
   const finalBtn = Button({
     label: copy.steps.format_check.final_cta,
     variant: "primary",
-    disabled: true,
+    state: "disabled",
     onClick: callbacks.onComplete,
   });
   ctaRow.append(finalBtn);
@@ -130,6 +130,7 @@ export function createStep48kProbe(
     const fixBtn = Button({
       label: copy.steps.format_check.fix_cta,
       variant: "primary",
+      state: "armed",
       onClick: async () => {
         try {
           await invoke("run_audio_config", { action: "configure-routing" });

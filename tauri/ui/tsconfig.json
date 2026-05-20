@@ -17,5 +17,6 @@
     "useDefineForClassFields": true
   },
   "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "dist", ".vite"]
+  "comment:exclude": "tests/visual/* are Playwright scaffolds (import @playwright/test, which is not a dependency here) run by the separate test:e2e:visual project — exclude them from the unit/type-check surface.",
+  "exclude": ["node_modules", "dist", ".vite", "tests/visual"]
 }

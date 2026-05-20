@@ -141,7 +141,8 @@ export function createUninstallDialog(
   ctaRow.className = "uninstall-dialog__cta-row";
   const cancelBtn = Button({
     label: copy.uninstall.cancel_cta,
-    variant: "ghost",
+    variant: "secondary",
+    state: "armed",
     onClick: () => {
       backdrop.remove();
       callbacks.onCancel();
@@ -150,6 +151,7 @@ export function createUninstallDialog(
   const confirmBtn = Button({
     label: copy.uninstall.default_cta,
     variant: "primary",
+    state: "armed",
     onClick: async () => {
       const isClean = checkbox.checked;
       backdrop.remove();

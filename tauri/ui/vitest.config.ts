@@ -28,6 +28,15 @@ export default defineConfig({
       "tests/**/*.spec.ts",
       "tests/**/*.test.ts",
     ],
+    // tests/visual/*.spec.ts are Playwright scaffolds (import "@playwright/test")
+    // run by the separate `test:e2e:visual` script — NOT vitest. The broad
+    // `tests/**/*.spec.ts` include above would otherwise collect them and fail
+    // on the unresolved Playwright import. Exclude them here.
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "tests/visual/**",
+    ],
     environmentMatchGlobs: [
       ["tests/**/*.spec.ts", "jsdom"],
       ["tests/**/*.test.ts", "jsdom"],

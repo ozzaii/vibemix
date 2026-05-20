@@ -126,7 +126,8 @@ export function createStepForewarning(
   if (callbacks.onBack) {
     const back = Button({
       label: copy.steps.forewarning.back_cta,
-      variant: "ghost",
+      variant: "secondary",
+      state: "armed",
       onClick: callbacks.onBack,
     });
     ctaRow.append(back);
@@ -137,6 +138,7 @@ export function createStepForewarning(
   const continueBtn = Button({
     label: copy.steps.forewarning.continue_cta,
     variant: "primary",
+    state: "armed",
     onClick: callbacks.onContinue,
   });
   ctaRow.append(continueBtn);

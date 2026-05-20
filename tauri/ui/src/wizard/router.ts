@@ -323,7 +323,9 @@ export function renderCurrentStep(): void {
     stepStripMount.replaceChildren(stepStripFor(wizardState.currentStep));
   }
 
-  let primary: HTMLElement;
+  // Placeholder fallback guarantees definite assignment for the (type-level
+  // non-exhaustive) switch below; overwritten by every handled step.
+  let primary: HTMLElement = document.createElement("div");
   switch (wizardState.currentStep) {
     case "intro":
       primary = renderStep0Intro({

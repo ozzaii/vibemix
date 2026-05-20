@@ -254,34 +254,45 @@ describe("Phase 15: recording browser wiring", () => {
   });
 
   it("list_result populates 2 row elements in the recording browser DOM", async () => {
-    sendIpcRequestMock.mockResolvedValueOnce({
-      type: "ipc.recordings.list_result",
-      ts: "2026-05-13T21:04:10+02:00",
-      payload: {
-        sessions: [
-          {
-            session_dir: "20260513-210410",
-            started_at_iso: "2026-05-13T21:04:10+02:00",
-            duration_s: 1800,
-            event_count: 22,
-            bytes_total: 1_500_000,
-            crashed: false,
+    // Resolve only the recordings.list request — the drawer's profile panel
+    // also fires sendIpcRequest("ipc.profile.view") on every render (Phase 32),
+    // so a blanket mockResolvedValueOnce would be consumed by that render-time
+    // call before loadRecordings runs. Key on requestType instead.
+    sendIpcRequestMock.mockImplementation((requestType: string) => {
+      if (requestType === "ipc.recordings.list") {
+        return Promise.resolve({
+          type: "ipc.recordings.list_result",
+          ts: "2026-05-13T21:04:10+02:00",
+          payload: {
+            sessions: [
+              {
+                session_dir: "20260513-210410",
+                started_at_iso: "2026-05-13T21:04:10+02:00",
+                duration_s: 1800,
+                event_count: 22,
+                bytes_total: 1_500_000,
+                crashed: false,
+              },
+              {
+                session_dir: "20260512-182200",
+                started_at_iso: "2026-05-12T18:22:00+02:00",
+                duration_s: 7380,
+                event_count: 71,
+                bytes_total: 2_500_000,
+                crashed: false,
+              },
+            ],
+            bytes_total: 4_000_000,
           },
-          {
-            session_dir: "20260512-182200",
-            started_at_iso: "2026-05-12T18:22:00+02:00",
-            duration_s: 7380,
-            event_count: 71,
-            bytes_total: 2_500_000,
-            crashed: false,
-          },
-        ],
-        bytes_total: 4_000_000,
-      },
+        });
+      }
+      // Everything else (e.g. ipc.profile.view) never resolves — matches the
+      // beforeEach default and keeps render-time IPC from interfering.
+      return new Promise(() => undefined);
     });
     // Mount + set drawer open via state (NOT openSettings, which would
-    // auto-fire loadRecordings + consume the one-shot mock). We drive
-    // loadRecordings explicitly so the assertion runs after the resolver.
+    // auto-fire loadRecordings). We drive loadRecordings explicitly so the
+    // assertion runs after the resolver.
     mountSettingsDrawer(document.body);
     setSettingsUIState({ open: true });
     await loadRecordings();
@@ -350,11 +361,20 @@ describe("Phase 15: recording browser wiring", () => {
   });
 
   it("list IPC timeout swaps the disk-usage line to UNAVAILABLE copy", async () => {
-    sendIpcRequestMock.mockRejectedValueOnce(
-      new Error("ipc timeout: no ipc.recordings.list_result within 10000ms"),
-    );
-    // Mount + open via state directly so loadRecordings runs exactly once
-    // and consumes the one-shot rejecting mock.
+    // Reject only the recordings.list request (see the row-population test for
+    // why a one-shot mock is stolen by the profile panel's render-time IPC).
+    sendIpcRequestMock.mockImplementation((requestType: string) => {
+      if (requestType === "ipc.recordings.list") {
+        return Promise.reject(
+          new Error(
+            "ipc timeout: no ipc.recordings.list_result within 10000ms",
+          ),
+        );
+      }
+      return new Promise(() => undefined);
+    });
+    // Mount + open via state directly so loadRecordings runs against the
+    // rejecting mock.
     mountSettingsDrawer(document.body);
     setSettingsUIState({ open: true });
     await loadRecordings();

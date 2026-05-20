@@ -81,7 +81,10 @@ if (!sessionDir) {
         {
           errorBannerEl: errorBanner,
           wsSink: {
-            send: (msg) => client.sendEarTestSubmit(msg.payload),
+            send: (msg) =>
+              client.sendEarTestSubmit(
+                msg.payload as unknown as Record<string, unknown>,
+              ),
           },
         },
       );

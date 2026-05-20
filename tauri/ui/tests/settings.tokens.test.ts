@@ -12,7 +12,25 @@
  * the vitest gate stay byte-aligned (Pitfall 6 — RESEARCH.md).
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The SettingsDrawer mounts the staleness banner + profile panel, which call
+// the real Tauri event/IPC APIs. In jsdom `window.__TAURI_INTERNALS__` is
+// undefined, so the real `listen` throws an unhandled rejection
+// ("Cannot read properties of undefined (reading 'transformCallback')").
+// Mock the IPC layer (and the Tauri primitives the drawer imports directly)
+// to a noop — same pattern as tests/settings/drawer.spec.ts.
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(async () => undefined),
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async () => () => {}),
+}));
+vi.mock("../src/ipc/client.js", () => ({
+  emitIpc: vi.fn(async () => undefined),
+  subscribeIpc: vi.fn(async () => () => {}),
+  sendIpcRequest: vi.fn(() => new Promise(() => undefined)),
+}));
 
 import { containsLegacyToken } from "./tokens.legacy-detect.test.js";
 
