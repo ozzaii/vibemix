@@ -29,6 +29,28 @@ plateau — i.e. "a real DJ built this", not an energy-sorted list.
    (recommendation in the brief: BRAVOH product, shared substrate). Decides where this
    spike code graduates to.
 
+## Automation ceiling — DECIDED (Kaan, 2026-05-20): "1-click import OK (safe)"
+
+The *intelligence* is fully automatic (track pick + arc + cue detection); the only
+non-auto step is handing cues to Rekordbox. Investigated whether that hand-off can be
+zero-click by auto-configuring Rekordbox's XML bridge path:
+
+- pyrekordbox `read_rekordbox6_options` does **not** expose the imported-XML path.
+- It lives in an opaque Pioneer `.settings` file (not the prefs plist, not the options DB),
+  with no documented/clean write API. Setting it programmatically is fragile and means
+  writing into Rekordbox's own settings — rejected (corrupts-user-setup risk, low confidence).
+
+**Locked product flow (safe, never touches master.db or Rekordbox settings):**
+1. **One-time setup:** vibemix writes every set to a STABLE path (e.g.
+   `~/Music/vibemix/current-set.xml`). The user points Rekordbox → Preferences → Advanced →
+   `rekordbox xml` → Imported Library at that file **once**.
+2. **Per set = 1 click:** the app overwrites that file with the new set + auto-detected cues;
+   the user clicks the `rekordbox xml` node (refreshes) and drags/imports. Non-destructive,
+   reversible, master.db untouched.
+
+So: "set up once, 1-click forever." Zero-click is only achievable via direct master.db writes
+(Slice 0 verdict: unsafe) or on more-open software (Serato/Mixxx/Engine) — both deferred.
+
 ## Deferred decision — Slice 3 cue-detection DSP dependency
 
 The auto-cue *detection* half (downbeat / breakdown / drop) needs beat-grid + structural
