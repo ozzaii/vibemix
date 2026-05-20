@@ -101,6 +101,13 @@ recordings/
 # fixture (synthetic MIDI events derived from cohost_v4.py POC source).
 !tests/fixtures/ddj_flx4_sync_capture.jsonl
 
+# DO ship the Phase 54 Plan 01 / LIVE-01 trace-replay ground-truth fixture
+# (real captured session recordings/20260515-112139/events.jsonl, copied
+# verbatim). 52 events -> 52 reactions, 0 suppressions — the grounded
+# substrate the hype-firing regression replays. Checked in so the suite
+# never reaches into the mutable recordings/ dir.
+!tests/fixtures/hype_trace_genre1.jsonl
+
 # DO ship the Phase 27 Plan 01 eval-harness synthetic fixture events.jsonl
 # (corpus events; regenerated only when conftest fixture is missing — kept
 # in tree so CI doesn't depend on the regeneration path).
