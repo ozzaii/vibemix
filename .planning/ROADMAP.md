@@ -59,14 +59,16 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 ### Phase 52: Audio Path + Feature Grounding
 **Goal**: The live audio path is proven on real hardware — master output reaches the co-host through BlackHole at 48 kHz with levels registering in real time — AND every feature derived from that audio is grounded so the AI (and the UI) never sees a value that did not happen. The live BPM=200 read on a ~129 BPM track is the canonical bug to close: out-of-range values must never reach the bus/UI.
 **Depends on**: Phase 51 (needs a stable, running session to route audio into)
-**Requirements**: BRINGUP-02
+**Requirements**: BRINGUP-02, GENRE-01, GENRE-02
 **Success Criteria** (what must be TRUE):
   1. Real master output routed through BlackHole reaches the co-host at 48 kHz and live audio levels register on-screen in real time (capture path confirmed live).
-  2. Derived BPM tracks the real track tempo — a ~129 BPM track reads ~129, never 200; out-of-range BPM (outside BPM_VALID_MAX) is rejected at the source and never reaches the bus or UI.
+  2. Derived BPM tracks the real track tempo — a ~129 BPM track reads ~129, never 200; out-of-range BPM (outside BPM_VALID_MAX) is rejected at the source and never reaches the bus or UI. *(The median-ring stabilizer already landed in `fd25337`; this phase confirms the gate + adds a real-trace regression — it does NOT re-implement it.)*
   3. The other audio-derived features (RMS levels, frequency bands, onset density) stay within valid ranges across a full-set run — no NaN, no out-of-range spikes leaking to the UI.
   4. With a track routed in, the on-screen level meters move in time with the music (visible, grounded feedback that capture is live and correct).
+  5. **Genre is auto-detected from the live audio** (Kaan directive): a `psytrance` profile exists, and a grounded DSP detector (BPM band + band-signature + crest-factor) picks the active profile from real features — confidence-gated with `unknown` fallback + hysteresis, env override wins when set. Psytrance no longer misclassifies.
+  6. **Detected genre + confidence are on the bus/UI** — surfaced as `unknown` when unsure, never a hallucinated label.
 **Plans**: TBD
-**UI hint**: yes
+**UI hint**: yes — genre + confidence join the live snapshot the UI/mascot read
 
 ### Phase 53: Controller Live + Graceful Fallback
 **Goal**: The DDJ-FLX4 MIDI path is proven on real hardware — controller moves are ingested live during a real session — and the app degrades cleanly to a clear, no-crash state when the controller is unplugged mid-session or absent at boot.

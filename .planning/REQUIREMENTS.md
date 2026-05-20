@@ -22,6 +22,11 @@ This milestone is the first time the built app is **driven on real hardware in a
 - [ ] **BRINGUP-04**: Runtime errors surfaced in the Tauri console + sidecar logs during a real session are triaged and fixed — no unhandled exceptions across a full-set run.
 - [ ] **BRINGUP-05**: A ≥30-minute real session runs without dropout, hang, or unbounded memory growth.
 
+### Feature Grounding — Genre (GENRE)
+
+- [ ] **GENRE-01**: Genre is **detected from the live audio**, not just env-pinned (Kaan directive 2026-05-21 — psytrance misclassified because there is no psytrance profile and the active profile is env-set, never auto-detected). Add a `psytrance` profile + a grounded DSP auto-detector (BPM band + band-signature + crest-factor nearest-match across the profile library) that picks the active profile from real features each tick. Anti-slop: confidence-gated with an `unknown` fallback (never a false-confident guess), hysteresis to prevent bar-to-bar flicker, and an explicit env override that wins when the user pins a genre. No CLAP/MERT/new heavy deps.
+- [ ] **GENRE-02**: The detected genre + confidence are exposed on the bus/UI the same way `phase`/`bpm`/`mood` are — surfaced honestly as `unknown` when the detector is unsure, never a hallucinated label.
+
 ### Live-Session Validation (LIVE)
 
 - [ ] **LIVE-01**: Hype (party) mode produces grounded, in-time, non-slop reactions on real audio across ≥2 genres.
@@ -73,6 +78,8 @@ This milestone is the first time the built app is **driven on real hardware in a
 | BRINGUP-04 | Phase 51 | Pending |
 | BRINGUP-05 | Phase 51 | Pending |
 | BRINGUP-02 | Phase 52 | Pending |
+| GENRE-01 | Phase 52 | Pending |
+| GENRE-02 | Phase 52 | Pending |
 | BRINGUP-03 | Phase 53 | Pending |
 | LIVE-01 | Phase 54 | Pending |
 | LIVE-03 | Phase 54 | Pending |
@@ -90,6 +97,6 @@ This milestone is the first time the built app is **driven on real hardware in a
 | REL-02 | Phase 58 | Pending |
 | REL-03 | Phase 58 | Pending |
 
-**Coverage:** 20 / 20 v4.0 requirements mapped to exactly one phase ✓ (no orphans, no duplicates)
+**Coverage:** 22 / 22 v4.0 requirements mapped to exactly one phase ✓ (no orphans, no duplicates)
 
-**Per-phase counts:** P51=3 (BRINGUP-01/04/05) · P52=1 (BRINGUP-02) · P53=1 (BRINGUP-03) · P54=2 (LIVE-01/03) · P55=2 (LIVE-02/04) · P56=5 (PERF-01/02/03 + LIVE-05 + LIVE-05a) · P57=3 (POLISH-01/02/03) · P58=3 (REL-01/02/03) = 20.
+**Per-phase counts:** P51=3 (BRINGUP-01/04/05) · P52=3 (BRINGUP-02 + GENRE-01/02) · P53=1 (BRINGUP-03) · P54=2 (LIVE-01/03) · P55=2 (LIVE-02/04) · P56=5 (PERF-01/02/03 + LIVE-05 + LIVE-05a) · P57=3 (POLISH-01/02/03) · P58=3 (REL-01/02/03) = 22.
