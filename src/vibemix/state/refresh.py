@@ -61,10 +61,17 @@ from vibemix.audio.constants import (
 from vibemix.state.evidence_registry import EvidenceRegistry
 from vibemix.state.genre import (
     EmaSmoother,
+    GenreHysteresis,
     HysteresisState,
     VocalDetector,
+    apply_genre_hysteresis,
     crest_factor,
     get_active_profile,
+    is_auto_enabled,
+    list_profiles,
+    load_profile,
+    score_genre,
+    set_active_profile,
     validate_bpm,
 )
 from vibemix.state.emotion_router import derive_emotion
@@ -79,6 +86,20 @@ from vibemix.state.track_resolver import derive_audible_deck, derive_audible_tra
 # active_genre to unknown/house, which destabilised the genre profile and let
 # phase classification fall back to the no-hysteresis path → live phase flicker.
 _BPM_RING_MAXLEN = 5  # ~15 s at the 3 s estimate cadence
+
+# Phase 52 (GENRE-01): cache the loaded GenreProfile library once — the profile
+# JSONs do not change at runtime, so re-loading all of them every tick (10Hz)
+# would be wasteful. Lazily populated on first use; the genre auto-detector
+# scores nearest-match across this list.
+_PROFILE_CACHE: list | None = None
+
+
+def _cached_profiles() -> list:
+    """Return the loaded GenreProfile library, loaded once and cached."""
+    global _PROFILE_CACHE
+    if _PROFILE_CACHE is None:
+        _PROFILE_CACHE = [p for p in (load_profile(n) for n in list_profiles()) if p is not None]
+    return _PROFILE_CACHE
 
 
 def _stabilize_bpm(ring: list[float]) -> float:
@@ -182,6 +203,7 @@ def _tick_once(
     hysteresis_state: HysteresisState | None = None,
     feature_history: deque[dict] | None = None,
     evidence_registry: EvidenceRegistry | None = None,
+    genre_hysteresis: GenreHysteresis | None = None,
 ) -> tuple[float, float, float, float]:
     """One iteration of the state_refresh_loop body. Extracted so tests can
     drive single ticks deterministically with fake time and fake snapshots.
@@ -216,6 +238,8 @@ def _tick_once(
         hysteresis_state = HysteresisState()
     if feature_history is None:
         feature_history = deque(maxlen=5)
+    if genre_hysteresis is None:
+        genre_hysteresis = GenreHysteresis()
 
     # Re-read active profile per tick — Phase 12 UI may flip mid-session.
     active_profile = get_active_profile()
@@ -300,6 +324,45 @@ def _tick_once(
         state.vocal_active = vocal_active
         state.bpm_corrected = was_corrected
         state.genre_profile_name = profile_name
+
+        # Phase 52 (GENRE-01) — grounded DSP genre auto-detection. Pure-numpy
+        # score over features ALREADY computed this tick (stabilized bpm_cache +
+        # band shares + smoothed_crest); nearest-match across the cached profile
+        # library. Anti-slop: score_genre returns "unknown" below confidence /
+        # on a tie, and GenreHysteresis debounces the committed label (no
+        # bar-to-bar flicker; "unknown" commits immediately). Written here
+        # inside the single-writer batch — ADDITIVE; the coarse active_genre /
+        # _classify_active_genre signal below is untouched.
+        raw_genre, raw_genre_conf = score_genre(
+            bpm_cache,
+            {
+                "sub": feats.get("sub_share", 0.0),
+                "low": feats.get("low_share", 0.0),
+                "mid": feats.get("mid_share", 0.0),
+                "high": feats.get("high_share", 0.0),
+            },
+            smoothed_crest,
+            _cached_profiles(),
+        )
+        committed_genre = apply_genre_hysteresis(raw_genre, genre_hysteresis)
+        state.detected_genre = committed_genre
+        state.genre_confidence = round(raw_genre_conf, 2)
+
+        # Env override wins: only re-point the active profile when the user did
+        # NOT explicitly pin a genre (is_auto_enabled), the detector committed a
+        # real (non-unknown) genre, and it differs from the current active
+        # profile. set_active_profile mutates a module singleton (not
+        # MusicState), called from this one tick path only. The honesty fields
+        # above are surfaced regardless of the flag.
+        if (
+            is_auto_enabled()
+            and committed_genre != "unknown"
+            and committed_genre != profile_name
+        ):
+            try:
+                set_active_profile(committed_genre)
+            except ValueError:
+                pass  # committed name not a loadable profile — never flip
 
         # Phase 13-05: downbeat-phase + bpm_confidence (mascot beat-lock).
         # Pure function over the same 4-second audio window. Invalid BPM
@@ -463,6 +526,9 @@ async def state_refresh_loop(
     vocal_detector = VocalDetector(profile=active_profile_at_start)
     hysteresis_state = HysteresisState()
     feature_history: deque[dict] = deque(maxlen=5)
+    # Phase 52 (GENRE-01) loop-local genre-detector hysteresis — separate
+    # state object from the phase HysteresisState above; threaded into _tick_once.
+    genre_hysteresis = GenreHysteresis()
 
     while not stop_event.is_set():
         await asyncio.sleep(0.1)
@@ -484,6 +550,7 @@ async def state_refresh_loop(
                 hysteresis_state=hysteresis_state,
                 feature_history=feature_history,
                 evidence_registry=evidence_registry,
+                genre_hysteresis=genre_hysteresis,
             )
         except Exception as e:
             print(f"[state refresh err] {e}", file=sys.stderr)

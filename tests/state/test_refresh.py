@@ -1309,3 +1309,89 @@ def test_18_02_state_refresh_loop_threads_registry_kwarg(mocker):
     )
     assert captured_kwargs, "tick_once was never called"
     assert captured_kwargs[0].get("evidence_registry") is registry
+
+
+# ---------- Phase 52 (GENRE-01): genre auto-detect wiring ----------
+
+
+def test_tick_writes_detected_genre_and_confidence():
+    """After an audible tick, state.detected_genre is a str and
+    state.genre_confidence is a float in [0, 1] — the two additive bus fields
+    are written single-writer-safe inside _tick_once."""
+    from vibemix.state.genre import set_active_profile, set_auto_enabled
+
+    set_active_profile(None)
+    set_auto_enabled(True)
+    try:
+        state = MusicState()
+        _tick_once(
+            state,
+            _audible_buf(),
+            _ctrl_mock(),
+            _track_mock(),
+            now=1000.0,
+            last_audible_high=0.0,
+            last_audible_low=0.0,
+            bpm_cache=0.0,
+            last_bpm_at=0.0,
+        )
+        assert isinstance(state.detected_genre, str)
+        assert isinstance(state.genre_confidence, float)
+        assert 0.0 <= state.genre_confidence <= 1.0
+    finally:
+        set_active_profile(None)
+        set_auto_enabled(True)
+
+
+def test_tick_lazy_defaults_genre_hysteresis_kwarg():
+    """Omitting genre_hysteresis must not crash existing _tick_once callers —
+    the kwarg lazy-defaults a fresh GenreHysteresis (backward-compat)."""
+    from vibemix.state.genre import set_active_profile, set_auto_enabled
+
+    set_active_profile(None)
+    set_auto_enabled(True)
+    try:
+        state = MusicState()
+        # No genre_hysteresis kwarg passed — must not raise.
+        out = _tick_once(
+            state,
+            _audible_buf(),
+            _ctrl_mock(),
+            _track_mock(),
+            now=1000.0,
+            last_audible_high=0.0,
+            last_audible_low=0.0,
+            bpm_cache=0.0,
+            last_bpm_at=0.0,
+        )
+        assert len(out) == 4  # still returns the (high, low, bpm_cache, last_bpm_at) tuple
+    finally:
+        set_active_profile(None)
+        set_auto_enabled(True)
+
+
+def test_tick_does_not_touch_active_genre_path():
+    """The coarse active_genre / _classify_active_genre signal is still written
+    and is independent of detected_genre (parallel, not replaced)."""
+    from vibemix.state.genre import set_active_profile, set_auto_enabled
+
+    set_active_profile(None)
+    set_auto_enabled(True)
+    try:
+        state = MusicState()
+        _tick_once(
+            state,
+            _audible_buf(),
+            _ctrl_mock(),
+            _track_mock(),
+            now=1000.0,
+            last_audible_high=0.0,
+            last_audible_low=0.0,
+            bpm_cache=0.0,
+            last_bpm_at=0.0,
+        )
+        # active_genre is still one of the coarse renderer values.
+        assert state.active_genre in {"house", "techno", "hard_tek", "unknown"}
+    finally:
+        set_active_profile(None)
+        set_auto_enabled(True)
