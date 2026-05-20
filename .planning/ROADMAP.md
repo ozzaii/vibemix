@@ -35,7 +35,7 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 
 - [x] **Phase 51: Real-Hardware Bring-Up** - Boot the app + sidecar on Kaan's Mac, reach a stable live "listening" session with clean startup logs, and survive a ≥30-min full-set run with zero unhandled exceptions or unbounded memory. ✅ 2026-05-21 — boot green, ws_bus empty-frame + stale-sidecar dev loop closed, soak harness shipped; review CLEAN; real ≥30-min live soak = KAAN-ACTION.
 - [x] **Phase 52: Audio Path + Feature Grounding** - BlackHole 48 kHz capture is live end-to-end and every feature derived from it (levels, BPM, bands) is grounded — out-of-range values like the live BPM=200 read on a ~129 BPM track never reach the bus or UI. ✅ 2026-05-21 — BPM never exceeds 180 on harmonic-leak trace; psytrance profile + grounded DSP genre auto-detector (confidence-gated, `unknown` fallback, hysteresis) + genre on bus; review CLEAN; multi-genre live drive = KAAN-ACTION.
-- [ ] **Phase 53: Controller Live + Graceful Fallback** - DDJ-FLX4 MIDI is ingested live during a real session and the app degrades cleanly when the controller is unplugged.
+- [x] **Phase 53: Controller Live + Graceful Fallback** - DDJ-FLX4 MIDI is ingested live during a real session and the app degrades cleanly when the controller is unplugged. ✅ 2026-05-21 — closed the real gap: `start_port_watcher` now wired into the live session (was never spawned); `mark_disconnected` clears stale moves; single-state hot-plug callback (no rebuild divergence); review CLEAN; physical FLX4 plug/unplug drive = KAAN-ACTION.
 - [ ] **Phase 54: Hype Mode Live** - On real audio, hype (party) mode actually fires grounded, in-bar, non-slop reactions — the AI voice lands on real events (drops/builds) across ≥2 genres, cooldowns/latency tuned live so nothing comes late.
 - [ ] **Phase 55: Feedback Mode Live + Citation Integrity** - On real audio, feedback (coach) mode produces grounded, in-bar, non-slop coaching across ≥2 genres, and the EvidenceRegistry citation strip reflects real session events with zero orphaned or hallucinated citations.
 - [ ] **Phase 56: Performance + Live Mascot** - TTFT within budget on real HW, no audio dropouts under live load, mascot + UI hold 60fps, and the Neon Rebel mascot reacts correctly to live audio/MIDI events in-session across its **many modes** (idle/groove/build/drop/breakdown/speaking), driven by the rich bus signals — not the loudness ramp it uses today.
@@ -149,7 +149,7 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 |-------|-----------|----------------|--------|-----------|
 | 51. Real-Hardware Bring-Up | v4.0 | 3/3 | Complete | 2026-05-21 |
 | 52. Audio Path + Feature Grounding | v4.0 | 4/4 | Complete | 2026-05-21 |
-| 53. Controller Live + Graceful Fallback | v4.0 | 0/TBD | Not started | - |
+| 53. Controller Live + Graceful Fallback | v4.0 | 2/2 | Complete | 2026-05-21 |
 | 54. Hype Mode Live | v4.0 | 0/TBD | Not started | - |
 | 55. Feedback Mode Live + Citation Integrity | v4.0 | 0/TBD | Not started | - |
 | 56. Performance + Live Mascot | v4.0 | 0/TBD | Not started | - |

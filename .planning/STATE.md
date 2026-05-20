@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: SHIP
 status: executing
-last_updated: "2026-05-21T02:00:00.000Z"
-last_activity: 2026-05-21 -- Phase 53 PLANNED (2 plans, 2 waves; BRINGUP-03); dual-map resolved + watcher live-wiring gap found; ready to execute
+last_updated: "2026-05-21T03:00:00.000Z"
+last_activity: 2026-05-21 -- Phase 53 COMPLETE (review CLEAN; watcher live-wired, stale-move leak closed); physical FLX4 drive = KAAN-ACTION. Next: plan + execute Phase 54
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 7
-  percent: 25
+  completed_plans: 9
+  percent: 38
 ---
 
 # vibemix — State
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 ## Current Position
 
-Phase: 53 — Controller Live + Graceful Fallback (context grounded, ready to plan)
+Phase: 54 — Hype Mode Live (context grounded, ready to plan)
 Plan: —
-Status: Phases 51+52 complete → planning Phase 53
-Last activity: 2026-05-21 -- Phase 52 complete (genre detector + psytrance shipped); Phase 53+54 contexts grounded
+Status: Phases 51+52+53 complete → planning Phase 54
+Last activity: 2026-05-21 -- Phase 53 complete (watcher live-wired, stale-move leak closed); Phase 54 context grounded
 
 ## Performance Metrics
 
@@ -54,7 +54,7 @@ Last activity: 2026-05-21 -- Phase 52 complete (genre detector + psytrance shipp
 | Plans complete (v3.1) | 32 / 32 |
 | v3.0 REQ-IDs mapped + satisfied | 57 / 57 ✓ (100% coverage, no orphans) |
 | v3.1 REQ-IDs mapped + satisfied | 44 / 44 ✓ (100% coverage, no orphans) |
-| v4.0 REQ-IDs mapped | 19 / 19 ✓ (100% coverage, no orphans, no duplicates) |
+| v4.0 REQ-IDs mapped | 22 / 22 ✓ (100% coverage, no orphans, no duplicates — +GENRE-01/02 to P52, +LIVE-05a to P56 per Kaan 2026-05-21) |
 | v4.0 phase count | 8 (Phases 51–58) |
 | v3.0 cross-phase integration seams WIRED | 3 / 3 |
 | v3.1 cross-phase integration seams WIRED | 5 / 5 |
