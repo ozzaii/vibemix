@@ -32,7 +32,7 @@ from vibemix.llm.model_router import ROUTER_PATHS, RouterPathError, resolve
 @pytest.mark.parametrize(
     ("path", "expected_model", "expected_tier"),
     [
-        ("live_coach", "gemini-3-flash-preview", ServiceTier.STANDARD),
+        ("live_coach", "gemini-3.5-flash", ServiceTier.STANDARD),
         ("debrief", "gemini-3-pro-preview", ServiceTier.FLEX),
         ("library_auto_tag", "gemini-3-flash-preview", ServiceTier.FLEX),
         ("embedding", "gemini-embedding-2", ServiceTier.FLEX),

@@ -317,6 +317,14 @@ class DJCoHostAgent(Agent):
         # Q2 — closes the "AI claims to predict the future" hallucination
         # class that lookahead introduces.
         lookahead: "LookaheadProvider | None" = None,
+        # ipc.session.snapshot transcript sink. Optional bounded deque the
+        # live runtime (``ws_broadcast``) drains per snapshot to light up the
+        # cohost transcript panel. None default keeps every other construction
+        # path byte-identical. Appended ONLY at the spoken-text points (next
+        # to ``_ai_text_history.append``) which live in the cold post-stream
+        # logging tail — NEVER in the audio/TTS hot path. Best-effort: any
+        # append failure is swallowed so a sink hiccup can't touch a turn.
+        transcript_sink: "collections.deque | None" = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -398,13 +406,15 @@ class DJCoHostAgent(Agent):
         self._lookahead: "LookaheadProvider | None" = lookahead
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
+        # ipc.session.snapshot transcript sink (see __init__ kwarg docstring).
+        self._transcript_sink: "collections.deque | None" = transcript_sink
         # Both the LiveKit-side ``instructions`` AND the google.genai-side
         # ``GenerateContentConfig.system_instruction`` use the same cell.
         self._gen_cfg = types.GenerateContentConfig(
             system_instruction=prompt_body,
             thinking_config=types.ThinkingConfig(thinking_level="minimal"),
             temperature=1.0,
-            max_output_tokens=220,
+            max_output_tokens=1024,  # 2026-05-20 — lifted from 220 for gemini-3.5-flash (thinking shares budget); Kaan: don't cap output
         )
         # Plan 41-03 / LAT-08 — second gate, defense in depth. llm_factory
         # already runs validate_live_config; the agent re-runs it against
@@ -415,6 +425,20 @@ class DJCoHostAgent(Agent):
         # llm_node uses its own pre-validated thinking_level="minimal"
         # literal, identical to this _gen_cfg, so it inherits the gate).
         validate_live_config(self._gen_cfg)
+
+    def _push_transcript(self, text: str) -> None:
+        """Best-effort push of a spoken AI line onto the snapshot sink.
+
+        Called next to each ``_ai_text_history.append`` (the spoken-text
+        signal). Swallows all errors — a transcript-sink hiccup must never
+        perturb a reaction turn.
+        """
+        if self._transcript_sink is None:
+            return
+        try:
+            self._transcript_sink.append(text)
+        except Exception:
+            pass
 
     def set_next_event(self, ev: Event) -> None:
         self._pending_event = ev
@@ -656,7 +680,7 @@ class DJCoHostAgent(Agent):
                     cached_content=cache_name,
                     thinking_config=types.ThinkingConfig(thinking_level="minimal"),
                     temperature=1.0,
-                    max_output_tokens=220,
+                    max_output_tokens=1024,  # 2026-05-20 — lifted from 220 for gemini-3.5-flash (thinking shares budget); Kaan: don't cap output
                 )
                 cache_state = "warm"
 
@@ -968,6 +992,7 @@ class DJCoHostAgent(Agent):
                             latency_s=round(elapsed, 2),
                         )
                         self._ai_text_history.append(stripped[:140])
+                        self._push_transcript(stripped[:140])
                     else:
                         print("[ai_text] <empty> (skip TTS)", flush=True)
                 else:
@@ -1004,6 +1029,7 @@ class DJCoHostAgent(Agent):
                         # text, so the no-repeat memory must reflect it.
                         if stripped:
                             self._ai_text_history.append(stripped[:140])
+                            self._push_transcript(stripped[:140])
                     else:
                         # Strip path — no chunks yielded. Pre-recorded
                         # ack substitution is retired (English placeholder
@@ -1049,6 +1075,7 @@ class DJCoHostAgent(Agent):
                         "ai_text", text=full_text, latency_s=round(elapsed, 2)
                     )
                     self._ai_text_history.append(stripped[:140])
+                    self._push_transcript(stripped[:140])
                 else:
                     print("[ai_text] <empty> (skip TTS)", flush=True)
                 # Legacy path = no linter wired; treat as if citation_action

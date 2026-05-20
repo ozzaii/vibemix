@@ -16,6 +16,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
+import time
+from collections import deque
+from typing import Any
 
 import websockets
 
@@ -23,18 +27,188 @@ from vibemix.audio import WS_HOST, WS_PORT, Levels
 from vibemix.state import MusicState
 
 
+# ---------------------------------------------------------------------------
+# ipc.session.snapshot — wired into the LIVE runtime (the real cohost).
+# ---------------------------------------------------------------------------
+#
+# The Tauri shell spawns the sidecar FLAG-LESS → ``__main__.py:main()`` (the
+# real cohost). The app's session panels (meters/bpm/phase/track/cohost
+# status/grounded/midi/transcript) are driven by ``ipc.session.snapshot``
+# frames — but ``main()`` historically only ran ``ws_broadcast`` here, which
+# emitted ONLY the flat mascot frame (no ``type`` field). The unused Phase 12
+# W2 ``SessionLoop`` stub was the only emitter of ``ipc.session.snapshot`` and
+# the app no longer spawns ``--session``, so every panel was DEAD.
+#
+# Fix: ``ws_broadcast`` now ALSO emits a schema-valid ``ipc.session.snapshot``
+# to the same connected clients (downsampled — see SNAPSHOT_EVERY_N). The
+# mascot frame keeps its EXACT shape + 30Hz cadence (mascot.html + the WS
+# tests pin both); the snapshot is an ADDITIONAL frame on the same socket.
+#
+# Snapshot SHAPE + field mapping mirror SessionLoop._build_snapshot (the
+# reference stub). Every snapshot is validated before send; on validation /
+# emit failure we log to stderr and CONTINUE so a single bad frame can never
+# bring the loop down or kill the mascot frames (the snapshot is strictly
+# additive — its failure never touches the mascot path).
+
+# Emit one ipc.session.snapshot every Nth mascot tick. 30Hz / 2 = 15Hz —
+# plenty for the UI panels, half the wire volume of the mascot stream. The
+# mascot sleep stays 1/30 (pinned by test_ws_07); only the snapshot is gated.
+SNAPSHOT_EVERY_N: int = 2
+
+# Cap the AI transcript drained per snapshot so a burst can't blow the frame.
+_TRANSCRIPT_DRAIN_CAP: int = 8
+# MIDI event ribbon cap per snapshot — mirrors SessionLoop.MIDI_EVENT_RING_SIZE.
+_MIDI_EVENT_CAP: int = 64
+
+
+def _now_iso() -> str:
+    """ISO-8601 UTC timestamp (mirror of ui_bus.messages._now_iso)."""
+    from vibemix.ui_bus.messages import _now_iso as _impl
+
+    return _impl()
+
+
+def _validate_snapshot(msg: dict) -> None:
+    """Validate an outbound ipc.session.snapshot against the IPC schema.
+
+    Thin re-export so the snapshot path uses the SAME outbound validator the
+    WizardBus / SessionLoop use (``vibemix.ui_bus.validator.validate_message``).
+    """
+    from vibemix.ui_bus.validator import validate_message as _v
+
+    _v(msg)
+
+
+def _build_session_snapshot(
+    levels: Levels,
+    state: MusicState,
+    *,
+    transcript_buf: deque | None = None,
+    controller_state: Any | None = None,
+    last_move_ts: list[float] | None = None,
+) -> dict:
+    """Build a schema-valid ``ipc.session.snapshot`` dict from live refs.
+
+    Pure-ish builder (the only side effects are draining ``transcript_buf``
+    and advancing ``last_move_ts[0]``) so it can be unit-tested against
+    fake refs without binding a socket. Mirrors the field mapping in
+    ``SessionLoop._build_snapshot``: meters (music/voice/mic), bpm, track
+    (title from ``state.audible_track``, deck from ``state.audible_deck``),
+    cohost_status (TALKING when voice rms > 0.05, LISTENING when audible,
+    else IDLE), grounded (= ``state.audible``), MIDI ribbon, transcript.
+    """
+    from vibemix.ui_bus.messages import (
+        LevelPair,
+        MetersTriple,
+        MidiEventEntry,
+        SessionSnapshot,
+        TrackInfo,
+        TranscriptLine,
+    )
+
+    snap = levels.snapshot()
+    music_rms = max(0.0, min(1.0, float(snap.get("music", 0.0))))
+    voice_rms = max(0.0, min(1.0, float(snap.get("voice", 0.0))))
+    mic_rms = max(0.0, min(1.0, float(snap.get("mic", 0.0))))
+    meters = MetersTriple(
+        music=LevelPair(rms=music_rms, peak=music_rms),
+        voice=LevelPair(rms=voice_rms, peak=voice_rms),
+        mic=LevelPair(rms=mic_rms, peak=mic_rms),
+    )
+
+    grounded = bool(getattr(state, "audible", False))
+    if voice_rms > 0.05:
+        cohost_status = "TALKING"
+    elif grounded:
+        cohost_status = "LISTENING"
+    else:
+        cohost_status = "IDLE"
+
+    raw_bpm = float(getattr(state, "bpm", 0.0) or 0.0)
+    bpm = raw_bpm if raw_bpm > 0.0 else None
+
+    audible_track = getattr(state, "audible_track", None)
+    audible_deck = getattr(state, "audible_deck", None)
+    if audible_track:
+        track = TrackInfo(
+            title=str(audible_track),
+            artist=None,
+            deck=str(audible_deck) if audible_deck else None,
+        )
+    else:
+        track = None
+
+    # Transcript delta — drain newly spoken AI lines (FIFO), capped.
+    transcript_delta: tuple[TranscriptLine, ...] = ()
+    if transcript_buf is not None and transcript_buf:
+        drained: list[TranscriptLine] = []
+        while transcript_buf and len(drained) < _TRANSCRIPT_DRAIN_CAP:
+            text = transcript_buf.popleft()
+            drained.append(
+                TranscriptLine(role="ai", text=str(text), ts=_now_iso())  # type: ignore[arg-type]
+            )
+        transcript_delta = tuple(drained)
+
+    # MIDI ribbon — drain moves observed since the last snapshot. The real
+    # ControllerState exposes ``moves_since(t) -> [(age_secs, label), ...]``;
+    # we track an absolute wall-clock high-water mark in ``last_move_ts[0]``.
+    midi_events: tuple[MidiEventEntry, ...] = ()
+    if controller_state is not None and last_move_ts is not None:
+        try:
+            now = time.time()
+            moves = controller_state.moves_since(last_move_ts[0])
+            last_move_ts[0] = now
+            if moves:
+                midi_events = tuple(
+                    MidiEventEntry(control=str(label), value=None, ts=_now_iso())
+                    for _age, label in moves[-_MIDI_EVENT_CAP:]
+                )
+        except Exception:
+            midi_events = ()
+
+    msg = SessionSnapshot.make(
+        meters=meters,
+        phase=(),
+        phase_now_pct=0.0,
+        bpm=bpm,
+        drop_pred_bars=None,
+        transcript_delta=transcript_delta,
+        midi_events=midi_events,
+        track=track,
+        cohost_status=cohost_status,  # type: ignore[arg-type]
+        latency_ms=None,
+        grounded=grounded,
+    )
+    return json.loads(msg.to_json())
+
+
 async def ws_broadcast(
     levels: Levels,
     state: MusicState,
     manual_trigger: asyncio.Event,
     stop_event: asyncio.Event,
+    *,
+    transcript_buf: deque | None = None,
+    controller_state: Any | None = None,
 ) -> None:
     """30Hz outbound mascot broadcast + inbound manual-trigger handler.
 
     Verbatim port of cohost_v4.py:1872-1918 with the ``_HAS_WS``
     early-return removed (Phase 2 anti-pattern note — fail loud).
+
+    Additionally emits a schema-valid ``ipc.session.snapshot`` to the same
+    clients every ``SNAPSHOT_EVERY_N`` ticks (~15Hz) so the Tauri session
+    panels light up under the real cohost. ``transcript_buf`` (an AI-text
+    deque, drained per snapshot) and ``controller_state`` (for the MIDI
+    ribbon) are OPTIONAL with ``None`` defaults — existing 4-arg callers and
+    the WS tests are unaffected. The mascot frame's shape + 30Hz cadence are
+    untouched; the snapshot is strictly additive and its failure is isolated.
     """
     clients: set = set()
+    # Snapshot downsample counter + MIDI high-water mark (boxed in a list so
+    # the builder can advance it across ticks).
+    tick = 0
+    last_move_ts: list[float] = [time.time()]
 
     async def handler(ws):
         clients.add(ws)
@@ -109,6 +283,33 @@ async def ws_broadcast(
                     dead.append(c)
             for c in dead:
                 clients.discard(c)
+
+            # Additive ipc.session.snapshot @ ~15Hz (every Nth tick). Built +
+            # validated + sent in its OWN try/except so a bad snapshot frame
+            # NEVER touches the mascot path above or the loop cadence below.
+            tick += 1
+            if tick % SNAPSHOT_EVERY_N == 0:
+                try:
+                    snap_msg = _build_session_snapshot(
+                        levels,
+                        state,
+                        transcript_buf=transcript_buf,
+                        controller_state=controller_state,
+                        last_move_ts=last_move_ts,
+                    )
+                    _validate_snapshot(snap_msg)
+                    snap_payload = json.dumps(snap_msg, separators=(",", ":"))
+                    snap_dead = []
+                    for c in clients:
+                        try:
+                            await c.send(snap_payload)
+                        except Exception:
+                            snap_dead.append(c)
+                    for c in snap_dead:
+                        clients.discard(c)
+                except Exception as e:
+                    print(f"[ws snapshot] emit failed: {e}", file=sys.stderr)
+
             await asyncio.sleep(1 / 30)
     finally:
         server.close()

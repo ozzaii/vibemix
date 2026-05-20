@@ -167,7 +167,7 @@ def test_llm_node_warm_cache_preserves_thinking_temp_max_tokens(mocker, tmp_path
 
     cfg = gen_client.aio.models.generate_content_stream.call_args.kwargs["config"]
     assert cfg.temperature == 1.0
-    assert cfg.max_output_tokens == 220
+    assert cfg.max_output_tokens == 1024
     level = cfg.thinking_config.thinking_level
     assert str(getattr(level, "value", level)).lower() == "minimal"
 

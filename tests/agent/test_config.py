@@ -26,7 +26,7 @@ def test_config_01_constants_pinned() -> None:
     per-machine via the calibration wizard; the strings here are the
     factory values.
     """
-    assert LLM_MODEL == "gemini-3-flash-preview"
+    assert LLM_MODEL == "gemini-3.5-flash"
     assert TTS_MODEL == "gemini-3.1-flash-tts-preview"
     assert TTS_FALLBACK_MODEL == "gemini-2.5-flash-preview-tts"
     assert OPENROUTER_TTS_MODEL == "google/gemini-3.1-flash-tts-preview"

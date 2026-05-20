@@ -161,7 +161,7 @@ def test_agent_03_initial_state(mocker, tmp_path) -> None:
     assert agent._gen_cfg.system_instruction.startswith(SYSTEM_INSTRUCTION)
     assert "[ev:" in agent._gen_cfg.system_instruction
     assert agent._gen_cfg.temperature == 1.0
-    assert agent._gen_cfg.max_output_tokens == 220
+    assert agent._gen_cfg.max_output_tokens == 1024
     level = agent._gen_cfg.thinking_config.thinking_level
     assert str(getattr(level, "value", level)).lower() == "minimal"
 

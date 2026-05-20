@@ -24,7 +24,7 @@ from google.genai.types import ServiceTier
 # the OpenRouter API is consumed by the LiveKit OpenAI plugin, not by the
 # Gemini SDK, so ServiceTier has no semantic meaning there.
 _ROUTES: dict[str, tuple[str, ServiceTier | None]] = {
-    "live_coach": ("gemini-3-flash-preview", ServiceTier.STANDARD),
+    "live_coach": ("gemini-3.5-flash", ServiceTier.STANDARD),
     "live_coach_tts": ("gemini-3.1-flash-tts-preview", ServiceTier.STANDARD),
     "live_coach_tts_fallback": (
         "gemini-2.5-flash-preview-tts",

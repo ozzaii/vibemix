@@ -27,7 +27,7 @@ def _build_direct(api_key: str) -> google_plugin.LLM:
     gen_cfg = types.GenerateContentConfig(
         temperature=1.0,
         thinking_config=types.ThinkingConfig(thinking_level="minimal"),
-        max_output_tokens=220,
+        max_output_tokens=1024,  # 2026-05-20 — lifted from 220: gemini-3.5-flash thinking tokens share the budget, and Kaan wants reactions uncapped (system prompt still keeps lines short)
     )
     validate_live_config(gen_cfg)
     return google_plugin.LLM(
@@ -55,7 +55,7 @@ def _build_proxy(proxy_base_url: str, jwt: str) -> google_plugin.LLM:
     gen_cfg = types.GenerateContentConfig(
         temperature=1.0,
         thinking_config=types.ThinkingConfig(thinking_level="minimal"),
-        max_output_tokens=220,
+        max_output_tokens=1024,  # 2026-05-20 — lifted from 220: gemini-3.5-flash thinking tokens share the budget, and Kaan wants reactions uncapped (system prompt still keeps lines short)
     )
     validate_live_config(gen_cfg)
     return google_plugin.LLM(

@@ -23,10 +23,10 @@ def test_llm_01_build_llm_direct_kwargs_match_v4(mocker) -> None:
     assert isinstance(inst, google_plugin.LLM)
 
     kwargs = google_plugin.LLM.__init__.call_args.kwargs
-    assert kwargs["model"] == "gemini-3-flash-preview"
+    assert kwargs["model"] == "gemini-3.5-flash"
     assert kwargs["api_key"] == "dummy-key"
     assert kwargs["temperature"] == 1.0
-    assert kwargs["max_output_tokens"] == 220
+    assert kwargs["max_output_tokens"] == 1024
     tc = kwargs["thinking_config"]
     level = getattr(tc, "thinking_level", None)
     assert level is not None

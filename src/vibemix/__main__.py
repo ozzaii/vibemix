@@ -35,6 +35,7 @@ import os
 import signal
 import sys
 import threading
+from collections import deque
 from pathlib import Path
 
 import httpx
@@ -734,6 +735,12 @@ async def main() -> None:
             "bypass_active": bool(bypass_active),
         }
 
+    # ipc.session.snapshot transcript sink — spoken AI lines land here from
+    # the agent's cold post-stream logging tail; ws_broadcast drains it per
+    # snapshot to light up the Tauri cohost transcript panel. Bounded so a
+    # paused/dead UI client can't grow it unbounded.
+    transcript_buf: deque = deque(maxlen=200)
+
     agent = DJCoHostAgent(
         genai_client=genai_client,
         clean_audio_buf=clean_audio_buf,
@@ -766,6 +773,8 @@ async def main() -> None:
         # returns ``(None, meta)`` on every failure path — the agent's
         # try/except wrapper double-belts that contract (T-40-03-02).
         lookahead=lookahead_provider,
+        # ipc.session.snapshot transcript sink (drained by ws_broadcast).
+        transcript_sink=transcript_buf,
     )
 
     # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──
@@ -838,7 +847,16 @@ async def main() -> None:
     midi_thread = midi_macos.start_listener_thread(midi_stop)  # noqa: F841 — daemon thread
 
     # --- Asyncio tasks (6) ---
-    ws_task = asyncio.create_task(ws_broadcast(levels, state, manual_trigger, stop_event))
+    ws_task = asyncio.create_task(
+        ws_broadcast(
+            levels,
+            state,
+            manual_trigger,
+            stop_event,
+            transcript_buf=transcript_buf,
+            controller_state=midi_macos.controller_state,
+        )
+    )
     diag_task = asyncio.create_task(diag_loop(levels, state, stop_event))
     screen_task = asyncio.create_task(screen_macos.run_capture_loop(state, stop_event))
     track_task = asyncio.create_task(track_macos.run_poll_loop(stop_event))
