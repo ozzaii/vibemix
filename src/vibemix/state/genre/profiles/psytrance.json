@@ -1,0 +1,21 @@
+{
+  "name": "psytrance",
+  "label": "Psytrance / Goa / Full-On",
+  "bpm_range": [138, 150],
+  "absolute_thresholds": {
+    "silent_rms": 0.012,
+    "low_rms": 0.040,
+    "peak_rms": 0.110
+  },
+  "expected_crest_factor": [4.0, 7.0],
+  "band_signature": {
+    "sub":  [0.30, 0.50],
+    "low":  [0.20, 0.35],
+    "mid":  [0.08, 0.20],
+    "high": [0.05, 0.15]
+  },
+  "vocal_likelihood": "rare",
+  "build_climb_threshold": 0.028,
+  "breakdown_ratio": 0.40,
+  "drop_jump_threshold": 0.065
+}
