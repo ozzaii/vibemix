@@ -98,8 +98,8 @@ describe("HelpGroup standalone (H10)", () => {
     expect(source?.getAttribute("title")).toContain("github");
     expect(source?.getAttribute("aria-label")).toContain("github");
     const sub = source?.querySelector(".vmx-help-row__sub")?.textContent;
-    expect(sub).toContain("bravoh/vibemix");
-    expect(GITHUB_REPO_URL).toBe("https://github.com/bravoh/vibemix");
+    expect(sub).toContain("bravoh-ai/vibemix");
+    expect(GITHUB_REPO_URL).toBe("https://github.com/bravoh-ai/vibemix");
   });
 
   it("ABOUT row shows the version + build-date constants", () => {

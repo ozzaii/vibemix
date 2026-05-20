@@ -29,18 +29,18 @@ Built by DJs. The reactions are tuned against real sessions on rekordbox, Serato
 Your audio doesn't leave your machine without you knowing. vibemix is open source under Apache 2.0, runs on Mac + Windows, and the only network calls go to Bravoh's Gemini proxy at `api.altidus.world` — analyzed in flight, never stored. Recordings stay local under `recordings/<session>/` with a 7-day default retention you can change in Settings. Read the FAQ for the long version.
 
 <p align="center">
-  <img alt="release" src="https://img.shields.io/github/v/release/bravoh/vibemix?style=flat-square&color=ff8a3d" />
-  <img alt="build" src="https://img.shields.io/github/actions/workflow/status/bravoh/vibemix/release.yml?branch=main&style=flat-square" />
+  <img alt="release" src="https://img.shields.io/github/v/release/bravoh-ai/vibemix?style=flat-square&color=ff8a3d" />
+  <img alt="build" src="https://img.shields.io/github/actions/workflow/status/bravoh-ai/vibemix/release.yml?branch=main&style=flat-square" />
   <img alt="license" src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" />
   <img alt="platforms" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey?style=flat-square" />
-  <img alt="stars" src="https://img.shields.io/github/stars/bravoh/vibemix?style=flat-square" />
+  <img alt="stars" src="https://img.shields.io/github/stars/bravoh-ai/vibemix?style=flat-square" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/bravoh/vibemix/actions/workflows/dep-audit.yml"><img alt="uv lock status" src="https://img.shields.io/github/actions/workflow/status/bravoh/vibemix/dep-audit.yml?label=uv%20lock&branch=main&style=flat-square" /></a>
-  <a href="https://github.com/bravoh/vibemix/actions/workflows/dep-audit.yml"><img alt="cargo-deny" src="https://img.shields.io/github/actions/workflow/status/bravoh/vibemix/dep-audit.yml?label=cargo-deny&branch=main&event=push&style=flat-square" /></a>
-  <a href="https://github.com/bravoh/vibemix/actions/workflows/dep-audit.yml"><img alt="npm-audit" src="https://img.shields.io/github/actions/workflow/status/bravoh/vibemix/dep-audit.yml?label=npm-audit&branch=main&event=push&style=flat-square" /></a>
-  <a href="https://github.com/bravoh/vibemix/actions/workflows/sbom.yml"><img alt="CycloneDX SBOM" src="https://img.shields.io/github/actions/workflow/status/bravoh/vibemix/sbom.yml?label=CycloneDX%20SBOM&branch=main&style=flat-square" /></a>
+  <a href="https://github.com/bravoh-ai/vibemix/actions/workflows/dep-audit.yml"><img alt="uv lock status" src="https://img.shields.io/github/actions/workflow/status/bravoh-ai/vibemix/dep-audit.yml?label=uv%20lock&branch=main&style=flat-square" /></a>
+  <a href="https://github.com/bravoh-ai/vibemix/actions/workflows/dep-audit.yml"><img alt="cargo-deny" src="https://img.shields.io/github/actions/workflow/status/bravoh-ai/vibemix/dep-audit.yml?label=cargo-deny&branch=main&event=push&style=flat-square" /></a>
+  <a href="https://github.com/bravoh-ai/vibemix/actions/workflows/dep-audit.yml"><img alt="npm-audit" src="https://img.shields.io/github/actions/workflow/status/bravoh-ai/vibemix/dep-audit.yml?label=npm-audit&branch=main&event=push&style=flat-square" /></a>
+  <a href="https://github.com/bravoh-ai/vibemix/actions/workflows/sbom.yml"><img alt="CycloneDX SBOM" src="https://img.shields.io/github/actions/workflow/status/bravoh-ai/vibemix/sbom.yml?label=CycloneDX%20SBOM&branch=main&style=flat-square" /></a>
 </p>
 
 ---
@@ -80,10 +80,10 @@ Don't see your app? vibemix listens to the audio coming out of your machine — 
 
 | OS | Download |
 |----|----------|
-| macOS (Apple Silicon) | [vibemix.dmg](https://github.com/bravoh/vibemix/releases/latest) |
-| Windows 11 | [vibemix-installer.msi](https://github.com/bravoh/vibemix/releases/latest) |
+| macOS (Apple Silicon) | [vibemix.dmg](https://github.com/bravoh-ai/vibemix/releases/latest) |
+| Windows 11 | [vibemix-installer.msi](https://github.com/bravoh-ai/vibemix/releases/latest) |
 
-<!-- TBD(launch): Install URLs go live with the first signed release (Phase 21 deliverable). Verify the `bravoh/vibemix` org/repo slug matches the final GitHub home before public launch. -->
+<!-- TBD(launch): Install URLs go live with the first signed release (Phase 21 deliverable). Verify the `bravoh-ai/vibemix` org/repo slug matches the final GitHub home before public launch. -->
 <!-- TODO: drop install GIFs (clone-to-running in <60s) into docs/assets/install/ -->
 
 Builds are signed (Apple Developer ID on macOS, SignPath OSS cert on Windows) and notarized. Auto-update is on by default; opt out in Settings.
@@ -167,7 +167,7 @@ Calibrate any other controller — see [docs/midi-mapping.md](docs/midi-mapping.
 
 Two ways to add it:
 
-1. **File a request** — open a [new-controller issue](https://github.com/bravoh/vibemix/issues/new?template=new_controller.yml) and we'll triage. <!-- TBD: confirm org slug `bravoh/vibemix` matches the final repo name before launch -->
+1. **File a request** — open a [new-controller issue](https://github.com/bravoh-ai/vibemix/issues/new?template=new_controller.yml) and we'll triage. <!-- TBD: confirm org slug `bravoh-ai/vibemix` matches the final repo name before launch -->
 2. **Send a PR** — run `python3 scripts/sniff_controller.py` to capture your controller's MIDI shape, then drop a JSON profile under `src/vibemix/midi/profiles/` per [CONTRIBUTING.md](CONTRIBUTING.md#2-new-controller-mapping). CI auto-merges clean profile additions.
 
 ---
