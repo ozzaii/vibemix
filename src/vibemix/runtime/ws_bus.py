@@ -274,6 +274,15 @@ async def ws_broadcast(
                 "downbeat_phase": state.downbeat_phase,
                 "beat_phase": state.beat_phase,
                 "active_genre": state.active_genre,
+                # Phase 52 (GENRE-02) — additive. `detected_genre` is the FULL-
+                # LIBRARY auto-detected genre name (Plan 52-03), distinct from
+                # the coarse `active_genre` house/techno/hard_tek renderer
+                # signal above. Anti-hallucination is honored at the SOURCE: the
+                # detector writes "unknown" when it is unsure, so the bus is a
+                # dumb wire that carries the value as-is — never a fabricated
+                # label. `genre_confidence` is the detector's score in [0,1].
+                "detected_genre": state.detected_genre,
+                "genre_confidence": state.genre_confidence,
                 "emotion": state.emotion,
                 "reaction_intent": state.last_reaction_intent,
             }
