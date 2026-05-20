@@ -28,7 +28,8 @@ This milestone is the first time the built app is **driven on real hardware in a
 - [ ] **LIVE-02**: Feedback (coach) mode produces grounded, in-time, non-slop reactions on real audio across ≥2 genres.
 - [ ] **LIVE-03**: Event cooldowns + reaction latency are tuned live so reactions land in-bar, not after the moment passes.
 - [ ] **LIVE-04**: The EvidenceRegistry citation strip reflects real session events live — zero orphaned or hallucinated citations.
-- [ ] **LIVE-05**: The reactive mascot (Neon Rebel) responds correctly to live audio/MIDI events in-session.
+- [ ] **LIVE-05**: The reactive mascot (Neon Rebel) responds correctly to live audio/MIDI events in-session — driven by the **rich signals the bus already emits** (`phase`, `mood`, `reaction_intent`, `bpm`, levels), not just the music-loudness ramp it uses today (`mascot.html` currently consumes only `music`+`voice` → 3 crude tiers).
+- [ ] **LIVE-05a**: The mascot has **many distinct modes** (Kaan directive 2026-05-21) — at minimum idle/dead-air, vibing/groove, building, drop/peak, breakdown/chill, and a speaking/emoting mode while the AI talks — each grounded in a real bus signal so a mode change always corresponds to a real musical/session event (anti-slop: no random/decorative state changes).
 
 ### Peak Performance (PERF)
 
@@ -81,6 +82,7 @@ This milestone is the first time the built app is **driven on real hardware in a
 | PERF-02 | Phase 56 | Pending |
 | PERF-03 | Phase 56 | Pending |
 | LIVE-05 | Phase 56 | Pending |
+| LIVE-05a | Phase 56 | Pending |
 | POLISH-01 | Phase 57 | Pending |
 | POLISH-02 | Phase 57 | Pending |
 | POLISH-03 | Phase 57 | Pending |
@@ -88,6 +90,6 @@ This milestone is the first time the built app is **driven on real hardware in a
 | REL-02 | Phase 58 | Pending |
 | REL-03 | Phase 58 | Pending |
 
-**Coverage:** 19 / 19 v4.0 requirements mapped to exactly one phase ✓ (no orphans, no duplicates)
+**Coverage:** 20 / 20 v4.0 requirements mapped to exactly one phase ✓ (no orphans, no duplicates)
 
-**Per-phase counts:** P51=3 (BRINGUP-01/04/05) · P52=1 (BRINGUP-02) · P53=1 (BRINGUP-03) · P54=2 (LIVE-01/03) · P55=2 (LIVE-02/04) · P56=4 (PERF-01/02/03 + LIVE-05) · P57=3 (POLISH-01/02/03) · P58=3 (REL-01/02/03) = 19.
+**Per-phase counts:** P51=3 (BRINGUP-01/04/05) · P52=1 (BRINGUP-02) · P53=1 (BRINGUP-03) · P54=2 (LIVE-01/03) · P55=2 (LIVE-02/04) · P56=5 (PERF-01/02/03 + LIVE-05 + LIVE-05a) · P57=3 (POLISH-01/02/03) · P58=3 (REL-01/02/03) = 20.

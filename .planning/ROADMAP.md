@@ -38,7 +38,7 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 - [ ] **Phase 53: Controller Live + Graceful Fallback** - DDJ-FLX4 MIDI is ingested live during a real session and the app degrades cleanly when the controller is unplugged.
 - [ ] **Phase 54: Hype Mode Live** - On real audio, hype (party) mode actually fires grounded, in-bar, non-slop reactions — the AI voice lands on real events (drops/builds) across ≥2 genres, cooldowns/latency tuned live so nothing comes late.
 - [ ] **Phase 55: Feedback Mode Live + Citation Integrity** - On real audio, feedback (coach) mode produces grounded, in-bar, non-slop coaching across ≥2 genres, and the EvidenceRegistry citation strip reflects real session events with zero orphaned or hallucinated citations.
-- [ ] **Phase 56: Performance + Live Mascot** - TTFT within budget on real HW, no audio dropouts under live load, mascot + UI hold 60fps, and the Neon Rebel mascot reacts correctly to live audio/MIDI events in-session.
+- [ ] **Phase 56: Performance + Live Mascot** - TTFT within budget on real HW, no audio dropouts under live load, mascot + UI hold 60fps, and the Neon Rebel mascot reacts correctly to live audio/MIDI events in-session across its **many modes** (idle/groove/build/drop/breakdown/speaking), driven by the rich bus signals — not the loudness ramp it uses today.
 - [ ] **Phase 57: Sexify Finish** - Final Tier-1 visual pass (zero HIGH findings), close v0.1.0-rc1 carryover bugs, tighten fresh-account first-run.
 - [ ] **Phase 58: Ship Readiness** - All engineering release gates green on real artifacts, §E2E-50A-WALK discharged by driving the real app, one-button SHIP-CUT sequence documented + pre-verified with external-clock items surfaced as KAAN-ACTION.
 
@@ -104,14 +104,16 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 ### Phase 56: Performance + Live Mascot
 **Goal**: On the real machine under live-session load, the co-host hits peak performance — reactions are fast (TTFT within budget), audio never glitches, the UI and mascot hold 60fps — and the Neon Rebel mascot is a live, correct feedback surface that telegraphs back what the system saw from real audio/MIDI events.
 **Depends on**: Phase 54 + Phase 55 (perf is measured against real reaction traffic from both modes); Phase 53 (mascot reacts to live MIDI)
-**Requirements**: PERF-01, PERF-02, PERF-03, LIVE-05
+**Requirements**: PERF-01, PERF-02, PERF-03, LIVE-05, LIVE-05a
 **Success Criteria** (what must be TRUE):
   1. TTFT (trigger → first audio out) measured on the real MacBook meets the live-path latency budget.
   2. No audio glitches/dropouts occur in the playback path under real-session load across a full set.
   3. The mascot + UI hold 60fps on the integrated-GPU MacBook during a live session.
   4. The Neon Rebel mascot reacts correctly to live audio/MIDI events in-session — its state visibly tracks real drops/builds/controller moves (the visual feedback loop is grounded, not decorative).
+  5. The mascot consumes the **rich bus signals** (`phase`, `mood`, `reaction_intent`, `bpm`, levels), not just the music-loudness ramp it uses today — `mascot.html` currently reads only `music`+`voice` → 3 tiers; this seam is the gap.
+  6. The mascot has **many distinct modes** (Kaan directive 2026-05-21): ≥ idle/dead-air, vibing/groove, building, drop/peak, breakdown/chill, and a speaking/emoting mode while the AI talks — every mode change corresponds to a real musical/session event (anti-slop: no random or purely decorative state changes).
 **Plans**: TBD
-**UI hint**: yes
+**UI hint**: yes — mascot is a Tier-1 live surface; the many-modes work is design-led (lift `mocks/` + `frontend-enforcement` skill; the bus already carries the signals to drive it).
 
 ### Phase 57: Sexify Finish
 **Goal**: The surfaces a real user touches are polished to peak — Tier-1 live views get a final CDJ-Whisper visual pass, the v0.1.0-rc1 carryover bugs are closed, and a fresh account reaches first-session with no friction.
