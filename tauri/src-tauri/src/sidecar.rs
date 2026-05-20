@@ -235,6 +235,96 @@ pub async fn spawn_sidecar_with_watchdog(
     }
 }
 
+/// How the watchdog should launch the sidecar this iteration.
+///
+/// `Bundled` is the shipped/release path: run the PyInstaller `vibemix-core`
+/// binary resolved via `resource_dir()`. `DevSource` is the env-gated dev
+/// path (BRINGUP-04): run the repo Python entrypoint (`python -m vibemix`)
+/// so `cargo tauri dev` reflects `src/vibemix/` HEAD edits without a
+/// PyInstaller rebuild. The two arms feed the SAME watchdog supervision
+/// (stdout/stderr drain, exit-code sentinels, wizard handoff) — only the
+/// command construction differs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SidecarInvocation {
+    /// Run the bundled PyInstaller binary at this path.
+    Bundled(PathBuf),
+    /// Run a Python interpreter from repo source.
+    DevSource {
+        program: String,
+        args: Vec<String>,
+        cwd: PathBuf,
+    },
+}
+
+/// Decide the sidecar invocation from environment + the bundled path.
+///
+/// Pure + side-effect-free: the environment is injected as a closure so unit
+/// tests pass a fake map and never touch the process env. This is the single
+/// landmine-safe decision point for the dev-vs-release split (RESEARCH §2,
+/// Opt C A-first):
+///
+///   * `VIBEMIX_DEV_SIDECAR == "1"` → `DevSource`. The interpreter defaults to
+///     `uv` (project venv auto-resolved → `uv run python -m vibemix`); set
+///     `VIBEMIX_DEV_PYTHON=/path/to/python3` to override (→ `python3 -m
+///     vibemix`). The repo root (cwd) comes from `VIBEMIX_DEV_REPO` when set,
+///     else the deterministic `CARGO_MANIFEST_DIR`'s parent's parent
+///     (`tauri/src-tauri` → `tauri` → repo root). When the override env is
+///     absent we still need a deterministic cwd, so `manifest_parent` is
+///     passed in by the caller.
+///   * flag absent → `Bundled(bundled)`. IDENTICAL to today's behavior. The
+///     bundled path is only ever resolved (via `resource_dir()`) for this
+///     arm, so the DevSource path NEVER calls `resource_dir()` (the landmine:
+///     `resource_dir()` errors / points at a non-existent bundle under
+///     `cargo tauri dev`).
+///
+/// `--wizard` is folded in HERE (appended last) so both arms share one
+/// wizard-arg decision and the call site stays a thin match.
+pub(crate) fn resolve_sidecar_invocation(
+    bundled: Option<PathBuf>,
+    wizard_mode: bool,
+    manifest_parent: &std::path::Path,
+    env: &impl Fn(&str) -> Option<String>,
+) -> SidecarInvocation {
+    if env("VIBEMIX_DEV_SIDECAR").as_deref() == Some("1") {
+        let program = env("VIBEMIX_DEV_PYTHON").unwrap_or_else(|| "uv".to_string());
+        let mut args: Vec<String> = if program == "uv" {
+            vec![
+                "run".to_string(),
+                "python".to_string(),
+                "-m".to_string(),
+                "vibemix".to_string(),
+            ]
+        } else {
+            vec!["-m".to_string(), "vibemix".to_string()]
+        };
+        if wizard_mode {
+            args.push("--wizard".to_string());
+        }
+        let cwd = env("VIBEMIX_DEV_REPO")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| manifest_parent.to_path_buf());
+        SidecarInvocation::DevSource { program, args, cwd }
+    } else {
+        SidecarInvocation::Bundled(
+            bundled.expect("bundled sidecar path required when VIBEMIX_DEV_SIDECAR != 1"),
+        )
+    }
+}
+
+/// Compute the repo root from CARGO_MANIFEST_DIR (`tauri/src-tauri`).
+///
+/// The dev-source cwd defaults to the repo root so `python -m vibemix`
+/// resolves the project (and `uv` finds the project venv). Two `parent()`
+/// hops: `tauri/src-tauri` → `tauri` → repo root.
+fn repo_root_from_manifest() -> PathBuf {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf())
+        .unwrap_or(manifest)
+}
+
 /// Resolve the bundled sidecar binary path inside the .app/.exe.
 ///
 /// Tauri's `bundle.resources` puts each pattern's match under
@@ -361,6 +451,142 @@ mod tests {
 
         let last = read_last_log_line(f.path()).expect("should find tail");
         assert_eq!(last, "RuntimeError: boom");
+    }
+
+    // ---------------------------------------------------------------------
+    // Plan 51-02 — env-gated sidecar invocation resolver (dev vs bundled).
+    // ---------------------------------------------------------------------
+
+    /// Build a fake env reader from a slice of (key, value) pairs.
+    fn fake_env(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
+        let map: std::collections::HashMap<String, String> = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        move |k: &str| map.get(k).cloned()
+    }
+
+    #[test]
+    fn resolve_sidecar_flag_absent_returns_bundled() {
+        // Release path: with VIBEMIX_DEV_SIDECAR unset the resolver returns
+        // the bundled binary path verbatim (no path-shape change).
+        let bundled = PathBuf::from("/app/Resources/binaries/vibemix-core-x/vibemix-core-x");
+        let env = fake_env(&[]);
+        let manifest_parent = std::path::Path::new("/repo");
+
+        let inv = resolve_sidecar_invocation(
+            Some(bundled.clone()),
+            /* wizard */ false,
+            manifest_parent,
+            &env,
+        );
+        assert_eq!(inv, SidecarInvocation::Bundled(bundled));
+    }
+
+    #[test]
+    fn resolve_sidecar_flag_set_default_uses_uv_module_vibemix() {
+        // Dev path with no VIBEMIX_DEV_PYTHON → program "uv", args run the
+        // project: ["run","python","-m","vibemix"].
+        let env = fake_env(&[("VIBEMIX_DEV_SIDECAR", "1")]);
+        let manifest_parent = std::path::Path::new("/repo");
+
+        let inv =
+            resolve_sidecar_invocation(None, false, manifest_parent, &env);
+        match inv {
+            SidecarInvocation::DevSource { program, args, cwd } => {
+                assert_eq!(program, "uv");
+                // contains "-m" then "vibemix"
+                let m = args.iter().position(|a| a == "-m").expect("has -m");
+                assert_eq!(args[m + 1], "vibemix");
+                assert_eq!(args, vec!["run", "python", "-m", "vibemix"]);
+                // cwd defaults to the manifest parent when VIBEMIX_DEV_REPO unset.
+                assert_eq!(cwd, PathBuf::from("/repo"));
+            }
+            other => panic!("expected DevSource, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resolve_sidecar_flag_set_custom_python_runs_module_directly() {
+        // VIBEMIX_DEV_PYTHON override → that interpreter, args start ["-m","vibemix"].
+        let env = fake_env(&[
+            ("VIBEMIX_DEV_SIDECAR", "1"),
+            ("VIBEMIX_DEV_PYTHON", "/path/python3"),
+        ]);
+        let manifest_parent = std::path::Path::new("/repo");
+
+        let inv =
+            resolve_sidecar_invocation(None, false, manifest_parent, &env);
+        match inv {
+            SidecarInvocation::DevSource { program, args, .. } => {
+                assert_eq!(program, "/path/python3");
+                assert_eq!(args[0], "-m");
+                assert_eq!(args[1], "vibemix");
+            }
+            other => panic!("expected DevSource, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resolve_sidecar_dev_repo_env_overrides_cwd() {
+        // VIBEMIX_DEV_REPO sets the cwd explicitly (the run script exports it).
+        let env = fake_env(&[
+            ("VIBEMIX_DEV_SIDECAR", "1"),
+            ("VIBEMIX_DEV_REPO", "/elsewhere/dj-set-ai"),
+        ]);
+        let manifest_parent = std::path::Path::new("/repo");
+
+        let inv =
+            resolve_sidecar_invocation(None, false, manifest_parent, &env);
+        match inv {
+            SidecarInvocation::DevSource { cwd, .. } => {
+                assert_eq!(cwd, PathBuf::from("/elsewhere/dj-set-ai"));
+            }
+            other => panic!("expected DevSource, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resolve_sidecar_wizard_arg_appended_in_both_arms() {
+        let manifest_parent = std::path::Path::new("/repo");
+
+        // Dev path with wizard → --wizard appended last.
+        let dev_env = fake_env(&[("VIBEMIX_DEV_SIDECAR", "1")]);
+        let dev = resolve_sidecar_invocation(None, true, manifest_parent, &dev_env);
+        match dev {
+            SidecarInvocation::DevSource { args, .. } => {
+                assert_eq!(args.last().map(String::as_str), Some("--wizard"));
+                // wizard is LAST, after -m vibemix.
+                assert_eq!(args, vec!["run", "python", "-m", "vibemix", "--wizard"]);
+            }
+            other => panic!("expected DevSource, got {other:?}"),
+        }
+
+        // Bundled path is unaffected by the helper's wizard flag — wizard for
+        // the bundled arm is appended at the call site (Task 2), so the
+        // helper still returns plain Bundled(path).
+        let bundled = PathBuf::from("/app/vibemix-core");
+        let rel_env = fake_env(&[]);
+        let rel = resolve_sidecar_invocation(
+            Some(bundled.clone()),
+            true,
+            manifest_parent,
+            &rel_env,
+        );
+        assert_eq!(rel, SidecarInvocation::Bundled(bundled));
+    }
+
+    #[test]
+    fn repo_root_from_manifest_is_two_levels_up() {
+        // CARGO_MANIFEST_DIR is .../tauri/src-tauri; repo root is two hops up.
+        let root = repo_root_from_manifest();
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        assert_eq!(root, manifest.parent().unwrap().parent().unwrap());
+        // Sanity: the repo root contains pyproject.toml (the project marker).
+        assert!(
+            root.join("pyproject.toml").exists(),
+            "repo root {root:?} should contain pyproject.toml"
+        );
     }
 }
 
