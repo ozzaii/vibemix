@@ -73,6 +73,30 @@ from vibemix.state.phase import classify_phase
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
 
 
+# BPM stabilization — estimate_bpm is bimodal on dense material: a strong
+# subdivision lock can land at ~200 while the true kick reads ~130 (measured on
+# a real psytrance track, 2026-05-21). One raw sample per 3 s tick flickered
+# active_genre to unknown/house, which destabilised the genre profile and let
+# phase classification fall back to the no-hysteresis path → live phase flicker.
+_BPM_RING_MAXLEN = 5  # ~15 s at the 3 s estimate cadence
+
+
+def _stabilize_bpm(ring: list[float]) -> float:
+    """Lower-median of the in-range BPM samples in ``ring`` (0.0 if none).
+
+    Drops anything outside [BPM_VALID_MIN, BPM_VALID_MAX] before taking the
+    median, so a transient subdivision lock (>180) can never reach genre/phase.
+    Lower-median (``valid[len//2]`` over the sorted list) guarantees the result
+    is an actually-observed sample — never a manufactured between-samples value
+    that could fall in a cross-genre gap. A mean/EMA would average 130+200 into
+    the ~165 'unknown' gap, which is strictly worse — hence median, not EMA.
+    """
+    valid = sorted(b for b in ring if BPM_VALID_MIN <= b <= BPM_VALID_MAX)
+    if not valid:
+        return 0.0
+    return float(valid[len(valid) // 2])
+
+
 def _classify_active_genre(bpm: float, feats: dict) -> str:
     """Coarse BPM-band + spectral-centroid heuristic for `active_genre`.
 
@@ -152,6 +176,7 @@ def _tick_once(
     last_audible_low: float,
     bpm_cache: float,
     last_bpm_at: float,
+    bpm_ring: list[float] | None = None,
     crest_smoother: EmaSmoother | None = None,
     vocal_detector: VocalDetector | None = None,
     hysteresis_state: HysteresisState | None = None,
@@ -214,8 +239,19 @@ def _tick_once(
 
     # BPM updated every 3s — autocorr is heavier
     if now - last_bpm_at > 3.0 and currently_loud:
-        bpm_cache = estimate_bpm(audio_buf, seconds=6.0)
+        raw_bpm = estimate_bpm(audio_buf, seconds=6.0)
         last_bpm_at = now
+        if bpm_ring is not None:
+            # Median-stabilize: reject transient subdivision locks (the live
+            # ~200 BPM cluster) instead of letting a single bad tick flip genre.
+            bpm_ring.append(raw_bpm)
+            if len(bpm_ring) > _BPM_RING_MAXLEN:
+                del bpm_ring[0]
+            stabilized = _stabilize_bpm(bpm_ring)
+            if stabilized > 0:  # keep last-good until an in-range sample lands
+                bpm_cache = stabilized
+        else:
+            bpm_cache = raw_bpm  # backward-compat path for direct _tick_once tests
 
     # Phase 6: BPM half/double validation against active profile.
     if active_profile is not None and bpm_cache > 0:
@@ -419,6 +455,7 @@ async def state_refresh_loop(
     last_audible_low = 0.0
     bpm_cache = 0.0
     last_bpm_at = 0.0
+    bpm_ring: list[float] = []  # rolling raw estimates for median stabilization
 
     # Phase 6 loop-local state — created once per session.
     crest_smoother = EmaSmoother(alpha=0.3)
@@ -441,6 +478,7 @@ async def state_refresh_loop(
                 last_audible_low=last_audible_low,
                 bpm_cache=bpm_cache,
                 last_bpm_at=last_bpm_at,
+                bpm_ring=bpm_ring,
                 crest_smoother=crest_smoother,
                 vocal_detector=vocal_detector,
                 hysteresis_state=hysteresis_state,
