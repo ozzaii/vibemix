@@ -101,18 +101,58 @@ pub async fn spawn_sidecar_with_watchdog(
             tokio::time::sleep(Duration::from_millis(500 * restart_count as u64)).await;
         }
 
-        let sidecar_bin = resolve_sidecar_path(&app)
-            .map_err(|e| format!("sidecar lookup failed: {e}"))?;
-        let mut cmd = app.shell().command(&sidecar_bin);
+        // Decide source-vs-bundled BEFORE touching resource_dir(). The
+        // landmine (RESEARCH §2): resolve_sidecar_path() calls resource_dir(),
+        // which errors / points at a non-existent bundle under `cargo tauri
+        // dev`. So we only resolve the bundled path on the Bundled arm —
+        // the DevSource arm never calls resource_dir().
+        //
         // 2026-05-18 — `--session` routes to a Phase 12 W2 structural stub
         // that never wires Gemini/LiveKit. Per __main__.py docstring the
         // real cohost lives in the flag-less `main()` branch (verbatim port
         // of cohost_v4.py:1925-2080). Drop the flag for post-wizard launches
         // until session_loop owns the snapshot path (v3.2 scope).
         // Wizard launches keep `--wizard` (Phase 11 wave 4 behaviour).
-        if wizard_mode {
-            cmd = cmd.args(["--wizard"]);
-        }
+        let invocation = {
+            // Lazily resolve the bundled path; the resolver only consumes it
+            // on the Bundled arm, so under the dev flag this closure short-
+            // circuits and resource_dir() is never called.
+            let bundled = if std::env::var("VIBEMIX_DEV_SIDECAR").as_deref() == Ok("1") {
+                None
+            } else {
+                Some(
+                    resolve_sidecar_path(&app)
+                        .map_err(|e| format!("sidecar lookup failed: {e}"))?,
+                )
+            };
+            resolve_sidecar_invocation(
+                bundled,
+                wizard_mode,
+                &repo_root_from_manifest(),
+                &|k: &str| std::env::var(k).ok(),
+            )
+        };
+
+        let cmd = match invocation {
+            SidecarInvocation::Bundled(bin) => {
+                // Release path — IDENTICAL to before: shell().command(bin) then
+                // optional --wizard. (Wizard is appended here for the bundled
+                // arm; the helper only folds wizard into the DevSource args.)
+                let mut c = app.shell().command(&bin);
+                if wizard_mode {
+                    c = c.args(["--wizard"]);
+                }
+                c
+            }
+            SidecarInvocation::DevSource { program, args, cwd } => {
+                // Dev path — run repo source so `cargo tauri dev` reflects
+                // src/vibemix/ HEAD. args already include --wizard when set.
+                app.shell()
+                    .command(&program)
+                    .args(&args)
+                    .current_dir(&cwd)
+            }
+        };
 
         let (mut rx, child) = cmd
             .spawn()
