@@ -862,6 +862,17 @@ async def main() -> None:
     midi_stop = threading.Event()
     midi_thread = midi_macos.start_listener_thread(midi_stop)  # noqa: F841 — daemon thread
 
+    # --- MIDI hot-plug watcher (Phase 53 BRINGUP-03) ---
+    # The static listener above retries silently on disconnect; it does NOT flip
+    # is_connected() false or clear stale moves. The watcher detects mid-session
+    # unplug/replug (~poll_seconds latency) and drives the single-state callback,
+    # which mutates midi_macos.controller_state IN PLACE — the SAME object passed
+    # to ws_broadcast + state_refresh_loop below, so single-state ownership holds
+    # (no rebuild, no consumer change). Runs on its own asyncio.Event stop signal;
+    # cleaned up in the finally block alongside midi_stop.
+    midi_watcher_stop = asyncio.Event()
+    midi_watcher_task = midi_macos.start_port_watcher(midi_watcher_stop)
+
     # --- Asyncio tasks (6) ---
     ws_task = asyncio.create_task(
         ws_broadcast(
@@ -930,6 +941,9 @@ async def main() -> None:
         await stop_event.wait()
     finally:
         midi_stop.set()
+        # Phase 53 BRINGUP-03: signal the hot-plug watcher to exit cooperatively
+        # (within one poll) BEFORE its task is cancelled below.
+        midi_watcher_stop.set()
         cleanup_tasks: list[asyncio.Task] = [
             coach_task,
             refresh_task,
@@ -938,6 +952,7 @@ async def main() -> None:
             diag_task,
             track_task,
             parent_watch_task,
+            midi_watcher_task,
         ]
         for t in cleanup_tasks:
             t.cancel()
