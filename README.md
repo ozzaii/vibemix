@@ -108,6 +108,7 @@ Each cell speaks a different vocabulary on purpose. Beginner is encouragement-he
 
 | Phase | Surface | What shipped |
 |---|---|---|
+| 51 | Real-Hardware Bring-Up** - Boot the app + sidecar on Kaan's Mac, reach a stable live "listening" session with clean startup logs, and survive a ≥30-min full-set run with zero unhandled exceptions or unbounded memory. ✅ 2026-05-21 | boot green, ws_bus empty-frame + stale-sidecar dev loop closed, soak harness shipped; review CLEAN; real ≥30-min live soak = KAAN-ACTION. |
 | 40 | Anti-Slop Audio Port (6/6 plans) | completed 2026-05-16 (AUDIO-01..04 GREEN; AUDIO-05/06/07 = KAAN-ACTION-LEGAL) |
 | 41 | Gemini SKU Upgrade + Latency Stack v2 (7/7 plans) | completed 2026-05-16 (LAT-01..08 GREEN; LAT-09 spike = KAAN-ACTION-PROXY) |
 | 42 | Hallucination Gate v3 | Hybrid (6/6 plans) — completed 2026-05-16 (GATE-05..09 GREEN; GATE-01/02/03/04 corpus = KAAN-ACTION-LEGAL) |
