@@ -158,15 +158,33 @@ export interface Mounted {
  * file in the sweep. */
 const LAYOUT_CSS = `
   .vmx-session {
-    --col-left: 320px;
-    --col-center: 420px;
-    --col-right: 420px;
+    --col-left: 300px;
+    --col-right: 400px;
     --gap-col: var(--sp-5);
     display: grid;
     grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
     height: 100vh;
     position: relative;
     overflow: hidden;
+  }
+  /* Bolder (2026-05-20) — stage lighting. The session was a flat field of
+   * equal-weight glass tiles: no light direction, so nothing read as the
+   * hero. This lays a warm stage-pool behind the center deck (the glass
+   * tiles' backdrop-blur turns it into a soft backlight) and a framing
+   * vignette that sinks the outer rails into shadow. Static, not breathing
+   * — the deck border-anim is the one breathing light. Sits at z-index 0,
+   * below the children promoted to z-index 5 below, so it backlights
+   * without ever painting over content. One amber; no new tokens. */
+  .vmx-session::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 44% 52% at 47% 40%, rgba(255, 138, 61, 0.055), transparent 64%),
+      radial-gradient(ellipse 36% 30% at 47% 34%, rgba(255, 184, 138, 0.03), transparent 70%),
+      radial-gradient(ellipse 120% 100% at 50% 46%, transparent 52%, rgba(0, 0, 0, 0.5) 100%);
   }
   /* The animated amber border-anim is z-index 4 (tokens.css). Promote
    * direct children above it so titlebar / grid / status-bar paint over
@@ -191,28 +209,40 @@ const LAYOUT_CSS = `
   .vmx-session__screw[data-corner="br"] { bottom: 6px; right: 6px; }
   .vmx-session__grid {
     display: grid;
-    grid-template-columns: var(--col-left) var(--col-center) var(--col-right);
+    /* Center deck is the hero: a fluid 1fr column flanked by a narrow
+     * control rail and the cohost voice. minmax(0,1fr) lets the deck
+     * own all reclaimed width so the frame fills edge-to-edge instead of
+     * left-packing three fixed columns into a dead-space layout. */
+    grid-template-columns: var(--col-left) minmax(0, 1fr) var(--col-right);
     gap: var(--gap-col);
-    padding: 32px; /* mock-verbatim — no v5 spacing equivalent for 32 */
-    /* Body has overflow: hidden globally (tokens.css line 274). Below 1100px
-     * the @media rule collapses to a single column and the right column's
-     * content stacks vertically — without overflow-y: auto + min-height: 0
-     * here, anything below the viewport gets clipped and is unreachable.
-     * overscroll-behavior: contain so wheel events don't leak to the OS. */
+    padding: var(--sp-5) var(--sp-6);
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
     overscroll-behavior: contain;
-    align-items: start;
+    /* Columns stretch to the full deck height — no floating panels over
+     * a void floor; the instrument fills its enclosure. */
+    align-items: stretch;
   }
   .vmx-session__col {
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
     min-width: 0;
+    min-height: 0;
   }
   .vmx-session__col[data-col="right"] {
     height: 100%;
+  }
+  /* The center column reads as ONE deck unit, not a stack of widgets:
+   * the now-playing display and the waveform tape are the dominant mass,
+   * everything beneath settles to the deck floor. */
+  .vmx-session__col[data-col="center"] {
+    gap: var(--sp-5);
+  }
+  .vmx-session__col[data-col="center"] > .vmx-tile:first-child,
+  .vmx-session__col[data-col="center"] > [data-tc] {
+    flex: 0 0 auto;
   }
   .vmx-session__meter-strip {
     display: flex;

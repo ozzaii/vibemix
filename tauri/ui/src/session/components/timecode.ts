@@ -34,16 +34,27 @@ const CSS = `
     -webkit-backdrop-filter: var(--blur-glass);
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-md);
-    padding: var(--sp-5) var(--sp-5) var(--sp-4);
+    padding: var(--sp-6) var(--sp-6) var(--sp-5);
     box-shadow:
       inset 0 1px 0 var(--glass-top),
       inset 0 -1px 0 rgba(0, 0, 0, 0.55),
-      0 16px 36px rgba(0, 0, 0, 0.5),
+      0 24px 60px rgba(0, 0, 0, 0.6),
       0 0 0 1px rgba(255, 255, 255, 0.018);
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
+    gap: var(--sp-5);
+  }
+  /* Hero deck glows from within — a faint amber wash rising off the floor,
+   * the CDJ display backlight bleeding past the bezel. One amber breath. */
+  .vmx-timecode::before {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: -40%;
+    height: 80%;
+    background: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(255, 138, 61, 0.07), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
   }
   /* Faint diagonal glass-fingerprint streak — barely-there character */
   .vmx-timecode::after {
@@ -143,13 +154,13 @@ const CSS = `
   }
   .vmx-timecode__title {
     font-family: var(--type-display);
-    font-variation-settings: "wdth" 80, "wght" 700;
-    font-size: 32px;
-    line-height: 0.94;
-    letter-spacing: -0.022em;
+    font-variation-settings: "wdth" 78, "wght" 800;
+    font-size: clamp(44px, 5vw, 76px);
+    line-height: 0.9;
+    letter-spacing: -0.03em;
     text-transform: uppercase;
     color: var(--silk);
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.7);
     word-break: normal;
     overflow-wrap: anywhere;
     text-wrap: balance;
@@ -219,11 +230,11 @@ const CSS = `
     font-family: var(--type-mono);
     font-variant-numeric: tabular-nums;
     font-weight: 500;
-    font-size: 38px;
+    font-size: 52px;
     line-height: 0.95;
     color: var(--silk);
-    text-shadow: 0 0 6px rgba(255, 138, 61, 0.20);
-    letter-spacing: -0.035em;
+    text-shadow: 0 0 14px rgba(255, 138, 61, 0.32), 0 0 4px rgba(255, 138, 61, 0.45);
+    letter-spacing: -0.04em;
     display: block;
     user-select: none;
   }
@@ -317,15 +328,47 @@ export function renderTimecode(props: TimecodeProps): HTMLElement {
   hero.append(display);
   root.append(hero);
 
-  // Meta cells
+  // Meta cells — built once, then shown/hidden by value. A null field
+  // hides its cell entirely rather than printing a dash, so the row only
+  // ever carries grounded facts (BPM/DECK are real; KEY appears when a
+  // now-playing / rekordbox prior supplies it).
   const meta = document.createElement("div");
   meta.className = "vmx-timecode__meta";
-  meta.append(buildCell("BPM", formatBpm(props.bpm)));
-  meta.append(buildCell("KEY", props.key ?? "—"));
-  meta.append(buildCell("DECK", props.deck ?? "—"));
+  meta.dataset.role = "meta";
+  const bpmCell = buildCell("BPM", "");
+  const keyCell = buildCell("KEY", "");
+  const deckCell = buildCell("DECK", "");
+  meta.append(bpmCell, keyCell, deckCell);
+  applyMeta(meta, props);
   root.append(meta);
 
   return root;
+}
+
+/** Show/hide each meta cell by value (null → hidden) and poke its number.
+ *  Shared by render + hot-update so the row stays a list of real facts. */
+function applyMeta(meta: HTMLElement, props: TimecodeProps): void {
+  const cells: Array<[string, string | null]> = [
+    ["bpm", props.bpm != null ? formatBpm(props.bpm) : null],
+    ["key", props.key && props.key.trim() ? props.key : null],
+    ["deck", props.deck && props.deck.trim() ? props.deck : null],
+  ];
+  let visible = 0;
+  for (const [role, value] of cells) {
+    const cell = meta.querySelector<HTMLElement>(`[data-role="${role}"]`);
+    if (!cell) continue;
+    const b = cell.querySelector("b");
+    if (value == null) {
+      cell.style.display = "none";
+    } else {
+      cell.style.display = "";
+      visible++;
+      if (b && b.textContent !== value) b.textContent = value;
+    }
+  }
+  // Collapse the whole row (with its top border + padding) when nothing
+  // is grounded yet — e.g. the "silence" empty state.
+  meta.style.display = visible > 0 ? "" : "none";
 }
 
 function buildCell(label: string, value: string): HTMLElement {
@@ -407,19 +450,6 @@ export function setTimecode(el: HTMLElement, props: TimecodeProps): void {
     if (live.textContent !== v) live.textContent = v;
   }
 
-  const bpm = el.querySelector<HTMLElement>('[data-role="bpm"] b');
-  if (bpm) {
-    const v = formatBpm(props.bpm);
-    if (bpm.textContent !== v) bpm.textContent = v;
-  }
-  const key = el.querySelector<HTMLElement>('[data-role="key"] b');
-  if (key) {
-    const v = props.key ?? "—";
-    if (key.textContent !== v) key.textContent = v;
-  }
-  const deck = el.querySelector<HTMLElement>('[data-role="deck"] b');
-  if (deck) {
-    const v = props.deck ?? "—";
-    if (deck.textContent !== v) deck.textContent = v;
-  }
+  const meta = el.querySelector<HTMLElement>('[data-role="meta"]');
+  if (meta) applyMeta(meta, props);
 }

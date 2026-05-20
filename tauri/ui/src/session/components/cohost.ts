@@ -246,7 +246,17 @@ const CSS = `
     overflow-y: auto;
     overflow-x: hidden;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
   }
+  /* Bolder (2026-05-20) — bottom-anchor the glance surface. The live view
+   * is capped at 3 lines, so a top-stacked transcript opened to a tall
+   * dead void above the foot. margin-top:auto sinks the lines to the
+   * display floor (newest nearest the READING-THE-ROOM foot, where the
+   * eye already rests) and collapses to normal scroll the moment content
+   * overflows. The void now reads as "history scrolled up," not "empty
+   * panel." */
+  .vmx-cohost__transcript > *:first-child { margin-top: auto; }
   .vmx-cohost__transcript::after {
     /* Fade to bottom — long transcripts breathe into the void */
     content: "";
@@ -283,15 +293,34 @@ const CSS = `
    * stacking 4 amber signals on a single line read louder than the
    * rest of the surface. The remaining two carry the "this is the
    * latest" semantic alone. */
+  /* Bolder hierarchy (2026-05-20): the latest reaction is the cohost
+   * SPEAKING right now — it commands the column. Dramatic scale jump
+   * (20px vs 13px peers) carries the "this is live" semantic; the amber
+   * edge stays a single 1px hairline (a >1px side-stripe is banned).
+   * Older lines recede in both size and silk alpha so the eye lands on
+   * the now-line without any extra amber. */
   .vmx-cohost__msg[data-tier="now"] {
     color: var(--silk);
     box-shadow: inset 1px 0 0 var(--amber-40);
+    font-size: 20px;
+    line-height: 1.32;
+    font-variation-settings: "wdth" 100, "wght" 500;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    margin-bottom: var(--sp-4);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  }
+  .vmx-cohost__msg[data-tier="now"]::before {
+    font-size: 15px;
+    top: 8px;
   }
   .vmx-cohost__msg[data-tier="faded"] {
     color: var(--silk-65);
+    font-size: 13px;
   }
   .vmx-cohost__msg[data-tier="old"] {
     color: var(--silk-40);
+    font-size: 12px;
   }
   .vmx-cohost__ts {
     /* 2026-05-19 /impeccable critique fix: dropped the

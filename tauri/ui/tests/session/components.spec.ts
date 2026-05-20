@@ -640,7 +640,7 @@ describe("renderTimecode", () => {
     expect(cells[2]?.querySelector("b")?.textContent).toBe("A");
   });
 
-  it("handles null bpm/key/deck/track with em-dash and empty state", () => {
+  it("hides every null meta cell (no dash placeholders) + shows empty state", () => {
     const t = renderTimecode({
       clock: "00:00:00",
       bpm: null,
@@ -650,10 +650,34 @@ describe("renderTimecode", () => {
       genre: null,
     });
     host().append(t);
-    const dashes = Array.from(t.querySelectorAll<HTMLElement>(".vmx-timecode__meta-cell b"))
-      .map((b) => b.textContent);
-    expect(dashes).toEqual(["—", "—", "—"]);
+    // 2026-05-20 contract: a null field hides its cell rather than printing
+    // a dash, so the row only ever carries grounded facts.
+    const cells = t.querySelectorAll<HTMLElement>(".vmx-timecode__meta-cell");
+    expect(cells).toHaveLength(3);
+    cells.forEach((c) => expect(c.style.display).toBe("none"));
+    // Whole row collapses when nothing is grounded.
+    expect(t.querySelector<HTMLElement>('[data-role="meta"]')?.style.display).toBe("none");
     expect(t.querySelector<HTMLElement>(".vmx-timecode__title")?.dataset.empty).toBe("true");
+  });
+
+  it("hides only the null cell, keeps grounded ones (KEY absent)", () => {
+    const t = renderTimecode({
+      clock: "00:41:12",
+      bpm: 128,
+      key: null,
+      deck: "A",
+      track: { title: "Strobe", artist: "Deadmau5" },
+      genre: "techno",
+    });
+    host().append(t);
+    const bpmCell = t.querySelector<HTMLElement>('[data-role="bpm"]');
+    const keyCell = t.querySelector<HTMLElement>('[data-role="key"]');
+    const deckCell = t.querySelector<HTMLElement>('[data-role="deck"]');
+    expect(bpmCell?.style.display).toBe("");
+    expect(bpmCell?.querySelector("b")?.textContent).toBe("128");
+    expect(keyCell?.style.display).toBe("none");
+    expect(deckCell?.style.display).toBe("");
+    expect(deckCell?.querySelector("b")?.textContent).toBe("A");
   });
 });
 

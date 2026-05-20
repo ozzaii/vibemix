@@ -39,6 +39,10 @@ export interface TrackInfo {
   title: string;
   artist?: string | null;
   deck?: string | null;
+  /** Musical key (Camelot e.g. "5A" or notation e.g. "F min"). Optional —
+   *  vibemix surfaces it when a now-playing / rekordbox prior carries it,
+   *  otherwise the hero KEY cell stays hidden rather than showing a dash. */
+  key?: string | null;
 }
 
 export interface StatusFlags {
@@ -114,9 +118,19 @@ export interface SessionState {
   cohostStatus: CohostStatus;
   latencyMs: number | null;
   grounded: boolean;
-  /** Wall-clock display string (HH:MM:SS) for the titlebar + timecode.
-   *  Recomputed locally in render-loop.ts; ws-bridge does not touch this. */
+  /** Wall-clock display string (HH:MM:SS) for the TITLEBAR. Recomputed
+   *  locally in render-loop.ts; ws-bridge does not touch this. */
   clockText: string;
+  /** Set-elapsed display string (HH:MM:SS) for the hero deck ELAPSED
+   *  window — counts up from `sessionStartMs`. Distinct from `clockText`
+   *  so the deck reads how long the SET has run, not the time of day.
+   *  Optional: render-loop fills it each tick; tests/older snapshots that
+   *  omit it fall back to `clockText` in projectToLayoutState. */
+  elapsedText?: string;
+  /** Epoch ms marking when the session began. Null until the first render
+   *  tick seeds it (proxy for session start = window-open). The mock
+   *  pre-seeds an offset so the dev demo reads mid-set. */
+  sessionStartMs?: number | null;
 }
 
 export const TRANSCRIPT_RING_CAP = 200;
@@ -168,6 +182,8 @@ function makeDefault(): SessionState {
     latencyMs: null,
     grounded: false,
     clockText: "00:00:00",
+    elapsedText: "00:00:00",
+    sessionStartMs: null,
   };
 }
 

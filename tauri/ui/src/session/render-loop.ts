@@ -167,6 +167,20 @@ function tick(timestamp: number): void {
       setSessionState({ clockText: wallClock });
     }
 
+    // Refresh the SET-elapsed string (hero deck). Seed sessionStartMs on
+    // the first tick where it's null (proxy for session start); the mock
+    // pre-seeds an offset so the dev demo reads mid-set. Distinct from the
+    // wall clock so the deck shows how long the set has run.
+    let startMs = getSessionState().sessionStartMs;
+    if (startMs == null) {
+      startMs = Date.now();
+      setSessionState({ sessionStartMs: startMs });
+    }
+    const elapsed = formatElapsed(Date.now() - startMs);
+    if (getSessionState().elapsedText !== elapsed) {
+      setSessionState({ elapsedText: elapsed });
+    }
+
     const bridgeState = getSessionState();
     const layoutState = projectToLayoutState(bridgeState);
     renderSessionFrame(mountedRef, layoutState);
@@ -199,9 +213,12 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
     },
     meters: s.meters,
     timecode: {
-      clock: s.clockText,
+      // Hero deck shows SET ELAPSED, not the time of day (that's the
+      // titlebar clock). Fall back to clockText for older snapshots /
+      // tests that don't populate elapsedText.
+      clock: s.elapsedText ?? s.clockText,
       bpm: s.bpm,
-      key: null,
+      key: s.track?.key ?? null,
       deck: s.track?.deck ?? null,
       track: s.track ? { title: s.track.title, artist: s.track.artist ?? null } : null,
       genre: s.settings.genre || null,
@@ -353,6 +370,18 @@ function formatWallClock(timestamp: number): string {
   return `${hh}:${mm}:${ss}`;
 }
 
+/** Format a positive elapsed-ms span as HH:MM:SS (zero-padded, tabular).
+ *  Caps at 99:59:59 so a left-running window never overflows the display.
+ *  Negative spans (clock skew / future seed) clamp to 0. */
+function formatElapsed(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const hh = Math.min(99, Math.floor(totalSec / 3600));
+  const mm = Math.floor((totalSec % 3600) / 60);
+  const ss = totalSec % 60;
+  const p = (n: number): string => n.toString().padStart(2, "0");
+  return `${p(hh)}:${p(mm)}:${p(ss)}`;
+}
+
 function isDev(): boolean {
   // import.meta.env.DEV is replaced at build time by Vite. In test env
   // (vitest) this resolves to true; in production builds it's false and
@@ -398,5 +427,6 @@ export const _internals = {
   projectToLayoutState,
   formatHotkey,
   formatWallClock,
+  formatElapsed,
   trackFrameTime,
 };

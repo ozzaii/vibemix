@@ -107,8 +107,8 @@ function tick(): void {
       title: "Strobe (Deadmau5 Remix)",
       artist: "Deadmau5",
       deck: "A",
+      key: "5A",
     },
-    clockText: tsHHMMSS(elapsed),
   });
 
   // Drop countdown · cycles 16 → 0 → null → 16 every ~32s
@@ -164,6 +164,11 @@ export async function routeSessionMock(rootEl?: HTMLElement): Promise<void> {
   // Mount layout + drawer.
   const m = mountSessionLayout(root);
   mountSettingsDrawer(document.body);
+
+  // Seed a mid-set start so the dev demo's hero ELAPSED window reads
+  // ~41 min in rather than 00:00:00. The render-loop reads sessionStartMs
+  // and counts up from here (the titlebar keeps the real wall clock).
+  setSessionState({ sessionStartMs: Date.now() - (41 * 60 + 12) * 1000 });
 
   // Start render loop reading SessionState.
   startRenderLoop(m);

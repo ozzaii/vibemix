@@ -39,9 +39,13 @@ export interface PhaseTapeProps {
 
 const CSS = `
   .vmx-phase-tape {
-    margin-top: 18px;
+    margin-top: 0;
     position: relative;
-    height: 108px;
+    /* Bolder (2026-05-20): the waveform is a DJ-signature element, not a
+     * thin strip. Grow to fill the center deck's free height so the deck
+     * reads as one tall instrument face instead of top-packed widgets. */
+    flex: 1 1 auto;
+    min-height: 200px;
     background: var(--glass-3);
     backdrop-filter: var(--blur-glass-display);
     -webkit-backdrop-filter: var(--blur-glass-display);
@@ -120,6 +124,8 @@ const CSS = `
     position: relative;
     overflow: hidden;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    font-size: 11px;
+    letter-spacing: 0.26em;
   }
   .vmx-phase-chunk[data-kind="silent"] {
     color: var(--silk-22);
