@@ -23,14 +23,27 @@ State machine:
 - Read-back: `track.marks` (attribute), `mark.Name` / `mark.Start` / `mark.Num`.
 - Minimal `<TRACK>` attributes the production reader requires: **none beyond `location`** — `TrackID` auto-assigns ("1", "2", ...), and `vibemix.library.rekordbox.RekordboxLibrary.load_xml` reads the minimal track + its marks cleanly (verified in `test_roundtrip.py`).
 
+- **macOS Location quirk (found while running the demo):** `pyrekordbox.rbxml.encode_path`
+  emits `"file://localhost/" + quote(path)`. A POSIX absolute path (`/Users/...`) yields a
+  DOUBLE slash (`file://localhost//Users/...`) that does NOT match Rekordbox's canonical
+  `file://localhost/Users/...` — import would fail to attach cues to the real file.
+  `cue_writer._rb_location` strips one leading slash on POSIX to compensate; guarded by
+  `test_location_encoding.py`. This is exactly the class of write-back gotcha the spike exists to catch.
+
 **Headline finding:** Direct `master.db` writes are NOT viable (no stable write API in 0.4.4; SQLCipher; ANLZ/PCOB sync; VBR offset bug — GitHub discussion #113). The **collection.xml round-trip is the safe, working path** and is non-destructive by construction.
 
-## Automated proof (Tasks 3-5) — all green (`8 passed`)
+## Automated proof — all green (`9 passed`)
 
 - [x] Confidence gate drops sub-0.85 cues (`test_confidence_gate.py`, 3 tests)
 - [x] Writer backs up before overwrite; never mutates source (`test_backup_nondestructive.py`, 3 tests)
 - [x] Written cues read back correctly through production `RekordboxLibrary` (`test_roundtrip.py`, 1 test)
 - [x] Installed-version write API pinned (`test_api_probe.py`, 1 test)
+- [x] Location serializes to Rekordbox-canonical single-slash URI (`test_location_encoding.py`, 1 test)
+
+## Demo artifact (run `python -m spikes.vibe_mix_slice0.demo`)
+
+Writes `~/Desktop/vibemix-cues-demo.xml` for the two `~/Music/PioneerDJ/Demo Tracks`:
+6 cues kept, 1 gated out (BREAK @ 0.55 confidence). Drag into Rekordbox to feel it.
 
 ## Kaan-together import test (manual — the real gate)
 

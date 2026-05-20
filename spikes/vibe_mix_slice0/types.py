@@ -14,7 +14,8 @@ class CueCandidate:
     the confidence gate (the anti-slop law) drops anything below threshold.
     """
 
-    track_location: str   # file:// URI of the audio file
+    track_location: str   # plain absolute filesystem path of the audio file
+                          # (NOT a file:// URI — the writer builds the URI)
     name: str             # cue label, e.g. "DROP"
     type: str             # "cue" (hot/memory) — strict set only at this gate
     start_s: float        # cue position in seconds
