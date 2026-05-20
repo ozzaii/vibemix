@@ -10,7 +10,9 @@ exit-non-zero gate once the real-corpus baseline is signed.
 
 from __future__ import annotations
 
+import json
 import statistics
+from collections import defaultdict
 from pathlib import Path
 
 import pytest
@@ -172,3 +174,71 @@ def test_cli_help_lists_print_cooldowns_flag(capsys) -> None:
     captured = capsys.readouterr()
     # argparse emits --help to stdout
     assert "--print-cooldowns" in captured.out
+
+
+# ----------------------------------------------------------------------
+# Phase 54 Plan 02 / LIVE-03 — --print-cooldowns over the REAL captured
+# trace. The genre-1 ground-truth fixture (tests/fixtures/
+# hype_trace_genre1.jsonl, checked in by Plan 01) is the data source the
+# Kaan-action live-drive tuning pass reads: per-type measured-vs-locked
+# gap deltas tell whether a cooldown needs a one-line edit. This test
+# proves the tuning instrument RUNS over real data and emits the expected
+# per-type structure. It does NOT assert the real gaps fall within +-1s of
+# locked — the real session legitimately spaces wider than the floor (the
+# WARNING is observational, not a failure).
+# ----------------------------------------------------------------------
+
+GENRE1_FIXTURE = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "hype_trace_genre1.jsonl"
+)
+
+
+def _genre1_per_type_gaps() -> dict[str, list[float]]:
+    """Group genre-1 event-line t-values by event type, compute consecutive
+    inter-event deltas. Mirrors how the harness accumulates measured gaps from
+    a real session's events."""
+    by_type: dict[str, list[float]] = defaultdict(list)
+    with GENRE1_FIXTURE.open() as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            if rec.get("kind") != "event":
+                continue
+            by_type[rec["type"]].append(float(rec["t"]))
+
+    gaps: dict[str, list[float]] = {}
+    for ev_type, ts in by_type.items():
+        ts.sort()
+        deltas = [ts[i] - ts[i - 1] for i in range(1, len(ts))]
+        if deltas:  # only types that fired >=2 times have inter-event gaps
+            gaps[ev_type] = deltas
+    return gaps
+
+
+def test_print_cooldowns_runs_over_real_captured_trace(capsys) -> None:
+    """Feed genre-1-derived per-type gaps to _emit_cooldown_report; assert
+    PHASE + MIX_MOVE rows appear with median_gap + expected_min in the report.
+    Proves the tuning instrument works on REAL data — the Kaan-action live
+    pass reads these measured-vs-locked deltas."""
+    gaps = _genre1_per_type_gaps()
+    # The real trace fired PHASE (21x) and MIX_MOVE (20x) — both have many
+    # inter-event gaps, so both must appear in the report.
+    assert "PHASE" in gaps and len(gaps["PHASE"]) >= 1
+    assert "MIX_MOVE" in gaps and len(gaps["MIX_MOVE"]) >= 1
+
+    _emit_cooldown_report(gaps)
+    err = capsys.readouterr().err
+
+    # Per-type rows for the real trace's recurring event types.
+    assert "PHASE" in err
+    assert "MIX_MOVE" in err
+    # The report structure (median_gap + expected_min columns) is present for
+    # the real-data rows — the measured-vs-locked instrument the tuning pass
+    # consumes.
+    assert "median_gap=" in err
+    assert "expected_min=" in err
+    # expected_min reflects the locked v4 baseline (PHASE 10.0, MIX_MOVE 14.0).
+    assert "expected_min=10.00s" in err  # PHASE locked floor
+    assert "expected_min=14.00s" in err  # MIX_MOVE locked floor
