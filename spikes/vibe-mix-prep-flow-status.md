@@ -13,7 +13,7 @@ module-home decision). **48 tests green.**
 | 1 | 3-track calibration | **proven** — centroid-anchored farthest-first over the embedding pool; reuses shipping cosine math. | 5 |
 | 1 | end-to-end `prep_flow` | **proven** — NL → filter → calibrate → pick → focused re-extract → arc, dependency-injected. | 2 |
 | 2 | harmonic arc ordering | **proven** — full Camelot wheel + compatibility; energy tent guarantees the arc, harmonic reorder within equal-energy runs. | 32 |
-| 3 | auto-cue DSP detection | **NOT started** — see decision below. | — |
+| 3 | auto-cue DSP detection | **proven** — spectral-flux onset + autocorr beat-grid + RMS energy → intro/breakdown/drop, beat-snapped, confidence-scored. numpy/scipy only (no new dep). Wired into demo. | 5 |
 
 Concrete `prep_flow` output on a fake pool: calibration surfaced the off-vibe
 outlier as an anchor (so the DJ can reject it), the pick dropped it via focused
@@ -51,19 +51,19 @@ zero-click by auto-configuring Rekordbox's XML bridge path:
 So: "set up once, 1-click forever." Zero-click is only achievable via direct master.db writes
 (Slice 0 verdict: unsafe) or on more-open software (Serato/Mixxx/Engine) — both deferred.
 
-## Deferred decision — Slice 3 cue-detection DSP dependency
+## Slice 3 dep decision — RESOLVED: numpy/scipy only (no new dep)
 
-The auto-cue *detection* half (downbeat / breakdown / drop) needs beat-grid + structural
-DSP. `librosa` is the obvious choice but is **not installed** and is heavy (numba/llvmlite),
-which is a one-click-install-budget concern (every dep is rated green/yellow/red). Did not
-pull it unilaterally. Options to weigh before Slice 3:
+The cue-detection DSP was built on **numpy + scipy** (both already deps) — spectral-flux
+onset, autocorrelation tempo/beat-grid, RMS energy curve. No librosa (heavy: numba/llvmlite),
+no aubio, no CLAP. Install stays green; Gemini-only-AI constraint untouched (deterministic DSP
+is not an "AI provider"). The librosa-vs-aubio-vs-Rust-sidecar question is moot for v1.
 
-- **librosa** — fast to prototype, heaviest install footprint (yellow/red).
-- **aubio** — lighter beat/onset C lib, smaller footprint.
-- **Beat This! via a Rust sidecar** — already in the v3.x backlog ("closes AI-reacts-off-beat
-  class; gated on install-size budget"); deterministic, no Python DSP dep, Gemini-compliant.
-- Recommendation: do the cue-detection spike with **aubio or a Rust beat sidecar**, not
-  librosa, to keep the install green — but this is a Kaan call before Slice 3 starts.
+Real-track behaviour (the honest finding): on Demo Track 1 it kept INTRO + BREAKDOWN@115s and
+**gated the DROP@119.8s at conf 0.83** (just under the 0.85 bar); on Demo Track 2 it gated all
+structural cues (conf 0.03 / 0.32) — it only emits what it is confident about. This is anti-slop
+working as intended, and exactly the kind of threshold/quality call Kaan's ear-test settles: if
+the gated DROP is real, the 0.85 bar (or the detector's surge scaling) is the tuning knob.
 
-Detection is also the half gated on the Slice 0 manual verdict: no point perfecting cue
-detection until write-back is confirmed trustworthy in real Rekordbox.
+A future accuracy lift (deferred, optional): beat-grid from a dedicated model (Beat This! via a
+Rust sidecar, already in the v3.x backlog) would tighten downbeat snapping — but it is an
+accuracy upgrade, not a prerequisite. The v1 detector ships on numpy/scipy.
