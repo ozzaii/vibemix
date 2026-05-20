@@ -2,21 +2,21 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: SHIP
-status: ready_to_plan
-last_updated: 2026-05-20T23:37:49.641Z
-last_activity: 2026-05-21 -- Phase 53 COMPLETE (review CLEAN; watcher live-wired, stale-move leak closed); physical FLX4 drive = KAAN-ACTION. Next: plan + execute Phase 54
+status: executing
+last_updated: 2026-05-21T04:00:00.000Z
+last_activity: 2026-05-21 -- Phase 54 COMPLETE (hype mode; suite 3768 green + 12 vitest; anti-slop spine + hype indicator; review CLEAN). Live ear-pass + cooldown tuning = KAAN-ACTION. Next: plan + execute Phase 55
 progress:
   total_phases: 8
-  completed_phases: 3
-  total_plans: 9
+  completed_phases: 4
+  total_plans: 13
   completed_plans: 13
-  percent: 38
-stopped_at: Phase 54 complete (4/4) — ready to discuss Phase 55
+  percent: 50
+stopped_at: Phase 54 complete (4/4) — ready to plan Phase 55
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-21 — **Phase 53 (Controller Live + Graceful Fallback) PLANNED** (2 plans, 2 waves; BRINGUP-03). Key findings: dual-map question resolved — `midi/profiles/` is canonical for live binding+decode, `midi/controllers/`+`MidiMapLoader` is a separate, currently-unwired registry; the hot-plug watcher (`port_watcher_task`/`handle_port_change`/`start_port_watcher`) exists + is unit-tested but `__main__` never spawns it (the real BRINGUP-03 gap); `mark_disconnected` only clears the connected flag, not the moves/events rings (stale-move leak). Plan 01 (Wave 1) hardens state + proves FLX4 decode; Plan 02 (Wave 2) wires the watcher into the live session with a single-state callback (option B — no rebuild divergence) + disconnect/reconnect proof. Real FLX4 plug/move/unplug/replug drive = KAAN-ACTION. **Phase 52 + 51 COMPLETE.** Next: execute Phase 53.
+**Last updated:** 2026-05-21 — **Phase 54 (Hype Mode Live) COMPLETE** (4/4 plans; full suite 3768 passed + 12 vitest; review CLEAN). Grounded investigation killed the phantom "32s-silent-on-drop" bug — the real captured trace shows 52 events → 52 reactions → 0 suppressions (max gap 29.6s = natural cooldown spacing; likely-historical cause `max_output_tokens=220` already fixed at 1024). Shipped: trace-replay grounding regression (REAL EventDetector, ≥2 genres), `IN_BAR_TOLERANCE_S` named tuning knob (no v4 cooldown value changed), anti-slop spine (REAL EvidenceRegistry+CitationLinter: empty→no fire, unbacked citation→strip, grounded→emit), thin HYPE·LIVE indicator + cadence pulse (token-only, 20/80). Live ≥2-genre ear-pass + cooldown tuning = KAAN-ACTION (`54-HUMAN-UAT.md`). **Phases 51–54 COMPLETE (4/8, 50%).** Next: plan + execute Phase 55 (feedback mode + citation integrity).
 
 ---
 
@@ -37,10 +37,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 ## Current Position
 
-Phase: 55
+Phase: 55 — Feedback Mode Live + Citation Integrity (context grounded, ready to plan)
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-20
+Status: Phases 51–54 complete → planning Phase 55
+Last activity: 2026-05-21 -- Phase 54 complete (hype mode, anti-slop spine + indicator); Phase 55+56 contexts grounded
 
 ## Performance Metrics
 
