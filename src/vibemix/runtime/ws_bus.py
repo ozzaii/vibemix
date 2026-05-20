@@ -259,22 +259,44 @@ async def ws_broadcast(
             # the priority-80 ReactionLayer. Both fields default None
             # which the renderer interprets as "no-op" — backward
             # compatible with v2.0 subscribers that don't read them.
-            payload = json.dumps(
-                {
-                    **levels.snapshot(),
-                    "audible": state.audible,
-                    "deck": state.audible_deck,
-                    "phase": state.phase,
-                    "bpm": state.bpm,
-                    "mood": state.mood,
-                    "bpm_confidence": state.bpm_confidence,
-                    "downbeat_phase": state.downbeat_phase,
-                    "beat_phase": state.beat_phase,
-                    "active_genre": state.active_genre,
-                    "emotion": state.emotion,
-                    "reaction_intent": state.last_reaction_intent,
-                }
-            )
+            # Build the mascot frame as a dict FIRST so we can gate the send
+            # at the emit boundary (BRINGUP-04). The key set / ordering / 30Hz
+            # cadence are unchanged — the guard below only decides whether to
+            # PUT this tick on the wire, it never reshapes a valid frame.
+            mascot_frame = {
+                **levels.snapshot(),
+                "audible": state.audible,
+                "deck": state.audible_deck,
+                "phase": state.phase,
+                "bpm": state.bpm,
+                "mood": state.mood,
+                "bpm_confidence": state.bpm_confidence,
+                "downbeat_phase": state.downbeat_phase,
+                "beat_phase": state.beat_phase,
+                "active_genre": state.active_genre,
+                "emotion": state.emotion,
+                "reaction_intent": state.last_reaction_intent,
+            }
+            # Emit-boundary guard (BRINGUP-04): never serialize an empty or
+            # meter-less payload onto the wire. ``Levels.snapshot()`` always
+            # returns the 3 meter keys and the static keys above are literal,
+            # so this branch is normally unreachable — but it makes the
+            # "no {} / no meter-less frame" contract permanent at the SEND
+            # boundary regardless of any future upstream regression (a
+            # snapshot returning {} or a state attr vanishing). A skipped
+            # tick keeps the loop + cadence intact; we just don't send a
+            # malformed frame. Logged once-per-occurrence to stderr.
+            if not mascot_frame or not all(
+                k in mascot_frame for k in ("music", "voice", "mic")
+            ):
+                print(
+                    "[ws] skipped malformed mascot frame "
+                    f"(missing meter keys; got {sorted(mascot_frame)})",
+                    file=sys.stderr,
+                )
+                await asyncio.sleep(1 / 30)
+                continue
+            payload = json.dumps(mascot_frame)
             dead = []
             for c in clients:
                 try:
