@@ -41,7 +41,7 @@ export const VIBEMIX_BUILD_DATE = "2026-05-14";
 
 /** Public repo URL — opened by the GITHUB row. NOT in the capability
  *  allowlist today; see TODO in `openGithubRepo()`. */
-export const GITHUB_REPO_URL = "https://github.com/bravoh-ai/vibemix";
+export const GITHUB_REPO_URL = "https://github.com/bravoh/vibemix";
 
 /** BlackHole install URL — already in default.json allowlist. */
 const BLACKHOLE_URL = "https://existential.audio/blackhole";
@@ -341,7 +341,7 @@ export function HelpGroup(props: HelpGroupProps = {}): HTMLElement {
   body.append(
     buildRow({
       label: "SOURCE",
-      sub: "bravoh-ai/vibemix",
+      sub: "bravoh/vibemix",
       chev: "↗",
       ariaLabel: "open vibemix github repository",
       title: "open the vibemix github repository in your browser",
