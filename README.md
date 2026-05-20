@@ -174,15 +174,21 @@ Two ways to add it:
 
 ## Screenshots
 
-<!-- TODO: drop final PNGs into docs/assets/screenshots/ once UI surfaces stabilize. -->
+<p align="center">
+  <img src="docs/assets/screenshots/session.png" alt="vibemix live session — deck readout, polychrome master meter, set clock, and the AI co-host reacting in real time" width="100%" />
+  <br/><sub><b>Live session.</b> Deck readout + polychrome master meter on the left, set clock and phase tape in the middle, the co-host reading the room on the right.</sub>
+</p>
 
-| Surface | Image |
-|---------|-------|
-| Calibration wizard | <img src="docs/assets/screenshots/wizard.png" width="500" /> |
-| Mode picker | <img src="docs/assets/screenshots/mode-picker.png" width="500" /> |
-| Voice picker | <img src="docs/assets/screenshots/voice-picker.png" width="500" /> |
-| Live session UI | <img src="docs/assets/screenshots/session.png" width="500" /> |
-| Recording browser | <img src="docs/assets/screenshots/recordings.png" width="500" /> |
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/screenshots/wizard.png" alt="first-run permissions wizard" width="100%" /><br/><sub><b>First-run wizard.</b> Permissions, device, controller, profile, telemetry — five steps to ready.</sub></td>
+    <td width="50%"><img src="docs/assets/screenshots/recordings.png" alt="recording browser in the settings drawer" width="100%" /><br/><sub><b>Recordings.</b> Every set stays local. Play back, browse, set your own retention.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/assets/screenshots/mode-picker.png" alt="skill level and hype/teach/coach mode picker" width="100%" /><br/><sub><b>Mode.</b> Beginner / Intermediate / Pro × Hype-man / Coach. Pick the energy before the set.</sub></td>
+    <td width="50%"><img src="docs/assets/screenshots/voice-picker.png" alt="co-host voice picker" width="100%" /><br/><sub><b>Voice.</b> Three co-host voices — calm, warm, or gruff.</sub></td>
+  </tr>
+</table>
 
 ---
 
