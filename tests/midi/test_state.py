@@ -294,3 +294,33 @@ def test_mark_disconnected_clears_connected_flag():
     assert cs.is_connected() is True
     cs.mark_disconnected()
     assert cs.is_connected() is False
+
+
+def test_mark_disconnected_clears_moves_and_events_rings():
+    """Phase 53 BRINGUP-03 — the stale-move hardening gap.
+
+    Before this fix mark_disconnected cleared ONLY the connected flag, leaving
+    up-to-12s of recorded moves + events readable by moves_since/events_since.
+    A reaction firing right after an unplug could therefore cite a controller
+    move that the (now-gone) controller never re-sent — a hallucinated reaction.
+    mark_disconnected must clear BOTH rings so an unplug leaves nothing stale
+    for the coach/event-detector to read.
+    """
+    cs = ControllerState(profile=_flx4())
+    cs.mark_connected("DDJ-FLX4 USB MIDI")
+
+    # Record real moves AND events: an eq_low_a tier-cross, a vol_a big delta,
+    # and a play_a note_on — each produces a move label + a MidiEvent.
+    cs.handle_msg(_cc(0, 15, 2))  # eq_low_a 64->2 = flat->killed (move + cc event)
+    cs.handle_msg(_cc(0, 19, 110))  # vol_a 0->110 = up big (move + cc event)
+    cs.handle_msg(_note_on(0, 11, velocity=127))  # play_a (move + play event)
+
+    assert cs.moves_since(0.0), "precondition: moves recorded before disconnect"
+    assert cs.events_since(0.0), "precondition: events recorded before disconnect"
+    assert cs.is_connected() is True
+
+    cs.mark_disconnected()
+
+    assert cs.moves_since(0.0) == [], "moves ring must be cleared on disconnect"
+    assert cs.events_since(0.0) == [], "events ring must be cleared on disconnect"
+    assert cs.is_connected() is False

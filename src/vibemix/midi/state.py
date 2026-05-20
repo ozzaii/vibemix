@@ -182,11 +182,22 @@ class ControllerState:
             self.port_name = port_name
 
     def mark_disconnected(self) -> None:
-        """Symmetric to ``mark_connected`` — clears the connected flag (used
-        by the Phase 9 Wave 2 ``handle_port_change`` callback when the bound
-        port disappears mid-session)."""
+        """Symmetric to ``mark_connected`` — clears the connected flag AND the
+        moves/events rings (used by the ``handle_port_change`` callback when the
+        bound port disappears mid-session).
+
+        Phase 53 BRINGUP-03 hardening: the rings are time-trimmed (12s), so
+        without an explicit clear they sit FROZEN with up-to-12s of stale moves
+        after an unplug — and ``moves_since``/``events_since`` would still
+        surface them to the coach, producing a reaction grounded on a controller
+        that is no longer present (a hallucinated move). Clearing both rings here
+        guarantees that after an unplug nothing stale is readable; the next
+        ``mark_connected`` + decode resumes on a fresh ring. Not on the
+        ``handle_msg`` decode path, so the FLX4 golden decode is untouched."""
         with self._lock:
             self._connected = False
+            self._moves.clear()
+            self._events.clear()
 
     def is_connected(self) -> bool:
         with self._lock:
