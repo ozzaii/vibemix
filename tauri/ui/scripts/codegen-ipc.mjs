@@ -49,6 +49,18 @@ let moduleCode = standaloneCode(ajv, validateFn);
 // runtime helpers even when esm: true is set. The Tauri webview CSP blocks
 // CommonJS require, so we rewrite each require("...") into a hoisted static
 // import. Vite then bundles those modules into the final main.js.
+//
+// These MUST be namespace imports (`import * as`), not default imports.
+// The standalone code accesses the require() result as a CJS namespace
+// object (e.g. `__req_0.fullFormats`, `__req_1.default`). ajv-formats'
+// dist/formats.js is a CJS module with `__esModule: true` and named
+// exports but NO `default` export. Under Node a default import resolves
+// to the whole module.exports (so it happens to work in vitest), but
+// vite's browser interop sees `__esModule: true` and resolves a default
+// import to `module.exports.default` — which is undefined — crashing the
+// webview with "undefined is not an object (evaluating
+// '__req_0.fullFormats')". A namespace import exposes the full export
+// surface (named + default) in both environments, matching require().
 const requireSpecs = new Map();
 moduleCode = moduleCode.replace(/require\("([^"]+)"\)/g, (_match, spec) => {
   let ident = requireSpecs.get(spec);
@@ -59,7 +71,7 @@ moduleCode = moduleCode.replace(/require\("([^"]+)"\)/g, (_match, spec) => {
   return ident;
 });
 const importLines = [...requireSpecs.entries()]
-  .map(([spec, ident]) => `import ${ident} from ${JSON.stringify(spec)};`)
+  .map(([spec, ident]) => `import * as ${ident} from ${JSON.stringify(spec)};`)
   .join("\n");
 const stripped = moduleCode.replace(/^"use strict";\s*/, "");
 const banner = `${BANNER}\n/* eslint-disable */\n${importLines}\n`;
