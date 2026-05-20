@@ -27,7 +27,7 @@ v2.1 builds on the v2.0 architectural foundation:
 - 3-process Tauri-shell + Python-sidecar + FastAPI-proxy locked.
 - 1961 v2.0 tests / 10 pre-existing failures preserved.
 - v2.0 final-mile orphan (`register_library`) closed via Phase 28 grounding wire-in.
-- POC files (`cohost.py`, `cohost_v2.py`, `cohost_lk.py`, `mascot.html`) byte-frozen against the `v2.0` git tag (Phase 37 AUDIT-06).
+- POC variant zoo (`cohost*.py`, `run*.sh`, `generate_bat.py`, `test_voice.py`) retired 2026-05-20 — logic lifted into `src/vibemix/`, files pruned to end canonical-file confusion; `mascot.html` (live overlay) retained. Historical source reachable via the `v2.0` git tag (Phase 37 AUDIT-06, inverted).
 
 Full v2.0 close summary: [.planning/milestones/v2.0-ROADMAP.md](.planning/milestones/v2.0-ROADMAP.md).
 

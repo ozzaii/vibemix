@@ -1,16 +1,21 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 37 Plan 37-06 — POC immutability gate (AUDIT-06).
+"""POC retirement gate (was Phase 37 AUDIT-06 "POC immutability gate").
 
-Memory `feedback_poc_is_reference` + `project_v3_poc_reference` +
-`project_v4_canonical_baseline`: the POC files (cohost.py, cohost_v2.py,
-cohost_lk.py, mascot.html, cohost.streaming.py.bak) are TRUSTED
-INTUITION to port FROM, never edit. This test asserts byte-for-byte
-identity against the v2.0 git tag baseline.
+History: through v2.x the root POC variants (cohost.py, cohost_v2.py,
+cohost_lk.py, cohost_v3.py, cohost_v4.py, cohost.streaming.py.bak) were
+TRUSTED INTUITION to port FROM and were byte-frozen against the ``v2.0``
+git tag so they could never be edited.
 
-Phase 37 ALLOWLIST extension: v2.1 paths that intentionally diverge
-from v2.0 (new wizard / mascot layer / day-zero artifacts). The
-allowlist NEVER contains cohost*.py or mascot.html — that's the load-
-bearing safety check (``test_allowlist_does_not_contain_poc_patterns``).
+2026-05-20: their logic has been fully lifted into ``src/vibemix/`` and the
+variant zoo was PRUNED to end the recurring "which file is canonical?"
+confusion. The gate is inverted accordingly — it now asserts the variants
+stay GONE rather than stay byte-identical. (The filename is retained so the
+CI grep-gate allowlist in mascot-audit.yml / test_ci_grep_gates.py and
+cut_release.sh Gate 5 keep resolving without churn.)
+
+``mascot.html`` is the lone survivor: it is the live overlay wired into
+``vibemix.runtime.ws_bus`` + the ``mascot-audit`` workflow, not a POC, so it
+must remain present (and is free to evolve).
 """
 
 from __future__ import annotations
@@ -22,156 +27,65 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 
-# POC reference files — MUST match v2.0 byte-for-byte.
-PROTECTED_POC_PATTERNS = [
+# Root-level POC variant files that were retired 2026-05-20. The gate asserts
+# they stay absent from both the working tree and HEAD.
+RETIRED_POC_FILES = [
     "cohost.py",
     "cohost_v2.py",
     "cohost_lk.py",
+    "cohost_v3.py",
+    "cohost_v4.py",
     "cohost.streaming.py.bak",
-    "mascot.html",
+    "run.sh",
+    "run_v2.sh",
+    "run_lk.sh",
+    "generate_bat.py",
+    "test_voice.py",
 ]
 
-# v2.1 modified-files allowlist — paths that intentionally diverge
-# from v2.0. NEVER contains the protected POC patterns above.
-MODIFIED_FILES_ALLOWLIST = frozenset({
-    # Phase 27 — eval harness + carry-forward close-out
-    "scripts/eval/replay_harness.py",
-    ".github/workflows/eval.yml",
-    "eval/THRESHOLD-LOCK.md",
-    # Phase 28 — library intelligence v1
-    "src/vibemix/library/grounding.py",
-    "src/vibemix/library/embed.py",
-    "src/vibemix/library/index_sqlite_vec.py",
-    "src/vibemix/library/index_numpy.py",
-    "src/vibemix/library/similar.py",
-    "src/vibemix/library/staleness.py",
-    "src/vibemix/library/search.py",
-    "src/vibemix/library/budget.py",
-    "src/vibemix/library/store.py",
-    "src/vibemix/library/importer.py",
-    # Phase 29 — post-session debrief MVP UI
-    "src/vibemix/debrief/",
-    # Phase 30 — Hard Tek detectors
-    "src/vibemix/state/detectors/",
-    # Phase 31 — 4-layer mascot
-    "tauri/ui/src/mascot/priority-stack.ts",
-    "tauri/ui/src/mascot/layers/",
-    # Phase 32 — long-term DJ profile
-    "src/vibemix/profile/cache_render.py",
-    # Phase 33 — one-click install hardening
-    "src/vibemix/install/",
-    "src/vibemix/wizard/",
-    # Phase 34 — open-source security pass
-    "SECURITY.md",
-    ".github/workflows/secret-scan.yml",
-    ".github/workflows/python-cve.yml",
-    ".github/workflows/rust-cve.yml",
-    ".github/workflows/sbom.yml",
-    # Phase 35 — real GLB animations + viral demo
-    "scripts/demo_film/",
-    "scripts/reaction_reel/",
-    # Phase 36 — day-zero ops
-    "scripts/dayzero/",
-    # Phase 37 — this phase
-    "scripts/integration_audit.py",
-    "tests/e2e/test_seam_p18__p20.py",
-    "tests/e2e/test_seam_p19__agent.py",
-    "tests/e2e/test_seam_p25__p28.py",
-    "tests/e2e/test_seam_p27__eval_gate.py",
-    "tests/e2e/test_seam_p31__ws_bus.py",
-    "tests/scripts/test_integration_audit_v2_1.py",
-    "tests/scripts/test_orphan_inventory.py",
-    "tests/scripts/test_kaan_action_rollup.py",
-    "tests/scripts/test_grey_area_log.py",
-    "tests/repo/test_g5_poc_files_untouched.py",
-    ".github/workflows/orphan-inventory.yml",
-    ".planning/codebase/orphans.csv",
-    ".planning/v2.1-MILESTONE-AUDIT.md",
-    # Phase 38 — signing pipeline
-    ".github/workflows/release.yml",
-    ".github/workflows/verify-signed.yml",
-    "scripts/sign_windows.ps1",
-    "KAAN-ACTION-LEGAL.md",
-})
 
-
-def _git_blob_hash(ref: str, path: str) -> str | None:
-    """Return the git blob hash for ``path`` at ``ref``, or None if absent."""
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", f"{ref}:{path}"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO),
-            check=False,
-        )
-    except OSError:
-        return None
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip()
-
-
-def _current_blob_hash(path: str) -> str | None:
-    """Hash the working-tree contents of ``path`` using git hash-object."""
-    full = REPO / path
-    if not full.exists():
-        return None
+def _tracked_at_head(path: str) -> bool:
+    """True if ``path`` is tracked in the current HEAD tree."""
     result = subprocess.run(
-        ["git", "hash-object", str(full)],
+        ["git", "ls-files", "--error-unmatch", path],
         capture_output=True,
         text=True,
         cwd=str(REPO),
         check=False,
     )
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip()
+    return result.returncode == 0
 
 
-@pytest.mark.parametrize("poc", ["cohost.py", "cohost_v2.py", "cohost_lk.py", "mascot.html"])
-def test_poc_file_untouched_since_v2_0(poc: str) -> None:
-    """Each POC reference file MUST hash-match its v2.0 tag blob."""
-    v20_hash = _git_blob_hash("v2.0", poc)
-    if v20_hash is None:
-        pytest.skip(f"v2.0 tag has no {poc} blob (test cannot run)")
-    current = _current_blob_hash(poc)
-    assert current == v20_hash, (
-        f"{poc} has been modified since v2.0!\n"
-        f"  v2.0 blob:  {v20_hash}\n"
-        f"  current:    {current}\n"
-        f"POC files are TRUSTED INTUITION TO PORT FROM, never edit. "
-        f"Revert to the v2.0 version: git checkout v2.0 -- {poc}"
+@pytest.mark.parametrize("poc", RETIRED_POC_FILES)
+def test_retired_poc_variant_absent_from_worktree(poc: str) -> None:
+    """Each retired POC variant must NOT exist in the working tree."""
+    assert not (REPO / poc).exists(), (
+        f"{poc} is back in the working tree — it was retired 2026-05-20 once "
+        f"its logic landed in the vibemix package. Do not resurrect the "
+        f"variant zoo (that confusion is exactly what the prune removed)."
     )
 
 
-def test_cohost_streaming_bak_untouched_since_v2_0() -> None:
-    """The archived streaming prototype is also frozen."""
-    v20_hash = _git_blob_hash("v2.0", "cohost.streaming.py.bak")
-    if v20_hash is None:
-        pytest.skip("v2.0 tag has no cohost.streaming.py.bak")
-    current = _current_blob_hash("cohost.streaming.py.bak")
-    assert current == v20_hash, (
-        "cohost.streaming.py.bak has drifted from v2.0 — revert it"
+@pytest.mark.parametrize("poc", RETIRED_POC_FILES)
+def test_retired_poc_variant_untracked(poc: str) -> None:
+    """Each retired POC variant must NOT be tracked at HEAD."""
+    assert not _tracked_at_head(poc), (
+        f"{poc} is tracked at HEAD — a stray `git add` resurrected a retired "
+        f"POC variant. Run `git rm {poc}`."
     )
 
 
-def test_allowlist_does_not_contain_poc_patterns() -> None:
-    """The v2.1 modified-files allowlist NEVER permits cohost*.py / mascot.html.
-
-    This is the LOAD-BEARING safety check — if a future developer adds
-    one of the POC patterns to the allowlist, this test fails loud.
-    """
-    for entry in MODIFIED_FILES_ALLOWLIST:
-        for poc in PROTECTED_POC_PATTERNS:
-            assert poc not in entry, (
-                f"allowlist entry {entry!r} matches protected POC pattern {poc!r} — "
-                f"REMOVE IT. POC files are byte-frozen at v2.0."
-            )
+def test_mascot_html_survives() -> None:
+    """The live mascot overlay is NOT a POC and must remain present."""
+    assert (REPO / "mascot.html").exists(), (
+        "mascot.html is missing — it is the live overlay (vibemix.runtime."
+        "ws_bus + mascot-audit CI), not a retired POC, and must survive."
+    )
 
 
 def test_v2_0_tag_exists() -> None:
-    """Sanity: the v2.0 git tag exists in the repo."""
+    """Sanity: the v2.0 git tag (the old freeze baseline) still exists so the
+    historical POC source remains reachable via git history."""
     result = subprocess.run(
         ["git", "tag", "-l", "v2.0"],
         capture_output=True,
@@ -179,4 +93,6 @@ def test_v2_0_tag_exists() -> None:
         cwd=str(REPO),
         check=False,
     )
-    assert "v2.0" in result.stdout, "v2.0 tag missing — POC drift gate cannot run"
+    assert "v2.0" in result.stdout, (
+        "v2.0 tag missing — retired POC source should stay reachable in history"
+    )

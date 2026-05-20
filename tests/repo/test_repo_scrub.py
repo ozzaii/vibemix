@@ -3,13 +3,14 @@
 
 These tests are the contract that locks the post-scrub state of the repo:
 - Five scratch files removed from root (``_test_*.py`` + ``sprite-*.png``).
-- ``cohost.streaming.py.bak`` is the only tracked ``*.bak`` file (POC exempt).
+- No tracked ``*.bak`` files (the lone POC ``.bak`` was retired 2026-05-20).
 - No tracked ``.env`` files.
-- All tracked files >1 MB are LFS-tracked, except the POC reference set.
+- All tracked files >1 MB are LFS-tracked, except ``mascot.html``.
 - ``.gitattributes`` declares the ``*.glb filter=lfs`` rule.
-- POC reference files (``cohost*.py``, ``mascot.html``, ``run_v*.sh``,
-  ``generate_bat.py``, ``fillers/``, ``mocks/``) survive untouched —
-  per CLAUDE.md "POC = reference, devour it".
+- The root POC variant zoo (``cohost*.py``, ``run_v*.sh``, ``generate_bat.py``,
+  ``test_voice.py``) is RETIRED — logic lifted into the ``vibemix`` package
+  (Phases 2-13), variants pruned to end the canonical-file confusion.
+  ``mascot.html`` (live overlay) and ``mocks/`` (UI contracts) survive.
 - ``.gitignore`` carries the Phase 19 hygiene block.
 
 Style follows ``tests/test_license.py`` (the repo-level test template).
@@ -26,27 +27,35 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 SCRATCH_NAMES = {"_test_multimodal.py", "_test_tts.py"}
 SPRITE_NAMES = {"sprite-1.png", "sprite-2.png", "sprite-3.png"}
 
-# POC reference files survive the scrub per CLAUDE.md "POC = reference,
-# devour it". These are *trusted intuition to port wholesale*, not legacy
-# to preserve verbatim — but they stay in the repo until Phase 2-13 finish
-# lifting their logic into the new package shape.
+# POC reference files have been RETIRED (2026-05-20). Their logic was
+# lifted wholesale into the ``vibemix`` package (Phases 2-13) and the
+# variant zoo (cohost.py / _v2 / _lk / _v3 / _v4 + run scripts) was pruned
+# to end the "which file is canonical?" confusion. ``mascot.html`` is the
+# one survivor — it is still the live overlay wired into the package
+# runtime (vibemix.runtime.ws_bus) and CI (mascot-audit), not a POC.
 POC_EXEMPT: set[str] = {
+    "mascot.html",
+}
+
+# Retired root-level variant files — the sentinel test below asserts these
+# stay gone so a stray ``git add`` can't resurrect the confusion.
+RETIRED_POC_FILES: set[str] = {
     "cohost.py",
     "cohost_v2.py",
     "cohost_lk.py",
     "cohost_v3.py",
     "cohost_v4.py",
     "cohost.streaming.py.bak",
-    "mascot.html",
     "run.sh",
     "run_lk.sh",
     "run_v2.sh",
     "run_v3.sh",
     "run_v4.sh",
     "generate_bat.py",
+    "test_voice.py",
 }
 
-POC_EXEMPT_DIRS: set[str] = {"fillers", "mocks", "archive"}
+POC_EXEMPT_DIRS: set[str] = {"mocks"}
 
 # Globs in ``.gitattributes`` that route files through git-lfs. Tracked
 # files matching any of these patterns are EXEMPT from the >1 MB cap.
@@ -112,13 +121,14 @@ def test_no_sprite_files_at_root() -> None:
         )
 
 
-def test_only_poc_bak_file_is_tracked() -> None:
-    """``cohost.streaming.py.bak`` is the only tracked .bak file (POC)."""
+def test_no_bak_files_are_tracked() -> None:
+    """No ``.bak`` files are tracked — the lone POC ``.bak`` was retired
+    2026-05-20 and ``.gitignore`` carries the ``*.bak`` rule."""
     bak_files = [p for p in _git_ls_files() if p.endswith(".bak")]
     unexpected = [p for p in bak_files if Path(p).name not in POC_EXEMPT]
     assert not unexpected, (
-        f"Unexpected tracked .bak files: {unexpected}. Only "
-        "cohost.streaming.py.bak (POC reference) is exempt."
+        f"Unexpected tracked .bak files: {unexpected}. POC variants were "
+        "retired; no .bak should be tracked."
     )
 
 
@@ -181,24 +191,25 @@ def test_gitattributes_no_lfs_rules() -> None:
     )
 
 
-def test_poc_reference_files_still_present() -> None:
-    """The POC reference set survives the scrub — sentinel against over-delete."""
-    sentinels = [
-        "cohost.py",
-        "cohost_v2.py",
-        "cohost_lk.py",
-        "mascot.html",
-        "run_v2.sh",
-        "generate_bat.py",
-    ]
-    for name in sentinels:
+def test_retired_poc_files_stay_gone() -> None:
+    """The root-level POC variant zoo is retired — sentinel against a stray
+    ``git add`` resurrecting the "which file is canonical?" confusion.
+
+    Logic was lifted into the ``vibemix`` package (Phases 2-13); the variants
+    were pruned 2026-05-20. ``mascot.html`` and ``mocks/`` are NOT POC variants
+    (live overlay + UI design contracts) and must survive."""
+    for name in RETIRED_POC_FILES:
         path = REPO_ROOT / name
-        assert path.exists(), (
-            f"POC reference file {name} is missing — Plan 19-01 must not "
-            "delete POC reference material (CLAUDE.md 'POC = reference, "
-            "devour it')."
+        assert not path.exists(), (
+            f"Retired POC variant {name} is back at repo root — it was pruned "
+            "2026-05-20 once its logic landed in the vibemix package. Do not "
+            "resurrect the variant zoo."
         )
-    assert (REPO_ROOT / "mocks").is_dir(), "mocks/ POC reference dir missing"
+    assert (REPO_ROOT / "mascot.html").exists(), (
+        "mascot.html missing — it is the live overlay (vibemix.runtime.ws_bus "
+        "+ CI mascot-audit), not a retired POC, and must survive."
+    )
+    assert (REPO_ROOT / "mocks").is_dir(), "mocks/ UI design-contract dir missing"
 
 
 def test_gitignore_carries_phase19_hygiene_block() -> None:

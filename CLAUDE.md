@@ -26,6 +26,16 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 - **Hallucination grounding**: No release until verification phase confirms reactions are tied to real events. This is a hard gate.
 <!-- GSD:project-end -->
 
+> **⚠️ STALE — auto-generated map predates the package (regenerate with `/gsd-map-codebase`).**
+> The GSD-managed blocks below (Technology Stack → Architecture, sourced from
+> `.planning/codebase/*.md`) still describe the **retired POC era**: single-file
+> `cohost*.py` variants, "Python 3.14", and "no pyproject.toml". None of that is
+> current. Reality: a packaged project under `src/vibemix/` + `tauri/`, Python
+> **3.12** (`>=3.12,<3.13`), `pyproject.toml` + `uv.lock` at root. The POC variants
+> were pruned 2026-05-20 (see "POC Variants — RETIRED" below). Trust the
+> **Commands** section, not the auto-generated architecture description, until a
+> map regeneration refreshes these blocks.
+
 <!-- GSD:stack-start source:codebase/STACK.md -->
 ## Technology Stack
 
@@ -318,35 +328,26 @@ Do not make direct repo edits outside a GSD workflow unless the user explicitly 
 
 ## Commands
 
-This repo is pre-package: no `pyproject.toml`, no lockfile, no test runner wired. Phase 1 of the roadmap is what introduces the unified `vibemix` package + lockfile.
+The repo is now a packaged project: `pyproject.toml` (hatchling) + `uv.lock` at root, Python `>=3.12,<3.13` (the `.venv/` is 3.12.x — **not** 3.14, despite stale notes elsewhere in this file). `uv` is the runner. Source lives in `src/vibemix/`; the Tauri desktop shell is under `tauri/`.
 
-**Run a POC variant** (each launches the mascot overlay first, then the Python script):
-
-```bash
-./run.sh       # cohost.py     — stateless HTTP cascade (Gemini 3 Flash + TTS)
-./run_v2.sh    # cohost_v2.py  — LiveKit + MusicState (most evolved)
-./run_lk.sh    # cohost_lk.py  — LiveKit + heuristic triggers
-```
-
-Each script does `source .venv/bin/activate && exec python3 <variant>.py`. The `.venv/` is Python 3.14; deps were installed ad-hoc via `pip install` (no `requirements.txt` — see CONCERNS.md).
-
-**Smoke tests** (single-file, no runner — invoke directly):
+**Run the co-host (dev):**
 
 ```bash
-python3 test_voice.py          # TTS round-trip
-python3 _test_tts.py           # TTS API smoke test
-python3 _test_multimodal.py    # multimodal LLM — edit hardcoded recording path at line 14 first
+uv run python -m vibemix          # launches the real session loop (vibemix.__main__:main)
 ```
 
-**Mascot overlay only** (no Python needed; the overlay is standalone HTML):
+**Run the test suite** (the authoritative dev workflow, per CONTRIBUTING.md):
 
 ```bash
-open "file://$(pwd)/mascot.html"
+source .venv/bin/activate && PYTHONPATH=src python3 -m pytest -q
+# or, without activating:  uv run pytest -q
 ```
 
-**Required environment:** `.env` at repo root with `GEMINI_API_KEY=...`. Read via `python-dotenv`.
+Opt-in markers (default run skips them): `-m macos_audio`, `-m windows_only`, `-m integration`, `-m slow`, `-m e2e`, `-m cli`, `-m network`. See `[tool.pytest.ini_options]` in `pyproject.toml`.
 
-**macOS prerequisites:** BlackHole 2ch (system audio driver, `brew install blackhole-2ch`), `nowplaying-cli` (`brew install nowplaying-cli`), djay Pro running as the audio source, Pioneer DDJ-FLX4 over USB (optional, graceful fallback).
+**Required environment:** `.env` at repo root with `GEMINI_API_KEY=...` (and `OPENROUTER_API_KEY=...` for the TTS fallback chain). Read via `python-dotenv`.
+
+**macOS prerequisites:** BlackHole 2ch (`brew install blackhole-2ch`), `nowplaying-cli` (`brew install nowplaying-cli`), a DJ app routed through BlackHole as the audio source, Pioneer DDJ-FLX4 over USB (optional, graceful fallback). Windows uses WASAPI loopback — see `docs/windows-setup.md`.
 
 ## Planning Home
 
@@ -354,13 +355,13 @@ open "file://$(pwd)/mascot.html"
 
 When a phase is active, its planning artifacts live under `.planning/phases/<NN>-<slug>/` (CONTEXT.md, RESEARCH.md, PLAN.md, etc.). Read those before touching code on that phase.
 
-## POC = Reference, Devour It
+## POC Variants — RETIRED (2026-05-20)
 
-`cohost.py`, `cohost_v2.py`, `cohost_lk.py`, and `cohost.streaming.py.bak` are **trusted intuition to port wholesale**, not legacy to preserve. Kaan iterated on them over real DJ sessions — the encoded decisions (mic gating, evidence-packet shape, event taxonomy, audible-deck heuristics, MIDI maps) are load-bearing IP. Phase 2-13 lift logic out of these into the new package shape.
+The root POC variant zoo (`cohost.py`, `cohost_v2.py`, `cohost_lk.py`, `cohost_v3.py`, `cohost_v4.py`, `cohost.streaming.py.bak`, plus `run*.sh`, `generate_bat.py`, `test_voice.py`) has been **pruned**. Their load-bearing intuition — mic gating, evidence-packet shape, event taxonomy, audible-deck heuristics, MIDI maps, the OpenRouter-primary TTS chain and tuned event cooldowns — was lifted wholesale into `src/vibemix/` over Phases 2-13 and beyond. The variants were deleted to end the recurring "which file is canonical?" confusion now that the package supersedes them.
 
-Default canonical baseline = `cohost_v2.py` (most evolved: `MusicState` + `EventDetector` + audible-deck). Cherry-pick `cohost.py` for `TurnHistory` + the stateless `run_one_turn` cascade pattern. Cherry-pick `cohost_lk.py` for controller-aware triggers + band-shift detection. Tuning constants (e.g. `SILENT_RMS`, `MIC_HOLD_AFTER_AI_MS`, `MUSIC_GAIN_TO_GEMINI`, `MIN_EVENT_GAP_PER_TYPE`) diverge across variants — pick one when porting, document why, don't paper over.
+The retirement is enforced by `tests/repo/test_repo_scrub.py::test_retired_poc_files_stay_gone` (a stray `git add` cannot resurrect them). The v3/v4 design notes survive as research under `.planning/research/v3-shipped/`. If you need the historical source, it is in git history.
 
-Don't redesign primitives unless `.planning/codebase/CONCERNS.md` or `.planning/research/PITFALLS.md` flags a real bug (e.g., the `np.concatenate`-per-callback regression is genuine — pre-allocate the ring).
+`mascot.html` at root is **not** a POC — it is the live overlay wired into `vibemix.runtime.ws_bus` + CI (`mascot-audit`). Keep it.
 
 ## UI Mocks
 

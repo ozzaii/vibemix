@@ -15,7 +15,8 @@
 #   2b. `check_gate.sh` — Phase 42 hybrid hallucination gate (GATE-06).
 #   3.  `pytest tests/repo/test_readme_hero_hash_sync.py` (Phase 35).
 #   4.  `.planning/v2.1-MILESTONE-AUDIT.md` exists + frontmatter verdict WIRED.
-#   5.  `pytest tests/repo/test_g5_poc_files_untouched.py` (Phase 37 / AUDIT-06).
+#   5.  `pytest tests/repo/test_g5_poc_files_untouched.py` — POC variants retired,
+#       stay gone (Phase 37 / AUDIT-06; inverted 2026-05-20).
 #   5b. `check_bravoh_server_ready.sh` — 3-endpoint Bravoh server probe
 #       (Plan 45-03 / SHIP-06 / OPS-14).
 #   6.  `pytest tests/security/test_bundle_id_locked.py` (Phase 33 / P63).
@@ -131,12 +132,12 @@ else
 fi
 echo
 
-# ── Gate 5: POC files untouched ────────────────────────────────────────
-echo "[Gate 5] POC files untouched since v2.0 (AUDIT-06 / P85)"
+# ── Gate 5: POC variants retired (stay gone) ───────────────────────────
+echo "[Gate 5] POC variants retired — stay gone (AUDIT-06 / P85)"
 if ${PYTHON} -m pytest "${REPO_ROOT}/tests/repo/test_g5_poc_files_untouched.py" -q --no-header >/dev/null 2>&1; then
   pass "tests/repo/test_g5_poc_files_untouched.py"
 else
-  fail "tests/repo/test_g5_poc_files_untouched.py — POC drift detected"
+  fail "tests/repo/test_g5_poc_files_untouched.py — retired POC variant resurrected"
 fi
 echo
 

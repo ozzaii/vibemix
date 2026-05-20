@@ -24,7 +24,7 @@ REQUIRED_SECTIONS = [
     "## 3. Orphan Inventory",
     "## 4. Kaan-Action Roll-Up",
     "## 5. Grey-Area Decisions",
-    "## 6. POC Files Untouched",
+    "## 6. POC Variants Retired",
     "## 7. Conclusion",
 ]
 

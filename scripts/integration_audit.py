@@ -567,28 +567,29 @@ def grey_area_log_markdown() -> str:
 # --------------------------------------------------------------------------- #
 
 
-POC_FILES = [
+# Retired 2026-05-20 — logic lifted into src/vibemix/, variants pruned.
+RETIRED_POC_FILES = [
     "cohost.py",
     "cohost_v2.py",
     "cohost_lk.py",
     "cohost.streaming.py.bak",
-    "mascot.html",
 ]
 
 
 def poc_files_status() -> str:
-    """Verdict: are POC files unchanged since v2.0 baseline?
+    """Verdict: the POC variant zoo is retired (absent), mascot.html survives.
 
-    Cheap check: confirm files still exist + are tracked. Real byte-
-    for-byte v2.0-tag comparison lives in tests/repo/test_g5_poc_files_
-    untouched.py (37-06). Here we report presence.
+    The retirement is enforced byte-for-byte by tests/repo/test_g5_poc_files_
+    untouched.py (now an absence gate). Here we report the presence verdict.
     """
-    lines = ["| File | Present | Notes |", "|---|---|---|"]
-    for p in POC_FILES:
-        path = REPO / p
-        present = "yes" if path.exists() else "no"
-        notes = "POC reference, never edited"
-        lines.append(f"| `{p}` | {present} | {notes} |")
+    lines = ["| File | Present | Expected | Notes |", "|---|---|---|---|"]
+    for p in RETIRED_POC_FILES:
+        present = "yes" if (REPO / p).exists() else "no"
+        ok = "OK" if present == "no" else "DRIFT — retired variant resurrected"
+        lines.append(f"| `{p}` | {present} | absent | {ok} |")
+    mascot = "yes" if (REPO / "mascot.html").exists() else "no"
+    mascot_ok = "OK" if mascot == "yes" else "MISSING — live overlay must exist"
+    lines.append(f"| `mascot.html` | {mascot} | present | {mascot_ok} |")
     return "\n".join(lines)
 
 
@@ -697,12 +698,13 @@ flagged where the source text explicitly marks it.
 
 {grey_table}
 
-## 6. POC Files Untouched
+## 6. POC Variants Retired
 
-POC reference files (`cohost*.py`, `mascot.html`) MUST stay untouched
-since v2.0 (memory `feedback_poc_is_reference`). Byte-for-byte git
-diff against v2.0 baseline is asserted by
-`tests/repo/test_g5_poc_files_untouched.py`.
+The root POC variant zoo (`cohost*.py`, `run*.sh`, `generate_bat.py`,
+`test_voice.py`) was retired 2026-05-20 — its logic was lifted into
+`src/vibemix/` and the files pruned to end the "which file is canonical?"
+confusion. They MUST stay gone; `mascot.html` (live overlay) MUST survive.
+Enforced by `tests/repo/test_g5_poc_files_untouched.py` (now an absence gate).
 
 {poc_table}
 

@@ -7,8 +7,9 @@ name: Mascot tests target Tauri+Three.js (Phase 47 / MASCOT-08)
 # project_v0_1_0_rc1_open_bugs ("mascot chrome strip" regression class).
 #
 # The grep target is intentionally narrow: tests/, e2e/, scripts/ci/.
-# mascot.html itself is preserved byte-identical to v2.0 tag (Phase 37-06
-# POC immutability gate at poc-immutability-check.yml — separate gate).
+# mascot.html is the live overlay and is retained; the POC variant zoo was
+# retired 2026-05-20 (gate inverted to an absence check in
+# tests/repo/test_g5_poc_files_untouched.py).
 
 on:
   pull_request:

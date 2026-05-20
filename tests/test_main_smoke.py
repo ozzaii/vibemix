@@ -25,7 +25,6 @@ Strategy:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import subprocess
 import sys
 from pathlib import Path
@@ -421,52 +420,6 @@ def test_smoke_05_cleanup_closes_all_streams(monkeypatch, mocker, tmp_path):
         stream_mock = audio_mocks[key].return_value
         assert stream_mock.stop.call_count >= 1, f"{key}: stop not called"
         assert stream_mock.close.call_count >= 1, f"{key}: close not called"
-
-
-# ---------------------------------------------------------------------------
-# SMOKE-06 — POC files diff-untouched (cohost_v2.py byte-identical)
-# ---------------------------------------------------------------------------
-
-
-def test_smoke_06_poc_files_untouched_during_smoke(monkeypatch, mocker, tmp_path):
-    """SMOKE-06: running the smoke does NOT touch any POC file. Hash
-    cohost_v2.py before and after, assert equality.
-
-    (Pre-2026-05-19 this hashed cohost_v4.py. v4 was retired into
-    ``.planning/research/v3-shipped/``; v2 is the oldest still-tracked
-    POC variant and is the one most likely to be accidentally edited
-    during a smoke since it shares many symbol names with the vibemix
-    package.)
-    """
-    poc = Path("cohost_v2.py")
-    before = hashlib.sha256(poc.read_bytes()).hexdigest()
-
-    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
-    monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
-
-    _build_audio_mocks(mocker)
-    _build_sensor_mocks(mocker)
-    _build_state_refresh_noop(mocker)
-    _build_livekit_mocks(mocker)
-    _patch_voice_recorder(mocker, tmp_path)
-    _patch_runtime_for_fast_smoke(mocker, [])
-
-    from vibemix.__main__ import main
-
-    async def driver():
-        main_task = asyncio.create_task(main())
-        await _REAL_SLEEP(0.05)
-        main_task.cancel()
-        try:
-            await asyncio.wait_for(main_task, timeout=3.0)
-        except (asyncio.CancelledError, Exception):
-            pass
-
-    asyncio.run(driver())
-
-    after = hashlib.sha256(poc.read_bytes()).hexdigest()
-    assert before == after, "cohost_v2.py was modified during the smoke test"
 
 
 # ---------------------------------------------------------------------------
