@@ -18,6 +18,10 @@ dist/
 !scripts/dist/**
 !tests/dist/
 !tests/dist/**
+# ...but the broad ``**`` whitelist above re-exposes byte-compiled caches
+# under those trees, defeating the top-level ``__pycache__/`` rule. Re-ignore.
+scripts/dist/**/__pycache__/
+tests/dist/**/__pycache__/
 # Phase 49 — wizard copy sync helper at scripts/build/ would be caught by
 # the generic ``build/`` rule above. Whitelist explicitly.
 !scripts/build/
@@ -123,6 +127,8 @@ tests/scripts/fixtures/synthetic_session/linter_report.csv
 # whitelisted). PR-only scorecards are ephemeral artifacts — ignore.
 .planning/eval-runs/*/scorecard.preview.md
 .planning/eval-runs/*/eval_report.json.tmp
+# Ad-hoc load-test scorecards (loadtest_<epoch>.json) are ephemeral too.
+.planning/eval-runs/loadtest_*.json
 
 # vibemix proxy (independent Python project under proxy/)
 proxy/.env
@@ -179,6 +185,7 @@ v5-*.png
 # Claude Code worktrees + Playwright MCP scratch dirs are per-agent / per-run
 # state and must never be tracked.
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 .playwright-mcp/
 
 # Node modules at repo root (e.g. from running ``npx`` against the repo root).
