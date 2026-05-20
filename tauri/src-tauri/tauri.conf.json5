@@ -23,10 +23,16 @@
       {
         "label": "main",
         "title": "vibemix",
-        "width": 960,
-        "height": 800,
-        "minWidth": 960,
-        "minHeight": 600,
+        // 2026-05-20 — the live session is a 3-column instrument; below the
+        // 1100px CSS breakpoint it collapses to a single stacked column that
+        // reads as broken. Open at 1440x900 (matches the design mock's
+        // proportions) and never let the window drop below the breakpoint,
+        // so the deck always renders as the wide 3-column layout. The wizard
+        // (same window) is centered content and reads fine at this size.
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1180,
+        "minHeight": 760,
         "resizable": true,
         "decorations": false,
         "transparent": false,

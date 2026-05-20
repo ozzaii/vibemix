@@ -23,7 +23,12 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import (
+    collect_all,
+    collect_data_files,
+    collect_dynamic_libs,
+    collect_submodules,
+)
 
 block_cipher = None
 
@@ -58,6 +63,20 @@ for _pkg in _DYNAMIC_PKGS:
         hiddenimports.extend(collect_submodules(_pkg))
     except Exception as exc:  # pragma: no cover — defensive
         print(f"[spec] collect_submodules({_pkg!r}) skipped: {exc}", file=sys.stderr)
+
+# livekit ships a native FFI lib (livekit/rtc/resources/liblivekit_ffi.dylib)
+# plus non-.py resources under livekit/{rtc,agents}/resources. collect_submodules
+# above only grabs .py modules, so the frozen sidecar ImportErrors at
+# AgentSession.start() ("failed to load liblivekit_ffi.dylib ... not found when
+# the application was frozen"). collect_dynamic_libs walks the package for
+# .dylib/.so and preserves their package-relative dest paths; collect_data_files
+# picks up the header / html / license siblings the loader probes for. 2026-05-20:
+# this is what unblocks the .app's LiveKit cohost from booting at all.
+try:
+    binaries.extend(collect_dynamic_libs("livekit"))
+    datas.extend(collect_data_files("livekit", includes=["**/resources/**"]))
+except Exception as exc:  # pragma: no cover — defensive
+    print(f"[spec] livekit native-lib collection skipped: {exc}", file=sys.stderr)
 
 # vibemix sub-packages — explicit so PyInstaller picks up every Phase 2-10
 # leaf module (cohost*.py POC files are intentionally NOT bundled).
