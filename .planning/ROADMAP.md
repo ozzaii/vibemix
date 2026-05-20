@@ -2,7 +2,7 @@
 
 **Project:** vibemix — AI DJ Co-Host
 **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted — 7 Kaan-action carveouts ride the v3.0 external clock per `gsd-autonomous fully` mode)
-**Current milestone:** v3.2 "Plug In And Play" — Real-Hardware Bring-Up → Public Ship (planning)
+**Current milestone:** v4.0 "SHIP" — Real-Hardware Bring-Up → Public Ship (planning)
 
 ---
 
@@ -13,19 +13,19 @@
 - ✅ **v2.1 The Unified Cut** — Phases 27–39 (shipped 2026-05-16, tech_debt accepted) — see `.planning/milestones/v2.1-ROADMAP.md`
 - ✅ **v3.0 Clean OSS Ship** — Phases 40–45 (shipped 2026-05-17, tech_debt accepted) — see `.planning/milestones/v3.0-ROADMAP.md`
 - ✅ **v3.1 Distribution-Ready Pass** — Phases 46–50 (shipped 2026-05-18, tech_debt accepted) — see `.planning/milestones/v3.1-ROADMAP.md`
-- 🔨 **v3.2 Plug In And Play** — Phases 51–54 (planning) — active below
+- 🔨 **v4.0 SHIP** — Phases 51–54 (planning) — active below
 
 ---
 
 ## Overview
 
-v3.1 left vibemix engineering-complete: a built Tauri app + Python sidecar, one-click installer chain, dependency-audited lockfile, full mascot scaffold, and an e2e harness — all green in CI, none of it yet driven on real hardware in a real DJ session. v3.2 closes that gap. For the first time the actual app runs on Kaan's MacBook with real audio through BlackHole and a real DDJ-FLX4 over USB. The journey: **boot it and make it stable** (Phase 51) → **make both modes feel like a real DJ friend on real audio and at peak performance** (Phase 52) → **final visual pass + close the carryover bugs + tighten first-run** (Phase 53) → **get every engineering gate green on real artifacts and document the one-button ship sequence** (Phase 54). The signed public binary itself is gated on external signatures (Apple Dev Agreement via Francesco; SignPath OSS cert) — those stay KAAN-ACTION; engineering makes the release one-button-after-signatures.
+v3.1 left vibemix engineering-complete: a built Tauri app + Python sidecar, one-click installer chain, dependency-audited lockfile, full mascot scaffold, and an e2e harness — all green in CI, none of it yet driven on real hardware in a real DJ session. v4.0 closes that gap. For the first time the actual app runs on Kaan's MacBook with real audio through BlackHole and a real DDJ-FLX4 over USB. The journey: **boot it and make it stable** (Phase 51) → **make both modes feel like a real DJ friend on real audio and at peak performance** (Phase 52) → **final visual pass + close the carryover bugs + tighten first-run** (Phase 53) → **get every engineering gate green on real artifacts and document the one-button ship sequence** (Phase 54). The signed public binary itself is gated on external signatures (Apple Dev Agreement via Francesco; SignPath OSS cert) — those stay KAAN-ACTION; engineering makes the release one-button-after-signatures.
 
 This is bring-up + live validation + polish + ship of an **already-built** app. No new AI providers, no new detectors, no scope creep.
 
 ## Phases
 
-**Phase Numbering:** Continues from v3.1 (closed at Phase 50). v3.2 starts at **Phase 51**. Integer phases (51, 52, …) = planned milestone work; decimal phases (e.g. 52.1) = urgent insertions if needed.
+**Phase Numbering:** Continues from v3.1 (closed at Phase 50). v4.0 starts at **Phase 51**. Integer phases (51, 52, …) = planned milestone work; decimal phases (e.g. 52.1) = urgent insertions if needed.
 
 - [ ] **Phase 51: Real-Hardware Bring-Up** - Boot the app + sidecar on Kaan's Mac, reach a stable live "listening" session, fix every runtime break read from Tauri console + sidecar logs across a full-set run.
 - [ ] **Phase 52: Live-Session Validation + Latency/Performance Tuning** - Both modes produce grounded, in-bar, non-slop reactions on real audio across ≥2 genres; citation strip + mascot track real events; TTFT/dropouts/60fps tuned to budget on real HW.
@@ -82,7 +82,7 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 
 ---
 
-## Progress — v3.2 Plug In And Play
+## Progress — v4.0 SHIP
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -91,7 +91,7 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 | 53. Sexify Finish | 0/TBD | Not started | - |
 | 54. Ship Readiness | 0/TBD | Not started | - |
 
-**Coverage:** 19/19 v3.2 requirements mapped ✓ (no orphans, no duplicates)
+**Coverage:** 19/19 v4.0 requirements mapped ✓ (no orphans, no duplicates)
 
 ---
 
@@ -168,8 +168,8 @@ Full archive: `.planning/milestones/v3.1-ROADMAP.md` · Requirements: `.planning
 | v2.1 The Unified Cut | 27–39 | ✅ Shipped (tech_debt) | 2026-05-16 |
 | v3.0 Clean OSS Ship | 40–45 | ✅ Shipped (tech_debt) | 2026-05-17 |
 | v3.1 Distribution-Ready Pass | 46–50 | ✅ Shipped (tech_debt) | 2026-05-18 |
-| v3.2 Plug In And Play | 51–54 | 🔨 Planning | - |
+| v4.0 SHIP | 51–54 | 🔨 Planning | - |
 
 ---
 
-*Roadmap reopened 2026-05-20 for v3.2 "Plug In And Play" (Phases 51–54) via `/gsd:new-milestone` under `gsd-autonomous fully`. Bring-up MUST come first (Phase 51) since all downstream validation depends on a running app. Live validation + performance tuning are co-observed in the same real sessions (Phase 52). External signatures (Apple Dev + SignPath) stay KAAN-ACTION — engineering makes the release one-button-after-signatures.*
+*Roadmap reopened 2026-05-20 for v4.0 "SHIP" (Phases 51–54) via `/gsd:new-milestone` under `gsd-autonomous fully`. Bring-up MUST come first (Phase 51) since all downstream validation depends on a running app. Live validation + performance tuning are co-observed in the same real sessions (Phase 52). External signatures (Apple Dev + SignPath) stay KAAN-ACTION — engineering makes the release one-button-after-signatures.*

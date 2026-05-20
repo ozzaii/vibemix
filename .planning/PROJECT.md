@@ -10,7 +10,7 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v3.2 Plug In And Play
+## Current Milestone: v4.0 SHIP
 
 **Goal:** Take vibemix from engineering-complete to a co-host Kaan plugs into his MacBook and plays full sets with — validated live on real hardware (audio + controller), both modes feeling like a real DJ friend in the ear, polished to peak, with the public release one button away once external signatures land.
 
@@ -363,4 +363,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-20 — v3.2 "Plug In And Play" milestone started via `/gsd:new-milestone` under `gsd-autonomous fully`. Scope: real-hardware bring-up (drive the app on Kaan's Mac, read Tauri console + sidecar logs, fix live), hype+feedback live validation, peak performance, sexify finish, ship to one-button-after-signatures. Vibe Mix prep module explicitly deferred (separate commercial product). External clock unchanged: Apple Dev Agreement (Francesco) + SignPath OSS cert gate the literal publish.*
+*Last updated: 2026-05-20 — v4.0 "SHIP" milestone started via `/gsd:new-milestone` under `gsd-autonomous fully`. Scope: real-hardware bring-up (drive the app on Kaan's Mac, read Tauri console + sidecar logs, fix live), hype+feedback live validation, peak performance, sexify finish, ship to one-button-after-signatures. Vibe Mix prep module explicitly deferred (separate commercial product). External clock unchanged: Apple Dev Agreement (Francesco) + SignPath OSS cert gate the literal publish.*

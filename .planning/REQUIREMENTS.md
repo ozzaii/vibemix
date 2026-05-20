@@ -1,6 +1,6 @@
 # vibemix — Requirements
 
-**Milestone:** v3.2 "Plug In And Play" — Real-Hardware Bring-Up → Public Ship
+**Milestone:** v4.0 "SHIP" — Real-Hardware Bring-Up → Public Ship
 **Started:** 2026-05-20
 **Mode:** `gsd-autonomous fully` (recommended grey-area answers + defer blockers to KAAN-ACTION; only privacy rule + destructive risk pause)
 
@@ -12,7 +12,7 @@ This milestone is the first time the built app is **driven on real hardware in a
 
 ---
 
-## v3.2 Requirements
+## v4.0 Requirements
 
 ### Real-Hardware Bring-Up (BRINGUP)
 
@@ -52,7 +52,7 @@ This milestone is the first time the built app is **driven on real hardware in a
 
 ## Future Requirements (deferred — next milestone)
 
-- **Vibe Mix prep module** — natural-language set creation, 3-track calibration, harmonic arc ordering, auto hot-cue write-back (spiked under `spikes/vibe_mix_slice*/`, 53 tests green). This is a **separate commercial BRAVOH product**, not the OSS live co-host. Graduates to its own milestone after the co-host ships. Do not fold into v3.2.
+- **Vibe Mix prep module** — natural-language set creation, 3-track calibration, harmonic arc ordering, auto hot-cue write-back (spiked under `spikes/vibe_mix_slice*/`, 53 tests green). This is a **separate commercial BRAVOH product**, not the OSS live co-host. Graduates to its own milestone after the co-host ships. Do not fold into v4.0.
 - **Mixxx OSC adapter + controller-map transpiler** (10 → 30+ controllers) — v3.x candidate per `project_v2_open_candidates`.
 - **pyrekordbox integration depth, post-session debrief multi-session arc, library coach drill packs** — v3.x candidates.
 - **§VIS-04 / §VIS-05 Mixamo retargets** — real GLB land; independent asset-discharge, parallel to ship.
@@ -88,4 +88,4 @@ This milestone is the first time the built app is **driven on real hardware in a
 | REL-02 | Phase 54 | Pending |
 | REL-03 | Phase 54 | Pending |
 
-**Coverage:** 19 / 19 v3.2 requirements mapped to exactly one phase ✓ (no orphans, no duplicates)
+**Coverage:** 19 / 19 v4.0 requirements mapped to exactly one phase ✓ (no orphans, no duplicates)

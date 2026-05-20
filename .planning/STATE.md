@@ -1,7 +1,7 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.2
-milestone_name: Plug In And Play
+milestone: v4.0
+milestone_name: SHIP
 status: planning
 last_updated: "2026-05-20T20:51:03.000Z"
 last_activity: 2026-05-20
@@ -39,7 +39,7 @@ See: .planning/PROJECT.md (updated 2026-05-18 after v3.1 milestone close)
 Phase: 51 — Real-Hardware Bring-Up (not started)
 Plan: —
 Status: Roadmap locked — ready for `/gsd:plan-phase 51`
-Last activity: 2026-05-20 — v3.2 roadmap created (Phases 51–54; 19/19 REQ-IDs mapped)
+Last activity: 2026-05-20 — v4.0 roadmap created (Phases 51–54; 19/19 REQ-IDs mapped)
 
 ## Performance Metrics
 
@@ -69,9 +69,9 @@ Last activity: 2026-05-20 — v3.2 roadmap created (Phases 51–54; 19/19 REQ-ID
 
 ## Accumulated Context
 
-### v3.2 Roadmap Locked (2026-05-20)
+### v4.0 Roadmap Locked (2026-05-20)
 
-v3.2 "Plug In And Play" scoped into **4 phases (51–54)**, continuing numbering from v3.1 (closed at Phase 50). 19/19 REQ-IDs mapped to exactly one phase — 100% coverage, no orphans, no duplicates. Granularity is `fine` but the milestone is deliberately kept tight (bring-up + validation + polish + ship of an already-built app, not new feature work).
+v4.0 "SHIP" scoped into **4 phases (51–54)**, continuing numbering from v3.1 (closed at Phase 50). 19/19 REQ-IDs mapped to exactly one phase — 100% coverage, no orphans, no duplicates. Granularity is `fine` but the milestone is deliberately kept tight (bring-up + validation + polish + ship of an already-built app, not new feature work).
 
 | Phase | Goal | Requirements (count) | UI |
 |-------|------|----------------------|----|
@@ -86,9 +86,9 @@ v3.2 "Plug In And Play" scoped into **4 phases (51–54)**, continuing numbering
 - **Phase 53 (polish)** depends on a running app to inspect (51) and benefits from live observations (52), but its work — visual pass, carryover bugs, first-run — is independent of validation outcomes.
 - **Phase 54 (ship)** is last: Gate 2b (hallucination) is fed by Phase 52 live validation; Gate 6b (e2e report) and §E2E-50A-WALK need the real app driven end-to-end; final artifacts cut after polish (53) lands.
 
-**Locked invariants carried into v3.2 (all preserved from v3.0/v3.1):**
+**Locked invariants carried into v4.0 (all preserved from v3.0/v3.1):**
 - POC immutability — `cohost*.py` retired (deleted, scrub-gated); `mascot.html` byte-stable + CI `mascot-audit`. No resurrection.
-- ModelRouter seam — zero new hardcoded model literals; CI grep gate extends to v3.2 artifacts.
+- ModelRouter seam — zero new hardcoded model literals; CI grep gate extends to v4.0 artifacts.
 - Anti-slop blocklist — 15-token + `deeply\s+\w+` regex; live reactions + any new UI copy must pass.
 - Privacy rule (`feedback_privacy_scope_narrow`) — off-limits LLM-transcript paths absolute; e2e harness asserts zero writes to `~/.hermes/` / `~/hermes-rig/logs/` / `~/.lmstudio/`. Bring-up debugging reads Tauri console + sidecar logs ONLY (vibemix's own logs), never Kaan's OZ/Hermes/local-AI surfaces.
 - Gemini-only (`feedback_no_clap_use_gemini_embedding`) — no new providers/detectors; this is bring-up, not feature work.
@@ -96,7 +96,7 @@ v3.2 "Plug In And Play" scoped into **4 phases (51–54)**, continuing numbering
 - Hallucination gate is hard (`project_phase_16_kaan_dj_testing`) — satisfied by Kaan's DJ ear + autonomous proxy, NOT a 30-session replay harness. No release until live reactions are confirmed grounded.
 - Frontend-enforcement skill applies to Phases 52 + 53 (UI hint: yes) — CDJ Whisper, 20/80 accent rule, textured material feel, no AI-slop typography.
 
-**Reuses already-built engineering (do NOT rebuild):** v3.1 e2e harness (`tests/e2e/macbook/`), 50a Kaan-walk checklist + `record_50a_walk.sh`, `cut_release.sh` with Gate 2b + Gate 6b wired, EvidenceRegistry citation strip, Neon Rebel 4-layer mascot state machine, BlackHole 48 kHz probe, TTFTMeter, installer/first-run wizard. v3.2 DRIVES and TUNES these on real hardware — it does not re-implement them.
+**Reuses already-built engineering (do NOT rebuild):** v3.1 e2e harness (`tests/e2e/macbook/`), 50a Kaan-walk checklist + `record_50a_walk.sh`, `cut_release.sh` with Gate 2b + Gate 6b wired, EvidenceRegistry citation strip, Neon Rebel 4-layer mascot state machine, BlackHole 48 kHz probe, TTFTMeter, installer/first-run wizard. v4.0 DRIVES and TUNES these on real hardware — it does not re-implement them.
 
 
 ### Phase 50 Outcome (2026-05-18, engineering-green)
