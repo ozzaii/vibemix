@@ -64,6 +64,16 @@ EVENT_GLOBAL_MIN_GAP = (
 # chat-tested ear-test; locked target is the chat-tested baseline.
 HEARTBEAT_SEC = 45.0
 
+# Plan 54-02 / LIVE-03 — in-bar reaction-timing tolerance. One bar = 4 beats *
+# 60/bpm: ~1.65s @145 BPM .. ~1.85s @130 BPM; conservative upper bound 2.0 so a
+# reaction landing within ~1 bar of a transition counts as in-bar. This is the
+# named, one-line-editable tuning knob for the LIVE-03 "reactions land in-bar,
+# not after the moment passes" contract — a tuning change after Kaan's live
+# drive is a single constant edit + restart, never a re-plan
+# (feedback_no_gsd_orchestra_for_trivial_tweaks). NOT a cooldown value — the v4
+# cooldown baseline below is unchanged.
+IN_BAR_TOLERANCE_S = 2.0
+
 MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 + Plan 40-04 retune
     # Plan 40-04 — v4 chat-tested 2026-05-11 baseline (was 6/18/16/20/70).
     # Phase 17/30 detector cooldowns below UNCHANGED.
