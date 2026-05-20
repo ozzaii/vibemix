@@ -2,8 +2,8 @@
 """GenreProfile loader + active-profile singleton coverage (Phase 6 Wave 1).
 
 Tests pin:
-- 5 hand-tuned profiles load via ``load_profile``.
-- ``list_profiles`` returns the canonical sorted 5-element list.
+- 6 hand-tuned profiles load via ``load_profile``.
+- ``list_profiles`` returns the canonical sorted 6-element list.
 - Schema validator raises on missing/malformed fields (no silent defaults).
 - ``set_active_profile(None)`` is a valid call that clears the singleton —
   Critical Constraint 8 (Phase 3 absolute-threshold fallback path).
@@ -25,7 +25,7 @@ from vibemix.state.genre import (
 )
 from vibemix.state.genre.profile import _parse_profile
 
-PROFILE_NAMES = ["disco", "drum_and_bass", "house", "pop", "techno"]
+PROFILE_NAMES = ["disco", "drum_and_bass", "house", "pop", "psytrance", "techno"]
 
 
 @pytest.fixture(autouse=True)
@@ -42,7 +42,7 @@ def _reset_active_profile():
 # ---------- Loader smoke ----------
 
 
-def test_list_profiles_returns_all_five():
+def test_list_profiles_returns_all_six():
     assert list_profiles() == PROFILE_NAMES
 
 
