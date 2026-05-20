@@ -78,7 +78,10 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
   1. The DDJ-FLX4 is ingested live during a session when plugged in — real fader/knob/jog moves register in `ControllerState` and surface to the bus.
   2. Unplugging the controller mid-session degrades gracefully — no crash, no unhandled exception, the app stays in a clear, defined state and keeps running.
   3. Booting with the controller absent runs a full session on audio alone with no MIDI-related errors in the logs (verified graceful fallback).
-**Plans**: TBD
+**Plans** (2 plans, 2 waves):
+  - **Wave 1** — 53-01: Controller state hardening + FLX4 decode proof + canonical-binding pin (mark_disconnected clears stale rings; profiles/ vs controllers/ dual-map resolved; FLX4 synthetic-stream decode; unknown-controller graceful path).
+  - **Wave 2** *(blocked on Wave 1 completion)* — 53-02: Wire hot-plug watcher into the live session + disconnect/reconnect proof (single-state callback, no rebuild divergence; `__main__` watcher spawn + cleanup; disconnect→reconnect + watcher-callback integration; macos_audio live-drive recipe).
+  - **Cross-cutting constraints:** profiles/ is canonical for live binding/decode (controllers/+MidiMapLoader unwired — do not switch/delete); mark_disconnected must clear moves+events rings; real FLX4 plug/move/unplug/replug drive = KAAN-ACTION.
 
 ### Phase 54: Hype Mode Live
 **Goal**: On real audio, hype (party) mode feels like a real DJ friend in the ear — and, critically, the AI voice **actually fires** on real events. Real hardware surfaced a hard bug: a detected drop produced no voice in a 32s window. Hype mode is not validated until grounded, in-bar reactions reliably land on real drops/builds across ≥2 genres, with cooldowns and latency tuned live so nothing comes late.

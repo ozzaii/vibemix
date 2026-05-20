@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: SHIP
 status: executing
-last_updated: "2026-05-21T01:00:00.000Z"
-last_activity: 2026-05-21 -- Phase 52 COMPLETE (review CLEAN, verification passed; genre detector + psytrance shipped); Phase 53/54 grounded
+last_updated: "2026-05-21T02:00:00.000Z"
+last_activity: 2026-05-21 -- Phase 53 PLANNED (2 plans, 2 waves; BRINGUP-03); dual-map resolved + watcher live-wiring gap found; ready to execute
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 7
+  total_plans: 9
   completed_plans: 7
   percent: 25
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-21 — **Phase 52 (Audio Path + Feature Grounding) COMPLETE** (4/4 plans; review CLEAN; verification passed). Shipped: BPM-grounding regressions (never > 180 on harmonic-leak trace), psytrance profile, grounded DSP genre auto-detector (confidence-gated, `unknown` fallback, hysteresis, env override), genre on the ws bus. Multi-genre live drive = KAAN-ACTION. **Phase 51 also COMPLETE.** Mascot many-modes (LIVE-05a) → Phase 56. Phase 53 (controller) + 54 (hype) contexts grounded. Next: plan + execute Phase 53.
+**Last updated:** 2026-05-21 — **Phase 53 (Controller Live + Graceful Fallback) PLANNED** (2 plans, 2 waves; BRINGUP-03). Key findings: dual-map question resolved — `midi/profiles/` is canonical for live binding+decode, `midi/controllers/`+`MidiMapLoader` is a separate, currently-unwired registry; the hot-plug watcher (`port_watcher_task`/`handle_port_change`/`start_port_watcher`) exists + is unit-tested but `__main__` never spawns it (the real BRINGUP-03 gap); `mark_disconnected` only clears the connected flag, not the moves/events rings (stale-move leak). Plan 01 (Wave 1) hardens state + proves FLX4 decode; Plan 02 (Wave 2) wires the watcher into the live session with a single-state callback (option B — no rebuild divergence) + disconnect/reconnect proof. Real FLX4 plug/move/unplug/replug drive = KAAN-ACTION. **Phase 52 + 51 COMPLETE.** Next: execute Phase 53.
 
 ---
 
