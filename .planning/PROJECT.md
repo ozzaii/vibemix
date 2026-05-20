@@ -10,7 +10,16 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: Planning next milestone
+## Current Milestone: v3.2 Plug In And Play
+
+**Goal:** Take vibemix from engineering-complete to a co-host Kaan plugs into his MacBook and plays full sets with — validated live on real hardware (audio + controller), both modes feeling like a real DJ friend in the ear, polished to peak, with the public release one button away once external signatures land.
+
+**Target features:**
+- Real-hardware bring-up — launch the Tauri app + Python sidecar on the real Mac, reach a live session, read Tauri console + sidecar logs, fix what breaks across a full-set run
+- Live-session validation — hype + feedback modes produce grounded, in-time, non-slop reactions on real audio across ≥2 genres; cooldowns/latency tuned live
+- Peak performance — TTFT measured on real hardware within budget; no audio dropouts; 60fps mascot/UI under live load
+- Sexify finish — Tier-1 live surfaces final visual pass; v0.1.0-rc1 carryover bugs closed; fresh-account first-run tightened
+- Ship — engineering gates green + §E2E-50A-WALK discharged by driving the real app; release one-button-after-signatures; Apple Dev + SignPath surfaced as KAAN-ACTION
 
 **Last shipped:** v3.1 "Distribution-Ready Pass" — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts ride the v3.0 external clock per `gsd-autonomous fully` mode).
 
@@ -354,4 +363,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-18 — v3.1 "Distribution-Ready Pass" shipped engineering-complete via `/gsd:autonomous fully`. 5 phases (46–50), 32 plans, 44/44 REQs green, 7 Kaan-action carveouts deferred to external-clock surface. Critical-path discharge order: §INSTALL-COMPANION-SIGN → §INSTALL-VM-RUN → §E2E-50A-WALK; §VIS-04 + §VIS-05 (Mixamo) run in parallel. Next milestone TBD via `/gsd:new-milestone` once Kaan decides scope (likely post-public-RC user-signal milestone).*
+*Last updated: 2026-05-20 — v3.2 "Plug In And Play" milestone started via `/gsd:new-milestone` under `gsd-autonomous fully`. Scope: real-hardware bring-up (drive the app on Kaan's Mac, read Tauri console + sidecar logs, fix live), hype+feedback live validation, peak performance, sexify finish, ship to one-button-after-signatures. Vibe Mix prep module explicitly deferred (separate commercial product). External clock unchanged: Apple Dev Agreement (Francesco) + SignPath OSS cert gate the literal publish.*

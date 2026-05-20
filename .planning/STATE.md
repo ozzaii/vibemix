@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.1
-milestone_name: Distribution-Ready Pass
-status: Shipped (tech_debt accepted — 7 Kaan-action carveouts on external clock)
-last_updated: "2026-05-18T11:25:00.000Z"
-last_activity: 2026-05-18 — Milestone v3.1 completed and archived
+milestone: v3.2
+milestone_name: Plug In And Play
+status: planning
+last_updated: "2026-05-20T20:46:50.473Z"
+last_activity: 2026-05-20
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 32
-  completed_plans: 32
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # vibemix — State
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-05-18 after v3.1 milestone close)
 
 ## Current Position
 
-Phase: Milestone v3.1 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-18 — Milestone v3.1 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-20 — Milestone v3.2 started
 
 ## Performance Metrics
 
