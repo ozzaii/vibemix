@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: SHIP
-status: planning
-last_updated: "2026-05-20T21:30:00.000Z"
-last_activity: 2026-05-20
+status: executing
+last_updated: "2026-05-20T21:37:26.357Z"
+last_activity: 2026-05-20 -- Phase 51 planning complete
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 0
+  total_plans: 3
   completed_plans: 0
   percent: 0
 ---
@@ -38,8 +38,8 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 Phase: 51 — Real-Hardware Bring-Up (not started)
 Plan: —
-Status: Roadmap locked (8-phase split) — ready for `/gsd:plan-phase 51`
-Last activity: 2026-05-20 — v4.0 roadmap RE-SPLIT to 8 phases (51–58); 19/19 REQ-IDs re-mapped
+Status: Ready to execute
+Last activity: 2026-05-20 -- Phase 51 planning complete
 
 ## Performance Metrics
 
@@ -87,6 +87,7 @@ v4.0 "SHIP" re-roadmapped from the prior 4-phase cut into **8 phases (51–58)**
 | 58 — Ship Readiness | All engineering gates green on real artifacts; §E2E-50A-WALK discharged; one-button SHIP-CUT documented + pre-verified | REL-01/02/03 (3) | — |
 
 **Build-order rationale (8-phase):**
+
 - **Phase 51 MUST be first** — every downstream validation depends on a running app booting to a live listening session on real hardware with clean startup.
 - **Phases 52 + 53 are the two input seams** — audio (52) and controller (53) are independent of each other (53 needs only a running app from 51), but both must be live + grounded before any mode that consumes them is validated. Audio comes first because both modes react primarily to audio; controller is a secondary input + graceful-fallback contract.
 - **Phases 54 + 55 are the two interaction modes**, split because they have different live failure shapes: hype's hard bug is "the AI voice did not fire on a detected drop in 32s" (54); feedback's hard bug class is citation integrity (55). Each is its own Kaan-ear pass + autonomous-proxy clean. Both depend on grounded audio features (52).
@@ -95,12 +96,14 @@ v4.0 "SHIP" re-roadmapped from the prior 4-phase cut into **8 phases (51–58)**
 - **Phase 58 (ship)** is last: Gate 2b (hallucination) is fed by Phases 54 + 55 live validation; Gate 6b (e2e report) and §E2E-50A-WALK need the real app driven end-to-end; final artifacts cut after polish (57) lands.
 
 **Real-hardware findings folded into phases as concrete success criteria / known issues:**
+
 - **Audio capture path is LIVE** (music level registers when a track is routed into BlackHole 2ch) → Phase 52 SC-1 confirms the live capture path.
 - **BUG: live BPM read 200 on a ~129 BPM track** (BPM_VALID_MAX=180; out-of-range value reaching bus/UI) → Phase 52 SC-2: grounding fix at the source so a ~129 track reads ~129 and out-of-range BPM never reaches bus/UI.
 - **BUG: AI voice did NOT fire in a 32s window despite a detected drop** → Phase 54 SC-1: the AI voice must actually fire on real drops/builds — the 32s-silent-on-drop bug is closed.
 - **ws_bus emits intermittent empty `{}` frames between real frames** (minor) → Phase 51 SC-2 + known-issues note: bring-up cleanliness, close here.
 
 **Locked invariants carried into v4.0 (all preserved from v3.0/v3.1):**
+
 - POC immutability — `cohost*.py` retired (deleted, scrub-gated); `mascot.html` byte-stable + CI `mascot-audit`. No resurrection.
 - ModelRouter seam — zero new hardcoded model literals; CI grep gate extends to v4.0 artifacts.
 - Anti-slop blocklist — 15-token + `deeply\s+\w+` regex; live reactions + any new UI copy must pass.
@@ -111,7 +114,6 @@ v4.0 "SHIP" re-roadmapped from the prior 4-phase cut into **8 phases (51–58)**
 - Frontend-enforcement skill applies to Phases 52, 54, 55, 56, 57 (UI hint: yes) — CDJ Whisper, 20/80 accent rule, textured material feel, no AI-slop typography.
 
 **Reuses already-built engineering (do NOT rebuild):** v3.1 e2e harness (`tests/e2e/macbook/`), 50a Kaan-walk checklist + `record_50a_walk.sh`, `cut_release.sh` with Gate 2b + Gate 6b wired, EvidenceRegistry citation strip, Neon Rebel 4-layer mascot state machine, BlackHole 48 kHz probe, TTFTMeter, installer/first-run wizard. v4.0 DRIVES and TUNES these on real hardware — it does not re-implement them.
-
 
 ### Phase 50 Outcome (2026-05-18, engineering-green)
 
