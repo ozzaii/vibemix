@@ -11,6 +11,15 @@ from __future__ import annotations
 from vibemix.state.genre.bpm_validator import validate_bpm
 from vibemix.state.genre.crest_factor import EmaSmoother, crest_factor
 from vibemix.state.genre.detector import HysteresisState, classify_phase_percentile
+from vibemix.state.genre.genre_autodetect import (
+    GENRE_CONFIDENCE_MIN,
+    GENRE_TIE_MARGIN,
+    GenreHysteresis,
+    apply_genre_hysteresis,
+    is_auto_enabled,
+    score_genre,
+    set_auto_enabled,
+)
 from vibemix.state.genre.profile import (
     GenreProfile,
     get_active_profile,
@@ -21,15 +30,22 @@ from vibemix.state.genre.profile import (
 from vibemix.state.genre.vocal_detector import VocalDetector
 
 __all__ = [
+    "GENRE_CONFIDENCE_MIN",
+    "GENRE_TIE_MARGIN",
     "EmaSmoother",
+    "GenreHysteresis",
     "GenreProfile",
     "HysteresisState",
     "VocalDetector",
+    "apply_genre_hysteresis",
     "classify_phase_percentile",
     "crest_factor",
     "get_active_profile",
+    "is_auto_enabled",
     "list_profiles",
     "load_profile",
+    "score_genre",
     "set_active_profile",
+    "set_auto_enabled",
     "validate_bpm",
 ]

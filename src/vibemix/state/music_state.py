@@ -42,6 +42,17 @@ class MusicState:
     bpm_corrected: bool = False
     genre_profile_name: str = "unknown"
 
+    # Phase 52 (GENRE-01) — grounded DSP genre auto-detection. SINGLE-WRITER
+    # (_tick_once only). `detected_genre` is the FULL-LIBRARY auto-detected
+    # profile name (any of list_profiles(), or "unknown" when the detector is
+    # below confidence) — distinct from the coarse `active_genre`
+    # house/techno/hard_tek renderer signal below. `genre_confidence` is the
+    # detector's score in [0, 1]. Additive defaults preserve golden-equivalence:
+    # no behavior changes until _tick_once writes them. Anti-slop is enforced at
+    # the SOURCE (the scorer's unknown fallback) — the wire carries these as-is.
+    detected_genre: str = "unknown"
+    genre_confidence: float = 0.0
+
     # Phase 13 (mascot overlay) — mood is SettingsApplier-owned; the other two
     # are state_refresh_loop-owned. mood is a CONSUMER-readable evidence field
     # (Coach prompt template + mascot renderer subscribe via the WS bus).
