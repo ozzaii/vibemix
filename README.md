@@ -108,19 +108,6 @@ Each cell speaks a different vocabulary on purpose. Beginner is encouragement-he
 
 | Phase | Surface | What shipped |
 |---|---|---|
-| 27 | Eval Harness + v2.0 Carry-Forward Close-Out (9/9 plans, 140 tests) | completed 2026-05-15 |
-| 28 | Library Intelligence v1 (9/9 plans, 258 tests) | completed 2026-05-15 |
-| 29 | Post-Session Debrief MVP UI (9/9 plans) | completed 2026-05-15 |
-| 30 | 2 Hard Tek Detectors (4/4 plans, 45 tests) | completed 2026-05-15 |
-| 31 | 4-Layer Mascot Full Additive State Machine (8/8 plans, 17 mascot tests, GLB 21.67/25 MB) | completed 2026-05-15 |
-| 32 | Long-Term DJ Profile ~2KB JSON (6/6 plans, 67 tests, P51/P53/P60 enforced) | completed 2026-05-15 |
-| 33 | One-Click Install Hardening (9/9 plans, 50 tests; INSTALL-VM-RUN = KAAN-ACTION-LEGAL) | completed 2026-05-15 |
-| 34 | Open-Source Security Pass (10/10 plans, 63 tests) | completed 2026-05-15 |
-| 35 | Real GLBs + 30s Viral Demo Film (6/6 plans, 35 tests; real assets = KAAN-ACTION-LEGAL) | completed 2026-05-15 |
-| 36 | Day-Zero Operations Automation (6/6 plans, 36 tests; 6 real-execution items = KAAN-ACTION-LEGAL) | completed 2026-05-15 |
-| 37 | Cross-Phase Integration Audit Gate (6/6 plans, 42 tests; 5/5 seams WIRED) | completed 2026-05-15 |
-| 38 | Signing Pipeline Real Execution (6/6 plans, 58 tests; DIST-09 + DIST-11 = P46 legal-capacity carveouts) | completed 2026-05-15 |
-| 39 | Public RC Cut + Ship (8/8 plans, 91 tests; §SHIP × 6 + §POST-RC-CLEANUP × 3 = KAAN-ACTION-LEGAL) | completed 2026-05-15 |
 | 40 | Anti-Slop Audio Port (6/6 plans) | completed 2026-05-16 (AUDIO-01..04 GREEN; AUDIO-05/06/07 = KAAN-ACTION-LEGAL) |
 | 41 | Gemini SKU Upgrade + Latency Stack v2 (7/7 plans) | completed 2026-05-16 (LAT-01..08 GREEN; LAT-09 spike = KAAN-ACTION-PROXY) |
 | 42 | Hallucination Gate v3 | Hybrid (6/6 plans) — completed 2026-05-16 (GATE-05..09 GREEN; GATE-01/02/03/04 corpus = KAAN-ACTION-LEGAL) |
