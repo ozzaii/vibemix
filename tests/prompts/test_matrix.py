@@ -668,8 +668,14 @@ def test_prompt_61_coach_carries_positive_callout_balance(skill: str) -> None:
     positive-callout / 'say it when something works' balance rule.
 
     Robust to wording (PRO='PROPS', BEGINNER='ENCOURAGING TONE', the post-61-02
-    INTERMEDIATE will satisfy one of these) but still fails if a cell has NO
+    INTERMEDIATE='POSITIVE-CALLOUT BALANCE') but still fails if a cell has NO
     balance rule at all. RED for INTERMEDIATE today.
+
+    Markers are restricted to balance-SPECIFIC phrasings (61-02 WR-02): bare
+    fragments like 'credit it'/'call it' were removed because they also occur in
+    unrelated prescribe prose, so a future edit could strip the real balance
+    section and still false-pass. Each cell must hit a marker that only a
+    deliberate positive-callout rule would carry.
     """
     body = build_system_instruction(skill, "coach").lower()
     markers = [
@@ -679,8 +685,6 @@ def test_prompt_61_coach_carries_positive_callout_balance(skill: str) -> None:
         "when something works",
         "say it works",
         "when a move",
-        "credit it",
-        "call it",
     ]
     assert any(
         m in body for m in markers
