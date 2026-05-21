@@ -62,6 +62,22 @@ def test_priority_default_drop_reserved(ms: MusicState) -> None:
     assert ev.priority == 10
 
 
+def test_priority_default_key_clash(ms: MusicState) -> None:
+    """Phase 59 (DECK-04) — KEY_CLASH ties with TRACK_CHANGE: a clashing
+    overlay is "react now". Plumbing only — firing logic is Phase 60. The
+    point of registering it: an unregistered type silently falls back to
+    priority 0 (below HEARTBEAT) via EVENT_PRIORITY.get(type, 0)."""
+    ev = Event(type="KEY_CLASH", state=ms)
+    assert ev.priority == 7
+
+
+def test_priority_default_transition_opportunity(ms: MusicState) -> None:
+    """Phase 59 (DECK-04) — TRANSITION_OPPORTUNITY ties with MIX_MOVE:
+    structural, not urgent. Plumbing only — firing logic is Phase 60."""
+    ev = Event(type="TRANSITION_OPPORTUNITY", state=ms)
+    assert ev.priority == 5
+
+
 def test_priority_default_unknown_type(ms: MusicState) -> None:
     """Unknown type → priority 0 (lowest; never preempts)."""
     ev = Event(type="WHO_KNOWS", state=ms)
@@ -94,3 +110,6 @@ def test_event_priority_map_is_module_constant() -> None:
     assert EVENT_PRIORITY["MIX_MOVE"] == 5
     assert EVENT_PRIORITY["LAYER_ARRIVAL"] == 4
     assert EVENT_PRIORITY["HEARTBEAT"] == 1
+    # Phase 59 (DECK-04) — deck-state event TYPES registered (plumbing only).
+    assert EVENT_PRIORITY["KEY_CLASH"] == 7
+    assert EVENT_PRIORITY["TRANSITION_OPPORTUNITY"] == 5

@@ -41,6 +41,12 @@ EVENT_PRIORITY: dict[str, int] = {
     # Tek set worth calling out, on a par with a structural mix move.
     "DISTORTION_CLIMB": 5,
     "ACID_LINE_ENTRY": 5,
+    # Phase 59 (DECK-04) — deck-state event TYPES, plumbing ONLY (the firing
+    # logic lands in Phase 60). Registering them here is the point: without an
+    # entry the EVENT_PRIORITY.get(type, 0) fallback would silently rank a
+    # KEY_CLASH at priority 0 (below HEARTBEAT) the moment Phase 60 emits one.
+    "KEY_CLASH": 7,  # tie with TRACK_CHANGE — a clashing overlay is "react now"
+    "TRANSITION_OPPORTUNITY": 5,  # tie with MIX_MOVE — structural, not urgent
     "LAYER_ARRIVAL": 4,
     "HEARTBEAT": 1,
 }

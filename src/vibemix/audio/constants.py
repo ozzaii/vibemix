@@ -112,6 +112,11 @@ MIN_EVENT_GAP_PER_TYPE: dict[str, float] = {  # v4:134-142 + Phase 17 SENSE-12 +
     # track); longer would silently swallow a real moment.
     "DISTORTION_CLIMB": 6.0,
     "ACID_LINE_ENTRY": 8.0,
+    # Phase 59 (DECK-04) — deck-state event-type cooldowns, plumbing ONLY (the
+    # firing logic is Phase 60). Both inherit the EVENT_GLOBAL_MIN_GAP=22.0
+    # floor via _cooldown_ok — no gate-logic change here.
+    "KEY_CLASH": 28.0,  # long gap — a harmonic clash persists; re-arm only after it clears+recurs (~25-30s band)
+    "TRANSITION_OPPORTUNITY": 20.0,  # medium — fires at the moment a blend COULD start, not continuously
 }
 
 TRACK_CHANGE_MIN_CONFIDENCE = 0.5  # v4:143 — ignore stale nowplaying-cli phantom tracks

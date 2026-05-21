@@ -119,6 +119,9 @@ def test_event_gap_dict_shape_and_values() -> None:
         # Phase 30 SENSE-17/18 — Hard Tek genre-specific detectors
         "DISTORTION_CLIMB",
         "ACID_LINE_ENTRY",
+        # Phase 59 (DECK-04) — deck-state event-type cooldowns (plumbing only)
+        "KEY_CLASH",
+        "TRANSITION_OPPORTUNITY",
     }
     # Plan 40-04 re-tuned v4 baseline entries (v4 2026-05-11 ear-test).
     assert MIN_EVENT_GAP_PER_TYPE["TRACK_CHANGE"] == 5.0  # Plan 40-04 — was 6.0
@@ -140,6 +143,10 @@ def test_event_gap_dict_shape_and_values() -> None:
     # Phase 30 SENSE-17/18 — UNCHANGED by Plan 40-04
     assert MIN_EVENT_GAP_PER_TYPE["DISTORTION_CLIMB"] == 6.0
     assert MIN_EVENT_GAP_PER_TYPE["ACID_LINE_ENTRY"] == 8.0
+    # Phase 59 (DECK-04) — deck-state event-type cooldowns (plumbing only;
+    # firing logic is Phase 60). Both inherit the EVENT_GLOBAL_MIN_GAP floor.
+    assert MIN_EVENT_GAP_PER_TYPE["KEY_CLASH"] == 28.0
+    assert MIN_EVENT_GAP_PER_TYPE["TRANSITION_OPPORTUNITY"] == 20.0
     # HEARTBEAT key should reference the HEARTBEAT_SEC module-level constant
     # (identity, not value — preserves the source-of-truth coupling).
     assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == HEARTBEAT_SEC
