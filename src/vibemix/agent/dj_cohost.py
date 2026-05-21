@@ -1012,8 +1012,13 @@ class DJCoHostAgent(Agent):
                                 yield txt
                         # Bypass means we did NOT strip — tracker records
                         # the actual outcome (False = "we let it through").
+                        # Plan 55-03 — surface the raw reply as the
+                        # last-unverified text: the user HEARD this unverified
+                        # line, so the diagnostics strip must show it.
                         if self._stripped_tracker is not None:
-                            self._stripped_tracker.record(False)
+                            self._stripped_tracker.record(
+                                False, unverified_text=full_text
+                            )
                         self._recorder.log_event(
                             "citation_bypass",
                             response_id=response_id,
@@ -1042,8 +1047,14 @@ class DJCoHostAgent(Agent):
                         citation_action = "strip"
                         if head_yielded:
                             _push_silence_pad_and_cancel("citation_failure")
+                        # Plan 55-03 — surface the raw reply as the
+                        # last-unverified text: this is the line the user did
+                        # NOT hear, but the diagnostics strip should show what
+                        # got silenced. Mirrors the raw_text= log field below.
                         if self._stripped_tracker is not None:
-                            self._stripped_tracker.record(True)
+                            self._stripped_tracker.record(
+                                True, unverified_text=full_text
+                            )
                         self._recorder.log_event(
                             "citation_strip",
                             response_id=response_id,
