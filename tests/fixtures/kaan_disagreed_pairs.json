@@ -1,0 +1,14 @@
+[
+  {"a": "8A", "b": "9A",  "verdict": "safe",  "note": "adjacent fifth (+1 hour) — bread and butter, Kaan mixes this all night"},
+  {"a": "8A", "b": "7A",  "verdict": "safe",  "note": "adjacent fifth (-1 hour) — the other-side perfect fifth, equally clean"},
+  {"a": "8A", "b": "8B",  "verdict": "safe",  "note": "relative major — same number, swapped letter — mood lift, never a clash"},
+  {"a": "8A", "b": "10A", "verdict": "safe",  "note": "+2 energy boost — the best mix; +2 hours is 2 semitones, not a clash"},
+  {"a": "8A", "b": "6A",  "verdict": "safe",  "note": "-2 energy move — 2 hours = 2 semitones, manageable, Kaan rides it"},
+  {"a": "5A", "b": "5A",  "verdict": "safe",  "note": "same key — ride it; zero hour-distance, never flag"},
+  {"a": "8A", "b": "5A",  "verdict": "safe",  "note": "3-hour drift — the silent neither-zone; a wrong tag here looks identical to a real drift, so say nothing"},
+  {"a": "8A", "b": "12A", "verdict": "safe",  "note": "4-hour drift — silent neither-zone; conservative-by-default, no clash claim"},
+
+  {"a": "8A", "b": "3A",  "verdict": "clash", "note": "1 semitone apart (5-hour distance) — the melodic-overlap disaster, SHOULD flag"},
+  {"a": "8A", "b": "1A",  "verdict": "clash", "note": "1 semitone apart (5-hour distance, other side) — SHOULD flag"},
+  {"a": "8A", "b": "2A",  "verdict": "clash", "note": "tritone (6-hour distance) — the most dissonant overlap, SHOULD flag"}
+]
