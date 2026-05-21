@@ -111,6 +111,9 @@ class DeckPoller:
         # JPEG when enabled; left dormant here (no per-tick capture while gated).
         self._vision_reader = vision_reader
         self._vision_enabled = bool(vision_enabled)
+        # One-shot guard so the "enabled but no screen source wired" diagnostic
+        # (WR-05) prints once, not on every tick.
+        self._vision_no_source_warned = False
         # Internal holder — the last-known resolved deck map. Empty until the
         # first successful poll. snapshot() returns COPIES of these.
         self._decks: dict[str, DeckTrack] = {}
@@ -293,6 +296,21 @@ class DeckPoller:
         try:
             jpeg = self._latest_screen_jpeg()
             if jpeg is None:
+                # WR-05: vision is ENABLED but no screen source is wired yet
+                # (``_latest_screen_jpeg`` is dormant until the eval gate, Task 3,
+                # injects a real source). Without this the path is a SILENT no-op —
+                # a dev flipping ``vision_enabled`` would get nothing, not an error.
+                # Emit ONCE so the no-op is observable. The flag + its data source
+                # are meant to ship as a pair (tracked at the eval-gate wiring).
+                if not self._vision_no_source_warned:
+                    print(
+                        "[deck vision] vision_enabled=True but no screen source "
+                        "is wired (_latest_screen_jpeg returns None) — vision-leg "
+                        "is a no-op until the eval-gate wires a screen buffer "
+                        "(Plan 59-05 Task 3).",
+                        file=sys.stderr,
+                    )
+                    self._vision_no_source_warned = True
                 return
             vision_decks = self._vision_reader.read(jpeg)
             for side, dt in vision_decks.items():
@@ -303,8 +321,16 @@ class DeckPoller:
             print(f"[deck vision apply err] {e}", file=sys.stderr)
 
     def _latest_screen_jpeg(self):
-        """Latest JPEG for the gated vision read — dormant until a screen source
-        is wired at the eval gate (Task 3). Returns ``None`` while gated."""
+        """Latest JPEG for the gated vision read.
+
+        EXPLICIT no-op (WR-05): returns ``None`` unconditionally because no
+        screen source is wired yet. Even with ``vision_enabled=True`` + a
+        ``vision_reader`` injected, ``_maybe_apply_vision`` short-circuits on this
+        ``None`` (and logs a one-shot diagnostic so the no-op is observable, not
+        silent). The real screen-buffer source lands together with the
+        ``vision_enabled`` enable path at the eval gate (Plan 59-05 Task 3) — the
+        flag and its data source ship as a pair. Until then the vision leg is
+        deliberately dormant (the v4 anti-hallucination posture: off-by-default)."""
         return None
 
     # ------------------------------------------------------------------ #
