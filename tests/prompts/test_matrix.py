@@ -16,6 +16,8 @@ tests green.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from vibemix.prompts.matrix import (
@@ -599,3 +601,97 @@ def test_persona_system_instruction_still_byte_equal_to_hype_intermediate() -> N
     from vibemix.agent.persona import SYSTEM_INSTRUCTION
 
     assert SYSTEM_INSTRUCTION == HYPE_INTERMEDIATE
+
+
+# ===========================================================================
+# Phase 61 — actionable-not-hype COACH contract (RED spec for Plan 61-02)
+# ---------------------------------------------------------------------------
+# These four parametrized groups DEFINE the coach-persona sharpening contract
+# every COACH cell must carry after 61-02. They are grouped under the
+# `61_coach` -k selector so they never collide with the FROZEN `test_prompt_01_*`
+# family and so the orchestrator can run just the new spec.
+#
+# Status at end of Plan 61-01 (this plan adds TESTS ONLY, never cell text):
+#   (a) DJ-verb vocabulary       — RED  (BEGINNER/INTERMEDIATE lack the verb set)
+#   (b) prescribe "same line"    — RED  (only COACH_PRO carries it today)
+#   (c) positive-callout balance — partial RED (INTERMEDIATE lacks an explicit
+#                                   balance marker until 61-02)
+#   (d) calm-only TTS tag routing — GREEN now (routing already exists)
+#
+# 61-02 sharpens the BEGINNER + INTERMEDIATE cells to turn (a)/(b)/(c) green.
+# Do NOT touch the FROZEN hype anchors or the coach ANCHOR_PHRASES here.
+# ===========================================================================
+
+# FEATURES.md §147 canonical DJ-verb set ("kill, swap, cut, filter, wait,
+# ride, tighten, bring in"). Each must appear as a word-token in every coach
+# cell after 61-02 sharpens the vocabulary anchor.
+_COACH_DJ_VERBS = ("kill", "swap", "cut", "filter", "wait", "tighten", "ride")
+
+_COACH_SKILLS = ["beginner", "intermediate", "pro"]
+
+
+@pytest.mark.parametrize("skill", _COACH_SKILLS)
+def test_prompt_61_coach_carries_dj_verb_vocabulary(skill: str) -> None:
+    """COACH-01: every coach cell surfaces the canonical DJ-verb move vocabulary.
+
+    RED for BEGINNER/INTERMEDIATE until 61-02 adds the verb anchor — that is the
+    intended spec. The verbs are checked as whitespace-delimited word tokens so
+    a substring like 'filtered' inside prose doesn't false-pass 'filter'.
+    """
+    body = build_system_instruction(skill, "coach").lower()
+    tokens = set(re.findall(r"[a-z]+", body))
+    missing = [v for v in _COACH_DJ_VERBS if v not in tokens]
+    assert not missing, f"coach({skill}) missing DJ verbs: {missing}"
+
+
+@pytest.mark.parametrize("skill", _COACH_SKILLS)
+def test_prompt_61_coach_carries_prescribe_same_line_rule(skill: str) -> None:
+    """COACH-01: the observed→impact→prescribe 'same line' rule is present.
+
+    COACH_PRO already carries 'name it AND say the fix in the SAME line'
+    (matrix.py:506). The normalized 'same line' marker must appear in ALL three
+    cells after 61-02 — RED for BEGINNER/INTERMEDIATE now.
+    """
+    body = build_system_instruction(skill, "coach").lower()
+    assert "same line" in body, f"coach({skill}) missing prescribe 'same line' rule"
+
+
+@pytest.mark.parametrize("skill", _COACH_SKILLS)
+def test_prompt_61_coach_carries_positive_callout_balance(skill: str) -> None:
+    """COACH-04: every coach cell carries an over-correction guard — a
+    positive-callout / 'say it when something works' balance rule.
+
+    Robust to wording (PRO='PROPS', BEGINNER='ENCOURAGING TONE', the post-61-02
+    INTERMEDIATE will satisfy one of these) but still fails if a cell has NO
+    balance rule at all. RED for INTERMEDIATE today.
+    """
+    body = build_system_instruction(skill, "coach").lower()
+    markers = [
+        "props",
+        "encouraging",
+        "balance",
+        "when something works",
+        "say it works",
+        "when a move",
+        "credit it",
+        "call it",
+    ]
+    assert any(
+        m in body for m in markers
+    ), f"coach({skill}) has no positive-callout balance rule (markers: {markers})"
+
+
+@pytest.mark.parametrize("skill", _COACH_SKILLS)
+def test_prompt_61_coach_routes_calm_only_tts_tags(skill: str) -> None:
+    """COACH-04 / Pitfall 5: coach mode gets the calm-only tag set.
+
+    The default `build_system_instruction` path includes the tag DSL. Coach
+    delivery must advertise the calm tags ([chill]/[whisper]) and must NOT
+    advertise the hype tags ([excited]/[fast]) — routing already exists, so
+    this is GREEN now and fences against calm-tag drift.
+    """
+    body = build_system_instruction(skill, "coach")
+    assert "[chill]" in body, f"coach({skill}) missing calm [chill] tag"
+    assert "[whisper]" in body, f"coach({skill}) missing calm [whisper] tag"
+    assert "[excited]" not in body, f"coach({skill}) leaked hype [excited] tag"
+    assert "[fast]" not in body, f"coach({skill}) leaked hype [fast] tag"
