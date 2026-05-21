@@ -49,7 +49,9 @@ from __future__ import annotations
 import json
 import sys
 import time
-from typing import Any
+from typing import Any, Optional
+
+from pydantic import BaseModel
 
 from vibemix.state.deck_state import DeckTrack
 from vibemix.state.harmonics import to_camelot
@@ -70,26 +72,31 @@ VISION_CONF: float = 0.5
 # (RESEARCH A2, ~5-10s band; cost bound + DoS mitigation T-59-05-03).
 DEFAULT_VISION_INTERVAL_S: float = 7.0
 
-# The JSON schema for the structured deck-read. Kept as a plain dict so the call
-# works with both ``types.GenerateContentConfig(response_schema=...)`` and the
-# dict-config form, and so the schema is trivially inspectable in tests.
-_DECK_READ_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "decks": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "side": {"type": "string", "nullable": True},
-                    "title": {"type": "string", "nullable": True},
-                    "key": {"type": "string", "nullable": True},
-                    "bpm": {"type": "number", "nullable": True},
-                },
-            },
-        }
-    },
-}
+# The structured deck-read schema. Mirrors the established repo pattern —
+# ``debrief/drills.py`` passes a Pydantic ``BaseModel`` as ``response_schema``
+# (the genai schema layer expresses field-presence via ``Optional[...]``, NOT the
+# OpenAPI ``"nullable": True`` key, which a plain dict could leave silently
+# ignored by the SDK — WR-03). Using the model class is what makes the
+# STRUCTURED-output guarantee (guardrail ②) actually hold, so the eval gate
+# (Task 3) measures the same constrained call that ships. The null-defensive
+# ``_parse`` still protects deck-state regardless.
+class DeckSlot(BaseModel):
+    """One deck panel read off the screenshot. Every field Optional — an
+    unreadable badge returns ``None`` (no guess), parsed null-defensively."""
+
+    side: Optional[str] = None
+    title: Optional[str] = None
+    key: Optional[str] = None
+    bpm: Optional[float] = None
+
+
+class DeckRead(BaseModel):
+    """Structured deck-vision response — ``{"decks": [DeckSlot, ...]}``."""
+
+    decks: list[DeckSlot] = []
+
+
+_DECK_READ_SCHEMA: type[BaseModel] = DeckRead
 
 _DECK_READ_PROMPT = (
     "You are reading a DJ software screenshot to extract per-deck track state. "
