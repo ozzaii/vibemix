@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" style="background: transparent; margin: 0; padding: 0;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>vibemix pill</title>
+    <!--
+      Phase 62 Plan 04 — floating-pill overlay webview entry.
+
+      This is the THIRD Tauri overlay webview (after mascot_window + debrief),
+      loaded into the "pill" window built by pill_window::create_pill_window
+      (Plan 62-01/02). The window itself is `transparent: true` +
+      `always_on_top: true` + `decorations: false` + non-activating per the
+      62-UI-SPEC §Window/Tauri Contract.
+
+      TRANSPARENT-OVERLAY INVARIANT (cloned from the shipped overlay entries —
+      NOT referenced by name in any test surface so the mascot-audit fence
+      stays green): tokens.css applies a v5 cinematic body background (radial
+      vignette + film-grain SVG via body::before) at :root scope. That would
+      opaque-out the always-on-top pill window. We force html/body transparent
+      !important and disable body::before so the Tauri transparent flag
+      composites the pill's own --glass-3 rgba surface straight over the
+      desktop. The !important is justified — the overlay MUST composite over
+      the desktop (62-UI-SPEC §Color / RESEARCH Pitfall 4).
+
+      The VISIBLE surface is painted by CSS `--glass-3` = rgba(2,3,6,0.88)
+      (62-UI-SPEC §Color), NOT OS vibrancy — guarantees mac+win parity +
+      dodges the DMG white-box regression (tauri#13415). backdrop-filter is a
+      progressive enhancement layered ON TOP, never the sole opacity source.
+      (The explicit rgba glass surface + deck-context chips land in Plan 62-05;
+      this scaffold lays out the structure + the core idle/listening/speaking/
+      expand surface.)
+
+      Hard rules honoured (frontend-enforcement skill):
+        - tokens-only CSS (var(--*)), Saira + JetBrains Mono only, single amber
+          accent reserved to the state dot / waveform / citation chips.
+        - No external CDNs, no inline scripts beyond the module import.
+        - Transparent root chain so the pill is a free-floating lozenge.
+    -->
+    <link rel="stylesheet" href="/src/tokens.css" />
+    <style>
+      /* ── Transparent-overlay invariant override ─────────────────────────
+       * Survive the tokens.css v5 vignette + kill the film-grain SVG layer so
+       * the pill composites over the desktop. */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent !important;
+        background-image: none !important;
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+      }
+      body::before {
+        display: none !important;
+      }
+
+      /* ── Pill surface ──────────────────────────────────────────────────
+       * 62-UI-SPEC: collapsed 280×44, --rad-lg lozenge, --glass-3 dark glass,
+       * hairline silk edge, top inner-light seam. Expands DOWN only. The
+       * explicit rgba glass tuning is finalised in 62-05; this scaffold uses
+       * the --glass-3 token (already rgba(2,3,6,0.88)). */
+      .pill {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        width: 100vw;
+        background: var(--glass-3);
+        border: 1px solid var(--glass-edge);
+        border-radius: var(--rad-lg);
+        box-shadow: inset 0 1px 0 var(--glass-top);
+        backdrop-filter: var(--blur-glass-light);
+        -webkit-backdrop-filter: var(--blur-glass-light);
+        overflow: hidden;
+        font-family: var(--type-display);
+        color: var(--silk);
+        cursor: default;
+      }
+
+      /* ── Drag strip — top 28px (62-UI-SPEC §Drag handle) ───────────────
+       * The whole strip is the drag region; a faint 2px×20px --silk-22
+       * grab-bar is the only non-amber affordance. */
+      .pill__drag {
+        flex: 0 0 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: grab;
+      }
+      .pill__drag:active {
+        cursor: grabbing;
+      }
+      .pill__grab {
+        width: 20px;
+        height: 2px;
+        border-radius: 1px;
+        background: var(--silk-22);
+        pointer-events: none;
+      }
+
+      /* ── Collapsed row — state dot + label + waveform ──────────────────── */
+      .pill__row {
+        flex: 1 1 auto;
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2);
+        padding: 0 var(--sp-3) var(--sp-1);
+      }
+      .pill__dot {
+        flex: 0 0 auto;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--silk-40); /* idle: dim, no pulse */
+      }
+      .pill[data-state="listening"] .pill__dot,
+      .pill[data-state="speaking"] .pill__dot {
+        background: var(--amber);
+      }
+      .pill[data-state="listening"] .pill__dot {
+        animation: pill-blink 1.4s ease-in-out infinite;
+      }
+      .pill[data-state="speaking"] .pill__dot {
+        animation: pill-blink 0.9s ease-in-out infinite;
+      }
+      @keyframes pill-blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+      }
+      .pill__label {
+        flex: 0 0 auto;
+        font-variation-settings: "wdth" 85, "wght" 500;
+        font-size: 9px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--silk-65);
+        line-height: 1;
+      }
+      .pill__wave {
+        flex: 1 1 auto;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        min-width: 0;
+        height: 16px;
+      }
+
+      /* ── Expand panel — grows DOWN on a reaction (62-UI-SPEC) ───────────
+       * Hidden when collapsed; the rAF loop toggles data-state="expand". The
+       * 200ms reveal uses --motion-transition. */
+      .pill__expand {
+        display: none;
+        flex-direction: column;
+        gap: var(--sp-4);
+        padding: 0 var(--sp-4) var(--sp-4);
+      }
+      .pill[data-state="expand"] .pill__expand {
+        display: flex;
+      }
+      .pill__reaction {
+        font-variation-settings: "wdth" 100, "wght" 400;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--silk);
+        /* Max 3 lines, ellipsis after (62-UI-SPEC §Typography). */
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      /* Mount left for 62-05 to populate deck-context chips. */
+      .pill__decks {
+        display: none;
+      }
+    </style>
+  </head>
+  <body style="background: transparent; margin: 0; padding: 0; overflow: hidden;">
+    <div class="pill" id="pill" data-state="idle">
+      <!-- Top 28px = drag strip (62-UI-SPEC §Drag handle). -->
+      <div class="pill__drag" id="pill-drag" aria-hidden="true">
+        <div class="pill__grab"></div>
+      </div>
+      <!-- Collapsed row: state dot + state label + waveform mount. -->
+      <div class="pill__row">
+        <div class="pill__dot" id="pill-dot" aria-hidden="true"></div>
+        <div class="pill__label" id="pill-label">IDLE</div>
+        <div class="pill__wave" id="pill-wave"></div>
+      </div>
+      <!-- Expand panel: reaction text + citation strip mount (62-04);
+           deck-context chips mount (62-05). -->
+      <div class="pill__expand" id="pill-expand">
+        <div class="pill__reaction" id="pill-reaction"></div>
+        <div class="pill__decks" id="pill-decks"></div>
+      </div>
+    </div>
+    <script type="module" src="/src/pill/index.ts"></script>
+  </body>
+</html>
