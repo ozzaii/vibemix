@@ -260,3 +260,62 @@ def test_transition_silent_when_decks_unresolved(mocker):
     _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is None or ev.type != "TRANSITION_OPPORTUNITY"
+
+
+def test_transition_fires_when_grounded(mocker):
+    """Positive path (closes the WR-02/WR-03 fix's test gap): a SAFE pair (so
+    KEY_CLASH cannot pre-empt) + both decks resolved + a FRESH structural blend
+    move (age ≤ BLEND_RECENCY_S) + the melodic-overlap gate passing →
+    Event("TRANSITION_OPPORTUNITY") citing both decks.
+
+    The move is primed into last_mix_moves_seen so the higher-priority live
+    MIX_MOVE branch (which reacts to NEW moves) treats it as already-seen — this
+    is exactly the retrospective semantics: MIX_MOVE fired live on a prior tick,
+    TRANSITION_OPPORTUNITY narrates the completed blend after."""
+    d = _enabled_detector()
+    ms = _clash_state(
+        a_camelot="8A",
+        b_camelot="9A",  # adjacent perfect fifth — SAFE, so no KEY_CLASH
+        recent_moves=[(1.0, "xfader→full-B")],  # fresh structural blend (age 1.0s ≤ 8.0)
+    )
+    _prime(d, ms, mocker)
+    d.last_mix_moves_seen = ["xfader→full-B"]  # MIX_MOVE already reacted live
+    ev = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert ev is not None
+    assert ev.type == "TRANSITION_OPPORTUNITY"
+    assert ev.extra["a_camelot"] == "8A"
+    assert ev.extra["b_camelot"] == "9A"
+
+
+def test_transition_silent_when_blend_move_stale(mocker):
+    """WR-03 age bound: a structural blend move older than BLEND_RECENCY_S (8.0s)
+    is too stale to ground a 'you just blended' note → no fire (falls through).
+    Move primed as seen so MIX_MOVE doesn't fire — isolating the age bound."""
+    d = _enabled_detector()
+    ms = _clash_state(
+        a_camelot="8A",
+        b_camelot="9A",
+        recent_moves=[(11.0, "xfader→full-B")],  # stale: age 11.0s > 8.0
+    )
+    _prime(d, ms, mocker)
+    d.last_mix_moves_seen = ["xfader→full-B"]
+    ev = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert ev is None or ev.type != "TRANSITION_OPPORTUNITY"
+
+
+def test_transition_suppressed_in_breakdown(mocker):
+    """WR-02 symmetry: even with a fresh blend move + resolved decks, the melodic-
+    overlap gate suppresses TRANSITION_OPPORTUNITY during a breakdown (no melodic
+    overlap to talk about) — same gate the clash path runs. Move primed as seen
+    so MIX_MOVE doesn't fire — isolating the melodic gate."""
+    d = _enabled_detector()
+    ms = _clash_state(
+        a_camelot="8A",
+        b_camelot="9A",
+        phase="breakdown",
+        recent_moves=[(1.0, "xfader→full-B")],
+    )
+    _prime(d, ms, mocker)
+    d.last_mix_moves_seen = ["xfader→full-B"]
+    ev = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert ev is None or ev.type != "TRANSITION_OPPORTUNITY"
