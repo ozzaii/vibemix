@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v5.0
 milestone_name: The Useful Cut
 status: executing
-last_updated: "2026-05-21T21:20:54.305Z"
-last_activity: 2026-05-21 -- Phase 62 execution started
+last_updated: "2026-05-22T00:00:00.000Z"
+last_activity: 2026-05-22 -- 62-01 pill_window spike + "pill" capability complete (PILL-01/04 engineering-green)
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 42
-  completed_plans: 37
-  percent: 88
+  completed_plans: 38
+  percent: 90
 ---
 
 # vibemix — State
@@ -46,9 +46,9 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 ## Current Position
 
 Phase: 62 (floating-pill-ui) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 62
-Last activity: 2026-05-21 -- Phase 62 execution started
+Plan: 2 of 5
+Status: 62-01 COMPLETE — pill_window spike + capability landed; ready for 62-02 (primary_surface switch)
+Last activity: 2026-05-22 -- 62-01 pill_window.rs (transparent/on-top/non-focus-steal, geometry persist + display re-clamp, macOS Accessory FLOOR + gated NSPanel STRETCH) + "pill" capability label; cargo build clean, cargo test 59/59; PILL-01/PILL-04 engineering-complete (felt drag + focus-non-steal = KAAN-ACTION). Decision: objc2 (raw, crates.io) over objc2-app-kit for the swizzle — graph unchanged; git tauri-nspanel stays rejected.
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Last activity: 2026-05-21 -- Phase 62 execution started
 | Phase 59 P05 | 22 min | 2 tasks | 5 files |
 | Phase 61 P01 | 9min | 3 tasks | 5 files |
 | Phase 61 P02 | 12 min | 2 tasks | 3 files |
+| Phase 62 P01 | 6min | 4 tasks | 5 files |
 
 ## Accumulated Context
 
