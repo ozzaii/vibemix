@@ -72,6 +72,14 @@ if TYPE_CHECKING:
 # only raise if false-fires appear in the Kaan-ear corpus (Plan 60-03).
 TONAL_SHARE_FLOOR: float = 0.20
 
+# Phase 60 (HARMONIC-04, review WR-03) — recency bound on the structural blend
+# move that fires TRANSITION_OPPORTUNITY. state.recent_moves is a ~12s window
+# (refresh.py), so an unbounded scan would let a "you just blended A→B" note
+# fire on a move up to ~12s stale. Bound it to the same freshness the coach
+# uses when it surfaces recent_moves to the LLM (coach.py: age <= 8.0) so the
+# past-tense "just" claim stays grounded.
+BLEND_RECENCY_S: float = 8.0
+
 
 class EventDetector:
     """Reads MusicState diffs, emits at most ONE event per cycle.
@@ -376,7 +384,23 @@ class EventDetector:
         # keys) that indicates a blend just happened. The coach narrates it
         # past-tense ("you just blended A→B, the keys sit fine / clash") — no
         # present-tense imperative (those arrive 5-10s late, Pitfall 3).
-        if self._harmonic_clash_enabled and self._cooldown_ok("TRANSITION_OPPORTUNITY", now):
+        #
+        # SYMMETRY WITH KEY_CLASH (Phase 60 review WR-02/WR-03): this branch
+        # carries a clash verdict (`clash:`) to the audience exactly like the
+        # KEY_CLASH path above, so it MUST be at least as grounded. Two guards
+        # were tightened to match:
+        #   (i)  _melodic_overlap_gate — without it a blend note could fire
+        #        during a breakdown / vocal acapella / atonal tool track, the
+        #        precise false-expertise class this phase guards against;
+        #   (ii) BLEND_RECENCY_S age bound on the structural move — recent_moves
+        #        is a ~12s window (refresh.py), so an unbounded scan could
+        #        narrate "you just blended" on a move up to ~12s stale. Bounded
+        #        to match the cited deck-state freshness (coach.py uses age<=8.0).
+        if (
+            self._harmonic_clash_enabled
+            and self._melodic_overlap_gate(state)
+            and self._cooldown_ok("TRANSITION_OPPORTUNITY", now)
+        ):
             decks = state.deck_state.decks
             a, b = decks.get("A"), decks.get("B")
             both_cited = (
@@ -388,11 +412,12 @@ class EventDetector:
                 and b.confidence >= DECK_CITE_MIN_CONF
             )
             structural_blend = any(
-                any(
+                age <= BLEND_RECENCY_S
+                and any(
                     k in label
                     for k in ("killed", "_low:", "_mid:", "_hi:", "_filter:", "xfader")
                 )
-                for _age, label in state.recent_moves
+                for age, label in state.recent_moves
             )
             if both_cited and structural_blend:
                 ev = Event(
