@@ -496,20 +496,20 @@ function deckChipText(d: { deck: string; camelot: string | null; bpm: number | n
 | A4 | The direct-WS live frame carries the Phase-59 deck_state fields (not only the bridged snapshot) | Pattern 2 / Deck chips | MEDIUM — confirm at plan time which frame variant carries `deck_state`/`key`; if deck fields are bridge-only, the pill can use the Rust→event bridge for the deck chips specifically (still no new port). |
 | A5 | `set_activation_policy(Accessory)` does not regress the main session window / tray behavior | Leg A (floor) | MEDIUM — Accessory hides the app from the Dock; verify the tray + main window still behave (the app is already tray-centric, so Accessory likely aligns, but confirm). |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Which focus-non-steal path lands on the built app?**
    - What we know: NonactivatingPanel needs an NSPanel; Tauri gives an NSWindow; Accessory policy is the no-dep floor; objc2 swizzle is the true-fix stretch.
    - What's unclear: whether the in-tree swizzle works cleanly with wry's NSWindow within the spike budget.
-   - Recommendation: plan a bounded spike task (Floor first, Stretch attempt, honest fallback). Felt result = KAAN-ACTION.
+   - **RESOLVED:** Plan 62-01 ships the Accessory-policy + `focused(false)` **floor** as the real PILL-04 mechanism, with the in-tree objc2 NSPanel swizzle as a **bounded stretch** (honest fallback to the floor if it doesn't land in budget). The *felt* focus-non-steal on the built app = KAAN-ACTION live-confirm.
 
 2. **Does the DMG build reproduce #13415 white-box?**
    - What we know: open issue, no fix; explicit rgba mitigates the content.
    - What's unclear: chrome-edge transparency on the artifact.
-   - Recommendation: KAAN-ACTION build-and-run; document outcome.
+   - **RESOLVED:** explicit `--glass-3` rgba (Plan 62-05) mitigates the content surface; the chrome-edge transparency on the built `.dmg` = KAAN-ACTION build-and-run (document outcome). Not a blocker.
 
 3. **Does `deck_state` ride the direct-WS frame or only the bridged snapshot?** (A4)
-   - Recommendation: confirm in `src/vibemix/runtime/ws_bus` at plan time; choose direct-WS vs bridge per-field accordingly (both honor one-socket).
+   - **RESOLVED:** confirmed (PATTERNS + grep) `deck_state` rides **NEITHER** frame today — it lives only in-process in `MusicState.deck_state`. Plan 62-03 adds it additively to the existing flat ws:8765 frame (no new port → honors one-socket); 62-05's deck-chips consume it. Producer (62-03, Wave 1) lands before consumer (62-05, Wave 4).
 
 ## Environment Availability
 
