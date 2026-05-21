@@ -3,19 +3,23 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: SHIP
 status: executing
-last_updated: "2026-05-21T06:37:19.072Z"
-last_activity: 2026-05-21 -- Phase 56 execution started
+last_updated: "2026-05-21T10:20:00.000Z"
+last_activity: 2026-05-21 -- Phase 56 (Performance + Live Mascot) COMPLETE (3/3 plans; vitest 711 + perf suites green; verify human_needed 13/13 engineering must-haves; review 0 critical, WR-01+IN-01 fixed). Retargeted mascot work to the shipped Three.js GLB rig. Felt perf + mascot-alive live-drive = KAAN-ACTION. Next: plan + execute Phase 57
 progress:
   total_phases: 8
-  completed_phases: 5
-  total_plans: 19
-  completed_plans: 16
-  percent: 63
+  completed_phases: 6
+  total_plans: 22
+  completed_plans: 19
+  percent: 75
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-21 — **Phase 55 (Feedback Mode Live + Citation Integrity) COMPLETE** (3/3 plans; full suite 3821 passed; review 0 critical / 1 warning + 3 info, WR-01+IN-01 fixed). LIVE-04 made airtight provable engineering: zero-orphan replay + hallucination-strip on a real non-empty registry + live/debrief consistency (REAL CitationLinter+EvidenceRegistry, no mocks); the two `_citation_telemetry()` stubs closed with REAL signals — cumulative stripped/total `slop_ratio` + actual stripped text sourced from `StrippedRateTracker` (the `1/(1+mean)` placeholder is gone). LIVE-02 coach grounding pinned across ≥2 genres (REAL EventDetector real fixture + synthetic genre-2; empty/weak evidence→no fire). Verify = human_needed: 8/8 engineering must-haves green; 2 Kaan live-drive items persisted (`55-HUMAN-UAT.md`). Code-review fixes: WR-01 (live/debrief consistency test now drives the real `drills._citation_resolves`, not the dormant linter mode) + IN-01 (`drills.py` uses canonical `DEBRIEF_TOLERANCE_S`). IN-02/IN-03 deferred v2.x. **Phases 51–55 COMPLETE (5/8, 62%).** Next: plan + execute Phase 56 (performance + live mascot).
+**Last updated:** 2026-05-21 — **Phase 56 (Performance + Live Mascot) COMPLETE** (3/3 plans; vitest 711 passed + Python perf suites green; verify human_needed 13/13 engineering must-haves; review 0 critical / 1 warning + 3 info, WR-01+IN-01 fixed). **KEY CORRECTION:** research found the shipped Tauri app loads the **Three.js GLB rig** (`tauri/ui/mascot.html`), NOT root `mascot.html` (sprites absent) — retargeted the whole phase to the surface users actually see (CONTEXT POST-RESEARCH CORRECTION block). LIVE-05/05a: `SnapshotSlice` threads `music`/`voice` from the live bus frame; 6 modes reachable each gated to a real event; music-confirmation anti-slop guard (now mirrors real `phase.py` semantics after WR-01 fix — `PEAK_FLOOR_RMS=0.045` for peak, breakdown rejects only the opposite extreme — breakdown/peak no longer over-suppressed); speaking-overrides-music; FSM pure. PERF-01 `LIVE_TTFT_BUDGET_MS=1500` + `thinking_gate` MINIMAL pinned (TTFTMeter is telemetry-only); PERF-02 zero soak underruns (reused `SoakCounters`); PERF-03 dispatch p95 ~0.22ms < 50ms. Skipped standalone gsd-ui-review (advisory; UI-SPEC target shifted to the 3D rig mid-phase + visual felt-quality is a 3D-render Kaan-eye call). Felt TTFT/60fps/no-dropout + "mascot feels alive across modes" live-drive = KAAN-ACTION (`56-HUMAN-UAT.md`). NOTE: Kaan ran parallel persona/prompt WIP this session (uncommitted: `__main__.py`, `dj_cohost.py`, `audio/constants.py` INVOKE_AUDIO_SECONDS 18→30, `prompts/matrix.py` react-don't-go-silent, `tests/agent/test_*`) — Phase 56 preserved all of it untouched. **Phases 51–56 COMPLETE (6/8, 75%).** Next: plan + execute Phase 57 (Sexify Finish).
+
+---
+
+### (prior) Phase 55 — Feedback Mode Live + Citation Integrity COMPLETE (3/3 plans; full suite 3821 passed; review 0 critical / 1 warning + 3 info, WR-01+IN-01 fixed). LIVE-04 made airtight provable engineering: zero-orphan replay + hallucination-strip on a real non-empty registry + live/debrief consistency (REAL CitationLinter+EvidenceRegistry, no mocks); the two `_citation_telemetry()` stubs closed with REAL signals — cumulative stripped/total `slop_ratio` + actual stripped text sourced from `StrippedRateTracker` (the `1/(1+mean)` placeholder is gone). LIVE-02 coach grounding pinned across ≥2 genres (REAL EventDetector real fixture + synthetic genre-2; empty/weak evidence→no fire). Verify = human_needed: 8/8 engineering must-haves green; 2 Kaan live-drive items persisted (`55-HUMAN-UAT.md`). Code-review fixes: WR-01 (live/debrief consistency test now drives the real `drills._citation_resolves`, not the dormant linter mode) + IN-01 (`drills.py` uses canonical `DEBRIEF_TOLERANCE_S`). IN-02/IN-03 deferred v2.x. **Phases 51–55 COMPLETE (5/8, 62%).** Next: plan + execute Phase 56 (performance + live mascot).
 
 ---
 
@@ -25,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 56 — Performance + Live Mascot
+- **Current focus:** Phase 57 — Sexify Finish
 - **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts on external clock).
 - **Project mode:** standard.
 - **Granularity:** fine.
@@ -36,10 +40,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 ## Current Position
 
-Phase: 56 (Performance + Live Mascot) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 56
-Last activity: 2026-05-21 -- Phase 56 execution started
+Phase: 56 (Performance + Live Mascot) — COMPLETE (engineering green; felt perf + mascot-alive = KAAN-ACTION)
+Plan: 3 of 3
+Status: Phase 56 complete — ready to plan + execute Phase 57 (Sexify Finish)
+Last activity: 2026-05-21 -- Phase 56 complete (3/3 plans, vitest 711 green, verify human_needed, review fixes applied)
 
 ## Performance Metrics
 
