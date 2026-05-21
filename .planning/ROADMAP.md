@@ -81,7 +81,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
   4. Transition-execution feedback gives **concrete, actionable blend notes** (e.g. EQ bass-swap, phrase alignment, where to start/end the blend), scoped strictly to what is grounded in deck-state and retrospective/past-tense — no advice is emitted when the underlying signals are not available, and no mid-blend present-tense imperatives.
 **Plans**: 4 plans (3 waves)
 - [x] 60-01-PLAN.md — Deterministic Camelot clash predicate (`is_clash`/`compatible`/`semitone_distance`) + table-oracle test [HARMONIC-01]
-- [ ] 60-02-PLAN.md — `_melodic_overlap_gate` + KEY_CLASH/TRANSITION_OPPORTUNITY detector branches + default-off `harmonic_clash_enabled` flag [HARMONIC-02, HARMONIC-03]
+- [x] 60-02-PLAN.md — `_melodic_overlap_gate` + KEY_CLASH/TRANSITION_OPPORTUNITY detector branches + default-off `harmonic_clash_enabled` flag [HARMONIC-02, HARMONIC-03]
 - [ ] 60-03-PLAN.md — Kaan-ear veto harness: disagreed-pairs corpus + test + runnable scorer (KAAN-ACTION ship gate) [HARMONIC-03]
 - [ ] 60-04-PLAN.md — Cited narrate-only coach fragments (KEY_CLASH + retrospective TRANSITION_OPPORTUNITY) + matrix grammar reconcile [HARMONIC-01, HARMONIC-04]
 **Kaan-ear veto**: HARMONIC-03 cannot ship until Kaan validates the suppression thresholds against his real disagreed-pairs corpus (no false clash on a pair he'd happily mix).
