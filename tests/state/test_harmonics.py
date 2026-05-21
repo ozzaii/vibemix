@@ -16,7 +16,12 @@ from __future__ import annotations
 
 import pytest
 
-from vibemix.state.harmonics import to_camelot
+from vibemix.state.harmonics import (
+    compatible,
+    is_clash,
+    semitone_distance,
+    to_camelot,
+)
 
 # The 24 musical-notation → Camelot pairs (the full wheel, both enharmonic
 # spellings where they differ). This is the table-driven oracle.
@@ -127,3 +132,153 @@ def test_unrecognized_input_returns_none_never_raises(raw):
     """Empty / None / garbage / out-of-range → None, NEVER raises (honest
     unknown — degrades to key=unknown rather than guessing a Camelot code)."""
     assert to_camelot(raw) is None
+
+
+# =====================================================================
+# Phase 60 (HARMONIC-01) — the deterministic Camelot clash predicate.
+# Same table-oracle shape as to_camelot above: module-level (a, b) pair
+# lists + parametrized assertions, plus an explicit anchors smoke gate,
+# plus a never-raises garbage test.
+#
+# Verified circle-of-fifths derivation (60-RESEARCH §Pattern 1):
+# same-letter hour-distance → pitch-class semitone distance → verdict.
+#   hour 0 → 0 st   (same key)             → SAFE
+#   hour 1 → 5/7 st (perfect fifth)        → SAFE  (adjacent ±1, bread-and-butter)
+#   hour 2 → 2 st   (+2 energy move)       → SAFE
+#   hour 3 → 3 st                          → NEITHER (drift; silent)
+#   hour 4 → 4 st                          → NEITHER (drift; silent)
+#   hour 5 → 1 SEMITONE                    → CLASH
+#   hour 6 → 6 st   (tritone)              → CLASH
+#   hour 7 → 1 SEMITONE                    → CLASH
+# Cross-letter same-number = relative major/minor = SAFE.
+# =====================================================================
+
+# CLASH band — same-letter hours {5,6,7}, all keyed off 8A (the 1-semitone /
+# tritone dissonance that genuinely fights on a melodic overlap).
+CLASH_PAIRS = [
+    ("8A", "3A"),  # hour-distance 5 = 1 semitone
+    ("8A", "1A"),  # hour-distance 5 = 1 semitone
+    ("8A", "2A"),  # hour-distance 6 = tritone
+]
+
+# SAFE band — same key, adjacent fifth (±1), +2 energy, relative major/minor.
+SAFE_PAIRS = [
+    ("5A", "5A"),  # hour-distance 0 = same key
+    ("8A", "9A"),  # hour-distance 1 = adjacent perfect fifth
+    ("8A", "7A"),  # hour-distance 1 = adjacent perfect fifth (other side)
+    ("8A", "10A"),  # hour-distance 2 = +2 energy boost
+    ("8A", "6A"),  # hour-distance 2 = -2 energy move (NOT drift)
+    ("8A", "8B"),  # relative major/minor — same number, swapped letter
+]
+
+# DRIFT / "neither" zone — same-letter hours {3,4}: is_clash False AND
+# compatible False (stay SILENT; a wrong key tag here is indistinguishable
+# from a real drift, so we say nothing).
+DRIFT_PAIRS = [
+    ("8A", "5A"),  # hour-distance 3 = drift
+    ("8A", "12A"),  # hour-distance 4 = drift
+]
+
+
+@pytest.mark.parametrize("a,b", CLASH_PAIRS)
+def test_clash_pairs_flag(a, b):
+    """The unambiguous 1-semitone / tritone band (hours 5/6/7) → is_clash True.
+    Symmetric — order must not matter."""
+    assert is_clash(a, b) is True
+    assert is_clash(b, a) is True
+
+
+@pytest.mark.parametrize("a,b", SAFE_PAIRS + DRIFT_PAIRS)
+def test_safe_pairs_never_flag(a, b):
+    """SAFE pairs (same / fifth / +2 / relative) AND the drift "neither" zone
+    never flag as a clash — NARROW is_clash, conservative-by-default."""
+    assert is_clash(a, b) is False
+    assert is_clash(b, a) is False
+
+
+@pytest.mark.parametrize("a,b", SAFE_PAIRS)
+def test_compatible_safe_pairs(a, b):
+    """SAFE pairs are explicitly asserted compatible."""
+    assert compatible(a, b) is True
+    assert compatible(b, a) is True
+
+
+@pytest.mark.parametrize("a,b", DRIFT_PAIRS)
+def test_drift_pairs_not_compatible_not_clash(a, b):
+    """The drift zone (hours 3/4) is the deliberate silent middle: neither a
+    clash nor an asserted-compatible pair."""
+    assert is_clash(a, b) is False
+    assert compatible(a, b) is False
+
+
+def test_canonical_clash_safe_anchors():
+    """The RESEARCH-cited anchors, asserted directly as a smoke gate."""
+    # CLASH
+    assert is_clash("8A", "3A") is True  # 1 semitone
+    assert is_clash("8A", "1A") is True  # 1 semitone
+    # SAFE — the pairs Kaan would happily mix must NOT flag
+    assert is_clash("8A", "9A") is False  # adjacent fifth
+    assert is_clash("8A", "8B") is False  # relative major/minor
+    assert is_clash("8A", "10A") is False  # +2 energy
+    assert is_clash("5A", "5A") is False  # same key
+    # compatible mirror
+    assert compatible("8A", "9A") is True
+    assert compatible("8A", "10A") is True
+    assert compatible("8A", "8B") is True
+    assert compatible("8A", "3A") is False  # clash is not compatible
+    assert compatible("8A", "5A") is False  # drift not asserted compatible
+
+
+@pytest.mark.parametrize(
+    "raw_a,raw_b",
+    [
+        (None, "8A"),
+        ("8A", None),
+        ("", "8A"),
+        ("garbage", "8A"),
+        ("not-a-key", "8A"),
+        ("13A", "8A"),  # out-of-range Camelot number
+        ("0A", "8A"),  # out-of-range (starts at 1)
+        ("8C", "8A"),  # invalid wheel letter
+        (None, None),
+    ],
+)
+def test_predicate_honest_none_never_raises(raw_a, raw_b):
+    """None / empty / garbage / out-of-range in → is_clash and compatible both
+    return False, never raise (honest-unknown; we never flag what we can't
+    prove dissonant)."""
+    assert is_clash(raw_a, raw_b) is False
+    assert compatible(raw_a, raw_b) is False
+
+
+@pytest.mark.parametrize(
+    "a,b,expected",
+    [
+        ("8A", "3A", 1),  # hour-distance 5 → 1 semitone
+        ("8A", "1A", 1),  # hour-distance 5 → 1 semitone
+        ("8A", "2A", 6),  # hour-distance 6 → tritone
+        ("8A", "9A", 5),  # hour-distance 1 → perfect fifth (5 st)
+        ("8A", "10A", 2),  # hour-distance 2 → +2 semitones
+        ("5A", "5A", 0),  # hour-distance 0 → same key
+        ("8A", "5A", 3),  # hour-distance 3 → 3 semitones (drift)
+        ("8A", "12A", 4),  # hour-distance 4 → 4 semitones (drift)
+    ],
+)
+def test_semitone_distance_anchors(a, b, expected):
+    """Same-letter hour-distance → pitch-class semitone distance (the verified
+    table). Lets the coach narrate the interval without the LLM computing it."""
+    assert semitone_distance(a, b) == expected
+
+
+@pytest.mark.parametrize(
+    "a,b",
+    [
+        ("8A", "8B"),  # cross-letter — not on a single same-letter ring
+        ("8A", "9B"),
+        (None, "8A"),
+        ("8A", "garbage"),
+    ],
+)
+def test_semitone_distance_cross_letter_or_none_is_none(a, b):
+    """Cross-letter or None-in → None (no single same-letter semitone ring)."""
+    assert semitone_distance(a, b) is None
