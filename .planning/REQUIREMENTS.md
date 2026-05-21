@@ -1,102 +1,95 @@
 # vibemix — Requirements
 
-**Milestone:** v4.0 "SHIP" — Real-Hardware Bring-Up → Public Ship
-**Started:** 2026-05-20
+**Milestone:** v5.0 "The Useful Cut" — Deck-Aware, Actionable, Unobtrusive
+**Started:** 2026-05-21
 **Mode:** `gsd-autonomous fully` (recommended grey-area answers + defer blockers to KAAN-ACTION; only privacy rule + destructive risk pause)
 
 ## Goal
 
-Take vibemix from engineering-complete (v3.1) to a co-host Kaan plugs into his MacBook and plays full sets with — validated **live on real hardware** (audio + controller), both modes feeling like a real DJ friend in the ear, polished to peak, with the public release one button away once external signatures land.
+Turn the co-host from a vibe-narrator into a genuinely **useful** DJ tool: it understands the whole deck (every loaded track + key/BPM), gives feedback a DJ can actually act on (transition mechanics + harmonic key-clash, never hype), and lives in an unobtrusive draggable pill instead of a full-screen mascot.
 
-This milestone is the first time the built app is **driven on real hardware in a real session**, not simulated. Claude has Mac access: read Tauri console + sidecar logs, simulate UI clicks, play music through the path, and (when plugged) ingest the DDJ-FLX4. Engineering closes everything that does not require an external signature; the signed publish is surfaced as KAAN-ACTION.
+Everything is held to the project's hard line: **grounded, never hallucinating, no AI slop.** The headline harmonic feature is the strongest anti-slop play in the product — a Camelot key clash is *deterministically verifiable*, so the AI can be *proven* right. The dominant risk is hallucination tripping Kaan's release gate; the milestone is sequenced as an ordered anti-slop chain (citable key source → deterministic verdict → percussive suppression → conservative confidence gate → Kaan-ear veto).
+
+Research-resolved foundations (`.planning/research/SUMMARY.md`, 4 convergent agents):
+- **Deck data-source ladder:** pyrekordbox **XML** import primary (carries key/BPM, unencrypted — dodges the post-6.6.5 SQLCipher wall + the `master.db` write-corruption landmine) → **Gemini-vision** reading the deck screenshot we already capture (universal fallback for Serato/djay/Traktor) → in-house **numpy Krumhansl-Temperley** key estimator last-resort. Graceful degradation to `unknown`.
+- **Stale-stack correction:** Essentia/librosa are NOT installed; key fallback is in-house numpy, not a heavy C++ dep. CLAP/MERT/OpenL3 stay permanently banned.
+- **Pill:** clone `mascot_window.rs` → `pill_window.rs`, same ws:8765 frames, tri-state `primary_surface` config; `tauri-nspanel` + `window-vibrancy` crates; the drag-on-unfocused-window bug is the load-bearing spike.
 
 ---
 
-## v4.0 Requirements
+## v5.0 Requirements
 
-### Real-Hardware Bring-Up (BRINGUP)
+### Full Deck Awareness (DECK) — Phase 59
 
-- [ ] **BRINGUP-01**: The Tauri app + Python sidecar launch on Kaan's actual MacBook and reach a live "listening" session with no crash on boot.
-- [ ] **BRINGUP-02**: BlackHole routing is live end-to-end — master output reaches the co-host at 48 kHz and audio levels register in real time.
-- [ ] **BRINGUP-03**: DDJ-FLX4 MIDI events are ingested live during a real session, with verified graceful fallback when the controller is unplugged.
-- [ ] **BRINGUP-04**: Runtime errors surfaced in the Tauri console + sidecar logs during a real session are triaged and fixed — no unhandled exceptions across a full-set run.
-- [ ] **BRINGUP-05**: A ≥30-minute real session runs without dropout, hang, or unbounded memory growth.
+- [ ] **DECK-01**: The co-host maintains a session-wide **deck-state** — every track loaded across the decks (title, key, BPM, energy where available), not just the one currently audible — exposed to the coach the same grounded way `phase`/`bpm`/`mood` are.
+- [ ] **DECK-02**: Deck-state is populated from a real data-source ladder: pyrekordbox **XML** primary, **Gemini-vision** deck-screenshot read as universal fallback, in-house **numpy** key estimator last-resort. When no source can resolve a track/key, it is surfaced honestly as `unknown` — never a false-confident guess.
+- [ ] **DECK-03**: A new `key:` **evidence source** + citation-linter rule lands so harmonic/transition claims are *citable* — un-cited harmonic feedback is stripped by the existing `CitationLinter`. (Gates the harmonic feature; must land before any harmonic prompt is written.)
+- [ ] **DECK-04**: Deck-state integrates into `MusicState` under the **single-writer rule** (read-only poller → `_tick_once` is the only copier), with new event types `KEY_CLASH` + `TRANSITION_OPPORTUNITY` added to the priority/cooldown maps.
+- [ ] **DECK-05**: The integration is **strictly read-only** — never writes to any DJ-software database (the `master.db` write-corruption landmine is respected); cross-deck claims are suppressed when the second deck cannot be independently resolved.
 
-### Feature Grounding — Genre (GENRE)
+### Harmonic + Transition Feedback (HARMONIC) — Phase 60
 
-- [ ] **GENRE-01**: Genre is **detected from the live audio**, not just env-pinned (Kaan directive 2026-05-21 — psytrance misclassified because there is no psytrance profile and the active profile is env-set, never auto-detected). Add a `psytrance` profile + a grounded DSP auto-detector (BPM band + band-signature + crest-factor nearest-match across the profile library) that picks the active profile from real features each tick. Anti-slop: confidence-gated with an `unknown` fallback (never a false-confident guess), hysteresis to prevent bar-to-bar flicker, and an explicit env override that wins when the user pins a genre. No CLAP/MERT/new heavy deps.
-- [ ] **GENRE-02**: The detected genre + confidence are exposed on the bus/UI the same way `phase`/`bpm`/`mood` are — surfaced honestly as `unknown` when the detector is unsure, never a hallucinated label.
+- [ ] **HARMONIC-01**: Camelot-wheel key relationships are encoded as a **deterministic Python lookup table**; the LLM only narrates a clash the **code already confirmed** — it never computes key intervals itself (the anti-slop guarantee).
+- [ ] **HARMONIC-02**: A real key clash fires **only on simultaneous melodic overlap** in clashing keys. A percussive/atonal + breakdown **suppression gate** runs *before* any clash note fires (no clash calls on two drum/tool tracks or during a breakdown/acapella).
+- [ ] **HARMONIC-03**: The clash detector is **conservative by default** — suppresses one-step-off-Camelot pairs (adjacent = safe), low-confidence keys, and ambiguous deck-resolution; tuning accounts for the ~57–70% library key-tag accuracy band. Gated behind a **Kaan-ear veto** before it can ship.
+- [ ] **HARMONIC-04**: Transition-execution feedback gives **concrete, actionable blend notes** (e.g. EQ bass-swap, phrase alignment, where to start/end the blend) — scoped strictly to what is grounded in deck-state; no advice is emitted when the underlying signals are not available.
 
-### Live-Session Validation (LIVE)
+### Actionable-Not-Hype Coach Persona (COACH) — Phase 61
 
-- [x] **LIVE-01**: Hype (party) mode produces grounded, in-time, non-slop reactions on real audio across ≥2 genres.
-- [ ] **LIVE-02**: Feedback (coach) mode produces grounded, in-time, non-slop reactions on real audio across ≥2 genres.
-- [x] **LIVE-03**: Event cooldowns + reaction latency are tuned live so reactions land in-bar, not after the moment passes.
-- [ ] **LIVE-04**: The EvidenceRegistry citation strip reflects real session events live — zero orphaned or hallucinated citations.
-- [ ] **LIVE-05**: The reactive mascot (Neon Rebel) responds correctly to live audio/MIDI events in-session — driven by the **rich signals the bus already emits** (`phase`, `mood`, `reaction_intent`, `bpm`, levels), not just the music-loudness ramp it uses today (`mascot.html` currently consumes only `music`+`voice` → 3 crude tiers).
-- [ ] **LIVE-05a**: The mascot has **many distinct modes** (Kaan directive 2026-05-21) — at minimum idle/dead-air, vibing/groove, building, drop/peak, breakdown/chill, and a speaking/emoting mode while the AI talks — each grounded in a real bus signal so a mode change always corresponds to a real musical/session event (anti-slop: no random/decorative state changes).
+- [ ] **COACH-01**: Feedback (coach) mode delivers **concrete, prescriptive DJ notes** (observed → impact → prescribe, using real DJ verbs: kill, swap, cut, filter, wait, tighten) — not narration or cheerleading.
+- [ ] **COACH-02**: The persona refactor **extends the in-flight `live-tuning-or-brain` work** (`prompts/matrix.py` COACH cells + `state/coach.py` `task_for_event`) — it does **not** add a new mode (preserves the `_CELLS`/`_VALID_MODES` env-var contract) and flows through both the genai and OpenRouter paths.
+- [ ] **COACH-03**: **Hype mode is regression-fenced** with goldens so shared-prompt edits for the coach persona cannot silently break or cold-ify the hype voice.
+- [ ] **COACH-04**: Every prescriptive note stays **anti-slop / cited** — it ties to an observed deck-state or event; the warm "friend in your ear" tone is preserved while becoming actionable (no robotic over-correction, cooldown/pacing prevents nagging).
 
-### Peak Performance (PERF)
+### Floating Pill UI (PILL) — Phase 62
 
-- [ ] **PERF-01**: TTFT (trigger → first audio out) is measured on real hardware and meets the live-path latency budget.
-- [ ] **PERF-02**: No audio glitches/dropouts in the playback path under real-session load.
-- [ ] **PERF-03**: Mascot + UI hold 60fps on the integrated-GPU MacBook during a live session.
-
-### Sexify Finish / Polish (POLISH)
-
-- [ ] **POLISH-01**: Tier-1 live surfaces (session view, mascot overlay) get a final visual pass — zero HIGH findings, CDJ Whisper consistency held.
-- [ ] **POLISH-02**: v0.1.0-rc1 carryover bugs closed — Tauri drag capability, mascot chrome strip, TCC list-population.
-- [ ] **POLISH-03**: Fresh-account first-run → first-session flow is friction-checked and tightened.
-
-### Ship (RELEASE)
-
-- [ ] **REL-01**: All engineering-side release gates pass on real artifacts — `cut_release.sh` 6-gate pre-flight + Gate 2b (hallucination) + Gate 6b (e2e report) green.
-- [ ] **REL-02**: §E2E-50A-WALK discharged by driving the real app end-to-end; walk artifact recorded.
-- [ ] **REL-03**: External-clock items (Apple Dev Agreement, SignPath OSS cert) surfaced as KAAN-ACTION with the exact one-button SHIP-CUT sequence documented and pre-verified.
+- [ ] **PILL-01**: A small, **always-on-top, transparent, draggable** Super-Whisper-style pill is positionable anywhere on screen and multi-monitor safe.
+- [ ] **PILL-02**: The pill is the **primary** live surface via a tri-state `primary_surface` config (`pill` default | `mascot` opt-in/secondary | `none`); the existing Three.js mascot overlay keeps working and does not regress (`mascot-audit` CI fence held).
+- [ ] **PILL-03**: The pill **consumes the existing ws:8765 frames** (`ipc.session.snapshot` + `ipc.session.cohost-reaction`) — no new port, no Python delivery change — and shows idle / listening / speaking / expand-on-event states with the real TTS waveform (`Levels.update_voice`) + the citation strip.
+- [ ] **PILL-04**: The pill **never steals keyboard focus** mid-set and never covers critical deck info; the drag-on-unfocused-window mechanism is resolved (spike on the built app per tauri#11605/#10767), with mac+win transparency parity.
 
 ---
 
 ## Future Requirements (deferred — next milestone)
 
-- **Vibe Mix prep module** — natural-language set creation, 3-track calibration, harmonic arc ordering, auto hot-cue write-back (spiked under `spikes/vibe_mix_slice*/`, 53 tests green). This is a **separate commercial BRAVOH product**, not the OSS live co-host. Graduates to its own milestone after the co-host ships. Do not fold into v4.0.
-- **Mixxx OSC adapter + controller-map transpiler** (10 → 30+ controllers) — v3.x candidate per `project_v2_open_candidates`.
-- **pyrekordbox integration depth, post-session debrief multi-session arc, library coach drill packs** — v3.x candidates.
-- **§VIS-04 / §VIS-05 Mixamo retargets** — real GLB land; independent asset-discharge, parallel to ship.
+- **ProDJ Link / StagelinQ hardware deck telemetry** (`prolink-connect`) — real per-deck loaded-track + play-state over the network; hardware-gated, deferred from the v5.0 data-source ladder.
+- **Live audio key-detection as a primary source** — only the numpy estimator fallback ships in v5.0; promoting audio key-detection to primary (with cross-check) is future.
+- **Per-deck low-band/bass-clash DSP** — depends on dual-deck audio separation from a single master stream; bass-clash note stays P2 until feasible.
+- **Vibe Mix prep module** — separate commercial BRAVOH product, its own milestone (unchanged from v4.0 deferral).
+- **Mixxx OSC adapter + controller-map transpiler** — v3.x candidate, unchanged.
 
 ## Out of Scope (this milestone)
 
-- **The signed public binary publish itself** — gated on Apple Dev Agreement (Francesco) + SignPath OSS cert (~1wk SLA). Surfaced as KAAN-ACTION; engineering makes it one-button.
-- **Vibe Mix prep module graduation** — separate product, separate milestone (see Future).
-- **New AI/domain features** — this is bring-up + validation + polish + ship of what is already built. No new providers, no new detectors, no scope creep (`feedback_no_scope_creep_clean_utility`).
-- **Full 30-session replay harness / LLM scorer** — hallucination gate is satisfied by Kaan's DJ ear + the autonomous proxy (`project_phase_16_kaan_dj_testing`).
+- **Next-track recommendation** — the co-host reacts to what's loaded; it does not pick the next song (would invite hallucinated suggestions; out of the grounded-reaction thesis).
+- **Transition scoring (1–10 ratings)** — gamified scores are slop-prone and not actionable; feedback is prescriptive notes, not grades.
+- **Headphone-cue / pre-listen analysis** — Gemini conflates cue vs master from a single stream; explicitly excluded.
+- **Writing to any DJ-software database** — `master.db` write path is unsafe (banned); v5.0 is read-only.
+- **Notch-locked / Dynamic-Island-only pill** — would exclude Windows; the pill is a free-floating window on both platforms.
+- **The v4.0 signed public binary publish** — still gated on Apple Dev + SignPath (KAAN-ACTION); v5.0 does not change that external clock.
+- **New AI providers / new heavy audio deps** — Gemini-only + no-CLAP + no-Essentia held; no scope creep (`feedback_no_scope_creep_clean_utility`).
 
 ## Traceability
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| BRINGUP-01 | Phase 51 | Pending |
-| BRINGUP-04 | Phase 51 | Pending |
-| BRINGUP-05 | Phase 51 | Pending |
-| BRINGUP-02 | Phase 52 | Pending |
-| GENRE-01 | Phase 52 | Pending |
-| GENRE-02 | Phase 52 | Pending |
-| BRINGUP-03 | Phase 53 | Pending |
-| LIVE-01 | Phase 54 | Complete |
-| LIVE-03 | Phase 54 | Complete |
-| LIVE-02 | Phase 55 | Pending |
-| LIVE-04 | Phase 55 | Pending |
-| PERF-01 | Phase 56 | Pending |
-| PERF-02 | Phase 56 | Pending |
-| PERF-03 | Phase 56 | Pending |
-| LIVE-05 | Phase 56 | Pending |
-| LIVE-05a | Phase 56 | Pending |
-| POLISH-01 | Phase 57 | Pending |
-| POLISH-02 | Phase 57 | Pending |
-| POLISH-03 | Phase 57 | Pending |
-| REL-01 | Phase 58 | Pending |
-| REL-02 | Phase 58 | Pending |
-| REL-03 | Phase 58 | Pending |
+| DECK-01 | Phase 59 | Pending |
+| DECK-02 | Phase 59 | Pending |
+| DECK-03 | Phase 59 | Pending |
+| DECK-04 | Phase 59 | Pending |
+| DECK-05 | Phase 59 | Pending |
+| HARMONIC-01 | Phase 60 | Pending |
+| HARMONIC-02 | Phase 60 | Pending |
+| HARMONIC-03 | Phase 60 | Pending |
+| HARMONIC-04 | Phase 60 | Pending |
+| COACH-01 | Phase 61 | Pending |
+| COACH-02 | Phase 61 | Pending |
+| COACH-03 | Phase 61 | Pending |
+| COACH-04 | Phase 61 | Pending |
+| PILL-01 | Phase 62 | Pending |
+| PILL-02 | Phase 62 | Pending |
+| PILL-03 | Phase 62 | Pending |
+| PILL-04 | Phase 62 | Pending |
 
-**Coverage:** 22 / 22 v4.0 requirements mapped to exactly one phase ✓ (no orphans, no duplicates)
+**Coverage:** 17 / 17 v5.0 requirements mapped to exactly one phase ✓ (no orphans, no duplicates)
 
-**Per-phase counts:** P51=3 (BRINGUP-01/04/05) · P52=3 (BRINGUP-02 + GENRE-01/02) · P53=1 (BRINGUP-03) · P54=2 (LIVE-01/03) · P55=2 (LIVE-02/04) · P56=5 (PERF-01/02/03 + LIVE-05 + LIVE-05a) · P57=3 (POLISH-01/02/03) · P58=3 (REL-01/02/03) = 22.
+**Per-phase counts:** P59=5 (DECK-01..05) · P60=4 (HARMONIC-01..04) · P61=4 (COACH-01..04) · P62=4 (PILL-01..04) = 17.
