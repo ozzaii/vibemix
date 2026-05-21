@@ -14,9 +14,15 @@
       + `decorations: false` + `visible_on_all_workspaces: true` per
       13-CONTEXT Area 2.
 
-      Phase 14 Plan 14-05 (Wave 4) — CDJ Whisper v5 mascot overlay chrome.
-        - tokens.css now linked so the .border-anim utility + v5 vars
-          cascade in.
+      Phase 14 → resolved direction (DESIGN.md §"The mascot window is
+      fully transparent", 2026-05-19 critique drift-resolution; reaffirmed
+      by /impeccable pass 57, 2026-05-21): the overlay is FULLY TRANSPARENT
+      — no chrome rectangle, no rim-light, no second border-sweep. The
+      WebGL canvas composites directly over the desktop and the character
+      IS the surface.
+        - tokens.css is linked so the v5 vars + .border-anim utility
+          definition cascade in (the sweep is defined but NOT painted here
+          — see below).
         - html/body forced background: transparent !important so the
           Phase 13 transparent-overlay invariant survives the tokens.css
           load (tokens.css ships a v5 dark vignette body background that
@@ -24,12 +30,14 @@
         - body::before film-grain SVG is disabled in the mascot window —
           it would render over the desktop on every overlay frame, again
           breaking transparency.
-        - A new <div class="mascot-window"> wrapper hosts the canvas with
-          glass-3 + display blur + amber bottom-edge undertone, with a
-          .border-anim.slow.rev (32s reverse sweep — de-sync from
-          session's 22s forward sweep per 14-CONTEXT Area 3).
-        - Three.js scene + renderer.ts are UNTOUCHED — this is purely a
-          chrome wrapper around the existing <canvas id="mascot-canvas">.
+        - The <div class="mascot-window"> wrapper is a bare transparent
+          positioning host (chrome.css: background transparent, border
+          none, box-shadow none). The earlier Phase 14 chrome elements
+          (.border-anim.slow.rev sweep, __top-label, __state-caption) stay
+          in markup as display:none so HMR + the mascot.chrome.test.ts
+          fixtures don't break — they render NOTHING in production.
+        - Three.js scene + renderer.ts are UNTOUCHED — this is purely the
+          transparent host around the existing <canvas id="mascot-canvas">.
 
       Plan 13-04 / 13-06 invariants honoured:
         - /src/mascot/index.ts boots a Three.js WebGLRenderer against the
@@ -40,8 +48,8 @@
       Hard rules honoured (frontend-enforcement skill):
         - No external CDNs, no inline scripts beyond the module import.
         - Transparent root chain — html + body explicitly transparent so
-          the Tauri transparent flag composites the WebGL canvas + the
-          .mascot-window chrome rectangle straight over the desktop.
+          the Tauri transparent flag composites the WebGL canvas straight
+          over the desktop (no chrome rectangle — the host is bare).
         - PixelRatio capped + transparent clear are owned by renderer.ts.
     -->
     <link rel="stylesheet" href="/src/tokens.css" />

@@ -161,14 +161,18 @@ const CSS = `
    * breathing cadence; this LED stays solid so the eye reads one signal,
    * not three. */
   .vmx-statusbar__muted[hidden] { display: none; }
-  /* Signature — Saira italic at very low alpha so brand chrome is
-   * present but does not compete with active state indicators. The
-   * earlier Caveat treatment fought the Pioneer aesthetic; v5 makes the
-   * mark sit quietly in the corner. */
+  /* Signature — Saira at very low alpha so brand chrome is present but
+   * does not compete with active state indicators. The earlier Caveat
+   * treatment fought the Pioneer aesthetic; v5 makes the mark sit quietly
+   * in the corner.
+   * 2026-05-21 /impeccable pass 57 (HIGH): dropped font-style: italic.
+   * DESIGN.md §Typography lists no italic style and RESEARCH Pitfall 5
+   * pins "no italic anywhere" (Fraunces italic was the rejected v1 tell).
+   * The recessive read is carried by silk-40 + 0.06em tracking + the
+   * leading mid-dot, not by a slanted face. */
   .vmx-statusbar__sig {
     font-family: var(--type-body);
     font-variation-settings: "wdth" 100, "wght" 400;
-    font-style: italic;
     font-size: 11px;
     color: var(--silk-40);
     letter-spacing: 0.06em;

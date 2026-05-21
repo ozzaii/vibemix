@@ -165,13 +165,19 @@ const CSS = `
     0%, 100% { transform: translateX(0); opacity: 0.6; }
     50% { transform: translateX(3px); opacity: 1; }
   }
+  /* drop-ghost — the predicted-but-not-yet drop, dashed amber outline.
+   * 2026-05-21 /impeccable pass 57 (HIGH): dropped font-style: italic
+   * (DESIGN.md §Typography + RESEARCH Pitfall 5 — "no italic anywhere";
+   * the older app mock carried italic but predates the locked CDJ-Whisper
+   * type rule). The "ghost / not-real-yet" semantic is already carried by
+   * the dashed border + amber-pale + low-alpha wash; the dashed outline
+   * is the ghost tell, not a slanted face. */
   .vmx-phase-chunk[data-kind="drop-ghost"] {
     border: 1px dashed var(--amber-40);
     background: rgba(255, 138, 61, 0.04);
     color: var(--amber-pale);
     font-family: var(--type-display);
     font-variation-settings: "wdth" 100, "wght" 600;
-    font-style: italic;
     font-size: 12px;
     letter-spacing: 0.05em;
     text-shadow: 0 0 4px var(--amber-22);
