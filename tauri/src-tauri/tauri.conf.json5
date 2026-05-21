@@ -15,7 +15,10 @@
   "build": {
     "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npm --prefix ui run dev",
+    // tauri-cli 2.10 runs beforeDevCommand from the frontend dir (tauri/ui,
+    // inferred from frontendDist), so no `--prefix ui` — that doubled to
+    // tauri/ui/ui and ENOENT'd the launch.
+    "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": ""
   },
   "app": {

@@ -58,8 +58,15 @@ def derive_audible_deck(
             return 1.0
 
     def deck_weight(d: dict, side: str) -> float:
-        if not d.get("play"):
-            return 0.0
+        # 2026-05-21 (Kaan: "ensure a/b is working") — dropped the hard
+        # play-gate. Phase 9 known issue: djay Pro doesn't write play-state
+        # back to the DDJ-FLX4, so d['play'] stays False during a live mix,
+        # which zeroed every weight and collapsed audible_deck to 'none'
+        # (no single / double / transition awareness reached the LLM). The
+        # channel fader (vol) + crossfader side are the RELIABLE grounded
+        # signals: a fader up on the audible side of the xfader means that
+        # deck is sounding, play-LED desync or not. vol<0.1 = fader down =
+        # silent is still honoured — we never guess a silent deck audible.
         vol = d.get("vol", 0) / 127.0
         if vol < 0.1:
             return 0.0

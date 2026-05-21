@@ -19,9 +19,19 @@ def test_deck_not_connected_returns_none():
     assert out == ("none", 0.0)
 
 
-def test_deck_no_play_returns_none():
-    # play=False for both decks → both weights = 0.0 → ("none", 0.0).
+def test_deck_play_flag_ignored_uses_vol_xfader():
+    # 2026-05-21 (Kaan: "ensure a/b is working") — the play-gate was dropped
+    # because djay Pro doesn't sync play-state back to the DDJ-FLX4 (Phase 9).
+    # play=False is now IGNORED: both faders up + center xfader → both decks
+    # audible → ("mix", 0.5). Audibility is judged on vol × xfader alone.
     out = derive_audible_deck({"play": False, "vol": 127}, {"play": False, "vol": 127}, 64, True)
+    assert out == ("mix", 0.5)
+
+
+def test_deck_fader_down_still_silent_regardless_of_play():
+    # The vol<0.1 floor is the grounding guard that survives the play-gate
+    # drop: faders down → silent → ("none", 0.0), even if play were True.
+    out = derive_audible_deck({"play": True, "vol": 0}, {"play": True, "vol": 0}, 64, True)
     assert out == ("none", 0.0)
 
 

@@ -14,12 +14,20 @@ to be None.
 
 from __future__ import annotations
 
+import os
 import time
 
+import numpy as np
 from livekit import rtc
 from livekit.agents.voice import io as voice_io
 
 from vibemix.audio import OUTPUT_SR, PlaybackQueue, VoiceRecorder
+
+# 2026-05-21 (Kaan: "sesini yükseğe al") — software gain on the AI voice
+# before it hits the speaker. Gemini TTS outputs at a moderate level and
+# gets buried under the music passthrough. Multiplies the int16 PCM with
+# hard-clip protection. Env-tunable (VIBEMIX_VOICE_GAIN); 1.0 = bypass.
+VOICE_GAIN: float = float(os.environ.get("VIBEMIX_VOICE_GAIN", "2.0"))
 
 
 class PlaybackQueueAudioOutput(voice_io.AudioOutput):
@@ -51,6 +59,14 @@ class PlaybackQueueAudioOutput(voice_io.AudioOutput):
             self.on_playback_started(created_at=self._segment_started_at)
         pcm = bytes(frame.data)
         if pcm:
+            # Apply the AI-voice gain with int16 clip protection (speech
+            # peaks are occasional, so mild clipping at >1.0 is inaudible).
+            # voice.wav keeps the BOOSTED bytes so the audit matches what
+            # was actually played.
+            if VOICE_GAIN != 1.0:
+                arr = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+                arr = np.clip(arr * VOICE_GAIN, -32768.0, 32767.0)
+                pcm = arr.astype(np.int16).tobytes()
             self._playback.push(pcm)
             self._recorder.push_voice(pcm)
         # frame.duration is samples_per_channel / sample_rate; sum across frames

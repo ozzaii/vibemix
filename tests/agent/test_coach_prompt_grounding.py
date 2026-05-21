@@ -126,8 +126,8 @@ def test_build_prompt_phase_grounded_with_corpus_footer():
 
 def test_build_prompt_mix_move_grounded_with_task_tail():
     """A MIX_MOVE coach prompt: grounded evidence_line + the MIX_MOVE task tail
-    ('describe the SONIC EFFECT') + the evidence-corpus footer on a non-empty
-    snapshot."""
+    (change-point grounding on the move's audible result) + the evidence-corpus
+    footer on a non-empty snapshot."""
     state = _grounded_state(bpm=130.0, rms=0.07)
     ev = Event(
         "MIX_MOVE",
@@ -138,7 +138,7 @@ def test_build_prompt_mix_move_grounded_with_task_tail():
 
     assert "hearing[rms=" in prompt
     assert "event=MIX_MOVE" in prompt
-    assert "describe the SONIC EFFECT" in prompt
+    assert "CHANGE point" in prompt
     assert "evidence_corpus[" in prompt
 
 

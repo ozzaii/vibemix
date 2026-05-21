@@ -114,7 +114,11 @@ def test_sink_04_second_frame_does_not_refire_on_playback_started(mocker) -> Non
 
 
 def test_sink_05_push_to_playback_and_recorder(mocker) -> None:
-    """SINK-05: capture_frame pushes bytes to both PlaybackQueue + VoiceRecorder."""
+    """SINK-05: capture_frame pushes bytes to both PlaybackQueue + VoiceRecorder.
+
+    Pins the push plumbing with the voice gain bypassed (VOICE_GAIN=1.0) so the
+    byte identity is exact; the gain math is covered by SINK-05b below."""
+    mocker.patch("vibemix.agent.playback_sink.VOICE_GAIN", 1.0)
     sink, playback, recorder = _build_sink(mocker)
     payload = b"\x00\x01\x02\x03\x04\x05"
 
@@ -122,6 +126,26 @@ def test_sink_05_push_to_playback_and_recorder(mocker) -> None:
 
     playback.push.assert_called_once_with(payload)
     recorder.push_voice.assert_called_once_with(payload)
+
+
+def test_sink_05b_voice_gain_applied_with_clip(mocker) -> None:
+    """SINK-05b (2026-05-21): VOICE_GAIN multiplies the int16 PCM with clip.
+    Kaan: 'sesini yükseğe al' — the AI voice is boosted before playback."""
+    import numpy as np
+
+    mocker.patch("vibemix.agent.playback_sink.VOICE_GAIN", 2.0)
+    sink, playback, recorder = _build_sink(mocker)
+    # int16 LE samples [100, 20000] → *2 → [200, 40000-clipped-to-32767]
+    payload = np.array([100, 20000], dtype=np.int16).tobytes()
+
+    _run(sink.capture_frame(_make_frame(data=payload)))
+
+    pushed = playback.push.call_args.args[0]
+    got = np.frombuffer(pushed, dtype=np.int16)
+    assert got[0] == 200
+    assert got[1] == 32767  # 40000 clipped to int16 max
+    # voice.wav gets the same boosted bytes (audit matches playback).
+    recorder.push_voice.assert_called_once_with(pushed)
 
 
 def test_sink_06_empty_data_is_noop_for_push(mocker) -> None:

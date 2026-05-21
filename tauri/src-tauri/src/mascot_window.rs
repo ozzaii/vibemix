@@ -76,8 +76,27 @@ pub fn create_mascot_window(
     let width = state.width.unwrap_or(DEFAULT_WIDTH);
     let height = state.height.unwrap_or(DEFAULT_HEIGHT);
     let (default_x, default_y) = default_top_right(app, width);
-    let x = state.x.unwrap_or(default_x);
-    let y = state.y.unwrap_or(default_y);
+    let mut x = state.x.unwrap_or(default_x);
+    let mut y = state.y.unwrap_or(default_y);
+    // Guard against a persisted origin that no longer lands on-screen:
+    // either a monitor topology that's since gone (e.g. an external display
+    // to the right that saved x=2564) or the historical physical/logical
+    // save mismatch (saved physical, restored as logical → doubled on a 2x
+    // Retina panel → off-screen). If the window would build off the primary
+    // monitor, fall back to the on-screen top-right default so it can't go
+    // "missing". Margins keep at least a sliver grabbable.
+    if let Some((logical_w, logical_h)) = primary_logical_size(app) {
+        let (fx, fy) = (f64::from(x), f64::from(y));
+        let (fw, fh) = (f64::from(width), f64::from(height));
+        let off_screen = fx > logical_w - 48.0
+            || fy > logical_h - 48.0
+            || fx + fw < 48.0
+            || fy + fh < 48.0;
+        if off_screen {
+            x = default_x;
+            y = default_y;
+        }
+    }
 
     let window = WebviewWindowBuilder::new(
         app,
@@ -108,21 +127,32 @@ pub fn create_mascot_window(
     Ok(Some(window))
 }
 
-/// Returns (x, y) for the default top-right placement on the current
-/// primary monitor. Falls back to a conservative 1280-wide assumption if
-/// monitor enumeration fails (rare; only on macOS without an attached
-/// display, which is impossible for an interactive DJ session anyway).
-fn default_top_right(app: &AppHandle, _width: u32) -> (i32, i32) {
-    // We need a Webview to call `primary_monitor()`; in setup() the main
-    // window is available. If it isn't (edge case), use a 1280×800
-    // fallback that won't spawn off-screen on any reasonable display.
-    let monitor_width = app
-        .get_webview_window("main")
+/// Logical (width, height) of the primary monitor, or None if it can't be
+/// resolved. Logical units are what `WebviewWindowBuilder::position` and
+/// `inner_size` consume, so keeping all geometry math in logical units (not
+/// the physical pixels `Monitor::size()` reports) avoids the 2x-Retina
+/// doubling that pushed the window off-screen.
+fn primary_logical_size(app: &AppHandle) -> Option<(f64, f64)> {
+    app.get_webview_window("main")
         .and_then(|w| w.primary_monitor().ok().flatten())
-        .map(|m| m.size().width as i32)
-        .unwrap_or(1280);
-    let x = (monitor_width - DEFAULT_RIGHT_INSET).max(0);
-    (x, DEFAULT_TOP_OFFSET)
+        .map(|m| {
+            let sf = m.scale_factor();
+            let sz = m.size();
+            (sz.width as f64 / sf, sz.height as f64 / sf)
+        })
+}
+
+/// Returns (x, y) for the default top-right placement on the current
+/// primary monitor, in LOGICAL pixels. Falls back to a conservative
+/// 1280×800 assumption if monitor enumeration fails (rare; only on macOS
+/// without an attached display, which is impossible for an interactive DJ
+/// session anyway).
+fn default_top_right(app: &AppHandle, width: u32) -> (i32, i32) {
+    // Logical width so the result is a valid logical position (the builder
+    // treats `.position()` as logical). Place flush-right, fully on-screen.
+    let logical_w = primary_logical_size(app).map_or(1280.0, |(w, _)| w);
+    let x = (logical_w - f64::from(width) - f64::from(DEFAULT_RIGHT_INSET)).max(24.0);
+    (x as i32, DEFAULT_TOP_OFFSET)
 }
 
 /// Listen for `WindowEvent::Moved` and `WindowEvent::Resized` on the

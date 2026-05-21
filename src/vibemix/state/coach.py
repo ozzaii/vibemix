@@ -215,18 +215,16 @@ class AICoach:
         if t == "MIX_MOVE":
             mv = ", ".join(ev.extra.get("moves", []))
             return (
-                f"Trigger seed (do NOT quote, do NOT narrate): MIDI moves [{mv}]. "
-                "The move is ONLY the reason you woke up — it is NOT the topic. "
-                "Give your take on the MIX AS A WHOLE right now: how the groove "
-                "is sitting, how the blend is landing, whether the energy is "
-                "building or sagging, what's working or what isn't. Listen to "
-                "the AUDIO and react to the overall sound — NOT to the knob/fader "
-                "Kaan just touched. Do NOT do play-by-play of his last move "
-                "('you killed the lows', 'you hit play'). Do NOT name "
-                "faders/EQs/knobs/decks/controls. Only mention the move's effect "
-                "if it genuinely reshaped the whole mix; otherwise ignore it and "
-                "talk about the music. If you have nothing fresh on the mix, "
-                "output a single space to stay silent."
+                f"A move just landed [{mv}]. The recent_moves[8s] ages tell you HOW "
+                "MANY SECONDS AGO it hit — that moment is a CHANGE point in the audio. "
+                "Put your ears RIGHT THERE and listen to the before→after: what shifted "
+                "in the SOUND (energy, low-end, space, tension, how the blend sits). "
+                "Ground your feedback on what that change DID to the mix — did it land, "
+                "muddy it, open it up — and if it needs a fix, give the fix. Name the "
+                "EQ, filter, or move if that's genuinely what's worth flagging — you're "
+                "a pro, you decide what matters this moment. If the change did nothing "
+                "notable, give your read on how the mix is sitting overall, or output a "
+                "single space to stay silent."
             )
         if t == "HEARTBEAT":
             return (

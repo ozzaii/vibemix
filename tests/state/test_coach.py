@@ -277,20 +277,24 @@ def test_task_layer_arrival_exact_string():
 
 
 def test_task_mix_move_LOAD_BEARING_anti_slop_clause():
-    """The 'Do NOT name faders/EQs/knobs/decks/controls' clause is the v4
-    anti-slop tightening — DO NOT paraphrase on refactor. 2026-05-21: MIX_MOVE
-    reframed so the move is the trigger seed, NOT the topic — the cohost gives
-    feedback on the mix as a whole instead of narrating the last knob move
-    (Kaan-directed: 'give me feedback on my mix, not the latest move')."""
+    """2026-05-21 (Kaan-directed) — the move-second is a CHANGE point; the
+    cohost puts its ears there and grounds feedback on the audible before→after
+    of the move ('hareket ettiğim saniyeyi işaretle ki orda yaşanan değişikliği
+    alsın'). The OLD v4 hard ban 'Do NOT name faders/EQs/knobs' is LIFTED — Kaan:
+    'eqları seslendirebilir ... tam bir professional coach olmalı, ne hakkında
+    konuşacağına o karar verecek.' A pro names the EQ/filter when it's worth it."""
     out = AICoach.task_for_event(
         _ev("MIX_MOVE", {"moves": ["A_play→ON", "A_low: cut→killed (big twist)"]})
     )
-    assert "MIDI moves [A_play→ON, A_low: cut→killed (big twist)]" in out
-    assert "Do NOT name faders/EQs/knobs/decks/controls" in out
-    # The move is the trigger, not the headline — react to the whole mix.
-    assert "MIX AS A WHOLE" in out
-    assert "NOT to the knob/fader" in out
-    # Silence path still present (now keyed on "nothing fresh on the mix").
+    assert "A move just landed [A_play→ON, A_low: cut→killed (big twist)]" in out
+    # The move-second is a change point — ground on the audible before→after there.
+    assert "CHANGE point" in out
+    # The knob-ban is GONE; naming an EQ/filter is now explicitly allowed.
+    assert "Do NOT name faders/EQs/knobs/decks/controls" not in out
+    assert "Name the EQ" in out
+    # The model decides what matters this moment.
+    assert "you decide what matters" in out
+    # Silence path still present.
     assert "output a single space to stay silent" in out
 
 

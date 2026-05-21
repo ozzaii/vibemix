@@ -61,7 +61,7 @@ def test_engine_constants_match_v4() -> None:
 
 def test_io_constants_match_v4() -> None:
     """I/O constants — v4:100-113."""
-    assert INVOKE_AUDIO_SECONDS == 30.0  # 2026-05-21 Kaan — bumped 18→30 for more audio context per turn
+    assert INVOKE_AUDIO_SECONDS == 60.0  # 2026-05-21 Kaan — 18→30→60 ("a minute of past")
     assert INPUT_SR_NATIVE == 48000
     assert INPUT_SR_TARGET == 16000
     assert OUTPUT_SR == 24000

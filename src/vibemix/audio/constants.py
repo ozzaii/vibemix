@@ -17,7 +17,7 @@ them OUT to module scope so Phase 3 can import without dragging EventDetector al
 from __future__ import annotations
 
 # ---- Audio I/O ----
-INVOKE_AUDIO_SECONDS = 30.0  # 2026-05-21 (Kaan): bumped 18→30 for more audio context per turn. v4:100 — rolling audio snapshot length to LLM (Phase 4 consumer). Diet path (quick acks) still 6s — see DIET_AUDIO_SECONDS in dj_cohost.
+INVOKE_AUDIO_SECONDS = 60.0  # 2026-05-21 (Kaan): 18→30→60 — "a minute of past" for fuller context per turn. v4:100 — rolling audio snapshot length to LLM (Phase 4 consumer). clean_audio_buf auto-sizes to this+5s (__main__:470); audio_buf is 140s. Diet path (quick acks) still 6s — see DIET_AUDIO_SECONDS in dj_cohost.
 INPUT_SR_NATIVE = 48000  # v4:106 — BlackHole capture rate
 INPUT_SR_TARGET = 16000  # v4:107 — AudioBuffer / LLM consumption rate (post-resample)
 OUTPUT_SR = 24000  # v4:108 — AI voice output rate

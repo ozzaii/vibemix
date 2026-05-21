@@ -132,8 +132,8 @@ def test_diet_true_mix_move_under_cap_with_moves_inline(mocker):
     )
     out = AICoach.build_prompt(ev, diet=True)
     assert _tokens(out) <= PROMPT_TOKEN_CAP_ACK
-    # Moves list is still in the task tail (the v4 MIX_MOVE task formats it).
-    assert "MIDI moves [A_low: cut→killed (big twist), xfader→A-side]" in out
+    # Moves list is still in the task tail (the MIX_MOVE task formats it).
+    assert "A move just landed [A_low: cut→killed (big twist), xfader→A-side]" in out
 
 
 def test_diet_true_layer_arrival_under_cap(mocker):

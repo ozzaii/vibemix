@@ -481,12 +481,22 @@ async def main() -> None:
     # in llm_node and conditionally appends Part 3 to the multimodal
     # contents list, labeled "NOT YET HEARD BY AUDIENCE" per locked
     # CONTEXT.md Q2.
-    lookahead_provider = LookaheadProvider()
-    print(
-        f"-> lookahead: +{LOOKAHEAD_SECONDS:.1f}s @ "
-        f"{LOOKAHEAD_WINDOW_SECONDS:.0f}s window "
-        f"(degrades silently on streaming tracks)"
-    )
+    # 2026-05-21 (Kaan): lookahead is OFF by default. It feeds the PRISTINE
+    # source file from disk (pre-EQ/filter/blend) — so the AI would hear the
+    # original track, NOT the DJing Kaan is doing to it on the master. For a
+    # coach grounding on HIS performance that's backwards. Master output
+    # (Part 1, BlackHole) is the only audience-true signal. Re-enable with
+    # VIBEMIX_LOOKAHEAD=1 if a latency-offset peek is ever wanted again.
+    if os.environ.get("VIBEMIX_LOOKAHEAD", "0").strip().lower() in ("1", "true", "yes", "on"):
+        lookahead_provider = LookaheadProvider()
+        print(
+            f"-> lookahead: +{LOOKAHEAD_SECONDS:.1f}s @ "
+            f"{LOOKAHEAD_WINDOW_SECONDS:.0f}s window "
+            f"(degrades silently on streaming tracks)"
+        )
+    else:
+        lookahead_provider = None
+        print("-> lookahead: OFF (grounding on live master output only)")
 
     # Phase 15 — boot-time crashed-session sweep. Walks recordings_root for
     # session.json files whose ended_at_iso is None AND mtime older than
