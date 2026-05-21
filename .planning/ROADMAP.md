@@ -117,7 +117,10 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
   4. The Neon Rebel mascot reacts correctly to live audio/MIDI events in-session — its state visibly tracks real drops/builds/controller moves (the visual feedback loop is grounded, not decorative).
   5. The mascot consumes the **rich bus signals** (`phase`, `mood`, `reaction_intent`, `bpm`, levels), not just the music-loudness ramp it uses today — `mascot.html` currently reads only `music`+`voice` → 3 tiers; this seam is the gap.
   6. The mascot has **many distinct modes** (Kaan directive 2026-05-21): ≥ idle/dead-air, vibing/groove, building, drop/peak, breakdown/chill, and a speaking/emoting mode while the AI talks — every mode change corresponds to a real musical/session event (anti-slop: no random or purely decorative state changes).
-**Plans**: TBD
+**Plans**: 3 plans (2 waves)
+  - [ ] 56-01-PLAN.md — LIVE-05/05a anti-slop guard: extend the Three.js rig SnapshotSlice with music/voice + the drop/breakdown music-confirmation defence-in-depth guard + anti-slop fixtures (wave 1)
+  - [ ] 56-02-PLAN.md — PERF-01 (TTFT telemetry budget + thinking-gate positive/negative pin) + PERF-02 (zero playback underruns under both-mode soak) via Python test extensions (wave 1)
+  - [ ] 56-03-PLAN.md — LIVE-05/05a six-mode reachability + speaking-overrides-music proof + mood/emotion tint discipline + PERF-03 dispatch-latency mode-transition floor (wave 2, depends on 56-01)
 **UI hint**: yes — mascot is a Tier-1 live surface; the many-modes work is design-led (lift `mocks/` + `frontend-enforcement` skill; the bus already carries the signals to drive it).
 
 ### Phase 57: Sexify Finish
