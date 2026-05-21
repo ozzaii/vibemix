@@ -102,4 +102,8 @@ None for the four tasks — plan executed as written. One mid-task test fix: the
 
 The full-suite single failure — `tests/eval/test_corpus_diversity_gate.py::test_each_session_has_events_jsonl_file` — is a missing corpus fixture (`eval/corpus/sessions/hard_tek_01/events.jsonl`). It fails identically on the base commit `15fa3fe` and maps to the documented **GATE-03 carryover** (corpus WAV/label population pending — a Kaan-action discharge per PROJECT.md "Pre-stage discharges" + STATE.md tech-debt). It lives under `eval/corpus/`, which Plan 55-03 did not touch. Logged to `.planning/phases/55-feedback-mode-citation-integrity/deferred-items.md`; left unfixed per the executor scope-boundary rule.
 
-## Self-Check: PENDING
+## Self-Check: PASSED
+
+All 6 plan-scoped files + the 2 planning docs verified present on disk; all 4
+task commits (`0814daa`, `c24428b`, `c3f9316`, `d4819a0`) + the docs commit
+(`8d4d0c3`) verified in git history.
