@@ -114,8 +114,15 @@ class DeckPoller:
         # Internal holder — the last-known resolved deck map. Empty until the
         # first successful poll. snapshot() returns COPIES of these.
         self._decks: dict[str, DeckTrack] = {}
-        # Title→track_id index, built once per library object (read-only).
+        # Title→track_id index, rebuilt when the library identity or track count
+        # changes (read-only). Keyed on id(library)+len(tracks) so a mid-session
+        # collection.xml re-import (RekordboxLibrary.load_xml overwrites
+        # self.tracks in place — same object, new count) invalidates the cache
+        # instead of resolving titles against a STALE map (WR-01: a stale index
+        # mis-attributes track_id/key → a false-confident [track:]/[key:] cite).
         self._title_index: dict[str, str] | None = None
+        self._index_for_library_id: int | None = None
+        self._index_track_count: int = -1
 
     # ------------------------------------------------------------------ #
     # Read-only library resolution (NO XML re-parse, NO DB open)          #
@@ -135,14 +142,28 @@ class DeckPoller:
             tracks = self._library.tracks
         except Exception:
             return None
-        # Build a case-folded title→id index once (bounded — collection size).
-        if self._title_index is None:
+        # Build/refresh a case-folded title→id index (bounded — collection size).
+        # Rebuild when the library object changed (id) OR the track count moved
+        # (a re-import) — otherwise a re-imported collection.xml would keep
+        # resolving against the stale index (WR-01). The len() guard catches
+        # re-imports that change count; id() covers a same-count object swap.
+        try:
+            track_count = len(tracks)
+        except Exception:
+            track_count = -1
+        if (
+            self._title_index is None
+            or id(self._library) != self._index_for_library_id
+            or track_count != self._index_track_count
+        ):
             try:
                 self._title_index = {
                     e.title.casefold(): tid for tid, e in tracks.items() if e.title
                 }
             except Exception:
                 self._title_index = {}
+            self._index_for_library_id = id(self._library)
+            self._index_track_count = track_count
         tid = self._title_index.get(title.casefold())
         if tid is None:
             return None
