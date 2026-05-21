@@ -24,6 +24,7 @@ mod hotkey;
 mod mascot_window;
 mod overlay;
 mod permissions;
+mod pill_window;
 mod recordings;
 mod sidecar;
 mod tray;
