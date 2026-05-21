@@ -64,6 +64,14 @@ accessibility-sys = "0.1"       # AXUIElementCreateApplication / kAX* attributes
 # revoke watcher (INSTALL-06 / P71). macOS-only — Windows degrades to
 # OS-managed runtime grant on first capture.
 tauri-plugin-macos-permissions = "2.3.0"
+# Phase 62 / PILL-04 — focus-non-steal STRETCH (pill_window.rs). objc2 is the
+# canonical Objective-C runtime binding (madsmtm); already in Cargo.lock as a
+# transitive tauri/wry dep so adding it direct does not move the graph. Used
+# ONLY to swizzle the pill's NSWindow → NSPanel + set the NonactivatingPanel
+# style mask. crates.io-only — the rejected git-only NSPanel crate stays out
+# of this graph (reproducible-build / one-click-install discipline). If the
+# swizzle is ever pulled, the Accessory-policy FLOOR (no dep) is the baseline.
+objc2 = "0.6"                   # verified on crates.io 2026-05-22 (0.6.4 locked)
 
 [dev-dependencies]
 tempfile = "3"                                                   # verified 2026-05-12 — watchdog log-tail tests

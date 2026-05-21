@@ -4585,6 +4585,7 @@ dependencies = [
  "dirs-next",
  "file-rotate",
  "futures-util",
+ "objc2",
  "serde",
  "serde_json",
  "tauri",
