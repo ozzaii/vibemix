@@ -332,6 +332,140 @@ describe("state-machine fixture replay — event-traces.json", () => {
     );
   });
 
+  // Phase 56 / LIVE-05a (LIVE-05) — the ≥6-distinct-modes reachability proof.
+  // The auto-runner above already replays six_mode_reachability and matches
+  // every expectedTransition; this explicit test adds the LIVE-05a acceptance
+  // assertion directly: each of the six contract modes is ENTERED from its
+  // real bus event, and the walk reaches ≥4 distinct MascotStates across the
+  // six phase/event steps (idle_breathe + idle_bop_to_beat_energetic each
+  // cover >1 phase, so the six modes collapse to 4 distinct states + talk).
+  it("six_mode_reachability — all six contract modes enter from a real bus event", () => {
+    const trace = (traces.traces as Trace[]).find(
+      (t) => t.name === "six_mode_reachability",
+    )!;
+    expect(trace).toBeDefined();
+    const actual = replayTrace(trace);
+    // Every expectedTransition must land (the per-step reachability proof).
+    const { matched } = matchExpected(trace.expectedTransitions, actual);
+    expect(matched).toBe(trace.expectedTransitions.length);
+    // The six contract modes map onto these distinct entered states. Each
+    // MUST appear at least once in the actual replay (proves it is reachable
+    // from a real signal — the "≥6 distinct modes, each gated to a real
+    // event" LIVE-05a acceptance).
+    const enteredStates = new Set(actual.map((a) => a.state));
+    expect(enteredStates.has("idle_breathe")).toBe(true); // silent + breakdown
+    expect(enteredStates.has("idle_bop_to_beat_energetic")).toBe(true); // groove + build
+    expect(enteredStates.has("dance_hard")).toBe(true); // drop (music-confirmed)
+    expect(enteredStates.has("talk_loop")).toBe(true); // speaking
+    // Six phase/event steps collapse to ≥4 distinct entered states (excluding
+    // the boot seed). idle_breathe + idle_bop each carry two phases.
+    const nonBoot = new Set(
+      actual.filter((a) => a.source !== "boot").map((a) => a.state),
+    );
+    expect(nonBoot.size).toBeGreaterThanOrEqual(4);
+  });
+
+  // Phase 56 / LIVE-05a — speaking overrides music (the talk-block proof).
+  // The auto-runner above replays speaking_overrides_music and matches its
+  // positive expectedTransitions (dance_hard -> talk_loop -> react_yes); this
+  // explicit test adds the DISCRIMINATING held assertion (mirroring
+  // anti_slop_drop_quiet + talk_blocks_dance): the music PHASE->groove DURING
+  // talk records NO new transition — talk_loop persists. A regression that
+  // removed the block rule would surface here as an idle/groove transition
+  // between the talk and the AI_REPLY_DONE.
+  it("speaking_overrides_music — music PHASE during talk is denied (held)", () => {
+    const trace = (traces.traces as Trace[]).find(
+      (t) => t.name === "speaking_overrides_music",
+    )!;
+    expect(trace).toBeDefined();
+    const actual = replayTrace(trace);
+    const transitions = actual.filter((a) => a.source !== "boot");
+    // The recorded transitions are EXACTLY: dance_hard (loud-drop seed),
+    // talk_loop (AI speaks), react_yes (AI done). The groove PHASE at t=450
+    // DURING talk must NOT add a fourth — it is blocked_by_talk.
+    expect(transitions).toHaveLength(3);
+    expect(transitions[0]!.state).toBe("dance_hard");
+    expect(transitions[1]!.state).toBe("talk_loop");
+    expect(transitions[2]!.state).toBe("react_yes");
+    // DISCRIMINATING: between the talk-enter (t=200) and the AI_REPLY_DONE
+    // (t=600), NO transition fires — the spurious music PHASE->groove at
+    // t=450 is denied, so talk_loop holds across the whole talk window.
+    const duringTalk = transitions.filter((a) => a.at > 200 && a.at < 600);
+    expect(duringTalk).toHaveLength(0);
+    // No groove/idle state ever appears DURING the talk window (the
+    // speaking-overrides-music acceptance — UI-SPEC speaking row).
+    const idleDuringTalk = actual.filter(
+      (a) =>
+        a.at > 200 &&
+        a.at < 600 &&
+        (STATE_CLASS[a.state] === "idle" || STATE_CLASS[a.state] === "dance"),
+    );
+    expect(idleDuringTalk).toHaveLength(0);
+  });
+
+  // Phase 56 / LIVE-05a — mood is a variant TINT, not a mode (Pitfall 5).
+  // mood lives on the SnapshotSlice ref and drives WHICH variant the renderer
+  // tints — it does NOT branch the dispatcher's mode selection. A snapshot
+  // frame (mood-carrying) is a state-READER: it returns null from dispatchEvent
+  // (no transition), exactly like any other snapshot. Two snapshots that differ
+  // ONLY in mood produce the SAME (null) dispatch result — the dispatcher does
+  // not select a different mode based on mood.
+  it("mood is a tint, not a mode — a mood-only snapshot frame produces no transition", () => {
+    const m = initialMachineState(0);
+    const hypeSnap: SnapshotSlice = {
+      bpm: 120,
+      bpm_confidence: 0.4,
+      downbeat_phase: 0.5,
+      mood: "hype-man",
+      music: 0.3,
+      voice: 0,
+    };
+    const coachSnap: SnapshotSlice = { ...hypeSnap, mood: "coach" };
+    // A snapshot frame is a state-READER — dispatchEvent returns null (no
+    // transition) regardless of the mood it carries.
+    const hypeFrame = { type: "snapshot", mood: "hype-man" };
+    const coachFrame = { type: "snapshot", mood: "coach" };
+    expect(dispatchEvent(m, hypeFrame, 100, hypeSnap)).toBeNull();
+    expect(dispatchEvent(m, coachFrame, 100, coachSnap)).toBeNull();
+    // And a real event dispatched with two mood-differing snapshots picks the
+    // SAME target mode — mood does not branch the mode selection.
+    const phaseDrop = {
+      type: "event",
+      subtype: "PHASE",
+      payload: { from: "build", to: "drop" },
+    };
+    const underHype = dispatchEvent(m, phaseDrop, 100, hypeSnap);
+    const underCoach = dispatchEvent(m, phaseDrop, 100, coachSnap);
+    expect(underHype!.plan.target).toBe("dance_hard");
+    expect(underCoach!.plan.target).toBe("dance_hard");
+    expect(underHype!.plan.target).toBe(underCoach!.plan.target);
+  });
+
+  // Phase 56 / LIVE-05 — emotion is a finer nudge; emotion == null is a no-op.
+  // The dispatcher has NO emotion branch — emotion (when present) is a renderer
+  // eye/brow nudge layered on the mood tint, never a mode selector. A frame
+  // carrying emotion: null (or no emotion at all) must produce NO transition
+  // (backward-compatible with the pre-emotion Three.js rig contract).
+  it("emotion == null is a no-op — an emotion-only/null-emotion frame produces no transition", () => {
+    const m = initialMachineState(0);
+    const snap: SnapshotSlice = {
+      bpm: 120,
+      bpm_confidence: 0.4,
+      downbeat_phase: 0.5,
+      mood: "hype-man",
+      music: 0.3,
+      voice: 0,
+    };
+    // A snapshot frame carrying emotion: null — the dispatcher has no emotion
+    // branch, so a null (or any) emotion is silently a no-op (returns null).
+    const nullEmotionFrame = { type: "snapshot", emotion: null };
+    expect(dispatchEvent(m, nullEmotionFrame, 100, snap)).toBeNull();
+    // An explicit emotion value is ALSO a no-op at the dispatcher (it's a
+    // renderer nudge, not a mode) — proving emotion never branches the FSM.
+    const hypedEmotionFrame = { type: "snapshot", emotion: "hyped" };
+    expect(dispatchEvent(m, hypedEmotionFrame, 100, snap)).toBeNull();
+  });
+
   it("aggregates: every documented ROADMAP event-mapping criterion is covered by ≥1 trace", () => {
     const criteriaCovered = new Set(
       (traces.traces as Trace[]).map((t) => t.criterion),

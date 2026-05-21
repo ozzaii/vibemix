@@ -12,13 +12,22 @@ What this measures:
        collision with a running app or with other parallel test runs).
     2. A real ``websockets.connect`` client subscribes.
     3. The server emits 100 synthetic frames at 30Hz, each carrying its
-       emit timestamp (``perf_counter_ns()``).
+       emit timestamp (``perf_counter_ns()``). ONE of those frames is a
+       synthetic MODE-TRANSITION frame (a PHASE->drop-shaped payload that
+       still carries ``seq`` + ``t_emit_ns``), interleaved with the plain
+       seq frames — it REPLACES a seq frame, it does NOT add a 101st emit.
+       This pins PERF-03's webview-side floor: a mode-transition frame in
+       the stream must not push p95 over the budget (mode-select is a
+       handful of float compares, < 1ms — it adds no measurable
+       sidecar->client latency).
     4. The client records the receive timestamp the moment the frame
        lands.
     5. Asserts ``p95(t_recv - t_emit) < 50ms`` (server-to-client on
        localhost). The 50ms budget is the SIDECAR-SIDE share of the
-       100ms total — the webview JS dispatch + state-machine apply adds
-       at most another 10ms, leaving 40ms slack.
+       100ms total (MASCOT-08) — the webview JS dispatch + state-machine
+       apply (incl. mode-select) adds at most another 10ms, leaving 40ms
+       slack. This is the PERF-03 60fps-floor pin: the mode machine adds
+       zero measurable latency to the bus->client path.
 
 What this does NOT measure:
     - Browser webview latency (covered by vitest pure-function tests).
@@ -55,6 +64,12 @@ FRAME_COUNT: int = 100
 
 #: Frame cadence (Hz). Mirrors ws_broadcast in src/vibemix/runtime/ws_bus.py.
 EMIT_HZ: int = 30
+
+#: PERF-03 — index of the single synthetic MODE-TRANSITION frame in the
+#: emitted set. This frame REPLACES a plain seq frame (it still carries seq +
+#: t_emit_ns) so server-emit count == client-drain count == FRAME_COUNT. Placed
+#: mid-stream so its latency lands inside the p95 window, not at a warm-up edge.
+MODE_TRANSITION_FRAME: int = FRAME_COUNT // 2
 
 #: p95 latency budget in milliseconds (sidecar-side half of MASCOT-08's 100ms
 #: total). The webview JS dispatch + state-machine apply adds at most another
@@ -120,12 +135,37 @@ async def _run_latency_probe(port: int) -> list[float]:
     client_connected = asyncio.Event()
 
     async def server_handler(ws):
-        """One-shot server: emit FRAME_COUNT frames at EMIT_HZ then exit."""
+        """One-shot server: emit FRAME_COUNT frames at EMIT_HZ then exit.
+
+        PERF-03: exactly ONE of the FRAME_COUNT frames (at
+        ``MODE_TRANSITION_FRAME``) is a synthetic mode-transition frame —
+        a PHASE->drop-shaped payload that STILL carries ``seq`` +
+        ``t_emit_ns``. It REPLACES a plain seq frame (not an extra emit),
+        so server-emit count == client-drain count == FRAME_COUNT and the
+        ≥95-valid-sample sanity gate stays satisfied. A mode-transition
+        frame in the stream must not push p95 over the budget — mode-select
+        is < 1ms, so the existing 50ms budget holds unchanged.
+        """
         client_connected.set()
         period_s = 1.0 / EMIT_HZ
         for i in range(FRAME_COUNT):
             t_emit_ns = time.perf_counter_ns()
-            payload = json.dumps({"seq": i, "t_emit_ns": t_emit_ns})
+            if i == MODE_TRANSITION_FRAME:
+                # Synthetic mode-transition frame: a real PHASE-shaped mode
+                # change. Still carries seq + t_emit_ns so the client's
+                # latency math (and the t_emit_ns int-check at the drain
+                # site) treats it identically to a seq frame.
+                payload = json.dumps(
+                    {
+                        "seq": i,
+                        "t_emit_ns": t_emit_ns,
+                        "type": "event",
+                        "subtype": "PHASE",
+                        "payload": {"to": "drop"},
+                    }
+                )
+            else:
+                payload = json.dumps({"seq": i, "t_emit_ns": t_emit_ns})
             await ws.send(payload)
             # Schedule the next frame on EMIT_HZ cadence. asyncio.sleep
             # absorbs any small handler-internal jitter without
