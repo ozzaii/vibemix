@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v5.0
 milestone_name: The Useful Cut
 status: executing
-last_updated: "2026-05-21T15:57:23.403Z"
+last_updated: "2026-05-21T17:22:05.992Z"
 last_activity: 2026-05-21
 progress:
   total_phases: 12
-  completed_phases: 9
-  total_plans: 35
-  completed_plans: 34
-  percent: 75
+  completed_phases: 10
+  total_plans: 37
+  completed_plans: 36
+  percent: 83
 ---
 
 # vibemix — State
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 60 — Harmonic-Feedback Confidence Gate
+- **Current focus:** Phase 61 — Actionable-Not-Hype Coach Persona
 - **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts on external clock).
 - **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
 - **Project mode:** standard.
@@ -45,8 +45,8 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 
 ## Current Position
 
-Phase: 60 (Harmonic-Feedback Confidence Gate) — EXECUTING
-Plan: 4 of 4
+Phase: 61 (Actionable-Not-Hype Coach Persona) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
 Last activity: 2026-05-21
 
@@ -72,6 +72,7 @@ Last activity: 2026-05-21
 | Phase 59 P02 | 9 min | 2 tasks | 8 files |
 | Phase 59 P03 | 18 min | 2 tasks | 5 files |
 | Phase 59 P05 | 22 min | 2 tasks | 5 files |
+| Phase 61 P01 | 9min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -217,6 +218,7 @@ All external-clock items from v3.0 / v3.1 / v4.0 remain on the same clock — v5
 
 ### Last Session
 
+- 2026-05-21 — **Plan 61-01 COMPLETE** (Wave-0 coach-persona test fence; tests-only, no production code). Laid the actionable-not-hype contract as RED-first asserts that 61-02 must satisfy, plus three Wave-0 gap tests that fence already-correct behavior GREEN. **Task 1** (`tests/prompts/test_matrix.py`, `34cc286`): 4 `test_prompt_61_coach_*` parametrized groups over beginner/intermediate/pro under `-k 61_coach` — (a) DJ-verb word-token vocabulary `{kill,swap,cut,filter,wait,tighten,ride}` **RED** (all 3), (b) prescribe "same line" **RED** (beginner+intermediate; PRO already has it), (c) positive-callout balance `any(marker)` **RED** (intermediate), (d) calm-only TTS tag routing (`[chill]/[whisper]` yes, `[excited]/[fast]` no) **GREEN**. **Task 2** (`tests/state/test_coach.py`, `3ccaa20`): `test_task_key_clash_*` (DJ-verb move + both keys cited `[key:A:8A]`/`[key:B:2A]` + no-invent + system-owns-verdict + "3 semitones apart") and `test_task_transition_opportunity_*` (past-tense-only + both keys + no-invent + clash=False verdict) — both **GREEN** vs Phase-60 arms; closes the 61-RESEARCH gap. **Task 3** (`tests/agent/test_dj_cohost_matrix_dispatch.py` + `tests/agent/test_coach_prompt_grounding.py`, `9fdc2e5`): `test_dispatch_61_coach_prompt_body_feeds_both_paths` proves `_gen_cfg.system_instruction == _prompt_body` (genai + OpenRouter share one body, COACH-02 dual-path) + no-new-mode `_VALID_MODES == {hype,coach}`; `test_coach_grounding_61_fabricated_key_strips` proves a fabricated `[key:A:12B]` strips the whole turn via the existence-only CitationLinter (COACH-04) — both **GREEN**, no linter change. Full suite **(in `.venv`)**: **13 failed, 4079 passed, 26 skipped** = the SAME 7 pre-existing `live-tuning-or-brain` WIP failures + the 6 intended RED `61_coach` cell-contract asserts (the 61-02 target, grouped/named distinct from the baseline). Hype goldens byte-stable; no production module touched; no `ANCHOR_PHRASES` modified. **COACH-01/02/04 NOT yet marked complete — contract satisfied only when 61-02 turns the RED asserts green.** Next: Phase 61 Plan 02 (sharpen COACH cells to green the spec).
 - 2026-05-21 — **Plan 60-04 COMPLETE** (cited narrate-only harmonic coach fragments + matrix grammar reconcile; HARMONIC-01/04, TDD). Replaced the two Phase-59 STUB `task_for_event` arms (`src/vibemix/state/coach.py`) with REAL cited fragments. **KEY_CLASH** (HARMONIC-01): hands the LLM a SYSTEM-decided verdict ("HARMONIC CLASH confirmed by the system (you do NOT decide this)"), names both decks + keys + the pre-computed `semitones` count from `Event.extra`, instructs CITE BOTH keys exactly as `[key:A:8A]`/`[key:B:3A]`, and FORBIDS inventing a key or computing intervals — the LLM narrates the verdict the code already proved. Guards `semitones=None` (cross-letter → "clashing on the melodic overlap", no None interpolation). **TRANSITION_OPPORTUNITY** (HARMONIC-04): RETROSPECTIVE / past-tense ("You just blended deck A into deck B — harmonically the keys sat fine / clashing"), NO present-tense imperatives (Pitfall 3 — they arrive 5-10s late), cites both keys, no phrase/bass-swap guesses (not groundable). Both arms end with the single-space silence escape. Matrix grammar (`prompts/matrix.py`): added `KEY_CLASH` + `TRANSITION_OPPORTUNITY` to the `[ev:<TYPE>]` "Event types currently tracked" list (Open Q1 resolved — `_fire` writes `[ev:<TYPE>]` so the model may validly cite them); goldens re-checked, BYTE-STABLE. Neither type added to `ACK_ELIGIBLE_EVENTS` (diet path still raises for them). The structural anti-slop guarantee is proven: a fabricated `[key:B:12B]` the registry never observed strips the WHOLE turn via the existence-only CitationLinter (no linter change — Phase 59). 9 new coach harmonic tests (cited-narration shape, no-key-math, None-semitone guard, uncited-strip, retrospective/no-imperatives, cite-both-keys, not-ack-eligible). Commits: test `15ac737` (RED) → feat `b77b1d6` (GREEN). Full suite **(in `.venv` — system python3.14 has incompatible google.genai)**: **7 failed, 4066 passed, 26 skipped** — the SAME 7 pre-existing `live-tuning-or-brain` WIP failures (release/readme-matrix/anti-slop-wiring/main-smoke; NONE touch coach.py/matrix.py/harmonic paths), count held at 7, no new failures, no golden churn. **HARMONIC-01 (narrate-only half) + HARMONIC-04 satisfied. Phase 60 plans 1-4 ALL COMPLETE** (HARMONIC-03 ship still gated on the Kaan-ear veto, Plan 60-03). Next: Phase 61 (actionable coach persona — owns the voice).
 - 2026-05-21 — **Plan 60-02 COMPLETE** (harmonic detector branches + default-off gate; HARMONIC-02/03, TDD). Wired `_melodic_overlap_gate(state)` + the `KEY_CLASH` and `TRANSITION_OPPORTUNITY` branches into `EventDetector.detect()` (placed AFTER MIX_MOVE / BEFORE the genre chain) behind a default-OFF `harmonic_clash_enabled` flag (kwarg + attribute, mirroring `DeckPoller._vision_enabled` — the Kaan-ear ship gate; Plan 60-03 flips it). The gate is a PURE read-gate over shipped MusicState fields (no new detector stack): `audible_deck=="mix"` AND `rms ≥ LOW_RMS` AND phase ∉ {breakdown,silent,low} AND `not vocal_active` AND `bands["mid"]+bands["high"] ≥ TONAL_SHARE_FLOOR (0.20)`. KEY_CLASH layered conservatism: flag → gate → both decks resolved (camelot) + `confidence ≥ DECK_CITE_MIN_CONF (0.6)` cross-deck cite-floor → deterministic `is_clash()` (Plan 60-01) → inherited 28s cooldown; emits cited extra (a/b camelot + `semitone_distance`). TRANSITION_OPPORTUNITY scoped near-zero/honest per Open Q2 §5: fires ONLY on both-decks-cited + a recent structural xfader/EQ blend move (reuses MIX_MOVE significance keys), silent otherwise (no phrase grid / no dual-deck low-band → not groundable). Both types kept OUT of `ACK_ELIGIBLE_EVENTS` (unchanged). Imported `DECK_CITE_MIN_CONF` from `deck_poller` (no import cycle confirmed). 13 new harmonic detector tests cover every suppression/firing/cooldown/default-off path. Commits: test `2a868fe` (RED) → feat `c870ab4` (GREEN). Full suite **(in `.venv` — system python3.14 lacks livekit/has incompatible google.genai)**: **7 failed, 4046 passed, 26 skipped** — the SAME 7 pre-existing `live-tuning-or-brain` WIP failures (release/readme/coach-wiring infra; none in event_detector/harmonics), no new failures, no golden flips. **HARMONIC-02/03 satisfied (detector layer; ship gated on Plan 60-03 Kaan-ear veto).** Next: 60-03 (Kaan-ear veto harness) → 60-04 (cited coach fragments).
 - 2026-05-21 — **Plan 59-05 COMPLETE** (Gemini-vision deck-read leg, eval-gated; DECK-02). Built the SEPARATE structured-output Gemini deck-read (`state/deck_vision.py::DeckVisionReader.read()`): a dedicated non-streaming `generate_content` with `response_mime_type=application/json` + `response_schema` for `{decks:[{side,title,key,bpm}]}` + an explicit "null if not legible" instruction (the constrained schema closes the free-text hallucination class that killed v4's screen Part). Null/missing/junk fields → `None` → confidence=0/unknown (no guess); key normalized via `harmonics.to_camelot` (raw kept, camelot cited); swallows ALL exceptions (TrackInfo.poll_once discipline — never raises into the poller); cadence debounce (~7s default) + audio-only-tier skip (cost/DoS bound); `VISION_CONF=0.5` sits BELOW `XML_CONF_FLOOR=0.6` so a misread badge can never out-cite a pre-analyzed tag. Wired a **GATED slot** into `state/deck_poller.py`: injectable `vision_reader` + `vision_enabled` (default **False** — conservative-by-design); `_maybe_apply_vision` consumes vision ONLY when enabled and never overwrites an XML-resolved deck. The reaction-path `dj_cohost.py:screen_jpeg=None` killswitch is **UNTOUCHED** (count-stable grep = 1); Gemini-only (no openai/anthropic). Added the real-screenshot accuracy eval harness (`eval/deck_vision/run_eval.py` — per-app + overall title/key accuracy, Camelot-normalized, `null↔null` correct; `ACCURACY_FLOOR=0.90` per-app enable gate; **opt-in live path**, NOT collected by the default suite) + `eval/deck_vision/README.md` (KAAN-ACTION corpus instructions + the floor gate). **Task 3 = KAAN-ACTION (recorded, NOT blocked per `gsd-autonomous fully`):** vision ships **dormant** (off by default) — Kaan must run `eval/deck_vision/run_eval.py` against his real djay/Serato/Traktor screenshot corpus, review per-app accuracy vs the 0.90 floor, then flip `vision_enabled=True` only for floor-clearing apps; below-floor apps stay XML-or-unknown (logged in `deferred-items.md`). Commits: test `0302231` (RED) → feat `e36d1ce` (GREEN: reader + gated slot) → feat `55baa58` (eval harness + README). Full suite: **7 failed, 3992 passed, 26 skipped** — the SAME 7 pre-existing `live-tuning-or-brain` WIP failures, unchanged count (passing 3976→3992 from 15 new mocked deck_vision tests + 1); none reference `deck_vision`/`VISION_CONF`/`vision_enabled` (grep-empty); no new failures, no golden flips, orphan-diff clean. **DECK-02 (vision ladder leg) satisfied.** Phase 59 plans 1-5 all complete. Next: Phase 60 (harmonic firing/clash detection).
