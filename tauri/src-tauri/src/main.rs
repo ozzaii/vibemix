@@ -143,27 +143,61 @@ fn main() {
             // Fires on platform default (Cmd+Shift+M / Ctrl+Shift+M).
             hotkey::register_default(&app_handle);
 
-            // Phase 13 Plan 02 — spawn the mascot overlay window.
-            // Honours persisted visibility (visible=false → no window built;
-            // tray left-click can wake it on next launch). Logs but does
-            // NOT bail setup on failure — the main session UI must still
-            // come up even if the mascot fails to build (e.g. an unusual
-            // multi-monitor topology).
-            match mascot_window::create_mascot_window(&app_handle) {
-                Ok(Some(_)) => {
-                    tracing::info!("mascot overlay window built");
+            // Phase 62 Plan 02 — choose the in-set surface from
+            // `primary_surface` (PILL-02). Default `Pill` — the Kaan-approved
+            // partial reversal of the shipped full-screen-mascot direction
+            // (62-CONTEXT Area 2). The mascot is demoted to opt-in/secondary
+            // (`primary_surface = "mascot"`), NOT deleted — it stays buildable
+            // on demand and the `mascot-audit` CI fence stays green. The
+            // choice applies at session start; no live hot-swap in v1.
+            //
+            // `.unwrap_or_default()` so a store-read / decode failure also
+            // falls back to Pill (T-62-04 — a tampered config never selects an
+            // out-of-band surface or crashes setup).
+            //
+            // Each branch LOGS but does NOT bail setup on failure — the main
+            // session UI must still come up even if the chosen overlay fails
+            // to build (e.g. an unusual multi-monitor topology). This clones
+            // the Phase 13 mascot non-fatal discipline exactly (T-62-05).
+            match config::load_primary_surface(&app_handle).unwrap_or_default() {
+                config::PrimarySurface::Pill => {
+                    match pill_window::create_pill_window(&app_handle) {
+                        Ok(Some(_)) => {
+                            tracing::info!("pill overlay window built");
+                        }
+                        Ok(None) => {
+                            tracing::info!("pill overlay hidden (user preference)");
+                        }
+                        Err(e) => {
+                            tracing::error!("pill window build failed: {e}");
+                        }
+                    }
                 }
-                Ok(None) => {
-                    tracing::info!("mascot overlay hidden (user preference)");
+                config::PrimarySurface::Mascot => {
+                    // Existing path (Phase 13 Plan 02) — the mascot stays
+                    // buildable on demand; it honours persisted visibility
+                    // (visible=false → no window built; tray left-click wakes
+                    // it). Demoted, not retired.
+                    match mascot_window::create_mascot_window(&app_handle) {
+                        Ok(Some(_)) => {
+                            tracing::info!("mascot overlay window built");
+                        }
+                        Ok(None) => {
+                            tracing::info!("mascot overlay hidden (user preference)");
+                        }
+                        Err(e) => {
+                            tracing::error!("mascot window build failed: {e}");
+                        }
+                    }
                 }
-                Err(e) => {
-                    tracing::error!("mascot window build failed: {e}");
+                config::PrimarySurface::None => {
+                    tracing::info!("no in-set surface (primary_surface=none)");
                 }
             }
 
             // Phase 13 Plan 02 — initialise the system tray icon + menu.
-            // Must run AFTER create_mascot_window so the left-click handler
-            // can target the live mascot window when toggling visibility.
+            // Must run AFTER create_*_window (pill or mascot) so the left-click
+            // handler can target the live overlay window when toggling.
             if let Err(e) = tray::init_tray(&app_handle) {
                 // Tray failure is non-fatal at setup but visibility-breaking
                 // for the user (no Quit, no Open Session UI from the menu

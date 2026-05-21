@@ -215,7 +215,10 @@ pub fn load_primary_surface(app: &AppHandle) -> Result<PrimarySurface, String> {
 /// Phase 62 Plan 02 — persist the `PrimarySurface`. Mirrors
 /// `save_mascot_state`. The v1 default path needs no caller (absent key →
 /// Pill); this exists so a future Settings toggle can flip the surface
-/// through `tauri-plugin-store` without a schema change.
+/// through `tauri-plugin-store` without a schema change. The Settings flip
+/// command is deferred (62-02 plan: surface choice applies at startup), so
+/// this writer has no v1 caller — allow the dead-code until that ships.
+#[allow(dead_code)]
 pub fn save_primary_surface(app: &AppHandle, surface: PrimarySurface) -> Result<(), String> {
     use tauri_plugin_store::StoreExt;
     let store = app

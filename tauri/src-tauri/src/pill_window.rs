@@ -52,11 +52,9 @@
 //! failure, falls back to the floor (never panics). `objc2-app-kit` is a
 //! macOS-only crates.io dep (NOT the git-only `tauri-nspanel`).
 
-// Plan 62-01 builds this module standalone; `create_pill_window` and its
-// private helpers are wired into the `main.rs` setup branch by plan 62-02
-// (the `primary_surface` switch). Until then the whole module is intentionally
-// dead code — suppress the dead-code warnings so the 62-01 build stays quiet.
-#![allow(dead_code)]
+// Plan 62-02 wires `create_pill_window` into the `main.rs` setup branch (the
+// `primary_surface` switch), so the module is no longer dead code — the
+// transient 62-01 `#![allow(dead_code)]` is removed here.
 
 use std::sync::Arc;
 use std::time::Duration;
