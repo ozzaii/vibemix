@@ -29,23 +29,32 @@ import { initialMachineState, applyTransition, planTransition } from "./state-ma
 
 const T0 = 1_000_000;
 
+// Phase 56 / LIVE-05a: SnapshotSlice now carries music/voice. The drop
+// tests use HIGH/LOW_CONF_SNAP, so these carry music ≥ PEAK_RMS (0.110) —
+// a REAL drop is loud, and the music-confirmation guard requires it.
 const HIGH_CONF_SNAP = {
   bpm: 120,
   bpm_confidence: 0.85,
   downbeat_phase: 0.5,
   mood: "hype-man",
+  music: 0.3,
+  voice: 0,
 };
 const LOW_CONF_SNAP = {
   bpm: 120,
   bpm_confidence: 0.4,
   downbeat_phase: 0.5,
   mood: "hype-man",
+  music: 0.3,
+  voice: 0,
 };
 const ZERO_SNAP = {
   bpm: 0,
   bpm_confidence: 0,
   downbeat_phase: 0,
   mood: "hype-man",
+  music: 0,
+  voice: 0,
 };
 
 describe("dispatchEvent — event taxonomy", () => {

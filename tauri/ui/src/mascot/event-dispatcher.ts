@@ -60,6 +60,16 @@ export interface SnapshotSlice {
   bpm_confidence: number;
   downbeat_phase: number;
   mood: string;
+  /**
+   * Smoothed master-bus music level (0..1). The live ws frame broadcasts
+   * this as a flat float (`levels.snapshot()`); the fixture frame carries
+   * it nested as `{ rms, peak }`. Both feed this numeric field. Phase 56 /
+   * LIVE-05a: the music-confirmation guard in stateForPhase reads it so a
+   * `phase` that disagrees with the level is treated as "no signal".
+   */
+  music: number;
+  /** Smoothed AI-voice level (0..1). Same flat-vs-nested duality as `music`. */
+  voice: number;
 }
 
 export interface DispatchFollowup {

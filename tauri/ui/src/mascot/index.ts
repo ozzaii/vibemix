@@ -170,6 +170,8 @@ async function boot(): Promise<void> {
     bpm_confidence: 0,
     downbeat_phase: 0,
     mood: "hype-man",
+    music: 0,
+    voice: 0,
   };
 
   // ── Pending followups (e.g., puff_particle → idle_breathe @500ms) ───────
@@ -200,10 +202,19 @@ async function boot(): Promise<void> {
           ? m.downbeat_phase
           : currentSnapshot.downbeat_phase;
       const mood = typeof m.mood === "string" ? m.mood : currentSnapshot.mood;
+      // Phase 56 / LIVE-05a: music/voice arrive as FLAT floats on the live
+      // ws frame (levels.snapshot() broadcasts top-level numbers). Read them
+      // off the same flat frame; default to the prior value when absent.
+      const music =
+        typeof m.music === "number" ? m.music : currentSnapshot.music;
+      const voice =
+        typeof m.voice === "number" ? m.voice : currentSnapshot.voice;
       currentSnapshot.bpm = bpm;
       currentSnapshot.bpm_confidence = conf;
       currentSnapshot.downbeat_phase = phase;
       currentSnapshot.mood = mood;
+      currentSnapshot.music = music;
+      currentSnapshot.voice = voice;
       return;
     }
 
