@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 61 — actionable-not-hype-coach-persona
+- **Current focus:** Phase 62 — Floating Pill UI (last v5.0 phase)
 - **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts on external clock).
 - **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
 - **Project mode:** standard.
@@ -45,10 +45,10 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 
 ## Current Position
 
-Phase: 61 (actionable-not-hype-coach-persona) — EXECUTING
-Plan: 2 of 2 — COMPLETE
-Status: Phase 61 plans complete (61-01 fence + 61-02 sharpen) — ready for /gsd:verify-work + Kaan-ear gate
-Last activity: 2026-05-21 -- 61-02 COACH cells sharpened GREEN
+Phase: 62 (Floating Pill UI) — NOT STARTED (last v5.0 phase)
+Plan: 0 of ? — needs discuss → ui-phase → plan → execute
+Status: Phase 61 COMPLETE (4/4 COACH eng-verified, human_needed live-ear → KAAN-ACTION). Overnight autonomous run: 62 → v5.0 lifecycle → plan+execute v6.0 "The Memory Turn".
+Last activity: 2026-05-21 -- Phase 61 verified + routed; starting Phase 62 (pill)
 
 ## Performance Metrics
 
