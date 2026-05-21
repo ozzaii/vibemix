@@ -8,10 +8,11 @@ field. This phase does NOT touch evidence_line (the deck block lands in Plan
 populating it — leaves evidence_line BYTE-IDENTICAL to the pre-Phase-59
 baseline, because evidence_line does not read deck_state yet.
 
-If Plan 59-04 wires the deck block, the byte-identity-WHEN-EMPTY assertion must
-still hold (empty deck_state → no deck output, mirroring the existing
-track=unknown gate). The byte-identity-WHEN-POPULATED assertion below is
-Phase-59-scoped and will be tightened in 59-04.
+Plan 59-04 wires the deck block into evidence_line, so:
+- byte-identity-WHEN-EMPTY still holds (empty deck_state → no deck output,
+  mirroring the existing track=unknown gate — these tests stay green);
+- a POPULATED + resolved deck_state now renders ``decks[A='..' 8A 128bpm]``;
+- a populated-but-unresolved deck_state renders honest ``decks=unknown``.
 """
 
 from __future__ import annotations
@@ -57,18 +58,31 @@ def test_deck_state_does_not_appear_in_evidence_line_when_empty():
     assert "deck_state" not in line
 
 
-def test_populated_deck_state_does_not_change_evidence_line_yet():
-    """Phase 59 does NOT touch evidence_line: even a POPULATED deck_state
-    leaves the evidence_line byte-identical to the same state with an empty
-    deck_state. (Plan 59-04 wires the deck block and tightens this.)"""
-    empty = _grounded_state()
+def test_resolved_deck_state_renders_deck_block():
+    """Plan 59-04: a resolved deck_state (camelot + confidence>=0.3) now renders
+    a grounded decks[...] block — title, Camelot, bpm."""
     populated = _grounded_state()
     populated.deck_state = DeckState(
         decks={"A": DeckTrack(title="Strobe", key="Am", camelot="8A",
                               bpm=128.0, confidence=0.8, source="rekordbox_xml")},
         updated_at=12.5,
     )
-    assert AICoach.evidence_line(populated) == AICoach.evidence_line(empty)
+    line = AICoach.evidence_line(populated)
+    assert "decks[A='Strobe' 8A 128bpm]" in line
+
+
+def test_populated_but_unresolved_deck_state_renders_unknown():
+    """A deck_state present but with NO resolved deck (camelot None / sub-0.3
+    confidence) renders honest decks=unknown — never a fabricated key."""
+    populated = _grounded_state()
+    populated.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Mystery", key=None, camelot=None,
+                              bpm=0.0, confidence=0.0, source="unknown")},
+        updated_at=12.5,
+    )
+    line = AICoach.evidence_line(populated)
+    assert "decks=unknown" in line
+    assert "decks[" not in line
 
 
 def test_grounded_baseline_unchanged_by_deck_state():

@@ -85,6 +85,29 @@ class AICoach:
         # phase= removed — RMS-based label was priming the AI to invent kicks/drops
         # when the audio was actually atmospheric. AI should hear the phase from audio.
 
+        # Phase 59-04 (DECK-01) — deck-state block, the grounded way. ADDITIVE +
+        # gated so an EMPTY deck_state (decks={}) emits NOTHING and the v4
+        # evidence_line stays byte-identical (Pitfall 5 golden-equivalence — the
+        # 59-01 baseline test stays green). Once the poller populates decks, show
+        # the resolved decks (camelot present + confidence >= 0.3, mirroring the
+        # track= gate); decks present but none resolved → honest decks=unknown.
+        # NOT added to _evidence_line_compact — deck-state is substantive
+        # full-payload, out of the diet/ack path (RESEARCH line 243).
+        if state.deck_state.decks:
+            resolved = {
+                s: d
+                for s, d in state.deck_state.decks.items()
+                if d.camelot and d.confidence >= 0.3
+            }
+            if resolved:
+                parts = [
+                    f"{s}={d.title!r} {d.camelot} {d.bpm:.0f}bpm"
+                    for s, d in sorted(resolved.items())
+                ]
+                e.append("decks[" + " | ".join(parts) + "]")
+            else:
+                e.append("decks=unknown")
+
         # Per-event ages so the AI can reason in seconds (e.g. "you held that 6s").
         now_ts = time.time()
         if state.phase_history:
@@ -231,6 +254,22 @@ class AICoach:
                 "Steady stretch. ONE sharp observation about the SOUND right "
                 "now — groove, texture, what the track is doing musically. "
                 "Always reply with something fresh; don't go silent."
+            )
+        # Phase 59-04 (DECK plumbing) — STUB arms for the two harmonic event
+        # types. They are REGISTERED in event.py/constants.py this phase but the
+        # detector NEVER fires them yet (firing logic + the real clash/transition
+        # narration is Phase 60). These minimal placeholders keep the two types
+        # routed through the normal (non-diet) path so an accidental fire degrades
+        # gracefully instead of falling to the bland "React naturally." default.
+        if t == "KEY_CLASH":
+            return (
+                "React naturally to what you HEAR — ground on the audio and the "
+                "decks[...] evidence. (Harmonic clash detection is not live yet.)"
+            )
+        if t == "TRANSITION_OPPORTUNITY":
+            return (
+                "React naturally to what you HEAR — ground on the audio and the "
+                "decks[...] evidence. (Transition cueing is not live yet.)"
             )
         return "React naturally."
 

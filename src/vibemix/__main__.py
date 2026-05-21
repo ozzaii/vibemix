@@ -98,6 +98,7 @@ from vibemix.audio import (
 from vibemix.audio.recorder import sweep_crashed_sessions
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
+from vibemix.state.deck_poller import DeckPoller
 from vibemix.profile import load_profile, render_profile_for_cache
 from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
 from vibemix.runtime.cancel import CancelGate
@@ -882,10 +883,15 @@ async def main() -> None:
 
     # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──
     library_cache = Path.home() / ".cache" / "vibemix" / "library.pkl"
+    # Phase 59-04 (DECK-05) — retain the cache-warm RekordboxLibrary so the deck
+    # poller can reuse it READ-ONLY (no second XML import, no DB open). None when
+    # the user never imported a collection.xml → poller degrades to honest unknown.
+    deck_library = None
     if library_cache.exists():
         lib = RekordboxLibrary()
         if lib.try_load_cache():
             registered = evidence_registry.register_library(lib)
+            deck_library = lib  # share the SAME read-only object with the poller
             print(f"-> library: {registered} tracks registered for [track:<id>] citations")
         else:
             print("-> library: cache present but failed to load — skipping registration")
@@ -974,6 +980,19 @@ async def main() -> None:
     diag_task = asyncio.create_task(diag_loop(levels, state, stop_event))
     screen_task = asyncio.create_task(screen_macos.run_capture_loop(state, stop_event))
     track_task = asyncio.create_task(track_macos.run_poll_loop(stop_event))
+
+    # Phase 59-04 (DECK-04/05) — the THIRD external snapshot producer. Reuses the
+    # SAME read-only controller_state / track_info instances the refresh loop owns
+    # and the cache-warm RekordboxLibrary (deck_library, None when no collection.xml
+    # imported → honest unknown). Its run_poll_loop writes the poller's OWN holder;
+    # state_refresh_loop is the only thing that copies snapshot() into MusicState
+    # under state._lock (single-writer rule). deck_source threads in alongside.
+    deck_poller = DeckPoller(
+        library=deck_library,
+        controller=midi_macos.controller_state,
+        track_info=track_macos.track_info,
+    )
+    deck_poll_task = asyncio.create_task(deck_poller.run_poll_loop(stop_event))
     refresh_task = asyncio.create_task(
         state_refresh_loop(
             state,
@@ -982,6 +1001,7 @@ async def main() -> None:
             track_macos.track_info,
             stop_event,
             evidence_registry=evidence_registry,
+            deck_source=deck_poller,
         )
     )
     coach_task = asyncio.create_task(
@@ -1038,6 +1058,7 @@ async def main() -> None:
             ws_task,
             diag_task,
             track_task,
+            deck_poll_task,
             parent_watch_task,
             midi_watcher_task,
         ]
