@@ -96,6 +96,47 @@ describe("renderDeckChips — deck_state → chip strip (PILL-03)", () => {
     expect(glyph!.classList.contains("vmx-deck-chip__key--resolved")).toBe(true);
   });
 
+  test("WR-04: a LOW-confidence (<0.6) resolved key is dimmed — amber authority dropped", () => {
+    // The deck cite-floor is 0.6 (v2 derive_audible_track `(unsure)` threshold).
+    // A camelot resolved below it must NOT render with full amber authority —
+    // an anti-slop surface cannot present a barely-sure key as a registry hit.
+    const deckState: DeckStateWire = {
+      A: { title: "Track A", camelot: "8A", key: "C", bpm: 128, confidence: 0.3 },
+    };
+    const root = renderDeckChips(deckState);
+    const glyph = root!.querySelector<HTMLElement>(".vmx-deck-chip__key");
+    expect(glyph).not.toBeNull();
+    // The key text still shows (we DID resolve it), but dimmed — no amber.
+    expect(glyph!.textContent).toBe("8a");
+    expect(glyph!.classList.contains("vmx-deck-chip__key--resolved")).toBe(false);
+    // It carries an explicit low-confidence marker so the dim is intentional,
+    // not just an unresolved fallthrough.
+    expect(glyph!.classList.contains("vmx-deck-chip__key--unsure")).toBe(true);
+  });
+
+  test("WR-04: a HIGH-confidence (>=0.6) resolved key keeps full amber authority", () => {
+    const deckState: DeckStateWire = {
+      A: { title: "Track A", camelot: "8A", key: "C", bpm: 128, confidence: 0.6 },
+    };
+    const root = renderDeckChips(deckState);
+    const glyph = root!.querySelector<HTMLElement>(".vmx-deck-chip__key");
+    expect(glyph!.classList.contains("vmx-deck-chip__key--resolved")).toBe(true);
+    expect(glyph!.classList.contains("vmx-deck-chip__key--unsure")).toBe(false);
+  });
+
+  test("WR-04: a resolved key with null confidence keeps amber (no penalty without a score)", () => {
+    // Honest: absence of a confidence score is not evidence of low confidence —
+    // a resolved camelot with confidence:null keeps authority (don't punish a
+    // legacy producer that omits the field).
+    const deckState: DeckStateWire = {
+      A: { title: "Track A", camelot: "8A", key: "C", bpm: 128, confidence: null },
+    };
+    const root = renderDeckChips(deckState);
+    const glyph = root!.querySelector<HTMLElement>(".vmx-deck-chip__key");
+    expect(glyph!.classList.contains("vmx-deck-chip__key--resolved")).toBe(true);
+    expect(glyph!.classList.contains("vmx-deck-chip__key--unsure")).toBe(false);
+  });
+
   test("unknown-key glyph does NOT carry the amber class (dim --silk-40)", () => {
     const deckState: DeckStateWire = {
       A: { title: "Track A", camelot: null, key: null, bpm: 128, confidence: 0.4 },
@@ -191,5 +232,16 @@ describe("deck-chips CSS — frontend-enforcement (token-only, 20/80 amber)", ()
     // The resting key glyph is --silk-40; amber lives only on --resolved.
     expect(keyRule![0]).toMatch(/var\(--silk-40\)/);
     expect(keyRule![0]).not.toMatch(/var\(--amber/);
+  });
+
+  test("WR-04 — the low-confidence (--unsure) rule dims to silk, not amber", () => {
+    const unsureRule = _CSS_FOR_TEST.match(
+      /\.vmx-deck-chip__key--unsure\s*\{[^}]*\}/,
+    );
+    expect(unsureRule).not.toBeNull();
+    // A barely-sure key reads as dim silk — amber authority is reserved for a
+    // high-confidence registry hit.
+    expect(unsureRule![0]).toMatch(/var\(--silk-40\)/);
+    expect(unsureRule![0]).not.toMatch(/var\(--amber/);
   });
 });

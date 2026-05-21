@@ -88,6 +88,15 @@ const CSS = `
   .vmx-deck-chip__key--resolved {
     color: var(--amber);
   }
+  /* A LOW-confidence resolved key (< the deck cite-floor): the key text still
+   * shows (we did resolve it) but amber authority is DROPPED — a barely-sure
+   * camelot must not read with the same authority as a registry hit (WR-04,
+   * anti-slop). Dim to --silk-40, same ink as the honest 'unknown'. This rule
+   * wins over --resolved because --unsure is applied INSTEAD of --resolved when
+   * confidence is below the floor. */
+  .vmx-deck-chip__key--unsure {
+    color: var(--silk-40);
+  }
 `;
 
 registerStyle("vmx-deck-strip", CSS);
@@ -100,6 +109,13 @@ export const _CSS_FOR_TEST = CSS;
 /** The honest-`unknown` sentinel rendered when a deck/key/bpm is unresolved.
  *  A single source so the chip text + the glyph render the SAME word. */
 const UNKNOWN = "unknown";
+
+/** The deck cite-floor (WR-04). A resolved camelot whose `confidence` is BELOW
+ *  this reads as dim (--unsure), not full-amber authority — mirrors the v2
+ *  `derive_audible_track` `(unsure)` threshold. A `null` confidence is NOT a
+ *  penalty (absence of a score ≠ low confidence — a legacy producer that omits
+ *  the field keeps authority). */
+const CONFIDENCE_FLOOR = 0.6;
 
 /**
  * Build a resolved deck's chip text: `<deck> · <key> · <bpm>` ("a · 8a · 128").
@@ -128,6 +144,9 @@ function buildDeckChip(deck: string, d: DeckWire): HTMLDivElement {
   chip.dataset.deck = deck;
 
   const resolved = d.camelot != null;
+  // WR-04: a resolved key BELOW the cite-floor reads as dim (--unsure), not
+  // amber. A null confidence keeps authority (absence of score ≠ low score).
+  const unsure = resolved && d.confidence != null && d.confidence < CONFIDENCE_FLOOR;
   const keyText = resolved ? d.camelot!.toLowerCase() : UNKNOWN;
   // Honest-null: non-positive bpm is unknown — never a fabricated "0" (CR-02).
   const bpmText = d.bpm != null && d.bpm > 0 ? String(Math.round(d.bpm)) : UNKNOWN;
@@ -136,11 +155,17 @@ function buildDeckChip(deck: string, d: DeckWire): HTMLDivElement {
   // `<deck> · ` (text node — never markup)
   chip.append(document.createTextNode(`${deckText} · `));
 
-  // The key glyph — amber ONLY when a real key resolved.
+  // The key glyph — amber ONLY when a real key resolved AT or ABOVE the
+  // cite-floor. A low-confidence resolved key is dimmed (--unsure); an
+  // unresolved key is the base dim glyph.
   const keyEl = document.createElement("span");
-  keyEl.className = resolved
-    ? "vmx-deck-chip__key vmx-deck-chip__key--resolved"
-    : "vmx-deck-chip__key";
+  if (resolved && !unsure) {
+    keyEl.className = "vmx-deck-chip__key vmx-deck-chip__key--resolved";
+  } else if (unsure) {
+    keyEl.className = "vmx-deck-chip__key vmx-deck-chip__key--unsure";
+  } else {
+    keyEl.className = "vmx-deck-chip__key";
+  }
   keyEl.textContent = keyText;
   chip.append(keyEl);
 
