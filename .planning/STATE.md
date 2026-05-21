@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.0
-milestone_name: SHIP
-status: executing
-last_updated: "2026-05-21T12:00:00.000Z"
-last_activity: 2026-05-21 -- Phase 58 (Ship Readiness) COMPLETE (4/4 plans; 43/43 phase tests + green --dry-run; verify human_needed 13/13 engineering must-haves). ALL 8 v4.0 PHASES ENGINEERING-COMPLETE (8/8). Ready for milestone lifecycle: audit → complete → cleanup. Signed publish + live ear-passes + recorded walk = KAAN-ACTION/external-clock
+milestone: v5.0
+milestone_name: The Useful Cut
+status: planning
+last_updated: "2026-05-21T11:00:36.892Z"
+last_activity: 2026-05-21
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 26
-  completed_plans: 26
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # vibemix — State
@@ -48,10 +48,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 ## Current Position
 
-Phase: 58 (Ship Readiness) — COMPLETE — ALL 8 v4.0 PHASES ENGINEERING-COMPLETE
-Plan: 4 of 4
-Status: v4.0 engineering done (8/8); ready for milestone lifecycle (audit → complete → cleanup)
-Last activity: 2026-05-21 -- Phase 58 complete; all v4.0 phases engineering-green
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-21 — Milestone v5.0 started
 
 ## Performance Metrics
 

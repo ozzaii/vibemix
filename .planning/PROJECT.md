@@ -10,20 +10,40 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v4.0 SHIP
+## Current Milestone: v5.0 The Useful Cut
 
-**Goal:** Take vibemix from engineering-complete to a co-host Kaan plugs into his MacBook and plays full sets with — validated live on real hardware (audio + controller), both modes feeling like a real DJ friend in the ear, polished to peak, with the public release one button away once external signatures land.
+**Goal:** Turn the co-host from a vibe-narrator into a genuinely *useful* DJ tool — one that understands the whole deck, gives feedback a DJ can actually act on, and lives in an unobtrusive draggable surface instead of a full-screen mascot.
 
 **Target features:**
-- Real-hardware bring-up — launch the Tauri app + Python sidecar on the real Mac, reach a live session, read Tauri console + sidecar logs, fix what breaks across a full-set run
-- Live-session validation — hype + feedback modes produce grounded, in-time, non-slop reactions on real audio across ≥2 genres; cooldowns/latency tuned live
-- Peak performance — TTFT measured on real hardware within budget; no audio dropouts; 60fps mascot/UI under live load
-- Sexify finish — Tier-1 live surfaces final visual pass; v0.1.0-rc1 carryover bugs closed; fresh-account first-run tightened
-- Ship — engineering gates green + §E2E-50A-WALK discharged by driving the real app; release one-button-after-signatures; Apple Dev + SignPath surfaced as KAAN-ACTION
+- **Full deck awareness** — the co-host ingests and understands *every* track loaded across the decks (not one mix in isolation). Session-wide track knowledge powers concrete transition-execution feedback (how to run the blend) and harmonic key-clash detection (overlapping elements in clashing keys). Strong = real harmonic theory (Camelot/key-relationship awareness) + transition mechanics depth, not surface vibe.
+- **Actionable feedback, not hype** — retire the narrator/cheerleader persona; the feedback voice gives concrete, applicable DJ notes only. Builds on the in-flight `live-tuning-or-brain` work (OpenRouter brain+TTS, English pro-feedback, pacing/persona fixes) — extends it, doesn't duplicate it.
+- **Floating pill UI** — a small, draggable Super-Whisper-style pill, positionable anywhere on screen, becomes the **primary** live surface. The Three.js 3D mascot overlay (`tauri/ui/mascot.html`) becomes opt-in/secondary — kept, not retired. Deliberate, Kaan-approved partial reversal of the shipped CDJ-Whisper/VTuber-mascot direction for the in-set surface.
+
+**Open feasibility (de-risk in research):** the deck data-source for "all loaded tracks" — pyrekordbox / DJ-software library files / screen OCR / dual-deck audio analysis / nowplaying-cli — is unresolved. Milestone research (run first) must land a recommended source + fallback before requirements lock.
+
+**v4.0 status:** "SHIP" (Phases 51–58) is **engineering-complete (8/8)** but deliberately **NOT archived** — its public publish stays gated on the external signature clock (Apple Dev Agreement + SignPath OSS cert). v5.0 runs as the active milestone alongside it; v4.0's KAAN-ACTION discharge surface (`KAAN-ACTION-LEGAL.md §SHIP-V4`) is unchanged.
 
 **Last shipped:** v3.1 "Distribution-Ready Pass" — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts ride the v3.0 external clock per `gsd-autonomous fully` mode).
 
-(v3.1 shipped 2026-05-18. v3.0 "Clean OSS Ship" shipped 2026-05-17. v2.1 "The Unified Cut" shipped 2026-05-16. v2.0 shipped 2026-05-14. v0.1.0 shipped 2026-05-13. Full archives in `.planning/milestones/`.)
+(v4.0 "SHIP" engineering-complete 2026-05-21, publish on signature clock. v3.1 shipped 2026-05-18. v3.0 "Clean OSS Ship" 2026-05-17. v2.1 "The Unified Cut" 2026-05-16. v2.0 2026-05-14. v0.1.0 2026-05-13. Full archives in `.planning/milestones/`.)
+
+<details>
+<summary>📦 v4.0 SHIP (engineering-complete 2026-05-21, publish on signature clock) — archived narrative</summary>
+
+8 phases (51–58) shipped engineering-green under `gsd-autonomous fully` mode. 26 plans. **Goal:** take vibemix from engineering-complete to a co-host Kaan plugs into his MacBook and plays full sets with — validated live on real hardware (audio + controller), both modes feeling like a real DJ friend in the ear, polished to peak, release one button away once external signatures land.
+
+**Highlights:**
+- Real-hardware bring-up split into three input seams — boot/stability (51), audio + feature grounding (52, incl. live BPM=200 grounding fix), controller (53) — each green before the modes that consume it.
+- Hype mode (54) + feedback mode (55) validated as dedicated phases (different live failure shapes); feedback-mode citation integrity airtight (zero-orphan replay + hallucination-strip on a real registry).
+- Performance + live mascot (56) — `LIVE_TTFT_BUDGET_MS=1500`, zero soak underruns, dispatch p95 ~0.22ms; mascot retargeted to the shipped Three.js GLB rig.
+- Sexify finish (57) — impeccable CDJ-Whisper pass; v0.1.0-rc1 carryover bugs regression-pinned.
+- Ship readiness (58) — `cut_release.sh --dry-run v0.1.0-rc1` exits GREEN; publish hard-guard regression-pinned (never auto-runs); `v4.0-MILESTONE-AUDIT.md` generated.
+
+**Open at close (external clock):** Apple Dev Agreement (Francesco) + SignPath OSS cert (Kaan) gate the public RC publish; recorded §E2E walk + Gate-2b ear-passes are KAAN-ACTION. All in `KAAN-ACTION-LEGAL.md §SHIP-V4` + per-phase `*-HUMAN-UAT.md`.
+
+Roadmap: `.planning/ROADMAP.md` (v4.0 section) · Audit: `.planning/v4.0-MILESTONE-AUDIT.md`. Milestone intentionally left unarchived per Kaan directive 2026-05-21.
+
+</details>
 
 <details>
 <summary>📦 v3.1 Distribution-Ready Pass (shipped 2026-05-18, status <code>tech_debt</code>) — archived narrative</summary>
@@ -363,4 +383,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-20 — v4.0 "SHIP" milestone started via `/gsd:new-milestone` under `gsd-autonomous fully`. Scope: real-hardware bring-up (drive the app on Kaan's Mac, read Tauri console + sidecar logs, fix live), hype+feedback live validation, peak performance, sexify finish, ship to one-button-after-signatures. Vibe Mix prep module explicitly deferred (separate commercial product). External clock unchanged: Apple Dev Agreement (Francesco) + SignPath OSS cert gate the literal publish.*
+*Last updated: 2026-05-21 — v5.0 "The Useful Cut" milestone started via `/gsd:new-milestone` under `gsd-autonomous fully`. Scope: full deck awareness (all loaded tracks → transition + harmonic-clash feedback), actionable-not-hype feedback persona, floating Super-Whisper-style pill as primary live surface (3D mascot → opt-in/secondary). v4.0 "SHIP" kept OPEN (engineering-complete 8/8, publish on signature clock — NOT archived); v5.0 runs as active milestone alongside it. Milestone research runs first to resolve the deck data-source question. External clock unchanged: Apple Dev Agreement (Francesco) + SignPath OSS cert gate the v4.0 publish.*
