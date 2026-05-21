@@ -33,14 +33,26 @@ const CSS = `
     display: inline-flex;
     flex-direction: row;
     align-items: flex-end;
+    /* 2px LED-comb gap — INTENTIONAL sub-grid hardware exception. This matches
+     * the session meter's 2px segment gap (meter.ts) so the pill waveform reads
+     * as the same hardware-LED ladder. A 4px (--sp-1) gap would over-space the
+     * 14-bar comb inside the compact 280px pill and lose the LED read. Not on
+     * the --sp-* scale by design (62-UI-SPEC §Spacing hardware-meter carve-out). */
     gap: 2px;
     height: 16px;
     width: 100%;
+    /* 140px waveform geometry cap — a layout constraint, not a spacing token:
+     * half the 280px collapsed-pill width, leaving room for the state dot +
+     * label in the collapsed row (62-UI-SPEC §Pill Dimensions / §Waveform).
+     * Documented sub-grid layout value, not a silent literal (WR Fix 2). */
     max-width: 140px;
     margin-left: auto;
   }
   .vmx-pill-wave__bar {
     flex: 1 1 0;
+    /* 2px minimum bar width — the same LED-comb hardware exception as the gap
+     * above (a sub-2px bar disappears on HiDPI). Intentional sub-grid value,
+     * mirrors meter.ts's 2px segment width. */
     min-width: 2px;
     height: 100%;
     border-radius: 1px;

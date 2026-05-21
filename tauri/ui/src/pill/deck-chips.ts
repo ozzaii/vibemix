@@ -55,15 +55,23 @@ const CSS = `
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    /* Inter-chip gap = --sp-2 (8px), the 62-UI-SPEC §Spacing inter-chip token
+     * (was an off-grid 6px literal — WR Fix 2). */
+    gap: var(--sp-2);
     margin: 0;
     padding: 0;
   }
   .vmx-deck-chip {
     display: inline-flex;
     align-items: center;
+    /* Chip content-row height: 20px is the same content row the drag-handle
+     * exception is built on (62-UI-SPEC §Spacing: "28px = --sp-2 + 20px content
+     * row"). It is a 4-multiple read-height, NOT a spacing token — kept as a
+     * documented sub-token content-row height, mirroring how the spec carves
+     * out the 20px content row. */
     height: 20px;
-    padding: 0 8px;
+    /* Chip horizontal padding = --sp-2 (8px), tokenised (was a raw 8px). */
+    padding: 0 var(--sp-2);
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-sm);
     background: var(--glass-3);
