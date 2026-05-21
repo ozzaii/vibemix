@@ -44,7 +44,7 @@ Research-resolved foundations (`.planning/research/SUMMARY.md`, 4 convergent age
 ### Floating Pill UI (PILL) — Phase 62
 
 - [x] **PILL-01**: A small, **always-on-top, transparent, draggable** Super-Whisper-style pill is positionable anywhere on screen and multi-monitor safe.
-- [ ] **PILL-02**: The pill is the **primary** live surface via a tri-state `primary_surface` config (`pill` default | `mascot` opt-in/secondary | `none`); the existing Three.js mascot overlay keeps working and does not regress (`mascot-audit` CI fence held).
+- [x] **PILL-02**: The pill is the **primary** live surface via a tri-state `primary_surface` config (`pill` default | `mascot` opt-in/secondary | `none`); the existing Three.js mascot overlay keeps working and does not regress (`mascot-audit` CI fence held).
 - [x] **PILL-03**: The pill **consumes the existing ws:8765 frames** (`ipc.session.snapshot` + `ipc.session.cohost-reaction`) — no new port, no Python delivery change — and shows idle / listening / speaking / expand-on-event states with the real TTS waveform (`Levels.update_voice`) + the citation strip.
 - [x] **PILL-04**: The pill **never steals keyboard focus** mid-set and never covers critical deck info; the drag-on-unfocused-window mechanism is resolved (spike on the built app per tauri#11605/#10767), with mac+win transparency parity.
 
@@ -86,7 +86,7 @@ Research-resolved foundations (`.planning/research/SUMMARY.md`, 4 convergent age
 | COACH-03 | Phase 61 | Complete |
 | COACH-04 | Phase 61 | Complete |
 | PILL-01 | Phase 62 | Complete |
-| PILL-02 | Phase 62 | Pending |
+| PILL-02 | Phase 62 | Complete |
 | PILL-03 | Phase 62 | Complete |
 | PILL-04 | Phase 62 | Complete |
 

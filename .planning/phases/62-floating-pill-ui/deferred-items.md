@@ -39,3 +39,34 @@ The 4 new `test_ws_bus_deck_state.py` tests are GREEN within the full run
 **Action:** none for 62-03. The 2 capability-snapshot failures resolve when
 plan 62-02 regenerates `SNAPSHOT.json` (`python scripts/dist/snapshot_capabilities.py --write`);
 that is 62-02's responsibility, not this plan's (scope boundary).
+
+> **62-02 close update (2026-05-22):** the capability `SNAPSHOT.json` was
+> already regenerated for `"pill"` in commit `5fe1f6a` BEFORE plan 62-02's
+> config/main wiring began. Plan 62-02 (this plan) touched NO capability files
+> (diff = `config.rs` + `main.rs` + `pill_window.rs` only), so the 2
+> capability-snapshot failures listed above are now RESOLVED — `pytest -k
+> capability_snapshot` is 7/7 green. The note above is stale.
+
+## 62-02 Task 3 — pre-existing mascot.html grep-gate offender (out of scope)
+
+The `mascot-tauri-only.yml` simplified grep gate (and the plan's broader
+`<verify>` grep) flag `tests/e2e/macbook/snapshots/persona_smoke.spec.ts` for
+the string `mascot.html`. Investigation:
+
+- It is a **Phase-50 comment** (`760a3b2`, `feat(50-03)`) that literally reads
+  `// (the production Three.js renderer — mascot.html is NEVER referenced per POC` —
+  a documentation note, NOT an import/usage.
+- It **pre-dates Phase 62 entirely** and is **outside this plan's diff**
+  (62-02 changed only `config.rs` + `main.rs` + `pill_window.rs`).
+- The live CI fence (`mascot-tauri-only.yml`) is **path-scoped** to
+  `tests/** e2e/** scripts/ci/** scripts/mascot/** tauri/ui/src/mascot/**` +
+  the workflow file — none of which 62-02's Rust-only diff matches, so the
+  workflow never triggers on this plan's changes.
+- The authoritative local mirror `tests/mascot/test_ci_grep_gates.py` is
+  **7/7 GREEN** (it handles the allowlist correctly).
+
+**Action:** none for 62-02 (scope boundary — pre-existing Phase-50 comment, not
+a pill-introduced reference; no NEW `mascot.html` ref was added by this plan).
+A future cleanup could either rephrase the persona_smoke comment to avoid the
+literal string or add it to the gate's allowlist, but that belongs to the
+mascot/e2e fence owner, not this config-wiring plan.
