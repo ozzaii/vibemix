@@ -29,23 +29,32 @@ import { initialMachineState, applyTransition, planTransition } from "./state-ma
 
 const T0 = 1_000_000;
 
+// Phase 56 / LIVE-05a: SnapshotSlice now carries music/voice. The drop
+// tests use HIGH/LOW_CONF_SNAP, so these carry music ≥ PEAK_RMS (0.110) —
+// a REAL drop is loud, and the music-confirmation guard requires it.
 const HIGH_CONF_SNAP = {
   bpm: 120,
   bpm_confidence: 0.85,
   downbeat_phase: 0.5,
   mood: "hype-man",
+  music: 0.3,
+  voice: 0,
 };
 const LOW_CONF_SNAP = {
   bpm: 120,
   bpm_confidence: 0.4,
   downbeat_phase: 0.5,
   mood: "hype-man",
+  music: 0.3,
+  voice: 0,
 };
 const ZERO_SNAP = {
   bpm: 0,
   bpm_confidence: 0,
   downbeat_phase: 0,
   mood: "hype-man",
+  music: 0,
+  voice: 0,
 };
 
 describe("dispatchEvent — event taxonomy", () => {
@@ -194,5 +203,102 @@ describe("dispatchEvent — event taxonomy", () => {
     expect(high!.plan.action).toBe("schedule_for_downbeat");
     const low = dispatchEvent(m, dropMsg, T0 + 10, LOW_CONF_SNAP);
     expect(low!.plan.action).toBe("switch_now");
+  });
+});
+
+// ── Phase 56 / LIVE-05a — music-confirmation guard (anti-slop) ────────────
+//
+// Defence-in-depth: `phase` is trusted but a contradictory `music` level
+// blocks the flip. A `phase=drop` during a quiet section is a
+// misclassification → return null (current mode held). Mirrors the
+// src/vibemix/audio/constants.py thresholds verbatim.
+describe("dispatchEvent — Phase 56 music-confirmation guard", () => {
+  const QUIET_SNAP = {
+    bpm: 120,
+    bpm_confidence: 0.4, // low so a confirmed drop would switch_now (not schedule)
+    downbeat_phase: 0.5,
+    mood: "hype-man",
+    music: 0.05, // < PEAK_RMS (0.110) AND >= LOW_RMS (0.040)
+    voice: 0,
+  };
+  const LOUD_SNAP = {
+    bpm: 120,
+    bpm_confidence: 0.4,
+    downbeat_phase: 0.5,
+    mood: "hype-man",
+    music: 0.3, // >= PEAK_RMS
+    voice: 0,
+  };
+  const dropMsg = {
+    type: "event",
+    subtype: "PHASE",
+    payload: { from: "build", to: "drop" },
+  };
+  const breakdownMsg = {
+    type: "event",
+    subtype: "PHASE",
+    payload: { from: "drop", to: "breakdown" },
+  };
+
+  it("Test 11: phase=drop + music < PEAK_RMS → null (held, anti-slop)", () => {
+    const m = initialMachineState(T0);
+    const result = dispatchEvent(m, dropMsg, T0 + 10, QUIET_SNAP);
+    expect(result).toBeNull();
+  });
+
+  it("Test 12: phase=drop + music >= PEAK_RMS → dance_hard (confirmed)", () => {
+    const m = initialMachineState(T0);
+    const result = dispatchEvent(m, dropMsg, T0 + 10, LOUD_SNAP);
+    expect(result).not.toBeNull();
+    expect(result!.plan.target).toBe("dance_hard");
+  });
+
+  it("Test 13: phase=breakdown + music >= LOW_RMS → null (held, anti-slop)", () => {
+    const m = initialMachineState(T0);
+    // QUIET_SNAP.music = 0.05 >= LOW_RMS (0.040): a "loud" breakdown is
+    // contradictory → hold previous mode.
+    const result = dispatchEvent(m, breakdownMsg, T0 + 10, QUIET_SNAP);
+    expect(result).toBeNull();
+  });
+
+  it("Test 14: phase=breakdown + music < LOW_RMS → idle_breathe (confirmed)", () => {
+    const m = initialMachineState(T0);
+    const calmSnap = { ...QUIET_SNAP, music: 0.02 }; // < LOW_RMS (0.040)
+    const result = dispatchEvent(m, breakdownMsg, T0 + 10, calmSnap);
+    expect(result).not.toBeNull();
+    expect(result!.plan.target).toBe("idle_breathe");
+  });
+
+  it("Test 15: phase=peak + music < PEAK_RMS → null (same family as drop)", () => {
+    const m = initialMachineState(T0);
+    const peakMsg = {
+      type: "event",
+      subtype: "PHASE",
+      payload: { from: "drop", to: "peak" },
+    };
+    const result = dispatchEvent(m, peakMsg, T0 + 10, QUIET_SNAP);
+    expect(result).toBeNull();
+  });
+
+  it("Test 16: unguarded phases (groove/build/low/silent) unchanged by the guard", () => {
+    const m = initialMachineState(T0);
+    const mk = (to: string) => ({
+      type: "event",
+      subtype: "PHASE",
+      payload: { from: "x", to },
+    });
+    // Even at quiet music these map normally (not guarded by the contract).
+    expect(
+      dispatchEvent(m, mk("groove"), T0 + 10, QUIET_SNAP)!.plan.target,
+    ).toBe("idle_bop_to_beat_energetic");
+    expect(dispatchEvent(m, mk("build"), T0 + 10, QUIET_SNAP)!.plan.target).toBe(
+      "idle_bop_to_beat_energetic",
+    );
+    expect(dispatchEvent(m, mk("low"), T0 + 10, QUIET_SNAP)!.plan.target).toBe(
+      "idle_bop_to_beat_mellow",
+    );
+    expect(
+      dispatchEvent(m, mk("silent"), T0 + 10, QUIET_SNAP)!.plan.target,
+    ).toBe("idle_breathe");
   });
 });

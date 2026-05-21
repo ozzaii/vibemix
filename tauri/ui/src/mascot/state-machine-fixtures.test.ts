@@ -41,6 +41,8 @@ const DEFAULT_SNAPSHOT: SnapshotSlice = {
   bpm_confidence: 0,
   downbeat_phase: 0,
   mood: "hype-man",
+  music: 0,
+  voice: 0,
 };
 
 interface TraceMessage {
@@ -182,6 +184,14 @@ function replayTrace(trace: Trace): ActualTransition[] {
     if (type === "snapshot") {
       // Snapshot: update the SnapshotSlice ref. No transitions.
       const m = message.msg;
+      // The fixture frame carries music/voice NESTED as { rms, peak }
+      // (the live ws frame carries them flat — both feed the same numeric
+      // SnapshotSlice fields). Read the nested `.rms`, default to prior.
+      const nestedRms = (v: unknown, prior: number): number => {
+        if (typeof v !== "object" || v === null) return prior;
+        const rms = (v as { rms?: unknown }).rms;
+        return typeof rms === "number" ? rms : prior;
+      };
       snapshot = {
         bpm: typeof m.bpm === "number" ? m.bpm : snapshot.bpm,
         bpm_confidence:
@@ -193,6 +203,8 @@ function replayTrace(trace: Trace): ActualTransition[] {
             ? m.downbeat_phase
             : snapshot.downbeat_phase,
         mood: typeof m.mood === "string" ? m.mood : snapshot.mood,
+        music: nestedRms(m.music, snapshot.music),
+        voice: nestedRms(m.voice, snapshot.voice),
       };
       continue;
     }
@@ -288,6 +300,38 @@ describe("state-machine fixture replay — event-traces.json", () => {
     });
   }
 
+  // Phase 56 / LIVE-05a — the discriminating held-mode assertion. The
+  // auto-runner above proves dance_hard is present (positive); this proves
+  // the contradictory quiet drop fires NO new transition after it (the held
+  // behaviour the guard exists for). Without the guard, the t=1100 quiet
+  // PHASE→drop would re-issue dance_hard — but more importantly any future
+  // regression that swapped the guard for an unconditional mode flip would
+  // surface here as an extra transition past the contradictory frame.
+  it("anti_slop_drop_quiet — quiet drop fires no transition after the seed (held)", () => {
+    const trace = (traces.traces as Trace[]).find(
+      (t) => t.name === "anti_slop_drop_quiet",
+    )!;
+    expect(trace).toBeDefined();
+    const actual = replayTrace(trace);
+    // Real transitions (exclude the boot seed).
+    const transitions = actual.filter((a) => a.source !== "boot");
+    // Exactly TWO real transitions: dance_hard@~100 (loud drop seed) and
+    // idle_bop_to_beat_energetic@~600 (settle to groove). The contradictory
+    // quiet PHASE→drop at 1100ms must NOT add a third.
+    expect(transitions).toHaveLength(2);
+    expect(transitions[0]!.state).toBe("dance_hard");
+    expect(transitions[1]!.state).toBe("idle_bop_to_beat_energetic");
+    // DISCRIMINATING: nothing fires at/after the quiet-drop timestamp
+    // (1100ms). A broken/removed guard would re-flip to dance_hard here
+    // (idle→dance is a real recorded transition) — this catches it.
+    const afterContradiction = transitions.filter((a) => a.at >= 1100);
+    expect(afterContradiction).toHaveLength(0);
+    // The held mode after the contradiction is still the groove idle_bop.
+    expect(transitions[transitions.length - 1]!.state).toBe(
+      "idle_bop_to_beat_energetic",
+    );
+  });
+
   it("aggregates: every documented ROADMAP event-mapping criterion is covered by ≥1 trace", () => {
     const criteriaCovered = new Set(
       (traces.traces as Trace[]).map((t) => t.criterion),
@@ -298,5 +342,58 @@ describe("state-machine fixture replay — event-traces.json", () => {
     expect(criteriaCovered.has(4)).toBe(true);
     expect(criteriaCovered.has(5)).toBe(true);
     expect(criteriaCovered.has(6)).toBe(true);
+  });
+});
+
+// ── Phase 56 / LIVE-05a — SnapshotSlice carries music/voice ───────────────
+//
+// The live ws frame broadcasts music/voice as FLAT floats; the fixture frame
+// carries them NESTED as { rms, peak }. Both feed the SAME SnapshotSlice
+// numeric fields. The replay harness must read the nested fixture shape so
+// the Phase-56 music-confirmation guard (Task 2) can see the level.
+describe("Phase 56 — SnapshotSlice carries music/voice (LIVE-05a)", () => {
+  it("the DEFAULT_SNAPSHOT declares music/voice with a 0 default", () => {
+    // The guard never sees `undefined` — music/voice default to 0.
+    expect(DEFAULT_SNAPSHOT.music).toBe(0);
+    expect(DEFAULT_SNAPSHOT.voice).toBe(0);
+  });
+
+  it("the harness threads nested music.rms / voice.rms into the SnapshotSlice", () => {
+    // A snapshot frame carrying nested music:{rms} drives a level-gated
+    // PHASE→drop the same tick: dance_hard must land, proving the harness
+    // read music.rms (≥ PEAK_RMS) off the nested shape. (Pre-Task-2 the
+    // guard is a no-op, so this also stays green after the guard lands.)
+    const trace: Trace = {
+      name: "harness_reads_nested_music",
+      criterion: 5,
+      description: "harness threads nested music.rms",
+      messages: [
+        {
+          t: 0,
+          msg: {
+            type: "snapshot",
+            phase: "build",
+            bpm: 120,
+            bpm_confidence: 0.4,
+            downbeat_phase: 0.5,
+            mood: "hype-man",
+            music: { rms: 0.3, peak: 0.5 },
+            voice: { rms: 0.0, peak: 0.0 },
+          },
+        },
+        {
+          t: 100,
+          msg: {
+            type: "event",
+            subtype: "PHASE",
+            payload: { from: "build", to: "drop" },
+          },
+        },
+      ],
+      expectedTransitions: [{ after_t: 100, state: "dance_hard" }],
+    };
+    const actual = replayTrace(trace);
+    const { matched } = matchExpected(trace.expectedTransitions, actual);
+    expect(matched).toBe(1);
   });
 });

@@ -275,6 +275,172 @@
       "expectedTransitions": [
         { "after_t": 100, "state": "dance_hard" }
       ]
+    },
+    {
+      "name": "multi_mode_sequence",
+      "criterion": 5,
+      "description": "Phase 56 / LIVE-05a — the full synthetic multi-mode walk silent → build → drop(music>=PEAK_RMS) → breakdown(music<LOW_RMS) → AI speaks. Each step enters the contract mode: silent→idle_breathe, build→idle_bop_to_beat_energetic, drop(loud)→dance_hard, breakdown(quiet)→idle_breathe, AI_GENERATING_REPLY→talk_loop. bpm_confidence kept low (0.4) so the music-confirmed dance/idle targets switch_now (not schedule) — this trace pins the mode mapping, not the beat-lock math.",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "phase": "silent",
+            "bpm": 120,
+            "bpm_confidence": 0.4,
+            "downbeat_phase": 0.5,
+            "mood": "hype-man",
+            "music": { "rms": 0.005, "peak": 0.01 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": false,
+            "deck": "A"
+          }
+        },
+        {
+          "t": 100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "groove", "to": "silent" }
+          }
+        },
+        {
+          "t": 1000,
+          "msg": {
+            "type": "snapshot",
+            "phase": "build",
+            "music": { "rms": 0.06, "peak": 0.12 },
+            "voice": { "rms": 0, "peak": 0 }
+          }
+        },
+        {
+          "t": 1100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "silent", "to": "build" }
+          }
+        },
+        {
+          "t": 2000,
+          "msg": {
+            "type": "snapshot",
+            "phase": "drop",
+            "music": { "rms": 0.3, "peak": 0.5 },
+            "voice": { "rms": 0, "peak": 0 }
+          }
+        },
+        {
+          "t": 2100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "build", "to": "drop" }
+          }
+        },
+        {
+          "t": 3000,
+          "msg": {
+            "type": "snapshot",
+            "phase": "breakdown",
+            "music": { "rms": 0.02, "peak": 0.05 },
+            "voice": { "rms": 0, "peak": 0 }
+          }
+        },
+        {
+          "t": 3100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "drop", "to": "breakdown" }
+          }
+        },
+        {
+          "t": 4000,
+          "msg": {
+            "type": "event",
+            "subtype": "AI_GENERATING_REPLY",
+            "payload": {}
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 100, "state": "idle_breathe" },
+        { "after_t": 1100, "state": "idle_bop_to_beat_energetic" },
+        { "after_t": 2100, "state": "dance_hard" },
+        { "after_t": 3100, "state": "idle_breathe" },
+        { "after_t": 4000, "state": "talk_loop" }
+      ]
+    },
+    {
+      "name": "anti_slop_drop_quiet",
+      "criterion": 5,
+      "description": "Phase 56 / LIVE-05a — the highest-value anti-slop assertion. Seed dance_hard with a REAL loud drop, then settle into idle_bop (PHASE→groove). Then a quiet snapshot (music.rms=0.05 < PEAK_RMS) followed by a contradictory PHASE→drop: the music-confirmation guard rejects it (stateForPhase returns null → dispatchEvent returns null → applyTransition never runs), so the idle_bop mode is HELD — no dance_hard fires off the quiet drop. The settle-to-groove step is what makes this DISCRIMINATING: a broken/removed guard would re-flip to dance_hard at t=1100 (idle→dance is a real recorded transition). The explicit it(...) `anti_slop_drop_quiet — quiet drop fires no transition after the seed (held)` asserts NO dance_hard appears at/after the contradictory quiet drop.",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "phase": "drop",
+            "bpm": 120,
+            "bpm_confidence": 0.4,
+            "downbeat_phase": 0.5,
+            "mood": "hype-man",
+            "music": { "rms": 0.3, "peak": 0.5 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": true,
+            "deck": "A"
+          }
+        },
+        {
+          "t": 100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "build", "to": "drop" }
+          }
+        },
+        {
+          "t": 500,
+          "msg": {
+            "type": "snapshot",
+            "phase": "groove",
+            "music": { "rms": 0.15, "peak": 0.3 },
+            "voice": { "rms": 0, "peak": 0 }
+          }
+        },
+        {
+          "t": 600,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "drop", "to": "groove" }
+          }
+        },
+        {
+          "t": 1000,
+          "msg": {
+            "type": "snapshot",
+            "phase": "drop",
+            "music": { "rms": 0.05, "peak": 0.08 },
+            "voice": { "rms": 0, "peak": 0 }
+          }
+        },
+        {
+          "t": 1100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "breakdown", "to": "drop" }
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 100, "state": "dance_hard" },
+        { "after_t": 600, "state": "idle_bop_to_beat_energetic" }
+      ]
     }
   ]
 }
