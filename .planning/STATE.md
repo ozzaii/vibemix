@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v5.0
 milestone_name: The Useful Cut
 status: planning
-last_updated: "2026-05-21T11:00:36.892Z"
+last_updated: "2026-05-21T12:00:00.000Z"
 last_activity: 2026-05-21
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -15,30 +15,27 @@ progress:
 
 # vibemix — State
 
-**Last updated:** 2026-05-21 — **Phase 58 (Ship Readiness) COMPLETE — ALL 8 v4.0 PHASES ENGINEERING-COMPLETE (8/8, 100%).** REL-01: sidecar rebuilt AIza-clean + unsigned `vibemix_0.1.0-rc1_aarch64-unsigned.dmg` (254M) + `v4.0-MILESTONE-AUDIT.md` GENERATED (5/5 WIRED); `cut_release.sh` Gate 1→`^v0\.1\.0-rc[0-9]+$`, Gate 4→v4.0 audit. REL-02: `record_50a_walk.sh` path bug fixed; Gate-6b green on a REAL report (Hallucination honestly PARTIAL). REL-03: §SHIP-V4 consolidated KAAN-ACTION surface; **`cut_release.sh --dry-run v0.1.0-rc1` exits GREEN** — everything-but-the-signature is ready; publish hard-guard regression-pinned (never auto-runs). 43/43 phase tests green; verify human_needed 13/13. **Run on the MAIN checkout sequentially (not worktrees) to persist real artifacts + because the 3 path-leak incidents this session all came from worktree executors mis-resolving to main — running on main eliminated that class.** Strict per-file git staging; Kaan's 17-file parallel WIP verified intact after every plan. v4.0 KAAN-ACTION/external-clock discharge surface: recorded §E2E walk (`docs/e2e/2026-05-walk.webm`), Gate-2b ear-passes (54/55 HUMAN-UAT), Apple Dev Agreement + SignPath OSS cert, Gate-5b Bravoh healthz freshness, public-tag confirm (v0.1.0-rc1) — all in `KAAN-ACTION-LEGAL.md §SHIP-V4` + per-phase `*-HUMAN-UAT.md`. **Next: milestone lifecycle (audit → complete → cleanup).**
+**Last updated:** 2026-05-21 — **v5.0 "The Useful Cut" ROADMAP CREATED (4 phases, 59–62).** Numbering continues from v4.0 (ran 51–58) — NO reset. 17/17 v5.0 REQ-IDs mapped to exactly one phase (100% coverage, no orphans, no duplicates): P59=DECK-01..05, P60=HARMONIC-01..04, P61=COACH-01..04, P62=PILL-01..04. Derived from 4-agent convergent research (`.planning/research/SUMMARY.md`) — an **integration milestone** on the mature grounded system, not greenfield. Hard critical path: **P59 (deck-state + citable `key:` source) → P60 (deterministic Camelot clash + conservative gate + Kaan-ear veto) → P61 (actionable coach persona, extends in-flight `live-tuning-or-brain`)**; **P62 (floating pill) parallelizes** with the spine (only deck-chip polish soft-depends on P59). Two flagged spikes resolve in plan-time: P59 (pyrekordbox live-DB safety + `mix:`-reuse vs dedicated-`key:` decision; Gemini-vision deck-badge accuracy eval) and P62 (drag-on-unfocused-window per tauri#11605/#10767, resolve FIRST). **v4.0 "SHIP" kept OPEN + intact in ROADMAP.md** (engineering-complete 8/8, publish on external signature clock — NOT archived per Kaan directive). **Next: `/gsd:plan-phase 59`.**
 
 ---
 
-### (prior) Phase 57 — Sexify Finish COMPLETE (3/3 plans; vitest 721 + tsc clean + 7 security regression pins green; gsd-ui-auditor 22/24, 0 HIGH; verify human_needed 9/9 engineering must-haves). POLISH-01: impeccable CDJ-Whisper pass on session view + mascot overlay (removed 2 Tier-1 italics, aligned hero box-shadow to the documented recipe, fixed `cohost` undefined `--silk-25`→`--silk-22`); Saira+JetBrains Mono held, no Geist/Fraunces. POLISH-02: the 3 v0.1.0-rc1 carryover bugs were ALREADY fixed in `fac4c4a` — regression-PINNED (drag cap + JS handler, chrome strip display:none, TCC boot-prime path). POLISH-03: first-run friction audit = clean walk (absent forewarning/driver-fetch/48k-probe = Phase-49 installer-companion, intentionally out of in-app flow) + continuity smoke. Real-app drag/chrome/TCC + felt "looks peak" + fresh-account walk = KAAN-ACTION (`57-HUMAN-UAT.md`). Sidecar binary rebuild → Phase 58. Skipped standalone gsd-code-review (presentation-only CSS/TS + test assertions, already covered by ui-auditor). NOTE: Kaan ran a broad parallel persona/cooldown/audio-constants tuning WIP this session (17 uncommitted files: `__main__.py`, `dj_cohost.py`, `audio/constants.py`, `prompts/matrix.py`, `state/coach.py`, `mascot_window.rs`, `ws_client.rs`, `tauri.conf.json5`, several `tests/`) — Phases 56+57 preserved ALL of it untouched. **Phases 51–57 COMPLETE (7/8, 88%).** Next: plan + execute Phase 58 (Ship Readiness).
+### (prior) Phase 58 — Ship Readiness COMPLETE — ALL 8 v4.0 PHASES ENGINEERING-COMPLETE (8/8, 100%). REL-01: sidecar rebuilt AIza-clean + unsigned `vibemix_0.1.0-rc1_aarch64-unsigned.dmg` (254M) + `v4.0-MILESTONE-AUDIT.md` GENERATED (5/5 WIRED); `cut_release.sh` Gate 1→`^v0\.1\.0-rc[0-9]+$`, Gate 4→v4.0 audit. REL-02: `record_50a_walk.sh` path bug fixed; Gate-6b green on a REAL report (Hallucination honestly PARTIAL). REL-03: §SHIP-V4 consolidated KAAN-ACTION surface; **`cut_release.sh --dry-run v0.1.0-rc1` exits GREEN** — everything-but-the-signature is ready; publish hard-guard regression-pinned (never auto-runs). 43/43 phase tests green; verify human_needed 13/13. **Run on the MAIN checkout sequentially (not worktrees) to persist real artifacts + because the 3 path-leak incidents this session all came from worktree executors mis-resolving to main — running on main eliminated that class.** Strict per-file git staging; Kaan's 17-file parallel WIP verified intact after every plan. v4.0 KAAN-ACTION/external-clock discharge surface: recorded §E2E walk (`docs/e2e/2026-05-walk.webm`), Gate-2b ear-passes (54/55 HUMAN-UAT), Apple Dev Agreement + SignPath OSS cert, Gate-5b Bravoh healthz freshness, public-tag confirm (v0.1.0-rc1) — all in `KAAN-ACTION-LEGAL.md §SHIP-V4` + per-phase `*-HUMAN-UAT.md`. v4.0 left OPEN (NOT archived) per Kaan directive; v5.0 runs alongside.
 
 ---
 
-### (prior) Phase 56 — Performance + Live Mascot COMPLETE (3/3 plans; vitest 711 passed + Python perf suites green; verify human_needed 13/13 engineering must-haves; review 0 critical / 1 warning + 3 info, WR-01+IN-01 fixed). **KEY CORRECTION:** research found the shipped Tauri app loads the **Three.js GLB rig** (`tauri/ui/mascot.html`), NOT root `mascot.html` (sprites absent) — retargeted the whole phase to the surface users actually see (CONTEXT POST-RESEARCH CORRECTION block). LIVE-05/05a: `SnapshotSlice` threads `music`/`voice` from the live bus frame; 6 modes reachable each gated to a real event; music-confirmation anti-slop guard (now mirrors real `phase.py` semantics after WR-01 fix — `PEAK_FLOOR_RMS=0.045` for peak, breakdown rejects only the opposite extreme — breakdown/peak no longer over-suppressed); speaking-overrides-music; FSM pure. PERF-01 `LIVE_TTFT_BUDGET_MS=1500` + `thinking_gate` MINIMAL pinned (TTFTMeter is telemetry-only); PERF-02 zero soak underruns (reused `SoakCounters`); PERF-03 dispatch p95 ~0.22ms < 50ms. Skipped standalone gsd-ui-review (advisory; UI-SPEC target shifted to the 3D rig mid-phase + visual felt-quality is a 3D-render Kaan-eye call). Felt TTFT/60fps/no-dropout + "mascot feels alive across modes" live-drive = KAAN-ACTION (`56-HUMAN-UAT.md`). NOTE: Kaan ran parallel persona/prompt WIP this session (uncommitted: `__main__.py`, `dj_cohost.py`, `audio/constants.py` INVOKE_AUDIO_SECONDS 18→30, `prompts/matrix.py` react-don't-go-silent, `tests/agent/test_*`) — Phase 56 preserved all of it untouched. **Phases 51–56 COMPLETE (6/8, 75%).** Next: plan + execute Phase 57 (Sexify Finish).
-
----
-
-### (prior) Phase 55 — Feedback Mode Live + Citation Integrity COMPLETE (3/3 plans; full suite 3821 passed; review 0 critical / 1 warning + 3 info, WR-01+IN-01 fixed). LIVE-04 made airtight provable engineering: zero-orphan replay + hallucination-strip on a real non-empty registry + live/debrief consistency (REAL CitationLinter+EvidenceRegistry, no mocks); the two `_citation_telemetry()` stubs closed with REAL signals — cumulative stripped/total `slop_ratio` + actual stripped text sourced from `StrippedRateTracker` (the `1/(1+mean)` placeholder is gone). LIVE-02 coach grounding pinned across ≥2 genres (REAL EventDetector real fixture + synthetic genre-2; empty/weak evidence→no fire). Verify = human_needed: 8/8 engineering must-haves green; 2 Kaan live-drive items persisted (`55-HUMAN-UAT.md`). Code-review fixes: WR-01 (live/debrief consistency test now drives the real `drills._citation_resolves`, not the dormant linter mode) + IN-01 (`drills.py` uses canonical `DEBRIEF_TOLERANCE_S`). IN-02/IN-03 deferred v2.x. **Phases 51–55 COMPLETE (5/8, 62%).** Next: plan + execute Phase 56 (performance + live mascot).
+### (prior) Phase 57 — Sexify Finish COMPLETE (3/3 plans; vitest 721 + tsc clean + 7 security regression pins green; gsd-ui-auditor 22/24, 0 HIGH; verify human_needed 9/9 engineering must-haves). POLISH-01: impeccable CDJ-Whisper pass on session view + mascot overlay (removed 2 Tier-1 italics, aligned hero box-shadow to the documented recipe, fixed `cohost` undefined `--silk-25`→`--silk-22`); Saira+JetBrains Mono held, no Geist/Fraunces. POLISH-02: the 3 v0.1.0-rc1 carryover bugs were ALREADY fixed in `fac4c4a` — regression-PINNED (drag cap + JS handler, chrome strip display:none, TCC boot-prime path). POLISH-03: first-run friction audit = clean walk (absent forewarning/driver-fetch/48k-probe = Phase-49 installer-companion, intentionally out of in-app flow) + continuity smoke. NOTE: Kaan ran a broad parallel persona/cooldown/audio-constants tuning WIP (17 uncommitted files) — Phases 56+57 preserved ALL of it untouched. This WIP is the `live-tuning-or-brain` branch v5.0 Phase 61 extends.
 
 ---
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
+See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" milestone started)
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** v4.0 milestone lifecycle (audit → complete → cleanup) — all 8 phases engineering-complete
+- **Current focus:** v5.0 "The Useful Cut" — deck-aware, actionable, unobtrusive. Roadmap created (4 phases 59–62); ready to plan Phase 59.
 - **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts on external clock).
+- **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
 - **Project mode:** standard.
 - **Granularity:** fine.
 - **Model profile:** quality (all agents on Opus, all checkpoints on).
@@ -48,10 +45,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 59 — Full Deck Awareness + Grounding (not started; roadmap created)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-21 — Milestone v5.0 started
+Status: Roadmap created — ready to plan Phase 59
+Last activity: 2026-05-21 — v5.0 roadmap created (4 phases, 59–62)
 
 ## Performance Metrics
 
@@ -62,156 +59,99 @@ Last activity: 2026-05-21 — Milestone v5.0 started
 | Phases complete (v2.1) | 13 / 13 engineering-green |
 | Phases complete (v3.0) | 6 / 6 engineering-green (22 carveouts → KAAN-ACTION-LEGAL §SHIP-01..13) |
 | Phases complete (v3.1) | 5 / 5 engineering-green (7 carveouts on external clock) |
-| Plans complete (v3.0) | 41 / 41 |
-| Plans complete (v3.1) | 32 / 32 |
-| v3.0 REQ-IDs mapped + satisfied | 57 / 57 ✓ (100% coverage, no orphans) |
-| v3.1 REQ-IDs mapped + satisfied | 44 / 44 ✓ (100% coverage, no orphans) |
-| v4.0 REQ-IDs mapped | 22 / 22 ✓ (100% coverage, no orphans, no duplicates — +GENRE-01/02 to P52, +LIVE-05a to P56 per Kaan 2026-05-21) |
-| v4.0 phase count | 8 (Phases 51–58) |
-| v3.0 cross-phase integration seams WIRED | 3 / 3 |
-| v3.1 cross-phase integration seams WIRED | 5 / 5 |
-| v3.0 commits since `v2.1.0` tag | 250 |
-| v3.1 commits since `v3.0` tag | 61 |
-| v3.0 LOC delta | +62,215 / -1,029 across 529 files (net ~+61k) |
-| v3.1 LOC delta | +57,597 / -2,541 across 382 files (net ~+55k) |
-| v3.0 git tag | `v3.0` (annotated, LOCAL ONLY — not pushed) |
-| v3.1 git tag | `v3.1` (pending milestone-close commit; LOCAL ONLY when created — not pushed) |
-| v3.0 carveouts deferred to KAAN-ACTION-LEGAL | 22 |
-| v3.1 carveouts deferred to KAAN-ACTION | 7 (SignPath cert + Tart VM walk + Kaan MacBook walk + Mixamo Adobe walk + VB-Audio email + 2 dep-audit documented decisions) |
+| Phases complete (v4.0) | 8 / 8 engineering-green (publish on external signature clock; NOT archived) |
+| v4.0 REQ-IDs mapped + satisfied | 19 / 19 ✓ |
+| v5.0 phase count | 4 (Phases 59–62) |
+| v5.0 REQ-IDs mapped | 17 / 17 ✓ (100% coverage, no orphans, no duplicates) |
+| v5.0 per-phase REQ counts | P59=5 (DECK) · P60=4 (HARMONIC) · P61=4 (COACH) · P62=4 (PILL) |
+| v4.0 git tag | local artifacts on `live-tuning-or-brain`; unsigned `v0.1.0-rc1` .dmg built |
+| v3.0/v3.1 carveouts | external clock (Apple Dev + SignPath) — unchanged by v5.0 |
 
 ---
 
 ## Accumulated Context
 
+### v5.0 Roadmap Decisions Locked (2026-05-21)
+
+v5.0 "The Useful Cut" roadmapped into **4 phases (59–62)** continuing numbering from v4.0 (ran 51–58) — NO reset. 17/17 REQ-IDs mapped to exactly one phase (100% coverage, no orphans, no duplicates). Shaped by 4-agent convergent research (`.planning/research/SUMMARY.md`) that independently produced the same four-phase shape; this is an **integration milestone** on the existing single-writer/citation/one-socket system, not greenfield.
+
+| Phase | Goal | Requirements (count) | UI |
+|-------|------|----------------------|----|
+| 59 — Full Deck Awareness + Grounding | Session-wide deck-state (every loaded track + key/BPM) via XML→vision→numpy ladder; citable `key:` evidence source + linter rule; single-writer `MusicState` integration + `KEY_CLASH`/`TRANSITION_OPPORTUNITY` events; strictly read-only (no `master.db` write); honest `unknown` fallback. The gate for everything. | DECK-01..05 (5) | — |
+| 60 — Harmonic-Feedback Confidence Gate | Deterministic Camelot clash table the LLM only narrates; percussive/breakdown suppression BEFORE any clash note; conservative confidence (one-step-off suppressed, ~57–70% tag-accuracy band); actionable transition-execution notes; Kaan-ear veto. | HARMONIC-01..04 (4) | — |
+| 61 — Actionable-Not-Hype Coach Persona | Extend in-flight `live-tuning-or-brain` COACH cells (`prompts/matrix.py`) + `task_for_event` (`state/coach.py`) into prescriptive notes (observed→impact→prescribe); NO new mode; both genai + OpenRouter paths; hype-golden regression fence; cited + warm + non-nagging. | COACH-01..04 (4) | — |
+| 62 — Floating Pill UI | Clone `mascot_window.rs` → `pill_window.rs`: transparent/on-top/draggable/non-focus-stealing pill on existing ws:8765 frames; tri-state `primary_surface` (pill default \| mascot secondary \| none); mascot kept (mascot-audit green); idle/listening/speaking/expand states + TTS waveform + citation strip; drag/focus spike resolved; closes v0.1.0-rc1 drag-capability debt. | PILL-01..04 (4) | yes |
+
+**Build-order rationale (4-phase):**
+
+- **P59 → P60 → P61 is a HARD critical path** — feedback cannot cite deck-state that doesn't exist; conservatism cannot gate clashes that aren't detected; the persona cannot narrate keys the registry never saw. **Within P59, the citable `key:` source must land BEFORE any harmonic prompt** (Pitfall 1's "uncitable-by-construction" trap = HIGH-cost retrofit if discovered at the release gate).
+- **P62 parallelizes** with the spine — the pill's core (reaction text + meters + waveform) needs nothing from deck-state; only its deck-chip polish soft-depends on P59's snapshot fields. Its drag/focus spike should be de-risked FIRST.
+- Each phase is sized for an autonomous discuss → plan → execute cycle under `gsd-autonomous fully`.
+
+**Anti-slop / grounding guarantees baked into success criteria (P59/P60):**
+
+- A key clash NEVER fires on two percussive/atonal tracks and NEVER during a breakdown/acapella (suppression gate runs *before* any clash note; requires simultaneous melodic overlap + `audible_deck == "mix"`).
+- The LLM only narrates a clash the **code already confirmed** (deterministic Camelot table); it never computes key intervals (anti-slop guarantee).
+- Un-cited harmonic feedback is **stripped** by the existing `CitationLinter` via the new citable `key:` source.
+- One-step-off-Camelot pairs are suppressed (indistinguishable from a detection error; pros mix fifths/relatives freely); low-confidence keys + ambiguous deck-resolution suppressed.
+- Honest `unknown` whenever no source resolves a track/key — never a false-confident guess.
+- Strictly read-only — a repo test asserts no DJ-DB write-mode open (`master.db` corruption landmine respected).
+
+**Research-flagged spikes (resolve in plan-time):**
+
+- **P59 spike (a):** pyrekordbox live-DB read safety post-6.6.5 (encryption wall, `download-key` fragility on a distributed binary) — confirm XML-primary sufficient + SQLCipher stays opportunistic-read-only. **+ the `mix:`-reuse vs dedicated-`key:`-source decision** (ARCHITECTURE↔PITFALLS divergence): lean dedicated `key:` source *with confidence* (`key:A=9B@conf0.8`) for the strongest per-deck per-moment anti-slop guarantee, UNLESS the spike proves `mix:` reuse sufficient.
+- **P59 spike (b):** Gemini-vision deck-badge accuracy eval — how reliably can Gemini read loaded-track + key/BPM off each deck panel across djay/Serato/Traktor UIs on real screenshots. This is the universal fallback.
+- **P62 spike (resolve FIRST):** pill drag-on-unfocused-window (tauri#11605/#10767/#14102) — resolve `startDragging` vs `data-tauri-drag-region` vs NSPanel `isMovableByWindowBackground` on the built app *before* building the UI; + DMG-build transparency regression (tauri#13415). Single most likely "looks done but feels broken" failure.
+
+**Kaan-action (live-hardware / ear, surface but do NOT pause per `gsd-autonomous fully`):**
+
+- P59: live FLX4 + djay two-deck resolution-rate confirmation on real hardware.
+- P60: Kaan-ear veto on the clash suppression thresholds against his real disagreed-pairs corpus (no false clash on a pair he'd happily mix). HARMONIC-03 cannot ship without it.
+- P61/P62: live coach ear-pass + felt pill behavior (drag/focus/transparency) on the built app.
+
+**Locked invariants carried into v5.0 (all preserved):**
+
+- **Single-writer rule** — `state_refresh_loop._tick_once` is the ONLY `MusicState` writer; deck-state's read-only poller writes its own holder, `_tick_once` copies under lock (the third such external source alongside controller/track polling). Golden-equivalence of the existing snapshot preserved (additive only).
+- **Citation grounding** — new evidence must be written to the registry BEFORE the LLM can cite it; `CitationLinter` does a binary response-level strip. The clash must cite *both* decks' keys.
+- **"Trust the audio"** — no fabricated phase/key claims; degrade to single-deck or `unknown`, never guess.
+- **One socket** — everything on `ws://127.0.0.1:8765`; the pill consumes existing frames, no new port, no Python delivery change.
+- **Gemini-only** (`feedback_no_clap_use_gemini_embedding`) — no new providers; no CLAP/MERT/OpenL3; **no Essentia/librosa** (the MIR path is hand-rolled numpy/scipy — any MIR library is a NEW heavy install, not a reuse; key fallback is an in-house ~80-line numpy KS/Temperley estimator).
+- **No scope creep** (`feedback_no_scope_creep_clean_utility`) — no next-track recommendation, no 1–10 transition scoring, no headphone-cue analysis, no DJ-DB writes, no notch-locked pill.
+- **Anti-slop blocklist** — 15-token + `deeply\s+\w+` regex; all new UI/coach copy must pass.
+- **Privacy rule** (`feedback_privacy_scope_narrow`) — off-limits LLM-transcript paths absolute; never read Kaan's OZ/Hermes/local-AI surfaces.
+- **`gsd-autonomous fully`** — engineering closes everything not requiring an external signature; the v4.0 signed publish (Apple Dev + SignPath) stays KAAN-ACTION and is UNCHANGED by v5.0.
+- **mascot kept, not retired** — `mascot-audit` CI fence stays green; pill demotes the mascot to opt-in/secondary via `primary_surface`, does not delete it.
+- **Frontend-enforcement skill** applies to P62 (UI hint: yes) + the pill — CDJ-Whisper / Super-Whisper register, 20/80 accent rule, textured material feel, no AI-slop typography, Saira + JetBrains Mono.
+
+**Anchors on the in-flight `live-tuning-or-brain` branch (P61 EXTENDS, does not duplicate):** `prompts/matrix.py` COACH cells, `state/coach.py` `task_for_event`, the OpenRouter brain+TTS path, English pro-feedback, pacing/persona fixes. The 17-file WIP Kaan ran during v4.0 Phases 56/57 is this branch — preserve it.
+
+---
+
 ### v4.0 Roadmap RE-SPLIT to 8 Phases (2026-05-20)
 
-v4.0 "SHIP" re-roadmapped from the prior 4-phase cut into **8 phases (51–58)** per Kaan's explicit directive for finer granularity. Numbering continues from v3.1 (closed at Phase 50) — NO reset. 19/19 REQ-IDs re-mapped to exactly one phase — 100% coverage, no orphans, no duplicates. The split breaks bring-up into three independent input seams and gives each interaction mode its own validation phase, so every real-hardware path is independently green before the modes that consume it are validated.
+v4.0 "SHIP" re-roadmapped from the prior 4-phase cut into **8 phases (51–58)** per Kaan's explicit directive for finer granularity. Numbering continues from v3.1 (closed at Phase 50) — NO reset. 19/19 REQ-IDs re-mapped to exactly one phase — 100% coverage, no orphans, no duplicates. The split breaks bring-up into three independent input seams and gives each interaction mode its own validation phase. **v4.0 is engineering-complete (8/8) and kept OPEN/unarchived — publish on the external signature clock.**
 
 | Phase | Goal | Requirements (count) | UI |
 |-------|------|----------------------|----|
 | 51 — Real-Hardware Bring-Up | Boot + stabilize the built app on the real Mac; clean startup logs (incl. ws_bus empty-frame fix); ≥30-min full-set run with zero unhandled exceptions / bounded RSS | BRINGUP-01/04/05 (3) | — |
-| 52 — Audio Path + Feature Grounding | BlackHole 48 kHz capture live; ground every derived feature — fix live BPM=200-on-129BPM bug; out-of-range values never reach bus/UI | BRINGUP-02 (1) | yes |
+| 52 — Audio Path + Feature Grounding | BlackHole 48 kHz capture live; ground every derived feature — fix live BPM=200-on-129BPM bug; out-of-range values never reach bus/UI | BRINGUP-02 + GENRE-01/02 (3) | yes |
 | 53 — Controller Live + Graceful Fallback | DDJ-FLX4 MIDI ingested live; clean degrade when unplugged / absent at boot | BRINGUP-03 (1) | — |
 | 54 — Hype Mode Live | AI voice ACTUALLY FIRES on real drops/builds (close 32s-silent-on-drop bug); grounded in-bar non-slop across ≥2 genres; cooldowns/latency tuned live | LIVE-01/03 (2) | yes |
 | 55 — Feedback Mode Live + Citation Integrity | Coach mode grounded/in-bar/non-slop across ≥2 genres; EvidenceRegistry citation strip reflects real events, zero orphaned/hallucinated citations | LIVE-02/04 (2) | yes |
-| 56 — Performance + Live Mascot | TTFT to budget; no dropouts under live load; 60fps; Neon Rebel mascot reacts correctly to live audio/MIDI | PERF-01/02/03 + LIVE-05 (4) | yes |
+| 56 — Performance + Live Mascot | TTFT to budget; no dropouts under live load; 60fps; Neon Rebel mascot reacts correctly to live audio/MIDI | PERF-01/02/03 + LIVE-05/05a (5) | yes |
 | 57 — Sexify Finish | Final Tier-1 visual pass (zero HIGH); close v0.1.0-rc1 carryover bugs; tighten fresh-account first-run | POLISH-01/02/03 (3) | yes |
 | 58 — Ship Readiness | All engineering gates green on real artifacts; §E2E-50A-WALK discharged; one-button SHIP-CUT documented + pre-verified | REL-01/02/03 (3) | — |
-
-**Build-order rationale (8-phase):**
-
-- **Phase 51 MUST be first** — every downstream validation depends on a running app booting to a live listening session on real hardware with clean startup.
-- **Phases 52 + 53 are the two input seams** — audio (52) and controller (53) are independent of each other (53 needs only a running app from 51), but both must be live + grounded before any mode that consumes them is validated. Audio comes first because both modes react primarily to audio; controller is a secondary input + graceful-fallback contract.
-- **Phases 54 + 55 are the two interaction modes**, split because they have different live failure shapes: hype's hard bug is "the AI voice did not fire on a detected drop in 32s" (54); feedback's hard bug class is citation integrity (55). Each is its own Kaan-ear pass + autonomous-proxy clean. Both depend on grounded audio features (52).
-- **Phase 56 (perf + live mascot)** lands after both modes generate real reaction traffic — TTFT/dropouts/60fps are measured against real load, and the mascot is validated reacting to the live audio/MIDI events the prior phases proved.
-- **Phase 57 (polish)** depends on a running app to inspect (51) and benefits from all live observations (52–56), but its work — visual pass, carryover bugs, first-run — is independent of validation outcomes.
-- **Phase 58 (ship)** is last: Gate 2b (hallucination) is fed by Phases 54 + 55 live validation; Gate 6b (e2e report) and §E2E-50A-WALK need the real app driven end-to-end; final artifacts cut after polish (57) lands.
-
-**Real-hardware findings folded into phases as concrete success criteria / known issues:**
-
-- **Audio capture path is LIVE** (music level registers when a track is routed into BlackHole 2ch) → Phase 52 SC-1 confirms the live capture path.
-- **BUG: live BPM read 200 on a ~129 BPM track** (BPM_VALID_MAX=180; out-of-range value reaching bus/UI) → Phase 52 SC-2: grounding fix at the source so a ~129 track reads ~129 and out-of-range BPM never reaches bus/UI.
-- **BUG: AI voice did NOT fire in a 32s window despite a detected drop** → Phase 54 SC-1: the AI voice must actually fire on real drops/builds — the 32s-silent-on-drop bug is closed.
-- **ws_bus emits intermittent empty `{}` frames between real frames** (minor) → Phase 51 SC-2 + known-issues note: bring-up cleanliness, close here.
 
 **Locked invariants carried into v4.0 (all preserved from v3.0/v3.1):**
 
 - POC immutability — `cohost*.py` retired (deleted, scrub-gated); `mascot.html` byte-stable + CI `mascot-audit`. No resurrection.
-- ModelRouter seam — zero new hardcoded model literals; CI grep gate extends to v4.0 artifacts.
-- Anti-slop blocklist — 15-token + `deeply\s+\w+` regex; live reactions + any new UI copy must pass.
-- Privacy rule (`feedback_privacy_scope_narrow`) — off-limits LLM-transcript paths absolute; e2e harness asserts zero writes to `~/.hermes/` / `~/hermes-rig/logs/` / `~/.lmstudio/`. Bring-up debugging reads Tauri console + sidecar logs ONLY (vibemix's own logs), never Kaan's OZ/Hermes/local-AI surfaces.
-- Gemini-only (`feedback_no_clap_use_gemini_embedding`) — no new providers/detectors; this is bring-up, not feature work.
-- `gsd-autonomous fully` — engineering closes everything not requiring an external signature; the signed publish (Apple Dev Agreement via Francesco + SignPath OSS cert) stays KAAN-ACTION. Phase 58 makes the release one-button-after-signatures; it does NOT depend on the signatures landing.
-- Hallucination gate is hard (`project_phase_16_kaan_dj_testing`) — satisfied by Kaan's DJ ear + autonomous proxy, NOT a 30-session replay harness. No release until live reactions (Phases 54 + 55) are confirmed grounded.
-- Frontend-enforcement skill applies to Phases 52, 54, 55, 56, 57 (UI hint: yes) — CDJ Whisper, 20/80 accent rule, textured material feel, no AI-slop typography.
+- ModelRouter seam — zero new hardcoded model literals; CI grep gate.
+- Anti-slop blocklist — 15-token + `deeply\s+\w+` regex.
+- Privacy rule (`feedback_privacy_scope_narrow`) — off-limits LLM-transcript paths absolute.
+- Gemini-only (`feedback_no_clap_use_gemini_embedding`).
+- `gsd-autonomous fully` — engineering closes everything not requiring an external signature; the signed publish stays KAAN-ACTION.
 
-**Reuses already-built engineering (do NOT rebuild):** v3.1 e2e harness (`tests/e2e/macbook/`), 50a Kaan-walk checklist + `record_50a_walk.sh`, `cut_release.sh` with Gate 2b + Gate 6b wired, EvidenceRegistry citation strip, Neon Rebel 4-layer mascot state machine, BlackHole 48 kHz probe, TTFTMeter, installer/first-run wizard. v4.0 DRIVES and TUNES these on real hardware — it does not re-implement them.
-
-### Phase 50 Outcome (2026-05-18, engineering-green)
-
-v3.1 end-to-end MacBook + OS-matrix pass landed engineering-green. All 10 E2E REQ-IDs covered across 6 plans. Headline artifacts:
-
-- **`tests/e2e/macbook/`** — canonical harness root per ARCHITECTURE.md § 4. 5-dimension dataclasses (Functional / Visual / Aesthetic / Usability / Hallucination) + worst-of overall status; Jinja2 `report_template.html` implementing 50-UI-SPEC.md verbatim (Geist Mono, 10-token palette, locked section labels)
-- **Privacy fixture** — session-autouse `_privacy_guard` in `conftest.py` asserts zero file-count growth in `~/.hermes/` / `~/hermes-rig/logs/` / `~/.lmstudio/` on every test session (memory `feedback_privacy_scope_narrow`)
-- **Anti-slop sibling** — `scripts/audit/check_no_slop_e2e.py` imports `AI_SLOP_BLOCKLIST` from canonical via `importlib`; scoped to `dist/e2e-macbook-runs/**/report.html`; 6 tested cases (clean / banned / word-boundary / no-report / missing-dir / canonical-import)
-- **Visual regression** — Playwright + pixelmatch `maxDiffPixelRatio: 0.02` (REQ E2E-03 verbatim); persona-smoke + library-page + live-session specs target Tauri+Three.js production surfaces; baselines = Phase 47 placeholder GLBs (re-baseline at §VIS-04 discharge); CI-tolerant skips on Tauri dev-server unreachable per PITFALLS § 8
-- **Audio loopback** — `audio_loopback_fixture.py` + VCR cassette at `tests/e2e/macbook/cassettes/gate_02_v3_0_baseline.yaml` (pinned to v3.0 GATE-02 baseline; zero live Gemini calls); AST-based ModelRouter seam-check rejects `gemini-N` SKU literals in executable code
-- **48 kHz probe** — `test_blackhole_48khz_probe.py` re-asserts Phase 49 INSTALL-10 contract (48000 → ok, 44100 → fail, missing → fail); memory `project_v4_canonical_baseline`
-- **Gate 6b** — `scripts/e2e/check_e2e_report.sh` (POSIX bash + grep + sed; 4 tested cases); wired into `scripts/launch/cut_release.sh` immediately after Gate 2b; blocks release publish on any dimension FAIL
-- **50b OS-matrix smoke** — `os_matrix_smoke.py` composes Phase 49 `install_vm_matrix.sh --check-e2e`; 4-step smoke (install / launch / first-event / shutdown); dry-run wire-check across all 5 OS configs; Tart-image-required configs SKIPPED-with-reason
-- **50a Kaan-walk scaffold** — `50a_kaan_walk_checklist.md` (10 steps + PASS/FAIL marks) + `nielsen_10_checklist.json` (10 heuristics × Tier-1 surfaces) + `scripts/e2e/record_50a_walk.sh` (macOS screencast + ffmpeg transcode); per memory `project_phase_16_kaan_dj_testing` — Kaan-ear, NOT 30-session harness
-
-**Test verification:** 18 e2e tests added; harness foundation tests green (7 pass), audio fixtures green-or-skipped (4 skipped per CI-tolerant fallbacks), Gate 2b rerun + OS-matrix smoke green (3 pass + 1 skip), anti-slop sibling green (6 pass), Gate 6b bash test green (4/4 cases).
-
-**Kaan-action surface (deferred for v3.1 close):**
-
-1. **§E2E-50A-WALK** — Kaan executes the 50a walk on his MacBook + real DJ-set audio + records `docs/e2e/2026-05-walk.webm` per checklist at `tests/e2e/macbook/50a_kaan_walk_checklist.md`
-2. **§INSTALL-VM-RUN downstream** (carry-forward from Phase 49) — 50b real-VM execution on all 5 OS configs (engineering ships dry-run + 2 reachable configs; full execution waits on Tart images + §INSTALL-COMPANION-SIGN)
-
-### Phase 49 Outcome (2026-05-18, engineering-green)
-
-v3.1 one-click installer chain landed engineering-green. All 10 INSTALL REQ-IDs covered across 6 plans. 68 tests pass. Headline artifacts:
-
-- **`installer/companion/`** — `fetch_drivers.{sh,ps1}` + `driver_manifest.json` (SHA-256 placeholder pending §INSTALL-COMPANION-SIGN discharge) + `audio_config.py` (Mac CoreAudio + Win WASAPI 48 kHz probe + Multi-Output Device / default-playback routing) + `onboarding_copy.json` (single source-of-truth for wizard strings) + `uninstall.{sh,ps1}` (preserve-default + --clean opt-in)
-- **`.github/workflows/companion-sign.yml`** — new parallel signing stage with Mac codesign + Win SignPath submission scaffold + cross-runner verifier gate
-- **`scripts/audit/check_companion_signing.sh`** — tag-vs-branch fail-mode verifier; PLACEHOLDER_ SHA-256 emits §INSTALL-COMPANION-SIGN warning
-- **Inno Setup integration** — `installer/windows/vibemix-installer.iss` extended with [Files] companion bundle + [Run] fetch_drivers.ps1 invocation + [UninstallRun] preserve-default + [Code] VB-CABLE license dialog gating InitializeSetup
-- **DMG first-launch hook** — `installer/macos/firstrun_companion.sh` (Mac DMG cannot legally bundle BlackHole .pkg; deferred to first launch)
-- **Tauri commands** — `tauri/src-tauri/src/wizard_cmds.rs` exposes `run_companion_fetch` + `run_audio_config` + `open_audio_settings`; `capabilities/default.json` `shell:allow-execute` extended (ZERO new permission identifier)
-- **Wizard 3 new steps** — `step-forewarning.ts` (OS forewarning), `step-driver-fetch.ts` (companion orchestration + INSTALL_READY emit), `step-48k-probe.ts` (48 kHz format probe + fix-it CTA); all read from `copy.ts` typed loader; zero inline strings + zero hex literals gated by tests
-- **Uninstall dialog** — `uninstall-dialog.ts` with preserve-default + clean opt-in checkbox + destructive border-color tint
-- **VM matrix gate** — `scripts/dist/install_vm_matrix.sh --simulate --check-60s` produces synthetic run.json from `simulated_runs` stubs; `scripts/dist/check_60s_gate.py` computes median + p95; median across 5 SHIP-04 rows = 41 000 ms (well under 60 000 ms budget)
-- **Anti-slop sibling** — `scripts/audit/check_no_slop_install.py` imports `AI_SLOP_BLOCKLIST` from `scripts/launch/check_no_ai_slop.py` (parent unchanged per sibling-pattern invariant); clean across 10 Phase 49 targets; `docs/internal/copy-substitutions.md` documents 20+ forbidden tokens
-
-**Code review:** status `clean` — 0 critical, 2 warnings (pre-existing cargo build issue + audio_config regex parse fragility), 4 info findings (all Phase 50 polish, none block closure).
-
-**UI review:** 3.67 / 4 overall — Visual Hierarchy 4/4, Color/Contrast 4/4, Typography 4/4, Motion 3/4 (stopwatch tween should extract to tokens.css), Copy 4/4, A11y 3/4 (focus trap on uninstall dialog deferred to Phase 50).
-
-**Kaan-action surface (deferred):**
-
-1. §INSTALL-COMPANION-SIGN — SignPath OSS Foundation cert grant
-2. §INSTALL-VM-RUN — real Tart VM rehearsal on SHIP-04 5-row matrix
-3. §SHIP-CONTACT-VBAUDIO — Kaan emails VB-Audio for OEM redistribution permission (future optimization)
-
-### Phase 48 Outcome (2026-05-18, engineering-green)
-
-v3.1 opportunity scan landed via `docs/dep-opportunities/2026-05-scan.md` with 24 candidates under the 4-color rubric. Headline:
-
-| Bucket | Count | Surface |
-|---|---|---|
-| Green-adopt | 1 | docs-only (OBS browser-source via existing Tauri webview port 8765 + mascot bus) |
-| Yellow-defer | 8 | `.planning/research/v3-buckets/v3.x-*.md` stubs |
-| Red-constraint | 9 | none (CLAP / MERT / OpenL3 / OpenAI / Anthropic / Demucs / Spleeter / DAW APIs / Linux-only) |
-| Red-risk | 6 | none (ProDJ Link / cdj-link-py / Dante Via / Loopback Audio / Soundflower / Auto-Rig Pro) |
-
-**Net runtime-dep delta for v3.1: 0.** Phase 49 installer companion reads `scripts/audit/dep_ratings.yaml::opportunity_evaluations` to confirm OBS is docs-only (negative confirmation); positive companion pins (BlackHole + VB-CABLE) stay Phase 49 internal. No Kaan-action surface from Phase 48.
-
-### Phase 47 Kaan-Action Surface (2026-05-18, deferred per `gsd-autonomous fully` mode)
-
-One engineering-green-with-deferral item from Phase 47 — does NOT block Phase 48 (OPP) or any other v3.1 phase. Phase 50 visual-snapshot tests will hit the placeholder GLBs gracefully until discharge.
-
-- **§VIS-04: 28 Mixamo Adobe-account retargets deferred to Kaan-action**. Engineering ships the full scaffold: 28-slot retarget CLI (`scripts/mascot/retarget_to_neon_rebel.py` — 5 families × per-family size bands), `assets/mascot/source/MANIFEST.yaml` audit-trail schema (28 placeholder rows), `MIXAMO-CLIP-SOURCES.md` with 18 new selection-guidance rows + per-family aesthetic guardrails (Pioneer-CDJ headbob; hands near body; static-foot-grounded; ~120 BPM equivalent), 23 placeholder GLBs at `tauri/ui/assets/mascot/animations/` (44 KB stubs aliasing prep_settle.glb), `docs/mascot/BUNDLE-DECISION.md` documenting draco-first / 30 MB bump-fallback. Bundle gate at `scripts/mascot/check_bundle_size.sh` exits 2 (Tier 2 placeholder fail) by design — `continue-on-error: true` in `mascot-audit.yml` until discharge. **To close**: (1) Mixamo Adobe-account walk per `scripts/mascot/MIXAMO-CLIP-SOURCES.md`; (2) `~/Downloads/mixamo_<slot>.glb` per slot; (3) `uv run python scripts/mascot/retarget_to_neon_rebel.py --slot-family <family> --really` per family; (4) `bash scripts/mascot/render_readme_hero.sh` regenerates README hero PNG+WebM after `react_hype_peak.glb` ships real Mixamo content. Bundle gate flips to exit 0 on full discharge.
-
-### Phase 46 Kaan-Action Surface (2026-05-18, deferred per `gsd-autonomous fully` mode)
-
-Two engineering-green-with-deferral items from Phase 46 — neither blocks Phase 47 (MASCOT) or Phase 48 (dep-opportunity scan); both are documented in `docs/AUDIT.md` § Decisions and `scripts/audit/dep_ratings.yaml::decisions[]` for the long-lived paper trail.
-
-- **DEPS-07: DISCHARGED 2026-05-19** (commit `f164c5c`). `brew install pinact` + `bash scripts/audit/run_pinact.sh --apply` rewrote 19 workflow files to the SHA + version-comment form. `dtolnay/rust-toolchain@stable` exempted via `.pinact.yaml::ignore_actions` (branch ref convention — pinning gives no real supply-chain hardening since the toolchain is fetched from rust-lang.org regardless). Upstream typo `signpath/github-action-submit-signing-request@v1.2.0` corrected to `@v1.2` (no v1.2.0 tag exists in the action's repo). `test_every_uses_is_sha_pinned` xfail removed — now passes green. Companion test rebases in `tests/security/test_sbom_workflow_shape.py` + `test_release_yml_signing_skips.py`.
-
-- **DEPS-08: `livekit-plugins-openai` cull is CULL-BLOCKED**. `rg` found direct imports at `src/vibemix/agent/tts_chain.py:25` (`from livekit.plugins.openai import tts as _openai_tts_mod`) plus 3 test files (`tests/agent/test_proxy_client.py`, `tests/agent/test_config.py`, `tests/agent/test_tts_chain.py`). Removal requires rewiring the TTS proxy fallback chain — explicitly out-of-scope for Phase 46. `google-cloud-speech` + `google-cloud-texttospeech` are pure transitives of livekit-plugins-google with zero direct imports; retained-as-transitive (no Kaan-action needed there). **To close `livekit-plugins-openai`**: open a focused refactor phase post-v3.1 that rewires `tts_chain.py` to drop the OpenAI adapter path.
-
-### v3.1 Roadmap Decisions Locked (2026-05-17)
-
-- **5-phase decomposition P46–P50** with build-order: parallel cluster (46 + 47) → sequential cluster (48 → 49 → 50). Phase 46 + 47 share zero files. Phase 48 gated on Phase 46 `dep_ratings.json` schema. Phase 49 gated on Phase 46 + Phase 48 (companion pulls Green-rated deps only). Phase 50 gated on Phase 47 (real GLBs for visual snapshots) + Phase 49 (built signed `.dmg`).
-- **Phase numbering CONTINUED** from v3.0 — v3.0 closed at Phase 45. v3.1 starts at Phase 46 (no `--reset-phase-numbers` semantics).
-- **Five v3.0 invariants preserved** in every v3.1 phase: POC immutability (`cohost*.py`, `mascot.html` byte-identical to v2.0 tag), ModelRouter seam (zero new hardcoded model literals; CI grep gate extended to v3.1 artifacts), anti-slop blocklist (15-token + `\bdeeply\s+\w+` regex; grep target paths extended to `docs/AUDIT.md`, `docs/dep-opportunities/`, installer wizard copy, e2e report.html), privacy rule (project-scoped FS only; e2e harness asserts zero writes to off-limits paths per `feedback_privacy_scope_narrow`), 3-IPC-reservation contract (zero new IPC wrappers; v3.1 is build-time / test-harness / asset-only).
-- **`gsd-autonomous fully` mode applied** — engineering proceeds unblocked in PARALLEL with v3.0 external clock (Apple Dev + SignPath ~1-week SLA). Soft Kaan-discharge gates surface to KAAN-ACTION-LEGAL but do NOT pause work.
-- **Worktree-subagent Step-0 invariant** mandated for every plan per memory `feedback_worktree_must_sync_main_first` — every subagent prompt skeleton MUST include `git fetch origin main && git merge origin/main --no-edit` Step-0 block. Plan-checker rejects any plan lacking this. (Phase 40 worktree-isolation learning: stale base = ~161k-line regression on merge.)
-- **Phase 50 split: 50a Kaan-ear (subjective) + 50b OS-matrix smoke (objective)** per memory `project_phase_16_kaan_dj_testing` — NOT a formal 30-session replay harness; Kaan walks his MacBook with real DJ-set audio.
-- **Mascot scope locked to single VTuber character (Neon Rebel)** per memory `project_mascot_as_vtuber_personality_surface`.
-- **No CLAP / no multi-provider AI** per memory `feedback_no_clap_use_gemini_embedding` + `feedback_no_scope_creep_clean_utility`.
-- **BlackHole 48 kHz format requirement** per memory `project_v4_canonical_baseline`.
-- **One-click install ≤ 60s ceiling** per memory `project_one_click_install_hard_req`.
+**Reuses already-built engineering (do NOT rebuild):** v3.1 e2e harness (`tests/e2e/macbook/`), `cut_release.sh` with Gate 2b + Gate 6b, EvidenceRegistry citation strip, Neon Rebel mascot state machine, BlackHole 48 kHz probe, TTFTMeter, installer/first-run wizard.
 
 ### Decisions Locked (v3.0 — shipped, see v3.0-ROADMAP.md for full list)
 
@@ -237,33 +177,25 @@ All Phase 1–39 decisions remain locked. Highlights preserved:
 - Three.js (single 3D engine); vanilla TS in `tauri/ui/src/` (NOT React); WaveSurfer.js for Phase 29 debrief timeline.
 - POC files retired (deleted, scrub-gated); `mascot.html` byte-stable + CI `mascot-audit`.
 
-### Deferred Items (v3.1 close — 2026-05-18, carry forward as Kaan-action external clock)
+### Deferred Items (external clock — carry forward as Kaan-action; UNCHANGED by v5.0)
 
-Acknowledged per `gsd-autonomous fully` mode at v3.1 milestone close 2026-05-18. All 7 are external-clock dependent; critical-path discharge order: §INSTALL-COMPANION-SIGN → §INSTALL-VM-RUN → §E2E-50A-WALK; §VIS-04 + §VIS-05 (Mixamo) independent and parallel; §SHIP-CONTACT-VBAUDIO + 2 dep-audit decisions independent. v4.0 drives several of these to discharge: §E2E-50A-WALK is Phase 58 SC-2; the engineering-side gates feed Phase 58 SC-1.
-
-| Category | Item | Status |
-|----------|------|--------|
-| ship-blocker | §INSTALL-COMPANION-SIGN — SignPath OSS Foundation cert grant for companion `.ps1` + `.py` Authenticode | external_clock (same cert as v3.0 SHIP-CUT) |
-| ship-blocker | §INSTALL-VM-RUN — Real Tart VM execution macOS 12.3 / 14 / 15 + Win 10 / 11 | gated on §INSTALL-COMPANION-SIGN |
-| kaan-walk | §E2E-50A-WALK — Kaan's MacBook walk + record `docs/e2e/2026-05-walk.webm` via `scripts/e2e/record_50a_walk.sh` | v4.0 Phase 58 SC-2 |
-| asset-discharge | §VIS-04 — 28 Mixamo retargets via Adobe-account walk (Phase 47 scaffold ready) | independent (parallel) |
-| asset-discharge | §VIS-05 — 5 pre-existing legacy_prep_* slot retargets (bundle with §VIS-04) | independent (parallel) |
-| ship-optimization | §SHIP-CONTACT-VBAUDIO — VB-Audio OEM/bundle redistribution email | email drafted at `.planning/decisions/SHIP-CONTACT-VBAUDIO.md` (Kaan-action: send) |
-| tech-debt | ~~DEPS-07~~ — DISCHARGED 2026-05-19 (commit `f164c5c`) | closed |
-| tech-debt | DEPS-08 — `livekit-plugins-openai` cull blocked by `tts_chain.py:25` direct imports; scheduled post-v3.1 TTS proxy fallback chain refactor | tech_debt (docs/AUDIT.md § Decisions) |
+All external-clock items from v3.0 / v3.1 / v4.0 remain on the same clock — v5.0 does NOT change it. Critical-path discharge: §INSTALL-COMPANION-SIGN (SignPath OSS cert) → §INSTALL-VM-RUN (real Tart VM) → §E2E-50A-WALK; Apple Dev Agreement (Francesco) gates the signed publish; §VIS-04/§VIS-05 (Mixamo) independent. The v4.0 public RC publish (`v0.1.0-rc1`) is one-button-after-signatures per `KAAN-ACTION-LEGAL.md §SHIP-V4` + per-phase `*-HUMAN-UAT.md`.
 
 ### Blockers
 
-- **None engineering-side at v4.0 start.** All 8 phases (51–58) are engineering work on real hardware; none requires an external signature.
-- **External clock (v3.0 + v3.1 carryover, does NOT block v4.0 engineering):** Apple Developer Program Agreement update (Francesco, P46 legal-capacity) + SignPath OSS Foundation approval (Kaan, ~1-week SLA, P46 legal-capacity). These gate only the literal signed publish — surfaced as KAAN-ACTION in Phase 58; the SHIP-CUT is made one-button-after-signatures. No v4.0 phase depends on signatures landing.
+- **None engineering-side at v5.0 start.** All 4 phases (59–62) are engineering work on the in-flight `live-tuning-or-brain` branch + the shipped grounded system; none requires an external signature.
+- **External clock (v3.0 + v3.1 + v4.0 carryover, does NOT block v5.0 engineering):** Apple Developer Program Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA). These gate only the literal signed v4.0 publish. No v5.0 phase depends on signatures landing.
 
-### Risks (v4.0 — to mitigate during plan-time)
+### Risks (v5.0 — to mitigate during plan-time)
 
-1. **"It works on Kaan's MacBook" trap** — v4.0 validates only Apple-Silicon real hardware; the OS matrix (macOS 12.3 Intel + Win) stays simulated/VM-pending. Mitigation: v4.0 explicitly scopes to Kaan-ear + real-Mac; OS-matrix coverage stays the v3.1 50b smoke + KAAN-ACTION §INSTALL-VM-RUN.
-2. **Out-of-range derived features leak past the source guard** (Phase 52) — the BPM=200 bug shows feature validation is not airtight at the bus/UI boundary. Mitigation: clamp/reject at the producer, assert valid-range in the bus snapshot test, not just at the consumer.
-3. **AI-voice-fires fix masks a deeper trigger/in-flight bug** (Phase 54) — the 32s-silent-on-drop could be cooldown, in-flight lock not clearing, or generate_reply not landing. Mitigation: instrument the trigger→generate→first-audio path end-to-end before tuning constants; do not paper over with shorter cooldowns.
-4. **Privacy rule during live bring-up debugging** — reading logs to triage runtime errors must NEVER touch Kaan's OZ/Hermes/local-AI surfaces. Mitigation: bring-up debugging reads vibemix's own Tauri console + sidecar logs ONLY; off-limits paths in CLAUDE.md are absolute (`feedback_privacy_scope_narrow`).
-5. **Anti-slop blocklist false-trips on live reaction copy** (Phases 54 / 55) — temptation to relax corrodes the v3.0 anti-slop thesis. Mitigation: NEVER relax the gate; tune the prompt/grounding, not the blocklist.
+1. **False key clash is the headline hallucination** (P60) — library key tags are ~57–70% accurate with *silent* errors, worst on percussion-heavy techno/psytrance (vibemix's actual genres). Mitigation: conservative gate (both keys present + from a library match + unambiguous Camelot band; one-step-off SUPPRESS; carry confidence; Kaan-ear veto). Never relax to chase coverage.
+2. **Uncitable-by-construction harmonic feedback** (P59) — there is no `key`/`harmonic` member in `EVIDENCE_SOURCES` today. Mitigation: the citable `key:` source + linter rule lands FIRST, before any harmonic prompt text; HIGH-cost retrofit if discovered at the release gate.
+3. **Audible-deck ambiguity poisons the feature** (P59) — the DDJ-FLX4 doesn't write play-state when djay Pro controls it; `derive_audible_deck()` returns `none`/`mix` often. Mitigation: trust fader+xfader (the v4 fix), suppress cross-deck claims when the 2nd deck is unresolved — degrade to single-deck, never guess.
+4. **Reading live `master.db` corrupts the user's collection** (P59) — file locks + post-6.6.5 encryption wall + any write corrupts. Mitigation: read the unencrypted XML export; SQLCipher best-effort-only on a temp copy; NEVER write; repo test asserts no DJ-DB write-mode open.
+5. **Shared-prompt refactor breaks hype mode** (P61) — `matrix.py`/`coach.py` are shared. Mitigation: regression-fence the Phase-54-validated hype goldens; any hype-golden change is a deliberate, reviewed decision.
+6. **Persona over-correction (cold/nag)** (P61) — "actionable" overshoots into a fault-finding QC bot. Mitigation: keep the in-flight BALANCED rule (~half turns specific positive callouts, never reuse a praise line); actionability is in *specificity + peer register*, not frequency of critique.
+7. **Pill steals focus / blocks DJ input** (P62) — interactive draggable pill re-opens every focus/drag bug the click-through overlay sidestepped. Mitigation: `focused(false)` + NSPanel + verify keystrokes still reach the DJ app after clicking the pill; resolve the spike on the built app FIRST.
+8. **Essentia/librosa "reuse" assumption** (P59) — the briefing's "reuse Essentia/librosa" is FALSE; they are NOT installed. Mitigation: key fallback is an in-house ~80-line numpy KS/Temperley estimator (zero new dep); reject any MIR-library install.
 
 ---
 
@@ -271,19 +203,19 @@ Acknowledged per `gsd-autonomous fully` mode at v3.1 milestone close 2026-05-18.
 
 ### Last Session
 
-- 2026-05-20 — v4.0 "SHIP" roadmap RE-SPLIT from 4 phases into **8 phases (51–58)** per Kaan's explicit directive for finer granularity. Bring-up split into three input seams (boot/stability 51, audio+grounding 52, controller 53); the two interaction modes get dedicated phases (hype 54, feedback 55); perf+live-mascot 56; sexify 57; ship 58. 19/19 REQ-IDs re-mapped to exactly one phase (100% coverage, no orphans, no duplicates). Real-hardware findings folded in: ws_bus empty-frame fix (51), live BPM=200 grounding fix (52), AI-voice-must-fire fix (54). ROADMAP.md rewritten, REQUIREMENTS.md traceability re-mapped, STATE.md total_phases → 8, Current Position → Phase 51.
-- 2026-05-20 (earlier) — v4.0 milestone started via `/gsd:new-milestone`; initial 4-phase roadmap created.
-- 2026-05-18 — v3.1 "Distribution-Ready Pass" milestone SHIPPED + archived (5 phases P46–P50, 32 plans, 44/44 REQ-IDs).
+- 2026-05-21 — v5.0 "The Useful Cut" ROADMAP CREATED (4 phases, 59–62; numbering continued from v4.0's 51–58, no reset). 17/17 REQ-IDs mapped (DECK P59 / HARMONIC P60 / COACH P61 / PILL P62). Hard critical path P59→P60→P61; P62 parallelizes. ROADMAP.md: added the v5.0 active-milestone section at the top of the milestone content, kept v4.0 "SHIP" OPEN + intact below it (engineering-complete 8/8, publish on signature clock — NOT archived), added v5.0 row to the Milestone-Level Progress table. REQUIREMENTS.md traceability validated (already mapped, no change needed). STATE.md milestone preserved as v5.0, Current Position → Phase 59, total_phases → 4.
+- 2026-05-21 (earlier) — Phase 58 (Ship Readiness) COMPLETE; ALL 8 v4.0 phases engineering-complete (8/8). v4.0 left open on the external signature clock.
+- 2026-05-20 — v4.0 "SHIP" roadmap RE-SPLIT into 8 phases (51–58).
 
 ### Next Session
 
-- **`/gsd:plan-phase 51`** — decompose Phase 51 (Real-Hardware Bring-Up) into executable plans. This is the foundation: boot the app + sidecar on the real Mac, reach a stable live listening session, clean startup logs (ws_bus empty-frame fix), survive a ≥30-min full-set run with zero unhandled exceptions / bounded RSS. Everything downstream (52–58) depends on a running app.
-- **Track external clock (v3.0 + v3.1 share the same one)**: Apple Developer Program Agreement update (Francesco) + SignPath OSS Foundation approval (Kaan, ~1-week SLA). Gates only the literal signed publish; surfaced as KAAN-ACTION in Phase 58. Engineering proceeds unblocked.
+- **`/gsd:plan-phase 59`** — decompose Phase 59 (Full Deck Awareness + Grounding). This is the critical-path gate: land session-wide deck-state from the XML→vision→numpy ladder, the citable `key:` evidence source + linter rule (BEFORE any harmonic prompt), single-writer `MusicState` integration + the two new event types, strictly read-only. Resolve the two flagged spikes in plan-time: (a) pyrekordbox live-DB safety + `mix:`-reuse vs dedicated-`key:` decision; (b) Gemini-vision deck-badge accuracy eval. Everything in P60/P61 depends on this. P62 (pill) can be planned in parallel — resolve its drag/focus spike first.
+- **Track external clock (unchanged):** Apple Dev Agreement (Francesco) + SignPath OSS cert (Kaan). Gates only the v4.0 signed publish; surfaced in `KAAN-ACTION-LEGAL.md §SHIP-V4`. v5.0 engineering proceeds unblocked.
 
 ---
 
-*State managed by gsd-roadmapper at 2026-05-20 (v4.0 "SHIP" roadmap RE-SPLIT to 8 phases 51–58; ready for `/gsd:plan-phase 51`).*
+*State managed by gsd-roadmapper at 2026-05-21 (v5.0 "The Useful Cut" roadmap created — 4 phases 59–62; ready for `/gsd:plan-phase 59`).*
 
 ## Operator Next Steps
 
-- Plan the first phase with /gsd-plan-phase 51
+- Plan the first phase with /gsd-plan-phase 59
