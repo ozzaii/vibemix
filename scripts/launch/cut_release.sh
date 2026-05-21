@@ -10,11 +10,12 @@
 # invocation is a Kaan-action (see KAAN-ACTION-LEGAL.md §SHIP-CUT).
 #
 # Pre-flight gates (ALL must pass):
-#   1.  Tag prefix regex `^v2\.1\.0-rc[0-9]+$` (P83 — no premature v1.0.0).
+#   1.  Tag prefix regex `^v0\.1\.0-rc[0-9]+$` (P83 — no premature v1.0.0;
+#       v0.1.0-rc is the PUBLIC OSS tag, v4.0 stays the INTERNAL milestone).
 #   2.  `verify_signed.py --require-signed` for every dist/*.{dmg,msi,exe,pkg}.
 #   2b. `check_gate.sh` — Phase 42 hybrid hallucination gate (GATE-06).
 #   3.  `pytest tests/repo/test_readme_hero_hash_sync.py` (Phase 35).
-#   4.  `.planning/v2.1-MILESTONE-AUDIT.md` exists + frontmatter verdict WIRED.
+#   4.  `.planning/v4.0-MILESTONE-AUDIT.md` exists + frontmatter verdict WIRED.
 #   5.  `pytest tests/repo/test_g5_poc_files_untouched.py` — POC variants retired,
 #       stay gone (Phase 37 / AUDIT-06; inverted 2026-05-20).
 #   5b. `check_bravoh_server_ready.sh` — 3-endpoint Bravoh server probe
@@ -22,27 +23,45 @@
 #   6.  `pytest tests/security/test_bundle_id_locked.py` (Phase 33 / P63).
 #
 # Usage:
-#   bash scripts/launch/cut_release.sh v2.1.0-rc1
+#   bash scripts/launch/cut_release.sh v0.1.0-rc1
+#   bash scripts/launch/cut_release.sh --dry-run v0.1.0-rc1   # signature-stub mode
 #
 # Output on PASS: prints the exact `gh release create` command Kaan should
 # run; does NOT execute it. Confirms the Phase 42 hybrid hallucination
 # gate (GATE-06) is green — supersedes the v2.1 P85 override regime
 # (the autonomous-only ear-test bypass is formally retired in Plan 42-05).
 #
-# HARD GUARD: even with `--really` / `--real`, this script NEVER invokes
-# `gh release create` autonomously. That's the load-bearing safety property.
+# --dry-run (Phase 58 / REL-03): stubs ONLY the EXTERNAL signature gate
+# (Gate 2 drops --require-signed) and treats the KAAN-gated Gate 2b/6b as
+# PASS-for-dry-run with a loud wired-but-pending log. Every other gate runs
+# for real. Exits 0 = "everything but the signature is ready." A real
+# (non-dry-run) cut still FAILS Gate 2/2b/6b without the real inputs.
+#
+# HARD GUARD: even with `--really` / `--real` / `--dry-run`, this script
+# NEVER invokes `gh release create` autonomously. That's the load-bearing
+# safety property.
 
 set -u
 
-if [[ $# -lt 1 ]]; then
-  echo "usage: $0 <tag>  (e.g. $0 v2.1.0-rc1)" >&2
+# ── Arg parse: optional --dry-run/--no-sign flag + the tag ─────────────
+DRY_RUN=0
+TAG=""
+for arg in "$@"; do
+  case "${arg}" in
+    --dry-run|--no-sign) DRY_RUN=1 ;;
+    -*) echo "usage: $0 [--dry-run] <tag>  (e.g. $0 v0.1.0-rc1)" >&2; exit 1 ;;
+    *)  TAG="${arg}" ;;
+  esac
+done
+
+if [[ -z "${TAG}" ]]; then
+  echo "usage: $0 [--dry-run] <tag>  (e.g. $0 v0.1.0-rc1)" >&2
   exit 1
 fi
 
-TAG="$1"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PYTHON="${PYTHON:-python3}"
-TAG_REGEX='^v2\.1\.0-rc[0-9]+$'
+TAG_REGEX='^v0\.1\.0-rc[0-9]+$'
 
 FAIL=0
 TRIPPED=()
@@ -55,6 +74,9 @@ echo "════════════════════════�
 echo "  vibemix — cut_release.sh pre-flight (Phase 39 / SHIP-01)"
 echo "  Tag:    ${TAG}"
 echo "  Repo:   ${REPO_ROOT}"
+if [[ "${DRY_RUN}" -eq 1 ]]; then
+  echo "  Mode:   DRY-RUN (signature stubbed — EXTERNAL gate only)"
+fi
 echo "═════════════════════════════════════════════════════════"
 echo
 
@@ -118,10 +140,10 @@ fi
 echo
 
 # ── Gate 4: milestone audit ────────────────────────────────────────────
-echo "[Gate 4] .planning/v2.1-MILESTONE-AUDIT.md exists + verdict WIRED (Phase 37)"
-AUDIT="${REPO_ROOT}/.planning/v2.1-MILESTONE-AUDIT.md"
+echo "[Gate 4] .planning/v4.0-MILESTONE-AUDIT.md exists + verdict WIRED (Phase 37)"
+AUDIT="${REPO_ROOT}/.planning/v4.0-MILESTONE-AUDIT.md"
 if [[ ! -f "${AUDIT}" ]]; then
-  fail ".planning/v2.1-MILESTONE-AUDIT.md missing — run scripts/integration_audit.py --write-milestone-audit"
+  fail ".planning/v4.0-MILESTONE-AUDIT.md missing — run scripts/integration_audit.py --write-milestone-audit"
 else
   # Frontmatter convention: overall_verdict: WIRED  (or status: passed for back-compat).
   if grep -E '^(overall_verdict|status):\s*(WIRED|passed)\s*$' "${AUDIT}" >/dev/null 2>&1; then
