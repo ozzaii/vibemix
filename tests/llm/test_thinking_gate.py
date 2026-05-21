@@ -147,6 +147,61 @@ def test_both_violations_reports_both() -> None:
 
 
 # ---------------------------------------------------------------------------
+# PERF-01 — explicit production-shape positive + negative pin.
+#
+# The real PERF-01 lever is the boot-time MINIMAL-thinking gate: anything above
+# MINIMAL adds a 7s+ TTFT regression to the live coach. These tests pin a
+# GenerateContentConfig shaped exactly like the production `_gen_cfg`
+# (dj_cohost.py:413 / llm_factory.py:27 — thinking_level="minimal", no FLEX
+# tier, plus the system_instruction / temperature / max_output_tokens the gate
+# ignores) so that a future config-mutation PR re-introducing the 7s+ regression
+# fails CI. The positive pin proves the production config passes; the negative
+# pins prove MEDIUM / HIGH thinking and FLEX tier are each rejected.
+# ---------------------------------------------------------------------------
+
+
+def test_perf01_production_minimal_config_passes() -> None:
+    """PERF-01 positive pin — a config shaped like the production live `_gen_cfg`
+    (thinking_level="minimal", no FLEX tier) passes validate_live_config."""
+    cfg = GenerateContentConfig(
+        system_instruction="vibemix live coach system prompt",
+        thinking_config=ThinkingConfig(thinking_level="minimal"),
+        temperature=1.0,
+        max_output_tokens=220,
+    )
+    # No service_tier set (default == STANDARD on the live path).
+    assert validate_live_config(cfg) is None
+
+
+@pytest.mark.parametrize("level", [ThinkingLevel.MEDIUM, ThinkingLevel.HIGH])
+def test_perf01_medium_high_thinking_rejected(level: ThinkingLevel) -> None:
+    """PERF-01 negative pin — MEDIUM/HIGH thinking on the live path raises
+    LiveCoachConfigError (the 7s+ TTFT regression protection is live)."""
+    cfg = GenerateContentConfig(
+        system_instruction="vibemix live coach system prompt",
+        thinking_config=ThinkingConfig(thinking_level=level),
+        temperature=1.0,
+        max_output_tokens=220,
+    )
+    with pytest.raises(LiveCoachConfigError, match=r"thinking_level.*MINIMAL"):
+        validate_live_config(cfg)
+
+
+def test_perf01_flex_tier_rejected() -> None:
+    """PERF-01 negative pin — a FLEX service_tier on the production-shape live
+    config raises LiveCoachConfigError (Flex SLA = live UX collapse)."""
+    cfg = GenerateContentConfig(
+        system_instruction="vibemix live coach system prompt",
+        thinking_config=ThinkingConfig(thinking_level="minimal"),
+        service_tier=ServiceTier.FLEX,
+        temperature=1.0,
+        max_output_tokens=220,
+    )
+    with pytest.raises(LiveCoachConfigError, match=r"service_tier.*Flex SLA"):
+        validate_live_config(cfg)
+
+
+# ---------------------------------------------------------------------------
 # Task 2 — wiring into llm_factory + DJCoHostAgent
 # ---------------------------------------------------------------------------
 # These tests assert the validator is called at the two construction seams

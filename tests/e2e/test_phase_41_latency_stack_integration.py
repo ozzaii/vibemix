@@ -142,12 +142,16 @@ def test_router_unknown_path_raises_with_diagnostic() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.e2e
 def test_agent_validates_live_config() -> None:
     """Production-shape `_gen_cfg` passes validate_live_config without raise.
 
     This mirrors `DJCoHostAgent.__init__`'s actual construction (Plan 41-03
     second gate). The model + temperature + max_output_tokens fields are
     not checked by the gate — only thinking_level + service_tier matter.
+
+    PERF-01 (Phase 56) — this is the e2e positive leg: the production live
+    config passes the boot-time MINIMAL-thinking gate end-to-end.
     """
     cfg = GenerateContentConfig(
         system_instruction="test-system-instruction",
@@ -159,6 +163,7 @@ def test_agent_validates_live_config() -> None:
     validate_live_config(cfg)  # MUST NOT raise
 
 
+@pytest.mark.e2e
 def test_thinking_gate_rejects_flex_on_live() -> None:
     """LiveCoachConfigError raised when service_tier=FLEX on the live path.
 
@@ -178,6 +183,7 @@ def test_thinking_gate_rejects_flex_on_live() -> None:
     assert "Pitfall 3" in msg
 
 
+@pytest.mark.e2e
 def test_thinking_gate_rejects_higher_than_minimal_thinking() -> None:
     """Anything above MINIMAL adds 7s+ TTFT regression — gate must reject."""
     cfg = GenerateContentConfig(
@@ -189,6 +195,39 @@ def test_thinking_gate_rejects_higher_than_minimal_thinking() -> None:
     msg = str(exc.value)
     assert "thinking_level" in msg
     assert "MINIMAL" in msg
+
+
+@pytest.mark.e2e
+def test_perf01_live_config_latency_leg_positive_and_negative() -> None:
+    """PERF-01 (Phase 56) e2e leg — the production-shape live `_gen_cfg`
+    passes the thinking-budget gate across the latency stack (positive), and a
+    non-MINIMAL config crafted on the same shape is rejected (negative).
+
+    SDK-boundary mock posture (no cassettes): validate_live_config is a pure
+    callable that takes a GenerateContentConfig — the gate IS the latency-stack
+    boundary, so no genai client mock is needed for this leg. The 7s+ TTFT
+    regression protection is provably live end-to-end.
+    """
+    # Positive — production live config (thinking minimal, no FLEX) passes.
+    prod_cfg = GenerateContentConfig(
+        system_instruction="vibemix live coach system prompt",
+        thinking_config=ThinkingConfig(thinking_level="minimal"),
+        temperature=1.0,
+        max_output_tokens=220,
+    )
+    assert validate_live_config(prod_cfg) is None
+
+    # Negative — a non-MINIMAL config on the same shape is rejected (proves the
+    # latency-stack gate has teeth, not a vacuous pass).
+    bad_cfg = GenerateContentConfig(
+        system_instruction="vibemix live coach system prompt",
+        thinking_config=ThinkingConfig(thinking_level="high"),
+        temperature=1.0,
+        max_output_tokens=220,
+    )
+    with pytest.raises(LiveCoachConfigError) as exc:
+        validate_live_config(bad_cfg)
+    assert "MINIMAL" in str(exc.value)
 
 
 # ---------------------------------------------------------------------------
