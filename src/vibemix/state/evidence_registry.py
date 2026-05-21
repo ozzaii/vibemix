@@ -86,14 +86,22 @@ DEFAULT_MIN_REFRESH_INTERVAL_S: float = 30.0
 # Locked grammar surface                                                       #
 # --------------------------------------------------------------------------- #
 
-#: The 7 EBNF source identifiers locked in 18-CONTEXT.md §EBNF Grammar.
+#: The 8 EBNF source identifiers — 7 locked in 18-CONTEXT.md §EBNF Grammar
+#: plus ``key`` added Phase 59 (DECK-03).
 #: ``ev`` = event-detector fire; ``aud`` = audio feature (RMS/BPM/bands);
 #: ``midi`` = controller move; ``track`` = nowplaying-cli track id;
 #: ``screen`` = djay screen-capture region; ``mix`` = derived mix state
-#: (``audible_deck`` etc.); ``tend`` = Kaan-profile fact (Phase 26 hook).
+#: (``audible_deck`` etc.); ``tend`` = Kaan-profile fact (Phase 26 hook);
+#: ``key`` = deck harmonic key, body ``<deck>:<camelot>`` (e.g. ``A:8A``) —
+#: the dedicated source that makes a fabricated clash uncitable-by-construction
+#: (Phase 60 narrates clashes the code already confirmed; existence-only,
+#: mirrors ``track``).
 #: Phase 20 linter consumes this for source-validity checks.
+#: SCHEMA-MIRROR: this frozenset is the source-of-truth — keep ``_SOURCE_ALT``,
+#: the EBNF docstring, ``prompts/matrix.py::CITATION_GRAMMAR_BLOCK`` and
+#: ``agent/dj_cohost.py::_build_citation_strip`` in lock-step.
 EVIDENCE_SOURCES: frozenset[str] = frozenset(
-    {"ev", "aud", "midi", "track", "screen", "mix", "tend"}
+    {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key"}
 )
 
 
@@ -101,7 +109,12 @@ EVIDENCE_SOURCES: frozenset[str] = frozenset(
 # non-comma. Comma is excluded so the multi-citation regex can split cleanly
 # on it. Bracket + whitespace exclusion enforces the LOCKED grammar
 # (no nested brackets, no internal spaces).
-_SOURCE_ALT = "ev|aud|midi|track|screen|mix|tend"
+#
+# ``key`` (Phase 59 / DECK-03) joins the alternation; ``_INNER_ATOM`` itself is
+# UNCHANGED — a ``key:A:8A`` body has no whitespace/comma/bracket, and
+# parse_citations splits on the FIRST ``:`` so the inner ``A:8A`` colon survives
+# as the body. No parser change is required.
+_SOURCE_ALT = "ev|aud|midi|track|screen|mix|tend|key"
 _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 
 #: Compiled regex matching the LOCKED EBNF grammar:
@@ -109,9 +122,12 @@ _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 #:   citation := '[' atom ( ',' atom )* ']'
 #:   atom     := source ':' body
 #:   source   := 'ev' | 'aud' | 'midi' | 'track' | 'screen' | 'mix' | 'tend'
+#:             | 'key'
 #:   body     := one-or-more chars excluding whitespace, ']', ','
+#:   key-body := <deck> ':' <camelot>   # e.g. "A:8A" — deck ∈ {A,B,C,D},
+#:                                       # camelot ∈ 1A..12B (Phase 59 DECK-03)
 #:
-#: Matches the 7 single-citation forms + the comma-joined multi-citation
+#: Matches the 8 single-citation forms + the comma-joined multi-citation
 #: form in one pass. Empty ``[]`` is rejected (body requires at least one
 #: char). Whitespace inside brackets is rejected.
 EVIDENCE_CITATION_RE: re.Pattern[str] = re.compile(

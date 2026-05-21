@@ -41,7 +41,14 @@ from vibemix.state.evidence_registry import EVIDENCE_SOURCES, parse_citations
 
 # Sources where the body shape is ``key@t`` (time-keyed lookup with
 # tolerance). The complement of this set inside EVIDENCE_SOURCES is the
-# existence-only set (track / screen / mix / tend).
+# existence-only set (track / screen / mix / tend / key).
+#
+# Phase 59 (DECK-03): ``key`` (deck harmonic, body ``<deck>:<camelot>``)
+# joins the EXISTENCE-ONLY set purely by being in EVIDENCE_SOURCES and
+# ABSENT here — it MUST stay out of this frozenset. The poller registers
+# the exact ``A:8A`` body; a fabricated ``A:12B`` was never observed, so the
+# existence-only branch (``body in snapshot["key"]``) strips the turn. No
+# ``@t`` is required (mirrors ``track:``); _validate_atom needs no change.
 _TIME_KEYED_SOURCES: frozenset[str] = frozenset({"ev", "aud", "midi"})
 
 
@@ -176,8 +183,9 @@ class CitationLinter:
 
         ``malformed`` only surfaces for time-keyed atoms (ev/aud/midi)
         whose body is missing ``@`` or whose post-``@`` substring is not
-        a float. Existence-only atoms (track/screen/mix/tend) cannot be
-        malformed in v2.0 — their body shape is free-form.
+        a float. Existence-only atoms (track/screen/mix/tend/key) cannot be
+        malformed in v2.0 — their body shape is free-form. ``key`` (Phase 59,
+        body ``<deck>:<camelot>``) flows through the existence-only branch.
 
         Unknown sources should never reach here (parse_citations regex
         whitelists EVIDENCE_SOURCES) but if they do, treat as malformed
