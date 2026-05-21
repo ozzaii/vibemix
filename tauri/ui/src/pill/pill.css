@@ -137,17 +137,34 @@
 }
 
 /* ── Expand panel — grows DOWN on a reaction (62-UI-SPEC §States) ─────────── *
- * Hidden when collapsed; the rAF loop toggles data-state="expand". The reveal
- * uses --motion-transition (one orchestrated reveal — frontend-enforcement
- * rule 6). Section separation reaction ↔ chips ↔ deck chips = --sp-5. */
+ * The reveal is ONE orchestrated 200ms motion (frontend-enforcement rule 6).
+ * `display` is NOT transitionable, so the panel stays in flow as a flex column
+ * and we tween `max-height` (0 → cap) + `opacity` (0 → 1) under
+ * --motion-transition ease-out. Collapsed state pins max-height:0 + opacity:0 +
+ * overflow:hidden so there is NO layout/scroll artifact at rest; the
+ * data-state="expand" selector opens it to the spec cap. The 220px max-height
+ * is the 62-UI-SPEC §Pill Dimensions "auto height (cap ~220px)" — also bounds
+ * the panel so a long reaction can't grow unbounded. Section separation
+ * reaction ↔ chips ↔ deck chips = --sp-5. */
 .pill__expand {
-  display: none;
+  display: flex;
   flex-direction: column;
   gap: var(--sp-5);
-  padding: 0 var(--sp-4) var(--sp-4);
+  /* Collapsed: zero-height, transparent, no padding contribution, no scroll. */
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  padding: 0 var(--sp-4);
+  transition:
+    max-height var(--motion-transition) ease-out,
+    opacity var(--motion-transition) ease-out,
+    padding-bottom var(--motion-transition) ease-out;
 }
 .pill[data-state="expand"] .pill__expand {
-  display: flex;
+  /* 62-UI-SPEC §Pill Dimensions: expanded panel cap ~220px. */
+  max-height: 220px;
+  opacity: 1;
+  padding-bottom: var(--sp-4);
 }
 .pill__reaction {
   font-variation-settings: "wdth" 100, "wght" 400;
@@ -173,4 +190,26 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
+}
+
+/* ── Reduced-motion guard (a11y) ──────────────────────────────────────────── *
+ * An always-on-top, always-visible pulsing dot sits in the user's peripheral
+ * vision — exactly the motion-sensitivity case `prefers-reduced-motion` exists
+ * for. tokens.css already freezes the --border-sweep / .border-anim under this
+ * query; this block freezes the pill's OWN keyframe + transitions:
+ *   - the infinite `pill-blink` on the listening/speaking state dot → static
+ *     (the dot stays amber, just stops pulsing — sign-of-life via color, not
+ *     motion);
+ *   - the expand reveal + waveform-bar tweens → no transition (the panel still
+ *     opens, it just snaps instead of animating, which is the accessible read).
+ * The state dot keeps its amber fill (set by the data-state rules above); only
+ * the animation is dropped. */
+@media (prefers-reduced-motion: reduce) {
+  .pill[data-state="listening"] .pill__dot,
+  .pill[data-state="speaking"] .pill__dot {
+    animation: none;
+  }
+  .pill__expand {
+    transition: none;
+  }
 }
