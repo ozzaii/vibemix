@@ -3382,3 +3382,128 @@ SHIP-13 v3.0 MILESTONE CLOSED on:    _____________________   (date — ROADMAP.m
 Sign-off by (Kaan):                  _____________________
 ```
 
+---
+
+## §SHIP-V4 — Consolidated v4.0 Ship Surface (2026-05)
+
+**REQ-ID:** REL-03
+**Owner:** Kaan (founder) + Francesco (Apple signatory) + external clock (Apple, SignPath)
+**Status:** ☐ pending  ☐ signatures landed  ☐ ear-passes signed  ☐ §E2E walk recorded  ☐ tag confirmed  ☐ cut
+
+This is the ONE place that lists every open external-clock + Kaan-action item
+standing between an engineering-green v4.0 and a live public release. It does
+NOT re-write the §SHIP-CUT runbook — it points at it. Each external signature
+links back to its existing sign-off block (DIST-09 Apple, DIST-11 SignPath).
+Engineering closes everything that needs no external signature; the items below
+are the human-discharge map.
+
+**The exact one-button sequence is the existing §SHIP-CUT runbook above** (this
+file, §SHIP — SHIP-CUT, the 9-step protocol). Run that — do not retype the 9
+steps here. The only delta for v4.0 is the public tag and the two Kaan-input
+gates, both flagged below.
+
+### Pre-requisites
+
+- **DIST-09 — Apple Developer Program Agreement** accepted by Francesco (sign-off
+  block in §6 / DIST-09 above). Gates signed macOS binaries.
+- **DIST-11 / §INSTALL-COMPANION-SIGN — SignPath OSS Foundation cert** granted to
+  Kaan (sign-off block in §7 / DIST-11 above). **This is ONE shared cert** across
+  the v3.x companion-signing (§INSTALL-COMPANION-SIGN), DIST-11 Windows binary
+  signing, and this ship — do not count it three times. ~1-week SLA.
+- **Gate-2b ear-passes** — Kaan signs `54-HUMAN-UAT.md` (live hype ear-pass, ≥2
+  genres) + `55-HUMAN-UAT.md` (live coach ear-pass, ≥2 genres). These feed Gate 2b
+  (hallucination); the gate wiring is pre-verified and flips green when the
+  sign-offs land.
+- **§E2E-50A-WALK recording** — Kaan drives the real app end-to-end on the Mac with
+  real DJ-set audio and records `docs/e2e/2026-05-walk.webm` via
+  `scripts/e2e/record_50a_walk.sh`. This feeds Gate 6b (e2e report); the harness +
+  recipe are ready, the recorded `.webm` is the missing input.
+- **Gate 5b precondition** — before a real cut, the Bravoh prod server must be up
+  and `/vibemix/healthz` fresh (heartbeat ≤10 min old). Verify with
+  `bash scripts/release/check_bravoh_server_ready.sh` (exit 0). See §SHIP-06.
+
+### Open discharge items
+
+| Item | Owner | Status | Sign-off / pointer |
+|------|-------|--------|--------------------|
+| DIST-09 — Apple Dev Program Agreement | Francesco | pending | §6 / DIST-09 sign-off block |
+| DIST-11 — SignPath OSS cert (shared) | Kaan | pending, ~1wk SLA | §7 / DIST-11 sign-off block |
+| §INSTALL-COMPANION-SIGN — SignPath companion signing | Kaan | external_clock | SAME cert as DIST-11 — do not double-count |
+| Gate-2b ear-pass — 54-HUMAN-UAT (hype) | Kaan | pending | `54-HUMAN-UAT.md` |
+| Gate-2b ear-pass — 55-HUMAN-UAT (coach) | Kaan | pending | `55-HUMAN-UAT.md` |
+| §E2E-50A-WALK recording → `docs/e2e/2026-05-walk.webm` | Kaan | pending | `scripts/e2e/record_50a_walk.sh` |
+| §INSTALL-VM-RUN — Tart VM 5-OS matrix | Kaan | gated on cert | carry-forward (not a v4.0 blocker) |
+| §VIS-04 — 28 Mixamo retargets | Kaan | parallel | asset-discharge (not ship-blocking) |
+| §VIS-05 — 5 legacy_prep_* retargets | Kaan | parallel | bundle with §VIS-04 (not ship-blocking) |
+| §SHIP-CONTACT-VBAUDIO — email VB-Audio | Kaan | drafted, send | ship-optimization (not a blocker) |
+| DEPS-08 — `livekit-plugins-openai` cull | Kaan | tech_debt | post-v3.1 TTS refactor (not ship-blocking) |
+
+### Discharge commands
+
+```bash
+# 0. Gate 5b precondition — Bravoh server up + healthz fresh (≤10 min):
+bash scripts/release/check_bravoh_server_ready.sh   # must exit 0
+
+# 1. Then run the existing §SHIP-CUT 9-step runbook (above). Do NOT retype it.
+#    The public tag for v4.0 is v0.1.0-rc1 (see the Kaan-confirm below).
+#    Everything else — changelog, gates, draft-first publish — is unchanged.
+```
+
+### Public-tag confirm (Kaan-confirm, NOT a blocker)
+
+- **Recommended public tag: `v0.1.0-rc1`** — vibemix's first public OSS release.
+  Grounded in `pyproject.toml` (`0.1.0-dev0`), the existing rc1 open-bugs surface,
+  and CLAUDE.md framing this as Bravoh's first open-source release. The Gate-1 tag
+  regex points at `^v0\.1\.0-rc[0-9]+$`.
+- **`v4.0` stays the INTERNAL milestone identity** (Gate 4 reads
+  `v4.0-MILESTONE-AUDIT.md`); it is not the public artifact version.
+- **Override:** if Kaan prefers `v4.0.0-rc1` as the public tag, it is a one-line
+  TAG_REGEX flip in `scripts/launch/cut_release.sh` — surfaced here as a confirm,
+  it does NOT block the cut.
+
+### Verification
+
+```bash
+# 1. The two Kaan-input gates flip green once the inputs land:
+bash scripts/release/check_gate.sh        # Gate 2b — ear-test leg green after 54+55 sign-off
+bash scripts/e2e/check_e2e_report.sh      # Gate 6b — green once 2026-05-walk run dir exists
+
+# 2. Gate 5b precondition fresh:
+bash scripts/release/check_bravoh_server_ready.sh   # exit 0
+
+# 3. This surface stays complete (no drift away from STATE):
+source .venv/bin/activate && PYTHONPATH=src python3 -m pytest \
+    tests/repo/test_kaan_action_v4_surface.py -q
+```
+
+### Post-discharge
+
+- Mark each item's checkbox in this section + its source sign-off block (DIST-09,
+  DIST-11) as the signatures land.
+- Update `.planning/STATE.md` "Deferred Items" + "Blockers" so closed items drop
+  off — the completeness pin (`test_kaan_action_v4_surface.py`) keeps this surface
+  honest against STATE.
+- After the cut publishes, fold the v4.0 carry-forwards that closed into the v4.0
+  milestone-close commit.
+
+### What unblocks
+
+- **The one-button SHIP-CUT** — once the signatures land + the two Kaan-input gates
+  are green, the §SHIP-CUT runbook is the only remaining step.
+- **§INSTALL-VM-RUN** — the shared SignPath cert unblocks the Tart VM matrix walk.
+- **v4.0 milestone closure** — the terminal step once the public RC publishes.
+
+### Sign-off block
+
+```
+SHIP-V4 APPLE (DIST-09) LANDED on:       _____________________   (date — Francesco)
+SHIP-V4 SIGNPATH (DIST-11) LANDED on:    _____________________   (date — Kaan, shared cert)
+SHIP-V4 54-HUMAN-UAT EAR-PASS on:        _____________________   (date — hype, ≥2 genres)
+SHIP-V4 55-HUMAN-UAT EAR-PASS on:        _____________________   (date — coach, ≥2 genres)
+SHIP-V4 E2E-50A-WALK RECORDED on:        _____________________   (date — docs/e2e/2026-05-walk.webm)
+SHIP-V4 GATE 5b BRAVOH HEALTHZ FRESH:    _____________________   (date — check_bravoh_server_ready.sh exit 0)
+SHIP-V4 PUBLIC TAG CONFIRMED:            _____________________   (v0.1.0-rc1 / v4.0.0-rc1)
+SHIP-V4 SHIP-CUT EXECUTED on:            _____________________   (date — §SHIP-CUT runbook)
+Sign-off by:                             _____________________   (Kaan)
+```
+
