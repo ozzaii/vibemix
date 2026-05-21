@@ -145,7 +145,11 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
   1. `cut_release.sh` 6-gate pre-flight + Gate 2b (hallucination) + Gate 6b (e2e report) all run green on real artifacts (not simulated fixtures).
   2. §E2E-50A-WALK is discharged by driving the real app end-to-end on the MacBook with real DJ-set audio, and the walk artifact (`docs/e2e/2026-05-walk.webm`) is recorded.
   3. The external-clock items (Apple Dev Agreement, SignPath OSS cert) are surfaced as KAAN-ACTION with the exact one-button SHIP-CUT sequence documented and pre-verified — a dry-run confirms everything-but-the-signature is ready, with no engineering step left to discover after signatures land.
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 58-01-PLAN.md — Real artifacts: sidecar rebuild + unsigned .dmg + generated v4.0 milestone audit (REL-01)
+- [ ] 58-02-PLAN.md — §E2E walk rig path-bug fix + real Gate-6b report producer (REL-02)
+- [ ] 58-03-PLAN.md — Consolidated v4.0 KAAN-ACTION ship surface in the canonical cookbook (REL-03)
+- [ ] 58-04-PLAN.md — Re-point cut_release.sh to v0.1.0-rc/v4.0 + --dry-run signature stub + hard-guard regression + green-now gate run (REL-01/03)
 
 ---
 
