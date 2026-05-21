@@ -33,9 +33,16 @@ import {
   type PillFrame,
   type PillState,
 } from "./state-machine.js";
+import { renderWaveform, setWaveform } from "./waveform.js";
 import { connectMascotBus, type MascotBusClient } from "./ws-client.js";
 
 const TAG = "[pill]";
+
+/**
+ * Silent-baseline RMS the waveform settles to between phrases while speaking
+ * (62-UI-SPEC §Waveform: "the bars settle to a flat low baseline, not zero").
+ */
+const WAVE_BASELINE_RMS = 0.06;
 
 // ── Pure frame reader (unit-testable, no DOM / no globals) ─────────────────
 
@@ -114,6 +121,7 @@ interface PillView {
   reaction: HTMLElement;
   expand: HTMLElement;
   waveMount: HTMLElement;
+  waveEl: HTMLElement;
 }
 
 const STATE_LABEL: Record<PillState["mode"], string> = {
@@ -176,8 +184,13 @@ function boot(): void {
     return;
   }
 
-  // The waveform mount is populated in Task 3 (meter.ts reuse).
-  const view: PillView = { root, label, reaction, expand, waveMount };
+  // Mount the waveform (meter.ts reuse) into the collapsed-row mount. Tag
+  // no-drag — it lives below the drag strip, but belt-and-braces.
+  const waveEl = renderWaveform();
+  waveEl.setAttribute("data-no-drag", "");
+  waveMount.append(waveEl);
+
+  const view: PillView = { root, label, reaction, expand, waveMount, waveEl };
 
   let state = initialPillState(performance.now());
 
@@ -228,7 +241,18 @@ function boot(): void {
         : (STATE_LABEL[state.mode] ?? "IDLE");
     render(view, state, baseLabel);
 
-    // Task 3 wires the real voice.rms waveform here.
+    // Waveform: real voice.rms while speaking (or expanded over a speaking
+    // base), floored to a low baseline between phrases — never zero, never a
+    // fake loop. Suppressed (0) otherwise.
+    const speakingNow =
+      state.mode === "speaking" ||
+      (state.mode === "expand" && state.cohostStatus === "TALKING");
+    if (speakingNow) {
+      const rms = Math.max(WAVE_BASELINE_RMS, state.voiceRms);
+      setWaveform(view.waveEl, rms, state.voicePeak);
+    } else {
+      setWaveform(view.waveEl, 0, null);
+    }
 
     requestAnimationFrame(frame);
   }
