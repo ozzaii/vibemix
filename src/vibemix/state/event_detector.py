@@ -54,13 +54,23 @@ from vibemix.audio.constants import (
     MUSIC_PRESENCE_MIN_SECONDS,
     TRACK_CHANGE_MIN_CONFIDENCE,
 )
+from vibemix.state.deck_poller import DECK_CITE_MIN_CONF
 from vibemix.state.event import Event
 from vibemix.state.evidence_registry import EvidenceRegistry
 from vibemix.state.genre_router import GenreRouter
+from vibemix.state.harmonics import is_clash, semitone_distance
 from vibemix.state.music_state import MusicState
 
 if TYPE_CHECKING:
     from vibemix.audio.buffers import AudioBuffer
+
+# Phase 60 (HARMONIC-02) — tonal-share floor for the melodic-overlap gate.
+# A clash needs simultaneous MELODIC content. A drum-only / atonal tool track
+# parks almost all energy in sub/low; require a minimum combined mid+high share
+# so percussive overlaps ("hard to clash where there's hardly any harmony",
+# FEATURES line 56) are suppressed. Deliberately conservative — start low and
+# only raise if false-fires appear in the Kaan-ear corpus (Plan 60-03).
+TONAL_SHARE_FLOOR: float = 0.20
 
 
 class EventDetector:
@@ -84,6 +94,7 @@ class EventDetector:
         audio_buf: "AudioBuffer | None" = None,
         *,
         evidence_registry: EvidenceRegistry | None = None,
+        harmonic_clash_enabled: bool = False,
     ) -> None:
         """Construct EventDetector with optional ``audio_buf`` for genre-chain
         detectors that need raw samples (KickSwap, PhraseBoundary).
@@ -121,6 +132,18 @@ class EventDetector:
         # a registry exception cannot corrupt cooldown gates (Test D pin).
         self._registry: EvidenceRegistry | None = evidence_registry
 
+        # Phase 60 Plan 02 (HARMONIC-02/03) — default-OFF harmonic-clash gate.
+        # Mirrors DeckPoller._vision_enabled (deck_poller.py:97-116): the
+        # KEY_CLASH + TRANSITION_OPPORTUNITY branches stay COMPLETELY quiet
+        # until this flips. False is conservative-by-design — a wrong key tag
+        # (~57-70% library accuracy) reaching the audience as false expertise
+        # is the exact anti-slop hallucination class this phase guards. The
+        # flag flips ONLY after the Kaan-ear veto corpus passes (Plan 60-03 —
+        # the KAAN-ACTION ship gate). Until then NO clash reaches the audience,
+        # even with a fully-resolved clashing deck pair. The kwarg shape mirrors
+        # ``vision_enabled`` so a caller / test flips it without monkeypatching.
+        self._harmonic_clash_enabled = bool(harmonic_clash_enabled)
+
     def _cooldown_ok(self, ev_type: str, now: float) -> bool:
         gap = MIN_EVENT_GAP_PER_TYPE.get(ev_type, EVENT_GLOBAL_MIN_GAP)
         last = self.last_per_type_at.get(ev_type, 0.0)
@@ -139,6 +162,34 @@ class EventDetector:
             return False
         bpm = state.bpm or 0
         if bpm < BPM_VALID_MIN or bpm > BPM_VALID_MAX:
+            return False
+        return True
+
+    def _melodic_overlap_gate(self, state: MusicState) -> bool:
+        """True iff BOTH decks are plausibly contributing simultaneous MELODIC
+        content — the precondition for ANY clash note (HARMONIC-02).
+
+        Built ENTIRELY from shipped MusicState signals (no new detector stack,
+        no new audio computation). A clash note CANNOT fire unless this returns
+        True. Suppresses, in order:
+          1. single-deck (audible_deck != "mix") — no overlap to clash;
+          2. sub-LOW_RMS sections — a dropped-out mix disguises a clash;
+          3. breakdown / silent / low phase — harmony has dropped out, keys
+             don't matter (FEATURES line 57);
+          4. acapella overlap (vocal_active) — no instrumental harmony to clash;
+          5. percussive / atonal content — combined mid+high band share below
+             TONAL_SHARE_FLOOR ≈ drum-only tool track (FEATURES line 56).
+
+        Read-only: never writes deck-state (single-writer rule in refresh.py)."""
+        if state.audible_deck != "mix":
+            return False
+        if state.rms < LOW_RMS:
+            return False
+        if state.phase in ("breakdown", "silent", "low"):
+            return False
+        if state.vocal_active:
+            return False
+        if (state.bands.get("mid", 0.0) + state.bands.get("high", 0.0)) < TONAL_SHARE_FLOOR:
             return False
         return True
 
@@ -273,6 +324,90 @@ class EventDetector:
             return ev
         # Always keep seen-list fresh so we don't replay old moves later
         self.last_mix_moves_seen = [m for _, m in state.recent_moves][-12:]
+
+        # 4a) KEY_CLASH (Phase 60 Plan 02 — HARMONIC-02/03). Deterministic
+        # harmonic clash on a simultaneous melodic overlap. Placed AFTER
+        # MIX_MOVE so a real structural mix move still beats a clash, BEFORE the
+        # genre chain + HEARTBEAT fallthrough. Layered conservatism:
+        #   (i)   default-off flag — quiet until the Kaan-ear veto (Plan 60-03);
+        #   (ii)  _melodic_overlap_gate — both decks melodic + audible + tonal;
+        #   (iii) cross-deck + cite-floor — BOTH decks resolved (camelot) AND
+        #         confidence >= DECK_CITE_MIN_CONF (a sub-floor deck has NO key:
+        #         observation in Phase 59, so a clash citing it would be stripped
+        #         anyway — we gate here so we never even emit the turn);
+        #   (iv)  is_clash() — the deterministic Camelot verdict (Plan 60-01);
+        #   (v)   the inherited 28s KEY_CLASH cooldown.
+        # READ-ONLY on deck-state (single-writer rule). The LLM later only
+        # narrates the verdict — it never computes the interval.
+        if self._harmonic_clash_enabled and self._melodic_overlap_gate(state):
+            decks = state.deck_state.decks
+            a, b = decks.get("A"), decks.get("B")
+            if (
+                a is not None
+                and b is not None
+                and a.camelot
+                and b.camelot
+                and a.confidence >= DECK_CITE_MIN_CONF
+                and b.confidence >= DECK_CITE_MIN_CONF
+                and is_clash(a.camelot, b.camelot)
+                and self._cooldown_ok("KEY_CLASH", now)
+            ):
+                ev = Event(
+                    "KEY_CLASH",
+                    state,
+                    extra={
+                        "a_side": "A",
+                        "a_camelot": a.camelot,
+                        "b_side": "B",
+                        "b_camelot": b.camelot,
+                        "semitones": semitone_distance(a.camelot, b.camelot),
+                    },
+                )
+                self._fire("KEY_CLASH", now, state)
+                return ev
+
+        # 4b) TRANSITION_OPPORTUNITY (Phase 60 Plan 02 — HARMONIC-04).
+        # RETROSPECTIVE, groundable-only blend note. Open Q2 / §5: vibemix has
+        # NO per-deck phrase grid and NO dual-deck low-band, so phrase-alignment
+        # / bass-swap notes are NOT groundable and MUST stay silent (silence over
+        # a guess — acceptable to be near-zero this phase). We fire ONLY on what
+        # deck-state CAN ground retrospectively: BOTH decks resolved + cited AND
+        # a recent STRUCTURAL xfader/EQ move (reusing the MIX_MOVE significance
+        # keys) that indicates a blend just happened. The coach narrates it
+        # past-tense ("you just blended A→B, the keys sit fine / clash") — no
+        # present-tense imperative (those arrive 5-10s late, Pitfall 3).
+        if self._harmonic_clash_enabled and self._cooldown_ok("TRANSITION_OPPORTUNITY", now):
+            decks = state.deck_state.decks
+            a, b = decks.get("A"), decks.get("B")
+            both_cited = (
+                a is not None
+                and b is not None
+                and a.camelot
+                and b.camelot
+                and a.confidence >= DECK_CITE_MIN_CONF
+                and b.confidence >= DECK_CITE_MIN_CONF
+            )
+            structural_blend = any(
+                any(
+                    k in label
+                    for k in ("killed", "_low:", "_mid:", "_hi:", "_filter:", "xfader")
+                )
+                for _age, label in state.recent_moves
+            )
+            if both_cited and structural_blend:
+                ev = Event(
+                    "TRANSITION_OPPORTUNITY",
+                    state,
+                    extra={
+                        "a_side": "A",
+                        "a_camelot": a.camelot,
+                        "b_side": "B",
+                        "b_camelot": b.camelot,
+                        "clash": is_clash(a.camelot, b.camelot),
+                    },
+                )
+                self._fire("TRANSITION_OPPORTUNITY", now, state)
+                return ev
 
         # 5) Genre-chain detectors (Phase 17 Plan 05 — SENSE-11 / SENSE-15).
         # Iterate the active per-genre chain in registration order; first

@@ -79,11 +79,17 @@ def _clash_state(
     return ms
 
 
-def _prime(d: EventDetector, mocker, *, t0: float = 1000.0):
+def _prime(d: EventDetector, ms: MusicState, mocker, *, t0: float = 1000.0):
     """Satisfy _music_truly_playing on the next detect() call without polluting
-    change-detection refs (mirror test_event_detector._prime_music_playing)."""
+    change-detection refs (mirror test_event_detector._prime_music_playing).
+
+    Syncs last_phase + last_audible_track to the state so the earlier-priority
+    PHASE / TRACK_CHANGE branches don't fire ahead of the harmonic branches the
+    test is exercising."""
     t = _patch_time(mocker, t0 + 5.0)
     d._audible_since = t0
+    d.last_phase = ms.phase
+    d.last_audible_track = ms.audible_track
     return t
 
 
@@ -103,7 +109,7 @@ def test_detector_gated_by_default(mocker):
     d = EventDetector()  # default: harmonic_clash_enabled is False
     assert d._harmonic_clash_enabled is False
     ms = _clash_state()
-    _prime(d, mocker)
+    _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is None or ev.type != "KEY_CLASH"
 
@@ -115,7 +121,7 @@ def test_no_clash_single_deck(mocker):
     """audible_deck != "mix" → only one deck contributing → no overlap → None."""
     d = _enabled_detector()
     ms = _clash_state(audible_deck="A")
-    _prime(d, mocker)
+    _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is None or ev.type != "KEY_CLASH"
 
@@ -125,7 +131,7 @@ def test_no_clash_in_breakdown(mocker):
     d = _enabled_detector()
     for ph in ("breakdown", "silent", "low"):
         ms = _clash_state(phase=ph)
-        _prime(d, mocker)
+        _prime(d, ms, mocker)
         ev = d.detect(ms, kaan_just_spoke=False, manual=False)
         assert ev is None or ev.type != "KEY_CLASH", f"fired in phase={ph}"
 
@@ -134,14 +140,14 @@ def test_no_clash_percussive(mocker):
     """vocal_active True (acapella) and/or no tonal band share → None."""
     d = _enabled_detector()
     ms = _clash_state(vocal_active=True)
-    _prime(d, mocker)
+    _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is None or ev.type != "KEY_CLASH"
 
     d2 = _enabled_detector()
     # Drum-only / atonal: nearly all energy in sub/low, negligible mid+high.
     ms2 = _clash_state(bands={"sub": 0.55, "low": 0.4, "mid": 0.03, "high": 0.02})
-    _prime(d2, mocker)
+    _prime(d2, ms2, mocker)
     ev2 = d2.detect(ms2, kaan_just_spoke=False, manual=False)
     assert ev2 is None or ev2.type != "KEY_CLASH"
 
@@ -150,7 +156,7 @@ def test_no_clash_below_rms_floor(mocker):
     """rms < LOW_RMS (0.040) → a dropped-out section disguises a clash → None."""
     d = _enabled_detector()
     ms = _clash_state(rms=0.02)
-    _prime(d, mocker)
+    _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is None or ev.type != "KEY_CLASH"
 
@@ -162,7 +168,7 @@ def test_no_clash_subfloor_deck(mocker):
     """deck B confidence < DECK_CITE_MIN_CONF (0.6) → cross-deck suppression → None."""
     d = _enabled_detector()
     ms = _clash_state(b_conf=0.4)
-    _prime(d, mocker)
+    _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is None or ev.type != "KEY_CLASH"
 
@@ -171,7 +177,7 @@ def test_no_clash_missing_second_deck(mocker):
     """decks.get("B") absent → unresolved 2nd deck → uncitable → None."""
     d = _enabled_detector()
     ms = _clash_state(decks={"A": _deck("8A", 0.8)})
-    _prime(d, mocker)
+    _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is None or ev.type != "KEY_CLASH"
 
@@ -180,7 +186,7 @@ def test_no_clash_unresolved_camelot(mocker):
     """deck B camelot None (resolved deck but no key) → uncitable → None."""
     d = _enabled_detector()
     ms = _clash_state(b_camelot=None)
-    _prime(d, mocker)
+    _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is None or ev.type != "KEY_CLASH"
 
@@ -193,7 +199,7 @@ def test_no_clash_safe_pair(mocker):
     fifth, SAFE) → None."""
     d = _enabled_detector()
     ms = _clash_state(a_camelot="8A", b_camelot="9A")
-    _prime(d, mocker)
+    _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is None or ev.type != "KEY_CLASH"
 
@@ -203,7 +209,7 @@ def test_clash_fires_when_all_conditions_met(mocker):
     1 semitone clash) → Event("KEY_CLASH") with the cited extra."""
     d = _enabled_detector()
     ms = _clash_state(a_camelot="8A", b_camelot="3A")
-    _prime(d, mocker)
+    _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is not None
     assert ev.type == "KEY_CLASH"
@@ -220,7 +226,7 @@ def test_clash_respects_cooldown(mocker):
     it — we only prove the branch honors _cooldown_ok."""
     d = _enabled_detector()
     ms = _clash_state(a_camelot="8A", b_camelot="3A")
-    t = _prime(d, mocker)
+    t = _prime(d, ms, mocker)
     ev1 = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev1 is not None and ev1.type == "KEY_CLASH"
     # Advance only 10s — inside the 28s KEY_CLASH gap → no re-fire.
@@ -237,7 +243,7 @@ def test_transition_silent_without_structural_move(mocker):
     d = _enabled_detector()
     # Safe pair so KEY_CLASH cannot fire; no structural move so TRANSITION can't either.
     ms = _clash_state(a_camelot="8A", b_camelot="9A", recent_moves=[])
-    _prime(d, mocker)
+    _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is None or ev.type not in ("KEY_CLASH", "TRANSITION_OPPORTUNITY")
 
@@ -251,6 +257,6 @@ def test_transition_silent_when_decks_unresolved(mocker):
         b_camelot=None,
         recent_moves=[(1.0, "xfader→full-B")],
     )
-    _prime(d, mocker)
+    _prime(d, ms, mocker)
     ev = d.detect(ms, kaan_just_spoke=False, manual=False)
     assert ev is None or ev.type != "TRANSITION_OPPORTUNITY"
