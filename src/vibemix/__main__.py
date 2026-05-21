@@ -533,6 +533,18 @@ async def main() -> None:
     midi_macos = MidiMacOS()
     track_macos = TrackMacOS()
     state = MusicState()
+    # 2026-05-21 — seed mood from VIBEMIX_MOOD at boot. MusicState.mood defaults
+    # to "hype-man" (hardcoded), and the agent reads ``live_mood = state.mood``
+    # at build time — a non-None default SILENTLY OVERRODE VIBEMIX_MOOD=coach,
+    # so a pro+coach session got the COACH_PRO cell with the HYPE-MAN personality
+    # fragment ("high-energy, all-caps, celebrate every move") = hype-flavoured
+    # coaching. Seeding state.mood from the env makes VIBEMIX_MOOD actually take.
+    from vibemix.agent.dj_cohost import DEFAULT_MOOD, ENV_MOOD
+
+    _seed_mood = os.environ.get(ENV_MOOD, DEFAULT_MOOD).strip().lower()
+    if _seed_mood in ("hype-man", "teacher", "coach"):
+        state.mood = _seed_mood
+        print(f"-> mood: {_seed_mood} (from {ENV_MOOD})")
     state.set_start_at = _time.time()
     state.phase_started_at = _time.time()
     # Phase 17 Plan 05 — pass audio_buf to EventDetector so genre-chain
