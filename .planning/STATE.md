@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: SHIP
 status: executing
-last_updated: "2026-05-21T05:32:10.430Z"
-last_activity: 2026-05-21 -- Phase 55 execution started
+last_updated: "2026-05-21T09:20:00.000Z"
+last_activity: 2026-05-21 -- Phase 55 (Feedback Mode + Citation Integrity) COMPLETE (3/3 plans; full suite 3821 passed; verify human_needed 8/8 engineering must-haves; review 0 critical, WR-01+IN-01 fixed). Live coach ear-pass + citation-strip drive = KAAN-ACTION. Next: plan + execute Phase 56
 progress:
   total_phases: 8
-  completed_phases: 4
-  total_plans: 16
-  completed_plans: 13
-  percent: 50
+  completed_phases: 5
+  total_plans: 19
+  completed_plans: 16
+  percent: 62
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-21 — **Phase 54 (Hype Mode Live) COMPLETE** (4/4 plans; full suite 3768 passed + 12 vitest; review CLEAN). Grounded investigation killed the phantom "32s-silent-on-drop" bug — the real captured trace shows 52 events → 52 reactions → 0 suppressions (max gap 29.6s = natural cooldown spacing; likely-historical cause `max_output_tokens=220` already fixed at 1024). Shipped: trace-replay grounding regression (REAL EventDetector, ≥2 genres), `IN_BAR_TOLERANCE_S` named tuning knob (no v4 cooldown value changed), anti-slop spine (REAL EvidenceRegistry+CitationLinter: empty→no fire, unbacked citation→strip, grounded→emit), thin HYPE·LIVE indicator + cadence pulse (token-only, 20/80). Live ≥2-genre ear-pass + cooldown tuning = KAAN-ACTION (`54-HUMAN-UAT.md`). **Phases 51–54 COMPLETE (4/8, 50%).** Next: plan + execute Phase 55 (feedback mode + citation integrity).
+**Last updated:** 2026-05-21 — **Phase 55 (Feedback Mode Live + Citation Integrity) COMPLETE** (3/3 plans; full suite 3821 passed; review 0 critical / 1 warning + 3 info, WR-01+IN-01 fixed). LIVE-04 made airtight provable engineering: zero-orphan replay + hallucination-strip on a real non-empty registry + live/debrief consistency (REAL CitationLinter+EvidenceRegistry, no mocks); the two `_citation_telemetry()` stubs closed with REAL signals — cumulative stripped/total `slop_ratio` + actual stripped text sourced from `StrippedRateTracker` (the `1/(1+mean)` placeholder is gone). LIVE-02 coach grounding pinned across ≥2 genres (REAL EventDetector real fixture + synthetic genre-2; empty/weak evidence→no fire). Verify = human_needed: 8/8 engineering must-haves green; 2 Kaan live-drive items persisted (`55-HUMAN-UAT.md`). Code-review fixes: WR-01 (live/debrief consistency test now drives the real `drills._citation_resolves`, not the dormant linter mode) + IN-01 (`drills.py` uses canonical `DEBRIEF_TOLERANCE_S`). IN-02/IN-03 deferred v2.x. **Phases 51–55 COMPLETE (5/8, 62%).** Next: plan + execute Phase 56 (performance + live mascot).
 
 ---
 
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 55 — Feedback Mode Live + Citation Integrity
+- **Current focus:** Phase 56 — Performance + Live Mascot
 - **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts on external clock).
 - **Project mode:** standard.
 - **Granularity:** fine.
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 ## Current Position
 
-Phase: 55 (Feedback Mode Live + Citation Integrity) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 55
-Last activity: 2026-05-21 -- Phase 55 execution started
+Phase: 55 (Feedback Mode Live + Citation Integrity) — COMPLETE (engineering green; Kaan live-drive = KAAN-ACTION)
+Plan: 3 of 3
+Status: Phase 55 complete — ready to plan + execute Phase 56 (Performance + Live Mascot)
+Last activity: 2026-05-21 -- Phase 55 complete (3/3 plans, suite 3821 green, verify human_needed, review fixes applied)
 
 ## Performance Metrics
 
