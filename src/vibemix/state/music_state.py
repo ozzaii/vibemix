@@ -17,6 +17,8 @@ import threading
 import time
 from dataclasses import dataclass, field
 
+from vibemix.state.deck_state import DeckState
+
 
 @dataclass
 class MusicState:
@@ -52,6 +54,19 @@ class MusicState:
     # the SOURCE (the scorer's unknown fallback) — the wire carries these as-is.
     detected_genre: str = "unknown"
     genre_confidence: float = 0.0
+
+    # Phase 59 (DECK-01) — embedded per-deck state (currently-loaded track +
+    # key/BPM/energy per deck). SINGLE-WRITER (_tick_once only, DECK-04): the
+    # read-only deck poller writes its OWN holder; only state_refresh_loop.
+    # _tick_once copies deck_source.snapshot() into this field under state._lock
+    # (the third such external source after ControllerState/TrackInfo), and
+    # populates each DeckTrack.camelot via harmonics.to_camelot in that batch.
+    # ADDITIVE: default-empty DeckState (decks={}) preserves golden-equivalence
+    # — evidence_line emits zero deck output until _tick_once populates it
+    # (Pitfall 5; the deck block lands in Plan 59-04). Honest unknown is
+    # enforced at the SOURCE (the poller's confidence floor + DeckTrack's
+    # all-empty defaults) — a default deck is never a fabricated key.
+    deck_state: DeckState = field(default_factory=DeckState)
 
     # Phase 13 (mascot overlay) — mood is SettingsApplier-owned; the other two
     # are state_refresh_loop-owned. mood is a CONSUMER-readable evidence field
