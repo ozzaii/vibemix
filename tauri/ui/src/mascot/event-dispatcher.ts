@@ -53,6 +53,16 @@ const REACT_CLIP_MS = 800;
 /** Puff-particle effect lifetime (ms) per CONTEXT.md Area 4. */
 const PUFF_LIFETIME_MS = 500;
 
+// Phase 56 / LIVE-05a — music-confirmation thresholds. These MIRROR the
+// Python source-of-truth in src/vibemix/audio/constants.py (SILENT_RMS=0.012,
+// LOW_RMS=0.040, PEAK_RMS=0.110) so the mascot's mode boundaries agree with
+// state.phase. Never invent new thresholds — keep these in lock-step with
+// the Python side. Only the two the guard uses are declared here.
+/** Loud-section floor: a confirmed drop/peak requires music ≥ this. */
+const PEAK_RMS = 0.11;
+/** Low-energy ceiling: a confirmed breakdown requires music < this. */
+const LOW_RMS = 0.04;
+
 // ── Types ─────────────────────────────────────────────────────────────────
 
 export interface SnapshotSlice {
@@ -115,14 +125,31 @@ function strField(payload: unknown, key: string): string | null {
 
 /**
  * Pick the right idle/dance state for a given musical phase. CONTEXT
- * Area 3 mapping verbatim.
+ * Area 3 mapping + Phase 56 / LIVE-05a music-confirmation guard.
+ *
+ * Defence-in-depth (anti-slop): `phase` is trusted, but the loud/quiet
+ * modes (`drop`/`peak`/`breakdown`) require the `music` level to AGREE
+ * with the classification. A `phase=="drop"` during a quiet section is a
+ * misclassification — pumping the peak animation off it is pure AI-slop
+ * (RESEARCH Pitfall 6). When the level contradicts the phase we return
+ * `null`, which the PHASE case treats as "no signal" → the current mode
+ * persists. This is the SAME conjunction shape as the state-machine.ts
+ * beat-lock guard ("all conditions hold or fall through") and the SAME
+ * "contradiction → return null, never throw, never default to a
+ * decorative mode" discipline as the dispatcher's `default` arm.
+ *
+ * @param phase the bus `state.phase` value
+ * @param music the smoothed master-bus level (0..1) confirming the phase
  */
-function stateForPhase(phase: string): MascotState | null {
+function stateForPhase(phase: string, music: number): MascotState | null {
   switch (phase) {
     case "drop":
-      return "dance_hard";
     case "peak":
-      return "dance_hard";
+      // Loud-section modes: only fire when the level confirms a real drop.
+      return music >= PEAK_RMS ? "dance_hard" : null;
+    case "breakdown":
+      // Low-energy mode: only fire when the energy is actually low.
+      return music < LOW_RMS ? "idle_breathe" : null;
     case "groove":
       return "idle_bop_to_beat_energetic";
     case "build":
@@ -130,8 +157,6 @@ function stateForPhase(phase: string): MascotState | null {
     case "low":
       return "idle_bop_to_beat_mellow";
     case "silent":
-      return "idle_breathe";
-    case "breakdown":
       return "idle_breathe";
     default:
       return null;
@@ -210,7 +235,10 @@ export function dispatchEvent(
       case "PHASE": {
         const to = strField(m.payload, "to");
         if (to === null) return null;
-        const target = stateForPhase(to);
+        // Phase 56 / LIVE-05a: pass the confirming music level so a phase
+        // that disagrees with the level is treated as "no signal".
+        const target = stateForPhase(to, snapshot.music);
+        // A contradictory frame falls out here = current mode persists (anti-slop).
         if (target === null) return null;
         const stateClass = STATE_CLASS[target];
         // Only idle/dance targets carry beat-lock signals into planTransition.
