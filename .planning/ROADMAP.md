@@ -108,7 +108,12 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
   2. The pill is the **primary** live surface via a tri-state `primary_surface` config (`pill` default | `mascot` opt-in/secondary | `none`); the existing Three.js mascot overlay keeps working and does not regress (`mascot-audit` CI fence stays green).
   3. The pill **consumes the existing ws:8765 frames** (`ipc.session.snapshot` + `ipc.session.cohost-reaction`) — no new port, no Python delivery change — and shows idle / listening / speaking / expand-on-event states with the real TTS waveform (`Levels.update_voice`) + the citation strip; deck-context chips land after Phase 59.
   4. The pill **never steals keyboard focus** mid-set and never covers critical deck info — keystrokes still reach the DJ app after clicking the pill (NSPanel non-activating + `focused(false)`), the drag-on-unfocused-window mechanism is resolved (spike on the built app per tauri#11605/#10767), and the v0.1.0-rc1 drag-capability debt is closed via the `"pill"` capability allowlist.
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 62-01-PLAN.md — Resolve-FIRST spike: pill_window.rs (transparent/on-top/draggable/non-focus-steal, geometry + display-change re-clamp, Accessory floor + NSPanel stretch) + "pill" capability allowlist [PILL-01, PILL-04]
+- [ ] 62-02-PLAN.md — primary_surface tri-state config (pill default | mascot | none) + main.rs surface selection; mascot kept secondary, mascot-audit fence green [PILL-02]
+- [ ] 62-03-PLAN.md — Additive deck_state field on the existing ws:8765 frame (read-only, honest-null, golden-equivalence) — the deck-chip wire source [PILL-03]
+- [ ] 62-04-PLAN.md — Pill UI core: transparent pill.html + pure 4-state machine + frame consume + real-voice.rms waveform + citation strip (reuse) [PILL-03]
+- [ ] 62-05-PLAN.md — Deck-context chips (consume 62-03, honest unknown) + explicit --glass-3 rgba transparency parity + DMG KAAN-ACTION [PILL-03, PILL-01]
 **Spike (research-flagged, resolve FIRST in plan-time)**: pill drag-on-unfocused-window (tauri#11605/#10767/#14102) — resolve `startDragging` vs `data-tauri-drag-region` vs NSPanel `isMovableByWindowBackground` on the built app *before* building the UI; plus the DMG-build transparency regression (tauri#13415). This is the single most likely "looks done but feels broken" failure.
 **UI hint**: yes
 
@@ -125,7 +130,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
 | 59. Full Deck Awareness + Grounding | v5.0 | 5/5 | Complete   | 2026-05-21 |
 | 60. Harmonic-Feedback Confidence Gate | v5.0 | 3/4 | In Progress|  |
 | 61. Actionable-Not-Hype Coach Persona | v5.0 | 2/2 | Complete   | 2026-05-21 |
-| 62. Floating Pill UI | v5.0 | 0/? | Not started | - |
+| 62. Floating Pill UI | v5.0 | 0/5 | Planned    | - |
 
 **Coverage:** 17/17 v5.0 requirements mapped ✓ (no orphans, no duplicates). Per-phase: P59=5 (DECK-01..05) · P60=4 (HARMONIC-01..04) · P61=4 (COACH-01..04) · P62=4 (PILL-01..04).
 
