@@ -290,4 +290,44 @@ mod tests {
         assert_eq!(s.width, None);
         assert!(s.visible);
     }
+
+    // Phase 62 Plan 02 — PrimarySurface tri-state (PILL-02).
+
+    #[test]
+    fn primary_surface_decodes_legacy_missing_as_pill() {
+        // A pre-Phase-62 config.json has no `primary_surface` key. The default
+        // must resolve to Pill — the Kaan-approved partial reversal of the
+        // shipped full-screen-mascot direction for the in-set surface
+        // (62-CONTEXT Area 2). Mirrors the mascot legacy-decode guard.
+        let s = PrimarySurface::default();
+        assert_eq!(s, PrimarySurface::Pill);
+    }
+
+    #[test]
+    fn primary_surface_roundtrips_via_serde_json() {
+        // Each variant serialises (lowercase rename) and deserialises back to
+        // itself unchanged. Mirrors mascot_window_state_roundtrips_via_serde_json.
+        for v in [
+            PrimarySurface::Pill,
+            PrimarySurface::Mascot,
+            PrimarySurface::None,
+        ] {
+            let j = serde_json::to_value(v).unwrap();
+            assert_eq!(serde_json::from_value::<PrimarySurface>(j).unwrap(), v);
+        }
+        // The lowercase serde rename is the on-disk contract the Settings UI
+        // (and any hand-edit) writes — pin it explicitly.
+        assert_eq!(
+            serde_json::to_value(PrimarySurface::Pill).unwrap(),
+            serde_json::json!("pill")
+        );
+        assert_eq!(
+            serde_json::to_value(PrimarySurface::Mascot).unwrap(),
+            serde_json::json!("mascot")
+        );
+        assert_eq!(
+            serde_json::to_value(PrimarySurface::None).unwrap(),
+            serde_json::json!("none")
+        );
+    }
 }
