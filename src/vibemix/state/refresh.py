@@ -74,7 +74,9 @@ from vibemix.state.genre import (
     set_active_profile,
     validate_bpm,
 )
+from vibemix.state.deck_poller import DECK_CITE_MIN_CONF
 from vibemix.state.emotion_router import derive_emotion
+from vibemix.state.harmonics import to_camelot
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
@@ -204,6 +206,7 @@ def _tick_once(
     feature_history: deque[dict] | None = None,
     evidence_registry: EvidenceRegistry | None = None,
     genre_hysteresis: GenreHysteresis | None = None,
+    deck_source=None,
 ) -> tuple[float, float, float, float]:
     """One iteration of the state_refresh_loop body. Extracted so tests can
     drive single ticks deterministically with fake time and fake snapshots.
@@ -459,6 +462,44 @@ def _tick_once(
         state.audible_track = tt
         state.audible_track_confidence = tc
 
+        # Phase 59-04 (DECK-04) — deck-state single-writer copy. The deck poller
+        # is the THIRD external snapshot producer (after ControllerState /
+        # TrackInfo): it writes its OWN holder, and THIS is the only place
+        # state.deck_state.decks is ever assigned (single-writer invariant,
+        # Pitfall 3). Capture the prior (side, camelot) BEFORE the reassignment so
+        # the key:/track: registry writes can be change-only — mirrors the
+        # mix:audible_deck prev_deck pattern above.
+        if deck_source is not None:
+            prev_camelot = {
+                side: dt.camelot for side, dt in state.deck_state.decks.items()
+            }
+            deck_snap = deck_source.snapshot()
+            for dt in deck_snap.values():
+                # Normalize the raw Tonality tag → Camelot inside the lock — pure
+                # µs-cost transform on the writer side (RESEARCH §Code Examples).
+                dt.camelot = to_camelot(dt.key)
+            state.deck_state.decks = deck_snap
+            state.deck_state.updated_at = now
+
+            # Change-only, confidence-gated key:/track: registry writes. Bounded
+            # registry growth (Pitfall T-59-04-04): only write when a deck's
+            # (side, camelot) changes AND the deck clears the citation floor
+            # (Pitfall 4 cross-deck suppression — a sub-floor deck is uncitable).
+            # try/except so a registry-write failure cannot kill the tick.
+            if evidence_registry is not None:
+                for side, dt in deck_snap.items():
+                    if dt.confidence < DECK_CITE_MIN_CONF or not dt.camelot:
+                        continue
+                    if prev_camelot.get(side) == dt.camelot:
+                        continue  # unchanged — no duplicate write
+                    try:
+                        t_session = max(0.0, now - state.set_start_at)
+                        evidence_registry.write("key", f"{side}:{dt.camelot}", t_session)
+                        if dt.track_id:
+                            evidence_registry.write("track", dt.track_id, t_session)
+                    except Exception:
+                        pass
+
         # Recent moves
         state.recent_moves = controller_state.moves_since(now - 12.0)
 
@@ -496,6 +537,7 @@ async def state_refresh_loop(
     stop_event: asyncio.Event,
     *,
     evidence_registry: EvidenceRegistry | None = None,
+    deck_source=None,
 ) -> None:
     """Updates MusicState every 100ms from all sources. The ONLY writer to state.
     Audible flag is debounced — sustained samples required to flip in either
@@ -551,6 +593,7 @@ async def state_refresh_loop(
                 feature_history=feature_history,
                 evidence_registry=evidence_registry,
                 genre_hysteresis=genre_hysteresis,
+                deck_source=deck_source,
             )
         except Exception as e:
             print(f"[state refresh err] {e}", file=sys.stderr)
