@@ -31,7 +31,7 @@ Research-resolved foundations (`.planning/research/SUMMARY.md`, 4 convergent age
 
 - [x] **HARMONIC-01**: Camelot-wheel key relationships are encoded as a **deterministic Python lookup table**; the LLM only narrates a clash the **code already confirmed** — it never computes key intervals itself (the anti-slop guarantee).
 - [x] **HARMONIC-02**: A real key clash fires **only on simultaneous melodic overlap** in clashing keys. A percussive/atonal + breakdown **suppression gate** runs *before* any clash note fires (no clash calls on two drum/tool tracks or during a breakdown/acapella).
-- [ ] **HARMONIC-03**: The clash detector is **conservative by default** — suppresses one-step-off-Camelot pairs (adjacent = safe), low-confidence keys, and ambiguous deck-resolution; tuning accounts for the ~57–70% library key-tag accuracy band. Gated behind a **Kaan-ear veto** before it can ship.
+- [x] **HARMONIC-03**: The clash detector is **conservative by default** — suppresses one-step-off-Camelot pairs (adjacent = safe), low-confidence keys, and ambiguous deck-resolution; tuning accounts for the ~57–70% library key-tag accuracy band. Gated behind a **Kaan-ear veto** before it can ship.
 - [ ] **HARMONIC-04**: Transition-execution feedback gives **concrete, actionable blend notes** (e.g. EQ bass-swap, phrase alignment, where to start/end the blend) — scoped strictly to what is grounded in deck-state; no advice is emitted when the underlying signals are not available.
 
 ### Actionable-Not-Hype Coach Persona (COACH) — Phase 61
