@@ -314,6 +314,63 @@ def test_task_fallback_unknown_type():
     assert out == "React naturally."
 
 
+# ---------- Phase 61 Wave-0 gap: KEY_CLASH / TRANSITION harmonic voice ----------
+# 61-RESEARCH flagged that NO test fenced the Phase-60 harmonic arms. These two
+# fence the live arm text (coach.py:267-316) so a future cell/persona edit cannot
+# silently break the DJ-verb move, the both-keys-cited contract, the no-invent
+# guard, or the system-owns-the-verdict / past-tense framing. GREEN against the
+# current arms (this plan changes no production code). Modeled on
+# test_task_mix_move_LOAD_BEARING_anti_slop_clause.
+
+
+def test_task_key_clash_LOAD_BEARING_dj_verb_cited_no_invent():
+    """KEY_CLASH (COACH-01 prescriptive + COACH-04 cited): the arm prescribes a
+    DJ-verb move, cites BOTH decks' keys exactly, forbids inventing a key, and
+    frames the verdict as the system's (not the LLM's)."""
+    out = AICoach.task_for_event(
+        _ev(
+            "KEY_CLASH",
+            {"a_side": "A", "a_camelot": "8A", "b_side": "B", "b_camelot": "2A", "semitones": 3},
+        )
+    )
+    # A DJ-verb move is prescribed.
+    assert any(v in out for v in ("kill", "cut", "filter")), f"no DJ verb in: {out!r}"
+    # BOTH keys are cited exactly (existence-only [key:...] grammar).
+    assert "[key:A:8A]" in out
+    assert "[key:B:2A]" in out
+    # No-invent guard present.
+    assert "Do NOT invent a key" in out
+    # System owns the verdict — the LLM narrates, it does not decide the clash.
+    assert "you do NOT decide this" in out
+    assert "confirmed by the system" in out
+    # The pre-computed semitone count is handed in, not derived by the model.
+    assert "3 semitones apart" in out
+    assert "do NOT compute intervals" in out
+
+
+def test_task_transition_opportunity_LOAD_BEARING_past_tense_cited_no_invent():
+    """TRANSITION_OPPORTUNITY (COACH-04 cited + Pitfall 3 latency): retrospective
+    past-tense read only — no present-tense imperative — with both keys cited and
+    the no-invent guard."""
+    out = AICoach.task_for_event(
+        _ev(
+            "TRANSITION_OPPORTUNITY",
+            {"a_side": "A", "a_camelot": "8A", "b_side": "B", "b_camelot": "9A", "clash": False},
+        )
+    )
+    # Past-tense framing — the moment is already gone; no live advice.
+    assert "PAST-TENSE" in out
+    assert "no present-tense advice" in out
+    assert "the moment's already gone" in out
+    # Both keys cited exactly.
+    assert "[key:A:8A]" in out
+    assert "[key:B:9A]" in out
+    # No-invent guard present.
+    assert "Do NOT invent a key" in out
+    # clash=False → "keys sat fine together" verdict (not the clash branch).
+    assert "the keys sat fine together" in out
+
+
 # ---------- build_prompt: format wrapper ----------
 
 
