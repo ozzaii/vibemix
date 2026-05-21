@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v5.0
 milestone_name: The Useful Cut
 status: executing
-last_updated: "2026-05-22T00:00:00.000Z"
-last_activity: 2026-05-22 -- 62-01 pill_window spike + "pill" capability complete (PILL-01/04 engineering-green)
+last_updated: "2026-05-21T21:37:54.832Z"
+last_activity: 2026-05-22
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 42
-  completed_plans: 38
-  percent: 90
+  completed_plans: 39
+  percent: 92
 ---
 
 # vibemix — State
@@ -46,9 +46,11 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 ## Current Position
 
 Phase: 62 (floating-pill-ui) — EXECUTING
-Plan: 2 of 5
-Status: 62-01 COMPLETE — pill_window spike + capability landed; ready for 62-02 (primary_surface switch)
-Last activity: 2026-05-22 -- 62-01 pill_window.rs (transparent/on-top/non-focus-steal, geometry persist + display re-clamp, macOS Accessory FLOOR + gated NSPanel STRETCH) + "pill" capability label; cargo build clean, cargo test 59/59; PILL-01/PILL-04 engineering-complete (felt drag + focus-non-steal = KAAN-ACTION). Decision: objc2 (raw, crates.io) over objc2-app-kit for the swizzle — graph unchanged; git tauri-nspanel stays rejected.
+Plan: 4 of 5 (62-03 COMPLETE — deck_state on the ws:8765 wire)
+Status: Ready to execute (62-04 deck-chips consumer next)
+Last activity: 2026-05-22
+
+**62-03 done (PILL-03 producer):** additive read-only `deck_state` ({side: {title, camelot, key, bpm, confidence}}) on the flat 30Hz ws:8765 frame — honest-null (unresolved → camelot/key=null), golden-equivalence on empty ({}), single-writer untouched, no new port. Tests `tests/runtime/test_ws_bus_deck_state.py` GREEN; full suite at branch-WIP baseline (9 failed/4087 passed — none touch ws_bus; +2 over the documented 7 are 62-02's `SNAPSHOT.json` drift, see phase `deferred-items.md`). Commits a01ef3f (RED) + c202184 (GREEN).
 
 ## Performance Metrics
 
@@ -75,8 +77,13 @@ Last activity: 2026-05-22 -- 62-01 pill_window.rs (transparent/on-top/non-focus-
 | Phase 61 P01 | 9min | 3 tasks | 5 files |
 | Phase 61 P02 | 12 min | 2 tasks | 3 files |
 | Phase 62 P01 | 6min | 4 tasks | 5 files |
+| Phase 62 P03 | ~10min | 3 tasks | 3 files |
 
 ## Accumulated Context
+
+### Plan 62-03 Decision Locked (2026-05-22)
+
+**PILL-03 producer half shipped.** Phase-59 `MusicState.deck_state` now serializes onto the EXISTING flat 30Hz `ws://127.0.0.1:8765` mascot frame as an additive read-only field `deck_state: {<side>: {title, camelot, key, bpm, confidence}}` (helper `_serialize_deck_state` in `runtime/ws_bus.py`). **One-socket invariant honored** — no new port/socket/transport (the safe reading of CONTEXT's "no Python delivery change"). **Single-writer untouched** — pure read at the serialize edge; `_tick_once` remains the only writer of `deck_state.decks` (grep proves zero `state.deck_state =` in ws_bus). **Honest-null on the wire** — unresolved deck → `camelot:null`+`key:null`, never fabricated, never recomputed (camelot already normalized upstream via `harmonics.to_camelot`). **Golden-equivalence** — empty decks → `{}`, every pre-existing flat key byte-stable (existing mascot.html subscribers undisturbed). `confidence` carried so 62-04 can dim a low-confidence chip. RED-first: `tests/runtime/test_ws_bus_deck_state.py` (4 tests) failed `KeyError 'deck_state'` then GREEN. Full suite 9 failed/4087 passed — zero new failures from deck_state; +2 over the documented 7-WIP baseline are 62-02's `SNAPSHOT.json` drift (`default.json` gained `"pill"`), tracked in phase `deferred-items.md`. Consumer = 62-04 `deck-chips.ts` (wave-ordered after). Commits a01ef3f (RED) + c202184 (GREEN).
 
 ### Plan 59-03 Decision Locked (2026-05-21)
 
