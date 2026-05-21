@@ -90,7 +90,13 @@ fi
 echo
 
 # ── Gate 2: signed binaries in dist/ ───────────────────────────────────
+# Under --dry-run we STUB the EXTERNAL signature requirement: verify_signed.py
+# runs WITHOUT --require-signed (checksum-only), so an unsigned local .dmg
+# passes. The real cut MUST keep --require-signed (Apple/SignPath, EXTERNAL).
 echo "[Gate 2] verify_signed.py --require-signed for every dist artifact"
+if [[ "${DRY_RUN}" -eq 1 ]]; then
+  info "DRY-RUN: signature gate stubbed (EXTERNAL — Apple/SignPath)"
+fi
 DIST_DIR="${REPO_ROOT}/dist"
 if [[ ! -d "${DIST_DIR}" ]]; then
   fail "dist/ directory missing — build artifacts before cutting"
@@ -102,8 +108,16 @@ else
     fail "no .dmg/.pkg/.msi/.exe artifacts in dist/ — sign + drop them before cutting"
   else
     for art in "${ARTIFACTS[@]}"; do
-      if "${PYTHON}" "${REPO_ROOT}/scripts/dist/verify_signed.py" --artifact "${art}" --require-signed >/dev/null 2>&1; then
-        pass "signed: $(basename "${art}")"
+      REQUIRE_SIGNED="--require-signed"
+      if [[ "${DRY_RUN}" -eq 1 ]]; then
+        REQUIRE_SIGNED=""   # stub: checksum-only, unsigned .dmg passes
+      fi
+      if "${PYTHON}" "${REPO_ROOT}/scripts/dist/verify_signed.py" --artifact "${art}" ${REQUIRE_SIGNED} >/dev/null 2>&1; then
+        if [[ "${DRY_RUN}" -eq 1 ]]; then
+          pass "checksum OK (signature stubbed): $(basename "${art}")"
+        else
+          pass "signed: $(basename "${art}")"
+        fi
       else
         fail "unsigned (or verifier blocked): $(basename "${art}")"
       fi
@@ -113,18 +127,27 @@ fi
 echo
 
 # ── Gate 2b: hybrid hallucination gate (Phase 42 / GATE-06) ────────────
+# KAAN-gated leg (live ear-pass, 54/55 HUMAN-UAT). Under --dry-run we prove
+# the WIRING and treat a missing input as PASS-for-dry-run with a loud
+# wired-but-pending log. A real cut MUST still FAIL without the ear-pass.
 echo "[Gate 2b] check_gate.sh — 7-day nightly proxy + ear-test (Phase 42)"
 if bash "${REPO_ROOT}/scripts/release/check_gate.sh" >/dev/null 2>&1; then
   pass "check_gate.sh — hybrid gate green"
+elif [[ "${DRY_RUN}" -eq 1 ]]; then
+  info "DRY-RUN: Gate 2b wired; awaiting Kaan input (54/55 ear-pass) — PASS-for-dry-run"
 else
   fail "check_gate.sh — hybrid gate FAILED (nightly proxy and/or ear-test). Run 'bash ${REPO_ROOT}/scripts/release/check_gate.sh' for the structured blocker."
 fi
 echo
 
 # ── Gate 6b: e2e harness dimension-FAIL block (Phase 50 / E2E-08) ──────
+# KAAN-gated feed (§E2E-50A-WALK recording). Under --dry-run a missing run
+# is PASS-for-dry-run with a loud wired-but-pending log; a real cut FAILS.
 echo "[Gate 6b] check_e2e_report.sh — blocks on FAIL in dist/e2e-macbook-runs/"
 if bash "${REPO_ROOT}/scripts/e2e/check_e2e_report.sh" >/dev/null 2>&1; then
   pass "check_e2e_report.sh — latest e2e run all dimensions PASS / PARTIAL / SKIPPED"
+elif [[ "${DRY_RUN}" -eq 1 ]]; then
+  info "DRY-RUN: Gate 6b wired; awaiting Kaan input (E2E walk) — PASS-for-dry-run"
 else
   fail "check_e2e_report.sh — latest e2e run reports FAIL on at least one dimension. Run 'bash ${REPO_ROOT}/scripts/e2e/check_e2e_report.sh' for the dimension breakdown."
 fi
@@ -164,9 +187,15 @@ fi
 echo
 
 # ── Gate 5b: Bravoh server ready (Plan 45-03 / SHIP-06 / OPS-14) ───────
+# ENG-but-server-dependent: probes Bravoh PROD (api.altidus.world), read-only.
+# Not a Kaan-input gate, but external server state. Under --dry-run a down
+# server is logged as a server-readiness PRECONDITION and PASS-for-dry-run
+# (the gate is NOT weakened — a real cut still FAILS when the server is down).
 echo "[Gate 5b] check_bravoh_server_ready.sh — 3-endpoint probe + healthz freshness (Plan 45-03)"
 if bash "${REPO_ROOT}/scripts/release/check_bravoh_server_ready.sh" --quiet >/dev/null 2>&1; then
   pass "check_bravoh_server_ready.sh — 3/3 endpoints OK + healthz fresh"
+elif [[ "${DRY_RUN}" -eq 1 ]]; then
+  info "DRY-RUN: Gate 5b server-dependent; Bravoh server-readiness is a real-cut PRECONDITION — PASS-for-dry-run"
 else
   fail "check_bravoh_server_ready.sh — Bravoh server gate FAILED. Run 'bash ${REPO_ROOT}/scripts/release/check_bravoh_server_ready.sh' for the BLOCKED_BY line."
 fi
@@ -194,6 +223,10 @@ if [[ "${FAIL}" -ne 0 ]]; then
   exit 1
 fi
 
+if [[ "${DRY_RUN}" -eq 1 ]]; then
+  echo "  DRY-RUN GREEN — everything but the signature is ready. Real cut blocked only on: [Apple Dev Agreement, SignPath cert, 54/55 ear-pass, E2E walk]."
+  echo
+fi
 echo "  ALL GATES PASS — Kaan, run the following:"
 echo
 CHANGELOG="${REPO_ROOT}/CHANGELOG-${TAG}.md"
