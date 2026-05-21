@@ -131,7 +131,10 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
   1. Tier-1 live surfaces (session view, mascot overlay) pass a final paired ui-checker + ui-auditor visual pass with zero HIGH findings and CDJ Whisper consistency held (20/80 accent rule, textured material feel, no AI-slop typography).
   2. The three v0.1.0-rc1 carryover bugs are closed and verified on the real app: Tauri drag capability works, the mascot chrome strip is gone, and the TCC permissions list populates correctly.
   3. A fresh macOS user account walks first-run → first-session with the friction points identified and tightened (no dead-ends, no confusing steps before audio is live).
-**Plans**: TBD
+**Plans**: 3 plans (2 waves)
+- [ ] 57-01-PLAN.md — POLISH-02: regression-pin the 3 carryover-bug fixes (drag cap + JS handler, chrome strip display:none, deep-link + TCC prime path) [wave 1, autonomous]
+- [ ] 57-02-PLAN.md — POLISH-03: fresh-account first-run friction audit + wizard continuity smoke [wave 1, autonomous]
+- [ ] 57-03-PLAN.md — POLISH-01: impeccable CDJ-Whisper visual pass on session view + mascot overlay → zero HIGH [wave 2, depends 57-01, has Kaan felt-sign-off checkpoint]
 **UI hint**: yes — **use the `impeccable` skill for the visual polish pass** (Kaan directive 2026-05-21), not just the default ui-phase/ui-review.
 
 ### Phase 58: Ship Readiness

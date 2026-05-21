@@ -2,7 +2,7 @@
 phase: 57
 slug: sexify-finish
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-05-21
 ---
@@ -38,7 +38,14 @@ created: 2026-05-21
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Status |
 |---------|------|------|-------------|-----------|-------------------|--------|
-| (planner fills) | — | — | POLISH-01/02/03 | unit | (planner fills) | ⬜ pending |
+| 57-01 T1 | 57-01 | 1 | POLISH-02 | static/unit | `pytest -q tests/security/test_drag_capability_present.py` + `npm test -- mascot.chrome.test.ts drag.spec.ts` | ⬜ pending |
+| 57-01 T2 | 57-01 | 1 | POLISH-02 | static | `pytest -q tests/security/test_tcc_prime_path_wired.py` | ⬜ pending |
+| 57-02 T1 | 57-02 | 1 | POLISH-03 | static/audit | `python3 scripts/audit/check_no_slop_install.py` + `npm test -- wizard` | ⬜ pending |
+| 57-02 T2 | 57-02 | 1 | POLISH-03 | unit | `npm test -- first-run-continuity.spec.ts` + `npm test` | ⬜ pending |
+| 57-03 T1 | 57-03 | 2 | POLISH-01 | unit (regression) | `npm test` (session component contracts hold) | ⬜ pending |
+| 57-03 T2 | 57-03 | 2 | POLISH-01 | unit (regression) | `npm test -- mascot.chrome.test.ts` + `npm test` | ⬜ pending |
+| 57-03 T3 | 57-03 | 2 | POLISH-01 | agent gate | paired ui-checker + ui-auditor → zero HIGH; `npm test` | ⬜ pending |
+| 57-03 T4 | 57-03 | 2 | POLISH-01 | KAAN-ACTION | felt visual sign-off (human-verify checkpoint) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -71,4 +78,4 @@ created: 2026-05-21
 - [ ] Feedback latency < 220s
 - [ ] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** planner-filled 2026-05-21
