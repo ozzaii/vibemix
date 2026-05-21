@@ -43,6 +43,7 @@ import asyncio
 import sys
 import threading
 import time
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from vibemix.state.deck_state import DeckTrack
@@ -316,16 +317,13 @@ class DeckPoller:
 
 def replace_decktrack(dt: DeckTrack) -> DeckTrack:
     """Return a shallow copy of a ``DeckTrack`` (all fields are immutable
-    scalars/None) so a caller mutating the copy cannot reach the holder."""
-    return DeckTrack(
-        title=dt.title,
-        track_id=dt.track_id,
-        bpm=dt.bpm,
-        key=dt.key,
-        camelot=dt.camelot,
-        open_key=dt.open_key,
-        energy=dt.energy,
-        loaded_at=dt.loaded_at,
-        confidence=dt.confidence,
-        source=dt.source,
-    )
+    scalars/None) so a caller mutating the copy cannot reach the holder.
+
+    Uses ``dataclasses.replace(dt)`` (a field-complete copy) rather than a
+    hand-enumerated field list — that hand copy would silently drop any field
+    added to ``DeckTrack`` later, returning the new field at its default instead
+    of the holder's value (WR-04: a silent data-loss-on-read at the single-writer
+    boundary, undetectable by the type checker). ``DeckTrack`` is a non-frozen
+    dataclass of immutable scalars, so ``replace(dt)`` with no overrides yields
+    exactly the desired copy and stays correct as fields are added."""
+    return replace(dt)
