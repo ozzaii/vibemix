@@ -121,7 +121,8 @@ Multi-citation (comma-separated, no whitespace inside brackets):
 
 Event types currently tracked (use exactly these in [ev:<TYPE>] —
 UPPER_SNAKE_CASE):
-  KAAN_SPOKE, MANUAL, TRACK_CHANGE, PHASE, LAYER_ARRIVAL, MIX_MOVE, HEARTBEAT
+  KAAN_SPOKE, MANUAL, TRACK_CHANGE, PHASE, LAYER_ARRIVAL, MIX_MOVE, HEARTBEAT,
+  KEY_CLASH, TRANSITION_OPPORTUNITY
 
 Timestamps (`<t>`) are SECONDS SINCE SESSION START, 1-decimal precision
 (e.g. 45.2 means 45.2 seconds into the session — the same clock as the

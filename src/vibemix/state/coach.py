@@ -255,21 +255,64 @@ class AICoach:
                 "now — groove, texture, what the track is doing musically. "
                 "Always reply with something fresh; don't go silent."
             )
-        # Phase 59-04 (DECK plumbing) — STUB arms for the two harmonic event
-        # types. They are REGISTERED in event.py/constants.py this phase but the
-        # detector NEVER fires them yet (firing logic + the real clash/transition
-        # narration is Phase 60). These minimal placeholders keep the two types
-        # routed through the normal (non-diet) path so an accidental fire degrades
-        # gracefully instead of falling to the bland "React naturally." default.
+        # Phase 60-04 (HARMONIC-01) — CITED, NARRATE-ONLY clash fragment. The
+        # verdict is the system's (is_clash() in the detector), NOT the LLM's.
+        # The fragment hands the pre-decided clash + both decks' keys + the
+        # pre-computed semitone count, instructs the model to CITE BOTH keys
+        # exactly, and FORBIDS it from inventing a key or computing intervals.
+        # The existence-only CitationLinter (Phase 59, key source) strips the
+        # WHOLE turn if the model fabricates a [key:...] the registry never
+        # observed — the anti-slop guarantee is structural, not prompt-trust.
+        # Phase 61 owns the persona voice; this phase keeps to the grounded FACTS.
         if t == "KEY_CLASH":
-            return (
-                "React naturally to what you HEAR — ground on the audio and the "
-                "decks[...] evidence. (Harmonic clash detection is not live yet.)"
+            a_side = ev.extra.get("a_side", "A")
+            a_cam = ev.extra.get("a_camelot", "?")
+            b_side = ev.extra.get("b_side", "B")
+            b_cam = ev.extra.get("b_camelot", "?")
+            semis = ev.extra.get("semitones")
+            # Guard the count against None (cross-letter pairs carry no semitone
+            # number) — say "clashing" without interpolating a None.
+            gap = (
+                f"{semis} semitone{'s' if semis != 1 else ''} apart"
+                if semis is not None
+                else "clashing on the melodic overlap"
             )
-        if t == "TRANSITION_OPPORTUNITY":
             return (
-                "React naturally to what you HEAR — ground on the audio and the "
-                "decks[...] evidence. (Transition cueing is not live yet.)"
+                f"HARMONIC CLASH confirmed by the system (you do NOT decide this): "
+                f"deck {a_side} is {a_cam}, deck {b_side} is {b_cam} — {gap}, "
+                f"they're fighting where the two decks' melodies overlap. Tell Kaan "
+                f"the move in DJ verbs (kill {b_side}'s mids, cut on the drop, "
+                f"filter one out, don't ride the pads). Cite BOTH keys exactly: "
+                f"[key:{a_side}:{a_cam}] and [key:{b_side}:{b_cam}]. Do NOT invent a "
+                f"key and do NOT compute intervals — narrate the clash the code "
+                f"already proved. If it doesn't warrant a call, output a single "
+                f"space to stay silent."
+            )
+        # Phase 60-04 (HARMONIC-04) — RETROSPECTIVE transition note. PAST-TENSE
+        # only: LLM+TTS latency makes a live "bring the fader down" arrive 5-10s
+        # late (Pitfall 3). The detector fires this ONLY when both decks are
+        # resolved + cited AND a structural blend move just landed, so we narrate
+        # what ALREADY happened. No phrase-alignment / bass-swap specifics —
+        # vibemix has no per-deck phrase grid or dual-deck low-band, so those are
+        # not groundable; stay silent on them.
+        if t == "TRANSITION_OPPORTUNITY":
+            a_side = ev.extra.get("a_side", "A")
+            a_cam = ev.extra.get("a_camelot", "?")
+            b_side = ev.extra.get("b_side", "B")
+            b_cam = ev.extra.get("b_camelot", "?")
+            clash = ev.extra.get("clash")
+            verdict = (
+                "harmonically those keys were clashing"
+                if clash
+                else "harmonically the keys sat fine together"
+            )
+            return (
+                f"You just blended deck {a_side} ({a_cam}) into deck {b_side} "
+                f"({b_cam}) — {verdict}. Give Kaan the PAST-TENSE read on how that "
+                f"blend sat harmonically — nothing else, no present-tense advice, "
+                f"the moment's already gone. Cite both keys: [key:{a_side}:{a_cam}] "
+                f"and [key:{b_side}:{b_cam}]. Do NOT invent a key. If there's "
+                f"nothing worth saying, output a single space to stay silent."
             )
         return "React naturally."
 
