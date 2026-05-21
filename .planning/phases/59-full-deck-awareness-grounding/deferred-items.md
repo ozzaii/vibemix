@@ -37,3 +37,16 @@ failing files reference `EVIDENCE_SOURCES` / `parse_citations` /
 `CITATION_GRAMMAR_BLOCK` / `_build_citation_strip` / `key:` (grep-verified empty).
 No new failures introduced — these remain the in-flight `live-tuning-or-brain`
 WIP debt for a later finalization plan.
+
+### Re-confirmed at Plan 59-03 close (2026-05-21)
+
+Plan 59-03 (event-type plumbing + DECK-05 read-only repo test) ran the full
+suite: **7 failed, 3952 passed, 26 skipped** — the SAME 7 tests, unchanged
+count (passing count rose 3947 → 3952 from the 5 new tests this plan added: 2
+event-priority asserts + 3 repo-scrub deck-readonly cases). 59-03 touched only
+`state/event.py`, `audio/constants.py`, and three test files
+(`test_event_priority.py`, `test_constants.py`, `test_repo_scrub.py`); none of
+the 7 failing files reference `EVENT_PRIORITY` / `MIN_EVENT_GAP_PER_TYPE` /
+`KEY_CLASH` / `TRANSITION_OPPORTUNITY` / `deck_readonly` (grep-verified empty).
+No new failures, no golden flips — these remain the in-flight
+`live-tuning-or-brain` WIP debt for a later finalization plan.

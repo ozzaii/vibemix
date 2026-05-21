@@ -61,7 +61,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
   - **Wave 1** (parallel, autonomous) —
     - [x] 59-01-PLAN.md — harmonics.to_camelot (load-bearing FIRST) + DeckState/DeckTrack model + additive MusicState field
     - [x] 59-02-PLAN.md — citable `key:` evidence source + linter rule + 5 schema-mirror touchpoints (lands BEFORE any harmonic prompt)
-    - [ ] 59-03-PLAN.md — KEY_CLASH/TRANSITION_OPPORTUNITY event-type plumbing + DECK-05 read-only repo guarantee (test-first)
+    - [x] 59-03-PLAN.md — KEY_CLASH/TRANSITION_OPPORTUNITY event-type plumbing + DECK-05 read-only repo guarantee (test-first)
   - **Wave 2** (depends on 59-01/02/03) —
     - [ ] 59-04-PLAN.md — read-only deck poller (XML-primary ladder + cross-deck suppression) + single-writer `_tick_once` wiring + change-only key:/track: registry writes + coach evidence_line + poller spawn
   - **Wave 3** (depends on 59-04) —

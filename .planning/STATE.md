@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v5.0
 milestone_name: The Useful Cut
 status: executing
-last_updated: "2026-05-21T13:10:39.969Z"
+last_updated: "2026-05-21T13:30:00.000Z"
 last_activity: 2026-05-21
 progress:
   total_phases: 12
   completed_phases: 8
   total_plans: 31
-  completed_plans: 28
-  percent: 67
+  completed_plans: 29
+  percent: 69
 ---
 
 # vibemix — State
@@ -46,9 +46,9 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 ## Current Position
 
 Phase: 59 (Full Deck Awareness + Grounding) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
-Last activity: 2026-05-21 -- Plan 59-02 COMPLETE (citable existence-only `key:` evidence source, body `<deck>:<camelot>`; DECK-03 done; fabricated [key:A:12B] stripped by linter, registered [key:A:8A] accepted; all 5 schema-mirror touchpoints in lock-step; killswitch untouched; 7 pre-existing WIP failures unchanged)
+Last activity: 2026-05-21 -- Plan 59-03 COMPLETE (event-type plumbing + DECK-05 read-only repo test; DECK-04 + DECK-05 done; KEY_CLASH=7/28.0s + TRANSITION_OPPORTUNITY=5/20.0s registered in EVENT_PRIORITY + MIN_EVENT_GAP_PER_TYPE — plumbing only, zero firing logic in event_detector; test_deck_readonly tokenize-strips comments+docstrings + two-tier scan + positive control + deck-path SQLCipher dormancy; full suite 7 failed/3952 passed — same 7 pre-existing WIP failures, unchanged)
 
 ## Performance Metrics
 
@@ -70,8 +70,15 @@ Last activity: 2026-05-21 -- Plan 59-02 COMPLETE (citable existence-only `key:` 
 ---
 | Phase 59 P01 | 12 min | 2 tasks | 6 files |
 | Phase 59 P02 | 9 min | 2 tasks | 8 files |
+| Phase 59 P03 | 18 min | 2 tasks | 5 files |
 
 ## Accumulated Context
+
+### Plan 59-03 Decision Locked (2026-05-21)
+
+Two new event TYPES registered as **plumbing-only** (firing logic is Phase 60): `KEY_CLASH` (priority **7**, tie with TRACK_CHANGE — "react now") + `TRANSITION_OPPORTUNITY` (priority **5**, tie with MIX_MOVE — structural) in `EVENT_PRIORITY`; cooldowns `KEY_CLASH=28.0s` + `TRANSITION_OPPORTUNITY=20.0s` in `MIN_EVENT_GAP_PER_TYPE` (both inherit the `EVENT_GLOBAL_MIN_GAP=22.0` floor — no gate-logic change). This closes the latent `EVENT_PRIORITY.get(type, 0)` silent-priority-0 gap before Phase 60 emits these events. **Zero firing/detection logic** added (`event_detector.py` grep = 0). **DECK-04 satisfied.**
+
+**DECK-05 read-only guarantee** landed as a regression-pinned repo test (`tests/repo/test_repo_scrub.py::test_deck_readonly`). Decision: used **`tokenize`-based comment+docstring stripping** rather than the plan's literal `grep -v '^#'` — because the existing grep-gate documentation lives in **docstrings** (`library/rekordbox.py:14-18`, `library/__init__.py:4` mention `Rekordbox6Database`/`pyrekordbox.db6` to *document* the ban), which a bare `#`-line grep would leave in place and falsely trip. Tokenize (strips COMMENT + STRING tokens) is the robust generalization of the plan's intent. **Two-tier scope**: the SQLCipher class/subpackage is banned repo-wide; `.commit()`/`executescript()`/sqlite-write-mode-URI patterns are banned in the **deck path only** (`state/deck*`, `state/harmonics*`, `library/rekordbox.py`) because vibemix's OWN sqlite-vec embedding cache (`library/embed.py`, `index_sqlite_vec.py`, `search.py`) legitimately commits to its own DB — DECK-05 is specifically the USER's-DJ-collection guarantee (master.db landmine, Risk 4). A **positive-control test** proves the detector catches a synthetic write path (and that tokenize preserves `db.commit()` adjacency) so the gate can never pass vacuously; a **subprocess-dormancy sibling** confirms importing the deck path loads no `*sqlcipher*` module. **DECK-05 satisfied.** The pin will fail loudly if the 59-04 poller or any future commit writes a DJ DB. Commits: feat `8040be7` (event types), test `aa51499` (DECK-05). Full suite **7 failed / 3952 passed / 26 skipped** — same 7 pre-existing `live-tuning-or-brain` WIP failures, unchanged count; re-confirmed in `deferred-items.md`.
 
 ### Plan 59-02 Decision Locked (2026-05-21)
 
@@ -209,6 +216,7 @@ All external-clock items from v3.0 / v3.1 / v4.0 remain on the same clock — v5
 
 ### Last Session
 
+- 2026-05-21 — **Plan 59-03 COMPLETE** (event-type plumbing + DECK-05 read-only repo test; DECK-04 + DECK-05). Registered `KEY_CLASH` (pri 7 / 28.0s) + `TRANSITION_OPPORTUNITY` (pri 5 / 20.0s) in `EVENT_PRIORITY` (`state/event.py`) + `MIN_EVENT_GAP_PER_TYPE` (`audio/constants.py`) — **plumbing only**, closing the `EVENT_PRIORITY.get(type,0)` silent-0 gap; zero firing/detection logic (`event_detector.py` grep = 0; Phase 60 owns firing). Landed `tests/repo/test_repo_scrub.py::test_deck_readonly` — a **two-tier tokenize-stripped static scan** (SQLCipher class banned repo-wide; DJ-DB write patterns banned in the deck path only — vibemix's own sqlite-vec store legitimately writes) + a **positive control** (proves the detector catches `db.commit()` adjacency + ignores docstring prose; caught a real `tokenize.untokenize` adjacency bug during TDD RED) + a **subprocess SQLCipher-dormancy sibling** for the deck import path. Existing `test_no_sqlcipher_module_imported_after_load` still green. Strict per-file staging (no in-flight WIP swept in). Commits: feat `8040be7` (event types) → test `aa51499` (DECK-05). Full suite: **7 failed, 3952 passed, 26 skipped** — the SAME 7 pre-existing WIP failures (passing 3947→3952 from 5 new tests), no new failures, no golden flips; re-confirmed in `deferred-items.md`. **DECK-04 + DECK-05 satisfied.** Next: 59-04 (deck poller + `_tick_once` wiring + `evidence_line` deck block).
 - 2026-05-21 — **Plan 59-02 COMPLETE** (citable `key:` harmonic evidence source, DECK-03). Added a **dedicated existence-only `key:` source** (body `<deck>:<camelot>`, e.g. `[key:A:8A]`) across all **5 schema-mirror touchpoints** in lock-step: (1) `EVIDENCE_SOURCES` frozenset (now 8 members), (2) `_SOURCE_ALT` regex alternation, (3) the EBNF docstring (`key-body := <deck> ':' <camelot>`), (4) `prompts/matrix.py::CITATION_GRAMMAR_BLOCK` Form line, (5) `agent/dj_cohost.py::_build_citation_strip` chip whitelist. `_INNER_ATOM`/`parse_citations` UNCHANGED (`key:A:8A` matches; partition splits first colon → `('key','A:8A')`). `key` joins the existence-only set purely by being in `EVIDENCE_SOURCES` and ABSENT from `_TIME_KEYED_SOURCES` — **zero `_validate_atom` logic change** (diff-grep verified). A fabricated `[key:A:12B]` (never poller-written) is stripped response-level; a registered `[key:A:8A]` accepted. Citation-strip chip `timestamp_s` sourced from the registry, never the body (anti-hallucination contract). `screen_jpeg = None` vision killswitch UNTOUCHED (count-stable grep = 1). NO harmonic firing/detection (Phase 60). Commits: test 416b504→feat 4bb3c7e (registry+linter), feat c19c691 (prompt+strip). Full suite: **7 failed, 3947 passed, 26 skipped** — same 7 pre-existing `live-tuning-or-brain` WIP failures from 59-01 (grep-proven not citation/key/grammar), no new failures, no golden flips; re-confirmed in `deferred-items.md`. **DECK-03 satisfied.** Next: 59-03.
 - 2026-05-21 — **Plan 59-01 COMPLETE** (Full Deck Awareness foundations, TDD). Shipped the load-bearing pure `state/harmonics.py::to_camelot` (Rekordbox `Tonality` is musical notation `Am`/`F#m`, NOT Camelot — normalizes musical/Camelot/open-key forms, honest `None` on empty/garbage/out-of-range, NEVER raises) + `state/deck_state.py` `DeckTrack`/`DeckState` honest-default model (`source="unknown"`, every harmonic field `None`/`0.0` — no false-confident key by construction) + additive `MusicState.deck_state = field(default_factory=DeckState)` (single-writer `_tick_once`-only; `evidence_line` untouched until 59-04 → golden-equivalence byte-identical for empty AND populated deck_state). `is_clash`/`compatible` deliberately deferred to Phase 60 (grep-gated to 0). **DECK-01 + DECK-02 satisfied.** 67 plan tests green (RED→GREEN per task). 7 unrelated full-suite failures are PRE-EXISTING `live-tuning-or-brain` WIP (README feature-matrix phases 55–58 + `__main__.py`/`cut_release.sh` churn) — proven by reverting `music_state.py` to pre-plan `5f375c0`; logged in `59-full-deck-awareness-grounding/deferred-items.md`, NOT this plan's regression. Commits: test eaf9992→feat d962611 (harmonics), test 0d0110f→feat e0fecf1 (deck_state). Next: 59-02 (citable `key:` evidence source + linter rule).
 - 2026-05-21 — v5.0 "The Useful Cut" ROADMAP CREATED (4 phases, 59–62; numbering continued from v4.0's 51–58, no reset). 17/17 REQ-IDs mapped (DECK P59 / HARMONIC P60 / COACH P61 / PILL P62). Hard critical path P59→P60→P61; P62 parallelizes. ROADMAP.md: added the v5.0 active-milestone section at the top of the milestone content, kept v4.0 "SHIP" OPEN + intact below it (engineering-complete 8/8, publish on signature clock — NOT archived), added v5.0 row to the Milestone-Level Progress table. REQUIREMENTS.md traceability validated (already mapped, no change needed). STATE.md milestone preserved as v5.0, Current Position → Phase 59, total_phases → 4.
