@@ -23,7 +23,7 @@ Research-resolved foundations (`.planning/research/SUMMARY.md`, 4 convergent age
 
 - [x] **DECK-01**: The co-host maintains a session-wide **deck-state** — every track loaded across the decks (title, key, BPM, energy where available), not just the one currently audible — exposed to the coach the same grounded way `phase`/`bpm`/`mood` are.
 - [x] **DECK-02**: Deck-state is populated from a real data-source ladder: pyrekordbox **XML** primary, **Gemini-vision** deck-screenshot read as universal fallback, in-house **numpy** key estimator last-resort. When no source can resolve a track/key, it is surfaced honestly as `unknown` — never a false-confident guess.
-- [ ] **DECK-03**: A new `key:` **evidence source** + citation-linter rule lands so harmonic/transition claims are *citable* — un-cited harmonic feedback is stripped by the existing `CitationLinter`. (Gates the harmonic feature; must land before any harmonic prompt is written.)
+- [x] **DECK-03**: A new `key:` **evidence source** + citation-linter rule lands so harmonic/transition claims are *citable* — un-cited harmonic feedback is stripped by the existing `CitationLinter`. (Gates the harmonic feature; must land before any harmonic prompt is written.)
 - [ ] **DECK-04**: Deck-state integrates into `MusicState` under the **single-writer rule** (read-only poller → `_tick_once` is the only copier), with new event types `KEY_CLASH` + `TRANSITION_OPPORTUNITY` added to the priority/cooldown maps.
 - [ ] **DECK-05**: The integration is **strictly read-only** — never writes to any DJ-software database (the `master.db` write-corruption landmine is respected); cross-deck claims are suppressed when the second deck cannot be independently resolved.
 
@@ -74,7 +74,7 @@ Research-resolved foundations (`.planning/research/SUMMARY.md`, 4 convergent age
 |--------|-------|--------|
 | DECK-01 | Phase 59 | Complete |
 | DECK-02 | Phase 59 | Complete |
-| DECK-03 | Phase 59 | Pending |
+| DECK-03 | Phase 59 | Complete |
 | DECK-04 | Phase 59 | Pending |
 | DECK-05 | Phase 59 | Pending |
 | HARMONIC-01 | Phase 60 | Pending |

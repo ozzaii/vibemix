@@ -26,3 +26,14 @@ cut-release script churn).
 **Action:** none in Plan 59-01. The README feature-matrix and cut-release/
 `__main__.py` wiring belong to the v4.0 ship/branch work, not deck-state. Surface
 to Kaan / a later plan that owns the `live-tuning-or-brain` finalization.
+
+### Re-confirmed at Plan 59-02 close (2026-05-21)
+
+Plan 59-02 (citable `key:` evidence source) ran the full suite: **7 failed, 3947
+passed, 26 skipped** — the SAME 7 tests, unchanged count. 59-02 touched only the
+citation/grammar surface (`evidence_registry.py`, `citation_linter.py`,
+`prompts/matrix.py`, `agent/dj_cohost.py` + their 4 test files); none of the 7
+failing files reference `EVIDENCE_SOURCES` / `parse_citations` /
+`CITATION_GRAMMAR_BLOCK` / `_build_citation_strip` / `key:` (grep-verified empty).
+No new failures introduced — these remain the in-flight `live-tuning-or-brain`
+WIP debt for a later finalization plan.

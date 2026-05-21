@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v5.0
 milestone_name: The Useful Cut
 status: executing
-last_updated: "2026-05-21T12:58:31.189Z"
+last_updated: "2026-05-21T13:10:39.969Z"
 last_activity: 2026-05-21
 progress:
   total_phases: 12
   completed_phases: 8
   total_plans: 31
-  completed_plans: 27
+  completed_plans: 28
   percent: 67
 ---
 
@@ -46,9 +46,9 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 ## Current Position
 
 Phase: 59 (Full Deck Awareness + Grounding) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
-Last activity: 2026-05-21 -- Plan 59-01 COMPLETE (harmonics.to_camelot + DeckState/DeckTrack model + additive MusicState.deck_state; DECK-01/DECK-02 done; 67 plan tests green; golden-equivalence preserved)
+Last activity: 2026-05-21 -- Plan 59-02 COMPLETE (citable existence-only `key:` evidence source, body `<deck>:<camelot>`; DECK-03 done; fabricated [key:A:12B] stripped by linter, registered [key:A:8A] accepted; all 5 schema-mirror touchpoints in lock-step; killswitch untouched; 7 pre-existing WIP failures unchanged)
 
 ## Performance Metrics
 
@@ -69,8 +69,13 @@ Last activity: 2026-05-21 -- Plan 59-01 COMPLETE (harmonics.to_camelot + DeckSta
 
 ---
 | Phase 59 P01 | 12 min | 2 tasks | 6 files |
+| Phase 59 P02 | 9 min | 2 tasks | 8 files |
 
 ## Accumulated Context
+
+### Plan 59-02 Decision Locked (2026-05-21)
+
+Dedicated existence-only `key:` evidence source (body `<deck>:<camelot>`, e.g. `[key:A:8A]`) chosen over `mix:` reuse — the CONTEXT-locked resolution of the ARCHITECTURE↔PITFALLS divergence. The `<deck>:<camelot>` body makes a fabricated `12B` clash **uncitable-by-construction** (the exact body must have been written by the poller or the existing CitationLinter strips the whole turn). `key` joins the **existence-only** set by being added to `EVIDENCE_SOURCES` + `_SOURCE_ALT` and kept OUT of `_TIME_KEYED_SOURCES` — **zero `_validate_atom` logic change** (verified by diff-grep). All 5 schema-mirror touchpoints (frozenset, regex, EBNF docstring, `CITATION_GRAMMAR_BLOCK`, `_build_citation_strip` whitelist) carry `key` in lock-step. Chip `timestamp_s` sourced from the registry observation, never the citation body (anti-hallucination contract preserved). The `screen_jpeg = None` vision killswitch untouched (count-stable grep returns 1). No harmonic firing/detection — that is Phase 60. **DECK-03 satisfied.** This is the Risk-2 (uncitable-by-construction) retrofit landed BEFORE any harmonic prompt, as required by the hard critical path.
 
 ### v5.0 Roadmap Decisions Locked (2026-05-21)
 
@@ -204,6 +209,7 @@ All external-clock items from v3.0 / v3.1 / v4.0 remain on the same clock — v5
 
 ### Last Session
 
+- 2026-05-21 — **Plan 59-02 COMPLETE** (citable `key:` harmonic evidence source, DECK-03). Added a **dedicated existence-only `key:` source** (body `<deck>:<camelot>`, e.g. `[key:A:8A]`) across all **5 schema-mirror touchpoints** in lock-step: (1) `EVIDENCE_SOURCES` frozenset (now 8 members), (2) `_SOURCE_ALT` regex alternation, (3) the EBNF docstring (`key-body := <deck> ':' <camelot>`), (4) `prompts/matrix.py::CITATION_GRAMMAR_BLOCK` Form line, (5) `agent/dj_cohost.py::_build_citation_strip` chip whitelist. `_INNER_ATOM`/`parse_citations` UNCHANGED (`key:A:8A` matches; partition splits first colon → `('key','A:8A')`). `key` joins the existence-only set purely by being in `EVIDENCE_SOURCES` and ABSENT from `_TIME_KEYED_SOURCES` — **zero `_validate_atom` logic change** (diff-grep verified). A fabricated `[key:A:12B]` (never poller-written) is stripped response-level; a registered `[key:A:8A]` accepted. Citation-strip chip `timestamp_s` sourced from the registry, never the body (anti-hallucination contract). `screen_jpeg = None` vision killswitch UNTOUCHED (count-stable grep = 1). NO harmonic firing/detection (Phase 60). Commits: test 416b504→feat 4bb3c7e (registry+linter), feat c19c691 (prompt+strip). Full suite: **7 failed, 3947 passed, 26 skipped** — same 7 pre-existing `live-tuning-or-brain` WIP failures from 59-01 (grep-proven not citation/key/grammar), no new failures, no golden flips; re-confirmed in `deferred-items.md`. **DECK-03 satisfied.** Next: 59-03.
 - 2026-05-21 — **Plan 59-01 COMPLETE** (Full Deck Awareness foundations, TDD). Shipped the load-bearing pure `state/harmonics.py::to_camelot` (Rekordbox `Tonality` is musical notation `Am`/`F#m`, NOT Camelot — normalizes musical/Camelot/open-key forms, honest `None` on empty/garbage/out-of-range, NEVER raises) + `state/deck_state.py` `DeckTrack`/`DeckState` honest-default model (`source="unknown"`, every harmonic field `None`/`0.0` — no false-confident key by construction) + additive `MusicState.deck_state = field(default_factory=DeckState)` (single-writer `_tick_once`-only; `evidence_line` untouched until 59-04 → golden-equivalence byte-identical for empty AND populated deck_state). `is_clash`/`compatible` deliberately deferred to Phase 60 (grep-gated to 0). **DECK-01 + DECK-02 satisfied.** 67 plan tests green (RED→GREEN per task). 7 unrelated full-suite failures are PRE-EXISTING `live-tuning-or-brain` WIP (README feature-matrix phases 55–58 + `__main__.py`/`cut_release.sh` churn) — proven by reverting `music_state.py` to pre-plan `5f375c0`; logged in `59-full-deck-awareness-grounding/deferred-items.md`, NOT this plan's regression. Commits: test eaf9992→feat d962611 (harmonics), test 0d0110f→feat e0fecf1 (deck_state). Next: 59-02 (citable `key:` evidence source + linter rule).
 - 2026-05-21 — v5.0 "The Useful Cut" ROADMAP CREATED (4 phases, 59–62; numbering continued from v4.0's 51–58, no reset). 17/17 REQ-IDs mapped (DECK P59 / HARMONIC P60 / COACH P61 / PILL P62). Hard critical path P59→P60→P61; P62 parallelizes. ROADMAP.md: added the v5.0 active-milestone section at the top of the milestone content, kept v4.0 "SHIP" OPEN + intact below it (engineering-complete 8/8, publish on signature clock — NOT archived), added v5.0 row to the Milestone-Level Progress table. REQUIREMENTS.md traceability validated (already mapped, no change needed). STATE.md milestone preserved as v5.0, Current Position → Phase 59, total_phases → 4.
 - 2026-05-21 (earlier) — Phase 58 (Ship Readiness) COMPLETE; ALL 8 v4.0 phases engineering-complete (8/8). v4.0 left open on the external signature clock.
@@ -211,7 +217,7 @@ All external-clock items from v3.0 / v3.1 / v4.0 remain on the same clock — v5
 
 ### Next Session
 
-- **`/gsd:plan-phase 59`** — decompose Phase 59 (Full Deck Awareness + Grounding). This is the critical-path gate: land session-wide deck-state from the XML→vision→numpy ladder, the citable `key:` evidence source + linter rule (BEFORE any harmonic prompt), single-writer `MusicState` integration + the two new event types, strictly read-only. Resolve the two flagged spikes in plan-time: (a) pyrekordbox live-DB safety + `mix:`-reuse vs dedicated-`key:` decision; (b) Gemini-vision deck-badge accuracy eval. Everything in P60/P61 depends on this. P62 (pill) can be planned in parallel — resolve its drag/focus spike first.
+- **Execute Plan 59-03** — the next plan in the in-flight Phase 59 (3 of 5). With DECK-01/02 (deck-state model + harmonics) and DECK-03 (citable `key:` source + linter rule) now landed, the remaining 59-plans wire the deck poller, the single-writer `_tick_once` registry-write site, the `evidence_line` deck block (59-04), the two new event types' priorities/cooldowns, and the read-only repo assertion. Phase 60 (harmonic firing/detection) stays gated behind the rest of Phase 59.
 - **Track external clock (unchanged):** Apple Dev Agreement (Francesco) + SignPath OSS cert (Kaan). Gates only the v4.0 signed publish; surfaced in `KAAN-ACTION-LEGAL.md §SHIP-V4`. v5.0 engineering proceeds unblocked.
 
 ---
