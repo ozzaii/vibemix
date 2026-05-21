@@ -92,11 +92,24 @@ class DeckPoller:
         library: "RekordboxLibrary | None" = None,
         controller=None,
         track_info=None,
+        vision_reader=None,
+        vision_enabled: bool = False,
     ) -> None:
         self._lock = threading.Lock()
         self._library = library
         self._controller = controller
         self._track_info = track_info
+        # GATED vision leg (Plan 59-05, DECK-02). The reader (a DeckVisionReader)
+        # may be injected, but vision-sourced keys are NOT consumed until
+        # ``vision_enabled`` is True. The default is False (conservative-by-design):
+        # vision must NOT feed deck-state until the real-screenshot accuracy eval
+        # (eval/deck_vision/run_eval.py) clears the documented floor per app — the
+        # KAAN-ACTION checkpoint (Plan 59-05 Task 3). Re-enabling vision un-does a
+        # deliberate v4 anti-hallucination killswitch, so the gate stays OFF by
+        # default until Kaan signs off the eval. ``screen_buf`` would supply the
+        # JPEG when enabled; left dormant here (no per-tick capture while gated).
+        self._vision_reader = vision_reader
+        self._vision_enabled = bool(vision_enabled)
         # Internal holder — the last-known resolved deck map. Empty until the
         # first successful poll. snapshot() returns COPIES of these.
         self._decks: dict[str, DeckTrack] = {}
@@ -220,12 +233,51 @@ class DeckPoller:
                 conf = max(XML_CONF_FLOOR, min(1.0, deck_conf))
                 decks[audible_deck] = self._xml_decktrack(entry, confidence=conf, now=now)
 
-        # The second / non-audible deck is SUPPRESSED — there is no independent
-        # source for it this phase. Emit NOTHING for it (no honest-unknown stub
-        # that could be mistaken for a resolved deck); Phase 60's clash logic
-        # cannot cite a deck the registry never saw. (Vision badge read in Plan
-        # 59-05 will give the silent deck its own source signal.)
+        # The second / non-audible deck is SUPPRESSED unless an INDEPENDENT source
+        # confirms it. The GATED vision leg (Plan 59-05 `deck_vision` →
+        # `source="screen_vision"`) is that independent source — but it is consumed
+        # ONLY when ``self._vision_enabled`` is True (the KAAN-ACTION eval gate,
+        # Task 3). While gated (the default), emit NOTHING for the silent deck (no
+        # honest-unknown stub that could be mistaken for a resolved deck); Phase
+        # 60's clash logic cannot cite a deck the registry never saw.
+        #
+        # NOTE: even when enabled, vision-sourced keys carry VISION_CONF (set in
+        # deck_vision.py BELOW XML_CONF_FLOOR) — a misread badge can never out-cite
+        # a pre-analyzed XML tag. The wiring lands here so the slot is structurally
+        # present + grep-linkable (deck_vision | screen_vision); flipping
+        # ``vision_enabled`` is the only step gated behind the real-screenshot eval.
+        if self._vision_enabled and self._vision_reader is not None:
+            self._maybe_apply_vision(decks, audible_deck, now)
         return decks
+
+    def _maybe_apply_vision(self, decks: dict, audible_deck, now: float) -> None:
+        """Consume the GATED vision leg for any deck without an independent source.
+
+        Only reached when ``vision_enabled`` is True (post-eval, KAAN-ACTION
+        approved). Vision fills a deck the XML ladder could not resolve, at the
+        below-XML ``VISION_CONF`` confidence. Swallows all exceptions (graceful
+        degradation) — a vision failure NEVER perturbs the XML-resolved decks.
+
+        Left structurally minimal on purpose: the screenshot source + per-app
+        enable matrix are finalized at the eval gate (Task 3). Until enabled this
+        method is dormant (the gate above never calls it).
+        """
+        try:
+            jpeg = self._latest_screen_jpeg()
+            if jpeg is None:
+                return
+            vision_decks = self._vision_reader.read(jpeg)
+            for side, dt in vision_decks.items():
+                # Never overwrite an independently XML-resolved (higher-conf) deck.
+                if side not in decks and dt.confidence > 0.0:
+                    decks[side] = dt
+        except Exception as e:  # never let vision perturb XML-resolved decks
+            print(f"[deck vision apply err] {e}", file=sys.stderr)
+
+    def _latest_screen_jpeg(self):
+        """Latest JPEG for the gated vision read — dormant until a screen source
+        is wired at the eval gate (Task 3). Returns ``None`` while gated."""
+        return None
 
     # ------------------------------------------------------------------ #
     # Snapshot — copies under the lock                                    #
