@@ -50,3 +50,24 @@ the 7 failing files reference `EVENT_PRIORITY` / `MIN_EVENT_GAP_PER_TYPE` /
 `KEY_CLASH` / `TRANSITION_OPPORTUNITY` / `deck_readonly` (grep-verified empty).
 No new failures, no golden flips — these remain the in-flight
 `live-tuning-or-brain` WIP debt for a later finalization plan.
+
+### Re-confirmed at Plan 59-04 close (2026-05-21)
+
+Plan 59-04 (deck-poller single-writer wiring + coach evidence_line + __main__
+spawn) ran the full suite: **7 failed, 3976 passed, 26 skipped** — the SAME 7
+tests, unchanged count. 59-04 touched `state/refresh.py`, `state/coach.py`,
+`__main__.py`, `.planning/codebase/orphans.csv` + three test files
+(`test_refresh_deck.py`, `test_coach_prompt_grounding.py` and Task-1's
+`test_deck_poller.py`); none of the 7 failing files reference `deck_source` /
+`deck_state.decks` / `DeckPoller` / the deck evidence_line block (grep-verified
+empty). The 7 stem from the unrelated `__main__.py` WIP churn (the
+`system_instruction_body=SYSTEM_INSTRUCTION` literal moved out of `main()` by
+in-flight v4.0 work — NOT by my deck wiring), README feature-matrix not
+regenerated for phases 55–58, and `cut_release.sh` regex churn.
+
+**One transient 8th failure, caused by THIS plan and FIXED in-plan (not deferred):**
+`tests/scripts/test_orphan_inventory.py::test_orphan_diff_clean_against_committed_baseline`
+flagged `replace_decktrack` (Task-1 deck_poller helper) as a new orphan. Resolved
+by a surgical single-line add to `.planning/codebase/orphans.csv` (commit 8a1527c),
+leaving the two unrelated stale entries (`BlackHoleProbeResult`,
+`set_device_nominal_sample_rate`) untouched. Orphan-diff green again.
