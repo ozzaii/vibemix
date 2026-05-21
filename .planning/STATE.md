@@ -3,19 +3,23 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: SHIP
 status: executing
-last_updated: "2026-05-21T08:39:12.454Z"
-last_activity: 2026-05-21 -- Phase 58 execution started
+last_updated: "2026-05-21T12:00:00.000Z"
+last_activity: 2026-05-21 -- Phase 58 (Ship Readiness) COMPLETE (4/4 plans; 43/43 phase tests + green --dry-run; verify human_needed 13/13 engineering must-haves). ALL 8 v4.0 PHASES ENGINEERING-COMPLETE (8/8). Ready for milestone lifecycle: audit → complete → cleanup. Signed publish + live ear-passes + recorded walk = KAAN-ACTION/external-clock
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 26
-  completed_plans: 22
-  percent: 85
+  completed_plans: 26
+  percent: 100
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-21 — **Phase 57 (Sexify Finish) COMPLETE** (3/3 plans; vitest 721 + tsc clean + 7 security regression pins green; gsd-ui-auditor 22/24, 0 HIGH; verify human_needed 9/9 engineering must-haves). POLISH-01: impeccable CDJ-Whisper pass on session view + mascot overlay (removed 2 Tier-1 italics, aligned hero box-shadow to the documented recipe, fixed `cohost` undefined `--silk-25`→`--silk-22`); Saira+JetBrains Mono held, no Geist/Fraunces. POLISH-02: the 3 v0.1.0-rc1 carryover bugs were ALREADY fixed in `fac4c4a` — regression-PINNED (drag cap + JS handler, chrome strip display:none, TCC boot-prime path). POLISH-03: first-run friction audit = clean walk (absent forewarning/driver-fetch/48k-probe = Phase-49 installer-companion, intentionally out of in-app flow) + continuity smoke. Real-app drag/chrome/TCC + felt "looks peak" + fresh-account walk = KAAN-ACTION (`57-HUMAN-UAT.md`). Sidecar binary rebuild → Phase 58. Skipped standalone gsd-code-review (presentation-only CSS/TS + test assertions, already covered by ui-auditor). NOTE: Kaan ran a broad parallel persona/cooldown/audio-constants tuning WIP this session (17 uncommitted files: `__main__.py`, `dj_cohost.py`, `audio/constants.py`, `prompts/matrix.py`, `state/coach.py`, `mascot_window.rs`, `ws_client.rs`, `tauri.conf.json5`, several `tests/`) — Phases 56+57 preserved ALL of it untouched. **Phases 51–57 COMPLETE (7/8, 88%).** Next: plan + execute Phase 58 (Ship Readiness).
+**Last updated:** 2026-05-21 — **Phase 58 (Ship Readiness) COMPLETE — ALL 8 v4.0 PHASES ENGINEERING-COMPLETE (8/8, 100%).** REL-01: sidecar rebuilt AIza-clean + unsigned `vibemix_0.1.0-rc1_aarch64-unsigned.dmg` (254M) + `v4.0-MILESTONE-AUDIT.md` GENERATED (5/5 WIRED); `cut_release.sh` Gate 1→`^v0\.1\.0-rc[0-9]+$`, Gate 4→v4.0 audit. REL-02: `record_50a_walk.sh` path bug fixed; Gate-6b green on a REAL report (Hallucination honestly PARTIAL). REL-03: §SHIP-V4 consolidated KAAN-ACTION surface; **`cut_release.sh --dry-run v0.1.0-rc1` exits GREEN** — everything-but-the-signature is ready; publish hard-guard regression-pinned (never auto-runs). 43/43 phase tests green; verify human_needed 13/13. **Run on the MAIN checkout sequentially (not worktrees) to persist real artifacts + because the 3 path-leak incidents this session all came from worktree executors mis-resolving to main — running on main eliminated that class.** Strict per-file git staging; Kaan's 17-file parallel WIP verified intact after every plan. v4.0 KAAN-ACTION/external-clock discharge surface: recorded §E2E walk (`docs/e2e/2026-05-walk.webm`), Gate-2b ear-passes (54/55 HUMAN-UAT), Apple Dev Agreement + SignPath OSS cert, Gate-5b Bravoh healthz freshness, public-tag confirm (v0.1.0-rc1) — all in `KAAN-ACTION-LEGAL.md §SHIP-V4` + per-phase `*-HUMAN-UAT.md`. **Next: milestone lifecycle (audit → complete → cleanup).**
+
+---
+
+### (prior) Phase 57 — Sexify Finish COMPLETE (3/3 plans; vitest 721 + tsc clean + 7 security regression pins green; gsd-ui-auditor 22/24, 0 HIGH; verify human_needed 9/9 engineering must-haves). POLISH-01: impeccable CDJ-Whisper pass on session view + mascot overlay (removed 2 Tier-1 italics, aligned hero box-shadow to the documented recipe, fixed `cohost` undefined `--silk-25`→`--silk-22`); Saira+JetBrains Mono held, no Geist/Fraunces. POLISH-02: the 3 v0.1.0-rc1 carryover bugs were ALREADY fixed in `fac4c4a` — regression-PINNED (drag cap + JS handler, chrome strip display:none, TCC boot-prime path). POLISH-03: first-run friction audit = clean walk (absent forewarning/driver-fetch/48k-probe = Phase-49 installer-companion, intentionally out of in-app flow) + continuity smoke. Real-app drag/chrome/TCC + felt "looks peak" + fresh-account walk = KAAN-ACTION (`57-HUMAN-UAT.md`). Sidecar binary rebuild → Phase 58. Skipped standalone gsd-code-review (presentation-only CSS/TS + test assertions, already covered by ui-auditor). NOTE: Kaan ran a broad parallel persona/cooldown/audio-constants tuning WIP this session (17 uncommitted files: `__main__.py`, `dj_cohost.py`, `audio/constants.py`, `prompts/matrix.py`, `state/coach.py`, `mascot_window.rs`, `ws_client.rs`, `tauri.conf.json5`, several `tests/`) — Phases 56+57 preserved ALL of it untouched. **Phases 51–57 COMPLETE (7/8, 88%).** Next: plan + execute Phase 58 (Ship Readiness).
 
 ---
 
@@ -33,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 58 — Ship Readiness
+- **Current focus:** v4.0 milestone lifecycle (audit → complete → cleanup) — all 8 phases engineering-complete
 - **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts on external clock).
 - **Project mode:** standard.
 - **Granularity:** fine.
@@ -44,10 +48,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 ## Current Position
 
-Phase: 58 (Ship Readiness) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 58
-Last activity: 2026-05-21 -- Phase 58 execution started
+Phase: 58 (Ship Readiness) — COMPLETE — ALL 8 v4.0 PHASES ENGINEERING-COMPLETE
+Plan: 4 of 4
+Status: v4.0 engineering done (8/8); ready for milestone lifecycle (audit → complete → cleanup)
+Last activity: 2026-05-21 -- Phase 58 complete; all v4.0 phases engineering-green
 
 ## Performance Metrics
 
