@@ -70,3 +70,30 @@ a pill-introduced reference; no NEW `mascot.html` ref was added by this plan).
 A future cleanup could either rephrase the persona_smoke comment to avoid the
 literal string or add it to the gate's allowlist, but that belongs to the
 mascot/e2e fence owner, not this config-wiring plan.
+
+---
+
+## Phase-level KAAN-ACTION (live-confirm on the BUILT `.dmg`) — verification close
+
+Phase 62 closed `human_needed` at **4/4 PILL must-haves engineering-verified**
+(cargo 61/61 · vitest 787/787 · tsc clean · pytest 7-WIP baseline; 2 code-review
+blockers + 5/6 warnings fixed). The open items are felt/visual/build behaviors only
+the built app on real hardware can settle — surface, do NOT pause (`gsd-autonomous fully`):
+
+1. **Drag-on-unfocused-window FEEL** (PILL-01/04) — drag the pill while the DJ app is
+   focused; follows the cursor, no focus flash (`startDragging` on the 28px strip).
+2. **Focus non-steal** (PILL-04) — click the pill, then type → keystrokes land in the DJ
+   app, not vibemix. Confirms whether the **Accessory-policy floor** suffices or whether a
+   real crates.io `objc2-app-kit` NSPanel subclass is needed (the unsound in-place objc2
+   class-swap was removed in CR-01). Accessory is applied ONLY in `primary_surface=pill`
+   mode — confirm the main window keeps Dock/Cmd-Tab in mascot/none modes.
+3. **`.dmg` transparency parity** (PILL-01) — no opaque white chrome box around the pill
+   on macOS (tauri#13415 OPEN upstream; mitigated by the explicit `--glass-3` rgba surface).
+4. **Windows transparency parity** (PILL-01) — explicit `--glass-*` rgba renders (no white box).
+5. **Multi-monitor felt clamp** (PILL-01) — move across monitors / unplug a display → clamps
+   to a visible region (engine: `clamp_to_work_area` + `ScaleFactorChanged`, unit-tested).
+6. **Rendered 4-state look** (PILL-03) — idle / listening / speaking (real voice.rms waveform)
+   / expand (reaction + citation strip + honest deck chips) reads right in CDJ-Whisper register.
+
+> If the focus floor proves insufficient (item 2), remediation = a crates.io
+> `objc2-app-kit` real NSPanel subclass — a follow-up, NOT a v5.0 blocker.
