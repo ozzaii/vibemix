@@ -113,7 +113,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
 - [x] 62-02-PLAN.md — primary_surface tri-state config (pill default | mascot | none) + main.rs surface selection; mascot kept secondary, mascot-audit fence green [PILL-02]
 - [x] 62-03-PLAN.md — Additive deck_state field on the existing ws:8765 frame (read-only, honest-null, golden-equivalence) — the deck-chip wire source [PILL-03]
 - [x] 62-04-PLAN.md — Pill UI core: transparent pill.html + pure 4-state machine + frame consume + real-voice.rms waveform + citation strip (reuse) [PILL-03]
-- [ ] 62-05-PLAN.md — Deck-context chips (consume 62-03, honest unknown) + explicit --glass-3 rgba transparency parity + DMG KAAN-ACTION [PILL-03, PILL-01]
+- [x] 62-05-PLAN.md — Deck-context chips (consume 62-03, honest unknown) + explicit --glass-3 rgba transparency parity + DMG KAAN-ACTION [PILL-03, PILL-01]
 **Spike (research-flagged, resolve FIRST in plan-time)**: pill drag-on-unfocused-window (tauri#11605/#10767/#14102) — resolve `startDragging` vs `data-tauri-drag-region` vs NSPanel `isMovableByWindowBackground` on the built app *before* building the UI; plus the DMG-build transparency regression (tauri#13415). This is the single most likely "looks done but feels broken" failure.
 **UI hint**: yes
 
@@ -130,7 +130,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
 | 59. Full Deck Awareness + Grounding | v5.0 | 5/5 | Complete   | 2026-05-21 |
 | 60. Harmonic-Feedback Confidence Gate | v5.0 | 3/4 | In Progress|  |
 | 61. Actionable-Not-Hype Coach Persona | v5.0 | 2/2 | Complete   | 2026-05-21 |
-| 62. Floating Pill UI | v5.0 | 4/5 | In Progress|  |
+| 62. Floating Pill UI | v5.0 | 5/5 | Complete   | 2026-05-21 |
 
 **Coverage:** 17/17 v5.0 requirements mapped ✓ (no orphans, no duplicates). Per-phase: P59=5 (DECK-01..05) · P60=4 (HARMONIC-01..04) · P61=4 (COACH-01..04) · P62=4 (PILL-01..04).
 
