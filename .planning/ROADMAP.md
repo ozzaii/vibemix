@@ -95,7 +95,9 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
   2. The persona refactor **extends the existing COACH cells** (`prompts/matrix.py`) + `task_for_event` arms (`state/coach.py`) — it adds **no new mode** (preserves the `_CELLS`/`_VALID_MODES` env-var contract) and flows through both the genai and OpenRouter paths.
   3. **Hype mode is regression-fenced with goldens** — the Phase-54-validated hype voice cannot silently break or go cold from shared-prompt edits; any hype-golden change is a deliberate, reviewed decision (cross-mode verification gate green).
   4. Every prescriptive note stays **anti-slop / cited** — it ties to an observed deck-state or event, the warm "friend in your ear" tone is preserved, and cooldown/pacing prevents nagging (no robotic over-correction; harmonic fragments injected only when the tier supplies them, so the model can't be tempted to invent them).
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 61-01-PLAN.md — Wave-0 test fence: coach-cell contract asserts (RED spec), KEY_CLASH/TRANSITION voice fence, dual-path `_prompt_body` proof, coach-context anti-slop assert
+- [ ] 61-02-PLAN.md — Sharpen the 3 COACH cells (beginner impact-clause + deck/harmonic path; intermediate balance rule; pro verb-list) + lockstep coach anchors; hype frozen
 
 ### Phase 62: Floating Pill UI
 **Goal**: A small, transparent, always-on-top, draggable Super-Whisper-style pill becomes the **primary** live surface — positionable anywhere on screen, multi-monitor safe, never stealing keyboard focus mid-set or covering critical deck info. It consumes the existing ws:8765 frames (no new port, no Python delivery change), shows idle/listening/speaking/expand-on-event states with the real TTS waveform + citation strip, and demotes the Three.js mascot to opt-in/secondary without regressing it.
