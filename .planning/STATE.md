@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v5.0
-milestone_name: The Useful Cut
-status: Awaiting next milestone
-last_updated: "2026-05-21T22:50:39.236Z"
-last_activity: 2026-05-21 — Milestone v5.0 completed and archived
+milestone: v6.0
+milestone_name: The Memory Turn
+status: planning
+last_updated: "2026-05-21T22:54:07.969Z"
+last_activity: 2026-05-21
 progress:
-  total_phases: 12
-  completed_phases: 12
-  total_plans: 42
-  completed_plans: 42
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # vibemix — State
@@ -45,10 +45,10 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 
 ## Current Position
 
-Phase: Milestone v5.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-21 — Milestone v5.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-21 — Milestone v6.0 started
 
 ## Performance Metrics
 

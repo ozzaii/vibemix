@@ -10,20 +10,23 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v5.0 The Useful Cut
+## Current Milestone: v6.0 The Memory Turn
 
-**Goal:** Turn the co-host from a vibe-narrator into a genuinely *useful* DJ tool — one that understands the whole deck, gives feedback a DJ can actually act on, and lives in an unobtrusive draggable surface instead of a full-screen mascot.
+**Goal:** Shift vibemix from a *reactive* AI co-host to a *forward-leaning* AI **copilot**. The mechanism is memory: every session feeds an embedding layer; coach prompts ground in past sessions, not just the current moment. Personalization is an emergent property of the retrieval seam — not a configured feature, not an LLM-extraction layer.
 
-**Target features:**
-- **Full deck awareness** — the co-host ingests and understands *every* track loaded across the decks (not one mix in isolation). Session-wide track knowledge powers concrete transition-execution feedback (how to run the blend) and harmonic key-clash detection (overlapping elements in clashing keys). Strong = real harmonic theory (Camelot/key-relationship awareness) + transition mechanics depth, not surface vibe.
-- **Actionable feedback, not hype** — retire the narrator/cheerleader persona; the feedback voice gives concrete, applicable DJ notes only. Builds on the in-flight `live-tuning-or-brain` work (OpenRouter brain+TTS, English pro-feedback, pacing/persona fixes) — extends it, doesn't duplicate it.
-- **Floating pill UI** — a small, draggable Super-Whisper-style pill, positionable anywhere on screen, becomes the **primary** live surface. The Three.js 3D mascot overlay (`tauri/ui/mascot.html`) becomes opt-in/secondary — kept, not retired. Deliberate, Kaan-approved partial reversal of the shipped CDJ-Whisper/VTuber-mascot direction for the in-set surface.
+**Target features (scope spine):**
+- **Ingest pipeline** — session artifacts (`events.jsonl`, voice/input audio, MIDI moves, track metadata) → typed embeddable records. Raw in, raw out — no LLM-extraction between session and embedding (extraction = confabulation surface = anti-slop violation).
+- **Storage** — `sqlite-vec` + a ~50-line wrapper, scoped per-install (retention + size budget TBD in research). Pure-Python, embedded, no server, green on one-click install.
+- **Retrieval seam** — the coach prompt is grounded with top-k past moments at reaction time (hybrid cosine + time-weight, TBD per research). The same grounding discipline as the existing registry — past moments become another grounding axis.
+- **Visible copilot moves (1–2)** — end-user-noticeable proofs retrieval is firing: the AI calls back a vocabulary/transition shape it has seen the DJ make, or cites a past moment in its reaction.
 
-**Open feasibility (de-risk in research):** the deck data-source for "all loaded tracks" — pyrekordbox / DJ-software library files / screen OCR / dual-deck audio analysis / nowplaying-cli — is unresolved. Milestone research (run first) must land a recommended source + fallback before requirements lock.
+**Locked decisions (from `.planning/notes/v-next-memory-turn.md`):** Gemini Embedding 002 (`gemini-embedding-001`, natively multimodal); `sqlite-vec` + DIY wrapper; **no managed memory framework** (Mem0 / Letta / Zep / Cognee all rejected); **no LLM-extraction layer**. Acid test for any embedded artifact: *"does retrieving this close a hallucination class or unlock a copilot move?"* — if neither, don't embed it.
+
+**Open feasibility (de-risk in research):** which session artifacts ground best (the FIRST phase's research, not a pre-decided answer); the retrieval blend (cosine vs cosine+time-weight); retention/size budget per install; how `sqlite-vec` loads cleanly across the one-click Mac+Win install.
 
 **v4.0 status:** "SHIP" (Phases 51–58) is **engineering-complete (8/8)** but deliberately **NOT archived** — its public publish stays gated on the external signature clock (Apple Dev Agreement + SignPath OSS cert). v5.0 runs as the active milestone alongside it; v4.0's KAAN-ACTION discharge surface (`KAAN-ACTION-LEGAL.md §SHIP-V4`) is unchanged.
 
-**Last shipped:** v3.1 "Distribution-Ready Pass" — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts ride the v3.0 external clock per `gsd-autonomous fully` mode).
+**Last shipped:** v5.0 "The Useful Cut" — 2026-05-22 (status: `tech_debt` accepted; deck-aware + actionable coach + floating pill. KAAN-ACTION live-confirm items ride forward: harmonic clash veto flip, vision-eval, coach/pill live-ear+felt passes, FLX4 live. `v5.0` git tag + branch merge deferred to Kaan — `live-tuning-or-brain` unmerged).
 
 (v4.0 "SHIP" engineering-complete 2026-05-21, publish on signature clock. v3.1 shipped 2026-05-18. v3.0 "Clean OSS Ship" 2026-05-17. v2.1 "The Unified Cut" 2026-05-16. v2.0 2026-05-14. v0.1.0 2026-05-13. Full archives in `.planning/milestones/`.)
 
