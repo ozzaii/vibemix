@@ -24,10 +24,13 @@ const CSS = `
   .vmx-timecode {
     /* 2026-05-19 /impeccable critique fix: hero shadow lifted to the
      * documented .vmx-tile[data-tile="hero"] recipe — 0 16px 36px
-     * rgba(0,0,0,0.5) — instead of the bespoke 0 24px 60px stack that
-     * was 50% heavier than DESIGN.md §4 prescribes. Timecode is the
-     * single hero panel in the session view; the recipe must match
-     * what tokens.css publishes for that role. */
+     * rgba(0,0,0,0.5). Timecode is the single hero panel in the session
+     * view; the recipe must match what tokens.css publishes for that role.
+     * 2026-05-21 /impeccable pass 57 (MEDIUM): the code still carried the
+     * bespoke 0 24px 60px / 0.6 stack the comment said was removed — a
+     * stale comment vs. code mismatch + a drop 67% deeper than DESIGN.md
+     * §4 allows ("the hero panel gets one 0 16px 36px drop"). Aligned the
+     * box-shadow to the published hero recipe so code matches contract. */
     position: relative;
     background: var(--glass-1);
     backdrop-filter: var(--blur-glass);
@@ -38,7 +41,7 @@ const CSS = `
     box-shadow:
       inset 0 1px 0 var(--glass-top),
       inset 0 -1px 0 rgba(0, 0, 0, 0.55),
-      0 24px 60px rgba(0, 0, 0, 0.6),
+      0 16px 36px rgba(0, 0, 0, 0.5),
       0 0 0 1px rgba(255, 255, 255, 0.018);
     overflow: hidden;
     display: flex;
