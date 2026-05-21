@@ -205,6 +205,42 @@ def test_dispatch_06_gen_cfg_system_instruction_matches_dispatch(
     assert "[ev:" in agent._gen_cfg.system_instruction
 
 
+# ---------- Phase 61 COACH-02: ONE prompt body feeds BOTH paths -----------
+
+
+def test_dispatch_61_coach_prompt_body_feeds_both_paths(
+    mocker, tmp_path, monkeypatch
+) -> None:
+    """COACH-02 dual-path proof: the single ``build_system_instruction`` result
+    feeds BOTH the genai path (``_gen_cfg.system_instruction``, dj_cohost.py:447)
+    AND the OpenRouter path (``stream_or(system_instruction=self._prompt_body)``,
+    dj_cohost.py:813-816). They are the SAME body — no path-specific persona
+    code — and ``_VALID_MODES`` stays the two-element no-new-mode invariant.
+    """
+    from vibemix.prompts.matrix import _VALID_MODES
+
+    monkeypatch.setenv("VIBEMIX_SKILL_LEVEL", "pro")
+    monkeypatch.setenv("VIBEMIX_MODE", "coach")
+    mocker.patch.object(Agent, "__init__", return_value=None)
+    state = _build_state()
+    recorder = _FakeRecorder(tmp_path)
+    agent = DJCoHostAgent(
+        genai_client=mocker.MagicMock(),
+        clean_audio_buf=mocker.MagicMock(),
+        screen_buf=mocker.MagicMock(),
+        state=state,
+        recorder=recorder,
+        llm_inst=mocker.MagicMock(),
+        tts_inst=mocker.MagicMock(),
+    )
+    # Dual-path equality: the genai system_instruction IS the OpenRouter body.
+    assert agent._gen_cfg.system_instruction == agent._prompt_body
+    # Both carry the rendered COACH_PRO persona as the prefix.
+    assert agent._prompt_body.startswith(_coach_rendered(COACH_PRO))
+    # No-new-mode invariant — exactly hype + coach, nothing else.
+    assert _VALID_MODES == frozenset({"hype", "coach"})
+
+
 # ---------- invalid env values fail loudly --------------------------------
 
 

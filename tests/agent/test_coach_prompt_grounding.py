@@ -185,3 +185,35 @@ def test_build_prompt_uses_real_evidence_registry_not_mocks():
     prompt = AICoach.build_prompt(ev, registry_snapshot=snap)
     assert "evidence_corpus[ev=1,aud=0,mix=0]" in prompt
     assert prompt.endswith("don't go silent.")  # the HEARTBEAT coach task tail
+
+
+# =========================================================================== #
+# Phase 61 COACH-04: coach-context anti-slop / fabricated-key strip            #
+# =========================================================================== #
+
+
+def test_coach_grounding_61_fabricated_key_strips():
+    """COACH-04: the structural anti-slop guarantee the coach persona relies on
+    holds in a coach-prompt context. With a snapshot that observed NO harmonic
+    key, a coach reply that fabricates a ``[key:A:12B]`` is uncitable-by-
+    construction — the existence-only CitationLinter strips the WHOLE turn
+    (response-level binary). The linter is NOT modified; this PINS the contract
+    in a coach setting. Mirrors tests/coach/test_citation_linter.py's headline
+    DECK-03 anti-slop case without duplicating its logic."""
+    from vibemix.coach.citation_linter import CitationLinter
+
+    # A real registry that observed grounded evidence but NO key — so a
+    # fabricated [key:...] was never written and cannot validate.
+    reg = EvidenceRegistry()
+    reg.write("ev", "MIX_MOVE", 83.0)
+    reg.write("mix", "audible_deck=A", 0.0)
+    snap = reg.snapshot()
+    assert "key" not in snap  # nothing harmonic was observed
+
+    linter = CitationLinter()
+    result = linter.check("clashing keys [key:A:12B]", snap, mode="live")
+
+    # The fabricated key strips the whole turn (existence-only branch).
+    assert result.valid is False
+    assert ("key", "A:12B") in result.missing
+    assert result.reason == "invalid_atoms"
