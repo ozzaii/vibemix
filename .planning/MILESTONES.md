@@ -1,5 +1,46 @@
 # vibemix — Milestones
 
+## v5.0 The Useful Cut (Shipped: 2026-05-21)
+
+**Phases completed:** 12 phases, 42 plans, 67 tasks
+
+**Key accomplishments:**
+
+- Requirements:
+- Requirements:
+- Requirements:
+- Requirements:
+- Requirements:
+- Requirements:
+- Requirements:
+- FLOOR (REAL `EventDetector`)
+- Extended Phase 54's anti-slop spine to COACH (feedback) mode: the REAL CitationLinter strips an unbacked coach citation and passes the grounded one; coach-relevant events fire grounded across ≥2 genres through the REAL EventDetector; empty evidence never fires — all with real primitives, no mocks, no network.
+- Registry from the real fixture.
+- Closed the LIVE-05a anti-slop gap on the shipped Three.js rig: SnapshotSlice now carries music/voice levels and drop/peak/breakdown mode entry requires the music level to confirm the phase — a spurious `phase=drop` during a quiet section no longer fires the peak animation.
+- Extended four existing perf tests to lock the PERF-01 TTFT telemetry floor and the MINIMAL-thinking gate, plus the PERF-02 zero-underrun floor under both-mode reaction traffic — all CI-runnable without real hardware, zero production code changed.
+- Closed the remaining LIVE-05a contract items on the shipped Three.js rig: all six contract modes are proven reachable from real canonical bus events, the AI-speaking path provably overrides every music mode via the existing talk-block rule, mood/emotion are pinned as renderer tints (never FSM branches), and a synthetic mode-transition frame in the dispatch-latency test confirms the mode machine adds no measurable sidecar->client latency (p95 ~0.22ms, well under the 50ms PERF-03 budget).
+- Five headless regression assertions (2 new pytest gates, 1 new vitest spec, 1 extended chrome spec) that pin the three v0.1.0-rc1 carryover-bug fixes shipped in `fac4c4a` so the drag capability, JS drag fallback, chrome strip hide, deep-link form, and TCC prime path can no longer silently regress.
+- Task 1 — Friction audit (`docs/internal/first-run-friction-audit.md`):
+- Rebuilt the AIza-clean vibemix-core sidecar for both apple-darwin triples, produced an unsigned macOS `.dmg` for Gate 2 to inspect (notarization blocked on the EXTERNAL Apple agreement — documented, not forced), and GENERATED `.planning/v4.0-MILESTONE-AUDIT.md` reading `overall_verdict: WIRED` after fixing a generator bug that was reporting false-MISSING seams.
+- Fixed the latent REPO_ROOT double-`..` path bug in record_50a_walk.sh (now cwd-independent, target pinned to docs/e2e/2026-05-walk.webm) and proved the Gate-6b producer→consumer path green on a REAL rendered report with Hallucination honestly PARTIAL pending Kaan's ear.
+- `cut_release.sh` re-pointed to the v0.1.0-rc public tag + v4.0 milestone audit, with a `--dry-run` signature-stub mode that exits GREEN on the real Plan-01/02 artifacts (everything but the EXTERNAL signature ready) while the `gh release create` hard guard stays absolute and regression-pinned.
+- Task 1 — `harmonics.to_camelot` (the load-bearing pure function):
+- Added a dedicated existence-only `key:` evidence source (body `<deck>:<camelot>`, e.g. `[key:A:8A]`) across all 5 schema-mirror touchpoints so the existing CitationLinter strips any fabricated harmonic clash — the un-cited-harmonic-feedback retrofit (Risk 2) lands BEFORE any Phase 60 harmonic prompt text.
+- Registered KEY_CLASH (pri 7 / 28s) + TRANSITION_OPPORTUNITY (pri 5 / 20s) event types as plumbing-only, and landed the DECK-05 strictly-read-only repo test (tokenize-stripped two-tier scan + SQLCipher dormancy) that fails if any future commit writes a DJ-software DB.
+- Task 2 — `_tick_once` single-writer wiring (TDD RED→GREEN):
+- A SEPARATE structured-output Gemini deck-read (`DeckVisionReader`) + a real-screenshot accuracy eval harness + a KAAN-ACTION accuracy-floor gate — the universal cross-app fallback leg of the source ladder, shipped DORMANT (vision_enabled=False) behind the eval so it can never feed a misread key until Kaan signs off the real-rig corpus.
+- Pure table-driven `is_clash`/`compatible`/`semitone_distance` on top of `to_camelot` — the anti-slop core where the LLM narrates a Camelot clash the code already proved, never computing intervals (HARMONIC-01).
+- Wired `_melodic_overlap_gate` + the KEY_CLASH and TRANSITION_OPPORTUNITY branches into `EventDetector.detect()` behind a default-off `harmonic_clash_enabled` flag — a clash is structurally impossible to reach the audience unless the melodic-overlap gate passes, both decks clear the 0.6 cite floor, `is_clash()` returns True, AND the Kaan-ear ship gate flips the flag.
+- Task 1 — corpus + veto test (`6c5805c`):
+- Replaced the two Phase-59 stub coach arms with real cited harmonic fragments — KEY_CLASH hands the LLM a system-decided verdict + both decks' keys to cite + a hard "do NOT compute intervals" rule; TRANSITION_OPPORTUNITY is a strictly past-tense retrospective blend note — and reconciled the matrix [ev:<TYPE>] grammar.
+- Built `pill_window.rs` as a clone-with-subtraction of `mascot_window.rs` (transparent/on-top/decoration-less/non-focus-steal, interactive — NOT click-through), with pill-scoped 200ms-debounced geometry persistence, a display-change re-clamp hook, the macOS focus-non-steal Accessory FLOOR plus a gated NSPanel STRETCH, and the `"pill"` capability-allowlist entry that closes the v0.1.0-rc1 drag-capability debt.
+- Added the `primary_surface` tri-state config (`pill` default | `mascot` opt-in | `none`) to `config.rs` and wired `main.rs` setup() to create the pill, the mascot, or neither at session start — making the floating pill the primary in-set surface while keeping the mascot buildable on demand and the mascot-audit fence green.
+- Additive read-only `deck_state` field ({side: {title, camelot, key, bpm, confidence}}) serialized onto the EXISTING flat 30Hz mascot frame on ws://127.0.0.1:8765 — honest-null keys, golden-equivalence on empty, single-writer untouched, no new port.
+- The pill consumes the existing ws:8765 bus (direct-WS, no new port) and renders idle/listening/speaking/expand from real wire data — a pure 4-state machine, a real voice.rms TTS waveform (meter.ts tokens), and a verbatim citation strip — all decoupled from src/mascot/ so the mascot-audit fence stays green.
+- Honest deck-context chips (`a · 8a · 128`, dim `unknown` on null, `decks · unknown` when nothing resolves) consuming the 62-03 `deck_state` wire field, wired into the pill expand panel, plus the explicit `var(--glass-3)` rgba surface that guarantees mac+win transparency parity (no OS vibrancy, DMG-#13415-resistant).
+
+---
+
 Living history of shipped milestones. One entry per milestone, newest first. Detailed archives in `.planning/milestones/`.
 
 ---
@@ -29,6 +70,7 @@ Living history of shipped milestones. One entry per milestone, newest first. Det
 ### Carveouts at close (`gsd-autonomous fully` mode)
 
 Critical-path discharge order (per audit):
+
 1. §INSTALL-COMPANION-SIGN — SignPath OSS Foundation cert grant (Authenticode for `.ps1` + `.py`).
 2. §INSTALL-VM-RUN — Real Tart VM execution on macOS 12.3 / 14 / 15 + Win 10 / 11.
 3. §E2E-50A-WALK — Kaan's MacBook walk with real DJ-set audio; `docs/e2e/2026-05-walk.webm` capture.

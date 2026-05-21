@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v5.0
 milestone_name: The Useful Cut
-status: verifying
-last_updated: "2026-05-21T22:07:15.651Z"
-last_activity: 2026-05-21
+status: Awaiting next milestone
+last_updated: "2026-05-21T22:50:39.236Z"
+last_activity: 2026-05-21 — Milestone v5.0 completed and archived
 progress:
   total_phases: 12
   completed_phases: 12
@@ -45,16 +45,10 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 
 ## Current Position
 
-Phase: 62 (floating-pill-ui) — COMPLETE & VERIFIED (human_needed: 4/4 PILL eng-verified, 6 KAAN-ACTION live items). **v5.0 "The Useful Cut" = 4/4 phases complete.**
-Plan: 5 of 5 COMPLETE + code-review (2 blockers + 5/6 warnings fixed) + UI-review (21/24, 3 priority + 2 minor fixes). cargo 61/61 · vitest 787/787 · tsc clean · pytest 7-WIP baseline.
-Status: v5.0 engineering COMPLETE → entering milestone lifecycle (audit → complete → cleanup), then v6.0 "The Memory Turn".
-Last activity: 2026-05-22 -- Phase 62 complete; v5.0 done; starting lifecycle
-
-**62-02 done (PILL-02):** `primary_surface` tri-state config (`pill` default | `mascot` opt-in/secondary | `none`) in `config.rs` (closed `PrimarySurface` enum mirroring `MascotWindowState`, lowercase serde rename, absent-key → Pill, `.unwrap_or_default()` on decode error) + `main.rs` setup() surface-selection branch (`Pill` → `create_pill_window`, `Mascot` → `create_mascot_window` preserved, `None` → no surface; all non-fatal). Transient 62-01 `#![allow(dead_code)]` cleared from `pill_window.rs`. **Mascot demoted, NOT deleted**; mascot-audit fence held (diff = 3 Rust src files; `mascot.html` byte-stable; `test_ci_grep_gates` 7/7 + mascot mirror 75/75). Capability snapshot already in sync (no capability files touched). `cargo test` 61/61, build warning-free. Commits `b9bbabb` (RED) → `a1f71b8` (GREEN config) → `d197533` (main.rs wiring).
-
-**62-03 done (PILL-03 producer):** additive read-only `deck_state` ({side: {title, camelot, key, bpm, confidence}}) on the flat 30Hz ws:8765 frame — honest-null (unresolved → camelot/key=null), golden-equivalence on empty ({}), single-writer untouched, no new port. Tests `tests/runtime/test_ws_bus_deck_state.py` GREEN; full suite at branch-WIP baseline (9 failed/4087 passed — none touch ws_bus; the +2 over the documented 7 were 62-02's `SNAPSHOT.json` drift, since RESOLVED — snapshot regenerated for `"pill"` in `5fe1f6a`; see phase `deferred-items.md`). Commits a01ef3f (RED) + c202184 (GREEN).
-
-**62-05 done (PILL-03 consumer + PILL-01):** `deck-chips.ts` consumes the 62-03 `deck_state` field → one honest `<deck> · <key> · <bpm>` chip per resolved deck (`a · 8a · 128`), dim `unknown` (`--silk-40`) on null camelot/bpm, single `decks · unknown` chip when nothing resolves — NEVER a fabricated key (T-62-15). Amber key glyph ONLY when resolved (20/80, the 4th reserved accent). Wired into the pill expand panel BELOW the citation strip via `readDeckState`/`syncDeckChips` in `index.ts` (`#pill-decks` un-hidden — 62-04's intentional stub closed). `pill.css` (NEW, token-only) paints the visible pill surface with an EXPLICIT `var(--glass-3)` rgba fill (NOT OS vibrancy) → mac+win parity + DMG tauri#13415 resistance; `backdrop-filter` enhancement-only; body stays transparent (overlay invariant). vitest **776/776** green (was 761; +15 deck-chips tests), `tsc --noEmit` clean, pill.css token-only (no hex), no `mascot.html` ref (mascot-audit safe). Task 3 (DMG/Windows transparency + live deck key/bpm) = KAAN-ACTION (live-confirm), auto-approved overnight, recorded in SUMMARY — not a blocker. Commits `4c4230f` (RED) → `b2c185e` (GREEN deck-chips) → `4ba18dc` (wire + pill.css). **PILL-03 fully satisfied (producer 62-03 + consumer 62-05); PILL-01 explicit-rgba transparency parity shipped.**
+Phase: Milestone v5.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-21 — Milestone v5.0 completed and archived
 
 ## Performance Metrics
 
@@ -265,4 +259,4 @@ All external-clock items from v3.0 / v3.1 / v4.0 remain on the same clock — v5
 
 ## Operator Next Steps
 
-- Plan the first phase with /gsd-plan-phase 59
+- Start the next milestone with /gsd-new-milestone
