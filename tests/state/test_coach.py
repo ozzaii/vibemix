@@ -278,13 +278,20 @@ def test_task_layer_arrival_exact_string():
 
 def test_task_mix_move_LOAD_BEARING_anti_slop_clause():
     """The 'Do NOT name faders/EQs/knobs/decks/controls' clause is the v4
-    anti-slop tightening — DO NOT paraphrase on refactor."""
+    anti-slop tightening — DO NOT paraphrase on refactor. 2026-05-21: MIX_MOVE
+    reframed so the move is the trigger seed, NOT the topic — the cohost gives
+    feedback on the mix as a whole instead of narrating the last knob move
+    (Kaan-directed: 'give me feedback on my mix, not the latest move')."""
     out = AICoach.task_for_event(
         _ev("MIX_MOVE", {"moves": ["A_play→ON", "A_low: cut→killed (big twist)"]})
     )
     assert "MIDI moves [A_play→ON, A_low: cut→killed (big twist)]" in out
     assert "Do NOT name faders/EQs/knobs/decks/controls" in out
-    assert "If the audio didn't actually change, output a single space to stay silent." in out
+    # The move is the trigger, not the headline — react to the whole mix.
+    assert "MIX AS A WHOLE" in out
+    assert "NOT to the knob/fader" in out
+    # Silence path still present (now keyed on "nothing fresh on the mix").
+    assert "output a single space to stay silent" in out
 
 
 def test_task_heartbeat_LOAD_BEARING_anti_silence_clause():

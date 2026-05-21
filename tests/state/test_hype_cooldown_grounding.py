@@ -122,7 +122,7 @@ def test_v4_cooldown_baseline_values_are_pinned():
     assert MIN_EVENT_GAP_PER_TYPE["MIX_MOVE"] == 14.0
     assert MIN_EVENT_GAP_PER_TYPE["LAYER_ARRIVAL"] == 10.0
     assert MIN_EVENT_GAP_PER_TYPE["TRACK_CHANGE"] == 5.0
-    assert EVENT_GLOBAL_MIN_GAP == 10.0
+    assert EVENT_GLOBAL_MIN_GAP == 22.0
     assert HEARTBEAT_SEC == 45.0
     # HEARTBEAT per-type gap flows from HEARTBEAT_SEC.
     assert MIN_EVENT_GAP_PER_TYPE["HEARTBEAT"] == HEARTBEAT_SEC

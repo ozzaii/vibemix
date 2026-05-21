@@ -358,12 +358,13 @@ def test_llm_node_06_history_clause_shape(mocker, tmp_path) -> None:
 
     second_contents = gen_client.aio.models.generate_content_stream.call_args.kwargs["contents"]
     second_prompt_text = second_contents[0]
-    assert "RECENT THINGS YOU JUST SAID (do NOT repeat or rephrase" in second_prompt_text
+    assert "RECENT THINGS YOU JUST SAID (each tagged [M:SS]" in second_prompt_text
     assert "first_reply" in second_prompt_text
 
 
 def test_llm_node_07_history_truncation_to_140_chars(mocker, tmp_path) -> None:
-    """LLM-NODE-07: stripped text truncated to 140 chars before deque append."""
+    """LLM-NODE-07: stripped text truncated to 140 chars before deque append
+    (entry also carries a leading [M:SS] set-time prefix — Kaan-directed 2026-05-21)."""
     agent, gen_client, _, state = _build_agent(mocker, tmp_path)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="x")
@@ -378,7 +379,9 @@ def test_llm_node_07_history_truncation_to_140_chars(mocker, tmp_path) -> None:
     _drive_llm_node(agent)
 
     assert len(agent._ai_text_history) == 1
-    assert len(agent._ai_text_history[0]) == 140
+    # Text portion capped at 140 chars; the [M:SS] prefix adds a few more.
+    assert agent._ai_text_history[0].count("A") == 140
+    assert agent._ai_text_history[0].startswith("[")
 
 
 def test_llm_node_08_history_maxlen_10(mocker, tmp_path) -> None:

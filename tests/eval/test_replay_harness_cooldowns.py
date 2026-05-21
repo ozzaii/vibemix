@@ -83,13 +83,13 @@ def test_emit_cooldown_report_unknown_event_type_falls_back_to_global(
     capsys,
 ) -> None:
     """Event type not in MIN_EVENT_GAP_PER_TYPE → compares against
-    EVENT_GLOBAL_MIN_GAP (10.0) per the additive lookup semantics."""
-    gaps = {"NOVEL_DETECTOR_TYPE_X": [11.0, 11.0]}
+    EVENT_GLOBAL_MIN_GAP (22.0) per the additive lookup semantics."""
+    gaps = {"NOVEL_DETECTOR_TYPE_X": [25.0, 25.0]}
     _emit_cooldown_report(gaps)
     err = capsys.readouterr().err
     assert "NOVEL_DETECTOR_TYPE_X" in err
-    assert "expected_min=10.00s" in err  # EVENT_GLOBAL_MIN_GAP fallback
-    assert "median_gap= 11.00s" in err
+    assert "expected_min=22.00s" in err  # EVENT_GLOBAL_MIN_GAP fallback
+    assert "median_gap= 25.00s" in err
 
 
 def test_emit_cooldown_report_skips_single_event_types(capsys) -> None:

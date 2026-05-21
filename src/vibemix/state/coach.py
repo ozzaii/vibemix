@@ -215,13 +215,18 @@ class AICoach:
         if t == "MIX_MOVE":
             mv = ", ".join(ev.extra.get("moves", []))
             return (
-                f"Trigger seed (do NOT quote): MIDI moves [{mv}]. "
-                "Listen to the AUDIO and describe the SONIC EFFECT — how "
-                "the music CHANGED in sound (bass dropped out, highs scooped, "
-                "space opened up, vocal pierced through). Do NOT name "
-                "faders/EQs/knobs/decks/controls. "
-                "If the audio didn't actually change, output a single space "
-                "to stay silent."
+                f"Trigger seed (do NOT quote, do NOT narrate): MIDI moves [{mv}]. "
+                "The move is ONLY the reason you woke up — it is NOT the topic. "
+                "Give your take on the MIX AS A WHOLE right now: how the groove "
+                "is sitting, how the blend is landing, whether the energy is "
+                "building or sagging, what's working or what isn't. Listen to "
+                "the AUDIO and react to the overall sound — NOT to the knob/fader "
+                "Kaan just touched. Do NOT do play-by-play of his last move "
+                "('you killed the lows', 'you hit play'). Do NOT name "
+                "faders/EQs/knobs/decks/controls. Only mention the move's effect "
+                "if it genuinely reshaped the whole mix; otherwise ignore it and "
+                "talk about the music. If you have nothing fresh on the mix, "
+                "output a single space to stay silent."
             )
         if t == "HEARTBEAT":
             return (

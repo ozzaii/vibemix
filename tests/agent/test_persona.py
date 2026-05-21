@@ -51,8 +51,9 @@ def test_persona_03_anti_hallucination_substrings_present() -> None:
         "LATENCY IS BRUTAL",
         # The hard-gate section.
         "ANTI HALLUCINATION RULES (HARD GATES)",
-        # The single most-cited anti-slop clause.
-        "If you have NOTHING grounded to say, say NOTHING",
+        # The grounding hard-gate (relaxed 2026-05-21 to talk more, but the
+        # no-invention essence stays): silence only to avoid making things up.
+        "invented track name or a fake move",
         # The 4th-wall rule — kills "as an AI" disclaimers.
         "NEVER break the 4th wall",
         # The "audio is ground truth" rule — biases toward what's heard.

@@ -41,7 +41,7 @@ import os
 import sys
 import time
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from google import genai
 from google.genai import types
@@ -325,6 +325,14 @@ class DJCoHostAgent(Agent):
         # logging tail — NEVER in the audio/TTS hot path. Best-effort: any
         # append failure is swallowed so a sink hiccup can't touch a turn.
         transcript_sink: "collections.deque | None" = None,
+        # 2026-05-21 — OpenRouter LLM path. When ``or_client`` is non-None,
+        # llm_node streams the brain through OpenRouter (OpenAI-compat,
+        # ``or_model``) instead of the direct google.genai client — escapes
+        # the free-tier Gemini 503s while keeping inline-audio grounding
+        # (verified: OR passes input_audio to Gemini). None default keeps the
+        # direct-genai path byte-identical for every existing caller/test.
+        or_client: Any = None,
+        or_model: str = "google/gemini-3.5-flash",
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -345,6 +353,13 @@ class DJCoHostAgent(Agent):
             allow_interruptions=False,
         )
         self._genai_client = genai_client
+        # 2026-05-21 — OpenRouter brain path (see kwarg docstring). Store the
+        # resolved persona cell too: the OR path passes it as the system
+        # message (the direct path carries it in _gen_cfg.system_instruction
+        # / the context cache).
+        self._or_client = or_client
+        self._or_model = or_model
+        self._prompt_body = prompt_body
         self._clean_audio_buf = clean_audio_buf
         self._screen_buf = screen_buf
         self._state = state
@@ -440,6 +455,19 @@ class DJCoHostAgent(Agent):
         except Exception:
             pass
 
+    def _record_said(self, text: str) -> None:
+        """Append a spoken line to the no-repeat memory, prefixed with the
+        set-time it was said at ([M:SS]). Lets the model see WHEN it last
+        spoke so it doesn't re-react to a moment it already covered or
+        re-quote a set-time it already used. Kaan-directed 2026-05-21.
+
+        Stays a deque[str] (timestamp baked into the string) so the
+        existing _ai_text_history contract + tests are untouched.
+        """
+        set_s = getattr(self._state, "set_seconds", 0.0) or 0.0
+        stamp = f"{int(set_s // 60)}:{int(set_s % 60):02d}"
+        self._ai_text_history.append(f"[{stamp}] {text}")
+
     def set_next_event(self, ev: Event) -> None:
         self._pending_event = ev
         # Plan 19-05 — start the TTFT measurement window. Overwriting an
@@ -529,8 +557,11 @@ class DJCoHostAgent(Agent):
         if self._ai_text_history:
             recent = " | ".join(f'"{t}"' for t in self._ai_text_history)
             history_clause = (
-                f"\n\nRECENT THINGS YOU JUST SAID (do NOT repeat or rephrase — pick a "
-                f"DIFFERENT angle, or stay silent if there's nothing new): {recent}"
+                f"\n\nRECENT THINGS YOU JUST SAID (each tagged [M:SS] with the set-time you "
+                f"said it — compare against the current set_time in the evidence packet to know "
+                f"how long ago that was). Do NOT repeat, rephrase, or re-react to a moment you "
+                f"already covered, and don't re-quote a set-time you already mentioned. Find a "
+                f"FRESH angle on what's happening NOW: {recent}"
             )
 
         # Plan 40-01 / AUDIO-01 — mic-as-2nd-Gemini-Part decision. Three
@@ -753,11 +784,27 @@ class DJCoHostAgent(Agent):
         last_cache_hit_emitted: int = 0
         # ---- end Plan 41-02 telemetry block ----
         try:
-            stream = await self._genai_client.aio.models.generate_content_stream(
-                model=LLM_MODEL,
-                contents=contents,
-                config=gen_cfg,
-            )
+            if self._or_client is not None:
+                # 2026-05-21 — OpenRouter brain. Same ``contents`` (text +
+                # inline-audio Parts) converted to OpenAI-compat messages by
+                # the adapter; system instruction passed explicitly (no
+                # Gemini context cache on this path). Yields genai-shaped
+                # chunks so the downstream loop is byte-identical.
+                from vibemix.agent.openrouter_llm import stream_or
+
+                stream = stream_or(
+                    self._or_client,
+                    model=self._or_model,
+                    system_instruction=self._prompt_body,
+                    contents=contents,
+                    temperature=1.0,
+                )
+            else:
+                stream = await self._genai_client.aio.models.generate_content_stream(
+                    model=LLM_MODEL,
+                    contents=contents,
+                    config=gen_cfg,
+                )
             async for chunk in stream:
                 txt = getattr(chunk, "text", None) or ""
                 # ---- Plan 41-02 cache_hit telemetry ---------------------
@@ -991,7 +1038,7 @@ class DJCoHostAgent(Agent):
                             text=full_text,
                             latency_s=round(elapsed, 2),
                         )
-                        self._ai_text_history.append(stripped[:140])
+                        self._record_said(stripped[:140])
                         self._push_transcript(stripped[:140])
                     else:
                         print("[ai_text] <empty> (skip TTS)", flush=True)
@@ -1033,7 +1080,7 @@ class DJCoHostAgent(Agent):
                         # History appended on bypass — the user heard the
                         # text, so the no-repeat memory must reflect it.
                         if stripped:
-                            self._ai_text_history.append(stripped[:140])
+                            self._record_said(stripped[:140])
                             self._push_transcript(stripped[:140])
                     else:
                         # Strip path — no chunks yielded. Pre-recorded
@@ -1085,7 +1132,7 @@ class DJCoHostAgent(Agent):
                     self._recorder.log_event(
                         "ai_text", text=full_text, latency_s=round(elapsed, 2)
                     )
-                    self._ai_text_history.append(stripped[:140])
+                    self._record_said(stripped[:140])
                     self._push_transcript(stripped[:140])
                 else:
                     print("[ai_text] <empty> (skip TTS)", flush=True)

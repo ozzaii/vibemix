@@ -17,7 +17,7 @@ them OUT to module scope so Phase 3 can import without dragging EventDetector al
 from __future__ import annotations
 
 # ---- Audio I/O ----
-INVOKE_AUDIO_SECONDS = 18.0  # v4:100 — rolling audio snapshot length to LLM (Phase 4 consumer)
+INVOKE_AUDIO_SECONDS = 30.0  # 2026-05-21 (Kaan): bumped 18→30 for more audio context per turn. v4:100 — rolling audio snapshot length to LLM (Phase 4 consumer). Diet path (quick acks) still 6s — see DIET_AUDIO_SECONDS in dj_cohost.
 INPUT_SR_NATIVE = 48000  # v4:106 — BlackHole capture rate
 INPUT_SR_TARGET = 16000  # v4:107 — AudioBuffer / LLM consumption rate (post-resample)
 OUTPUT_SR = 24000  # v4:108 — AI voice output rate
@@ -56,7 +56,7 @@ PEAK_RMS = 0.110  # v4:129 — drop / chorus / full mix (v4 raised from 0.055)
 AUDIBLE_DEBOUNCE_SEC = 0.6  # v4:130 — debounce silent→audible
 SILENCE_DEBOUNCE_SEC = 1.2  # v4:131 — debounce audible→silent
 EVENT_GLOBAL_MIN_GAP = (
-    10.0  # v4:132 — global cooldown ("let the music breathe", retuned post-chat-log)
+    22.0  # 2026-05-21 (Kaan live): was 10.0 — co-host talked back-to-back ("peş peşe"). With ~6s LLM latency, a 10s gap = a reaction every ~16s = constant chatter. 22s gives real breathing room between ANY two reactions (gates every event type). v4:132 "let the music breathe".
 )
 # Plan 40-04 / AUDIO-03 — was 70.0; v4 chat-tested 2026-05-11 baseline
 # ("harikaydı" session). See project memory project_v4_canonical_baseline.

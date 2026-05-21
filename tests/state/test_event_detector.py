@@ -107,11 +107,11 @@ def test_kaan_spoke_respects_MIC_cooldown(mocker):
     ev2 = d.detect(ms, kaan_just_spoke=True, manual=False)
     assert ev2 is None
 
-    t.return_value = 1009.5  # 9.5s later, > 3.0s MIC but still < 10s global
+    t.return_value = 1009.5  # 9.5s later, > 3.0s MIC but still < 22s global
     ev3 = d.detect(ms, kaan_just_spoke=True, manual=False)
     assert ev3 is None  # global cooldown still blocks
 
-    t.return_value = 1011.0  # > 10s global → KAAN_SPOKE fires again
+    t.return_value = 1023.0  # > 22s global → KAAN_SPOKE fires again
     ev4 = d.detect(ms, kaan_just_spoke=True, manual=False)
     assert ev4 is not None
     assert ev4.type == "KAAN_SPOKE"
@@ -146,7 +146,7 @@ def test_manual_respects_MANUAL_cooldown(mocker):
     ev3 = d.detect(ms, kaan_just_spoke=False, manual=True)
     assert ev3 is None
 
-    t.return_value = 1011.0  # > 10s global → MANUAL fires again
+    t.return_value = 1023.0  # > 22s global → MANUAL fires again
     ev4 = d.detect(ms, kaan_just_spoke=False, manual=True)
     assert ev4 is not None
     assert ev4.type == "MANUAL"
@@ -788,8 +788,8 @@ def test_18_02_registry_write_per_event_type(mocker):
     ev = d.detect(ms, kaan_just_spoke=True, manual=False)
     assert ev is not None and ev.type == "KAAN_SPOKE"
 
-    # 2) MANUAL — also bypass; advance past global cooldown (10s)
-    t = _patch_time(mocker, 1011.0)
+    # 2) MANUAL — also bypass; advance past global cooldown (22s)
+    t = _patch_time(mocker, 1023.0)
     ev = d.detect(ms, kaan_just_spoke=False, manual=True)
     assert ev is not None and ev.type == "MANUAL"
 

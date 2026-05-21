@@ -153,13 +153,27 @@ pub async fn forward_ipc_to_sidecar(
     message: serde_json::Value,
     state: tauri::State<'_, WsClientHandle>,
 ) -> Result<(), String> {
-    let mut guard = state.tx.lock().await;
-    let Some(sink) = guard.as_mut() else {
-        return Err("forward_ipc_to_sidecar: WS not connected".into());
-    };
-    let text = serde_json::to_string(&message).map_err(|e| e.to_string())?;
-    sink.send(Message::Text(text.into()))
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    // Sidecar boot race (2026-05-21): the webview fires its startup IPC
+    // (settings.get, status.recheck, profile load) the instant it mounts,
+    // but the Rust WS client hasn't connected to the sidecar yet — the
+    // sidecar takes a few seconds to bind :8765. Failing immediately with
+    // "WS not connected" left the controller / profile / settings panels
+    // stuck on their first-load error with no retry. Poll up to ~8s for the
+    // run loop to park the sink. CRITICAL: release the lock between polls —
+    // holding it across the sleep would deadlock the run loop that parks
+    // the sink on connect. Connected = instant return on the first pass.
+    for _ in 0..40 {
+        {
+            let mut guard = state.tx.lock().await;
+            if let Some(sink) = guard.as_mut() {
+                let text = serde_json::to_string(&message).map_err(|e| e.to_string())?;
+                return sink
+                    .send(Message::Text(text.into()))
+                    .await
+                    .map_err(|e| e.to_string());
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    Err("forward_ipc_to_sidecar: WS not connected".into())
 }

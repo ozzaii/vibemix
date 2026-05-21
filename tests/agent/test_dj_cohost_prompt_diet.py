@@ -2,7 +2,7 @@
 """Plan 19-02 Task 2 — DJCoHostAgent.llm_node diet wiring.
 
 Pins:
-- Audio Part window: 6.0s on ack-eligible events, 18.0s (INVOKE_AUDIO_SECONDS)
+- Audio Part window: 6.0s on ack-eligible events, 30.0s (INVOKE_AUDIO_SECONDS)
   on full events.
 - Screen Part: SKIPPED on MIX_MOVE + HEARTBEAT (SCREEN_SKIP_EVENTS).
 - AICoach.build_prompt called with diet=True on ack events, diet=False on full.
@@ -207,10 +207,10 @@ def test_log_event_payload_contains_diet_and_audio_seconds(mocker, tmp_path):
 
 
 def test_log_event_payload_diet_false_on_phase(mocker, tmp_path):
-    """Mirror — PHASE event logs diet=False + audio_seconds=18."""
+    """Mirror — PHASE event logs diet=False + audio_seconds=INVOKE_AUDIO_SECONDS (30)."""
     _, recorder, _ = _drive_with_event(mocker, tmp_path, "PHASE")
     invoke_events = [e for e in recorder.events if e[0] == "llm_invoke"]
     assert len(invoke_events) == 1
     fields = invoke_events[0][1]
     assert fields["diet"] is False
-    assert fields["audio_seconds"] == 18
+    assert fields["audio_seconds"] == INVOKE_AUDIO_SECONDS

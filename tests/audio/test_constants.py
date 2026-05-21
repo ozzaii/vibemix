@@ -55,13 +55,13 @@ def test_engine_constants_match_v4() -> None:
     assert PEAK_RMS == 0.110
     assert AUDIBLE_DEBOUNCE_SEC == 0.6
     assert SILENCE_DEBOUNCE_SEC == 1.2
-    assert EVENT_GLOBAL_MIN_GAP == 10.0  # retuned post-2026-05-11 — "let the music breathe"
+    assert EVENT_GLOBAL_MIN_GAP == 22.0  # 2026-05-21 Kaan live retune — was 10.0, talked back-to-back; 22s lets the music breathe
     assert HEARTBEAT_SEC == 45.0  # Plan 40-04 — was 70.0; v4 chat-tested 2026-05-11 baseline
 
 
 def test_io_constants_match_v4() -> None:
     """I/O constants — v4:100-113."""
-    assert INVOKE_AUDIO_SECONDS == 18.0
+    assert INVOKE_AUDIO_SECONDS == 30.0  # 2026-05-21 Kaan — bumped 18→30 for more audio context per turn
     assert INPUT_SR_NATIVE == 48000
     assert INPUT_SR_TARGET == 16000
     assert OUTPUT_SR == 24000

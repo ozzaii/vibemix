@@ -649,14 +649,28 @@ async def main() -> None:
     profile_section = render_profile_for_cache(profile_dict)
     if profile_dict is not None:
         print(f"-> profile: loaded ({len(profile_section)} chars in cache section)")
+    # 2026-05-21 — the context cache MUST carry the SAME persona cell the
+    # agent resolves from VIBEMIX_SKILL_LEVEL / VIBEMIX_MODE / VIBEMIX_MOOD.
+    # Previously it baked the hardcoded SYSTEM_INSTRUCTION (= HYPE_INTERMEDIATE,
+    # Turkish hype). When the cache went warm, Gemini used the cached system
+    # instruction and SILENTLY OVERRODE the agent's COACH_PRO/English gen_cfg —
+    # so a pro+coach+English session still spoke Turkish hype. Resolve the same
+    # cell here so cache ≡ agent.
+    from vibemix.agent.dj_cohost import _resolve_prompt_cell
+
+    cache_system_instruction = _resolve_prompt_cell()
     cache: GeminiContextCache | None = GeminiContextCache(
         client=genai_client,
-        system_instruction_body=SYSTEM_INSTRUCTION,
+        system_instruction_body=cache_system_instruction,
         model=LLM_MODEL,
         profile_section=profile_section,
     )
     try:
-        await cache.create()
+        # 2026-05-21 — wrap in a hard timeout. The SDK caches.create() call has
+        # no timeout of its own; on a free-tier key (explicit context caching is
+        # paid-tier on some projects) it HANGS indefinitely and blocks boot
+        # before "listening to". Fail fast → cache=None → graceful degradation.
+        await asyncio.wait_for(cache.create(), timeout=4.0)
         print("-> cache: warm (Gemini context cache active)")
     except Exception as e:
         print(f"-> cache disabled: {e}", file=sys.stderr)
@@ -691,8 +705,27 @@ async def main() -> None:
         evidence_registry = EvidenceRegistry(on_mutation=lambda: cache.refresh())
     else:
         evidence_registry = EvidenceRegistry()
-    citation_linter = CitationLinter() if anti_slop_enabled else None
+    # Citation-linter ENFORCEMENT gate — decoupled from anti-slop 2026-05-21
+    # (Kaan). The v1.0 prompt contract is "cites encouraged, not required, no
+    # penalty" (CITATION_GRAMMAR_BLOCK), but a wired linter strips EVERY
+    # uncited reply as reason='no_citations' — gemini-3.x rarely emits the
+    # [cite] grammar, so wiring it muzzles the co-host. Default OFF; opt back
+    # in with VIBEMIX_CITATION_LINT=on. The banned-phrase slop filter +
+    # <silence/> short-circuit are UNAFFECTED — they run regardless of the
+    # linter (see dj_cohost.llm_node silence/slop gate).
+    citation_lint_flag = os.environ.get("VIBEMIX_CITATION_LINT", "off").strip().lower()
+    citation_lint_enabled = anti_slop_enabled and citation_lint_flag not in (
+        "off",
+        "0",
+        "false",
+        "",
+    )
+    citation_linter = CitationLinter() if citation_lint_enabled else None
     stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
+    print(
+        "-> citation lint: "
+        f"{'on' if citation_lint_enabled else 'off (VIBEMIX_CITATION_LINT)'}"
+    )
     # In-process IpcBus shim — Plan 20-04's coach_loop publish gate
     # duck-types against ``await ipc_bus.emit(dict)``. The shim buffers each
     # SessionCitation envelope into a bounded deque (no I/O). v2.x follow-up
@@ -766,6 +799,27 @@ async def main() -> None:
     # paused/dead UI client can't grow it unbounded.
     transcript_buf: deque = deque(maxlen=200)
 
+    # 2026-05-21 — OpenRouter brain path (opt-in via VIBEMIX_LLM_VIA_OPENROUTER=1).
+    # Routes the live-coach LLM through OpenRouter (OpenAI-compat, inline-audio
+    # verified) to escape free-tier Gemini 503s. Requires OPENROUTER_API_KEY.
+    # Model id overridable via VIBEMIX_OR_LLM_MODEL (default google/gemini-3.5-flash).
+    or_llm_client = None
+    or_llm_model = os.environ.get("VIBEMIX_OR_LLM_MODEL", "google/gemini-3.5-flash")
+    if os.environ.get("VIBEMIX_LLM_VIA_OPENROUTER", "0").strip().lower() not in (
+        "0",
+        "off",
+        "false",
+        "",
+    ):
+        if not or_key:
+            sys.exit(
+                "VIBEMIX_LLM_VIA_OPENROUTER=1 but OPENROUTER_API_KEY missing in .env."
+            )
+        from vibemix.agent.openrouter_llm import build_or_client
+
+        or_llm_client = build_or_client(or_key)
+        print(f"-> brain via OpenRouter: {or_llm_model} (escapes free-tier 503)")
+
     agent = DJCoHostAgent(
         genai_client=genai_client,
         clean_audio_buf=clean_audio_buf,
@@ -775,6 +829,8 @@ async def main() -> None:
         llm_inst=llm_inst,
         tts_inst=tts_inst,
         cache=cache,
+        or_client=or_llm_client,
+        or_model=or_llm_model,
         ttft_meter=ttft_meter,
         evidence_registry=evidence_registry,
         citation_linter=citation_linter,
