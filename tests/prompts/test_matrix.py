@@ -385,15 +385,33 @@ def test_prompt_01_coach_mode_includes_feedback_bias(skill: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_o_citation_grammar_block_contains_seven_source_forms_and_multi_cite() -> None:
-    """Test O — GROUND-02: CITATION_GRAMMAR_BLOCK enumerates all 7 EBNF source
+def test_o_citation_grammar_block_contains_eight_source_forms_and_multi_cite() -> None:
+    """Test O — GROUND-02: CITATION_GRAMMAR_BLOCK enumerates all 8 EBNF source
     forms as literal substrings + the multi-citation form + the v1.0 fail-open
-    phrase 'encouraged, not required'. Locks the prompt-side grammar surface."""
+    phrase 'encouraged, not required'. Locks the prompt-side grammar surface.
+
+    Phase 59 (DECK-03) added the `[key:` deck-harmonic form (touchpoint #4 of
+    the 5 schema-mirror sites), in lock-step with EVIDENCE_SOURCES.
+    """
     from vibemix.prompts.matrix import CITATION_GRAMMAR_BLOCK
 
-    # 7 single-citation forms (GROUND-02 lock)
-    for prefix in ("[ev:", "[aud:", "[midi:", "[track:", "[screen:", "[mix:", "[tend:"):
+    # 8 single-citation forms (GROUND-02 lock + DECK-03 `key`)
+    for prefix in (
+        "[ev:",
+        "[aud:",
+        "[midi:",
+        "[track:",
+        "[screen:",
+        "[mix:",
+        "[tend:",
+        "[key:",
+    ):
         assert prefix in CITATION_GRAMMAR_BLOCK, f"missing source form {prefix!r}"
+
+    # The DECK-03 form carries the deck:camelot body shape verbatim.
+    assert "[key:<deck>:<camelot>]" in CITATION_GRAMMAR_BLOCK, (
+        "DECK-03 key form missing from grammar block"
+    )
 
     # Multi-citation form — concrete example Gemini can pattern-match against
     assert "[ev:KICK_SWAP@45.2,aud:bpm@45.0]" in CITATION_GRAMMAR_BLOCK, (

@@ -177,10 +177,19 @@ def _build_citation_strip(
     None) so the WS payload type stays stable across reactions.
 
     Sources currently supported for chip derivation: ``ev``, ``mix``,
-    ``midi``. Other sources (``aud``, ``track``, ``screen``, ``tend``)
-    parse correctly but do not yield chips — they're either too noisy
-    (``aud``) or carry no obvious DJ-action verb (``track``). v2.x may
-    widen this set; v1 stays narrow per the "no scope creep" rule.
+    ``midi``, ``key``. Other sources (``aud``, ``track``, ``screen``,
+    ``tend``) parse correctly but do not yield chips — they're either too
+    noisy (``aud``) or carry no obvious DJ-action verb (``track``). v2.x
+    may widen this set; v1 stays narrow per the "no scope creep" rule.
+
+    ``key`` (Phase 59 / DECK-03) is the deck harmonic source, body
+    ``<deck>:<camelot>`` (e.g. ``A:8A``). It is existence-only — the
+    registry key is the FULL ``A:8A`` body (NOT a ``KEY@t`` form), so the
+    lookup uses the body verbatim and the chip ``timestamp_s`` is sourced
+    from the registry observation, NEVER from the citation body (the
+    anti-hallucination contract — the body is the LLM's claim, the registry
+    is the truth). The verb is a fixed ``"key"`` label (the deck + camelot
+    detail lives in ``event_id`` for the click→debrief deep-link).
 
     Args:
         reaction_text: The full AI reaction text returned by the LLM
@@ -201,7 +210,7 @@ def _build_citation_strip(
         # Source allow-list — only sources with a clear "DJ action" verb
         # yield UI chips. Quiet sources (aud/screen/tend) parse but do
         # not surface as user-visible evidence tags.
-        if source not in ("ev", "mix", "midi"):
+        if source not in ("ev", "mix", "midi", "key"):
             continue
         # Registry lookup uses the body verbatim (KEY@t form). Drop the
         # chip when the registry has no matching observation — closes
@@ -215,12 +224,21 @@ def _build_citation_strip(
         # at the same key would arrive from cooldown bypass paths, but
         # the first is the authoritative "when did this event fire".
         timestamp_s = float(timestamps[0])
-        # Derive verb from the KEY portion of the body. Body shape is
-        # ``KEY@t`` for ev/aud/midi; partition on "@" so a missing "@"
-        # (defensive: future grammar drift) falls back to the full body.
-        key, _, _ = body.partition("@")
-        verb_tokens = key.lower().split("_")
-        verb = " ".join(verb_tokens[:CITATION_VERB_MAX_WORDS])
+        # Derive verb from the KEY portion of the body.
+        if source == "key":
+            # Phase 59 (DECK-03): body is ``<deck>:<camelot>`` (e.g. A:8A),
+            # not the ``KEY@t`` shape. The camelot detail (deck + code) lives
+            # in event_id for the deep-link; the chip verb is a fixed,
+            # letters-only "key" label (keeps the locked verb format
+            # `^[a-z]+( [a-z]+){0,2}$` — camelot codes carry digits).
+            verb = "key"
+        else:
+            # Body shape is ``KEY@t`` for ev/aud/midi/mix; partition on "@"
+            # so a missing "@" (defensive: future grammar drift) falls back
+            # to the full body.
+            key, _, _ = body.partition("@")
+            verb_tokens = key.lower().split("_")
+            verb = " ".join(verb_tokens[:CITATION_VERB_MAX_WORDS])
         chips.append(
             {
                 "event_id": f"{source}:{body}",

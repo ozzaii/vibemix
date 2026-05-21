@@ -157,6 +157,53 @@ def test_empty_registry_yields_empty_list() -> None:
 
 
 # --------------------------------------------------------------------------
+# key: deck-harmonic chip — DECK-03 (Phase 59)
+# --------------------------------------------------------------------------
+
+
+def test_key_citation_yields_chip_with_registry_timestamp_DECK03() -> None:
+    """A grounded `[key:A:8A]` citation yields a chip.
+
+    Anti-hallucination contract: the chip ``timestamp_s`` is sourced from the
+    registry observation (the poller wrote A:8A at a session time), NOT parsed
+    from the citation body (the body has no @t — it is `<deck>:<camelot>`).
+    The full deck:camelot detail rides in ``event_id`` for the deep-link; the
+    verb is the fixed letters-only "key" label.
+    """
+    reg = EvidenceRegistry()
+    # The deck poller registers the EXACT body `A:8A` at a session-relative time.
+    reg.write("key", "A:8A", 128.5)
+
+    strip = _build_citation_strip(
+        reaction_text="locked in harmonically [key:A:8A], ride it",
+        registry=reg,
+    )
+
+    assert len(strip) == 1
+    assert strip[0]["event_id"] == "key:A:8A"
+    # timestamp comes from the registry (128.5), NOT the citation body.
+    assert strip[0]["timestamp_s"] == pytest.approx(128.5, abs=0.01)
+    assert strip[0]["verb"] == "key"
+
+
+def test_fabricated_key_citation_yields_no_chip_DECK03() -> None:
+    """A fabricated `[key:A:12B]` (never registered) → NO chip.
+
+    Mirrors the empty-registry contract — the strip never fabricates a chip
+    for a harmonic claim the poller did not observe. The poller wrote A:8A;
+    the LLM's invented A:12B clash resolves to nothing → dropped.
+    """
+    reg = EvidenceRegistry()
+    reg.write("key", "A:8A", 60.0)
+
+    strip = _build_citation_strip(
+        reaction_text="big clash [key:A:12B] watch out",
+        registry=reg,
+    )
+    assert strip == []
+
+
+# --------------------------------------------------------------------------
 # Verb format contract — pinned because the chip text relies on this shape
 # --------------------------------------------------------------------------
 
