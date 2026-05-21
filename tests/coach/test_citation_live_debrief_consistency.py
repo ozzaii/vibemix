@@ -15,8 +15,18 @@ citation strip is consistent across live (±1.0s, LIVE_TOLERANCE_S) and debrief
    VALID in debrief (±2.0s), documenting the wider debrief band is deliberate
    and that inclusion is monotone (live ⊆ debrief).
 
-NO source is modified — citation_linter.py + constants.py are the airtight
-grounding gate per 55-RESEARCH Q0; this file ADDS regressions only.
+4. REAL DEBRIEF CONSUMER PARITY — the live linter path AND the production
+   debrief resolver (``debrief.drills._citation_resolves``) reach the SAME
+   verdict on the same registry. This is the assertion that actually guards
+   LIVE-04 end-to-end: the linter's ``mode="debrief"`` branch is dormant in
+   the live↔debrief data flow (no ``src/`` caller), so consistency that only
+   compared the linter's two bands could not catch the real resolver drifting
+   away from the live gate. Here we drive ``_citation_resolves`` — the code
+   the real post-session drills surface runs — against the same orphan /
+   grounded / drifted citations and pin it to the live linter's verdict.
+
+NO source is modified — citation_linter.py + constants.py + drills.py are the
+airtight grounding gate per 55-RESEARCH Q0; this file ADDS regressions only.
 """
 
 from __future__ import annotations
@@ -25,6 +35,7 @@ import pytest
 
 from vibemix.coach.citation_linter import CitationLinter
 from vibemix.coach.constants import DEBRIEF_TOLERANCE_S, LIVE_TOLERANCE_S
+from vibemix.debrief.drills import _citation_resolves
 from vibemix.state.evidence_registry import EvidenceRegistry
 
 
@@ -122,7 +133,75 @@ def test_citation_in_debrief_only_band_is_live_invalid_debrief_valid() -> None:
 
 
 # =========================================================================== #
-# (4) Fail-loud on unknown mode                                                #
+# (4) Real debrief consumer parity — the resolver the drills surface runs      #
+#     against reaches the SAME verdict as the live linter                       #
+# =========================================================================== #
+
+
+def test_real_debrief_resolver_matches_live_linter_verdict() -> None:
+    """The PRODUCTION debrief resolver agrees with the live linter.
+
+    ``CitationLinter.check(mode="debrief")`` is a dormant branch — no
+    ``src/`` caller routes through it. The real post-session drills surface
+    resolves citations via ``debrief.drills._citation_resolves`` instead.
+    The earlier tests in this file only compared the linter's two bands, so a
+    drift between the real resolver and the live gate would slip through
+    silently. This test drives the REAL resolver against the same registry
+    and the same orphan / grounded citations, pinning genuine live↔debrief
+    consistency end-to-end.
+    """
+    reg = _registry_with_phase_at(120.0)
+    snap = reg.snapshot()
+    linter = CitationLinter()
+
+    # --- Orphan: rejected in the live linter AND the real debrief resolver. -
+    # GHOST is not a registered key, so no tolerance widening can rescue it.
+    orphan = "[ev:GHOST@500.0]"
+    assert linter.check(orphan, snap, mode="live").valid is False
+    # The resolver takes a single canonical bracketed tag (the form drills
+    # actually emit). Both the live band and the wider debrief band reject it.
+    assert _citation_resolves(orphan, snap, tol=LIVE_TOLERANCE_S) is False
+    assert _citation_resolves(orphan, snap, tol=DEBRIEF_TOLERANCE_S) is False
+
+    # --- Grounded (0.5s off): accepted by the live linter AND by the real ---
+    # debrief resolver within its (wider) tolerance band. Debrief never strips
+    # what live accepts on the same data.
+    grounded = "[ev:PHASE@120.5]"
+    assert linter.check(grounded, snap, mode="live").valid is True
+    # Real resolver accepts at the live band AND at the wider debrief band
+    # (default tol == DEBRIEF_TOLERANCE_S, the band the production drills use).
+    assert _citation_resolves(grounded, snap, tol=LIVE_TOLERANCE_S) is True
+    assert _citation_resolves(grounded, snap) is True  # default == debrief band
+    assert _citation_resolves(grounded, snap, tol=DEBRIEF_TOLERANCE_S) is True
+
+
+def test_real_debrief_resolver_honors_the_wider_band() -> None:
+    """The real resolver reproduces the live ⊆ debrief inclusion the linter
+    pins: a 1.5s-drifted citation is rejected at the live band but accepted at
+    the debrief band — through the PRODUCTION resolver, not just the linter.
+
+    This is the parity assertion for property (3): the deliberate wider debrief
+    band is honored by the real consumer, not only by the dormant linter mode.
+    """
+    reg = _registry_with_phase_at(120.0)
+    snap = reg.snapshot()
+    linter = CitationLinter()
+
+    drifted = "[ev:PHASE@121.5]"  # 1.5s off → outside ±1.0, inside ±2.0
+
+    # Live verdict (linter) and live-band resolver agree: rejected.
+    assert linter.check(drifted, snap, mode="live").valid is False
+    assert _citation_resolves(drifted, snap, tol=LIVE_TOLERANCE_S) is False
+
+    # Debrief verdict (linter) and the real resolver's default (debrief) band
+    # agree: accepted.
+    assert linter.check(drifted, snap, mode="debrief").valid is True
+    assert _citation_resolves(drifted, snap) is True  # default == debrief band
+    assert _citation_resolves(drifted, snap, tol=DEBRIEF_TOLERANCE_S) is True
+
+
+# =========================================================================== #
+# (5) Fail-loud on unknown mode                                                #
 # =========================================================================== #
 
 
