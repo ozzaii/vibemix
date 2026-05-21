@@ -157,6 +157,11 @@ interface PillView {
   /** Latest deck_state read off the wire (read-only meta — held on the view, not
    *  PillState). null until the first frame carrying deck_state arrives. */
   deckState: DeckStateWire | null;
+  /** Render-memo keys for the cheap rebuild-only-on-change guards. WR-05: held
+   *  PER-VIEW (not module globals) so two pill instances — or two vitest mounts
+   *  — can't leak each other's last-render key and skip a legitimate rebuild. */
+  lastChipsKey: string;
+  lastDeckKey: string;
 }
 
 const STATE_LABEL: Record<PillState["mode"], string> = {
@@ -179,21 +184,21 @@ function render(view: PillView, state: PillState, baseLabel: string): void {
     // Reaction text rendered VERBATIM as a text node (T-62-11 — never innerHTML).
     view.reaction.textContent = state.reactionText;
     // Citation strip rendered VERBATIM via the shipped component (T-62-12).
-    syncCitationStrip(view.expand, state.chips);
+    syncCitationStrip(view, state.chips);
     // Deck-context chips from the LAST seen deck_state — honest unknown when a
     // deck/key is unresolved (PILL-03). renderDeckChips owns the honest-null +
     // amber-only-when-resolved rendering; the pill never fabricates a key (T-62-15).
-    syncDeckChips(view.decksMount, view.deckState);
+    syncDeckChips(view);
   }
 }
 
-let lastChipsKey = "";
-function syncCitationStrip(expandEl: HTMLElement, chips: CitationChip[]): void {
+function syncCitationStrip(view: PillView, chips: CitationChip[]): void {
+  const expandEl = view.expand;
   // Only rebuild the strip when the chip set changes (cheap key) — the rAF
-  // loop calls render() every frame.
+  // loop calls render() every frame. The memo key lives on the view (WR-05).
   const key = chips.map((c) => `${c.event_id}@${c.timestamp_s}`).join("|");
-  if (key === lastChipsKey) return;
-  lastChipsKey = key;
+  if (key === view.lastChipsKey) return;
+  view.lastChipsKey = key;
   expandEl.querySelector(".vmx-citation-strip")?.remove();
   const strip = renderCitationStrip({
     chips,
@@ -210,7 +215,6 @@ function syncCitationStrip(expandEl: HTMLElement, chips: CitationChip[]): void {
   }
 }
 
-let lastDeckKey = "";
 /**
  * Populate the #pill-decks mount with the honest deck-context chips from the
  * latest deck_state (62-UI-SPEC §States — deck chips sit below the citation
@@ -220,16 +224,23 @@ let lastDeckKey = "";
  * drag. renderDeckChips always returns at least the honest `decks · unknown`
  * chip, so the mount always shows the truthful deck context while expanded.
  */
-function syncDeckChips(decksMount: HTMLElement, deckState: DeckStateWire | null): void {
-  // Cheap change key over the wire shape (side + camelot + bpm per deck) so an
-  // unchanged deck_state does not rebuild the DOM every animation frame.
+function syncDeckChips(view: PillView): void {
+  const decksMount = view.decksMount;
+  const deckState = view.deckState;
+  // Cheap change key over EVERY field the chip renders (side + camelot + key +
+  // bpm + confidence) so an in-place value change (e.g. a key resolving while
+  // camelot/bpm hold, or a confidence shift that flips the WR-04 dim) rebuilds
+  // the DOM. The memo key lives on the view, not a module global (WR-05).
   const key = deckState
     ? Object.entries(deckState)
-        .map(([side, d]) => `${side}:${d.camelot ?? "-"}:${d.bpm ?? "-"}`)
+        .map(
+          ([side, d]) =>
+            `${side}:${d.camelot ?? "-"}:${d.key ?? "-"}:${d.bpm ?? "-"}:${d.confidence ?? "-"}`,
+        )
         .join("|")
     : "";
-  if (key === lastDeckKey && decksMount.childElementCount > 0) return;
-  lastDeckKey = key;
+  if (key === view.lastDeckKey && decksMount.childElementCount > 0) return;
+  view.lastDeckKey = key;
   decksMount.replaceChildren();
   const strip = renderDeckChips(deckState);
   if (strip) {
@@ -271,6 +282,8 @@ function boot(): void {
     waveEl,
     decksMount,
     deckState: null,
+    lastChipsKey: "",
+    lastDeckKey: "",
   };
 
   let state = initialPillState(performance.now());
