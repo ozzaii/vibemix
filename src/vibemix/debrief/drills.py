@@ -24,6 +24,7 @@ try:
 except ImportError:  # pragma: no cover — pydantic should be installed
     raise
 
+from vibemix.coach.constants import DEBRIEF_TOLERANCE_S
 from vibemix.llm.model_router import resolve
 from vibemix.state.evidence_registry import EVIDENCE_CITATION_RE
 
@@ -42,8 +43,10 @@ logger = logging.getLogger(__name__)
 DEBRIEF_DRILLS_MODEL = resolve("debrief")[0]
 
 # How tight the citation→snapshot lookup is. Phase 20 ``mode="debrief"``
-# tolerance is ±2.0s.
-_CITATION_RESOLVE_TOL_S = 2.0
+# tolerance is ±2.0s. Bound to the single source of truth in
+# ``coach/constants.py`` so the live linter band and the debrief drills
+# resolver can never silently diverge (IN-01 / LIVE-04 citation integrity).
+_CITATION_RESOLVE_TOL_S = DEBRIEF_TOLERANCE_S
 
 
 class Drill(BaseModel):
