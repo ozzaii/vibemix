@@ -229,8 +229,14 @@ class DeckPoller:
             entry = self._resolve_title(title)
             if entry is not None:
                 # XML match clears the floor → resolved DeckTrack on the audible
-                # deck. Confidence is bounded by the attribution confidence so a
-                # weakly-attributed deck never cites at full XML trust.
+                # deck. An XML tag is high-trust regardless of how strongly the
+                # deck was attributed, so a matched deck ALWAYS clears the
+                # citation floor (the max() raises a weak deck_conf up to
+                # XML_CONF_FLOOR). Attribution confidence only caps the UPPER
+                # bound — a weakly-attributed deck never reaches full 1.0 XML
+                # trust. (Floor, not min-cap; pinned by test_deck_poller.py:145,221
+                # `confidence >= XML_CONF_FLOOR`. Do NOT "fix" toward min() — that
+                # breaks the cite gate.)
                 conf = max(XML_CONF_FLOOR, min(1.0, deck_conf))
                 decks[audible_deck] = self._xml_decktrack(entry, confidence=conf, now=now)
 
