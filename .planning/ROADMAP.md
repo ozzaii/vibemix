@@ -59,7 +59,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
   5. Deck-state is embedded in `MusicState` under the **single-writer rule** (a read-only poller writes its own holder; `_tick_once` is the only copier), with `KEY_CLASH` + `TRANSITION_OPPORTUNITY` added to the event priority/cooldown maps; golden-equivalence of the existing snapshot is preserved (additive only).
 **Plans** (5 plans, 3 waves):
   - **Wave 1** (parallel, autonomous) —
-    - [ ] 59-01-PLAN.md — harmonics.to_camelot (load-bearing FIRST) + DeckState/DeckTrack model + additive MusicState field
+    - [x] 59-01-PLAN.md — harmonics.to_camelot (load-bearing FIRST) + DeckState/DeckTrack model + additive MusicState field
     - [ ] 59-02-PLAN.md — citable `key:` evidence source + linter rule + 5 schema-mirror touchpoints (lands BEFORE any harmonic prompt)
     - [ ] 59-03-PLAN.md — KEY_CLASH/TRANSITION_OPPORTUNITY event-type plumbing + DECK-05 read-only repo guarantee (test-first)
   - **Wave 2** (depends on 59-01/02/03) —
@@ -116,7 +116,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 59. Full Deck Awareness + Grounding | v5.0 | 0/5 | Planned | - |
+| 59. Full Deck Awareness + Grounding | v5.0 | 1/5 | In Progress|  |
 | 60. Harmonic-Feedback Confidence Gate | v5.0 | 0/? | Not started | - |
 | 61. Actionable-Not-Hype Coach Persona | v5.0 | 0/? | Not started | - |
 | 62. Floating Pill UI | v5.0 | 0/? | Not started | - |

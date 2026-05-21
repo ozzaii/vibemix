@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v5.0
 milestone_name: The Useful Cut
-status: planning
-last_updated: "2026-05-21T12:00:00.000Z"
+status: executing
+last_updated: "2026-05-21T12:58:31.189Z"
 last_activity: 2026-05-21
 progress:
-  total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 12
+  completed_phases: 8
+  total_plans: 31
+  completed_plans: 27
+  percent: 67
 ---
 
 # vibemix — State
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** v5.0 "The Useful Cut" — deck-aware, actionable, unobtrusive. Roadmap created (4 phases 59–62); ready to plan Phase 59.
+- **Current focus:** Phase 59 — Full Deck Awareness + Grounding
 - **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts on external clock).
 - **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
 - **Project mode:** standard.
@@ -45,10 +45,10 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 
 ## Current Position
 
-Phase: 59 — Full Deck Awareness + Grounding (not started; roadmap created)
-Plan: —
-Status: Roadmap created — ready to plan Phase 59
-Last activity: 2026-05-21 — v5.0 roadmap created (4 phases, 59–62)
+Phase: 59 (Full Deck Awareness + Grounding) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-05-21 -- Plan 59-01 COMPLETE (harmonics.to_camelot + DeckState/DeckTrack model + additive MusicState.deck_state; DECK-01/DECK-02 done; 67 plan tests green; golden-equivalence preserved)
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Last activity: 2026-05-21 — v5.0 roadmap created (4 phases, 59–62)
 | v3.0/v3.1 carveouts | external clock (Apple Dev + SignPath) — unchanged by v5.0 |
 
 ---
+| Phase 59 P01 | 12 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -203,6 +204,7 @@ All external-clock items from v3.0 / v3.1 / v4.0 remain on the same clock — v5
 
 ### Last Session
 
+- 2026-05-21 — **Plan 59-01 COMPLETE** (Full Deck Awareness foundations, TDD). Shipped the load-bearing pure `state/harmonics.py::to_camelot` (Rekordbox `Tonality` is musical notation `Am`/`F#m`, NOT Camelot — normalizes musical/Camelot/open-key forms, honest `None` on empty/garbage/out-of-range, NEVER raises) + `state/deck_state.py` `DeckTrack`/`DeckState` honest-default model (`source="unknown"`, every harmonic field `None`/`0.0` — no false-confident key by construction) + additive `MusicState.deck_state = field(default_factory=DeckState)` (single-writer `_tick_once`-only; `evidence_line` untouched until 59-04 → golden-equivalence byte-identical for empty AND populated deck_state). `is_clash`/`compatible` deliberately deferred to Phase 60 (grep-gated to 0). **DECK-01 + DECK-02 satisfied.** 67 plan tests green (RED→GREEN per task). 7 unrelated full-suite failures are PRE-EXISTING `live-tuning-or-brain` WIP (README feature-matrix phases 55–58 + `__main__.py`/`cut_release.sh` churn) — proven by reverting `music_state.py` to pre-plan `5f375c0`; logged in `59-full-deck-awareness-grounding/deferred-items.md`, NOT this plan's regression. Commits: test eaf9992→feat d962611 (harmonics), test 0d0110f→feat e0fecf1 (deck_state). Next: 59-02 (citable `key:` evidence source + linter rule).
 - 2026-05-21 — v5.0 "The Useful Cut" ROADMAP CREATED (4 phases, 59–62; numbering continued from v4.0's 51–58, no reset). 17/17 REQ-IDs mapped (DECK P59 / HARMONIC P60 / COACH P61 / PILL P62). Hard critical path P59→P60→P61; P62 parallelizes. ROADMAP.md: added the v5.0 active-milestone section at the top of the milestone content, kept v4.0 "SHIP" OPEN + intact below it (engineering-complete 8/8, publish on signature clock — NOT archived), added v5.0 row to the Milestone-Level Progress table. REQUIREMENTS.md traceability validated (already mapped, no change needed). STATE.md milestone preserved as v5.0, Current Position → Phase 59, total_phases → 4.
 - 2026-05-21 (earlier) — Phase 58 (Ship Readiness) COMPLETE; ALL 8 v4.0 phases engineering-complete (8/8). v4.0 left open on the external signature clock.
 - 2026-05-20 — v4.0 "SHIP" roadmap RE-SPLIT into 8 phases (51–58).
