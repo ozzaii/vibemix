@@ -1,0 +1,176 @@
+/* pill.css — Phase 62 Plan 62-05 (PILL-01 transparency parity + PILL-03 chrome).
+ *
+ * The floating pill's own surface stylesheet — token-only, NO hex anywhere
+ * (frontend-enforcement hard rule: only tokens.css carries literal colors).
+ *
+ * TRANSPARENCY PARITY (PILL-01 / 62-UI-SPEC §Color, the load-bearing rule):
+ * the pill's VISIBLE surface is painted by an EXPLICIT `background: var(--glass-3)`
+ * (= rgba(2,3,6,0.88)) — the near-opaque dark glass the user actually sees. This
+ * is NOT OS vibrancy. The explicit rgba fill:
+ *   - guarantees mac+win parity (Windows has no vibrancy → no opaque white box),
+ *   - dodges the DMG transparency regression (tauri issue 13415, OPEN, no
+ *     upstream fix — the built .dmg can drop OS vibrancy and render a white box;
+ *     an explicit rgba fill survives that),
+ *   - and composites over the desktop because the window is transparent(true) +
+ *     decorations(false) and pill.html forces html/body transparent !important
+ *     (the overlay invariant). The rgba fill is on the PILL element, never the
+ *     body — the transparent-overlay invariant survives.
+ * `backdrop-filter: var(--blur-glass)` is a PROGRESSIVE ENHANCEMENT layered ON
+ * TOP of the opaque-enough rgba — it is NEVER the sole opacity source. On a
+ * surface that can't blur (Windows / DMG, tauri issue 13415) the rgba alone
+ * still reads as dark glass.
+ *
+ * NOTE — body background: this file deliberately sets NO `html`/`body`
+ * background. pill.html owns the `background: transparent !important;
+ * background-image: none !important; body::before { display:none }` overlay
+ * invariant; re-introducing an opaque body here would defeat the transparent
+ * overlay (RESEARCH Pitfall 4). The rgba fill belongs to `.pill`, not `body`.
+ *
+ * Linked from pill.html (the pill chrome was inline in 62-04's scaffold; 62-05
+ * lifts it to this canonical stylesheet so the explicit-rgba surface + the
+ * un-hidden deck-chips mount live in one token-only file).
+ */
+
+/* ── Pill surface — the dominant ~80% dark-glass tone (20/80 rule) ───────── *
+ * 62-UI-SPEC: collapsed 280×44, --rad-lg lozenge, explicit --glass-3 fill,
+ * hairline silk edge + top inner-light seam (the "sealed glass" read). Expands
+ * DOWN only (height grows; the window does not resize horizontally). */
+.pill {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  /* EXPLICIT rgba glass surface — what the user sees. NOT OS vibrancy. */
+  background: var(--glass-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-lg);
+  /* Top inner-light seam (the sealed-glass read) + a dark bottom inset for the
+   * recessed lozenge feel — same language as the .vmx-tile glass shell. */
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 -1px 0 var(--void-50);
+  /* Progressive enhancement ONLY — layered on top of the opaque-enough rgba.
+   * Never the sole opacity source (Windows / DMG have no vibrancy). */
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  overflow: hidden;
+  font-family: var(--type-display);
+  color: var(--silk);
+  cursor: default;
+}
+
+/* ── Drag strip — top 28px (62-UI-SPEC §Drag handle) ─────────────────────── *
+ * The whole strip is the drag region; a faint 2px×20px --silk-22 grab-bar is
+ * the only non-amber affordance. */
+.pill__drag {
+  flex: 0 0 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+}
+.pill__drag:active {
+  cursor: grabbing;
+}
+.pill__grab {
+  width: 20px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--silk-22);
+  pointer-events: none;
+}
+
+/* ── Collapsed row — state dot + label + waveform ────────────────────────── */
+.pill__row {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3) var(--sp-1);
+}
+.pill__dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--silk-40); /* idle: dim, no pulse */
+}
+/* State dot — one of the four reserved amber accents (20/80). Amber + pulse
+ * ONLY in listening/speaking; dim silk at idle. */
+.pill[data-state="listening"] .pill__dot,
+.pill[data-state="speaking"] .pill__dot {
+  background: var(--amber);
+}
+.pill[data-state="listening"] .pill__dot {
+  animation: pill-blink 1.4s ease-in-out infinite;
+}
+.pill[data-state="speaking"] .pill__dot {
+  animation: pill-blink 0.9s ease-in-out infinite;
+}
+@keyframes pill-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.pill__label {
+  flex: 0 0 auto;
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--silk-65);
+  line-height: 1;
+}
+.pill__wave {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  height: 16px;
+}
+
+/* ── Expand panel — grows DOWN on a reaction (62-UI-SPEC §States) ─────────── *
+ * Hidden when collapsed; the rAF loop toggles data-state="expand". The reveal
+ * uses --motion-transition (one orchestrated reveal — frontend-enforcement
+ * rule 6). Section separation reaction ↔ chips ↔ deck chips = --sp-5. */
+.pill__expand {
+  display: none;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding: 0 var(--sp-4) var(--sp-4);
+}
+.pill[data-state="expand"] .pill__expand {
+  display: flex;
+}
+.pill__reaction {
+  font-variation-settings: "wdth" 100, "wght" 400;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--silk);
+  /* Max 3 lines, ellipsis after (62-UI-SPEC §Typography). */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Deck-context chips mount (62-05 — PILL-03) ──────────────────────────── *
+ * 62-04 stubbed `.pill__decks { display: none }`; 62-05 un-hides it. index.ts
+ * sets `display: flex` inline when it populates the mount with renderDeckChips
+ * (one chip per resolved deck — honest `unknown` otherwise). The chip styling
+ * itself is registered by deck-chips.ts (.vmx-deck-strip / .vmx-deck-chip),
+ * token-only; this rule only positions the mount. Default visible (flex) so the
+ * deck context shows whenever the expand panel is open. */
+.pill__decks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}

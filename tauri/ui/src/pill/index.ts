@@ -25,6 +25,7 @@
  */
 
 import { renderCitationStrip, type CitationChip } from "../session/components/citation-strip.js";
+import { renderDeckChips, type DeckStateWire } from "./deck-chips.js";
 import {
   applyFrame,
   initialPillState,
@@ -104,6 +105,28 @@ function isCohostStatus(v: unknown): v is CohostStatus {
 }
 
 /**
+ * Read the 62-03 `deck_state` wire field off a raw frame, defensively
+ * (`msg.deck_state ?? {}` per the wire contract — DECK-04 / `_serialize_deck_state`).
+ * Returns `null` when the frame carries no `deck_state` key at all, so the caller
+ * holds the LAST seen deck_state (read-only meta — it does NOT drive a pill state
+ * transition, so it lives on the view ref, not the state-machine PillState).
+ *
+ * The deck_state is the per-deck `{title, camelot, key, bpm, confidence}` map
+ * keyed by deck side; `camelot`/`key` are JSON null when unresolved (honest-null,
+ * never a fabricated key — the pill passes the value through to renderDeckChips
+ * verbatim). Exported for index.test.ts to keep the read deterministic + DOM-free.
+ */
+export function readDeckState(msg: unknown): DeckStateWire | null {
+  if (msg == null || typeof msg !== "object") return null;
+  const m = msg as Record<string, unknown>;
+  const ds = m.deck_state;
+  if (ds == null || typeof ds !== "object") return null;
+  // Pass the contract-shaped map through verbatim — renderDeckChips owns the
+  // honest-unknown / amber-only-when-resolved rendering. NEVER fabricated here.
+  return ds as DeckStateWire;
+}
+
+/**
  * Pure reduce: apply one raw wire message to the pill state. Exported for
  * tests so the frame→state map is asserted without the bus or DOM.
  */
@@ -122,6 +145,11 @@ interface PillView {
   expand: HTMLElement;
   waveMount: HTMLElement;
   waveEl: HTMLElement;
+  /** The #pill-decks mount (62-04 stubbed it hidden; 62-05 un-hides + fills it). */
+  decksMount: HTMLElement;
+  /** Latest deck_state read off the wire (read-only meta — held on the view, not
+   *  PillState). null until the first frame carrying deck_state arrives. */
+  deckState: DeckStateWire | null;
 }
 
 const STATE_LABEL: Record<PillState["mode"], string> = {
@@ -145,6 +173,10 @@ function render(view: PillView, state: PillState, baseLabel: string): void {
     view.reaction.textContent = state.reactionText;
     // Citation strip rendered VERBATIM via the shipped component (T-62-12).
     syncCitationStrip(view.expand, state.chips);
+    // Deck-context chips from the LAST seen deck_state — honest unknown when a
+    // deck/key is unresolved (PILL-03). renderDeckChips owns the honest-null +
+    // amber-only-when-resolved rendering; the pill never fabricates a key (T-62-15).
+    syncDeckChips(view.decksMount, view.deckState);
   }
 }
 
@@ -164,10 +196,42 @@ function syncCitationStrip(expandEl: HTMLElement, chips: CitationChip[]): void {
   if (strip) {
     // Tag the strip so a chip click does not start a window drag.
     strip.setAttribute("data-no-drag", "");
-    // Insert before the deck-chips mount (62-05 populates that).
+    // Insert before the deck-chips mount (the deck chips sit BELOW the citation
+    // strip per 62-UI-SPEC §States).
     const decks = expandEl.querySelector("#pill-decks");
     expandEl.insertBefore(strip, decks);
   }
+}
+
+let lastDeckKey = "";
+/**
+ * Populate the #pill-decks mount with the honest deck-context chips from the
+ * latest deck_state (62-UI-SPEC §States — deck chips sit below the citation
+ * strip). Un-hides the mount (62-04 stubbed it `display:none`) and only rebuilds
+ * when the deck_state changes (cheap key) — the rAF loop calls render() every
+ * frame. Tags the strip `[data-no-drag]` so a chip area never starts a window
+ * drag. renderDeckChips always returns at least the honest `decks · unknown`
+ * chip, so the mount always shows the truthful deck context while expanded.
+ */
+function syncDeckChips(decksMount: HTMLElement, deckState: DeckStateWire | null): void {
+  // Cheap change key over the wire shape (side + camelot + bpm per deck) so an
+  // unchanged deck_state does not rebuild the DOM every animation frame.
+  const key = deckState
+    ? Object.entries(deckState)
+        .map(([side, d]) => `${side}:${d.camelot ?? "-"}:${d.bpm ?? "-"}`)
+        .join("|")
+    : "";
+  if (key === lastDeckKey && decksMount.childElementCount > 0) return;
+  lastDeckKey = key;
+  decksMount.replaceChildren();
+  const strip = renderDeckChips(deckState);
+  if (strip) {
+    strip.setAttribute("data-no-drag", "");
+    decksMount.append(strip);
+  }
+  // Un-hide the mount (62-04 stubbed `.pill__decks { display: none }`); the
+  // explicit inline flex survives the stylesheet rule.
+  decksMount.style.display = "flex";
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────
@@ -179,7 +243,8 @@ function boot(): void {
   const expand = document.getElementById("pill-expand");
   const waveMount = document.getElementById("pill-wave");
   const dragStrip = document.getElementById("pill-drag");
-  if (!root || !label || !reaction || !expand || !waveMount || !dragStrip) {
+  const decksMount = document.getElementById("pill-decks");
+  if (!root || !label || !reaction || !expand || !waveMount || !dragStrip || !decksMount) {
     console.error(`${TAG} pill DOM skeleton missing — cannot mount`);
     return;
   }
@@ -190,7 +255,16 @@ function boot(): void {
   waveEl.setAttribute("data-no-drag", "");
   waveMount.append(waveEl);
 
-  const view: PillView = { root, label, reaction, expand, waveMount, waveEl };
+  const view: PillView = {
+    root,
+    label,
+    reaction,
+    expand,
+    waveMount,
+    waveEl,
+    decksMount,
+    deckState: null,
+  };
 
   let state = initialPillState(performance.now());
 
@@ -221,6 +295,13 @@ function boot(): void {
     bus = connectMascotBus("ws://127.0.0.1:8765");
     bus.addMessageListener((msg) => {
       state = reduceFrame(state, msg, performance.now());
+      // deck_state is read-only meta riding the SAME flat 30Hz frame as
+      // voice/cohost_status (62-03 _serialize_deck_state). Hold the LAST seen
+      // map on the view ref; only overwrite when a frame actually carries one
+      // (readDeckState returns null otherwise) so we keep deck context across
+      // frames that omit it.
+      const ds = readDeckState(msg);
+      if (ds !== null) view.deckState = ds;
     });
     // 62-UI-SPEC §Copywriting: NO error UI on the pill — silence is the honest
     // empty state; bus-health surfaces in the main session window, not here.

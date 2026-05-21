@@ -38,10 +38,19 @@
         - Transparent root chain so the pill is a free-floating lozenge.
     -->
     <link rel="stylesheet" href="/src/tokens.css" />
+    <!-- Pill chrome + the explicit --glass-3 rgba transparency-parity surface
+         live in the canonical token-only stylesheet (62-05). The inline <style>
+         below carries ONLY the transparent-overlay invariant (which MUST sit
+         inline so it loads before the pill paints + can't be split into a
+         component stylesheet). -->
+    <link rel="stylesheet" href="/src/pill/pill.css" />
     <style>
-      /* ── Transparent-overlay invariant override ─────────────────────────
+      /* ── Transparent-overlay invariant override (MUST stay inline) ───────
        * Survive the tokens.css v5 vignette + kill the film-grain SVG layer so
-       * the pill composites over the desktop. */
+       * the pill composites over the desktop. The pill's OWN surface is the
+       * explicit --glass-3 rgba fill in pill.css — this block only keeps the
+       * html/body chain transparent so that fill composites over the desktop
+       * (the rgba is on .pill, NEVER on body). */
       html,
       body {
         margin: 0;
@@ -54,126 +63,6 @@
       }
       body::before {
         display: none !important;
-      }
-
-      /* ── Pill surface ──────────────────────────────────────────────────
-       * 62-UI-SPEC: collapsed 280×44, --rad-lg lozenge, --glass-3 dark glass,
-       * hairline silk edge, top inner-light seam. Expands DOWN only. The
-       * explicit rgba glass tuning is finalised in 62-05; this scaffold uses
-       * the --glass-3 token (already rgba(2,3,6,0.88)). */
-      .pill {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        flex-direction: column;
-        width: 100vw;
-        background: var(--glass-3);
-        border: 1px solid var(--glass-edge);
-        border-radius: var(--rad-lg);
-        box-shadow: inset 0 1px 0 var(--glass-top);
-        backdrop-filter: var(--blur-glass-light);
-        -webkit-backdrop-filter: var(--blur-glass-light);
-        overflow: hidden;
-        font-family: var(--type-display);
-        color: var(--silk);
-        cursor: default;
-      }
-
-      /* ── Drag strip — top 28px (62-UI-SPEC §Drag handle) ───────────────
-       * The whole strip is the drag region; a faint 2px×20px --silk-22
-       * grab-bar is the only non-amber affordance. */
-      .pill__drag {
-        flex: 0 0 28px;
-        height: 28px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: grab;
-      }
-      .pill__drag:active {
-        cursor: grabbing;
-      }
-      .pill__grab {
-        width: 20px;
-        height: 2px;
-        border-radius: 1px;
-        background: var(--silk-22);
-        pointer-events: none;
-      }
-
-      /* ── Collapsed row — state dot + label + waveform ──────────────────── */
-      .pill__row {
-        flex: 1 1 auto;
-        display: flex;
-        align-items: center;
-        gap: var(--sp-2);
-        padding: 0 var(--sp-3) var(--sp-1);
-      }
-      .pill__dot {
-        flex: 0 0 auto;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--silk-40); /* idle: dim, no pulse */
-      }
-      .pill[data-state="listening"] .pill__dot,
-      .pill[data-state="speaking"] .pill__dot {
-        background: var(--amber);
-      }
-      .pill[data-state="listening"] .pill__dot {
-        animation: pill-blink 1.4s ease-in-out infinite;
-      }
-      .pill[data-state="speaking"] .pill__dot {
-        animation: pill-blink 0.9s ease-in-out infinite;
-      }
-      @keyframes pill-blink {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.35; }
-      }
-      .pill__label {
-        flex: 0 0 auto;
-        font-variation-settings: "wdth" 85, "wght" 500;
-        font-size: 9px;
-        letter-spacing: 0.22em;
-        text-transform: uppercase;
-        color: var(--silk-65);
-        line-height: 1;
-      }
-      .pill__wave {
-        flex: 1 1 auto;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        min-width: 0;
-        height: 16px;
-      }
-
-      /* ── Expand panel — grows DOWN on a reaction (62-UI-SPEC) ───────────
-       * Hidden when collapsed; the rAF loop toggles data-state="expand". The
-       * 200ms reveal uses --motion-transition. */
-      .pill__expand {
-        display: none;
-        flex-direction: column;
-        gap: var(--sp-4);
-        padding: 0 var(--sp-4) var(--sp-4);
-      }
-      .pill[data-state="expand"] .pill__expand {
-        display: flex;
-      }
-      .pill__reaction {
-        font-variation-settings: "wdth" 100, "wght" 400;
-        font-size: 13px;
-        line-height: 1.5;
-        color: var(--silk);
-        /* Max 3 lines, ellipsis after (62-UI-SPEC §Typography). */
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-      }
-      /* Mount left for 62-05 to populate deck-context chips. */
-      .pill__decks {
-        display: none;
       }
     </style>
   </head>
