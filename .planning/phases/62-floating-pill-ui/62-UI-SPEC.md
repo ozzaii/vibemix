@@ -1,10 +1,12 @@
 ---
 phase: 62
 slug: floating-pill-ui
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-05-21
+reviewed_at: 2026-05-21
+ui_checker: VERIFIED 6/6 (0 block, 0 flag)
 ---
 
 # Phase 62 — UI Design Contract: Floating Pill
