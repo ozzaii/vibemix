@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 62 — floating-pill-ui
+- **Current focus:** v5.0 COMPLETE (4/4 phases 59–62) → milestone lifecycle (audit → complete → cleanup) → then plan + execute v6.0 "The Memory Turn" (overnight run)
 - **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts on external clock).
 - **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
 - **Project mode:** standard.
@@ -45,10 +45,10 @@ See: .planning/PROJECT.md (updated 2026-05-21 — v5.0 "The Useful Cut" mileston
 
 ## Current Position
 
-Phase: 62 (floating-pill-ui) — ALL 5 PLANS COMPLETE — READY FOR VERIFICATION
-Plan: 5 of 5 COMPLETE (62-05 = deck-context chips consuming the 62-03 deck_state wire + explicit-rgba glass surface — the final plan)
-Status: Phase complete — ready for verification
-Last activity: 2026-05-21
+Phase: 62 (floating-pill-ui) — COMPLETE & VERIFIED (human_needed: 4/4 PILL eng-verified, 6 KAAN-ACTION live items). **v5.0 "The Useful Cut" = 4/4 phases complete.**
+Plan: 5 of 5 COMPLETE + code-review (2 blockers + 5/6 warnings fixed) + UI-review (21/24, 3 priority + 2 minor fixes). cargo 61/61 · vitest 787/787 · tsc clean · pytest 7-WIP baseline.
+Status: v5.0 engineering COMPLETE → entering milestone lifecycle (audit → complete → cleanup), then v6.0 "The Memory Turn".
+Last activity: 2026-05-22 -- Phase 62 complete; v5.0 done; starting lifecycle
 
 **62-02 done (PILL-02):** `primary_surface` tri-state config (`pill` default | `mascot` opt-in/secondary | `none`) in `config.rs` (closed `PrimarySurface` enum mirroring `MascotWindowState`, lowercase serde rename, absent-key → Pill, `.unwrap_or_default()` on decode error) + `main.rs` setup() surface-selection branch (`Pill` → `create_pill_window`, `Mascot` → `create_mascot_window` preserved, `None` → no surface; all non-fatal). Transient 62-01 `#![allow(dead_code)]` cleared from `pill_window.rs`. **Mascot demoted, NOT deleted**; mascot-audit fence held (diff = 3 Rust src files; `mascot.html` byte-stable; `test_ci_grep_gates` 7/7 + mascot mirror 75/75). Capability snapshot already in sync (no capability files touched). `cargo test` 61/61, build warning-free. Commits `b9bbabb` (RED) → `a1f71b8` (GREEN config) → `d197533` (main.rs wiring).
 
