@@ -1,191 +1,177 @@
-# Project Research Summary — v3.1 Distribution-Ready Pass
+# Project Research Summary
 
-**Project:** vibemix (AI DJ Co-Host)
-**Domain:** Cross-platform desktop AI distribution polish — Win + Mac one-click install, dep audit/pin, e2e MacBook validation, mascot real-asset land, narrow-scope OSS utility
-**Researched:** 2026-05-17
+**Project:** vibemix — AI DJ Co-Host (v5.0 "The Useful Cut")
+**Domain:** Local AI DJ co-host — adding full-deck awareness, harmonic/transition feedback, actionable-coach persona, floating-pill live UI
+**Researched:** 2026-05-21
 **Confidence:** HIGH
+
+> Detailed research: [STACK.md](./STACK.md) · [FEATURES.md](./FEATURES.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [PITFALLS.md](./PITFALLS.md)
 
 ## Executive Summary
 
-v3.0 closed engineering-complete on 2026-05-17 — anti-slop audio path, latency stack v2, hybrid hallucination gate, CDJ-Whisper visual lock, README hero verbatim lock, EvidenceRegistry citation strip, and the KAAN-ACTION-LEGAL §SHIP-01..13 discharge cookbook are all in the repo. **The product itself is finished.** v3.1 is NOT new product scope — it is the distribution-polish layer that closes the gap between "Kaan's machine runs this" and "anyone on a clean Mac or Windows box can run this." Five target features map 1:1 to milestone scope: (1) one-click install Win+Mac, (2) dep audit/pin/lockfile/SBOM, (3) new-dep opportunity scan, (4) end-to-end MacBook pass, (5) mascot real GLBs with full emotion coverage.
+v5.0 adds three capabilities to a mature, grounded local AI DJ co-host: (A) full deck-state awareness that powers (B) transition + harmonic key-clash feedback, (C) an actionable-not-hype coaching persona, and a floating Super-Whisper-style pill that becomes the primary live surface (the 3D mascot demotes to opt-in/secondary, kept not retired). All four research streams **converged independently** on the same architecture: this is an *integration* milestone on an existing single-writer/citation-linter system, not a greenfield build. Every new capability is anchored to a real file on the in-flight `live-tuning-or-brain` branch, and every recommendation passes the project's central test — "what hallucination class does it close?"
 
-The 4 research agents converged on a tight, opinionated recommendation: **zero new runtime AI deps, zero new IPC wrappers, zero new processes, every change either build-time / CI-time / test-time / asset-only.** Bundle stays under the 350 MB hard cap (Win +~6 MB VB-CABLE optional bundle; Mac detect-and-guide pattern). The mascot lands 23 GLB clips (3 Base + 5 Emotion + 5 Anticipation + 10 Reaction) anchored to the existing v2.1 4-layer additive state machine. Every dep choice carries an explicit green/yellow/red install-impact rating per memory `project_one_click_install_hard_req`. Two unavoidable OS-mandated friction points are reframed as forewarning UX rather than engineering problems: the Windows driver-signature security prompt (cannot be suppressed per VB-Audio confirmation) and the macOS BlackHole system-extension approval (cannot be silent-installed by Apple design).
+The recommended approach for deck data is a **layered grounding ladder, not a single source**: pyrekordbox **XML export** (unencrypted, carries `Tonality`/key/BPM/cues) as the primary metadata oracle, **Gemini-vision deck read** of the already-captured screenshot as the universal cross-app fallback, and the existing numpy/scipy audio + nowplaying-cli/MIDI audible-deck heuristic as the acoustic cross-check ("trust the audio" wins ties). Two stale-stack corrections are load-bearing: **Essentia and librosa are NOT installed** (the audio path is pure numpy/scipy FFT — any "reuse" is actually a new heavy dependency), and **pyrekordbox is installed XML-only** with the SQLCipher path deliberately banned by a grep-gate. Musical key prefers pre-computed tags; the fallback is an in-house ~80-line numpy Krumhansl/Temperley estimator (no new dep). Camelot logic is a deterministic 24-entry Python table — the LLM *narrates* a clash the code already confirmed, it never computes intervals.
 
-The principal risk is **silent regression of the v3.0 engineering surface** while polishing distribution. The pitfalls catalogue 44 specific tripwires — top of the list: stale-`pip freeze`-from-Kaan-venv shipping unused deps into the lockfile; the "MacBook-only" trap that validates only Apple-Silicon Sonoma and rubber-stamps a build that fails on macOS 12.3 Intel; mascot tests built around the `mascot.html` easter egg instead of the v3.0 Tauri+Three.js production surface; the anti-slop blocklist false-tripping on installer prose and tempting a gate relaxation. Every pitfall has a grep-able plan-phase warning sign + a constraint-preserving prevention. The five v3.0 invariants — POC immutability, ModelRouter seam, anti-slop blocklist, privacy rule, IPC contract — are respected by every proposal and verified by the architecture research. v3.1 engineers in parallel with v3.0's external clock (Apple Dev + SignPath ~1-week SLA); when approvals land, v3.1 feeds straight into the v3.0 SHIP-CUT cookbook.
+The dominant risk is **hallucination tripping Kaan's hard release gate**: a false key clash, or naming a deck/key that isn't audible, is the most credibility-destroying failure possible for a tool claiming harmonic expertise. The mitigation chain is non-negotiable and must land in order: a new citable evidence source for keys → deterministic Camelot verdict → a percussive/melodic suppression gate → a conservative confidence gate (library key tags are only ~57-70% accurate, with silent errors) → a Kaan-ear veto. The persona refactor *extends* the in-flight branch (it does NOT add a new mode) and must regression-fence the Phase-54-validated hype goldens. The pill's load-bearing spike is the drag-on-unfocused-window bug — "draggable" and "non-focus-stealing" are in direct tension and that tension is exactly where the pill will look done but feel broken.
 
 ## Key Findings
 
 ### Recommended Stack
 
-v3.1 is **strictly additive on the v3.0 baseline** — no row in the v3.0 stack changes. Net runtime delta: zero. Net dev/CI/test delta: 4 dev-only tools, 5 mascot asset files, and one bundled Win installer payload. See `.planning/research/STACK.md` for the full pin table.
+No new PyPI package is required for deck-state + key. The recommended path is config + code on already-pinned deps: activate pyrekordbox's XML import (already shipped), add an in-house numpy key estimator + a Camelot lookup table (both zero-dep new source files), and extend the existing Gemini-vision screenshot prompt to read both deck panels. Two new Rust crates serve the pill. **Critical correction:** the briefing's "reuse Essentia/librosa" assumption is false — they are not in the stack; the entire MIR path is hand-rolled numpy/scipy, so any MIR library is a *new* heavy install, not a reuse.
 
-**Core additions:**
-- **`uv==0.11.14`** (Apache-2.0/MIT): cross-platform universal Python lockfile — CI fails fast on lock drift via `uv sync --locked`. Dev/CI only.
-- **`cyclonedx-python==7.3.0`** (Apache-2.0): CycloneDX SBOM alongside existing syft SPDX. CI only.
-- **`tauri-plugin-playwright==0.1.0`** (MIT, dev-dep, gated under `[features] test`): native-webview Playwright bridge for e2e. **0.1.0 maturity flagged for plan-time spike; fallback is `tauri-driver` (pre-alpha) or WebView2-only on Win.**
-- **`@playwright/test==1.50.x`** + **`pixelmatch==7.1.0`**: visual-regression assertions with `maxDiffPixelRatio: 0.02`.
-- **`pinact` v3.x**: GH Actions SHA pinning.
-- **Mixamo + Adobe auto-rigger** (free, royalty-free commercial): production mascot retargeting — already scaffolded at `scripts/mascot/` (Phase 43-05). Rejects Ready Player Me (ARKit blendshape mismatch), Auto-Rig Pro ($40 paid), AccuRIG (FBX/USD only).
-- **VB-CABLE NSIS `/S` silent install bundled inside Inno Setup `[Run]` section** (Win only, ~6 MB). EULA-redistribution gate flagged for plan-time legal confirm; fallback Mac-style detect-and-guide.
-- **`cargo-deny` `deny.toml`** (already in v3.0 CI): tighten with license allowlist (Apache-2.0/MIT/BSD/ISC/Unicode-DFS-2016/MPL-2.0) + GPL bans.
-
-**Explicit non-additions (REJECTED in opportunity-scan):** Loopback Audio, Dante Via, Soundflower, Pioneer ProDJ Link / cdj-link-py, CLAP/MERT/OpenL3, stem separators, additional LLM providers, `testdriver.ai`, Poetry/Pipenv, Linux support, DAW integration, Mixxx OSC (DEFERRED v3.x), Beat This! Rust crate (DEFERRED v3.x).
+**Core technologies:**
+- **pyrekordbox XML export** — deck metadata oracle (key/BPM/cues) — unencrypted, stdlib-parseable, no live-DB lock or post-6.6.5 encryption wall. (Live SQLCipher `master.db` = best-effort-only, read-only-on-temp, NEVER write.)
+- **Gemini-vision deck read** — universal cross-app deck-state fallback — reuses the screenshot already sent every turn; works for Serato/djay/Traktor/Engine without per-app parsers; zero new dependency.
+- **In-house numpy KS/Temperley key estimator + Camelot table** — key fallback + clash math — same DSP family as the shipped BPM autocorrelation; deterministic verdict the LLM narrates. (Essentia = RED install-impact, librosa = YELLOW — both rejected; key detection is fallback-only and doesn't justify a heavy binary.)
+- **tauri-nspanel v2.1** (macOS, git branch) — non-activating NSPanel so the pill doesn't steal focus from the DJ app.
+- **window-vibrancy 0.7.x** (crates.io) — cross-platform frosted glass (HudWindow on mac; acrylic/mica on Windows).
 
 ### Expected Features
 
+Every feature maps to a hallucination class it closes. The harmonic feature is the most defensible anti-slop claim in the whole product because a key clash is *math-checkable* — the AI can be proven right or wrong.
+
 **Must have (table stakes):**
-- Signed `.dmg` + signed `.msi`/`.exe` from `releases/latest` (gates on SHIP-01/02 external clock).
-- First-launch wizard end-to-end walk: install → probes (BlackHole/VB-CABLE/TCC/MIDI/Bravoh proxy) → session-ready ≤60s.
-- BlackHole 2ch auto-detect-and-prompt Mac (Homebrew-first / `.pkg`-fallback) + VB-CABLE auto-prompt Win with forewarning copy.
-- Every Python+Rust+Tauri runtime dep pinned in `uv.lock`/`Cargo.lock`/`package-lock.json` with rationale + license + install-impact in `docs/AUDIT.md`.
-- 23 mascot GLB clips covering Base(3)+Emotion(5)+Anticipation(5)+Reaction(10), wired to 4-layer state machine across every event class.
-- E2E MacBook walk: functional + visual + aesthetic + usability + hallucination dimensions with gap-closure routing.
-- Onboarding stopwatch ≤60s validated on SHIP-04 fresh-VM matrix (macOS 12.3/14/15 + Win 10/11).
+- Deterministic Camelot clash detection (lookup table, cited verdict) — a harmonic tool that gets key math wrong is instantly discredited.
+- Percussive/atonal suppression gate — flagging a clash on two drum loops is the canonical slop; this is a *hard precondition* before any clash note fires.
+- Phrase-alignment note ("you came in off-phrase") — #1 amateur error, every coach leads with it.
+- Bass-clash note ("two basslines running — swap the lows") — most audible mistake.
+- Actionable coach register (observed→prescriptive, DJ verbs: kill/swap/cut/filter/wait/ride/tighten) — the whole v5.0 premise.
+- Draggable floating pill with idle/active/speaking states, collapse-by-default/expand-on-event, TTS-synced waveform.
 
 **Should have (competitive):**
-- First-session demo button reusing v3.0 VIS-09 deterministic 30-event sequencer.
-- Single-binary universal2 sidecar audited GREEN ("no Python needed" verifiable on fresh VM).
-- `AUDIT.md` + CI badges + Dependabot + lockfile-diff bot on PRs.
-- License-policy gate via `cargo-deny licenses` allowlist.
-- Inline emote-tag vocab integration (gated on v2.1 v2 text-channel-timing spike; defer to v3.2 if spike fails).
-- Mascot README hero render alongside locked verbatim hero text.
-- OBS browser-source mascot-path callout in README.
+- Full-deck awareness powering *prescriptive* transition notes ("real DJ friend who sees both decks") — the flagship.
+- Provably-correct harmonic verdict — marketing-grade: "the AI can be *proven* right about key."
+- Deliberately *withholding* wrong advice (no key nag on percussive content) — sophistication a generic LLM tool never shows.
+- Key chips + deck-context micro-display in the expanded pill.
+- Blend-length judgment tied to content; prescriptive timing ("breakdown now — bring B in").
 
-**Defer (v3.2+ or v3.x):** `/hatch` user-gen mascot, Mixxx OSC adapter, controller map transpiler, 10→30 controller library, multi-session debrief arc, Beat This! Rust sidecar, `obs-websocket-py` event uplink, external usability testers, A/B onboarding flows, quantified SUS/NASA-TLX metrics.
+**Defer (v2+):**
+- Per-deck DSP (true dual-stream audio analysis) — only if metadata grounding proves insufficient; heavy.
+- Per-app library parsers (Serato/Traktor/Engine) — vision-read covers them universally for v5.0.
+- ProDJ Link / prolink-connect — hardware-gated, explicitly deferred.
 
-**Anti-features (REJECTED to preserve clean-utility constraint):** Bundle BlackHole `.pkg` redistribution, auto-update silent installs, Linux/`.deb`/`.AppImage`, macOS App Store distribution, 30-session formal hallucination harness, Snyk/Black Duck enterprise SBOM tooling, vendoring all Python deps.
+**Anti-features (LOCK these out):**
+- No next-track recommendation (kills DJ agency; out of scope).
+- No 1-10 transition scoring (turns a friend into a nagging judge; most "errors" are creative choices).
+- No headphone-cue analysis (Gemini conflates cue with master → wrong reactions).
+- No live audio key-*detection* as primary (unreliable, invites false-confident clash claims).
+- No full chat history in the pill; no notch-locked Dynamic Island; no 3D character in the pill.
 
 ### Architecture Approach
 
-v3.1 lives at three existing roots — `installer/`, `scripts/release/`, `tauri/ui/assets/mascot/animations/` — plus three new generated/test surfaces (`docs/AUDIT.md`, `docs/dep-opportunities/`, `tests/e2e/macbook/`). **Zero new processes. Zero new IPC messages. Zero changes to the runtime sidecar↔Tauri contract.**
+Pure integration on the existing system, respecting four cardinal invariants: **single-writer** (`state_refresh_loop._tick_once` is the only `MusicState` writer), **citation grounding** (new evidence must be written to the registry before the LLM can cite it; `CitationLinter` does a binary response-level strip), **"trust the audio"** (no fabricated phase/key claims), and **one socket** (everything on `ws://127.0.0.1:8765`). Deck-state is a new `DeckState` dataclass *embedded* in `MusicState` (additive, golden-equivalence preserved); a read-only poller writes its own holder and `_tick_once` copies it under the lock — the *third* such external source alongside controller/track polling. The pill is a near-clone of `mascot_window.rs` consuming the same `ipc.session.*` frames on the same socket.
 
 **Major components:**
-1. **Installer companion chain** (`installer/companion/fetch_drivers.{sh,ps1}` + `audio_config.py` + `driver_manifest.json` + `onboarding_copy.json`) — post-install driver fetch from official vendor URLs, SHA-256 verified, runs vendor-signed installers; codesigned by Bravoh cert via new `companion-sign` release.yml stage between BUILD and SIGN.
-2. **Dep audit surface** (`docs/AUDIT.md` + `scripts/audit/dep_audit.py` + `dep_ratings.json` + `check_audit_freshness.sh` + `.github/workflows/dep-audit.yml`) — generator consumes existing lockfiles, emits committed markdown 3-table; CI freshness gate fails PR if lockfile newer than AUDIT.md.
-3. **Dep-opportunity scan** (`docs/dep-opportunities/<UTC>-scan.md` + `scripts/audit/scan_opportunities.py` + ADR sidecar `.planning/decisions/DEP-OPP-<N>-<slug>.md`) — dated discovery artifact, 4-color rubric (Red-constraint/Red-risk/Yellow-defer/Green-adopt), explicit exclusion-set upfront.
-4. **E2E MacBook harness** (`tests/e2e/macbook/test_*.py` + `scripts/e2e/run_macbook_pass.sh` + `__snapshots__/` + `docs/e2e/MACBOOK-PASS-PROTOCOL.md` + `scripts/e2e/check_e2e_report.sh`) — installs SHIPPED `.dmg` to `/Applications`, launches with debug logging, runs 4 pytest suites, emits report.html. **Splits into 5a Kaan-aesthetic-ear pass (subjective) + 5b OS-matrix smoke (objective, ≥2 of 5 configs).**
-5. **Mascot real-GLB swap** (drop-in at existing `tauri/ui/assets/mascot/animations/prep_*.glb` slot paths) — pure asset operation, zero state-machine code change, 23-clip enumeration anchored to Plutchik 8-primary set adapted for DJ-context, bundle stays within 25 MB Tier-1 cap via draco retune (preferred) or 30 MB cap bump with audit trail (fallback).
+1. **`DeckState`/`DeckTrack` model + deck poller** (`state/deck_state.py`, `state/deck_poller.py` — NEW) — session-wide per-deck track facts; read-only producer feeding `_tick_once` only.
+2. **`harmonics.py`** (NEW) — pure Camelot/key/clash functions, no I/O, fully unit-testable.
+3. **`KEY_CLASH` + `TRANSITION_OPPORTUNITY` events** (`event.py`, `event_detector.py` — MODIFIED) — diff-based, read-only, onset-gated with long cooldowns; reuse `mix:`/`track:` evidence sources (no new `deck:` source).
+4. **`AICoach` + persona cells** (`state/coach.py`, `prompts/matrix.py` — MODIFIED) — extend COACH_* cells + add per-event task arms; do NOT add a new mode.
+5. **`pill_window.rs` + pill UI + `primary_surface` tri-state** (NEW) — transparent/on-top/draggable window; `"pill"|"mascot"|"none"` config; mascot kept as secondary.
 
-**Build order:** Phase A (parallel A1 dep-audit + A2 mascot) → Phase B (opportunity scan) → Phase C (installer) → Phase D (e2e). A2 must precede D for visual snapshots; C must precede D since e2e drives shipped DMG.
+> **One architectural divergence to flag:** ARCHITECTURE.md recommends reusing the existing `mix:` evidence source for deck keys (existence-only, no grammar change), while PITFALLS.md (Pitfall 1) argues for a dedicated **`key:` source with confidence** (`key:A=9B@conf0.8`) so the linter can validate per-deck per-moment key assertions. **The roadmapper must resolve this in the deck-grounding phase.** PITFALLS' position is stronger for the headline anti-slop guarantee (per-moment, per-deck, confidence-carrying) — recommend the `key:` source unless the deck-grounding spike proves `mix:` reuse is sufficient.
 
 ### Critical Pitfalls
 
-44 pitfalls catalogued; top 5 by release-blocking impact:
-
-1. **Stale `pip freeze` from Kaan's `.venv` ships as lockfile** — bakes unused transitives (`google-cloud-speech`, `google-cloud-texttospeech`, `openai`) + drifts off v3.0 GATE-02 VCR cassette pin. **Prevention:** lock in clean `python:3.12-slim-bookworm` container; `requirements.in` (curated) vs `requirements.lock` (resolved); `pip-deptree --reverse` prune gate.
-2. **Silent BlackHole/VB-CABLE auto-install trips macOS endpoint security / Win driver-signature UAC** — produces "system extension blocked" modal that breaks HARD one-click req. **Prevention:** re-scope to "detect + one-tap fallback"; routing config (Multi-Output Device) is what gets automated, not kernel-mode install; wizard copy anticipates OS modal as expected step; verify BlackHole 48 kHz format post-install per memory `project_v4_canonical_baseline`.
-3. **"It works on Kaan's MacBook" trap** — e2e validates only Apple-Silicon Sonoma, ignores macOS 12.3 Intel + Win matrix. **Prevention:** split target feature #4 into #4a Kaan-ear (subjective) + #4b OS-matrix smoke (objective, ≥2 of {12.3 Intel, 14 AS, 15 AS, Win 10, Win 11}); #4b prerequisite for milestone close; commit screencast.
-4. **Mascot tests built around `mascot.html` easter egg instead of v3.0 Tauri+Three.js production** — emotion coverage appears green while real surface ships with placeholder GLBs (v0.1.0-rc1 "mascot chrome strip" bug class). **Prevention:** e2e mascot tests target Tauri WebviewWindow only; CI grep gate `! grep -rn "mascot.html" tests/ e2e/ scripts/ci/`; 4-layer × 7-event-type coverage matrix; vitest snapshot on transparent wrapper background.
-5. **Anti-slop blocklist false-trips on installer/wizard/dep-audit copy** — 15-token blocklist + `\bdeeply\s+\w+` regex fires on legitimate installer prose; temptation to relax corrodes v3.0 anti-slop thesis. **Prevention:** vocabulary substitution dictionary at `docs/internal/copy-substitutions.md` ("seamless → one-tap", "robust → tested", "leverage → use"); plan-checker pre-commit runs `check_no_slop.py` on every PLAN.md/wizard copy/e2e report; **never** relax the gate.
-
-**Other high-severity:** Dep-opportunity scan recommends Linux-only or multi-provider AI dep (mitigation: scan plan quotes exclusion set verbatim + 4-color rubric with auto-red constraint-violation rule); VB-CABLE EULA bundled-redistribution clause (mitigation: post-install fetch fallback); worktree-isolated subagents start from stale base per memory `feedback_worktree_must_sync_main_first` (mitigation: Step-0 `git merge origin/main` invariant in every subagent prompt).
+1. **Uncitable harmonic feedback (no evidence source)** — there is no `key`/`harmonic` member in `EVIDENCE_SOURCES` today. Add the citable key source + linter rule **FIRST**, before any harmonic prompt text. The clash must cite *both* decks' keys; the linter strips a fabricated clash.
+2. **False clash from wrong key (the headline hallucination)** — library key tags are ~57-70% accurate with *silent* errors, worst on percussion-heavy techno/psytrance (vibemix's actual genres). Conservative gate: clash only when both keys present, both from a library match, and Camelot distance is in the unambiguous clash band. **One-step-off-wheel = SUPPRESS** (indistinguishable from a detection error; pros mix fifths/relatives freely). Carry derived confidence; Kaan-ear veto.
+3. **Context-blind feedback** — clash called during a breakdown (no overlapping tonal content), or transition critique landing 12s late. Gate on `audible_deck == "mix"` + both decks above an energy floor; transition feedback is **retrospective/past-tense only**, never mid-blend imperatives.
+4. **Audible-deck ambiguity poisons the feature** — the DDJ-FLX4 doesn't write play-state when djay Pro controls it; `derive_audible_deck()` returns `none`/`mix` often. Trust fader+xfader (the v4 fix), suppress cross-deck claims when the 2nd deck is unresolved — degrade to single-deck feedback, never guess.
+5. **Reading live `master.db`** — file locks during live sessions, post-6.6.5 encryption wall, and **any write corrupts the user's collection**. Read the unencrypted XML export; SQLCipher best-effort-only on a temp copy; NEVER write. Repo test asserts no DJ-DB write-mode open.
+6. **No graceful degradation when no source exists** — Serato/Traktor/encrypted-RB users get a broken or *fabricating* feature. Tiered capability (T0 audio+MIDI only / T1 +library); harmonic prompt fragments are conditionally injected — absent → not in the prompt → model can't be tempted.
+7. **Persona over-correction (cold/nag)** — "actionable" overshoots into a fault-finding QC bot. Keep the in-flight BALANCED rule (~half turns specific positive callouts, never reuse a praise line). Actionability is in *specificity + peer register*, not frequency of critique.
+8. **Shared-prompt refactor breaks hype mode** — `matrix.py`/`coach.py` are shared. Regression-fence the Phase-54-validated hype goldens; any hype-golden change is a deliberate, reviewed decision.
+9. **Pill steals focus / blocks DJ input** — interactive draggable pill re-opens every focus/drag bug the click-through overlay sidestepped (tauri#10767/#14102/#6568). `focused(false)` + NSPanel + verify keystrokes still reach the DJ app after clicking the pill.
+10-11. **Multi-monitor positioning + mac/win transparency** — clamp-to-visible on display-change; explicit `--glass-*` background (not pure OS-vibrancy → opaque white box on Windows); `--blur-glass-light` (16px) for integrated-GPU perf; keep `mascot-audit` CI green.
 
 ## Implications for Roadmap
 
-5-phase structure aligned 1:1 with PROJECT.md milestone scope, dependency-aware order:
+The dependency chain is firm: **harmonic + transition feedback both gate on deck-state existing first; the pill parallelizes.** Within the deck/harmonic spine, the citable key source must precede any harmonic prompt. PITFALLS, ARCHITECTURE, and FEATURES independently produced the same four-phase shape. (v4.0 ended at Phase 58; v5.0 begins at 59. Names are recommendations, not locked titles.)
 
-### Phase 46: Dep Audit + Lockfile + AUDIT.md
-**Rationale:** Independent; establishes `scripts/audit/` + `dep_ratings.json` schema that downstream phases append to. Cheapest; warm-up. Parallel with Phase 47.
-**Delivers:** `uv.lock` hermetic-container generated; CycloneDX SBOM; `pinact` SHA-pinning; `cargo-deny` license allowlist; `docs/AUDIT.md` 3-table surface; CI freshness gate; dep-cull pass on `livekit-plugins-openai` + `google-cloud-speech` + `google-cloud-texttospeech` if non-transitive; README badges; Dependabot.
-**Addresses:** FEATURES Category 2 (DEPS); target feature #2.
+### Phase 59: Deck-Awareness Data Source + Grounding
+**Rationale:** The gate for everything. No flagship feature can ground until "all loaded tracks" has a resolved source + the keys are *citable*. Three research streams flag this as the critical-path item.
+**Delivers:** `harmonics.py` (pure Camelot/key/clash); `DeckState`/`DeckTrack` embedded in `MusicState` (additive); deck poller (XML-primary + Gemini-vision fallback + audio cross-check, single-writer compliant); the citable key evidence source + linter rule; XML-primary read-only decision with a repo test asserting no DJ-DB write; tiered capability model (T0 audio-only / T1 +library).
+**Addresses:** Full-deck awareness (table stakes); deck data-source resolution (P1).
+**Avoids:** Pitfalls 1 (uncitable harmonic), 4 (audible-deck ambiguity), 5 (master.db landmine), 6 (graceful degradation).
+**Uses:** pyrekordbox XML, Gemini-vision deck read, in-house numpy key estimator.
 
-### Phase 47: Mascot Real GLB Land + Emotion Coverage Wiring
-**Rationale:** Independent; parallel with Phase 46. **Must precede Phase 50** so visual snapshots baseline against real assets. Gated on KAAN-ACTION-LEGAL §VIS-04.
-**Delivers:** 23 GLB clips retargeted via existing Phase 43-05 Mixamo+Adobe CLI; MANIFEST emotion-to-event mapping; bundle gate flips exit-2 → exit-0 via draco retune (or 30 MB bump fallback); 30s persona smoke; mascot README hero render.
-**Addresses:** FEATURES Category 4 (MASCOT); target feature #5; closes v3.0 §VIS-04 pre-stage.
+### Phase 60: Harmonic-Feedback Confidence Gate
+**Rationale:** The hard hallucination gate. Owns the conservatism that keeps a wrong-key tag from announcing a false clash. Must be its own phase, not folded into deck-awareness — it gets a Kaan-ear veto.
+**Delivers:** `KEY_CLASH` + `TRANSITION_OPPORTUNITY` detectors (onset-gated, long cooldowns); the percussive/melodic suppression gate (runs BEFORE any clash note); one-step-off-wheel suppression; derived per-key confidence; breakdown/single-deck suppression; deterministic Camelot verdict the LLM only narrates.
+**Addresses:** Deterministic Camelot clash, percussive-suppression gate, provably-correct verdict.
+**Avoids:** Pitfalls 2 (false clash — headline), 3 (context-blind).
+**Implements:** Event detectors + `harmonics.is_clash`.
 
-### Phase 48: Dep-Opportunity Scan
-**Rationale:** Depends on Phase 46 `dep_ratings.json` schema. Informs Phase 49 installer.
-**Delivers:** `docs/dep-opportunities/2026-05-scan.md` rating v3.x candidates (Mixxx OSC, map transpiler, pyrekordbox depth, DJ-software coverage gaps, hardware controller gaps, OS edge cases); 4-color rubric; exclusion-set upfront; ADRs per green adoption; OBS browser-source docs callout. Likely outcome: zero new runtime deps.
-**Addresses:** FEATURES Category 5 (OPPORTUNITY-SCAN); target feature #3.
+### Phase 61: Actionable-Not-Hype Coach Persona
+**Rationale:** Consumes the deck-state from 59-60. Extends the in-flight `live-tuning-or-brain` work — sharpens the *coach* register and wires prescriptive deck instructions, without adding a new mode.
+**Delivers:** COACH_* cell deck-feedback paragraphs (transition mechanics + harmonic vocabulary); `task_for_event` arms for the two new events; observed→prescriptive (SBI/AID) phrasing on the existing citation contract; the hardened BALANCED rule; conditional prompt-fragment injection by tier; hype-golden regression fence + cross-mode verification gate.
+**Addresses:** Actionable coach register (table stakes); deliberately-withholding-wrong-advice (differentiator).
+**Avoids:** Pitfalls 3 (no present-tense imperatives), 6 (conditional injection), 7 (over-correction), 8 (hype regression).
+**Implements:** `prompts/matrix.py` + `state/coach.py` (extend, don't duplicate).
 
-### Phase 49: One-Click Installer Chain (Win + Mac)
-**Rationale:** Depends on Phase 46 + Phase 48. Most expensive; longest tail. Must complete BEFORE Phase 50.
-**Delivers:** `installer/companion/fetch_drivers.{sh,ps1}` + `driver_manifest.json` + `audio_config.py`; wizard CTA cards with vendor download links + UAC forewarning; Inno Setup `[Run]` VB-CABLE `/S` (EULA-permitting) or detect-and-guide fallback; Tauri MSI target; uninstall path; a11y pass; SHIP-04 fresh-VM matrix real-run + SHIP-05 ≤60s gate.
-**Addresses:** FEATURES Category 1 (INSTALL); target feature #1; closes SHIP-04 + SHIP-05 + AUDIO-07.
-
-### Phase 50: End-to-End MacBook Pass (Split 5a + 5b)
-**Rationale:** Last in order. Depends on Phase 47 (real GLBs) + Phase 49 (built DMG). **Must split per Pitfall 3.**
-**Delivers (50a Kaan-ear, subjective):** functional flow walk; CDJ Whisper visual + aesthetic re-walk with paired gsd-ui-checker + gsd-ui-auditor; Nielsen 10 heuristic checklist; hallucination gate re-run via `check_gate.sh` Gate 2b; screencast committed; gap-closure routing.
-**Delivers (50b OS-matrix, objective):** automated install/launch/first-event/shutdown on ≥2 of {macOS 12.3 Intel, 14 AS, 15 AS, Win 10, Win 11} via existing `tart` matrix; report.html PASS/FAIL per dimension; CI gate via `check_e2e_report.sh` Gate 6b in `cut_release.sh`.
-**Addresses:** FEATURES Category 3 (TEST); target feature #4.
+### Phase 62: Floating Pill UI (parallel — soft-depends only on snapshot deck fields)
+**Rationale:** Independent of deck-state; can run in parallel with 59-61. Only its final polish (deck chips) waits on Phase 59's snapshot fields. The drag-on-unfocused spike is load-bearing and should be de-risked first.
+**Delivers:** `pill_window.rs` (clone of `mascot_window.rs`) + `PillWindowState`; pill.html + shared `src/ipc/session-frames.ts` parser (Vite 5th entry); `primary_surface` tri-state + `set_primary_surface` command + tray/Settings toggle; NSPanel non-activating focus behavior; window-vibrancy frosted glass with explicit `--glass-*` fallback; clamp-to-visible multi-monitor handling; capability allowlist `"pill"` (closes the v0.1.0-rc1 drag-capability debt); deck chips after 59.
+**Addresses:** Draggable pill + idle/active/speaking states; TTS-synced waveform; deck-context chips.
+**Avoids:** Pitfalls 9 (focus steal), 10 (multi-monitor), 11 (transparency mac/win + mascot regression).
+**Uses:** tauri-nspanel v2.1, window-vibrancy 0.7.x.
 
 ### Phase Ordering Rationale
-- 46+47 parallel: share zero files; 46 unblocks 48; 47 must precede 50.
-- 48 after 46: appends to `dep_ratings.json` schema.
-- 49 after 46+48: installer companion pulls only green-rated deps.
-- 50 last: validates SHIPPED `.dmg` + real GLBs.
-- All five respect: zero new IPC wrappers; POC immutability; ModelRouter seam; anti-slop blocklist (extended grep target paths for 4 new artifact globs); privacy rule (project-scoped FS only).
+- **59 -> 60 -> 61 is a hard critical path:** feedback cannot cite deck-state that doesn't exist; conservatism cannot gate clashes that aren't detected; persona cannot narrate keys the registry never saw.
+- **62 parallelizes** with the spine — the pill's core (reaction text + meters) needs nothing from deck-state; only its deck-chip polish waits on 59 step 4.
+- **The citable key source lands in 59 before any harmonic prompt** — Pitfall 1's "uncitable-by-construction" trap is a HIGH-cost retrofit if discovered at the release gate.
+- Grouping mirrors the four research files' independent convergence and the existing single-writer/citation/one-socket invariants.
 
 ### Research Flags
 
-**Needs research (plan-time):**
-- **Phase 49 (Installer):** `tauri-plugin-playwright==0.1.0` maturity 1-day spike; VB-CABLE EULA legal review; macOS 16 + Win 11 24H2 matrix additions; companion script signing semantics on Win (`.ps1` Authenticode via SignPath).
-- **Phase 50 (E2E):** Pixelmatch SSIM threshold calibration on Retina M-series; e2e audio-loopback fixture timing-sensitivity with recorded WAV vs live PIE; macOS 12.3 FileVault edge case in `installer -pkg` flow.
-- **Phase 47 (Mascot):** real GLB animation track naming vs placeholder — `pools.ts` may need one-line `clipName` mapping update; inline emote-tag vocab gated on v2.1 v2 Gemini text-channel-timing spike.
+Phases likely needing deeper research / a spike during planning (`/gsd:plan-phase --research-phase N`):
+- **Phase 59:** pyrekordbox **live-DB read safety** post-6.6.5 (encryption wall, `download-key` fragility on a distributed binary) — confirm XML-primary is sufficient and SQLCipher stays opportunistic. Also the `mix:`-reuse vs dedicated-`key:`-source decision (ARCHITECTURE <-> PITFALLS divergence).
+- **Phase 59:** **Gemini-vision deck-badge reliability eval** — how reliably can Gemini read the loaded track + key/BPM badge off each deck panel across djay/Serato/Traktor UIs? This is the universal fallback; needs a real-screenshot accuracy pass.
+- **Phase 62:** **Pill drag-on-unfocused-window spike** (tauri#11605/#10767/#14102) — the single most likely "looks done but feels broken" failure; resolve `startDragging` vs `data-tauri-drag-region` vs NSPanel `isMovableByWindowBackground` before building the UI. Plus the DMG-build transparency regression (tauri#13415).
 
-**Standard patterns (skip extra research):**
-- **Phase 46:** `uv` + `cyclonedx-python` + `pinact` + `cargo-deny` well-documented; HIGH confidence.
-- **Phase 48:** constraint enumeration + scan rubric are documentation/process; HIGH confidence on zero-new-runtime-deps outcome.
+Phases with standard patterns (lighter research):
+- **Phase 60:** Camelot theory is HIGH-confidence and fully sourced; the math is a deterministic table. Effort is in the gate tuning + Kaan-ear veto, not research.
+- **Phase 61:** extends well-mapped in-flight branch code on the existing citation contract; SBI/AID coaching structure is established.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Direct PyPI/crates.io/official-source verification 2026-05-17. MEDIUM on `tauri-plugin-playwright==0.1.0` (flagged spike). MEDIUM on Mixamo asset selection (Kaan-aesthetic). |
-| Features | HIGH | 1:1 mapped to PROJECT.md scope; anchored to shipped v2.1 + v3.0 surfaces. MEDIUM on Windows install-flow (driver-signature prompt OS-mandated, reframed as UX). |
-| Architecture | HIGH | Verified against `.planning/codebase/ARCHITECTURE.md`, release.yml, IPC schema, mascot module tree. MEDIUM on new-component placements (first-time integrations, well-sited). LOW on bundled-driver signing semantics (KAAN-ACTION-LEGAL timing). |
-| Pitfalls | HIGH | Anchored to v3-shipped P1–P41 + 44 v3.1-specific tripwires with grep-able warning signs. |
+| Stack | HIGH (MEDIUM on non-RB deck sources) | Tauri pill, key detection, Rekordbox path verified against `pyproject.toml`/`uv.lock` + official docs. Non-Rekordbox deck sources web-verified but no live-hardware confirmation. |
+| Features | HIGH | Camelot theory + transition mechanics cross-verified across MixedInKey/DJ.Studio/Pioneer/NI. Pill UX MEDIUM (reference-app behavior inferred from product pages, not source). |
+| Architecture | HIGH | Read directly against real files on branch `live-tuning-or-brain`; every recommendation anchored to a file/line. |
+| Pitfalls | HIGH (MEDIUM on key-accuracy numbers) | Grounding/citation + deck-source + Tauri gotchas codebase- and GH-issue-verified. Key-detection accuracy from multiple agreeing secondary sources, no single authoritative benchmark. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
-- **VB-CABLE EULA bundled-redistribution clause** — plan-time legal review; fallback Mac-style detect-and-guide.
-- **`tauri-plugin-playwright==0.1.0` production stability** — 1-day spike at Phase 50 plan time; fallback `tauri-driver` or WebView2-only Win e2e + Kaan-manual Mac walk. **Do NOT block v3.1 on this.**
-- **macOS 16 release date relative to v3.1 ship** — verify at SHIP-04 real-run time.
-- **VIS-04 Adobe-account Mixamo download** — KAAN-ACTION-LEGAL discharge; autonomous mode defers to Kaan-action-required surface but continues unblocked work.
-- **`livekit-plugins-openai` cull decision** — verify `uv pip tree` for hard transitive dep.
-- **23-clip emotion enumeration vs Mixamo library availability** — Kaan-aesthetic selection has latitude to swap intent labels if needed.
-- **Worktree-isolated subagent base-sync invariant** — every Phase 46-50 subagent prompt MUST include Step-0 `git merge origin/main` per memory `feedback_worktree_must_sync_main_first`.
+- **Deck data-source live confirmation:** XML-primary + vision-fallback is the recommended ladder, but no live FLX4+djay drive has confirmed two-deck resolution rates. Resolve via a real-hardware live test in Phase 59 (KAAN-ACTION).
+- **`mix:` reuse vs dedicated `key:` evidence source:** ARCHITECTURE recommends `mix:` reuse (no grammar change), PITFALLS recommends a confidence-carrying `key:` source. Decide in Phase 59 planning — lean `key:` for the strongest anti-slop guarantee unless the spike proves reuse sufficient.
+- **Gemini-vision deck-badge accuracy:** the universal fallback's reliability across DJ-app UIs is unmeasured. Eval in Phase 59.
+- **Pill drag/focus resolution:** which drag mechanism survives the non-activating-window constraint on both mac + win. Spike in Phase 62.
+- **Key-detection accuracy band:** the ~57-70% library-tag accuracy drives the conservatism gate; validate the suppression thresholds against Kaan's real disagreed-pairs corpus in Phase 60.
 
 ## Sources
 
-### Primary (HIGH)
-- `.planning/research/STACK.md` §XI — tool pin verification PyPI/crates.io 2026-05-17.
-- `.planning/research/FEATURES.md` — shipped v2.1+v3.0 surfaces; Plutchik 8-primary reference; VTuber expression patterns.
-- `.planning/research/ARCHITECTURE.md` §IX — codebase/ARCHITECTURE.md, release.yml, install_vm_matrix, IPC schema, mascot module tree, tauri.conf.json5 bundle-ID lock.
-- `.planning/research/PITFALLS.md` — v3-shipped P1–P41 + 44 v3.1-specific.
-- PROJECT.md (post-v3.0 close).
+### Primary (HIGH confidence)
+- Live codebase on branch `live-tuning-or-brain` — `state/{music_state,event,event_detector,refresh,coach,track_resolver,evidence_registry}.py`, `coach/citation_linter.py`, `prompts/matrix.py`, `agent/dj_cohost.py`, `runtime/ws_bus.py`, `audio/features.py`, `library/rekordbox.py`, `pyproject.toml`/`uv.lock`, `tauri/src-tauri/src/{mascot_window,config,overlay}.rs`, `tauri.conf.json5`.
+- [pyrekordbox PyPI/docs](https://pyrekordbox.readthedocs.io/en/stable/quickstart.html) — v0.4.4, `Rekordbox6Database`, `download-key`, db6 SQLCipher 6.6.5 obfuscation.
+- [tauri-nspanel](https://github.com/ahkohd/tauri-nspanel) (v2.1) · [window-vibrancy](https://github.com/tauri-apps/window-vibrancy) (0.7.x) · [Tauri window customization](https://v2.tauri.app/learn/window-customization/).
+- [Tauri #11605](https://github.com/tauri-apps/tauri/issues/11605) (drag-region broken unfocused), [#10767](https://github.com/tauri-apps/tauri/issues/10767), [#14102](https://github.com/tauri-apps/tauri/issues/14102), [#6568](https://github.com/tauri-apps/tauri/issues/6568), [#13415](https://github.com/tauri-apps/tauri/issues/13415).
+- [Mixed In Key — Harmonic Mixing Guide](https://mixedinkey.com/harmonic-mixing-guide/), [DJ.Studio Camelot Wheel](https://dj.studio/blog/camelot-wheel) + [Transitions Playbook](https://dj.studio/blog/the-dj-transitions-playbook), [Pioneer DJ harmonic mixing](https://blog.pioneerdj.com/djtips/how-do-djs-approach-harmonic-mixing/), [Native Instruments transitions](https://blog.native-instruments.com/dj-transitions/).
+- PROJECT.md, REQUIREMENTS.md, CLAUDE.md anti-slop thesis; prior VERIFIED research `.planning/research/v2-buckets/{B-industry-integrations,C-ui-overlay}.md`, `v3-buckets/v3.x-pyrekordbox-depth.md`.
 
-### Secondary (MEDIUM)
-- v3.0 source-of-truth: release.yml, Cargo.toml, pyproject.toml, installer/windows/vibemix-installer.iss, scripts/dist/install_vm_matrix.{sh,json}, scripts/mascot/check_bundle_size.sh, tauri/ui/src/mascot/state-machine.ts.
-- KAAN-ACTION-LEGAL §SHIP-01..13 cookbook 8-block format.
-- v3.0 milestone archive (ROADMAP / REQUIREMENTS / MILESTONE-AUDIT).
-- Inno Setup silent-install ref; NSIS silent-install ref; BlackHole Wiki; Tauri 2 WebDriver docs; Playwright visual comparison docs; MoCap/Tripo3D Mixamo alternative reviews.
+### Secondary (MEDIUM confidence)
+- Key-detection accuracy: [Crossfader MIK 11](https://wearecrossfader.co.uk/blog/mixed-in-key-11/), [Dubspot MIK vs Beatport](https://blog.dubspot.com/dubspot-lab-report-mixed-in-key-vs-beatport), [Engine DJ key thread](https://community.enginedj.com/t/engine-dj-badly-analyses-track-key/52099), [VirtualDJ key issues](https://virtualdj.com/forums/228037/) — RB ~57% / Traktor ~54% / VirtualDJ ~65% / MIK ~70%.
+- Pill UX: [Superwhisper](https://superwhisper.com/), [MacStories NotchNook/MediaMate](https://www.macstories.net/reviews/notchnook-and-mediamate-two-apps-to-add-a-dynamic-island-to-the-mac/), [Alcove](https://tryalcove.com/).
+- Coaching structure: [HR Acuity constructive feedback](https://www.hracuity.com/blog/constructive-feedback-examples/), [ICCS AID/SBI](https://iccs.co/feedback-in-coaching-supervision/).
 
-### Tertiary (LOW — plan-time validation)
-- `tauri-plugin-playwright==0.1.0` production stability.
-- VB-CABLE EULA bundled-redistribution clause (vb-audio.com terms).
-- VB-Audio forum UAC + driver-signature dialog suppressability.
-- macOS 16 release date vs v3.1 ship.
-- Bundled-driver signing semantics on Windows under SignPath OSS Foundation cert.
-
-### Memory anchors (cite in plan-checker)
-- `project_one_click_install_hard_req` — green/yellow/red dep rating.
-- `feedback_no_clap_use_gemini_embedding` — Gemini-only embedding.
-- `feedback_no_scope_creep_clean_utility` — no multi-provider, no stems, no enterprise, no DAW.
-- `project_mascot_as_vtuber_personality_surface` — single VTuber 3D char; /hatch v2.x stretch.
-- `project_visual_direction_cdj_whisper` — visual baseline.
-- `project_v2_open_candidates` — confirmed/deferred/backlog inventory.
-- `feedback_autonomous_no_grey_area_pause` — autonomous discharge; Kaan-action carveouts.
-- `feedback_privacy_scope_narrow` — narrow rule (LLM-transcript paths only); project FS access fine.
-- `feedback_worktree_must_sync_main_first` — Phase 40 worktree-isolation learning.
-- `project_phase_16_kaan_dj_testing` — Kaan's DJ ear, not formal suite.
-- `project_v4_canonical_baseline` — BlackHole 48 kHz format requirement.
-- `project_v0_1_0_rc1_open_bugs` — mascot chrome strip regression class.
-- `project_github_star_goal` — 500+ floor.
-- `project_anti_slop_grounded_gemini_thesis` — 15-token + `\bdeeply\s+\w+` blocklist; never relax.
+### Tertiary (LOW confidence)
+- [Essentia KeyExtractor](https://essentia.upf.edu/reference/std_KeyExtractor.html) — accuracy context only; NOT adopted (RED install-impact).
+- [prolink-connect](https://github.com/evanpurkhiser/prolink-connect) / [python-prodj-link](https://github.com/flesniak/python-prodj-link) — PRO DJ Link, hardware-gated, DEFERRED.
+- Non-RB library parsers (traktor-nml-utils, python-serato-crates, Engine Library Format) — v.next, vision-read covers them for v5.0.
 
 ---
-*Research completed: 2026-05-17*
+*Research completed: 2026-05-21*
 *Ready for roadmap: yes*
