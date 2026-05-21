@@ -17,16 +17,29 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT_DIR="${REPO_ROOT}/../docs/e2e"
-OUT_WEBM="docs/e2e/2026-05-walk.webm"
+# Script lives in scripts/e2e/ — repo root is two levels up. Resolving here
+# (not via cwd) makes the recipe correct regardless of where it is invoked from.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+OUT_DIR="${REPO_ROOT}/docs/e2e"
+# Absolute target so the .webm always lands at <repo>/docs/e2e/2026-05-walk.webm,
+# matching CONTEXT + README + Gate 6b expectations regardless of cwd.
+OUT_WEBM="${OUT_DIR}/2026-05-walk.webm"
+
+mode="${1:---record}"
+
+# Diagnostic short-circuit (must precede the macOS-only guard so the path-pin
+# test can assert the resolved paths from any cwd on any platform).
+if [[ "${mode}" == "--print-paths" ]]; then
+  echo "REPO_ROOT=${REPO_ROOT}"
+  echo "OUT_DIR=${OUT_DIR}"
+  echo "OUT_WEBM=${OUT_WEBM}"
+  exit 0
+fi
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "error: 50a screencast capture is macOS-only (project constraint)" >&2
   exit 1
 fi
-
-mode="${1:---record}"
 
 case "${mode}" in
   --record)
