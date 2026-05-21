@@ -279,7 +279,7 @@
     {
       "name": "multi_mode_sequence",
       "criterion": 5,
-      "description": "Phase 56 / LIVE-05a — the full synthetic multi-mode walk silent → build → drop(music>=PEAK_RMS) → breakdown(music<LOW_RMS) → AI speaks. Each step enters the contract mode: silent→idle_breathe, build→idle_bop_to_beat_energetic, drop(loud)→dance_hard, breakdown(quiet)→idle_breathe, AI_GENERATING_REPLY→talk_loop. bpm_confidence kept low (0.4) so the music-confirmed dance/idle targets switch_now (not schedule) — this trace pins the mode mapping, not the beat-lock math.",
+      "description": "Phase 56 / LIVE-05a (WR-01/IN-01) — the full synthetic multi-mode walk silent → build → drop(music>=PEAK_RMS) → breakdown → AI speaks. The breakdown step uses a REALISTIC level: a loud 0.30 drop is followed by a breakdown at music.rms=0.10 — well ABOVE LOW_RMS (0.040) but below half of the earlier 0.30 max, which is exactly the half-of-earlier-max breakdown shape real audio produces (phase.py `last < 0.5*earlier_max`). Under the OLD strict guard (music < LOW_RMS) this breakdown would have been HELD (idle_breathe unreachable); the corrected guard (reject only music >= PEAK_RMS) lets it enter idle_breathe. Each step enters the contract mode: silent→idle_breathe, build→idle_bop_to_beat_energetic, drop(loud)→dance_hard, breakdown(mid-energy)→idle_breathe, AI_GENERATING_REPLY→talk_loop. bpm_confidence kept low (0.4) so the music-confirmed dance/idle targets switch_now (not schedule) — this trace pins the mode mapping, not the beat-lock math.",
       "messages": [
         {
           "t": 0,
@@ -344,7 +344,7 @@
           "msg": {
             "type": "snapshot",
             "phase": "breakdown",
-            "music": { "rms": 0.02, "peak": 0.05 },
+            "music": { "rms": 0.10, "peak": 0.18 },
             "voice": { "rms": 0, "peak": 0 }
           }
         },
@@ -445,7 +445,7 @@
     {
       "name": "six_mode_reachability",
       "criterion": 5,
-      "description": "Phase 56 / LIVE-05a (LIVE-05) — the ≥6-distinct-modes acceptance proof: a single walk that enters EACH of the six contract modes from its REAL canonical bus event. silent(music<SILENT_RMS)→idle_breathe, groove(mid music)→idle_bop_to_beat_energetic, drop(music>=PEAK_RMS 0.110)→dance_hard, build(rising music)→idle_bop_to_beat_energetic, breakdown(music<LOW_RMS 0.040)→idle_breathe, AI_GENERATING_REPLY→talk_loop. The walk is ordered so each consecutive step lands on a DIFFERENT state (groove and build both map to idle_bop_to_beat_energetic, so the drop is interleaved between them — re-entering the same state records no new transition). bpm_confidence kept low (0.4) so the music-confirmed dance/idle targets switch_now (not schedule) — this pins the six-mode mapping, not the beat-lock math. The six phase/event steps collapse to >=4 distinct entered states (idle_breathe + idle_bop_to_beat_energetic each cover >1 phase). Canonical subtypes/states only so the Python taxonomy pin stays green.",
+      "description": "Phase 56 / LIVE-05a (LIVE-05, WR-01/IN-01) — the ≥6-distinct-modes acceptance proof: a single walk that enters EACH of the six contract modes from its REAL canonical bus event. silent(music<SILENT_RMS)→idle_breathe, groove(mid music)→idle_bop_to_beat_energetic, drop(music>=PEAK_RMS 0.110)→dance_hard, build(rising music)→idle_bop_to_beat_energetic, breakdown(music=0.10, a half-of-earlier-max breakdown ABOVE LOW_RMS 0.040 off the earlier 0.30 drop — the realistic shape WR-01 fixed)→idle_breathe, AI_GENERATING_REPLY→talk_loop. The walk is ordered so each consecutive step lands on a DIFFERENT state (groove and build both map to idle_bop_to_beat_energetic, so the drop is interleaved between them — re-entering the same state records no new transition). bpm_confidence kept low (0.4) so the music-confirmed dance/idle targets switch_now (not schedule) — this pins the six-mode mapping, not the beat-lock math. The six phase/event steps collapse to >=4 distinct entered states (idle_breathe + idle_bop_to_beat_energetic each cover >1 phase). Canonical subtypes/states only so the Python taxonomy pin stays green.",
       "messages": [
         {
           "t": 0,
@@ -527,7 +527,7 @@
           "msg": {
             "type": "snapshot",
             "phase": "breakdown",
-            "music": { "rms": 0.02, "peak": 0.05 },
+            "music": { "rms": 0.10, "peak": 0.18 },
             "voice": { "rms": 0, "peak": 0 }
           }
         },
@@ -624,6 +624,161 @@
         { "after_t": 100, "state": "dance_hard" },
         { "after_t": 200, "state": "talk_loop" },
         { "after_t": 600, "state": "react_yes" }
+      ]
+    },
+    {
+      "name": "realistic_breakdown_above_low_rms",
+      "criterion": 5,
+      "description": "Phase 56 / LIVE-05a (WR-01/IN-01) — the DISCRIMINATING realistic-breakdown trace. A loud section (music.rms=0.30) is followed by a breakdown at music.rms=0.10 — ABOVE LOW_RMS (0.040) but below half of the earlier 0.30 max, exactly the half-of-earlier-max breakdown real audio produces (phase.py `last < 0.5*earlier_max`). The bus correctly classifies it `phase=breakdown`. Under the OLD strict guard (music < LOW_RMS) the dispatcher returned null and the mascot HELD dance_hard — the breakdown/chill mode was unreachable for this common case. The corrected guard (reject only music >= PEAK_RMS) lets the mid-energy breakdown legitimately enter idle_breathe. This trace would FAIL on the pre-WR-01 guard. bpm_confidence low (0.4) so the music-confirmed idle target switch_now.",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "phase": "drop",
+            "bpm": 120,
+            "bpm_confidence": 0.4,
+            "downbeat_phase": 0.5,
+            "mood": "hype-man",
+            "music": { "rms": 0.30, "peak": 0.5 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": true,
+            "deck": "A"
+          }
+        },
+        {
+          "t": 100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "build", "to": "drop" }
+          }
+        },
+        {
+          "t": 1000,
+          "msg": {
+            "type": "snapshot",
+            "phase": "breakdown",
+            "music": { "rms": 0.10, "peak": 0.18 },
+            "voice": { "rms": 0, "peak": 0 }
+          }
+        },
+        {
+          "t": 1100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "drop", "to": "breakdown" }
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 100, "state": "dance_hard" },
+        { "after_t": 1100, "state": "idle_breathe" }
+      ]
+    },
+    {
+      "name": "realistic_peak_midband",
+      "criterion": 5,
+      "description": "Phase 56 / LIVE-05a (WR-01/IN-01) — the DISCRIMINATING realistic-peak trace. Python admits a `peak` whenever `all(v >= 0.045)` (phase.py), so a genuine peak section legitimately sits anywhere from 0.045 upward — including the 0.045–0.110 band. Here the bus classifies `phase=peak` at music.rms=0.06 (above the 0.045 floor, below PEAK_RMS 0.110). Under the OLD guard (peak require music >= PEAK_RMS) this legit peak returned null → dance_hard unreachable. The corrected guard (peak floor = PEAK_FLOOR_RMS 0.045) lets it enter dance_hard. This trace would FAIL on the pre-WR-01 guard. bpm_confidence low (0.4) so the music-confirmed dance target switch_now.",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "phase": "build",
+            "bpm": 120,
+            "bpm_confidence": 0.4,
+            "downbeat_phase": 0.5,
+            "mood": "hype-man",
+            "music": { "rms": 0.05, "peak": 0.1 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": true,
+            "deck": "A"
+          }
+        },
+        {
+          "t": 100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "groove", "to": "build" }
+          }
+        },
+        {
+          "t": 1000,
+          "msg": {
+            "type": "snapshot",
+            "phase": "peak",
+            "music": { "rms": 0.06, "peak": 0.11 },
+            "voice": { "rms": 0, "peak": 0 }
+          }
+        },
+        {
+          "t": 1100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "build", "to": "peak" }
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 100, "state": "idle_bop_to_beat_energetic" },
+        { "after_t": 1100, "state": "dance_hard" }
+      ]
+    },
+    {
+      "name": "anti_slop_breakdown_at_peak",
+      "criterion": 5,
+      "description": "Phase 56 / LIVE-05a (WR-01/IN-01) — the genuine breakdown contradiction that the corrected guard MUST still reject. A real loud drop (music.rms=0.30) seeds dance_hard; then a contradictory `phase=breakdown` arrives while the audio is still at peak loudness (music.rms=0.30 >= PEAK_RMS). A breakdown cannot be at full peak — this is the OPPOSITE-extreme contradiction. The guard returns null → dance_hard is HELD, no spurious idle_breathe fires off a loud 'breakdown'. The explicit held-mode it(...) assertion in state-machine-fixtures.test.ts proves NO transition records after the contradictory frame. bpm_confidence low (0.4) so the confirmed drop seeds dance_hard via switch_now.",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "phase": "drop",
+            "bpm": 120,
+            "bpm_confidence": 0.4,
+            "downbeat_phase": 0.5,
+            "mood": "hype-man",
+            "music": { "rms": 0.30, "peak": 0.5 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": true,
+            "deck": "A"
+          }
+        },
+        {
+          "t": 100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "build", "to": "drop" }
+          }
+        },
+        {
+          "t": 1000,
+          "msg": {
+            "type": "snapshot",
+            "phase": "breakdown",
+            "music": { "rms": 0.30, "peak": 0.5 },
+            "voice": { "rms": 0, "peak": 0 }
+          }
+        },
+        {
+          "t": 1100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "drop", "to": "breakdown" }
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 100, "state": "dance_hard" }
       ]
     }
   ]

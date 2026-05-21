@@ -332,6 +332,74 @@ describe("state-machine fixture replay — event-traces.json", () => {
     );
   });
 
+  // Phase 56 / LIVE-05a (WR-01/IN-01) — the breakdown anti-slop assertion.
+  // The corrected guard loosens breakdown (it no longer requires music <
+  // LOW_RMS), but it MUST still reject the opposite-extreme contradiction: a
+  // `phase=breakdown` arriving while the audio is at full peak loudness
+  // (music >= PEAK_RMS). A real loud drop seeds dance_hard, then the
+  // contradictory loud "breakdown" must be HELD — no idle_breathe fires off a
+  // peak-loudness breakdown. This is the discriminating proof that the WR-01
+  // loosening did NOT open an anti-slop hole.
+  it("anti_slop_breakdown_at_peak — a breakdown at peak loudness fires no transition (held)", () => {
+    const trace = (traces.traces as Trace[]).find(
+      (t) => t.name === "anti_slop_breakdown_at_peak",
+    )!;
+    expect(trace).toBeDefined();
+    const actual = replayTrace(trace);
+    const transitions = actual.filter((a) => a.source !== "boot");
+    // Exactly ONE real transition: dance_hard@~100 (loud-drop seed). The
+    // contradictory loud PHASE→breakdown at 1100ms must NOT add a second.
+    expect(transitions).toHaveLength(1);
+    expect(transitions[0]!.state).toBe("dance_hard");
+    // DISCRIMINATING: nothing fires at/after the contradictory frame (1100ms).
+    // A regression that re-derived breakdown from an absolute level (or dropped
+    // the >= PEAK_RMS rejection) would surface here as a spurious idle_breathe.
+    const afterContradiction = transitions.filter((a) => a.at >= 1100);
+    expect(afterContradiction).toHaveLength(0);
+    // The held mode is still the loud-drop dance_hard.
+    expect(transitions[transitions.length - 1]!.state).toBe("dance_hard");
+  });
+
+  // Phase 56 / LIVE-05a (WR-01/IN-01) — the realistic-breakdown reachability
+  // assertion. A mid-energy breakdown (music=0.10, ABOVE LOW_RMS, the
+  // half-of-earlier-max shape real audio produces) MUST now enter idle_breathe.
+  // This is the case the OLD strict guard wrongly suppressed — the explicit
+  // assertion pins that the corrected guard makes it reachable.
+  it("realistic_breakdown_above_low_rms — a mid-energy breakdown enters idle_breathe", () => {
+    const trace = (traces.traces as Trace[]).find(
+      (t) => t.name === "realistic_breakdown_above_low_rms",
+    )!;
+    expect(trace).toBeDefined();
+    const actual = replayTrace(trace);
+    const { matched } = matchExpected(trace.expectedTransitions, actual);
+    expect(matched).toBe(trace.expectedTransitions.length);
+    // The breakdown@0.10 (above LOW_RMS) genuinely reaches idle_breathe — the
+    // WR-01 fix. Under the pre-fix guard this would never have appeared.
+    const enteredStates = new Set(actual.map((a) => a.state));
+    expect(enteredStates.has("idle_breathe")).toBe(true);
+    // And it lands AFTER the loud-drop dance_hard (the held-mode-broken case
+    // would leave dance_hard as the terminal state instead).
+    const transitions = actual.filter((a) => a.source !== "boot");
+    expect(transitions[transitions.length - 1]!.state).toBe("idle_breathe");
+  });
+
+  // Phase 56 / LIVE-05a (WR-01/IN-01) — the realistic-peak reachability
+  // assertion. A peak in the 0.045–0.110 band (Python's actual peak floor is
+  // 0.045, NOT PEAK_RMS) MUST now enter dance_hard. This is the case the OLD
+  // guard wrongly suppressed.
+  it("realistic_peak_midband — a peak at 0.045–0.110 enters dance_hard", () => {
+    const trace = (traces.traces as Trace[]).find(
+      (t) => t.name === "realistic_peak_midband",
+    )!;
+    expect(trace).toBeDefined();
+    const actual = replayTrace(trace);
+    const { matched } = matchExpected(trace.expectedTransitions, actual);
+    expect(matched).toBe(trace.expectedTransitions.length);
+    const transitions = actual.filter((a) => a.source !== "boot");
+    // The mid-band peak@0.06 reaches dance_hard — the WR-01 fix.
+    expect(transitions[transitions.length - 1]!.state).toBe("dance_hard");
+  });
+
   // Phase 56 / LIVE-05a (LIVE-05) — the ≥6-distinct-modes reachability proof.
   // The auto-runner above already replays six_mode_reachability and matches
   // every expectedTransition; this explicit test adds the LIVE-05a acceptance
