@@ -37,7 +37,7 @@ Research-resolved foundations (`.planning/research/SUMMARY.md`, 4 convergent age
 ### Actionable-Not-Hype Coach Persona (COACH) — Phase 61
 
 - [x] **COACH-01**: Feedback (coach) mode delivers **concrete, prescriptive DJ notes** (observed → impact → prescribe, using real DJ verbs: kill, swap, cut, filter, wait, tighten) — not narration or cheerleading.
-- [ ] **COACH-02**: The persona refactor **extends the in-flight `live-tuning-or-brain` work** (`prompts/matrix.py` COACH cells + `state/coach.py` `task_for_event`) — it does **not** add a new mode (preserves the `_CELLS`/`_VALID_MODES` env-var contract) and flows through both the genai and OpenRouter paths.
+- [x] **COACH-02**: The persona refactor **extends the in-flight `live-tuning-or-brain` work** (`prompts/matrix.py` COACH cells + `state/coach.py` `task_for_event`) — it does **not** add a new mode (preserves the `_CELLS`/`_VALID_MODES` env-var contract) and flows through both the genai and OpenRouter paths.
 - [x] **COACH-03**: **Hype mode is regression-fenced** with goldens so shared-prompt edits for the coach persona cannot silently break or cold-ify the hype voice.
 - [x] **COACH-04**: Every prescriptive note stays **anti-slop / cited** — it ties to an observed deck-state or event; the warm "friend in your ear" tone is preserved while becoming actionable (no robotic over-correction, cooldown/pacing prevents nagging).
 
@@ -82,7 +82,7 @@ Research-resolved foundations (`.planning/research/SUMMARY.md`, 4 convergent age
 | HARMONIC-03 | Phase 60 | Detector-layer complete (60-02 — conservative cross-deck cite-floor + adjacent-safe + default-off flag); ship gated on Kaan-ear veto (60-03) |
 | HARMONIC-04 | Phase 60 | Complete (60-02/60-04 — retrospective groundable-only transition note, melodic-gated + 8s blend-recency bound, cited both decks) |
 | COACH-01 | Phase 61 | Complete |
-| COACH-02 | Phase 61 | Pending |
+| COACH-02 | Phase 61 | Complete |
 | COACH-03 | Phase 61 | Complete |
 | COACH-04 | Phase 61 | Complete |
 | PILL-01 | Phase 62 | Pending |
