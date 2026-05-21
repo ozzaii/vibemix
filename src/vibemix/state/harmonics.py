@@ -12,9 +12,10 @@ value, "trust the audio"): ``to_camelot`` degrades to ``None`` (→
 ``key=unknown``) on empty / odd / out-of-range input — it NEVER raises and
 NEVER guesses a Camelot code.
 
-Scope: Phase 59 ships ``to_camelot`` ONLY. Phase 60 will consume ``is_clash`` /
-``compatible`` (the deterministic Camelot-wheel clash table the LLM merely
-narrates) ON TOP of this normalizer — those functions are NOT defined here yet.
+Scope: Phase 59 shipped ``to_camelot``. Phase 60 adds ``is_clash`` /
+``compatible`` / ``semitone_distance`` (the deterministic Camelot-wheel clash
+table the LLM merely narrates) ON TOP of this normalizer — the LLM never
+computes intervals, it only narrates the verdict the code already proved.
 
 Table source: Camelot wheel canonical mapping
 [mixedinkey.com/camelot-wheel + dj.studio/blog/camelot-wheel].
@@ -105,3 +106,125 @@ def to_camelot(raw: str | None) -> str | None:
     if _OPEN_KEY_RE.match(s.lower()):  # open-key form ("1m" / "1d")
         return _OPEN_KEY_TO_CAMELOT[s.lower()]
     return None  # unrecognized → honest None, never a guess
+
+
+# =====================================================================
+# Phase 60 (HARMONIC-01) — the deterministic Camelot-wheel clash predicate.
+#
+# The Camelot wheel IS the circle of fifths relabeled: each +1 hour (same
+# letter) is +7 semitones in pitch. Re-deriving the tonic pitch-class per
+# Camelot number gives the same-letter hour-distance → pitch-class semitone
+# distance table below (verified computation, 60-RESEARCH §Pattern 1):
+#   hour 0 → 0 semitones  (same key)               → SAFE
+#   hour 1 → perfect fifth (5/7 st)                → SAFE  (adjacent ±1)
+#   hour 2 → 2 semitones  (+2 energy move)         → SAFE
+#   hour 3 → 3 semitones                           → NEITHER (drift; silent)
+#   hour 4 → 4 semitones                           → NEITHER (drift; silent)
+#   hour 5 → 1 SEMITONE                            → CLASH
+#   hour 6 → 6 semitones  (tritone)                → CLASH
+#   hour 7 → 1 SEMITONE   (== the +7 dominant)     → CLASH
+#
+# The critical, counter-intuitive fact: an adjacent ±1 Camelot move (8A→9A)
+# is a perfect FIFTH and SAFE — the one-semitone disaster is two melodic
+# tracks overlapping, which in same-letter terms is an hour-distance of 5 or
+# 7. The LLM NEVER computes this; it only narrates the verdict the code
+# already proved. Pure, side-effect-free, never raises — mirrors to_camelot.
+# Table source: circle-of-fifths derivation cross-checked against
+# [mixedinkey.com/camelot-wheel + dj.studio/blog/camelot-wheel].
+# =====================================================================
+
+# Same-letter hour-distances that produce a 1-semitone (5/7) or tritone (6)
+# dissonance — the ONLY same-letter relationships that genuinely clash on a
+# melodic overlap. Deliberately NARROW (conservative-by-default, HARMONIC-03).
+_CLASH_HOURS = frozenset({5, 6, 7})
+# Safe same-letter relationships: same key (0), adjacent perfect fifth (1),
+# +2 energy move (2). Hours 3/4 are the intentional silent "neither" zone.
+_SAFE_HOURS = frozenset({0, 1, 2})
+
+# Same-letter hour-distance → pitch-class semitone distance (the verified
+# table above). Only same-letter pairs sit on a single semitone ring; the
+# coach narrates "N semitone(s) apart" straight off this without the LLM
+# doing key math.
+_HOUR_TO_SEMITONES: dict[int, int] = {0: 0, 1: 5, 2: 2, 3: 3, 4: 4, 5: 1, 6: 6}
+
+
+def _parse(code: str | None) -> tuple[int, str] | None:
+    """``"8A"`` → ``(8, "A")``; honest ``None`` on anything ``to_camelot``
+    wouldn't emit.
+
+    Normalizes the raw via ``to_camelot`` FIRST so musical / open-key forms
+    resolve, then matches the shipped ``_CAMELOT_RE`` recognizer and splits
+    into ``(number, letter)``. Never raises.
+    """
+    normalized = to_camelot(code)  # resolve musical / open-key / Camelot forms
+    if normalized is None:
+        return None
+    m = _CAMELOT_RE.match(normalized)  # reuse the shipped recognizer
+    if not m:
+        return None
+    return int(m.group(1)), normalized[-1]
+
+
+def _hour_distance(n1: int, n2: int) -> int:
+    """Circular distance on the 12-hour Camelot wheel, range 0..6."""
+    d = abs(n1 - n2) % 12
+    return min(d, 12 - d)
+
+
+def semitone_distance(a: str | None, b: str | None) -> int | None:
+    """Same-letter pitch-class semitone distance between two Camelot codes.
+
+    Returns the semitone interval (0..6) via the verified hour→semitone
+    table so the coach can narrate "1 semitone apart" without the LLM
+    computing intervals. Cross-letter pairs (no single same-letter ring) and
+    any ``None`` / garbage input return ``None``. Never raises.
+    """
+    pa, pb = _parse(a), _parse(b)
+    if pa is None or pb is None:
+        return None
+    (na, la), (nb, lb) = pa, pb
+    if la != lb:
+        return None  # cross-letter — not on a single same-letter semitone ring
+    return _HOUR_TO_SEMITONES[_hour_distance(na, nb)]
+
+
+def compatible(a: str | None, b: str | None) -> bool:
+    """True iff ``a`` and ``b`` can ride a long melodic overlap cleanly.
+
+    SAFE cases: same key, adjacent ±1 (perfect fifth), +2 energy move
+    (same-letter hours ``_SAFE_HOURS``), relative major/minor (same number,
+    swapped letter), and the exact ±1 cross-letter diagonal. Everything else
+    — the clash band and the hours-3/4 drift "neither" zone — returns False.
+    Honest ``None``-in → False. Pure, never raises.
+    """
+    pa, pb = _parse(a), _parse(b)
+    if pa is None or pb is None:
+        return False
+    (na, la), (nb, lb) = pa, pb
+    if la == lb:
+        return _hour_distance(na, nb) in _SAFE_HOURS
+    # different letters
+    if na == nb:
+        return True  # relative major/minor — same notes, mood swap. SAFE.
+    # only the exact ±1 cross-letter diagonal is treated SAFE (conservative);
+    # wider cross-letter pairs stay in the silent "neither" zone.
+    return _hour_distance(na, nb) == 1
+
+
+def is_clash(a: str | None, b: str | None) -> bool:
+    """True iff ``a`` and ``b`` are an UNAMBIGUOUS dissonant clash worth
+    flagging.
+
+    Deliberately NARROW (conservative-by-default, HARMONIC-03): only the
+    same-letter 1-semitone / tritone band (``_CLASH_HOURS`` = hours 5/6/7)
+    fires. Cross-letter pairs and any ``None`` / garbage input return False —
+    we never flag what we can't prove dissonant. The LLM narrates this
+    verdict; it NEVER computes it. Pure, never raises.
+    """
+    pa, pb = _parse(a), _parse(b)
+    if pa is None or pb is None:
+        return False  # honest unknown — no clash claim (anti-slop)
+    (na, la), (nb, lb) = pa, pb
+    if la != lb:
+        return False  # cross-letter: not in the unambiguous clash band
+    return _hour_distance(na, nb) in _CLASH_HOURS
