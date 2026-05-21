@@ -332,6 +332,39 @@ describe("state-machine fixture replay — event-traces.json", () => {
     );
   });
 
+  // Phase 56 / LIVE-05a (LIVE-05) — the ≥6-distinct-modes reachability proof.
+  // The auto-runner above already replays six_mode_reachability and matches
+  // every expectedTransition; this explicit test adds the LIVE-05a acceptance
+  // assertion directly: each of the six contract modes is ENTERED from its
+  // real bus event, and the walk reaches ≥4 distinct MascotStates across the
+  // six phase/event steps (idle_breathe + idle_bop_to_beat_energetic each
+  // cover >1 phase, so the six modes collapse to 4 distinct states + talk).
+  it("six_mode_reachability — all six contract modes enter from a real bus event", () => {
+    const trace = (traces.traces as Trace[]).find(
+      (t) => t.name === "six_mode_reachability",
+    )!;
+    expect(trace).toBeDefined();
+    const actual = replayTrace(trace);
+    // Every expectedTransition must land (the per-step reachability proof).
+    const { matched } = matchExpected(trace.expectedTransitions, actual);
+    expect(matched).toBe(trace.expectedTransitions.length);
+    // The six contract modes map onto these distinct entered states. Each
+    // MUST appear at least once in the actual replay (proves it is reachable
+    // from a real signal — the "≥6 distinct modes, each gated to a real
+    // event" LIVE-05a acceptance).
+    const enteredStates = new Set(actual.map((a) => a.state));
+    expect(enteredStates.has("idle_breathe")).toBe(true); // silent + breakdown
+    expect(enteredStates.has("idle_bop_to_beat_energetic")).toBe(true); // groove + build
+    expect(enteredStates.has("dance_hard")).toBe(true); // drop (music-confirmed)
+    expect(enteredStates.has("talk_loop")).toBe(true); // speaking
+    // Six phase/event steps collapse to ≥4 distinct entered states (excluding
+    // the boot seed). idle_breathe + idle_bop each carry two phases.
+    const nonBoot = new Set(
+      actual.filter((a) => a.source !== "boot").map((a) => a.state),
+    );
+    expect(nonBoot.size).toBeGreaterThanOrEqual(4);
+  });
+
   it("aggregates: every documented ROADMAP event-mapping criterion is covered by ≥1 trace", () => {
     const criteriaCovered = new Set(
       (traces.traces as Trace[]).map((t) => t.criterion),
