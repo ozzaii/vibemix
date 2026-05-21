@@ -100,7 +100,12 @@ def _serialize_deck_state(state: MusicState) -> dict[str, dict[str, Any]]:
             "title": dt.title,
             "camelot": dt.camelot,  # honest-null: None -> JSON null, never fabricated
             "key": dt.key,          # honest-null: None -> JSON null, never fabricated
-            "bpm": dt.bpm,
+            # honest-null: DeckTrack defaults bpm to 0.0 (typed-empty), NOT None.
+            # An unresolved deck (0.0) must NOT serialize a fabricated "0 BPM" on
+            # the pill — treat a non-positive bpm as unknown (JSON null), same
+            # discipline as camelot/key. Mirrors the snapshot's own
+            # `bpm = raw if raw > 0 else None` normalization below (CR-02).
+            "bpm": dt.bpm if dt.bpm and dt.bpm > 0.0 else None,
             "confidence": dt.confidence,
         }
         for side, dt in decks.items()

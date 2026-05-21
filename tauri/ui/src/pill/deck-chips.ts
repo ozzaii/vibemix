@@ -113,7 +113,10 @@ export function deckChipText(d: {
   bpm: number | null;
 }): string {
   const key = d.camelot ?? UNKNOWN; // NEVER fabricate a key (anti-slop, Phase-59)
-  const bpm = d.bpm != null ? Math.round(d.bpm) : UNKNOWN;
+  // Honest-null: a non-positive bpm (0 = DeckTrack typed-empty default, or any
+  // <=0 that slips the serialize edge) is UNKNOWN — never a fabricated "0 BPM"
+  // (CR-02, mirrors the camelot honest-null above).
+  const bpm = d.bpm != null && d.bpm > 0 ? Math.round(d.bpm) : UNKNOWN;
   return `${d.deck.toLowerCase()} · ${key.toLowerCase()} · ${bpm}`;
 }
 
@@ -126,7 +129,8 @@ function buildDeckChip(deck: string, d: DeckWire): HTMLDivElement {
 
   const resolved = d.camelot != null;
   const keyText = resolved ? d.camelot!.toLowerCase() : UNKNOWN;
-  const bpmText = d.bpm != null ? String(Math.round(d.bpm)) : UNKNOWN;
+  // Honest-null: non-positive bpm is unknown — never a fabricated "0" (CR-02).
+  const bpmText = d.bpm != null && d.bpm > 0 ? String(Math.round(d.bpm)) : UNKNOWN;
   const deckText = deck.toLowerCase();
 
   // `<deck> · ` (text node — never markup)

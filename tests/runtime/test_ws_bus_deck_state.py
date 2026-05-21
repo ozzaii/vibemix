@@ -173,6 +173,34 @@ def test_payload_unresolved_deck_is_honest_null(mocker):
     assert deck_b["bpm"] == 124.0
 
 
+def test_unresolved_bpm_zero_is_honest_null(mocker):
+    """CR-02 honest-null hole: a present-but-unresolved deck has the honest
+    ``DeckTrack`` default ``bpm=0.0`` (NOT a measured value). A serialized
+    ``bpm: 0.0`` renders a fabricated ``"0"`` BPM on the pill — exactly the
+    anti-slop leak the phase exists to close. The serialize edge must emit
+    ``bpm: null`` (treat 0.0 as unknown), mirroring the camelot/key honest-null
+    discipline already on this wire."""
+    state = MusicState()
+    state.audible = True
+    state.deck_state = DeckState(
+        decks={
+            # All-defaults DeckTrack: bpm=0.0, camelot=None, key=None — a deck
+            # detected present (vision) but with no metadata resolved.
+            "A": DeckTrack(title="Untagged"),
+        }
+    )
+
+    payload = _capture_payload(state, mocker)
+
+    deck_a = payload["deck_state"]["A"]
+    # The whole point: a 0.0-default bpm must serialize as JSON null, never 0.
+    assert deck_a["bpm"] is None, "bpm=0.0 leaked as a fabricated value instead of null"
+    # camelot/key remain honest-null too.
+    assert deck_a["camelot"] is None
+    assert deck_a["key"] is None
+    assert deck_a["title"] == "Untagged"
+
+
 def test_empty_deck_state_is_golden_equivalent(mocker):
     """Golden-equivalence: an empty ``deck_state.decks`` serializes
     ``deck_state: {}`` (additive-only) AND every pre-existing flat key is

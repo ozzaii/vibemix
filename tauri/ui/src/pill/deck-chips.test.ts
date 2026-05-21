@@ -53,6 +53,18 @@ describe("deckChipText — honest-unknown chip text (PILL-03)", () => {
       "b · 5a · 128",
     );
   });
+
+  test("CR-02: bpm 0 (honest-default, unresolved) → `unknown`, NEVER a fabricated `0`", () => {
+    // A present-but-unresolved deck carries the DeckTrack default bpm=0.0. The
+    // wire normalizes 0 → null, but the chip MUST treat any non-positive bpm as
+    // unknown even if a 0 slips through — never paint a fabricated "0 BPM".
+    expect(deckChipText({ deck: "A", camelot: "8A", bpm: 0 })).toBe(
+      "a · 8a · unknown",
+    );
+    expect(deckChipText({ deck: "A", camelot: "8A", bpm: null })).toBe(
+      "a · 8a · unknown",
+    );
+  });
 });
 
 describe("renderDeckChips — deck_state → chip strip (PILL-03)", () => {
@@ -103,6 +115,18 @@ describe("renderDeckChips — deck_state → chip strip (PILL-03)", () => {
     const root = renderDeckChips(deckState);
     const chip = root!.querySelector(".vmx-deck-chip");
     expect(chip?.textContent).toContain("a · 8a · unknown");
+  });
+
+  test("CR-02: bpm 0 in the wire renders `unknown` (never a fabricated `0`)", () => {
+    // Defense-in-depth alongside the serialize-edge null: even if a 0 slips
+    // through (legacy producer / state skew), the chip never paints "0".
+    const deckState: DeckStateWire = {
+      A: { title: "Track A", camelot: "8A", key: "C", bpm: 0, confidence: 0.9 },
+    };
+    const root = renderDeckChips(deckState);
+    const chip = root!.querySelector(".vmx-deck-chip");
+    expect(chip?.textContent).toContain("a · 8a · unknown");
+    expect(chip?.textContent).not.toContain("· 0");
   });
 
   test("empty deck_state → a SINGLE `decks · unknown` chip (honest, never a fake key)", () => {
