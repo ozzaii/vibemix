@@ -11,7 +11,7 @@
  *   silent     — flex 0.5
  *   groove     — flex 1.8, phosphor-soft tint
  *   build      — flex 1.2, striped phosphor repeating gradient + slide-arrow
- *   drop-ghost — flex 0.6, dashed border, Caveat italic label
+ *   drop-ghost — flex 0.6, dashed border, upright ghost label
  *
  * NOW marker absolutely positioned at `--phase-now-pct: <0..100>%` via
  * inline style — set by the caller (rAF-driven).

@@ -529,7 +529,7 @@ const CSS = `
     font-variant-numeric: tabular-nums;
     font-size: 10px;
     letter-spacing: 0.04em;
-    color: var(--silk-25);
+    color: var(--silk-22);
     padding: 2px 4px;
     user-select: none;
   }
