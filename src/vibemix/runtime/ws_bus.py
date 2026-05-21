@@ -68,6 +68,45 @@ def _now_iso() -> str:
     return _impl()
 
 
+def _serialize_deck_state(state: MusicState) -> dict[str, dict[str, Any]]:
+    """Read-only serialize ``MusicState.deck_state`` → flat-frame ``deck_state`` map.
+
+    Maps Phase-59 ``DeckState.decks`` → ``{side: {title, camelot, key, bpm,
+    confidence}}`` for the additive field on the flat 30Hz mascot frame (PILL-03,
+    the producer half consumed by Plan 62-04's deck-chips).
+
+    Three invariants this helper exists to GUARANTEE:
+
+      * **Read-only / single-writer** — this is a PURE READ at the serialize
+        boundary; it never assigns into ``state.deck_state``. The only writer of
+        ``deck_state.decks`` remains ``state_refresh_loop._tick_once`` (DECK-04).
+      * **Honest-null (anti-slop)** — ``camelot`` and ``key`` pass THROUGH as-is,
+        so an unresolved deck serializes JSON ``null`` (Phase-59
+        uncitable-by-construction guarantee carried to the UI surface). Never a
+        fabricated key, never recomputed here (``_tick_once`` already normalized
+        camelot via ``harmonics.to_camelot``).
+      * **Golden-equivalence** — when ``decks`` is empty (the boot / no-decks
+        case) this returns ``{}`` so the additive field is inert and existing
+        subscribers (mascot.html) are byte-undisturbed.
+
+    ``getattr`` is used defensively so an older state object lacking a
+    ``deck_state`` (or a deck_state lacking ``decks``) degrades to ``{}`` rather
+    than raising — robust to state-shape skew.
+    """
+    deck_state = getattr(state, "deck_state", None)
+    decks = getattr(deck_state, "decks", None) or {}
+    return {
+        side: {
+            "title": dt.title,
+            "camelot": dt.camelot,  # honest-null: None -> JSON null, never fabricated
+            "key": dt.key,          # honest-null: None -> JSON null, never fabricated
+            "bpm": dt.bpm,
+            "confidence": dt.confidence,
+        }
+        for side, dt in decks.items()
+    }
+
+
 def _validate_snapshot(msg: dict) -> None:
     """Validate an outbound ipc.session.snapshot against the IPC schema.
 
@@ -285,6 +324,17 @@ async def ws_broadcast(
                 "genre_confidence": state.genre_confidence,
                 "emotion": state.emotion,
                 "reaction_intent": state.last_reaction_intent,
+                # Phase 62 (PILL-03) — additive, read-only. The per-deck
+                # ``deck_state`` map ({side: {title, camelot, key, bpm,
+                # confidence}}) read from the Phase-59 ``MusicState.deck_state``
+                # so the pill's deck-context chips have a real per-deck source.
+                # Honest-null is preserved: an unresolved deck carries
+                # ``camelot: null`` / ``key: null`` (never a fabricated key —
+                # the bus is a dumb wire). Empty deck_state -> ``{}`` so this
+                # field is golden-equivalent for existing subscribers. This is a
+                # PURE READ at the serialize edge; the single writer
+                # (``_tick_once``) is upstream and untouched.
+                "deck_state": _serialize_deck_state(state),
             }
             # Emit-boundary guard (BRINGUP-04): never serialize an empty or
             # meter-less payload onto the wire. ``Levels.snapshot()`` always
