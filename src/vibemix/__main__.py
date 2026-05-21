@@ -706,40 +706,49 @@ async def main() -> None:
     def _citation_telemetry() -> dict:
         """Closure invoked by ``coach_loop``'s publish gate every
         ``CITATION_PUBLISH_INTERVAL_S`` (2.0s). Reads fresh from the
-        StrippedRateTracker + EvidenceRegistry on every call so the
-        emitted SessionCitation envelope reflects the latest state.
+        StrippedRateTracker on every call so the emitted SessionCitation
+        envelope reflects the latest state.
 
         Returns the 4 keys ``SessionCitation.make()`` expects:
 
-        - ``slop_ratio``: placeholder ``1 / (1 + mean)`` derived from the
-          rolling-50-turn citation-count mean — drops toward 0 as Gemini
-          emits more citations. The true slop metric (slop-vs-clean turn
-          ratio) is a v2.x refinement once we have a stable definition;
-          the placeholder is intentionally loud (1.0 at cold-start)
-          rather than silent.
-        - ``stripped_rate_15s``: tracker rate fresh per call. 0.0 when
-          tracker is None (anti-slop disabled).
-        - ``last_unverified_response``: ``None`` — no simple existing
-          source. v2.x adds a 5-entry ring buffer of stripped/bypassed
-          response texts so the Settings → Diagnostics surface can show
-          the most recent unverified emission.
+        - ``slop_ratio``: the REAL cumulative stripped/total ratio sourced
+          from ``stripped_rate_tracker.slop_ratio()`` (Plan 55-03 / LIVE-04).
+          This is the lifetime "what fraction of model turns got stripped"
+          metric — it MOVES when the linter strips, unlike the retired
+          ``1 / (1 + mean)`` count-derived placeholder. 0.0 when the tracker
+          is None (anti-slop disabled).
+        - ``stripped_rate_15s``: tracker 15s rolling rate fresh per call.
+          0.0 when tracker is None. Distinct from slop_ratio (windowed
+          bypass-guard vs lifetime metric — same record() decisions).
+        - ``last_unverified_response``: the REAL most-recent stripped/bypassed
+          response text sourced from ``stripped_rate_tracker.last_unverified()``
+          (Plan 55-03 / LIVE-04), fed by the agent's strip/bypass branches.
+          None when the tracker is None or nothing unverified yet this session.
         - ``bypass_active``: non-destructive read — ``rate >
           STRIPPED_RATE_THRESHOLD``. We deliberately do NOT call
           ``tracker.should_bypass()`` here because that's the one-shot
           latch consumer; using it from telemetry would race the gate
           decision in the agent's llm_node strip path.
 
-        T-20-05-03: the callable must not raise. ``coach_loop`` does
-        wrap it in try/except, but staying clean keeps the publish path
-        quiet.
+        T-20-05-03: the callable must not raise. When the tracker is None
+        the safe defaults (slop_ratio 0.0, last_unverified None) are returned
+        and nothing is dereferenced. ``coach_loop`` also wraps it in
+        try/except, but staying clean keeps the publish path quiet.
         """
-        reg_tel = evidence_registry.citation_telemetry()
-        mean = reg_tel.get("mean", 0.0)
-        slop_ratio = 1.0 / (1.0 + mean) if mean > 0 else 1.0
+        slop_ratio = (
+            stripped_rate_tracker.slop_ratio()
+            if stripped_rate_tracker is not None
+            else 0.0
+        )
         rate = (
             stripped_rate_tracker.rate()
             if stripped_rate_tracker is not None
             else 0.0
+        )
+        last_unverified = (
+            stripped_rate_tracker.last_unverified()
+            if stripped_rate_tracker is not None
+            else None
         )
         bypass_active = (
             stripped_rate_tracker is not None and rate > STRIPPED_RATE_THRESHOLD
@@ -747,7 +756,7 @@ async def main() -> None:
         return {
             "slop_ratio": float(slop_ratio),
             "stripped_rate_15s": float(rate),
-            "last_unverified_response": None,  # v2.x follow-up
+            "last_unverified_response": last_unverified,
             "bypass_active": bool(bypass_active),
         }
 

@@ -222,3 +222,85 @@ def test_wire15_linter_primitives_constructed_before_agent(main_src: str) -> Non
     assert linter_idx < agent_idx, "CitationLinter() must precede DJCoHostAgent("
     assert tracker_idx < agent_idx, "StrippedRateTracker() must precede DJCoHostAgent("
     assert registry_idx < agent_idx, "EvidenceRegistry() must precede DJCoHostAgent("
+
+
+# ---------------------------------------------------------------------------
+# Plan 55-03 (LIVE-04) — _citation_telemetry sources REAL slop_ratio +
+# last_unverified from the tracker; the count-placeholder + hardcoded-None
+# leaks are closed.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def telemetry_src(main_src: str) -> str:
+    """Slice out the _citation_telemetry() closure body for focused grepping.
+
+    From the ``def _citation_telemetry`` line to the next top-level-ish
+    boundary (the transcript_buf sink comment that follows the return) so the
+    asserts below scope to the closure, not the whole module.
+    """
+    start = main_src.find("def _citation_telemetry()")
+    assert start != -1, "_citation_telemetry() closure missing from __main__.py"
+    # The closure ends before the transcript_buf sink block.
+    end = main_src.find("transcript_buf", start)
+    assert end != -1, "expected transcript_buf sink after _citation_telemetry"
+    return main_src[start:end]
+
+
+def test_wire16_telemetry_sources_real_slop_ratio(telemetry_src: str) -> None:
+    """W16: _citation_telemetry() sources slop_ratio from
+    stripped_rate_tracker.slop_ratio() (the real cumulative metric)."""
+    assert "stripped_rate_tracker.slop_ratio()" in telemetry_src, (
+        "_citation_telemetry must source slop_ratio from "
+        "stripped_rate_tracker.slop_ratio()"
+    )
+
+
+def test_wire17_telemetry_sources_real_last_unverified(telemetry_src: str) -> None:
+    """W17: _citation_telemetry() sources last_unverified_response from
+    stripped_rate_tracker.last_unverified() (the real stripped text)."""
+    assert "stripped_rate_tracker.last_unverified()" in telemetry_src, (
+        "_citation_telemetry must source last_unverified_response from "
+        "stripped_rate_tracker.last_unverified()"
+    )
+
+
+def test_wire18_placeholder_slop_ratio_removed(telemetry_src: str) -> None:
+    """W18: the 1/(1+mean) count-derived placeholder is GONE from the closure."""
+    normalized = telemetry_src.replace(" ", "")
+    assert "1.0/(1.0+mean)" not in normalized, (
+        "the 1/(1+mean) placeholder slop_ratio must be removed"
+    )
+    # The evidence_registry mean read that fed the placeholder is also gone
+    # from the closure (the registry telemetry stays available elsewhere).
+    assert "evidence_registry.citation_telemetry()" not in telemetry_src, (
+        "the mean-based evidence_registry read must be removed from "
+        "_citation_telemetry (placeholder source closed)"
+    )
+
+
+def test_wire19_hardcoded_none_last_unverified_removed(telemetry_src: str) -> None:
+    """W19: the hardcoded `"last_unverified_response": None` is GONE."""
+    normalized = telemetry_src.replace(" ", "")
+    assert '"last_unverified_response":None' not in normalized, (
+        "the hardcoded last_unverified_response: None must be removed"
+    )
+
+
+def test_wire20_telemetry_keeps_rate_and_non_destructive_bypass(
+    telemetry_src: str,
+) -> None:
+    """W20: stripped_rate_15s still sources rate(); bypass_active stays the
+    non-destructive `rate > STRIPPED_RATE_THRESHOLD` read (NOT should_bypass)."""
+    assert "stripped_rate_tracker.rate()" in telemetry_src, (
+        "stripped_rate_15s must still source stripped_rate_tracker.rate()"
+    )
+    assert "STRIPPED_RATE_THRESHOLD" in telemetry_src, (
+        "bypass_active must stay the non-destructive rate > threshold read"
+    )
+    # The docstring legitimately MENTIONS should_bypass to explain why it is
+    # avoided; assert it is never INVOKED on the tracker instance.
+    assert "stripped_rate_tracker.should_bypass()" not in telemetry_src, (
+        "_citation_telemetry must NOT call stripped_rate_tracker.should_bypass() "
+        "(one-shot latch consumer — would race the agent gate)"
+    )
