@@ -57,7 +57,16 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
   3. A new citable `key:` **evidence source** + `CitationLinter` rule exists so harmonic/transition claims are citable per-deck per-moment — un-cited harmonic feedback is stripped by the existing linter (this lands BEFORE any harmonic prompt text is written).
   4. The integration is **strictly read-only** — a repo test asserts no DJ-software database (`master.db`) is ever opened in write mode; cross-deck claims are suppressed when the second deck cannot be independently resolved (degrade to single-deck, never guess).
   5. Deck-state is embedded in `MusicState` under the **single-writer rule** (a read-only poller writes its own holder; `_tick_once` is the only copier), with `KEY_CLASH` + `TRANSITION_OPPORTUNITY` added to the event priority/cooldown maps; golden-equivalence of the existing snapshot is preserved (additive only).
-**Plans**: TBD
+**Plans** (5 plans, 3 waves):
+  - **Wave 1** (parallel, autonomous) —
+    - [ ] 59-01-PLAN.md — harmonics.to_camelot (load-bearing FIRST) + DeckState/DeckTrack model + additive MusicState field
+    - [ ] 59-02-PLAN.md — citable `key:` evidence source + linter rule + 5 schema-mirror touchpoints (lands BEFORE any harmonic prompt)
+    - [ ] 59-03-PLAN.md — KEY_CLASH/TRANSITION_OPPORTUNITY event-type plumbing + DECK-05 read-only repo guarantee (test-first)
+  - **Wave 2** (depends on 59-01/02/03) —
+    - [ ] 59-04-PLAN.md — read-only deck poller (XML-primary ladder + cross-deck suppression) + single-writer `_tick_once` wiring + change-only key:/track: registry writes + coach evidence_line + poller spawn
+  - **Wave 3** (depends on 59-04) —
+    - [ ] 59-05-PLAN.md — Gemini-vision deck-read (separate structured eval-gated call) + real-screenshot accuracy eval harness + KAAN-ACTION corpus checkpoint
+  - **Cross-cutting constraints:** to_camelot sequenced first (Rekordbox Tonality is musical notation, not Camelot); `key:` source lands before harmonic deps; vision is eval-gated and never feeds deck-state until the accuracy floor passes; single-writer + strictly-read-only invariants are repo-tested.
 **Spikes (research-flagged, resolve in plan-time)**: (a) pyrekordbox live-DB read safety post-6.6.5 + the `mix:`-reuse vs dedicated-`key:`-source decision (ARCHITECTURE↔PITFALLS divergence — lean `key:` with confidence unless the spike proves `mix:` reuse sufficient); (b) Gemini-vision deck-badge accuracy eval across djay/Serato/Traktor UIs on real screenshots.
 **Kaan-action**: live FLX4 + djay two-deck resolution-rate confirmation on real hardware.
 
@@ -107,7 +116,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 59. Full Deck Awareness + Grounding | v5.0 | 0/? | Not started | - |
+| 59. Full Deck Awareness + Grounding | v5.0 | 0/5 | Planned | - |
 | 60. Harmonic-Feedback Confidence Gate | v5.0 | 0/? | Not started | - |
 | 61. Actionable-Not-Hype Coach Persona | v5.0 | 0/? | Not started | - |
 | 62. Floating Pill UI | v5.0 | 0/? | Not started | - |
