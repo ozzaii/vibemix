@@ -158,10 +158,14 @@ def test_evidence_06_has_missing_returns_false_GROUND01() -> None:
         "[screen:waveform_deck_a]",
         "[mix:audible_deck=A]",
         "[tend:user_likes_acid]",
+        # Phase 59 (DECK-03) — the dedicated `key:` harmonic source.
+        # body `A:8A` carries an inner colon; the atom regex still matches
+        # because the body charset excludes only whitespace/comma/bracket.
+        "[key:A:8A]",
     ],
 )
-def test_evidence_07_regex_matches_all_seven_forms_GROUND02(citation: str) -> None:
-    """EVIDENCE_CITATION_RE matches each of the 7 EBNF source forms."""
+def test_evidence_07_regex_matches_all_eight_forms_GROUND02(citation: str) -> None:
+    """EVIDENCE_CITATION_RE matches each of the 8 EBNF source forms."""
     assert EVIDENCE_CITATION_RE.fullmatch(citation) is not None, (
         f"expected EVIDENCE_CITATION_RE to match {citation!r}"
     )
@@ -177,7 +181,7 @@ def test_evidence_08_regex_multi_citation_GROUND02() -> None:
     assert m is not None, f"expected fullmatch on multi-citation {text!r}"
 
     # Inner-form sub-match: walk the source-tagged segments.
-    inner_re = re.compile(r"(ev|aud|midi|track|screen|mix|tend):[^\s,\]]+")
+    inner_re = re.compile(r"(ev|aud|midi|track|screen|mix|tend|key):[^\s,\]]+")
     parts = inner_re.findall(text)
     assert len(parts) == 2
     assert parts == ["ev", "aud"]
@@ -204,10 +208,16 @@ def test_evidence_10_regex_rejects_empty_GROUND02_DLOCKED() -> None:
 # Test 11 — EVIDENCE_SOURCES constant — GROUND-02
 # --------------------------------------------------------------------------- #
 def test_evidence_11_sources_constant_locked_GROUND02() -> None:
-    """EVIDENCE_SOURCES is a frozenset of exactly the 7 CONTEXT.md sources."""
+    """EVIDENCE_SOURCES is a frozenset of exactly the 8 source identifiers.
+
+    Phase 59 (DECK-03) added the dedicated ``key`` harmonic source to the
+    original 7 CONTEXT.md sources. The frozenset is the schema-mirror
+    source-of-truth — the regex alternation, EBNF docstring, prompt grammar
+    block and citation-strip whitelist all carry ``key`` in lock-step.
+    """
     assert isinstance(EVIDENCE_SOURCES, frozenset)
     assert EVIDENCE_SOURCES == frozenset(
-        {"ev", "aud", "midi", "track", "screen", "mix", "tend"}
+        {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key"}
     )
 
 
@@ -257,6 +267,31 @@ def test_evidence_13_parse_citations_multi_form_GROUND02() -> None:
 
     # No citations → empty list, not error.
     assert parse_citations("plain text with no brackets") == []
+
+
+# --------------------------------------------------------------------------- #
+# Test 14 — `key:` harmonic source grammar — DECK-03 (Phase 59)
+# --------------------------------------------------------------------------- #
+def test_evidence_14_key_source_in_frozenset_DECK03() -> None:
+    """The dedicated `key` source is a registered EVIDENCE_SOURCES member."""
+    assert "key" in EVIDENCE_SOURCES
+
+
+def test_evidence_14_key_atom_parses_deck_camelot_body_DECK03() -> None:
+    """parse_citations splits a `key:` atom on the FIRST colon only.
+
+    The body `A:8A` keeps its inner `<deck>:<camelot>` colon — partition(':')
+    yields source='key', body='A:8A'. This is what makes a hallucinated
+    `[key:A:12B]` clash uncitable-by-construction: the exact body must have
+    been written by the deck poller or the linter strips the turn.
+    """
+    assert parse_citations("[key:A:8A]") == [("key", "A:8A")]
+
+    # Multi-citation: `key:` co-exists with `track:` in one bracket.
+    assert parse_citations("[track:t1,key:A:8A]") == [
+        ("track", "t1"),
+        ("key", "A:8A"),
+    ]
 
 
 # --------------------------------------------------------------------------- #

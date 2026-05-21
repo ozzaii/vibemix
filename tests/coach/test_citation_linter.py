@@ -171,6 +171,61 @@ def test_track_atom_existence_only() -> None:
 
 
 # ---------------------------------------------------------------------------
+# (g2) key: harmonic source — existence-only — DECK-03 (Phase 59)
+# ---------------------------------------------------------------------------
+
+
+def test_key_atom_existence_only_DECK03() -> None:
+    """key:<deck>:<camelot> is existence-only — no @t parsing (mirrors track:).
+
+    The deck poller registers `key:A:8A`; the linter validates by exact-body
+    presence. `key` is NOT in _TIME_KEYED_SOURCES, so the existence-only
+    branch (`body in snapshot["key"]`) handles it with no @timestamp.
+    """
+    snap = _registry(("key", "A:8A", None))
+    linter = CitationLinter()
+
+    valid = linter.check("[key:A:8A]", snap, mode="live")
+    assert valid.valid is True
+    assert valid.reason == "valid"
+
+
+def test_key_atom_fabricated_camelot_stripped_DECK03() -> None:
+    """A fabricated harmonic clash `[key:A:12B]` never written → STRIPPED.
+
+    This is the headline anti-slop guarantee: only poller-written
+    `<deck>:<camelot>` bodies validate. A hallucinated 12B body that was
+    never observed is uncitable-by-construction — the whole turn is stripped
+    (response-level binary). The poller registered A:8A, not A:12B.
+    """
+    snap = _registry(("key", "A:8A", None))
+    linter = CitationLinter()
+
+    result = linter.check("clashing keys [key:A:12B]", snap, mode="live")
+    assert result.valid is False
+    assert ("key", "A:12B") in result.missing
+    assert result.reason == "invalid_atoms"
+
+
+def test_key_source_not_time_keyed_DECK03() -> None:
+    """`key` MUST stay OUT of _TIME_KEYED_SOURCES — existence-only, no @t.
+
+    A bare `key:A:8A` (no @timestamp) validates by presence alone. If `key`
+    leaked into the time-keyed set, the missing `@` would make it malformed.
+    """
+    from vibemix.coach.citation_linter import _TIME_KEYED_SOURCES
+
+    assert "key" not in _TIME_KEYED_SOURCES
+
+    # Prove the behavioral consequence: a bare (no @t) key atom is valid.
+    snap = _registry(("key", "B:5A", None))
+    linter = CitationLinter()
+    result = linter.check("[key:B:5A]", snap, mode="live")
+    assert result.valid is True
+    assert result.reason == "valid"
+
+
+# ---------------------------------------------------------------------------
 # (h) test_screen_mix_tend_existence_only
 # ---------------------------------------------------------------------------
 
