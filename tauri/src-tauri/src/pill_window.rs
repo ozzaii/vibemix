@@ -43,14 +43,22 @@
 //! may still transfer key-window status — wry#637 / tauri#14102 (open, no
 //! fix as of 2.11.x). Accept for v1; surface as KAAN-ACTION.
 //!
-//! STRETCH (true non-activating, bounded, gated): in a `with_webview`
-//! closure, swizzle the underlying `NSWindow` class to `NSPanel` and set
-//! `NonactivatingPanel` on the style mask. CAVEAT (HIGH-confidence,
-//! 62-RESEARCH Leg A): `NSWindowStyleMaskNonactivatingPanel` is a SILENT
-//! NO-OP on a plain `NSWindow` — it only takes effect after the class is an
-//! `NSPanel` subclass. The stretch is gated behind a helper that, on ANY
-//! failure, falls back to the floor (never panics). `objc2-app-kit` is a
-//! macOS-only crates.io dep (NOT the git-only `tauri-nspanel`).
+//! STRETCH — DROPPED (code-review CR-01, 2026-05-22). The original plan
+//! sanctioned an `objc2` `NSWindow → NSPanel` class swizzle (so the
+//! `NonactivatingPanel` style mask takes effect) as a BOUNDED, gated stretch.
+//! Code review found the swizzle UNSOUND: `AnyObject::set_class`'s SAFETY
+//! contract requires the new class be a subclass of the object's CURRENT class
+//! (which is wry's own `NSWindow` subclass, NOT bare `NSWindow` — `NSPanel` is
+//! a cousin, not a descendant) and that it add no instance variables (`NSPanel`
+//! historically does). Worse, under `[profile.release] panic = "abort"` a
+//! `msg_send!` / `unwrap_unchecked` failure in the closure SIGABRTs the whole
+//! app — `with_webview`'s `Err` arm never sees it, and `catch_unwind` is a
+//! no-op under `panic = "abort"`. The plan explicitly allows shipping the floor
+//! alone, so the swizzle is removed. The full felt non-activating behavior
+//! (first-click not stealing key-window) is KAAN-ACTION live-confirm on the
+//! built app; if it ever needs the panel mask, the correct path is the
+//! crates.io `objc2-app-kit` NSPanel subclass (a real subclass, allocated as
+//! NSPanel from the start) — NOT an in-place class swap on a live wry window.
 
 // Plan 62-02 wires `create_pill_window` into the `main.rs` setup branch (the
 // `primary_surface` switch), so the module is no longer dead code — the
@@ -193,9 +201,11 @@ pub fn create_pill_window(
     // DELTA vs mascot: DO NOT clone the click-through block — the pill is
     // interactive (it must receive the drag mousedown + chip clicks).
 
-    // macOS focus-non-steal (Leg A). Floor always applies; stretch is gated.
+    // macOS focus-non-steal (Leg A). Only the Accessory-policy FLOOR ships; the
+    // NSPanel swizzle stretch was dropped (CR-01). This is reached ONLY in the
+    // Pill surface branch (main.rs), so Accessory is pill-scoped (WR-01).
     #[cfg(target_os = "macos")]
-    apply_nonactivating(app, &window);
+    apply_nonactivating(app);
 
     install_geometry_listener(app.clone(), window.clone());
 
@@ -377,76 +387,32 @@ fn save_pill_state(app: &AppHandle, state: &PillWindowState) -> Result<(), Strin
 // macOS focus-non-steal interop (Leg A) — #[cfg(target_os="macos")] only.
 // ---------------------------------------------------------------------------
 
-/// Apply the focus-non-steal FLOOR (Accessory activation policy) and attempt
-/// the bounded STRETCH (NSWindow→NSPanel swizzle + NonactivatingPanel mask).
-/// Any stretch failure silently degrades to the floor — never panics.
+/// Apply the focus-non-steal FLOOR (Accessory activation policy). The unsound
+/// NSWindow→NSPanel swizzle STRETCH was removed (CR-01) — see the module doc.
+///
+/// WR-01 — the Accessory policy is a PROCESS-GLOBAL side effect (no Dock icon,
+/// no menubar takeover; the whole app reads as a background agent). It is
+/// therefore deliberately scoped to the PILL surface ONLY: this function is
+/// reached exclusively from `create_pill_window`, which `main.rs` calls ONLY in
+/// the `PrimarySurface::Pill` branch. The `Mascot` / `None` surfaces never call
+/// it, so the main session window keeps its default Regular policy (Dock icon +
+/// Cmd-Tab reachability) under those surfaces — the pill mode is the only one
+/// that opts the app into background-agent activation, by design (the pill mode
+/// is tray-centric, 62-RESEARCH A5).
+///
+/// KAAN-ACTION (live-confirm on the built app): whether Accessory is the right
+/// FELT choice in pill mode — i.e. whether losing the Dock icon / Cmd-Tab in
+/// pill mode is acceptable, and whether `.focused(false)` + Accessory is enough
+/// to stop first-click key-window theft (wry#637 / tauri#14102, open) — is not
+/// verifiable from code; confirm it on Kaan's Mac.
 #[cfg(target_os = "macos")]
-fn apply_nonactivating(app: &AppHandle, window: &tauri::WebviewWindow) {
-    // FLOOR — Accessory policy: vibemix reads as a background/accessory app
-    // (no Dock bounce, no menubar takeover), reducing the perceived focus
-    // theft. The app is already tray-centric, so Accessory aligns (62-RESEARCH
-    // A5). Combined with the builder's `.focused(false)`, this is the shipped
-    // PILL-04 mechanism. RESIDUAL: first-click may still transfer key-window
-    // status on a plain NSWindow (wry#637 / tauri#14102, open) → KAAN-ACTION.
+fn apply_nonactivating(app: &AppHandle) {
+    // FLOOR — Accessory policy (PILL-surface-scoped per the doc above). Combined
+    // with the builder's `.focused(false)`, this is the shipped PILL-04
+    // mechanism. RESIDUAL: first-click may still transfer key-window status on a
+    // plain NSWindow (wry#637 / tauri#14102, open) → KAAN-ACTION live-confirm.
     if let Err(e) = app.set_activation_policy(tauri::ActivationPolicy::Accessory) {
         tracing::warn!("pill: set_activation_policy(Accessory) failed: {e}");
-    }
-
-    // STRETCH — true non-activating via NSWindow→NSPanel swizzle. Gated:
-    // any failure (closure error, null ns_window, class mismatch) leaves the
-    // floor in place. The NonactivatingPanel mask is a SILENT no-op unless the
-    // class is first swizzled to NSPanel (62-RESEARCH Leg A, HIGH confidence).
-    nonactivating_stretch(window);
-}
-
-#[cfg(target_os = "macos")]
-fn nonactivating_stretch(window: &tauri::WebviewWindow) {
-    use objc2::msg_send;
-    use objc2::runtime::{AnyClass, AnyObject};
-
-    // `with_webview` hands us the platform webview on the main thread; from
-    // it we get the raw `NSWindow*` (an obj-c `id`). All obj-c sends below
-    // are wrapped so a failure degrades to the floor.
-    let res = window.with_webview(|webview| {
-        // SAFETY: ns_window() returns the live `NSWindow*` for this webview's
-        // window. We only mutate its class to NSPanel (a strict superclass of
-        // NSWindow) and send well-known AppKit selectors; we never retain or
-        // release across the closure. On any unexpected shape we bail and the
-        // Accessory floor remains in effect.
-        unsafe {
-            let ns_window = webview.ns_window() as *mut AnyObject;
-            let Some(ns_window) = ns_window.as_ref() else {
-                return; // null NSWindow → floor.
-            };
-
-            // Convert the window's class to NSPanel so the NonactivatingPanel
-            // style mask actually takes effect (it is a SILENT no-op on a plain
-            // NSWindow). This is the same technique tauri-nspanel uses, written
-            // in-tree to keep the dep graph crates.io-only. NSPanel is a direct
-            // subclass of NSWindow so the layout/ivars are compatible.
-            let Some(ns_panel_cls) = AnyClass::get(c"NSPanel") else {
-                return; // NSPanel class missing (impossible on macOS) → floor.
-            };
-            let _old: &AnyClass = AnyObject::set_class(ns_window, ns_panel_cls);
-
-            // styleMask |= NSWindowStyleMaskNonactivatingPanel (1 << 7 = 128).
-            const NONACTIVATING_PANEL: usize = 1 << 7;
-            let cur_mask: usize = msg_send![ns_window, styleMask];
-            let _: () = msg_send![ns_window, setStyleMask: cur_mask | NONACTIVATING_PANEL];
-
-            // Panel hygiene: float, become key only when needed, don't hide on
-            // app deactivation.
-            let _: () = msg_send![ns_window, setFloatingPanel: true];
-            let _: () = msg_send![ns_window, setBecomesKeyOnlyIfNeeded: true];
-            let _: () = msg_send![ns_window, setHidesOnDeactivate: false];
-        }
-    });
-
-    match res {
-        Ok(()) => tracing::info!("pill: NSPanel non-activating stretch applied"),
-        Err(e) => tracing::info!(
-            "pill: NSPanel stretch unavailable ({e}); Accessory floor in effect"
-        ),
     }
 }
 
