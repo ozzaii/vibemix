@@ -122,21 +122,26 @@ def to_camelot(raw: str | None) -> str | None:
 #   hour 4 → 4 semitones                           → NEITHER (drift; silent)
 #   hour 5 → 1 SEMITONE                            → CLASH
 #   hour 6 → 6 semitones  (tritone)                → CLASH
-#   hour 7 → 1 SEMITONE   (== the +7 dominant)     → CLASH
 #
+# A 7-hour separation is NOT a separate runtime case: _hour_distance folds it
+# to 5 via min(d, 12-d) (the +7 dominant and the -5 are the same circular
+# distance), so the table tops out at 6 and "hour 7" never reaches the set.
 # The critical, counter-intuitive fact: an adjacent ±1 Camelot move (8A→9A)
 # is a perfect FIFTH and SAFE — the one-semitone disaster is two melodic
-# tracks overlapping, which in same-letter terms is an hour-distance of 5 or
-# 7. The LLM NEVER computes this; it only narrates the verdict the code
+# tracks overlapping, which in same-letter terms is a circular hour-distance
+# of 5 (the 7-hour dominant folds here). The LLM NEVER computes this; it only
+# narrates the verdict the code
 # already proved. Pure, side-effect-free, never raises — mirrors to_camelot.
 # Table source: circle-of-fifths derivation cross-checked against
 # [mixedinkey.com/camelot-wheel + dj.studio/blog/camelot-wheel].
 # =====================================================================
 
-# Same-letter hour-distances that produce a 1-semitone (5/7) or tritone (6)
-# dissonance — the ONLY same-letter relationships that genuinely clash on a
-# melodic overlap. Deliberately NARROW (conservative-by-default, HARMONIC-03).
-_CLASH_HOURS = frozenset({5, 6, 7})
+# Same-letter circular hour-distances (0..6, post-fold) that produce a
+# 1-semitone (hour 5) or tritone (hour 6) dissonance — the ONLY same-letter
+# relationships that genuinely clash on a melodic overlap. Deliberately NARROW
+# (conservative-by-default, HARMONIC-03). A 7-hour separation folds to 5 via
+# _hour_distance, so there is no separate "hour 7" case at runtime.
+_CLASH_HOURS = frozenset({5, 6})
 # Safe same-letter relationships: same key (0), adjacent perfect fifth (1),
 # +2 energy move (2). Hours 3/4 are the intentional silent "neither" zone.
 _SAFE_HOURS = frozenset({0, 1, 2})
@@ -216,8 +221,9 @@ def is_clash(a: str | None, b: str | None) -> bool:
     flagging.
 
     Deliberately NARROW (conservative-by-default, HARMONIC-03): only the
-    same-letter 1-semitone / tritone band (``_CLASH_HOURS`` = hours 5/6/7)
-    fires. Cross-letter pairs and any ``None`` / garbage input return False —
+    same-letter 1-semitone / tritone band (``_CLASH_HOURS`` = hours 5/6, the
+    circular post-fold range) fires. Cross-letter pairs and any ``None`` /
+    garbage input return False —
     we never flag what we can't prove dissonant. The LLM narrates this
     verdict; it NEVER computes it. Pure, never raises.
     """
