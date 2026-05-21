@@ -40,6 +40,12 @@ const STORE_PATH: &str = "config.json";
 const KEY_FIRST_RUN_STATE: &str = "first_run_state";
 const KEY_MASCOT_WINDOW: &str = "mascot_window";
 
+/// Phase 62 Plan 02 — top-level config key choosing the in-set surface
+/// (PILL-02). Sits alongside `mascot_window` / `first_run_state`. A
+/// legacy/missing config (no `primary_surface` key) decodes to the `pill`
+/// default — see `PrimarySurface` + `load_primary_surface`.
+const KEY_PRIMARY_SURFACE: &str = "primary_surface";
+
 /// Phase 18 Plan 18-04 — bool. Default `true`. When `false`, the boot-time
 /// updater check in `updater::run_update_check_if_enabled` returns early
 /// without hitting the manifest endpoint. Read directly from
@@ -95,6 +101,32 @@ impl Default for MascotWindowState {
             click_through: false,
         }
     }
+}
+
+/// Phase 62 Plan 02 — the in-set surface chosen at session start (PILL-02).
+///
+/// A closed tri-state enum so a malformed/hand-edited `config.json` value
+/// decodes to the safe default (`Pill`), never an arbitrary surface — see
+/// `load_primary_surface` (absent key → default) and `main.rs`'
+/// `.unwrap_or_default()` (decode error → default).
+///
+/// Default `Pill` — the deliberate, Kaan-approved partial reversal of the
+/// shipped full-screen-mascot direction for the in-set surface (62-CONTEXT
+/// Area 2). The mascot is demoted to opt-in/secondary via `Mascot` — **NOT
+/// retired** (`mascot-audit` CI fence stays green). `None` = neither surface.
+///
+/// The surface choice applies at startup (config write → which window is
+/// created); no live hot-swap in v1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PrimarySurface {
+    /// Default — the floating Super-Whisper pill (the primary in-set surface).
+    #[default]
+    Pill,
+    /// Opt-in / secondary — the Three.js mascot overlay (kept, not deleted).
+    Mascot,
+    /// Neither in-set surface is created.
+    None,
 }
 
 /// Returns true when no `first_run_state` is recorded or when its
@@ -157,6 +189,40 @@ pub fn save_mascot_state(app: &AppHandle, state: &MascotWindowState) -> Result<(
         .map_err(|e| format!("store init failed: {e}"))?;
     let value = serde_json::to_value(state).map_err(|e| format!("encode failed: {e}"))?;
     store.set(KEY_MASCOT_WINDOW, value);
+    store
+        .save()
+        .map_err(|e| format!("store save failed: {e}"))?;
+    Ok(())
+}
+
+/// Phase 62 Plan 02 — read the persisted `PrimarySurface` (PILL-02). Returns
+/// the `Pill` default when the key is absent (legacy/missing config → Pill,
+/// 62-CONTEXT Area 2). Mirrors `load_mascot_state`'s shape. `main.rs` wraps
+/// this in `.unwrap_or_default()` so a decode failure also falls back to Pill
+/// — a tampered value can never crash setup or select an out-of-band surface.
+pub fn load_primary_surface(app: &AppHandle) -> Result<PrimarySurface, String> {
+    use tauri_plugin_store::StoreExt;
+    let store = app
+        .store(STORE_PATH)
+        .map_err(|e| format!("store init failed: {e}"))?;
+    match store.get(KEY_PRIMARY_SURFACE) {
+        Some(value) => serde_json::from_value(value.clone())
+            .map_err(|e| format!("decode failed: {e}")),
+        None => Ok(PrimarySurface::default()),
+    }
+}
+
+/// Phase 62 Plan 02 — persist the `PrimarySurface`. Mirrors
+/// `save_mascot_state`. The v1 default path needs no caller (absent key →
+/// Pill); this exists so a future Settings toggle can flip the surface
+/// through `tauri-plugin-store` without a schema change.
+pub fn save_primary_surface(app: &AppHandle, surface: PrimarySurface) -> Result<(), String> {
+    use tauri_plugin_store::StoreExt;
+    let store = app
+        .store(STORE_PATH)
+        .map_err(|e| format!("store init failed: {e}"))?;
+    let value = serde_json::to_value(surface).map_err(|e| format!("encode failed: {e}"))?;
+    store.set(KEY_PRIMARY_SURFACE, value);
     store
         .save()
         .map_err(|e| format!("store save failed: {e}"))?;
