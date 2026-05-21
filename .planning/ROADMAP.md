@@ -80,7 +80,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
   3. The detector is **conservative by default** — one-step-off-Camelot pairs (adjacent = safe) are suppressed, low-confidence keys and ambiguous deck-resolution are suppressed, and tuning accounts for the ~57–70% library key-tag accuracy band; it ships only after a **Kaan-ear veto** pass on his real disagreed-pairs corpus.
   4. Transition-execution feedback gives **concrete, actionable blend notes** (e.g. EQ bass-swap, phrase alignment, where to start/end the blend), scoped strictly to what is grounded in deck-state and retrospective/past-tense — no advice is emitted when the underlying signals are not available, and no mid-blend present-tense imperatives.
 **Plans**: 4 plans (3 waves)
-- [ ] 60-01-PLAN.md — Deterministic Camelot clash predicate (`is_clash`/`compatible`/`semitone_distance`) + table-oracle test [HARMONIC-01]
+- [x] 60-01-PLAN.md — Deterministic Camelot clash predicate (`is_clash`/`compatible`/`semitone_distance`) + table-oracle test [HARMONIC-01]
 - [ ] 60-02-PLAN.md — `_melodic_overlap_gate` + KEY_CLASH/TRANSITION_OPPORTUNITY detector branches + default-off `harmonic_clash_enabled` flag [HARMONIC-02, HARMONIC-03]
 - [ ] 60-03-PLAN.md — Kaan-ear veto harness: disagreed-pairs corpus + test + runnable scorer (KAAN-ACTION ship gate) [HARMONIC-03]
 - [ ] 60-04-PLAN.md — Cited narrate-only coach fragments (KEY_CLASH + retrospective TRANSITION_OPPORTUNITY) + matrix grammar reconcile [HARMONIC-01, HARMONIC-04]
@@ -121,7 +121,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 59. Full Deck Awareness + Grounding | v5.0 | 5/5 | Complete   | 2026-05-21 |
-| 60. Harmonic-Feedback Confidence Gate | v5.0 | 0/? | Not started | - |
+| 60. Harmonic-Feedback Confidence Gate | v5.0 | 1/4 | In Progress|  |
 | 61. Actionable-Not-Hype Coach Persona | v5.0 | 0/? | Not started | - |
 | 62. Floating Pill UI | v5.0 | 0/? | Not started | - |
 
