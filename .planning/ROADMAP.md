@@ -120,7 +120,7 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 **Plans**: 3 plans (2 waves)
   - [x] 56-01-PLAN.md — LIVE-05/05a anti-slop guard: extend the Three.js rig SnapshotSlice with music/voice + the drop/breakdown music-confirmation defence-in-depth guard + anti-slop fixtures (wave 1)
   - [x] 56-02-PLAN.md — PERF-01 (TTFT telemetry budget + thinking-gate positive/negative pin) + PERF-02 (zero playback underruns under both-mode soak) via Python test extensions (wave 1)
-  - [ ] 56-03-PLAN.md — LIVE-05/05a six-mode reachability + speaking-overrides-music proof + mood/emotion tint discipline + PERF-03 dispatch-latency mode-transition floor (wave 2, depends on 56-01)
+  - [x] 56-03-PLAN.md — LIVE-05/05a six-mode reachability + speaking-overrides-music proof + mood/emotion tint discipline + PERF-03 dispatch-latency mode-transition floor (wave 2, depends on 56-01)
 **UI hint**: yes — mascot is a Tier-1 live surface; the many-modes work is design-led (lift `mocks/` + `frontend-enforcement` skill; the bus already carries the signals to drive it).
 
 ### Phase 57: Sexify Finish
@@ -155,7 +155,7 @@ This is bring-up + live validation + polish + ship of an **already-built** app. 
 | 53. Controller Live + Graceful Fallback | v4.0 | 2/2 | Complete | 2026-05-21 |
 | 54. Hype Mode Live | v4.0 | 4/4 | Complete    | 2026-05-20 |
 | 55. Feedback Mode Live + Citation Integrity | v4.0 | 3/3 | Complete   | 2026-05-21 |
-| 56. Performance + Live Mascot | v4.0 | 2/3 | In Progress|  |
+| 56. Performance + Live Mascot | v4.0 | 3/3 | Complete   | 2026-05-21 |
 | 57. Sexify Finish | v4.0 | 0/TBD | Not started | - |
 | 58. Ship Readiness | v4.0 | 0/TBD | Not started | - |
 
