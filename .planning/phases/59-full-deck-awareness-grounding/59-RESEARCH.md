@@ -507,17 +507,17 @@ else:
 
 **If this table looks long:** all six are Claude's-Discretion tuning values explicitly delegated by CONTEXT, plus the vision-reliability unknown that the eval task resolves. None contradict a locked decision.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does Kaan's real rig expose a readable second-deck badge to Gemini-vision?**
    - What we know: djay Pro is the primary app; FLX4 desyncs play-state; vision is the only universal second-deck identity source.
    - What's unclear: whether the silent/cued deck's key badge is reliably visible+readable in his actual djay layout.
-   - Recommendation: the vision eval task uses *his* screenshots; if the second deck isn't reliably readable, cross-deck claims degrade to single-deck (DECK-05) and the harmonic feature waits for XML-resolved both-deck cases — which is the conservative-by-design path anyway.
+   - RESOLVED: the vision eval task (Plan 59-05) uses *his* screenshots; if the second deck isn't reliably readable, cross-deck claims degrade to single-deck (DECK-05) and the harmonic feature waits for XML-resolved both-deck cases — the conservative-by-design path anyway. Gated, not blocking.
 
 2. **Should the numpy KS estimator ship in Phase 59 or defer to Phase 60?**
    - What we know: it's fallback-only, fires only when no tag/badge yields a key, zero-dep.
    - What's unclear: whether the XML+vision ladder already covers Kaan's library coverage.
-   - Recommendation: scaffold `harmonics.to_camelot` + the `DeckTrack.source="numpy_key"` slot in Phase 59 (cheap), but the estimator *implementation* can be a small task gated on the live test showing real "no-tag" gaps. Keep it in scope but low-priority within the phase.
+   - RESOLVED: scaffold `harmonics.to_camelot` + the `DeckTrack.source="numpy_key"` slot in Phase 59 (cheap); the estimator *implementation* is a thin stub this phase, gated on the live test showing real "no-tag" gaps before a fuller implementation. In scope, low-priority.
 
 ## Environment Availability
 
