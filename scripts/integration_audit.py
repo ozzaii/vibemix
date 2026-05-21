@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -173,6 +174,17 @@ def evaluate_seam(seam: dict[str, str]) -> SeamVerdict:
         verdict.detail = "test file missing"
         return verdict
 
+    # The vibemix package is NOT editable-installed; it resolves only via
+    # PYTHONPATH=src (the canonical CLAUDE.md test invocation). Propagate it
+    # into the subprocess env so the seam tests import `vibemix` instead of
+    # raising ModuleNotFoundError — without this every seam whose test imports
+    # vibemix reports a false MISSING/PARTIAL verdict (it green-blocks Gate 4).
+    seam_env = dict(os.environ)
+    src_path = str(REPO / "src")
+    existing = seam_env.get("PYTHONPATH", "")
+    seam_env["PYTHONPATH"] = (
+        src_path if not existing else f"{src_path}{os.pathsep}{existing}"
+    )
     proc = subprocess.run(
         [
             sys.executable,
@@ -186,6 +198,7 @@ def evaluate_seam(seam: dict[str, str]) -> SeamVerdict:
         capture_output=True,
         text=True,
         cwd=str(REPO),
+        env=seam_env,
     )
     # Parse pytest -q output: "N passed", "N failed", etc.
     output = proc.stdout + proc.stderr
@@ -598,6 +611,27 @@ def poc_files_status() -> str:
 # --------------------------------------------------------------------------- #
 
 
+def milestone_meta_for_path(target: Path) -> tuple[str, str, str]:
+    """Derive (milestone, milestone_name, phase_line) from the audit filename.
+
+    The audit body must not be hardcoded to one milestone — the same generator
+    composes v2.1, v3.x, v4.0, … audits depending on the output path. Falls
+    back to the original v2.1 identity for any unrecognized name so existing
+    callers keep their behavior.
+    """
+    name = target.name
+    table = {
+        "v4.0": ("v4.0", "SHIP", "58 — Ship Readiness"),
+        "v3.1": ("v3.1", "Distribution-Ready Pass", "50 — E2E + OS Matrix"),
+        "v3.0": ("v3.0", "The Grounded Cut", "45 — Release Readiness"),
+        "v2.1": ("v2.1", "The Unified Cut", "37 — Cross-Phase Integration Audit Gate"),
+    }
+    for key, meta in table.items():
+        if name.startswith(f"{key}-MILESTONE-AUDIT"):
+            return meta
+    return table["v2.1"]
+
+
 def compose_milestone_audit(
     seam_verdicts: list[SeamVerdict],
     orphans_csv: str,
@@ -605,6 +639,9 @@ def compose_milestone_audit(
     kaan_non_legal_remaining: bool,
     grey_table: str,
     poc_table: str,
+    milestone: str = "v2.1",
+    milestone_name: str = "The Unified Cut",
+    phase_line: str = "37 — Cross-Phase Integration Audit Gate",
 ) -> str:
     total = len(seam_verdicts)
     wired = sum(1 for v in seam_verdicts if v.verdict == "WIRED")
@@ -638,8 +675,8 @@ def compose_milestone_audit(
         orph_md_str = "_No orphan candidates detected._"
 
     return f"""---
-milestone: v2.1
-milestone_name: The Unified Cut
+milestone: {milestone}
+milestone_name: {milestone_name}
 audited_at: 2026-05-15
 auditor: scripts/integration_audit.py
 mode: gsd-autonomous fully
@@ -651,10 +688,10 @@ overall_verdict: {overall}
 kaan_action_non_legal_remaining: {str(kaan_non_legal_remaining).lower()}
 ---
 
-# v2.1 Milestone Audit — The Unified Cut
+# {milestone} Milestone Audit — {milestone_name}
 
 **Generated:** by `python scripts/integration_audit.py --write-milestone-audit`
-**Phase:** 37 — Cross-Phase Integration Audit Gate
+**Phase:** {phase_line}
 **Verdict:** **{overall}**
 
 This audit is produced by `scripts/integration_audit.py`. Re-run after
@@ -718,7 +755,7 @@ Re-run this audit by:
 
 ```bash
 python scripts/integration_audit.py --write-milestone-audit \\
-    .planning/v2.1-MILESTONE-AUDIT.md --force
+    .planning/{milestone}-MILESTONE-AUDIT.md --force
 ```
 """
 
@@ -849,6 +886,7 @@ def main(argv: list[str] | None = None) -> int:
         kaan_table, kaan_non_legal_remaining = kaan_action_rollup_markdown()
         grey_table = grey_area_log_markdown()
         poc_table = poc_files_status()
+        ms, ms_name, phase_line = milestone_meta_for_path(target)
         body = compose_milestone_audit(
             seam_verdicts,
             orphans_csv,
@@ -856,6 +894,9 @@ def main(argv: list[str] | None = None) -> int:
             kaan_non_legal_remaining,
             grey_table,
             poc_table,
+            milestone=ms,
+            milestone_name=ms_name,
+            phase_line=phase_line,
         )
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(body, encoding="utf-8")
