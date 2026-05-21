@@ -143,6 +143,7 @@
     "debrief",
     "main",
     "mascot",
-    "overlay-*"
+    "overlay-*",
+    "pill"
   ]
 }
