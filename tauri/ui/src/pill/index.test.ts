@@ -60,6 +60,28 @@ describe("toPillFrame — defensive normalisation", () => {
     expect(f?.text).toBe("ride the kick");
     expect(f?.chips?.length).toBe(1);
   });
+
+  it("WR-06: filters malformed citation chips (no `[undefined @ 0:00]` slop)", () => {
+    const f = toPillFrame({
+      type: "cohost-reaction",
+      text: "kick swap",
+      citation_strip: [
+        42,
+        null,
+        {},
+        { event_id: "ev:OK@2.0", verb: "kick", timestamp_s: 2.0 }, // the only valid one
+        { event_id: "ev:BAD", verb: "x" }, // missing timestamp_s
+        { event_id: 7, verb: "x", timestamp_s: 1 }, // event_id wrong type
+      ],
+    });
+    expect(f?.chips?.length).toBe(1);
+    expect(f?.chips?.[0]?.event_id).toBe("ev:OK@2.0");
+  });
+
+  it("WR-06: a non-array citation_strip yields no chips (defensive)", () => {
+    const f = toPillFrame({ type: "cohost-reaction", text: "x", citation_strip: "nope" });
+    expect(f?.chips).toEqual([]);
+  });
 });
 
 describe("reduceFrame — frame→state map (READER)", () => {

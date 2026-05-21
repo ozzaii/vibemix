@@ -65,8 +65,13 @@ export function toPillFrame(msg: unknown): PillFrame | null {
   // WRITER — cohost-reaction (either the bare or the ipc-prefixed type).
   if (type === "cohost-reaction" || type === "ipc.session.cohost-reaction") {
     const text = typeof m.text === "string" ? m.text : "";
+    // WR-06: validate the per-element shape before trusting the wire — a blind
+    // `as CitationChip[]` cast lets a malformed frame (`[42, null, {}]`) render
+    // `[undefined @ 0:00]` slop. The pill is the trust boundary for what it
+    // paints, so filter to well-formed chips (not an injection vector — all
+    // chip text is rendered via textContent — but it keeps the strip honest).
     const chips = Array.isArray(m.citation_strip)
-      ? (m.citation_strip as CitationChip[])
+      ? (m.citation_strip as unknown[]).filter(isCitationChip)
       : [];
     return { type, text, chips };
   }
@@ -102,6 +107,22 @@ export function toPillFrame(msg: unknown): PillFrame | null {
 
 function isCohostStatus(v: unknown): v is CohostStatus {
   return v === "IDLE" || v === "LISTENING" || v === "TALKING";
+}
+
+/**
+ * Per-element shape guard for a citation chip off the wire (WR-06). The
+ * renderer reads `event_id`/`verb`/`timestamp_s` directly, so a chip missing
+ * any of them (or of the wrong type) would paint `[undefined @ 0:00]` slop —
+ * filter those out at the trust boundary instead of a blind cast.
+ */
+function isCitationChip(c: unknown): c is CitationChip {
+  return (
+    c != null &&
+    typeof c === "object" &&
+    typeof (c as Record<string, unknown>).event_id === "string" &&
+    typeof (c as Record<string, unknown>).verb === "string" &&
+    typeof (c as Record<string, unknown>).timestamp_s === "number"
+  );
 }
 
 /**
