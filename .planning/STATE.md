@@ -3,19 +3,23 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: SHIP
 status: executing
-last_updated: "2026-05-21T07:46:34.562Z"
-last_activity: 2026-05-21 -- Phase 57 execution started
+last_updated: "2026-05-21T11:20:00.000Z"
+last_activity: 2026-05-21 -- Phase 57 (Sexify Finish) COMPLETE (3/3 plans; vitest 721 + tsc clean + 7 security pins green; ui-auditor 22/24 0-HIGH; verify human_needed 9/9 engineering must-haves). 5 Kaan-action items (real-app bugs + felt visual + fresh-account walk). Next: plan + execute Phase 58 (Ship Readiness)
 progress:
   total_phases: 8
-  completed_phases: 6
-  total_plans: 22
-  completed_plans: 19
-  percent: 75
+  completed_phases: 7
+  total_plans: 25
+  completed_plans: 22
+  percent: 88
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-21 — **Phase 56 (Performance + Live Mascot) COMPLETE** (3/3 plans; vitest 711 passed + Python perf suites green; verify human_needed 13/13 engineering must-haves; review 0 critical / 1 warning + 3 info, WR-01+IN-01 fixed). **KEY CORRECTION:** research found the shipped Tauri app loads the **Three.js GLB rig** (`tauri/ui/mascot.html`), NOT root `mascot.html` (sprites absent) — retargeted the whole phase to the surface users actually see (CONTEXT POST-RESEARCH CORRECTION block). LIVE-05/05a: `SnapshotSlice` threads `music`/`voice` from the live bus frame; 6 modes reachable each gated to a real event; music-confirmation anti-slop guard (now mirrors real `phase.py` semantics after WR-01 fix — `PEAK_FLOOR_RMS=0.045` for peak, breakdown rejects only the opposite extreme — breakdown/peak no longer over-suppressed); speaking-overrides-music; FSM pure. PERF-01 `LIVE_TTFT_BUDGET_MS=1500` + `thinking_gate` MINIMAL pinned (TTFTMeter is telemetry-only); PERF-02 zero soak underruns (reused `SoakCounters`); PERF-03 dispatch p95 ~0.22ms < 50ms. Skipped standalone gsd-ui-review (advisory; UI-SPEC target shifted to the 3D rig mid-phase + visual felt-quality is a 3D-render Kaan-eye call). Felt TTFT/60fps/no-dropout + "mascot feels alive across modes" live-drive = KAAN-ACTION (`56-HUMAN-UAT.md`). NOTE: Kaan ran parallel persona/prompt WIP this session (uncommitted: `__main__.py`, `dj_cohost.py`, `audio/constants.py` INVOKE_AUDIO_SECONDS 18→30, `prompts/matrix.py` react-don't-go-silent, `tests/agent/test_*`) — Phase 56 preserved all of it untouched. **Phases 51–56 COMPLETE (6/8, 75%).** Next: plan + execute Phase 57 (Sexify Finish).
+**Last updated:** 2026-05-21 — **Phase 57 (Sexify Finish) COMPLETE** (3/3 plans; vitest 721 + tsc clean + 7 security regression pins green; gsd-ui-auditor 22/24, 0 HIGH; verify human_needed 9/9 engineering must-haves). POLISH-01: impeccable CDJ-Whisper pass on session view + mascot overlay (removed 2 Tier-1 italics, aligned hero box-shadow to the documented recipe, fixed `cohost` undefined `--silk-25`→`--silk-22`); Saira+JetBrains Mono held, no Geist/Fraunces. POLISH-02: the 3 v0.1.0-rc1 carryover bugs were ALREADY fixed in `fac4c4a` — regression-PINNED (drag cap + JS handler, chrome strip display:none, TCC boot-prime path). POLISH-03: first-run friction audit = clean walk (absent forewarning/driver-fetch/48k-probe = Phase-49 installer-companion, intentionally out of in-app flow) + continuity smoke. Real-app drag/chrome/TCC + felt "looks peak" + fresh-account walk = KAAN-ACTION (`57-HUMAN-UAT.md`). Sidecar binary rebuild → Phase 58. Skipped standalone gsd-code-review (presentation-only CSS/TS + test assertions, already covered by ui-auditor). NOTE: Kaan ran a broad parallel persona/cooldown/audio-constants tuning WIP this session (17 uncommitted files: `__main__.py`, `dj_cohost.py`, `audio/constants.py`, `prompts/matrix.py`, `state/coach.py`, `mascot_window.rs`, `ws_client.rs`, `tauri.conf.json5`, several `tests/`) — Phases 56+57 preserved ALL of it untouched. **Phases 51–57 COMPLETE (7/8, 88%).** Next: plan + execute Phase 58 (Ship Readiness).
+
+---
+
+### (prior) Phase 56 — Performance + Live Mascot COMPLETE (3/3 plans; vitest 711 passed + Python perf suites green; verify human_needed 13/13 engineering must-haves; review 0 critical / 1 warning + 3 info, WR-01+IN-01 fixed). **KEY CORRECTION:** research found the shipped Tauri app loads the **Three.js GLB rig** (`tauri/ui/mascot.html`), NOT root `mascot.html` (sprites absent) — retargeted the whole phase to the surface users actually see (CONTEXT POST-RESEARCH CORRECTION block). LIVE-05/05a: `SnapshotSlice` threads `music`/`voice` from the live bus frame; 6 modes reachable each gated to a real event; music-confirmation anti-slop guard (now mirrors real `phase.py` semantics after WR-01 fix — `PEAK_FLOOR_RMS=0.045` for peak, breakdown rejects only the opposite extreme — breakdown/peak no longer over-suppressed); speaking-overrides-music; FSM pure. PERF-01 `LIVE_TTFT_BUDGET_MS=1500` + `thinking_gate` MINIMAL pinned (TTFTMeter is telemetry-only); PERF-02 zero soak underruns (reused `SoakCounters`); PERF-03 dispatch p95 ~0.22ms < 50ms. Skipped standalone gsd-ui-review (advisory; UI-SPEC target shifted to the 3D rig mid-phase + visual felt-quality is a 3D-render Kaan-eye call). Felt TTFT/60fps/no-dropout + "mascot feels alive across modes" live-drive = KAAN-ACTION (`56-HUMAN-UAT.md`). NOTE: Kaan ran parallel persona/prompt WIP this session (uncommitted: `__main__.py`, `dj_cohost.py`, `audio/constants.py` INVOKE_AUDIO_SECONDS 18→30, `prompts/matrix.py` react-don't-go-silent, `tests/agent/test_*`) — Phase 56 preserved all of it untouched. **Phases 51–56 COMPLETE (6/8, 75%).** Next: plan + execute Phase 57 (Sexify Finish).
 
 ---
 
@@ -29,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **Current focus:** Phase 57 — Sexify Finish
+- **Current focus:** Phase 58 — Ship Readiness
 - **Last shipped:** v3.1 Distribution-Ready Pass — 2026-05-18 (status: `tech_debt` accepted; 7 Kaan-action carveouts on external clock).
 - **Project mode:** standard.
 - **Granularity:** fine.
@@ -40,10 +44,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 — v4.0 "SHIP" milestone started)
 
 ## Current Position
 
-Phase: 57 (Sexify Finish) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 57
-Last activity: 2026-05-21 -- Phase 57 execution started
+Phase: 57 (Sexify Finish) — COMPLETE (engineering green; real-app bugs + felt visual + fresh-account walk = KAAN-ACTION)
+Plan: 3 of 3
+Status: Phase 57 complete — ready to plan + execute Phase 58 (Ship Readiness)
+Last activity: 2026-05-21 -- Phase 57 complete (3/3 plans, ui-auditor 0-HIGH, verify human_needed)
 
 ## Performance Metrics
 
