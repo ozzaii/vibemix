@@ -300,6 +300,38 @@ describe("state-machine fixture replay — event-traces.json", () => {
     });
   }
 
+  // Phase 56 / LIVE-05a — the discriminating held-mode assertion. The
+  // auto-runner above proves dance_hard is present (positive); this proves
+  // the contradictory quiet drop fires NO new transition after it (the held
+  // behaviour the guard exists for). Without the guard, the t=1100 quiet
+  // PHASE→drop would re-issue dance_hard — but more importantly any future
+  // regression that swapped the guard for an unconditional mode flip would
+  // surface here as an extra transition past the contradictory frame.
+  it("anti_slop_drop_quiet — quiet drop fires no transition after the seed (held)", () => {
+    const trace = (traces.traces as Trace[]).find(
+      (t) => t.name === "anti_slop_drop_quiet",
+    )!;
+    expect(trace).toBeDefined();
+    const actual = replayTrace(trace);
+    // Real transitions (exclude the boot seed).
+    const transitions = actual.filter((a) => a.source !== "boot");
+    // Exactly TWO real transitions: dance_hard@~100 (loud drop seed) and
+    // idle_bop_to_beat_energetic@~600 (settle to groove). The contradictory
+    // quiet PHASE→drop at 1100ms must NOT add a third.
+    expect(transitions).toHaveLength(2);
+    expect(transitions[0]!.state).toBe("dance_hard");
+    expect(transitions[1]!.state).toBe("idle_bop_to_beat_energetic");
+    // DISCRIMINATING: nothing fires at/after the quiet-drop timestamp
+    // (1100ms). A broken/removed guard would re-flip to dance_hard here
+    // (idle→dance is a real recorded transition) — this catches it.
+    const afterContradiction = transitions.filter((a) => a.at >= 1100);
+    expect(afterContradiction).toHaveLength(0);
+    // The held mode after the contradiction is still the groove idle_bop.
+    expect(transitions[transitions.length - 1]!.state).toBe(
+      "idle_bop_to_beat_energetic",
+    );
+  });
+
   it("aggregates: every documented ROADMAP event-mapping criterion is covered by ≥1 trace", () => {
     const criteriaCovered = new Set(
       (traces.traces as Trace[]).map((t) => t.criterion),
