@@ -132,6 +132,40 @@ describe("mascot overlay chrome (Wave 4 — 14-05)", () => {
       const css = readFileSync(MASCOT_CHROME_CSS_PATH, "utf-8");
       expect(containsLegacyToken(css)).toBe(false);
     });
+
+    // Phase 57 / POLISH-02b — regression pin (fac4c4a). The Phase 14 chrome
+    // strip elements (animated border + top label + state caption) are kept
+    // in markup so HMR/tests don't break, but MUST stay visually hidden via
+    // `display: none`. The pre-existing it() cases above pin the bare
+    // .mascot-window shape; these pin that the three strip selectors are
+    // each hidden so an un-hide can't silently regress. Whitespace is
+    // normalized so a reorder can't false-fail and any selector deletion
+    // (or display change) fails the test.
+    const STRIP_SELECTORS = [
+      ".mascot-window > .border-anim",
+      ".mascot-window__top-label",
+      ".mascot-window__state-caption",
+    ];
+
+    it("hides the three Phase 14 chrome strip elements with display: none", () => {
+      const css = readFileSync(MASCOT_CHROME_CSS_PATH, "utf-8");
+      // Find every CSS rule whose declaration block sets display: none, and
+      // collect the selector text preceding each such block. The strip rule
+      // groups all three selectors before one `{ display: none }` block.
+      const displayNoneRules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(
+        (m) => /display\s*:\s*none/.test(m[2]),
+      );
+      const hiddenSelectorText = displayNoneRules
+        .map((m) => m[1].replace(/\s+/g, " ").trim())
+        .join(" ");
+      for (const sel of STRIP_SELECTORS) {
+        const normalized = sel.replace(/\s+/g, " ").trim();
+        expect(
+          hiddenSelectorText.includes(normalized),
+          `chrome.css must hide \`${sel}\` via display: none (POLISH-02b)`,
+        ).toBe(true);
+      }
+    });
   });
 
   describe("src/mascot/index.ts — resolveCssColor v5 migration", () => {
