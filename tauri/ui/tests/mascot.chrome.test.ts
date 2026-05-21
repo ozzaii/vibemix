@@ -153,10 +153,10 @@ describe("mascot overlay chrome (Wave 4 — 14-05)", () => {
       // collect the selector text preceding each such block. The strip rule
       // groups all three selectors before one `{ display: none }` block.
       const displayNoneRules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(
-        (m) => /display\s*:\s*none/.test(m[2]),
+        (m) => /display\s*:\s*none/.test(m[2] ?? ""),
       );
       const hiddenSelectorText = displayNoneRules
-        .map((m) => m[1].replace(/\s+/g, " ").trim())
+        .map((m) => (m[1] ?? "").replace(/\s+/g, " ").trim())
         .join(" ");
       for (const sel of STRIP_SELECTORS) {
         const normalized = sel.replace(/\s+/g, " ").trim();
