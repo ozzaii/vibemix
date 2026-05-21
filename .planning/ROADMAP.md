@@ -97,7 +97,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
   4. Every prescriptive note stays **anti-slop / cited** — it ties to an observed deck-state or event, the warm "friend in your ear" tone is preserved, and cooldown/pacing prevents nagging (no robotic over-correction; harmonic fragments injected only when the tier supplies them, so the model can't be tempted to invent them).
 **Plans**: 2 plans
 - [x] 61-01-PLAN.md — Wave-0 test fence: coach-cell contract asserts (RED spec), KEY_CLASH/TRANSITION voice fence, dual-path `_prompt_body` proof, coach-context anti-slop assert
-- [ ] 61-02-PLAN.md — Sharpen the 3 COACH cells (beginner impact-clause + deck/harmonic path; intermediate balance rule; pro verb-list) + lockstep coach anchors; hype frozen
+- [x] 61-02-PLAN.md — Sharpen the 3 COACH cells (beginner impact-clause + deck/harmonic path; intermediate balance rule; pro verb-list) + lockstep coach anchors; hype frozen
 
 ### Phase 62: Floating Pill UI
 **Goal**: A small, transparent, always-on-top, draggable Super-Whisper-style pill becomes the **primary** live surface — positionable anywhere on screen, multi-monitor safe, never stealing keyboard focus mid-set or covering critical deck info. It consumes the existing ws:8765 frames (no new port, no Python delivery change), shows idle/listening/speaking/expand-on-event states with the real TTS waveform + citation strip, and demotes the Three.js mascot to opt-in/secondary without regressing it.
@@ -124,7 +124,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
 |-------|-----------|----------------|--------|-----------|
 | 59. Full Deck Awareness + Grounding | v5.0 | 5/5 | Complete   | 2026-05-21 |
 | 60. Harmonic-Feedback Confidence Gate | v5.0 | 3/4 | In Progress|  |
-| 61. Actionable-Not-Hype Coach Persona | v5.0 | 1/2 | In Progress|  |
+| 61. Actionable-Not-Hype Coach Persona | v5.0 | 2/2 | Complete   | 2026-05-21 |
 | 62. Floating Pill UI | v5.0 | 0/? | Not started | - |
 
 **Coverage:** 17/17 v5.0 requirements mapped ✓ (no orphans, no duplicates). Per-phase: P59=5 (DECK-01..05) · P60=4 (HARMONIC-01..04) · P61=4 (COACH-01..04) · P62=4 (PILL-01..04).

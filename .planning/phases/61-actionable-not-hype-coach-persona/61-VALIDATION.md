@@ -3,7 +3,7 @@ phase: 61
 slug: actionable-not-hype-coach-persona
 status: planned
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-05-21
 ---
 
@@ -54,5 +54,5 @@ created: 2026-05-21
 | 61-01-T1 | 61-01 | 1 | COACH-01, COACH-04 | Coach-cell contract (DJ verbs + prescribe-clause + balance + calm-tag) asserted for all 3 skills (RED spec) | unit | `PYTHONPATH=src .venv/bin/python -m pytest -q tests/prompts/test_matrix.py -k 61_coach` | done — RED spec (6 fail, 6 pass; verb/prescribe/balance RED, calm-tag GREEN) for 61-02 |
 | 61-01-T2 | 61-01 | 1 | COACH-01, COACH-04 | KEY_CLASH/TRANSITION coach voice fenced (DJ-verb move + both keys cited + no-invent + past-tense) | unit | `PYTHONPATH=src .venv/bin/python -m pytest -q tests/state/test_coach.py -k "key_clash or transition"` | done — GREEN (2 new pass) |
 | 61-01-T3 | 61-01 | 1 | COACH-02, COACH-04 | Dual-path `_prompt_body` equality + no-new-mode invariant; coach-context fabricated-key strip | integration | `PYTHONPATH=src .venv/bin/python -m pytest -q tests/agent/test_dj_cohost_matrix_dispatch.py tests/agent/test_coach_prompt_grounding.py -k 61` | done — GREEN (2 new pass) |
-| 61-02-T1 | 61-02 | 2 | COACH-01, COACH-03, COACH-04 | COACH_PRO verb-list + COACH_INTERMEDIATE balance rule + same-line prescribe-clause + verbs; hype byte-stable | unit | `PYTHONPATH=src .venv/bin/python -m pytest -q tests/prompts/test_matrix.py -k "61_coach or hype_intermediate or anchor"` | planned |
-| 61-02-T2 | 61-02 | 2 | COACH-01, COACH-03, COACH-04 | COACH_BEGINNER impact clause + verb vocab + deck/harmonic path; lockstep anchors; hype + persona + harmonic green | unit | `PYTHONPATH=src .venv/bin/python -m pytest -q tests/prompts/test_matrix.py tests/state/test_coach.py tests/agent/test_persona.py tests/agent/test_hype_prompt_grounding.py` | planned |
+| 61-02-T1 | 61-02 | 2 | COACH-01, COACH-03, COACH-04 | COACH_PRO verb-list + COACH_INTERMEDIATE balance rule + same-line prescribe-clause + verbs; hype byte-stable | unit | `PYTHONPATH=src .venv/bin/python -m pytest -q tests/prompts/test_matrix.py -k "61_coach or hype_intermediate or anchor"` | done — GREEN (pro+intermediate 61_coach pass; hype byte-stable) — `9163d40` |
+| 61-02-T2 | 61-02 | 2 | COACH-01, COACH-03, COACH-04 | COACH_BEGINNER impact clause + verb vocab + deck/harmonic path; lockstep anchors; hype + persona + harmonic green | unit | `PYTHONPATH=src .venv/bin/python -m pytest -q tests/prompts/test_matrix.py tests/state/test_coach.py tests/agent/test_persona.py tests/agent/test_hype_prompt_grounding.py` | done — GREEN (all 12 61_coach pass across 3 skills; full suite 7 baseline failures) — `f35e9bc` |
