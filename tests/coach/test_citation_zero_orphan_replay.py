@@ -203,3 +203,88 @@ def test_zero_orphans_across_grounded_replies() -> None:
 
     assert total_atoms > 0, "the replies must contain citation atoms to replay"
     assert orphans == [], f"expected zero orphans, found: {orphans}"
+
+
+# =========================================================================== #
+# Task 2 — hallucination-strip: injected non-existent citation is stripped     #
+# against a NON-empty real registry (stronger than the empty-registry hype     #
+# proof in tests/state/test_hype_anti_slop.py — here real evidence EXISTS but  #
+# the fabricated citation still never reaches the ear).                        #
+# =========================================================================== #
+
+
+def test_hallucinated_time_keyed_citation_is_stripped() -> None:
+    """An injected time-keyed orphan ([ev:GHOST_EVENT@999.9]) is stripped on
+    the NON-empty real registry: valid False, reason 'invalid_atoms', and the
+    orphan atom surfaces in LintResult.missing.
+
+    GHOST_EVENT is not a fixture event type and 999.9s is beyond every real
+    observation — a deliberately-hallucinated citation. The strip proves an
+    orphan never reaches the ear even when the registry holds real evidence.
+    """
+    reg = _build_registry_from_fixture()
+    snap = reg.snapshot()
+    linter = CitationLinter()
+
+    result = linter.check("Massive ghost drop [ev:GHOST_EVENT@999.9]", snap, mode="live")
+    assert result.valid is False
+    assert result.reason == "invalid_atoms"
+    assert ("ev", "GHOST_EVENT@999.9") in result.missing
+
+
+def test_hallucinated_track_citation_is_stripped() -> None:
+    """An injected existence-only orphan ([track:NONEXISTENT_ID]) is stripped:
+    valid False, reason 'invalid_atoms', the orphan in .missing.
+
+    NONEXISTENT_ID was never registered via register_library — a fabricated
+    track reference is provably stripped on the real registry.
+    """
+    reg = _build_registry_from_fixture()
+    snap = reg.snapshot()
+    linter = CitationLinter()
+
+    result = linter.check("Reckon that was [track:NONEXISTENT_ID]", snap, mode="live")
+    assert result.valid is False
+    assert result.reason == "invalid_atoms"
+    assert ("track", "NONEXISTENT_ID") in result.missing
+
+
+def test_mixed_reply_one_hallucinated_atom_strips_whole_reply() -> None:
+    """Response-level binary strip: a reply with one REAL atom + one
+    hallucinated atom is INVALID as a whole (a single bad atom strips the
+    entire utterance). The hallucinated atom is in .missing; the real one
+    is NOT — orphans never reach the ear, and the valid atom is still
+    surfaced as grounded for telemetry.
+    """
+    reg = _build_registry_from_fixture()
+    snap = reg.snapshot()
+    linter = CitationLinter()
+
+    phase_t = next(t for etype, t in _fixture_events() if etype == "PHASE")
+    reply = f"Real phase shift [ev:PHASE@{phase_t}] then a ghost [ev:GHOST_EVENT@999.9]"
+
+    result = linter.check(reply, snap, mode="live")
+    assert result.valid is False, "one bad atom must strip the WHOLE reply"
+    assert result.reason == "invalid_atoms"
+    assert ("ev", "GHOST_EVENT@999.9") in result.missing
+    assert ("ev", f"PHASE@{phase_t}") not in result.missing
+
+
+def test_strip_holds_on_nonempty_registry_not_just_empty() -> None:
+    """Documents the contract: this proves the airtight strip on a NON-empty
+    real registry. test_hype_anti_slop.py strips against an EMPTY registry;
+    here real evidence EXISTS (the fixture corpus), yet the hallucinated
+    citation is still stripped — the harder, more realistic case.
+    """
+    reg = _build_registry_from_fixture()
+    snap = reg.snapshot()
+    # The registry genuinely holds real observations (non-empty).
+    assert len(reg) > 0, "this proof requires a NON-empty real registry"
+    assert snap.get("ev"), "real ev observations must exist in the snapshot"
+
+    # Yet a fabricated citation is still stripped.
+    result = CitationLinter().check(
+        "Fabricated banger [ev:GHOST_EVENT@999.9]", snap, mode="live"
+    )
+    assert result.valid is False
+    assert ("ev", "GHOST_EVENT@999.9") in result.missing
