@@ -75,7 +75,11 @@
       <!-- Collapsed row: state dot + state label + waveform mount. -->
       <div class="pill__row">
         <div class="pill__dot" id="pill-dot" aria-hidden="true"></div>
-        <div class="pill__label" id="pill-label">IDLE</div>
+        <!-- a11y: the dot + waveform are aria-hidden decoration, so the dynamic
+             state caption is the ONLY screen-reader signal of IDLE→LISTENING→
+             SPEAKING. role=status + aria-live=polite announces the co-host
+             starting/stopping without interrupting (UI-REVIEW minor a11y rec). -->
+        <div class="pill__label" id="pill-label" role="status" aria-live="polite">IDLE</div>
         <div class="pill__wave" id="pill-wave"></div>
       </div>
       <!-- Expand panel: reaction text + citation strip mount (62-04);
