@@ -71,3 +71,39 @@ flagged `replace_decktrack` (Task-1 deck_poller helper) as a new orphan. Resolve
 by a surgical single-line add to `.planning/codebase/orphans.csv` (commit 8a1527c),
 leaving the two unrelated stale entries (`BlackHoleProbeResult`,
 `set_device_nominal_sample_rate`) untouched. Orphan-diff green again.
+
+### Re-confirmed at Plan 59-05 close (2026-05-21)
+
+Plan 59-05 (Gemini-vision deck-read leg, eval-gated) ran the full suite: **7
+failed, 3992 passed, 26 skipped** — the SAME 7 tests, unchanged count (passing
+rose 3976 → 3992 from the 15 new mocked `test_deck_vision.py` cases + 1). 59-05
+created `state/deck_vision.py`, `tests/state/test_deck_vision.py`,
+`eval/deck_vision/run_eval.py` + `README.md`, and added a GATED slot to
+`state/deck_poller.py`; none of the 7 failing files reference `deck_vision` /
+`DeckVisionReader` / `VISION_CONF` / `vision_enabled` (grep-verified empty). No
+new failures, no golden flips, orphan-diff clean. These remain the in-flight
+`live-tuning-or-brain` v4.0 WIP debt for a later finalization plan.
+
+## KAAN-ACTION — vision deck-read accuracy eval (Plan 59-05 Task 3)
+
+**Surfaced, NOT blocking** (per `gsd-autonomous fully`). The Gemini-vision
+deck-read leg is built but ships **DORMANT**: `DeckPoller(vision_enabled=False)`
+by default, so vision never feeds deck-state until the real-screenshot eval
+clears the per-app accuracy floor. The reaction-path `dj_cohost.py:
+screen_jpeg = None` killswitch is untouched regardless (vision is a separate
+structured call).
+
+**Kaan must:** run `PYTHONPATH=src python3 eval/deck_vision/run_eval.py
+<corpus_dir>` against a corpus of his real djay Pro / Serato / Traktor
+screenshots (light + dark themes; the silent/second-deck badge is the key open
+question per RESEARCH Open Q1), per `eval/deck_vision/README.md`. Review the
+per-app accuracy report against `ACCURACY_FLOOR=0.90`. For each app that clears
+the floor → flip `vision_enabled=True` for it (vision keys at the below-XML
+`deck_vision.VISION_CONF=0.5`). Below-floor apps stay **XML-or-unknown** (vision
+dormant — the conservative path, not a failure). Record the per-app enable/gate
+outcome in `59-05-SUMMARY.md`.
+
+Until this runs, vision is off and the co-host runs XML-or-unknown — the safe,
+killswitch-respecting state. Re-enabling vision un-does a deliberate v4
+anti-hallucination killswitch, so the gate is a human sign-off, not an
+autonomous flip.

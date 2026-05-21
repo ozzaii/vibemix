@@ -65,7 +65,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
   - **Wave 2** (depends on 59-01/02/03) —
     - [x] 59-04-PLAN.md — read-only deck poller (XML-primary ladder + cross-deck suppression) + single-writer `_tick_once` wiring + change-only key:/track: registry writes + coach evidence_line + poller spawn
   - **Wave 3** (depends on 59-04) —
-    - [ ] 59-05-PLAN.md — Gemini-vision deck-read (separate structured eval-gated call) + real-screenshot accuracy eval harness + KAAN-ACTION corpus checkpoint
+    - [x] 59-05-PLAN.md — Gemini-vision deck-read (separate structured eval-gated call) + real-screenshot accuracy eval harness + KAAN-ACTION corpus checkpoint
   - **Cross-cutting constraints:** to_camelot sequenced first (Rekordbox Tonality is musical notation, not Camelot); `key:` source lands before harmonic deps; vision is eval-gated and never feeds deck-state until the accuracy floor passes; single-writer + strictly-read-only invariants are repo-tested.
 **Spikes (research-flagged, resolve in plan-time)**: (a) pyrekordbox live-DB read safety post-6.6.5 + the `mix:`-reuse vs dedicated-`key:`-source decision (ARCHITECTURE↔PITFALLS divergence — lean `key:` with confidence unless the spike proves `mix:` reuse sufficient); (b) Gemini-vision deck-badge accuracy eval across djay/Serato/Traktor UIs on real screenshots.
 **Kaan-action**: live FLX4 + djay two-deck resolution-rate confirmation on real hardware.
@@ -116,7 +116,7 @@ No new AI providers (Gemini-only held), no CLAP/MERT/OpenL3, no Essentia/librosa
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 59. Full Deck Awareness + Grounding | v5.0 | 4/5 | In Progress|  |
+| 59. Full Deck Awareness + Grounding | v5.0 | 5/5 | Complete   | 2026-05-21 |
 | 60. Harmonic-Feedback Confidence Gate | v5.0 | 0/? | Not started | - |
 | 61. Actionable-Not-Hype Coach Persona | v5.0 | 0/? | Not started | - |
 | 62. Floating Pill UI | v5.0 | 0/? | Not started | - |
