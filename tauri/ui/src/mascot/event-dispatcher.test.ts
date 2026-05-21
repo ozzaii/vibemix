@@ -208,18 +208,36 @@ describe("dispatchEvent — event taxonomy", () => {
 
 // ── Phase 56 / LIVE-05a — music-confirmation guard (anti-slop) ────────────
 //
-// Defence-in-depth: `phase` is trusted but a contradictory `music` level
-// blocks the flip. A `phase=drop` during a quiet section is a
-// misclassification → return null (current mode held). Mirrors the
-// src/vibemix/audio/constants.py thresholds verbatim.
+// Defence-in-depth: `phase` is the trusted classifier output; the guard is a
+// SANITY FLOOR that rejects only GENUINE contradictions — a phase the audio
+// level cannot possibly support. Per WR-01 (Phase 56 review) it must NOT be
+// stricter than Python `_classify_phase_v4` (src/vibemix/state/phase.py), or
+// it suppresses legitimate modes. Mirrored Python floors:
+//   - drop:      `last >= PEAK_RMS (0.110)`  → loud; reject drop-on-silence.
+//   - peak:      `all(v >= 0.045)`           → floor 0.045 (PEAK_FLOOR_RMS),
+//                                               NOT PEAK_RMS; peaks live 0.045+.
+//   - breakdown: `last < 0.5 * earlier_max`  → RELATIVE; a real breakdown sits
+//                                               well above LOW_RMS. No energy
+//                                               history here → reject only the
+//                                               opposite extreme (music >=
+//                                               PEAK_RMS, a "breakdown" at peak).
 describe("dispatchEvent — Phase 56 music-confirmation guard", () => {
+  // Legit mid-energy frame: above the peak floor (0.045) and well above
+  // LOW_RMS (0.040), but below PEAK_RMS (0.110). This is the value WR-01
+  // showed the OLD strict guard wrongly suppressed for peak + breakdown.
   const QUIET_SNAP = {
     bpm: 120,
     bpm_confidence: 0.4, // low so a confirmed drop would switch_now (not schedule)
     downbeat_phase: 0.5,
     mood: "hype-man",
-    music: 0.05, // < PEAK_RMS (0.110) AND >= LOW_RMS (0.040)
+    music: 0.05, // < PEAK_RMS (0.110), >= PEAK_FLOOR_RMS (0.045) AND >= LOW_RMS
     voice: 0,
+  };
+  // Near-silence frame: below the peak floor — the genuine peak/drop
+  // contradiction (high-energy phase but the audio is quiet).
+  const SILENT_SNAP = {
+    ...QUIET_SNAP,
+    music: 0.01, // < PEAK_FLOOR_RMS (0.045) AND < LOW_RMS (0.040): near-silent
   };
   const LOUD_SNAP = {
     bpm: 120,
@@ -239,9 +257,16 @@ describe("dispatchEvent — Phase 56 music-confirmation guard", () => {
     subtype: "PHASE",
     payload: { from: "drop", to: "breakdown" },
   };
+  const peakMsg = {
+    type: "event",
+    subtype: "PHASE",
+    payload: { from: "drop", to: "peak" },
+  };
 
   it("Test 11: phase=drop + music < PEAK_RMS → null (held, anti-slop)", () => {
     const m = initialMachineState(T0);
+    // 0.05 < PEAK_RMS (0.110): a drop must be loud, so this is a genuine
+    // contradiction (drop-on-quiet, RESEARCH Pitfall 6) → hold prior mode.
     const result = dispatchEvent(m, dropMsg, T0 + 10, QUIET_SNAP);
     expect(result).toBeNull();
   });
@@ -253,15 +278,29 @@ describe("dispatchEvent — Phase 56 music-confirmation guard", () => {
     expect(result!.plan.target).toBe("dance_hard");
   });
 
-  it("Test 13: phase=breakdown + music >= LOW_RMS → null (held, anti-slop)", () => {
+  it("Test 13: phase=breakdown at mid-energy (>= LOW_RMS, < PEAK_RMS) → idle_breathe (legit, WR-01)", () => {
     const m = initialMachineState(T0);
-    // QUIET_SNAP.music = 0.05 >= LOW_RMS (0.040): a "loud" breakdown is
-    // contradictory → hold previous mode.
+    // WR-01: Python classifies breakdown RELATIVELY (last < 0.5*earlier_max),
+    // so a real breakdown off a loud section settles WELL ABOVE LOW_RMS
+    // (e.g. 0.05). The old strict guard (music < LOW_RMS) wrongly held the
+    // prior mode here, making the breakdown/chill mode unreachable. The
+    // corrected guard rejects only the opposite extreme (>= PEAK_RMS), so a
+    // mid-energy breakdown legitimately enters idle_breathe.
     const result = dispatchEvent(m, breakdownMsg, T0 + 10, QUIET_SNAP);
+    expect(result).not.toBeNull();
+    expect(result!.plan.target).toBe("idle_breathe");
+  });
+
+  it("Test 13b: phase=breakdown + music >= PEAK_RMS → null (held, anti-slop — breakdown can't be at peak loudness)", () => {
+    const m = initialMachineState(T0);
+    // The ONLY genuine breakdown contradiction: a "breakdown" at full peak
+    // loudness. Reject it (hold prior mode) — this is the anti-slop floor
+    // that survives the WR-01 loosening.
+    const result = dispatchEvent(m, breakdownMsg, T0 + 10, LOUD_SNAP);
     expect(result).toBeNull();
   });
 
-  it("Test 14: phase=breakdown + music < LOW_RMS → idle_breathe (confirmed)", () => {
+  it("Test 14: phase=breakdown + music < LOW_RMS → idle_breathe (confirmed quiet breakdown)", () => {
     const m = initialMachineState(T0);
     const calmSnap = { ...QUIET_SNAP, music: 0.02 }; // < LOW_RMS (0.040)
     const result = dispatchEvent(m, breakdownMsg, T0 + 10, calmSnap);
@@ -269,14 +308,21 @@ describe("dispatchEvent — Phase 56 music-confirmation guard", () => {
     expect(result!.plan.target).toBe("idle_breathe");
   });
 
-  it("Test 15: phase=peak + music < PEAK_RMS → null (same family as drop)", () => {
+  it("Test 15: phase=peak at 0.045–0.110 → dance_hard (legit, WR-01 — Python peak floor is 0.045)", () => {
     const m = initialMachineState(T0);
-    const peakMsg = {
-      type: "event",
-      subtype: "PHASE",
-      payload: { from: "drop", to: "peak" },
-    };
+    // WR-01: Python admits peaks down to 0.045 (`all(v >= 0.045)`). The old
+    // guard re-imposed PEAK_RMS (0.110) on peak, dropping legit peaks in
+    // 0.045–0.110. QUIET_SNAP.music = 0.05 is a real peak → dance_hard.
     const result = dispatchEvent(m, peakMsg, T0 + 10, QUIET_SNAP);
+    expect(result).not.toBeNull();
+    expect(result!.plan.target).toBe("dance_hard");
+  });
+
+  it("Test 15b: phase=peak + music < PEAK_FLOOR_RMS (near-silent) → null (held, anti-slop)", () => {
+    const m = initialMachineState(T0);
+    // Genuine peak contradiction: a "peak" on near-silence (below Python's
+    // 0.045 floor) → hold prior mode.
+    const result = dispatchEvent(m, peakMsg, T0 + 10, SILENT_SNAP);
     expect(result).toBeNull();
   });
 

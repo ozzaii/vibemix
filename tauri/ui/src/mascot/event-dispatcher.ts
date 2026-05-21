@@ -53,15 +53,36 @@ const REACT_CLIP_MS = 800;
 /** Puff-particle effect lifetime (ms) per CONTEXT.md Area 4. */
 const PUFF_LIFETIME_MS = 500;
 
-// Phase 56 / LIVE-05a — music-confirmation thresholds. These MIRROR the
-// Python source-of-truth in src/vibemix/audio/constants.py (SILENT_RMS=0.012,
-// LOW_RMS=0.040, PEAK_RMS=0.110) so the mascot's mode boundaries agree with
-// state.phase. Never invent new thresholds — keep these in lock-step with
-// the Python side. Only the two the guard uses are declared here.
-/** Loud-section floor: a confirmed drop/peak requires music ≥ this. */
+// Phase 56 / LIVE-05a — music-confirmation thresholds, mirrored VERBATIM from
+// the Python source-of-truth in src/vibemix/audio/constants.py
+// (SILENT_RMS=0.012, LOW_RMS=0.040, PEAK_RMS=0.110). Keep these in lock-step
+// with the Python side; never invent new values here.
+//
+// IMPORTANT (WR-01, Phase 56 review): the guard below is a defence-in-depth
+// SANITY FLOOR, NOT a re-derivation of `state.phase`. `state.phase` already
+// encodes the full breakdown/peak/drop logic upstream (src/vibemix/state/phase.py
+// `_classify_phase_v4`). The guard's only job is to reject the GENUINE
+// contradiction (a phase value that the audio level can't possibly support —
+// chiefly the drop-during-silence misclassification, RESEARCH Pitfall 6). It
+// must NOT impose boundaries STRICTER than the classifier, or it silently
+// suppresses legitimate, correctly-classified modes (the LIVE-05a "≥6 distinct
+// modes, each reachable" headline). See PEAK_FLOOR_RMS below for why `peak`
+// uses 0.045, not PEAK_RMS.
+/** Loud-section floor: a confirmed drop requires music ≥ this. Mirrors
+ *  `last >= PEAK_RMS` in phase.py `_classify_phase_v4` (drop branch).
+ *  Also used as the breakdown contradiction ceiling — reject a "breakdown"
+ *  at full peak loudness (a breakdown can sit anywhere BELOW peak, but never
+ *  AT peak; see the breakdown case below). */
 const PEAK_RMS = 0.11;
-/** Low-energy ceiling: a confirmed breakdown requires music < this. */
-const LOW_RMS = 0.04;
+/**
+ * Python `peak` floor: phase.py `_classify_phase_v4` admits a `peak` when
+ * `all(v >= 0.045 for v in recent)` — i.e. peaks legitimately live anywhere
+ * from 0.045 upward, NOT only at PEAK_RMS (0.110). Re-imposing PEAK_RMS on
+ * `peak` over-suppresses real peaks in the 0.045–0.110 band. Mirror Python's
+ * actual floor so the guard never fights the classifier. (src/vibemix/state/
+ * phase.py: `if all(v >= 0.045 for v in recent): return "peak"`.)
+ */
+const PEAK_FLOOR_RMS = 0.045;
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -127,16 +148,31 @@ function strField(payload: unknown, key: string): string | null {
  * Pick the right idle/dance state for a given musical phase. CONTEXT
  * Area 3 mapping + Phase 56 / LIVE-05a music-confirmation guard.
  *
- * Defence-in-depth (anti-slop): `phase` is trusted, but the loud/quiet
- * modes (`drop`/`peak`/`breakdown`) require the `music` level to AGREE
- * with the classification. A `phase=="drop"` during a quiet section is a
- * misclassification — pumping the peak animation off it is pure AI-slop
- * (RESEARCH Pitfall 6). When the level contradicts the phase we return
- * `null`, which the PHASE case treats as "no signal" → the current mode
- * persists. This is the SAME conjunction shape as the state-machine.ts
- * beat-lock guard ("all conditions hold or fall through") and the SAME
- * "contradiction → return null, never throw, never default to a
- * decorative mode" discipline as the dispatcher's `default` arm.
+ * Defence-in-depth (anti-slop): `phase` is the trusted classifier output;
+ * the guard is a SANITY FLOOR that rejects only the GENUINE contradictions —
+ * a `phase` value the audio level cannot possibly support. It does NOT
+ * re-derive the classifier, and it must NOT be stricter than Python's
+ * `_classify_phase_v4` (src/vibemix/state/phase.py), or it suppresses
+ * legitimate modes (WR-01).
+ *
+ * Per-mode rationale (each mirrors phase.py semantics):
+ *   - `drop`: a real drop is loud — phase.py needs `last >= PEAK_RMS`. The
+ *     slop case is `phase=="drop"` on near-silence (Pitfall 6). Keep the
+ *     hard PEAK_RMS floor.
+ *   - `peak`: phase.py admits peaks down to 0.045 (`all(v >= 0.045 …)`), NOT
+ *     PEAK_RMS. Confirm only "not silent" via PEAK_FLOOR_RMS (0.045); using
+ *     PEAK_RMS here drops legit peaks in 0.045–0.110.
+ *   - `breakdown`: phase.py classifies breakdown RELATIVELY (`last < 0.5 *
+ *     earlier_max`), so a breakdown off a loud section sits FAR above
+ *     LOW_RMS (e.g. 0.05–0.14). The TS rig has no energy history, so we do
+ *     NOT re-derive it from an absolute level. The only genuine
+ *     contradiction is the OPPOSITE extreme — a "breakdown" at full peak
+ *     loudness — so reject only `music >= PEAK_RMS`.
+ *
+ * When the level contradicts the phase we return `null`, which the PHASE
+ * case treats as "no signal" → the current mode persists (never drops to a
+ * decorative mode). Same "contradiction → return null, never throw" discipline
+ * as the dispatcher's `default` arm.
  *
  * @param phase the bus `state.phase` value
  * @param music the smoothed master-bus level (0..1) confirming the phase
@@ -144,12 +180,18 @@ function strField(payload: unknown, key: string): string | null {
 function stateForPhase(phase: string, music: number): MascotState | null {
   switch (phase) {
     case "drop":
-    case "peak":
-      // Loud-section modes: only fire when the level confirms a real drop.
+      // Drop is the slop-prone case: a real drop is loud. Keep the hard
+      // floor — mirrors phase.py drop branch (`last >= PEAK_RMS`).
       return music >= PEAK_RMS ? "dance_hard" : null;
+    case "peak":
+      // Python peak floor is 0.045 (NOT PEAK_RMS) — confirm "not silent"
+      // only, so legit peaks in 0.045–0.110 are not over-suppressed.
+      return music >= PEAK_FLOOR_RMS ? "dance_hard" : null;
     case "breakdown":
-      // Low-energy mode: only fire when the energy is actually low.
-      return music < LOW_RMS ? "idle_breathe" : null;
+      // Python breakdown = "fell to < half recent max", which can sit well
+      // above LOW_RMS. With no energy history here, gate on "not at full
+      // peak" (reject only the absurd loud breakdown), never on `< LOW_RMS`.
+      return music < PEAK_RMS ? "idle_breathe" : null;
     case "groove":
       return "idle_bop_to_beat_energetic";
     case "build":
