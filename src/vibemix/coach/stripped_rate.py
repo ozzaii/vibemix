@@ -72,16 +72,30 @@ class StrippedRateTracker:
         # lock — the single-threaded coach-loop contract holds for these too.
         self._cum_stripped: int = 0
         self._cum_total: int = 0
+        # Plan 55-03 — most-recent unverified-response holder. Fed by the
+        # optional record(..., unverified_text=...) kwarg on a strip OR a
+        # bypass (both surface text the user did / did-not hear). None until
+        # the first unverified emission; a clean record(False) never sets it.
+        self._last_unverified: str | None = None
 
     # ------------------------------------------------------------------
     # Mutation
     # ------------------------------------------------------------------
 
-    def record(self, stripped: bool) -> None:
+    def record(self, stripped: bool, *, unverified_text: str | None = None) -> None:
         """Append one decision to the rolling window + evict stale entries.
 
         Also re-arms the one-shot bypass when the post-eviction rate falls
         back to ``<= threshold`` — this is the recovery path.
+
+        Args:
+            stripped: ``True`` when the linter stripped this turn (drives both
+                the 15s rolling ``rate()`` and the cumulative ``slop_ratio()``).
+            unverified_text: optional raw text the user did/did-not hear on a
+                strip OR a bypass. When non-None it overwrites the
+                ``last_unverified()`` holder (most-recent semantics). The
+                default None keeps every existing ``record(bool)`` call site
+                byte-identical (Plan 55-03).
         """
         now = self._time_fn()
         self._entries.append((now, stripped))
@@ -96,6 +110,11 @@ class StrippedRateTracker:
         self._cum_total += 1
         if stripped:
             self._cum_stripped += 1
+
+        # Plan 55-03 — surface the unverified text when provided (strip OR
+        # bypass). None default leaves the holder untouched on a clean emit.
+        if unverified_text is not None:
+            self._last_unverified = unverified_text
 
         # Recovery: re-arm the one-shot if the rate has fallen back below
         # threshold. Without this branch the bypass would fire only once
@@ -132,6 +151,16 @@ class StrippedRateTracker:
         ``_cum_total == 0`` guard short-circuits the divide.
         """
         return self._cum_stripped / self._cum_total if self._cum_total else 0.0
+
+    def last_unverified(self) -> str | None:
+        """Return the most-recent unverified-response text (Plan 55-03).
+
+        ``None`` until the first ``record(..., unverified_text=...)`` on a
+        strip or bypass; thereafter the latest such text. A clean
+        ``record(False)`` (no kwarg) never sets or clears it — this is the
+        source for ``SessionCitationPayload.last_unverified_response``.
+        """
+        return self._last_unverified
 
     def should_bypass(self) -> bool:
         """One-shot bypass decision.
