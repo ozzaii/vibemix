@@ -18,7 +18,7 @@
 import { describe, expect, it } from "vitest";
 
 import { initialPillState } from "./state-machine.js";
-import { reduceFrame, toPillFrame } from "./index.js";
+import { reduceFrame, readDeckState, toPillFrame } from "./index.js";
 
 const T0 = 2_000_000;
 
@@ -92,6 +92,34 @@ describe("reduceFrame — frame→state map (READER)", () => {
   it("carries flat voice even when cohost_status is absent on the flat frame", () => {
     const s = reduceFrame(initialPillState(T0), { voice: 0.33 }, T0 + 1);
     expect(s.voiceRms).toBe(0.33);
+  });
+});
+
+describe("readDeckState — latest-frame deck context (WR-03)", () => {
+  it("returns the deck_state map verbatim when the frame carries one", () => {
+    const ds = readDeckState({
+      deck_state: { A: { title: "x", camelot: "8A", key: "C", bpm: 128, confidence: 0.9 } },
+    });
+    expect(ds).not.toBeNull();
+    expect(ds!.A?.camelot).toBe("8A");
+  });
+
+  it("WR-03: an EMPTY deck_state {} is returned as {} (clears the chips on a deck unload)", () => {
+    // A deck unload empties deck_state. readDeckState must return the empty map
+    // (NOT null) so the caller replaces view.deckState with {} → the resolved
+    // chip falls back to `decks · unknown` (no stale resolved key lingers).
+    const ds = readDeckState({ deck_state: {} });
+    expect(ds).not.toBeNull();
+    expect(ds).toEqual({});
+  });
+
+  it("WR-03: a frame that OMITS deck_state returns null (caller keeps last — no thrash)", () => {
+    // A bridged ipc.session.snapshot omits deck_state entirely; that frame says
+    // nothing about decks, so the caller holds the last flat-frame map rather
+    // than wiping it on every interleaved snapshot.
+    expect(readDeckState({ type: "snapshot", meters: {} })).toBeNull();
+    expect(readDeckState({})).toBeNull();
+    expect(readDeckState(null)).toBeNull();
   });
 });
 

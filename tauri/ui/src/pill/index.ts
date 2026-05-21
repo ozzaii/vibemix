@@ -107,9 +107,16 @@ function isCohostStatus(v: unknown): v is CohostStatus {
 /**
  * Read the 62-03 `deck_state` wire field off a raw frame, defensively
  * (`msg.deck_state ?? {}` per the wire contract — DECK-04 / `_serialize_deck_state`).
- * Returns `null` when the frame carries no `deck_state` key at all, so the caller
- * holds the LAST seen deck_state (read-only meta — it does NOT drive a pill state
- * transition, so it lives on the view ref, not the state-machine PillState).
+ *
+ * WR-03 — latest-frame, replace-not-merge. The return distinguishes two cases:
+ *   - frame OMITS `deck_state` (a bridged ipc.session.snapshot says nothing
+ *     about decks) → `null` → the caller HOLDS the last flat-frame map (so an
+ *     interleaved snapshot never thrashes the chips).
+ *   - frame CARRIES `deck_state` (the authoritative flat 30Hz frame, which the
+ *     producer ALWAYS emits) → the map verbatim, INCLUDING `{}` on a deck
+ *     unload → the caller REPLACES `view.deckState` with it, so an emptied
+ *     deck_state CLEARS the chips back to `decks · unknown` and a stale resolved
+ *     key never lingers after a track unload.
  *
  * The deck_state is the per-deck `{title, camelot, key, bpm, confidence}` map
  * keyed by deck side; `camelot`/`key` are JSON null when unresolved (honest-null,
@@ -296,10 +303,12 @@ function boot(): void {
     bus.addMessageListener((msg) => {
       state = reduceFrame(state, msg, performance.now());
       // deck_state is read-only meta riding the SAME flat 30Hz frame as
-      // voice/cohost_status (62-03 _serialize_deck_state). Hold the LAST seen
-      // map on the view ref; only overwrite when a frame actually carries one
-      // (readDeckState returns null otherwise) so we keep deck context across
-      // frames that omit it.
+      // voice/cohost_status (62-03 _serialize_deck_state). WR-03: REPLACE (not
+      // merge) view.deckState with the latest carried map — including an empty
+      // {} on a deck unload, which CLEARS the chips back to `decks · unknown`
+      // (no stale resolved key lingers). A frame that OMITS deck_state returns
+      // null and we hold the last map (a bridged snapshot says nothing about
+      // decks, so it must not wipe them).
       const ds = readDeckState(msg);
       if (ds !== null) view.deckState = ds;
     });
