@@ -556,6 +556,75 @@
         { "after_t": 4100, "state": "idle_breathe" },
         { "after_t": 5000, "state": "talk_loop" }
       ]
+    },
+    {
+      "name": "speaking_overrides_music",
+      "criterion": 5,
+      "description": "Phase 56 / LIVE-05a — speaking overrides EVERY music mode. Seed dance_hard with a REAL loud drop (music>=PEAK_RMS), then AI_GENERATING_REPLY enters talk_loop. A music PHASE->groove DURING talk is DENIED by the existing block rule (talk priority 80 > idle 20 -> blocked_by_talk), so talk_loop is HELD — the spurious music event cannot interrupt the AI talking. After AI_REPLY_DONE the mascot returns to a music-context state (react_yes -> afterReactYesState). The HELD assertion is POSITIVE, mirroring talk_blocks_dance: expectedTransitions asserts talk_loop persists (the latest transition before AND after the denied groove is talk_loop) — there is NO groove/idle entry during the talk window. The explicit held-mode it(...) assertion proves the denied groove records no new transition. Canonical subtypes (AI_GENERATING_REPLY, PHASE, AI_REPLY_DONE) + canonical states keep the Python taxonomy pin green.",
+      "messages": [
+        {
+          "t": 0,
+          "msg": {
+            "type": "snapshot",
+            "phase": "drop",
+            "bpm": 120,
+            "bpm_confidence": 0.4,
+            "downbeat_phase": 0.5,
+            "mood": "hype-man",
+            "music": { "rms": 0.3, "peak": 0.5 },
+            "voice": { "rms": 0, "peak": 0 },
+            "mic": { "rms": 0, "peak": 0 },
+            "audible": true,
+            "deck": "A"
+          }
+        },
+        {
+          "t": 100,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "build", "to": "drop" }
+          }
+        },
+        {
+          "t": 200,
+          "msg": {
+            "type": "event",
+            "subtype": "AI_GENERATING_REPLY",
+            "payload": {}
+          }
+        },
+        {
+          "t": 400,
+          "msg": {
+            "type": "snapshot",
+            "phase": "groove",
+            "music": { "rms": 0.15, "peak": 0.3 },
+            "voice": { "rms": 0, "peak": 0 }
+          }
+        },
+        {
+          "t": 450,
+          "msg": {
+            "type": "event",
+            "subtype": "PHASE",
+            "payload": { "from": "drop", "to": "groove" }
+          }
+        },
+        {
+          "t": 600,
+          "msg": {
+            "type": "event",
+            "subtype": "AI_REPLY_DONE",
+            "payload": {}
+          }
+        }
+      ],
+      "expectedTransitions": [
+        { "after_t": 100, "state": "dance_hard" },
+        { "after_t": 200, "state": "talk_loop" },
+        { "after_t": 600, "state": "react_yes" }
+      ]
     }
   ]
 }
