@@ -32,7 +32,7 @@ Research-resolved foundations (`.planning/research/SUMMARY.md`, 4 convergent age
 - [x] **HARMONIC-01**: Camelot-wheel key relationships are encoded as a **deterministic Python lookup table**; the LLM only narrates a clash the **code already confirmed** — it never computes key intervals itself (the anti-slop guarantee).
 - [x] **HARMONIC-02**: A real key clash fires **only on simultaneous melodic overlap** in clashing keys. A percussive/atonal + breakdown **suppression gate** runs *before* any clash note fires (no clash calls on two drum/tool tracks or during a breakdown/acapella).
 - [x] **HARMONIC-03**: The clash detector is **conservative by default** — suppresses one-step-off-Camelot pairs (adjacent = safe), low-confidence keys, and ambiguous deck-resolution; tuning accounts for the ~57–70% library key-tag accuracy band. Gated behind a **Kaan-ear veto** before it can ship.
-- [ ] **HARMONIC-04**: Transition-execution feedback gives **concrete, actionable blend notes** (e.g. EQ bass-swap, phrase alignment, where to start/end the blend) — scoped strictly to what is grounded in deck-state; no advice is emitted when the underlying signals are not available.
+- [x] **HARMONIC-04**: Transition-execution feedback gives **concrete, actionable blend notes** (e.g. EQ bass-swap, phrase alignment, where to start/end the blend) — scoped strictly to what is grounded in deck-state; no advice is emitted when the underlying signals are not available.
 
 ### Actionable-Not-Hype Coach Persona (COACH) — Phase 61
 
@@ -80,7 +80,7 @@ Research-resolved foundations (`.planning/research/SUMMARY.md`, 4 convergent age
 | HARMONIC-01 | Phase 60 | Complete |
 | HARMONIC-02 | Phase 60 | Complete (60-02 — melodic-overlap gate + percussive/breakdown/acapella suppression) |
 | HARMONIC-03 | Phase 60 | Detector-layer complete (60-02 — conservative cross-deck cite-floor + adjacent-safe + default-off flag); ship gated on Kaan-ear veto (60-03) |
-| HARMONIC-04 | Phase 60 | Pending |
+| HARMONIC-04 | Phase 60 | Complete (60-02/60-04 — retrospective groundable-only transition note, melodic-gated + 8s blend-recency bound, cited both decks) |
 | COACH-01 | Phase 61 | Pending |
 | COACH-02 | Phase 61 | Pending |
 | COACH-03 | Phase 61 | Pending |
