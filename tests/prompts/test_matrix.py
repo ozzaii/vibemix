@@ -69,14 +69,20 @@ ANCHOR_PHRASES = {
         "build-release timing",
     ],
     ("beginner", "coach"): [
+        # Phase 61 (Plan 61-02): the vague nudges ("give the build more space",
+        # "you're rushing the blend", "more space", "rushing the blend") are
+        # replaced with cited-observation + DJ-verb lines kept gentle — the
+        # deliberate, research-authorized coach-anchor update. HYPE anchors stay
+        # frozen; this list is byte-pinned against the COACH_BEGINNER cell anchor
+        # lines by test_prompt_01_each_cell_has_eight_anchor_phrases.
         "the cut felt early — try 8 bars later",
         "low boost muddied the breakdown",
-        "give the build more space",
-        "you're rushing the blend",
+        "the build felt rushed — try holding it 8 bars longer",
+        "the blend ran long and muddied the drop — tighten it next time",
+        "those two tracks were fighting a bit — try cutting one in cleaner",
         "try 8 bars later",
         "muddied the breakdown",
-        "more space",
-        "rushing the blend",
+        "tighten it next time",
     ],
     ("intermediate", "coach"): [
         "kicks stepped on each other for a half-bar",
