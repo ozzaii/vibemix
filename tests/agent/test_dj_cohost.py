@@ -1049,3 +1049,146 @@ def test_ttft_llm_node_records_first_chunk_on_first_non_empty(
 
     # Exactly one record_first_chunk call (on "hello" — the first non-empty).
     meter.record_first_chunk.assert_called_once()
+
+
+# ---------- Phase 66 review WR-04 regression — set_s_at_event threading ----------
+
+
+def test_record_said_uses_event_fired_set_seconds_when_provided(
+    mocker, tmp_path
+) -> None:
+    """Phase 66 WR-05 (regression for WR-04) — when ``_record_said`` is called
+    with ``set_s_at_event=<captured-at-event-time>``, the [M:SS] stamp baked
+    into ``_ai_text_history`` MUST reflect that captured value, NOT the live
+    ``self._state.set_seconds`` at the moment of the call.
+
+    Pins the "event-fired set_seconds threaded through _record_said" contract.
+    A future refactor that drops the kwarg threading at any of the three
+    llm_node call sites would silently re-engage the multi-second-drift bug
+    WR-04 closed (~2-3s drift across stream + lint + bus emit on a typical
+    reaction turn). This test catches that regression.
+    """
+    agent, _, _, state = _build_agent(mocker, tmp_path)
+
+    # Live state.set_seconds = 12.5s into the set (post-stream snapshot — the
+    # drifted value). The event fired at 10.0s — that is the value we MUST
+    # see in the history stamp.
+    state.set_start_at = 1000.0
+    mocker.patch(
+        "vibemix.state.music_state.time.time",
+        return_value=1012.5,
+    )
+
+    agent._record_said("clean reply text", set_s_at_event=10.0)
+
+    assert len(agent._ai_text_history) == 1
+    entry = agent._ai_text_history[0]
+    # Event fired at 10s → [0:10]. If the threading regresses and the kwarg
+    # is dropped, the fallback path reads live state.set_seconds (=12.5) →
+    # [0:12], failing this assertion.
+    assert entry.startswith("[0:10]"), (
+        f"expected event-fired stamp [0:10]; got {entry!r} — WR-04 regression: "
+        "set_s_at_event kwarg not honored by _record_said"
+    )
+    assert "clean reply text" in entry
+
+
+def test_record_said_legacy_fallback_uses_live_state_set_seconds(
+    mocker, tmp_path
+) -> None:
+    """Phase 66 WR-05 (regression for WR-04 — fallback half) — when
+    ``_record_said`` is called WITHOUT ``set_s_at_event`` (or with None), it
+    falls back to live ``self._state.set_seconds`` (the legacy pre-WR-04
+    behavior). This is the multi-second-drift footprint by design — kept
+    so legacy callers that don't yet thread the event-fired value still
+    work.
+
+    Pins the "None fallback === live state.set_seconds" contract so a
+    future refactor that changes the fallback semantics (e.g. defaults to
+    0.0 or raises) is caught here. Combined with the sibling test above,
+    this nails both halves of the _record_said(set_s_at_event=...) contract.
+    """
+    agent, _, _, state = _build_agent(mocker, tmp_path)
+
+    # state.set_seconds == 12.5 — same drifted-clock setup as the sibling
+    # test, but this time we DON'T pass set_s_at_event.
+    state.set_start_at = 1000.0
+    mocker.patch(
+        "vibemix.state.music_state.time.time",
+        return_value=1012.5,
+    )
+
+    # Legacy call shape — no set_s_at_event kwarg at all.
+    agent._record_said("legacy reply")
+    # Explicit-None call shape — same fallback path.
+    agent._record_said("explicit none reply", set_s_at_event=None)
+
+    assert len(agent._ai_text_history) == 2
+    # Both entries reflect live state.set_seconds (12.5s → [0:12]) — the
+    # documented legacy multi-second-drift behavior the fallback preserves.
+    assert agent._ai_text_history[0].startswith("[0:12]"), (
+        f"expected legacy live-state stamp [0:12]; got "
+        f"{agent._ai_text_history[0]!r}"
+    )
+    assert agent._ai_text_history[1].startswith("[0:12]"), (
+        f"expected legacy live-state stamp [0:12] for explicit-None; got "
+        f"{agent._ai_text_history[1]!r}"
+    )
+
+
+def test_llm_node_threads_event_fired_set_seconds_to_record_said(
+    mocker, tmp_path
+) -> None:
+    """Phase 66 WR-05 (regression for WR-04 — end-to-end) — drive ``llm_node``
+    with a clock that advances DURING the stream (event fires at 10.0s,
+    _record_said is reached at 12.5s after stream + lint + bus emit). The
+    [M:SS] stamp baked into ``_ai_text_history`` MUST reflect 0:10 (the
+    event-fired set_seconds), NOT 0:12 (the post-emit live set_seconds).
+
+    Locks the capture-at-top-of-llm_node + kwarg-threaded-to-three-call-sites
+    contract end-to-end. A future refactor that:
+      * drops the ``ev_set_seconds = float(getattr(ev.state, "set_seconds", 0.0) ...)``
+        capture at the top of llm_node, OR
+      * drops the ``set_s_at_event=ev_set_seconds`` kwarg at any of the
+        three ``_record_said`` call sites (legacy ai_text path, citation
+        bypass path, citation valid path)
+    would re-engage the multi-second-drift bug and fail this test.
+    """
+    agent, gen_client, _, state = _build_agent(mocker, tmp_path)
+
+    # Event fired at set_seconds=10.0; by the time _record_said runs (after
+    # stream + lint + bus emit), set_seconds has advanced to 12.5. The
+    # WR-04 fix MUST stamp 0:10, not 0:12.
+    state.set_start_at = 1000.0
+    times = iter([1010.0, 1012.5, 1012.5, 1012.5, 1012.5, 1012.5])
+
+    def _advancing_time() -> float:
+        try:
+            return next(times)
+        except StopIteration:
+            return 1012.5
+
+    mocker.patch(
+        "vibemix.state.music_state.time.time",
+        side_effect=_advancing_time,
+    )
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["clean reply"])
+    )
+
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive_llm_node(agent)
+
+    assert len(agent._ai_text_history) == 1
+    entry = agent._ai_text_history[0]
+    # 10s = 0:10. If WR-04 regresses and the kwarg threading is dropped,
+    # the fallback path reads live state.set_seconds (=12.5) → 0:12,
+    # failing this assertion.
+    assert entry.startswith("[0:10]"), (
+        f"expected event-fired stamp [0:10]; got {entry!r} — WR-04 regression: "
+        "ev_set_seconds capture or set_s_at_event= threading dropped"
+    )
+    assert "clean reply" in entry
