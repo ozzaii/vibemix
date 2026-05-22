@@ -576,7 +576,7 @@ class DJCoHostAgent(Agent):
         except Exception:
             pass
 
-    def _record_said(self, text: str) -> None:
+    def _record_said(self, text: str, set_s_at_event: float | None = None) -> None:
         """Append a spoken line to the no-repeat memory, prefixed with the
         set-time it was said at ([M:SS]). Lets the model see WHEN it last
         spoke so it doesn't re-react to a moment it already covered or
@@ -584,8 +584,21 @@ class DJCoHostAgent(Agent):
 
         Stays a deque[str] (timestamp baked into the string) so the
         existing _ai_text_history contract + tests are untouched.
+
+        Phase 66 review WR-04 — accept an optional ``set_s_at_event``
+        captured at event-fired time (top of ``llm_node``) so the
+        [M:SS] stamp reflects WHEN the event fired rather than WHEN
+        ``_record_said`` happens to be called (which is after the
+        entire llm_node call — stream consumed, lint gate, bus emit;
+        2-3s of drift on a typical reaction turn). Falls back to live
+        ``self._state.set_seconds`` for legacy callers that don't yet
+        thread the event-fired value, so the existing _ai_text_history
+        contract + tests stay untouched.
         """
-        set_s = getattr(self._state, "set_seconds", 0.0) or 0.0
+        if set_s_at_event is not None:
+            set_s = float(set_s_at_event)
+        else:
+            set_s = getattr(self._state, "set_seconds", 0.0) or 0.0
         stamp = f"{int(set_s // 60)}:{int(set_s % 60):02d}"
         self._ai_text_history.append(f"[{stamp}] {text}")
 
@@ -747,6 +760,19 @@ class DJCoHostAgent(Agent):
         # while guaranteeing the clear runs on both the success and
         # exception paths.
         ev = self._pending_event
+        # Phase 66 review WR-04 — capture the event-fired set_seconds NOW,
+        # before the LLM dispatch (stream + lint + bus emit, ~2-3s on a
+        # typical reaction turn). ``_record_said`` writes a [M:SS] stamp
+        # into the no-repeat memory; reading ``self._state.set_seconds`` at
+        # write time would carry the END-of-reaction set time, not the
+        # EVENT-fired set time, drifting Gemini's "how long ago did I cover
+        # that" reasoning by the full turn latency. Threaded through the
+        # three _record_said call sites below as ``set_s_at_event=``.
+        ev_set_seconds: float | None = (
+            float(getattr(ev.state, "set_seconds", 0.0) or 0.0)
+            if ev is not None
+            else None
+        )
         recall_moments: list = []
         try:
             # Phase 65 Plan 04 (RECALL-01/02) — pull the off-loop recall
@@ -1442,7 +1468,9 @@ class DJCoHostAgent(Agent):
                             text=full_text,
                             latency_s=round(elapsed, 2),
                         )
-                        self._record_said(stripped[:140])
+                        # WR-04 — stamp from event-fired set_seconds, not the
+                        # post-stream/lint/bus set_seconds (multi-second drift).
+                        self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
                         self._push_transcript(stripped[:140])
                     else:
                         print("[ai_text] <empty> (skip TTS)", flush=True)
@@ -1484,7 +1512,8 @@ class DJCoHostAgent(Agent):
                         # History appended on bypass — the user heard the
                         # text, so the no-repeat memory must reflect it.
                         if stripped:
-                            self._record_said(stripped[:140])
+                            # WR-04 — stamp from event-fired set_seconds.
+                            self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
                             self._push_transcript(stripped[:140])
                     else:
                         # Strip path — no chunks yielded. Pre-recorded
@@ -1536,7 +1565,8 @@ class DJCoHostAgent(Agent):
                     self._recorder.log_event(
                         "ai_text", text=full_text, latency_s=round(elapsed, 2)
                     )
-                    self._record_said(stripped[:140])
+                    # WR-04 — stamp from event-fired set_seconds.
+                    self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
                     self._push_transcript(stripped[:140])
                 else:
                     print("[ai_text] <empty> (skip TTS)", flush=True)
