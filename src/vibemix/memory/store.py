@@ -35,6 +35,7 @@ Hard invariants (objective + 63-PATTERNS.md):
 from __future__ import annotations
 
 import logging
+import re
 import sqlite3
 import sys
 from dataclasses import dataclass
@@ -71,6 +72,66 @@ def _memory_db_path() -> Path:
     # Durable user data — same base as recordings/. NOT ~/.cache (the library
     # default is the anti-pattern we override; see 63-PATTERNS.md drift note).
     return app_data_dir() / "memory.db"
+
+
+# The recordings-session-dir canonical shape (YYYYMMDD-HHMMSS) — the same gate
+# used by ``runtime/recordings_index.py::SESSION_DIR_RE``. Reused verbatim so a
+# recordings-session id (the common caller) is validated against the identical
+# shape on both the recordings filesystem path AND here. Mirror, do not import
+# (importing recordings_index would risk pulling the live-path surface).
+SESSION_DIR_RE: re.Pattern[str] = re.compile(r"^\d{8}-\d{6}$")
+
+
+def _validate_session_id(session_id: str, db_path: Path) -> None:
+    """Reject a crafted ``session_id`` BEFORE it touches the filesystem.
+
+    Two-layer path-traversal defense (mirrors
+    ``recordings_index.py:388-401``):
+
+      1. **Shape floor (generic).** Reject any ``session_id`` that is not a
+         plain str, or that contains a path separator (``/`` or ``\\``), a
+         ``..`` parent-dir token, a NUL byte, or a leading absolute/drive
+         marker. This is the floor: it makes a NON-recordings session_id (one
+         that isn't the ``SESSION_DIR_RE`` shape) still safe, because the memory
+         store does not require recordings ids — but ANY id that reaches the
+         filesystem (a sibling-DB filename, an ``app_data_dir`` subpath) must be
+         a single safe path component.
+
+      2. **Containment check (defense in depth).** Resolve the id as a child of
+         the store's parent dir and assert it stays inside that root via
+         ``Path.resolve().is_relative_to(root.resolve())`` (symlink-escape-proof
+         — ``resolve()`` follows symlinks before the comparison). Refuse the
+         root itself.
+
+    Raises ``ValueError`` on rejection — callers (``add_record`` /
+    ``delete_session``) propagate it; the FS is never touched on a bad id.
+    """
+    if not isinstance(session_id, str) or not session_id:
+        raise ValueError(f"invalid session_id (not a non-empty str): {session_id!r}")
+    if (
+        "/" in session_id
+        or "\\" in session_id
+        or ".." in session_id
+        or "\x00" in session_id
+        or session_id in (".", "")
+    ):
+        raise ValueError(
+            f"session_id rejected (path-traversal shape): {session_id!r}"
+        )
+    # Defense in depth: it must resolve to a direct child of the store root and
+    # never escape it. (The shape floor above already excludes separators/``..``
+    # /absolute markers; this catches anything the floor missed, e.g. a
+    # platform-specific drive token, and refuses the root itself.)
+    root = db_path.parent
+    try:
+        candidate = (root / session_id).resolve()
+        root_resolved = root.resolve()
+    except OSError as e:  # pragma: no cover - resolve rarely raises here
+        raise ValueError(f"session_id failed to resolve: {session_id!r}") from e
+    if not candidate.is_relative_to(root_resolved) or candidate == root_resolved:
+        raise ValueError(
+            f"session_id escapes the store root: {session_id!r}"
+        )
 
 
 class _Backend(Protocol):  # pragma: no cover - protocol
@@ -234,7 +295,12 @@ class MemoryStore:
 
         The float32 + (768,) dimension-drift guard lives in the backend's
         add_batch assert (and cosine_topk re-asserts at query time).
+
+        Path-traversal gate (T-63-07): ``session_id`` is validated BEFORE any
+        write — a crafted id (``../``, absolute, separator, NUL) raises
+        ``ValueError`` and nothing is persisted.
         """
+        _validate_session_id(session_id, self._db_path)
         self._backend.add_batch([(record_id, embedding)])
         self._moments.execute(
             "INSERT OR REPLACE INTO moments "
@@ -277,13 +343,23 @@ class MemoryStore:
     def delete_session(self, session_id: str) -> int:
         """Remove every record of ``session_id`` from vectors + metadata.
 
-        Minimal correct cascade: look up the session's record_ids in moments,
-        delete them from the vector backend, delete the moments rows, single
-        commit. Idempotent — deleting an already-gone session returns 0.
+        Path-traversal-defended (T-63-07): a crafted ``session_id`` is rejected
+        by ``_validate_session_id`` BEFORE any lookup or delete — it never
+        touches the filesystem.
 
-        Plan 03 (Wave 2) extends this with the path-traversal guard, the
-        retention sweep, and orphan reconciliation.
+        Atomic cascade (T-63-08, 63-RESEARCH.md §Pattern 4): look up the
+        session's record_ids in ``moments``, ``DELETE FROM moments`` rows, then
+        ``backend.delete(record_ids)`` — and on the sqlite-vec path both deletes
+        live on the SAME connection (``self._moments is backend.db``) so the
+        backend's commit closes ONE transaction covering both. On the numpy
+        fallback (separate ``.npy`` + ``memory_moments.db`` files) a true shared
+        transaction is impossible; the order (moments-row delete first, then
+        vector delete) leaves at worst a reconcilable orphan vector — never a
+        metadata row pointing at a missing vector — which ``reconcile_orphans``
+        sweeps up (Pitfall 3). Idempotent: deleting an already-gone session
+        returns 0 without a write.
         """
+        _validate_session_id(session_id, self._db_path)
         rows = self._moments.execute(
             "SELECT record_id FROM moments WHERE session_id = ?",
             (session_id,),
@@ -291,12 +367,85 @@ class MemoryStore:
         record_ids = [r[0] for r in rows]
         if not record_ids:
             return 0
-        self._backend.delete(record_ids)
+        # Delete the moments rows on the moments connection WITHOUT committing
+        # yet, so that on the sqlite-vec path (shared connection) the backend's
+        # delete-commit below closes a single transaction over both deletes.
         self._moments.execute(
             "DELETE FROM moments WHERE session_id = ?", (session_id,)
         )
-        self._moments.commit()
+        if self._owns_moments:
+            # numpy path: separate files — commit the metadata delete here; the
+            # vector delete (a different file) commits independently below. The
+            # vector-after-metadata ordering keeps any crash window reconcilable.
+            self._moments.commit()
+        # backend.delete commits its connection. On the sqlite-vec path that IS
+        # self._moments, so this single commit also flushes the moments delete
+        # staged above — one atomic transaction, no orphaned vectors.
+        self._backend.delete(record_ids)
         return len(record_ids)
+
+    def reconcile_orphans(self) -> int:
+        """Drop vec records that have no matching ``moments`` row.
+
+        The defensive backstop for the numpy-path vector-first write ordering
+        (63-RESEARCH.md Pitfall 3) and any partially-applied cascade: a vector
+        whose ``moments`` row is gone is a dangling, un-joinable record that
+        ``query_topk`` would surface with an empty signature. Intended to run at
+        boot.
+
+        Loads all vec record_ids via ``backend.load_all()``, finds those with no
+        ``moments`` row, and ``backend.delete(...)`` them in one transaction.
+        Best-effort and transactional: it never raises on a single bad entry —
+        a reconciliation pass must never block boot. Returns the count dropped.
+
+        Direction is one-way by design: a ``moments`` row whose vector is
+        missing is NOT touched here (that direction should not occur given the
+        vector-first ``add_record`` ordering, and dropping live metadata would
+        be the more destructive error). Imports nothing from the recordings
+        index or the live reaction path.
+        """
+        try:
+            ids, _vectors = self._backend.load_all()
+        except Exception as e:  # pragma: no cover - load failure is non-fatal
+            logger.warning("reconcile_orphans: backend load_all failed: %s", e)
+            return 0
+        if not ids:
+            return 0
+        live = self._sessions_for(ids)  # record_id -> session_id for ids WITH a row
+        orphans = [rid for rid in ids if rid not in live]
+        if not orphans:
+            return 0
+        try:
+            self._backend.delete(orphans)
+        except Exception as e:  # pragma: no cover - best-effort
+            logger.warning(
+                "reconcile_orphans: dropping %d orphan vectors failed: %s",
+                len(orphans),
+                e,
+            )
+            return 0
+        logger.info("reconcile_orphans: dropped %d orphan vectors", len(orphans))
+        return len(orphans)
+
+    def run_retention_sweep(
+        self,
+        *,
+        max_moments: int | None = None,
+        max_age_days: int | None = None,
+    ):
+        """Evict whole sessions oldest-first under a count/age budget.
+
+        Thin instance-method seam over ``vibemix.memory.retention``'s
+        ``run_memory_retention_sweep`` — the eviction logic lives there (the
+        recordings-sweep analog), this is the ergonomic call site
+        (``store.run_retention_sweep(...)``). Imported lazily to keep
+        ``retention`` off the ``import vibemix.memory.store`` hot path.
+        """
+        from vibemix.memory.retention import run_memory_retention_sweep
+
+        return run_memory_retention_sweep(
+            self, max_moments=max_moments, max_age_days=max_age_days
+        )
 
     def close(self) -> None:
         if self._owns_moments:
