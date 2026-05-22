@@ -70,7 +70,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
   3. Re-ingesting an already-ingested session is idempotent and costs 0 API calls (signature-keyed content-hash embed cache + a `memory_ingested` marker reconciled against `moments` existence), and every record is `session_id`/timestamp-tagged so it can later be excluded from its own session's retrieval and cascade-deleted.
   4. The embedded moment taxonomy ("which artifacts ground best") is RESOLVED in-phase against the acid test (64-RESEARCH §Taxonomy Decision) to exactly ONE v1 kind — **`coach_line`** (an emitted `ai_text` reaction + its preceding-event context + inline citation tokens): the only artifact that closes a hallucination class AND unlocks a Phase-66 copilot move. `moment` (a bare structural event, re-derivable live) is **CUT**; `audio_moment` (multimodal) is **DEFERRED** to a future milestone. Silenced `citation_strip` lines are NOT ingested (embedding a never-heard line is confabulation).
 **Plans**: 3 plans (3 waves)
-- [ ] 64-01-PLAN.md — Wave 0: RED-first tests/memory/test_ingest.py contract (signature determinism, coach_line emission + citation_strip skip, idempotent re-ingest, tagging, embed-cache hit, sweep path-defense) + synthetic events.jsonl fixture + the ingest no-live-path subprocess dormancy assertion
+- [x] 64-01-PLAN.md — Wave 0: RED-first tests/memory/test_ingest.py contract (signature determinism, coach_line emission + citation_strip skip, idempotent re-ingest, tagging, embed-cache hit, sweep path-defense) + synthetic events.jsonl fixture + the ingest no-live-path subprocess dormancy assertion
 - [ ] 64-02-PLAN.md — Wave 1: src/vibemix/memory/ingest.py — build_coach_line_signature + _read_events mirror + signature-keyed embed cache + memory_ingested marker + ingest_session + run_ingest_sweep (path-traversal-defended) — flips the contract GREEN (INGEST-01/02/03)
 - [ ] 64-03-PLAN.md — Wave 2: runtime wiring — session-close (on_session_close) + boot (run_boot_sweeps) ingest enqueue via run_in_executor, one-way runtime→ingest, best-effort/never-raise (INGEST-02)
 **Research flag (RESOLVED)**: the "which artifacts ground best" taxonomy question is closed by 64-RESEARCH §Taxonomy Decision — ONE kind (`coach_line`), text-signature only, no audio, no LLM-extraction. Re-expansion to `moment`/`audio_moment` is gated on Phase-65 retrieval proving `coach_line` insufficient against Kaan's real corpus, never by default.
@@ -104,7 +104,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 63. Memory Store | v6.0 | 3/3 | Complete    | 2026-05-22 |
-| 64. Session Ingest | v6.0 | 0/3 | Planned | - |
+| 64. Session Ingest | v6.0 | 1/3 | In Progress|  |
 | 65. Memory Retrieval Seam | v6.0 | 0/? | Not started | - |
 | 66. Visible Copilot Move | v6.0 | 0/? | Not started | - |
 

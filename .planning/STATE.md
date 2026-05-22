@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
-status: ready_to_plan
-last_updated: 2026-05-22T07:37:29.618Z
+status: executing
+last_updated: "2026-05-22T08:53:57.435Z"
 last_activity: 2026-05-22
 progress:
   total_phases: 12
   completed_phases: 9
-  total_plans: 29
-  completed_plans: 45
+  total_plans: 32
+  completed_plans: 30
   percent: 75
-stopped_at: Phase 63 complete (3/3) — ready to discuss Phase 64
 ---
 
 # vibemix — State
@@ -36,7 +35,7 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
 - **v6.0 thesis:** reactive co-host → forward-leaning **copilot**. Mechanism = memory: every session feeds an embedding store; coach prompts ground in *past* sessions. Personalization is **emergent from the retrieval seam**, NOT a settings screen and NOT an LLM-extraction layer. Acid test for any embedded artifact: *"does retrieving this close a hallucination class OR unlock a copilot move?"* — if neither, don't embed it.
 - **New headline hallucination class:** **retrieval poisoning** (an irrelevant past moment injected into the live prompt → AI references something that didn't happen). Mitigation is structural, not a prompt plea: ~0.7 floor (below → inject nothing), top-k 2–3 cap, event-gating, PAST-tense fence, current-session exclusion, `recall` citation source (fabricated `[recall:<id>]` strips the whole turn). **P65 RETRIEVE = anti-slop release gate.**
-- **Current focus:** Phase 64 — session ingest
+- **Current focus:** Phase 64 — session-ingest
 - **Last shipped:** v5.0 "The Useful Cut" — 2026-05-22 (tech_debt accepted).
 - **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
@@ -46,10 +45,10 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 
 ## Current Position
 
-Phase: 64
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-22
+Phase: 64 (session-ingest) — EXECUTING
+Plan: 2 of 3
+Status: 64-01 RED contract pinned (GREEN-flip is 64-02); ready to execute 64-02
+Last activity: 2026-05-22 -- P64-01 RED contract committed (dcdc307, 1cb9008)
 
 ## v6.0 Phase Map
 
@@ -85,6 +84,7 @@ Last activity: 2026-05-22
 | v3.0/v3.1/v4.0 carveouts | external clock (Apple Dev + SignPath) — unchanged by v6.0 |
 
 ---
+| Phase 64 P01 | ~14 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -129,6 +129,16 @@ v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numberi
 - **`run_retention_sweep` shipped as a MemoryStore method AND module fn.** The RED tests call `store.run_retention_sweep(max_moments=)` reading `result.deleted`; the plan asked for module-level `run_memory_retention_sweep` + `RetentionSweepResult`. Both shipped: `retention.py` holds the logic (prod defaults ~10k/180d for boot wiring); the method seam defaults caps to `None` and delegates lazily (keeps retention off the store import hot path). `RetentionSweepResult.deleted` = pruned MOMENT count.
 - **Call-site wiring deferred (by plan scope).** `recordings_index.delete → delete_session` and `boot/session-close → run_memory_retention_sweep` land in the downstream recordings-UI-delete phase — the live reaction path was NOT touched. Surfaced as KAAN-ACTION in 63-03-SUMMARY.
 - **Pre-existing baseline:** 8 full-suite failures, all OUTSIDE `tests/memory/` (none reference `vibemix.memory`) — the known `live-tuning-or-brain` WIP baseline (tests/repo README-matrix ×2, gate-42 STATE annotation, cut-release tag-regex, cut-release-preflight ×2, coach anti-slop-wiring, main-smoke-08). Not introduced by this plan; logged in SUMMARY, left untouched per SCOPE BOUNDARY.
+
+### P64-01 Execution Decisions (2026-05-22)
+
+- **Wave-0 RED-first contract for `vibemix.memory.ingest` is the deliverable, not green tests.** `tests/memory/test_ingest.py` (6 tests) pins the ingest surface BEFORE the module exists: `build_coach_line_signature(reaction_text, ctx)` (fallbacks track→`unknown`/phase→`unknown`/deck→`none`/event→`MANUAL`; citation tokens sorted+`,`-joined; leading `[emotion]` tag stripped; NO `t` in the embedded string), `ingest_session(session_dir, store, embedder) -> IngestResult` (`.records_written` + `.embeds_made`), `run_ingest_sweep(recordings_root, store, embedder)`, `SIG_TEMPLATE_VERSION == "v1-coach_line"`. Acceptance = collection `ModuleNotFoundError: No module named 'vibemix.memory.ingest'` (verified under `.venv`/Python 3.12 — system 3.14 masks it). Plans 64-02/03 flip GREEN. Commits `dcdc307`, `1cb9008`.
+- **Synthetic `events.jsonl` fixture generated in-test** (no repo fixture file) mirroring real on-disk shapes: `event` lines (`type/track/phase/deck`), two EMITTED `ai_text` lines (`[chill]` tag; one with inline `[aud:rms@96.0]`, one citation-free → legit empty `cite=`), and one `citation_strip` (silenced) line the contract asserts is SKIPPED (anti-confabulation — embedding a never-heard line is the exact slop class).
+- **`FakeEmbedder` exposes ONLY `embed_query`** with a call counter — no generation surface (no-extraction invariant by construction). `test_reingest_is_noop` pins 0 embed calls + 0 new records on a marked session via the counter + store record count; `test_embed_cache_hit` pins the byte-identical-signature cache-key precondition at the embedder boundary.
+- **No-live-path subprocess dormancy gate EXTENDED** to `import vibemix.memory.ingest` (`test_importing_ingest_loads_no_coach_loop`) — clones the store-side leak-scan block verbatim, swaps `store→ingest`. Closes the PATTERNS gap (subprocess gate previously imported only `memory.store`). RED until 64-02; the static AST gate already auto-covered `ingest.py` via the `memory/*.py` glob (not duplicated).
+- **INGEST-01/02/03 NOT marked complete** — RED-first; the impl lands in 64-02/03. Traceability stays "Contract pinned (64-01); impl pending (64-02/03)".
+- **Verify state:** `tests/memory` minus the RED ingest module = 21 passed; the only failures are the two intentional RED edges (test_ingest collection + ingest-dormancy), both pointing at the missing `vibemix.memory.ingest`. No NEW collateral failures vs the known 8-WIP baseline.
+- **Invariant carried to 64-02:** any `config_store`/`vibemix.runtime` import in `ingest.py` MUST be function-local — a module-level pull trips the dormancy gate this plan just extended.
 
 ### v6.0 KAAN-ACTION / Research Flags (carry into planning)
 
