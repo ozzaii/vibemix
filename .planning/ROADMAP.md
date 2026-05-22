@@ -38,7 +38,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 
 **Phase Numbering:** Continues from v5.0 (closed at Phase 62). v6.0 starts at **Phase 63** and runs through **Phase 66**. Integer phases (63, 64, …) = planned milestone work; decimal phases (e.g. 65.1) = urgent insertions if needed.
 
-- [ ] **Phase 63: Memory Store** - A local per-install `memory.db` (sqlite-vec) + a ~50-line `MemoryStore` wrapper, cloned from the shipped `library/` store/cosine/embed-cache primitives (zero new dependency), with Mac/Win bit-identical `cosine_topk` parity + numpy fallback, retention + delete-cascade, and embedding routed via `model_router.resolve("embedding")` on the FLEX cost lane. No live-path touch. (3 plans, 3 waves.)
+- [x] **Phase 63: Memory Store** - A local per-install `memory.db` (sqlite-vec) + a ~50-line `MemoryStore` wrapper, cloned from the shipped `library/` store/cosine/embed-cache primitives (zero new dependency), with Mac/Win bit-identical `cosine_topk` parity + numpy fallback, retention + delete-cascade, and embedding routed via `model_router.resolve("embedding")` on the FLEX cost lane. No live-path touch. (3 plans, 3 waves.) **COMPLETE 2026-05-22 — STORE-01..04 GREEN, 19/19 tests/memory/ pass.**
 - [ ] **Phase 64: Session Ingest** - An off-hot-path post-session batch job (+ boot-time sweep) that turns each session's existing artifacts (`events.jsonl` + cited evidence + `ai_text`) into deterministic TEXT "reaction moment" records — NO audio embedding, NO LLM-extraction (CI-guarded) — every record `session_id`/timestamp-tagged. Depends on 63.
 - [ ] **Phase 65: Memory Retrieval Seam (ANTI-SLOP RELEASE GATE)** - A new existence-only `recall` evidence source (zero new linter code, à la Phase 59 `key`) + a gated `recall[…]` block in `coach.py::evidence_line` (copy the Phase 59 `decks[…]` gate → cold-memory golden byte-identical), top-k 2–3 cap, ~0.7 similarity floor, PAST-tense fence, current-session excluded, cosine-vs-time-weight blend tuned in-phase on Kaan's real corpus. **Kaan-ear veto.** Depends on 63 + 64.
 - [ ] **Phase 66: Visible Copilot Move** - A linter-grounded transition-shape callback + a vocabulary/register callback — cited, warm, non-nagging — that prove retrieval is firing, with NO anti-features (no next-track rec, no LLM-extracted "tendencies", no settings-screen personalization, no continuous audio embedding). Depends on 65.
@@ -57,7 +57,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 **Plans**: 3 plans
 - [x] 63-01-PLAN.md — Wave 0: scaffold the full tests/memory/ contract suite (parity, round-trip, fallback, cascade, path-traversal, no-live-import, no-extraction, retention)
 - [x] 63-02-PLAN.md — Wave 1: SqliteVecMemoryStore (vec_memory + moments table) + MemoryStore facade + open_memory_store probe (STORE-01/02/04)
-- [ ] 63-03-PLAN.md — Wave 2: hardened delete-cascade + path-traversal gate + oldest-session-first retention sweep + orphan reconciliation (STORE-03)
+- [x] 63-03-PLAN.md — Wave 2: hardened delete-cascade + path-traversal gate + oldest-session-first retention sweep + orphan reconciliation (STORE-03)
 **Research/KAAN-ACTION flag**: sqlite-vec one-click-install fragility — the `vec0.dylib`/`vec0.dll` native binaries must be signed/notarized and a clean-VM (incl. Windows ARM64) memory round-trip proven in the e2e matrix. This rides the Apple notarization + SignPath external clock already on the critical path — surface it early so it parallelizes against the in-flight approvals. (The *binary* was already signed in shipping builds; the new artifact is only a data file with zero new signing surface, but the clean-VM round-trip is the proof item.)
 
 ### Phase 64: Session Ingest
@@ -100,7 +100,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 63. Memory Store | v6.0 | 2/3 | In Progress|  |
+| 63. Memory Store | v6.0 | 3/3 | ✅ Complete |  |
 | 64. Session Ingest | v6.0 | 0/? | Not started | - |
 | 65. Memory Retrieval Seam | v6.0 | 0/? | Not started | - |
 | 66. Visible Copilot Move | v6.0 | 0/? | Not started | - |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
 status: executing
-last_updated: "2026-05-22T06:53:40.374Z"
+last_updated: "2026-05-22T07:40:00.000Z"
 last_activity: 2026-05-22
 progress:
   total_phases: 12
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 29
-  completed_plans: 28
-  percent: 67
+  completed_plans: 29
+  percent: 75
 ---
 
 # vibemix — State
@@ -45,10 +45,10 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 
 ## Current Position
 
-Phase: 63 (memory-store) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute 63-03 (Wave 2 — session_id path-traversal guard + retention sweep + orphan reconcile). 63-02 done: storage spine GREEN (Wave-1 subset).
-Last activity: 2026-05-22 — Phase 63 Plan 02 complete: `src/vibemix/memory/` package (SqliteVecMemoryStore + MemoryStore + open_memory_store + Record), STORE-01/02/04 contract subset GREEN (10/19 tests/memory/ green; path-traversal + retention correctly RED, deferred to 63-03).
+Phase: 63 (memory-store) — ✅ COMPLETE (3/3 plans)
+Plan: 3 of 3 — done
+Status: Phase 63 complete. STORE-01..04 all GREEN; 19/19 tests/memory/ pass; no-live-path subprocess gate CLEAN. Storage spine feature-complete. **Next: `/gsd:plan-phase --research-phase 64` (Session Ingest — moment taxonomy research flag).**
+Last activity: 2026-05-22 — Phase 63 Plan 03 complete: hardened `delete_session` (path-traversal gate + atomic cascade), `reconcile_orphans` boot backstop, `run_memory_retention_sweep` (oldest-session-first whole-session eviction) in new `src/vibemix/memory/retention.py`. The 9 previously-RED tests (path-traversal ×6, retention ×3) flipped GREEN; the 10 already-green stayed green. STORE-03 complete. Commits `18a5c1f`, `eb5b5b5`.
 
 ## v6.0 Phase Map
 
@@ -73,11 +73,13 @@ Last activity: 2026-05-22 — Phase 63 Plan 02 complete: `src/vibemix/memory/` p
 | Phases complete (v4.0) | 8 / 8 engineering-green (publish on external signature clock; NOT archived) |
 | Phases complete (v5.0) | 4 / 4 engineering-green (KAAN-ACTION live-confirm items ride forward) |
 | v6.0 phase count | 4 (Phases 63–66) |
+| Phases complete (v6.0) | 1 / 4 — P63 Memory Store engineering-green (STORE-01..04, 19/19 tests/memory/) |
 | v6.0 REQ-IDs mapped | 14 / 14 ✓ (100% coverage, no orphans, no duplicates) |
 | v6.0 per-phase REQ counts | P63=4 (STORE) · P64=3 (INGEST) · P65=4 (RECALL) · P66=3 (COPILOT) |
 | v6.0 net-new dependencies | 0 (WIRING/REUSE milestone — `sqlite-vec>=0.1.9` already declared) |
 | P63-01 (Wave 0) | 2 tasks, 6 files, ~18 min — RED-first test contract (dde3c0f, 5635390) |
 | P63-02 (Wave 1) | 2 tasks, 3 files, ~32 min — storage spine GREEN; STORE-01/02/04 (610c374, d36d924) |
+| P63-03 (Wave 2) | 2 tasks, 2 files, ~18 min — hardening GREEN; STORE-03 (18a5c1f, eb5b5b5); 19/19 tests/memory/ |
 | v4.0 git tag | local artifacts on `live-tuning-or-brain`; unsigned `v0.1.0-rc1` .dmg built |
 | v3.0/v3.1/v4.0 carveouts | external clock (Apple Dev + SignPath) — unchanged by v6.0 |
 
@@ -119,6 +121,14 @@ v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numberi
 - **Path-traversal + retention correctly RED (deferred to 63-03).** 9/19 `tests/memory/` red by design: 6× `test_session_id_path_traversal` (session_id guard — regex shape + `is_relative_to`, mirroring `recordings_index`) + 3× `test_retention` (`run_retention_sweep(max_moments=)`). `delete_session` is the documented Wave-2 extension point. 4 pre-existing `tests/repo/` failures (README matrix ×2, gate-42 STATE annotation, cut-release tag-regex) confirmed failing identically at parent `b45b419` — unrelated to `memory/`, no new failures introduced.
 - **STORE-01/02/04 marked complete in REQUIREMENTS** (impl landed). STORE-03 (cascade + retention + path-traversal) stays open for 63-03.
 
+### P63-03 Execution Decisions (2026-05-22)
+
+- **Phase 63 COMPLETE — STORE-03 hardening GREEN.** `delete_session` is now path-traversal-defended (shared `_validate_session_id`: separator/`..`/NUL floor + `is_relative_to(root.resolve())` containment, refuse-root — mirroring `recordings_index.py:388-401`) and atomic (moments-row delete staged, `backend.delete()` commits both as ONE transaction on the shared sqlite-vec connection; numpy path stays reconcilable via vector-after-metadata ordering). Added `reconcile_orphans` (boot backstop, drops vec-without-moments danglers, transactional/best-effort) and new `src/vibemix/memory/retention.py::run_memory_retention_sweep` (oldest-session-first WHOLE-session eviction under count/age budget, routed through `delete_session`, ∞-no-op short-circuit, never empties the store). 19/19 `tests/memory/` GREEN (the 9 previously-RED flipped). Commits `18a5c1f`, `eb5b5b5`.
+- **Gate fires in `add_record` too (not only `delete_session`).** The RED `test_session_id_path_traversal` triggers via `add_record` — so the shared validator is called from both write paths (security correctness).
+- **`run_retention_sweep` shipped as a MemoryStore method AND module fn.** The RED tests call `store.run_retention_sweep(max_moments=)` reading `result.deleted`; the plan asked for module-level `run_memory_retention_sweep` + `RetentionSweepResult`. Both shipped: `retention.py` holds the logic (prod defaults ~10k/180d for boot wiring); the method seam defaults caps to `None` and delegates lazily (keeps retention off the store import hot path). `RetentionSweepResult.deleted` = pruned MOMENT count.
+- **Call-site wiring deferred (by plan scope).** `recordings_index.delete → delete_session` and `boot/session-close → run_memory_retention_sweep` land in the downstream recordings-UI-delete phase — the live reaction path was NOT touched. Surfaced as KAAN-ACTION in 63-03-SUMMARY.
+- **Pre-existing baseline:** 8 full-suite failures, all OUTSIDE `tests/memory/` (none reference `vibemix.memory`) — the known `live-tuning-or-brain` WIP baseline (tests/repo README-matrix ×2, gate-42 STATE annotation, cut-release tag-regex, cut-release-preflight ×2, coach anti-slop-wiring, main-smoke-08). Not introduced by this plan; logged in SUMMARY, left untouched per SCOPE BOUNDARY.
+
 ### v6.0 KAAN-ACTION / Research Flags (carry into planning)
 
 - **P63 — sqlite-vec install fragility (KAAN-ACTION, external clock):** `vec0.dylib`/`vec0.dll` native binaries must be signed/notarized + a clean-VM (incl. Windows ARM64) `memory.db` round-trip proven in the e2e matrix. Rides the Apple notarization + SignPath external clock already on the critical path — surfaced EARLY so it parallelizes against the in-flight v4.0 approvals. (The binary was already signed in shipping builds; the new artifact is only a data file with zero new signing surface — the clean-VM round-trip is the proof item.)
@@ -139,13 +149,13 @@ v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numberi
 
 ## Session Continuity
 
-**Next command:** continue Phase 63 — execute Plan 63-03 (Wave 2: session_id path-traversal guard + `run_retention_sweep(max_moments=)` + orphan reconciliation) to turn the remaining 9 RED `tests/memory/` GREEN.
+**Next command:** `/gsd:plan-phase --research-phase 64` (Session Ingest) — the moment-taxonomy research flag ("which artifacts ground best": `coach_line` vs `moment` vs stretch `audio_moment`) resolves in-phase. Start text-only.
 
-**What's done:** Phase 63 Plan 02 complete — `src/vibemix/memory/` storage spine: `index_sqlite_vec_memory.py` (SqliteVecMemoryStore — vec0 `vec_memory` + `moments` table), `store.py` (MemoryStore + open_memory_store + Record), `__init__.py` (barrel). Committed `610c374` + `d36d924`. Wave-1 contract GREEN (10/19 `tests/memory/`): roundtrip, numpy_fallback, delete_cascade, parity, no_live_path (CLEAN), no_extraction + model_literal_gate. STORE-01/02/04 marked complete. Earlier: 63-01 RED-first contract (`dde3c0f`, `5635390`); v6.0 roadmap.
+**What's done:** **Phase 63 (Memory Store) COMPLETE — 3/3 plans, STORE-01..04 GREEN.** P63-03 (Wave 2) hardened the storage spine: `delete_session` is now path-traversal-defended + atomic-cascade, `reconcile_orphans` is the boot backstop, and `src/vibemix/memory/retention.py::run_memory_retention_sweep` does oldest-session-first whole-session eviction. 19/19 `tests/memory/` GREEN; no-live-path subprocess gate CLEAN; model-literal gate green. Commits `18a5c1f` + `eb5b5b5`. Earlier: P63-02 storage spine (`610c374`, `d36d924`); P63-01 RED contract (`dde3c0f`, `5635390`).
 
-**What's next:** Plan 63-03 extends `delete_session` (the documented Wave-2 hook) with the path-traversal guard (regex shape + `is_relative_to`, mirroring `recordings_index`) and adds the retention sweep + orphan reconciliation against the still-RED contract. **Invariant for 63-03/64:** keep any `config_store`/`vibemix.runtime` import function-local — module-level pulls the live path into `sys.modules` and fails the no-live-path dormancy gate (see P63-02 decisions). Then `/gsd:plan-phase --research-phase` for P64 (taxonomy) / P65 (blend/half-life). Surface the P63 sqlite-vec clean-VM/sign item to the v4.0 external-clock surface early.
+**What's next:** Phase 64 Session Ingest — an off-hot-path post-session batch job (+ boot sweep) writing deterministic TEXT "reaction moment" records into `MemoryStore.add_record` (the validation gate is now in place). NO audio embedding, NO LLM-extraction (CI-guarded). **Invariant for 64:** keep any `config_store`/`vibemix.runtime` import function-local in any `memory/`-adjacent module — module-level pulls the live path into `sys.modules` and fails the no-live-path dormancy gate. Then `/gsd:plan-phase --research-phase` for P65 (blend/half-life). The P63 sqlite-vec clean-VM/sign item rides the v4.0 external-clock surface; the cascade/retention call-site wiring is deferred to the recordings-UI-delete phase.
 
-**Open before execution:** none blocking — the spine is research-locked and dependency-correct. Model-ID (text-001 vs multimodal-2) is a one-line config choice to confirm with Kaan but never hardcode either way.
+**Open before execution:** none blocking. Model-ID (text-001 vs multimodal-2) is a one-line config choice to confirm with Kaan but never hardcode either way.
 
 ---
 

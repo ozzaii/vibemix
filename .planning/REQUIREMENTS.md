@@ -22,7 +22,7 @@ Acid test for any embedded artifact: *"does retrieving this close a hallucinatio
 
 - [x] **STORE-01**: A local, per-install `memory.db` (sqlite-vec) stores embedded session "moments" + metadata, **reusing the shipped** `SqliteVecStore` + the storage-only `vec0` + the deterministic `cosine_topk` chokepoint + the content-hash embed cache — **no new dependency** (`sqlite-vec>=0.1.9` already declared). Falls back to the existing NumpyStore when the extension can't load (Mac/Win parity-tested, `pytest -m parity`). _(contract pinned RED-first by Plan 63-01; implementation lands in Plans 63-02/03)_
 - [x] **STORE-02**: A ~50-line `MemoryStore` wrapper exposes `add_record` + `query_topk`; each record carries `session_id` + timestamp + the raw text signature + its embedding — **never** an LLM-extracted "insight" (raw-in, raw-out). _(contract pinned RED-first by Plan 63-01; implementation lands in Plans 63-02/03)_
-- [ ] **STORE-03**: Retention + privacy: deleting a session's recordings **cascades** to its memory embeddings (no orphaned vectors); a per-install size/retention budget caps growth; everything is local-only and user-deletable (extends the shipped `recordings_index` retention/delete machinery + path-traversal defense). _(contract pinned RED-first by Plan 63-01; implementation lands in Plans 63-02/03)_
+- [x] **STORE-03**: Retention + privacy: deleting a session's recordings **cascades** to its memory embeddings (no orphaned vectors); a per-install size/retention budget caps growth; everything is local-only and user-deletable (extends the shipped `recordings_index` retention/delete machinery + path-traversal defense). _(impl landed Plan 63-03: path-traversal-defended atomic `delete_session` + `reconcile_orphans` + `run_memory_retention_sweep` oldest-session-first whole-session eviction; all 19 `tests/memory/` GREEN. Call-site wiring deferred — see 63-03-SUMMARY KAAN-ACTION.)_
 - [x] **STORE-04**: The embedding model is resolved via `model_router.resolve("embedding")` (**never** hardcode `gemini-embedding-001` — the multimodal intent maps to `gemini-embedding-2`; the router already probes the right one); embed calls route through the Bravoh proxy on the `ServiceTier.FLEX` cost lane. _(contract pinned RED-first by Plan 63-01; implementation lands in Plans 63-02/03)_
 
 ### Session Ingest (INGEST) — Phase 64
@@ -68,10 +68,10 @@ Acid test for any embedded artifact: *"does retrieving this close a hallucinatio
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STORE-01 | Phase 63 | Contract pinned (Plan 63-01); impl pending (63-02/03) |
-| STORE-02 | Phase 63 | Contract pinned (Plan 63-01); impl pending (63-02/03) |
-| STORE-03 | Phase 63 | Contract pinned (Plan 63-01); impl pending (63-02/03) |
-| STORE-04 | Phase 63 | Contract pinned (Plan 63-01); impl pending (63-02/03) |
+| STORE-01 | Phase 63 | ✅ Complete (Plan 63-02 — storage spine, numpy fallback, parity) |
+| STORE-02 | Phase 63 | ✅ Complete (Plan 63-02 — MemoryStore add_record/query_topk, raw-in/raw-out) |
+| STORE-03 | Phase 63 | ✅ Complete (Plan 63-03 — atomic cascade + path-traversal gate + retention sweep + orphan reconcile) |
+| STORE-04 | Phase 63 | ✅ Complete (Plan 63-02 — embedding via model_router.resolve, no literal) |
 | INGEST-01 | Phase 64 | Pending |
 | INGEST-02 | Phase 64 | Pending |
 | INGEST-03 | Phase 64 | Pending |
