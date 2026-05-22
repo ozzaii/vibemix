@@ -10,9 +10,15 @@ A near-verbatim COPY of ``vibemix.library.index_sqlite_vec.SqliteVecStore``
        ``63-RESEARCH.md`` §"Library vs Memory" — so its table must not collide
        with the library's ``vec_library``.
     2. A plain ``moments`` sibling table (record metadata) is created on the
-       SAME connection in ``__init__`` so ``MemoryStore.add_record`` can commit
-       the vec0 vector + the metadata row inside one transaction (single-writer,
-       atomic). See 63-RESEARCH.md §Pattern 2.
+       SAME connection in ``__init__`` so ``MemoryStore.add_record`` writes the
+       vec0 vector and the metadata row over one connection. Note: ``add_batch``
+       commits the vector BEFORE ``add_record`` writes the moments row — two
+       commits, NOT one transaction. The ordering is vector-first, so a crash
+       between them leaves at worst a reconcilable orphan vector (swept by
+       ``reconcile_orphans``), never a metadata row pointing at a missing
+       vector. (``delete_session`` IS one transaction here, because it stages
+       the moments DELETE and lets ``delete``'s single commit close both.)
+       See 63-RESEARCH.md §Pattern 2.
 
 Per RESEARCH §Summary + Pitfall P55: sqlite-vec is **storage-only** in v1.
 We do NOT use the extension's built-in KNN-style index lookup — that path can
@@ -65,33 +71,48 @@ class SqliteVecMemoryStore:
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(str(self._db_path))
-        self.db.enable_load_extension(True)
-        # If the host has no sqlite-vec extension wheel, this raises and the
-        # caller (open_memory_store) catches → numpy fallback. Assumption A2.
-        sqlite_vec.load(self.db)
-        self.db.enable_load_extension(False)
-        self.db.execute(
-            f"CREATE VIRTUAL TABLE IF NOT EXISTS vec_memory USING vec0("
-            f"record_id TEXT PRIMARY KEY, "
-            f"embedding FLOAT[{EMBEDDING_DIM}] distance_metric=cosine"
-            f")"
-        )
-        # moments sibling table on the SAME connection so add_record commits
-        # vec0 + metadata atomically downstream. Plain sqlite — no vec0 syntax.
-        self.db.execute(
-            "CREATE TABLE IF NOT EXISTS moments ("
-            "record_id  TEXT PRIMARY KEY, "
-            "session_id TEXT NOT NULL, "
-            "ts         REAL NOT NULL, "
-            "kind       TEXT NOT NULL, "
-            "signature  TEXT NOT NULL"
-            ")"
-        )
-        self.db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_moments_session "
-            "ON moments(session_id)"
-        )
-        self.db.commit()
+        # Guard all post-connect work: on a host with no sqlite-vec extension
+        # wheel (Win ARM64, Assumption A2 — the EXPECTED fallback path), the
+        # ``sqlite_vec.load`` below re-raises so ``open_memory_store`` can fall
+        # through to NumpyStore. The connection is already open by then, so we
+        # MUST close it before the exception propagates — otherwise the
+        # partially-constructed object is discarded with a live sqlite handle
+        # (a leaked file handle on ``memory.db``, which on Windows can block a
+        # later delete/replace). Close-then-re-raise on ANY failure here.
+        try:
+            self.db.enable_load_extension(True)
+            # If the host has no sqlite-vec extension wheel, this raises and the
+            # caller (open_memory_store) catches → numpy fallback. Assumption A2.
+            sqlite_vec.load(self.db)
+            self.db.enable_load_extension(False)
+            self.db.execute(
+                f"CREATE VIRTUAL TABLE IF NOT EXISTS vec_memory USING vec0("
+                f"record_id TEXT PRIMARY KEY, "
+                f"embedding FLOAT[{EMBEDDING_DIM}] distance_metric=cosine"
+                f")"
+            )
+            # moments sibling table on the SAME connection so add_record commits
+            # the vec0 vector and metadata row downstream. Plain sqlite — no
+            # vec0 syntax.
+            self.db.execute(
+                "CREATE TABLE IF NOT EXISTS moments ("
+                "record_id  TEXT PRIMARY KEY, "
+                "session_id TEXT NOT NULL, "
+                "ts         REAL NOT NULL, "
+                "kind       TEXT NOT NULL, "
+                "signature  TEXT NOT NULL"
+                ")"
+            )
+            self.db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_moments_session "
+                "ON moments(session_id)"
+            )
+            self.db.commit()
+        except Exception:
+            try:
+                self.db.close()
+            finally:
+                raise
 
     def add_batch(self, items: list[tuple[str, np.ndarray]]) -> None:
         if not items:
