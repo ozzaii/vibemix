@@ -615,13 +615,35 @@ class DJCoHostAgent(Agent):
                     ),
                     timeout=RECALL_DEADLINE_S,
                 )
+            except asyncio.CancelledError:
+                # Phase 65 review iter-3 WR-02 — ``prev.cancel()`` below
+                # raises ``asyncio.CancelledError`` inside this task, which
+                # is NOT a subclass of ``Exception`` (Python 3.8+). Catching
+                # only ``Exception`` lets the cancel propagate uncaught
+                # through the task wrapper but, more importantly, would
+                # SKIP a clear if we tried to handle it generically — and a
+                # clear on cancel is WRONG: the cancel was triggered by
+                # ``set_next_event`` overwriting the dispatch with a NEW
+                # event, whose own ``on_event`` will (a) bump
+                # ``_inflight_gen`` (invalidating any still-running
+                # executor write from THIS task) and (b) latch its own
+                # fresh survivors. So we explicitly catch + re-raise the
+                # cancel so it propagates to the task scheduler normally,
+                # WITHOUT calling ``recall.clear()`` (which would torpedo
+                # the new dispatch's latch).
+                raise
             except (TimeoutError, asyncio.TimeoutError):
                 # Late memory is worse than no memory — clear() ensures the
                 # stale latch from a prior turn cannot bleed into this one.
+                # This DOES bump ``_inflight_gen`` (default) so the still-
+                # running executor's final ``_latest = survivors`` write
+                # fails its token check and is discarded (CR-04 race).
                 recall.clear()
             except Exception as _e:
                 # Any other failure also clears, then swallows — recall
-                # can never break a reaction turn.
+                # can never break a reaction turn. Same generation-bump
+                # semantics as the deadline path: invalidate the in-flight
+                # write if any.
                 recall.clear()
                 print(f"[recall dispatch err] {_e}", file=sys.stderr)
 
