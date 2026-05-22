@@ -132,3 +132,53 @@ def test_importing_memory_loads_no_coach_loop() -> None:
         f"not importable yet — expected once Plans 02/03 land). stdout="
         f"{result.stdout!r}; stderr={result.stderr!r}"
     )
+
+
+def test_importing_ingest_loads_no_coach_loop() -> None:
+    """Runtime dormancy gate (Phase 64) — importing the ingest module leaks no
+    live-path module.
+
+    Closes the PATTERNS-flagged gap (64-PATTERNS.md §No-live-path import
+    boundary): the store-side dormancy test above imports only
+    ``vibemix.memory.store``; the ingest module needs the same runtime-dormancy
+    proof. A fresh interpreter imports ``vibemix.memory.ingest`` and inspects
+    ``sys.modules`` for any transitively-loaded live-path module — using the
+    identical leak predicate as the store version.
+
+    RED-first: until Plan 64-02 lands ``vibemix.memory.ingest`` the import
+    raises and the subprocess exits non-zero — the gate becomes a true
+    ``CLEAN`` assertion once the module is importable. (The static AST gate
+    above already auto-covers ``ingest.py`` via the ``memory/*.py`` glob; this
+    adds the runtime-dormancy parity, not a duplicate of the static scan.)
+
+    T-64-02 (Tampering): future ingest imports the live reaction path —
+    mitigated by this gate (the build fails if violated).
+    """
+    script = (
+        "import sys\n"
+        "import vibemix.memory.ingest  # noqa: F401\n"
+        "leak = sorted(\n"
+        "    m for m in sys.modules\n"
+        "    if m.startswith('vibemix.state.coach')\n"
+        "    or m.startswith('vibemix.state.refresh')\n"
+        "    or m.startswith('vibemix.agent')\n"
+        "    or m.startswith('vibemix.prompts')\n"
+        "    or 'ws_bus' in m\n"
+        ")\n"
+        "print('LEAKED:' + ','.join(leak) if leak else 'CLEAN')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        cwd=REPO,
+        env={**os.environ, "PYTHONPATH": str(REPO / "src")},
+    )
+    # RED-first: the module does not exist yet, so the import fails (non-zero
+    # exit) and stdout is NOT "CLEAN" — that pins the contract. Once 64-02 lands
+    # the import succeeds and stdout must be exactly "CLEAN".
+    assert result.stdout.strip() == "CLEAN", (
+        "ingest import leaked a live-path module (or vibemix.memory.ingest is "
+        f"not importable yet — expected once Plan 64-02 lands). stdout="
+        f"{result.stdout!r}; stderr={result.stderr!r}"
+    )
