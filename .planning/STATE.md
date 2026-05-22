@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
-status: verifying
-last_updated: "2026-05-22T09:32:49.417Z"
+status: ready_to_plan
+last_updated: 2026-05-22T09:46:52.706Z
 last_activity: 2026-05-22
 progress:
   total_phases: 12
   completed_phases: 10
   total_plans: 32
-  completed_plans: 32
+  completed_plans: 48
   percent: 83
+stopped_at: Phase 64 complete (3/3) — ready to discuss Phase 65
 ---
 
 # vibemix — State
@@ -35,7 +36,7 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
 - **v6.0 thesis:** reactive co-host → forward-leaning **copilot**. Mechanism = memory: every session feeds an embedding store; coach prompts ground in *past* sessions. Personalization is **emergent from the retrieval seam**, NOT a settings screen and NOT an LLM-extraction layer. Acid test for any embedded artifact: *"does retrieving this close a hallucination class OR unlock a copilot move?"* — if neither, don't embed it.
 - **New headline hallucination class:** **retrieval poisoning** (an irrelevant past moment injected into the live prompt → AI references something that didn't happen). Mitigation is structural, not a prompt plea: ~0.7 floor (below → inject nothing), top-k 2–3 cap, event-gating, PAST-tense fence, current-session exclusion, `recall` citation source (fabricated `[recall:<id>]` strips the whole turn). **P65 RETRIEVE = anti-slop release gate.**
-- **Current focus:** Phase 64 — session-ingest
+- **Current focus:** Phase 65 — memory retrieval seam (anti slop release gate)
 - **Last shipped:** v5.0 "The Useful Cut" — 2026-05-22 (tech_debt accepted).
 - **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
@@ -45,10 +46,10 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 
 ## Current Position
 
-Phase: 64 (session-ingest) — COMPLETE (ready for verification)
-Plan: 3 of 3
-Status: 64-03 runtime wiring GREEN — session-close + boot ingest wired off-hot-path via run_in_executor (best-effort/never-raise, one-way runtime→memory.ingest arrow, no-live-path dormancy gate CLEAN); tests/memory all GREEN (35); full suite back to the 8-WIP baseline (no new failures). INGEST-01..03 done. Next: verify Phase 64, then /gsd:plan-phase 65 (RETRIEVE — anti-slop release gate).
-Last activity: 2026-05-22 -- P64-03 wiring committed (f871b17, d5ac253, 96df78b, e024c8a)
+Phase: 65
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-22
 
 ## v6.0 Phase Map
 

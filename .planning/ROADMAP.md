@@ -104,7 +104,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 63. Memory Store | v6.0 | 3/3 | Complete    | 2026-05-22 |
-| 64. Session Ingest | v6.0 | 3/3 | Complete   | 2026-05-22 |
+| 64. Session Ingest | v6.0 | 3/3 | Complete    | 2026-05-22 |
 | 65. Memory Retrieval Seam | v6.0 | 0/? | Not started | - |
 | 66. Visible Copilot Move | v6.0 | 0/? | Not started | - |
 
