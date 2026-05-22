@@ -94,19 +94,23 @@ def test_wiring_imports_memory_ingest() -> None:
 
 
 def test_wiring_dispatches_through_run_in_executor() -> None:
-    """Both ingest entrypoints appear as ``run_in_executor`` arguments.
+    """The ingest worker is dispatched via ``run_in_executor`` (not inline).
 
-    Source-text proof that the heavy FS+embed work is NOT called inline: the
-    ``run_in_executor(None, ingest_session, ...)`` /
-    ``run_in_executor(None, run_ingest_sweep, ...)`` shape is present and the
-    ingest functions are passed (not invoked) at the seams.
+    Source-text proof that ALL heavy FS+embed work is pushed off the loop: the
+    seam awaits ``run_in_executor(None, _worker)`` and the ingest entrypoints
+    (``ingest_session`` / ``run_ingest_sweep``) are called INSIDE that off-loop
+    worker — never on the event-loop thread.
     """
     src = _session_loop_source()
     assert "run_in_executor" in src
-    # The function objects are passed positionally to run_in_executor — never
-    # `ingest_session(...)` / `run_ingest_sweep(...)` directly in the seam body.
-    assert "run_in_executor(\n                    None, ingest_session" in src
-    assert "run_in_executor(\n                    None, run_ingest_sweep" in src
+    # The synchronous worker (heavy imports + embedder build + ingest) is the
+    # run_in_executor target — the seam coroutine returns to the loop at once.
+    assert "await loop.run_in_executor(None, _worker)" in src
+    # The ingest entrypoints are imported + invoked INSIDE the off-loop worker
+    # (function-local import = the gate-safe one-way arrow), never on the loop.
+    assert "from vibemix.memory.ingest import ingest_session, run_ingest_sweep" in src
+    assert "ingest_session(session_dir, store, embedder)" in src
+    assert "run_ingest_sweep(recordings_root, store, embedder)" in src
 
 
 # ---------------------------------------------------------------------------

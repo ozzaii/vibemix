@@ -860,48 +860,62 @@ class SessionLoop:
         has no session_dir, it falls back to the boot-style sweep (the marker
         makes it a near no-op).
 
-        Both the store + embedder are constructed lazily inside this helper and
-        the heavy FS+embed work is dispatched via ``loop.run_in_executor`` — it
-        NEVER runs on the asyncio reaction loop, never touches MusicState, never
-        holds ``state._lock``. The whole body is wrapped in try/except + log so
-        a failing ingest cannot crash session close or boot (T-64-09).
+        ALL heavy work — the ``memory.ingest`` import, the lazy embedder/store
+        construction (which imports ``genai`` + builds a client), and the FS+embed
+        ingest itself — runs INSIDE a single ``loop.run_in_executor`` worker. The
+        seam coroutine therefore returns to the event loop immediately and NEVER
+        runs the heavy path on the asyncio reaction loop, never touches
+        MusicState, never holds ``state._lock``. The worker is wrapped in
+        try/except + log so a failing ingest cannot crash session close or boot
+        (T-64-09); the seam awaits the executor future but the future itself
+        never raises.
 
         The runtime→memory.ingest import is the gate-safe one-way arrow; it is
-        function-local so the no-live-path dormancy gate (which scans the
-        ``memory/*.py`` import graph) is unaffected.
+        function-local (inside the worker) so the no-live-path dormancy gate
+        (which scans the ``memory/*.py`` import graph) is unaffected.
         """
         if self.recordings_root is None:
             return
-        try:
-            from vibemix.memory.ingest import ingest_session, run_ingest_sweep
-            from vibemix.memory.store import MemoryStore
 
-            embedder = self._build_ingest_embedder()
-            if embedder is None:
-                # No usable embedder (no key / no proxy) — skip without raising.
-                return
-            store = MemoryStore(db_path=None)
+        recordings_root = self.recordings_root
+
+        def _worker() -> None:
+            # Off-loop: heavy imports + embedder/store build + ingest. Anything
+            # that raises is logged + swallowed so the seam never fails.
+            try:
+                from vibemix.memory.ingest import ingest_session, run_ingest_sweep
+                from vibemix.memory.store import MemoryStore
+
+                embedder = self._build_ingest_embedder()
+                if embedder is None:
+                    # No usable embedder (no key / no proxy) — skip, no raise.
+                    return
+                store = MemoryStore(db_path=None)
+                if trigger == "close" and session_dir is not None:
+                    result = ingest_session(session_dir, store, embedder)
+                    log.info(
+                        "memory ingest (close): session=%s records=%s embeds=%s "
+                        "skipped=%s",
+                        getattr(result, "session_id", "?"),
+                        getattr(result, "records_written", "?"),
+                        getattr(result, "embeds_made", "?"),
+                        getattr(result, "skipped", "?"),
+                    )
+                else:
+                    ingested = run_ingest_sweep(recordings_root, store, embedder)
+                    log.info(
+                        "memory ingest (%s sweep): %d session(s) ingested",
+                        trigger,
+                        len(ingested or []),
+                    )
+            except Exception:
+                log.exception("memory ingest (%s) failed", trigger)
+
+        try:
             loop = asyncio.get_running_loop()
-            if trigger == "close" and session_dir is not None:
-                result = await loop.run_in_executor(
-                    None, ingest_session, session_dir, store, embedder
-                )
-                log.info(
-                    "memory ingest (close): session=%s records=%s embeds=%s skipped=%s",
-                    getattr(result, "session_id", "?"),
-                    getattr(result, "records_written", "?"),
-                    getattr(result, "embeds_made", "?"),
-                    getattr(result, "skipped", "?"),
-                )
-            else:
-                ingested = await loop.run_in_executor(
-                    None, run_ingest_sweep, self.recordings_root, store, embedder
-                )
-                log.info(
-                    "memory ingest (%s sweep): %d session(s) ingested",
-                    trigger,
-                    len(ingested or []),
-                )
+            await loop.run_in_executor(None, _worker)
+        except Exception:
+            log.exception("memory ingest (%s) dispatch failed", trigger)
         except Exception:
             log.exception("memory ingest (%s) failed", trigger)
 
