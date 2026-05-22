@@ -160,6 +160,44 @@ def test_evidence_line_recall_empty_no_block():
     assert AICoach.evidence_line(state, recall_moments=[]) == AICoach.evidence_line(state)
 
 
+def test_evidence_line_audible_no_recall_byte_identical_v5_baseline(mocker):
+    """Phase 65 review WR-05 — the no-recall path is BYTE-IDENTICAL to v5.0.
+
+    The recall block is additive on top of a v5.0 baseline; the cold/feature-off
+    path (default ``recall_moments=None``) and the empty-list path
+    (``recall_moments=[]``) must both produce the SAME bytes the v5.0 baseline
+    produced. ``test_evidence_line_recall_empty_no_block`` proves "None == []"
+    relatively (both no-recall calls match); this test pins the ABSOLUTE bytes
+    so a future maintainer who accidentally adds a trailing space, reorders a
+    field, or shifts the corpus footer also breaks ``recall_moments=None`` —
+    not just the recall comparison.
+    """
+    mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
+    state = MusicState(
+        audible=True,
+        rms=0.094,
+        bands={"sub": 0.20, "low": 0.30, "mid": 0.30, "high": 0.20},
+        bpm=126.0,
+        audible_track="Daft Punk - Around the World",
+        audible_track_confidence=0.6,
+        audible_deck="A",
+        set_start_at=755.0,  # now-set = 245s → 4:05
+    )
+    # v5.0 baseline string — copied from the live audible-block format pinned
+    # by test_evidence_line_audible_block_format below.
+    v5_baseline = (
+        "hearing[rms=0.094 sub=0.20 low=0.30 mid=0.30 high=0.20 bpm=126] | "
+        "track='Daft Punk - Around the World' | deck=A | set_time=4:05 | "
+        "recent_moves[8s]: NONE"
+    )
+    out_default = AICoach.evidence_line(state)
+    out_none = AICoach.evidence_line(state, recall_moments=None)
+    out_empty = AICoach.evidence_line(state, recall_moments=[])
+    assert out_default == v5_baseline
+    assert out_none == v5_baseline
+    assert out_empty == v5_baseline
+
+
 def test_evidence_line_audible_block_format(mocker):
     """Pin the exact audible-block format from v4:1336-1339."""
     mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)
