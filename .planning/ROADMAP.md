@@ -56,7 +56,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
   4. Every embed call resolves the model via `model_router.resolve("embedding")` (no hardcoded `gemini-embedding-001` literal — CI grep gate green) and routes through the Bravoh proxy on the `ServiceTier.FLEX` cost lane; a record carries the raw text signature only — never an LLM-extracted "insight" (raw-in, raw-out).
 **Plans**: 3 plans
 - [x] 63-01-PLAN.md — Wave 0: scaffold the full tests/memory/ contract suite (parity, round-trip, fallback, cascade, path-traversal, no-live-import, no-extraction, retention)
-- [ ] 63-02-PLAN.md — Wave 1: SqliteVecMemoryStore (vec_memory + moments table) + MemoryStore facade + open_memory_store probe (STORE-01/02/04)
+- [x] 63-02-PLAN.md — Wave 1: SqliteVecMemoryStore (vec_memory + moments table) + MemoryStore facade + open_memory_store probe (STORE-01/02/04)
 - [ ] 63-03-PLAN.md — Wave 2: hardened delete-cascade + path-traversal gate + oldest-session-first retention sweep + orphan reconciliation (STORE-03)
 **Research/KAAN-ACTION flag**: sqlite-vec one-click-install fragility — the `vec0.dylib`/`vec0.dll` native binaries must be signed/notarized and a clean-VM (incl. Windows ARM64) memory round-trip proven in the e2e matrix. This rides the Apple notarization + SignPath external clock already on the critical path — surface it early so it parallelizes against the in-flight approvals. (The *binary* was already signed in shipping builds; the new artifact is only a data file with zero new signing surface, but the clean-VM round-trip is the proof item.)
 
@@ -100,7 +100,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 63. Memory Store | v6.0 | 1/3 | In Progress|  |
+| 63. Memory Store | v6.0 | 2/3 | In Progress|  |
 | 64. Session Ingest | v6.0 | 0/? | Not started | - |
 | 65. Memory Retrieval Seam | v6.0 | 0/? | Not started | - |
 | 66. Visible Copilot Move | v6.0 | 0/? | Not started | - |

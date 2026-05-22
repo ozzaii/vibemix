@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
 status: executing
-last_updated: "2026-05-22T06:44:50.849Z"
+last_updated: "2026-05-22T06:53:40.374Z"
 last_activity: 2026-05-22
 progress:
   total_phases: 12
   completed_phases: 8
   total_plans: 29
-  completed_plans: 27
+  completed_plans: 28
   percent: 67
 ---
 
@@ -46,9 +46,9 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 ## Current Position
 
 Phase: 63 (memory-store) — EXECUTING
-Plan: 2 of 3
-Status: Ready to execute (63-01 done — Wave-0 test contract pinned RED-first)
-Last activity: 2026-05-22 — Phase 63 Plan 01 complete (6 tests/memory/ contract files, RED on missing vibemix.memory)
+Plan: 3 of 3
+Status: Ready to execute 63-03 (Wave 2 — session_id path-traversal guard + retention sweep + orphan reconcile). 63-02 done: storage spine GREEN (Wave-1 subset).
+Last activity: 2026-05-22 — Phase 63 Plan 02 complete: `src/vibemix/memory/` package (SqliteVecMemoryStore + MemoryStore + open_memory_store + Record), STORE-01/02/04 contract subset GREEN (10/19 tests/memory/ green; path-traversal + retention correctly RED, deferred to 63-03).
 
 ## v6.0 Phase Map
 
@@ -77,6 +77,7 @@ Last activity: 2026-05-22 — Phase 63 Plan 01 complete (6 tests/memory/ contrac
 | v6.0 per-phase REQ counts | P63=4 (STORE) · P64=3 (INGEST) · P65=4 (RECALL) · P66=3 (COPILOT) |
 | v6.0 net-new dependencies | 0 (WIRING/REUSE milestone — `sqlite-vec>=0.1.9` already declared) |
 | P63-01 (Wave 0) | 2 tasks, 6 files, ~18 min — RED-first test contract (dde3c0f, 5635390) |
+| P63-02 (Wave 1) | 2 tasks, 3 files, ~32 min — storage spine GREEN; STORE-01/02/04 (610c374, d36d924) |
 | v4.0 git tag | local artifacts on `live-tuning-or-brain`; unsigned `v0.1.0-rc1` .dmg built |
 | v3.0/v3.1/v4.0 carveouts | external clock (Apple Dev + SignPath) — unchanged by v6.0 |
 
@@ -109,6 +110,15 @@ v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numberi
 - **STORE-01..04 traceability = "Contract pinned (63-01); impl pending (63-02/03)"** — NOT marked Complete, because the `MemoryStore` source does not exist yet. (Reverted an auto-mark that the plan-frontmatter `requirements` field triggered — requirements complete when the implementing plan lands.)
 - T-63-01 (no-live-path import) + T-63-02 (no-extraction) mitigations are now regression-pinned from the first commit (static AST + subprocess dormancy; tokenize-stripped generation-surface scan w/ positive control).
 
+### P63-02 Execution Decisions (2026-05-22)
+
+- **Storage spine shipped, contract subset GREEN.** `src/vibemix/memory/` (3 files): `SqliteVecMemoryStore` (vec0 backend cloned from `library/index_sqlite_vec.py` — `vec_library`→`vec_memory` + `moments` sibling table on one connection), `MemoryStore` facade (compose-not-subclass: backend + owned `moments` connection; `add_record`/`query_topk(*, exclude_session=None)`/`delete_session`), `open_memory_store()` (clone of `library/store.py::open_store` pointed at `app_data_dir()/memory.db`). 10/19 `tests/memory/` GREEN: roundtrip, numpy_fallback, delete_cascade, parity (sqlite-vec↔numpy bit-identical + tie-break + float32 round-trip), no_live_path (CLEAN), no_extraction, + `tests/repo/test_model_literal_gate.py`.
+- **`cosine_topk` IMPORTED VERBATIM** from `vibemix.library._cosine` — sole ranking path in `query_topk`; no native vec0 KNN / `MATCH` / `ORDER BY distance` / `vec_distance_cosine` anywhere in `memory/`. `NumpyStore` reused as-is (no `index_numpy_memory.py`). Embedding seam = reused `LibraryEmbedder` (no hardcoded model literal — `model_literal_gate` green).
+- **Lazy `app_data_dir` import (the one auto-fix, Rule 3 blocking).** Module-level `from vibemix.runtime.config_store import app_data_dir` triggers `vibemix.runtime.__init__`, which eagerly imports the live reaction path (`coach`, `ws_bus`, `session_loop`, `state.refresh`) → leaked into `sys.modules`, failing `test_no_live_path_import.py`. Fixed by deferring the import into `_memory_db_path()` + `db_path=None` sentinel defaults resolved lazily. Behavior/public surface unchanged; only import timing. (Library never hit this — it uses `~/.cache` defaults, never `config_store`.) **Note for 63-03/64:** any new `memory/` module must keep `config_store`/runtime imports function-local or the dormancy gate fails.
+- **add_record vector-first then moments-row then commit** (crash → at worst a reconcilable orphan vector, never metadata→missing-vector). `moments` reuses the sqlite-vec backend's single `self.db` (atomic); numpy path opens sibling `memory_moments.db`.
+- **Path-traversal + retention correctly RED (deferred to 63-03).** 9/19 `tests/memory/` red by design: 6× `test_session_id_path_traversal` (session_id guard — regex shape + `is_relative_to`, mirroring `recordings_index`) + 3× `test_retention` (`run_retention_sweep(max_moments=)`). `delete_session` is the documented Wave-2 extension point. 4 pre-existing `tests/repo/` failures (README matrix ×2, gate-42 STATE annotation, cut-release tag-regex) confirmed failing identically at parent `b45b419` — unrelated to `memory/`, no new failures introduced.
+- **STORE-01/02/04 marked complete in REQUIREMENTS** (impl landed). STORE-03 (cascade + retention + path-traversal) stays open for 63-03.
+
 ### v6.0 KAAN-ACTION / Research Flags (carry into planning)
 
 - **P63 — sqlite-vec install fragility (KAAN-ACTION, external clock):** `vec0.dylib`/`vec0.dll` native binaries must be signed/notarized + a clean-VM (incl. Windows ARM64) `memory.db` round-trip proven in the e2e matrix. Rides the Apple notarization + SignPath external clock already on the critical path — surfaced EARLY so it parallelizes against the in-flight v4.0 approvals. (The binary was already signed in shipping builds; the new artifact is only a data file with zero new signing surface — the clean-VM round-trip is the proof item.)
@@ -129,11 +139,11 @@ v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numberi
 
 ## Session Continuity
 
-**Next command:** continue Phase 63 — execute Plan 63-02 (build `src/vibemix/memory/store.py` to turn the Wave-0 contract GREEN).
+**Next command:** continue Phase 63 — execute Plan 63-03 (Wave 2: session_id path-traversal guard + `run_retention_sweep(max_moments=)` + orphan reconciliation) to turn the remaining 9 RED `tests/memory/` GREEN.
 
-**What's done:** Phase 63 Plan 01 complete — Wave-0 RED-first test contract: `tests/memory/` package + 6 contract files (`__init__`, `test_store`, `test_store_parity`, `test_no_live_path_import`, `test_no_extraction`, `test_retention`), committed `dde3c0f` + `5635390`. All RED on missing `vibemix.memory` (the pinned contract). Earlier: v6.0 roadmap + REQUIREMENTS traceability.
+**What's done:** Phase 63 Plan 02 complete — `src/vibemix/memory/` storage spine: `index_sqlite_vec_memory.py` (SqliteVecMemoryStore — vec0 `vec_memory` + `moments` table), `store.py` (MemoryStore + open_memory_store + Record), `__init__.py` (barrel). Committed `610c374` + `d36d924`. Wave-1 contract GREEN (10/19 `tests/memory/`): roundtrip, numpy_fallback, delete_cascade, parity, no_live_path (CLEAN), no_extraction + model_literal_gate. STORE-01/02/04 marked complete. Earlier: 63-01 RED-first contract (`dde3c0f`, `5635390`); v6.0 roadmap.
 
-**What's next:** Plan 63-02/03 build `src/vibemix/memory/store.py` (compose-not-subclass: `library`-style backend over `memory.db` + own `moments` sqlite table; `cosine_topk` chokepoint; `LibraryEmbedder` for embeds; cascade + retention) against the now-pinned contract. Then `/gsd:plan-phase --research-phase` for P64 (taxonomy) / P65 (blend/half-life). Surface the P63 sqlite-vec clean-VM/sign item to the v4.0 external-clock surface early.
+**What's next:** Plan 63-03 extends `delete_session` (the documented Wave-2 hook) with the path-traversal guard (regex shape + `is_relative_to`, mirroring `recordings_index`) and adds the retention sweep + orphan reconciliation against the still-RED contract. **Invariant for 63-03/64:** keep any `config_store`/`vibemix.runtime` import function-local — module-level pulls the live path into `sys.modules` and fails the no-live-path dormancy gate (see P63-02 decisions). Then `/gsd:plan-phase --research-phase` for P64 (taxonomy) / P65 (blend/half-life). Surface the P63 sqlite-vec clean-VM/sign item to the v4.0 external-clock surface early.
 
 **Open before execution:** none blocking — the spine is research-locked and dependency-correct. Model-ID (text-001 vs multimodal-2) is a one-line config choice to confirm with Kaan but never hardcode either way.
 
