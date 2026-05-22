@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
-status: executing
-last_updated: "2026-05-22T12:53:09.699Z"
+status: milestone_complete
+last_updated: 2026-05-22T14:12:19.454Z
 last_activity: 2026-05-22 -- Phase 66 planning complete
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 38
-  completed_plans: 36
+  completed_plans: 54
   percent: 92
+stopped_at: Milestone complete (Phase 66 was final phase)
 ---
 
 # vibemix — State
@@ -35,7 +36,7 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
 - **v6.0 thesis:** reactive co-host → forward-leaning **copilot**. Mechanism = memory: every session feeds an embedding store; coach prompts ground in *past* sessions. Personalization is **emergent from the retrieval seam**, NOT a settings screen and NOT an LLM-extraction layer. Acid test for any embedded artifact: *"does retrieving this close a hallucination class OR unlock a copilot move?"* — if neither, don't embed it.
 - **New headline hallucination class:** **retrieval poisoning** (an irrelevant past moment injected into the live prompt → AI references something that didn't happen). Mitigation is structural, not a prompt plea: ~0.7 floor (below → inject nothing), top-k 2–3 cap, event-gating, PAST-tense fence, current-session exclusion, `recall` citation source (fabricated `[recall:<id>]` strips the whole turn). **P65 RETRIEVE = anti-slop release gate.**
-- **Current focus:** Phase 66 — visible copilot move
+- **Current focus:** Milestone complete
 - **Last shipped:** v5.0 "The Useful Cut" — 2026-05-22 (tech_debt accepted).
 - **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
@@ -47,8 +48,8 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 
 Phase: 66
 Plan: Not started
-Status: Ready to execute
-Last activity: 2026-05-22 -- Phase 66 planning complete
+Status: Milestone complete
+Last activity: 2026-05-22
 
 ## v6.0 Phase Map
 

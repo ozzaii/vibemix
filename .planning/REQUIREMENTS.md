@@ -40,9 +40,9 @@ Acid test for any embedded artifact: *"does retrieving this close a hallucinatio
 
 ### Visible Copilot Move (COPILOT) — Phase 66
 
-- [ ] **COPILOT-01**: At least one end-user-noticeable copilot move proves retrieval is firing — a **transition-shape callback** ("last time you ran this blend you killed the bass 2 bars earlier"), **linter-grounded** so the comparison must resolve to a real registered past moment (no fabricated callback).
-- [ ] **COPILOT-02**: A second **vocabulary/register callback** calls back phrasing/moves the DJ has made before — cited, warm, non-nagging (reuses the v5.0 actionable-not-hype coach persona discipline + cooldown/pacing).
-- [ ] **COPILOT-03**: The copilot voice carries **no anti-features** — no next-track recommendation, no LLM-extracted "tendencies"/insights presented as fact, no settings-screen personalization, no continuous audio embedding (explicit anti-slop exclusions, enforced by review).
+- [x] **COPILOT-01**: At least one end-user-noticeable copilot move proves retrieval is firing — a **transition-shape callback** ("last time you ran this blend you killed the bass 2 bars earlier"), **linter-grounded** so the comparison must resolve to a real registered past moment (no fabricated callback).
+- [x] **COPILOT-02**: A second **vocabulary/register callback** calls back phrasing/moves the DJ has made before — cited, warm, non-nagging (reuses the v5.0 actionable-not-hype coach persona discipline + cooldown/pacing).
+- [x] **COPILOT-03**: The copilot voice carries **no anti-features** — no next-track recommendation, no LLM-extracted "tendencies"/insights presented as fact, no settings-screen personalization, no continuous audio embedding (explicit anti-slop exclusions, enforced by review).
 
 ---
 
@@ -79,8 +79,8 @@ Acid test for any embedded artifact: *"does retrieving this close a hallucinatio
 | RECALL-02 | Phase 65 | Complete |
 | RECALL-03 | Phase 65 | Complete |
 | RECALL-04 | Phase 65 | Complete |
-| COPILOT-01 | Phase 66 | Pending |
-| COPILOT-02 | Phase 66 | Pending |
-| COPILOT-03 | Phase 66 | Pending |
+| COPILOT-01 | Phase 66 | Complete |
+| COPILOT-02 | Phase 66 | Complete |
+| COPILOT-03 | Phase 66 | Complete |
 
 **Coverage:** 14/14 requirements mapped to exactly one phase each — no orphans, no duplicates (STORE-01..04 → Phase 63 · INGEST-01..03 → Phase 64 · RECALL-01..04 → Phase 65 · COPILOT-01..03 → Phase 66). Mapped by the roadmapper 2026-05-22.
