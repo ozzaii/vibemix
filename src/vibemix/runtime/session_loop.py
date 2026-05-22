@@ -703,8 +703,15 @@ class SessionLoop:
         same code path as the periodic + close triggers (single place to
         adjust the events.jsonl logging gate, log line shape, and usage
         emit ordering).
+
+        Phase 64 Plan 03 — additionally enqueues the memory-ingest boot sweep
+        (``run_ingest_sweep`` over the recordings tree) off the hot path. It
+        is a sibling of the retention sweep (order does not matter) and is
+        idempotent by construction (the ``memory_ingested`` marker makes a
+        steady-state boot ingest a 0-session no-op — Pitfall 5).
         """
         await self._fire_one_retention_sweep("boot")
+        await self._fire_ingest("boot")
 
     async def on_session_close(self) -> None:
         """Phase 15 Plan 03 — session-close trigger.
@@ -714,8 +721,17 @@ class SessionLoop:
         sweep walks the tree.
 
         Same best-effort guarantee as run_boot_sweeps — never raises.
+
+        Phase 64 Plan 03 — additionally enqueues a single-session memory
+        ingest (``ingest_session``) for the just-finished session off the
+        hot path, AFTER the retention sweep. The session dir is derived from
+        the live ``active_recorder.session_dir``; if unavailable it falls back
+        to the boot-style ``run_ingest_sweep`` (the marker makes it a near
+        no-op). Best-effort — a failing ingest never blocks session close.
         """
         await self._fire_one_retention_sweep("close")
+        session_dir = self._active_session_dir()
+        await self._fire_ingest("close", session_dir=session_dir)
 
     # ------------------------------------------------------------------
     # Phase 15 Plan 02 — shared retention-sweep dispatch
@@ -771,6 +787,123 @@ class SessionLoop:
             await self._emit_recordings_usage()
         except Exception:
             log.exception("retention sweep (%s) failed", trigger)
+
+    # ------------------------------------------------------------------
+    # Phase 64 Plan 03 — memory-ingest dispatch (off the hot path)
+    # ------------------------------------------------------------------
+
+    def _active_session_dir(self) -> Path | None:
+        """Best-effort: the just-finished session's dir from the live recorder.
+
+        ``VoiceRecorder.session_dir`` (audio/recorder.py:211) is the canonical
+        ``<recordings_root>/<ts>/`` path. Returns None when no live recorder is
+        attached (the close path then falls back to the boot-style sweep).
+        Duck-typed + never raises — a missing attribute degrades to None.
+        """
+        recorder = self.active_recorder
+        if recorder is None:
+            return None
+        session_dir = getattr(recorder, "session_dir", None)
+        if session_dir is None:
+            return None
+        try:
+            return Path(session_dir)
+        except (TypeError, ValueError):
+            return None
+
+    def _build_ingest_embedder(self):
+        """Lazily construct a ``LibraryEmbedder`` for ingest — best-effort.
+
+        The ingest path's only model call is ``embedder.embed_query(...)``.
+        Construction is wrapped so a missing API key / proxy JWT / network
+        never breaks session close or boot — on any failure we return None
+        and the caller skips the ingest enqueue (logged, swallowed).
+
+        Mirrors __main__'s embedder build: proxy mode when
+        ``VIBEMIX_LLM_MODE=proxy``, else a direct ``genai.Client`` from
+        ``GEMINI_API_KEY``. Function-local imports keep the live-path/genai
+        surface out of session_loop's module import graph.
+        """
+        import os
+
+        from google import genai
+
+        from vibemix.library.embed import LibraryEmbedder
+
+        mode = os.environ.get("VIBEMIX_LLM_MODE", "direct").strip().lower()
+        if mode == "proxy":
+            from vibemix.agent.proxy_client import build_proxy_genai_client
+
+            jwt = os.environ.get("VIBEMIX_PROXY_JWT")
+            if not jwt:
+                log.info("[ingest] proxy mode but no VIBEMIX_PROXY_JWT — skip embed")
+                return None
+            proxy_url = os.environ.get(
+                "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
+            )
+            client = build_proxy_genai_client(jwt, proxy_url)
+        else:
+            api_key = os.environ.get("GEMINI_API_KEY")
+            if not api_key:
+                log.info("[ingest] no GEMINI_API_KEY — skip embed")
+                return None
+            client = genai.Client(api_key=api_key)
+        return LibraryEmbedder(client)
+
+    async def _fire_ingest(self, trigger: str, *, session_dir: Path | None = None) -> None:
+        """Enqueue a memory ingest off the hot path — best-effort, never-raise.
+
+        ``trigger == "boot"`` → ``run_ingest_sweep`` over the whole recordings
+        tree (idempotent; steady-state is a 0-session no-op via the marker).
+        ``trigger == "close"`` with a ``session_dir`` → single-session
+        ``ingest_session`` for the just-finished session. When the close path
+        has no session_dir, it falls back to the boot-style sweep (the marker
+        makes it a near no-op).
+
+        Both the store + embedder are constructed lazily inside this helper and
+        the heavy FS+embed work is dispatched via ``loop.run_in_executor`` — it
+        NEVER runs on the asyncio reaction loop, never touches MusicState, never
+        holds ``state._lock``. The whole body is wrapped in try/except + log so
+        a failing ingest cannot crash session close or boot (T-64-09).
+
+        The runtime→memory.ingest import is the gate-safe one-way arrow; it is
+        function-local so the no-live-path dormancy gate (which scans the
+        ``memory/*.py`` import graph) is unaffected.
+        """
+        if self.recordings_root is None:
+            return
+        try:
+            from vibemix.memory.ingest import ingest_session, run_ingest_sweep
+            from vibemix.memory.store import MemoryStore
+
+            embedder = self._build_ingest_embedder()
+            if embedder is None:
+                # No usable embedder (no key / no proxy) — skip without raising.
+                return
+            store = MemoryStore(db_path=None)
+            loop = asyncio.get_running_loop()
+            if trigger == "close" and session_dir is not None:
+                result = await loop.run_in_executor(
+                    None, ingest_session, session_dir, store, embedder
+                )
+                log.info(
+                    "memory ingest (close): session=%s records=%s embeds=%s skipped=%s",
+                    getattr(result, "session_id", "?"),
+                    getattr(result, "records_written", "?"),
+                    getattr(result, "embeds_made", "?"),
+                    getattr(result, "skipped", "?"),
+                )
+            else:
+                ingested = await loop.run_in_executor(
+                    None, run_ingest_sweep, self.recordings_root, store, embedder
+                )
+                log.info(
+                    "memory ingest (%s sweep): %d session(s) ingested",
+                    trigger,
+                    len(ingested or []),
+                )
+        except Exception:
+            log.exception("memory ingest (%s) failed", trigger)
 
     def _log_retention_event_to_active_recorder(
         self, *, count: int, bytes_pruned: int
