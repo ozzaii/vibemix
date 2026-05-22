@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
 status: executing
-last_updated: "2026-05-22T10:38:55.002Z"
-last_activity: 2026-05-22
+last_updated: "2026-05-22T10:52:19.236Z"
+last_activity: 2026-05-22 -- Phase 65 execution started
 progress:
   total_phases: 12
   completed_phases: 10
@@ -46,9 +46,9 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 ## Current Position
 
 Phase: 65 (memory-retrieval-seam) — EXECUTING
-Plan: 4 of 4
-Status: 65-03 complete (MemoryRecall service GREEN, RECALL-03/04) — 65-04 (live-path wiring) next
-Last activity: 2026-05-22
+Plan: 1 of 4
+Status: Executing Phase 65
+Last activity: 2026-05-22 -- Phase 65 execution started
 
 ## v6.0 Phase Map
 
