@@ -86,7 +86,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
   4. Retrieval stays off the hot path and within the €50/mo budget gate (event-gate + executor-offload + content-hash cache + hard deadline — late memory is worse than no memory), TTFT p95 is unchanged feature-on vs feature-off, and all four cardinal invariants hold (single-writer, citation-grounding, trust-the-audio, one-socket).
 **Plans**: 4 plans
 - [x] 65-01-PLAN.md — Wave 0 RED-first test scaffold (poisoning RED, byte-identical cold golden, lockstep 8→9 count updates)
-- [ ] 65-02-PLAN.md — `recall` vocabulary across schema-mirror sites 1-3 (sites 1+2 lockstep — silent-poisoning-hole guard); zero new linter code
+- [x] 65-02-PLAN.md — `recall` vocabulary across schema-mirror sites 1-3 (sites 1+2 lockstep — silent-poisoning-hole guard); zero new linter code
 - [ ] 65-03-PLAN.md — `MemoryRecall` service (Grounding clone): event-gate, 0.7 floor, current-session-excluded, cosine-only, no live-path import
 - [ ] 65-04-PLAN.md — live-path wiring: gated `recall[…]` block + off-loop pre-dispatch/deadline + register survivors + clear (behind `recall_enabled`)
 **Research/KAAN-ACTION flag**: (1) the cosine-only vs cosine+time-weight blend and the decay half-life (in *sessions*, not hours) is an explicit open question — tune the shape (two-term exp-decay + relevance floor) and the exact recall threshold (start at 0.7) against Kaan's real session corpus in-phase (`/gsd:plan-phase --research-phase`). (2) Ships behind a **Kaan-ear veto** on retrieval relevance (mirrors the Phase 60 harmonic veto) — no callback that references a moment Kaan's ear says didn't matter; this is the hard quality gate.
@@ -109,7 +109,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 |-------|-----------|----------------|--------|-----------|
 | 63. Memory Store | v6.0 | 3/3 | Complete    | 2026-05-22 |
 | 64. Session Ingest | v6.0 | 3/3 | Complete    | 2026-05-22 |
-| 65. Memory Retrieval Seam | v6.0 | 1/4 | In Progress|  |
+| 65. Memory Retrieval Seam | v6.0 | 2/4 | In Progress|  |
 | 66. Visible Copilot Move | v6.0 | 0/? | Not started | - |
 
 **Coverage:** 14/14 v6.0 requirements mapped ✓ (no orphans, no duplicates) — STORE-01..04 → P63 · INGEST-01..03 → P64 · RECALL-01..04 → P65 · COPILOT-01..03 → P66
