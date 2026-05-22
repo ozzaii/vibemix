@@ -226,6 +226,36 @@ def test_key_source_not_time_keyed_DECK03() -> None:
 
 
 # ---------------------------------------------------------------------------
+# (g3) recall: past-session source — existence-only — RECALL-01 (Phase 65)
+# ---------------------------------------------------------------------------
+
+
+def test_recall_existence_only_valid() -> None:
+    """A REGISTERED ``[recall:<record_id>]`` passes the existence-only branch.
+
+    Phase 65 adds the dedicated ``recall`` source for past-session callbacks.
+    Like ``key``/``track`` it is existence-only — NOT in _TIME_KEYED_SOURCES, so
+    no ``@t`` parse. The agent registers each retrieved survivor's ``record_id``
+    (``f"{session_id}:{seq}"`` — the inner ``:`` survives because parse_citations
+    splits on the FIRST colon, exactly like ``key:A:8A``) BEFORE the LLM call;
+    the linter then validates by exact-body presence in ``snapshot["recall"]``.
+
+    RED until Plan 65-02: ``recall`` is not yet in EVIDENCE_SOURCES, so the
+    parse_citations regex (driven off ``_SOURCE_ALT``) never matches
+    ``[recall:…]`` → the linter sees 0 citations → ``no_citations`` (invalid).
+    Once 65-02 lands sites 1+2, this body-presence check passes. That is the
+    intended Wave-0 RED — the registered-recall-passes contract for 65-02.
+    """
+    record_id = "20260520-2200:7"
+    snap = _registry(("recall", record_id, None))
+    linter = CitationLinter()
+
+    valid = linter.check(f"[recall:{record_id}]", snap, mode="live")
+    assert valid.valid is True
+    assert valid.reason == "valid"
+
+
+# ---------------------------------------------------------------------------
 # (h) test_screen_mix_tend_existence_only
 # ---------------------------------------------------------------------------
 
