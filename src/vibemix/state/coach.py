@@ -27,9 +27,18 @@ TWO confidence thresholds (do not confuse):
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
 from vibemix.state.event import Event
 from vibemix.state.music_state import MusicState
+
+if TYPE_CHECKING:  # pragma: no cover — typing-only, keeps coach.py import-light
+    # Forward reference for Phase 65 RECALL-02 — the recall_moments list is a
+    # list[Record] from vibemix.memory.store. Imported under TYPE_CHECKING so
+    # state/coach.py never pulls memory/ at module import time (the no-live-
+    # path / no-extraction static gates over memory/ still hold; the coupling
+    # here is one-way and lazy, only for the type hint).
+    from vibemix.memory.store import Record
 
 # ---- Plan 19-02 — prompt diet caps + ack-eligible event set ----
 # 4 chars/token proxy (cl100k empirical English baseline; project has no
@@ -55,6 +64,7 @@ class AICoach:
         state: MusicState,
         *,
         registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None = None,
+        recall_moments: "list[Record] | None" = None,
     ) -> str:
         """Build the grounded-state evidence string for the AI prompt.
 
@@ -64,6 +74,18 @@ class AICoach:
         appended — primes Gemini that grounded observations exist (Plan
         18-03 builds on this to bake the citation grammar). Default None
         preserves the v4 byte-identical output for all existing callers.
+
+        ``recall_moments`` (Phase 65 Plan 04, RECALL-02): optional list of
+        past-session ``Record`` objects pulled off the (off-loop)
+        ``MemoryRecall`` seam. The block is gated identically to the Phase-59 ``decks[…]``
+        block: ``None`` AND ``[]`` are both falsy → zero bytes appended →
+        the v5.0 cold-memory golden stays BYTE-IDENTICAL. When the list is
+        non-empty, a PAST-tense fenced ``FROM A PAST SESSION (not happening
+        now): …`` block is appended AFTER the live evidence (subordinate —
+        live audio stays primary; recall is never read as live). Each token
+        is ``[recall:<record_id>]`` so the EXISTING CitationLinter validates
+        a Gemini emission against registry survivors registered before the
+        snapshot. Default ``None`` preserves the v5.0 byte-identical output.
         """
         e = []
         if state.audible:
@@ -143,6 +165,34 @@ class AICoach:
         if len(state.track_history) >= 2:
             titles = [repr(t) for _, t in state.track_history[-3:]]
             e.append(f"recent_tracks: {'→'.join(titles)}")
+
+        # Phase 65 Plan 04 (RECALL-02) — recall[…] block. ADDITIVE + gated
+        # identically to the Phase-59 decks[…] block (and the
+        # registry_snapshot footer below): ``if recall_moments:`` is falsy
+        # for both the default ``None`` (cold / feature-off) AND ``[]``
+        # (event fired but all below floor / deadline missed / current-
+        # session-only). In every empty case ZERO bytes are appended →
+        # the v5.0 cold-memory golden (tests/state/test_coach.py:47) stays
+        # BYTE-IDENTICAL.  PAST-TENSE fenced (RECALL-03) — never read as
+        # live evidence; live audio/track/decks above stays primary, recall
+        # is subordinate (the order matters: appended AFTER recent_moves so
+        # the recall fence lands AFTER the live evidence block — pinned by
+        # test_evidence_line_recall_block_present's index assertion).  Each
+        # ``[recall:<record_id>]`` token is registered in the
+        # EvidenceRegistry by the agent BEFORE the prompt snapshot (Plan
+        # 65-04 wiring); a fabricated ``[recall:<unregistered>]`` then
+        # strips the WHOLE turn via the existing CitationLinter's
+        # existence-only branch (the headline RECALL-01 poisoning gate).
+        # The diet/compact path intentionally has NO recall block (diet =
+        # ACK_ELIGIBLE_EVENTS incl. HEARTBEAT, which is never a retrieval
+        # event — keeping recall off the diet path is correct).
+        if recall_moments:
+            parts = [
+                f"[recall:{m.record_id}] {m.signature}" for m in recall_moments
+            ]
+            e.append(
+                "FROM A PAST SESSION (not happening now): " + " || ".join(parts)
+            )
 
         # Phase 18 Plan 02 — evidence-corpus footer. When the registry
         # snapshot is provided AND has at least one observation, append a
@@ -321,6 +371,7 @@ class AICoach:
         ev: Event,
         *,
         registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None = None,
+        recall_moments: "list[Record] | None" = None,
         diet: bool = False,
     ) -> str:
         """Format the per-event prompt body.
@@ -328,6 +379,12 @@ class AICoach:
         ``registry_snapshot`` (Phase 18 Plan 02) threads through to
         ``evidence_line`` for the evidence-corpus footer. Default None
         preserves the v4 byte-identical output.
+
+        ``recall_moments`` (Phase 65 Plan 04, RECALL-02): optional list of
+        past-session ``Record`` objects. Threads through to ``evidence_line``;
+        ``None``/``[]`` → no recall block, byte-identical to v5.0. The diet
+        branch intentionally skips the recall block — diet events are
+        ACK_ELIGIBLE (incl. HEARTBEAT) and are never retrieval events.
 
         ``diet`` (Plan 19-02): when True, returns a compressed prompt for
         ack-eligible events — the compact 5-field evidence_line + the
@@ -348,6 +405,10 @@ class AICoach:
             evidence = AICoach._evidence_line_compact(ev.state)
             task = AICoach.task_for_event(ev)
             return f"[{evidence}] {task}"
-        evidence = AICoach.evidence_line(ev.state, registry_snapshot=registry_snapshot)
+        evidence = AICoach.evidence_line(
+            ev.state,
+            registry_snapshot=registry_snapshot,
+            recall_moments=recall_moments,
+        )
         task = AICoach.task_for_event(ev)
         return f"[{evidence} | event={ev.type}] {task}"
