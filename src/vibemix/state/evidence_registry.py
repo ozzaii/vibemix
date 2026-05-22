@@ -96,12 +96,19 @@ DEFAULT_MIN_REFRESH_INTERVAL_S: float = 30.0
 #: the dedicated source that makes a fabricated clash uncitable-by-construction
 #: (Phase 60 narrates clashes the code already confirmed; existence-only,
 #: mirrors ``track``).
+#: ``recall`` = past-session callback, body ``<record_id>`` (e.g.
+#: ``20260520-2200:7``) — Phase 65 (RECALL-01). Retrieval-time source that
+#: makes a fabricated ``[recall:<id>]`` uncitable-by-construction: it joins
+#: the linter's EXISTENCE-ONLY set purely by being IN this frozenset and
+#: ABSENT from ``citation_linter.py::_TIME_KEYED_SOURCES`` (mirrors ``key``/
+#: ``track``). The agent registers retrieved record_ids via ``write("recall",
+#: record_id, 0.0)`` (Phase 66 wiring) so unregistered ids strip the turn.
 #: Phase 20 linter consumes this for source-validity checks.
 #: SCHEMA-MIRROR: this frozenset is the source-of-truth — keep ``_SOURCE_ALT``,
 #: the EBNF docstring, ``prompts/matrix.py::CITATION_GRAMMAR_BLOCK`` and
 #: ``agent/dj_cohost.py::_build_citation_strip`` in lock-step.
 EVIDENCE_SOURCES: frozenset[str] = frozenset(
-    {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key"}
+    {"ev", "aud", "midi", "track", "screen", "mix", "tend", "key", "recall"}
 )
 
 
@@ -114,7 +121,19 @@ EVIDENCE_SOURCES: frozenset[str] = frozenset(
 # UNCHANGED — a ``key:A:8A`` body has no whitespace/comma/bracket, and
 # parse_citations splits on the FIRST ``:`` so the inner ``A:8A`` colon survives
 # as the body. No parser change is required.
-_SOURCE_ALT = "ev|aud|midi|track|screen|mix|tend|key"
+#
+# ``recall`` (Phase 65 / RECALL-01) is the silent-poisoning-hole pair: it MUST
+# join this alternation in the SAME commit it joins EVIDENCE_SOURCES — otherwise
+# a fabricated ``[recall:<id>]`` is never matched by parse_citations, never
+# stripped, and rides through un-validated. ``_INNER_ATOM`` stays UNCHANGED — a
+# ``recall:20260520-2200:7`` body has no whitespace/comma/bracket and the inner
+# colon survives as the record_id body (same as ``key:A:8A``).
+#
+# ASYMMETRY (intentional, do NOT "fix"): ``memory/ingest.py``'s copy of this
+# alternation stays at 8 sources — ``recall`` is RETRIEVAL-time, never
+# ingest-time (a stored past reaction never cited recall itself), so the
+# ingest-time extractor must not whitelist it.
+_SOURCE_ALT = "ev|aud|midi|track|screen|mix|tend|key|recall"
 _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 
 #: Compiled regex matching the LOCKED EBNF grammar:
@@ -122,12 +141,14 @@ _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 #:   citation := '[' atom ( ',' atom )* ']'
 #:   atom     := source ':' body
 #:   source   := 'ev' | 'aud' | 'midi' | 'track' | 'screen' | 'mix' | 'tend'
-#:             | 'key'
+#:             | 'key' | 'recall'
 #:   body     := one-or-more chars excluding whitespace, ']', ','
 #:   key-body := <deck> ':' <camelot>   # e.g. "A:8A" — deck ∈ {A,B,C,D},
 #:                                       # camelot ∈ 1A..12B (Phase 59 DECK-03)
+#:   recall-body := <record_id>          # e.g. "20260520-2200:7" — inner colon
+#:                                       # survives as body (Phase 65 RECALL-01)
 #:
-#: Matches the 8 single-citation forms + the comma-joined multi-citation
+#: Matches the 9 single-citation forms + the comma-joined multi-citation
 #: form in one pass. Empty ``[]`` is rejected (body requires at least one
 #: char). Whitespace inside brackets is rejected.
 EVIDENCE_CITATION_RE: re.Pattern[str] = re.compile(
