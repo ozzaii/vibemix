@@ -317,3 +317,51 @@ def test_embed_called_once(tmp_path: Path) -> None:
 
     # Exactly one embed for the one query — never per-candidate.
     assert embedder.calls == 1
+
+
+# ---------------------------------------------------------------------------
+# RECALL-04 — STATIC GATE: llm_node MUST NOT inline-await embed_query.
+# ---------------------------------------------------------------------------
+
+
+def test_llm_node_does_not_inline_await_embed_query() -> None:
+    """Static assertion — ``DJCoHostAgent.llm_node`` MUST NEVER inline-await
+    ``embed_query``. TTFT regression is the existential failure of RECALL-04;
+    the structural guarantee is that the embed runs off-loop via the
+    pre-dispatched ``MemoryRecall.on_event`` (run_in_executor + wait_for) and
+    that ``llm_node`` only pulls survivors via the LOCK-FREE
+    ``recall.get_latest()`` — which returns ``[]`` if the deadline missed, so
+    no block, no stall.
+
+    This guard is intentionally cheap + structural: we read the body of
+    ``llm_node`` between its ``async def`` header and the next sibling method
+    and assert NO ``await ... embed_query`` substring appears. A future
+    refactor that inlines the embed (e.g. ``await self._recall._embedder.
+    embed_query(…)``) will trip this. The legitimate dispatch path lives in
+    ``_maybe_dispatch_recall`` (a separate method) — that does not match
+    the substring search inside llm_node's body.
+
+    The recall service itself MAY synchronously call ``embed_query`` (it runs
+    off-loop in an executor, that is exactly the point); only ``llm_node``'s
+    body is checked here.
+    """
+    import inspect
+
+    from vibemix.agent.dj_cohost import DJCoHostAgent
+
+    src = inspect.getsource(DJCoHostAgent.llm_node)
+    # Defense in depth: assert both spellings of an inline-await would-be
+    # offender. The error message names the violation explicitly so a
+    # future maintainer who trips this knows WHY the rule exists.
+    assert "embed_query" not in src, (
+        "RECALL-04 TTFT static gate: DJCoHostAgent.llm_node MUST NOT "
+        "reference embed_query — the embed is pre-dispatched off-loop via "
+        "_maybe_dispatch_recall + asyncio.wait_for(RECALL_DEADLINE_S). "
+        "llm_node only pulls survivors via recall.get_latest() (no await). "
+        "If you need the live query embedded, do it at the set_next_event "
+        "dispatch seam, not inside the reaction body."
+    )
+    assert "await " in src and ".embed_query" not in src, (
+        "llm_node must be async (await present) and must NOT call .embed_query "
+        "anywhere in its body. Sanity check on the inspect.getsource path."
+    )
