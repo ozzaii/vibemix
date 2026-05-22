@@ -209,6 +209,10 @@ class SessionLoop:
         self._snapshot_task: asyncio.Task | None = None
         self._retention_task: asyncio.Task | None = None
         self._parent_watch_task: asyncio.Task | None = None
+        # Phase 64 — the ref-kept boot-ingest task (created in run_boot_sweeps).
+        # Declared here so run()'s teardown can cancel+await it; otherwise a
+        # fast boot→shutdown orphans it ("Task was destroyed but pending"). WR-02.
+        self._boot_ingest_task: asyncio.Task | None = None
         self._transcript: deque[TranscriptLine] = deque(maxlen=TRANSCRIPT_RING_SIZE)
         # ``_transcript_unsent`` is the slice not yet emitted in a snapshot
         # delta. Snapshot builds ``transcript_delta`` from this; on emit
@@ -896,23 +900,30 @@ class SessionLoop:
                     # No usable embedder (no key / no proxy) — skip, no raise.
                     return
                 store = MemoryStore(db_path=None)
-                if trigger == "close" and session_dir is not None:
-                    result = ingest_session(session_dir, store, embedder)
-                    log.info(
-                        "memory ingest (close): session=%s records=%s embeds=%s "
-                        "skipped=%s",
-                        getattr(result, "session_id", "?"),
-                        getattr(result, "records_written", "?"),
-                        getattr(result, "embeds_made", "?"),
-                        getattr(result, "skipped", "?"),
-                    )
-                else:
-                    ingested = run_ingest_sweep(recordings_root, store, embedder)
-                    log.info(
-                        "memory ingest (%s sweep): %d session(s) ingested",
-                        trigger,
-                        len(ingested or []),
-                    )
+                # Always release the store's sqlite connection(s) (and, on the
+                # numpy fallback, the sibling memory_moments.db handle): without
+                # this every session-close/boot ingest leaks an fd on the
+                # executor thread (WR-01).
+                try:
+                    if trigger == "close" and session_dir is not None:
+                        result = ingest_session(session_dir, store, embedder)
+                        log.info(
+                            "memory ingest (close): session=%s records=%s embeds=%s "
+                            "skipped=%s",
+                            getattr(result, "session_id", "?"),
+                            getattr(result, "records_written", "?"),
+                            getattr(result, "embeds_made", "?"),
+                            getattr(result, "skipped", "?"),
+                        )
+                    else:
+                        ingested = run_ingest_sweep(recordings_root, store, embedder)
+                        log.info(
+                            "memory ingest (%s sweep): %d session(s) ingested",
+                            trigger,
+                            len(ingested or []),
+                        )
+                finally:
+                    store.close()
             except Exception:
                 log.exception("memory ingest (%s) failed", trigger)
 
@@ -921,8 +932,6 @@ class SessionLoop:
             await loop.run_in_executor(None, _worker)
         except Exception:
             log.exception("memory ingest (%s) dispatch failed", trigger)
-        except Exception:
-            log.exception("memory ingest (%s) failed", trigger)
 
     def _log_retention_event_to_active_recorder(
         self, *, count: int, bytes_pruned: int
@@ -1310,6 +1319,7 @@ class SessionLoop:
                 self._snapshot_task,
                 self._retention_task,
                 self._parent_watch_task,
+                self._boot_ingest_task,
             ):
                 if task is not None:
                     task.cancel()
