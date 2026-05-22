@@ -659,19 +659,39 @@ class DJCoHostAgent(Agent):
                 print(f"[recall pull err] {_e}", file=sys.stderr)
                 recall_moments = []
             if recall_moments and self._registry is not None:
+                # Phase 65 review CR-01/CR-02 — the registered set MUST be a
+                # strict subset of what the prompt shows, or fabricated
+                # ``[recall:<id>]`` ids that match an accumulated registration
+                # would pass the linter's existence-only branch (the headline
+                # anti-poisoning gate). Two structural rules:
+                #   1. Clear the recall registry between turns so prior-turn
+                #      ids cannot leak as "valid" for fabrication this turn.
+                #   2. Use an explicit accumulator (``kept``) so we only
+                #      register survivors that actually land in
+                #      ``recall_moments`` — no in-loop list rebind (CR-02
+                #      iterator/rebind interaction), no registered-but-
+                #      dropped ids (CR-01 superset leak).
+                # The registry's per-source clear is keyed on the source
+                # string ("recall"); other sources (ev/aud/mix) are untouched.
+                try:
+                    self._registry.clear_source("recall")
+                except Exception as _e:
+                    # Defensive — best-effort; if clear fails, the per-turn
+                    # subset invariant below still holds because we only
+                    # ever append to ``kept`` on successful registration.
+                    print(f"[recall registry clear err] {_e}", file=sys.stderr)
                 t_session = getattr(ev.state, "set_seconds", 0.0) if ev is not None else 0.0
+                kept: list = []
                 for m in recall_moments:
                     try:
                         self._registry.write("recall", m.record_id, float(t_session))
+                        kept.append(m)
                     except Exception as _e:
-                        # A failed registration is structural — DROP the
-                        # offending survivor from the prompt list so the
-                        # linter cannot see an unregistered token (any
-                        # fabricated/leaked recall id must still strip).
+                        # A failed registration is structural — the offending
+                        # survivor is omitted from ``kept`` so the linter
+                        # cannot see an unregistered token.
                         print(f"[recall register err] {_e}", file=sys.stderr)
-                        recall_moments = [
-                            x for x in recall_moments if x.record_id != m.record_id
-                        ]
+                recall_moments = kept  # strict subset of registered ids
 
         # Plan 18-03 — snapshot the EvidenceRegistry FRESH per turn so the
         # AICoach.evidence_line corpus footer reflects observations written

@@ -250,6 +250,24 @@ class EvidenceRegistry:
             self._citation_buffer.clear()
             self._total_turns = 0
 
+    def clear_source(self, source: str) -> None:
+        """Reset observations for a single ``source`` (per-turn scoping).
+
+        Phase 65 review CR-01 — recall registration is per-turn, NOT
+        accumulative across the session. Without this, every consecutive
+        recall turn widens the set of ``[recall:<id>]`` tokens Gemini can
+        fabricate without being stripped by the linter (the registered set
+        must stay a strict subset of what the current prompt shows). The
+        agent's ``llm_node`` calls this BEFORE re-registering this turn's
+        survivors so the registry's "recall" bucket reflects ONLY the ids
+        shown in the current prompt's recall block.
+
+        Telemetry counters (citation buffer, total turns) are NOT reset —
+        those are session-scoped, not source-scoped.
+        """
+        with self._lock:
+            self._data.pop(source, None)
+
     # --- library wiring (Plan 25-02) ------------------------------------ #
 
     def register_library(
