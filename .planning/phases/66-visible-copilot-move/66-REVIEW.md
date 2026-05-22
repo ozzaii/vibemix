@@ -1,7 +1,8 @@
 ---
 phase: 66-visible-copilot-move
-reviewed: 2026-05-22T00:00:00Z
+reviewed: 2026-05-22T17:00:00Z
 depth: standard
+iteration: 2
 files_reviewed: 6
 files_reviewed_list:
   - src/vibemix/agent/dj_cohost.py
@@ -11,177 +12,156 @@ files_reviewed_list:
   - tests/state/test_coach.py
   - tests/repo/test_no_recall_antifeatures.py
 findings:
-  critical: 1
-  warning: 4
-  info: 3
-  total: 8
+  critical: 0
+  warning: 1
+  info: 2
+  total: 3
 status: issues_found
+iter_1_fixes_confirmed: 4
+v5_byte_identity: green
+phase_65_anti_poisoning: green
 ---
 
-# Phase 66: Code Review Report
+# Phase 66: Code Review Report — Iteration 2
 
-**Reviewed:** 2026-05-22
+**Reviewed:** 2026-05-22T17:00:00Z
 **Depth:** standard
 **Files Reviewed:** 6
-**Status:** issues_found
+**Iteration:** 2 (re-review of iteration 1 fixes)
+**Status:** issues_found (1 WARNING, 2 INFO; no BLOCKERs)
 
 ## Summary
 
-Phase 66 ("Visible Copilot Move") wires the recall chip into `_build_citation_strip`, adds a coach-tier `RECALL_CALLBACK_COOLDOWN_S=120.0s` cooldown, threads two prompt fragments (transition-shape + vocabulary) into `AICoach.build_prompt` via the `recall_fragment_for_event` helper, and lands a static anti-feature gate in `tests/repo/test_no_recall_antifeatures.py`.
+Iteration 2 of Phase 66 review. The 4 iteration-1 fixes (CR-01 BLOCKER + WR-01/02/04) are confirmed correctly applied. The bus-less cooldown arm path now mirrors the bus path's structural lens via `_build_citation_strip`, closing the BLOCKER cleanly. Forbidden-phrase tuple expansion (WR-01), test rename (WR-02), and event-fired set_seconds capture (WR-04) all check out.
 
-The bulk of the implementation is careful: the cold-path byte-identity contract holds (recall_moments=None / [] / no-kwarg all return identical strings, pinned by `test_task_for_event_byte_identical_v5_baseline_no_recall`); the cooldown arms strictly on the `else:` branch of the bus-emit try in the bus path; the strongest-survivor-only interpolation is structural (only `recall_moments[0].record_id` is fed to the template); the Phase 65 floor stays untouched (`clear_source("recall")` is still unconditional per `recall_enabled` turn, the `bump_generation` flag survives on the reactive clear, registration writes BEFORE the snapshot).
+Full test suite for the Phase 65/66 surface is GREEN (110/110: tests/agent/test_dj_cohost_linter.py + test_citation_strip_emit.py + tests/repo/test_no_recall_antifeatures.py + tests/state/test_coach.py + tests/memory/). v5.0 byte-identity goldens still green. The 4 broader-suite failures (`test_readme_feature_matrix_sync.py`, `test_cut_release_invokes_bravoh_server.py`, `test_gate_42_hybrid_in_force.py`) are PRE-EXISTING repo-meta failures unrelated to this phase's surface.
 
-The headline defect: the **bus-less cooldown arm path** (dj_cohost.py:1635-1654) arms on `citation_action in ("emit", "bypass")` using a **raw `parse_citations(full_text)` scan** that is NOT registry-validated. On the bypass path, a FABRICATED `[recall:<unregistered>]` atom will arm the cooldown — breaking the "REACHED the audience" semantic the bus path enforces structurally (the chip-strip filters by registry presence). The two paths must produce the same arm/no-arm decision; today they don't.
+Iteration 1 fix verifications (all CONFIRMED):
 
-Secondary concerns: the anti-feature tuple has obvious-gap synonyms (e.g. "your typical move", "you've been"), the linter-stripped test is partially undermined by the fact that the stripper replaces STRINGS with `""` (so even a real forbidden phrase inside a string literal won't trip the gate — defense-in-depth depends on the §RECALL-EAR Kaan-ear check), and the bus-less arm path additionally has a subtle redundancy with `_recall_enabled` (it arms even when recall is OFF, which is a no-harm but spec-violating path).
+1. **CR-01 (BLOCKER) — Bus-less arm structural filter** — `dj_cohost.py:1665-1709`. The bus-less arm path now (a) guards on `not self._recall_enabled or self._registry is None` and skips arming if either fails, (b) calls `_build_citation_strip(reaction_text=full_text, registry=self._registry)` instead of raw `parse_citations()`, and (c) arms only when a chip with `event_id.startswith("recall:")` is in the strip. A fabricated `[recall:<unregistered>]` riding through bypass cannot register a chip (registry lookup returns no timestamps → `continue` in the strip builder), so the cooldown does NOT arm — symmetric with the bus path. Verified by re-running `test_cooldown_suppresses_back_to_back_recalls_COPILOT02` (GREEN) + tracing the fabricated-bypass path manually.
 
-## Critical Issues
+2. **WR-01 — Forbidden-phrase tuple expansion** — `tests/repo/test_no_recall_antifeatures.py:130-145`. Nine new entries: "your typical", "you've been", "i'd recommend", "play next", "you should play next", "consider playing", "track to play next", "your usual move", "your habit". Re-grep against `src/vibemix/state/coach.py` + `src/vibemix/prompts/matrix.py` returns ZERO hits for all 9 phrases — the gate stays VACUOUS-GREEN at land. Static gate test green.
 
-### CR-01: Bus-less cooldown arm uses raw parse_citations (skips registry-validation), arms on bypass with fabricated recall atoms
+3. **WR-02 — Static gate test name rename** — `tests/repo/test_no_recall_antifeatures.py:235`. Renamed to `test_no_recall_antifeatures_in_coach_surface_after_string_and_comment_scrub_COPILOT03`. The module docstring already explicitly documents the divergence-from-analog stripper semantics (lines 24-71); the renamed test reinforces this with the explicit mechanical claim ("after string and comment scrub") in the function name itself. Test still collected and green.
 
-**File:** `src/vibemix/agent/dj_cohost.py:1635-1654`
-**Issue:** The bus-less cooldown arm scans `full_text` with `parse_citations(...)` and arms if ANY `("recall", body)` atom appears. This differs from the bus path (lines 1592-1634), which builds `strip` via `_build_citation_strip` — which only emits chips for atoms that **resolve in the registry**. On the BYPASS path (`citation_action == "bypass"`, linter said `invalid` but the one-shot bypass let the unverified text through), `full_text` can contain a FABRICATED `[recall:<unregistered_id>]`. The bus path correctly does NOT arm in that case (the unregistered atom yields no chip). The bus-less path arms anyway. The two paths must yield the same decision per the strict "REACHED the audience" semantic locked in CONTEXT.md Area 1 Q3.
+4. **WR-04 — `set_seconds` capture at event-fired time** — `dj_cohost.py:763-775`. `ev_set_seconds` is captured at the TOP of `llm_node` (before the LLM dispatch + stream + lint + bus emit, ~2-3s of drift in the prior code path), then threaded through all three `_record_said(...)` call sites at lines 1473, 1516, 1569 as `set_s_at_event=ev_set_seconds`. The `_record_said` signature (lines 579-603) was extended to accept the optional kwarg with a fallback to live `self._state.set_seconds` for legacy callers that don't yet thread the value. The capture is via `getattr(ev.state, "set_seconds", 0.0)` — `set_seconds` is a `@property` on `MusicState` (lines 147-148 of `music_state.py`) that returns `time.time() - self.set_start_at` LIVE, so the value is computed at the top-of-llm_node call site as intended.
 
-A secondary leak: this arm runs even when `self._recall_enabled is False` (the outer condition checks only `citation_action` and `_ipc_bus is None`). If a future flag-OFF code path were ever to emit a `[recall:...]` atom (today the prompt fragment is gated by `recall_enabled`, so this is theoretical), the cooldown would arm with no recall service in play — a state confusion the design explicitly tries to avoid.
-
-**Fix:** Mirror the bus path's structural filter — validate against the registry, or simply reuse the same `_build_citation_strip` lens:
-
-```python
-elif self._ipc_bus is None and citation_action in ("emit", "bypass"):
-    # Phase 66 (COPILOT-02) — bus-less arm path. Mirror the bus path's
-    # structural filter: only arm when a [recall:<id>] atom that resolves
-    # IN THE REGISTRY survives. parse_citations alone would also arm on a
-    # fabricated recall id under bypass (linter let it through), breaking
-    # the "REACHED the audience" semantic the bus path enforces.
-    if not self._recall_enabled or self._registry is None:
-        pass  # feature OFF or no registry — never arm without backing state
-    else:
-        try:
-            strip = _build_citation_strip(
-                reaction_text=full_text,
-                registry=self._registry,
-            )
-            if any(
-                chip.get("event_id", "").startswith("recall:")
-                for chip in strip
-            ):
-                self._last_recall_callback_at = time.time()
-        except Exception as _e:  # noqa: BLE001
-            print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
-```
-
-This unifies the bus and bus-less arm logic on the same structural lens (`_build_citation_strip`), eliminating the bypass-asymmetry and the flag-OFF arm path in one move.
+No NEW BLOCKER issues introduced. The remaining findings below are non-blocking quality concerns surfaced by the iteration 2 audit.
 
 ## Warnings
 
-### WR-01: Anti-feature forbidden-phrase tuple has obvious-synonym gaps
+### WR-05: No regression test for the WR-04 `set_s_at_event` fix
 
-**File:** `tests/repo/test_no_recall_antifeatures.py:118-130`
-**Issue:** The FORBIDDEN_RECALL_PHRASES tuple covers the cardinal failure modes from 66-RESEARCH §Pitfall 6 but misses near-synonyms that any production-corpus drift would naturally land on. Examples not in the tuple:
-- "your typical" / "your typical move" (paraphrase of "tendency")
-- "you've been" / "you've usually" (past-tense tendency)
-- "your habit" / "your habits"
-- "you keep doing" / "you keep" (recurrence claim)
-- "your style" (personalization-as-attribute)
-- "your move would" / "you'd usually" (predictive personalization)
-- "try next" / "play next" (next-track paraphrase)
-- "you should ride" / "you should drop" (recommendation paraphrase that "you should play" doesn't catch)
-- "I'd recommend" (contraction not caught by "i recommend")
+**File:** `src/vibemix/agent/dj_cohost.py:579-603, 763-775, 1473, 1516, 1569` / `tests/agent/` (missing)
+**Issue:** WR-04 added the `set_s_at_event` kwarg + capture-at-top-of-llm_node behavior, but no regression test pins the contract. A future refactor that reverts the threading (drops `set_s_at_event=...` at any of the three call sites, or removes the capture at the top of llm_node) would silently regress to the multi-second-drift behavior the fix exists to prevent. The fallback path (`if set_s_at_event is not None: ... else: self._state.set_seconds`) means the legacy behavior re-engages with no test signal — _the fallback IS the regression footprint_.
 
-Note: the comment at the top of the file acknowledges the gate is VACUOUS-GREEN at land (no forbidden phrase in TARGET_FILES today, and the stripper removes STRING contents anyway — see WR-02 below). So this gate's real lifetime value is "human-readable signal that Kaan/PR reviewers should rerun the Kaan-ear check if a tuple-listed phrase ever surfaces". The narrower the tuple, the weaker the signal.
+The other three iter-1 fixes all have dedicated tests:
+- CR-01 → bus-less arm symmetry pinned by the existing cooldown test (would fail under a fabricated-recall-arms-cooldown regression)
+- WR-01 → static-gate test catches any of the 9 new phrases landing in source
+- WR-02 → test name itself is the contract
 
-**Fix:** Either expand the tuple to cover the obvious-synonyms above, or rename the gate to make its limited scope explicit (e.g. `FORBIDDEN_LITERAL_RECALL_PHRASES` + a docstring note that the real defense is the Kaan-ear runtime check). Concretely, at minimum add:
-```python
-FORBIDDEN_RECALL_PHRASES: tuple[str, ...] = (
-    "you tend to", "you usually", "you always", "you've been", "you've usually",
-    "your tendency", "your tendencies", "your typical", "your habit", "your habits",
-    "your style",
-    "based on your past", "based on your history",
-    "next track", "play next", "try next",
-    "you should play", "you should try", "you should ride", "you should drop",
-    "i recommend", "i'd recommend", "my recommendation",
-    "you keep", "you keep doing",
-)
-```
+WR-04 has none. Recommend adding a test that drives `llm_node` with `time.time` patched to advance during the stream, then asserts the `[M:SS]` stamp in `agent._ai_text_history[0]` reflects the event-fired-time set_seconds, not the post-emit time.
 
-### WR-02: Static gate is functionally vacuous against TARGET_FILES — the comment is honest but the test name overpromises
-
-**File:** `tests/repo/test_no_recall_antifeatures.py:172-256`
-**Issue:** The module docstring explicitly documents that the tokenize stripper replaces STRING tokens with `""` AND removes COMMENT tokens. For human English prose (multi-word strings), the ONLY place a forbidden phrase can live in source is inside a STRING or COMMENT — Python identifiers cannot contain spaces. Therefore the main scan is mathematically incapable of firing on prompt fragment literals (the place where a forbidden phrase WOULD reach Gemini). The gate as written can ONLY catch a Python NAME-token sequence — which is impossible for multi-word English prose. This is acknowledged in the module docstring ("The main scan is necessarily VACUOUS against TARGET_FILES").
-
-So the test's name (`test_no_recall_antifeatures_in_coach_surface_COPILOT03`) reads as a defense-in-depth gate, but in fact the gate's only mechanical claim is "no future commit accidentally adds an English-prose anti-feature phrase as a Python NAME token" — which is syntactically impossible. The actual defense (Kaan-ear check, KAAN-ACTION-LEGAL.md §RECALL-EAR) lives elsewhere.
-
-This is not a code defect — the implementation matches the documented semantic — but the test gives a false sense of security to any reader who hasn't read the divergence section in the module docstring.
-
-**Fix:** Either:
-1. Rename the test to `test_no_recall_antifeatures_in_coach_NAME_tokens_only_COPILOT03` to be explicit about what it actually checks; OR
-2. Add a SECOND scan that does NOT strip STRING tokens — only COMMENTS — so prompt fragment literals are scanned for forbidden phrases. This would correctly fire if a future engineer copy-pastes "you tend to" into a fragment template body. The cost: the in-template "do NOT claim a tendency ('you usually do', 'you always')" examples become offenders. Carve out by listing the current template literal substrings as known-good, OR re-author the templates so their negative examples use different lexicalizations (e.g. replace `'you usually do'` with `'YOU-USUALLY-DO'` so the gate doesn't trip while Gemini still sees the negative-example pattern).
-
-The current implementation chose path 1 implicitly (the gate is type-level only); the test name should be made explicit so future maintainers don't loosen the stripper assuming the gate would catch a regression.
-
-### WR-03: Cooldown can suppress recall on the FIRST recall-eligible turn after an unrelated bypass turn
-
-**File:** `src/vibemix/agent/dj_cohost.py:845-848` + the bus-less arm at 1635-1654 + the bus arm at 1611-1634
-**Issue:** Consider this sequence under `recall_enabled=True`:
-1. Turn N is a recall-eligible event (TRACK_CHANGE). Survivors arrive, recall_moments non-empty, the fragment is built, Gemini emits `[recall:<id>]`. Linter passes (the id was registered). Bus emit succeeds. Cooldown arms at t=N.
-2. Turn N+1 is the same event class within 120s. Cooldown gate at line 845-848 drops survivors to `[]`. Correct — no callback this turn.
-
-Now consider this alternate sequence:
-1. Turn N is recall-eligible. Survivors non-empty. Fragment built. Gemini emits a fabricated `[recall:<bad>]`. Linter says invalid. should_bypass() returns True (one-shot bypass fires). Text emitted. citation_action == "bypass". Bus path: `_build_citation_strip` returns `[]` (fabricated id has no chip). `any(...startswith("recall:"))` is False. **Cooldown does NOT arm.** Good — the audience heard a fabricated callback, but the cooldown thinks no recall reached them. Future turn N+1 will allow another recall.
-
-Now repeat sequence with the bus-less path:
-1. Same fabricated-recall-under-bypass turn. `parse_citations(full_text)` finds `("recall", "<bad>")`. Cooldown arms with a fabricated atom backing it. Turn N+1 within 120s now suppresses a LEGITIMATE recall that should have surfaced.
-
-This is the CR-01 issue's downstream user-visible effect: in the bus-less path, a bypass turn that leaked a fabricated recall now suppresses legitimate recalls for 120s.
-
-**Fix:** Fix CR-01. Same fix closes this.
-
-### WR-04: `_record_said` history line uses `state.set_seconds`, not the turn-fired set_seconds — small but real cross-turn drift
-
-**File:** `src/vibemix/agent/dj_cohost.py:579-590` (`_record_said`)
-**Issue:** `_record_said` reads `self._state.set_seconds` AT THE TIME `_record_said` is called — which is AFTER the entire llm_node call has completed (stream consumed, lint gate, bus emit). On a 2-3s reaction turn, the set_seconds at write time is 2-3s AFTER the event fired. The history line `[M:SS]` then carries the END-of-reaction set time, not the EVENT-fired set time. Downstream, the prompt's "RECENT THINGS YOU JUST SAID" clause asks Gemini to compare set times. So the history clauses appear ~2-3s late, which over a session can produce minor drift in Gemini's "how long ago did I cover that" reasoning.
-
-This is a pre-existing concern, not introduced by Phase 66 — but Phase 66 didn't change `_record_said` while adding callable patterns that compare set times. If a future fix wants to preserve the EVENT-fired set time, capture it at `set_next_event` time and pass it through.
-
-**Fix:** Capture `ev.state.set_seconds` at set_next_event time and store it alongside `_pending_event`, then read it in `_record_said`. Alternatively, accept the drift as documented behavior and add a comment to `_record_said` clarifying the timing semantic.
+**Fix (sketch):**
 
 ```python
-def _record_said(self, text: str, set_s_at_event: float | None = None) -> None:
-    # Use the EVENT-fired set time when provided; fall back to live state
-    # for legacy callers that don't yet thread the event-fired value.
-    set_s = (
-        set_s_at_event
-        if set_s_at_event is not None
-        else (getattr(self._state, "set_seconds", 0.0) or 0.0)
+def test_record_said_uses_event_fired_set_seconds(mocker, tmp_path):
+    """WR-04 regression — [M:SS] stamp reflects EVENT-fired set_seconds,
+    not POST-emit set_seconds. A future refactor that drops set_s_at_event
+    threading would multi-second-drift the timestamp."""
+    agent, gen, recorder, state = _build_agent_legacy(mocker, tmp_path)
+    state.set_start_at = 1000.0  # set started at t=1000
+    # time at llm_node entry = 1060.0 (60s into set); time at _record_said
+    # call would be 1063.5 (3.5s of stream/lint/emit drift).
+    times = iter([1060.0, 1060.0, 1060.0, 1063.5, 1063.5])
+    mocker.patch(
+        "vibemix.agent.dj_cohost.time.time",
+        side_effect=lambda: next(times, 1063.5),
     )
-    ...
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"X")
+    mocker.patch.object(AICoach, "build_prompt", return_value="P")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["clean reply"])
+    )
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    _drive(agent)
+    # 60s = 1:00; if drift bug returns, stamp would be 1:03 instead.
+    assert agent._ai_text_history[0].startswith("[1:00]"), (
+        f"expected [1:00] event-fired stamp; got {agent._ai_text_history[0]!r}"
+    )
 ```
 
 ## Info
 
-### IN-01: `_maybe_dispatch_recall` imports inside the function body — fine for laziness, but the import error is silently swallowed
+### IN-01: One redundant entry in expanded FORBIDDEN_RECALL_PHRASES
 
-**File:** `src/vibemix/agent/dj_cohost.py:642-651`
-**Issue:** The lazy import of `vibemix.memory.retrieval` is wrapped in a bare `except Exception` that logs to stderr and returns. If the memory module is renamed or its public surface drifts, the agent will silently skip recall dispatch — not an outright failure, but `recall_enabled=True` users will see no recall callbacks with no actionable signal beyond a stderr line that won't be looked at.
+**File:** `tests/repo/test_no_recall_antifeatures.py:139`
+**Issue:** `"you should play next"` is a strict superset of `"you should play"` (already in the tuple at line 127). The gate is substring-based, so `"you should play next"` would already trip via the shorter form. The entry adds no coverage. Not a correctness bug — the gate is union-of-substrings — but it's dead expansion that future maintainers may copy-paste-extend with similar redundant pairs.
 
-**Fix:** Promote the import-failure log to a `recorder.log_event("recall_import_failure", ...)` so events.jsonl surfaces it for coach-loop tails. The diagnostic-trail value is high; cost is one extra log line per import failure (rare).
+**Fix:** Either drop `"you should play next"` from the tuple, or keep it with a brief comment ("kept for explicit-name reads even though `you should play` already catches it"). Both are acceptable.
 
-### IN-02: `recall_fragment_for_event` docstring describes the helper as called from `AICoach.build_prompt` in the non-diet path — but the actual integration is in `build_prompt`, not at `dj_cohost.py:827`
+### IN-02: Forbidden-phrase coverage gaps still present after WR-01 expansion
 
-**File:** `src/vibemix/state/coach.py:166-171`
-**Issue:** The docstring says: "It is called from `AICoach.build_prompt` in the non-diet path; the diet path skips it entirely". Correct. But the parenthetical "the existing `_bp_kwargs` logic at `dj_cohost.py:827` already withholds `recall_moments` from the diet call" is a stale line reference — the current code at line 921-923 builds `_bp_kwargs` and conditionally adds `recall_moments`. The reference is approximately correct but the line number is wrong, and the language ("already withholds") is backward — the agent only ADDS the kwarg when `recall_moments and not diet`, so the diet path doesn't withhold, it never adds.
+**File:** `tests/repo/test_no_recall_antifeatures.py:118-146`
+**Issue:** WR-01 closed 9 paraphrase gaps, but predictive-personalization classes are still uncovered. Examples that today would slip through the substring gate:
 
-**Fix:** Update the docstring to describe the actual logic and drop the stale line reference, or use a name-anchor reference (e.g. "see the `_bp_kwargs` construction in `DJCoHostAgent.llm_node`") that doesn't go stale on line drift.
+- `"you'll probably"` / `"you'll want to"` — predictive second-person ("you'll probably reach for the high pass" is a tendency claim with future-tense framing)
+- `"that's your style"` / `"that's typical of you"` — third-person tendency
+- `"your move is to"` — habit reframe
+- `"based on your tendency"` — explicit version of `"based on your past"` already in the tuple
 
-### IN-03: Cooldown docstring at `dj_cohost.py:520-531` references a test that doesn't appear to exist by that exact name
+Not a correctness bug — pre-grep against current source confirms ZERO of these appear today. The gate is vacuous-green per the documented contract. But the WR-01 fix-pass framed itself as "expand … with synonym gaps" and these are obvious paraphrase classes the executor could have folded into the same fix wave.
 
-**File:** `src/vibemix/agent/dj_cohost.py:520-535` (in the `_last_recall_callback_at` docstring)
-**Issue:** The comment says the gate is "pinned by `test_cooldown_suppresses_back_to_back_recalls_COPILOT02`" and walks through a mocked t=100.0 / t=180.0 scenario. The test exists at `tests/agent/test_dj_cohost_linter.py:673` and matches the scenario. But the docstring also says "the plain `0.0` initializer would incorrectly trip the gate" — verified, since the gap on the first turn would be (100.0 - 0.0) = 100.0 < 120.0 → suppress. The `-inf` init is correct. Just confirming the docstring's reasoning checks out.
-
-No fix needed — this is informational. The reasoning is sound and the test pins it.
+**Fix:** Either (a) accept current coverage as sufficient and document iter-2's decision in the module docstring's "Pre-grep evidence" section, or (b) extend the tuple with the missing predictive-personalization class in a follow-up. Acceptable to defer to v6.1.
 
 ---
 
-_Reviewed: 2026-05-22_
+## Verification: v5.0 byte-identity goldens
+
+Re-ran the three v5.0 byte-identity anchor tests:
+
+- `tests/state/test_coach.py::test_evidence_line_audible_no_recall_byte_identical_v5_baseline` — PASSED
+- `tests/state/test_coach.py::test_task_for_event_byte_identical_v5_baseline_no_recall` — PASSED
+- `tests/state/test_coach.py::test_evidence_line_silent_state_full_format` — PASSED
+
+The cold-path byte-identity floor (recall_moments=None == [] == no-kwarg, across all 9 event types: KAAN_SPOKE / MANUAL / TRACK_CHANGE / PHASE / LAYER_ARRIVAL / MIX_MOVE / HEARTBEAT / KEY_CLASH / TRANSITION_OPPORTUNITY) is intact.
+
+## Verification: Phase 65 anti-poisoning gates
+
+Re-ran the Phase 65 anti-poisoning headline tests:
+
+- `tests/agent/test_dj_cohost_linter.py::test_fabricated_recall_strips_turn` — PASSED
+- `tests/agent/test_dj_cohost_linter.py::test_fabricated_recall_strips_turn_n_plus_1_with_empty_recall` — PASSED (cross-turn rescope)
+- `tests/agent/test_dj_cohost_linter.py::test_invalid_response_strips_silently` — PASSED
+- `tests/agent/test_dj_cohost_linter.py::test_no_citations_response_strips` — PASSED
+
+The Phase 65 anti-poisoning gate carries forward intact. The iter-2 fix to the bus-less arm path does not weaken the linter's existence-only branch — fabricated recall ids still strip the whole turn.
+
+## Verification: Phase 66 cooldown contract tests
+
+- `tests/agent/test_dj_cohost_linter.py::test_cooldown_suppresses_back_to_back_recalls_COPILOT02` — PASSED
+- `tests/agent/test_dj_cohost_linter.py::test_max_one_recall_per_turn_COPILOT02` — PASSED
+
+Both COPILOT-02 contract tests green. Cooldown "REACHED the audience" semantic holds across bus and bus-less paths after the CR-01 fix.
+
+## Verification: Full test sweep
+
+- Full suite (tests/agent/ + tests/state/ + tests/repo/ + tests/memory/): 1386 passed, 4 failed, 1 skipped.
+- The 4 failures (`test_readme_feature_matrix_sync.py::*`, `test_cut_release_invokes_bravoh_server.py::test_tag_regex_unchanged_in_this_plan`, `test_gate_42_hybrid_in_force.py::test_state_md_phase_16_line_is_annotated_retired`) are PRE-EXISTING repo-meta failures unrelated to Phase 66's surface — confirmed by spot-check of failure messages (README sync drift, release tag regex, STATE.md phase-16 annotation). None touch the recall / coach / linter / prompt surface.
+
+## Summary table
+
+| Iter-1 finding | Fix commit | Iter-2 status | Outstanding |
+|----------------|------------|---------------|-------------|
+| CR-01 (BLOCKER) — Bus-less arm fabricated-id leak | `5f84f4d` | CONFIRMED FIXED — bus-less arm now mirrors bus-path structural lens via `_build_citation_strip` + flag-OFF guard | — |
+| WR-01 — Forbidden phrase synonym gaps | `34ef104` | CONFIRMED FIXED — 9 new phrases, pre-grep ZERO hits, gate VACUOUS-GREEN | IN-01 (1 redundant), IN-02 (gaps remain) |
+| WR-02 — Static gate test name | `8b385ce` | CONFIRMED FIXED — renamed to `..._after_string_and_comment_scrub_COPILOT03` | — |
+| WR-04 — set_seconds captured at event-fired time | `5f27dcd` | CONFIRMED FIXED — capture-at-top-of-llm_node + threaded to 3 `_record_said` call sites | **WR-05 — no regression test** |
+
+---
+
+_Reviewed: 2026-05-22T17:00:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+_Iteration: 2_
