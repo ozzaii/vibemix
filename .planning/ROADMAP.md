@@ -85,7 +85,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
   3. Retrieval is anti-poisoning by construction: below-floor injects nothing; retrieved moments are fenced PAST-tense ("FROM A PAST SESSION") so they can never be read as live evidence; and the current in-progress session is excluded from its own retrieval.
   4. Retrieval stays off the hot path and within the €50/mo budget gate (event-gate + executor-offload + content-hash cache + hard deadline — late memory is worse than no memory), TTFT p95 is unchanged feature-on vs feature-off, and all four cardinal invariants hold (single-writer, citation-grounding, trust-the-audio, one-socket).
 **Plans**: 4 plans
-- [ ] 65-01-PLAN.md — Wave 0 RED-first test scaffold (poisoning RED, byte-identical cold golden, lockstep 8→9 count updates)
+- [x] 65-01-PLAN.md — Wave 0 RED-first test scaffold (poisoning RED, byte-identical cold golden, lockstep 8→9 count updates)
 - [ ] 65-02-PLAN.md — `recall` vocabulary across schema-mirror sites 1-3 (sites 1+2 lockstep — silent-poisoning-hole guard); zero new linter code
 - [ ] 65-03-PLAN.md — `MemoryRecall` service (Grounding clone): event-gate, 0.7 floor, current-session-excluded, cosine-only, no live-path import
 - [ ] 65-04-PLAN.md — live-path wiring: gated `recall[…]` block + off-loop pre-dispatch/deadline + register survivors + clear (behind `recall_enabled`)
@@ -109,7 +109,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 |-------|-----------|----------------|--------|-----------|
 | 63. Memory Store | v6.0 | 3/3 | Complete    | 2026-05-22 |
 | 64. Session Ingest | v6.0 | 3/3 | Complete    | 2026-05-22 |
-| 65. Memory Retrieval Seam | v6.0 | 0/? | Not started | - |
+| 65. Memory Retrieval Seam | v6.0 | 1/4 | In Progress|  |
 | 66. Visible Copilot Move | v6.0 | 0/? | Not started | - |
 
 **Coverage:** 14/14 v6.0 requirements mapped ✓ (no orphans, no duplicates) — STORE-01..04 → P63 · INGEST-01..03 → P64 · RECALL-01..04 → P65 · COPILOT-01..03 → P66
