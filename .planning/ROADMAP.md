@@ -38,7 +38,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 
 **Phase Numbering:** Continues from v5.0 (closed at Phase 62). v6.0 starts at **Phase 63** and runs through **Phase 66**. Integer phases (63, 64, …) = planned milestone work; decimal phases (e.g. 65.1) = urgent insertions if needed.
 
-- [ ] **Phase 63: Memory Store** - A local per-install `memory.db` (sqlite-vec) + a ~50-line `MemoryStore` wrapper, cloned from the shipped `library/` store/cosine/embed-cache primitives (zero new dependency), with Mac/Win bit-identical `cosine_topk` parity + numpy fallback, retention + delete-cascade, and embedding routed via `model_router.resolve("embedding")` on the FLEX cost lane. No live-path touch.
+- [ ] **Phase 63: Memory Store** - A local per-install `memory.db` (sqlite-vec) + a ~50-line `MemoryStore` wrapper, cloned from the shipped `library/` store/cosine/embed-cache primitives (zero new dependency), with Mac/Win bit-identical `cosine_topk` parity + numpy fallback, retention + delete-cascade, and embedding routed via `model_router.resolve("embedding")` on the FLEX cost lane. No live-path touch. (3 plans, 3 waves.)
 - [ ] **Phase 64: Session Ingest** - An off-hot-path post-session batch job (+ boot-time sweep) that turns each session's existing artifacts (`events.jsonl` + cited evidence + `ai_text`) into deterministic TEXT "reaction moment" records — NO audio embedding, NO LLM-extraction (CI-guarded) — every record `session_id`/timestamp-tagged. Depends on 63.
 - [ ] **Phase 65: Memory Retrieval Seam (ANTI-SLOP RELEASE GATE)** - A new existence-only `recall` evidence source (zero new linter code, à la Phase 59 `key`) + a gated `recall[…]` block in `coach.py::evidence_line` (copy the Phase 59 `decks[…]` gate → cold-memory golden byte-identical), top-k 2–3 cap, ~0.7 similarity floor, PAST-tense fence, current-session excluded, cosine-vs-time-weight blend tuned in-phase on Kaan's real corpus. **Kaan-ear veto.** Depends on 63 + 64.
 - [ ] **Phase 66: Visible Copilot Move** - A linter-grounded transition-shape callback + a vocabulary/register callback — cited, warm, non-nagging — that prove retrieval is firing, with NO anti-features (no next-track rec, no LLM-extracted "tendencies", no settings-screen personalization, no continuous audio embedding). Depends on 65.
@@ -54,7 +54,10 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
   2. On a host where the sqlite-vec extension can't load, the store falls back to the existing NumpyStore and produces bit-identical top-k rank order to the sqlite-vec path (Mac/Win parity, `pytest -m parity` green).
   3. Deleting a session's recordings cascades to its memory embeddings — no orphaned vectors remain — and a per-install size/retention budget caps growth; everything is local-only, user-deletable, and confined to the app cache dir (path-traversal defended).
   4. Every embed call resolves the model via `model_router.resolve("embedding")` (no hardcoded `gemini-embedding-001` literal — CI grep gate green) and routes through the Bravoh proxy on the `ServiceTier.FLEX` cost lane; a record carries the raw text signature only — never an LLM-extracted "insight" (raw-in, raw-out).
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 63-01-PLAN.md — Wave 0: scaffold the full tests/memory/ contract suite (parity, round-trip, fallback, cascade, path-traversal, no-live-import, no-extraction, retention)
+- [ ] 63-02-PLAN.md — Wave 1: SqliteVecMemoryStore (vec_memory + moments table) + MemoryStore facade + open_memory_store probe (STORE-01/02/04)
+- [ ] 63-03-PLAN.md — Wave 2: hardened delete-cascade + path-traversal gate + oldest-session-first retention sweep + orphan reconciliation (STORE-03)
 **Research/KAAN-ACTION flag**: sqlite-vec one-click-install fragility — the `vec0.dylib`/`vec0.dll` native binaries must be signed/notarized and a clean-VM (incl. Windows ARM64) memory round-trip proven in the e2e matrix. This rides the Apple notarization + SignPath external clock already on the critical path — surface it early so it parallelizes against the in-flight approvals. (The *binary* was already signed in shipping builds; the new artifact is only a data file with zero new signing surface, but the clean-VM round-trip is the proof item.)
 
 ### Phase 64: Session Ingest
@@ -97,7 +100,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 63. Memory Store | v6.0 | 0/? | Not started | - |
+| 63. Memory Store | v6.0 | 0/3 | Planned | - |
 | 64. Session Ingest | v6.0 | 0/? | Not started | - |
 | 65. Memory Retrieval Seam | v6.0 | 0/? | Not started | - |
 | 66. Visible Copilot Move | v6.0 | 0/? | Not started | - |
