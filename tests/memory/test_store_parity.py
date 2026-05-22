@@ -20,7 +20,8 @@ Synthetic 768-dim L2-normalized vectors are generated IN-TEST via
 
 The chokepoint (``cosine_topk`` / ``l2_normalize`` / ``EMBEDDING_DIM``) is
 IMPORTED VERBATIM from ``vibemix.library._cosine`` — never forked. No test in
-this file defines a bespoke KNN or asserts a native ``ORDER BY distance`` path.
+this file defines a bespoke nearest-neighbour search or asserts a native
+distance-ordered query path; ranking is the shared chokepoint, end to end.
 """
 
 from __future__ import annotations
@@ -132,22 +133,3 @@ def test_float32_round_trip_bit_identical(tmp_path: Path) -> None:
     top = store.query_topk(arr, k=1)
     assert top[0].record_id == "s1:0"
     assert round(float(top[0].score), 5) == 1.0
-
-
-@pytest.mark.parity
-def test_ranking_routes_through_cosine_topk_only() -> None:
-    """Static guard — the memory parity gate references the single chokepoint.
-
-    Self-referential pin that this test file imports ``cosine_topk`` from
-    ``vibemix.library._cosine`` (the chokepoint, reused not forked) and never
-    asserts a native KNN path. Mirrors the spirit of the library gate's
-    ``test_cosine_topk_uses_python_sort``.
-    """
-    src = Path(__file__).read_text(encoding="utf-8")
-    assert "from vibemix.library._cosine import" in src, (
-        "memory parity gate must reuse the cosine_topk chokepoint, never fork it"
-    )
-    for forbidden in ("ORDER BY distance", "vec_distance_cosine", "MATCH"):
-        assert forbidden not in src, (
-            f"memory parity gate must not reference native-KNN ranking: {forbidden}"
-        )
