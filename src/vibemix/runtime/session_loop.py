@@ -708,10 +708,15 @@ class SessionLoop:
         (``run_ingest_sweep`` over the recordings tree) off the hot path. It
         is a sibling of the retention sweep (order does not matter) and is
         idempotent by construction (the ``memory_ingested`` marker makes a
-        steady-state boot ingest a 0-session no-op — Pitfall 5).
+        steady-state boot ingest a 0-session no-op — Pitfall 5). It is fired
+        as a background task (NOT awaited) so the heavy embedder build never
+        gates IPC readiness or starves the periodic loop (Pitfall 5: the boot
+        sweep must never block startup).
         """
         await self._fire_one_retention_sweep("boot")
-        await self._fire_ingest("boot")
+        # Fire-and-forget: the boot ingest must NOT block boot/IPC readiness.
+        # Keep a ref so the task is not GC'd mid-flight.
+        self._boot_ingest_task = asyncio.create_task(self._fire_ingest("boot"))
 
     async def on_session_close(self) -> None:
         """Phase 15 Plan 03 — session-close trigger.
