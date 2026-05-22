@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
 status: executing
-last_updated: "2026-05-22T08:53:57.435Z"
+last_updated: "2026-05-22T09:07:15.913Z"
 last_activity: 2026-05-22
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 32
-  completed_plans: 30
+  completed_plans: 31
   percent: 75
 ---
 
@@ -46,9 +46,9 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 ## Current Position
 
 Phase: 64 (session-ingest) — EXECUTING
-Plan: 2 of 3
-Status: 64-01 RED contract pinned (GREEN-flip is 64-02); ready to execute 64-02
-Last activity: 2026-05-22 -- P64-01 RED contract committed (dcdc307, 1cb9008)
+Plan: 3 of 3
+Status: 64-02 ingest module GREEN (all 6 test_ingest + ingest-dormancy CLEAN + no-extraction + model-literal gates); ready to execute 64-03 (runtime wiring)
+Last activity: 2026-05-22 -- P64-02 ingest.py committed (c68fe31, d6b29cf)
 
 ## v6.0 Phase Map
 
@@ -80,11 +80,14 @@ Last activity: 2026-05-22 -- P64-01 RED contract committed (dcdc307, 1cb9008)
 | P63-01 (Wave 0) | 2 tasks, 6 files, ~18 min — RED-first test contract (dde3c0f, 5635390) |
 | P63-02 (Wave 1) | 2 tasks, 3 files, ~32 min — storage spine GREEN; STORE-01/02/04 (610c374, d36d924) |
 | P63-03 (Wave 2) | 2 tasks, 2 files, ~18 min — hardening GREEN; STORE-03 (18a5c1f, eb5b5b5); 19/19 tests/memory/ |
+| P64-02 (Wave 1) | 2 tasks, 1 file, ~22 min — ingest.py GREEN; INGEST-01/02/03 (c68fe31, d6b29cf); 6/6 test_ingest + dormancy CLEAN |
 | v4.0 git tag | local artifacts on `live-tuning-or-brain`; unsigned `v0.1.0-rc1` .dmg built |
 | v3.0/v3.1/v4.0 carveouts | external clock (Apple Dev + SignPath) — unchanged by v6.0 |
 
 ---
 | Phase 64 P01 | ~14 min | 2 tasks | 2 files |
+| Phase 64 P02 | ~22 min | 2 tasks | 1 file (+1 baseline) |
+| Phase 64 P02 | 22 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -140,6 +143,17 @@ v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numberi
 - **Verify state:** `tests/memory` minus the RED ingest module = 21 passed; the only failures are the two intentional RED edges (test_ingest collection + ingest-dormancy), both pointing at the missing `vibemix.memory.ingest`. No NEW collateral failures vs the known 8-WIP baseline.
 - **Invariant carried to 64-02:** any `config_store`/`vibemix.runtime` import in `ingest.py` MUST be function-local — a module-level pull trips the dormancy gate this plan just extended.
 
+### P64-02 Execution Decisions (2026-05-22)
+
+- **`src/vibemix/memory/ingest.py` GREEN — the full INGEST capability (INGEST-01/02/03).** Flipped all 6 `tests/memory/test_ingest.py` + `test_importing_ingest_loads_no_coach_loop` (now CLEAN) + the no-extraction + model-literal gates GREEN. Commits `c68fe31` (feat), `d6b29cf` (orphan baseline). `library/embed.py` and `memory/store.py` (incl. `delete_session`) UNMODIFIED; zero net-new deps (stdlib + shipped modules only).
+- **`build_coach_line_signature` is a PURE deterministic string assembly** — regex + string ops, NO model in the path. `EVIDENCE_CITATION_RE` COPIED VERBATIM from `evidence_registry.py:133` (lock-step comment) rather than imported; leading `[emotion]` TTS tag stripped; citation tokens sorted+`,`-joined; NO `t` in the embedded string. The ingest path's ONLY model call is `embedder.embed_query`.
+- **ONE kind only — `coach_line`.** Ingest `kind=="ai_text"` (emitted/heard) lines ONLY; `citation_strip` (silenced) explicitly SKIPPED — embedding a never-heard line is confabulation (the anti-slop failure class). `record_id = f"{sid}:{seq}"` (0-based emitted-ai_text index), `ts` = line's `t`, tagged via `store.add_record`.
+- **Two-layer idempotency (Finding 2 fix):** a NEW signature-keyed content-hash `embed_cache` (CLONED from `embed.py:146-157,605-623`, key = `SHA256(sig‖model‖SIG_TEMPLATE_VERSION)`) + a `memory_ingested` marker — both in an ingest-OWNED sibling `memory_ingest.db` (does NOT modify `library/embed.py` nor reuse the store's backend connection). Re-ingest = 0 embeds + 0 new records.
+- **A4 marker↔retention coupling solved WITHOUT editing Phase-63 code:** the short-circuit is gated on the marker AND `COUNT(*) FROM moments WHERE session_id=?` > 0 (a cheap read of the store's moments connection) — so a retention-evicted session (0 moments) re-ingests despite a surviving stale marker. `store.delete_session` untouched.
+- **MIRROR not import:** `_read_events_jsonl` clones `session_loader._read_events` WITHOUT the 5-min `SessionTooShort` floor; `SESSION_DIR_RE` + the two-layer `is_relative_to` gate copied from `recordings_index.py:78,388-401`. `run_ingest_sweep` is best-effort (one bad session logs + continues, never raises). No `vibemix.runtime` import needed (cache/marker paths derive from `store._db_path`), so the dormancy gate prints CLEAN.
+- **Two Rule-3 auto-fixes:** (1) `model_id = getattr(embedder, "_model", "") or ""` — the contract's stand-in embedder exposes only `embed_query` (no `_model`); the real `LibraryEmbedder` always has the probe-derived `_model` (never a literal). (2) `IngestResult` registered in `.planning/codebase/orphans.csv` — it is referenced by 64-03 Wave 3 wiring; orphan-diff CI gate refreshed per its own instruction.
+- **Pre-existing baseline:** full suite = 9 failed / 4116 passed. 8 are the known `live-tuning-or-brain` WIP baseline (confirmed identical with `ingest.py` removed); the 9th (orphan-inventory) was caused-by + resolved-within this plan. No NEW collateral failures.
+
 ### v6.0 KAAN-ACTION / Research Flags (carry into planning)
 
 - **P63 — sqlite-vec install fragility (KAAN-ACTION, external clock):** `vec0.dylib`/`vec0.dll` native binaries must be signed/notarized + a clean-VM (incl. Windows ARM64) `memory.db` round-trip proven in the e2e matrix. Rides the Apple notarization + SignPath external clock already on the critical path — surfaced EARLY so it parallelizes against the in-flight v4.0 approvals. (The binary was already signed in shipping builds; the new artifact is only a data file with zero new signing surface — the clean-VM round-trip is the proof item.)
@@ -160,11 +174,11 @@ v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numberi
 
 ## Session Continuity
 
-**Next command:** `/gsd:plan-phase --research-phase 64` (Session Ingest) — the moment-taxonomy research flag ("which artifacts ground best": `coach_line` vs `moment` vs stretch `audio_moment`) resolves in-phase. Start text-only.
+**Next command:** execute `64-03-PLAN.md` (Wave 2 — runtime wiring) — `/gsd:execute-phase 64`.
 
-**What's done:** **Phase 63 (Memory Store) COMPLETE — 3/3 plans, STORE-01..04 GREEN.** P63-03 (Wave 2) hardened the storage spine: `delete_session` is now path-traversal-defended + atomic-cascade, `reconcile_orphans` is the boot backstop, and `src/vibemix/memory/retention.py::run_memory_retention_sweep` does oldest-session-first whole-session eviction. 19/19 `tests/memory/` GREEN; no-live-path subprocess gate CLEAN; model-literal gate green. Commits `18a5c1f` + `eb5b5b5`. Earlier: P63-02 storage spine (`610c374`, `d36d924`); P63-01 RED contract (`dde3c0f`, `5635390`).
+**What's done:** **Phase 64 INGEST module GREEN (64-01 RED → 64-02 GREEN).** `src/vibemix/memory/ingest.py` ships `build_coach_line_signature` (pure, deterministic, model-free), `ingest_session` (one `coach_line` per EMITTED `ai_text`; skips silenced `citation_strip`; two-layer idempotency = `memory_ingested` marker + signature-keyed `embed_cache`; A4 reconciliation on `COUNT(*) moments`), `run_ingest_sweep` (best-effort boot sweep, `SESSION_DIR_RE` + `is_relative_to` path-traversal defense), `IngestResult`. All 6 `test_ingest` + ingest-dormancy CLEAN + no-extraction + model-literal gates GREEN; `library/embed.py` + `memory/store.py` UNMODIFIED. Commits `c68fe31`, `d6b29cf`. Earlier: P64-01 RED contract (`dcdc307`, `1cb9008`). **Phase 63 (Memory Store) COMPLETE** — STORE-01..04 GREEN (`18a5c1f`, `eb5b5b5`, `610c374`, `d36d924`, `dde3c0f`, `5635390`).
 
-**What's next:** Phase 64 Session Ingest — an off-hot-path post-session batch job (+ boot sweep) writing deterministic TEXT "reaction moment" records into `MemoryStore.add_record` (the validation gate is now in place). NO audio embedding, NO LLM-extraction (CI-guarded). **Invariant for 64:** keep any `config_store`/`vibemix.runtime` import function-local in any `memory/`-adjacent module — module-level pulls the live path into `sys.modules` and fails the no-live-path dormancy gate. Then `/gsd:plan-phase --research-phase` for P65 (blend/half-life). The P63 sqlite-vec clean-VM/sign item rides the v4.0 external-clock surface; the cascade/retention call-site wiring is deferred to the recordings-UI-delete phase.
+**What's next:** Phase 64 Plan 03 (Wave 2) — runtime wiring: enqueue `ingest_session` at session-close (`on_session_close`) + `run_ingest_sweep` at boot (`run_boot_sweeps`), both via `run_in_executor`, one-way runtime→ingest, best-effort/never-raise. The ingest seam is complete + tested; 64-03 only wires the call sites (touches the runtime/session-end seam, NOT the live ears). Then `/gsd:plan-phase --research-phase` for P65 (blend/half-life — the anti-slop release gate). The P63 sqlite-vec clean-VM/sign item rides the v4.0 external-clock surface; the cascade/retention call-site wiring is deferred to the recordings-UI-delete phase.
 
 **Open before execution:** none blocking. Model-ID (text-001 vs multimodal-2) is a one-line config choice to confirm with Kaan but never hardcode either way.
 

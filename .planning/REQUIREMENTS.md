@@ -27,9 +27,9 @@ Acid test for any embedded artifact: *"does retrieving this close a hallucinatio
 
 ### Session Ingest (INGEST) — Phase 64
 
-- [ ] **INGEST-01**: A post-session ingest job turns each session's existing artifacts (`events.jsonl` + the cited evidence + the `ai_text` it produced) into typed **"reaction moment"** records as **deterministic TEXT signatures** — **NO audio embedding (v1), NO LLM-extraction** between session and embedding (a CI guard asserts the ingest path only calls `embed_content`).
-- [ ] **INGEST-02**: Ingest runs **off the hot path** — at session-close in batch (FLEX tier) plus a boot-time sweep for crashed sessions (mirrors the recorder sweep), via `run_in_executor`; it never touches `MusicState`, never holds `state._lock`, and is never a live tap.
-- [ ] **INGEST-03**: The moment taxonomy ("which artifacts ground best") is research-resolved in-phase and held to the acid test — only records that close a hallucination class or unlock a copilot move are embedded; everything is `session_id`/timestamp-tagged for later exclusion + deletion.
+- [x] **INGEST-01**: A post-session ingest job turns each session's existing artifacts (`events.jsonl` + the cited evidence + the `ai_text` it produced) into typed **"reaction moment"** records as **deterministic TEXT signatures** — **NO audio embedding (v1), NO LLM-extraction** between session and embedding (a CI guard asserts the ingest path only calls `embed_content`).
+- [x] **INGEST-02**: Ingest runs **off the hot path** — at session-close in batch (FLEX tier) plus a boot-time sweep for crashed sessions (mirrors the recorder sweep), via `run_in_executor`; it never touches `MusicState`, never holds `state._lock`, and is never a live tap.
+- [x] **INGEST-03**: The moment taxonomy ("which artifacts ground best") is research-resolved in-phase and held to the acid test — only records that close a hallucination class or unlock a copilot move are embedded; everything is `session_id`/timestamp-tagged for later exclusion + deletion.
 
 ### Memory Retrieval Seam (RECALL) — Phase 65 (anti-slop release gate)
 
@@ -72,9 +72,9 @@ Acid test for any embedded artifact: *"does retrieving this close a hallucinatio
 | STORE-02 | Phase 63 | ✅ Complete (Plan 63-02 — MemoryStore add_record/query_topk, raw-in/raw-out) |
 | STORE-03 | Phase 63 | ✅ Complete (Plan 63-03 — atomic cascade + path-traversal gate + retention sweep + orphan reconcile) |
 | STORE-04 | Phase 63 | ✅ Complete (Plan 63-02 — embedding via model_router.resolve, no literal) |
-| INGEST-01 | Phase 64 | Pending |
-| INGEST-02 | Phase 64 | Pending |
-| INGEST-03 | Phase 64 | Pending |
+| INGEST-01 | Phase 64 | Complete |
+| INGEST-02 | Phase 64 | Complete |
+| INGEST-03 | Phase 64 | Complete |
 | RECALL-01 | Phase 65 | Pending |
 | RECALL-02 | Phase 65 | Pending |
 | RECALL-03 | Phase 65 | Pending |
