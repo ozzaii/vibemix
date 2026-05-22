@@ -3507,3 +3507,120 @@ SHIP-V4 SHIP-CUT EXECUTED on:            _____________________   (date — §SHI
 Sign-off by:                             _____________________   (Kaan)
 ```
 
+## §RECALL-EAR — Phase 66 Visible Copilot Move Kaan-Ear Discharge
+
+**REQ-ID:** COPILOT-01, COPILOT-02, COPILOT-03
+**Owner:** Kaan (founder / ear)
+**Status:** ☐ open  ☐ ear-pass landed  ☐ flag flipped on real corpus
+**Mode:** Carry-forward (engineering ships green per `gsd-autonomous
+fully`; Kaan-ear is veto, not blocker — same pattern as Phase 60
+§HARMONIC-VETO and Phase 65 §RECALL).
+
+Phase 66 (Visible Copilot Move) ships the two visible end-user copilot
+moves on top of the Phase 65 retrieval seam:
+- **Transition-shape callback** (COPILOT-01) — "killed the bass earlier
+  this time around" style, fires on TRACK_CHANGE / MIX_MOVE /
+  LAYER_ARRIVAL with non-empty survivors.
+- **Vocabulary/register callback** (COPILOT-02) — echoes Kaan's own past
+  phrasing, fires on PHASE with non-empty survivors.
+- **No anti-features** (COPILOT-03) — no "you tend to" tendency claims,
+  no "next track" recommendation, no settings-screen personalization,
+  no continuous audio embedding.
+
+The recall chip rides the existing `ipc.session.cohost-reaction`
+envelope on the citation_strip (one-socket invariant preserved); the
+coach-tier cooldown caps callbacks at ≥120s gap + max 1 per turn; the
+Phase 65 anti-poisoning gate is the structural floor (a fabricated
+`[recall:<unregistered>]` strips the WHOLE turn — defense in depth).
+
+**Engineering close:** Wave 1 GREEN landed 2026-05-22 — 9 Wave 0 RED
+tests flipped GREEN; v5.0 byte-identity goldens stayed GREEN; Phase 65
+anti-poisoning + cross-turn + byte-identity goldens stayed GREEN; the
+static anti-feature gate (`tests/repo/test_no_recall_antifeatures.py`)
+stayed GREEN (negative-control stripper + main scan); zero NEW failures
+vs the documented 8-WIP `live-tuning-or-brain` baseline.
+
+**Flag default:** `VIBEMIX_RECALL_ENABLED=0` (Phase 65 default carries
+forward — engineering ships behind the same flag; Kaan flips after
+ear-pass discharge below).
+
+### Discharge — Kaan-ear pass on the real corpus
+
+The four ear-tests live in `66-HUMAN-UAT.md` (per the §HARMONIC-VETO /
+§RECALL precedent). Run order:
+
+1. **Flip the flag** for a single live DJ session:
+   ```bash
+   export VIBEMIX_RECALL_ENABLED=1
+   uv run python -m vibemix
+   ```
+2. **Run a real set** ≥30 minutes, ideally crossing ≥2 genres with at
+   least one prior-session that has been ingested into memory (so the
+   survivor list is non-empty on track-aware events).
+3. **Listen for the four ear-tests** (66-HUMAN-UAT.md items 1-4):
+   - Transition-shape callback grounds on a real past move.
+   - Vocabulary callback echoes prior phrasing IN Kaan's voice (not
+     Gemini-paraphrased — the explicit anti-paraphrase failure mode
+     research §Pitfall 4 documents).
+   - Cooldown discipline by ear (no more than ~1 callback / ~2 min;
+     never two back-to-back inside the 120s window).
+   - Anti-feature absence by ear (no "you tend to" / "next track" /
+     "you usually" phrases in the emitted reactions).
+4. **Flip the flag persistent** once all four pass:
+   ```bash
+   # In the user's vibemix env file or the launcher script:
+   export VIBEMIX_RECALL_ENABLED=1
+   ```
+
+### Tuning knobs (one-line edits — no surrounding wiring depends on
+literals)
+
+- **Cooldown:** `RECALL_CALLBACK_COOLDOWN_S` at
+  `src/vibemix/agent/dj_cohost.py` (currently 120.0s; Kaan-tune if the
+  felt rhythm is too crowded or too sparse).
+- **Fragment text:** `TRANSITION_SHAPE_RECALL_FRAGMENT_TPL` +
+  `VOCABULARY_RECALL_FRAGMENT_TPL` at `src/vibemix/state/coach.py`
+  (currently verbatim from 66-RESEARCH.md §Pattern 1+2; Kaan-tune if
+  Gemini drifts toward paraphrase or anti-feature phrases).
+
+### Defense in depth
+
+- **Static gate:** `tests/repo/test_no_recall_antifeatures.py` scans
+  `coach.py` + `prompts/matrix.py` (post-stripping) for forbidden
+  English-prose phrases. Vacuous-green at land (zero hits in TARGET_FILES
+  at 2026-05-22 commit time). Future regression = gate fires.
+- **Phase 65 anti-poisoning gate:** fabricated `[recall:<unregistered>]`
+  strips the WHOLE turn before any chip can surface — the unit-test
+  contract (`test_fabricated_recall_strips_turn` +
+  `test_fabricated_recall_strips_turn_n_plus_1_with_empty_recall`)
+  carries forward unchanged.
+- **Cooldown arm:** strict "REACHED the audience" semantic per CONTEXT.md
+  Area 1 Q3 + RESEARCH §Pitfall 2 + §Open Q5 — a bus-emit failure cannot
+  arm the cooldown; a bus-less path (no `_ipc_bus` wired) arms on
+  `citation_action in {emit, bypass}` + a recall atom in `parse_citations
+  (full_text)`.
+- **Kaan-ear:** this discharge. The runtime defense the gates can't catch.
+
+### Sign-off block
+
+```
+RECALL-EAR Test 1 (transition-shape grounds on real past)   on: _________   (date — Kaan)
+RECALL-EAR Test 2 (vocabulary echoes Kaan's voice)          on: _________   (date — Kaan)
+RECALL-EAR Test 3 (cooldown discipline by ear)              on: _________   (date — Kaan)
+RECALL-EAR Test 4 (anti-feature absence by ear)             on: _________   (date — Kaan)
+RECALL-EAR VIBEMIX_RECALL_ENABLED=1 persistent flip         on: _________   (date — Kaan)
+Sign-off by:                                                    _________   (Kaan)
+```
+
+### Cross-references
+
+- `.planning/phases/66-visible-copilot-move/66-HUMAN-UAT.md` — the four
+  ear-test items (full prose).
+- `.planning/phases/66-visible-copilot-move/66-CONTEXT.md` Area 4 — the
+  Kaan-ear release gate decisions (Q1-Q3 all locked).
+- `.planning/phases/66-visible-copilot-move/66-RESEARCH.md` §Pitfall 4
+  — the anti-paraphrase failure mode (the explicit ear-check for the
+  vocabulary callback).
+- Phase 65 §RECALL — the sibling carry-forward (retrieval-seam ear-pass).
+- Phase 60 §HARMONIC-VETO — the original carry-forward precedent.
+
