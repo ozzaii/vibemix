@@ -3597,8 +3597,9 @@ literals)
 - **Cooldown arm:** strict "REACHED the audience" semantic per CONTEXT.md
   Area 1 Q3 + RESEARCH §Pitfall 2 + §Open Q5 — a bus-emit failure cannot
   arm the cooldown; a bus-less path (no `_ipc_bus` wired) arms on
-  `citation_action in {emit, bypass}` + a recall atom in `parse_citations
-  (full_text)`.
+  `citation_action in {emit, bypass}` + a `recall` chip surviving
+  `_build_citation_strip` (registry-resolution required, mirrors the bus
+  path — post-CR-01 fix in REVIEW-FIX iter 1).
 - **Kaan-ear:** this discharge. The runtime defense the gates can't catch.
 
 ### Sign-off block
