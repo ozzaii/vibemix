@@ -1641,17 +1641,42 @@ class DJCoHostAgent(Agent):
             # in {emit, bypass} = "user heard the text"). The strict
             # "REACHED the audience" semantic locked in CONTEXT.md Area 1
             # Q3 still applies here: the audience heard the recall callback
-            # via audio even though no chip was broadcast. Scan the emitted
-            # ``full_text`` for any ``[recall:<id>]`` atom; if present, arm
-            # the cooldown. Best-effort try/except so a parse failure
-            # cannot crash the turn (project Pattern B).
-            try:
-                if any(
-                    src == "recall" for src, _body in parse_citations(full_text)
-                ):
-                    self._last_recall_callback_at = time.time()
-            except Exception as _e:  # noqa: BLE001
-                print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
+            # via audio even though no chip was broadcast.
+            #
+            # Phase 66 review CR-01 — mirror the bus path's STRUCTURAL filter.
+            # Previously this arm used ``parse_citations(full_text)`` raw,
+            # which arms on ANY ``("recall", <body>)`` atom found — INCLUDING
+            # a FABRICATED ``[recall:<unregistered>]`` that the one-shot
+            # bypass let through after the linter said invalid. The bus
+            # path correctly uses ``_build_citation_strip`` which ONLY counts
+            # atoms that resolve in the registry, so a fabricated recall id
+            # under bypass NEVER reaches the audience as a registered chip
+            # and never arms there. The two paths MUST yield the same
+            # arm/no-arm decision per the "REACHED the audience" semantic.
+            # Reuse the same lens here. The flag-OFF guard up-front (recall
+            # disabled or no registry) closes a secondary leak: today the
+            # outer condition only checks ``citation_action`` + bus-None, so
+            # if a future flag-OFF code path ever emitted a ``[recall:...]``
+            # atom this arm would fire with no recall service in play. The
+            # explicit ``_recall_enabled`` / ``_registry is None`` guards
+            # make the arm spec-correct under every state.
+            # Best-effort try/except so a parse failure cannot crash the
+            # turn (project Pattern B).
+            if not self._recall_enabled or self._registry is None:
+                pass  # feature OFF or no registry — never arm without backing state
+            else:
+                try:
+                    strip = _build_citation_strip(
+                        reaction_text=full_text,
+                        registry=self._registry,
+                    )
+                    if any(
+                        chip.get("event_id", "").startswith("recall:")
+                        for chip in strip
+                    ):
+                        self._last_recall_callback_at = time.time()
+                except Exception as _e:  # noqa: BLE001
+                    print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
 
         # ---- Per-invocation dump (always written, even on suppression) ----
         try:
