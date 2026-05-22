@@ -639,68 +639,82 @@ class DJCoHostAgent(Agent):
         tools: list,
         model_settings: ModelSettings,
     ) -> AsyncGenerator:
+        # Phase 65 review WR-03 — capture ``_pending_event`` but defer the
+        # ``= None`` clear until AFTER recall pull + registration finish (in
+        # the ``finally`` below). Previously the field was cleared on the
+        # next line, so if the registration block raised an uncaught
+        # exception the registry was in a partial-write state AND
+        # ``_pending_event`` was already gone — the agent could never retry
+        # this turn but the registry permanently carried the half-registered
+        # ids. The ``finally`` keeps the one-event-per-turn semantics intact
+        # while guaranteeing the clear runs on both the success and
+        # exception paths.
         ev = self._pending_event
-        self._pending_event = None
-
-        # Phase 65 Plan 04 (RECALL-01/02) — pull the off-loop recall
-        # survivors and REGISTER their record_ids in the EvidenceRegistry
-        # BEFORE the once-per-turn snapshot below. The order is structural:
-        # if survivors are written AFTER the snapshot, the linter's
-        # existence-only branch wouldn't see them and a legitimate
-        # ``[recall:<id>]`` would strip the turn. If recall is disabled /
-        # no service / pre-dispatch hasn't landed, get_latest() returns
-        # ``[]`` → no registration, no recall block, byte-identical to the
-        # cold/feature-off path.
         recall_moments: list = []
-        if self._recall_enabled and self._recall is not None:
-            try:
-                recall_moments = self._recall.get_latest()
-            except Exception as _e:
-                print(f"[recall pull err] {_e}", file=sys.stderr)
-                recall_moments = []
-                # Phase 65 review WR-01 — defense-in-depth: a failed read
-                # must NOT leave a stale latch on the service. The next
-                # turn's get_latest() would otherwise return the prior
-                # turn's survivors (the "stale latch" failure mode the
-                # design explicitly tries to prevent).
+        try:
+            # Phase 65 Plan 04 (RECALL-01/02) — pull the off-loop recall
+            # survivors and REGISTER their record_ids in the EvidenceRegistry
+            # BEFORE the once-per-turn snapshot below. The order is structural:
+            # if survivors are written AFTER the snapshot, the linter's
+            # existence-only branch wouldn't see them and a legitimate
+            # ``[recall:<id>]`` would strip the turn. If recall is disabled /
+            # no service / pre-dispatch hasn't landed, get_latest() returns
+            # ``[]`` → no registration, no recall block, byte-identical to the
+            # cold/feature-off path.
+            if self._recall_enabled and self._recall is not None:
                 try:
-                    self._recall.clear()
-                except Exception:
-                    pass
-            if recall_moments and self._registry is not None:
-                # Phase 65 review CR-01/CR-02 — the registered set MUST be a
-                # strict subset of what the prompt shows, or fabricated
-                # ``[recall:<id>]`` ids that match an accumulated registration
-                # would pass the linter's existence-only branch (the headline
-                # anti-poisoning gate). Two structural rules:
-                #   1. Clear the recall registry between turns so prior-turn
-                #      ids cannot leak as "valid" for fabrication this turn.
-                #   2. Use an explicit accumulator (``kept``) so we only
-                #      register survivors that actually land in
-                #      ``recall_moments`` — no in-loop list rebind (CR-02
-                #      iterator/rebind interaction), no registered-but-
-                #      dropped ids (CR-01 superset leak).
-                # The registry's per-source clear is keyed on the source
-                # string ("recall"); other sources (ev/aud/mix) are untouched.
-                try:
-                    self._registry.clear_source("recall")
+                    recall_moments = self._recall.get_latest()
                 except Exception as _e:
-                    # Defensive — best-effort; if clear fails, the per-turn
-                    # subset invariant below still holds because we only
-                    # ever append to ``kept`` on successful registration.
-                    print(f"[recall registry clear err] {_e}", file=sys.stderr)
-                t_session = getattr(ev.state, "set_seconds", 0.0) if ev is not None else 0.0
-                kept: list = []
-                for m in recall_moments:
+                    print(f"[recall pull err] {_e}", file=sys.stderr)
+                    recall_moments = []
+                    # Phase 65 review WR-01 — defense-in-depth: a failed read
+                    # must NOT leave a stale latch on the service. The next
+                    # turn's get_latest() would otherwise return the prior
+                    # turn's survivors (the "stale latch" failure mode the
+                    # design explicitly tries to prevent).
                     try:
-                        self._registry.write("recall", m.record_id, float(t_session))
-                        kept.append(m)
+                        self._recall.clear()
+                    except Exception:
+                        pass
+                if recall_moments and self._registry is not None:
+                    # Phase 65 review CR-01/CR-02 — the registered set MUST be a
+                    # strict subset of what the prompt shows, or fabricated
+                    # ``[recall:<id>]`` ids that match an accumulated registration
+                    # would pass the linter's existence-only branch (the headline
+                    # anti-poisoning gate). Two structural rules:
+                    #   1. Clear the recall registry between turns so prior-turn
+                    #      ids cannot leak as "valid" for fabrication this turn.
+                    #   2. Use an explicit accumulator (``kept``) so we only
+                    #      register survivors that actually land in
+                    #      ``recall_moments`` — no in-loop list rebind (CR-02
+                    #      iterator/rebind interaction), no registered-but-
+                    #      dropped ids (CR-01 superset leak).
+                    # The registry's per-source clear is keyed on the source
+                    # string ("recall"); other sources (ev/aud/mix) are untouched.
+                    try:
+                        self._registry.clear_source("recall")
                     except Exception as _e:
-                        # A failed registration is structural — the offending
-                        # survivor is omitted from ``kept`` so the linter
-                        # cannot see an unregistered token.
-                        print(f"[recall register err] {_e}", file=sys.stderr)
-                recall_moments = kept  # strict subset of registered ids
+                        # Defensive — best-effort; if clear fails, the per-turn
+                        # subset invariant below still holds because we only
+                        # ever append to ``kept`` on successful registration.
+                        print(f"[recall registry clear err] {_e}", file=sys.stderr)
+                    t_session = getattr(ev.state, "set_seconds", 0.0) if ev is not None else 0.0
+                    kept: list = []
+                    for m in recall_moments:
+                        try:
+                            self._registry.write("recall", m.record_id, float(t_session))
+                            kept.append(m)
+                        except Exception as _e:
+                            # A failed registration is structural — the offending
+                            # survivor is omitted from ``kept`` so the linter
+                            # cannot see an unregistered token.
+                            print(f"[recall register err] {_e}", file=sys.stderr)
+                    recall_moments = kept  # strict subset of registered ids
+        finally:
+            # Phase 65 review WR-03 — clear ``_pending_event`` on BOTH the
+            # success and exception paths so the agent's one-event-per-turn
+            # model holds even if recall pull/registration raises.
+            self._pending_event = None
 
         # Plan 18-03 — snapshot the EvidenceRegistry FRESH per turn so the
         # AICoach.evidence_line corpus footer reflects observations written
