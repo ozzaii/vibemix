@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
-status: executing
-last_updated: "2026-05-22T09:07:15.913Z"
+status: verifying
+last_updated: "2026-05-22T09:32:49.417Z"
 last_activity: 2026-05-22
 progress:
   total_phases: 12
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 32
-  completed_plans: 31
-  percent: 75
+  completed_plans: 32
+  percent: 83
 ---
 
 # vibemix — State
@@ -45,10 +45,10 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 
 ## Current Position
 
-Phase: 64 (session-ingest) — EXECUTING
+Phase: 64 (session-ingest) — COMPLETE (ready for verification)
 Plan: 3 of 3
-Status: 64-02 ingest module GREEN (all 6 test_ingest + ingest-dormancy CLEAN + no-extraction + model-literal gates); ready to execute 64-03 (runtime wiring)
-Last activity: 2026-05-22 -- P64-02 ingest.py committed (c68fe31, d6b29cf)
+Status: 64-03 runtime wiring GREEN — session-close + boot ingest wired off-hot-path via run_in_executor (best-effort/never-raise, one-way runtime→memory.ingest arrow, no-live-path dormancy gate CLEAN); tests/memory all GREEN (35); full suite back to the 8-WIP baseline (no new failures). INGEST-01..03 done. Next: verify Phase 64, then /gsd:plan-phase 65 (RETRIEVE — anti-slop release gate).
+Last activity: 2026-05-22 -- P64-03 wiring committed (f871b17, d5ac253, 96df78b, e024c8a)
 
 ## v6.0 Phase Map
 

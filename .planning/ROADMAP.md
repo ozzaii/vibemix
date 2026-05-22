@@ -72,7 +72,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 **Plans**: 3 plans (3 waves)
 - [x] 64-01-PLAN.md — Wave 0: RED-first tests/memory/test_ingest.py contract (signature determinism, coach_line emission + citation_strip skip, idempotent re-ingest, tagging, embed-cache hit, sweep path-defense) + synthetic events.jsonl fixture + the ingest no-live-path subprocess dormancy assertion
 - [x] 64-02-PLAN.md — Wave 1: src/vibemix/memory/ingest.py — build_coach_line_signature + _read_events mirror + signature-keyed embed cache + memory_ingested marker + ingest_session + run_ingest_sweep (path-traversal-defended) — flips the contract GREEN (INGEST-01/02/03)
-- [ ] 64-03-PLAN.md — Wave 2: runtime wiring — session-close (on_session_close) + boot (run_boot_sweeps) ingest enqueue via run_in_executor, one-way runtime→ingest, best-effort/never-raise (INGEST-02)
+- [x] 64-03-PLAN.md — Wave 2: runtime wiring — session-close (on_session_close) + boot (run_boot_sweeps) ingest enqueue via run_in_executor, one-way runtime→ingest, best-effort/never-raise (INGEST-02)
 **Research flag (RESOLVED)**: the "which artifacts ground best" taxonomy question is closed by 64-RESEARCH §Taxonomy Decision — ONE kind (`coach_line`), text-signature only, no audio, no LLM-extraction. Re-expansion to `moment`/`audio_moment` is gated on Phase-65 retrieval proving `coach_line` insufficient against Kaan's real corpus, never by default.
 
 ### Phase 65: Memory Retrieval Seam (ANTI-SLOP RELEASE GATE)
@@ -104,7 +104,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 63. Memory Store | v6.0 | 3/3 | Complete    | 2026-05-22 |
-| 64. Session Ingest | v6.0 | 2/3 | In Progress|  |
+| 64. Session Ingest | v6.0 | 3/3 | Complete   | 2026-05-22 |
 | 65. Memory Retrieval Seam | v6.0 | 0/? | Not started | - |
 | 66. Visible Copilot Move | v6.0 | 0/? | Not started | - |
 
