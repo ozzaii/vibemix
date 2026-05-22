@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
-status: executing
-last_updated: "2026-05-22T10:52:19.236Z"
+status: ready_to_plan
+last_updated: 2026-05-22T12:02:53.722Z
 last_activity: 2026-05-22 -- Phase 65 execution started
 progress:
   total_phases: 12
   completed_phases: 10
   total_plans: 36
-  completed_plans: 35
+  completed_plans: 52
   percent: 83
+stopped_at: Phase 65 complete (4/4) — ready to discuss Phase 66
 ---
 
 # vibemix — State
@@ -35,7 +36,7 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
 - **v6.0 thesis:** reactive co-host → forward-leaning **copilot**. Mechanism = memory: every session feeds an embedding store; coach prompts ground in *past* sessions. Personalization is **emergent from the retrieval seam**, NOT a settings screen and NOT an LLM-extraction layer. Acid test for any embedded artifact: *"does retrieving this close a hallucination class OR unlock a copilot move?"* — if neither, don't embed it.
 - **New headline hallucination class:** **retrieval poisoning** (an irrelevant past moment injected into the live prompt → AI references something that didn't happen). Mitigation is structural, not a prompt plea: ~0.7 floor (below → inject nothing), top-k 2–3 cap, event-gating, PAST-tense fence, current-session exclusion, `recall` citation source (fabricated `[recall:<id>]` strips the whole turn). **P65 RETRIEVE = anti-slop release gate.**
-- **Current focus:** Phase 65 — memory-retrieval-seam
+- **Current focus:** Phase 66 — visible copilot move
 - **Last shipped:** v5.0 "The Useful Cut" — 2026-05-22 (tech_debt accepted).
 - **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
@@ -45,10 +46,10 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 
 ## Current Position
 
-Phase: 65 (memory-retrieval-seam) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 65
-Last activity: 2026-05-22 -- Phase 65 execution started
+Phase: 66
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-22
 
 ## v6.0 Phase Map
 

@@ -109,7 +109,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 |-------|-----------|----------------|--------|-----------|
 | 63. Memory Store | v6.0 | 3/3 | Complete    | 2026-05-22 |
 | 64. Session Ingest | v6.0 | 3/3 | Complete    | 2026-05-22 |
-| 65. Memory Retrieval Seam | v6.0 | 4/4 | Complete   | 2026-05-22 |
+| 65. Memory Retrieval Seam | v6.0 | 4/4 | Complete    | 2026-05-22 |
 | 66. Visible Copilot Move | v6.0 | 0/? | Not started | - |
 
 **Coverage:** 14/14 v6.0 requirements mapped ✓ (no orphans, no duplicates) — STORE-01..04 → P63 · INGEST-01..03 → P64 · RECALL-01..04 → P65 · COPILOT-01..03 → P66
