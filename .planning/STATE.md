@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
 status: executing
-last_updated: "2026-05-22T10:28:18.606Z"
+last_updated: "2026-05-22T10:38:55.002Z"
 last_activity: 2026-05-22
 progress:
   total_phases: 12
   completed_phases: 10
   total_plans: 36
-  completed_plans: 34
+  completed_plans: 35
   percent: 83
 ---
 
@@ -46,8 +46,8 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 ## Current Position
 
 Phase: 65 (memory-retrieval-seam) — EXECUTING
-Plan: 3 of 4
-Status: Ready to execute
+Plan: 4 of 4
+Status: 65-03 complete (MemoryRecall service GREEN, RECALL-03/04) — 65-04 (live-path wiring) next
 Last activity: 2026-05-22
 
 ## v6.0 Phase Map
@@ -81,6 +81,7 @@ Last activity: 2026-05-22
 | P63-02 (Wave 1) | 2 tasks, 3 files, ~32 min — storage spine GREEN; STORE-01/02/04 (610c374, d36d924) |
 | P63-03 (Wave 2) | 2 tasks, 2 files, ~18 min — hardening GREEN; STORE-03 (18a5c1f, eb5b5b5); 19/19 tests/memory/ |
 | P64-02 (Wave 1) | 2 tasks, 1 file, ~22 min — ingest.py GREEN; INGEST-01/02/03 (c68fe31, d6b29cf); 6/6 test_ingest + dormancy CLEAN |
+| P65-03 (Wave 1) | 1 task, 1 file, ~14 min — MemoryRecall service GREEN; RECALL-03/04 (10bcaf0); 5/5 test_retrieval + no-live-path/no-extraction/model-literal CLEAN |
 | v4.0 git tag | local artifacts on `live-tuning-or-brain`; unsigned `v0.1.0-rc1` .dmg built |
 | v3.0/v3.1/v4.0 carveouts | external clock (Apple Dev + SignPath) — unchanged by v6.0 |
 
@@ -89,6 +90,7 @@ Last activity: 2026-05-22
 | Phase 64 P02 | ~22 min | 2 tasks | 1 file (+1 baseline) |
 | Phase 64 P02 | 22 | 2 tasks | 1 files |
 | Phase 65 P01 | 18min | 2 tasks | 6 files |
+| Phase 65 P03 | ~14 min | 1 task | 1 file (MemoryRecall GREEN; 10bcaf0) |
 
 ## Accumulated Context
 

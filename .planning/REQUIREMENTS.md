@@ -35,8 +35,8 @@ Acid test for any embedded artifact: *"does retrieving this close a hallucinatio
 
 - [x] **RECALL-01**: A new **`recall` evidence source** (existence-only) is added to `EVIDENCE_SOURCES` and flows through the **existing** `CitationLinter` with **zero new linter code** (à la the Phase 59 `key:` source) — each retrieved `record_id` is registered before the LLM call, and a fabricated `[recall:<id>]` strips the whole turn.
 - [ ] **RECALL-02**: The coach prompt is grounded with **top-k (2–3 cap)** past moments via a **gated `recall[…]` block** in `state/coach.py::evidence_line` (copying the Phase 59 `decks[…]` gate verbatim so the cold/empty-memory golden stays **byte-identical**), behind a similarity floor (~0.7, mirroring `CITATION_THRESHOLD`) and event-gated to track-aware events.
-- [ ] **RECALL-03**: Retrieval is **anti-poisoning by construction**: below-floor → inject **nothing**; retrieved moments are fenced **past-tense** ("FROM A PAST SESSION") so they can never be confused with live evidence; the **current session is excluded** from its own retrieval. The cosine-vs-cosine+time-weight blend + half-life is tuned in-phase on Kaan's real session corpus.
-- [ ] **RECALL-04**: Retrieval stays off the hot path / within the €50/mo budget gate; the four cardinal invariants hold (single-writer, citation-grounding, trust-the-audio, one-socket); ships behind a **Kaan-ear veto** on retrieval relevance (mirrors the Phase 60 harmonic veto — no callback that references a moment Kaan's ear says didn't matter).
+- [x] **RECALL-03**: Retrieval is **anti-poisoning by construction**: below-floor → inject **nothing**; retrieved moments are fenced **past-tense** ("FROM A PAST SESSION") so they can never be confused with live evidence; the **current session is excluded** from its own retrieval. The cosine-vs-cosine+time-weight blend + half-life is tuned in-phase on Kaan's real session corpus.
+- [x] **RECALL-04**: Retrieval stays off the hot path / within the €50/mo budget gate; the four cardinal invariants hold (single-writer, citation-grounding, trust-the-audio, one-socket); ships behind a **Kaan-ear veto** on retrieval relevance (mirrors the Phase 60 harmonic veto — no callback that references a moment Kaan's ear says didn't matter).
 
 ### Visible Copilot Move (COPILOT) — Phase 66
 
@@ -77,8 +77,8 @@ Acid test for any embedded artifact: *"does retrieving this close a hallucinatio
 | INGEST-03 | Phase 64 | Complete |
 | RECALL-01 | Phase 65 | Complete |
 | RECALL-02 | Phase 65 | Pending |
-| RECALL-03 | Phase 65 | Pending |
-| RECALL-04 | Phase 65 | Pending |
+| RECALL-03 | Phase 65 | Complete |
+| RECALL-04 | Phase 65 | Complete |
 | COPILOT-01 | Phase 66 | Pending |
 | COPILOT-02 | Phase 66 | Pending |
 | COPILOT-03 | Phase 66 | Pending |
