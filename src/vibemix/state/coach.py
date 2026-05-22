@@ -166,34 +166,6 @@ class AICoach:
             titles = [repr(t) for _, t in state.track_history[-3:]]
             e.append(f"recent_tracks: {'→'.join(titles)}")
 
-        # Phase 65 Plan 04 (RECALL-02) — recall[…] block. ADDITIVE + gated
-        # identically to the Phase-59 decks[…] block (and the
-        # registry_snapshot footer below): ``if recall_moments:`` is falsy
-        # for both the default ``None`` (cold / feature-off) AND ``[]``
-        # (event fired but all below floor / deadline missed / current-
-        # session-only). In every empty case ZERO bytes are appended →
-        # the v5.0 cold-memory golden (tests/state/test_coach.py:47) stays
-        # BYTE-IDENTICAL.  PAST-TENSE fenced (RECALL-03) — never read as
-        # live evidence; live audio/track/decks above stays primary, recall
-        # is subordinate (the order matters: appended AFTER recent_moves so
-        # the recall fence lands AFTER the live evidence block — pinned by
-        # test_evidence_line_recall_block_present's index assertion).  Each
-        # ``[recall:<record_id>]`` token is registered in the
-        # EvidenceRegistry by the agent BEFORE the prompt snapshot (Plan
-        # 65-04 wiring); a fabricated ``[recall:<unregistered>]`` then
-        # strips the WHOLE turn via the existing CitationLinter's
-        # existence-only branch (the headline RECALL-01 poisoning gate).
-        # The diet/compact path intentionally has NO recall block (diet =
-        # ACK_ELIGIBLE_EVENTS incl. HEARTBEAT, which is never a retrieval
-        # event — keeping recall off the diet path is correct).
-        if recall_moments:
-            parts = [
-                f"[recall:{m.record_id}] {m.signature}" for m in recall_moments
-            ]
-            e.append(
-                "FROM A PAST SESSION (not happening now): " + " || ".join(parts)
-            )
-
         # Phase 18 Plan 02 — evidence-corpus footer. When the registry
         # snapshot is provided AND has at least one observation, append a
         # single-line summary of citable observation counts. This SEEDS
@@ -203,12 +175,55 @@ class AICoach:
         # below preserves the v4 byte-identical output for all existing
         # callers (Phase 4 invariant; HYPE_INTERMEDIATE prompt golden test
         # stays green).
+        #
+        # Phase 65 review CR-03 — the corpus footer is emitted BEFORE the
+        # recall block so its counts describe LIVE evidence (which is what
+        # state_refresh_loop / EventDetector wrote into the registry), NOT
+        # the past-session fence below. If recall landed first, the
+        # adjacent "evidence_corpus[…]" line would sit AFTER the
+        # "FROM A PAST SESSION" fence and prime Gemini to read the counts
+        # as describing the past session — an inversion of meaning the
+        # linter cannot catch.
         if registry_snapshot:
             ev_n = sum(len(v) for v in registry_snapshot.get("ev", {}).values())
             aud_n = sum(len(v) for v in registry_snapshot.get("aud", {}).values())
             mix_n = sum(len(v) for v in registry_snapshot.get("mix", {}).values())
             if (ev_n + aud_n + mix_n) > 0:
                 e.append(f"evidence_corpus[ev={ev_n},aud={aud_n},mix={mix_n}]")
+
+        # Phase 65 Plan 04 (RECALL-02) — recall[…] block. ADDITIVE + gated
+        # identically to the Phase-59 decks[…] block (and the
+        # registry_snapshot footer above): ``if recall_moments:`` is falsy
+        # for both the default ``None`` (cold / feature-off) AND ``[]``
+        # (event fired but all below floor / deadline missed / current-
+        # session-only). In every empty case ZERO bytes are appended →
+        # the v5.0 cold-memory golden (tests/state/test_coach.py:47) stays
+        # BYTE-IDENTICAL.  PAST-TENSE fenced (RECALL-03) — never read as
+        # live evidence; live audio/track/decks above stays primary, recall
+        # is subordinate. The order is structural: recall is the LAST
+        # element so it sits AFTER both the live evidence block AND the
+        # evidence_corpus footer — pinned by
+        # test_evidence_line_recall_block_present's index assertion (recall
+        # after recent_moves) and the CR-03 ordering test (recall after
+        # corpus footer).  Each ``[recall:<record_id>]`` token is
+        # registered in the EvidenceRegistry by the agent BEFORE the
+        # prompt snapshot (Plan 65-04 wiring); a fabricated
+        # ``[recall:<unregistered>]`` then strips the WHOLE turn via the
+        # existing CitationLinter's existence-only branch (the headline
+        # RECALL-01 poisoning gate).  The diet/compact path intentionally
+        # has NO recall block (diet = ACK_ELIGIBLE_EVENTS incl. HEARTBEAT,
+        # which is never a retrieval event — keeping recall off the diet
+        # path is correct).
+        # Inner separator " || " (double-pipe) distinguishes recall moments
+        # from the outer " | "-joined evidence fields — makes a grep over
+        # evidence_line unambiguous about field count vs moment count.
+        if recall_moments:
+            parts = [
+                f"[recall:{m.record_id}] {m.signature}" for m in recall_moments
+            ]
+            e.append(
+                "FROM A PAST SESSION (not happening now): " + " || ".join(parts)
+            )
 
         return " | ".join(e)
 

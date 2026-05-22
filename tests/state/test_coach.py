@@ -112,6 +112,40 @@ def test_evidence_line_recall_block_present():
     assert out.index("recent_moves[8s]") < out.index(fence)
 
 
+def test_evidence_line_recall_block_after_corpus_footer():
+    """Phase 65 review CR-03 — recall block lands AFTER the evidence_corpus footer.
+
+    When BOTH ``registry_snapshot`` AND ``recall_moments`` are populated, the
+    evidence-corpus footer (whose counts describe LIVE evidence) MUST appear
+    BEFORE the PAST-tense recall fence — otherwise Gemini can read the corpus
+    counts as describing the past session, an inversion of meaning the linter
+    cannot catch.
+    """
+    state = MusicState()  # silent baseline — minimum live content
+    snapshot = {
+        "ev": {"HEARTBEAT": (10.0, 80.0)},
+        "aud": {"rms": (5.0,)},
+        "mix": {},
+    }
+    out = AICoach.evidence_line(
+        state,
+        registry_snapshot=snapshot,
+        recall_moments=_recall_records(),
+    )
+    fence = "FROM A PAST SESSION (not happening now): "
+    corpus = "evidence_corpus[ev=2,aud=1,mix=0]"
+    assert corpus in out
+    assert fence in out
+    # Ordering invariant: live-evidence corpus footer FIRST, past-session
+    # fence SECOND (recall is the LAST element of the evidence line).
+    assert out.index(corpus) < out.index(fence)
+    # Recall fence sits at the END of the line (no trailing content after).
+    assert out.endswith(
+        "[recall:20260520-2200:7] that filter sweep into the drop was clean"
+        " || [recall:20260520-2200:12] you rode the groove a touch long here"
+    )
+
+
 def test_evidence_line_recall_empty_no_block():
     """RECALL-02 — empty (and None) recall_moments → emit NOTHING.
 
