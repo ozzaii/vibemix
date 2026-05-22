@@ -84,7 +84,11 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
   2. The coach prompt is grounded via a gated `recall[…]` block in `state/coach.py::evidence_line` (copying the Phase 59 `decks[…]` gate verbatim) — top-k 2–3 cap, ~0.7 similarity floor, event-gated to track-aware events — and when memory is cold/empty/below-floor the prompt is **byte-identical** to the v5.0 baseline (golden test green; no "I don't remember anything" filler).
   3. Retrieval is anti-poisoning by construction: below-floor injects nothing; retrieved moments are fenced PAST-tense ("FROM A PAST SESSION") so they can never be read as live evidence; and the current in-progress session is excluded from its own retrieval.
   4. Retrieval stays off the hot path and within the €50/mo budget gate (event-gate + executor-offload + content-hash cache + hard deadline — late memory is worse than no memory), TTFT p95 is unchanged feature-on vs feature-off, and all four cardinal invariants hold (single-writer, citation-grounding, trust-the-audio, one-socket).
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 65-01-PLAN.md — Wave 0 RED-first test scaffold (poisoning RED, byte-identical cold golden, lockstep 8→9 count updates)
+- [ ] 65-02-PLAN.md — `recall` vocabulary across schema-mirror sites 1-3 (sites 1+2 lockstep — silent-poisoning-hole guard); zero new linter code
+- [ ] 65-03-PLAN.md — `MemoryRecall` service (Grounding clone): event-gate, 0.7 floor, current-session-excluded, cosine-only, no live-path import
+- [ ] 65-04-PLAN.md — live-path wiring: gated `recall[…]` block + off-loop pre-dispatch/deadline + register survivors + clear (behind `recall_enabled`)
 **Research/KAAN-ACTION flag**: (1) the cosine-only vs cosine+time-weight blend and the decay half-life (in *sessions*, not hours) is an explicit open question — tune the shape (two-term exp-decay + relevance floor) and the exact recall threshold (start at 0.7) against Kaan's real session corpus in-phase (`/gsd:plan-phase --research-phase`). (2) Ships behind a **Kaan-ear veto** on retrieval relevance (mirrors the Phase 60 harmonic veto) — no callback that references a moment Kaan's ear says didn't matter; this is the hard quality gate.
 
 ### Phase 66: Visible Copilot Move
