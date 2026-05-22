@@ -93,9 +93,9 @@ BANNED: {_format_ban_list()}
 #
 # Anti-prompt-injection (T-18-03-01): the block is a fixed string with NO
 # interpolation — no user input can mutate it (mirrors MOOD_PERSONAS pattern).
-# The 8 source forms are kept in lock-step with EVIDENCE_SOURCES (Plan 18-01,
-# + `key` added Phase 59 / DECK-03) via Test R cross-validation in
-# tests/prompts/test_matrix.py.
+# The 9 source forms are kept in lock-step with EVIDENCE_SOURCES (Plan 18-01,
+# + `key` added Phase 59 / DECK-03, + `recall` added Phase 65 / RECALL-01) via
+# Test R cross-validation in tests/prompts/test_matrix.py.
 # ---------------------------------------------------------------------------
 
 CITATION_GRAMMAR_BLOCK: str = """--- CITATION GRAMMAR (v1.0 — encouraged, not required) ---
@@ -115,6 +115,7 @@ Forms (each is a single citation; the linter accepts any of these):
   [mix:<derived>]     derived mix-state, e.g. [mix:audible_deck=A]
   [tend:<fact>]       user-profile fact, e.g. [tend:user_likes_acid]
   [key:<deck>:<camelot>]  deck harmonic key, e.g. [key:A:8A]
+  [recall:<record_id>]  past-moment reference, e.g. [recall:20260520-2200:7]
 
 Multi-citation (comma-separated, no whitespace inside brackets):
   [ev:KICK_SWAP@45.2,aud:bpm@45.0]
