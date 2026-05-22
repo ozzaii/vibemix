@@ -703,6 +703,22 @@ class DJCoHostAgent(Agent):
                         self._recall.clear()
                     except Exception:
                         pass
+                # Phase 65 review iter-3 WR-01 — when ``_recall_enabled`` is
+                # True but ``_registry`` is None (test-only construction
+                # path; default production wiring threads both together),
+                # the recall block would otherwise inject ``[recall:<id>]``
+                # tokens into the prompt with NO registry to validate them.
+                # The linter would then strip every recall-bearing turn (no
+                # registered set → existence-only check fails on every id).
+                # Drop the survivors here so the recall block is never
+                # injected without a backing registry — the cold/feature-off
+                # path is preserved byte-identically and the live LLM is
+                # never asked to ground against a state that can never
+                # validate. Lower blast radius than a hard assertion (which
+                # would break test_recall_pull_called_when_enabled-style
+                # smoke tests that wire a service without a registry).
+                if self._registry is None:
+                    recall_moments = []
                 if recall_moments and self._registry is not None:
                     # Phase 65 review CR-01/CR-02 — the registered set MUST
                     # be a strict subset of what the prompt shows, or
