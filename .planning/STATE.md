@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
-status: executing
-last_updated: "2026-05-22T07:40:00.000Z"
+status: ready_to_plan
+last_updated: 2026-05-22T07:37:29.618Z
 last_activity: 2026-05-22
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 29
-  completed_plans: 29
+  completed_plans: 45
   percent: 75
+stopped_at: Phase 63 complete (3/3) — ready to discuss Phase 64
 ---
 
 # vibemix — State
@@ -35,7 +36,7 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
 - **v6.0 thesis:** reactive co-host → forward-leaning **copilot**. Mechanism = memory: every session feeds an embedding store; coach prompts ground in *past* sessions. Personalization is **emergent from the retrieval seam**, NOT a settings screen and NOT an LLM-extraction layer. Acid test for any embedded artifact: *"does retrieving this close a hallucination class OR unlock a copilot move?"* — if neither, don't embed it.
 - **New headline hallucination class:** **retrieval poisoning** (an irrelevant past moment injected into the live prompt → AI references something that didn't happen). Mitigation is structural, not a prompt plea: ~0.7 floor (below → inject nothing), top-k 2–3 cap, event-gating, PAST-tense fence, current-session exclusion, `recall` citation source (fabricated `[recall:<id>]` strips the whole turn). **P65 RETRIEVE = anti-slop release gate.**
-- **Current focus:** Phase 63 — memory-store
+- **Current focus:** Phase 64 — session ingest
 - **Last shipped:** v5.0 "The Useful Cut" — 2026-05-22 (tech_debt accepted).
 - **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
@@ -45,10 +46,10 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 
 ## Current Position
 
-Phase: 63 (memory-store) — ✅ COMPLETE (3/3 plans)
-Plan: 3 of 3 — done
-Status: Phase 63 complete. STORE-01..04 all GREEN; 19/19 tests/memory/ pass; no-live-path subprocess gate CLEAN. Storage spine feature-complete. **Next: `/gsd:plan-phase --research-phase 64` (Session Ingest — moment taxonomy research flag).**
-Last activity: 2026-05-22 — Phase 63 Plan 03 complete: hardened `delete_session` (path-traversal gate + atomic cascade), `reconcile_orphans` boot backstop, `run_memory_retention_sweep` (oldest-session-first whole-session eviction) in new `src/vibemix/memory/retention.py`. The 9 previously-RED tests (path-traversal ×6, retention ×3) flipped GREEN; the 10 already-green stayed green. STORE-03 complete. Commits `18a5c1f`, `eb5b5b5`.
+Phase: 64
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-22
 
 ## v6.0 Phase Map
 
