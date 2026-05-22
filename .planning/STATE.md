@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
-status: roadmap_created
-last_updated: "2026-05-22T00:00:00.000Z"
+status: executing
+last_updated: "2026-05-22T06:44:50.849Z"
 last_activity: 2026-05-22
 progress:
-  total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 12
+  completed_phases: 8
+  total_plans: 29
+  completed_plans: 27
+  percent: 67
 ---
 
 # vibemix — State
@@ -35,7 +35,7 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
 - **v6.0 thesis:** reactive co-host → forward-leaning **copilot**. Mechanism = memory: every session feeds an embedding store; coach prompts ground in *past* sessions. Personalization is **emergent from the retrieval seam**, NOT a settings screen and NOT an LLM-extraction layer. Acid test for any embedded artifact: *"does retrieving this close a hallucination class OR unlock a copilot move?"* — if neither, don't embed it.
 - **New headline hallucination class:** **retrieval poisoning** (an irrelevant past moment injected into the live prompt → AI references something that didn't happen). Mitigation is structural, not a prompt plea: ~0.7 floor (below → inject nothing), top-k 2–3 cap, event-gating, PAST-tense fence, current-session exclusion, `recall` citation source (fabricated `[recall:<id>]` strips the whole turn). **P65 RETRIEVE = anti-slop release gate.**
-- **Current focus:** v6.0 roadmap created (4 phases 63–66) → next is `/gsd:plan-phase 63`.
+- **Current focus:** Phase 63 — memory-store
 - **Last shipped:** v5.0 "The Useful Cut" — 2026-05-22 (tech_debt accepted).
 - **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
@@ -45,10 +45,10 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 
 ## Current Position
 
-Phase: Not started (roadmap created; planning next)
-Plan: —
-Status: Roadmap created — awaiting `/gsd:plan-phase 63`
-Last activity: 2026-05-22 — v6.0 roadmap created (4 phases 63–66, 14/14 REQ-IDs mapped)
+Phase: 63 (memory-store) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute (63-01 done — Wave-0 test contract pinned RED-first)
+Last activity: 2026-05-22 — Phase 63 Plan 01 complete (6 tests/memory/ contract files, RED on missing vibemix.memory)
 
 ## v6.0 Phase Map
 
@@ -76,6 +76,7 @@ Last activity: 2026-05-22 — v6.0 roadmap created (4 phases 63–66, 14/14 REQ-
 | v6.0 REQ-IDs mapped | 14 / 14 ✓ (100% coverage, no orphans, no duplicates) |
 | v6.0 per-phase REQ counts | P63=4 (STORE) · P64=3 (INGEST) · P65=4 (RECALL) · P66=3 (COPILOT) |
 | v6.0 net-new dependencies | 0 (WIRING/REUSE milestone — `sqlite-vec>=0.1.9` already declared) |
+| P63-01 (Wave 0) | 2 tasks, 6 files, ~18 min — RED-first test contract (dde3c0f, 5635390) |
 | v4.0 git tag | local artifacts on `live-tuning-or-brain`; unsigned `v0.1.0-rc1` .dmg built |
 | v3.0/v3.1/v4.0 carveouts | external clock (Apple Dev + SignPath) — unchanged by v6.0 |
 
@@ -88,6 +89,7 @@ Last activity: 2026-05-22 — v6.0 roadmap created (4 phases 63–66, 14/14 REQ-
 v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numbering from v5.0 (ran 59–62) — NO reset. 14/14 REQ-IDs mapped to exactly one phase (100% coverage, no orphans, no duplicates). Shaped by 4-agent convergent research that independently produced the same four-phase spine. This is a **WIRING/REUSE milestone with ZERO net-new dependencies** on the mature grounded co-host — not greenfield.
 
 **Reuse map (the load-bearing finding):** the entire memory layer is built on already-shipped `src/vibemix/library/` primitives:
+
 - `index_sqlite_vec.py::SqliteVecStore` + `store.py::open_store` (numpy fallback) → cloned by `memory/store.py` (NEW sibling pkg `src/vibemix/memory/`, imports from `library/`, does NOT fork).
 - `_cosine.py::cosine_topk` → reused verbatim (single chokepoint; Mac/Win bit-identical parity, P55 rule).
 - `embed.py::LibraryEmbedder` + content-hash cache (`embeddings.db`) → reused for ingest + query embeds.
@@ -98,6 +100,14 @@ v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numberi
 - `runtime/config_store.py::app_data_dir()` → `memory.db` placement (durable user-data tier, not `~/.cache`).
 
 **Model-ID correction (surface to Kaan):** locked literal `gemini-embedding-001` is the TEXT-ONLY GA model; the milestone's multimodal intent maps to `gemini-embedding-2`. **Never hardcode either** — route via `model_router.resolve("embedding")` (CI grep gate forbids literals). v1 ingest is text-signature-only, so cheaper text-001 is even a viable one-line config choice; default stays the multimodal model per milestone intent. Decision to confirm with Kaan in-phase.
+
+### P63-01 Execution Decisions (2026-05-22)
+
+- **Wave-0 RED-first contract is the deliverable, not green tests.** 6 `tests/memory/` files pin the `MemoryStore` interface (`add_record` / `query_topk(.., *, exclude_session=None)` / `delete_session` / `run_retention_sweep(max_moments=)` → `result.deleted`; `Record.{record_id,session_id,ts,kind,signature,score}`; `MemoryStore(db_path, prefer_sqlite_vec=True)`) BEFORE `src/vibemix/memory/` exists. Acceptance = collection `ModuleNotFoundError: No module named 'vibemix.memory'` (verified under `.venv`/Python 3.12, the authoritative runner — system Python 3.14 masks it with a `ServiceTier` import gap, so always verify under `.venv`). Plans 63-02/03 flip these GREEN.
+- **`cosine_topk` reused verbatim** from `vibemix.library._cosine` in the memory parity gate (`@pytest.mark.parity`); never forked, no native-KNN ranking anywhere in the tests. Synthetic 768-dim vectors generated in-test (`np.random.default_rng`) — no new fixture file.
+- **STORE-04 literal gate delegated, not duplicated:** the shipped `tests/repo/test_model_literal_gate.py` already scans all of `src/vibemix/` (incl. the new `memory/`); a module comment records the delegation.
+- **STORE-01..04 traceability = "Contract pinned (63-01); impl pending (63-02/03)"** — NOT marked Complete, because the `MemoryStore` source does not exist yet. (Reverted an auto-mark that the plan-frontmatter `requirements` field triggered — requirements complete when the implementing plan lands.)
+- T-63-01 (no-live-path import) + T-63-02 (no-extraction) mitigations are now regression-pinned from the first commit (static AST + subprocess dormancy; tokenize-stripped generation-surface scan w/ positive control).
 
 ### v6.0 KAAN-ACTION / Research Flags (carry into planning)
 
@@ -119,11 +129,11 @@ v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numberi
 
 ## Session Continuity
 
-**Next command:** `/gsd:plan-phase 63`
+**Next command:** continue Phase 63 — execute Plan 63-02 (build `src/vibemix/memory/store.py` to turn the Wave-0 contract GREEN).
 
-**What's done:** v6.0 roadmap created. `.planning/ROADMAP.md` (v6.0 section added above the v5.0 collapsed block; v4.0 OPEN section + v5.0 + Phase History + milestone table preserved verbatim), `.planning/REQUIREMENTS.md` (traceability table mapped, 14/14, zero TBD), `.planning/STATE.md` (this file).
+**What's done:** Phase 63 Plan 01 complete — Wave-0 RED-first test contract: `tests/memory/` package + 6 contract files (`__init__`, `test_store`, `test_store_parity`, `test_no_live_path_import`, `test_no_extraction`, `test_retention`), committed `dde3c0f` + `5635390`. All RED on missing `vibemix.memory` (the pinned contract). Earlier: v6.0 roadmap + REQUIREMENTS traceability.
 
-**What's next:** plan Phase 63 (Memory Store). Recommend `/gsd:plan-phase --research-phase` for P64 (taxonomy) and P65 (blend/half-life) when those phases come up. Surface the P63 sqlite-vec clean-VM/sign item to the v4.0 external-clock surface early.
+**What's next:** Plan 63-02/03 build `src/vibemix/memory/store.py` (compose-not-subclass: `library`-style backend over `memory.db` + own `moments` sqlite table; `cosine_topk` chokepoint; `LibraryEmbedder` for embeds; cascade + retention) against the now-pinned contract. Then `/gsd:plan-phase --research-phase` for P64 (taxonomy) / P65 (blend/half-life). Surface the P63 sqlite-vec clean-VM/sign item to the v4.0 external-clock surface early.
 
 **Open before execution:** none blocking — the spine is research-locked and dependency-correct. Model-ID (text-001 vs multimodal-2) is a one-line config choice to confirm with Kaan but never hardcode either way.
 
