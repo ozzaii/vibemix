@@ -101,8 +101,8 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
   3. The copilot voice carries no anti-features — no next-track recommendation, no LLM-extracted "tendencies"/insights presented as fact, no settings-screen personalization, no continuous audio embedding (enforced by review).
   4. Kaan's ear confirms a recall actually fires grounded on real session data and does not feel scripted (the hard quality gate).
 **Plans**: 2 plans
-- [ ] 66-01-PLAN.md — Wave 0 RED-first contract: 9 new tests pin chip allow-list, fragment helper, byte-identity baseline, cooldown gate + new tests/repo/test_no_recall_antifeatures.py static gate (COPILOT-01/02/03)
-- [ ] 66-02-PLAN.md — Wave 1 GREEN: dj_cohost.py allow-list + recall verb branch + RECALL_CALLBACK_COOLDOWN_S + cooldown gate/arm; coach.py recall_fragment_for_event helper + 2 templates + build_prompt integration; 66-HUMAN-UAT.md + §RECALL-EAR in KAAN-ACTION-LEGAL.md (COPILOT-01/02/03)
+- [x] 66-01-PLAN.md — Wave 0 RED-first contract: 9 new tests pin chip allow-list, fragment helper, byte-identity baseline, cooldown gate + new tests/repo/test_no_recall_antifeatures.py static gate (COPILOT-01/02/03)
+- [x] 66-02-PLAN.md — Wave 1 GREEN: dj_cohost.py allow-list + recall verb branch + RECALL_CALLBACK_COOLDOWN_S + cooldown gate/arm; coach.py recall_fragment_for_event helper + 2 templates + build_prompt integration; 66-HUMAN-UAT.md + §RECALL-EAR in KAAN-ACTION-LEGAL.md (COPILOT-01/02/03)
 **UI hint**: yes — the recall chip surfaces on the existing `SessionCohostReaction.citation_strip` / floating pill (a small additive touch on a Tier-1 live surface; the `frontend-enforcement` skill governs the chip's CDJ-Whisper material/typography). No new socket, no new port — rides the existing `ipc.session.*` envelopes.
 
 ## Progress (v6.0)
@@ -112,7 +112,7 @@ This is a memory-layer graft on an already-mature grounded co-host. No new AI pr
 | 63. Memory Store | v6.0 | 3/3 | Complete    | 2026-05-22 |
 | 64. Session Ingest | v6.0 | 3/3 | Complete    | 2026-05-22 |
 | 65. Memory Retrieval Seam | v6.0 | 4/4 | Complete    | 2026-05-22 |
-| 66. Visible Copilot Move | v6.0 | 0/2 | Planned | - |
+| 66. Visible Copilot Move | v6.0 | 2/2 | Complete   | 2026-05-22 |
 
 **Coverage:** 14/14 v6.0 requirements mapped ✓ (no orphans, no duplicates) — STORE-01..04 → P63 · INGEST-01..03 → P64 · RECALL-01..04 → P65 · COPILOT-01..03 → P66
 
