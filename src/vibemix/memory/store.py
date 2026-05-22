@@ -15,8 +15,12 @@ Architecture (63-RESEARCH.md §Pattern 1, "compose-not-subclass"):
       ``library/store.py::open_store`` pointed at ``memory.db``.
     * A ``moments`` metadata table. On the sqlite-vec path it lives in the SAME
       ``memory.db`` file and ``MemoryStore`` reuses the backend's single
-      ``self.db`` connection (atomic vec0 + metadata writes, single-writer). On
-      the numpy path (no sqlite file in the ``.npy`` sidecars) it lives in a
+      ``self.db`` connection (single-writer). NOTE: ``add_record`` is NOT one
+      transaction — ``add_batch`` commits the vector first, then the moments row
+      is written and committed (two commits). The ordering is vector-first, so a
+      crash between them leaves at worst a reconcilable orphan vector. (Only
+      ``delete_session`` is genuinely one transaction on this path.) On the numpy
+      path (no sqlite file in the ``.npy`` sidecars) the moments table lives in a
       sibling ``memory_moments.db`` connection owned here.
 
 Hard invariants (objective + 63-PATTERNS.md):
@@ -35,9 +39,7 @@ Hard invariants (objective + 63-PATTERNS.md):
 from __future__ import annotations
 
 import logging
-import re
 import sqlite3
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -54,6 +56,13 @@ from vibemix.library.embed import LibraryEmbedder  # noqa: F401
 from vibemix.library.index_numpy import NumpyStore
 
 logger = logging.getLogger(__name__)
+
+# Sentinel for run_retention_sweep: distinguishes "caller omitted this cap"
+# (fall through to the retention module's production default) from an explicit
+# ``None`` (disable that axis — the ∞-sentinel). Using a sentinel keeps the real
+# budget constants off this module's import surface (they live in
+# vibemix.memory.retention, imported lazily inside the method).
+_UNSET: object = object()
 
 
 def _memory_db_path() -> Path:
@@ -74,14 +83,6 @@ def _memory_db_path() -> Path:
     return app_data_dir() / "memory.db"
 
 
-# The recordings-session-dir canonical shape (YYYYMMDD-HHMMSS) — the same gate
-# used by ``runtime/recordings_index.py::SESSION_DIR_RE``. Reused verbatim so a
-# recordings-session id (the common caller) is validated against the identical
-# shape on both the recordings filesystem path AND here. Mirror, do not import
-# (importing recordings_index would risk pulling the live-path surface).
-SESSION_DIR_RE: re.Pattern[str] = re.compile(r"^\d{8}-\d{6}$")
-
-
 def _validate_session_id(session_id: str, db_path: Path) -> None:
     """Reject a crafted ``session_id`` BEFORE it touches the filesystem.
 
@@ -91,11 +92,12 @@ def _validate_session_id(session_id: str, db_path: Path) -> None:
       1. **Shape floor (generic).** Reject any ``session_id`` that is not a
          plain str, or that contains a path separator (``/`` or ``\\``), a
          ``..`` parent-dir token, a NUL byte, or a leading absolute/drive
-         marker. This is the floor: it makes a NON-recordings session_id (one
-         that isn't the ``SESSION_DIR_RE`` shape) still safe, because the memory
-         store does not require recordings ids — but ANY id that reaches the
-         filesystem (a sibling-DB filename, an ``app_data_dir`` subpath) must be
-         a single safe path component.
+         marker. This is the floor: the memory store does NOT shape-constrain
+         ids to the recordings ``YYYYMMDD-HHMMSS`` form (any separator-free,
+         non-``..``, non-NUL string is accepted), because it does not require
+         recordings ids — but ANY id that reaches the filesystem (a sibling-DB
+         filename, an ``app_data_dir`` subpath) must be a single safe path
+         component, which this floor guarantees.
 
       2. **Containment check (defense in depth).** Resolve the id as a child of
          the store's parent dir and assert it stays inside that root via
@@ -186,11 +188,7 @@ def open_memory_store(
             )
 
             backend: _Backend = SqliteVecMemoryStore(db_path=db_path)
-            print(
-                "-> memory store: backend=SqliteVecMemoryStore reason=ok",
-                file=sys.stdout,
-                flush=True,
-            )
+            logger.info("memory store: backend=SqliteVecMemoryStore reason=ok")
             return backend
         except Exception as e:
             logger.warning(
@@ -198,22 +196,15 @@ def open_memory_store(
                 "reason=%s — falling back to NumpyStore",
                 e,
             )
-            print(
-                f"-> memory store: backend=NumpyStore "
-                f"reason=sqlite_vec_unavailable ({e})",
-                file=sys.stdout,
-                flush=True,
-            )
 
     parent = db_path.parent
     backend = NumpyStore(
         vectors_path=parent / "memory_vectors.npy",
         ids_path=parent / "memory_ids.json",
     )
-    print(
-        "-> memory store: backend=NumpyStore reason=preferred",
-        file=sys.stdout,
-        flush=True,
+    logger.info(
+        "memory store: backend=NumpyStore reason=%s",
+        "preferred" if prefer_sqlite_vec is False else "sqlite_vec_unavailable",
     )
     return backend
 
@@ -288,10 +279,18 @@ class MemoryStore:
     ) -> None:
         """Persist one moment: its embedding + raw metadata.
 
-        Vector-first ordering (63-RESEARCH.md §Pattern 2 / Pitfall 3): write the
-        vector via the backend FIRST, then the moments row, then commit. A crash
-        between the two leaves at worst a vector with no metadata (reconcilable
-        by a boot sweep), never a metadata row pointing at a missing vector.
+        Vector-first ordering, TWO commits — NOT one transaction (63-RESEARCH.md
+        §Pattern 2 / Pitfall 3). ``add_batch`` writes AND commits the vector
+        first; this method then writes and commits the moments row. So the
+        sequence is: commit vector → write moments row → commit moments. There is
+        no single transaction spanning both (``add_batch`` owns its own
+        ``commit()``, and ``NumpyStore`` cannot honor a shared transaction
+        anyway). Because the order is vector-first, a crash between the two
+        commits leaves at worst a dangling vector with no metadata — reconcilable
+        by ``reconcile_orphans`` (the documented-safe direction), never a
+        metadata row pointing at a missing vector. Phase 64/65 maintainers MUST
+        NOT assume atomicity here. (Contrast ``delete_session``, which IS one
+        transaction on the sqlite-vec path.)
 
         The float32 + (768,) dimension-drift guard lives in the backend's
         add_batch assert (and cosine_topk re-asserts at query time).
@@ -430,8 +429,8 @@ class MemoryStore:
     def run_retention_sweep(
         self,
         *,
-        max_moments: int | None = None,
-        max_age_days: int | None = None,
+        max_moments: int | None | object = _UNSET,
+        max_age_days: int | None | object = _UNSET,
     ):
         """Evict whole sessions oldest-first under a count/age budget.
 
@@ -440,12 +439,22 @@ class MemoryStore:
         recordings-sweep analog), this is the ergonomic call site
         (``store.run_retention_sweep(...)``). Imported lazily to keep
         ``retention`` off the ``import vibemix.memory.store`` hot path.
+
+        Budget defaults: a no-arg ``store.run_retention_sweep()`` (the obvious
+        boot call) MUST enforce the real ~10k/180d budget, NOT a silent no-op.
+        Each cap is only forwarded when explicitly provided, so an omitted cap
+        falls through to the module function's production default
+        (``DEFAULT_MAX_MOMENTS`` / ``DEFAULT_MAX_AGE_DAYS``). Passing ``None``
+        explicitly still disables that axis (the documented ∞-sentinel).
         """
         from vibemix.memory.retention import run_memory_retention_sweep
 
-        return run_memory_retention_sweep(
-            self, max_moments=max_moments, max_age_days=max_age_days
-        )
+        kwargs = {}
+        if max_moments is not _UNSET:
+            kwargs["max_moments"] = max_moments
+        if max_age_days is not _UNSET:
+            kwargs["max_age_days"] = max_age_days
+        return run_memory_retention_sweep(self, **kwargs)
 
     def close(self) -> None:
         if self._owns_moments:
