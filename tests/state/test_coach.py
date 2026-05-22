@@ -954,4 +954,9 @@ def test_transition_wins_track_change_overlap():
         "vocabulary fragment leaked into a TRACK_CHANGE turn — transition "
         "must win the overlap (Pitfall 5 / Open Q1)"
     )
-    assert "evidence_corpus" not in out_default
+    # No registry_snapshot was threaded → no evidence_corpus footer should
+    # appear in the output. Defense in depth: pins that the recall fragment
+    # integration does not accidentally synthesize a corpus footer.
+    # (Plan 02 Task 2 fix-up — Wave 0 left this as ``out_default`` which is
+    # an undefined name; the intended assertion target is ``out``.)
+    assert "evidence_corpus" not in out

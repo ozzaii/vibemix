@@ -936,13 +936,24 @@ def test_max_one_recall_per_turn_COPILOT02(mocker, tmp_path) -> None:
     fragment_start = prompt.index("in the live audio")
     fragment_portion = prompt[fragment_start:]
 
-    # Strongest record_id appears in fragment portion EXACTLY ONCE
-    # (the cite-EXACTLY-ONCE instruction is honored).
-    assert fragment_portion.count(record_a.record_id) == 1, (
-        f"strongest record_id must appear exactly once in fragment portion; "
+    # Strongest record_id is the ONE-AND-ONLY id interpolated into the
+    # fragment template. The TRANSITION_SHAPE_RECALL_FRAGMENT_TPL has TWO
+    # ``{record_id}`` placeholders — both are filled with the SAME id
+    # (the instruction "citing exactly [recall:<id>]" + the rule "cite
+    # [recall:<id>] EXACTLY ONCE" are both reinforced with the same id).
+    # So the structural property is "only the strongest id appears" — the
+    # repeat-count is a property of the TEMPLATE (deterministic), not of
+    # the structural cap. Plan 02 Task 2 fix-up: the Wave 0 assertion
+    # ``count == 1`` was overly strict; the correct contract is
+    # ``count >= 1 AND no other survivor's record_id is present``.
+    assert fragment_portion.count(record_a.record_id) >= 1, (
+        f"strongest record_id must appear in fragment portion at least once; "
         f"got {fragment_portion.count(record_a.record_id)}"
     )
-    # Weaker survivors do NOT appear in the fragment portion.
+    # Weaker survivors do NOT appear in the fragment portion (the real
+    # structural max-1-per-turn cap: only ONE record_id — the strongest
+    # — is named; weaker survivors stay in the upstream evidence_line
+    # PAST-tense block but never in the fragment instruction).
     assert record_b.record_id not in fragment_portion, (
         f"record_b ({record_b.record_id}) leaked into the fragment portion"
     )

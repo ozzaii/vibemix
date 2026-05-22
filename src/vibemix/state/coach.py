@@ -55,6 +55,199 @@ ACK_ELIGIBLE_EVENTS: frozenset[str] = frozenset(
 )
 
 
+# ---- Phase 66 — Visible Copilot Move prompt fragments (COPILOT-01/02/03) ----
+#
+# Two module-scope fragment template strings + the dispatch helper
+# (``recall_fragment_for_event``). The fragments are CONDITIONAL APPENDS
+# to ``AICoach.build_prompt`` output: they fire only when ``recall_moments``
+# is non-empty AND the event type matches the gate (transition-shape vs
+# vocabulary). On a cold/feature-off turn the helper returns ``""`` (the
+# falsy gate at top of the helper) — preserving the v5.0 byte-identity
+# regression floor across every existing ``tests/state/test_coach.py``
+# golden test.
+#
+# Shape precedent: Phase 60 KEY_CLASH + TRANSITION_OPPORTUNITY branches
+# at lines 332-381 below — cited, system-grounded, narrate-only,
+# do-NOT-invent. Each fragment template:
+#   - reads PAST-tense (the past moment AND the current latency)
+#   - hands the cite to the LLM ([recall:{record_id}]) — the LLM does
+#     NOT invent it; the registry strict-subset at dj_cohost.py:754-778
+#     validates the id (a fabricated id strips the WHOLE turn via the
+#     Phase 65 anti-poisoning linter — defense in depth)
+#   - bakes the anti-feature rules into the template body (no "tendency"
+#     phrases, no "next track" recommendation, no settings-screen
+#     personalization — COPILOT-03)
+#   - caps emission at ONE [recall:<id>] per turn structurally (the
+#     "EXACTLY ONCE" instruction + the single-survivor-interpolation in
+#     the helper + the registry strict-subset)
+#
+# Static-gate compatibility note (load-bearing): the templates below
+# contain literal forbidden phrases ("you usually do", "you always",
+# "you tend to") INSIDE QUOTED EXAMPLES. Those quoted examples are inside
+# Python STRING LITERALS — the static gate at
+# tests/repo/test_no_recall_antifeatures.py uses
+# ``_strip_comments_and_docstrings`` to remove STRING token contents
+# (replaces with ``""``) before scanning for forbidden phrases. So the
+# forbidden phrases inside example quotes are STRIPPED OUT before the
+# substring scan. This means the gate stays GREEN with the example
+# phrases in place — the stripper is the load-bearing mechanism, not a
+# carve-out. (Verified by the negative-control stripper test
+# ``test_strip_comments_and_docstrings_removes_string_content``.)
+#
+# The leading-space at the start of each template is LOAD-BEARING:
+# ``AICoach.build_prompt`` concatenates the fragment directly onto the
+# task tail with no separator, so the leading space is the only
+# delimiter; preserve it exactly.
+#
+# Phase 66 (COPILOT-01) — transition-shape recall fragment. Verbatim
+# from 66-RESEARCH.md §Pattern 1 (RESEARCH lines 258-275). Gates on
+# TRACK_CHANGE / MIX_MOVE / LAYER_ARRIVAL events with non-empty
+# survivors. Substring-uniqueness anchor: "in the live audio" (pre-
+# grepped at Wave 0 land time, zero hits in coach.py + matrix.py — the
+# Wave 0 RED tests use this as the structural marker).
+TRANSITION_SHAPE_RECALL_FRAGMENT_TPL: str = (
+    " A PAST MOMENT from a prior session is attached in the "
+    "'FROM A PAST SESSION' block above — a transition with similar shape "
+    "you've run before. If — AND ONLY IF — that past moment matches what "
+    "just happened in the live audio, you MAY add ONE short past-tense "
+    "callback line referencing it, citing exactly [recall:{record_id}]. "
+    "Compare what you heard NOW vs. what's in the past signature — the "
+    "delta is the whole point. Examples of shape: \"that blend sat longer "
+    "than the same one you ran last set\", \"killed the bass earlier this "
+    "time around\", \"cleaner cut than the version you ran before\". "
+    "Hard rules: cite [recall:{record_id}] EXACTLY ONCE (the registry "
+    "validates it; a fabricated id strips the whole turn); do NOT invent a "
+    "past moment, paraphrase the past signature, or describe it as live; "
+    "do NOT recommend a NEXT track or move (no 'try X next time'); do NOT "
+    "claim a tendency ('you usually do', 'you always') — narrate THIS one "
+    "compared to THAT one. If the past moment doesn't match, OMIT the "
+    "callback entirely — your normal reaction is the floor."
+)
+
+
+# Phase 66 (COPILOT-02) — vocabulary/register recall fragment. Verbatim
+# from 66-RESEARCH.md §Pattern 2 (RESEARCH lines 288-302). Gates on
+# PHASE events with non-empty survivors. Substring-uniqueness anchor:
+# "echo your own past words" (pre-grepped at Wave 0 land time, zero
+# hits in coach.py + matrix.py).
+#
+# Anti-paraphrase discipline (66-RESEARCH §Pitfall 4): the template
+# instructs Gemini to speak in the DJ's own register ("speak in the same
+# register, not Gemini-paraphrased") — explicit framing against the
+# failure mode where Gemini describes the DJ's voice instead of echoing
+# it. The §RECALL-EAR Kaan-ear check (KAAN-ACTION-LEGAL.md) is the
+# runtime defense in depth.
+VOCABULARY_RECALL_FRAGMENT_TPL: str = (
+    " A PAST MOMENT from a prior session is attached in the "
+    "'FROM A PAST SESSION' block above — a phrasing or call you made "
+    "before. If — AND ONLY IF — what you'd naturally say RIGHT NOW lines "
+    "up with that past signature, you MAY echo your own past words, "
+    "citing exactly [recall:{record_id}]. The past signature is YOUR "
+    "voice from before; speak in the same register, not Gemini-paraphrased. "
+    "Examples: \"same call you made on the last drop like this\", "
+    "\"your line from the last set still holds\". Hard rules: cite "
+    "[recall:{record_id}] EXACTLY ONCE; do NOT invent a past phrasing; "
+    "do NOT claim it's a habit ('you always', 'you tend to'); do NOT "
+    "recommend a next move. If your live reaction wouldn't naturally "
+    "echo the past, OMIT the callback — a forced echo is the failure "
+    "mode this phase guards."
+)
+
+
+def recall_fragment_for_event(
+    ev: Event,
+    recall_moments: "list[Record] | None",
+) -> str:
+    """Phase 66 (COPILOT-01/02) — dispatch the right recall fragment
+    template for the event type, or return ``""`` on cold/empty input.
+
+    The helper is a TOP-LEVEL pure function (not a class method, not a
+    dispatcher class — 66-RESEARCH.md §Don't Hand-Roll names it as a
+    helper, not infrastructure). It is called from ``AICoach.build_prompt``
+    in the non-diet path; the diet path skips it entirely (Phase 65
+    invariant: diet events are ACK_ELIGIBLE incl. HEARTBEAT, never
+    retrieval events, and the existing ``_bp_kwargs`` logic at
+    ``dj_cohost.py:827`` already withholds ``recall_moments`` from the
+    diet call).
+
+    Falsy-gate (cold-path byte-identity contract): if ``recall_moments``
+    is ``None`` or ``[]``, return ``""`` immediately. This preserves the
+    v5.0 byte-identity floor — every existing
+    ``tests/state/test_coach.py`` golden test depends on cold-path
+    output being byte-identical to the v5.0 baseline. The triple-equality
+    contract is pinned by
+    ``test_task_for_event_byte_identical_v5_baseline_no_recall``
+    (recall_moments=None == recall_moments=[] == no-kwarg).
+
+    Branch order (TRACK_CHANGE overlap resolution per 66-RESEARCH.md
+    §Pitfall 5 + §Open Q1):
+        1. TRACK_CHANGE / MIX_MOVE / LAYER_ARRIVAL → transition-shape
+           fragment WINS (TRACK_CHANGE is in BOTH event gates per
+           CONTEXT.md Area 1 Q1+Q2; transition is more concrete than
+           a vocabulary echo on a track-flip).
+        2. PHASE → vocabulary fragment.
+        3. Other events → return ``""`` (no fragment).
+
+    Strongest-survivor-only interpolation (66-RESEARCH.md §Pattern 1
+    closing paragraph + §Pattern 3): only ``recall_moments[0].record_id``
+    is interpolated into the template — Phase 65's ``cosine_topk`` returns
+    survivors sorted DESCENDING by score, so index 0 is the strongest
+    match. The weaker survivors still appear in the
+    ``evidence_line``'s PAST-tense ``FROM A PAST SESSION`` block (so
+    Gemini can pattern-match across them) but ONLY the strongest is
+    named for the citation. This is the structural max-1-per-turn cap:
+    the template instructs "cite [recall:{record_id}] EXACTLY ONCE" and
+    only one record_id is interpolated, so any second citation Gemini
+    invents would target a record_id that EITHER is not in the registry
+    (fabricated → whole turn strips) OR is the same id repeated (the
+    EXACTLY-ONCE instruction is a soft cap; the registry strict-subset
+    invariant + the single-emit-stream-per-turn shape are the harder
+    enforcement). Pinned by
+    ``test_only_strongest_survivor_record_id_in_fragment`` +
+    ``test_max_one_recall_per_turn_COPILOT02``.
+
+    Args:
+        ev: The current ``Event`` (read for ``ev.type`` only — no other
+            field is consumed by this helper).
+        recall_moments: The Phase 65 ``MemoryRecall.get_latest()``
+            survivor list, sorted descending by cosine score. ``None``
+            (default / feature-off) and ``[]`` (event fired but all
+            below floor / deadline missed / current-session-only) are
+            both falsy → ``""`` returned, cold-path byte-identical to
+            v5.0.
+
+    Returns:
+        A leading-space-prefixed string to concatenate onto the
+        ``build_prompt`` task tail, or ``""`` on cold input / unmatched
+        event type.
+    """
+    # Cold-path falsy gate (Pattern A in 66-PATTERNS.md, the LOAD-BEARING
+    # byte-identity contract). Mirrors the existing ``if recall_moments:``
+    # gate in ``evidence_line`` at line 220.
+    if not recall_moments:
+        return ""
+    # Strongest-survivor-only interpolation. Phase 65 contract:
+    # ``cosine_topk`` returns DESC by score, so index 0 is the highest
+    # match. Documented in the dispatch decision §Pattern 1 closing
+    # paragraph (66-RESEARCH.md).
+    strongest = recall_moments[0]
+    # Branch order = TRACK_CHANGE overlap resolution (§Pitfall 5 + §Open
+    # Q1). TRACK_CHANGE is in BOTH gates; transition-shape WINS by being
+    # listed FIRST.
+    if ev.type in ("TRACK_CHANGE", "MIX_MOVE", "LAYER_ARRIVAL"):
+        return TRANSITION_SHAPE_RECALL_FRAGMENT_TPL.format(
+            record_id=strongest.record_id
+        )
+    if ev.type == "PHASE":
+        return VOCABULARY_RECALL_FRAGMENT_TPL.format(
+            record_id=strongest.record_id
+        )
+    # Other event types (KAAN_SPOKE, MANUAL, HEARTBEAT, KEY_CLASH,
+    # TRANSITION_OPPORTUNITY) → no fragment. The byte-identity guarantee
+    # for these types is preserved by returning "".
+    return ""
+
+
 class AICoach:
     """Builds the per-event prompt. Single persona is set at session-open via
     SYSTEM_INSTRUCTION; this class only adds event-specific evidence + task."""
@@ -426,4 +619,14 @@ class AICoach:
             recall_moments=recall_moments,
         )
         task = AICoach.task_for_event(ev)
-        return f"[{evidence} | event={ev.type}] {task}"
+        # Phase 66 (COPILOT-01/02) — conditional recall fragment append.
+        # ``recall_fragment_for_event`` returns ``""`` on cold/empty input
+        # (the load-bearing byte-identity gate); on hot input it returns
+        # a leading-space-prefixed string carrying the transition-shape
+        # fragment (TRACK_CHANGE / MIX_MOVE / LAYER_ARRIVAL) or the
+        # vocabulary fragment (PHASE), with the strongest survivor's
+        # record_id interpolated for the [recall:<id>] citation. The
+        # leading space in each template is the only separator from
+        # ``task`` — concatenation here is direct.
+        recall_frag = recall_fragment_for_event(ev, recall_moments)
+        return f"[{evidence} | event={ev.type}] {task}{recall_frag}"
