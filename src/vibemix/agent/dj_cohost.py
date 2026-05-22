@@ -144,6 +144,27 @@ CITATION_STRIP_MAX_CHIPS: int = 3
 # (`BAND_SHIFT_HIGH` → "band shift") get trimmed to keep chip width tight.
 CITATION_VERB_MAX_WORDS: int = 3
 
+# Phase 66 (COPILOT-02) — coach-tier recall-callback cooldown. ≥120s
+# between any two recall callbacks per the CONTEXT.md Area 1 Q3 decision
+# (66-CONTEXT.md: "rare-and-earned"; two recall moves in a single set
+# are the ceiling — not a floor). The structural max-1-per-turn cap is
+# enforced by the prompt fragment template ("cite [recall:<id>] EXACTLY
+# ONCE") + the registry strict-subset invariant + the single-emit-stream-
+# per-turn shape; the cooldown is the multi-turn pacing knob.
+#
+# This is a SEPARATE concern from ``EventDetector._cooldown_ok`` /
+# ``audio/constants.py::MIN_EVENT_GAP_PER_TYPE``: that cooldown gates
+# whether the EVENT fires at all (so the live reaction still happens);
+# this cooldown gates whether the recall-callback prompt fragment is
+# threaded for an event that already fired. Mixing them couples two
+# concerns — see 66-RESEARCH.md §Anti-Patterns ("Putting the cooldown
+# in EventDetector._cooldown_ok").
+#
+# One-line-tunable contract: a Kaan-ear pass on the real corpus
+# (§RECALL-EAR in KAAN-ACTION-LEGAL.md) may re-tune this value via a
+# single edit here — no surrounding wiring depends on the literal.
+RECALL_CALLBACK_COOLDOWN_S: float = 120.0
+
 
 def _build_citation_strip(
     *,
@@ -212,7 +233,19 @@ def _build_citation_strip(
         # Source allow-list — only sources with a clear "DJ action" verb
         # yield UI chips. Quiet sources (aud/screen/tend) parse but do
         # not surface as user-visible evidence tags.
-        if source not in ("ev", "mix", "midi", "key"):
+        #
+        # Phase 66 (COPILOT-01) — ``recall`` added as the fifth allow-list
+        # entry. The Phase 65 deferral comment that previously sat at this
+        # site ("do NOT add `recall`… the recall chip is Phase 66") is
+        # discharged here: the recall registration loop at
+        # ``llm_node`` line ~770 writes ``("recall", record_id, t_session)``
+        # BEFORE the snapshot below, so a grounded ``[recall:<id>]`` resolves
+        # like any other source and an unregistered (fabricated) ``[recall:
+        # <unregistered>]`` falls through the existing ``if not timestamps:
+        # continue`` guard with strip == [] (same final state as the
+        # Phase 65 anti-poisoning gate would produce via the linter
+        # whole-turn strip — defense in depth at two tiers).
+        if source not in ("ev", "mix", "midi", "key", "recall"):
             continue
         # Registry lookup uses the body verbatim (KEY@t form). Drop the
         # chip when the registry has no matching observation — closes
@@ -234,6 +267,20 @@ def _build_citation_strip(
             # letters-only "key" label (keeps the locked verb format
             # `^[a-z]+( [a-z]+){0,2}$` — camelot codes carry digits).
             verb = "key"
+        elif source == "recall":
+            # Phase 66 (COPILOT-01) — mirrors the ``key`` precedent above for
+            # opaque/structured bodies. The ``recall`` body shape is
+            # ``<session_id>:<seq>`` (e.g. ``20260520-2200:7``); the full
+            # record_id rides in ``event_id`` for the click→debrief deep-link.
+            # The chip verb is a fixed letters-only ``"recall"`` label —
+            # deriving a verb from a session-date string is meaningless and
+            # would leak embedding-internal values to the UI surface
+            # (66-RESEARCH.md §Don't Hand-Roll). A single lowercase word
+            # trivially matches the locked verb-format regex
+            # ``^[a-z]+( [a-z]+){0,2}$`` (pinned by
+            # tests/agent/test_citation_strip_emit.py::
+            # test_verb_format_is_two_to_three_lowercase_words).
+            verb = "recall"
         else:
             # Body shape is ``KEY@t`` for ev/aud/midi/mix; partition on "@"
             # so a missing "@" (defensive: future grammar drift) falls back
@@ -459,6 +506,34 @@ class DJCoHostAgent(Agent):
         # llm_node) — passing only the service is not enough.
         self._recall: "MemoryRecall | None" = recall
         self._recall_enabled: bool = recall_enabled and recall is not None
+        # Phase 66 (COPILOT-02) — wall-clock timestamp of the last recall
+        # callback that REACHED the audience (the ``await self._ipc_bus.
+        # emit(...)`` returned without raising on a turn that emitted a
+        # chip with ``event_id.startswith("recall:")``). Read by the
+        # cooldown gate in ``llm_node`` to drop ``recall_moments = []``
+        # when ``(time.time() - self._last_recall_callback_at) <
+        # RECALL_CALLBACK_COOLDOWN_S``. The semantic locked at CONTEXT.md
+        # Area 1 Q3 + RESEARCH §Pitfall 2 + §Open Q5 is "REACHED the
+        # audience" — a bus-emit failure cannot arm this timestamp (the
+        # arm sits on the ``else:`` branch of the bus-emit try/except,
+        # success-only).
+        #
+        # Initialized to ``float("-inf")`` (never-armed sentinel) so the
+        # FIRST recall callback always passes the cooldown gate regardless
+        # of the wall-clock value — ``(time.time() - -inf) == inf`` which
+        # is never ``< 120.0``. The plain ``0.0`` initializer would
+        # incorrectly trip the gate when ``time.time()`` is mocked to a
+        # small value (the pinned cooldown test mocks ``t=100.0`` on turn
+        # N; with ``0.0`` init the gap is 100s < 120s → first callback
+        # wrongly suppressed; with ``-inf`` the gate passes on turn N as
+        # intended, arms to 100.0, then suppresses turn N+1 at t=180 with
+        # gap=80s as the test expects).
+        #
+        # Wall-clock ``time.time()`` (not session-relative ``t_session``)
+        # so a single Kaan-session's pacing is what matters; if Kaan opens
+        # a fresh session, the previous session's timestamp is forgotten
+        # by virtue of being a per-agent-instance scalar.
+        self._last_recall_callback_at: float = float("-inf")
         # The pre-dispatch task ref. set_next_event creates this off-loop
         # background task and llm_node leaves it alone — it either landed
         # survivors in `_recall._latest` (Plan 65-03 contract) or its
@@ -750,6 +825,26 @@ class DJCoHostAgent(Agent):
                 # would break test_recall_pull_called_when_enabled-style
                 # smoke tests that wire a service without a registry).
                 if self._registry is None:
+                    recall_moments = []
+                # Phase 66 (COPILOT-02) — coach-tier recall-callback cooldown
+                # gate. When ``recall_moments`` is non-empty AND the wall-clock
+                # gap since the last callback REACHED the audience is < 120s,
+                # drop survivors to ``[]``. Downstream is then byte-identical
+                # to the cold/feature-off path: the strict-subset registration
+                # loop at :754 short-circuits (its ``recall_moments and ...``
+                # guard); the falsy-gate in ``evidence_line`` / the new
+                # ``recall_fragment_for_event`` helper both skip the recall
+                # block; the linter's existence-only branch sees no recall ids
+                # in the snapshot so a fabricated ``[recall:<id>]`` would
+                # strip the turn (the Phase 65 anti-poisoning gate still
+                # carries forward). The cooldown ARM site is the ``else:``
+                # branch of the bus-emit try/except below — strict "REACHED
+                # the audience" semantic per CONTEXT.md Area 1 Q3 + RESEARCH
+                # §Pitfall 2 + §Open Q5; a bus-emit failure cannot arm. Pinned
+                # by ``test_cooldown_suppresses_back_to_back_recalls_COPILOT02``.
+                if recall_moments and (
+                    time.time() - self._last_recall_callback_at
+                ) < RECALL_CALLBACK_COOLDOWN_S:
                     recall_moments = []
                 if recall_moments and self._registry is not None:
                     # Phase 65 review CR-01/CR-02 — the registered set MUST
@@ -1512,6 +1607,51 @@ class DJCoHostAgent(Agent):
                 await self._ipc_bus.emit(reaction_msg.to_dict())
             except Exception as e:  # noqa: BLE001 — best-effort telemetry
                 print(f"\n[cohost-reaction publish err] {e}", file=sys.stderr)
+            else:
+                # Phase 66 (COPILOT-02) — arm the recall-callback cooldown
+                # ONLY when the chip reached the audience. The ``else:``
+                # branch runs iff the try body completed without raising —
+                # i.e. ``_ipc_bus.emit(...)`` returned cleanly. A bus-emit
+                # failure jumps to the except above and this arm never runs;
+                # this is the strict semantic locked in CONTEXT.md Area 1
+                # Q3 + RESEARCH §Pitfall 2 + §Open Q5: cooldown reflects
+                # "a recall callback REACHED the audience", not "a recall
+                # callback was MERELY ATTEMPTED". One-way (arm only); no
+                # reset path — the wall-clock progression naturally drains
+                # the 120s window. Inner narrow try/except is defense in
+                # depth: a fault in ``chip.get`` (e.g. a future wire-format
+                # change) must not propagate and crash the turn — the
+                # outer ``else:`` placement already guarantees this code
+                # only runs on a clean bus emit, but the inner wrapper
+                # matches the project idiom (Pattern B in 66-PATTERNS.md).
+                try:
+                    if any(
+                        chip.get("event_id", "").startswith("recall:")
+                        for chip in strip
+                    ):
+                        self._last_recall_callback_at = time.time()
+                except Exception as _e:  # noqa: BLE001
+                    print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
+        elif self._ipc_bus is None and citation_action in ("emit", "bypass"):
+            # Phase 66 (COPILOT-02) — bus-less arm path. When ``_ipc_bus`` is
+            # None (test contexts that don't wire the UI broadcast surface,
+            # or production agents that skip the IPC bus) the chip surface
+            # never publishes, but the AUDIO surface still delivered the
+            # reaction to the audience via the TTS chunks (citation_action
+            # in {emit, bypass} = "user heard the text"). The strict
+            # "REACHED the audience" semantic locked in CONTEXT.md Area 1
+            # Q3 still applies here: the audience heard the recall callback
+            # via audio even though no chip was broadcast. Scan the emitted
+            # ``full_text`` for any ``[recall:<id>]`` atom; if present, arm
+            # the cooldown. Best-effort try/except so a parse failure
+            # cannot crash the turn (project Pattern B).
+            try:
+                if any(
+                    src == "recall" for src, _body in parse_citations(full_text)
+                ):
+                    self._last_recall_callback_at = time.time()
+            except Exception as _e:  # noqa: BLE001
+                print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
 
         # ---- Per-invocation dump (always written, even on suppression) ----
         try:
