@@ -53,6 +53,79 @@ def test_evidence_line_silent_state_full_format():
     )
 
 
+# ---------- evidence_line: recall[…] block (Phase 65, RECALL-02) ----------
+
+
+def _recall_records():
+    """Two populated past-session Record moments for the recall block tests.
+
+    Imported lazily so a future Record relocation only touches this helper. The
+    record_id is the Phase 64/65 ``f"{session_id}:{seq}"`` shape (inner colon).
+    """
+    from vibemix.memory.store import Record
+
+    return [
+        Record(
+            record_id="20260520-2200:7",
+            session_id="20260520-2200",
+            ts=120.0,
+            kind="coach_line",
+            signature="that filter sweep into the drop was clean",
+            score=0.91,
+        ),
+        Record(
+            record_id="20260520-2200:12",
+            session_id="20260520-2200",
+            ts=240.0,
+            kind="coach_line",
+            signature="you rode the groove a touch long here",
+            score=0.82,
+        ),
+    ]
+
+
+def test_evidence_line_recall_block_present():
+    """RECALL-02 — populated recall_moments → PAST-TENSE fence + [recall:<id>] tokens.
+
+    A non-empty recall_moments list appends the additive, PAST-TENSE-fenced
+    block AFTER the live evidence (subordinate ordering — recall is never read
+    as something happening now). Both record_id tokens appear verbatim so the
+    citation linter can validate them against the registered survivors.
+
+    RED until Plan 65-04 wires the recall_moments kwarg + block into
+    evidence_line — until then evidence_line() rejects the kwarg (TypeError) or
+    emits no block. That is the intended Wave-0 RED.
+    """
+    state = MusicState()  # silent baseline — only the recall block is added
+    out = AICoach.evidence_line(state, recall_moments=_recall_records())
+
+    # PAST-TENSE structural fence — never read as live.
+    fence = "FROM A PAST SESSION (not happening now): "
+    assert fence in out
+    # Both registered record_id tokens appear verbatim (linter-citable).
+    assert "[recall:20260520-2200:7]" in out
+    assert "[recall:20260520-2200:12]" in out
+    # The signatures ride along inside the block.
+    assert "that filter sweep into the drop was clean" in out
+
+    # Subordinate ordering: the recall fence appears AFTER the live evidence.
+    assert out.index("recent_moves[8s]") < out.index(fence)
+
+
+def test_evidence_line_recall_empty_no_block():
+    """RECALL-02 — empty (and None) recall_moments → emit NOTHING.
+
+    The recall block is gated identically to the decks[…] / registry_snapshot
+    gates: ``if recall_moments:`` — both ``[]`` and the default ``None`` are
+    falsy, so zero bytes are appended. An empty recall list must yield the EXACT
+    same string as the no-kwarg call (the byte-identical-when-empty contract).
+
+    RED until Plan 65-04 adds the recall_moments kwarg with a falsy gate.
+    """
+    state = MusicState()
+    assert AICoach.evidence_line(state, recall_moments=[]) == AICoach.evidence_line(state)
+
+
 def test_evidence_line_audible_block_format(mocker):
     """Pin the exact audible-block format from v4:1336-1339."""
     mocker.patch("vibemix.state.coach.time.time", return_value=1000.0)

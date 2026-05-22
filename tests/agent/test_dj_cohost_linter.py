@@ -243,6 +243,89 @@ def test_invalid_response_strips_silently(mocker, tmp_path) -> None:
 
 
 # --------------------------------------------------------------------------
+# (c2) THE HEADLINE — fabricated [recall:<unregistered>] strips the WHOLE turn
+# --------------------------------------------------------------------------
+
+
+def test_fabricated_recall_strips_turn(mocker, tmp_path) -> None:
+    """Phase 65 / RECALL-01 headline poisoning gate — the milestone's anti-slop
+    release gate, expressed as a test.
+
+    A past-session signature crosses the trust boundary into the live prompt as
+    raw text. If Gemini fabricates a callback citing a ``[recall:<id>]`` whose
+    ``record_id`` the registry NEVER wrote (the model invented the id, or echoed
+    a lookalike out of a past signature), the whole turn MUST strip — exactly
+    like a fabricated ``[ev:UNKNOWN@99.0]`` or ``[key:A:12B]``. A confabulated
+    "remember when you…" that never happened is the worst slop class this
+    milestone exists to kill.
+
+    Mirrors test_invalid_response_strips_silently: empty registry → the recall
+    id is unregistered-by-construction → CitationLinter.check(..., mode="live")
+    returns invalid → no chunks yielded + citation_strip logged + tracker
+    records the strip.
+
+    The id MUST be a structurally-valid recall body (``f"{session_id}:{seq}"``,
+    inner colon) so this is a genuine "registered? no" failure once recall is
+    parseable — NOT merely an unparsed token. To make this RED for the RIGHT
+    reason (and not a same-now-as-later smoke test that would pass even with the
+    poisoning hole open), the reaction ALSO carries a real, registered ``[ev:…]``
+    citation. That ev atom is valid, so the ONLY thing that can strip this turn
+    is the linter recognizing the fabricated ``[recall:…]`` as an
+    unregistered/invalid atom.
+
+    RED until Plans 65-02 (recall joins EVIDENCE_SOURCES + _SOURCE_ALT so
+    parse_citations sees it) + 65-04 (registration wiring): TODAY the recall
+    token is unparsed, so only the valid ``[ev:…]`` is seen → the turn is EMITTED
+    (no strip) → this test FAILS. That failure IS the poisoning hole, made
+    visible. Once 65-02 lands sites 1+2, the fabricated recall parses, fails
+    existence-only validation (``invalid_atoms``, id named in ``missing``), and
+    the WHOLE turn strips. That green transition is the non-negotiable contract.
+    """
+    # Registry knows the ev atom but NOT the recall id.
+    registry = EvidenceRegistry()
+    registry.write("ev", "KICK_SWAP", 45.2)
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    # A fabricated recall callback riding ALONGSIDE a genuinely valid ev cite.
+    fabricated_id = "20260520-2200:999"
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                f"that [ev:KICK_SWAP@45.2] hit — remember when you "
+                f"[recall:{fabricated_id}] killed that same drop"
+            ]
+        )
+    )
+
+    ev = Event(type="TRACK_CHANGE", state=state, extra={})
+    agent.set_next_event(ev)
+    chunks = _drive(agent)
+
+    # The WHOLE turn is silenced — the fabricated callback poisons the otherwise
+    # valid reaction. (The valid ev atom cannot rescue an invalid recall atom:
+    # response-level binary grounding.)
+    assert chunks == []
+    playback.push.assert_not_called()
+    # citation_strip logged; the fabricated reaction text is captured (silenced).
+    kinds = [k for k, _ in recorder.events]
+    assert "citation_strip" in kinds
+    strip_log = next(f for k, f in recorder.events if k == "citation_strip")
+    assert f"[recall:{fabricated_id}]" in strip_log["raw_text"]
+    # The strip names the fabricated recall id as the missing/invalid atom.
+    assert ("recall", fabricated_id) in strip_log["missing"] or [
+        "recall",
+        fabricated_id,
+    ] in strip_log["missing"]
+    assert strip_log["reason"] == "invalid_atoms"
+    # Tracker recorded the strip; ai_text NOT logged (nothing emitted).
+    assert tracker.rate() == 1.0
+    assert "ai_text" not in kinds
+
+
+# --------------------------------------------------------------------------
 # (d) No-citations response strips
 # --------------------------------------------------------------------------
 
