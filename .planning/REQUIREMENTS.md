@@ -68,19 +68,19 @@ Acid test for any embedded artifact: *"does retrieving this close a hallucinatio
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STORE-01 | TBD | Pending |
-| STORE-02 | TBD | Pending |
-| STORE-03 | TBD | Pending |
-| STORE-04 | TBD | Pending |
-| INGEST-01 | TBD | Pending |
-| INGEST-02 | TBD | Pending |
-| INGEST-03 | TBD | Pending |
-| RECALL-01 | TBD | Pending |
-| RECALL-02 | TBD | Pending |
-| RECALL-03 | TBD | Pending |
-| RECALL-04 | TBD | Pending |
-| COPILOT-01 | TBD | Pending |
-| COPILOT-02 | TBD | Pending |
-| COPILOT-03 | TBD | Pending |
+| STORE-01 | Phase 63 | Pending |
+| STORE-02 | Phase 63 | Pending |
+| STORE-03 | Phase 63 | Pending |
+| STORE-04 | Phase 63 | Pending |
+| INGEST-01 | Phase 64 | Pending |
+| INGEST-02 | Phase 64 | Pending |
+| INGEST-03 | Phase 64 | Pending |
+| RECALL-01 | Phase 65 | Pending |
+| RECALL-02 | Phase 65 | Pending |
+| RECALL-03 | Phase 65 | Pending |
+| RECALL-04 | Phase 65 | Pending |
+| COPILOT-01 | Phase 66 | Pending |
+| COPILOT-02 | Phase 66 | Pending |
+| COPILOT-03 | Phase 66 | Pending |
 
-**Coverage:** 14 requirements across 4 categories (STORE 4 · INGEST 3 · RECALL 4 · COPILOT 3). Phase mapping filled by the roadmapper.
+**Coverage:** 14/14 requirements mapped to exactly one phase each — no orphans, no duplicates (STORE-01..04 → Phase 63 · INGEST-01..03 → Phase 64 · RECALL-01..04 → Phase 65 · COPILOT-01..03 → Phase 66). Mapped by the roadmapper 2026-05-22.

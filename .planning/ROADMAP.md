@@ -2,7 +2,7 @@
 
 **Project:** vibemix — AI DJ Co-Host
 **Last shipped:** v5.0 "The Useful Cut" — 2026-05-22 (tech_debt accepted; KAAN-ACTION live-confirm items ride forward)
-**Current milestone:** v6.0 "The Memory Turn" — queued (planning next)
+**Current milestone:** v6.0 "The Memory Turn" — ACTIVE (planning) — Phases 63–66
 **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on the external signature clock (NOT archived)
 
 ---
@@ -16,6 +16,93 @@
 - ✅ **v3.1 Distribution-Ready Pass** — Phases 46–50 (shipped 2026-05-18, tech_debt accepted) — see `.planning/milestones/v3.1-ROADMAP.md`
 - 🟡 **v4.0 SHIP** — Phases 51–58 (engineering-complete 8/8, publish on signature clock — NOT archived) — see "v4.0 SHIP" section below
 - ✅ **v5.0 The Useful Cut** — Phases 59–62 (shipped 2026-05-22, tech_debt accepted) — see `.planning/milestones/v5.0-ROADMAP.md`
+- 🔵 **v6.0 The Memory Turn** — Phases 63–66 (ACTIVE — planning) — see "v6.0 The Memory Turn" section below
+
+---
+
+# v6.0 "The Memory Turn" — ACTIVE (planning)
+
+> **Status:** Active milestone. vibemix shifts from a *reactive* co-host to a *forward-leaning* **copilot** — every finished session feeds a local embedding store, and live coach prompts ground in *past* sessions, not just the current moment. Personalization is **emergent from the retrieval seam**, not a settings screen and not an LLM-summarized profile. This is a **WIRING / REUSE milestone with ZERO net-new dependencies** — `sqlite-vec>=0.1.9` is already declared/installed/signed-in-sidecar, and the entire embed → `cosine_topk` → cited-evidence machine already ships under `src/vibemix/library/`. The memory layer is a second `memory.db` + a ~50-line wrapper + an off-hot-path ingest job + one gated evidence line + one new existence-only `recall` citation source.
+
+## Overview (v6.0)
+
+The decisive research finding (4 convergent agents, HIGH confidence — `.planning/research/SUMMARY.md` + `ARCHITECTURE.md`): this is **not a greenfield build**. vibemix already shipped the working sqlite-vec store (`library/index_sqlite_vec.py`), the Gemini-Embedding-2 client with content-hash cache (`library/embed.py`), the single-chokepoint top-K math (`library/_cosine.py::cosine_topk`), and — crucially — the **event-gated embed→cosine→cited-evidence pattern** end-to-end (`library/grounding.py` → `[track:<id>]`). The retrieval seam is that exact shape generalized from `track` to `recall`.
+
+The product's hard line holds: **grounded, never hallucinating, no AI slop.** The new headline hallucination class is **retrieval poisoning** — an irrelevant past moment injected into the live prompt so the AI references something that didn't happen. For a product whose entire thesis is "no AI slop," a poisoned memory footer is an existential, release-blocking failure. The mitigation is **structural, not a prompt plea**: a hard ~0.7 similarity floor (below → inject *nothing*; empty retrieval is the correct, frequent state), a small top-k cap (2–3 — one good callback beats ten weak ones), event-gating (only track-aware events, never HEARTBEAT), a PAST-tense "FROM A PAST SESSION" fence, current-session exclusion, and a new `recall` citation source that makes a fabricated `[recall:<id>]` **uncitable-by-construction** (the existing `CitationLinter` strips the whole turn, exactly like the Phase 59 `key:` source). **RETRIEVE (Phase 65) is therefore the anti-slop release-gate phase.**
+
+The build-order spine is **dependency-correct and unanimous across all four researchers: STORE → INGEST → RETRIEVE → COPILOT MOVE.** Each phase is independently testable and the live reaction path is untouched until RETRIEVE. STORE + INGEST land with *zero* changes to the reaction path (a grep-gate enforces that ingest never imports the coach loop); the live path only changes in RETRIEVE, behind a gate that preserves byte-identity when memory is cold/empty. All **four cardinal invariants** (single-writer, citation-grounding, trust-the-audio, one-socket) are *preserved by reuse* — memory never writes `MusicState`, never opens a new port, never overrides the live ears.
+
+This is a memory-layer graft on an already-mature grounded co-host. No new AI providers, no CLAP/MERT/OpenL3/torch, no managed memory framework (Mem0/Letta/Zep/Cognee all rejected), no LLM-extraction layer, no new ws port, no next-track recommendation. The v4.0 external signature clock is unchanged.
+
+## Phases (v6.0)
+
+**Phase Numbering:** Continues from v5.0 (closed at Phase 62). v6.0 starts at **Phase 63** and runs through **Phase 66**. Integer phases (63, 64, …) = planned milestone work; decimal phases (e.g. 65.1) = urgent insertions if needed.
+
+- [ ] **Phase 63: Memory Store** - A local per-install `memory.db` (sqlite-vec) + a ~50-line `MemoryStore` wrapper, cloned from the shipped `library/` store/cosine/embed-cache primitives (zero new dependency), with Mac/Win bit-identical `cosine_topk` parity + numpy fallback, retention + delete-cascade, and embedding routed via `model_router.resolve("embedding")` on the FLEX cost lane. No live-path touch.
+- [ ] **Phase 64: Session Ingest** - An off-hot-path post-session batch job (+ boot-time sweep) that turns each session's existing artifacts (`events.jsonl` + cited evidence + `ai_text`) into deterministic TEXT "reaction moment" records — NO audio embedding, NO LLM-extraction (CI-guarded) — every record `session_id`/timestamp-tagged. Depends on 63.
+- [ ] **Phase 65: Memory Retrieval Seam (ANTI-SLOP RELEASE GATE)** - A new existence-only `recall` evidence source (zero new linter code, à la Phase 59 `key`) + a gated `recall[…]` block in `coach.py::evidence_line` (copy the Phase 59 `decks[…]` gate → cold-memory golden byte-identical), top-k 2–3 cap, ~0.7 similarity floor, PAST-tense fence, current-session excluded, cosine-vs-time-weight blend tuned in-phase on Kaan's real corpus. **Kaan-ear veto.** Depends on 63 + 64.
+- [ ] **Phase 66: Visible Copilot Move** - A linter-grounded transition-shape callback + a vocabulary/register callback — cited, warm, non-nagging — that prove retrieval is firing, with NO anti-features (no next-track rec, no LLM-extracted "tendencies", no settings-screen personalization, no continuous audio embedding). Depends on 65.
+
+## Phase Details (v6.0)
+
+### Phase 63: Memory Store
+**Goal**: A local, per-install vector store for embedded session "moments" exists and is proven correct — built entirely on the shipped `library/` primitives with zero new dependency, single-writer-disciplined, retention-bounded, and Mac/Win rank-identical. This is the storage spine everything downstream reads and writes; it has no dependency on ingest or retrieval and is unit-testable in isolation.
+**Depends on**: Nothing (first v6.0 phase — INGEST writes to it, RETRIEVE reads it)
+**Requirements**: STORE-01, STORE-02, STORE-03, STORE-04
+**Success Criteria** (what must be TRUE):
+  1. A per-install `memory.db` sqlite-vec store accepts an embedded record (`session_id` + timestamp + raw text signature + embedding) via a ~50-line `MemoryStore` wrapper exposing `add_record` + `query_topk`, and returns the correct top-k on query — reusing the shipped `SqliteVecStore` + the deterministic `cosine_topk` chokepoint (no forked KNN).
+  2. On a host where the sqlite-vec extension can't load, the store falls back to the existing NumpyStore and produces bit-identical top-k rank order to the sqlite-vec path (Mac/Win parity, `pytest -m parity` green).
+  3. Deleting a session's recordings cascades to its memory embeddings — no orphaned vectors remain — and a per-install size/retention budget caps growth; everything is local-only, user-deletable, and confined to the app cache dir (path-traversal defended).
+  4. Every embed call resolves the model via `model_router.resolve("embedding")` (no hardcoded `gemini-embedding-001` literal — CI grep gate green) and routes through the Bravoh proxy on the `ServiceTier.FLEX` cost lane; a record carries the raw text signature only — never an LLM-extracted "insight" (raw-in, raw-out).
+**Plans**: TBD
+**Research/KAAN-ACTION flag**: sqlite-vec one-click-install fragility — the `vec0.dylib`/`vec0.dll` native binaries must be signed/notarized and a clean-VM (incl. Windows ARM64) memory round-trip proven in the e2e matrix. This rides the Apple notarization + SignPath external clock already on the critical path — surface it early so it parallelizes against the in-flight approvals. (The *binary* was already signed in shipping builds; the new artifact is only a data file with zero new signing surface, but the clean-VM round-trip is the proof item.)
+
+### Phase 64: Session Ingest
+**Goal**: Each finished session's existing artifacts become typed, embeddable "reaction moment" records — deterministic TEXT signatures only, embedded off the hot path, with NO LLM-extraction between session and embedding. This is fully decoupled from the live reaction path: it runs on dead session data in an executor and can land before any prompt touch.
+**Depends on**: Phase 63 (writes to `memory.db`)
+**Requirements**: INGEST-01, INGEST-02, INGEST-03
+**Success Criteria** (what must be TRUE):
+  1. After a session closes, an ingest job reads that session's `events.jsonl` + cited evidence + `ai_text` and writes typed "reaction moment" records (deterministic text signatures) to `memory.db` — no audio embedding in v1, and a CI guard asserts the ingest path calls only `embed_content` (never any chat/generation model — extraction is structurally impossible).
+  2. Ingest runs strictly off the hot path: at session-close in a batch (FLEX tier) via `run_in_executor`, plus a boot-time sweep that re-ingests crashed/missed sessions (mirroring the recorder crash-sweep) — it never touches `MusicState`, never holds `state._lock`, never imports the coach loop (grep gate green).
+  3. Re-ingesting an already-ingested session is idempotent and costs 0 API calls (content-hash embed cache + a `memory_ingested` marker), and every record is `session_id`/timestamp-tagged so it can later be excluded from its own session's retrieval and cascade-deleted.
+  4. The embedded moment taxonomy ("which artifacts ground best") is resolved in-phase against the acid test — only records that close a hallucination class or unlock a copilot move are embedded; the v1 default is text-only (`coach_line` + `moment` signatures), audio_moment explicitly deferred.
+**Plans**: TBD
+**Research flag**: the "which artifacts ground best" question is explicitly the first phase's research per the milestone thesis (`coach_line` vs `moment` vs stretch `audio_moment` taxonomy). Recommend `/gsd:plan-phase --research-phase`; start text-only, resolve scope here rather than by default.
+
+### Phase 65: Memory Retrieval Seam (ANTI-SLOP RELEASE GATE)
+**Goal**: At reaction time, the coach prompt is grounded with top-k *past* moments — citable-by-construction, fenced past-tense, subordinate to the live audio, and structurally anti-poisoning — so the AI can call back a real past moment while a fabricated recall strips the whole turn. This is the one phase that touches the live reaction path, and the hallucination-gate phase: retrieval poisoning, latency, and staleness are all concentrated and verified here. **This is the milestone's anti-slop release gate.**
+**Depends on**: Phase 63 (reads `memory.db`) + Phase 64 (needs ingested records to retrieve)
+**Requirements**: RECALL-01, RECALL-02, RECALL-03, RECALL-04
+**Success Criteria** (what must be TRUE):
+  1. A new existence-only `recall` evidence source is added to `EVIDENCE_SOURCES` and flows through the **existing** `CitationLinter` with zero new linter code (à la Phase 59 `key`) — each retrieved `record_id` is registered before the LLM call, and a fabricated `[recall:<id>]` the registry never saw strips the whole turn.
+  2. The coach prompt is grounded via a gated `recall[…]` block in `state/coach.py::evidence_line` (copying the Phase 59 `decks[…]` gate verbatim) — top-k 2–3 cap, ~0.7 similarity floor, event-gated to track-aware events — and when memory is cold/empty/below-floor the prompt is **byte-identical** to the v5.0 baseline (golden test green; no "I don't remember anything" filler).
+  3. Retrieval is anti-poisoning by construction: below-floor injects nothing; retrieved moments are fenced PAST-tense ("FROM A PAST SESSION") so they can never be read as live evidence; and the current in-progress session is excluded from its own retrieval.
+  4. Retrieval stays off the hot path and within the €50/mo budget gate (event-gate + executor-offload + content-hash cache + hard deadline — late memory is worse than no memory), TTFT p95 is unchanged feature-on vs feature-off, and all four cardinal invariants hold (single-writer, citation-grounding, trust-the-audio, one-socket).
+**Plans**: TBD
+**Research/KAAN-ACTION flag**: (1) the cosine-only vs cosine+time-weight blend and the decay half-life (in *sessions*, not hours) is an explicit open question — tune the shape (two-term exp-decay + relevance floor) and the exact recall threshold (start at 0.7) against Kaan's real session corpus in-phase (`/gsd:plan-phase --research-phase`). (2) Ships behind a **Kaan-ear veto** on retrieval relevance (mirrors the Phase 60 harmonic veto) — no callback that references a moment Kaan's ear says didn't matter; this is the hard quality gate.
+
+### Phase 66: Visible Copilot Move
+**Goal**: At least one — ideally two — end-user-noticeable copilot moves prove retrieval is firing: the AI calls back a transition shape it has seen the DJ make, and reuses the DJ's own phrasing across sessions. Each is linter-grounded (must resolve to a real registered past moment), rare-and-earned, warm, and non-nagging — the felt "it remembers me" proof, built last and gated on Kaan's ear.
+**Depends on**: Phase 65 (retrieval must be firing for a copilot move to ground in)
+**Requirements**: COPILOT-01, COPILOT-02, COPILOT-03
+**Success Criteria** (what must be TRUE):
+  1. A transition-shape callback ("last time you ran this blend you killed the bass two bars earlier") fires as an end-user-noticeable copilot move — linter-grounded so the comparison must resolve to a real registered `[recall:<id>]` past moment (a fabricated callback strips the turn), surfaced on the existing `SessionCohostReaction.citation_strip` (no new socket/port).
+  2. A second vocabulary/register callback reuses phrasing/moves the DJ has made before — cited, warm, and non-nagging — reusing the v5.0 actionable-not-hype coach persona discipline + cooldown/pacing.
+  3. The copilot voice carries no anti-features — no next-track recommendation, no LLM-extracted "tendencies"/insights presented as fact, no settings-screen personalization, no continuous audio embedding (enforced by review).
+  4. Kaan's ear confirms a recall actually fires grounded on real session data and does not feel scripted (the hard quality gate).
+**Plans**: TBD
+**UI hint**: yes — the recall chip surfaces on the existing `SessionCohostReaction.citation_strip` / floating pill (a small additive touch on a Tier-1 live surface; the `frontend-enforcement` skill governs the chip's CDJ-Whisper material/typography). No new socket, no new port — rides the existing `ipc.session.*` envelopes.
+
+## Progress (v6.0)
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 63. Memory Store | v6.0 | 0/? | Not started | - |
+| 64. Session Ingest | v6.0 | 0/? | Not started | - |
+| 65. Memory Retrieval Seam | v6.0 | 0/? | Not started | - |
+| 66. Visible Copilot Move | v6.0 | 0/? | Not started | - |
+
+**Coverage:** 14/14 v6.0 requirements mapped ✓ (no orphans, no duplicates) — STORE-01..04 → P63 · INGEST-01..03 → P64 · RECALL-01..04 → P65 · COPILOT-01..03 → P66
 
 ---
 
@@ -270,6 +357,7 @@ Full archive: `.planning/milestones/v3.1-ROADMAP.md` · Requirements: `.planning
 | v3.1 Distribution-Ready Pass | 46–50 | ✅ Shipped (tech_debt) | 2026-05-18 |
 | v4.0 SHIP | 51–58 | 🟡 Engineering-complete (8/8) — publish on signature clock | - |
 | v5.0 The Useful Cut | 59–62 | ✅ Shipped (tech_debt) | 2026-05-22 |
+| v6.0 The Memory Turn | 63–66 | 🔵 Active (planning) | - |
 
 ---
 
