@@ -75,11 +75,32 @@ def build_recall_query(ev) -> str:  # noqa: ANN001 — duck-typed Event, no live
     never imports ``MusicState`` (no-live-path invariant). Missing fields fall
     back to the same ``unknown``/``none``/``MANUAL`` defaults the ingest builder
     uses, keeping the prefix byte-symmetric.
+
+    Phase 65 review WR-02 — when the state object exposes a ``_lock``
+    attribute (the canonical MusicState lock used by state_refresh_loop's
+    single-writer rule), the three field reads are snapshotted UNDER that
+    lock so they cannot mix values from two refresh ticks. Duck-typed: if
+    ``_lock`` is absent (test stubs, simple SimpleNamespace fixtures), fall
+    through to unlocked attribute reads — the no-live-path invariant is
+    preserved (we still do not import MusicState).
     """
     state = getattr(ev, "state", None)
-    track = getattr(state, "audible_track", None) or "unknown"
-    phase = getattr(state, "phase", None) or "unknown"
-    deck = getattr(state, "audible_deck", None) or "none"
+    if state is None:
+        etype = getattr(ev, "type", None) or "MANUAL"
+        return f"coach_line | track=unknown | phase=unknown | deck=none | event={etype}"
+    lock = getattr(state, "_lock", None)
+    if lock is not None:
+        # Snapshot the three needed fields under the state lock so they
+        # cannot mix values from two refresh-loop ticks — mirrors the
+        # state_refresh_loop single-writer / locked-read contract.
+        with lock:
+            track = getattr(state, "audible_track", None) or "unknown"
+            phase = getattr(state, "phase", None) or "unknown"
+            deck = getattr(state, "audible_deck", None) or "none"
+    else:
+        track = getattr(state, "audible_track", None) or "unknown"
+        phase = getattr(state, "phase", None) or "unknown"
+        deck = getattr(state, "audible_deck", None) or "none"
     etype = getattr(ev, "type", None) or "MANUAL"
     # Prefix only — omit cite=/said: (no spoken line at retrieval time).
     return f"coach_line | track={track} | phase={phase} | deck={deck} | event={etype}"
