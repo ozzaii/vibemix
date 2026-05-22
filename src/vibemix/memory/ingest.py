@@ -127,7 +127,14 @@ def build_coach_line_signature(reaction_text: str, ctx: dict | None) -> str:
         m.group(0).strip("[]") for m in EVIDENCE_CITATION_RE.finditer(reaction_text)
     )
     cite_str = ",".join(cites)
-    said = _EMOTION_TAG_RE.sub("", reaction_text).strip()
+    # Dedupe: the citation tokens already live (sorted) in ``cite=``; strip the
+    # inline ``[ev:drop]``/``[track:...]`` brackets from ``said:`` too so a
+    # citation is never repeated within the signature and the embedded vector
+    # encodes pure spoken language, not machine tokens (IN-01). Deterministic +
+    # order-stable: regex sub over a fixed grammar → same input, same bytes.
+    said = EVIDENCE_CITATION_RE.sub(
+        "", _EMOTION_TAG_RE.sub("", reaction_text)
+    ).strip()
     return (
         f"coach_line | track={track} | phase={phase} | deck={deck} "
         f"| event={etype} | cite={cite_str} | said: {said}"
@@ -402,6 +409,14 @@ def ingest_session(
             if kind != "ai_text":
                 # citation_strip (silenced — confabulation if embedded) and any
                 # other kind are skipped. Only EMITTED ai_text reaches memory.
+                #
+                # INTENTIONAL skip — NOT an oversight (IN-02): ``citation_bypass``
+                # (dj_cohost.py — the one-shot heard-but-unverified bypass) is a
+                # line the DJ *did* hear, yet it is deliberately excluded. The
+                # confabulation guard says memory must encode only what was
+                # GROUNDED+verified; letting the coach "remember" an unverified
+                # utterance would teach it to recall things the audio never
+                # justified. Do NOT add ``citation_bypass`` to the embed set.
                 continue
 
             text = ev.get("text") or ""
