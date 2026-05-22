@@ -843,6 +843,39 @@ async def main() -> None:
         or_llm_client = build_or_client(or_key)
         print(f"-> brain via OpenRouter: {or_llm_model} (escapes free-tier 503)")
 
+    # ── Phase 65 Plan 04 — Memory Retrieval Seam (RECALL-01..04) ──
+    # Build the MemoryRecall service lazily (best-effort): a memory.db
+    # populated by the Phase 64 ingest sweep + a LibraryEmbedder pointed at
+    # the same proxy-wired genai_client. The recall_enabled flag is the
+    # KAAN-ACTION live-relevance veto switch — DEFAULT-OFF so the seam
+    # ships wired + tested but never injects on live until Kaan flips it
+    # via VIBEMIX_RECALL_ENABLED=1 (or equivalent). Every failure path
+    # (no store, no embedder, no env var) yields ``recall=None`` /
+    # ``recall_enabled=False`` → the agent's cold path stays byte-identical.
+    recall_svc = None
+    recall_enabled = os.environ.get("VIBEMIX_RECALL_ENABLED", "0").strip().lower() not in (
+        "0",
+        "off",
+        "false",
+        "",
+    )
+    try:
+        from vibemix.library.embed import LibraryEmbedder as _LibEmbedderForRecall
+        from vibemix.memory.retrieval import MemoryRecall as _MemoryRecall
+        from vibemix.memory.store import open_memory_store as _open_memory_store
+
+        _recall_embedder = _LibEmbedderForRecall(genai_client)
+        _recall_store = _open_memory_store()
+        recall_svc = _MemoryRecall(_recall_embedder, _recall_store)
+        if recall_enabled:
+            print("-> recall: armed (track-aware, floor=0.7, off-loop)")
+        else:
+            print("-> recall: wired but disabled (set VIBEMIX_RECALL_ENABLED=1 to flip)")
+    except Exception as e:  # pragma: no cover — best-effort, never blocks boot
+        print(f"-> recall: disabled ({e})", file=sys.stderr)
+        recall_svc = None
+        recall_enabled = False
+
     agent = DJCoHostAgent(
         genai_client=genai_client,
         clean_audio_buf=clean_audio_buf,
@@ -879,6 +912,13 @@ async def main() -> None:
         lookahead=lookahead_provider,
         # ipc.session.snapshot transcript sink (drained by ws_broadcast).
         transcript_sink=transcript_buf,
+        # Phase 65 Plan 04 — MemoryRecall service + Kaan-ear veto flag.
+        # The service is wired regardless (so tests + telemetry see the seam);
+        # recall_enabled is the live-veto switch — default-OFF until Kaan
+        # flips it on the real corpus (KAAN-ACTION). With either None,
+        # the agent's cold path is byte-identical to v5.0.
+        recall=recall_svc,
+        recall_enabled=recall_enabled,
     )
 
     # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──

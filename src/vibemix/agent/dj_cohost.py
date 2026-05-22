@@ -35,6 +35,7 @@ single-modality gate is preserved.
 
 from __future__ import annotations
 
+import asyncio
 import collections
 import json
 import os
@@ -73,6 +74,7 @@ from vibemix.ui_bus import SessionCohostReaction, SessionOverlayHighlight
 if TYPE_CHECKING:  # pragma: no cover — typing-only
     from vibemix.audio.buffers import PlaybackQueue
     from vibemix.audio.lookahead import LookaheadProvider
+    from vibemix.memory.retrieval import MemoryRecall
     from vibemix.runtime.ws_bus import IpcBus
 
 # Sentinel suppression-token the LLM emits when nothing's worth reacting to.
@@ -351,6 +353,18 @@ class DJCoHostAgent(Agent):
         # direct-genai path byte-identical for every existing caller/test.
         or_client: Any = None,
         or_model: str = "google/gemini-3.5-flash",
+        # Phase 65 Plan 04 — Memory Retrieval Seam (RECALL-01/02/03/04). The
+        # MemoryRecall enrichment service is the off-hot-path retrieval
+        # seam: track-aware events pre-dispatch it via run_in_executor +
+        # asyncio.wait_for(RECALL_DEADLINE_S); llm_node pulls survivors via
+        # ``recall.get_latest()`` (``[]`` if the deadline missed → no
+        # block, no TTFT regression). Default ``None`` + ``recall_enabled
+        # = False`` keeps EVERY existing dj_cohost construction path
+        # BYTE-IDENTICAL (the cold/feature-off path is the v5.0 baseline).
+        # The live-relevance veto flip is KAAN-ACTION (Kaan-ear pass on the
+        # real corpus); the seam ships wired + tested regardless.
+        recall: "MemoryRecall | None" = None,
+        recall_enabled: bool = False,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -437,6 +451,20 @@ class DJCoHostAgent(Agent):
         # clean_audio_buf); the title→path cache lives for the whole DJ
         # session per RESEARCH Open Question 3 resolution.
         self._lookahead: "LookaheadProvider | None" = lookahead
+        # Phase 65 Plan 04 — MemoryRecall service + recall_enabled flag.
+        # The wired path runs iff BOTH the service is non-None AND the flag
+        # is True; the flag is the Kaan-ear veto switch (default-OFF so the
+        # engineering close ships wired but never live until Kaan flips it).
+        # The recall_enabled flag is checked at the seam (set_next_event +
+        # llm_node) — passing only the service is not enough.
+        self._recall: "MemoryRecall | None" = recall
+        self._recall_enabled: bool = recall_enabled and recall is not None
+        # The pre-dispatch task ref. set_next_event creates this off-loop
+        # background task and llm_node leaves it alone — it either landed
+        # survivors in `_recall._latest` (Plan 65-03 contract) or its
+        # asyncio.wait_for(RECALL_DEADLINE_S) timed out and the timeout
+        # handler called `_recall.clear()` to ensure nothing leaks.
+        self._recall_task: "asyncio.Task | None" = None
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         # ipc.session.snapshot transcript sink (see __init__ kwarg docstring).
@@ -498,6 +526,112 @@ class DJCoHostAgent(Agent):
         # meters share the (event_fired, first_*_at) baseline; only the
         # measured RHS differs (first_chunk vs first_sentence_yielded).
         self._llm_to_tts_meter.start_turn()
+        # Phase 65 Plan 04 — pre-dispatch MemoryRecall.on_event OFF the
+        # event loop for track-aware events. We MUST NOT inline-await the
+        # embed inside llm_node (TTFT regression — the RECALL-04 static
+        # gate); pre-dispatching here lets the embed + query_topk overlap
+        # with the audio snapshot + multimodal Part build that llm_node
+        # does up to the registry snapshot. Outcome semantics:
+        #   * on success within RECALL_DEADLINE_S → survivors latched in
+        #     ``recall._latest`` (Plan 65-03 contract); llm_node pulls them
+        #     via ``get_latest()``.
+        #   * on TimeoutError / Exception → the deadline handler calls
+        #     ``recall.clear()`` so a missed retrieval CANNOT bleed into
+        #     this turn (or the next) — ``get_latest()`` returns ``[]``,
+        #     the evidence_line gate is falsy, no recall block emitted, no
+        #     TTFT regression.
+        # The flag-OFF / no-service path is byte-identical to today.
+        self._maybe_dispatch_recall(ev)
+
+    def _maybe_dispatch_recall(self, ev: Event) -> None:
+        """Pre-dispatch ``MemoryRecall.on_event`` off-loop for track-aware events.
+
+        No-op when the recall service is None / recall_enabled is False / no
+        running asyncio loop is available (e.g. agent constructed outside a
+        live coach loop, as several unit tests do). Best-effort wrapper:
+        every step is guarded so a recall-side failure CANNOT perturb a
+        reaction turn — at worst, the recall block stays empty.
+
+        Schedules an asyncio task that wraps
+        ``loop.run_in_executor(None, recall.on_event, …)`` in
+        ``asyncio.wait_for(timeout=RECALL_DEADLINE_S)``; the task's done
+        callback calls ``recall.clear()`` on TimeoutError / Exception so a
+        missed retrieval never bleeds. NEVER inline-awaits the embed in
+        llm_node (RECALL-04 TTFT-unchanged static gate).
+        """
+        if not self._recall_enabled or self._recall is None:
+            return
+        # Lazy import — keeps the constants colocated with the service and
+        # avoids a top-level memory→agent coupling. The static no-live-path
+        # gate scans memory/*.py for forbidden imports, so this direction
+        # is the safe one (agent → memory, not the reverse).
+        try:
+            from vibemix.memory.retrieval import (
+                RECALL_DEADLINE_S,
+                RECALL_EVENT_GATE,
+                build_recall_query,
+            )
+        except Exception as _e:  # pragma: no cover — defensive only
+            print(f"[recall dispatch import err] {_e}", file=sys.stderr)
+            return
+        # Event gate — short-circuit BEFORE any executor / loop work on
+        # the high-frequency event classes (HEARTBEAT, MIX_MOVE, etc.).
+        # MemoryRecall.on_event ALSO gates internally (defense in depth),
+        # but checking here avoids burning a task + executor slot.
+        if ev.type not in RECALL_EVENT_GATE:
+            return
+        # Build the query text + resolve current_session_id before the
+        # executor hop — `build_recall_query` is duck-typed (no live-path
+        # import) and `_recorder.session_dir.name` is the canonical
+        # session-id basename used by the rest of the runtime.
+        try:
+            query_text = build_recall_query(ev)
+            current_session_id = self._recorder.session_dir.name
+        except Exception as _e:
+            print(f"[recall dispatch prep err] {_e}", file=sys.stderr)
+            return
+        # We need a running loop to schedule the task. set_next_event is
+        # called from coach_loop (async context) so a loop is normally
+        # available; in test contexts that construct the agent without a
+        # running loop, fall through silently — the recall path is
+        # opt-in and the no-recall path is byte-identical.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+
+        recall = self._recall
+        assert recall is not None  # narrowed by the early return above
+
+        async def _run() -> None:
+            try:
+                await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        recall.on_event,
+                        ev.type,
+                        query_text,
+                        current_session_id,
+                    ),
+                    timeout=RECALL_DEADLINE_S,
+                )
+            except (TimeoutError, asyncio.TimeoutError):
+                # Late memory is worse than no memory — clear() ensures the
+                # stale latch from a prior turn cannot bleed into this one.
+                recall.clear()
+            except Exception as _e:
+                # Any other failure also clears, then swallows — recall
+                # can never break a reaction turn.
+                recall.clear()
+                print(f"[recall dispatch err] {_e}", file=sys.stderr)
+
+        # Overwriting an existing pending pre-dispatch is intentional —
+        # the prior event was preempted (CancelGate or in-flight drop),
+        # so its recall result is no longer relevant. Cancel + replace.
+        prev = self._recall_task
+        if prev is not None and not prev.done():
+            prev.cancel()
+        self._recall_task = asyncio.create_task(_run())
 
     async def llm_node(
         self,
@@ -507,6 +641,37 @@ class DJCoHostAgent(Agent):
     ) -> AsyncGenerator:
         ev = self._pending_event
         self._pending_event = None
+
+        # Phase 65 Plan 04 (RECALL-01/02) — pull the off-loop recall
+        # survivors and REGISTER their record_ids in the EvidenceRegistry
+        # BEFORE the once-per-turn snapshot below. The order is structural:
+        # if survivors are written AFTER the snapshot, the linter's
+        # existence-only branch wouldn't see them and a legitimate
+        # ``[recall:<id>]`` would strip the turn. If recall is disabled /
+        # no service / pre-dispatch hasn't landed, get_latest() returns
+        # ``[]`` → no registration, no recall block, byte-identical to the
+        # cold/feature-off path.
+        recall_moments: list = []
+        if self._recall_enabled and self._recall is not None:
+            try:
+                recall_moments = self._recall.get_latest()
+            except Exception as _e:
+                print(f"[recall pull err] {_e}", file=sys.stderr)
+                recall_moments = []
+            if recall_moments and self._registry is not None:
+                t_session = getattr(ev.state, "set_seconds", 0.0) if ev is not None else 0.0
+                for m in recall_moments:
+                    try:
+                        self._registry.write("recall", m.record_id, float(t_session))
+                    except Exception as _e:
+                        # A failed registration is structural — DROP the
+                        # offending survivor from the prompt list so the
+                        # linter cannot see an unregistered token (any
+                        # fabricated/leaked recall id must still strip).
+                        print(f"[recall register err] {_e}", file=sys.stderr)
+                        recall_moments = [
+                            x for x in recall_moments if x.record_id != m.record_id
+                        ]
 
         # Plan 18-03 — snapshot the EvidenceRegistry FRESH per turn so the
         # AICoach.evidence_line corpus footer reflects observations written
@@ -520,6 +685,11 @@ class DJCoHostAgent(Agent):
         #   registry → snapshot → AICoach evidence_corpus footer → Gemini
         # plus the citation-grammar block in the system instruction
         # (Task 1) tells Gemini HOW to cite against that corpus.
+        #
+        # Phase 65 Plan 04 — recall survivors MUST already be written
+        # above so they appear in this snapshot. The linter's existence-
+        # only branch reads snapshot["recall"]; missing survivors would
+        # strip a legitimate turn.
         snapshot = self._registry.snapshot() if self._registry is not None else None
 
         # Plan 19-02 — diet dispatch. Ack-eligible events (HEARTBEAT,
@@ -533,15 +703,27 @@ class DJCoHostAgent(Agent):
         audio_seconds = DIET_AUDIO_SECONDS if diet else INVOKE_AUDIO_SECONDS
         skip_screen = ev_type_for_diet in SCREEN_SKIP_EVENTS
 
-        # Build grounded text packet (same evidence + task v2 used)
+        # Build grounded text packet (same evidence + task v2 used).
+        # Phase 65 Plan 04 — thread ``recall_moments`` ONLY when non-empty
+        # so every existing dj_cohost call-shape test stays BYTE-IDENTICAL
+        # (the cold/feature-off path is the v5.0 baseline). An empty list
+        # and a missing kwarg are semantically identical (the falsy-gate
+        # in evidence_line treats None and [] the same), but the existing
+        # mocker.assert_called_once_with(..., registry_snapshot=..., diet=)
+        # tests pin the EXACT kwargs — so we omit recall_moments when
+        # there's nothing to inject. The non-diet path with survivors
+        # passes the kwarg; the diet path NEVER receives it (diet =
+        # ACK_ELIGIBLE_EVENTS, never a retrieval event).
+        _bp_kwargs: dict[str, Any] = {"registry_snapshot": snapshot, "diet": diet}
+        if recall_moments and not diet:
+            _bp_kwargs["recall_moments"] = recall_moments
         if ev is not None:
-            text_prompt = AICoach.build_prompt(ev, registry_snapshot=snapshot, diet=diet)
+            text_prompt = AICoach.build_prompt(ev, **_bp_kwargs)
         else:
             # No event context (e.g. generate_reply called without prep) — fall back
             text_prompt = AICoach.build_prompt(
                 Event(type="MANUAL", state=self._state, extra={}),
-                registry_snapshot=snapshot,
-                diet=diet,
+                **_bp_kwargs,
             )
 
         audio_wav = snapshot_wav(self._clean_audio_buf, audio_seconds)
@@ -1277,6 +1459,19 @@ class DJCoHostAgent(Agent):
             )
         except Exception as _e:
             print(f"[delta-meter err] {_e}", file=sys.stderr)
+
+        # Phase 65 Plan 04 — clear the latched recall survivors at end of
+        # turn (mirrors library/grounding.py::Grounding.clear() lifecycle).
+        # Two reasons: (1) the next HEARTBEAT turn never retrieves, so a
+        # stale latch from this turn must NOT be re-injected as memory;
+        # (2) the next track-aware event will overwrite _latest cleanly
+        # via its own on_event dispatch. Best-effort — a clear() failure
+        # cannot perturb the turn that already completed.
+        if self._recall_enabled and self._recall is not None:
+            try:
+                self._recall.clear()
+            except Exception as _e:  # pragma: no cover — defensive only
+                print(f"[recall clear err] {_e}", file=sys.stderr)
 
     async def invalidate_cache(self) -> None:
         """Invalidate the context cache — Plan 19-03 cancel-aware chokepoint.
