@@ -721,8 +721,18 @@ class DJCoHostAgent(Agent):
                     # turn's get_latest() would otherwise return the prior
                     # turn's survivors (the "stale latch" failure mode the
                     # design explicitly tries to prevent).
+                    #
+                    # Phase 65 review iter-3 WR-03 — pass ``bump_generation=
+                    # False`` so this reactive clear does NOT invalidate any
+                    # concurrent in-flight ``on_event`` dispatch that is
+                    # about to land survivors for a FUTURE turn. The
+                    # ``_inflight_gen`` bump is only meaningful for the
+                    # deadline-miss path in ``_run`` (where the in-flight
+                    # dispatch is exactly the one we want to invalidate);
+                    # here we just want to drop the stale latched value, not
+                    # torpedo a healthy concurrent task.
                     try:
-                        self._recall.clear()
+                        self._recall.clear(bump_generation=False)
                     except Exception:
                         pass
                 # Phase 65 review iter-3 WR-01 — when ``_recall_enabled`` is

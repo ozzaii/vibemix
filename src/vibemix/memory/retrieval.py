@@ -192,19 +192,32 @@ class MemoryRecall:
         with self._lock:
             return list(self._latest)
 
-    def clear(self) -> None:
+    def clear(self, bump_generation: bool = True) -> None:
         """Reset the latched survivors to ``[]``.
 
         Called per-turn (and on a deadline miss, Plan 65-04) so a stale recall
         cannot bleed into a later turn / a next HEARTBEAT replays nothing.
 
-        Phase 65 review CR-04 — bumps ``_inflight_gen`` so any in-flight
-        ``on_event`` whose executor thread is still mid-``query_topk`` will
-        fail its token check at write-time and discard its (now-stale)
-        survivors instead of overwriting the cleared latch.
+        Phase 65 review CR-04 — by default bumps ``_inflight_gen`` so any
+        in-flight ``on_event`` whose executor thread is still mid-
+        ``query_topk`` will fail its token check at write-time and discard
+        its (now-stale) survivors instead of overwriting the cleared latch.
+        This is the deadline-miss path's contract: the dispatch we are
+        cancelling IS the one whose write we must invalidate.
+
+        Phase 65 review iter-3 WR-03 — callers that want to clear the
+        latched value WITHOUT invalidating a concurrent in-flight dispatch
+        (the reactive ``get_latest()``-exception path in
+        ``DJCoHostAgent.llm_node``) pass ``bump_generation=False``. In that
+        path the in-flight dispatch is unrelated to the failed read (it is
+        building survivors for a FUTURE turn) and bumping the generation
+        would silently torpedo its healthy write. The cold/feature-off path
+        and the CR-04 race-discard test both keep the default
+        ``bump_generation=True`` and remain BYTE-IDENTICAL in semantics.
         """
         with self._lock:
-            self._inflight_gen += 1
+            if bump_generation:
+                self._inflight_gen += 1
             self._latest = []
 
 
