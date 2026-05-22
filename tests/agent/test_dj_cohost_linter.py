@@ -326,6 +326,169 @@ def test_fabricated_recall_strips_turn(mocker, tmp_path) -> None:
 
 
 # --------------------------------------------------------------------------
+# (c3) Cross-turn regression — turn N's recall must NOT survive into turn N+1
+# --------------------------------------------------------------------------
+
+
+def test_fabricated_recall_strips_turn_n_plus_1_with_empty_recall(
+    mocker, tmp_path
+) -> None:
+    """Phase 65 review iter-3 BLOCKER regression — every turn rescopes its
+    own ``recall`` registrations, so a fabricated ``[recall:<id>]`` that
+    matches a PRIOR turn's registration must still strip on a turn whose
+    own recall pull came back empty.
+
+    The iter-1 CR-01 fix called ``clear_source("recall")`` only when
+    ``recall_moments`` was non-empty for the current turn. That gating
+    leaked prior-turn registrations into empty-survivor turns: turn N
+    registers ``{A, B}``, turn N+1 has ``recall_moments == []`` so the
+    clear is skipped, ``snapshot["recall"]`` still carries ``{A, B}``, and
+    Gemini can fabricate ``[recall:A]`` against the stale registration —
+    the linter accepts it. The fix moved ``clear_source("recall")`` OUT of
+    the conditional so it fires at the top of every recall-enabled turn,
+    making ``snapshot["recall"]`` exactly the ids in the current prompt
+    (or ``{}`` when there are none).
+
+    Staging:
+      * Wire a stub ``recall`` service whose ``get_latest()`` returns
+        ``[A, B]`` on the first call (turn N) and ``[]`` on the second
+        (turn N+1). ``recall_enabled=True`` so the seam fires.
+      * Turn N: drive a valid-cite turn — both A and B land in the registry.
+      * Turn N+1: drive with a fabricated ``[recall:<A.record_id>]``
+        alongside a real ev cite. The clear-source-unconditional invariant
+        means snapshot["recall"] is empty on turn N+1 → the fabricated
+        recall is unregistered → the whole turn strips.
+
+    Pre-fix this test would FAIL: turn N+1's snapshot still contains
+    ``{A: …, B: …}`` from turn N, so the fabricated ``[recall:A]`` passes
+    the existence-only branch and the turn would EMIT. That emit IS the
+    cross-turn poisoning hole this fix closes.
+    """
+    # Stub recall service: returns [A, B] on first get_latest(), [] on second.
+    class _StubRecord:
+        def __init__(self, record_id: str, signature: str) -> None:
+            self.record_id = record_id
+            self.signature = signature
+            self.session_id = "20260520-2200"
+            self.ts = 0.0
+
+    record_a = _StubRecord("20260520-2200:A", "past sig A")
+    record_b = _StubRecord("20260520-2200:B", "past sig B")
+
+    class _StubRecall:
+        def __init__(self) -> None:
+            self._queue = [[record_a, record_b], []]
+
+        def get_latest(self) -> list:
+            return self._queue.pop(0) if self._queue else []
+
+        def clear(self, bump_generation: bool = True) -> None:
+            pass
+
+    mocker.patch.object(Agent, "__init__", return_value=None)
+    state = _build_state()
+    recorder = _FakeRecorder(tmp_path)
+    genai_client = mocker.MagicMock()
+    linter = CitationLinter()
+    tracker = StrippedRateTracker()
+    playback = mocker.MagicMock()
+    registry = EvidenceRegistry()
+    # Pre-seed the ev atom so turn N+1's reaction has a real cite alongside
+    # the fabricated recall — the strip can ONLY be caused by the recall.
+    registry.write("ev", "KICK_SWAP", 45.2)
+
+    stub_recall = _StubRecall()
+    agent = DJCoHostAgent(
+        genai_client=genai_client,
+        clean_audio_buf=mocker.MagicMock(),
+        screen_buf=mocker.MagicMock(),
+        state=state,
+        recorder=recorder,
+        llm_inst=mocker.MagicMock(),
+        tts_inst=mocker.MagicMock(),
+        evidence_registry=registry,
+        citation_linter=linter,
+        stripped_rate_tracker=tracker,
+        playback=playback,
+        recall=stub_recall,
+        recall_enabled=True,
+    )
+
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    # Turn N: a legitimate recall turn — A + B both land in the registry.
+    gen = genai_client
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                f"that one [ev:KICK_SWAP@45.2] hit — like [recall:{record_a.record_id}] "
+                f"and [recall:{record_b.record_id}]"
+            ]
+        )
+    )
+    ev1 = Event(type="TRACK_CHANGE", state=state, extra={})
+    agent.set_next_event(ev1)
+    _drive(agent)
+    # Sanity precondition: A + B did land in the registry on turn N.
+    snap_after_n = registry.snapshot()
+    assert record_a.record_id in snap_after_n.get("recall", {}), (
+        "precondition: turn N registered record A under 'recall'"
+    )
+    assert record_b.record_id in snap_after_n.get("recall", {}), (
+        "precondition: turn N registered record B under 'recall'"
+    )
+
+    # Turn N+1: recall_moments comes back EMPTY, but Gemini fabricates a
+    # [recall:A] callback referencing the prior-turn registration. Pre-fix
+    # the clear_source("recall") gate skipped (because recall_moments==[])
+    # and snapshot["recall"] still carried {A, B} → fabricated id passes.
+    # Post-fix the clear fires unconditionally → snapshot["recall"] is {}
+    # → fabricated id strips the turn.
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                f"remember [recall:{record_a.record_id}] when [ev:KICK_SWAP@45.2] "
+                "killed it"
+            ]
+        )
+    )
+    ev2 = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev2)
+    pre_strip_events = len(recorder.events)
+    chunks = _drive(agent)
+
+    # The fabricated recall references a prior-turn id; after the
+    # unconditional clear it is unregistered-by-construction → STRIP.
+    assert chunks == [], (
+        "fabricated [recall:<prior-turn-id>] on an empty-recall turn "
+        "must strip the whole turn — the per-turn rescope contract"
+    )
+    new_kinds = [k for k, _ in recorder.events[pre_strip_events:]]
+    assert "citation_strip" in new_kinds, (
+        "turn N+1 must log citation_strip for the fabricated recall"
+    )
+    strip_log = next(
+        f for k, f in recorder.events[pre_strip_events:] if k == "citation_strip"
+    )
+    assert f"[recall:{record_a.record_id}]" in strip_log["raw_text"]
+    assert ("recall", record_a.record_id) in strip_log["missing"] or [
+        "recall",
+        record_a.record_id,
+    ] in strip_log["missing"], (
+        "strip log must name the fabricated prior-turn recall id"
+    )
+    # Snapshot invariant: turn N+1's empty recall_moments → no "recall" key
+    # (or empty dict under "recall") in the registry snapshot. Pre-fix this
+    # would still contain {A, B} → the failing case.
+    snap_after_np1 = registry.snapshot()
+    assert not snap_after_np1.get("recall"), (
+        "turn N+1 (empty recall_moments) must leave snapshot['recall'] empty "
+        "— prior-turn registrations must NOT survive into this turn's snapshot"
+    )
+
+
+# --------------------------------------------------------------------------
 # (d) No-citations response strips
 # --------------------------------------------------------------------------
 

@@ -662,6 +662,33 @@ class DJCoHostAgent(Agent):
             # ``[]`` → no registration, no recall block, byte-identical to the
             # cold/feature-off path.
             if self._recall_enabled and self._recall is not None:
+                # Phase 65 review iter-3 BLOCKER — clear the "recall" bucket
+                # UNCONDITIONALLY at the top of the recall path (when a
+                # registry exists), regardless of whether THIS turn produces
+                # survivors. Previously the clear was gated inside
+                # ``if recall_moments and self._registry is not None:`` so a
+                # turn with empty survivors after a prior turn registered
+                # {A, B} would leave {A, B} in the registry — Gemini could
+                # then fabricate ``[recall:A]`` on this turn and the linter's
+                # existence-only branch would ACCEPT it (the strict-subset
+                # invariant collapses across turn boundaries). Moving the
+                # clear OUT of the conditional makes every turn rescope its
+                # own registrations: snapshot["recall"] at line 736 is always
+                # exactly the ids in the current turn's prompt recall block
+                # (or ``{}`` when there are none), so a fabricated id that
+                # matches a prior turn's registration is now unregistered-
+                # by-construction and the whole turn strips.
+                #
+                # Cross-turn regression test:
+                # ``test_fabricated_recall_strips_turn_n_plus_1_with_empty_recall``.
+                if self._registry is not None:
+                    try:
+                        self._registry.clear_source("recall")
+                    except Exception as _e:
+                        # Defensive — best-effort; if clear fails, the per-turn
+                        # subset invariant below still holds because we only
+                        # ever append to ``kept`` on successful registration.
+                        print(f"[recall registry clear err] {_e}", file=sys.stderr)
                 try:
                     recall_moments = self._recall.get_latest()
                 except Exception as _e:
@@ -677,27 +704,18 @@ class DJCoHostAgent(Agent):
                     except Exception:
                         pass
                 if recall_moments and self._registry is not None:
-                    # Phase 65 review CR-01/CR-02 — the registered set MUST be a
-                    # strict subset of what the prompt shows, or fabricated
-                    # ``[recall:<id>]`` ids that match an accumulated registration
-                    # would pass the linter's existence-only branch (the headline
-                    # anti-poisoning gate). Two structural rules:
-                    #   1. Clear the recall registry between turns so prior-turn
-                    #      ids cannot leak as "valid" for fabrication this turn.
-                    #   2. Use an explicit accumulator (``kept``) so we only
-                    #      register survivors that actually land in
-                    #      ``recall_moments`` — no in-loop list rebind (CR-02
-                    #      iterator/rebind interaction), no registered-but-
-                    #      dropped ids (CR-01 superset leak).
-                    # The registry's per-source clear is keyed on the source
-                    # string ("recall"); other sources (ev/aud/mix) are untouched.
-                    try:
-                        self._registry.clear_source("recall")
-                    except Exception as _e:
-                        # Defensive — best-effort; if clear fails, the per-turn
-                        # subset invariant below still holds because we only
-                        # ever append to ``kept`` on successful registration.
-                        print(f"[recall registry clear err] {_e}", file=sys.stderr)
+                    # Phase 65 review CR-01/CR-02 — the registered set MUST
+                    # be a strict subset of what the prompt shows, or
+                    # fabricated ``[recall:<id>]`` ids that match an
+                    # accumulated registration would pass the linter's
+                    # existence-only branch (the headline anti-poisoning
+                    # gate). Use an explicit accumulator (``kept``) so we
+                    # only register survivors that actually land in
+                    # ``recall_moments`` — no in-loop list rebind (CR-02
+                    # iterator/rebind interaction), no registered-but-
+                    # dropped ids (CR-01 superset leak). The per-turn
+                    # rescope (``clear_source("recall")``) ran above
+                    # unconditionally — see iter-3 BLOCKER above.
                     t_session = getattr(ev.state, "set_seconds", 0.0) if ev is not None else 0.0
                     kept: list = []
                     for m in recall_moments:
