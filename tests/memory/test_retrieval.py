@@ -283,6 +283,61 @@ def test_deadline_miss_injects_nothing(tmp_path: Path) -> None:
     assert recall.get_latest() == []
 
 
+def test_clear_during_inflight_on_event_discards_stale_latch(tmp_path: Path) -> None:
+    """Phase 65 review CR-04 — generation token discards a stale on_event write.
+
+    Simulates the race where the agent's ``asyncio.wait_for`` fires
+    ``TimeoutError`` and calls ``recall.clear()`` while the executor thread
+    is still inside ``on_event`` (between embed and the final ``_latest =
+    survivors`` write). The per-dispatch generation token in
+    ``MemoryRecall.on_event`` must detect the intervening ``clear()`` and
+    DROP the (now-stale) survivors instead of overwriting the cleared
+    latch — otherwise the "missed deadline → no recall this turn" contract
+    is violated.
+
+    The race is staged by wrapping ``embed_query`` with a callable that fires
+    ``recall.clear()`` after the generation token has been captured but
+    BEFORE the final lock-protected write — the same window the executor
+    thread sits in under live load.
+    """
+    store = _store(tmp_path)
+    query = _unit(4)
+    strong = _aligned(query, target_cos=0.92, seed=44)
+    store.add_record(
+        record_id=f"{_PAST_SESSION}:9",
+        session_id=_PAST_SESSION,
+        ts=18.0,
+        kind="coach_line",
+        signature="late-running riser into the bridge",
+        embedding=strong,
+    )
+
+    embedder = _SpyEmbedder(query)
+    recall = MemoryRecall(embedder, store)
+
+    # Stage the race: when embed_query is called, fire clear() AFTER the
+    # generation token has been captured (the token is bumped at the very
+    # start of on_event, BEFORE embed_query is invoked) but BEFORE the
+    # final lock-write. The clear() bumps the generation again, so the
+    # final token check fails and survivors are dropped.
+    original_embed = embedder.embed_query
+
+    def racing_embed(text: str):  # noqa: ANN202 — test shim
+        vec = original_embed(text)
+        recall.clear()  # bumps _inflight_gen between dispatch and write
+        return vec
+
+    embedder.embed_query = racing_embed  # type: ignore[method-assign]
+
+    survivors = recall.on_event(_TRACK_AWARE, "riser into bridge", _CURRENT_SESSION)
+    # The caller still sees the result (the floor + ranking happened) but
+    # the latch was NOT mutated — the deadline contract holds.
+    assert survivors, "ranking still produces survivors for the caller"
+    assert recall.get_latest() == [], (
+        "stale executor write must be discarded after intervening clear()"
+    )
+
+
 # ---------------------------------------------------------------------------
 # RECALL-04 — exactly one embed per track-aware on_event (no fan-out).
 # ---------------------------------------------------------------------------

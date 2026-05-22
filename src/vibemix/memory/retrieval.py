@@ -99,6 +99,15 @@ class MemoryRecall:
         self._store = store
         self._lock = threading.Lock()
         self._latest: list[Record] = []
+        # Phase 65 review CR-04 — per-dispatch generation token. Incremented
+        # at the start of every ``on_event`` AND every ``clear``; captured by
+        # the executor thread at dispatch time, and re-checked before the
+        # final ``_latest = survivors`` write. If ``clear()`` ran between
+        # dispatch and write (deadline missed in the asyncio wrapper while
+        # the executor was mid-``query_topk``), the stale survivors are
+        # DISCARDED instead of latched — closes the "TimeoutError clears
+        # then the slow executor re-populates" race. Guarded by ``_lock``.
+        self._inflight_gen: int = 0
 
     def on_event(
         self,
@@ -112,11 +121,28 @@ class MemoryRecall:
         query embed, then ``query_topk`` over the pre-embedded corpus with the
         current session excluded, then the cosine-floor filter. Survivors are
         latched under the lock for ``get_latest`` and returned.
+
+        Phase 65 review CR-04 — a per-dispatch generation token is captured
+        BEFORE the (potentially slow) embed + ranking and re-checked before
+        the final latch write. If ``clear()`` was called in between (the
+        asyncio deadline wrapper fired ``TimeoutError`` mid-``query_topk``),
+        the token check fails and ``_latest`` is NOT mutated — the stale
+        result is silently dropped instead of overwriting the cleared latch.
+        The list is still returned to the caller (callers that aren't gated
+        by the deadline wrapper, such as the synchronous unit-test path,
+        still see the result).
         """
         # Event gate — short-circuit BEFORE any embed (no API round-trip on a
         # HEARTBEAT / non-track-aware event).
         if event_type not in RECALL_EVENT_GATE:
             return []
+
+        # Capture the generation BEFORE the slow work — held across the embed
+        # + query window. A concurrent ``clear()`` will bump ``_inflight_gen``
+        # while we're outside the lock, which the final check below detects.
+        with self._lock:
+            self._inflight_gen += 1
+            my_gen = self._inflight_gen
 
         # Exactly one FLEX query embed (no per-candidate re-embed, no retry).
         qvec = self._embedder.embed_query(query_text)
@@ -131,6 +157,12 @@ class MemoryRecall:
         survivors = [r for r in hits if r.score >= RECALL_SIMILARITY_FLOOR]
 
         with self._lock:
+            # Token check — if the agent's deadline wrapper fired ``clear()``
+            # between dispatch and now, ``_inflight_gen`` has been bumped and
+            # this result is stale. Drop it without touching ``_latest`` so
+            # the deadline-miss "no recall this turn" contract holds.
+            if my_gen != self._inflight_gen:
+                return list(survivors)
             self._latest = survivors
         return list(survivors)
 
@@ -144,8 +176,14 @@ class MemoryRecall:
 
         Called per-turn (and on a deadline miss, Plan 65-04) so a stale recall
         cannot bleed into a later turn / a next HEARTBEAT replays nothing.
+
+        Phase 65 review CR-04 — bumps ``_inflight_gen`` so any in-flight
+        ``on_event`` whose executor thread is still mid-``query_topk`` will
+        fail its token check at write-time and discard its (now-stale)
+        survivors instead of overwriting the cleared latch.
         """
         with self._lock:
+            self._inflight_gen += 1
             self._latest = []
 
 
