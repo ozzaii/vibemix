@@ -232,13 +232,27 @@ def test_strip_comments_and_docstrings_removes_string_content() -> None:
     assert "foo" in stripped_lit, "stripper blanked NAME tokens (over-strips)"
 
 
-def test_no_recall_antifeatures_in_coach_surface_COPILOT03() -> None:
-    """COPILOT-03 — no forbidden anti-feature phrases reach the coach /
-    prompt surface (state/coach.py + prompts/matrix.py).
+def test_no_recall_antifeatures_in_coach_surface_after_string_and_comment_scrub_COPILOT03() -> None:
+    """COPILOT-03 — no forbidden anti-feature phrase survives the
+    string-and-comment scrub of the coach / prompt surface
+    (state/coach.py + prompts/matrix.py).
 
     Scans tokenize-stripped + lowercased executable source of every file
     in TARGET_FILES for substring presence of any phrase in
     FORBIDDEN_RECALL_PHRASES. None may appear.
+
+    Phase 66 review WR-02 — renamed from
+    ``test_no_recall_antifeatures_in_coach_surface_COPILOT03`` to make the
+    test's actual mechanical claim explicit. The stripper removes STRING
+    AND COMMENT tokens (see ``_strip_comments_and_docstrings`` + the
+    module docstring's "Divergence from analog" section), so a forbidden
+    phrase inside a prompt fragment STRING LITERAL is invisible to this
+    scan. The mechanical claim is therefore "no forbidden phrase survives
+    the scrub" — NOT "no forbidden phrase reaches Gemini". The real
+    defense against fragment-literal regressions is the §RECALL-EAR
+    Kaan-ear runtime check (KAAN-ACTION-LEGAL.md). Future maintainers who
+    loosen the stripper assuming this gate would catch a regression — the
+    explicit name now warns them off.
 
     DECLARED VACUOUS-GREEN AT LAND — the pre-grep evidence (executed
     2026-05-22 during planning, recorded in 66-VALIDATION.md §Wave 0
