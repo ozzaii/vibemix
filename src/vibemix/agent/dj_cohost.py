@@ -658,6 +658,15 @@ class DJCoHostAgent(Agent):
             except Exception as _e:
                 print(f"[recall pull err] {_e}", file=sys.stderr)
                 recall_moments = []
+                # Phase 65 review WR-01 — defense-in-depth: a failed read
+                # must NOT leave a stale latch on the service. The next
+                # turn's get_latest() would otherwise return the prior
+                # turn's survivors (the "stale latch" failure mode the
+                # design explicitly tries to prevent).
+                try:
+                    self._recall.clear()
+                except Exception:
+                    pass
             if recall_moments and self._registry is not None:
                 # Phase 65 review CR-01/CR-02 — the registered set MUST be a
                 # strict subset of what the prompt shows, or fabricated
