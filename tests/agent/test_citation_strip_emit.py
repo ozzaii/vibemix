@@ -204,6 +204,98 @@ def test_fabricated_key_citation_yields_no_chip_DECK03() -> None:
 
 
 # --------------------------------------------------------------------------
+# recall: past-session callback chip — COPILOT-01 (Phase 66)
+# --------------------------------------------------------------------------
+# These tests clone the `key` precedent above (test_key_citation_* /
+# test_fabricated_key_*) token-for-token, swapping the source/body/verb:
+#   - source "key"    → "recall"
+#   - body   "A:8A"   → "20260520-2200:7"  (session_id:seq, opaque)
+#   - verb   "key"    → "recall"            (fixed letters-only label)
+#
+# RED contract (Wave 0, RED-first): today the allow-list at
+# src/vibemix/agent/dj_cohost.py:215 is ("ev","mix","midi","key") —
+# `recall` is excluded. The `continue` skips both tests' chip path, so
+# `strip == []` for BOTH the grounded and the fabricated cases. The
+# fabricated test trivially passes today (empty strip is the expected
+# shape); the grounded test FAILS for the right structural reason
+# (allow-list missing `recall` → no chip emitted even when the registry
+# has the survivor). Plan 02 flips both: grounded yields a chip; fabricated
+# stays empty (registry lookup misses → `continue` per existing logic).
+#
+# Anti-hallucination invariant: the chip ``timestamp_s`` comes from the
+# registry write (current turn's t_session per Pitfall 3 in 66-RESEARCH.md),
+# NEVER a past Record's `.ts`. The "the coach made a recall move just now"
+# semantic is locked at CONTEXT.md Area 3 Q3.
+
+
+def test_recall_citation_yields_chip_with_registry_timestamp_COPILOT01() -> None:
+    """A grounded `[recall:<session_id>:<seq>]` citation yields a chip.
+
+    Anti-hallucination contract: the chip ``timestamp_s`` is sourced from the
+    registry observation (the recall registration loop at dj_cohost.py:771
+    writes the CURRENT turn's set_seconds — when the callback FIRED), NOT
+    parsed from the citation body (the body has no @t — it is the opaque
+    ``<session_id>:<seq>`` shape). The full record_id rides in ``event_id``
+    for the deep-link; the verb is the fixed letters-only "recall" label
+    (mirroring the `key` precedent — opaque body → fixed verb).
+
+    RED reason (today): the allow-list at dj_cohost.py:215 excludes "recall"
+    so the `continue` at :216 skips the chip path entirely → strip == [].
+    Plan 02 Task 1 adds "recall" to the tuple and the test flips GREEN.
+    """
+    reg = EvidenceRegistry()
+    # The agent's recall registration loop writes (source, record_id,
+    # t_session). For the chip-strip test we register the exact body
+    # `20260520-2200:7` at the current turn's session-relative time.
+    reg.write("recall", "20260520-2200:7", 128.5)
+
+    strip = _build_citation_strip(
+        reaction_text="great call, [recall:20260520-2200:7]",
+        registry=reg,
+    )
+
+    assert len(strip) == 1
+    assert strip[0]["event_id"] == "recall:20260520-2200:7"
+    # timestamp comes from the registry write (128.5), NOT a past Record's .ts.
+    # Pitfall 3 in 66-RESEARCH.md: "the chip surface is 'the coach made a
+    # recall move just now'; the past moment is the *evidence*, not the
+    # visible event" — so timestamp_s must equal the REGISTRY write t.
+    assert strip[0]["timestamp_s"] == pytest.approx(128.5, abs=0.01)
+    # Fixed letters-only "recall" verb — mirrors the `key` precedent for
+    # opaque/structured bodies. Stays inside the locked verb format
+    # `^[a-z]+( [a-z]+){0,2}$` pinned by test_verb_format_is_two_to_three_lowercase_words.
+    assert strip[0]["verb"] == "recall"
+
+
+def test_fabricated_recall_yields_no_chip_COPILOT01() -> None:
+    """A fabricated `[recall:<unregistered>]` → NO chip.
+
+    GREEN today via the allow-list exclusion path: dj_cohost.py:215 excludes
+    "recall" so the `continue` skips the body BEFORE the registry lookup ever
+    runs — strip == [] regardless of registry state. GREEN after Plan 02 via
+    the registry-existence check (allow-list lets "recall" through; the
+    snapshot lookup for the fabricated id returns None; the existing
+    `if not timestamps: continue` at :220 drops the chip). Same final state,
+    different enforcement path. Pinning the contract regardless of which
+    path enforces it (the fabricated-id never surfaces as a chip).
+
+    In practice this turn-shape is already covered upstream by the
+    CitationLinter (fabricated [recall:<id>] strips the WHOLE turn — Phase
+    65 anti-poisoning gate). This test pins the local strip-builder's
+    behavior in isolation, complementing the linter test in
+    tests/agent/test_dj_cohost_linter.py.
+    """
+    reg = EvidenceRegistry()
+    reg.write("recall", "20260520-2200:7", 60.0)
+
+    strip = _build_citation_strip(
+        reaction_text="remember [recall:20260520-2200:9] when you killed it",
+        registry=reg,
+    )
+    assert strip == []
+
+
+# --------------------------------------------------------------------------
 # Verb format contract — pinned because the chip text relies on this shape
 # --------------------------------------------------------------------------
 

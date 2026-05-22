@@ -629,4 +629,329 @@ def test_18_02_build_prompt_threads_snapshot_kwarg():
     out_default = AICoach.build_prompt(ev)
     out_none = AICoach.build_prompt(ev, registry_snapshot=None)
     assert out_default == out_none
+
+
+# ---- Phase 66 — recall_fragment_for_event tests (COPILOT-01/02) ----
+#
+# RED-first contract pinning the recall_fragment_for_event helper + the
+# build_prompt integration. Mirrors the Phase 65 byte-identity discipline:
+# the helper MUST return "" for cold/empty `recall_moments` so build_prompt
+# output stays byte-identical to v5.0 — the load-bearing regression floor
+# at test_evidence_line_audible_no_recall_byte_identical_v5_baseline must
+# not move.
+#
+# Fragment-unique substring locks (verified absent from current source at
+# Wave 0 land — recorded in 66-VALIDATION.md §Wave 0 Requirements + the
+# task <action> grep evidence; the executor reproduced each substring grep
+# returning ZERO hits on src/vibemix/state/coach.py + src/vibemix/prompts/matrix.py
+# before committing):
+#
+#   - "in the live audio"        → transition-shape fragment unique marker
+#     (from 66-RESEARCH.md TRANSITION_SHAPE_RECALL_FRAGMENT_TPL lines 258-275:
+#      "Compare what you heard NOW vs. what's in the past signature... in
+#      the live audio")
+#
+#   - "echo your own past words" → vocabulary fragment unique marker
+#     (from 66-RESEARCH.md VOCABULARY_RECALL_FRAGMENT_TPL lines 288-302:
+#      "you MAY echo your own past words")
+#
+# If either substring grows into coach.py / matrix.py for an UNRELATED
+# reason before Plan 02 lands, surface a finding (Phase 66 must STOP and
+# pick a new fragment-unique substring) — do NOT alter the assertions to
+# work around it. The substring-uniqueness invariant is what makes these
+# tests RED for the right STRUCTURAL reason today and GREEN for the right
+# reason after Plan 02.
+#
+# Per-test-body imports of `recall_fragment_for_event` wrapped in
+# pytest.fail-on-ImportError keep the file COLLECTABLE under pytest even
+# while the symbol does not exist (Wave 0 contract: collection stays clean,
+# tests fail for the right reason).
+
+
+def _phase_66_record_stubs(n: int = 1):
+    """Return ``n`` minimal Record stubs sorted DESC by implied cosine score.
+
+    Imported lazily (matches the _recall_records pattern above) so a future
+    Record relocation only touches the helper. record_ids follow the Phase
+    64/65 ``f"{session_id}:{seq}"`` shape with an inner colon. The stubs are
+    ordered strongest-first per the Phase 65 cosine_topk contract (sort
+    DESC by score), so recall_moments[0] is the strongest survivor — this
+    is the ordering the Phase 66 fragment helper relies on for the
+    "interpolate ONLY the strongest record_id" structural cap.
+    """
+    from vibemix.memory.store import Record
+
+    pool = [
+        Record(
+            record_id="20260520-2200:7",
+            session_id="20260520-2200",
+            ts=120.0,
+            kind="coach_line",
+            signature="that filter sweep into the drop was clean",
+            score=0.91,
+        ),
+        Record(
+            record_id="20260520-2200:12",
+            session_id="20260520-2200",
+            ts=240.0,
+            kind="coach_line",
+            signature="you rode the groove a touch long here",
+            score=0.82,
+        ),
+        Record(
+            record_id="20260519-1830:3",
+            session_id="20260519-1830",
+            ts=60.0,
+            kind="coach_line",
+            signature="that bass drop punched harder than this one",
+            score=0.74,
+        ),
+    ]
+    return pool[:n]
+
+
+def test_transition_recall_fragment_appears():
+    """COPILOT-01 — TRACK_CHANGE/MIX_MOVE/LAYER_ARRIVAL with non-empty
+    recall_moments → build_prompt output contains both the Phase 65 PAST-tense
+    fence AND the transition-shape fragment's unique substring.
+
+    Fragment-unique substring: "in the live audio" — verified absent from
+    src/vibemix/state/coach.py AND src/vibemix/prompts/matrix.py at Wave 0
+    land (zero hits in the pre-grep recorded in the section header above).
+
+    RED reason: `recall_fragment_for_event` symbol does not exist in
+    vibemix.state.coach yet — Plan 02 Task 2 adds it.
+    """
+    try:
+        from vibemix.state.coach import recall_fragment_for_event  # noqa: F401
+    except ImportError:
+        import pytest
+
+        pytest.fail(
+            "recall_fragment_for_event symbol missing from "
+            "vibemix.state.coach — Plan 02 Task 2 must add it (COPILOT-01)"
+        )
+
+    survivors = _phase_66_record_stubs(n=2)
+    for type_ in ("TRACK_CHANGE", "MIX_MOVE", "LAYER_ARRIVAL"):
+        ev = _ev(type_)
+        out = AICoach.build_prompt(ev, recall_moments=survivors)
+        # Phase 65 evidence_line PAST-tense fence rides along (already green).
+        assert "FROM A PAST SESSION" in out, (
+            f"missing Phase 65 PAST-tense fence on {type_}"
+        )
+        # Transition-shape fragment unique marker — pinned at Wave 0 from
+        # 66-RESEARCH.md TRANSITION_SHAPE_RECALL_FRAGMENT_TPL.
+        assert "in the live audio" in out, (
+            f"missing transition fragment unique substring on {type_}"
+        )
+
+
+def test_vocabulary_recall_fragment_appears():
+    """COPILOT-02 — PHASE event with non-empty recall_moments → build_prompt
+    output contains the vocabulary fragment's unique substring.
+
+    Fragment-unique substring: "echo your own past words" — verified absent
+    from src/vibemix/state/coach.py AND src/vibemix/prompts/matrix.py at
+    Wave 0 land.
+
+    RED reason: `recall_fragment_for_event` symbol does not exist yet —
+    Plan 02 Task 2 must add it.
+    """
+    try:
+        from vibemix.state.coach import recall_fragment_for_event  # noqa: F401
+    except ImportError:
+        import pytest
+
+        pytest.fail(
+            "recall_fragment_for_event symbol missing from "
+            "vibemix.state.coach — Plan 02 Task 2 must add it (COPILOT-02)"
+        )
+
+    survivors = _phase_66_record_stubs(n=1)
+    ev = _ev("PHASE", {"prev_phase": "groove", "new_phase": "drop"})
+    out = AICoach.build_prompt(ev, recall_moments=survivors)
+    assert "FROM A PAST SESSION" in out, "missing Phase 65 PAST-tense fence on PHASE"
+    assert "echo your own past words" in out, (
+        "missing vocabulary fragment unique substring on PHASE"
+    )
+
+
+def test_task_for_event_byte_identical_v5_baseline_no_recall():
+    """COPILOT-01/03 — the LOAD-BEARING regression floor.
+
+    The cold-path byte-identity invariant (Phase 65 + Phase 66): when
+    recall_moments is None / [] / not passed, build_prompt output is
+    byte-identical across all three call shapes. After Plan 02 lands the
+    fragment helper, this test catches a broken falsy-gate (i.e. a helper
+    that appends a non-empty string on cold input) — the kind of bug that
+    breaks every existing v5.0 golden test.
+
+    Pinned across the FULL event-type set (KAAN_SPOKE / MANUAL /
+    TRACK_CHANGE / PHASE / LAYER_ARRIVAL / MIX_MOVE / HEARTBEAT / KEY_CLASH
+    / TRANSITION_OPPORTUNITY) so a future bug that flips the gate ONLY on a
+    specific event type cannot slip through.
+
+    PASSES today (helper does not exist; build_prompt ignores the kwarg
+    until Plan 02). MUST stay GREEN after Plan 02 — this is the floor.
+    """
+    extras = {
+        "TRACK_CHANGE": {"prev_track": "Old Title", "new_track": "New Title"},
+        "PHASE": {"prev_phase": "groove", "new_phase": "drop"},
+        "MIX_MOVE": {"moves": ["A_play→ON"]},
+        "KEY_CLASH": {
+            "a_side": "A",
+            "a_camelot": "8A",
+            "b_side": "B",
+            "b_camelot": "2A",
+            "semitones": 3,
+        },
+        "TRANSITION_OPPORTUNITY": {
+            "a_side": "A",
+            "a_camelot": "8A",
+            "b_side": "B",
+            "b_camelot": "9A",
+            "clash": False,
+        },
+    }
+    for type_ in (
+        "KAAN_SPOKE",
+        "MANUAL",
+        "TRACK_CHANGE",
+        "PHASE",
+        "LAYER_ARRIVAL",
+        "MIX_MOVE",
+        "HEARTBEAT",
+        "KEY_CLASH",
+        "TRANSITION_OPPORTUNITY",
+    ):
+        ev = _ev(type_, extras.get(type_))
+        out_default = AICoach.build_prompt(ev)
+        out_none = AICoach.build_prompt(ev, recall_moments=None)
+        out_empty = AICoach.build_prompt(ev, recall_moments=[])
+        # The triple-equality is the contract: None == [] == no-kwarg.
+        # A helper that mishandles the falsy gate breaks at least one leg.
+        assert out_default == out_none, (
+            f"recall_moments=None must be byte-identical to no-kwarg "
+            f"on {type_} (cold-path byte-identity floor)"
+        )
+        assert out_default == out_empty, (
+            f"recall_moments=[] must be byte-identical to no-kwarg "
+            f"on {type_} (cold-path byte-identity floor)"
+        )
+
+
+def test_only_strongest_survivor_record_id_in_fragment():
+    """COPILOT-02 — only the STRONGEST survivor's record_id is interpolated
+    into the fragment template, while the FULL survivor list still appears
+    in the Phase 65 PAST-tense FROM A PAST SESSION evidence_line block.
+
+    Pins BOTH halves of the contract:
+      (a) the fragment portion (the new Phase 66 helper output) contains
+          recall_moments[0].record_id EXACTLY ONCE and does NOT contain
+          record_ids of the weaker survivors;
+      (b) the FULL prompt still contains every survivor's record_id (the
+          weaker ones live in the Phase 65 evidence_line block — the LLM
+          can pattern-match across all of them, but the citation
+          instruction names only the strongest).
+
+    Survivors are constructed in descending cosine-score order per the
+    Phase 65 cosine_topk contract.
+
+    RED reason: helper does not exist; recall_moments=... yields no
+    fragment portion in build_prompt output today (build_prompt ignores
+    the kwarg until Plan 02 adds the integration).
+    """
+    try:
+        from vibemix.state.coach import recall_fragment_for_event  # noqa: F401
+    except ImportError:
+        import pytest
+
+        pytest.fail(
+            "recall_fragment_for_event symbol missing from "
+            "vibemix.state.coach — Plan 02 Task 2 must add it (COPILOT-02)"
+        )
+
+    survivors = _phase_66_record_stubs(n=3)
+    strongest, second, third = survivors[0], survivors[1], survivors[2]
+    ev = _ev("TRACK_CHANGE", {"prev_track": "X", "new_track": "Y"})
+    out = AICoach.build_prompt(ev, recall_moments=survivors)
+
+    # All three record_ids appear in the PAST-tense evidence_line block
+    # (Phase 65 — already green; this assertion pins that this contract is
+    # not regressed by the Phase 66 fragment integration).
+    assert strongest.record_id in out
+    assert second.record_id in out
+    assert third.record_id in out
+
+    # Locate the fragment portion: everything AFTER the
+    # "FROM A PAST SESSION" block. The evidence_line ends at "]" wrapping
+    # ` | event=TRACK_CHANGE]` — the fragment is appended to the task tail
+    # AFTER that closing bracket (66-PATTERNS.md build_prompt integration).
+    # We use the unique transition-shape substring "in the live audio" as
+    # the anchor: anything FOLLOWING the anchor is fragment, and the
+    # strongest record_id must appear in that tail (the cite-EXACTLY-ONCE
+    # instruction interpolates recall_moments[0].record_id once).
+    assert "in the live audio" in out, (
+        "fragment marker missing — recall_fragment_for_event did not append "
+        "the transition-shape fragment for TRACK_CHANGE"
+    )
+    fragment_start = out.index("in the live audio")
+    fragment_portion = out[fragment_start:]
+
+    # The strongest record_id is interpolated into the fragment (the only
+    # cite the fragment instructs Gemini to emit).
+    assert strongest.record_id in fragment_portion, (
+        "strongest survivor's record_id must appear in the fragment portion"
+    )
+    # The weaker survivors' record_ids must NOT appear in the fragment
+    # portion (they ride along ONLY in the upstream evidence_line block).
+    assert second.record_id not in fragment_portion, (
+        f"second-strongest record_id {second.record_id!r} leaked into the "
+        "fragment portion — the structural max-1-per-turn property is broken"
+    )
+    assert third.record_id not in fragment_portion, (
+        f"third-strongest record_id {third.record_id!r} leaked into the "
+        "fragment portion — the structural max-1-per-turn property is broken"
+    )
+
+
+def test_transition_wins_track_change_overlap():
+    """COPILOT-02 — on TRACK_CHANGE (which is in BOTH the transition-shape
+    and the vocabulary event gates per CONTEXT.md Area 1 Q1+Q2),
+    transition-shape WINS over vocabulary.
+
+    Rationale (Pitfall 5 + Open Q1 in 66-RESEARCH.md): TRACK_CHANGE is a
+    transition moment by definition; the comparison shape ("compare NOW vs
+    THEN") is more concrete + actionable than a vocabulary echo. PHASE-only
+    is where the vocabulary fragment dominates.
+
+    Asserts via the two unique substrings — transition-shape's marker
+    appears, vocabulary's marker does NOT, on a TRACK_CHANGE turn with
+    non-empty survivors.
+
+    RED reason: helper does not exist yet.
+    """
+    try:
+        from vibemix.state.coach import recall_fragment_for_event  # noqa: F401
+    except ImportError:
+        import pytest
+
+        pytest.fail(
+            "recall_fragment_for_event symbol missing from "
+            "vibemix.state.coach — Plan 02 Task 2 must add it (COPILOT-02)"
+        )
+
+    survivors = _phase_66_record_stubs(n=2)
+    ev = _ev("TRACK_CHANGE", {"prev_track": "X", "new_track": "Y"})
+    out = AICoach.build_prompt(ev, recall_moments=survivors)
+    # Transition fragment marker MUST appear on the TRACK_CHANGE overlap.
+    assert "in the live audio" in out, (
+        "transition-shape fragment must win on TRACK_CHANGE"
+    )
+    # Vocabulary fragment marker MUST NOT appear — only one fragment per turn.
+    assert "echo your own past words" not in out, (
+        "vocabulary fragment leaked into a TRACK_CHANGE turn — transition "
+        "must win the overlap (Pitfall 5 / Open Q1)"
+    )
     assert "evidence_corpus" not in out_default
