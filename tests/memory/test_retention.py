@@ -68,7 +68,10 @@ def test_retention_evicts_oldest_session_first_whole_session(tmp_path: Path) -> 
     store = MemoryStore(db_path=tmp_path / "memory.db", prefer_sqlite_vec=False)
     _seed_sessions(store)
 
-    result = store.run_retention_sweep(max_moments=6)
+    # Count-only sweep: disable the age axis explicitly (the seeded ts are
+    # 1970-epoch and would otherwise trip the default age cap; WR-03 makes an
+    # omitted cap fall through to the production default).
+    result = store.run_retention_sweep(max_moments=6, max_age_days=None)
 
     # The whole oldest session went — 3 records pruned.
     assert result.deleted == 3
@@ -92,7 +95,7 @@ def test_retention_evicts_multiple_whole_sessions_when_needed(tmp_path: Path) ->
     store = MemoryStore(db_path=tmp_path / "memory.db", prefer_sqlite_vec=False)
     _seed_sessions(store)
 
-    result = store.run_retention_sweep(max_moments=2)
+    result = store.run_retention_sweep(max_moments=2, max_age_days=None)
 
     assert result.deleted == 6  # s_old + s_mid, whole
     remaining = _remaining_sessions(store)
@@ -109,8 +112,45 @@ def test_retention_infinite_cap_is_noop(tmp_path: Path) -> None:
     store = MemoryStore(db_path=tmp_path / "memory.db", prefer_sqlite_vec=False)
     _seed_sessions(store)
 
-    result = store.run_retention_sweep(max_moments=10_000)
+    result = store.run_retention_sweep(max_moments=10_000, max_age_days=None)
 
     assert result.deleted == 0
     assert _remaining_sessions(store) == {"s_old", "s_mid", "s_new"}
     assert len(store.query_topk(_vec(99), k=100)) == 9
+
+
+def test_retention_no_arg_call_enforces_default_budget(tmp_path: Path) -> None:
+    """WR-03 — the obvious no-arg ``store.run_retention_sweep()`` boot call MUST
+    enforce the real ~10k/180d budget, NOT be a silent no-op.
+
+    The seeded sessions are 1970-epoch (far older than the 180-day default age
+    cap), so a no-arg sweep — which the method must forward to the module
+    function's production defaults — evicts them all as stale. Before the fix
+    the method overrode both caps with ``None`` and this call did nothing,
+    shipping an unbounded-growth regression. A no-op here is the bug.
+    """
+    store = MemoryStore(db_path=tmp_path / "memory.db", prefer_sqlite_vec=False)
+    _seed_sessions(store)
+
+    result = store.run_retention_sweep()
+
+    # The default budget actually fired (not the (None, None) ∞-no-op).
+    assert result.deleted > 0
+    # IN-03 never-empty guard: even a fully-stale install keeps the newest
+    # session standing rather than wiping to zero.
+    assert _remaining_sessions(store) == {"s_new"}
+
+
+def test_retention_age_pass_never_empties_store(tmp_path: Path) -> None:
+    """IN-03 — when EVERY session is older than the age cap, the age pass still
+    keeps the newest session, mirroring the count pass's never-empty guarantee.
+    """
+    store = MemoryStore(db_path=tmp_path / "memory.db", prefer_sqlite_vec=False)
+    _seed_sessions(store)
+
+    # All sessions (ts 100-302, 1970-epoch) are far past a 1-day age cap.
+    result = store.run_retention_sweep(max_moments=None, max_age_days=1)
+
+    # s_old + s_mid evicted; s_new (newest) protected → store not emptied.
+    assert result.deleted == 6
+    assert _remaining_sessions(store) == {"s_new"}

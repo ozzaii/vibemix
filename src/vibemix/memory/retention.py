@@ -120,11 +120,23 @@ def run_memory_retention_sweep(
     # A session is stale when its NEWEST moment is older than the cutoff (the
     # whole session has had no activity since). Conservative: a session with any
     # recent moment is retained whole.
+    #
+    # Never-empty guard (IN-03): like the count pass, the age pass must NEVER
+    # leave the store empty. ``sessions`` is oldest-first, so when EVERY session
+    # is stale we still keep the newest one standing (the last element) — even a
+    # fully-stale install retains its most-recent session rather than wiping to
+    # zero. The newest session is the most likely to be re-touched and the
+    # safest to preserve. A genuinely abandoned install simply keeps one stale
+    # session until new activity ages it out via the normal path.
     remaining: list[tuple[str, float, float, int]] = []
     if max_age_days is not None:
         cutoff = current - (max_age_days * _SECONDS_PER_DAY)
+        # The newest session (last, since sessions is oldest-first) is never
+        # eligible for age eviction — it is the floor that keeps the store
+        # non-empty.
+        protected_sid = sessions[-1][0] if sessions else None
         for sid, min_ts, max_ts, n in sessions:
-            if max_ts < cutoff:
+            if max_ts < cutoff and sid != protected_sid:
                 if _evict(store, sid):
                     evicted.append(sid)
                     pruned_moments += n
