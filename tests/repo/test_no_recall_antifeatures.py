@@ -127,6 +127,22 @@ FORBIDDEN_RECALL_PHRASES: tuple[str, ...] = (
     "you should try",
     "i recommend",
     "my recommendation",
+    # Phase 66 review WR-01 — synonym gaps surfaced by the review pass.
+    # All are obvious paraphrases of the cardinal anti-feature classes
+    # above (tendency claims, next-track recommendation, recommendation
+    # surface). Pre-grep against TARGET_FILES at land = ZERO hits for any
+    # of these — the gate stays VACUOUS-GREEN. Any future hit is a
+    # finding to SURFACE (re-research the prompt phrasing), NOT to carve
+    # out — see the module docstring's "Pre-grep evidence" note.
+    "your typical",
+    "you've been",
+    "i'd recommend",
+    "play next",
+    "you should play next",
+    "consider playing",
+    "track to play next",
+    "your usual move",
+    "your habit",
 )
 
 # Files scanned — the prompt + coach persona surface that Gemini sees.
