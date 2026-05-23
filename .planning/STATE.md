@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v7.0
 milestone_name: Open House
-status: planning
-last_updated: "2026-05-23T08:00:00.000Z"
+status: in_progress
+last_updated: "2026-05-23T09:02:34.000Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 5
+  completed_plans: 1
+  percent: 5
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-23 — **v7.0 "Open House" ROADMAPPED under `gsd-autonomous fully`.** 4 phases (67–70), one per pillar (TEST · DEV · OSS · GH), 19/19 REQ-IDs mapped to exactly one phase (no orphans, no duplicates): TEST-01..04 → P67 (4) · DEV-01..05 → P68 (5) · OSS-01..05 → P69 (5) · GH-01..05 → P70 (5). **WIRING + DISCHARGE + POLISH milestone — zero new product capability**, zero new AI providers (CLAP / MERT / OpenL3 / torch all out, unchanged), zero new managed-memory frameworks (Mem0 / Letta / Zep / Cognee all out, unchanged), zero new ws ports, zero new IPC envelopes. The four cardinal invariants (single-writer / citation-grounding / trust-the-audio / one-socket) hold by zero-touch — no phase modifies the reaction path. **Dependency spine (strict left-to-right):** P67 dep-free (test infra) → P68 on P67's CI matrix → P69 on P68 (don't publish a broken catalog; OSS-04 actually fires `cut_release.sh v0.1.0-rc1` for real after §SHIP-V4 discharge — v4.0 SHIP closes alongside) → P70 on P69 (front-porch references real artifacts). **Acid test** for any v7.0 phase or plan: *"does this turn an existing engineering-green capability into something a stranger can install, verify, contribute to, or see — without growing the surface?"* If neither, defer. v6.0's `VIBEMIX_RECALL_ENABLED=1` flip stays on its independent §RECALL-EAR Kaan-ear clock — not v7.0 scope.
+**Last updated:** 2026-05-23 (Plan 67P01 SHIPPED) — **v7.0 "Open House" IN PROGRESS under `gsd-autonomous fully`.** Phase 67 Plan 67P01 (Wave 0 — default-grid green + `flaky:` marker registered) SHIPPED 2026-05-23: 9 test-as-contract drift failures fixed (zero src/vibemix/ edits, zero new deps, zero new ws ports). `uv run pytest -q` exits 0 with 4160 passed / 26 skipped / 0 failed. TEST-01 SC#1 ("a third-party engineer cloning `main` and running `pytest -q` sees exit code 0") SATISFIED; TEST-03 marker-declaration prerequisite landed. 4 phases (67–70), one per pillar (TEST · DEV · OSS · GH), 19/19 REQ-IDs mapped to exactly one phase (no orphans, no duplicates): TEST-01..04 → P67 (4) · DEV-01..05 → P68 (5) · OSS-01..05 → P69 (5) · GH-01..05 → P70 (5). **WIRING + DISCHARGE + POLISH milestone — zero new product capability**, zero new AI providers (CLAP / MERT / OpenL3 / torch all out, unchanged), zero new managed-memory frameworks (Mem0 / Letta / Zep / Cognee all out, unchanged), zero new ws ports, zero new IPC envelopes. The four cardinal invariants (single-writer / citation-grounding / trust-the-audio / one-socket) hold by zero-touch — no phase modifies the reaction path. **Dependency spine (strict left-to-right):** P67 dep-free (test infra) → P68 on P67's CI matrix → P69 on P68 (don't publish a broken catalog; OSS-04 actually fires `cut_release.sh v0.1.0-rc1` for real after §SHIP-V4 discharge — v4.0 SHIP closes alongside) → P70 on P69 (front-porch references real artifacts). **Acid test** for any v7.0 phase or plan: *"does this turn an existing engineering-green capability into something a stranger can install, verify, contribute to, or see — without growing the surface?"* If neither, defer. v6.0's `VIBEMIX_RECALL_ENABLED=1` flip stays on its independent §RECALL-EAR Kaan-ear clock — not v7.0 scope.
 
 ---
 
@@ -39,7 +39,7 @@ See: .planning/PROJECT.md (Current Milestone: v7.0 "Open House")
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
 - **v7.0 thesis:** turn engineering-green into installable, contributable, install-anywhere OSS. Four pillars — TEST · DEV · OSS · GH — one phase per pillar (P67/P68/P69/P70). **Wiring + discharge + polish, zero new product capability.** Every phase reads as "verify / wire / discharge / generate / test" — never "build a new X". Anti-creep gated by the acid test: *"does this turn an existing engineering-green capability into something a stranger can install, verify, contribute to, or see — without growing the surface?"*
 - **Cardinal invariants verified by zero-touch:** the four cardinal invariants (single-writer · citation-grounding · trust-the-audio · one-socket) hold by construction because no v7.0 phase modifies the reaction path. v7.0 is a packaging/infrastructure/surface milestone, not a brain milestone.
-- **Current focus:** Phase 67 (TEST · All Tests Pass) — not started · Status: ready to plan
+- **Current focus:** Phase 67 (TEST · All Tests Pass) — Wave 0 SHIPPED (Plan 67P01) · Status: ready for Wave 1 (per-marker grid green)
 - **Last shipped:** v6.0 "The Memory Turn" — 2026-05-23 (tech_debt accepted).
 - **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). **Closes alongside v7.0 OSS-04.** NOT archived.
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
@@ -49,10 +49,10 @@ See: .planning/PROJECT.md (Current Milestone: v7.0 "Open House")
 
 ## Current Position
 
-Phase: 67 (TEST · All Tests Pass) — not started · Status: ready to plan
-Plan: —
-Status: ready to plan
-Last activity: 2026-05-23 — Milestone v7.0 roadmapped (4 phases, 19 REQ-IDs, 100% coverage)
+Phase: 67 (TEST · All Tests Pass) — Wave 0 SHIPPED · Status: in progress (1/5 plans)
+Plan: 67P01 — Wave 0 default-grid green + `flaky` marker registered (SHIPPED 2026-05-23)
+Status: ready for Wave 1 (per-marker grid green — `pytest -m <marker>` for each opt-in marker individually)
+Last activity: 2026-05-23 — Plan 67P01 SHIPPED. 9 default-grid failures fixed (all test-as-contract drift; no src/vibemix/ edits); `flaky:` marker registered under --strict-markers. `uv run pytest -q` exits 0 with 4160 passed / 26 skipped / 0 failed. TEST-01 SC#1 satisfied; TEST-03 marker prerequisite landed.
 
 ## v7.0 Phase Map
 
@@ -78,12 +78,15 @@ Last activity: 2026-05-23 — Milestone v7.0 roadmapped (4 phases, 19 REQ-IDs, 1
 | Phases complete (v5.0) | 4 / 4 engineering-green (KAAN-ACTION live-confirm items ride forward) |
 | Phases complete (v6.0) | 4 / 4 engineering-green (§RECALL-EAR + §LIVE-EMBED ride forward) |
 | v7.0 phase count | 4 (Phases 67–70) |
-| Phases complete (v7.0) | 0 / 4 — Phase 67 ready to plan |
+| Phases complete (v7.0) | 0 / 4 — Phase 67 in progress (1/5 plans shipped) |
+| Plans complete (v7.0) | 1 / 5+ (67P01 SHIPPED 2026-05-23 — default-grid green + flaky marker) |
 | v7.0 REQ-IDs mapped | 19 / 19 ✓ (100% coverage, no orphans, no duplicates) |
+| v7.0 REQ-IDs complete | 2 / 19 (TEST-01 SC#1 + TEST-03 marker-decl prerequisite, via 67P01) |
 | v7.0 per-phase REQ counts | P67=4 (TEST) · P68=5 (DEV) · P69=5 (OSS) · P70=5 (GH) |
 | v7.0 net-new dependencies | 0 (WIRING + DISCHARGE + POLISH milestone — no new product capability) |
 | v7.0 net-new ws ports | 0 (one-socket invariant held) |
 | v7.0 net-new IPC envelopes | 0 (zero-touch on reaction path) |
+| Default `pytest -q` (Phase 67 baseline) | 4160 passed / 26 skipped / 0 failed (exit 0) — Plan 67P01 SHIPPED |
 | v4.0 git tag | local artifacts on `live-tuning-or-brain`; unsigned `v0.1.0-rc1` .dmg built — closes alongside v7.0 OSS-04 |
 | External signature clock | Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) — gates ONLY OSS-04 in v7.0; routes to §SHIP-V4 under autonomous mode if not landed at execution |
 
@@ -135,13 +138,13 @@ v6.0's memory-grounded copilot ships behind `VIBEMIX_RECALL_ENABLED=0` until §R
 
 ## Session Continuity
 
-**Next command:** plan Phase 67 — `/gsd:plan-phase 67`.
+**Next command:** execute Phase 67 Wave 1 — `/gsd:execute-phase 67` (the next plan in the wave map; planner produces 67P02..67P05).
 
-**What's done:** **v7.0 "Open House" ROADMAPPED.** 4 phases (67–70), 19/19 REQ-IDs mapped to exactly one phase (TEST-01..04 → P67 · DEV-01..05 → P68 · OSS-01..05 → P69 · GH-01..05 → P70 — no orphans, no duplicates, confirmed by roadmapper). Hard dependency spine: P67 dep-free → P68 on P67's CI matrix → P69 on P68 (no broken catalog publish) → P70 on P69 (front-porch references real artifacts). Acid test held: every phase reads as "verify / wire / discharge / generate / test" — zero new product capability, zero new deps, zero new ws ports, zero new IPC envelopes. Files written: `.planning/ROADMAP.md` (v7.0 section + summary checklist + phase details + progress table), `.planning/REQUIREMENTS.md` (Traceability table flipped Pending → Mapped (planning), roadmapper confirmation note), `.planning/STATE.md` (this file — Current Position + v7.0 Phase Map + Performance Metrics + Accumulated Context). v6.0 archived into ROADMAP collapsible.
+**What's done:** **v7.0 "Open House" ROADMAPPED + Phase 67 Plan 67P01 SHIPPED.** Plan 67P01 (Wave 0) flipped default `uv run pytest -q` from 9-red to 0-red via 9 test-as-contract drift fixes (anti-slop wire13 regex accepts citation_lint_enabled gate; corpus session events.jsonl placeholders + .gitignore allowlist; cut_release tag-regex + audit-path pin updates v2.1→v0.1.0 / v4.0; STATE.md Phase 16 audit annotation restored; README feature-matrix resynced; smoke_08 accepts cache_system_instruction + asyncio.wait_for-wrapped cache.create). Zero src/vibemix/ edits — acid test held. `flaky:` marker registered in pyproject.toml so Wave 2's `tests/repo/test_no_silent_flakes.py` static gate is unblocked under --strict-markers. TEST-01 SC#1 + TEST-03 marker prerequisite both satisfied. Commit `a08594d`. Files written: `pyproject.toml`, `tests/coach/test_main_anti_slop_wiring.py`, `tests/repo/test_cut_release_invokes_bravoh_server.py`, `tests/scripts/test_cut_release_preflight.py`, `tests/test_main_smoke.py`, `.planning/STATE.md` (Phase 16 audit annotation), `README.md` (feature-matrix sync), `.gitignore` (corpus events.jsonl allowlist), `eval/corpus/sessions/{6 dirs}/events.jsonl` (empty placeholders), `.planning/phases/67-all-tests-pass/67P01-SUMMARY.md`.
 
-**What's next:** Phase 67 planning (TEST · All Tests Pass) — dependency-free, runs first. The phase scope is well-bounded: close every uncategorized red / skip / xfail in the default grid, prove the 65 opt-in tests pass or route their failure-modes to `§V7-LIVE`, flake-hunt + quarantine, ship `.github/workflows/full-test-matrix.yml` + README badge. Then P68 (DEV) on P67's CI matrix, then P69 (OSS) on P68, then P70 (GH) on P69. OSS-04 has the external Apple Dev + SignPath clock — under autonomous mode, routes to §SHIP-V4 if not landed; other 18 reqs ship unblocked. v4.0 SHIP closes alongside OSS-04.
+**What's next:** Phase 67 Wave 1 — `/gsd:plan-phase 67` produces the next plan (per-marker grid green). The wave map per RESEARCH.md is 5 waves: Wave 0 ✓ (this plan), Wave 1 (per-marker grid green or §V7-LIVE-routed), Wave 2 (`.github/workflows/full-test-matrix.yml` + `tests/repo/test_no_silent_flakes.py`), Wave 3 (flake-hunt 10× pass rate), Wave 4 (README badges row). Then P68 (DEV) on P67's CI matrix, then P69 (OSS) on P68, then P70 (GH) on P69. OSS-04 has the external Apple Dev + SignPath clock — under autonomous mode, routes to §SHIP-V4 if not landed; other 18 reqs ship unblocked. v4.0 SHIP closes alongside OSS-04.
 
-**Open before execution:** none blocking. The four KAAN-ACTION soft items (FLX4 ear / proxy hardening coordination / Francesco demo cut / Kaan landing sign-off) route to KAAN-ACTION surfaces (§V7-LIVE + §V7-LANDING — to create in plan); engineering ships green in CI alongside them. The one hard external item (OSS-04 signatures) has its autonomous-mode contingency pre-decided.
+**Open before next execution:** none blocking. Default-grid baseline is now 4160/0/26 green — the substrate every downstream wave / phase lands on is healthy. The four KAAN-ACTION soft items (FLX4 ear / proxy hardening coordination / Francesco demo cut / Kaan landing sign-off) still route to KAAN-ACTION surfaces (§V7-LIVE + §V7-LANDING); engineering ships green in CI alongside them. The one hard external item (OSS-04 signatures) has its autonomous-mode contingency pre-decided.
 
 ---
 

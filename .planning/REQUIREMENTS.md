@@ -90,9 +90,9 @@ The product's hard line holds: **grounded, never hallucinating, no AI slop.** No
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-01 | Phase 67 | Mapped (planning) |
+| TEST-01 | Phase 67 | In progress — SC#1 (default `pytest -q` exits 0) SATISFIED by Plan 67P01 (2026-05-23); remaining SCs (xfail/xpass with `# reason:` annotations, KAAN-ACTION external-clock items) land in Waves 1-2 |
 | TEST-02 | Phase 67 | Mapped (planning) |
-| TEST-03 | Phase 67 | Mapped (planning) |
+| TEST-03 | Phase 67 | In progress — marker-declaration prerequisite SATISFIED by Plan 67P01 (2026-05-23, `flaky:` line in pyproject.toml); static gate `tests/repo/test_no_silent_flakes.py` + flake-hunt land in Wave 2 |
 | TEST-04 | Phase 67 | Mapped (planning) |
 | DEV-01 | Phase 68 | Mapped (planning) |
 | DEV-02 | Phase 68 | Mapped (planning) |
