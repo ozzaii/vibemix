@@ -765,12 +765,17 @@ def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> 
     # SDK's lack of a built-in timeout — a free-tier key on a project where
     # context caching is paid-tier hangs `caches.create()` indefinitely and
     # blocks boot before "listening to"). Accept the bare-await form OR the
-    # timeout-wrapped form; both await the coroutine. Updated 2026-05-23
-    # (Phase 67 / Plan 67P01).
+    # timeout-wrapped form; both must include the `await` keyword.
+    # WR-03 tightening (Phase 67 REVIEW): the wait_for-branch substring now
+    # carries the `await ` prefix, so a future refactor that drops the
+    # leading `await` (e.g. `_unused = asyncio.wait_for(cache.create(), …)`)
+    # would silently never start the coroutine and silently regress the
+    # cache-boot fail-fast guarantee — this test now catches that drift.
+    # Updated 2026-05-23 (Phase 67 / Plan 67P01 + REVIEW WR-03).
     assert (
         "await cache.create()" in src
-        or "asyncio.wait_for(cache.create()" in src
-    ), "cache.create not awaited (bare or wait_for-wrapped form)"
+        or "await asyncio.wait_for(cache.create()" in src
+    ), "cache.create not awaited (bare or wait_for-wrapped form must be awaited)"
     # Graceful degradation — cache=None on failure, no propagation of exception
     assert "cache = None" in src, "graceful-degradation cache=None branch missing"
     # Plan 41-02 — wall-clock refresh_loop deleted. Cache refresh is event-
