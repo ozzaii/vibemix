@@ -1,0 +1,25 @@
+{
+  "id": "vendor_model_snake_case",
+  "display_name": "Vendor Model Display Name",
+  "port_name_hints": ["PORT_SUBSTRING_PLATFORM_A", "PORT_SUBSTRING_PLATFORM_B"],
+  "decks": ["A", "B"],
+  "controls": {
+    "vol_a": {
+      "kind": "cc",
+      "channel": 0,
+      "cc": 19,
+      "axis": "unipolar",
+      "deck": "A",
+      "field": "vol"
+    }
+  },
+  "buttons": {
+    "play_a": {
+      "kind": "play",
+      "channel": 0,
+      "note": 11,
+      "deck": "A"
+    }
+  },
+  "notes": "JSON-only; hardware not verified yet — pending live ear pass."
+}
