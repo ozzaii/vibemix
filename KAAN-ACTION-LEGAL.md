@@ -3886,6 +3886,242 @@ v0.1.0-rc1 cut  on: __________  (date — Kaan, SHA ____, N/10 GREEN)
 quarterly Q1    on: __________  (date — Kaan, SHA ____, N/10 GREEN)
 ```
 
+### §V7-LIVE-07 — Controller-recipe <30-min smoke
+
+**Tests (cluster size = 1 felt-quality discharge artifact):**
+- `docs/contributing/add-a-controller-smoke.md` (the discharge artifact — created at discharge time, NOT checked in pre-discharge)
+
+**Why it can't ship green in CI alone:** Plan 68P04 (Wave 3) lands the
+contributor recipe (`docs/contributing/add-a-controller.md`, 173 lines / 4
+numbered steps / 5-item PR checklist), the copy-target template
+(`docs/contributing/_template.json`, `_parse_profile`-valid as-is), and the
+≤30-line cross-platform port-name discovery helper
+(`scripts/discover_midi_port.py`, 0/1/2 exit-code contract, mode 100755,
+zero `vibemix` imports). The success criterion's <30-min end-to-end smoke
+(Kaan or a trusted DJ adds one new profile on a controller-of-opportunity
+following the recipe from cold-start to PR-ready) is a felt-quality
+discharge — the engineering side ships when the recipe is followable by a
+stranger; the smoke confirms it actually IS. Under `gsd-autonomous fully`
+this rides Kaan's clock. The recipe doc tests its OWN cross-references via
+the same Wave 1 contract + smoke tests at PR merge time (4-line CI gate);
+this cluster is the human-felt counterpart.
+
+**Fix path:** Kaan (or a trusted DJ from his network) picks a controller
+NOT in the bundled 10 — suggestions include the 5 controllers that
+shipped before but no longer do (DDJ-200 · DDJ-Rev1 · Kontrol-S2 · MC-7000
+· Mixtrack Platinum-FX) since Kaan or someone in his network is likely to
+still own one. From cold-start, follow `docs/contributing/add-a-controller.md`
+Steps 1-4 verbatim, tracking wall-clock minutes from "start reading Step 1"
+to "PR ready to submit". Create `docs/contributing/add-a-controller-smoke.md`
+recording: controller model, new `profile_id`, wall-clock minutes, any
+friction points or doc gaps surfaced.
+```bash
+# Step 1 — discover the port:
+uv run python scripts/discover_midi_port.py
+# Step 2 — copy the template:
+cp docs/contributing/_template.json src/vibemix/midi/profiles/<your-profile>.json
+# (then fill in, follow Steps 3-4 in add-a-controller.md, stopwatch the whole pass)
+```
+Expected: wall-clock < 30 min from cold-start to PR-ready. If > 30 min,
+file a follow-on issue with the friction-point list; the doc gets a
+polish pass.
+
+**Owner-clock:** Kaan (or trusted DJ from network) — controller-of-opportunity dependent.
+
+**Cross-reference:** This cluster ships the live-felt counterpart of Plan
+68P04's engineering green. If no controller is available pre-publish, Phase
+68 still ships engineering-complete; the smoke discharges during outreach
+phase (P70 GitHub front-porch period when the first contributor PRs land).
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · controller: ____ · profile_id: ____ · wall-clock minutes: ____ · friction points: ____
+
+### §V7-LIVE-08 — macOS BlackHole 2ch / 16ch live capture
+
+**Tests (cluster size = 5 mock rows + 1 live confirmation):**
+- `tests/integration/test_audio_backends.py` (3 of 5 fixtures cover the BlackHole side: 2ch present · 16ch present · absent graceful — all GREEN via `monkeypatch.setattr(sd, 'query_devices', ...)`)
+- live confirmation: `uv run python -m vibemix` on Kaan's Mac with BlackHole 2ch (and optionally 16ch) installed → 30+ seconds of clean 48kHz capture observed in the live-tuning logs (or pill UI)
+
+**Why it can't ship green in CI alone:** Same lineage as §V7-LIVE-01 —
+BlackHole 2ch ships as a macOS kernel extension (kext); loading a kext
+requires a system reboot; GitHub-hosted `macos-13`/`macos-14` runners are
+ephemeral and don't reboot mid-job, so the kext never loads. Plan 68P03
+(Wave 2) closes the engineering side via 5 mock fixtures
+(`monkeypatch.setattr(sd, 'query_devices', ...)`) — `probe_blackhole`
+returns the expected device shape across 2ch present / 16ch present /
+absent / WASAPI-loopback / no-loopback-OSError. The mock matrix is
+faithful to `sounddevice.query_devices` and validated against the
+production `src/vibemix/install/blackhole_probe.py` shape (sacred-source
+git diff empty — Threat T-68P03-01 gate held). What stays Kaan-clock is
+the wall-clock confirmation that the mock fixture matches real-CoreAudio
+behavior on his actual Mac — verifying the device_name string format,
+capture-stream sample rate, and that `RMS > 0` flows during music
+playback through BlackHole.
+
+**Fix path:** On Kaan's Mac with BlackHole 2ch already installed
+(verified via `system_profiler SPAudioDataType | grep -i blackhole`),
+route a DJ app's output through BlackHole 2ch, launch vibemix, and
+confirm live capture:
+```bash
+# 1. Confirm BlackHole 2ch is installed (per CLAUDE.md macOS prereqs):
+system_profiler SPAudioDataType | grep -i blackhole
+# Expected: at least one BlackHole 2ch entry
+
+# 2. Route a DJ app's master output through BlackHole 2ch (Audio MIDI Setup
+#    aggregate device if you want to also monitor on speakers).
+
+# 3. Launch vibemix:
+uv run python -m vibemix
+
+# 4. In the live-tuning logs (or pill UI), confirm:
+#    - vibemix detected BlackHole 2ch as the input device (startup banner)
+#    - audio buffer surfaces RMS > 0 during music playback
+#    - capture stream reports 48 kHz
+
+# 5. (Optional) Repeat with BlackHole 16ch if installed.
+```
+Expected: 30+ seconds of clean 48kHz capture; device_name in the live
+banner matches the substring observed by the mock fixture
+(`"BlackHole 2ch"`). Record outcome in §V7-LIVE-08 sign-off.
+
+**Owner-clock:** Kaan's Mac (BlackHole installed per CLAUDE.md macOS prereqs).
+
+**Cross-reference:** Overlaps §V7-LIVE-01 (BlackHole tests under the
+`macos_audio` marker). §V7-LIVE-01 covers the test-side cluster (3 Tier-B
+tests); §V7-LIVE-08 covers the full-stack run-vibemix-live confirmation
+that those tests' contract still holds end-to-end on real hardware.
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · device_name observed: ____ · sample_rate: ____ · capture duration: ____
+
+### §V7-LIVE-09 — Windows WASAPI loopback live capture
+
+**Tests (cluster size = 2 mock rows + 1 live confirmation):**
+- `tests/integration/test_audio_backends.py` (2 of 5 fixtures cover the WASAPI side: loopback found at 48k · no-loopback-driver OSError fallback — both GREEN via `monkeypatch.setitem(sys.modules, 'pyaudiowpatch', MagicMock())` + `sys.modules.pop('vibemix.platform._audio_windows', None)`)
+- live confirmation: `uv run python -m vibemix` on a real Windows 11 desktop VM (Parallels/UTM) with system audio playing → loopback stream opens, no `OSError("no loopback")`, audio buffer surfaces `RMS > 0`
+
+**Why it can't ship green in CI alone:** Same lineage as §V7-LIVE-02 —
+`windows-latest` is Windows Server 2022, NOT Windows 11 desktop. WASAPI
+loopback behaves differently on Server vs desktop SKU: Server 2022 lacks
+the active desktop-audio session shape `assert_wasapi_loopback_rate`
+expects. Plan 68P03 (Wave 2) closes the engineering side via 2 mock
+fixtures (`monkeypatch.setitem(sys.modules, 'pyaudiowpatch', MagicMock())`)
+— `assert_wasapi_loopback_rate(expected=48000)` returns the expected
+`(device_index, "...Loopback...")` shape on the happy path and
+`pytest.raises(OSError, match='no loopback')` on the absent-driver
+fallback (with PyAudio's `terminate()` exactly once via the production
+finally block — no leak on raise). The mock matrix is faithful to
+`pyaudiowpatch.PyAudio()` shape and validated against the production
+`src/vibemix/platform/_audio_windows.py` (sacred-source git diff empty).
+What stays Kaan-clock is the wall-clock confirmation that the mock
+fixture matches real-WASAPI behavior on a real Windows 11 desktop SKU.
+
+**Fix path:** On Kaan's Windows 11 VM (Parallels/UTM — same VM used for
+v3.0/v4.0 INSTALL-VM rehearsals), with audio playing in any Windows
+audio app:
+```powershell
+# 1. Boot Windows 11 VM (Parallels: prlctl start "Win11"; UTM: GUI start).
+
+# 2. Sync deps (win32-marker deps install automatically — 68-RESEARCH §Environment Availability):
+uv sync
+
+# 3. Start playback in any Windows audio app (Spotify, browser, file player).
+
+# 4. Run vibemix:
+uv run python -m vibemix
+
+# 5. Confirm at startup:
+#    - WASAPI loopback stream opens (no OSError("no loopback") at startup banner)
+#    - Device name printed contains "Loopback"
+#    - Audio buffer surfaces RMS > 0 during playback
+
+# 6. Toggle audio off → confirm no crash, levels drop to silence (graceful
+#    behavior mirroring the mock's "no audible signal" path).
+```
+Expected: 30+ seconds of clean capture on the Win 11 desktop SKU;
+device name + index from the live banner consistent with the mock
+fixture shape. Record outcome in §V7-LIVE-09 sign-off.
+
+**Owner-clock:** Kaan's Win 11 VM (Parallels/UTM).
+
+**Cross-reference:** Overlaps §V7-LIVE-02 (test_audio_windows_live under
+`windows_only` marker). §V7-LIVE-02 covers the test-side cluster (1 of 5
+windows_only Tier-B tests); §V7-LIVE-09 covers the full-stack
+run-vibemix-live confirmation on real Win 11 desktop SKU.
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · device name observed: ____ · device index: ____ · capture duration: ____ · screenshot of startup banner: ____
+
+### §V7-LIVE-10 — Live FLX4 plug/unplug ear pass
+
+**Tests (cluster size = 3 mock parametrized rows + 1 live confirmation):**
+- `tests/integration/test_hotplug_matrix.py` (3 parametrized rows: pioneer_ddj_flx4 · pioneer_ddj_400 · hercules_inpulse_500 — all GREEN against the v4.0 P53 single-state callback `vibemix.platform._midi_common::handle_port_change_single_state` + `vibemix.midi.state::ControllerState.mark_disconnected`)
+- `tests/midi/test_disconnect_reconnect.py` (the FLX4-focused single-state callback test that the matrix lifts helpers from)
+- live confirmation: real Pioneer DDJ-FLX4 plug → move → unplug → wait → replug cycle on Kaan's Mac with `vibemix` running
+
+**Why it can't ship green in CI alone:** Same lineage as §V7-LIVE-03 — no
+hosted runner carries DJ controller hardware over USB. Plan 68P03 (Wave 2)
+closes the engineering side via 3 GREEN parametrized rows against the v4.0
+P53 single-state callback: per row, CONNECT → state-mutate (one synthetic
+`control_change` for a real binding → `moves_since(0.0) ≥ 1`) → DISCONNECT
+(`is_connected() is False`, ring cleared, bound_port None, `id(controller_state)`
+preserved per v4.0 P53 invariant) → RECONNECT (`id(controller_state)`
+preserved, fresh ring). Helpers `_DummyThread` + `_make_holder` + `_stub_spawn_listener`
+are lifted verbatim from `tests/midi/test_disconnect_reconnect.py:45-77`.
+The v4.0 P53 production paths (`handle_port_change_single_state` +
+`mark_disconnected`) are READ-ONLY across both 68P03 commits (sacred-source
+git diff empty). What stays Kaan-clock is the wall-clock ear-pass: real USB
+plug/unplug jitter, real OS-level port-name rename behavior, real driver
+re-init latency, and most importantly the **felt-quality** check that the
+AI co-host stays alive across the disconnect (does NOT lose its thread,
+does NOT crash, does NOT fabricate reactions referencing the lost
+controller).
+
+**Fix path:** Plug the Pioneer DDJ-FLX4 into Kaan's Mac over USB, run a
+plug → move → unplug → wait → replug cycle 3× over a 5-minute window:
+```bash
+# 1. Plug FLX4 in. Confirm port discovery:
+uv run python scripts/discover_midi_port.py
+# Expected: list contains "DDJ-FLX4 USB MIDI" (matches pioneer_ddj_flx4.json::port_name_hints)
+
+# 2. Launch vibemix:
+uv run python -m vibemix
+
+# 3. Confirm startup log says: "controller connected: pioneer_ddj_flx4".
+
+# 4. Move the channel-A volume fader (binding 68P03 SUMMARY samples:
+#    profile_id=pioneer_ddj_flx4 → channel=0, cc=19, axis=unipolar, field=vol_a).
+#    Confirm vibemix logs a MidiEvent and the AI co-host's evidence packet
+#    includes the move.
+
+# 5. Physically unplug the FLX4. Confirm:
+#    - vibemix logs "controller disconnected"
+#    - AI co-host stays responsive (does NOT crash)
+#    - id(ControllerState) is preserved (NO "rebuilding controller state" log line)
+
+# 6. Wait 5s, plug back in. Confirm "controller connected" fires again;
+#    move the same fader; new MidiEvents flow; the AI references the new
+#    moves without referencing the gap-period as if controller was alive.
+
+# 7. Repeat steps 5-6 three times across a 5-minute window for reconnect
+#    stability + felt-quality ear check (does the AI feel "alive across the
+#    plug-unplug" or does it sound disoriented?).
+
+# 8. Capture events.jsonl from the session for the sign-off block.
+```
+Expected: 3× clean plug-unplug-replug cycles; no crashes; no "rebuilding
+controller state" log lines; `id(ControllerState)` preserved across all
+disconnect events; AI co-host's reactions feel alive (anti-slop bar). If
+the AI hallucinates a reaction tied to a fader move during the unplugged
+gap, that's a Rule 1 bug — file under DEV-03 follow-on.
+
+**Owner-clock:** Kaan's Mac + Pioneer DDJ-FLX4 USB.
+
+**Cross-reference:** Overlaps §V7-LIVE-03 (FLX4 USB test under
+`macos_audio` marker — single test). §V7-LIVE-10 ships the fuller
+hardware-bringup discharge (BRINGUP-03 plug/move/unplug/replug/boot-with-
+controller-absent — full sequence is in `tests/test_midi_macos_live.py`'s
+docstring and is Kaan-manual).
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · cycles completed: ____ / 3 · id(ControllerState) preserved across all: ____ (Y/N) · AI co-host felt alive: ____ (Y/N) · events.jsonl artifact: ____
+
 ### Discharge tracking
 
 | Cluster | Tests | Owner-clock | Sign-off |
@@ -3896,7 +4132,11 @@ quarterly Q1    on: __________  (date — Kaan, SHA ____, N/10 GREEN)
 | §V7-LIVE-04 | 2 | Kaan's Mac, manual one-shot | ☐ pending |
 | §V7-LIVE-05 | 1 workflow | Kaan — first push to GitHub | ☐ pending |
 | §V7-LIVE-06 | recurring (10× hunt) | Kaan — pre-release or quarterly | ☑ v7.0 baseline 2026-05-23 (10/10 GREEN @ 23c4203) |
-| **TOTAL** | **11 tests + 1 workflow + 1 recurring** | | |
+| §V7-LIVE-07 | 1 felt-quality smoke (P68 DEV-05) | Kaan or trusted DJ — controller-of-opportunity | ☐ pending |
+| §V7-LIVE-08 | 5 mock + 1 live (P68 DEV-04) | Kaan's Mac (BlackHole installed) | ☐ pending |
+| §V7-LIVE-09 | 2 mock + 1 live (P68 DEV-04) | Kaan's Win 11 VM (Parallels/UTM) | ☐ pending |
+| §V7-LIVE-10 | 3 mock parametrized + 1 live (P68 DEV-03) | Kaan's Mac + plugged FLX4 | ☐ pending |
+| **TOTAL** | **11 tests + 1 workflow + 1 recurring + 4 P68 live clusters** | | |
 
 ### Verification (engineering-side, always-green)
 
@@ -3914,13 +4154,17 @@ done
 ### Sign-off block
 
 ```
-V7-LIVE-01 BlackHole cluster (3 tests)        on: _________   (date — Kaan, SHA ____)
-V7-LIVE-02 Win 11 desktop cluster (5 tests)   on: _________   (date — Kaan, SHA ____)
-V7-LIVE-03 FLX4 USB cluster (1 test)          on: _________   (date — Kaan, SHA ____)
-V7-LIVE-04 Live full-stack cluster (2 tests)  on: _________   (date — Kaan, SHA ____)
-V7-LIVE-05 First-CI-green (full-test-matrix)  on: _________   (date — Kaan, SHA ____, run-id ____)
-V7-LIVE-06 10× flake-hunt re-baseline          on: see §V7-LIVE-06 Sign-off history (recurring)
-Sign-off by:                                     _________   (Kaan)
+V7-LIVE-01 BlackHole cluster (3 tests)              on: _________   (date — Kaan, SHA ____)
+V7-LIVE-02 Win 11 desktop cluster (5 tests)         on: _________   (date — Kaan, SHA ____)
+V7-LIVE-03 FLX4 USB cluster (1 test)                on: _________   (date — Kaan, SHA ____)
+V7-LIVE-04 Live full-stack cluster (2 tests)        on: _________   (date — Kaan, SHA ____)
+V7-LIVE-05 First-CI-green (full-test-matrix)        on: _________   (date — Kaan, SHA ____, run-id ____)
+V7-LIVE-06 10× flake-hunt re-baseline                on: see §V7-LIVE-06 Sign-off history (recurring)
+V7-LIVE-07 Controller-recipe <30-min smoke (DEV-05) on: _________   (date — Kaan or trusted DJ, controller ____, wall-clock ____ min)
+V7-LIVE-08 macOS BlackHole live capture (DEV-04)    on: _________   (date — Kaan, SHA ____)
+V7-LIVE-09 Windows WASAPI live capture (DEV-04)     on: _________   (date — Kaan, SHA ____)
+V7-LIVE-10 Live FLX4 plug/unplug ear (DEV-03)       on: _________   (date — Kaan, SHA ____, 3 cycles ____)
+Sign-off by:                                           _________   (Kaan)
 ```
 
 ### Cross-references
