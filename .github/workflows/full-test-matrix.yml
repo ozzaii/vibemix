@@ -1,0 +1,87 @@
+# Phase 67 Plan 04 — TEST-04 deliverable: full marker × OS test matrix.
+#
+# Triggers on every push to `main` and every PR. Runs the default
+# `uv run pytest -q` suite plus each opt-in marker individually on
+# `[macos-13, macos-14, windows-latest]`, with OS-incompatible
+# combinations excluded.
+#
+# Per-marker isolation: one job per marker per OS — a failure must be
+# attributable to the marker, not lost in an `or`-filter soup.
+# Tier-B `§V7-LIVE` xfails (Wave 1) ensure the macos_audio job stays
+# amber, not red, on hosted runners where BlackHole can't load
+# (actions/runner-images#11746 — reboot required).
+#
+# Security posture (RESEARCH.md `## Security Domain`):
+# - `on: pull_request` (NOT `pull_request_target`) — secrets unavailable
+#   for fork PRs, no privilege-escalation surface.
+# - All `uses:` lines SHA-pinned per dep-audit.yml pinact-audit invariant.
+# - `permissions.contents: read` — minimum scope; no write needed.
+#
+# Concurrency: workflow-prefixed group cancels in-flight runs on the
+# same ref (Pitfall 4 — collisions if the group name isn't unique
+# across workflows).
+
+name: Full Test Matrix
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: full-test-matrix-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} · ${{ matrix.marker }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-13, macos-14, windows-latest]
+        marker:
+          - default
+          - macos_audio
+          - windows_only
+          - integration
+          - slow
+          - e2e
+          - cli
+          - network
+        exclude:
+          # macos_audio requires BlackHole + CoreAudio — Windows can't run it.
+          - os: windows-latest
+            marker: macos_audio
+          # windows_only is sys.platform == 'win32' gated — Mac runners skip.
+          - os: macos-13
+            marker: windows_only
+          - os: macos-14
+            marker: windows_only
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3.2.4
+
+      - name: Install deps
+        run: uv sync --frozen --group dev
+
+      - name: Run tests (default)
+        if: matrix.marker == 'default'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: uv run pytest -q --tb=short
+
+      - name: Run tests (opt-in marker — ${{ matrix.marker }})
+        if: matrix.marker != 'default'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: uv run pytest -q --tb=short -m "${{ matrix.marker }}"
