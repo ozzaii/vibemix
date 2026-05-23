@@ -45,20 +45,24 @@ def test_readme_references_asset(readme_text: str, ref: str) -> None:
 
 
 # The canonical 10-controller set, locked against the JSON profiles in
-# ``src/vibemix/midi/controllers/`` (the actual source of truth for what
-# ships out-of-the-box). The earlier list named aspirational controllers
-# that never had mapping files — kept the README from being able to pass.
+# ``src/vibemix/midi/profiles/`` (the actual source of truth for what
+# ships out-of-the-box). Phase 68 Wave 0 (Plan 68P01) collapsed the
+# duplicated ``midi/controllers/`` ↔ ``midi/profiles/`` catalogs to a
+# single canonical directory; the list below is the 10 bundled profile
+# IDs verbatim. README carries them in the anti-drift comment block
+# beneath the controllers grid so this substring match can find them.
+# See ``docs/contributing/midi-catalog.md`` for the migration note.
 REQUIRED_CONTROLLERS = [
-    "DDJ-200",
-    "DDJ-400",
-    "DDJ-FLX4",
-    "DDJ-REV1",
-    "Kontrol S2",
-    "Kontrol S4",
-    "MC6000",
-    "MC7000",
-    "Mixtrack Platinum FX",
-    "Mixtrack Pro FX",
+    "pioneer_ddj_flx4",
+    "pioneer_ddj_flx6",
+    "pioneer_ddj_flx10",
+    "pioneer_ddj_400",
+    "pioneer_ddj_1000",
+    "pioneer_ddj_sx3",
+    "pioneer_xdj_rx3",
+    "numark_party_mix_live",
+    "hercules_inpulse_300",
+    "hercules_inpulse_500",
 ]
 
 

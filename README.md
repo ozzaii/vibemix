@@ -132,28 +132,33 @@ Each cell speaks a different vocabulary on purpose. Beginner is encouragement-he
 
 ## Supported controllers
 
-Out-of-the-box mappings for 10 controllers, sourced verbatim from [`src/vibemix/midi/controllers/`](src/vibemix/midi/controllers/). Anything else uses the generic positional fallback — see [docs/midi-mapping.md](docs/midi-mapping.md) to calibrate or contribute a mapping.
+Out-of-the-box mappings for 10 controllers, sourced verbatim from [`src/vibemix/midi/profiles/`](src/vibemix/midi/profiles/). Anything else uses the generic positional fallback — see [docs/midi-mapping.md](docs/midi-mapping.md) to calibrate or contribute a mapping.
 
 <table>
   <tr>
-    <td align="center"><img src="docs/assets/controllers/ddj-200.svg" alt="Pioneer DDJ-200" width="180" /><br/><sub><b>Pioneer DDJ-200</b></sub></td>
-    <td align="center"><img src="docs/assets/controllers/ddj-400.svg" alt="Pioneer DDJ-400" width="180" /><br/><sub><b>Pioneer DDJ-400</b></sub></td>
-    <td align="center"><img src="docs/assets/controllers/ddj-flx4.svg" alt="Pioneer DDJ-FLX4" width="180" /><br/><sub><b>Pioneer DDJ-FLX4</b></sub></td>
-    <td align="center"><img src="docs/assets/controllers/ddj-rev1.svg" alt="Pioneer DDJ-REV1" width="180" /><br/><sub><b>Pioneer DDJ-REV1</b></sub></td>
-    <td align="center"><img src="docs/assets/controllers/kontrol-s2.svg" alt="Native Instruments Traktor Kontrol S2" width="180" /><br/><sub><b>NI Traktor Kontrol S2</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/pioneer-ddj-flx4.svg" alt="Pioneer DDJ-FLX4" width="180" /><br/><sub><b>Pioneer DDJ-FLX4</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/pioneer-ddj-flx6.svg" alt="Pioneer DDJ-FLX6" width="180" /><br/><sub><b>Pioneer DDJ-FLX6</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/pioneer-ddj-flx10.svg" alt="Pioneer DDJ-FLX10" width="180" /><br/><sub><b>Pioneer DDJ-FLX10</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/pioneer-ddj-400.svg" alt="Pioneer DDJ-400" width="180" /><br/><sub><b>Pioneer DDJ-400</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/pioneer-ddj-1000.svg" alt="Pioneer DDJ-1000" width="180" /><br/><sub><b>Pioneer DDJ-1000</b></sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/assets/controllers/kontrol-s4.svg" alt="Native Instruments Traktor Kontrol S4" width="180" /><br/><sub><b>NI Traktor Kontrol S4</b></sub></td>
-    <td align="center"><img src="docs/assets/controllers/mc-6000.svg" alt="Denon DJ MC6000" width="180" /><br/><sub><b>Denon DJ MC6000</b></sub></td>
-    <td align="center"><img src="docs/assets/controllers/mc-7000.svg" alt="Denon DJ MC7000" width="180" /><br/><sub><b>Denon DJ MC7000</b></sub></td>
-    <td align="center"><img src="docs/assets/controllers/mixtrack-platinum-fx.svg" alt="Numark Mixtrack Platinum FX" width="180" /><br/><sub><b>Numark Mixtrack Platinum FX</b></sub></td>
-    <td align="center"><img src="docs/assets/controllers/mixtrack-pro-fx.svg" alt="Numark Mixtrack Pro FX" width="180" /><br/><sub><b>Numark Mixtrack Pro FX</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/pioneer-ddj-sx3.svg" alt="Pioneer DDJ-SX3" width="180" /><br/><sub><b>Pioneer DDJ-SX3</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/pioneer-xdj-rx3.svg" alt="Pioneer XDJ-RX3" width="180" /><br/><sub><b>Pioneer XDJ-RX3</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/numark-party-mix-live.svg" alt="Numark Party Mix Live" width="180" /><br/><sub><b>Numark Party Mix Live</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/hercules-inpulse-300.svg" alt="Hercules DJControl Inpulse 300" width="180" /><br/><sub><b>Hercules Inpulse 300</b></sub></td>
+    <td align="center"><img src="docs/assets/controllers/hercules-inpulse-500.svg" alt="Hercules DJControl Inpulse 500" width="180" /><br/><sub><b>Hercules Inpulse 500</b></sub></td>
   </tr>
 </table>
 
 Calibrate any other controller — see [docs/midi-mapping.md](docs/midi-mapping.md).
 
-<!-- Controller logos are placeholder wordmarks per KAAN-ACTION-LEGAL.md §LAUNCH-04 — real trademark-compliant logos land via Kaan-discharge before public launch. The canonical 10 controller set is locked against `src/vibemix/midi/controllers/*.json`; any drift between this grid and that JSON profile set fails `scripts/launch/check_readme_grids_a11y.py`. -->
+<!-- Controller logos are placeholder wordmarks per KAAN-ACTION-LEGAL.md §LAUNCH-04 — real trademark-compliant logos land via Kaan-discharge before public launch. The canonical 10 controller set is locked against `src/vibemix/midi/profiles/*.json`; any drift between this grid and that JSON profile set fails `scripts/launch/check_readme_grids_a11y.py`. See `docs/contributing/midi-catalog.md` for the Phase 68 catalog-reconciliation note.
+
+Canonical profile IDs (one per cell, mirrors `src/vibemix/midi/profiles/*.json`):
+  pioneer_ddj_flx4 · pioneer_ddj_flx6 · pioneer_ddj_flx10 · pioneer_ddj_400 · pioneer_ddj_1000 ·
+  pioneer_ddj_sx3 · pioneer_xdj_rx3 · numark_party_mix_live · hercules_inpulse_300 · hercules_inpulse_500
+-->
 
 
 ### Don't see your controller?

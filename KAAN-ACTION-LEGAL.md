@@ -1667,7 +1667,7 @@ Sign-off by (Kaan):                _____________________
 
 **REQ-ID:** LAUNCH-04 (Phase 44-02)
 **Owner:** Kaan
-**Status:** ☐ pre-discharge (Plan 44-02 shipped 10 wordmark SVG placeholders + a11y gate + canonical-10 reconciliation against `src/vibemix/midi/controllers/*.json`)  ☐ 10 real controller product shots sourced (vendor press kits)  ☐ 10 files dropped into `docs/assets/controllers/`  ☐ `<img src>` references in README confirmed  ☐ a11y gate stays green
+**Status:** ☐ pre-discharge (Plan 44-02 shipped 10 wordmark SVG placeholders + a11y gate + canonical-10 reconciliation; Phase 68 Plan 68P01 collapsed the duplicate `controllers/` ↔ `profiles/` catalogs — source of truth is now `src/vibemix/midi/profiles/*.json` with the 10 IDs FLX4/FLX6/FLX10/400/1000/SX3/XDJ-RX3/Party-Mix-Live/Inpulse-300/Inpulse-500)  ☐ 10 real controller product shots sourced (vendor press kits)  ☐ 10 files dropped into `docs/assets/controllers/`  ☐ `<img src>` references in README confirmed  ☐ a11y gate stays green
 **Effort:** ~30 minutes once vendor press-kit access lined up (download + crop + optimize)
 **Blocking for:** Public launch polish — same asset-swap pattern as §LAUNCH-03; placeholders are functional but real product photography raises "this works with my controller" credibility.
 
@@ -1675,36 +1675,39 @@ Sign-off by (Kaan):                _____________________
 
 Controller product photography sourcing is identical to the §LAUNCH-03
 problem at higher volume (10 vs 6), and requires vendor-press-kit
-account access (Pioneer/AlphaTheta DJ portal, Native Instruments brand
-portal, Denon DJ press kit, Numark press kit) plus the same per-vendor
-trademark-attribution judgement. The 44-02 legacy-table reconciliation
-already closed the harder problem (drift between README controllers
-list and `src/vibemix/midi/controllers/*.json`); this discharge is
-purely the visual polish layer.
+account access (Pioneer/AlphaTheta DJ portal, Hercules brand portal,
+Numark press kit) plus the same per-vendor trademark-attribution
+judgement. The 44-02 legacy-table reconciliation closed the first
+drift (between README controllers list and the JSON profile set);
+Phase 68 Plan 68P01 closed the second drift (duplicate `controllers/`
+↔ `profiles/` catalogs collapsed to `profiles/` only — see
+`docs/contributing/midi-catalog.md`). This discharge is purely the
+visual polish layer over the now-canonical 10.
 
 Note: prior to Plan 44-02 the README's "Supported controllers" table
 referenced PNGs at `docs/assets/controllers/pioneer_ddj_*.png` for
 controllers that were never mapped (FLX6/FLX10/1000/SX3/XDJ-RX3, etc.)
 — those PNGs never existed (only `.gitkeep` was ever committed). Plan
-44-02 closed the drift by replacing the legacy table with the canonical
-10 controllers from the JSON profile set, each with a placeholder SVG
-under the canonical slug filename. So this discharge has a clean
-ground state to swap against.
+44-02 closed the first drift by replacing the legacy table with a
+placeholder SVG per cell. Phase 68 Plan 68P01 closed the second drift
+by deleting the orphan `controllers/` catalog and rotating the 10 SVG
+placeholders to match the canonical `profiles/` slug set. So this
+discharge has a clean ground state to swap against.
 
 ### Files involved
 
 - **Placeholders (10, to be replaced):**
-  - `docs/assets/controllers/ddj-200.svg`
-  - `docs/assets/controllers/ddj-400.svg`
-  - `docs/assets/controllers/ddj-flx4.svg`
-  - `docs/assets/controllers/ddj-rev1.svg`
-  - `docs/assets/controllers/kontrol-s2.svg`
-  - `docs/assets/controllers/kontrol-s4.svg`
-  - `docs/assets/controllers/mc-6000.svg`
-  - `docs/assets/controllers/mc-7000.svg`
-  - `docs/assets/controllers/mixtrack-platinum-fx.svg`
-  - `docs/assets/controllers/mixtrack-pro-fx.svg`
-- **Source of truth (do NOT edit during asset swap):** `src/vibemix/midi/controllers/*.json` — the 10 canonical profiles. Adding / removing a controller here requires a planner decision + README grid update + new placeholder/asset, NOT a "while I'm here" tweak during this discharge.
+  - `docs/assets/controllers/pioneer-ddj-flx4.svg`
+  - `docs/assets/controllers/pioneer-ddj-flx6.svg`
+  - `docs/assets/controllers/pioneer-ddj-flx10.svg`
+  - `docs/assets/controllers/pioneer-ddj-400.svg`
+  - `docs/assets/controllers/pioneer-ddj-1000.svg`
+  - `docs/assets/controllers/pioneer-ddj-sx3.svg`
+  - `docs/assets/controllers/pioneer-xdj-rx3.svg`
+  - `docs/assets/controllers/numark-party-mix-live.svg`
+  - `docs/assets/controllers/hercules-inpulse-300.svg`
+  - `docs/assets/controllers/hercules-inpulse-500.svg`
+- **Source of truth (do NOT edit during asset swap):** `src/vibemix/midi/profiles/*.json` — the 10 canonical profiles (reconciled from the legacy `controllers/` dir in Phase 68 Plan 68P01). Adding / removing a controller here requires a planner decision + README grid update + new placeholder/asset, NOT a "while I'm here" tweak during this discharge.
 - **README reference (no edit needed if filenames preserved):** `README.md` "## Supported controllers" section.
 - **CI gate (stays in place):** `scripts/launch/check_readme_grids_a11y.py` + `tests/launch/test_readme_grids_a11y.py` (the controllers-grid half of the same gate that enforces §LAUNCH-03).
 
@@ -1712,10 +1715,9 @@ ground state to swap against.
 
 ```bash
 # 1. Source each product shot from the vendor's press kit:
-#    - Pioneer DDJ-200 / DDJ-400 / DDJ-FLX4 / DDJ-REV1 → Pioneer/AlphaTheta DJ press portal
-#    - NI Traktor Kontrol S2 / S4                       → Native Instruments brand portal
-#    - Denon DJ MC6000 / MC7000                         → Denon DJ press kit
-#    - Numark Mixtrack Platinum FX / Pro FX             → Numark press kit
+#    - Pioneer DDJ-FLX4 / FLX6 / FLX10 / 400 / 1000 / SX3 / XDJ-RX3 → Pioneer/AlphaTheta DJ press portal
+#    - Numark Party Mix Live                                          → Numark press kit
+#    - Hercules DJControl Inpulse 300 / 500                           → Hercules brand portal
 
 # 2. Crop to a consistent aspect ratio (top-down product shot preferred for grid uniformity);
 #    optimize to PNG <=80KB at 360x180 source (200px display width is README-render-size).
@@ -1724,9 +1726,9 @@ ground state to swap against.
 # 3. Drop each file at the same slug path. SVG OR PNG both legal —
 #    if swapping to PNG, also delete the .svg placeholder + update the
 #    README <img src> extension (one Edit per cell, 10 cells total):
-#      docs/assets/controllers/ddj-200.png       (replaces ddj-200.svg)
-#      docs/assets/controllers/ddj-400.png
-#      ... (ten total)
+#      docs/assets/controllers/pioneer-ddj-flx4.png   (replaces pioneer-ddj-flx4.svg)
+#      docs/assets/controllers/pioneer-ddj-flx6.png
+#      ... (ten total — see Files-involved list above for canonical slugs)
 
 # 4. Re-run the a11y gate:
 uv run pytest tests/launch/test_readme_grids_a11y.py -v
@@ -1741,7 +1743,7 @@ git commit -m "assets(launch): swap controller placeholders for real product pho
 
 ```bash
 # Ten files still present under the canonical slug paths:
-for slug in ddj-200 ddj-400 ddj-flx4 ddj-rev1 kontrol-s2 kontrol-s4 mc-6000 mc-7000 mixtrack-platinum-fx mixtrack-pro-fx; do
+for slug in pioneer-ddj-flx4 pioneer-ddj-flx6 pioneer-ddj-flx10 pioneer-ddj-400 pioneer-ddj-1000 pioneer-ddj-sx3 pioneer-xdj-rx3 numark-party-mix-live hercules-inpulse-300 hercules-inpulse-500; do
     ls docs/assets/controllers/${slug}.* 2>/dev/null | head -1
 done | wc -l
 # → expected: 10
@@ -1751,7 +1753,7 @@ grep -E 'src="docs/assets/controllers/' README.md | wc -l
 # → expected: 10
 
 # Canonical 10 still matches src-of-truth:
-ls src/vibemix/midi/controllers/*.json | wc -l
+ls src/vibemix/midi/profiles/*.json | wc -l
 # → expected: 10  (same count as README grid)
 
 # a11y gate still green:

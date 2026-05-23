@@ -16,8 +16,8 @@ sound forever:
    cells (rekordbox / Serato / Traktor / djay Pro / VirtualDJ / Mixxx —
    CONTEXT §LAUNCH-03 locked set); the controller grid has exactly 10
    cells (the canonical 10 controllers from
-   ``src/vibemix/midi/controllers/*.json`` — CONTEXT §LAUNCH-04 locked
-   set).
+   ``src/vibemix/midi/profiles/*.json`` — CONTEXT §LAUNCH-04 locked
+   set; reconciled from the legacy ``controllers/`` dir in v7.0 P68).
 
 3. **AI-slop blocklist gate** — alt-text must contain none of the
    tokens pinned in :data:`_AI_SLOP_BLOCKLIST` (copied verbatim from
@@ -59,9 +59,11 @@ CONTROLLERS_HEADING_FRAGMENT: str = "supported controllers"
 # ---------------------------------------------------------------------------
 # Locked cell counts — CONTEXT §LAUNCH-03 + §LAUNCH-04. The DJ-software list
 # is the 6 mainstream apps Bravoh's first OSS launch targets; the controller
-# list is the canonical 10 in src/vibemix/midi/controllers/*.json. Changing
-# either set requires a planner decision (new requirement or scope change),
-# not a "while I'm here" tweak.
+# list is the canonical 10 in src/vibemix/midi/profiles/*.json (reconciled
+# from the legacy ``controllers/`` directory in v7.0 P68 — see
+# docs/contributing/midi-catalog.md). Changing either set requires a
+# planner decision (new requirement or scope change), not a "while I'm
+# here" tweak.
 # ---------------------------------------------------------------------------
 DJ_SOFTWARE_CELL_COUNT: int = 6
 CONTROLLERS_CELL_COUNT: int = 10

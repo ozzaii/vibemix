@@ -31,34 +31,38 @@ Write down which control number corresponds to which physical control (low EQ le
 
 ## JSON schema
 
-A controller profile looks like this — match the shape of any of the existing `src/vibemix/midi/profiles/*.json` files:
+Profile JSONs validate against `src/vibemix/midi/profile.py::_parse_profile` (hand-rolled validator; no `jsonschema` in the live decode path — consistent with the project-wide ban on pydantic). A controller profile looks like this — match the shape of any of the existing `src/vibemix/midi/profiles/*.json` files (`pioneer_ddj_flx4.json` is the canonical reference):
 
 ```json
 {
-  "name": "Your Vendor Your Model",
-  "slug": "your_vendor_your_model",
-  "port_name_substr": "Your Controller MIDI Port",
-  "deck_a": {
-    "eq_low": {"type": "cc", "control": 38, "channel": 0},
-    "eq_mid": {"type": "cc", "control": 39, "channel": 0},
-    "eq_high": {"type": "cc", "control": 40, "channel": 0},
-    "fader": {"type": "cc", "control": 41, "channel": 0}
+  "id": "pioneer_ddj_flx4",
+  "display_name": "Pioneer DDJ-FLX4",
+  "port_name_hints": ["DDJ-FLX4", "FLX4"],
+  "decks": ["A", "B"],
+  "controls": {
+    "vol_a":    {"kind": "cc", "channel": 0, "cc": 19, "axis": "unipolar", "deck": "A",  "field": "vol"},
+    "filter_a": {"kind": "cc", "channel": 6, "cc": 23, "axis": "bipolar",  "deck": "A",  "field": "filter"},
+    "xfader":   {"kind": "cc", "channel": 6, "cc": 31, "axis": "bipolar",  "deck": null, "field": "xfader"}
   },
-  "deck_b": { /* same shape */ },
-  "global": {
-    "crossfader": {"type": "cc", "control": 99, "channel": 0}
-  }
+  "buttons": {
+    "play_a": {"kind": "play", "channel": 0, "note": 11, "deck": "A"},
+    "sync_a": {"kind": "sync", "channel": 0, "note": 96, "deck": "A"}
+  },
+  "notes": "Optional human description — e.g. 'sourced from controller hardware sniff 2026-04-12'."
 }
 ```
 
-Fields:
+Fields (validated by `_parse_profile`):
 
-- `name` — display name, what the calibration wizard shows.
-- `slug` — kebab-case file basename.
-- `port_name_substr` — substring matched against the macOS / Windows MIDI port name for auto-detection.
-- `deck_a` / `deck_b` — per-deck control map. The shape is locked by `src/vibemix/midi/profiles/_schema.py` (run `pytest tests/midi/` to confirm).
-- `global` — controls not bound to a deck (crossfader, master gain).
-- For pads, hot cues, loop tools etc., the curated mappings include them as separate keys. Mirror what the most similar curated controller does.
+- `id` — snake_case profile ID; doubles as the JSON filename stem (e.g. `pioneer_ddj_flx4.json`).
+- `display_name` — what the calibration wizard + README grid show.
+- `port_name_hints` — **non-empty list** of substrings matched against `mido.get_input_names()` output for auto-detection (FLX4 reports as `"DDJ-FLX4"` on macOS and `"FLX4"` on Windows — list both).
+- `decks` — list of deck IDs the controller exposes (typically `["A", "B"]`; some four-deck units use `["A", "B", "C", "D"]`).
+- `controls` — continuous-value bindings (faders, knobs, jog wheels, EQs, filters, crossfader). Each value carries `kind: "cc"` (today the only supported `kind`), `channel` (0-15), `cc` (CC number 0-127), `axis` (`unipolar` / `bipolar` — affects how the magnitude is normalized), `deck` (deck ID from `decks` or `null` for global controls), and `field` (semantic field name — `vol` / `eq_low` / `eq_mid` / `eq_hi` / `tempo` / `filter` / `xfader` etc.).
+- `buttons` — note-message bindings (play, cue, sync, hot cues, loop tools, jog touch). Each value carries `kind` (the semantic event — `play` / `cue` / `sync` / `jog_touch` / `loop_in` / `loop_out`), `channel`, `note` (note number 0-127), and `deck`.
+- `notes` — optional one-line string surfaced in diagnostics + the contributor PR review.
+
+To extract real values from your controller, follow the `mido` echo recipe in the "Extracting CC and note IDs" section above. Once you have the (channel, CC) and (channel, note) tuples for every physical control, fill them into the template and run `uv run pytest tests/midi/ -q` to validate.
 
 ## Submitting
 
