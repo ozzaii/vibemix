@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: The Memory Turn
-status: milestone_complete
-last_updated: 2026-05-22T14:12:19.454Z
-last_activity: 2026-05-22 -- Phase 66 planning complete
+status: Awaiting next milestone
+last_updated: "2026-05-23T06:46:50.967Z"
+last_activity: 2026-05-23 — Milestone v6.0 completed and archived
 progress:
   total_phases: 12
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 38
-  completed_plans: 54
-  percent: 92
-stopped_at: Milestone complete (Phase 66 was final phase)
+  completed_plans: 38
+  percent: 100
 ---
 
 # vibemix — State
@@ -46,10 +45,10 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 
 ## Current Position
 
-Phase: 66
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-05-22
+Phase: Milestone v6.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-23 — Milestone v6.0 completed and archived
 
 ## v6.0 Phase Map
 
@@ -190,4 +189,31 @@ v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numberi
 
 ## Deferred Items
 
-(v6.0: none yet — milestone just roadmapped. v3.0 / v3.1 / v4.0 / v5.0 external-clock + Kaan-action carveouts unchanged — see PROJECT.md Active section + KAAN-ACTION-LEGAL.md §SHIP / §SHIP-V4 + v5.0 KAAN-ACTION live-confirm items.)
+Items acknowledged and deferred at v6.0 milestone close on 2026-05-23 (all intentional KAAN-ACTION carry-forwards per `gsd-autonomous fully` directive — see PROJECT.md Active section + KAAN-ACTION-LEGAL.md §SHIP / §SHIP-V4 / §RECALL-EAR + v5.0 KAAN-ACTION live-confirm items):
+
+| Category | Phase | Status | Note |
+|----------|-------|--------|------|
+| verification | 51 | human_needed | v4.0 SHIP (external signature clock) |
+| verification | 53 | human_needed | v4.0 SHIP (external signature clock) |
+| verification | 54 | human_needed | v4.0 SHIP (external signature clock) |
+| verification | 55 | human_needed | v4.0 SHIP (external signature clock) |
+| verification | 56 | human_needed | v4.0 SHIP (external signature clock) |
+| verification | 57 | human_needed | v4.0 SHIP (external signature clock) |
+| verification | 58 | human_needed | v4.0 SHIP (external signature clock) |
+| verification | 59 | human_needed | v5.0 SHIPPED — KAAN-ACTION live-confirm |
+| verification | 60 | human_needed | v5.0 SHIPPED — KAAN-ACTION live-confirm (harmonic veto flip) |
+| verification | 61 | human_needed | v5.0 SHIPPED — KAAN-ACTION live-confirm (coach live-ear) |
+| verification | 62 | human_needed | v5.0 SHIPPED — KAAN-ACTION live-confirm (pill live-ear) |
+| verification | 66 | human_needed | v6.0 §RECALL-EAR (felt-quality discharge) |
+| uat | 54 | partial (2 open) | v4.0 SHIP HUMAN-UAT |
+| uat | 55 | partial (2 open) | v4.0 SHIP HUMAN-UAT |
+| uat | 56 | partial (4 open) | v4.0 SHIP HUMAN-UAT |
+| uat | 57 | partial (5 open) | v4.0 SHIP HUMAN-UAT |
+| uat | 58 | partial (4 open) | v4.0 SHIP HUMAN-UAT |
+| uat | 66 | partial (4 open) | v6.0 §RECALL-EAR HUMAN-UAT |
+
+**Total deferred at v6.0 close: 18 items** (12 verification gaps + 6 UAT gaps). None block v6.0; all documented KAAN-ACTION carry-forwards riding the external signature clock OR Kaan's ear-discharge pass.
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

@@ -1,5 +1,28 @@
 # vibemix — Milestones
 
+## v6.0 The Memory Turn (Shipped: 2026-05-23 — tech_debt accepted)
+
+**Phases completed:** 4 phases (63–66), 12 plans, ~19 tasks
+**Audit:** 14/14 requirements satisfied · 6/6 integration seams WIRED · 53/53 must-haves verified · 247/247 v6.0 surface tests GREEN · 4 cardinal invariants HOLD · 3 anti-feature gates GREEN · zero new dependencies · zero new IPC ports
+**Status:** Engineering-green; `VIBEMIX_RECALL_ENABLED=0` default until §RECALL-EAR Kaan-ear pass
+
+**Delivered:** vibemix shifts from a *reactive* co-host to a *forward-leaning* **copilot**. A local per-install `memory.db` + ~50-line `MemoryStore` wrapper land entirely on the shipped `src/vibemix/library/` primitives (zero net-new deps). An off-hot-path post-session ingest job (+ boot sweep) turns each session's `events.jsonl`+evidence+`ai_text` into deterministic TEXT "reaction moment" records — no audio, no LLM-extraction (CI-guarded). The coach prompt grounds in top-k past moments via a new existence-only `recall` evidence source (zero new linter code, mirror of P59 `key:`) + a PAST-tense-fenced gated block in `evidence_line` (cold/empty-memory golden byte-identical). A fabricated `[recall:<id>]` strips the whole turn. Two visible copilot moves (transition-shape callback + vocabulary callback) bottom out in real registered past moments — linter-grounded, cited, warm, non-nagging. The four cardinal invariants (single-writer / citation-grounding / trust-the-audio / one-socket) hold by reuse.
+
+**Key accomplishments:**
+
+- **Phase 63 — Memory Store** (STORE-01..04): MemoryStore storage spine with `SqliteVecMemoryStore` (vec0 primary) + `NumpyStore` fallback, Mac/Win bit-identical `cosine_topk` parity, raw-in/raw-out records, model resolved via `model_router.resolve("embedding")` on FLEX. Path-traversal-defended atomic `delete_session` cascade + boot `reconcile_orphans` + `run_memory_retention_sweep` (oldest-session-first whole-session eviction). All 19 `tests/memory/` GREEN; zero new deps.
+- **Phase 64 — Session Ingest** (INGEST-01..03): `ingest.py` ships `build_coach_line_signature` (deterministic, model-free) + `ingest_session` (one `coach_line` per emitted `ai_text`; silenced citation strips skipped; signature-keyed embed-cache idempotency) + `run_ingest_sweep` (boot path-traversal-defended). Wired into `session_loop` at boot + close via `run_in_executor`. Static gate: ingest never imports the coach loop.
+- **Phase 65 — Memory Retrieval Seam (ANTI-SLOP RELEASE GATE)** (RECALL-01..04): new existence-only `recall` source added to `EVIDENCE_SOURCES` + `_SOURCE_ALT` + `CITATION_GRAMMAR_BLOCK` (3 schema-mirror sites, lockstep) with zero new linter code. `MemoryRecall` service (event-gated, 0.7-cosine-floored, current-session-excluded). Gated PAST-tense `recall[…]` block in `evidence_line` (byte-identical when cold). Agent pre-dispatches off-loop with hard deadline; survivors registered BEFORE per-turn snapshot. Fabricated `[recall:<id>]` strips the whole turn — pinned by a static gate.
+- **Phase 66 — Visible Copilot Move** (COPILOT-01..03): transition-shape callback + vocabulary/register callback templates in `coach.py::recall_fragment_for_event`. Recall chip rides the existing `cohost-reaction` IPC envelope (no new socket). 120s cooldown discipline with arm-on-emit at both bus + bus-less paths. Static anti-feature gate (`tests/repo/test_no_recall_antifeatures.py`) catches 20 forbidden phrases × coach.py + matrix.py. Engineering ships behind `VIBEMIX_RECALL_ENABLED=0`; Kaan flips after §RECALL-EAR ear-pass.
+
+**Known deferred items at close: 18** (12 verification gaps + 6 UAT gaps — all intentional KAAN-ACTION carry-forwards; see STATE.md Deferred Items + KAAN-ACTION-LEGAL.md §SHIP-V4 / §RECALL-EAR). Of those, 11 are unchanged v4.0+v5.0 external-clock / live-confirm items; 6 are v6.0 P66 §RECALL-EAR felt-quality discharge (transition feel, voice/register match, FELT cooldown rhythm, runtime Gemini drift on anti-features). One STORE-03 call-site is deferred to a future recordings-UI-delete phase (out of v6.0 scope).
+
+**Git tag deferred** (consistent with v4.0 + v5.0): the `v6.0` tag + branch merge are Kaan's call on his clock — `live-tuning-or-brain` is unmerged and v4.0 is also untagged/open.
+
+Full archive: `.planning/milestones/v6.0-ROADMAP.md` · Requirements: `.planning/milestones/v6.0-REQUIREMENTS.md` · Audit: `.planning/milestones/v6.0-MILESTONE-AUDIT.md`
+
+---
+
 ## v5.0 The Useful Cut (Shipped: 2026-05-21)
 
 **Phases completed:** 12 phases, 42 plans, 67 tasks
