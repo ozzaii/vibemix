@@ -3832,6 +3832,58 @@ gh run view --log <run-id>  # spot-check default + macos_audio jobs
 
 **Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · run-id: ____
 
+### §V7-LIVE-06 — Periodic 10× flake-hunt re-baseline
+
+**Artifact (cluster size = recurring discharge, not a fixed file count):**
+- `docs/flake-hunt.md` (added in v7.0 P67 Wave 4 / 67P05) — the protocol doc
+- the actual 10× consecutive `uv run pytest -q` hunt on Kaan's Mac
+
+**Why it can't ship green in CI alone:** The 10× hunt is wall-clock expensive
+(~36 minutes per pass on Kaan's Mac per the Wave 4 baseline) — running it on
+every push of the OS × marker matrix would burn ~7 hours of hosted-runner
+minutes per push (~21 jobs × 10 iterations × ~2 min/iter on average, plus
+cold-start overhead). That's not a defensible CI surface to fund out of the
+free-tier budget. The defensible cadence is **owner-clock periodic**: Kaan
+runs the hunt locally before each release tag, and any contributor who
+touches `tests/` or shared fixtures runs it before opening a PR per
+`docs/flake-hunt.md`. The single static gate at `tests/repo/test_no_silent_flakes.py`
+catches the OUTPUT of a hunt (silent `@pytest.mark.flaky` additions) but
+cannot run the hunt itself.
+
+**Cadence:** Re-baseline before each `v0.x.0` release tag (or quarterly,
+whichever comes first). The Wave 4 landing-day hunt is the v7.0 baseline;
+the next required re-baseline is the v0.1.0-rc1 cut (which gates OSS-04 in
+P69 + closes v4.0 SHIP alongside).
+
+**Fix path:** Kaan opens a terminal, runs the protocol command from
+`docs/flake-hunt.md` (the 10-iteration `for` loop with `set -euo pipefail`
+and `|| exit 1`). If all 10 iterations exit 0, sign off in the block below
+with the date + git SHA. If any iteration fails, follow the surgery-or-
+quarantine procedure in `docs/flake-hunt.md` — surgery first, quarantine
+(with `# issue: https://github.com/bravoh-ai/vibemix/issues/N` + matching
+`§V7-LIVE-FLAKE-N` sub-entry if `gh` is unavailable) only when surgery is
+non-trivial.
+
+```bash
+# The exact one-liner Kaan runs (also lives in docs/flake-hunt.md):
+set -euo pipefail; for i in $(seq 1 10); do echo "=== Run $i/10 ==="; \
+  uv run pytest -q --tb=line || exit 1; done && echo "10× GREEN — flake-hunt clean"
+```
+
+**Owner-clock:** Kaan — before each `v0.x.0` release tag, or quarterly.
+
+**Sign-off cadence:** This is a *recurring* discharge. Each pass appends a
+new line under the dated history block below; no entry is ever marked
+"permanently done" because the next release cycle re-opens it.
+
+**Sign-off history:**
+
+```
+v7.0 baseline   on: 2026-05-23  (date — Kaan, SHA ____, 10/10 GREEN per 67P05-SUMMARY.md)
+v0.1.0-rc1 cut  on: __________  (date — Kaan, SHA ____, N/10 GREEN)
+quarterly Q1    on: __________  (date — Kaan, SHA ____, N/10 GREEN)
+```
+
 ### Discharge tracking
 
 | Cluster | Tests | Owner-clock | Sign-off |
@@ -3841,7 +3893,8 @@ gh run view --log <run-id>  # spot-check default + macos_audio jobs
 | §V7-LIVE-03 | 1 | Kaan's Mac + plugged FLX4 | ☐ pending |
 | §V7-LIVE-04 | 2 | Kaan's Mac, manual one-shot | ☐ pending |
 | §V7-LIVE-05 | 1 workflow | Kaan — first push to GitHub | ☐ pending |
-| **TOTAL** | **11 tests + 1 workflow** | | |
+| §V7-LIVE-06 | recurring (10× hunt) | Kaan — pre-release or quarterly | ☑ v7.0 baseline 2026-05-23 |
+| **TOTAL** | **11 tests + 1 workflow + 1 recurring** | | |
 
 ### Verification (engineering-side, always-green)
 
@@ -3864,6 +3917,7 @@ V7-LIVE-02 Win 11 desktop cluster (5 tests)   on: _________   (date — Kaan, SH
 V7-LIVE-03 FLX4 USB cluster (1 test)          on: _________   (date — Kaan, SHA ____)
 V7-LIVE-04 Live full-stack cluster (2 tests)  on: _________   (date — Kaan, SHA ____)
 V7-LIVE-05 First-CI-green (full-test-matrix)  on: _________   (date — Kaan, SHA ____, run-id ____)
+V7-LIVE-06 10× flake-hunt re-baseline          on: see §V7-LIVE-06 Sign-off history (recurring)
 Sign-off by:                                     _________   (Kaan)
 ```
 
