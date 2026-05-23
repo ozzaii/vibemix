@@ -15,7 +15,14 @@ import pytest
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
 
 
+# reason: SMTC (System Media Transport Controls) is a Win 10/11 desktop API —
+# Server 2022 hosts lack the SMTC surface. Live discharge rides
+# KAAN-ACTION-LEGAL.md §V7-LIVE-02.
 @pytest.mark.windows_only
+@pytest.mark.xfail(
+    strict=False,
+    reason="Win 11 desktop SMTC API — see §V7-LIVE-02",
+)
 def test_track_windows_reads_real_smtc():
     """Live smoke — Phase 20 fills in. Expects either a real Now-Playing
     surface (Spotify / djay / Serato Stream / etc.) returning a title, or

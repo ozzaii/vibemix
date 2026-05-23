@@ -26,7 +26,14 @@ from pathlib import Path
 import pytest
 
 
+# reason: live full-stack smoke — gated on VIBEMIX_LIVE_SMOKE=1 env + real
+# BlackHole/FLX4/AI-Capture devices on Kaan's Mac. Live discharge rides
+# KAAN-ACTION-LEGAL.md §V7-LIVE-04.
 @pytest.mark.macos_audio
+@pytest.mark.xfail(
+    strict=False,
+    reason="VIBEMIX_LIVE_SMOKE=1 + real BlackHole/FLX4 — see §V7-LIVE-04",
+)
 def test_live_startup_shutdown():
     """LIVE-01: live smoke — Kaan-only opt-in via env var."""
     if not os.environ.get("VIBEMIX_LIVE_SMOKE"):

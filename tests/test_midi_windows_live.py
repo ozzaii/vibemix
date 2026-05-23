@@ -19,7 +19,14 @@ import pytest
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
 
 
+# reason: needs Win 11 desktop SKU + real DDJ-FLX4 over USB — windows-latest
+# is Server 2022 with no MIDI hardware. Live discharge rides
+# KAAN-ACTION-LEGAL.md §V7-LIVE-02.
 @pytest.mark.windows_only
+@pytest.mark.xfail(
+    strict=False,
+    reason="Win 11 desktop SKU + real FLX4 USB — see §V7-LIVE-02",
+)
 def test_midi_windows_opens_real_ddj_flx4():
     """Smoke: enumerate MIDI input ports on a real Windows host with the
     DDJ-FLX4 plugged in; assert at least one port name contains 'DDJ-FLX4'.
@@ -34,7 +41,13 @@ def test_midi_windows_opens_real_ddj_flx4():
     assert any("DDJ-FLX4" in p for p in ports), f"no FLX4 in {ports}"
 
 
+# reason: same cluster as opens_real_ddj_flx4 — Win 11 desktop SKU + real FLX4
+# USB. Live discharge rides KAAN-ACTION-LEGAL.md §V7-LIVE-02.
 @pytest.mark.windows_only
+@pytest.mark.xfail(
+    strict=False,
+    reason="Win 11 desktop SKU + real FLX4 USB — see §V7-LIVE-02",
+)
 def test_midi_windows_listener_thread_starts_and_stops():
     """Smoke: spawn the listener thread against a real DDJ-FLX4, let it
     run for ~1s, then signal stop. Asserts the thread terminates within

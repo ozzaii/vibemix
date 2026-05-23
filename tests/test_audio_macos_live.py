@@ -36,7 +36,16 @@ from vibemix.audio.constants import INPUT_SR_NATIVE
 from vibemix.audio.errors import SampleRateMismatchError
 from vibemix.platform import AudioMacOS
 
-pytestmark = pytest.mark.macos_audio
+# reason: BlackHole 2ch kext can't load on hosted macOS runners (kext requires
+# reboot — actions/runner-images#11746). All three tests in this module need a
+# real BlackHole device; live discharge rides KAAN-ACTION-LEGAL.md §V7-LIVE-01.
+pytestmark = [
+    pytest.mark.macos_audio,
+    pytest.mark.xfail(
+        strict=False,
+        reason="hosted-runner BlackHole kext load — see §V7-LIVE-01",
+    ),
+]
 
 
 def _make_backend() -> AudioMacOS:

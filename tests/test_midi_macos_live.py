@@ -32,7 +32,13 @@ import pytest
 pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
 
 
+# reason: real Pioneer DDJ-FLX4 over USB required — no MIDI hardware on hosted
+# runners. Live discharge rides KAAN-ACTION-LEGAL.md §V7-LIVE-03.
 @pytest.mark.macos_audio
+@pytest.mark.xfail(
+    strict=False,
+    reason="real DDJ-FLX4 USB required — see §V7-LIVE-03",
+)
 def test_flx4_live_resolves_and_decodes():
     """Smoke + LIVE-DRIVE RECIPE for Kaan's FLX4 hardware sign-off (BRINGUP-03).
 

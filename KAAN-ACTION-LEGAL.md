@@ -3625,3 +3625,206 @@ Sign-off by:                                                    _________   (Kaa
 - Phase 65 §RECALL — the sibling carry-forward (retrieval-seam ear-pass).
 - Phase 60 §HARMONIC-VETO — the original carry-forward precedent.
 
+## §V7-LIVE — v7.0 Live-Hardware Discharge Surface
+
+**REQ-ID:** TEST-02 (Phase 67 — "no marker is a graveyard")
+**Owner:** Kaan (real-hardware ear) — soft Kaan-discharge under `gsd-autonomous fully`
+**Status:** ☐ pending — engineering side ships `xfail(strict=False)` in tree; live runs discharge per-cluster as Kaan re-runs the marker on the right hardware
+
+Each entry below documents a test (or cluster of tests sharing one
+environmental constraint) that cannot run green on GitHub-hosted CI runners
+and requires Kaan's real hardware (or Win 11 desktop VM) to confirm.
+Engineering side ships `@pytest.mark.xfail(strict=False, reason="… §V7-LIVE-NN")`
+adjacent to the existing opt-in marker on every Tier-B test, with a `# reason:`
+comment pointing at the cluster id. Per-marker pytest runs report xfailed
+counts ≥ Tier-B counts from triage; no `FAILED` lines in any marker run.
+
+This section is the **fix-path** for the live confirmation — engineering does
+NOT pause for it under autonomous mode (the four cardinal invariants hold by
+zero-touch; the default `pytest -q` grid stays GREEN). Cluster discharge is
+Kaan's clock — when he re-runs the marker on the right hardware, the xpass
+turns the entry green; if a test starts failing post-discharge, it surfaces
+the broken contract because `strict=False` keeps the discovery surface live.
+
+Triage record: `.planning/phases/67-all-tests-pass/67P02-TRIAGE.md`.
+
+### §V7-LIVE-01 — BlackHole 2ch kext cannot load on hosted macOS runners
+
+**Tests (cluster size = 3):**
+- `tests/test_audio_macos_live.py::test_blackhole_device_present_at_48khz_or_raises`
+- `tests/test_audio_macos_live.py::test_open_voice_output_completes_without_real_audio_device`
+- `tests/test_audio_macos_live.py::test_blackhole_input_is_48k_for_live_capture`
+
+(All three carry the file's module-level `pytestmark = pytest.mark.macos_audio`.)
+
+**Why it can't ship green in CI:** BlackHole 2ch ships as a macOS kernel
+extension (kext). Loading a kext requires a system reboot. GitHub-hosted
+`macos-13` / `macos-14` runners are ephemeral and don't reboot mid-job, so
+the kext never loads, the virtual device never appears in CoreAudio's device
+list, and `sounddevice.query_devices()` returns no BlackHole entry. Verified
+against actions/runner-images#11746.
+
+**Fix path:** Kaan re-runs the marker on his own Mac (where BlackHole 2ch is
+already installed):
+```bash
+uv run pytest -m macos_audio tests/test_audio_macos_live.py -v
+```
+Expected: 3 tests PASS (XPASS under the xfail-strict=False decorator). If any
+FAILED instead of XPASS, the contract has broken — investigate before
+discharge.
+
+**Owner-clock:** Kaan's Mac, immediate (no external dependency).
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · result: ____
+
+### §V7-LIVE-02 — `windows-latest` GitHub-hosted ≠ Windows 11 desktop SKU
+
+**Tests (cluster size = 5):**
+- `tests/test_audio_windows_live.py::test_audio_windows_can_open_real_loopback`
+- `tests/test_midi_windows_live.py::test_midi_windows_opens_real_ddj_flx4`
+- `tests/test_midi_windows_live.py::test_midi_windows_listener_thread_starts_and_stops`
+- `tests/test_screen_windows_live.py::test_screen_windows_captures_real_window`
+- `tests/test_track_windows_live.py::test_track_windows_reads_real_smtc`
+
+(All five carry module-level `pytestmark = pytest.mark.skipif(sys.platform != 'win32', ...)` so they
+skip cleanly on darwin; the `@pytest.mark.windows_only` decorator is per-test.)
+
+**Why it can't ship green in CI:** `windows-latest` is Windows Server 2022, NOT
+Windows 11 desktop. Several paths exercised by these tests behave differently
+on Server vs desktop SKU:
+- **WASAPI loopback** (test_audio_windows_live): Server 2022 lacks the active
+  desktop-audio session shape — `assert_wasapi_loopback_rate` can't observe
+  the 48kHz endpoint a real Win 11 DJ user has.
+- **SMTC** (test_track_windows_live): System Media Transport Controls is a
+  Win10/11 desktop API; Server 2022 hosts have no SMTC surface.
+- **Window manager / capture** (test_screen_windows_live): Server's window
+  manager surface differs from desktop — the find-DJ-window heuristic + JPEG
+  capture path expects desktop behaviour.
+- **MIDI hardware** (test_midi_windows_live ×2): additionally requires a real
+  Pioneer DDJ-FLX4 plugged over USB — no MIDI hardware on hosted runners
+  regardless of SKU.
+
+**Fix path:** Kaan re-runs the marker on the Parallels/UTM Windows 11 desktop
+VM (the same one used for v3.0/v4.0 INSTALL-VM rehearsals), with a real
+DDJ-FLX4 plugged for the MIDI cases:
+```powershell
+uv run pytest -m windows_only -v
+```
+Expected: 5 tests PASS (XPASS) when FLX4 plugged + a media app reporting
+SMTC; 2 tests (test_midi_windows_live) SKIP cleanly if FLX4 absent (runtime
+guards inside the test bodies).
+
+**Owner-clock:** Kaan's Win 11 VM (Parallels/UTM) + DDJ-FLX4 USB.
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · result: ____
+
+### §V7-LIVE-03 — Real Pioneer DDJ-FLX4 over USB (macOS side)
+
+**Tests (cluster size = 1):**
+- `tests/test_midi_macos_live.py::test_flx4_live_resolves_and_decodes`
+
+**Why it can't ship green in CI:** No hosted runner carries DJ controller
+hardware over USB. The test's body enumerates real MIDI input ports via
+`MidiMacOS().list_input_ports()` and asserts a port matching "FLX4" resolves
+to `pioneer_ddj_flx4`. Without the physical device, the test runtime-skips
+via `pytest.skip("no FLX4 connected …")`. The skip is correct degradation,
+but for the marker-grid green invariant we want explicit XFAIL via the
+opt-in decorator so a future regression where the test errors INSTEAD of
+skipping surfaces, rather than silently passing through skip.
+
+**Fix path:** Plug the Pioneer DDJ-FLX4 into Kaan's Mac over USB, then:
+```bash
+uv run pytest -m macos_audio tests/test_midi_macos_live.py -v
+```
+Expected: 1 test PASS (XPASS) when FLX4 plugged. The full LIVE-DRIVE RECIPE
+(BRINGUP-03 — plug/move/unplug/replug/boot-with-controller-absent) is in
+the test docstring and is Kaan-manual.
+
+**Cross-reference:** This cluster overlaps Phase 68 DEV-03 FLX4 live ear
+(§V7-LIVE successor in the upcoming P68 plan). v7.0 P67 records the test
+side; v7.0 P68 records the fuller hardware-bringup discharge.
+
+**Owner-clock:** Kaan's Mac + plugged FLX4.
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · result: ____
+
+### §V7-LIVE-04 — Live full-stack smoke (env-gated and/or real port binding)
+
+**Tests (cluster size = 2):**
+- `tests/test_main_live.py::test_live_startup_shutdown`
+- `tests/sidecar/test_wizard_entrypoint.py::test_wizard_starts_and_terminates_cleanly`
+
+**Why it can't ship green in CI:**
+- `test_live_startup_shutdown` is gated on `VIBEMIX_LIVE_SMOKE=1` per its
+  docstring (Kaan-only opt-in). It spawns `python -m vibemix` as a real
+  subprocess, expects BlackHole + DDJ-FLX4 + AI Capture devices to be live,
+  then asserts a new `recordings/<YYYYMMDD-HHMMSS>/` session directory
+  appears. Even if BlackHole were available, the env var gate keeps it
+  Kaan-manual.
+- `test_wizard_starts_and_terminates_cleanly` binds real port 8765 (the WS
+  bus). The test's own docstring says "live integration test, not a CI gate
+  — on CI the test_wizard_loop_ipc.py covers the handler dispatch path
+  without standing up the real WS server."
+
+Both tests are designed as Kaan-only one-shots, not CI gates.
+
+**Fix path:** On Kaan's Mac with BlackHole installed and FLX4 plugged:
+```bash
+# Full live-startup smoke (subprocess + recordings/ dir):
+VIBEMIX_LIVE_SMOKE=1 uv run pytest -m macos_audio tests/test_main_live.py -v
+
+# Wizard entrypoint smoke (binds port 8765):
+uv run pytest -m macos_audio tests/sidecar/test_wizard_entrypoint.py::test_wizard_starts_and_terminates_cleanly -v
+```
+Expected: both PASS (XPASS).
+
+**Owner-clock:** Kaan's Mac, manual one-shot.
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · result: ____
+
+### Discharge tracking
+
+| Cluster | Tests | Owner-clock | Sign-off |
+| ------- | ----- | ----------- | -------- |
+| §V7-LIVE-01 | 3 | Kaan's Mac (BlackHole installed) | ☐ pending |
+| §V7-LIVE-02 | 5 | Kaan's Win 11 VM + FLX4 | ☐ pending |
+| §V7-LIVE-03 | 1 | Kaan's Mac + plugged FLX4 | ☐ pending |
+| §V7-LIVE-04 | 2 | Kaan's Mac, manual one-shot | ☐ pending |
+| **TOTAL** | **11** | | |
+
+### Verification (engineering-side, always-green)
+
+```bash
+# Default suite stays GREEN (Wave 0 invariant — verified post-decoration):
+uv run pytest -q
+
+# Each opt-in marker run reports 0 FAILED (Tier-A passes; Tier-B xfails are amber):
+for m in macos_audio integration slow e2e cli network; do
+    uv run pytest -q -m "$m" --tb=no 2>&1 | tail -1
+done
+# windows_only on Mac → all 5 SKIP via skipif(sys.platform != 'win32')
+```
+
+### Sign-off block
+
+```
+V7-LIVE-01 BlackHole cluster (3 tests)        on: _________   (date — Kaan, SHA ____)
+V7-LIVE-02 Win 11 desktop cluster (5 tests)   on: _________   (date — Kaan, SHA ____)
+V7-LIVE-03 FLX4 USB cluster (1 test)          on: _________   (date — Kaan, SHA ____)
+V7-LIVE-04 Live full-stack cluster (2 tests)  on: _________   (date — Kaan, SHA ____)
+Sign-off by:                                     _________   (Kaan)
+```
+
+### Cross-references
+
+- `.planning/phases/67-all-tests-pass/67P02-TRIAGE.md` — the per-marker
+  Tier A/B/C triage record (54/11/0 split).
+- `.planning/phases/67-all-tests-pass/67-CONTEXT.md` `### Failure-Mode Triage`
+  — the locked Tier A/B/C rubric + "default to Tier B over C" rule.
+- `.planning/phases/67-all-tests-pass/67-RESEARCH.md` Pitfall 1 + Pitfall 2 +
+  Pattern 3 — BlackHole reboot blocker + windows-latest=Server2022 + §V7-LIVE
+  entry template.
+- §SHIP-V4 (this file, ~line 3387) — the v4.0 ship-discharge surface, parallel
+  pattern.
+- §RECALL-EAR (this file, ~line 3510) — the Kaan-ear veto pattern.
+

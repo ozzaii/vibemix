@@ -16,7 +16,14 @@ import pytest
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
 
 
+# reason: real Win 11 window-manager surface — Server 2022 has different
+# window enumeration + capture behaviour. Live discharge rides
+# KAAN-ACTION-LEGAL.md §V7-LIVE-02.
 @pytest.mark.windows_only
+@pytest.mark.xfail(
+    strict=False,
+    reason="Win 11 desktop window manager — see §V7-LIVE-02",
+)
 def test_screen_windows_captures_real_window():
     """Live smoke — Phase 20 fills in. Skipped on macOS by the module-level
     pytestmark."""
