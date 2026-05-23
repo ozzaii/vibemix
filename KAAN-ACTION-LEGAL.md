@@ -3782,6 +3782,56 @@ Expected: both PASS (XPASS).
 
 **Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · result: ____
 
+### §V7-LIVE-05 — First-CI-green confirmation for `full-test-matrix.yml`
+
+**Artifact (cluster size = 1 workflow):**
+- `.github/workflows/full-test-matrix.yml` (added in v7.0 P67 Wave 3 / 67P04)
+
+**Why it can't ship green in CI alone:** The workflow itself cannot
+"run" until the branch carrying it is pushed to GitHub and the next
+`push: branches: [main]` or `pull_request: branches: [main]` event
+fires. Until that first event lands, the README badge resolves to
+shields.io's "no status" gray state (Pitfall 5). The engineering side
+of this is done — the file exists locally, parses as valid YAML, has
+the OS × marker exclude grid, the workflow-prefixed concurrency group,
+SHA-pinned actions, and `fail-fast: false`. What's outstanding is the
+**first-green observation** on the actions tab.
+
+**Fix path:** When Kaan next pushes `live-tuning-or-brain` (or merges
+into `main`), the workflow fires on the hosted runners. Expected
+outcome:
+- All 21 jobs (8 markers × 3 OSes − 3 excludes = 21 jobs) start.
+- `default` markers on all 3 OSes report GREEN (the Wave 0 invariant —
+  `uv run pytest -q` is GREEN on Mac + Win + macOS).
+- `macos_audio` jobs report AMBER (xfails fire because BlackHole
+  can't load — §V7-LIVE-01).
+- `windows_only` job on `windows-latest` reports MIXED (some xfails
+  fire because Win Server 2022 ≠ Win 11 desktop — §V7-LIVE-02).
+- `integration` / `slow` / `e2e` / `cli` / `network` markers: each
+  reports per-Tier-A pass count + Tier-B xfails per §V7-LIVE-02/03/04.
+- `network` job will likely Tier-B xfail any live-net test under
+  fork-PR mode where `GEMINI_API_KEY` secret is unavailable.
+- README badge transitions from gray "no status" → green/amber.
+
+Once the first push lands and the actions tab confirms the matrix is
+running (every job exits 0 with xpassed/xfailed lines as expected),
+this cluster discharges. If any job exits red with a non-Tier-B
+failure, file the offending test under the appropriate §V7-LIVE-NN
+or fix it in a follow-up plan.
+
+```bash
+# After the first push to main lands, verify:
+gh run list --workflow=full-test-matrix.yml --limit 1
+gh run view --log <run-id>  # spot-check default + macos_audio jobs
+# Or just visit:
+#   https://github.com/bravoh-ai/vibemix/actions/workflows/full-test-matrix.yml
+# (URL transitions to ozzaii/vibemix until §SHIP-10 transfer fires.)
+```
+
+**Owner-clock:** Kaan — next push to GitHub.
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · run-id: ____
+
 ### Discharge tracking
 
 | Cluster | Tests | Owner-clock | Sign-off |
@@ -3790,7 +3840,8 @@ Expected: both PASS (XPASS).
 | §V7-LIVE-02 | 5 | Kaan's Win 11 VM + FLX4 | ☐ pending |
 | §V7-LIVE-03 | 1 | Kaan's Mac + plugged FLX4 | ☐ pending |
 | §V7-LIVE-04 | 2 | Kaan's Mac, manual one-shot | ☐ pending |
-| **TOTAL** | **11** | | |
+| §V7-LIVE-05 | 1 workflow | Kaan — first push to GitHub | ☐ pending |
+| **TOTAL** | **11 tests + 1 workflow** | | |
 
 ### Verification (engineering-side, always-green)
 
@@ -3812,6 +3863,7 @@ V7-LIVE-01 BlackHole cluster (3 tests)        on: _________   (date — Kaan, SH
 V7-LIVE-02 Win 11 desktop cluster (5 tests)   on: _________   (date — Kaan, SHA ____)
 V7-LIVE-03 FLX4 USB cluster (1 test)          on: _________   (date — Kaan, SHA ____)
 V7-LIVE-04 Live full-stack cluster (2 tests)  on: _________   (date — Kaan, SHA ____)
+V7-LIVE-05 First-CI-green (full-test-matrix)  on: _________   (date — Kaan, SHA ____, run-id ____)
 Sign-off by:                                     _________   (Kaan)
 ```
 
