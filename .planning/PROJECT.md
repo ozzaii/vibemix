@@ -10,25 +10,35 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v6.0 The Memory Turn
+## Current Milestone: awaiting next (v6.1 / v7.0 / TBD)
 
-**Goal:** Shift vibemix from a *reactive* AI co-host to a *forward-leaning* AI **copilot**. The mechanism is memory: every session feeds an embedding layer; coach prompts ground in past sessions, not just the current moment. Personalization is an emergent property of the retrieval seam — not a configured feature, not an LLM-extraction layer.
+**Last shipped:** v6.0 "The Memory Turn" — 2026-05-23 (status: `tech_debt` accepted; memory-grounded copilot via local sqlite-vec store + ~50-line `MemoryStore` wrapper + off-hot-path session-ingest + new existence-only `recall` evidence source + two visible copilot moves. Engineering green; ships behind `VIBEMIX_RECALL_ENABLED=0` until §RECALL-EAR Kaan-ear pass. `v6.0` git tag + branch merge deferred to Kaan — `live-tuning-or-brain` unmerged).
 
-**Target features (scope spine):**
-- **Ingest pipeline** — session artifacts (`events.jsonl`, voice/input audio, MIDI moves, track metadata) → typed embeddable records. Raw in, raw out — no LLM-extraction between session and embedding (extraction = confabulation surface = anti-slop violation).
-- **Storage** — `sqlite-vec` + a ~50-line wrapper, scoped per-install (retention + size budget TBD in research). Pure-Python, embedded, no server, green on one-click install.
-- **Retrieval seam** — the coach prompt is grounded with top-k past moments at reaction time (hybrid cosine + time-weight, TBD per research). The same grounding discipline as the existing registry — past moments become another grounding axis.
-- **Visible copilot moves (1–2)** — end-user-noticeable proofs retrieval is firing: the AI calls back a vocabulary/transition shape it has seen the DJ make, or cites a past moment in its reaction.
+**Status:** Awaiting next milestone definition. Use `/gsd:new-milestone` to start v6.1 / v7.0 — the questioning → research → requirements → roadmap cycle. Candidates surfaced from v6.0 deferred future requirements (`milestones/v6.0-REQUIREMENTS.md` §Future): multimodal moment-audio embedding (gated on text-retrieval proving insufficient on Kaan's real corpus), cross-session "arc" priors, memory-driven pre-set prep, ProDJ Link / live key-detection as primary sources.
 
-**Locked decisions (from `.planning/notes/v-next-memory-turn.md`):** Gemini Embedding 002 (`gemini-embedding-001`, natively multimodal); `sqlite-vec` + DIY wrapper; **no managed memory framework** (Mem0 / Letta / Zep / Cognee all rejected); **no LLM-extraction layer**. Acid test for any embedded artifact: *"does retrieving this close a hallucination class or unlock a copilot move?"* — if neither, don't embed it.
+**v4.0 status:** "SHIP" (Phases 51–58) is **engineering-complete (8/8)** but deliberately **NOT archived** — its public publish stays gated on the external signature clock (Apple Dev Agreement + SignPath OSS cert). v4.0's KAAN-ACTION discharge surface (`KAAN-ACTION-LEGAL.md §SHIP-V4`) is unchanged.
 
-**Open feasibility (de-risk in research):** which session artifacts ground best (the FIRST phase's research, not a pre-decided answer); the retrieval blend (cosine vs cosine+time-weight); retention/size budget per install; how `sqlite-vec` loads cleanly across the one-click Mac+Win install.
+(v5.0 "The Useful Cut" shipped 2026-05-22. v4.0 "SHIP" engineering-complete 2026-05-21, publish on signature clock. v3.1 shipped 2026-05-18. v3.0 "Clean OSS Ship" 2026-05-17. v2.1 "The Unified Cut" 2026-05-16. v2.0 2026-05-14. v0.1.0 2026-05-13. Full archives in `.planning/milestones/`.)
 
-**v4.0 status:** "SHIP" (Phases 51–58) is **engineering-complete (8/8)** but deliberately **NOT archived** — its public publish stays gated on the external signature clock (Apple Dev Agreement + SignPath OSS cert). v5.0 runs as the active milestone alongside it; v4.0's KAAN-ACTION discharge surface (`KAAN-ACTION-LEGAL.md §SHIP-V4`) is unchanged.
+<details>
+<summary>📦 v6.0 The Memory Turn (shipped 2026-05-23, status <code>tech_debt</code>) — archived narrative</summary>
 
-**Last shipped:** v5.0 "The Useful Cut" — 2026-05-22 (status: `tech_debt` accepted; deck-aware + actionable coach + floating pill. KAAN-ACTION live-confirm items ride forward: harmonic clash veto flip, vision-eval, coach/pill live-ear+felt passes, FLX4 live. `v5.0` git tag + branch merge deferred to Kaan — `live-tuning-or-brain` unmerged).
+4 phases (63–66) shipped engineering-green under `gsd-autonomous fully` mode. 12 plans, 14/14 v6.0 REQ-IDs satisfied, 6/6 cross-phase integration seams WIRED, 53/53 must-haves verified, 247/247 v6.0 surface tests GREEN. A **WIRING / REUSE milestone with ZERO net-new dependencies** — built entirely on the shipped `src/vibemix/library/` primitives (sqlite-vec, cosine_topk, embed-cache, grounding pattern, EVIDENCE_SOURCES schema).
 
-(v4.0 "SHIP" engineering-complete 2026-05-21, publish on signature clock. v3.1 shipped 2026-05-18. v3.0 "Clean OSS Ship" 2026-05-17. v2.1 "The Unified Cut" 2026-05-16. v2.0 2026-05-14. v0.1.0 2026-05-13. Full archives in `.planning/milestones/`.)
+**Highlights:**
+
+- **Memory Store (Phase 63)** — Local per-install `memory.db` (`SqliteVecMemoryStore` vec0 primary + `NumpyStore` fallback) + ~50-line `MemoryStore` wrapper with `add_record` / `query_topk`. Raw-in/raw-out records (never LLM-extracted "insight"). Mac/Win bit-identical `cosine_topk` parity (`pytest -m parity` GREEN; sqlite-vec loads on host). Path-traversal-defended atomic `delete_session` cascade + oldest-session-first whole-session retention sweep + boot `reconcile_orphans`. Model resolved via `model_router.resolve("embedding")` on FLEX cost lane (no hardcoded literal). All 19 `tests/memory/` GREEN.
+- **Session Ingest (Phase 64)** — Off-hot-path post-session batch + boot sweep via `run_in_executor`. ONE v1 moment kind: `coach_line` (emitted `ai_text` + preceding-event context + inline citation tokens) — the only artifact that closes a hallucination class AND unlocks a P66 copilot move. `moment` (bare structural event) CUT; `audio_moment` (multimodal) DEFERRED. CI-guarded: ingest path calls only `embed_content` (never any generative model — extraction structurally impossible). Idempotent re-ingest via signature-keyed embed cache + `memory_ingested` marker. Static gate: ingest never imports the coach loop.
+- **Memory Retrieval Seam (Phase 65) — ANTI-SLOP RELEASE GATE** — New existence-only `recall` evidence source added across 3 schema-mirror sites (`EVIDENCE_SOURCES`, `_SOURCE_ALT` regex, `CITATION_GRAMMAR_BLOCK`) with **zero new linter code** (à la P59 `key:`). `MemoryRecall` service (Grounding clone): event-gated, 0.7 cosine floor, current-session-excluded, single FLEX `embed_query` per track-aware event. Gated PAST-tense `recall[…]` block in `state/coach.py::evidence_line` — when memory is cold/empty/below-floor, prompt is **byte-identical** to v5.0 baseline. Anti-poisoning by construction: register-before-snapshot, unconditional per-turn rescope, fabricated `[recall:<unregistered>]` strips whole turn (pinned by headline RED test).
+- **Visible Copilot Move (Phase 66)** — Linter-grounded transition-shape callback + vocabulary/register callback templates in `coach.py::recall_fragment_for_event`. Recall chip rides existing `cohost-reaction` IPC envelope (no new socket — one-socket invariant verified). 120s cooldown discipline with arm-on-emit at both bus + bus-less paths. Static anti-feature gate (`tests/repo/test_no_recall_antifeatures.py`) catches 20 forbidden phrases × coach.py + matrix.py. Engineering ships behind `VIBEMIX_RECALL_ENABLED=0`; Kaan flips after §RECALL-EAR ear-pass.
+
+**Cardinal invariants verified** (4/4 hold by construction with named-test pinning): single-writer (memory never writes MusicState) · citation-grounding (every emitted `[recall:<id>]` resolves in CitationLinter) · trust-the-audio (live evidence renders before recall fence) · one-socket (zero new ws bindings).
+
+**Open at close (KAAN-ACTION, ride forward):** §RECALL-EAR felt-quality discharge (4 items: transition feel, voice/register match, FELT cooldown rhythm, runtime anti-feature drift). §LIVE-EMBED real-session FLEX-tier round-trip. Two doc-drifts where code is correct (RECALL-02 traceability row + KAAN-ACTION-LEGAL.md §RECALL-EAR bus-less arm description). STORE-03 recordings-UI delete-button call-site (out of v6.0 scope; future recordings-UI phase). All in `KAAN-ACTION-LEGAL.md §RECALL-EAR` + `66-HUMAN-UAT.md`.
+
+Full archive: `.planning/milestones/v6.0-ROADMAP.md` · Requirements: `.planning/milestones/v6.0-REQUIREMENTS.md` · Audit: `.planning/milestones/v6.0-MILESTONE-AUDIT.md`. Retrospective: `.planning/RETROSPECTIVE.md`.
+
+</details>
 
 <details>
 <summary>📦 v4.0 SHIP (engineering-complete 2026-05-21, publish on signature clock) — archived narrative</summary>
@@ -386,4 +396,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-21 — v5.0 "The Useful Cut" milestone started via `/gsd:new-milestone` under `gsd-autonomous fully`. Scope: full deck awareness (all loaded tracks → transition + harmonic-clash feedback), actionable-not-hype feedback persona, floating Super-Whisper-style pill as primary live surface (3D mascot → opt-in/secondary). v4.0 "SHIP" kept OPEN (engineering-complete 8/8, publish on signature clock — NOT archived); v5.0 runs as active milestone alongside it. Milestone research runs first to resolve the deck data-source question. External clock unchanged: Apple Dev Agreement (Francesco) + SignPath OSS cert gate the v4.0 publish.*
+*Last updated: 2026-05-23 — v6.0 "The Memory Turn" SHIPPED (tech_debt accepted) under `gsd-autonomous fully`. 4 phases (63–66) engineering-green: local sqlite-vec memory store + off-hot-path session ingest + new existence-only `recall` evidence source (anti-slop release gate, retrieval-poisoning-by-construction-impossible) + two visible copilot moves (transition-shape + vocabulary callbacks). 14/14 REQs satisfied, 6/6 integration seams WIRED, 247/247 v6.0 tests GREEN, zero net-new dependencies, zero new IPC ports. Awaiting next milestone (v6.1 / v7.0 / TBD) via `/gsd:new-milestone`. v4.0 "SHIP" still OPEN (publish on external signature clock — NOT archived); §RECALL-EAR rides forward to KAAN-ACTION-LEGAL.md.*
