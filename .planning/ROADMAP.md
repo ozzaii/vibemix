@@ -82,7 +82,7 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
   4. Running `pytest tests/integration/test_audio_backends.py -m integration -v` shows GREEN coverage of macOS BlackHole 2ch + 16ch + Windows WASAPI loopback + edge "no-loopback-driver" fallback against mocked CoreAudio + WASAPI in CI. Live capture on real BlackHole + real WASAPI routes to `KAAN-ACTION-LEGAL.md §V7-LIVE` (one entry per OS).
   5. `docs/contributing/add-a-controller.md` exists with: a bundled template profile JSON, the exact 4-step contract-test pattern, the `scripts/discover_midi_port.py` helper invocation, and a "submit a PR with these N files" checklist. Verified end-to-end by Kaan (or a trusted DJ) adding **one new profile** in < 30 min as a smoke — a `docs/contributing/add-a-controller-smoke.md` artifact records the new profile name + the wall-clock minutes. (Defensible default under autonomous mode: if no trusted DJ is available before plan-execute, Kaan does the smoke himself on a controller-of-opportunity; if neither is available, the smoke routes to `§V7-LIVE` and the rest of P68 ships.)
 **Plans**: 5 plans
-- [ ] 68P01-PLAN.md — Wave 0: atomic catalog reconciliation (delete `src/vibemix/midi/controllers/` + `map_loader.py` + `schema.json` + 2 orphan tests; rewrite README controller grid + a11y script + test_readme_shape + KAAN-ACTION §LAUNCH-04 + docs/midi-mapping.md + .planning/PROJECT.md; rotate 10 SVG placeholders; add `docs/contributing/midi-catalog.md` migration note) (DEV-02)
+- [x] 68P01-PLAN.md — Wave 0: atomic catalog reconciliation (delete `src/vibemix/midi/controllers/` + `map_loader.py` + `schema.json` + 2 orphan tests; rewrite README controller grid + a11y script + test_readme_shape + KAAN-ACTION §LAUNCH-04 + docs/midi-mapping.md + .planning/PROJECT.md; rotate 10 SVG placeholders; add `docs/contributing/midi-catalog.md` migration note) (DEV-02) — SHIPPED 2026-05-23 @ `52405a4` (one atomic commit; 36 files; default baseline 4158 → 4119 / 26 / 4 / 0; +Rule-3 deletion of vacuous `test_flx4_sync_disambig.py`)
 - [ ] 68P02-PLAN.md — Wave 1: 10-row parametrized contract test (`tests/midi/test_profile_contracts.py`) + 10-row synthetic-MIDI smoke (`tests/midi/test_profile_smokes.py`) — uses `load_profile()` not jsonschema (DEV-01)
 - [ ] 68P03-PLAN.md — Wave 2: 3-profile hot-plug matrix (`tests/integration/test_hotplug_matrix.py` — FLX4 + DDJ-400 + Inpulse-500) + 4-fixture audio backend matrix (`tests/integration/test_audio_backends.py` — BlackHole 2ch + 16ch + WASAPI loopback + no-loopback fallback) (DEV-03, DEV-04)
 - [ ] 68P04-PLAN.md — Wave 3: contributor recipe — `scripts/discover_midi_port.py` (≤30 lines) + `docs/contributing/_template.json` + `docs/contributing/add-a-controller.md` (≤200 lines, 4-step + PR checklist) (DEV-05)
@@ -124,7 +124,7 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 67. All Tests Pass | v7.0 | 5/5 | Complete   | 2026-05-23 |
-| 68. All Devices Ready | v7.0 | 0/5 | Planned (planning-complete 2026-05-23) | - |
+| 68. All Devices Ready | v7.0 | 1/5 | In progress (Wave 0 / 68P01 shipped 2026-05-23 — atomic catalog reconciliation; DEV-02 closed) | - |
 | 69. OSS Fully Integrated | v7.0 | 0/0 | Not started | - |
 | 70. GitHub Sexified, Generated, Tested | v7.0 | 0/0 | Not started | - |
 
