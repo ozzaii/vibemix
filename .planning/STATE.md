@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v6.0
-milestone_name: The Memory Turn
-status: Awaiting next milestone
-last_updated: "2026-05-23T06:46:50.967Z"
-last_activity: 2026-05-23 — Milestone v6.0 completed and archived
+milestone: v7.0
+milestone_name: Open House
+status: planning
+last_updated: "2026-05-23T07:26:11.351Z"
+last_activity: 2026-05-23
 progress:
-  total_phases: 12
-  completed_phases: 12
-  total_plans: 38
-  completed_plans: 38
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # vibemix — State
@@ -45,10 +45,10 @@ See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
 
 ## Current Position
 
-Phase: Milestone v6.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-23 — Milestone v6.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-23 — Milestone v7.0 started
 
 ## v6.0 Phase Map
 
