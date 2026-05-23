@@ -3879,7 +3879,7 @@ new line under the dated history block below; no entry is ever marked
 **Sign-off history:**
 
 ```
-v7.0 baseline   on: 2026-05-23  (date — Kaan, SHA ____, 10/10 GREEN per 67P05-SUMMARY.md)
+v7.0 baseline   on: 2026-05-23  (date — Kaan, SHA 23c4203, 10/10 GREEN per 67P05-SUMMARY.md; wall-clock 36m41s, 12:58→13:34 local)
 v0.1.0-rc1 cut  on: __________  (date — Kaan, SHA ____, N/10 GREEN)
 quarterly Q1    on: __________  (date — Kaan, SHA ____, N/10 GREEN)
 ```
@@ -3893,7 +3893,7 @@ quarterly Q1    on: __________  (date — Kaan, SHA ____, N/10 GREEN)
 | §V7-LIVE-03 | 1 | Kaan's Mac + plugged FLX4 | ☐ pending |
 | §V7-LIVE-04 | 2 | Kaan's Mac, manual one-shot | ☐ pending |
 | §V7-LIVE-05 | 1 workflow | Kaan — first push to GitHub | ☐ pending |
-| §V7-LIVE-06 | recurring (10× hunt) | Kaan — pre-release or quarterly | ☑ v7.0 baseline 2026-05-23 |
+| §V7-LIVE-06 | recurring (10× hunt) | Kaan — pre-release or quarterly | ☑ v7.0 baseline 2026-05-23 (10/10 GREEN @ 23c4203) |
 | **TOTAL** | **11 tests + 1 workflow + 1 recurring** | | |
 
 ### Verification (engineering-side, always-green)
