@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v7.0
 milestone_name: Open House
 status: in_progress
-last_updated: "2026-05-23T09:02:34.000Z"
+last_updated: "2026-05-23T09:25:00.000Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
-  percent: 5
+  completed_plans: 2
+  percent: 10
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-23 (Plan 67P01 SHIPPED) — **v7.0 "Open House" IN PROGRESS under `gsd-autonomous fully`.** Phase 67 Plan 67P01 (Wave 0 — default-grid green + `flaky:` marker registered) SHIPPED 2026-05-23: 9 test-as-contract drift failures fixed (zero src/vibemix/ edits, zero new deps, zero new ws ports). `uv run pytest -q` exits 0 with 4160 passed / 26 skipped / 0 failed. TEST-01 SC#1 ("a third-party engineer cloning `main` and running `pytest -q` sees exit code 0") SATISFIED; TEST-03 marker-declaration prerequisite landed. 4 phases (67–70), one per pillar (TEST · DEV · OSS · GH), 19/19 REQ-IDs mapped to exactly one phase (no orphans, no duplicates): TEST-01..04 → P67 (4) · DEV-01..05 → P68 (5) · OSS-01..05 → P69 (5) · GH-01..05 → P70 (5). **WIRING + DISCHARGE + POLISH milestone — zero new product capability**, zero new AI providers (CLAP / MERT / OpenL3 / torch all out, unchanged), zero new managed-memory frameworks (Mem0 / Letta / Zep / Cognee all out, unchanged), zero new ws ports, zero new IPC envelopes. The four cardinal invariants (single-writer / citation-grounding / trust-the-audio / one-socket) hold by zero-touch — no phase modifies the reaction path. **Dependency spine (strict left-to-right):** P67 dep-free (test infra) → P68 on P67's CI matrix → P69 on P68 (don't publish a broken catalog; OSS-04 actually fires `cut_release.sh v0.1.0-rc1` for real after §SHIP-V4 discharge — v4.0 SHIP closes alongside) → P70 on P69 (front-porch references real artifacts). **Acid test** for any v7.0 phase or plan: *"does this turn an existing engineering-green capability into something a stranger can install, verify, contribute to, or see — without growing the surface?"* If neither, defer. v6.0's `VIBEMIX_RECALL_ENABLED=1` flip stays on its independent §RECALL-EAR Kaan-ear clock — not v7.0 scope.
+**Last updated:** 2026-05-23 (Plans 67P01 + 67P02 SHIPPED) — **v7.0 "Open House" IN PROGRESS under `gsd-autonomous fully`.** Phase 67 Plan 67P02 (Wave 1 — per-marker triage + §V7-LIVE discharge surface + xfail decorators on 11 Tier-B tests) SHIPPED 2026-05-23: 65 opt-in tests triaged into 54 Tier-A / 11 Tier-B / 0 Tier-C; 4 cluster sub-entries created in new `KAAN-ACTION-LEGAL.md ## §V7-LIVE` section (BlackHole-hosted-mac · Win 11 desktop SKU · FLX4 USB · live full-stack); `@pytest.mark.xfail(strict=False)` + `# reason:` comments applied to 11 Tier-B tests. TEST-02 "no marker is a graveyard" SATISFIED. Default suite `uv run pytest -q` remains GREEN (4156 passed / 26 skipped / 4 xpassed / 0 failed — Wave 0 invariant preserved). Zero `src/vibemix/` edits, zero new deps, zero new ws ports. Phase 67 Plan 67P01 (Wave 0) shipped earlier same day: 9 test-as-contract drift failures fixed; `flaky:` marker registered under --strict-markers; TEST-01 SC#1 + TEST-03 marker-declaration prerequisite SATISFIED. 4 phases (67–70), one per pillar (TEST · DEV · OSS · GH), 19/19 REQ-IDs mapped to exactly one phase (no orphans, no duplicates): TEST-01..04 → P67 (4) · DEV-01..05 → P68 (5) · OSS-01..05 → P69 (5) · GH-01..05 → P70 (5). **WIRING + DISCHARGE + POLISH milestone — zero new product capability**, zero new AI providers (CLAP / MERT / OpenL3 / torch all out, unchanged), zero new managed-memory frameworks (Mem0 / Letta / Zep / Cognee all out, unchanged), zero new ws ports, zero new IPC envelopes. The four cardinal invariants (single-writer / citation-grounding / trust-the-audio / one-socket) hold by zero-touch — no phase modifies the reaction path. **Dependency spine (strict left-to-right):** P67 dep-free (test infra) → P68 on P67's CI matrix → P69 on P68 (don't publish a broken catalog; OSS-04 actually fires `cut_release.sh v0.1.0-rc1` for real after §SHIP-V4 discharge — v4.0 SHIP closes alongside) → P70 on P69 (front-porch references real artifacts). **Acid test** for any v7.0 phase or plan: *"does this turn an existing engineering-green capability into something a stranger can install, verify, contribute to, or see — without growing the surface?"* If neither, defer. v6.0's `VIBEMIX_RECALL_ENABLED=1` flip stays on its independent §RECALL-EAR Kaan-ear clock — not v7.0 scope.
 
 ---
 
@@ -49,10 +49,10 @@ See: .planning/PROJECT.md (Current Milestone: v7.0 "Open House")
 
 ## Current Position
 
-Phase: 67 (TEST · All Tests Pass) — Wave 0 SHIPPED · Status: in progress (1/5 plans)
-Plan: 67P01 — Wave 0 default-grid green + `flaky` marker registered (SHIPPED 2026-05-23)
-Status: ready for Wave 1 (per-marker grid green — `pytest -m <marker>` for each opt-in marker individually)
-Last activity: 2026-05-23 — Plan 67P01 SHIPPED. 9 default-grid failures fixed (all test-as-contract drift; no src/vibemix/ edits); `flaky:` marker registered under --strict-markers. `uv run pytest -q` exits 0 with 4160 passed / 26 skipped / 0 failed. TEST-01 SC#1 satisfied; TEST-03 marker prerequisite landed.
+Phase: 67 (TEST · All Tests Pass) — Wave 0 + Wave 1 SHIPPED · Status: in progress (2/5 plans)
+Plan: 67P02 — Wave 1 per-marker triage + §V7-LIVE discharge surface + xfail decorators (SHIPPED 2026-05-23)
+Status: ready for Wave 2 (build the two static gates `tests/repo/test_no_silent_skips.py` + `tests/repo/test_no_silent_flakes.py`)
+Last activity: 2026-05-23 — Plan 67P02 SHIPPED. 65 opt-in tests triaged (54 Tier-A / 11 Tier-B across 4 §V7-LIVE-NN clusters / 0 Tier-C); `## §V7-LIVE` section created in `KAAN-ACTION-LEGAL.md` mirroring §SHIP-V4 + §RECALL-EAR pattern; `@pytest.mark.xfail(strict=False, reason='… — see §V7-LIVE-NN')` + adjacent `# reason:` comments applied to 11 Tier-B tests (3 BlackHole + 5 Win 11 desktop SKU + 1 FLX4 USB + 2 live full-stack). Default `uv run pytest -q` still GREEN (4156 passed / 26 skipped / 4 xpassed / 0 failed — same exit 0 as Wave 0). Zero src/vibemix/ edits; acid test held. TEST-02 "no marker is a graveyard" SATISFIED.
 
 ## v7.0 Phase Map
 
@@ -78,15 +78,16 @@ Last activity: 2026-05-23 — Plan 67P01 SHIPPED. 9 default-grid failures fixed 
 | Phases complete (v5.0) | 4 / 4 engineering-green (KAAN-ACTION live-confirm items ride forward) |
 | Phases complete (v6.0) | 4 / 4 engineering-green (§RECALL-EAR + §LIVE-EMBED ride forward) |
 | v7.0 phase count | 4 (Phases 67–70) |
-| Phases complete (v7.0) | 0 / 4 — Phase 67 in progress (1/5 plans shipped) |
-| Plans complete (v7.0) | 1 / 5+ (67P01 SHIPPED 2026-05-23 — default-grid green + flaky marker) |
+| Phases complete (v7.0) | 0 / 4 — Phase 67 in progress (2/5 plans shipped) |
+| Plans complete (v7.0) | 2 / 5+ (67P01 + 67P02 SHIPPED 2026-05-23 — default-grid green + flaky marker + §V7-LIVE discharge surface + 11 Tier-B xfail decorators) |
 | v7.0 REQ-IDs mapped | 19 / 19 ✓ (100% coverage, no orphans, no duplicates) |
-| v7.0 REQ-IDs complete | 2 / 19 (TEST-01 SC#1 + TEST-03 marker-decl prerequisite, via 67P01) |
+| v7.0 REQ-IDs complete | 3 / 19 (TEST-01 SC#1 + TEST-03 marker-decl prerequisite via 67P01; TEST-02 "no marker is a graveyard" via 67P02) |
 | v7.0 per-phase REQ counts | P67=4 (TEST) · P68=5 (DEV) · P69=5 (OSS) · P70=5 (GH) |
 | v7.0 net-new dependencies | 0 (WIRING + DISCHARGE + POLISH milestone — no new product capability) |
 | v7.0 net-new ws ports | 0 (one-socket invariant held) |
 | v7.0 net-new IPC envelopes | 0 (zero-touch on reaction path) |
-| Default `pytest -q` (Phase 67 baseline) | 4160 passed / 26 skipped / 0 failed (exit 0) — Plan 67P01 SHIPPED |
+| Default `pytest -q` (Phase 67 baseline) | 4156 passed / 26 skipped / 4 xpassed / 0 failed (exit 0) — Plan 67P02 SHIPPED (4 xpasses = Tier-B tests on Kaan's Mac under xfail(strict=False)) |
+| §V7-LIVE clusters (Phase 67P02 ledger) | 4 clusters · 11 Tier-B tests · ☐ all pending Kaan-discharge |
 | v4.0 git tag | local artifacts on `live-tuning-or-brain`; unsigned `v0.1.0-rc1` .dmg built — closes alongside v7.0 OSS-04 |
 | External signature clock | Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) — gates ONLY OSS-04 in v7.0; routes to §SHIP-V4 under autonomous mode if not landed at execution |
 
@@ -138,13 +139,13 @@ v6.0's memory-grounded copilot ships behind `VIBEMIX_RECALL_ENABLED=0` until §R
 
 ## Session Continuity
 
-**Next command:** execute Phase 67 Wave 1 — `/gsd:execute-phase 67` (the next plan in the wave map; planner produces 67P02..67P05).
+**Next command:** execute Phase 67 Wave 2 — `/gsd:execute-phase 67` (the next plan in the wave map; planner produces 67P03 for the static gates).
 
-**What's done:** **v7.0 "Open House" ROADMAPPED + Phase 67 Plan 67P01 SHIPPED.** Plan 67P01 (Wave 0) flipped default `uv run pytest -q` from 9-red to 0-red via 9 test-as-contract drift fixes (anti-slop wire13 regex accepts citation_lint_enabled gate; corpus session events.jsonl placeholders + .gitignore allowlist; cut_release tag-regex + audit-path pin updates v2.1→v0.1.0 / v4.0; STATE.md Phase 16 audit annotation restored; README feature-matrix resynced; smoke_08 accepts cache_system_instruction + asyncio.wait_for-wrapped cache.create). Zero src/vibemix/ edits — acid test held. `flaky:` marker registered in pyproject.toml so Wave 2's `tests/repo/test_no_silent_flakes.py` static gate is unblocked under --strict-markers. TEST-01 SC#1 + TEST-03 marker prerequisite both satisfied. Commit `a08594d`. Files written: `pyproject.toml`, `tests/coach/test_main_anti_slop_wiring.py`, `tests/repo/test_cut_release_invokes_bravoh_server.py`, `tests/scripts/test_cut_release_preflight.py`, `tests/test_main_smoke.py`, `.planning/STATE.md` (Phase 16 audit annotation), `README.md` (feature-matrix sync), `.gitignore` (corpus events.jsonl allowlist), `eval/corpus/sessions/{6 dirs}/events.jsonl` (empty placeholders), `.planning/phases/67-all-tests-pass/67P01-SUMMARY.md`.
+**What's done:** **v7.0 "Open House" ROADMAPPED + Phase 67 Plans 67P01 + 67P02 SHIPPED.** Plan 67P02 (Wave 1) triaged the 65 deselected opt-in tests into 54 Tier-A / 11 Tier-B / 0 Tier-C; created `## §V7-LIVE` section in `KAAN-ACTION-LEGAL.md` mirroring §SHIP-V4 + §RECALL-EAR pattern with 4 cluster sub-entries (§V7-LIVE-01 BlackHole-on-hosted-macOS · §V7-LIVE-02 Win 11 desktop SKU vs Server 2022 · §V7-LIVE-03 real DDJ-FLX4 USB · §V7-LIVE-04 live full-stack); applied `@pytest.mark.xfail(strict=False, reason='… — see §V7-LIVE-NN')` decorators + adjacent `# reason:` comments on all 11 Tier-B tests. Each cluster has owner-clock + sign-off block; engineering ships GREEN now, Kaan discharges per-cluster as he runs the marker on the right hardware. Default `uv run pytest -q` exits 0 with 4156 passed / 26 skipped / 4 xpassed (the 4 xpasses = Tier-B tests on Kaan's Mac under xfail(strict=False) — same exit-0 as Wave 0's 4160 pass; total tests collected unchanged at 4186). TEST-02 "no marker is a graveyard" SATISFIED. Zero src/vibemix/ edits — acid test held. Commits `6f79943` (triage) + `293135c` (§V7-LIVE + decorators). Files: `.planning/phases/67-all-tests-pass/67P02-TRIAGE.md` (NEW · 199 lines), `KAAN-ACTION-LEGAL.md` (+247 lines · §V7-LIVE section), 8 test files (xfail decorators + # reason), `.planning/phases/67-all-tests-pass/67P02-SUMMARY.md` (NEW). Earlier same day: Plan 67P01 (Wave 0) flipped default suite from 9-red to 0-red via 9 test-as-contract drift fixes + registered `flaky:` marker. Commit `a08594d`.
 
-**What's next:** Phase 67 Wave 1 — `/gsd:plan-phase 67` produces the next plan (per-marker grid green). The wave map per RESEARCH.md is 5 waves: Wave 0 ✓ (this plan), Wave 1 (per-marker grid green or §V7-LIVE-routed), Wave 2 (`.github/workflows/full-test-matrix.yml` + `tests/repo/test_no_silent_flakes.py`), Wave 3 (flake-hunt 10× pass rate), Wave 4 (README badges row). Then P68 (DEV) on P67's CI matrix, then P69 (OSS) on P68, then P70 (GH) on P69. OSS-04 has the external Apple Dev + SignPath clock — under autonomous mode, routes to §SHIP-V4 if not landed; other 18 reqs ship unblocked. v4.0 SHIP closes alongside OSS-04.
+**What's next:** Phase 67 Wave 2 — `/gsd:plan-phase 67` produces the next plan (build the two static gates: `tests/repo/test_no_silent_skips.py` + `tests/repo/test_no_silent_flakes.py`). The wave map per RESEARCH.md: Wave 0 ✓, Wave 1 ✓ (this plan), Wave 2 (static gates), Wave 3 (`.github/workflows/full-test-matrix.yml`), Wave 4 (flake-hunt 10× + README badges row). Then P68 (DEV) on P67's CI matrix, then P69 (OSS) on P68, then P70 (GH) on P69. OSS-04 has the external Apple Dev + SignPath clock — under autonomous mode, routes to §SHIP-V4 if not landed; other 18 reqs ship unblocked. v4.0 SHIP closes alongside OSS-04.
 
-**Open before next execution:** none blocking. Default-grid baseline is now 4160/0/26 green — the substrate every downstream wave / phase lands on is healthy. The four KAAN-ACTION soft items (FLX4 ear / proxy hardening coordination / Francesco demo cut / Kaan landing sign-off) still route to KAAN-ACTION surfaces (§V7-LIVE + §V7-LANDING); engineering ships green in CI alongside them. The one hard external item (OSS-04 signatures) has its autonomous-mode contingency pre-decided.
+**Open before next execution:** none blocking. Default-grid baseline is 4156 passed + 4 xpassed = 4160 non-failures + 26 skipped — same exit-0 as before. The four §V7-LIVE-NN clusters await Kaan re-running each marker on the right hardware (3 BlackHole tests on Kaan's Mac · 5 windows_only tests on Win 11 VM + FLX4 · 1 FLX4 test on Kaan's Mac + plugged FLX4 · 2 live-full-stack tests on Kaan's Mac manual one-shots). All 4 clusters are soft Kaan-discharge under `gsd-autonomous fully` — engineering side is GREEN; live confirmation rides Kaan's clock. The original KAAN-ACTION soft items (FLX4 ear / proxy hardening / Francesco demo cut / Kaan landing sign-off) still route to §V7-LIVE + §V7-LANDING; v7.0 P67P02 just added 4 more §V7-LIVE-NN entries to the same ledger.
 
 ---
 
@@ -172,7 +173,7 @@ Items acknowledged and deferred at v7.0 milestone start on 2026-05-23 (all inten
 | uat | 57 | partial (5 open) | v4.0 SHIP HUMAN-UAT |
 | uat | 58 | partial (4 open) | v4.0 SHIP HUMAN-UAT |
 | uat | 66 | partial (4 open) | v6.0 §RECALL-EAR HUMAN-UAT |
-| v7.0 soft | 67 | to create in plan | TEST-02 65 opt-in tests on real hardware → `§V7-LIVE` |
+| v7.0 soft | 67 | created (4 clusters pending discharge) | TEST-02 11 Tier-B tests on real hardware → `§V7-LIVE-01..04` (created in 67P02; ☐ all pending Kaan-discharge) |
 | v7.0 soft | 68 | to create in plan | DEV-03 FLX4 live ear + DEV-04 BlackHole/WASAPI live + DEV-05 contributor smoke → `§V7-LIVE` |
 | v7.0 hard | 69 | to create in plan | OSS-04 external signatures (Apple Dev + SignPath) → `§SHIP-V4` discharge |
 | v7.0 soft | 70 | to create in plan | GH-01 Francesco demo cut → `§V7-LANDING` (or existing §ASSETS-DEMO-CUT) + GH-02 Kaan-felt landing aesthetic sign-off → `§V7-LANDING` |
@@ -187,4 +188,4 @@ Retained for audit-trail continuity (Plan 42-05 spec was annotate-not-delete; pi
 
 ## Operator Next Steps
 
-- Plan Phase 67 with `/gsd:plan-phase 67` (TEST · All Tests Pass — dependency-free, runs first).
+- Execute Phase 67 Wave 2 via `/gsd:plan-phase 67` (next plan = static gates `tests/repo/test_no_silent_skips.py` + `tests/repo/test_no_silent_flakes.py`).

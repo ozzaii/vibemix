@@ -65,8 +65,8 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
   3. A 10× consecutive re-run of `pytest -q` reveals no test below 100% pass rate, OR any non-deterministic test is quarantined behind a `@pytest.mark.flaky` decorator with a linked GitHub issue. A static gate at `tests/repo/test_no_silent_flakes.py` catches new `@pytest.mark.flaky` decorators that don't carry an issue link — verified by adding a no-issue-link flaky decorator in a scratch PR and watching CI go red.
   4. `.github/workflows/full-test-matrix.yml` exists, runs the full marker grid (default + each opt-in marker individually) on `macos-13` + `macos-14` + `windows-latest` on every push to `main` and every PR, and a green badge for it appears in the README badges row. Verified by opening the workflow run page on `main` HEAD + confirming the badge URL in `README.md` resolves 200 to a green SVG.
 **Plans**: 5 plans
-- [ ] 67P01-PLAN.md — Wave 0: fix the 8 currently-red default tests + register the `flaky` marker in `pyproject.toml` (TEST-01, TEST-03)
-- [ ] 67P02-PLAN.md — Wave 1: triage the 65 opt-in tests Tier-A/B/C + create the `§V7-LIVE` section + xfail decorate all Tier-B tests (TEST-01, TEST-02)
+- [x] 67P01-PLAN.md — Wave 0: fix the 8 currently-red default tests + register the `flaky` marker in `pyproject.toml` (TEST-01, TEST-03) — SHIPPED 2026-05-23 (commit a08594d)
+- [x] 67P02-PLAN.md — Wave 1: triage the 65 opt-in tests Tier-A/B/C + create the `§V7-LIVE` section + xfail decorate all Tier-B tests (TEST-01, TEST-02) — SHIPPED 2026-05-23 (commits 6f79943 + 293135c; §V7-LIVE has 4 cluster sub-entries; 11 Tier-B tests carry xfail(strict=False))
 - [ ] 67P03-PLAN.md — Wave 2: build the two static gates `test_no_silent_skips.py` + `test_no_silent_flakes.py` (TEST-01, TEST-03)
 - [ ] 67P04-PLAN.md — Wave 3: ship `.github/workflows/full-test-matrix.yml` + add README badge (TEST-02, TEST-04)
 - [ ] 67P05-PLAN.md — Wave 4: 10× flake-hunt + document the protocol in `docs/flake-hunt.md` + quarantine any flake found (TEST-03)
