@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v7.0
 milestone_name: Open House
 status: planning
-last_updated: "2026-05-23T07:26:11.351Z"
+last_updated: "2026-05-23T08:00:00.000Z"
 last_activity: 2026-05-23
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -15,51 +15,55 @@ progress:
 
 # vibemix — State
 
-**Last updated:** 2026-05-23 — **v6.0 "The Memory Turn" SHIPPED (tech_debt accepted) under `gsd-autonomous fully`.** 4 phases (63–66), 12 plans, 14/14 v6.0 REQ-IDs satisfied (STORE-01..04 + INGEST-01..03 + RECALL-01..04 + COPILOT-01..03), 6/6 cross-phase integration seams WIRED, 53/53 must-haves verified, 247/247 v6.0 surface tests GREEN, **zero net-new dependencies**, zero new IPC ports. Four cardinal invariants hold by construction (single-writer / citation-grounding / trust-the-audio / one-socket). vibemix now grounds coach prompts in past sessions via a new existence-only `recall` evidence source (zero new linter code, mirror of P59 `key:`) — fabricated `[recall:<id>]` strips the whole turn (anti-poisoning by construction). Cold/empty-memory golden byte-identical to v5.0 baseline. Two visible copilot moves wired (transition-shape callback + vocabulary callback) — ships behind `VIBEMIX_RECALL_ENABLED=0` until §RECALL-EAR Kaan-ear pass. **KAAN-ACTION ride-forward:** §RECALL-EAR felt-quality discharge (4 ear items) + §LIVE-EMBED real-session round-trip + two doc-drifts (code correct) + STORE-03 recordings-UI call-site (out of v6.0 scope). All accumulate to `KAAN-ACTION-LEGAL.md §RECALL-EAR` + `66-HUMAN-UAT.md`. **Git tag deferred** (consistent with v4.0 + v5.0 pattern): the `v6.0` tag + branch merge are Kaan's call. **v4.0 "SHIP" stays OPEN** (engineering-complete 8/8, publish on external signature clock — NOT archived). Full archive: `.planning/milestones/v6.0-*`. **Next: `/gsd:new-milestone` to start v6.1 / v7.0 / TBD** (candidates surfaced in `milestones/v6.0-REQUIREMENTS.md` §Future).
+**Last updated:** 2026-05-23 — **v7.0 "Open House" ROADMAPPED under `gsd-autonomous fully`.** 4 phases (67–70), one per pillar (TEST · DEV · OSS · GH), 19/19 REQ-IDs mapped to exactly one phase (no orphans, no duplicates): TEST-01..04 → P67 (4) · DEV-01..05 → P68 (5) · OSS-01..05 → P69 (5) · GH-01..05 → P70 (5). **WIRING + DISCHARGE + POLISH milestone — zero new product capability**, zero new AI providers (CLAP / MERT / OpenL3 / torch all out, unchanged), zero new managed-memory frameworks (Mem0 / Letta / Zep / Cognee all out, unchanged), zero new ws ports, zero new IPC envelopes. The four cardinal invariants (single-writer / citation-grounding / trust-the-audio / one-socket) hold by zero-touch — no phase modifies the reaction path. **Dependency spine (strict left-to-right):** P67 dep-free (test infra) → P68 on P67's CI matrix → P69 on P68 (don't publish a broken catalog; OSS-04 actually fires `cut_release.sh v0.1.0-rc1` for real after §SHIP-V4 discharge — v4.0 SHIP closes alongside) → P70 on P69 (front-porch references real artifacts). **Acid test** for any v7.0 phase or plan: *"does this turn an existing engineering-green capability into something a stranger can install, verify, contribute to, or see — without growing the surface?"* If neither, defer. v6.0's `VIBEMIX_RECALL_ENABLED=1` flip stays on its independent §RECALL-EAR Kaan-ear clock — not v7.0 scope.
 
 ---
 
-### (prior) v5.0 "The Useful Cut" SHIPPED 2026-05-22 (tech_debt accepted) — 4/4 phases 59–62, 17/17 REQ-IDs, 4/4 integration seams WIRED. Deck-aware + actionable coach + floating pill. P59=DECK-01..05 (deck-state ladder + citable `key:` source), P60=HARMONIC-01..04 (deterministic Camelot clash, default-OFF behind Kaan-ear veto), P61=COACH-01..04 (actionable-not-hype persona, extends `live-tuning-or-brain`), P62=PILL-01..04 (floating pill = primary surface, mascot demoted/opt-in, mascot-audit green). KAAN-ACTION live-confirm items ride forward (harmonic veto flip, vision-eval, coach/pill live-ear passes, FLX4 live). `v5.0` git tag + branch merge deferred to Kaan (`live-tuning-or-brain` unmerged). Full archive: `.planning/milestones/v5.0-*`.
+### (prior) v6.0 "The Memory Turn" SHIPPED 2026-05-23 (tech_debt accepted) — 4/4 phases 63–66, 14/14 REQ-IDs, 6/6 integration seams WIRED, 53/53 must-haves, 247/247 v6.0 surface tests GREEN, zero net-new deps. STORE-01..04 + INGEST-01..03 + RECALL-01..04 + COPILOT-01..03. Memory-grounded copilot via local sqlite-vec store + ~50-line `MemoryStore` wrapper + off-hot-path session-ingest + existence-only `recall` evidence source + two visible copilot moves. Ships behind `VIBEMIX_RECALL_ENABLED=0` until §RECALL-EAR Kaan-ear pass (independent clock). Git tag deferred (consistent with v4.0/v5.0). Full archive: `.planning/milestones/v6.0-*`.
 
 ---
 
-### (prior) v4.0 "SHIP" engineering-complete 2026-05-21 (8/8 phases 51–58, 19/19 REQ-IDs) — **kept OPEN, NOT archived per Kaan directive.** Public RC publish gated on the external signature clock (Apple Dev Agreement via Francesco + SignPath OSS cert). `cut_release.sh --dry-run v0.1.0-rc1` exits GREEN — everything-but-the-signature ready; publish hard-guard regression-pinned (never auto-runs). KAAN-ACTION discharge surface: `KAAN-ACTION-LEGAL.md §SHIP-V4` + per-phase `*-HUMAN-UAT.md`. v6.0's P63 sqlite-vec-binary clean-VM round-trip rides this same external clock — surface early to parallelize.
+### (prior) v5.0 "The Useful Cut" SHIPPED 2026-05-22 (tech_debt accepted) — 4/4 phases 59–62, 17/17 REQ-IDs, 4/4 integration seams WIRED. Deck-aware + actionable coach + floating pill. P59=DECK-01..05 (deck-state ladder + citable `key:` source), P60=HARMONIC-01..04 (deterministic Camelot clash, default-OFF behind Kaan-ear veto), P61=COACH-01..04 (actionable-not-hype persona), P62=PILL-01..04 (floating pill = primary surface, mascot demoted/opt-in, mascot-audit green). KAAN-ACTION live-confirm items ride forward. `v5.0` tag deferred. Full archive: `.planning/milestones/v5.0-*`.
+
+---
+
+### (prior) v4.0 "SHIP" engineering-complete 2026-05-21 (8/8 phases 51–58, 19/19 REQ-IDs) — **kept OPEN, NOT archived per Kaan directive.** Public RC publish gated on the external signature clock (Apple Dev Agreement via Francesco + SignPath OSS cert). `cut_release.sh --dry-run v0.1.0-rc1` exits GREEN — everything-but-the-signature ready; publish hard-guard regression-pinned. **v7.0's OSS-04 actually consumes this publish** — v4.0 closes alongside OSS-04 (KAAN-ACTION §SHIP-V4 discharge fires `cut_release.sh v0.1.0-rc1` for real, or routes to KAAN-ACTION if signatures haven't landed at execution).
 
 ---
 
 ## Project Reference
 
-See: .planning/PROJECT.md (Current Milestone: v6.0 "The Memory Turn")
+See: .planning/PROJECT.md (Current Milestone: v7.0 "Open House")
 
 - **Project:** vibemix — open-source AI DJ co-host (Bravoh's first OSS release)
 - **Core value:** "Real DJ friend in your ear" — never hallucinating, never breaking flow, never AI slop.
-- **v6.0 thesis:** reactive co-host → forward-leaning **copilot**. Mechanism = memory: every session feeds an embedding store; coach prompts ground in *past* sessions. Personalization is **emergent from the retrieval seam**, NOT a settings screen and NOT an LLM-extraction layer. Acid test for any embedded artifact: *"does retrieving this close a hallucination class OR unlock a copilot move?"* — if neither, don't embed it.
-- **New headline hallucination class:** **retrieval poisoning** (an irrelevant past moment injected into the live prompt → AI references something that didn't happen). Mitigation is structural, not a prompt plea: ~0.7 floor (below → inject nothing), top-k 2–3 cap, event-gating, PAST-tense fence, current-session exclusion, `recall` citation source (fabricated `[recall:<id>]` strips the whole turn). **P65 RETRIEVE = anti-slop release gate.**
-- **Current focus:** Milestone complete
-- **Last shipped:** v5.0 "The Useful Cut" — 2026-05-22 (tech_debt accepted).
-- **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). NOT archived.
+- **v7.0 thesis:** turn engineering-green into installable, contributable, install-anywhere OSS. Four pillars — TEST · DEV · OSS · GH — one phase per pillar (P67/P68/P69/P70). **Wiring + discharge + polish, zero new product capability.** Every phase reads as "verify / wire / discharge / generate / test" — never "build a new X". Anti-creep gated by the acid test: *"does this turn an existing engineering-green capability into something a stranger can install, verify, contribute to, or see — without growing the surface?"*
+- **Cardinal invariants verified by zero-touch:** the four cardinal invariants (single-writer · citation-grounding · trust-the-audio · one-socket) hold by construction because no v7.0 phase modifies the reaction path. v7.0 is a packaging/infrastructure/surface milestone, not a brain milestone.
+- **Current focus:** Phase 67 (TEST · All Tests Pass) — not started · Status: ready to plan
+- **Last shipped:** v6.0 "The Memory Turn" — 2026-05-23 (tech_debt accepted).
+- **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on Apple Dev Agreement + SignPath OSS cert (external clock). **Closes alongside v7.0 OSS-04.** NOT archived.
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
-- **Autonomy mode:** `gsd-autonomous fully` — every blocker + human-needed item discharged autonomously; only privacy rule + destructive risk + legal-capacity carveouts (Apple Dev + SignPath) still pause. Soft Kaan-discharge gates surface to KAAN-ACTION but do NOT pause work.
+- **Autonomy mode:** `gsd-autonomous fully` — every blocker + human-needed item discharged autonomously; only privacy rule + destructive risk + legal-capacity carveouts (Apple Dev + SignPath gating OSS-04) still pause. Soft Kaan-discharge gates (Kaan-felt landing-page sign-off in P70 §V7-LANDING, FLX4 live ear in P68 §V7-LIVE) surface to KAAN-ACTION but do NOT pause work.
 
 ---
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 67 (TEST · All Tests Pass) — not started · Status: ready to plan
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-23 — Milestone v7.0 started
+Status: ready to plan
+Last activity: 2026-05-23 — Milestone v7.0 roadmapped (4 phases, 19 REQ-IDs, 100% coverage)
 
-## v6.0 Phase Map
+## v7.0 Phase Map
 
 | Phase | Goal | Requirements (count) | Depends on | UI |
 |-------|------|----------------------|-----------|----|
-| 63 — Memory Store | Local per-install `memory.db` + ~50-line `MemoryStore` cloned from shipped `library/` primitives (zero new dep); Mac/Win `cosine_topk` parity + numpy fallback; retention + delete-cascade; `model_router.resolve("embedding")` on FLEX. Storage spine; no live-path touch. | STORE-01..04 (4) | — (first v6.0 phase) | — |
-| 64 — Session Ingest | Off-hot-path post-session batch (+ boot sweep) turning `events.jsonl`+evidence+`ai_text` into deterministic TEXT "reaction moment" records; NO audio, NO LLM-extraction (CI-guarded); session-id/timestamp-tagged. | INGEST-01..03 (3) | P63 | — |
-| 65 — Memory Retrieval Seam | **ANTI-SLOP RELEASE GATE.** New existence-only `recall` source (zero new linter code, à la P59 `key`); gated `recall[…]` block (copy P59 `decks[…]` gate → cold-memory byte-identical); top-k 2–3, ~0.7 floor, PAST-tense fence, current-session excluded; blend tuned in-phase. **Kaan-ear veto.** | RECALL-01..04 (4) | P63 + P64 | — |
-| 66 — Visible Copilot Move | Linter-grounded transition-shape callback + vocabulary callback — cited/warm/non-nagging; recall chip on existing `citation_strip`. NO anti-features (no next-track rec, no LLM-tendencies, no settings personalization, no continuous audio embed). | COPILOT-01..03 (3) | P65 | yes (recall chip on Tier-1 surface) |
+| 67 — All Tests Pass | Every collected test green across the full marker grid on Mac + Win; `.github/workflows/full-test-matrix.yml` runs the grid on every push to `main`; flake-hunt; no marker is a graveyard. Dependency-free, runs first. | TEST-01..04 (4) | — (first v7.0 phase) | — |
+| 68 — All Devices Ready | 10 bundled MIDI profiles (FLX4/6/10/400/1000/SX3/XDJ-RX3/Party-Mix-Live/Inpulse-300/500) with contract test + synthetic-MIDI smoke + port_name_hint; duplicate `midi/controllers/` ↔ `midi/profiles/` catalogs reconciled to a single source of truth; hot-plug ≥3 profiles + KAAN-ACTION FLX4 live ear; audio backend matrix (BlackHole 2ch/16ch + WASAPI loopback + edge fallback) in CI; "Add Your Controller" contributor recipe verified end-to-end. | DEV-01..05 (5) | P67 (CI matrix) | — |
+| 69 — OSS Fully Integrated | `CONTRIBUTING/CoC/SECURITY/MAINTAINERS.md` ship + presence-tested; Bravoh proxy production-hardened (per-install-UUID rate limit + token-bucket + Prom + Sentry + graceful offline fallback to "co-host unavailable this session"); `docs/byo-key.md` first-class BYO path; **`cut_release.sh v0.1.0-rc1` actually runs** after §SHIP-V4 discharge (signed Mac .dmg + signed Win .exe + CycloneDX/SPDX SBOM + Apache-2.0 NOTICE) — **v4.0 closes alongside**; Homebrew tap + Scoop bucket scaffolds check in + CI-validate but actual publish stays manual for v7.0 (split off as a future milestone). Under autonomous mode, OSS-04 routes to §SHIP-V4 if signatures haven't landed; rest ships unblocked. | OSS-01..05 (5) | P68 (don't publish a broken catalog) | — |
+| 70 — GitHub Sexified, Generated, Tested | Real `docs/assets/demo.mp4` (30s hero film) replaces placeholder + §ASSETS-DEMO-CUT discharged; GitHub Pages landing at `bravoh-ai.github.io/vibemix` in CDJ-Whisper aesthetic (5 warm blacks + amber + Saira + JetBrains Mono, no Geist/Fraunces) Lighthouse a11y ≥95 + perf ≥90; OG card (1200×630) auto-generated from Tailwind+Puppeteer source + pinned SHA; all `docs/assets/` auto-generated from `docs/assets/sources/` (byte-identical reproducibility CI gate); `tests/repo/test_github_presence.py` one-stop repo-presence suite. **Kaan-felt sign-off on landing aesthetic rides §V7-LANDING** (engineering closes when auto-checks pass; felt sign-off does not gate close under autonomous mode). | GH-01..05 (5) | P69 (references real released artifacts) | yes (Tier-1 landing surface — `frontend-enforcement` skill governs) |
 
-**Build-order rationale (dependency-correct, unanimous across 4 researchers):** STORE has no upstream deps; INGEST writes to STORE; RETRIEVE reads STORE; the MOVE needs RETRIEVE firing. Live path protected until last needed — STORE + INGEST land with zero reaction-path changes (grep-gate: ingest never imports the coach loop); the live path only changes in RETRIEVE behind a gate that preserves byte-identity when cold. The four cardinal invariants (single-writer / citation-grounding / trust-the-audio / one-socket) are preserved by reuse — memory never writes `MusicState`, never opens a new port, never overrides the live ears.
+**Build-order rationale (dependency-correct):** TEST is dependency-free and ships the CI matrix every downstream pillar lands on; DEV's contract tests + hot-plug + audio matrix land on that CI green from day one; OSS reconciles the catalog before the artifacts go public + ships the docs/proxy/BYO + actually publishes (gated on the external signature clock — autonomous-mode contingency routes OSS-04 to KAAN-ACTION while the other 4 OSS reqs ship); GH front-porch points at the actual released artifacts. The four cardinal invariants hold by zero-touch — no phase modifies the reaction path. v6.0's `VIBEMIX_RECALL_ENABLED=0` default stays unchanged (independent §RECALL-EAR Kaan-ear clock).
 
 ## Performance Metrics
 
@@ -70,136 +74,90 @@ Last activity: 2026-05-23 — Milestone v7.0 started
 | Phases complete (v2.1) | 13 / 13 engineering-green |
 | Phases complete (v3.0) | 6 / 6 engineering-green (22 carveouts → KAAN-ACTION-LEGAL) |
 | Phases complete (v3.1) | 5 / 5 engineering-green (7 carveouts on external clock) |
-| Phases complete (v4.0) | 8 / 8 engineering-green (publish on external signature clock; NOT archived) |
+| Phases complete (v4.0) | 8 / 8 engineering-green (publish on external signature clock; **closes alongside v7.0 OSS-04**) |
 | Phases complete (v5.0) | 4 / 4 engineering-green (KAAN-ACTION live-confirm items ride forward) |
-| v6.0 phase count | 4 (Phases 63–66) |
-| Phases complete (v6.0) | 1 / 4 — P63 Memory Store engineering-green (STORE-01..04, 19/19 tests/memory/) |
-| v6.0 REQ-IDs mapped | 14 / 14 ✓ (100% coverage, no orphans, no duplicates) |
-| v6.0 per-phase REQ counts | P63=4 (STORE) · P64=3 (INGEST) · P65=4 (RECALL) · P66=3 (COPILOT) |
-| v6.0 net-new dependencies | 0 (WIRING/REUSE milestone — `sqlite-vec>=0.1.9` already declared) |
-| P63-01 (Wave 0) | 2 tasks, 6 files, ~18 min — RED-first test contract (dde3c0f, 5635390) |
-| P63-02 (Wave 1) | 2 tasks, 3 files, ~32 min — storage spine GREEN; STORE-01/02/04 (610c374, d36d924) |
-| P63-03 (Wave 2) | 2 tasks, 2 files, ~18 min — hardening GREEN; STORE-03 (18a5c1f, eb5b5b5); 19/19 tests/memory/ |
-| P64-02 (Wave 1) | 2 tasks, 1 file, ~22 min — ingest.py GREEN; INGEST-01/02/03 (c68fe31, d6b29cf); 6/6 test_ingest + dormancy CLEAN |
-| P65-03 (Wave 1) | 1 task, 1 file, ~14 min — MemoryRecall service GREEN; RECALL-03/04 (10bcaf0); 5/5 test_retrieval + no-live-path/no-extraction/model-literal CLEAN |
-| v4.0 git tag | local artifacts on `live-tuning-or-brain`; unsigned `v0.1.0-rc1` .dmg built |
-| v3.0/v3.1/v4.0 carveouts | external clock (Apple Dev + SignPath) — unchanged by v6.0 |
+| Phases complete (v6.0) | 4 / 4 engineering-green (§RECALL-EAR + §LIVE-EMBED ride forward) |
+| v7.0 phase count | 4 (Phases 67–70) |
+| Phases complete (v7.0) | 0 / 4 — Phase 67 ready to plan |
+| v7.0 REQ-IDs mapped | 19 / 19 ✓ (100% coverage, no orphans, no duplicates) |
+| v7.0 per-phase REQ counts | P67=4 (TEST) · P68=5 (DEV) · P69=5 (OSS) · P70=5 (GH) |
+| v7.0 net-new dependencies | 0 (WIRING + DISCHARGE + POLISH milestone — no new product capability) |
+| v7.0 net-new ws ports | 0 (one-socket invariant held) |
+| v7.0 net-new IPC envelopes | 0 (zero-touch on reaction path) |
+| v4.0 git tag | local artifacts on `live-tuning-or-brain`; unsigned `v0.1.0-rc1` .dmg built — closes alongside v7.0 OSS-04 |
+| External signature clock | Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) — gates ONLY OSS-04 in v7.0; routes to §SHIP-V4 under autonomous mode if not landed at execution |
 
 ---
-| Phase 64 P01 | ~14 min | 2 tasks | 2 files |
-| Phase 64 P02 | ~22 min | 2 tasks | 1 file (+1 baseline) |
-| Phase 64 P02 | 22 | 2 tasks | 1 files |
-| Phase 65 P01 | 18min | 2 tasks | 6 files |
-| Phase 65 P03 | ~14 min | 1 task | 1 file (MemoryRecall GREEN; 10bcaf0) |
 
 ## Accumulated Context
 
-### v6.0 Roadmap Decisions Locked (2026-05-22)
+### v7.0 Roadmap Decisions Locked (2026-05-23)
 
-v6.0 "The Memory Turn" roadmapped into **4 phases (63–66)** continuing numbering from v5.0 (ran 59–62) — NO reset. 14/14 REQ-IDs mapped to exactly one phase (100% coverage, no orphans, no duplicates). Shaped by 4-agent convergent research that independently produced the same four-phase spine. This is a **WIRING/REUSE milestone with ZERO net-new dependencies** on the mature grounded co-host — not greenfield.
+v7.0 "Open House" roadmapped into **4 phases (67–70)** continuing numbering from v6.0 (ran 63–66) — NO reset. 19/19 REQ-IDs mapped to exactly one phase (100% coverage, no orphans, no duplicates). One phase per pillar — TEST · DEV · OSS · GH — per the REQUIREMENTS.md pre-decided structure. Every phase reads as "verify / wire / discharge / generate / test" — no phase grows the product surface.
 
-**Reuse map (the load-bearing finding):** the entire memory layer is built on already-shipped `src/vibemix/library/` primitives:
+**Why one phase per pillar (and not finer-grained per fine-granularity default).** The 4-pillar decomposition is *pre-decided* in REQUIREMENTS.md (Kaan's milestone framing) — the requirements are already pillar-sized (4/5/5/5 reqs per pillar), each pillar is internally coherent (a single goal: "tests green" / "devices ready" / "OSS shipped" / "front-porch finished"), and the cross-pillar dependencies are strict left-to-right (P67 → P68 → P69 → P70). Splitting a pillar into multiple phases would manufacture artificial seams without delivering finer verifiability — each pillar's success criteria are already a 4-5-item observable checklist. Fine granularity applies *within* each phase via plan decomposition, not by inflating phase count.
 
-- `index_sqlite_vec.py::SqliteVecStore` + `store.py::open_store` (numpy fallback) → cloned by `memory/store.py` (NEW sibling pkg `src/vibemix/memory/`, imports from `library/`, does NOT fork).
-- `_cosine.py::cosine_topk` → reused verbatim (single chokepoint; Mac/Win bit-identical parity, P55 rule).
-- `embed.py::LibraryEmbedder` + content-hash cache (`embeddings.db`) → reused for ingest + query embeds.
-- `grounding.py::Grounding` (event-gated embed→cosine→`[track:<id>]`) → the exact pattern `memory/retriever.py` clones, generalized `track`→`recall`.
-- `evidence_registry.py` + `coach/citation_linter.py` existence-only branch (`track`, `key`) → `recall` joins it with ZERO new linter code (à la P59 `key`).
-- `coach.py::evidence_line` P59 `decks[…]` gate → copied verbatim for the gated `recall[…]` block (cold-memory golden byte-identical).
-- `audio/recorder.py` `events.jsonl` schema + crash-sweep → ingest source + boot-sweep mirror.
-- `runtime/config_store.py::app_data_dir()` → `memory.db` placement (durable user-data tier, not `~/.cache`).
+**Critical-path / autonomous-mode contingencies:**
 
-**Model-ID correction (surface to Kaan):** locked literal `gemini-embedding-001` is the TEXT-ONLY GA model; the milestone's multimodal intent maps to `gemini-embedding-2`. **Never hardcode either** — route via `model_router.resolve("embedding")` (CI grep gate forbids literals). v1 ingest is text-signature-only, so cheaper text-001 is even a viable one-line config choice; default stays the multimodal model per milestone intent. Decision to confirm with Kaan in-phase.
+- **OSS-04 signature contingency:** `cut_release.sh v0.1.0-rc1` has a hard external dependency on Apple Dev Agreement (Francesco) + SignPath OSS Foundation cert (Kaan) — both on the clock since v3.0. Under `gsd-autonomous fully`: if signatures haven't landed by phase execution, OSS-04 routes to `KAAN-ACTION-LEGAL.md §SHIP-V4` with the exact pre-staged `cut_release.sh v0.1.0-rc1` invocation, the publish hard-guard stays absolute, and OSS-01/02/03/05 ship unblocked (none depend on signatures). v4.0 stays open until OSS-04 fires for real. This is the defensible answer — engineering ship-ready in the same milestone, publish closes when the clock catches up.
+- **GH-01 §ASSETS-DEMO-CUT discharge:** the real 30-sec demo film is gated on Francesco's capture day per v3.0 P43 VIS-09 runbook — surface in P70 plan, route to KAAN-ACTION if Francesco hasn't shot it by execution.
+- **GH-02 Kaan-felt landing sign-off:** the CDJ-Whisper aesthetic is a taste gate, not an automated check — engineering closes when auto-checks pass (Lighthouse + anti-backsliding grep + visual asset reproducibility), the felt sign-off rides `§V7-LANDING` (new KAAN-ACTION-LEGAL section to create in plan).
+- **DEV-03 FLX4 live ear + DEV-04 real BlackHole/WASAPI capture + DEV-05 contributor smoke:** all route to `KAAN-ACTION-LEGAL.md §V7-LIVE` (new section to create in plan) — the engineering side ships green in CI with mocks; the live confirmation is Kaan's clock.
+- **TEST-02 65 opt-in tests on real hardware:** any test that can't pass on `macos-13/14` + `windows-latest` GH runners (BlackHole-real / FLX4-real / etc.) documents its failure-mode in `§V7-LIVE` and stays opt-in — never a graveyard, always a fix-path entry.
 
-### P63-01 Execution Decisions (2026-05-22)
+**Cardinal invariants verified by zero-touch.** Every v7.0 phase is asked: "does this modify any prompt, evidence source, emission path, or reaction-time module?" Answer for all four phases: NO. P67/P68 are test infrastructure + device contracts; P69 is OSS docs + proxy hardening + release publish (all outside `src/vibemix/{coach,state,agent,runtime,memory,library,grounding}`); P70 is docs + assets + presence tests. The cardinal invariants (single-writer / citation-grounding / trust-the-audio / one-socket) hold by construction.
 
-- **Wave-0 RED-first contract is the deliverable, not green tests.** 6 `tests/memory/` files pin the `MemoryStore` interface (`add_record` / `query_topk(.., *, exclude_session=None)` / `delete_session` / `run_retention_sweep(max_moments=)` → `result.deleted`; `Record.{record_id,session_id,ts,kind,signature,score}`; `MemoryStore(db_path, prefer_sqlite_vec=True)`) BEFORE `src/vibemix/memory/` exists. Acceptance = collection `ModuleNotFoundError: No module named 'vibemix.memory'` (verified under `.venv`/Python 3.12, the authoritative runner — system Python 3.14 masks it with a `ServiceTier` import gap, so always verify under `.venv`). Plans 63-02/03 flip these GREEN.
-- **`cosine_topk` reused verbatim** from `vibemix.library._cosine` in the memory parity gate (`@pytest.mark.parity`); never forked, no native-KNN ranking anywhere in the tests. Synthetic 768-dim vectors generated in-test (`np.random.default_rng`) — no new fixture file.
-- **STORE-04 literal gate delegated, not duplicated:** the shipped `tests/repo/test_model_literal_gate.py` already scans all of `src/vibemix/` (incl. the new `memory/`); a module comment records the delegation.
-- **STORE-01..04 traceability = "Contract pinned (63-01); impl pending (63-02/03)"** — NOT marked Complete, because the `MemoryStore` source does not exist yet. (Reverted an auto-mark that the plan-frontmatter `requirements` field triggered — requirements complete when the implementing plan lands.)
-- T-63-01 (no-live-path import) + T-63-02 (no-extraction) mitigations are now regression-pinned from the first commit (static AST + subprocess dormancy; tokenize-stripped generation-surface scan w/ positive control).
+**Scope rule acid test applied to every requirement.** Every REQ-ID in REQUIREMENTS.md was checked against "does this turn an existing engineering-green capability into something a stranger can install, verify, contribute to, or see — without growing the surface?" — 19/19 pass. No requirement proposes a new feature, new dep, new socket, new IPC envelope, or new prompt change. The two "grey-area" candidates that would have failed this test (multi-language localization · Homebrew/Scoop *publish*) are explicitly deferred in REQUIREMENTS.md §Future.
 
-### P63-02 Execution Decisions (2026-05-22)
+### v7.0 KAAN-ACTION / External-Clock Flags (carry into planning)
 
-- **Storage spine shipped, contract subset GREEN.** `src/vibemix/memory/` (3 files): `SqliteVecMemoryStore` (vec0 backend cloned from `library/index_sqlite_vec.py` — `vec_library`→`vec_memory` + `moments` sibling table on one connection), `MemoryStore` facade (compose-not-subclass: backend + owned `moments` connection; `add_record`/`query_topk(*, exclude_session=None)`/`delete_session`), `open_memory_store()` (clone of `library/store.py::open_store` pointed at `app_data_dir()/memory.db`). 10/19 `tests/memory/` GREEN: roundtrip, numpy_fallback, delete_cascade, parity (sqlite-vec↔numpy bit-identical + tie-break + float32 round-trip), no_live_path (CLEAN), no_extraction, + `tests/repo/test_model_literal_gate.py`.
-- **`cosine_topk` IMPORTED VERBATIM** from `vibemix.library._cosine` — sole ranking path in `query_topk`; no native vec0 KNN / `MATCH` / `ORDER BY distance` / `vec_distance_cosine` anywhere in `memory/`. `NumpyStore` reused as-is (no `index_numpy_memory.py`). Embedding seam = reused `LibraryEmbedder` (no hardcoded model literal — `model_literal_gate` green).
-- **Lazy `app_data_dir` import (the one auto-fix, Rule 3 blocking).** Module-level `from vibemix.runtime.config_store import app_data_dir` triggers `vibemix.runtime.__init__`, which eagerly imports the live reaction path (`coach`, `ws_bus`, `session_loop`, `state.refresh`) → leaked into `sys.modules`, failing `test_no_live_path_import.py`. Fixed by deferring the import into `_memory_db_path()` + `db_path=None` sentinel defaults resolved lazily. Behavior/public surface unchanged; only import timing. (Library never hit this — it uses `~/.cache` defaults, never `config_store`.) **Note for 63-03/64:** any new `memory/` module must keep `config_store`/runtime imports function-local or the dormancy gate fails.
-- **add_record vector-first then moments-row then commit** (crash → at worst a reconcilable orphan vector, never metadata→missing-vector). `moments` reuses the sqlite-vec backend's single `self.db` (atomic); numpy path opens sibling `memory_moments.db`.
-- **Path-traversal + retention correctly RED (deferred to 63-03).** 9/19 `tests/memory/` red by design: 6× `test_session_id_path_traversal` (session_id guard — regex shape + `is_relative_to`, mirroring `recordings_index`) + 3× `test_retention` (`run_retention_sweep(max_moments=)`). `delete_session` is the documented Wave-2 extension point. 4 pre-existing `tests/repo/` failures (README matrix ×2, gate-42 STATE annotation, cut-release tag-regex) confirmed failing identically at parent `b45b419` — unrelated to `memory/`, no new failures introduced.
-- **STORE-01/02/04 marked complete in REQUIREMENTS** (impl landed). STORE-03 (cascade + retention + path-traversal) stays open for 63-03.
+- **P67 — TEST-02 live opt-in matrix (KAAN-ACTION, soft):** Mac + Win 11 VM execution of the 65 currently-deselected opt-in tests. CI side ships mocked; live confirmation routes to `§V7-LIVE`.
+- **P68 — DEV-03 / DEV-04 / DEV-05 live hardware (KAAN-ACTION, soft):** FLX4 plug/unplug ear-pass, real BlackHole + WASAPI capture, contributor recipe < 30-min smoke. CI side ships mocked; live confirmation routes to `§V7-LIVE`.
+- **P69 — OSS-04 external signature clock (KAAN-ACTION, hard):** Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) — gates the actual `gh release create v0.1.0-rc1`. Routes to `§SHIP-V4` if not landed at execution. **v4.0 SHIP closes alongside.** OSS-01/02/03/05 ship unblocked.
+- **P69 — OSS-02 Bravoh proxy production hardening (engineering side — autonomous):** per-install-UUID rate limit + token-bucket + Prom + Sentry + graceful client-side fallback. Lives in the `api.altidus.world` proxy repo (separate from vibemix OSS); coordination point with Bravoh deployment.
+- **P70 — GH-01 §ASSETS-DEMO-CUT (KAAN-ACTION, soft):** Francesco's 30-sec demo capture day per v3.0 P43 VIS-09 runbook. CI side ships placeholder-detection green; real asset routes to `§V7-LANDING`.
+- **P70 — GH-02 Kaan-felt landing aesthetic sign-off (KAAN-ACTION, soft):** the CDJ-Whisper hold is taste-gated, not auto-checked. Engineering closes when auto-checks pass; felt sign-off rides `§V7-LANDING`.
 
-### P63-03 Execution Decisions (2026-05-22)
+### Anti-slop invariants baked into v7.0 success criteria
 
-- **Phase 63 COMPLETE — STORE-03 hardening GREEN.** `delete_session` is now path-traversal-defended (shared `_validate_session_id`: separator/`..`/NUL floor + `is_relative_to(root.resolve())` containment, refuse-root — mirroring `recordings_index.py:388-401`) and atomic (moments-row delete staged, `backend.delete()` commits both as ONE transaction on the shared sqlite-vec connection; numpy path stays reconcilable via vector-after-metadata ordering). Added `reconcile_orphans` (boot backstop, drops vec-without-moments danglers, transactional/best-effort) and new `src/vibemix/memory/retention.py::run_memory_retention_sweep` (oldest-session-first WHOLE-session eviction under count/age budget, routed through `delete_session`, ∞-no-op short-circuit, never empties the store). 19/19 `tests/memory/` GREEN (the 9 previously-RED flipped). Commits `18a5c1f`, `eb5b5b5`.
-- **Gate fires in `add_record` too (not only `delete_session`).** The RED `test_session_id_path_traversal` triggers via `add_record` — so the shared validator is called from both write paths (security correctness).
-- **`run_retention_sweep` shipped as a MemoryStore method AND module fn.** The RED tests call `store.run_retention_sweep(max_moments=)` reading `result.deleted`; the plan asked for module-level `run_memory_retention_sweep` + `RetentionSweepResult`. Both shipped: `retention.py` holds the logic (prod defaults ~10k/180d for boot wiring); the method seam defaults caps to `None` and delegates lazily (keeps retention off the store import hot path). `RetentionSweepResult.deleted` = pruned MOMENT count.
-- **Call-site wiring deferred (by plan scope).** `recordings_index.delete → delete_session` and `boot/session-close → run_memory_retention_sweep` land in the downstream recordings-UI-delete phase — the live reaction path was NOT touched. Surfaced as KAAN-ACTION in 63-03-SUMMARY.
-- **Pre-existing baseline:** 8 full-suite failures, all OUTSIDE `tests/memory/` (none reference `vibemix.memory`) — the known `live-tuning-or-brain` WIP baseline (tests/repo README-matrix ×2, gate-42 STATE annotation, cut-release tag-regex, cut-release-preflight ×2, coach anti-slop-wiring, main-smoke-08). Not introduced by this plan; logged in SUMMARY, left untouched per SCOPE BOUNDARY.
+- **Proxy-offline fallback (OSS-02):** when the Bravoh proxy is offline, the pill/mascot says "co-host unavailable this session" — NOT a crash, NOT a hallucinated coach line. The brain refusing to lie when its grounding is missing is on-thesis.
+- **Demo asset honesty (GH-01):** the README's `<video src>` hash sentinel must match a real, non-placeholder, ≤8MB asset. A placeholder sentinel passing CI is a regression and the hash check catches it.
+- **Anti-backsliding gate (GH-02):** `grep -ri 'geist\|fraunces' docs/landing/` returns zero matches — the CDJ-Whisper typography lock from v3.0/v5.0 holds.
+- **Visual asset reproducibility (GH-04):** every `docs/assets/` artifact is byte-identical-reproducible from `docs/assets/sources/` via `scripts/regenerate_assets.sh` — eliminates "lost the original Figma file" rot.
+- **OSS files presence-tested (OSS-01):** `tests/repo/test_oss_presence.py` catches a contributor docs deletion before it ships.
+- **Four cardinal invariants:** held by zero-touch (no v7.0 phase modifies the reaction path).
 
-### P64-01 Execution Decisions (2026-05-22)
+### v6.0 carry-forward context (for reference — does NOT modify behavior in v7.0)
 
-- **Wave-0 RED-first contract for `vibemix.memory.ingest` is the deliverable, not green tests.** `tests/memory/test_ingest.py` (6 tests) pins the ingest surface BEFORE the module exists: `build_coach_line_signature(reaction_text, ctx)` (fallbacks track→`unknown`/phase→`unknown`/deck→`none`/event→`MANUAL`; citation tokens sorted+`,`-joined; leading `[emotion]` tag stripped; NO `t` in the embedded string), `ingest_session(session_dir, store, embedder) -> IngestResult` (`.records_written` + `.embeds_made`), `run_ingest_sweep(recordings_root, store, embedder)`, `SIG_TEMPLATE_VERSION == "v1-coach_line"`. Acceptance = collection `ModuleNotFoundError: No module named 'vibemix.memory.ingest'` (verified under `.venv`/Python 3.12 — system 3.14 masks it). Plans 64-02/03 flip GREEN. Commits `dcdc307`, `1cb9008`.
-- **Synthetic `events.jsonl` fixture generated in-test** (no repo fixture file) mirroring real on-disk shapes: `event` lines (`type/track/phase/deck`), two EMITTED `ai_text` lines (`[chill]` tag; one with inline `[aud:rms@96.0]`, one citation-free → legit empty `cite=`), and one `citation_strip` (silenced) line the contract asserts is SKIPPED (anti-confabulation — embedding a never-heard line is the exact slop class).
-- **`FakeEmbedder` exposes ONLY `embed_query`** with a call counter — no generation surface (no-extraction invariant by construction). `test_reingest_is_noop` pins 0 embed calls + 0 new records on a marked session via the counter + store record count; `test_embed_cache_hit` pins the byte-identical-signature cache-key precondition at the embedder boundary.
-- **No-live-path subprocess dormancy gate EXTENDED** to `import vibemix.memory.ingest` (`test_importing_ingest_loads_no_coach_loop`) — clones the store-side leak-scan block verbatim, swaps `store→ingest`. Closes the PATTERNS gap (subprocess gate previously imported only `memory.store`). RED until 64-02; the static AST gate already auto-covered `ingest.py` via the `memory/*.py` glob (not duplicated).
-- **INGEST-01/02/03 NOT marked complete** — RED-first; the impl lands in 64-02/03. Traceability stays "Contract pinned (64-01); impl pending (64-02/03)".
-- **Verify state:** `tests/memory` minus the RED ingest module = 21 passed; the only failures are the two intentional RED edges (test_ingest collection + ingest-dormancy), both pointing at the missing `vibemix.memory.ingest`. No NEW collateral failures vs the known 8-WIP baseline.
-- **Invariant carried to 64-02:** any `config_store`/`vibemix.runtime` import in `ingest.py` MUST be function-local — a module-level pull trips the dormancy gate this plan just extended.
-
-### P64-02 Execution Decisions (2026-05-22)
-
-- **`src/vibemix/memory/ingest.py` GREEN — the full INGEST capability (INGEST-01/02/03).** Flipped all 6 `tests/memory/test_ingest.py` + `test_importing_ingest_loads_no_coach_loop` (now CLEAN) + the no-extraction + model-literal gates GREEN. Commits `c68fe31` (feat), `d6b29cf` (orphan baseline). `library/embed.py` and `memory/store.py` (incl. `delete_session`) UNMODIFIED; zero net-new deps (stdlib + shipped modules only).
-- **`build_coach_line_signature` is a PURE deterministic string assembly** — regex + string ops, NO model in the path. `EVIDENCE_CITATION_RE` COPIED VERBATIM from `evidence_registry.py:133` (lock-step comment) rather than imported; leading `[emotion]` TTS tag stripped; citation tokens sorted+`,`-joined; NO `t` in the embedded string. The ingest path's ONLY model call is `embedder.embed_query`.
-- **ONE kind only — `coach_line`.** Ingest `kind=="ai_text"` (emitted/heard) lines ONLY; `citation_strip` (silenced) explicitly SKIPPED — embedding a never-heard line is confabulation (the anti-slop failure class). `record_id = f"{sid}:{seq}"` (0-based emitted-ai_text index), `ts` = line's `t`, tagged via `store.add_record`.
-- **Two-layer idempotency (Finding 2 fix):** a NEW signature-keyed content-hash `embed_cache` (CLONED from `embed.py:146-157,605-623`, key = `SHA256(sig‖model‖SIG_TEMPLATE_VERSION)`) + a `memory_ingested` marker — both in an ingest-OWNED sibling `memory_ingest.db` (does NOT modify `library/embed.py` nor reuse the store's backend connection). Re-ingest = 0 embeds + 0 new records.
-- **A4 marker↔retention coupling solved WITHOUT editing Phase-63 code:** the short-circuit is gated on the marker AND `COUNT(*) FROM moments WHERE session_id=?` > 0 (a cheap read of the store's moments connection) — so a retention-evicted session (0 moments) re-ingests despite a surviving stale marker. `store.delete_session` untouched.
-- **MIRROR not import:** `_read_events_jsonl` clones `session_loader._read_events` WITHOUT the 5-min `SessionTooShort` floor; `SESSION_DIR_RE` + the two-layer `is_relative_to` gate copied from `recordings_index.py:78,388-401`. `run_ingest_sweep` is best-effort (one bad session logs + continues, never raises). No `vibemix.runtime` import needed (cache/marker paths derive from `store._db_path`), so the dormancy gate prints CLEAN.
-- **Two Rule-3 auto-fixes:** (1) `model_id = getattr(embedder, "_model", "") or ""` — the contract's stand-in embedder exposes only `embed_query` (no `_model`); the real `LibraryEmbedder` always has the probe-derived `_model` (never a literal). (2) `IngestResult` registered in `.planning/codebase/orphans.csv` — it is referenced by 64-03 Wave 3 wiring; orphan-diff CI gate refreshed per its own instruction.
-- **Pre-existing baseline:** full suite = 9 failed / 4116 passed. 8 are the known `live-tuning-or-brain` WIP baseline (confirmed identical with `ingest.py` removed); the 9th (orphan-inventory) was caused-by + resolved-within this plan. No NEW collateral failures.
-
-### v6.0 KAAN-ACTION / Research Flags (carry into planning)
-
-- **P63 — sqlite-vec install fragility (KAAN-ACTION, external clock):** `vec0.dylib`/`vec0.dll` native binaries must be signed/notarized + a clean-VM (incl. Windows ARM64) `memory.db` round-trip proven in the e2e matrix. Rides the Apple notarization + SignPath external clock already on the critical path — surfaced EARLY so it parallelizes against the in-flight v4.0 approvals. (The binary was already signed in shipping builds; the new artifact is only a data file with zero new signing surface — the clean-VM round-trip is the proof item.)
-- **P64 — moment taxonomy (research flag):** "which artifacts ground best" (`coach_line` vs `moment` vs stretch `audio_moment`) is explicitly the first phase's research per the milestone thesis. `/gsd:plan-phase --research-phase`. Start text-only; resolve scope here, not by default.
-- **P65 — blend/half-life tuning (research flag) + Kaan-ear veto (KAAN-ACTION):** cosine-only vs cosine+time-weight and the decay half-life (in *sessions*, not hours) is an open question — tune the shape (two-term exp-decay + relevance floor) + exact recall threshold (start at 0.7) against Kaan's real session corpus in-phase. Ships behind a **Kaan-ear veto** on retrieval relevance (mirrors P60 harmonic veto) — the hard quality gate.
-- **P66 — Kaan-ear quality gate (KAAN-ACTION):** the visible copilot move's real gate is Kaan's ear (recall fires grounded + doesn't feel scripted), not a test.
-
-### Anti-slop invariants baked into v6.0 success criteria
-
-- **Retrieval-poisoning suppression:** ~0.7 floor (below → inject nothing; empty retrieval is correct + frequent), top-k 2–3 cap, event-gated to track-aware events (never HEARTBEAT). [P65]
-- **Citable-by-construction recall:** fabricated `[recall:<id>]` the registry never saw strips the whole turn (existing `CitationLinter`, zero new code). [P65 / P66]
-- **No-extraction:** raw-in/raw-out deterministic text signatures only; CI guard asserts ingest calls only `embed_content` (never any chat/generation model). [P64]
-- **Current-session exclusion:** the in-progress session is excluded from its own retrieval (natural — ingest is post-session). [P64 tag + P65 exclusion]
-- **Four cardinal invariants:** single-writer (memory DB sole writer = ingest, off-loop), citation-grounding (recall through the existing linter), trust-the-audio (recall fenced PAST-tense, subordinate to the live audio Part), one-socket (no new port; recall surfaces on existing `ipc.session.*` / citation strip). [P65 / P66]
-- **No anti-features:** no next-track recommendation, no LLM-extracted "tendencies"/insights as fact, no settings-screen personalization, no continuous audio embedding. [P66, enforced by review]
+v6.0's memory-grounded copilot ships behind `VIBEMIX_RECALL_ENABLED=0` until §RECALL-EAR Kaan-ear pass (independent clock). v7.0 does NOT touch the flag default. The reuse map under `src/vibemix/library/` + `src/vibemix/memory/` is untouched. Tests under `tests/memory/` are part of the default `pytest -q` grid that TEST-01 must hold green.
 
 ---
 
 ## Session Continuity
 
-**Next command:** execute `64-03-PLAN.md` (Wave 2 — runtime wiring) — `/gsd:execute-phase 64`.
+**Next command:** plan Phase 67 — `/gsd:plan-phase 67`.
 
-**What's done:** **Phase 64 INGEST module GREEN (64-01 RED → 64-02 GREEN).** `src/vibemix/memory/ingest.py` ships `build_coach_line_signature` (pure, deterministic, model-free), `ingest_session` (one `coach_line` per EMITTED `ai_text`; skips silenced `citation_strip`; two-layer idempotency = `memory_ingested` marker + signature-keyed `embed_cache`; A4 reconciliation on `COUNT(*) moments`), `run_ingest_sweep` (best-effort boot sweep, `SESSION_DIR_RE` + `is_relative_to` path-traversal defense), `IngestResult`. All 6 `test_ingest` + ingest-dormancy CLEAN + no-extraction + model-literal gates GREEN; `library/embed.py` + `memory/store.py` UNMODIFIED. Commits `c68fe31`, `d6b29cf`. Earlier: P64-01 RED contract (`dcdc307`, `1cb9008`). **Phase 63 (Memory Store) COMPLETE** — STORE-01..04 GREEN (`18a5c1f`, `eb5b5b5`, `610c374`, `d36d924`, `dde3c0f`, `5635390`).
+**What's done:** **v7.0 "Open House" ROADMAPPED.** 4 phases (67–70), 19/19 REQ-IDs mapped to exactly one phase (TEST-01..04 → P67 · DEV-01..05 → P68 · OSS-01..05 → P69 · GH-01..05 → P70 — no orphans, no duplicates, confirmed by roadmapper). Hard dependency spine: P67 dep-free → P68 on P67's CI matrix → P69 on P68 (no broken catalog publish) → P70 on P69 (front-porch references real artifacts). Acid test held: every phase reads as "verify / wire / discharge / generate / test" — zero new product capability, zero new deps, zero new ws ports, zero new IPC envelopes. Files written: `.planning/ROADMAP.md` (v7.0 section + summary checklist + phase details + progress table), `.planning/REQUIREMENTS.md` (Traceability table flipped Pending → Mapped (planning), roadmapper confirmation note), `.planning/STATE.md` (this file — Current Position + v7.0 Phase Map + Performance Metrics + Accumulated Context). v6.0 archived into ROADMAP collapsible.
 
-**What's next:** Phase 64 Plan 03 (Wave 2) — runtime wiring: enqueue `ingest_session` at session-close (`on_session_close`) + `run_ingest_sweep` at boot (`run_boot_sweeps`), both via `run_in_executor`, one-way runtime→ingest, best-effort/never-raise. The ingest seam is complete + tested; 64-03 only wires the call sites (touches the runtime/session-end seam, NOT the live ears). Then `/gsd:plan-phase --research-phase` for P65 (blend/half-life — the anti-slop release gate). The P63 sqlite-vec clean-VM/sign item rides the v4.0 external-clock surface; the cascade/retention call-site wiring is deferred to the recordings-UI-delete phase.
+**What's next:** Phase 67 planning (TEST · All Tests Pass) — dependency-free, runs first. The phase scope is well-bounded: close every uncategorized red / skip / xfail in the default grid, prove the 65 opt-in tests pass or route their failure-modes to `§V7-LIVE`, flake-hunt + quarantine, ship `.github/workflows/full-test-matrix.yml` + README badge. Then P68 (DEV) on P67's CI matrix, then P69 (OSS) on P68, then P70 (GH) on P69. OSS-04 has the external Apple Dev + SignPath clock — under autonomous mode, routes to §SHIP-V4 if not landed; other 18 reqs ship unblocked. v4.0 SHIP closes alongside OSS-04.
 
-**Open before execution:** none blocking. Model-ID (text-001 vs multimodal-2) is a one-line config choice to confirm with Kaan but never hardcode either way.
+**Open before execution:** none blocking. The four KAAN-ACTION soft items (FLX4 ear / proxy hardening coordination / Francesco demo cut / Kaan landing sign-off) route to KAAN-ACTION surfaces (§V7-LIVE + §V7-LANDING — to create in plan); engineering ships green in CI alongside them. The one hard external item (OSS-04 signatures) has its autonomous-mode contingency pre-decided.
 
 ---
 
 ## Deferred Items
 
-Items acknowledged and deferred at v6.0 milestone close on 2026-05-23 (all intentional KAAN-ACTION carry-forwards per `gsd-autonomous fully` directive — see PROJECT.md Active section + KAAN-ACTION-LEGAL.md §SHIP / §SHIP-V4 / §RECALL-EAR + v5.0 KAAN-ACTION live-confirm items):
+Items acknowledged and deferred at v7.0 milestone start on 2026-05-23 (all intentional KAAN-ACTION carry-forwards per `gsd-autonomous fully` directive — inherited from v4.0 SHIP + v5.0 + v6.0; v7.0 adds soft sign-off items to be created during plan execution):
 
 | Category | Phase | Status | Note |
 |----------|-------|--------|------|
-| verification | 51 | human_needed | v4.0 SHIP (external signature clock) |
-| verification | 53 | human_needed | v4.0 SHIP (external signature clock) |
-| verification | 54 | human_needed | v4.0 SHIP (external signature clock) |
-| verification | 55 | human_needed | v4.0 SHIP (external signature clock) |
-| verification | 56 | human_needed | v4.0 SHIP (external signature clock) |
-| verification | 57 | human_needed | v4.0 SHIP (external signature clock) |
-| verification | 58 | human_needed | v4.0 SHIP (external signature clock) |
+| verification | 51 | human_needed | v4.0 SHIP — closes alongside v7.0 OSS-04 (external signature clock) |
+| verification | 53 | human_needed | v4.0 SHIP — closes alongside v7.0 OSS-04 (external signature clock) |
+| verification | 54 | human_needed | v4.0 SHIP — closes alongside v7.0 OSS-04 (external signature clock) |
+| verification | 55 | human_needed | v4.0 SHIP — closes alongside v7.0 OSS-04 (external signature clock) |
+| verification | 56 | human_needed | v4.0 SHIP — closes alongside v7.0 OSS-04 (external signature clock) |
+| verification | 57 | human_needed | v4.0 SHIP — closes alongside v7.0 OSS-04 (external signature clock) |
+| verification | 58 | human_needed | v4.0 SHIP — closes alongside v7.0 OSS-04 (external signature clock) |
 | verification | 59 | human_needed | v5.0 SHIPPED — KAAN-ACTION live-confirm |
 | verification | 60 | human_needed | v5.0 SHIPPED — KAAN-ACTION live-confirm (harmonic veto flip) |
 | verification | 61 | human_needed | v5.0 SHIPPED — KAAN-ACTION live-confirm (coach live-ear) |
@@ -211,9 +169,13 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-05-23 (all inten
 | uat | 57 | partial (5 open) | v4.0 SHIP HUMAN-UAT |
 | uat | 58 | partial (4 open) | v4.0 SHIP HUMAN-UAT |
 | uat | 66 | partial (4 open) | v6.0 §RECALL-EAR HUMAN-UAT |
+| v7.0 soft | 67 | to create in plan | TEST-02 65 opt-in tests on real hardware → `§V7-LIVE` |
+| v7.0 soft | 68 | to create in plan | DEV-03 FLX4 live ear + DEV-04 BlackHole/WASAPI live + DEV-05 contributor smoke → `§V7-LIVE` |
+| v7.0 hard | 69 | to create in plan | OSS-04 external signatures (Apple Dev + SignPath) → `§SHIP-V4` discharge |
+| v7.0 soft | 70 | to create in plan | GH-01 Francesco demo cut → `§V7-LANDING` (or existing §ASSETS-DEMO-CUT) + GH-02 Kaan-felt landing aesthetic sign-off → `§V7-LANDING` |
 
-**Total deferred at v6.0 close: 18 items** (12 verification gaps + 6 UAT gaps). None block v6.0; all documented KAAN-ACTION carry-forwards riding the external signature clock OR Kaan's ear-discharge pass.
+**Total deferred at v7.0 start: 22 items** (12 verification gaps + 6 UAT gaps inherited from v4.0/v5.0/v6.0 + 4 v7.0 soft/hard items to be formalized in plan execution). None block v7.0 engineering close under autonomous mode; OSS-04 alone gates the *publish* (which closes v4.0 SHIP alongside).
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Plan Phase 67 with `/gsd:plan-phase 67` (TEST · All Tests Pass — dependency-free, runs first).

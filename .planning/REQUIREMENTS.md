@@ -86,26 +86,28 @@ The product's hard line holds: **grounded, never hallucinating, no AI slop.** No
 
 ## Traceability
 
+**Roadmapper confirmed 2026-05-23**: 19/19 requirements mapped to exactly one phase each — no orphans, no duplicates, no re-mappings (REQUIREMENTS.md proposed mapping = roadmap-derived mapping). Coverage validated against the 4-pillar / 4-phase decomposition (TEST-01..04 → P67 · DEV-01..05 → P68 · OSS-01..05 → P69 · GH-01..05 → P70). Each phase reads as "verify / wire / discharge / generate / test" — zero product-surface growth, acid test held.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-01 | Phase 67 | Pending |
-| TEST-02 | Phase 67 | Pending |
-| TEST-03 | Phase 67 | Pending |
-| TEST-04 | Phase 67 | Pending |
-| DEV-01 | Phase 68 | Pending |
-| DEV-02 | Phase 68 | Pending |
-| DEV-03 | Phase 68 | Pending |
-| DEV-04 | Phase 68 | Pending |
-| DEV-05 | Phase 68 | Pending |
-| OSS-01 | Phase 69 | Pending |
-| OSS-02 | Phase 69 | Pending |
-| OSS-03 | Phase 69 | Pending |
-| OSS-04 | Phase 69 | Pending |
-| OSS-05 | Phase 69 | Pending |
-| GH-01 | Phase 70 | Pending |
-| GH-02 | Phase 70 | Pending |
-| GH-03 | Phase 70 | Pending |
-| GH-04 | Phase 70 | Pending |
-| GH-05 | Phase 70 | Pending |
+| TEST-01 | Phase 67 | Mapped (planning) |
+| TEST-02 | Phase 67 | Mapped (planning) |
+| TEST-03 | Phase 67 | Mapped (planning) |
+| TEST-04 | Phase 67 | Mapped (planning) |
+| DEV-01 | Phase 68 | Mapped (planning) |
+| DEV-02 | Phase 68 | Mapped (planning) |
+| DEV-03 | Phase 68 | Mapped (planning) |
+| DEV-04 | Phase 68 | Mapped (planning) |
+| DEV-05 | Phase 68 | Mapped (planning) |
+| OSS-01 | Phase 69 | Mapped (planning) |
+| OSS-02 | Phase 69 | Mapped (planning) |
+| OSS-03 | Phase 69 | Mapped (planning) |
+| OSS-04 | Phase 69 | Mapped (planning) — gated on external Apple Dev + SignPath clock; routes to `KAAN-ACTION-LEGAL.md §SHIP-V4` if signatures haven't landed at execution; v4.0 "SHIP" closes alongside |
+| OSS-05 | Phase 69 | Mapped (planning) |
+| GH-01 | Phase 70 | Mapped (planning) — §ASSETS-DEMO-CUT discharge consumed |
+| GH-02 | Phase 70 | Mapped (planning) — Kaan-felt sign-off on landing aesthetic rides `§V7-LANDING` |
+| GH-03 | Phase 70 | Mapped (planning) |
+| GH-04 | Phase 70 | Mapped (planning) |
+| GH-05 | Phase 70 | Mapped (planning) |
 
-**Coverage:** 19/19 requirements mapped to exactly one phase each — no orphans, no duplicates (TEST-01..04 → Phase 67 · DEV-01..05 → Phase 68 · OSS-01..05 → Phase 69 · GH-01..05 → Phase 70). To be confirmed by the roadmapper.
+**Coverage:** 19/19 requirements mapped to exactly one phase each — no orphans, no duplicates (TEST-01..04 → Phase 67 · DEV-01..05 → Phase 68 · OSS-01..05 → Phase 69 · GH-01..05 → Phase 70). **Confirmed by roadmapper 2026-05-23.**
