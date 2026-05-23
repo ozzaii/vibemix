@@ -64,7 +64,12 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
   2. Running the full opt-in grid `pytest -m "macos_audio or windows_only or integration or slow or e2e or cli or network"` exits green on Kaan's Mac + a Windows 11 VM — the 65 currently-deselected tests either pass or each failure-mode is documented in `KAAN-ACTION-LEGAL.md §V7-LIVE`. Verified by inspecting per-marker pytest output + a count of `tests collected` matching what `pytest --collect-only -q` reports.
   3. A 10× consecutive re-run of `pytest -q` reveals no test below 100% pass rate, OR any non-deterministic test is quarantined behind a `@pytest.mark.flaky` decorator with a linked GitHub issue. A static gate at `tests/repo/test_no_silent_flakes.py` catches new `@pytest.mark.flaky` decorators that don't carry an issue link — verified by adding a no-issue-link flaky decorator in a scratch PR and watching CI go red.
   4. `.github/workflows/full-test-matrix.yml` exists, runs the full marker grid (default + each opt-in marker individually) on `macos-13` + `macos-14` + `windows-latest` on every push to `main` and every PR, and a green badge for it appears in the README badges row. Verified by opening the workflow run page on `main` HEAD + confirming the badge URL in `README.md` resolves 200 to a green SVG.
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 67P01-PLAN.md — Wave 0: fix the 8 currently-red default tests + register the `flaky` marker in `pyproject.toml` (TEST-01, TEST-03)
+- [ ] 67P02-PLAN.md — Wave 1: triage the 65 opt-in tests Tier-A/B/C + create the `§V7-LIVE` section + xfail decorate all Tier-B tests (TEST-01, TEST-02)
+- [ ] 67P03-PLAN.md — Wave 2: build the two static gates `test_no_silent_skips.py` + `test_no_silent_flakes.py` (TEST-01, TEST-03)
+- [ ] 67P04-PLAN.md — Wave 3: ship `.github/workflows/full-test-matrix.yml` + add README badge (TEST-02, TEST-04)
+- [ ] 67P05-PLAN.md — Wave 4: 10× flake-hunt + document the protocol in `docs/flake-hunt.md` + quarantine any flake found (TEST-03)
 
 ### Phase 68: All Devices Ready
 **Goal**: All 10 bundled MIDI controller profiles are live-verified end-to-end as data contracts — each has a schema-valid contract test, a synthetic-MIDI smoke that exercises every CC + NOTE through `find_mapping` → `ControllerState` → `MusicState`, and a documented `port_name_hint` that resolves cleanly on real hardware. The duplicate `src/vibemix/midi/controllers/*.json` ↔ `src/vibemix/midi/profiles/*.json` catalogs are reconciled atomically to a **single source of truth** (one canonical directory, one schema, one loader) — eliminating the "which one does the registry actually use?" ambiguity flagged in v4.0 Phase 53. Hot-plug (connect → disconnect → reconnect with state preservation) is end-to-end verified in CI across ≥3 distinct profiles; live FLX4 plug/unplug on real hardware routes to KAAN-ACTION. The audio backend matrix (macOS BlackHole 2ch + 16ch · Windows WASAPI loopback + edge "no-loopback-driver" fallback) is covered by integration tests against mocked CoreAudio + WASAPI. And a "Add Your Controller" contributor recipe lands at `docs/contributing/add-a-controller.md` — bundled template, the exact 4-step contract-test pattern, a `scripts/discover_midi_port.py` helper, a PR checklist — verified end-to-end by Kaan (or a trusted DJ) adding one new profile in < 30 min as a smoke. This phase is the bridge between "engineering-green" and "third-party-installable": a stranger should be able to plug in their controller and either have it work out-of-the-box or follow a clean recipe to add it.
@@ -113,7 +118,7 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 67. All Tests Pass | v7.0 | 0/0 | Not started | - |
+| 67. All Tests Pass | v7.0 | 0/5 | Not started | - |
 | 68. All Devices Ready | v7.0 | 0/0 | Not started | - |
 | 69. OSS Fully Integrated | v7.0 | 0/0 | Not started | - |
 | 70. GitHub Sexified, Generated, Tested | v7.0 | 0/0 | Not started | - |
