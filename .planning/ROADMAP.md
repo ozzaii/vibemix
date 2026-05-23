@@ -67,7 +67,7 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
 **Plans**: 5 plans
 - [x] 67P01-PLAN.md — Wave 0: fix the 8 currently-red default tests + register the `flaky` marker in `pyproject.toml` (TEST-01, TEST-03) — SHIPPED 2026-05-23 (commit a08594d)
 - [x] 67P02-PLAN.md — Wave 1: triage the 65 opt-in tests Tier-A/B/C + create the `§V7-LIVE` section + xfail decorate all Tier-B tests (TEST-01, TEST-02) — SHIPPED 2026-05-23 (commits 6f79943 + 293135c; §V7-LIVE has 4 cluster sub-entries; 11 Tier-B tests carry xfail(strict=False))
-- [ ] 67P03-PLAN.md — Wave 2: build the two static gates `test_no_silent_skips.py` + `test_no_silent_flakes.py` (TEST-01, TEST-03)
+- [x] 67P03-PLAN.md — Wave 2: build the two static gates `test_no_silent_skips.py` + `test_no_silent_flakes.py` (TEST-01, TEST-03) — SHIPPED 2026-05-23 (commits e5b7c98 + dc29e3d; AST-walk gates accept Wave 1 Tier-B decorator shape; flake gate vacuously-green at landing; negative controls verified)
 - [ ] 67P04-PLAN.md — Wave 3: ship `.github/workflows/full-test-matrix.yml` + add README badge (TEST-02, TEST-04)
 - [ ] 67P05-PLAN.md — Wave 4: 10× flake-hunt + document the protocol in `docs/flake-hunt.md` + quarantine any flake found (TEST-03)
 
