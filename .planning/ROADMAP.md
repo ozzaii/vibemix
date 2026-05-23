@@ -68,7 +68,7 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
 - [x] 67P01-PLAN.md — Wave 0: fix the 8 currently-red default tests + register the `flaky` marker in `pyproject.toml` (TEST-01, TEST-03) — SHIPPED 2026-05-23 (commit a08594d)
 - [x] 67P02-PLAN.md — Wave 1: triage the 65 opt-in tests Tier-A/B/C + create the `§V7-LIVE` section + xfail decorate all Tier-B tests (TEST-01, TEST-02) — SHIPPED 2026-05-23 (commits 6f79943 + 293135c; §V7-LIVE has 4 cluster sub-entries; 11 Tier-B tests carry xfail(strict=False))
 - [x] 67P03-PLAN.md — Wave 2: build the two static gates `test_no_silent_skips.py` + `test_no_silent_flakes.py` (TEST-01, TEST-03) — SHIPPED 2026-05-23 (commits e5b7c98 + dc29e3d; AST-walk gates accept Wave 1 Tier-B decorator shape; flake gate vacuously-green at landing; negative controls verified)
-- [ ] 67P04-PLAN.md — Wave 3: ship `.github/workflows/full-test-matrix.yml` + add README badge (TEST-02, TEST-04)
+- [x] 67P04-PLAN.md — Wave 3: ship `.github/workflows/full-test-matrix.yml` + add README badge (TEST-02, TEST-04) — SHIPPED 2026-05-23 (commits 6cd0d3a + 8c1482b + 809b66a; 87-line workflow with OS × marker exclude-matrix [8 markers × 3 OSes − 3 excludes = 21 jobs], SHA-pinned actions, workflow-prefixed concurrency, on: pull_request not pull_request_target, fail-fast: false, timeout-minutes: 30; new badge in README line 44 matching the 5 sibling badges' format; §V7-LIVE-05 first-CI-green cluster added to KAAN-ACTION-LEGAL.md for the Kaan-clock first-push discharge)
 - [ ] 67P05-PLAN.md — Wave 4: 10× flake-hunt + document the protocol in `docs/flake-hunt.md` + quarantine any flake found (TEST-03)
 
 ### Phase 68: All Devices Ready
@@ -118,7 +118,7 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 67. All Tests Pass | v7.0 | 1/5 | In progress | - |
+| 67. All Tests Pass | v7.0 | 4/5 | In Progress|  |
 | 68. All Devices Ready | v7.0 | 0/0 | Not started | - |
 | 69. OSS Fully Integrated | v7.0 | 0/0 | Not started | - |
 | 70. GitHub Sexified, Generated, Tested | v7.0 | 0/0 | Not started | - |
