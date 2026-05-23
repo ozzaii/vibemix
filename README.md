@@ -41,6 +41,7 @@ Your audio doesn't leave your machine without you knowing. vibemix is open sourc
   <a href="https://github.com/bravoh-ai/vibemix/actions/workflows/dep-audit.yml"><img alt="cargo-deny" src="https://img.shields.io/github/actions/workflow/status/bravoh-ai/vibemix/dep-audit.yml?label=cargo-deny&branch=main&event=push&style=flat-square" /></a>
   <a href="https://github.com/bravoh-ai/vibemix/actions/workflows/dep-audit.yml"><img alt="npm-audit" src="https://img.shields.io/github/actions/workflow/status/bravoh-ai/vibemix/dep-audit.yml?label=npm-audit&branch=main&event=push&style=flat-square" /></a>
   <a href="https://github.com/bravoh-ai/vibemix/actions/workflows/sbom.yml"><img alt="CycloneDX SBOM" src="https://img.shields.io/github/actions/workflow/status/bravoh-ai/vibemix/sbom.yml?label=CycloneDX%20SBOM&branch=main&style=flat-square" /></a>
+  <a href="https://github.com/bravoh-ai/vibemix/actions/workflows/full-test-matrix.yml"><img alt="full test matrix" src="https://img.shields.io/github/actions/workflow/status/bravoh-ai/vibemix/full-test-matrix.yml?label=tests&branch=main&style=flat-square" /></a>
 </p>
 
 ---
