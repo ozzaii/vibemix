@@ -84,4 +84,14 @@ jobs:
         if: matrix.marker != 'default'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: uv run pytest -q --tb=short -m "${{ matrix.marker }}"
+          # WR-01 defense-in-depth (Phase 67 REVIEW): route the matrix
+          # value through an intermediate env var rather than splicing
+          # `${{ matrix.marker }}` directly into the shell. Safe today
+          # because the matrix list is statically declared in YAML; the
+          # env-var indirection covers the day someone moves the marker
+          # list to a `workflow_dispatch.inputs.marker` (or a
+          # `repository_dispatch` payload) — where the same shape would
+          # otherwise be a script-injection vector.
+          # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
+          MATRIX_MARKER: ${{ matrix.marker }}
+        run: uv run pytest -q --tb=short -m "$MATRIX_MARKER"
