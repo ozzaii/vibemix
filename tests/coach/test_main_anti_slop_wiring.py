@@ -177,19 +177,28 @@ def test_wire12_env_var_vibemix_anti_slop_read(main_src: str) -> None:
 
 
 def test_wire13_anti_slop_disabled_path_passes_none_kwargs(main_src: str) -> None:
-    """W13: When VIBEMIX_ANTI_SLOP is off, the linter primitives are None.
-    Source contains a conditional `if anti_slop_enabled else None` pattern
-    OR equivalent — verifies the disable branch exists at the construction
-    site, not just a conditional banner print."""
-    # Accept any of: `if anti_slop_enabled else None`,
-    # `CitationLinter() if anti_slop_enabled else None`,
-    # or a multi-line `if/else` block that assigns None.
+    """W13: When VIBEMIX_ANTI_SLOP is off (or the post-2026-05-21 separate
+    VIBEMIX_CITATION_LINT gate is off), the linter primitive is None.
+
+    The original v1 contract was a single `CitationLinter() if anti_slop_enabled
+    else None`. The 2026-05-21 decoupling (Kaan) split citation enforcement
+    onto its own VIBEMIX_CITATION_LINT flag because gemini-3.x rarely emits the
+    [cite] grammar — wiring it on by default muzzled the co-host. The intent
+    of the test (linter is conditionally constructed, not unconditionally
+    instantiated) is preserved as long as `CitationLinter()` appears with
+    `if <flag> else None` adjacent.
+
+    Accept either form:
+      - `CitationLinter() if anti_slop_enabled else None` (v1)
+      - `CitationLinter() if citation_lint_enabled else None` (post-2026-05-21)
+    """
     pattern = re.compile(
-        r"CitationLinter\(\)\s+if\s+anti_slop_enabled\s+else\s+None"
+        r"CitationLinter\(\)\s+if\s+(?:anti_slop|citation_lint)_enabled\s+else\s+None"
     )
     assert pattern.search(main_src), (
         "CitationLinter must be conditionally constructed: "
-        "`CitationLinter() if anti_slop_enabled else None`"
+        "`CitationLinter() if anti_slop_enabled else None` OR "
+        "`CitationLinter() if citation_lint_enabled else None`"
     )
 
 

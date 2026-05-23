@@ -10,9 +10,14 @@ Pins the SHIP-06 / OPS-14 Bravoh-server gate plumbing decisions:
   Test 16. The ``fail()`` message in the Gate 5b block routes the operator to
            the probe for the structured ``BLOCKED_BY`` line.
   Test 17. ``scripts/release/check_bravoh_server_ready.sh`` exists and is executable.
-  Test 18. Tag regex ``^v2\\.1\\.0-rc[0-9]+$`` UNCHANGED — Plan 45-06 (or later)
-           owns the bump to ``v3.0``; this plan stays scoped to the Bravoh
-           server gate.
+  Test 18. Tag regex matches the current public-OSS RC shape (
+           ``^v0\\.1\\.0-rc[0-9]+$`` post-P83 / Phase 56 — "no premature
+           v1.0.0", v0.1.0-rc is the PUBLIC OSS tag). Updated 2026-05-23
+           (Phase 67 / Plan 67P01) to track the current source-of-truth in
+           ``scripts/launch/cut_release.sh``; the original v2.1 pin pre-dates
+           the v4.0 SHIP renumbering and the public-OSS RC decision. The
+           negative pin (no v3 regex) still holds — Plan 45-06 (or later)
+           remains the next legitimate bump path.
 
 Regression baseline preservation is asserted by re-running
 ``tests/repo/test_cut_release_invokes_check_gate.py`` in the same pytest
@@ -128,10 +133,12 @@ def test_check_bravoh_server_ready_exists_and_executable():
 
 def test_tag_regex_unchanged_in_this_plan():
     text = _read_script()
-    # Pin both the variable assignment and the contract that this plan does
-    # NOT introduce a v3 regex (that's a future plan's job).
-    assert "TAG_REGEX='^v2\\.1\\.0-rc[0-9]+$'" in text, (
-        "Tag regex must remain `^v2\\.1\\.0-rc[0-9]+$` in this plan; "
+    # Pin the current source-of-truth: the v0.1.0-rc public-OSS shape per
+    # P83 / Phase 56 ("v0.1.0-rc is the PUBLIC OSS tag, v4.0 stays the
+    # INTERNAL milestone"). Updated 2026-05-23 (Phase 67 / Plan 67P01) —
+    # the original v2.1 pin pre-dated the public-OSS renumbering.
+    assert "TAG_REGEX='^v0\\.1\\.0-rc[0-9]+$'" in text, (
+        "Tag regex must match `^v0\\.1\\.0-rc[0-9]+$` (public-OSS shape per P83). "
         "Plan 45-06 (or later) owns the v3.0 bump."
     )
     # Negative pin: no v3 regex sneaks in.

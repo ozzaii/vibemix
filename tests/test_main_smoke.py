@@ -743,10 +743,34 @@ def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> 
 
     # Cache construction
     assert "GeminiContextCache(" in src, "GeminiContextCache constructor call missing"
-    assert "system_instruction_body=SYSTEM_INSTRUCTION" in src, (
-        "GeminiContextCache must be built with SYSTEM_INSTRUCTION body"
+    # The original v1 contract baked `system_instruction_body=SYSTEM_INSTRUCTION`
+    # (= HYPE_INTERMEDIATE, Turkish hype). The 2026-05-21 fix (cache ≡ agent
+    # invariant: the cached system instruction MUST match the agent's resolved
+    # cell from VIBEMIX_SKILL_LEVEL / VIBEMIX_MODE / VIBEMIX_MOOD — otherwise
+    # a warm cache silently overrides COACH_PRO/English with HYPE_INTERMEDIATE/
+    # Turkish at runtime) replaced the hardcoded constant with a resolved local
+    # `cache_system_instruction = _resolve_prompt_cell()`. Accept either form;
+    # the load-bearing contract is "the cache is built with a system-instruction
+    # body kwarg" — not which constant feeds it. Updated 2026-05-23 (Phase 67
+    # / Plan 67P01).
+    assert (
+        "system_instruction_body=SYSTEM_INSTRUCTION" in src
+        or "system_instruction_body=cache_system_instruction" in src
+    ), (
+        "GeminiContextCache must be built with a system_instruction_body kwarg "
+        "(SYSTEM_INSTRUCTION OR cache_system_instruction)"
     )
-    assert "await cache.create()" in src, "cache.create not awaited"
+    # `cache.create()` must be awaited. The 2026-05-21 fix wrapped the await
+    # in `asyncio.wait_for(cache.create(), timeout=4.0)` (fail-fast against the
+    # SDK's lack of a built-in timeout — a free-tier key on a project where
+    # context caching is paid-tier hangs `caches.create()` indefinitely and
+    # blocks boot before "listening to"). Accept the bare-await form OR the
+    # timeout-wrapped form; both await the coroutine. Updated 2026-05-23
+    # (Phase 67 / Plan 67P01).
+    assert (
+        "await cache.create()" in src
+        or "asyncio.wait_for(cache.create()" in src
+    ), "cache.create not awaited (bare or wait_for-wrapped form)"
     # Graceful degradation — cache=None on failure, no propagation of exception
     assert "cache = None" in src, "graceful-degradation cache=None branch missing"
     # Plan 41-02 — wall-clock refresh_loop deleted. Cache refresh is event-

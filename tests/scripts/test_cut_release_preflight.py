@@ -66,29 +66,41 @@ def test_cut_release_blocks_on_bare_v2_1_0():
 
 
 def test_cut_release_accepts_valid_rc_tag_shape():
-    """Tag `v2.1.0-rc1` shape itself passes Gate 1; downstream gates may
-    still fail (missing dist artifacts etc.), but Gate 1 must not be the
-    tripped gate."""
-    result = _run_cut("v2.1.0-rc1")
+    """Valid RC tag shape passes Gate 1; downstream gates may still fail
+    (missing dist artifacts etc.), but Gate 1 must not be the tripped gate.
+
+    Updated 2026-05-23 (Phase 67 / Plan 67P01) to use the current public-OSS
+    RC shape `v0.1.0-rc1` (per P83 / Phase 56 — "v0.1.0-rc is the PUBLIC OSS
+    tag, v4.0 stays the INTERNAL milestone"). The v2.1.0-rc1 pin pre-dated
+    the public-OSS renumbering.
+    """
+    result = _run_cut("v0.1.0-rc1")
     # Gate 1 must report PASS.
     assert "Gate 1" in result.stdout
     # Anywhere in output, the Gate 1 region must show 'PASS' for the
     # tag-prefix line.
     g1_block = result.stdout.split("[Gate 2]")[0]
     assert "PASS" in g1_block, (
-        f"Gate 1 did not pass for v2.1.0-rc1.\nstdout=\n{result.stdout}"
+        f"Gate 1 did not pass for v0.1.0-rc1.\nstdout=\n{result.stdout}"
     )
 
 
 def test_cut_release_blocks_on_missing_milestone_audit(tmp_path: Path):
-    """Renaming the milestone audit must trip Gate 4."""
-    audit = REPO_ROOT / ".planning" / "v2.1-MILESTONE-AUDIT.md"
+    """Renaming the milestone audit must trip Gate 4.
+
+    Updated 2026-05-23 (Phase 67 / Plan 67P01) to track the current
+    milestone-audit filename + RC tag shape:
+      - audit path: `.planning/v4.0-MILESTONE-AUDIT.md` (was v2.1 pre-Phase-37
+        renumbering)
+      - RC tag: `v0.1.0-rc1` (public-OSS shape per P83 / Phase 56)
+    """
+    audit = REPO_ROOT / ".planning" / "v4.0-MILESTONE-AUDIT.md"
     backup = tmp_path / "audit-backup.md"
     if audit.exists():
         shutil.copy2(audit, backup)
         audit.unlink()
     try:
-        result = _run_cut("v2.1.0-rc1")
+        result = _run_cut("v0.1.0-rc1")
         combined = result.stdout + result.stderr
         assert result.returncode != 0
         assert "Gate 4" in result.stdout

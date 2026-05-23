@@ -113,6 +113,14 @@ recordings/
 # in tree so CI doesn't depend on the regeneration path).
 !tests/eval/fixtures/synthetic_session/events.jsonl
 
+# DO ship the Phase 27 Plan 03 corpus-diversity-gate per-session events.jsonl
+# placeholders (one per eval/corpus/sessions/<id>/ directory; empty until the
+# KAAN-ACTION corpus-acquisition step populates real labels). Pinned by
+# tests/eval/test_corpus_diversity_gate.py::test_each_session_has_events_jsonl_file
+# — docstring says "may be empty pending labeling". Tracked as committed
+# scaffold so a fresh clone never trips that test (Phase 67 / Plan 67P01).
+!eval/corpus/sessions/*/events.jsonl
+
 # DO ship the Phase 41 Plan 07 latency-stack synthetic 30-turn fixture
 # (events.jsonl with llm_to_tts_delta_ms + cache_hit + event_fired rows;
 # kept in tree so the 41-INTEGRATION-REPORT measurements reproduce

@@ -176,6 +176,12 @@ Items acknowledged and deferred at v7.0 milestone start on 2026-05-23 (all inten
 
 **Total deferred at v7.0 start: 22 items** (12 verification gaps + 6 UAT gaps inherited from v4.0/v5.0/v6.0 + 4 v7.0 soft/hard items to be formalized in plan execution). None block v7.0 engineering close under autonomous mode; OSS-04 alone gates the *publish* (which closes v4.0 SHIP alongside).
 
+## Historical Audit Annotations
+
+Retained for audit-trail continuity (Plan 42-05 spec was annotate-not-delete; pinned by `tests/repo/test_gate_42_hybrid_in_force.py::test_state_md_phase_16_line_is_annotated_retired`):
+
+- **Phase 16 ear-test memory override — RETIRED.** The v2.1 P85 autonomous-only override (Phase 16 ear-test memory override, accepted as a one-milestone carveout per `gsd-autonomous fully` mode while Kaan's ear was deferred) is formally retired as of Plan 42-05 (2026-05-16). Replaced by the v3.0 hybrid hallucination gate (`scripts/release/check_gate.sh` + `check_ear_test.sh`) wired into `cut_release.sh` at Gate 2b. Cross-reference: `.planning/decisions/P85-OVERRIDE-RETIRED.md`.
+
 ## Operator Next Steps
 
 - Plan Phase 67 with `/gsd:plan-phase 67` (TEST · All Tests Pass — dependency-free, runs first).

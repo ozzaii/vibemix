@@ -205,4 +205,5 @@ markers = [
     "cli: subprocess CLI integration tests (slower than unit tests; run via `pytest -m cli` for full coverage)",
     "e2e: end-to-end debrief lifecycle tests (Phase 29 Plan 08; opt-in via `pytest -m e2e`)",
     "network: live-network smoke tests (e.g. LAUNCH-06 GitHub org poller); opt-in via `pytest -m network`",
+    "flaky: quarantined non-deterministic test; carries a # issue: https://... link enforced by tests/repo/test_no_silent_flakes.py",
 ]

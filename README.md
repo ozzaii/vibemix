@@ -108,21 +108,22 @@ Each cell speaks a different vocabulary on purpose. Beginner is encouragement-he
 
 | Phase | Surface | What shipped |
 |---|---|---|
-| 51 | Real-Hardware Bring-Up** - Boot the app + sidecar on Kaan's Mac, reach a stable live "listening" session with clean startup logs, and survive a ≥30-min full-set run with zero unhandled exceptions or unbounded memory. ✅ 2026-05-21 | boot green, ws_bus empty-frame + stale-sidecar dev loop closed, soak harness shipped; review CLEAN; real ≥30-min live soak = KAAN-ACTION. |
-| 52 | Audio Path + Feature Grounding** - BlackHole 48 kHz capture is live end-to-end and every feature derived from it (levels, BPM, bands) is grounded | out-of-range values like the live BPM=200 read on a ~129 BPM track never reach the bus or UI. ✅ 2026-05-21 — BPM never exceeds 180 on harmonic-leak trace; psytrance profile + grounded DSP genre auto-detector (confidence-gated, `unknown` fallback, hysteresis) + genre on bus; review CLEAN; multi-genre live drive = KAAN-ACTION. |
-| 53 | Controller Live + Graceful Fallback** - DDJ-FLX4 MIDI is ingested live during a real session and the app degrades cleanly when the controller is unplugged. ✅ 2026-05-21 | closed the real gap: `start_port_watcher` now wired into the live session (was never spawned); `mark_disconnected` clears stale moves; single-state hot-plug callback (no rebuild divergence); review CLEAN; physical FLX4 plug/unplug drive = KAAN-ACTION. |
-| 54 | Hype Mode Live** - On real audio, hype (party) mode actually fires grounded, in-bar, non-slop reactions | the AI voice lands on real events (drops/builds) across ≥2 genres, cooldowns/latency tuned live so nothing comes late. ✅ 2026-05-21 — trace-replay regression pins the real captured trace's drop/build events fire through the REAL EventDetector (52/52 events→reactions, 0 suppressions) + a synthetic genre-2 build→drop, never on silence; `IN_BAR_TOLERANCE_S` named one-line knob + cooldown-respect pinned (no v4 value changed) + `--print-cooldowns` over the real trace; anti-slop spine pinned with REAL EvidenceRegistry+CitationLinter (empty evidence→no fire, unbacked citation→strip, grounded→emit) + grounded HYPE persona (no `phase=`); thin HYPE·LIVE indicator + reaction-cadence pulse (token-only, 20/80). Full suite 3768 passed; review CLEAN. Live ≥2-genre ear-pass + cooldown-tuning drive = KAAN-ACTION. |
-| 40 | Anti-Slop Audio Port (6/6 plans) | completed 2026-05-16 (AUDIO-01..04 GREEN; AUDIO-05/06/07 = KAAN-ACTION-LEGAL) |
-| 41 | Gemini SKU Upgrade + Latency Stack v2 (7/7 plans) | completed 2026-05-16 (LAT-01..08 GREEN; LAT-09 spike = KAAN-ACTION-PROXY) |
-| 42 | Hallucination Gate v3 | Hybrid (6/6 plans) — completed 2026-05-16 (GATE-05..09 GREEN; GATE-01/02/03/04 corpus = KAAN-ACTION-LEGAL) |
-| 43 | Visual Ship Lock (9/9 plans) | completed 2026-05-16 (VIS-01..09 GREEN; VIS-04 Mixamo retargets = KAAN-ACTION-LEGAL) |
-| 44 | Launch Positioning + Pre-stage (7/7 plans) | completed 2026-05-17 (LAUNCH-01..10 GREEN; LAUNCH-03/04/06/07/08 = KAAN-ACTION-LEGAL) |
-| 45 | External Discharge + Public RC Publish (6/6 plans) | completed 2026-05-17 (SHIP-08/11/13 engineering GREEN; SHIP-01..13 cookbook in KAAN-ACTION-LEGAL) |
-| 46 | Dependency Audit + Lockfile + AUDIT.md (6/6 plans, 45 tests + 1 xfail; DEPS-01..06 + DEPS-09/10 GREEN; DEPS-07 pinact + DEPS-08 cull-blocked documented in AUDIT.md § Decisions) | completed 2026-05-18 |
-| 47 | Mascot Real GLB Land + Full Emotion Coverage (8/8 plans, 63 python + 177 ts tests; MASCOT-01..08 GREEN; §VIS-04 + §VIS-05 Mixamo discharge = KAAN-ACTION) | completed 2026-05-18 |
-| 48 | New-Dep + Integration Opportunity Scan (6/6 plans, 19 tests; OPP-01..06 GREEN; 24 candidates rated 1G/8Y/9R-constraint/6R-risk; OBS adopted docs-only) | completed 2026-05-18 |
-| 49 | Win + Mac One-Click Installer Chain (6/6 plans, 68 passing + 1 skip; INSTALL-01..10 GREEN; §INSTALL-COMPANION-SIGN + §INSTALL-VM-RUN + §SHIP-CONTACT-VBAUDIO = KAAN-ACTION; median 41,000 ms / 60,000 ms budget) | completed 2026-05-18 |
-| 50 | End-to-End MacBook + OS-Matrix Pass (6/6 plans, 16 passing + 5 CI-tolerant skips; E2E-01..10 GREEN; §E2E-50A-WALK + §INSTALL-VM-RUN downstream = KAAN-ACTION; Gate 6b wired into cut_release.sh) | completed 2026-05-18 |
+| 63 | Memory Store (3/3 plans) | 2026-05-22 (STORE-01..04 GREEN; 19/19 tests/memory/) |
+| 64 | Session Ingest (3/3 plans) | 2026-05-22 (INGEST-01..03 GREEN; one v1 moment kind = `coach_line`; `moment` cut, `audio_moment` deferred) |
+| 65 | Memory Retrieval Seam | ANTI-SLOP RELEASE GATE (4/4 plans) — 2026-05-22 (RECALL-01..04 GREEN; existence-only `recall` source à la P59 `key:`, fabricated `[recall:<id>]` strips whole turn) |
+| 66 | Visible Copilot Move (2/2 plans) | 2026-05-22 (COPILOT-01..03 GREEN; transition-shape + vocabulary callbacks; ships behind `VIBEMIX_RECALL_ENABLED=0` until §RECALL-EAR Kaan-ear pass) |
+| 59 | Full Deck Awareness + Grounding (5/5 plans) | 2026-05-21 |
+| 60 | Harmonic-Feedback Confidence Gate (4/4 plans) | 2026-05-21 (detector default-OFF until the Kaan-ear veto flip) |
+| 61 | Actionable-Not-Hype Coach Persona (2/2 plans) | 2026-05-21 |
+| 62 | Floating Pill UI (5/5 plans) | 2026-05-22 |
+| 51 | Real-Hardware Bring-Up (3/3 plans) | 2026-05-21 |
+| 52 | Audio Path + Feature Grounding (4/4 plans) | 2026-05-21 |
+| 53 | Controller Live + Graceful Fallback (2/2 plans) | 2026-05-21 |
+| 54 | Hype Mode Live (4/4 plans) | 2026-05-20 |
+| 55 | Feedback Mode Live + Citation Integrity (3/3 plans) | 2026-05-21 |
+| 56 | Performance + Live Mascot (3/3 plans) | 2026-05-21 |
+| 57 | Sexify Finish (3/3 plans) | 2026-05-21 |
+| 58 | Ship Readiness (4/4 plans) | 2026-05-21 (`cut_release.sh --dry-run v0.1.0-rc1` GREEN; publish hard-guard regression-pinned) |
 
 <!-- AUTO-GEN: feature-matrix END -->
 
