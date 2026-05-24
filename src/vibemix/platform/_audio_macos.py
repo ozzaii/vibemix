@@ -21,6 +21,11 @@ from __future__ import annotations
 
 import sounddevice as sd
 
+from vibemix.audio.device_select import (
+    MasterCaptureNotFoundError,
+    find_device_index,
+    select_master_input,
+)
 from vibemix.audio.errors import SampleRateMismatchError
 from vibemix.audio.recorder import VoiceRecorder
 from vibemix.audio.registry import BufferRegistry
@@ -222,23 +227,36 @@ class AudioMacOS:
         self.recorder = recorder
 
     def find_device(self, name_substring: str, kind: Kind) -> int:
-        """Find a CoreAudio device by case-insensitive substring match on its name.
+        """Find a CoreAudio device for ``name_substring`` of the given ``kind``.
 
-        On miss, raises ``RuntimeError`` with the candidate-device list so the
+        MASTER-CAPTURE path (the release-blocking bug, 2026-05-24): when the
+        caller asks for the BlackHole capture input (``kind == "input"`` and
+        the request targets BlackHole), selection is delegated to
+        :func:`vibemix.audio.device_select.select_master_input`, which *ranks*
+        candidates — exact ``BlackHole 2ch`` first, then other BlackHole
+        variants — and EXCLUDES the DJ-controller soundcard (DDJ-FLX4 et al.)
+        and any microphone. The old naive substring scan returned whichever
+        input CoreAudio enumerated first, so the co-host grabbed the
+        controller instead of the master output. We never silently fall back
+        to "any input"; if BlackHole is absent we raise so the caller can show
+        the install affordance.
+
+        OUTPUT and MIC paths keep a plain case-insensitive substring match
+        (the caller passes an explicit, unambiguous device name there). On a
+        miss, raises ``RuntimeError`` with the candidate-device list so the
         user sees "available inputs: [...]" rather than a cryptic PortAudio
-        stack trace (RESEARCH.md Threat 4). Verbatim port of v4:241-250 with
-        the improved error message.
+        stack trace (RESEARCH.md Threat 4).
         """
-        target_field = "max_input_channels" if kind == "input" else "max_output_channels"
         devices = sd.query_devices()
-        needle = name_substring.lower()
-        for idx, info in enumerate(devices):
-            if needle in info["name"].lower() and info[target_field] > 0:
-                return idx
-        available = [d["name"] for d in devices if d[target_field] > 0]
-        raise RuntimeError(
-            f"No {kind} device matching {name_substring!r}. Available {kind} devices: {available}"
-        )
+        if kind == "input" and "blackhole" in name_substring.lower():
+            try:
+                return select_master_input(devices)
+            except MasterCaptureNotFoundError as e:
+                # Re-raise as RuntimeError carrying the requested name so the
+                # __main__ FATAL handler's ``INPUT_DEVICE in str(e)`` check
+                # still classifies this as an input-device miss (exit code 3).
+                raise RuntimeError(f"{name_substring}: {e}") from e
+        return find_device_index(devices, name_substring, kind)
 
     def open_capture(
         self,

@@ -47,6 +47,13 @@ from vibemix.audio.constants import (
     WS_HOST,
     WS_PORT,
 )
+from vibemix.audio.device_select import (
+    MasterCaptureNotFoundError,
+    find_device_index,
+    is_controller_device,
+    is_mic_device,
+    select_master_input,
+)
 from vibemix.audio.errors import SampleRateMismatchError
 from vibemix.audio.features import (
     compute_downbeat_phase,
@@ -107,11 +114,16 @@ __all__ = [
     "BufferRegistry",
     "Levels",
     "LookaheadProvider",
+    "MasterCaptureNotFoundError",
     "MicBuffer",
     "PassthroughBuffer",
     "PlaybackQueue",
     "SampleRateMismatchError",
     "VoiceRecorder",
+    "find_device_index",
+    "is_controller_device",
+    "is_mic_device",
+    "select_master_input",
     "compute_downbeat_phase",
     "energy_curve",
     "estimate_bpm",

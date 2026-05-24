@@ -165,6 +165,50 @@ def test_find_device_raises_with_candidate_list_on_miss(
     assert "BlackHole 2ch" in msg
 
 
+# ===== RATE-06b: find_device("BlackHole 2ch", input) on a real rig picks BlackHole, NOT the controller =====
+
+
+def test_find_device_master_input_skips_controller_on_founder_rig(
+    mocker: MockerFixture, make_backend
+) -> None:
+    """Release-blocking regression (2026-05-24): the co-host grabbed the
+    DDJ-FLX4 controller soundcard instead of BlackHole 2ch.
+
+    Through the real ``find_device`` path, with the controller + aggregates
+    enumerated BEFORE BlackHole, the backend MUST return the BlackHole 2ch
+    index and never the controller.
+    """
+    devices = [
+        {"name": "MacBook Pro Microphone", "max_input_channels": 1, "max_output_channels": 0},
+        {"name": "DDJ-FLX4", "max_input_channels": 4, "max_output_channels": 4},
+        {"name": "rekordbox Aggregate Device", "max_input_channels": 4, "max_output_channels": 4},
+        {"name": "AI Capture", "max_input_channels": 2, "max_output_channels": 2},
+        {"name": "BlackHole 2ch", "max_input_channels": 2, "max_output_channels": 0},
+        {"name": "BlackHole 16ch", "max_input_channels": 16, "max_output_channels": 0},
+    ]
+    mocker.patch("vibemix.platform._audio_macos.sd.query_devices", return_value=devices)
+    backend = make_backend()
+    idx = backend.find_device("BlackHole 2ch", "input")
+    assert devices[idx]["name"] == "BlackHole 2ch"
+
+
+def test_find_device_master_input_raises_when_blackhole_absent(
+    mocker: MockerFixture, make_backend
+) -> None:
+    """No BlackHole present → RuntimeError carrying the requested name (so the
+    __main__ FATAL handler classifies it as an input miss → exit 3), NOT a
+    silent fallback to the controller."""
+    devices = [
+        {"name": "MacBook Pro Microphone", "max_input_channels": 1, "max_output_channels": 0},
+        {"name": "DDJ-FLX4", "max_input_channels": 4, "max_output_channels": 4},
+    ]
+    mocker.patch("vibemix.platform._audio_macos.sd.query_devices", return_value=devices)
+    backend = make_backend()
+    with pytest.raises(RuntimeError, match="BlackHole 2ch") as exc:
+        backend.find_device("BlackHole 2ch", "input")
+    assert "blackhole-2ch" in str(exc.value)
+
+
 # ===== RATE-07: AudioMacOS satisfies @runtime_checkable AudioBackend =====
 
 

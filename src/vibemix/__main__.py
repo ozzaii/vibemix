@@ -112,7 +112,91 @@ from vibemix.state import (
     state_refresh_loop,
 )
 
-load_dotenv()
+def _load_env_robust() -> None:
+    """Load ``.env`` from any of the known vibemix locations, robust to CWD.
+
+    ``load_dotenv()`` with no args walks up from the *current working
+    directory*. That is correct for the dev path (the Tauri shell sets the
+    sidecar cwd to the repo root, where ``.env`` lives), but FAILS for the
+    bundled PyInstaller binary: a Finder/Dock-launched ``.app`` runs with
+    cwd ``/``, so ``find_dotenv()`` never sees the repo ``.env`` and
+    ``GEMINI_API_KEY`` is silently absent — the exact "co-host never speaks"
+    release blocker.
+
+    We therefore probe an ordered list of candidate ``.env`` paths and load
+    the first that exists. Earlier-loaded values win (``override=False``), so
+    a key already injected into the real process environment by the Tauri
+    shell (the preferred, secure delivery channel) is never clobbered by a
+    stale on-disk ``.env``. SECURITY: no key is ever embedded here — every
+    candidate is a runtime file or the inherited process env.
+
+    Candidate order (first existing wins):
+      1. CWD-relative ``.env`` (``find_dotenv`` — the dev/repo path).
+      2. ``app_data_dir()/.env`` — OS-aware per-user config dir. This is the
+         supported place to drop a key for a bundled install
+         (``~/Library/Application Support/vibemix/.env`` on macOS) without
+         touching the signed bundle.
+      3. A ``.env`` next to the running executable / its parent dirs — covers
+         a PyInstaller ``--onedir`` bundle shipping a ``.env`` resource.
+    """
+    from dotenv import find_dotenv
+
+    candidates: list[Path] = []
+
+    # 1. CWD-relative (dev / repo path). find_dotenv returns "" when none.
+    found = find_dotenv(usecwd=True)
+    if found:
+        candidates.append(Path(found))
+
+    # 2. Per-user app data dir — the bundled-install drop point.
+    try:
+        from vibemix.runtime.config_store import app_data_dir as _add
+
+        candidates.append(_add() / ".env")
+    except Exception:
+        pass
+
+    # 3. Alongside the frozen executable (PyInstaller) and its parents.
+    try:
+        exe_dir = Path(sys.executable).resolve().parent
+        candidates.append(exe_dir / ".env")
+        candidates.append(exe_dir.parent / ".env")
+    except Exception:
+        pass
+
+    loaded_from: str | None = None
+    for cand in candidates:
+        try:
+            if cand.is_file():
+                load_dotenv(dotenv_path=str(cand), override=False)
+                if loaded_from is None:
+                    loaded_from = str(cand)
+        except Exception:
+            continue
+
+    if loaded_from is None:
+        # No .env anywhere — rely entirely on the inherited process env
+        # (the Tauri shell forwards GEMINI_API_KEY / OPENROUTER_API_KEY).
+        load_dotenv(override=False)
+
+    # Diagnostic to stderr — but ONLY for the live-runtime / wizard / session
+    # paths the Tauri log captures. The `vibemix library <sub>` CLI emits a
+    # strict JSON-only stderr contract (parsed by tests/scripts/*), so we must
+    # not prepend a banner there. argv[1] == "library" is the dispatch guard
+    # used by cli_entry below.
+    _argv = sys.argv[1:]
+    if not (_argv and _argv[0] == "library"):
+        if loaded_from is None:
+            print(
+                "-> env: no .env found; using inherited process environment",
+                file=sys.stderr,
+                flush=True,
+            )
+        else:
+            print(f"-> env: loaded {loaded_from}", file=sys.stderr, flush=True)
+
+
+_load_env_robust()
 
 
 # =============================================================================
@@ -420,9 +504,26 @@ async def main() -> None:
     if mode == "direct":
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            sys.exit(
-                "GEMINI_API_KEY not set (mode=direct). Set VIBEMIX_LLM_MODE=proxy to use the proxy."
+            # LOUD failure. A missing key is the #1 cause of the "co-host
+            # never speaks" silent dead-end (the bundled binary not finding
+            # its .env). Emit a [FATAL]-tagged line so the Tauri watchdog's
+            # read_last_log_line surfaces the real cause in the crash banner
+            # instead of a generic exit. Exit 4 = "no API key" sentinel.
+            print(
+                "[FATAL] GEMINI_API_KEY not set (mode=direct) — the co-host "
+                "cannot authenticate to Gemini and will never speak.",
+                file=sys.stderr,
+                flush=True,
             )
+            print(
+                "[FATAL] Set GEMINI_API_KEY in the environment, in the "
+                "repo-root .env (dev), or in "
+                f"{app_data_dir() / '.env'} (bundled install). "
+                "Or set VIBEMIX_LLM_MODE=proxy to use the Bravoh proxy.",
+                file=sys.stderr,
+                flush=True,
+            )
+            sys.exit(4)
         or_key = os.environ.get("OPENROUTER_API_KEY")  # optional
     else:  # mode == "proxy"
         try:

@@ -80,8 +80,12 @@ def test_smoke_02_missing_gemini_key_exits_nonzero(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         cli_entry([])
 
-    msg = str(exc.value)
-    assert "GEMINI_API_KEY" in msg
+    # RELEASE-AUTH: the missing-key gate now exits with the no-retry sentinel
+    # code 4 (the Tauri watchdog routes it to the "set your API key" banner
+    # instead of looping). The human-readable [FATAL] explanation goes to
+    # stderr (verified by the watchdog's read_last_log_line), so the
+    # SystemExit payload is the bare exit code, not the message string.
+    assert exc.value.code == 4
 
 
 # ---------------------------------------------------------------------------

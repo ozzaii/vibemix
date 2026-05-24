@@ -1,0 +1,196 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Robust, OS-agnostic audio device selection.
+
+Pure-Python ranking over a CoreAudio / WASAPI device list (a list of
+``{"name", "max_input_channels", "max_output_channels"}`` dicts as returned by
+``sounddevice.query_devices()``). No OS imports — the platform backend hands us
+the already-queried list, we return the chosen index.
+
+Why this exists (release-blocking bug, 2026-05-24)
+--------------------------------------------------
+The co-host MUST listen to the DJ's MASTER output, captured on macOS via the
+``BlackHole 2ch`` virtual device. The old selection was a naive first-match
+case-insensitive substring scan: ``needle in name and max_input_channels > 0``.
+
+On a real rig the device list also contains the DJ controller's built-in
+soundcard (Pioneer DDJ-FLX4), the laptop mic, and several aggregate devices
+(``rekordbox Aggregate Device``, ``AIDJ``, ``AI Capture``, ``Multi-Output
+Device``). A bare substring scan has:
+
+  * no exact-match preference (any device merely *containing* the needle wins),
+  * no ranking (it returns whichever input-capable device CoreAudio enumerates
+    first — order is not stable), and
+  * no exclusion of the controller soundcard or the microphone.
+
+Result: the co-host grabbed the controller's input instead of BlackHole and
+"listened to the controller", never the master. This module fixes that by
+*ranking* candidates and *excluding* the controller and mic from the
+music-capture selection, with a strong exact match on ``BlackHole 2ch``.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Any
+
+# Substrings (lowercased) that identify a DJ controller's built-in soundcard.
+# These devices appear as both input AND output because the controller carries
+# its own audio interface — they must NEVER be chosen as the music-capture
+# source. Extend conservatively: only well-known controller-vendor / model
+# tokens, so we don't accidentally exclude a legitimately-named loopback.
+_CONTROLLER_NAME_TOKENS: tuple[str, ...] = (
+    "ddj",  # Pioneer DDJ-FLX4 / DDJ-* family (the founder's controller)
+    "flx",  # DDJ-FLX4 short form some drivers expose
+    "pioneer",
+    "rekordbox",  # rekordbox Aggregate Device (wraps the FLX4 soundcard)
+    "traktor",
+    "kontrol",  # NI Traktor Kontrol
+    "serato",
+    "denon",
+    "numark",
+    "rane",
+    "hercules",
+    "reloop",
+    "mixtrack",
+    "controller",
+)
+
+# Substrings (lowercased) that identify a microphone — never a master-capture
+# source. The mic is captured on a SEPARATE stream (MIC_DEVICE); for the music
+# input we must exclude it so we don't analyze the DJ's voice as "the music".
+_MIC_NAME_TOKENS: tuple[str, ...] = (
+    "microphone",
+    "mic",
+    "airpods",  # AirPods expose a mic input that must not be the music source
+    "headset",
+    "webcam",
+    "facetime",
+    "iphone microphone",
+)
+
+# The canonical master-capture device, in strict preference order. Exact name
+# first (``BlackHole 2ch`` is what the install wizard provisions), then other
+# BlackHole channel variants as a fallback so a 16ch/64ch-only machine still
+# captures rather than failing.
+_BLACKHOLE_EXACT = "blackhole 2ch"
+_BLACKHOLE_PREFIX = "blackhole"
+
+
+def _is_input(info: dict[str, Any]) -> bool:
+    try:
+        return int(info.get("max_input_channels", 0)) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _name_of(info: dict[str, Any]) -> str:
+    name = info.get("name")
+    return name if isinstance(name, str) else ""
+
+
+def is_controller_device(name: str) -> bool:
+    """True if ``name`` looks like a DJ-controller soundcard (excluded from capture)."""
+    low = name.lower()
+    return any(tok in low for tok in _CONTROLLER_NAME_TOKENS)
+
+
+def is_mic_device(name: str) -> bool:
+    """True if ``name`` looks like a microphone (excluded from music capture)."""
+    low = name.lower()
+    return any(tok in low for tok in _MIC_NAME_TOKENS)
+
+
+class MasterCaptureNotFoundError(RuntimeError):
+    """Raised when no BlackHole master-capture input can be selected.
+
+    Carries the candidate device list so the caller can render an actionable
+    "install BlackHole 2ch" message instead of silently grabbing the wrong
+    device (the bug this module fixes).
+    """
+
+
+def select_master_input(devices: Sequence[dict[str, Any]]) -> int:
+    """Choose the music-capture (master-output) INPUT device index.
+
+    Ranking (highest priority first), over input-capable devices only:
+
+      1. Exact ``BlackHole 2ch`` (case-insensitive) — the canonical target.
+      2. Any other ``BlackHole`` variant (16ch / 64ch) — degraded but correct.
+
+    Devices whose names look like a DJ controller soundcard or a microphone are
+    NEVER selected here, even on a tie — they are the two wrong sources the
+    founder hit. If no BlackHole input exists, raise
+    ``MasterCaptureNotFoundError`` rather than falling back to *any* input
+    (which is exactly how the co-host ended up on the controller).
+
+    Args:
+        devices: ``sounddevice.query_devices()``-shaped list.
+
+    Returns:
+        Index into ``devices`` of the chosen master-capture input.
+
+    Raises:
+        MasterCaptureNotFoundError: no BlackHole input device present.
+    """
+    exact_match: int | None = None
+    variant_match: int | None = None
+
+    for idx, info in enumerate(devices):
+        if not _is_input(info):
+            continue
+        name = _name_of(info)
+        if not name:
+            continue
+        # Hard exclusions: never let the controller or a mic win the music
+        # capture, regardless of how its name might otherwise match.
+        if is_controller_device(name) or is_mic_device(name):
+            continue
+        low = name.lower()
+        if low == _BLACKHOLE_EXACT and exact_match is None:
+            exact_match = idx
+        elif _BLACKHOLE_PREFIX in low and variant_match is None:
+            variant_match = idx
+
+    if exact_match is not None:
+        return exact_match
+    if variant_match is not None:
+        return variant_match
+
+    available = [_name_of(d) for d in devices if _is_input(d) and _name_of(d)]
+    raise MasterCaptureNotFoundError(
+        "No BlackHole master-capture input found. vibemix listens to your DJ "
+        "software's MASTER output via BlackHole 2ch — it will not fall back to "
+        "the controller soundcard or microphone. Install BlackHole 2ch via "
+        "`brew install blackhole-2ch` or https://existential.audio/blackhole/ "
+        f"and route your DJ app's master into it. Available input devices: {available}"
+    )
+
+
+def find_device_index(
+    devices: Sequence[dict[str, Any]], name_substring: str, kind: str
+) -> int:
+    """Generic case-insensitive substring lookup, kind-filtered.
+
+    Used for the OUTPUT and MIC paths where a plain substring match is correct
+    (the caller passes an explicit, unambiguous device name). The music-capture
+    INPUT path must use :func:`select_master_input` instead — see this module's
+    docstring for why a bare substring match is unsafe for master capture.
+
+    Returns the index of the first input/output-capable device whose name
+    contains ``name_substring`` (case-insensitive). Raises ``RuntimeError``
+    with the candidate list on a miss.
+    """
+    field = "max_input_channels" if kind == "input" else "max_output_channels"
+    needle = name_substring.lower()
+    for idx, info in enumerate(devices):
+        name = _name_of(info)
+        try:
+            chans = int(info.get(field, 0))
+        except (TypeError, ValueError):
+            chans = 0
+        if needle in name.lower() and chans > 0:
+            return idx
+    available = [_name_of(d) for d in devices if int(d.get(field, 0) or 0) > 0]
+    raise RuntimeError(
+        f"No {kind} device matching {name_substring!r}. Available {kind} devices: {available}"
+    )
