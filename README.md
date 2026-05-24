@@ -264,6 +264,17 @@ vibemix is Bravoh's first open-source release — a warm-up for our main product
 
 [**altidus.world →**](https://altidus.world/vibemix?utm_source=github&utm_medium=oss&utm_campaign=vibemix_launch)
 
+---
+
+## Community
+
+- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) — how to file bugs, add controller mappings, propose new prompt templates.
+- **Code of Conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community standards for contributors and maintainers.
+- **Security:** [SECURITY.md](SECURITY.md) — how to report vulnerabilities privately.
+- **Maintainers:** [MAINTAINERS.md](MAINTAINERS.md) — who maintains vibemix, decision process, release cadence.
+
+---
+
 Apache 2.0 · ([LICENSE](LICENSE)) · ([SECURITY](SECURITY.md)) · ([CONTRIBUTING](CONTRIBUTING.md)) · ([CODE_OF_CONDUCT](CODE_OF_CONDUCT.md))
 
 <!-- TODO(kaan, pre-tag-v0.1.0): replace TBD with the real Bravoh-managed vibemix Discord invite. -->
