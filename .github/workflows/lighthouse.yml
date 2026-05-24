@@ -1,0 +1,115 @@
+# Phase 70 Plan 70-03 — GH-02 deliverable: Lighthouse gate for the Pages landing.
+#
+# Runs Lighthouse against a LOCAL static-server build of docs/landing/ — NOT a
+# live URL. GitHub Pages is not enabled in CI (Kaan flips repo Settings -> Pages
+# as a manual step); the live bravoh-ai.github.io/vibemix Lighthouse run is the
+# Kaan-clock discharge routed to KAAN-ACTION-LEGAL.md §V7-LANDING (CONTEXT
+# reconciliation #4). Engineering closes GH-02 on this local/CI pass.
+#
+# Two gates:
+#   1. Anti-backsliding typography lock (fail-fast FIRST):
+#      `grep -ri 'geist|fraunces' docs/landing/` -> exit 1 on any match.
+#      Geist + Fraunces were tried in v1 and REJECTED (CDJ-Whisper lock).
+#   2. Lighthouse accessibility >= 0.95 AND performance >= 0.90 against the
+#      local build, else exit 1.
+#
+# Security posture lifted VERBATIM from packaging-audit.yml (Phase 69-04):
+#   - `on: pull_request` only — fork-PR secrets safe (the privileged
+#     pull-request trigger is deliberately NOT used here).
+#   - All `uses:` SHA-pinned.
+#   - `permissions.contents: read` — minimum scope.
+#   - Workflow-prefixed concurrency cancel-in-progress.
+#   - `timeout-minutes` set. fail-fast posture preserved.
+# Node/npx (lighthouse + http-server) are CI-side only — NOT a Python dep, no
+# entry in pyproject.toml/uv.lock.
+
+name: Lighthouse
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: lighthouse-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    name: Lighthouse (local build · a11y>=95 / perf>=90)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # GATE 1 — anti-backsliding typography lock (fail fast, before any build).
+      - name: Anti-backsliding grep gate (no Geist/Fraunces)
+        run: |
+          if grep -ri 'geist\|fraunces' docs/landing/; then
+            echo "::error::CDJ-Whisper typography lock broken — Geist/Fraunces found in docs/landing/"
+            exit 1
+          fi
+          echo "Typography lock holds — no rejected display faces in docs/landing/."
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+
+      # GATE 2 — serve the LOCAL build, run Lighthouse, assert thresholds.
+      - name: Serve docs/landing/ on a local static server
+        run: |
+          # Python ships on ubuntu-latest — no extra Node dep needed to serve.
+          nohup python3 -m http.server 8099 --directory docs/landing > /tmp/http.log 2>&1 &
+          echo "SERVER_PID=$!" >> "$GITHUB_ENV"
+          # Wait for the server to accept connections.
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8099/ > /dev/null; then
+              echo "Local static server is up on :8099"
+              break
+            fi
+            sleep 0.5
+          done
+
+      - name: Install Lighthouse (pinned, CI-side only)
+        run: |
+          # Pinned to a major so the run is reproducible; CI-side only, no
+          # pyproject.toml/uv.lock entry (per threat-model T-70P03-SC).
+          npm install -g lighthouse@12
+
+      - name: Run Lighthouse against the local build
+        run: |
+          lighthouse http://localhost:8099/ \
+            --only-categories=accessibility,performance \
+            --quiet \
+            --chrome-flags="--headless=new --no-sandbox --disable-gpu" \
+            --output=json \
+            --output-path=./lh.json
+          echo "Lighthouse run complete — asserting thresholds."
+
+      - name: Assert a11y >= 0.95 and perf >= 0.90
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          with open("lh.json") as f:
+              report = json.load(f)
+          cats = report["categories"]
+          a11y = cats["accessibility"]["score"]
+          perf = cats["performance"]["score"]
+          print(f"accessibility={a11y}  performance={perf}")
+          fail = False
+          if a11y is None or a11y < 0.95:
+              print(f"::error::accessibility {a11y} < 0.95")
+              fail = True
+          if perf is None or perf < 0.90:
+              print(f"::error::performance {perf} < 0.90")
+              fail = True
+          sys.exit(1 if fail else 0)
+          PY
+
+      - name: Stop the local static server
+        if: always()
+        run: |
+          if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null || true; fi
