@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v7.0
-milestone_name: Open House
-status: Awaiting next milestone
-last_updated: "2026-05-24T11:43:34.175Z"
-last_activity: 2026-05-24 — Milestone v7.0 completed and archived
+milestone: v8.0
+milestone_name: Proof & Polish
+status: planning
+last_updated: "2026-05-24T22:49:35.624Z"
+last_activity: 2026-05-24
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 20
-  completed_plans: 20
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # vibemix — State
@@ -49,10 +49,10 @@ See: .planning/PROJECT.md (Current Milestone: v7.0 "Open House")
 
 ## Current Position
 
-Phase: Milestone v7.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-24 — Milestone v7.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-24 — Milestone v8.0 started
 
 ## v7.0 Phase Map
 

@@ -2,7 +2,7 @@
 
 **Project:** vibemix — AI DJ Co-Host
 **Last shipped:** v7.0 "Open House" — 2026-05-24 (tech_debt accepted; KAAN-ACTION §V7-LIVE / §V7-PROXY / §V7-LANDING / §ASSETS-DEMO-CUT / §SHIP-V4 ride forward on Kaan's clock)
-**Current milestone:** none active — run `/gsd:new-milestone` to start the next cycle
+**Current milestone:** 🔵 **v8.0 "Proof & Polish"** — Phases 71–76 (in progress, `gsd-autonomous fully`)
 **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on the external Apple Dev + SignPath signature clock (NOT archived) — **v7.0's OSS-04 discharges §SHIP-V4 for real; v4.0 closes alongside when the real cut fires**
 
 ---
@@ -18,6 +18,50 @@
 - ✅ **v5.0 The Useful Cut** — Phases 59–62 (shipped 2026-05-22, tech_debt accepted) — see `.planning/milestones/v5.0-ROADMAP.md`
 - ✅ **v6.0 The Memory Turn** — Phases 63–66 (shipped 2026-05-23, tech_debt accepted) — see `.planning/milestones/v6.0-ROADMAP.md`
 - ✅ **v7.0 Open House** — Phases 67–70 (shipped 2026-05-24, tech_debt accepted) — see `.planning/milestones/v7.0-ROADMAP.md`
+- 🔵 **v8.0 Proof & Polish** — Phases 71–76 (in progress) — *this file, below*
+
+---
+
+# v8.0 "Proof & Polish" — IN PROGRESS (`gsd-autonomous fully`)
+
+**Goal:** Take the system from "engineering-sound on paper" to **proven, easy, and live on GitHub** — everything logged · simulated · reported · tested · fixed · re-tested · verified · GitHub-done, plus real **ease of use** and a **whole-design level-up loop**. The deep audit (`.planning/ALL-MILESTONES-DEEP-AUDIT.md`) already finds the system **sound** (4256 tests green at branch HEAD, 4 cardinal invariants hold); v8.0 *proves and polishes* — it does not rescue.
+
+**Anti-creep acid test:** *"Does this make an existing capability genuinely logged / simulated / reported / tested / fixed / verified / pushed — or easier to use / better-looking — WITHOUT a new product capability, AI/embedding provider, managed framework, ws port, or IPC envelope?"* If not, defer. Gemini-only holds; the four cardinal invariants hold by zero-touch on the reaction path.
+
+**Dependency spine:** P71 (land in-flight branch work) → P72 (log everything + simulate hardware) → P73 (report + full-grid test + fix loop + verify + close audit findings) → P74 (ease of use) ‖ P75 (design level-up) [both depend on P71-landed UI, run after P73 green] → P76 (GitHub done: push backlog, CI green; signed-release + social stay KAAN-ACTION).
+
+| # | Phase | Goal | REQ-IDs |
+|---|-------|------|---------|
+| 71 | Land & Verify | Finish + verify + commit the uncommitted live-tuning + observability branch work; green its new Py/TS/Rust tests | LOG-01, LOG-03 |
+| 72 | Logged & Simulated | Unified structured logging end-to-end; simulation/replay harness for hardware-gated paths (BlackHole/FLX4/device-select) | LOG-02, LOG-04, SIM-01..03 |
+| 73 | Reported · Tested · Fixed · Verified | Reports (test/coverage/session); full marker-grid run + fix loop to green; close deep-audit findings #1–#4; verify | RPT-01..03, TEST-01..05 |
+| 74 | Ease of Use | First-run/onboarding friction, device-select UX, settings clarity, actionable failure states | UX-01..04 |
+| 75 | Design Level-Up Loop | Whole-design CDJ-Whisper glow-up (impeccable + frontend-enforcement) across all surfaces; review→fix→re-review to zero HIGH | DESIGN-01..04 |
+| 76 | GitHub Done | Push the ~528-commit backlog + branch; origin/main current; CI green on full matrix; repo presence finalized | GH-01..03 (GH-04 = KAAN-ACTION) |
+
+### Phase 71 — Land & Verify
+**Goal:** The in-flight `live-tuning-or-brain` work (device_select, the debug-log surface, tray-mood, audio/sidecar/session changes) is finished, verified, and committed in clean atomic commits.
+**Success criteria:** (1) `device_select.py` + new audio backend changes land with `test_device_select` + `test_audio_macos` additions green; (2) debug-log surface (`debug_log.rs` + `debug-log.ts` + `debug-log-ws.ts` + `debug-log.spec`) wired one-socket-safe and green; (3) `tray-mood` + `test_proxy_fallback` land green; (4) default `pytest -q` stays 0-red (≥4256 passed); (5) TS + Rust suites run for the changed files.
+
+### Phase 72 — Logged & Simulated
+**Goal:** Everything important is logged through one structured surface, and the hardware-gated paths are simulatable headlessly.
+**Success criteria:** (1) reaction turns log evidence packet + citation-gate decision (LOG-02); (2) a log-level switch gates verbosity without changing default UX (LOG-04); (3) a sim harness replays a session end-to-end with no hardware + no live Gemini (SIM-01); (4) synthetic BlackHole/FLX4/device fixtures verify the §V7-LIVE paths in CI (SIM-02); (5) the sim emits a deterministic artifact (SIM-03).
+
+### Phase 73 — Reported · Tested · Fixed · Verified
+**Goal:** The whole suite is run, reported, every red driven green, and the result verified; the deep-audit housekeeping is closed.
+**Success criteria:** (1) saved test+coverage report artifact (RPT-01); (2) sim-session report (RPT-02); (3) full default suite 0-red + opt-in marker grid exercised (TEST-01/02); (4) TS+Rust green (TEST-03); (5) audit findings #1–#4 closed (TEST-04); (6) fix→re-test loop ends green + committed, no new skip/xfail graveyards (TEST-05); (7) v8.0 verification report ties each REQ to evidence (RPT-03).
+
+### Phase 74 — Ease of Use
+**Goal:** A stranger's path from install to first reaction is effortless and forgiving.
+**Success criteria:** (1) guided first-run with clear empty/loading/permission states (UX-01); (2) self-explanatory device selection + routing, no BlackHole guesswork (UX-02); (3) clear, reversible mode/level/settings controls (UX-03); (4) every failure mode (no audio/key/proxy/MIDI) gives actionable guidance (UX-04).
+
+### Phase 75 — Design Level-Up Loop
+**Goal:** Every surface is leveled up to the CDJ-Whisper bar through an auditor-driven loop, no AI slop.
+**Success criteria:** (1) session UI + pill zero HIGH findings (DESIGN-01); (2) mascot overlay + debrief + wizard + settings pass the bar (DESIGN-02); (3) review→fix→re-review loop run to zero HIGH (DESIGN-03); (4) consistent design tokens across surfaces (DESIGN-04).
+
+### Phase 76 — GitHub Done
+**Goal:** GitHub reflects the verified reality; the only thing left is Kaan's signature-gated public publish.
+**Success criteria:** (1) ~528-commit backlog + branch pushed; origin/main current (GH-01); (2) CI green on full matrix for the pushed state (GH-02); (3) repo presence finalized, no stale claims (GH-03); (4) §SHIP-V4 signed-release + social documented as the sole KAAN-ACTION carveout, NOT auto-fired (GH-04).
 
 ---
 

@@ -10,7 +10,27 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current State: v7.0 "Open House" SHIPPED 2026-05-24 (tech_debt accepted) — no active milestone
+## Current Milestone: v8.0 "Proof & Polish" (Phases 71–76 — IN PROGRESS, `gsd-autonomous fully`)
+
+**Goal:** Take the system from "engineering-sound on paper" to **proven, easy, and live on GitHub** — everything logged · simulated · reported · tested · fixed · re-tested · verified · GitHub-done, plus genuine **ease of use for users** and a **whole-design level-up loop**. The cumulative deep audit (`.planning/ALL-MILESTONES-DEEP-AUDIT.md`, 2026-05-24) finds the system **sound** (4256 tests green at branch HEAD, all four cardinal invariants hold, only housekeeping findings); v8.0 *proves and polishes* — it does not rescue.
+
+**Target features (6 phases):**
+1. **Land & Verify (P71)** — finish + verify + commit the in-flight `live-tuning-or-brain` work (device-select, the debug-log observability surface, tray-mood, audio/sidecar/session changes).
+2. **Logged & Simulated (P72)** — unified structured logging end-to-end; a simulation/replay harness so the hardware-gated §V7-LIVE paths (BlackHole, FLX4, device-select) are software-verified headlessly.
+3. **Reported · Tested · Fixed · Verified (P73)** — test/coverage/session reports; full marker-grid run + fix→re-test loop to green; close deep-audit findings #1–#4; verification report.
+4. **Ease of Use (P74)** — effortless first-run, discoverable device selection, clear reversible settings, actionable failure states.
+5. **Design Level-Up Loop (P75)** — whole-surface CDJ-Whisper glow-up (impeccable + frontend-enforcement), review→fix→re-review to zero HIGH findings.
+6. **GitHub Done (P76)** — push the ~528-commit local backlog + branch; bring `origin/main` current; CI green on the full matrix; repo presence finalized.
+
+**Anti-creep acid test:** *"Does this make an existing capability genuinely logged / simulated / reported / tested / fixed / verified / pushed — or easier to use / better-looking — WITHOUT a new product capability, AI/embedding provider, managed framework, ws port, or IPC envelope?"* If not, defer. Gemini-only holds; the four cardinal invariants hold by zero-touch on the reaction path.
+
+**KAAN-ACTION carveouts (ride forward, never block):** Apple Dev + SignPath signatures; real-hardware ear-passes (§V7-LIVE); the public **signed-release publish** + 5-channel social (§SHIP-V4, GH-04) — these stay gated on the external signature clock and Kaan's sign-off. v8.0 pushes code to GitHub but does **not** auto-cut a signed public release.
+
+**Requirements:** `.planning/REQUIREMENTS.md` (LOG / SIM / RPT / TEST / UX / DESIGN / GH). **Roadmap:** `.planning/ROADMAP.md` (v8.0 section).
+
+---
+
+## Prior State: v7.0 "Open House" SHIPPED 2026-05-24 (tech_debt accepted)
 
 **v7.0 shipped engineering-green** (4/4 phases 67–70, 19/19 REQ-IDs, 20 plans): the repo is now a publishable, contributable, install-anywhere OSS project — all tests green + CI matrix, all 10 MIDI devices contract-tested with a single-source catalog + contributor recipe, the 4 OSS docs + client-side proxy fallback + BYO-key path + packaging scaffolds, and a CDJ-Whisper GitHub front-porch (auto-generated hash-pinned assets + Pages landing + presence suite). Remaining work is all KAAN-ACTION external-clock / live-hardware / felt-quality discharge (§V7-LIVE / §V7-PROXY / §V7-LANDING / §ASSETS-DEMO-CUT / §SHIP-V4). **Next:** run `/gsd:new-milestone` to start the next cycle. v4.0 "SHIP" stays open until OSS-04's real cut fires.
 
