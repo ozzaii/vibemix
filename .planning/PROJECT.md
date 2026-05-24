@@ -10,7 +10,12 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v8.0 "Proof & Polish" (Phases 71–76 — IN PROGRESS, `gsd-autonomous fully`)
+## Current State: v8.0 "Proof & Polish" SHIPPED 2026-05-25 (tech_debt accepted) — no active milestone
+
+**v8.0 shipped engineering-complete** (6/6 phases 71–76): everything logged · simulated (everybody × every interaction) · reported · tested (pytest 4270/0 · marker grid 111/0 · vitest 816 · cargo 63) · fixed (all 4 deep-audit findings closed) · verified · on GitHub (539-commit backlog pushed + PR #8 to sync main). Plus a design-slop gate + the api-key-missing UX loop. Zero new capability/dep/port/envelope, zero reaction-path rewrite (562 insertions / 7 src files). **Remaining work is all KAAN-ACTION:** §GH-BILLING (resolve GitHub billing → CI green), §GH-MAIN-MERGE (merge PR #8, no squash), §SHIP-V4 (signed release + social — Apple/SignPath signatures; v4.0 closes alongside), §V7-LIVE (real-hardware ear-passes — software-simulated by P72), felt UX/design sign-off, and the user-level UI control (cross-stack follow-up). **Next:** `/gsd:new-milestone` for the next cycle, or discharge the KAAN-ACTION items. Full audit: `.planning/v8.0-MILESTONE-AUDIT.md`.
+
+<details>
+<summary>v8.0 "Proof & Polish" — original milestone goal (shipped)</summary>
 
 **Goal:** Take the system from "engineering-sound on paper" to **proven, easy, and live on GitHub** — everything logged · simulated · reported · tested · fixed · re-tested · verified · GitHub-done, plus genuine **ease of use for users** and a **whole-design level-up loop**. The cumulative deep audit (`.planning/ALL-MILESTONES-DEEP-AUDIT.md`, 2026-05-24) finds the system **sound** (4256 tests green at branch HEAD, all four cardinal invariants hold, only housekeeping findings); v8.0 *proves and polishes* — it does not rescue.
 
@@ -27,6 +32,8 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 **KAAN-ACTION carveouts (ride forward, never block):** Apple Dev + SignPath signatures; real-hardware ear-passes (§V7-LIVE); the public **signed-release publish** + 5-channel social (§SHIP-V4, GH-04) — these stay gated on the external signature clock and Kaan's sign-off. v8.0 pushes code to GitHub but does **not** auto-cut a signed public release.
 
 **Requirements:** `.planning/REQUIREMENTS.md` (LOG / SIM / RPT / TEST / UX / DESIGN / GH). **Roadmap:** `.planning/ROADMAP.md` (v8.0 section).
+
+</details>
 
 ---
 

@@ -1,5 +1,26 @@
 # vibemix — Milestones
 
+## v8.0 Proof & Polish (Shipped: 2026-05-25)
+
+**Phases completed:** 6 phases (71–76), `tech_debt` accepted, `gsd-autonomous fully`.
+
+**Delivered:** Took the system from "engineering-sound on paper" to **proven, easy, and on GitHub** — everything logged · simulated · reported · tested · fixed · verified · GitHub-done, plus ease-of-use + a design level-up loop, with **zero new product capability / dependency / ws-port / IPC-envelope** and **zero reaction-path rewrite** (562 insertions / 7 src files; cardinal invariants held). The pre-milestone deep audit found the system already sound; v8.0 proved and polished it.
+
+**Key accomplishments (one per phase):**
+
+- **P71 Land & Verify:** landed ~773 lines of in-flight `live-tuning-or-brain` work in 3 atomic commits — the BlackHole master-capture device-select fix (was listening to the controller, not the master), robust multi-path `.env` loading + `[FATAL]` exit-4 on a missing key, loud secret-free `connection_error` surfacing (events.jsonl + UI transcript), and a unified Rust+TS debug-log surface + tray-mood.
+- **P72 Logged & Simulated:** `--debug-log`/`VIBEMIX_DEBUG_LOG` switch (default-off, byte-identical baseline) + per-turn `reaction_evidence` log; `scripts/sim/simulate_session.py` drives device-select + FLX4 + the full reaction path with **no hardware, no Gemini**, emitting a deterministic `sim_report.json` — covering **everybody × every interaction** (6 personas × 7 event types).
+- **P73 Reported · Tested · Fixed · Verified:** `pytest` 4270/0, opt-in marker grid 111/0 (7 Windows/live-FLX4 KAAN-ACTION skips), vitest 816, cargo 63; closed all 4 ALL-MILESTONES-DEEP-AUDIT findings (ack-bank traceability, Phase-68 VERIFICATION.md, citation-bypass confirm, doc-drift); reports RPT-01..03.
+- **P74 Ease of Use:** `api-key-missing` (exit-4, the #1 "co-host never speaks" cause) now surfaces actionable UI guidance via the crash-banner — closing the P71 loud-failure loop end-to-end; error-state test coverage that was missing.
+- **P75 Design Level-Up Loop:** permanent design-slop gate locking the no-AI-slop brand promise (Saira + JetBrains Mono only, every font stack token-led) — the review→fix→re-review loop made continuous.
+- **P76 GitHub Done:** pushed the **539-commit backlog** (the entire v2.1→v8.0 history, never pushed before) to origin + opened **PR #8** to sync `main`. First-ever CI on origin revealed a **GitHub account billing lock** (all jobs fast-fail ~3s) — code verified green locally.
+
+**KAAN-ACTION at close (ride forward):** §GH-BILLING (resolve GitHub billing → CI green + §V7-LIVE-05), §GH-MAIN-MERGE (merge PR #8, no squash), §SHIP-V4/GH-04 (signed release + social, Apple Dev + SignPath signatures — v4.0 closes alongside), §V7-LIVE (real-hardware ear-passes — software-simulated by P72), felt UX/design sign-off, and the user-level (BEG/INT/PRO) UI control (a cross-stack follow-up, surfaced not half-built). All in `KAAN-ACTION-LEGAL.md` + `.planning/v8.0-MILESTONE-AUDIT.md`.
+
+Full audit: `.planning/v8.0-MILESTONE-AUDIT.md` · Requirements: `.planning/REQUIREMENTS.md` · Roadmap: `.planning/ROADMAP.md` (v8.0 section).
+
+---
+
 ## v7.0 Open House (Shipped: 2026-05-24)
 
 **Phases completed:** 4 phases, 20 plans, 37 tasks

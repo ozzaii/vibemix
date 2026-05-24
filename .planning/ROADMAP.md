@@ -2,7 +2,7 @@
 
 **Project:** vibemix — AI DJ Co-Host
 **Last shipped:** v7.0 "Open House" — 2026-05-24 (tech_debt accepted; KAAN-ACTION §V7-LIVE / §V7-PROXY / §V7-LANDING / §ASSETS-DEMO-CUT / §SHIP-V4 ride forward on Kaan's clock)
-**Current milestone:** 🔵 **v8.0 "Proof & Polish"** — Phases 71–76 (in progress, `gsd-autonomous fully`)
+**Current milestone:** none active — v8.0 "Proof & Polish" SHIPPED 2026-05-25 (tech_debt accepted); run `/gsd:new-milestone` for the next cycle
 **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on the external Apple Dev + SignPath signature clock (NOT archived) — **v7.0's OSS-04 discharges §SHIP-V4 for real; v4.0 closes alongside when the real cut fires**
 
 ---
@@ -18,11 +18,11 @@
 - ✅ **v5.0 The Useful Cut** — Phases 59–62 (shipped 2026-05-22, tech_debt accepted) — see `.planning/milestones/v5.0-ROADMAP.md`
 - ✅ **v6.0 The Memory Turn** — Phases 63–66 (shipped 2026-05-23, tech_debt accepted) — see `.planning/milestones/v6.0-ROADMAP.md`
 - ✅ **v7.0 Open House** — Phases 67–70 (shipped 2026-05-24, tech_debt accepted) — see `.planning/milestones/v7.0-ROADMAP.md`
-- 🔵 **v8.0 Proof & Polish** — Phases 71–76 (in progress) — *this file, below*
+- ✅ **v8.0 Proof & Polish** — Phases 71–76 (shipped 2026-05-25, tech_debt accepted) — *this file, below* · audit `.planning/v8.0-MILESTONE-AUDIT.md`
 
 ---
 
-# v8.0 "Proof & Polish" — IN PROGRESS (`gsd-autonomous fully`)
+# v8.0 "Proof & Polish" — SHIPPED 2026-05-25 (tech_debt accepted)
 
 **Goal:** Take the system from "engineering-sound on paper" to **proven, easy, and live on GitHub** — everything logged · simulated · reported · tested · fixed · re-tested · verified · GitHub-done, plus real **ease of use** and a **whole-design level-up loop**. The deep audit (`.planning/ALL-MILESTONES-DEEP-AUDIT.md`) already finds the system **sound** (4256 tests green at branch HEAD, 4 cardinal invariants hold); v8.0 *proves and polishes* — it does not rescue.
 

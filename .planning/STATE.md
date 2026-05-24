@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v8.0
 milestone_name: Proof & Polish
-status: planning
-last_updated: "2026-05-24T22:49:35.624Z"
-last_activity: 2026-05-24
+status: shipped
+last_updated: "2026-05-25T00:00:00.000Z"
+last_activity: 2026-05-25 — v8.0 SHIPPED (tech_debt accepted)
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 6
+  completed_phases: 6
+  total_plans: 6
+  completed_plans: 6
+  percent: 100
 ---
 
 # vibemix — State
@@ -49,12 +49,12 @@ See: .planning/PROJECT.md (Current Milestone: v7.0 "Open House")
 
 ## Current Position
 
-Phase: v8.0 milestone audit (all 6 phases ✅ engineering-complete)
+Phase: none active — v8.0 "Proof & Polish" SHIPPED 2026-05-25 (tech_debt accepted)
 Plan: —
-Status: P71–P76 ✅ complete — running milestone audit
-Last activity: 2026-05-25 — v8.0 P75 (design-slop gate, vitest 816) + P76 (GitHub) SHIPPED. P76: pushed live-tuning-or-brain to origin (539 commits, never pushed before) + opened PR #8 to sync main. First-ever CI on origin revealed a **GitHub account BILLING LOCK** — all jobs fast-fail in ~3s ("account is locked due to a billing issue"); code verified GREEN locally (pytest 4270/0 · vitest 816 · cargo 63). GH-02 CI-green + main-merge + signed release = KAAN-ACTION (§GH-BILLING / §GH-MAIN-MERGE / §SHIP-V4). See .planning/phases/76-github-done/SUMMARY.md.
+Status: ✅ v8.0 COMPLETE (6/6 phases) — milestone audited + archived. No active milestone.
+Last activity: 2026-05-25 — v8.0 "Proof & Polish" SHIPPED + audited. 6/6 phases (71–76), all REQ-IDs satisfied or KAAN-ACTION. everything logged·simulated(everybody×every-interaction)·reported·tested(pytest 4270/0 · marker grid 111/0 · vitest 816 · cargo 63)·fixed(4 deep-audit findings)·verified·on-GitHub(539-commit backlog pushed + PR #8). Zero new capability/dep/port/envelope, zero reaction-path rewrite (562 ins/7 files). Audit: .planning/v8.0-MILESTONE-AUDIT.md.
 
-**v8.0 progress:** P71 ✅ · P72 ✅ · P73 ✅ · P74 ✅ · P75 ✅ · P76 ✅ (GH-01..03 engineering; GH-02-green + merge → KAAN-ACTION). All 6 phases engineering-complete. Mode `gsd-autonomous fully`. **NEW blocker surfaced: §GH-BILLING — GitHub account billing lock blocks CI on origin (Kaan-only fix).** KAAN-ACTION carveouts: §GH-BILLING, §GH-MAIN-MERGE, §SHIP-V4 (signatures), felt UX/design + live-hardware ear-passes (§V7-LIVE).
+**KAAN-ACTION (ride forward, never blocked):** §GH-BILLING (GitHub account billing lock blocks CI on origin — Kaan-only fix at github.com/settings/billing → re-run PR #8 → GH-02 green + §V7-LIVE-05) · §GH-MAIN-MERGE (merge PR #8, no squash, to sync main) · §SHIP-V4/GH-04 (signed release + social — Apple Dev + SignPath signatures; v4.0 closes alongside) · §V7-LIVE (real-hardware ear-passes — software-simulated by P72) · felt UX/design sign-off · user-level (BEG/INT/PRO) UI control (cross-stack follow-up, surfaced not half-built). **Next:** `/gsd:new-milestone` or discharge KAAN-ACTION items.
 
 ## v7.0 Phase Map
 
