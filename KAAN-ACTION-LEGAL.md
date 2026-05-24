@@ -4687,3 +4687,103 @@ Sign-off by:                                              _________   (Kaan)
 - §SHIP-V4 (this file, ~line 3387) + §RECALL-EAR (~line 3510) — the v4.0
   ship + Kaan-ear felt-sign-off precedent.
 
+---
+
+## §ASSETS-DEMO-CUT — v7.0 GH-01 Real Demo Film Discharge
+
+**REQ-ID:** GH-01 (Phase 70 — "GitHub sexified, generated, tested")
+**Owner:** Francesco (capture) + Kaan (drop + cross-browser check + aesthetic sign-off)
+**Status:** ☐ pending — engineering side ships the still poster + the README hero-hash PLACEHOLDER sentinel; the real 30-sec film discharges on Francesco's capture clock
+
+Under `gsd-autonomous fully` this is a **SOFT** discharge. Engineering closed
+GH-01 on `docs/assets/demo-poster.png` (the source-generated CDJ-Whisper still,
+MANIFEST-pinned) + the `sha256=PLACEHOLDER` sentinel that keeps
+`scripts/check_readme_hero_hash.py` green while the real asset is pending. The
+real 30-sec hero film rides Francesco's capture clock (§VIS-09) and does **NOT**
+gate the v7.0 milestone close — the same soft-discharge pattern as §V7-LIVE +
+§V7-LANDING. This section is the **fix-path** for the real film, not a blocker.
+
+### Surface (what it gates)
+
+- The README hero `<video src="docs/assets/demo.mp4">` real asset — the
+  not-yet-present 30-sec CDJ-Whisper film (`README.md` hero block, lines ~9-21;
+  the `<video poster="docs/assets/demo-poster.png">` + `<img>` fallback keep the
+  hero non-broken in the interim).
+- The `scripts/check_readme_hero_hash.py` `sha256=PLACEHOLDER` → real-SHA-256
+  flip — the integrity anchor distinguishing a pending asset (PLACEHOLDER, exit
+  0) from a real shipped film (the comment's SHA must match the on-disk
+  `docs/assets/demo.mp4`, else the gate fails — anti-slop demo-honesty invariant).
+- The **≤ 8 MB cap (`8388608` bytes)** on the final `demo.mp4` — keeps the clone
+  lean (LFS is banned; compression, not LFS routing, holds the line). Asserted by
+  the Wave 4 `tests/repo/test_github_presence.py` demo-asset + size check.
+- **Cross-browser inline-play** — the `<video muted playsinline>` must play
+  inline (not punt to fullscreen) on **Chrome + Safari + Firefox** on the README
+  + the Pages landing demo window.
+
+### Why it can't ship green in CI / autonomous
+
+The 30-sec CDJ-Whisper hero film requires Francesco's capture day — real DJ
+hands on a real Pioneer DDJ-FLX4, in a real room with real lighting, per the
+v3.0 P43 §VIS-09 runbook (AV spec 1080p+/60fps+/48kHz, the Pioneer-CDJ-headbob
+mascot feel on cut 7, the 5-warm-black + single-amber palette sign-off). None of
+this is automatable; no engineering step can produce it. The interim poster +
+the PLACEHOLDER sentinel are the most a hosted runner can ship.
+
+### Fix path
+
+```
+# 1. Francesco shoots per §VIS-09 (this file, ~line 1344) — the existing
+#    capture-day runbook: shot list, 3-track audio chain, demo-mode sequencer,
+#    8 cuts, final master 1080p+/60fps+/48kHz.
+# 2. Editor cuts to <= 8 MB (8388608 bytes). Compress hard — LFS is banned
+#    (.gitattributes); H.264/AAC mp4, faststart, no external host.
+# 3. Kaan drops the file at docs/assets/demo.mp4 and updates the README hero
+#    comment:  sha256=PLACEHOLDER  ->  sha256=<actual 64-hex of demo.mp4>
+#    so scripts/check_readme_hero_hash.py verifies the on-disk hash matches.
+       shasum -a 256 docs/assets/demo.mp4   # paste into the hero comment
+       PYTHONPATH=src python3 scripts/check_readme_hero_hash.py   # MUST exit 0
+# 4. Kaan confirms inline-play on the 3 browsers (the <video muted playsinline>
+#    plays inline, does NOT punt to fullscreen) on the README + the landing:
+#    Chrome + Safari + Firefox.
+# 5. Optionally remove the "demo film coming soon" empty-state caption / repoint
+#    the poster once the real film reads on its own (UI-SPEC §2 / §244).
+```
+
+When the film lands, `demo-poster.png` either stays as the `<video poster=>`
+(first-frame fallback before play) or is superseded — Kaan's call at drop time.
+
+### Owner-clock
+
+Francesco (capture, per §VIS-09) + Kaan (drop the file + flip the sentinel +
+the 3-browser inline-play check). **SOFT** under `gsd-autonomous fully` —
+engineering closed GH-01 on the poster + the PLACEHOLDER-green gate; the real
+film rides this clock and does NOT block the v7.0 milestone close.
+
+### Cross-reference
+
+- **§VIS-09** (this file, ~line 1344) — Francesco's existing capture-day runbook
+  (shot list, audio chain, demo-mode sequencer, 8 cuts, AV spec + headbob feel +
+  palette sign-off); the real `demo.mp4` is its output.
+- `scripts/check_readme_hero_hash.py` — the PLACEHOLDER → real-SHA integrity gate.
+- `README.md` hero block (lines ~9-21) — the `<video src="docs/assets/demo.mp4">`
+  the film lands at.
+- `docs/assets/demo-poster.png` — the interim CDJ-Whisper still (Wave 3 / GH-01,
+  MANIFEST-pinned) the hero shows until the film lands.
+- `tests/repo/test_github_presence.py` (Wave 4 / GH-05) — the demo-asset present
+  + ≤ 8 MB size assertion that pins this cluster's cap.
+- §V7-LIVE (~line 3710) + §V7-LANDING (~line 4520) — the parallel soft-discharge
+  cluster shape this section mirrors.
+
+### Sign-off block
+
+```
+§ASSETS-DEMO-CUT CAPTURE (Francesco, per §VIS-09) on:  _________   (date)
+§ASSETS-DEMO-CUT EDIT TO <= 8 MB on:                    _________   (date — final bytes ____ / 8388608)
+§ASSETS-DEMO-CUT demo.mp4 DROPPED + SHA flipped on:     _________   (date — SHA ____)
+§ASSETS-DEMO-CUT <= 8 MB CAP HELD:                       _________   (yes / no)
+§ASSETS-DEMO-CUT INLINE-PLAY (Chrome / Safari / Firefox): _________   (yes / no — all 3)
+§ASSETS-DEMO-CUT check_readme_hero_hash.py GREEN on real SHA: _____   (yes / no)
+Sign-off by (Francesco):                                 _________
+Sign-off by (Kaan):                                      _________
+```
+
