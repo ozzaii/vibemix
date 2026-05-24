@@ -41,8 +41,11 @@ from vibemix.agent.llm_factory import build_llm
 from vibemix.agent.persona import SYSTEM_INSTRUCTION
 from vibemix.agent.playback_sink import PlaybackQueueAudioOutput
 from vibemix.agent.proxy_client import (
+    ProxyUnavailable,
     build_proxy_genai_client,
     build_proxy_tts_chain,
+    classify_proxy_error,
+    probe_proxy_health,
 )
 from vibemix.agent.tts_chain import build_tts_chain
 
@@ -58,10 +61,13 @@ __all__ = [
     "VOICE",
     "DJCoHostAgent",
     "PlaybackQueueAudioOutput",
+    "ProxyUnavailable",
     "build_llm",
     "build_proxy_genai_client",
     "build_proxy_tts_chain",
     "build_tts_chain",
+    "classify_proxy_error",
     "get_or_create_install_uuid",
     "get_or_refresh_jwt",
+    "probe_proxy_health",
 ]
