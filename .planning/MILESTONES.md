@@ -1,5 +1,26 @@
 # vibemix — Milestones
 
+## v7.0 Open House (Shipped: 2026-05-24)
+
+**Phases completed:** 4 phases, 20 plans, 37 tasks
+
+**Delivered:** Turned vibemix from engineering-green internal code into a publishable, contributable, install-anywhere OSS project — a WIRING + DISCHARGE + POLISH milestone with zero new product capability, zero net-new dependencies, and zero reaction-path edits (cardinal invariants held by zero-touch).
+
+**Key accomplishments (one per pillar):**
+
+- **TEST (Phase 67):** default `uv run pytest -q` flipped from 9-red to 0-red; 21-job `full-test-matrix.yml` CI (OS × marker grid, SHA-pinned, fork-PR-safe); two AST-walk static gates lock the no-silent-skip / no-silent-flake invariants at collection time; 10× flake-hunt baseline 10/10 GREEN; `docs/flake-hunt.md` contributor protocol. 65 opt-in tests triaged into §V7-LIVE clusters (no marker is a graveyard).
+- **DEV (Phase 68):** all 10 bundled MIDI profiles contract-tested + synthetic-MIDI-smoked; the duplicate `midi/controllers/` ↔ `midi/profiles/` catalogs reconciled atomically to a single `profiles/` source of truth; 3-profile hot-plug matrix + 4-fixture audio-backend matrix (BlackHole 2ch/16ch + WASAPI loopback + edge fallback) in CI; "Add Your Controller" contributor recipe (`scripts/discover_midi_port.py` + `_template.json` + `add-a-controller.md`).
+- **OSS (Phase 69):** 4 OSS docs (CONTRIBUTING/CoC/SECURITY/MAINTAINERS) + presence test with Bravoh carveout sentinel; client-side proxy fallback ("Co-host unavailable this session" — no crash, no hallucinated coach line, /health canary offloaded off the reaction path, 31 integration tests); `docs/byo-key.md` BYO-key path; Homebrew+Scoop scaffolds + `packaging-audit.yml`; `cut_release.sh --dry-run v0.1.0-rc1` re-verified GREEN with the real cut pre-staged in §SHIP-V4.
+- **GH (Phase 70):** asset reproducibility pipeline (`regenerate_assets.sh` + `MANIFEST.yaml` + `asset-bitrot.yml`); auto-generated 1200×630 og-card (Chrome-rendered, byte-deterministic, hash-pinned); CDJ-Whisper GitHub Pages landing (UI-review PASS 23/24 — reads as Pioneer-grade hardware, not slop; anti-backsliding grep zero; lighthouse CI gate); demo poster + hero-hash green; one-stop `tests/repo/test_github_presence.py` (validates the real `.yml` GitHub-Forms ISSUE_TEMPLATE shape).
+
+**Engineering:** 19/19 REQ-IDs satisfied engineering-side · 4/4 phases verified · 6/6 cross-phase wirings sound · default grid 4233+ passed / 0 failed.
+
+**Known deferred items at close: 2 verification gaps (Phase 69 + 70, both `human_needed`)** — acknowledged under `gsd-autonomous fully`; all KAAN-ACTION external-clock / live-hardware / felt-quality discharges (see STATE.md Deferred Items + `.planning/v7.0-MILESTONE-AUDIT.md`). The one HARD external gate (OSS-04 publish, gated on Apple Dev + SignPath) closes v4.0 "SHIP" alongside when the real cut fires.
+
+**Git tag + branch merge deferred** to Kaan (consistent with v4.0/v5.0/v6.0): the `v7.0` tag + `live-tuning-or-brain` → main merge ride the same signature clock as the OSS-04 publish.
+
+---
+
 ## v6.0 The Memory Turn (Shipped: 2026-05-23 — tech_debt accepted)
 
 **Phases completed:** 4 phases (63–66), 12 plans, ~19 tasks

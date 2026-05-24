@@ -10,7 +10,12 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v7.0 "Open House"
+## Current State: v7.0 "Open House" SHIPPED 2026-05-24 (tech_debt accepted) — no active milestone
+
+**v7.0 shipped engineering-green** (4/4 phases 67–70, 19/19 REQ-IDs, 20 plans): the repo is now a publishable, contributable, install-anywhere OSS project — all tests green + CI matrix, all 10 MIDI devices contract-tested with a single-source catalog + contributor recipe, the 4 OSS docs + client-side proxy fallback + BYO-key path + packaging scaffolds, and a CDJ-Whisper GitHub front-porch (auto-generated hash-pinned assets + Pages landing + presence suite). Remaining work is all KAAN-ACTION external-clock / live-hardware / felt-quality discharge (§V7-LIVE / §V7-PROXY / §V7-LANDING / §ASSETS-DEMO-CUT / §SHIP-V4). **Next:** run `/gsd:new-milestone` to start the next cycle. v4.0 "SHIP" stays open until OSS-04's real cut fires.
+
+<details>
+<summary>v7.0 "Open House" — original milestone goal (shipped)</summary>
 
 **Goal:** Turn the repo from "engineering-green, gated on external clock" into a **publishable, contributable, install-anywhere open-source project** that strangers can clone, install, run, and contribute to — warming visitors into Bravoh waitlist signups along the way. Four pillars, all closing existing loops (no new product capability):
 
@@ -27,7 +32,9 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 
 **Last shipped:** v6.0 "The Memory Turn" — 2026-05-23 (`tech_debt` accepted; memory-grounded copilot via local sqlite-vec store + ~50-line `MemoryStore` wrapper + off-hot-path session-ingest + existence-only `recall` evidence source + two visible copilot moves. Ships behind `VIBEMIX_RECALL_ENABLED=0` until §RECALL-EAR Kaan-ear pass).
 
-**v4.0 status:** "SHIP" (Phases 51–58) remains **engineering-complete (8/8)** but stays open alongside v7.0 — v7.0's OSS pillar actually **consumes** the v4.0 publish (§SHIP-V4 discharge → real `gh release create`). When v7.0 ships, v4.0 closes with it.
+**v4.0 status:** "SHIP" (Phases 51–58) remains **engineering-complete (8/8)** but stays open alongside v7.0 — v7.0's OSS pillar actually **consumes** the v4.0 publish (§SHIP-V4 discharge → real `gh release create`). When OSS-04's real cut fires, v4.0 closes with it.
+
+</details>
 
 (v5.0 "The Useful Cut" shipped 2026-05-22. v4.0 "SHIP" engineering-complete 2026-05-21, publish on signature clock. v3.1 shipped 2026-05-18. v3.0 "Clean OSS Ship" 2026-05-17. v2.1 "The Unified Cut" 2026-05-16. v2.0 2026-05-14. v0.1.0 2026-05-13. Full archives in `.planning/milestones/`.)
 
@@ -407,4 +414,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-23 — **v7.0 "Open House" STARTED** under `gsd-autonomous fully` mode. Finishing milestone: "all tests pass, all devices ready, OSS fully integrated, GitHub fully sexified / generated / tested". Four pillars (TEST · DEV · OSS · GH) = wiring + discharge + polish, **zero new product capability**, zero new AI providers, zero new deps (red-class), zero new ws ports. Closes v4.0 SHIP carryover (public RC publish on external Apple Dev + SignPath clock) and turns v6.0's engineering-green capabilities into a publishable OSS repo. v6.0's `VIBEMIX_RECALL_ENABLED=1` flip stays on its independent §RECALL-EAR Kaan-ear clock — not in v7.0 scope. Last shipped: v6.0 2026-05-23.*
+*Last updated: 2026-05-24 — **v7.0 "Open House" SHIPPED** (tech_debt accepted) under `gsd-autonomous fully` mode. 4/4 phases (67–70), 19/19 REQ-IDs engineering-side, 20 plans. Earlier: v7.0 STARTED 2026-05-23. Finishing milestone: "all tests pass, all devices ready, OSS fully integrated, GitHub fully sexified / generated / tested". Four pillars (TEST · DEV · OSS · GH) = wiring + discharge + polish, **zero new product capability**, zero new AI providers, zero new deps (red-class), zero new ws ports. Closes v4.0 SHIP carryover (public RC publish on external Apple Dev + SignPath clock) and turns v6.0's engineering-green capabilities into a publishable OSS repo. v6.0's `VIBEMIX_RECALL_ENABLED=1` flip stays on its independent §RECALL-EAR Kaan-ear clock — not in v7.0 scope. Last shipped: v6.0 2026-05-23.*
