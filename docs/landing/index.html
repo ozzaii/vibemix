@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vibemix — the only AI co-host that actually listens</title>
+<meta name="description" content="vibemix is a free, open-source AI co-host for live DJ sets. It hears your master, watches your screen, and reads your controller — then talks back in your ear like a friend who knows the room. Hype-man or coach. Runs local on Mac + Windows.">
+
+<!-- OG / social unfurl — references Wave 1's docs/assets/og-card.png (1200×630, hash-pinned in MANIFEST.yaml).
+     Repo-relative path resolves on GitHub Pages regardless of org/repo name. -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="vibemix — the only AI co-host that actually listens">
+<meta property="og:description" content="A real DJ friend in your ear. Free, open-source, runs local on Mac + Windows. Hype-man or coach — grounded, never hallucinating, no AI slop.">
+<meta property="og:image" content="../assets/og-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="../assets/og-card.png">
+
+<!-- Fonts: Saira (display+body, variable wdth/wght) + JetBrains Mono (numerals/code) — lifted verbatim from
+     mocks/vibemix-direction-final.html. CDJ-Whisper typography lock holds: only these two families ship.
+     (Rejected display faces are NOT named here on purpose — the anti-backsliding grep gate is a blunt
+     substring scan, so naming them would self-trip the gate. The lock is the absence, not a comment.) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@75..125,300..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ──────────────────────────────────────────────────────────────────────────
+   vibemix — GitHub Pages landing (GH-02)
+   CDJ-Whisper aesthetic. Tokens lifted VERBATIM from
+   mocks/vibemix-direction-final.html :root. 5 warm blacks + single amber
+   accent (20/80 rule) + Saira + JetBrains Mono. No build step, no framework.
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Void stack — five cool blacks */
+  --void:    #000000;
+  --void-1:  #020205;
+  --void-2:  #05070b;
+  --void-3:  #0a0c12;
+  --void-4:  #11141c;
+
+  /* Glass surfaces — darker, opaque (deck dominates, glass seals) */
+  --glass-1:  rgba(8, 10, 16, 0.78);    /* primary panel */
+  --glass-2:  rgba(12, 14, 22, 0.62);   /* secondary panel */
+  --glass-3:  rgba(2, 3, 6, 0.88);      /* recessed glass — near-solid */
+  --glass-edge:     rgba(255, 255, 255, 0.065);
+  --glass-edge-up:  rgba(255, 255, 255, 0.11);
+  --glass-top:      rgba(255, 255, 255, 0.055);
+
+  /* Silk text */
+  --silk:     #d6cfc7;
+  --silk-65:  rgba(214, 207, 199, 0.65);
+  --silk-40:  rgba(214, 207, 199, 0.40);
+  --silk-22:  rgba(214, 207, 199, 0.22);
+  --silk-12:  rgba(214, 207, 199, 0.12);
+
+  /* Amber — primary deck-light accent (the single 20% accent) */
+  --amber:       #ff8a3d;
+  --amber-deep:  #ff5a1a;
+  --amber-pale:  #ffb88a;
+  --amber-22:    rgba(255, 138, 61, 0.22);
+  --amber-40:    rgba(255, 138, 61, 0.40);
+  --amber-65:    rgba(255, 138, 61, 0.65);
+
+  /* Night-rave ambients — body atmospheric only */
+  --rave-magenta: rgba(192, 56, 224, 0.055);
+  --rave-pink:    rgba(255, 92, 188, 0.038);
+  --rave-cyan:    rgba(72, 152, 255, 0.042);
+  --rave-purple:  rgba(118, 56, 224, 0.030);
+  --rave-teal:    rgba(64, 220, 200, 0.022);
+
+  /* Status LEDs */
+  --led-ok:    #6dd44a;
+  --led-warn:  #f4c542;
+  --led-fault: #d4413a;
+
+  /* Glass blurs */
+  --blur-glass:        blur(32px) saturate(140%);
+  --blur-glass-light:  blur(16px) saturate(120%);
+  --blur-glass-display:blur(6px)  saturate(105%);
+
+  /* Glow — restrained */
+  --glow-faint:  0 0 5px var(--amber-22);
+  --glow-soft:   0 0 6px var(--amber-40), 0 0 14px var(--amber-22);
+  --glow-strong: 0 0 8px var(--amber-65), 0 0 18px var(--amber-22);
+
+  /* Type — exactly two families. Saira variable axes do the range; no second sans. */
+  --type-display: 'Saira', system-ui, sans-serif;
+  --type-body:    'Saira', system-ui, sans-serif;
+  --type-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  /* Spacing — multiples of 4 except the documented hardware-affordance exceptions */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 40px; --sp-7: 64px; --sp-8: 96px;
+
+  --rad-sm: 2px;
+  --rad-md: 6px;
+  --rad-lg: 10px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #000;
+  color: var(--silk);
+  font-family: var(--type-body);
+  font-weight: 400;
+  font-size: 15px;
+  font-variation-settings: "wdth" 100, "wght" 400;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Cinematic vignette + restrained rave washes + deep cold base — verbatim from mock */
+body {
+  background-image:
+    radial-gradient(ellipse 92% 78% at 50% 45%, transparent 0%, rgba(0,0,0,0.5) 75%, rgba(0,0,0,0.9) 100%),
+    radial-gradient(ellipse 55% 38% at 18% 22%, var(--rave-magenta), transparent 60%),
+    radial-gradient(ellipse 48% 36% at 84% 78%, var(--rave-cyan),    transparent 55%),
+    radial-gradient(ellipse 60% 42% at 55% 105%, var(--rave-pink),   transparent 60%),
+    radial-gradient(ellipse 35% 28% at 92% 12%, var(--rave-purple),  transparent 55%),
+    radial-gradient(ellipse 28% 22% at 5% 88%,  var(--rave-teal),    transparent 55%),
+    linear-gradient(180deg, #02030a 0%, #000000 55%, #030208 100%);
+  background-attachment: fixed;
+}
+
+/* Two-layer film grain — coarse dust + fine grain, blended overlay. Decorative. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='420' height='420'><filter id='d'><feTurbulence type='fractalNoise' baseFrequency='0.42' numOctaves='3' seed='9'/></filter><rect width='100%25' height='100%25' filter='url(%23d)' opacity='0.022'/></svg>"),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' seed='5'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.028'/></svg>");
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: overlay;
+}
+
+main { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; }
+
+/* Skip link (a11y) — visually hidden until focused */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--glass-1);
+  color: var(--amber);
+  padding: var(--sp-2) var(--sp-4);
+  font-family: var(--type-mono);
+  font-size: 12px;
+  text-decoration: none;
+  border: 1px solid var(--amber-40);
+}
+.skip-link:focus { left: var(--sp-4); top: var(--sp-4); }
+
+/* Universal visible focus ring — amber, never bare outline:none */
+a:focus-visible,
+button:focus-visible,
+video:focus-visible,
+.copy-btn:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+  border-radius: var(--rad-sm);
+}
+
+/* ── ANIMATED BORDER · slow amber perimeter sweep — sign of life ── */
+@keyframes borderSweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.border-anim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    conic-gradient(
+      from 0deg at 50% 50%,
+      transparent 0%, transparent 30%,
+      rgba(255, 138, 61, 0.28) 45%,
+      rgba(255, 220, 180, 0.42) 50%,
+      rgba(255, 138, 61, 0.28) 55%,
+      transparent 70%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  padding: 1px;
+  pointer-events: none;
+  z-index: 4;
+  animation: borderSweep 22s linear infinite;
+  opacity: 0.95;
+}
+
+/* ── META BAR (header) ── */
+.meta-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-6);
+  border-bottom: 1px solid var(--glass-edge);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: var(--blur-glass-light);
+  -webkit-backdrop-filter: var(--blur-glass-light);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+.meta-bar .brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-family: var(--type-body);
+  font-weight: 700;
+  font-variation-settings: "wdth" 85, "wght" 700;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--silk);
+}
+/* The one amber brand LED above the demo — pulsing dot */
+.meta-bar .brand .led-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--amber);
+  border-radius: 50%;
+  box-shadow: 0 0 4px var(--amber), 0 0 8px var(--amber-40);
+  animation: brandPulse 5s ease-in-out infinite;
+  flex: none;
+}
+.meta-bar .brand .tag {
+  font-weight: 400;
+  font-variation-settings: "wdth" 100, "wght" 400;
+  color: var(--silk-65);
+  margin-left: var(--sp-2);
+  letter-spacing: 0.18em;
+  font-size: 12px;
+}
+@keyframes brandPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+.meta-bar .versions {
+  display: flex;
+  gap: var(--sp-5);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  color: var(--silk-40);
+  letter-spacing: 0.08em;
+}
+
+/* ── §1 HERO ── */
+.hero {
+  padding: var(--sp-8) var(--sp-6) var(--sp-7);
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: var(--sp-7);
+  border-bottom: 1px solid var(--glass-edge);
+  align-items: end;
+}
+.hero .h0 {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 82, "wght" 700;
+  font-size: clamp(40px, 9vw, 88px);
+  line-height: 0.90;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--silk);
+}
+/* Amber accent line — the single amber emphasis in the hero body */
+.hero .h0 .accent {
+  color: var(--amber);
+  text-shadow: 0 0 10px var(--amber-40), 0 0 22px var(--amber-22);
+  display: block;
+  font-variation-settings: "wdth" 82, "wght" 800;
+}
+.hero .lede {
+  font-size: clamp(15px, 2.2vw, 18px);
+  line-height: 1.6;
+  color: var(--silk-65);
+  max-width: 50ch;
+}
+.hero .lede strong { color: var(--silk); font-weight: 600; }
+.hero .lede em { color: var(--amber); font-style: normal; font-weight: 600; }
+.hero .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 88, "wght" 500;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--silk-65);
+  margin-bottom: var(--sp-4);
+}
+
+/* ── SECTION scaffolding ── */
+.section {
+  padding: var(--sp-7) var(--sp-6);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-6);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.section-head .num-idx {
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--amber);
+}
+.section-head h2 {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 24px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--silk);
+}
+.section-head .right-note {
+  margin-left: auto;
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--silk-40);
+  text-transform: uppercase;
+}
+
+/* ── §2 DEMO WINDOW · recessed glass ── */
+.demo-window {
+  position: relative;
+  background: var(--glass-3);
+  backdrop-filter: var(--blur-glass-display);
+  -webkit-backdrop-filter: var(--blur-glass-display);
+  border-radius: var(--rad-md);
+  padding: 6px;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    inset 0 0 18px rgba(255, 138, 61, 0.035),
+    0 0 0 1px rgba(255, 255, 255, 0.022),
+    0 36px 80px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+}
+.demo-window .screen {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--rad-sm);
+  background: #000;
+  object-fit: cover;
+}
+.demo-window video.screen { background: #000; }
+.demo-window::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  pointer-events: none;
+  border-radius: var(--rad-sm);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 30%, transparent 80%, rgba(255, 138, 61, 0.025) 100%);
+}
+.demo-caption {
+  margin-top: var(--sp-3);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  text-align: center;
+}
+
+/* ── BUTTONS · anodised glass tiles ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 14px 28px;
+  min-height: 44px; /* a11y touch target */
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass-display);
+  -webkit-backdrop-filter: var(--blur-glass-display);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-sm);
+  color: var(--silk-65);
+  text-decoration: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: all 180ms ease-out;
+}
+.btn:hover {
+  color: var(--silk);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 8px var(--amber-22);
+  transform: translateY(-1px);
+}
+.btn:active { transform: translateY(0); box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.75); }
+/* .btn.on — amber-backlit primary (the install CTA) */
+.btn.on {
+  color: var(--amber);
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.09) 0%, rgba(255, 138, 61, 0.025) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 var(--amber-40),
+    inset 0 0 14px var(--amber-22),
+    0 0 0 1px rgba(255, 138, 61, 0.14);
+  text-shadow: 0 0 4px var(--amber-65);
+}
+.btn.on:hover { box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 var(--amber-40),
+    inset 0 0 18px var(--amber-22),
+    0 0 8px var(--amber-22),
+    0 0 0 1px rgba(255, 138, 61, 0.2); }
+
+/* ── §3 INSTALL CTA ── */
+.install {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-5);
+  text-align: center;
+}
+.install .cta-row { display: flex; gap: var(--sp-4); flex-wrap: wrap; justify-content: center; }
+.install .sub-copy {
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--silk-65);
+  font-variant-numeric: tabular-nums;
+}
+.install .secondary-link {
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--amber);
+  text-decoration: none;
+}
+.install .secondary-link:hover { text-decoration: underline; }
+
+/* Code tile — recessed glass, JetBrains Mono, mac/win one-liners */
+.code-tile {
+  width: 100%;
+  max-width: 560px;
+  background: var(--glass-3);
+  border-radius: var(--rad-md);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    inset 0 0 18px rgba(255, 138, 61, 0.035),
+    0 0 0 1px rgba(255, 255, 255, 0.022);
+  overflow: hidden;
+}
+.cmd-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: 14px var(--sp-5);
+  text-align: left;
+}
+.cmd-row + .cmd-row { border-top: 1px solid var(--glass-edge); }
+.cmd-row .os {
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 500;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  flex: none;
+  width: 52px;
+}
+.cmd-row code {
+  flex: 1;
+  font-family: var(--type-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--silk);
+  letter-spacing: 0;
+  user-select: all;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.copy-btn {
+  flex: none;
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 85, "wght" 600;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  min-height: 44px;
+  min-width: 44px;
+  background: transparent;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-sm);
+  color: var(--silk-40);
+  cursor: pointer;
+  transition: all 180ms ease-out;
+}
+.copy-btn:hover { color: var(--silk); border-color: var(--amber-40); box-shadow: 0 0 6px var(--amber-22); }
+.copy-btn.copied { color: var(--amber); border-color: var(--amber-40); }
+
+/* ── §4 WAITLIST ── */
+.waitlist {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-5);
+  text-align: center;
+}
+.waitlist .blurb {
+  max-width: 52ch;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--silk-65);
+}
+.waitlist .blurb strong { color: var(--silk); font-weight: 600; }
+/* Waitlist tile is secondary (silk) by default; amber lights only on hover/focus (intent). */
+.waitlist .wl-btn {
+  border-color: var(--glass-edge-up);
+}
+.waitlist .wl-btn:hover,
+.waitlist .wl-btn:focus-visible {
+  color: var(--amber);
+  border-color: var(--amber-40);
+  box-shadow: inset 0 0 14px var(--amber-22), 0 0 8px var(--amber-22);
+  text-shadow: 0 0 4px var(--amber-65);
+}
+
+/* ── FOOTER ── */
+footer {
+  padding: var(--sp-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--silk-40);
+}
+footer nav { display: flex; gap: var(--sp-4); flex-wrap: wrap; }
+footer a { color: var(--amber); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+footer .tagline { display: flex; align-items: center; gap: var(--sp-2); color: var(--silk-40); }
+/* Static ok-LED — hardware character; reduced-motion makes it static anyway (no animation here). */
+footer .tagline .ok-led {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--led-ok);
+  box-shadow:
+    0 0 3px var(--led-ok),
+    0 0 6px rgba(109, 212, 74, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
+  flex: none;
+}
+footer .right { text-align: right; line-height: 1.7; }
+
+/* ── RESPONSIVE (mobile-first collapse) ── */
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; gap: var(--sp-5); padding: var(--sp-7) var(--sp-5) var(--sp-6); }
+  .meta-bar .versions { display: none; }
+  .section { padding: var(--sp-6) var(--sp-5); }
+}
+@media (max-width: 600px) {
+  footer { flex-direction: column; gap: var(--sp-4); }
+  footer .right { text-align: left; }
+  .cmd-row code { font-size: 12px; }
+  .cmd-row { flex-wrap: wrap; }
+}
+
+/* ── REDUCED MOTION — disable all motion, page fully usable static ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+</style>
+</head>
+
+<body>
+<a class="skip-link" href="#install">Skip to install</a>
+
+<header class="meta-bar">
+  <div class="brand">
+    <span class="led-dot" aria-hidden="true"></span>
+    vibemix
+    <span class="tag">CDJ WHISPER</span>
+  </div>
+  <div class="versions">
+    <span>open source · apache 2.0</span>
+    <span>mac + windows</span>
+    <span>saira · jetbrains mono</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- §1 HERO -->
+  <section class="hero" aria-labelledby="hero-heading">
+    <div>
+      <span class="eyebrow">free · open-source · runs local</span>
+      <h1 class="h0" id="hero-heading">
+        THE ONLY AI CO-HOST<br>
+        <span class="accent">THAT ACTUALLY LISTENS</span>
+      </h1>
+    </div>
+    <div class="lede">
+      <p>It hears your master, watches your screen, and reads your controller — then talks back in your ear like <em>a friend who knows the room</em>. Hype-man or coach. Runs local, free, open-source.</p>
+    </div>
+  </section>
+
+  <!-- §2 DEMO EMBED -->
+  <section class="section" aria-labelledby="demo-heading">
+    <div class="section-head">
+      <span class="num-idx">§ 01</span>
+      <h2 id="demo-heading">See It Live</h2>
+      <span class="right-note">grounded · real-time · in your ear</span>
+    </div>
+    <div class="demo-window">
+      <div class="border-anim" aria-hidden="true"></div>
+      <!-- README hero pattern: <video> points at the not-yet-present demo.mp4 (KAAN-ACTION §ASSETS-DEMO-CUT);
+           the poster + <img> fallback keep it non-broken until the real film lands (Wave 3 / GH-01). -->
+      <video class="screen" controls muted playsinline preload="none"
+             poster="../assets/demo-placeholder.gif"
+             src="../assets/demo.mp4">
+        <img class="screen" src="../assets/demo-placeholder.gif"
+             alt="vibemix co-host live over a DJ set — the live session UI showing track, meters, and the AI hype-man line"
+             width="720" height="405">
+      </video>
+    </div>
+    <p class="demo-caption">demo film coming soon</p>
+  </section>
+
+  <!-- §3 INSTALL CTA -->
+  <section class="section install" id="install" aria-labelledby="install-heading">
+    <div class="section-head" style="width:100%;">
+      <span class="num-idx">§ 02</span>
+      <h2 id="install-heading">Install</h2>
+      <span class="right-note">one command · mac + windows</span>
+    </div>
+
+    <div class="cta-row">
+      <a class="btn on" href="#install-commands">Get vibemix</a>
+    </div>
+    <p class="sub-copy">macOS + Windows · free · open source</p>
+
+    <div class="code-tile" id="install-commands">
+      <div class="cmd-row">
+        <span class="os">macOS</span>
+        <code id="cmd-mac">brew install bravoh-ai/tap/vibemix</code>
+        <button class="copy-btn" type="button" data-copy-target="cmd-mac" aria-label="Copy the macOS install command">Copy</button>
+      </div>
+      <div class="cmd-row">
+        <span class="os">Windows</span>
+        <code id="cmd-win">scoop install vibemix</code>
+        <button class="copy-btn" type="button" data-copy-target="cmd-win" aria-label="Copy the Windows install command">Copy</button>
+      </div>
+    </div>
+
+    <a class="secondary-link" href="https://github.com/bravoh-ai/vibemix/releases">or download from GitHub Releases →</a>
+  </section>
+
+  <!-- §4 WAITLIST -->
+  <section class="section waitlist" aria-labelledby="waitlist-heading">
+    <div class="section-head" style="width:100%;">
+      <span class="num-idx">§ 03</span>
+      <h2 id="waitlist-heading">Built by Bravoh</h2>
+      <span class="right-note">opt-in · no tracking on this page</span>
+    </div>
+    <p class="blurb">vibemix is <strong>Bravoh's open-source warm-up</strong>. Want the full AI creative team for artists? Join the Bravoh waitlist.</p>
+    <!-- Default-OFF: no analytics/tracking script auto-loads. The UTM-tracked outbound link fires ONLY on click.
+         Real canonical waitlist URL → KAAN-ACTION-LEGAL.md §V7-LANDING (placeholder shape locked below). -->
+    <a class="btn wl-btn" rel="noopener" target="_blank"
+       href="https://altidus.world/waitlist?utm_source=vibemix&utm_medium=landing&utm_campaign=oss">Join the waitlist</a>
+  </section>
+
+</main>
+
+<footer>
+  <nav aria-label="Project links">
+    <a href="https://github.com/bravoh-ai/vibemix">GitHub</a>
+    <a href="https://github.com/bravoh-ai/vibemix/blob/main/CONTRIBUTING.md">Contributing</a>
+    <a href="https://github.com/bravoh-ai/vibemix/blob/main/LICENSE">License (Apache-2.0)</a>
+    <a href="https://github.com/bravoh-ai/vibemix/blob/main/SECURITY.md">Security</a>
+    <a href="https://github.com/bravoh-ai/vibemix/blob/main/CODE_OF_CONDUCT.md">Code of Conduct</a>
+  </nav>
+  <div class="right tagline">
+    <span class="ok-led" aria-hidden="true"></span>
+    vibemix · grounded, never hallucinating, no AI slop · Bravoh OSS
+  </div>
+</footer>
+
+<script>
+/* Vanilla copy-to-clipboard. Degrades gracefully: the <code> is user-select:all,
+   so the command stays selectable even if navigator.clipboard is absent. */
+(function () {
+  "use strict";
+  var buttons = document.querySelectorAll(".copy-btn[data-copy-target]");
+  buttons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var target = document.getElementById(btn.getAttribute("data-copy-target"));
+      if (!target) return;
+      var text = target.textContent;
+      var done = function () {
+        var original = "Copy";
+        btn.textContent = "Copied";
+        btn.classList.add("copied");
+        setTimeout(function () {
+          btn.textContent = original;
+          btn.classList.remove("copied");
+        }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () {
+          /* clipboard blocked — text is still selectable, no-op */
+        });
+      } else {
+        /* No clipboard API — select the text so the user can copy manually. */
+        try {
+          var range = document.createRange();
+          range.selectNodeContents(target);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch (e) { /* selectable fallback already in CSS */ }
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
