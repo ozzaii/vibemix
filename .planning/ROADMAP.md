@@ -121,7 +121,12 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
   3. The OG / social card at `docs/assets/og-card.png` (1200×630) is generated from `docs/assets/sources/og-card.html` (a Tailwind + Puppeteer template) via `scripts/regenerate_assets.sh`; the card is pinned at a known SHA-256 in `docs/assets/MANIFEST.yaml`; the GitHub Pages landing + the README both reference it via `<meta property="og:image">`; `tests/repo/test_github_presence.py::test_og_card_present_and_hash_matches` passes. Verified by inspecting the test run + opening the README in a Twitter/X card validator (or running `curl -I https://opengraph.xyz/url/<pages-url>` and confirming the card resolves).
   4. All visual assets in `docs/assets/` are **auto-generated from sources** in `docs/assets/sources/` — running `scripts/regenerate_assets.sh` produces byte-identical outputs to what's committed (or differs ONLY by intentional source edits). Verified by a CI gate at `.github/workflows/asset-bitrot.yml` that runs the regenerator, runs `git diff --exit-code docs/assets/`, and fails if a committed asset doesn't match its regenerated form. The list of source-generated assets is enumerated in `docs/assets/MANIFEST.yaml` (so hand-cut assets that are intentionally bespoke can be opt-out and don't break the gate).
   5. `tests/repo/test_github_presence.py` exists as a one-stop repo-presence suite — running `pytest tests/repo/test_github_presence.py -v` shows GREEN coverage of: every README badge URL returns 200 (via `requests.get` with a 5s timeout), the demo asset is present + under the size cap, the OG image is present + hash matches the manifest, the README hero hash matches the sentinel, every `.github/ISSUE_TEMPLATE/*.md` is non-empty + has the required front-matter (`---\nname: ...\nabout: ...\n---`), `.github/pull_request_template.md` exists + is non-empty, and the four OSS files from P69 (CONTRIBUTING / CoC / SECURITY / MAINTAINERS) all exist + link cleanly. **This test is the "GitHub sexified, generated, tested" success criterion encoded in code.**
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 70P01-asset-reproducibility-infra-PLAN.md — Wave 0: scripts/regenerate_assets.sh + docs/assets/MANIFEST.yaml + .github/workflows/asset-bitrot.yml + tests/repo/test_asset_manifest_shape.py (GH-04)
+- [ ] 70P02-og-social-card-PLAN.md — Wave 1: docs/assets/sources/og-card.html + regenerator wiring + og-card.png (1200x630) + MANIFEST SHA pin + README reference (GH-03)
+- [ ] 70P03-github-pages-landing-PLAN.md — Wave 2: docs/landing/ CDJ-Whisper static site + .github/workflows/lighthouse.yml (local build, a11y>=95/perf>=90) + anti-backsliding grep + KAAN-ACTION-LEGAL.md §V7-LANDING (GH-02)
+- [ ] 70P04-demo-film-poster-PLAN.md — Wave 3: docs/assets/demo-poster.png (source-generated) + README hero repoint (PLACEHOLDER sentinel kept green) + KAAN-ACTION-LEGAL.md §ASSETS-DEMO-CUT (GH-01)
+- [ ] 70P05-presence-suite-PLAN.md — Wave 4: tests/repo/test_github_presence.py one-stop repo-presence suite (badges + demo + OG hash + hero hash + .yml issue forms + PR template + 4 OSS files) (GH-05)
 **UI hint**: yes — the GitHub Pages landing is a Tier-1 surface for first-time visitors; the `frontend-enforcement` skill governs the CDJ-Whisper material/typography pass and the Kaan-felt sign-off is the hard taste gate (mirrors v4.0 P57 + v5.0 P62 pattern)
 
 ## Progress (v7.0)
@@ -131,7 +136,7 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
 | 67. All Tests Pass | v7.0 | 5/5 | Complete   | 2026-05-23 |
 | 68. All Devices Ready | v7.0 | 5/5 | Complete (Waves 0-4 / 68P01..68P05 all shipped 2026-05-23 — atomic catalog reconciliation + 10×2 parametrized contract/smoke + 3-profile hot-plug matrix + 4-fixture audio backend matrix + contributor recipe + §V7-LIVE-07..10 KAAN-ACTION clusters; DEV-01..05 all closed engineering-side; live-hardware confirmations ride Kaan's clock via §V7-LIVE-07..10) | 2026-05-23 |
 | 69. OSS Fully Integrated | v7.0 | 4/5 | In Progress|  |
-| 70. GitHub Sexified, Generated, Tested | v7.0 | 0/0 | Not started | - |
+| 70. GitHub Sexified, Generated, Tested | v7.0 | 0/5 | Planned (5 plans, Waves 0-4 — dependency-ordered: 70P01 dep-free, 70P02->01, 70P03->02, 70P04 dep-free, 70P05->all) | - |
 
 **Coverage:** 19/19 v7.0 requirements mapped ✓ (no orphans, no duplicates) — TEST-01..04 → P67 · DEV-01..05 → P68 · OSS-01..05 → P69 · GH-01..05 → P70
 
