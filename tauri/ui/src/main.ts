@@ -20,6 +20,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import { initCrashBanner, showFatalBanner } from "./crash-banner.js";
+import { vmxLog } from "./debug-log.js";
 import { sendIpcRequest } from "./ipc/client.js";
 import { isIpcMessage, parseIpcMessage } from "./ipc/validator.js";
 // VIS-06 (43-06): rolling perf observer drives data-blur-perf ladder.
@@ -48,6 +49,33 @@ declare global {
   }
 }
 
+// === Global error trap (Category 5 — CRITICAL) ===========================
+// Install BEFORE any boot logic runs so an init-time throw or a rejected
+// boot promise is loud in BOTH the console and the on-disk ui.log. A
+// headless operator otherwise sees a blank window with no signal. Guarded
+// on `window` so the module stays importable in a non-DOM test env.
+if (typeof window !== "undefined") {
+  window.addEventListener("error", (event: ErrorEvent) => {
+    const err = event.error;
+    vmxLog("[vmx:error]", "uncaught error", {
+      message: event.message,
+      source: event.filename,
+      line: event.lineno,
+      col: event.colno,
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+  });
+  window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => {
+    const reason = event.reason;
+    vmxLog("[vmx:error]", "unhandled promise rejection", {
+      reason:
+        reason instanceof Error
+          ? { message: reason.message, stack: reason.stack }
+          : String(reason),
+    });
+  });
+}
+
 // === DevTools diagnostic subscribers (one-shot only — status.tick is 1Hz
 // so logging it floods devtools; it's still consumed by the status bar
 // subscriber in wizard/router.ts which renders the LED dots).
@@ -72,13 +100,11 @@ void listen<string>("ipc-parse-error", (event) => {
 });
 
 void listen<string>("ws-state", (event) => {
-  // eslint-disable-next-line no-console
-  console.log("[ws-state]", event.payload);
+  vmxLog("[vmx:ws]", "rust bridge ws-state", { state: event.payload });
 });
 
 void listen<string>("sidecar-error", (event) => {
-  // eslint-disable-next-line no-console
-  console.warn("[sidecar-error]", event.payload);
+  vmxLog("[vmx:error]", "sidecar-error", { detail: event.payload });
 });
 
 // === Boot decision =======================================================
@@ -152,6 +178,7 @@ async function shouldShowWizard(): Promise<boolean> {
 }
 
 async function boot(): Promise<void> {
+  vmxLog("[vmx:state]", "boot: start", { readyState: document.readyState });
   consumeUrlParam();
   initCrashBanner();
 
@@ -185,8 +212,7 @@ async function boot(): Promise<void> {
   if (import.meta.env.DEV) {
     const params = new URLSearchParams(window.location.search);
     if (params.get("dev") === "session-mock") {
-      // eslint-disable-next-line no-console
-      console.log("[boot] DEV dev=session-mock → mounting mock session UI");
+      vmxLog("[vmx:state]", "boot → mock session UI (dev=session-mock)");
       const { routeSessionMock } = await import("./session/mock.js");
       await routeSessionMock();
       return;
@@ -194,6 +220,9 @@ async function boot(): Promise<void> {
   }
 
   const wizardMode = await shouldShowWizard();
+  vmxLog("[vmx:state]", "boot: surface decided", {
+    surface: wizardMode ? "wizard" : "session",
+  });
 
   if (wizardMode) {
     // Phase 11 path — render the wizard frame and hook the status bar.
@@ -212,19 +241,21 @@ async function boot(): Promise<void> {
   }
 
   // Phase 12 path — mount the live session UI.
-  // eslint-disable-next-line no-console
-  console.log("[boot] first_run_completed=true → mounting live session");
+  vmxLog("[vmx:state]", "boot → mounting live session");
   try {
     await routeSession();
+    vmxLog("[vmx:state]", "boot: live session mounted");
   } catch (err) {
     // Without surfacing this, the user sees a blank window with no
     // indication anything failed. Route through the existing crash
     // banner so the Restart button is reachable — restart_sidecar
     // bounces the Python process which is usually enough to recover
     // (the webview reloads on app restart anyway).
-    // eslint-disable-next-line no-console
-    console.error("[boot] routeSession failed:", err);
     const detail = err instanceof Error ? err.message : String(err);
+    vmxLog("[vmx:error]", "routeSession failed", {
+      detail,
+      stack: err instanceof Error ? err.stack : undefined,
+    });
     showFatalBanner("session-mount-failed", `Session UI failed to mount: ${detail}`);
   }
 }

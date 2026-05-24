@@ -10,6 +10,7 @@
  * shadow to look pressed-in. Pure-function — accepts {options, active,
  * onChange, variant} and emits a click that fires onChange(optionId). */
 
+import { vmxLog } from "../../debug-log.js";
 import { registerStyle } from "./_style-registry.js";
 
 export type RockerVariant = "rocker" | "interaction";
@@ -170,6 +171,10 @@ export function renderRocker(props: RockerProps): HTMLElement {
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
+      vmxLog("[vmx:click]", `rocker · ${props.ariaLabel ?? props.variant ?? "rocker"}`, {
+        id: opt.id,
+        noop: opt.id === props.active,
+      });
       if (opt.id === props.active) return;
       props.onChange?.(opt.id);
     });

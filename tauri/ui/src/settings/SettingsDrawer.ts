@@ -40,6 +40,7 @@ import { renderRocker } from "../session/components/rocker.js";
 import { getSessionState } from "../session/state.js";
 import { sendSettings, type SettingsField } from "../session/ws-bridge.js";
 import { emitIpc, sendIpcRequest } from "../ipc/client.js";
+import { vmxLog } from "../debug-log.js";
 import type {
   RecordingsDeleteAck,
   RecordingsListResult,
@@ -446,6 +447,7 @@ export function mountSettingsDrawer(root: HTMLElement): void {
 /** Slide the drawer in. Idempotent. */
 export function openSettings(): void {
   if (!mountedHandle) return;
+  vmxLog("[vmx:click]", "settings drawer open");
   openSettingsState();
   // Re-render with fresh settings (sidecar may have broadcast updates
   // while the drawer was closed).
@@ -462,6 +464,7 @@ export function openSettings(): void {
 /** Slide the drawer out. Idempotent. */
 export function closeSettings(): void {
   if (!mountedHandle) return;
+  vmxLog("[vmx:click]", "settings drawer close");
   closeSettingsState();
   mountedHandle.refresh();
 }

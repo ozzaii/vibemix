@@ -34,6 +34,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
+import { vmxLog } from "../debug-log.js";
 import type { VibemixIPCMessages as IpcMessage } from "./messages.js";
 import { parseIpcMessage } from "./validator.js";
 
@@ -63,6 +64,10 @@ export async function sendIpcRequest<TResponse extends IpcMessage = IpcMessage>(
     payload: requestPayload,
   };
 
+  vmxLog("[vmx:ipc>]", `request ${requestType} → expect ${responseType}`, {
+    payload: requestPayload,
+  });
+
   // Subscribe to the response channel FIRST, then send the request — closes
   // the race window where a fast sidecar reply could arrive before the
   // listener is attached.
@@ -83,6 +88,9 @@ export async function sendIpcRequest<TResponse extends IpcMessage = IpcMessage>(
 
     timer = setTimeout(() => {
       cleanup();
+      vmxLog("[vmx:error]", `ipc timeout: no ${responseType} within ${timeoutMs}ms`, {
+        requestType,
+      });
       reject(new Error(`ipc timeout: no ${responseType} within ${timeoutMs}ms`));
     }, timeoutMs);
 
@@ -90,6 +98,7 @@ export async function sendIpcRequest<TResponse extends IpcMessage = IpcMessage>(
       try {
         const msg = parseIpcMessage(event.payload) as TResponse;
         cleanup();
+        vmxLog("[vmx:ipc<]", `response ${responseType}`, { payload: msg });
         resolve(msg);
       } catch (err) {
         // Schema violation on the response — drop the frame, keep
@@ -121,15 +130,45 @@ export async function subscribeIpc<T extends IpcMessage = IpcMessage>(
   type: string,
   callback: (msg: T) => void,
 ): Promise<UnlistenFn> {
+  vmxLog("[vmx:ipc<]", `subscribe ${type}`);
   return await listen<unknown>(type.replace(/\./g, "-"), (event) => {
     try {
       const msg = parseIpcMessage(event.payload) as T;
+      // High-frequency stream types (status.tick @1Hz, session.snapshot @up to
+      // 30Hz) would flood ui.log — throttle them. Low-frequency / event types
+      // (reactions, settings.state, anything else) log every frame so a
+      // headless operator sees the reaction land immediately.
+      logSubscribedFrame(type, msg);
       callback(msg);
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn(`[ipc:${type}] schema violation:`, err);
+      vmxLog("[vmx:error]", `ipc subscribe schema violation: ${type}`, {
+        err: String(err),
+      });
     }
   });
+}
+
+/** Per-stream-type last-logged-at (ms) for throttling the high-frequency
+ *  subscribed frames in the on-disk log. */
+const _subThrottleAt = new Map<string, number>();
+const _SUB_THROTTLE_MS = 2000;
+/** Stream types that arrive often enough to flood the log — summarise at most
+ *  every _SUB_THROTTLE_MS. Everything else logs every frame. */
+const _HIGH_FREQ_TYPES = new Set([
+  "ipc.status.tick",
+  "ipc.session.snapshot",
+]);
+
+function logSubscribedFrame(type: string, msg: unknown): void {
+  if (_HIGH_FREQ_TYPES.has(type)) {
+    const now = Date.now();
+    const last = _subThrottleAt.get(type) ?? 0;
+    if (now - last < _SUB_THROTTLE_MS) return;
+    _subThrottleAt.set(type, now);
+    vmxLog("[vmx:ipc<]", `frame ${type} (throttled ${_SUB_THROTTLE_MS}ms)`, msg);
+    return;
+  }
+  vmxLog("[vmx:ipc<]", `frame ${type}`, msg);
 }
 
 /** Fire-and-forget: send a message to the sidecar; no response awaited.
@@ -141,6 +180,7 @@ export async function emitIpc(
   type: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
+  vmxLog("[vmx:ipc>]", `emit ${type} (fire-and-forget)`, { payload });
   await invoke("forward_ipc_to_sidecar", {
     message: { type, ts: new Date().toISOString(), payload },
   });
@@ -176,6 +216,7 @@ export async function emitIpc(
  *    * Missing session dir — Rust returns `Err("target canon: ...")`.
  *  Caller is responsible for surfacing failure (typically `console.error`). */
 export async function revealInOS(session_dir: string): Promise<void> {
+  vmxLog("[vmx:ipc>]", "invoke reveal_in_os", { sessionDir: session_dir });
   return invoke("reveal_in_os", { sessionDir: session_dir });
 }
 
@@ -185,6 +226,7 @@ export async function revealInOS(session_dir: string): Promise<void> {
  *  tauri-plugin-shell `open()` which delegates to the OS file association
  *  (LaunchServices on macOS, ShellExecute on Windows). */
 export async function openInputWav(session_dir: string): Promise<void> {
+  vmxLog("[vmx:ipc>]", "invoke open_input_wav", { sessionDir: session_dir });
   return invoke("open_input_wav", { sessionDir: session_dir });
 }
 

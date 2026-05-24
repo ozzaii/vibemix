@@ -14,6 +14,7 @@
  * closes session-audit finding M-02 (inactive opt :hover was previously
  * inconsistent with the row trigger which already gained a glow). */
 
+import { vmxLog } from "../../debug-log.js";
 import { registerStyle } from "./_style-registry.js";
 
 export interface PickerOption {
@@ -173,13 +174,23 @@ const CSS = `
     transform: rotate(180deg);
     text-shadow: 0 0 4px var(--amber-22);
   }
-  /* Dropdown — sealed glass-1 popover (mock .tray-popover treatment). */
+  /* Dropdown — sealed glass-1 popover (mock .tray-popover treatment).
+   *
+   * 2026-05-24 release-blocker fix: the popover is anchored with
+   * position:fixed (viewport coordinates supplied by openList() via
+   * getBoundingClientRect) rather than position:absolute. The pickers
+   * live inside .vmx-panel / .vmx-settings-group containers that carry
+   * overflow:hidden + backdrop-filter (for the rounded glass shell) — an
+   * absolutely-positioned child was clipped by that overflow and buried
+   * beneath sibling panels below it (each backdrop-filter opens a new
+   * stacking context, so the dropdown's z-index:30 was scoped to its own
+   * container and lost the cross-container paint order). Fixed positioning
+   * lifts the list into the viewport layer where nothing clips or occludes
+   * it; the z-index then competes at the top level. The row JS keeps left/
+   * top/width in sync on open + scroll/resize. */
   .vmx-picker__list {
-    position: absolute;
-    left: 0;
-    top: calc(100% + 5px);
-    z-index: 30;
-    width: 100%;
+    position: fixed;
+    z-index: 1000;
     min-width: 200px;
     max-height: 280px;
     overflow: auto;
@@ -345,6 +356,10 @@ export function renderPicker(props: PickerProps): HTMLElement {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      vmxLog("[vmx:click]", `picker option · ${props.label}`, {
+        id: opt.id,
+        label: opt.label,
+      });
       closeList();
       props.onChange?.(opt.id);
     });
@@ -352,23 +367,52 @@ export function renderPicker(props: PickerProps): HTMLElement {
   }
   root.append(list);
 
+  // The dropdown is `position: fixed`, so its coordinates are viewport-
+  // relative and must be recomputed from the row's live bounding rect each
+  // time it opens (and whenever an ancestor scrolls/the window resizes
+  // while open — the drawer body + session grid are both scroll containers).
+  function positionList(): void {
+    // getBoundingClientRect can be absent in non-DOM test envs — guard so a
+    // headless render path never throws.
+    if (typeof row.getBoundingClientRect !== "function") return;
+    const r = row.getBoundingClientRect();
+    list.style.left = `${r.left}px`;
+    list.style.top = `${r.bottom + 5}px`;
+    // Match the row width so the popover stays visually anchored to its
+    // trigger (mirrors the old `width: 100%` against the row).
+    list.style.width = `${r.width}px`;
+  }
+
   function openList(): void {
     root.dataset.open = "true";
     row.setAttribute("aria-expanded", "true");
+    positionList();
+    window.addEventListener("scroll", positionList, true);
+    window.addEventListener("resize", positionList);
   }
   function closeList(): void {
     root.dataset.open = "false";
     row.setAttribute("aria-expanded", "false");
+    window.removeEventListener("scroll", positionList, true);
+    window.removeEventListener("resize", positionList);
   }
 
   row.addEventListener("click", (e) => {
     e.preventDefault();
-    if (root.dataset.open === "true") closeList();
-    else openList();
+    const willOpen = root.dataset.open !== "true";
+    vmxLog("[vmx:click]", `picker row · ${props.label}`, {
+      action: willOpen ? "open" : "close",
+      value: props.value,
+    });
+    if (willOpen) openList();
+    else closeList();
   });
 
-  // Close on outside click — registered once per picker. Phase 12-04 may
-  // promote this to a single document-level listener if drawer perf demands it.
+  // Close on outside click — registered once per picker. Because the list
+  // is now `position: fixed` (lifted out of the picker's DOM-flow box but
+  // still a DOM descendant of `root`), `root.contains(e.target)` continues
+  // to match clicks inside the open popover, so an option click does NOT
+  // self-dismiss before its own handler runs.
   document.addEventListener("click", (e) => {
     if (root.dataset.open !== "true") return;
     if (!(e.target instanceof Node) || !root.contains(e.target)) {

@@ -18,10 +18,12 @@
  * UI-SPEC declared them as local-to-live-session tokens; this avoids
  * polluting tokens.css with Phase-12-only grid columns. */
 
+import { emitIpc } from "../ipc/client.js";
+import { sendSettings } from "./ws-bridge.js";
 import { registerStyle } from "./components/_style-registry.js";
 import { renderTitlebar, setTitlebarClock, setTitlebarPill, type PillLevel } from "./components/titlebar.js";
 import { renderPanel } from "./components/panel.js";
-import { renderRocker } from "./components/rocker.js";
+import { renderRocker, setRockerActive } from "./components/rocker.js";
 import { renderPicker } from "./components/picker.js";
 import { renderMeter, setMeterLevels } from "./components/meter.js";
 import { renderTimecode, setTimecode } from "./components/timecode.js";
@@ -491,6 +493,22 @@ export function voiceProfileToCode(profile: string): string {
   return VOICE_PROFILE_TO_CODE[profile] ?? "kore";
 }
 
+/** Map the deck mood rocker's UPPERCASE vocabulary (HYPE / TEACH / COACH)
+ *  onto the wire-level mood enum the sidecar persists
+ *  ("hype-man" | "teacher" | "coach"). Mirror of moodFromSettings() in
+ *  render-loop.ts, inverted. Defaults to "hype-man" for any unknown id. */
+function deckMoodToWire(id: string): "hype-man" | "teacher" | "coach" {
+  switch (id) {
+    case "TEACH":
+      return "teacher";
+    case "COACH":
+      return "coach";
+    case "HYPE":
+    default:
+      return "hype-man";
+  }
+}
+
 /** Map the active mood to a 1-line DJ-vocabulary caption.
  *  Round 3 critique lift (H6): users shouldn't have to remember what
  *  HYPE / TEACH / COACH each do. The caption renders under the rocker
@@ -554,18 +572,36 @@ function buildPersonaPanelBody(state: SessionState): HTMLElement {
     }),
   );
 
-  wrap.append(
-    renderRocker({
-      ariaLabel: "mood",
-      options: [
-        { id: "HYPE", label: "HYPE" },
-        { id: "TEACH", label: "TEACH" },
-        { id: "COACH", label: "COACH" },
-      ],
-      active: state.persona.mood,
-      variant: "interaction",
-    }),
-  );
+  const moodRocker = renderRocker({
+    ariaLabel: "mood",
+    options: [
+      { id: "HYPE", label: "HYPE" },
+      { id: "TEACH", label: "TEACH" },
+      { id: "COACH", label: "COACH" },
+    ],
+    active: state.persona.mood,
+    variant: "interaction",
+    // Bug 1 (2026-05-24) — the deck mood rocker was a read-only mirror
+    // with no click handler; clicking it did nothing. Wire it to the
+    // canonical mood write (same as the mascot-group pills + tray). The
+    // uppercase deck vocabulary maps to the wire enum. The sidecar
+    // round-trips ipc.settings.state which re-syncs every mood surface.
+    // The persona panel body is built once at mount and is NOT rebuilt by
+    // the render loop, so flip the active segment optimistically here so
+    // the control reads as alive the instant it's pressed; the round-trip
+    // confirms it.
+    onChange: (id) => {
+      setRockerActive(moodRocker, id);
+      void emitIpc("ipc.settings.set", {
+        field: "mood",
+        value: deckMoodToWire(id),
+      }).catch((err: unknown) => {
+        // eslint-disable-next-line no-console
+        console.warn("[session-layout] mood set failed:", err);
+      });
+    },
+  });
+  wrap.append(moodRocker);
 
   // 2026-05-19 /impeccable critique round 3 lift (H6): 1-line caption
   // under the active mood rocker so the user doesn't have to recall
@@ -606,6 +642,17 @@ function buildPersonaPanelBody(state: SessionState): HTMLElement {
         { id: "WARM",  label: "WARM",  sub: "warm, never sleepy" },
         { id: "GRUFF", label: "GRUFF", sub: "rough, cutting" },
       ],
+      // Bug 1 (2026-05-24) — wire the deck voice picker. The picker IDs are
+      // the profile abstraction (CALM/WARM/GRUFF); the wire field carries
+      // the underlying Gemini codename, so map through voiceProfileToCode.
+      onChange: (id) => {
+        void sendSettings("voice", voiceProfileToCode(id)).catch(
+          (err: unknown) => {
+            // eslint-disable-next-line no-console
+            console.warn("[session-layout] voice set failed:", err);
+          },
+        );
+      },
     }),
   );
 
@@ -623,6 +670,13 @@ function buildPersonaPanelBody(state: SessionState): HTMLElement {
         { id: "hip-hop", label: "hip-hop" },
         { id: "edm-generic", label: "edm-generic" },
       ],
+      // Bug 1 (2026-05-24) — wire the deck genre picker to the genre field.
+      onChange: (id) => {
+        void sendSettings("genre", id).catch((err: unknown) => {
+          // eslint-disable-next-line no-console
+          console.warn("[session-layout] genre set failed:", err);
+        });
+      },
     }),
   );
 
@@ -641,20 +695,43 @@ function buildOutputPanelBody(state: SessionState): HTMLElement {
       iconSvg: HEADPHONES_SVG,
       autoPill: true,
       options: [], // Wave 3 (12-04) populates from ipc.settings.state
+      // Bug 1 (2026-05-24) — wire device selection. "auto" maps to null on
+      // the wire (sidecar picks the default device). Real device IDs flow
+      // through verbatim once the sidecar populates the option list.
+      onChange: (id) => {
+        void sendSettings(
+          "output_device_id",
+          id === "auto" || id === "AUTO" ? null : id,
+        ).catch((err: unknown) => {
+          // eslint-disable-next-line no-console
+          console.warn("[session-layout] output device set failed:", err);
+        });
+      },
     }),
   );
 
-  wrap.append(
-    renderRocker({
-      ariaLabel: "output profile",
-      options: [
-        { id: "HP", label: "HP" },
-        { id: "SPK", label: "SPK" },
-      ],
-      active: state.output.profile,
-      variant: "rocker",
-    }),
-  );
+  const profileRocker = renderRocker({
+    ariaLabel: "output profile",
+    options: [
+      { id: "HP", label: "HP" },
+      { id: "SPK", label: "SPK" },
+    ],
+    active: state.output.profile,
+    variant: "rocker",
+    // Bug 1 (2026-05-24) — wire the HP/SPK profile rocker. Deck IDs are
+    // uppercase; the wire field is lowercase ("hp" | "spk"). Optimistic
+    // flip for the same not-rebuilt-by-render-loop reason as the mood rocker.
+    onChange: (id) => {
+      setRockerActive(profileRocker, id);
+      void sendSettings("output_profile", id.toLowerCase()).catch(
+        (err: unknown) => {
+          // eslint-disable-next-line no-console
+          console.warn("[session-layout] output profile set failed:", err);
+        },
+      );
+    },
+  });
+  wrap.append(profileRocker);
 
   return wrap;
 }

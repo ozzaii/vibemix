@@ -18,6 +18,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
+mod debug_log;
 mod debrief_window;
 mod djay_ax;
 mod hotkey;
@@ -75,6 +76,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             ws_client::forward_ipc_to_sidecar,
             sidecar::restart_sidecar,
+            debug_log::debug_log,
             config::read_first_run_state,
             config::write_first_run_state,
             config::read_mascot_window_state,

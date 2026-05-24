@@ -36,6 +36,7 @@ import {
 } from "./state-machine.js";
 import { renderWaveform, setWaveform } from "./waveform.js";
 import { connectMascotBus, type MascotBusClient } from "./ws-client.js";
+import { vmxLog } from "../debug-log.js";
 
 const TAG = "[pill]";
 
@@ -335,7 +336,16 @@ function boot(): void {
   try {
     bus = connectMascotBus("ws://127.0.0.1:8765");
     bus.addMessageListener((msg) => {
+      const prevMode = state.mode;
       state = reduceFrame(state, msg, performance.now());
+      // Category 4 — pill state-machine transition (frame-driven). Only logs
+      // on an actual mode change so the 30Hz reader frames don't spam.
+      if (state.mode !== prevMode) {
+        vmxLog("[vmx:state]", `pill ${prevMode} → ${state.mode}`, {
+          trigger: "frame",
+          cohostStatus: state.cohostStatus,
+        });
+      }
       // deck_state is read-only meta riding the SAME flat 30Hz frame as
       // voice/cohost_status (62-03 _serialize_deck_state). WR-03: REPLACE (not
       // merge) view.deckState with the latest carried map — including an empty
@@ -356,7 +366,15 @@ function boot(): void {
   // ── rAF loop — fire the data-driven collapse + repaint the waveform ──────
   function frame(): void {
     const now = performance.now();
+    const prevMode = state.mode;
     state = tickCollapse(state, now);
+    // Category 4 — data-driven expand→collapse transition.
+    if (state.mode !== prevMode) {
+      vmxLog("[vmx:state]", `pill ${prevMode} → ${state.mode}`, {
+        trigger: "collapse-timeout",
+        cohostStatus: state.cohostStatus,
+      });
+    }
 
     // Base label tracks the underlying status even while expanded.
     const baseLabel =

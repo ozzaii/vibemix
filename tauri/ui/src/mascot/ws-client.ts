@@ -19,6 +19,9 @@
  *     followups are expressed as data and the caller schedules them.
  */
 
+import { vmxLog } from "../debug-log.js";
+import { logBusFrame } from "../debug-log-ws.js";
+
 export type BusListener = (msg: unknown) => void;
 export type ConnectionStatus = "connected" | "disconnected" | "reconnecting";
 export type StatusListener = (status: ConnectionStatus) => void;
@@ -36,6 +39,8 @@ const BACKOFF_START_MS = 1000;
 const BACKOFF_CAP_MS = 8000;
 
 const TAG = "[mascot-bus]";
+/** Observability label for the file-sink (Category 3 — WS). */
+const WS_SINK = "mascot";
 
 // ── Implementation ────────────────────────────────────────────────────────
 
@@ -49,6 +54,8 @@ export function connectMascotBus(url: string = DEFAULT_URL): MascotBusClient {
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   function emitStatus(status: ConnectionStatus): void {
+    // Category 3 — connection state changes log immediately to the file sink.
+    vmxLog("[vmx:ws]", `${WS_SINK}: connection ${status}`, { url });
     for (const l of statusListeners) {
       try {
         l(status);
@@ -62,6 +69,9 @@ export function connectMascotBus(url: string = DEFAULT_URL): MascotBusClient {
   }
 
   function emitMessage(msg: unknown): void {
+    // Category 3 — reactions/ai_text log immediately; other frames are
+    // summarised + throttled inside logBusFrame so 30Hz traffic never floods.
+    logBusFrame(WS_SINK, msg);
     for (const l of messageListeners) {
       try {
         l(msg);

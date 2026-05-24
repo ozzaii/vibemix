@@ -7,6 +7,7 @@
 // the connection up to 3 times with exponential backoff (sidecar is
 // one-shot per window · long disconnects mean it crashed).
 
+import { vmxLog } from "../debug-log.js";
 import { stripDrillFields } from "./stripper-roundtrip.js";
 
 export type DebriefFrameKind =
@@ -53,12 +54,14 @@ export class DebriefWsClient extends EventTarget {
     }
     this.ws.onopen = () => {
       this.retries = 0;
+      vmxLog("[vmx:ws]", "debrief: connection connected", { url: this.url });
       this.dispatchEvent(new CustomEvent("open"));
     };
     this.ws.onmessage = (ev) => {
       this._onMessage(ev.data);
     };
     this.ws.onclose = () => {
+      vmxLog("[vmx:ws]", "debrief: connection disconnected", { url: this.url });
       this.dispatchEvent(new CustomEvent("close"));
       this._scheduleReconnect();
     };
@@ -127,10 +130,10 @@ export class DebriefWsClient extends EventTarget {
     }
     const kind = KIND_MAP[frame.type];
     if (!kind) {
-      // eslint-disable-next-line no-console
-      console.warn("[debrief] unknown frame kind:", frame.type);
+      vmxLog("[vmx:ws]", "debrief: unknown frame kind", { type: frame.type });
       return;
     }
+    vmxLog("[vmx:ws]", `debrief: frame ${kind}`, { type: frame.type });
     // Defense-in-depth: drills payload runs through the renderer-side
     // stripper before dispatch. If the server stripper had a bug, this
     // catches it; the renderer ErrorBanner flags non-zero strippedCount.

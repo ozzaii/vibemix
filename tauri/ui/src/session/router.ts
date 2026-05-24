@@ -19,13 +19,16 @@ import { installQuitGuard, installTrayQuitListener } from "./quit-guard.js";
 import { mountSessionLayout, type Mounted } from "./SessionLayout.js";
 import { startRenderLoop, stopRenderLoop } from "./render-loop.js";
 import { mountSessionShortcuts } from "./session-shortcuts.js";
+import { installTrayMoodListener } from "./tray-mood.js";
 import { mountSettingsDrawer } from "../settings/SettingsDrawer.js";
+import { vmxLog } from "../debug-log.js";
 
 let mounted: Mounted | null = null;
 let unsubscribeBridge: (() => void) | null = null;
 let unsubscribeShortcuts: (() => void) | null = null;
 let unsubscribeQuitGuard: (() => void) | null = null;
 let unsubscribeTrayQuit: (() => void) | null = null;
+let unsubscribeTrayMood: (() => void) | null = null;
 
 /** Mount the live session and start the bridge + render loop.
  *
@@ -33,6 +36,7 @@ let unsubscribeTrayQuit: (() => void) | null = null;
  *  starting fresh, so a hot-reload or a route bounce doesn't accumulate
  *  duplicate loops / DOM trees. */
 export async function routeSession(rootEl?: HTMLElement): Promise<void> {
+  vmxLog("[vmx:state]", "session-router → routeSession (mount)");
   // Find the mount root — fall back to the wizard container so we
   // replace its children if main.ts didn't provide an explicit root.
   const root =
@@ -81,12 +85,19 @@ export async function routeSession(rootEl?: HTMLElement): Promise<void> {
   // `confirmed-quit` so Rust exits. Closes H5 to 4/4 (Cmd+Q no longer
   // drops a live recording silently).
   unsubscribeTrayQuit = await installTrayQuitListener();
+
+  // Bug 3 (2026-05-24) — the system-tray mood menu emits `tray-set-mood`
+  // but nothing in the webview listened for it, so the tray Coach/Hype/
+  // Teacher switch was dead. Forward it to the sidecar via the same
+  // ipc.settings.set { field: "mood" } path the mascot-group pills use.
+  unsubscribeTrayMood = await installTrayMoodListener();
 }
 
 /** Tear down the session — stop the rAF, unsubscribe IPC, drop the
  *  Mounted handle. The DOM is left in place; route.session() replaces
  *  the root's children on next mount. */
 export async function teardownSession(): Promise<void> {
+  vmxLog("[vmx:state]", "session-router → teardownSession");
   stopRenderLoop();
   if (unsubscribeBridge) {
     try {
@@ -123,6 +134,15 @@ export async function teardownSession(): Promise<void> {
       console.warn("[session-router] tray-quit unsubscribe failed:", e);
     }
     unsubscribeTrayQuit = null;
+  }
+  if (unsubscribeTrayMood) {
+    try {
+      unsubscribeTrayMood();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[session-router] tray-mood unsubscribe failed:", e);
+    }
+    unsubscribeTrayMood = null;
   }
   mounted = null;
 }

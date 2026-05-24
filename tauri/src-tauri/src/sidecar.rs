@@ -33,6 +33,14 @@ use crate::config;
 
 const MAX_RESTARTS: u32 = 3;
 
+/// Environment keys the watchdog relays from the Tauri parent process to the
+/// spawned sidecar, IF present and non-empty (RELEASE-AUTH). SECURITY: this is
+/// an env *relay* — no key is ever embedded in the binary. The bundled
+/// distribution answer is the Bravoh proxy (VIBEMIX_LLM_MODE=proxy), which
+/// needs no key; this relay only helps the local/dev "BYO key" path so a key
+/// exported in the launching environment reaches the child.
+pub(crate) const FORWARDED_ENV_KEYS: [&str; 2] = ["GEMINI_API_KEY", "OPENROUTER_API_KEY"];
+
 /// Target triple of the bundled sidecar. Matches the per-triple directory
 /// name produced by scripts/build_sidecar.py.
 ///
@@ -135,10 +143,35 @@ pub async fn spawn_sidecar_with_watchdog(
 
         let cmd = match invocation {
             SidecarInvocation::Bundled(bin) => {
-                // Release path — IDENTICAL to before: shell().command(bin) then
-                // optional --wizard. (Wizard is appended here for the bundled
-                // arm; the helper only folds wizard into the DevSource args.)
+                // Release path. Two correctness fixes for the "co-host never
+                // speaks" release blocker (RELEASE-AUTH):
+                //
+                // 1. CWD — a Finder/Dock-launched .app runs with cwd "/", so
+                //    the bundled binary's load_dotenv() never finds a .env.
+                //    We pin cwd to the resource dir (next to the bundled
+                //    binary's _internal/ tree), giving the Python-side robust
+                //    loader a deterministic place to look for a shipped/.app-
+                //    adjacent .env. (The Python loader also probes
+                //    app_data_dir()/.env — the supported per-user key drop.)
+                //
+                // 2. API keys — forward GEMINI_API_KEY / OPENROUTER_API_KEY
+                //    from the Tauri parent env to the child WHEN PRESENT.
+                //    SECURITY (CLAUDE.md): no key is embedded here — we only
+                //    relay a key that already exists in the environment (e.g.
+                //    `GEMINI_API_KEY=… open vibemix.app`, or a launchd plist).
+                //    The real distribution answer is the Bravoh proxy
+                //    (VIBEMIX_LLM_MODE=proxy), which needs no key at all.
                 let mut c = app.shell().command(&bin);
+                if let Some(parent) = bin.parent() {
+                    c = c.current_dir(parent);
+                }
+                for key in FORWARDED_ENV_KEYS {
+                    if let Ok(val) = std::env::var(key) {
+                        if !val.is_empty() {
+                            c = c.env(key, val);
+                        }
+                    }
+                }
                 if wizard_mode {
                     c = c.args(["--wizard"]);
                 }
@@ -146,11 +179,24 @@ pub async fn spawn_sidecar_with_watchdog(
             }
             SidecarInvocation::DevSource { program, args, cwd } => {
                 // Dev path — run repo source so `cargo tauri dev` reflects
-                // src/vibemix/ HEAD. args already include --wizard when set.
-                app.shell()
+                // src/vibemix/ HEAD. cwd = repo root, so the Python-side
+                // load_dotenv() finds the repo .env. args already include
+                // --wizard when set. We ALSO forward GEMINI_API_KEY /
+                // OPENROUTER_API_KEY if they happen to be in the dev shell's
+                // env, so a key exported in the terminal wins even if the
+                // repo .env is absent (no key embedded — env relay only).
+                let mut c = app.shell()
                     .command(&program)
                     .args(&args)
-                    .current_dir(&cwd)
+                    .current_dir(&cwd);
+                for key in FORWARDED_ENV_KEYS {
+                    if let Ok(val) = std::env::var(key) {
+                        if !val.is_empty() {
+                            c = c.env(key, val);
+                        }
+                    }
+                }
+                c
             }
         };
 
@@ -227,14 +273,22 @@ pub async fn spawn_sidecar_with_watchdog(
             return Ok(());
         }
 
-        // Exit codes 2 + 3 are sidecar "fatal — do not retry" sentinels.
+        // Exit codes 2 + 3 + 4 are sidecar "fatal — do not retry" sentinels.
         // 2 = port 8765 already bound (another vibemix is running)
         // 3 = required audio device missing (BlackHole not installed)
+        // 4 = GEMINI_API_KEY not set (mode=direct) — the co-host can't
+        //     authenticate and would never speak. Retrying just loops on the
+        //     same missing key, so surface a distinct banner the webview can
+        //     route to a "set your API key" recovery surface (RELEASE-AUTH).
         // Retrying just races the same fault forever — emit a distinct
         // banner with `reason` set so the webview can route to the
         // matching recovery surface.
-        if exit_code == 2 || exit_code == 3 {
-            let reason = if exit_code == 2 { "port-in-use" } else { "audio-device-missing" };
+        if exit_code == 2 || exit_code == 3 || exit_code == 4 {
+            let reason = match exit_code {
+                2 => "port-in-use",
+                3 => "audio-device-missing",
+                _ => "api-key-missing",
+            };
             let last_line = read_last_log_line(&log_path).unwrap_or_default();
             app.emit(
                 "sidecar-crashed",
@@ -614,6 +668,28 @@ mod tests {
             &rel_env,
         );
         assert_eq!(rel, SidecarInvocation::Bundled(bundled));
+    }
+
+    #[test]
+    fn forwarded_env_keys_relay_gemini_and_openrouter() {
+        // RELEASE-AUTH: the watchdog relays exactly these two keys from the
+        // parent env to the spawned sidecar. Pin the set so a regression that
+        // drops GEMINI_API_KEY (the "co-host never speaks" cause) is forced to
+        // update this test. SECURITY: relay only — never an embedded value.
+        assert_eq!(FORWARDED_ENV_KEYS, ["GEMINI_API_KEY", "OPENROUTER_API_KEY"]);
+    }
+
+    #[test]
+    fn fatal_exit_code_4_maps_to_api_key_missing() {
+        // The no-retry sentinel for a missing API key. Mirrors the match arm
+        // in spawn_sidecar_with_watchdog so the reason string + non-retry
+        // behavior stay pinned together (Python __main__ sys.exit(4)).
+        let reason = match 4 {
+            2 => "port-in-use",
+            3 => "audio-device-missing",
+            _ => "api-key-missing",
+        };
+        assert_eq!(reason, "api-key-missing");
     }
 
     #[test]
