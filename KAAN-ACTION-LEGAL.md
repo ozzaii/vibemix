@@ -4245,3 +4245,164 @@ Sign-off by:                                           _________   (Kaan)
   pattern.
 - §RECALL-EAR (this file, ~line 3510) — the Kaan-ear veto pattern.
 
+## §V7-PROXY — Bravoh proxy production hardening (OSS-02 server-side)
+
+**REQ-ID:** OSS-02 (server-side half — client-side closed engineering-side
+via Plan 69-03 Tasks 1-3, landed in `live-tuning-or-brain` branch.)
+
+**Owner:** Kaan (founder) + Bravoh ops repo coordination.
+
+**Status:** ☐ pending  ☐ rate limit live  ☐ token bucket live  ☐ /metrics
+endpoint live  ☐ Sentry DSN wired  ☐ /health endpoint live  ☐ verified
+
+### Why this lives in a separate repo
+
+The Bravoh-side Gemini proxy at `api.altidus.world` is closed-source by
+design (per `CONTRIBUTING.md` carveout — "the Bravoh proxy is closed-source
+by design", Plan 69-01). Source edits live in the separate Bravoh ops repo.
+This §V7-PROXY cluster pre-stages the server-side hardening spec so when
+Kaan opens the Bravoh ops repo to land the work, every decision is already
+made: which endpoint shape, which env vars, which metric names, which Prom
+labels. The client-side fallback (Plan 69-03 Tasks 1-3) ships engineering-
+complete in vibemix independent of this cluster — when `/metrics` or
+`/health` goes live on `api.altidus.world`, NO client-side change is needed.
+The 60s recovery canary auto-detects `/health` and the "Co-host back
+online" line fires the first time `/health` returns 200 (or whenever the
+next real LLM call succeeds, whichever fires first).
+
+### Pre-staged server-side spec
+
+#### a. Per-install-UUID rate limit (token-bucket middleware)
+
+- Recommended library: `slowapi` (FastAPI-native, ~5 LOC integration) or an
+  in-house FastAPI `Depends()` token-bucket. Bravoh ops team picks the
+  implementation; vibemix-side is decoupled either way.
+- Bucket parameters (defensible defaults — tune via post-launch metrics):
+  60 tokens / install-UUID, refill 1 token/sec (i.e. 60 reqs/min steady-
+  state, burst-tolerant).
+- install-UUID comes from the existing `vibemix.agent.install_uuid` module
+  (client-side; sent as a header by the existing proxy_client per Plan 69-01
+  RESEARCH Q1 contract).
+- On bucket-empty: return HTTP 429 with `Retry-After: <seconds>` header AND
+  a JSON body `{"error": "rate_limited", "install_uuid": "...",
+  "retry_after_seconds": N}`. NOT a 5xx — the 429 fall-through path in the
+  vibemix client (Plan 69-03 Task 1 `classify_proxy_error` returns None for
+  429) is the contract.
+
+#### b. Prom `/metrics` endpoint
+
+- Endpoint path: `GET /metrics` (standard `prometheus_client` surface; no
+  auth — internal scrape only — `permissions: read-only` + IP-allowlist
+  Bravoh's monitoring stack).
+- Required metric names (snake_case, label-cardinality bounded):
+  - `rate_limit_hits_total{install_uuid="<uuid>"}` (counter)
+  - `tokens_remaining_bucket{install_uuid="<uuid>"}` (gauge)
+  - `proxy_request_duration_seconds{route="<route>", status="<status>"}`
+    (histogram)
+  - `proxy_upstream_errors_total{kind="<5xx|timeout|connect>"}` (counter
+    — mirrors the client-side trigger classes pinned in Plan 69-03 Task 1)
+
+#### c. Sentry DSN env var
+
+- Environment variable: `SENTRY_DSN` (the canonical Sentry SDK name; set in
+  the Bravoh service deployment env, NOT in vibemix client).
+- Sample rate: 0.1 for traces, 1.0 for errors (defensible defaults; tune
+  post-launch).
+- PII scrubbing: enable Sentry's default `send_default_pii=False`;
+  install-UUID is the only request-identifier emitted (no IP, no user
+  email — privacy-preserving by construction).
+
+#### d. `/health` endpoint
+
+- Endpoint path: `GET /health` (the contract the client-side
+  `probe_proxy_health` from Plan 69-03 Task 1 already polls every 60s).
+- Response (healthy): HTTP 200 + JSON
+  `{"status": "ok", "upstream_gemini": "<reachable|degraded|down>"}`.
+- Response (degraded): HTTP 503 if the upstream Gemini is unreachable
+  (which the client treats as 5xx-trigger → fallback stays armed; this is
+  the correct cascade — the client does not flip to "Co-host back online"
+  until upstream Gemini is also reachable).
+- NO auth on `/health` (canary endpoint; intentionally cheap; no per-
+  install-UUID rate limit applies — bypassed at the middleware layer).
+
+#### e. Coordination point with Bravoh ops repo
+
+- Bravoh ops repo branch: `feat/oss-02-proxy-hardening` (suggested; Kaan
+  picks the actual branch name).
+- File targets (per the existing FastAPI app layout in the Bravoh repo;
+  executor consults Bravoh's own CONVENTIONS.md if naming differs):
+  `app/middleware/rate_limit.py`, `app/middleware/metrics.py`,
+  `app/routes/health.py`, `app/config/sentry.py`.
+- Migration cadence: each sub-section (a-d) can land independently; the
+  client-side fallback (vibemix Plan 69-03) is GREEN today regardless of
+  which sub-section ships first.
+
+### Verification
+
+```bash
+# 1. /health endpoint reachable + returns 200:
+curl -s -o /dev/null -w '%{http_code}\n' https://api.altidus.world/health
+#   Expected: 200
+
+# 2. /metrics endpoint exposes the 4 required metric families:
+curl -s https://api.altidus.world/metrics | \
+    grep -E '^rate_limit_hits_total|^tokens_remaining_bucket|^proxy_request_duration_seconds|^proxy_upstream_errors_total'
+#   Expected: 4 matching lines (one per family; labels expand the row count)
+
+# 3. Synthetic abuse triggers a 429 within 60s of bucket exhaustion
+#    (120 requests, 1 install-UUID, count by status code):
+for i in {1..120}; do
+    curl -s -o /dev/null -w '%{http_code}\n' \
+        -H "X-Install-UUID: test-abuse-uuid" \
+        https://api.altidus.world/v1/<some-endpoint>
+done | sort | uniq -c
+#   Expected: at least one "429" in the output (proves rate limit fired)
+
+# 4. Sentry DSN wired in the Bravoh service env:
+#    SSH into the Bravoh service host, then:
+echo "${SENTRY_DSN:0:20}..."
+#   Expected: non-empty 20-char prefix (truncated to avoid leaking the DSN)
+
+# 5. Client-side recovery walk (end-to-end):
+#    a. On Kaan's Mac with VIBEMIX_LLM_MODE=proxy + a valid
+#       VIBEMIX_PROXY_JWT, launch `uv run python -m vibemix`.
+#    b. Block outbound DNS to api.altidus.world via the firewall.
+#    c. Trigger an event (manual MIDI move, track change). Within ~3s the
+#       "Co-host unavailable this session" transcript line MUST appear.
+#    d. Unblock the firewall. Within 60s (the canary cadence) the
+#       "Co-host back online" transcript line MUST appear.
+#    e. Trigger another event — Gemini reply lands normally.
+#   Expected: both one-shot lines observed; no duplicates.
+```
+
+### Sign-off block
+
+```
+§V7-PROXY rate limit live on:                _________   (date — Kaan, Bravoh ops repo SHA ____)
+§V7-PROXY /metrics endpoint live on:         _________   (date — Kaan, SHA ____)
+§V7-PROXY Sentry DSN wired on:               _________   (date — Kaan, deployment env confirmed)
+§V7-PROXY /health endpoint live on:          _________   (date — Kaan, SHA ____)
+§V7-PROXY synthetic 429 trigger verified:    _________   (date — Kaan, command output captured)
+§V7-PROXY client-side recovery verified:     _________   (date — Kaan, transcript line observed)
+Sign-off by:                                    _________   (Kaan)
+```
+
+### Cross-reference
+
+- `src/vibemix/agent/proxy_client.py` — `ProxyUnavailable` + `classify_proxy_error`
+  + `probe_proxy_health` (Plan 69-03 Task 1; the client-side contract surface).
+- `src/vibemix/agent/dj_cohost.py` — `_maybe_emit_proxy_unavailable` +
+  `_maybe_emit_proxy_recovery` + `_check_proxy_health_canary` (Plan 69-03
+  Task 2; the orchestration surface).
+- `tests/integration/test_proxy_fallback.py` — 31-row matrix pinning the
+  4 trigger classes + 4xx/429 fall-through boundary + 60s recovery flow +
+  direct-mode bypass (Plan 69-03 Task 3).
+- `.planning/phases/69-oss-fully-integrated/69-CONTEXT.md` — the OSS-02
+  decisions block + the "Server-side hardening route" bullet that authored
+  this cluster's pre-staged spec.
+- §V7-LIVE-11 (this file) — the BYO fresh-account walk cluster (Plan 69-02
+  OSS-03); the parallel autonomous-mode discharge pattern for the doc-only
+  half of v7.0.
+- §SHIP-V4 (this file, ~line 3387) — the v4.0 ship-discharge surface; the
+  parallel top-level-cluster shape pattern.
+
