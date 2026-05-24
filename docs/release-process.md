@@ -144,6 +144,19 @@ the current main with the secret-store in its expected state.
   `tauri-plugin-store` key is already exposed by Plan 18-04;
   `tauri/src-tauri/src/updater.rs` honours it on launch).
 
+## Homebrew + Scoop publish — split rationale
+
+vibemix's v7.0 OSS-05 ships the Homebrew Formula + Scoop manifest scaffolds in `packaging/homebrew/Formula/vibemix.rb` + `packaging/scoop/vibemix.json`, validated by `.github/workflows/packaging-audit.yml` (`brew audit --new` on macos-14 + `scoop checkver -d` on windows-latest). The scaffolds use deterministic 64-zero SHA placeholders that pass the syntax-only audit; `scripts/launch/sync_packaging.sh` replaces them with real signed-artifact SHAs at real-cut time after OSS-04 fires.
+
+The actual publish — pushing the synced manifests to `bravoh-ai/homebrew-tap` + `bravoh-ai/scoop-bucket` so users can run `brew install bravoh-ai/tap/vibemix` and `scoop install bravoh-ai/bucket/vibemix` — is **deferred to a future milestone** and is NOT in v7.0 scope. The tap/bucket push is a user-visible install upgrade (1-command install vs DMG download) that earns its own milestone gated on the v0.1.0 (non-RC) tag; the existing v0.1.0-rc1 audit + RC publish (OSS-04) lands first.
+
+Sequence at execution time:
+1. v7.0 OSS-04 fires: `cut_release.sh v0.1.0-rc1` ships signed DMG + EXE + SBOM + NOTICE as `v0.1.0-rc1` GitHub release assets.
+2. Run `bash scripts/launch/sync_packaging.sh dist/vibemix-v0.1.0-rc1-macos.dmg dist/vibemix-v0.1.0-rc1-windows-x64.exe` to fill the placeholder SHAs.
+3. Commit the synced manifests to `bravoh-ai/homebrew-tap` + `bravoh-ai/scoop-bucket` (future milestone — not v7.0).
+
+This split keeps the v7.0 surface clean: scaffolds + CI gate + helper script land now; the user-visible install upgrade ships as its own deliverable.
+
 ## Release-day checklist
 
 - [ ] `tauri.conf.json5` pubkey is NOT the placeholder.
