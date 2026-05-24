@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
+  "version": "0.1.0-rc1",
+  "description": "vibemix — open-source AI DJ co-host. Listens, watches, and reacts.",
+  "homepage": "https://github.com/bravoh-ai/vibemix",
+  "license": "Apache-2.0",
+  "notes": [
+    "vibemix runs locally and uses the Bravoh-hosted Gemini proxy by default.",
+    "For Bring-Your-Own-Key (BYO) mode, see docs/byo-key.md in the repo."
+  ],
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/bravoh-ai/vibemix/releases/download/v0.1.0-rc1/vibemix-v0.1.0-rc1-windows-x64.exe",
+      "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "bin": [
+    "vibemix.exe"
+  ],
+  "checkver": {
+    "github": "https://github.com/bravoh-ai/vibemix",
+    "regex": "v(0\\.1\\.0-rc[0-9]+)"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/bravoh-ai/vibemix/releases/download/v$version/vibemix-v$version-windows-x64.exe"
+      }
+    },
+    "hash": {
+      "url": "$url.sha256"
+    }
+  }
+}
