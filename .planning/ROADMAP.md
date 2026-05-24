@@ -104,7 +104,7 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
 **Plans**: 5 plans
 - [x] 69-01-PLAN.md — Wave 0: MAINTAINERS.md + CONTRIBUTING.md carveout audit + README Community section + tests/repo/test_oss_presence.py (OSS-01)
 - [x] 69-02-PLAN.md — Wave 1: docs/byo-key.md + tests/repo/test_byo_doc_shape.py + KAAN-ACTION §V7-LIVE-11 BYO fresh-account walk cluster (OSS-03)
-- [ ] 69-03-PLAN.md — Wave 2: src/vibemix/agent/proxy_client.py ProxyUnavailable + classify + probe_health + dj_cohost.py + session_loop.py orchestration + tests/integration/test_proxy_fallback.py + KAAN-ACTION §V7-PROXY cluster (OSS-02)
+- [x] 69-03-PLAN.md — Wave 2: src/vibemix/agent/proxy_client.py ProxyUnavailable + classify + probe_health + dj_cohost.py + session_loop.py orchestration + tests/integration/test_proxy_fallback.py + KAAN-ACTION §V7-PROXY cluster (OSS-02)
 - [ ] 69-04-PLAN.md — Wave 3: packaging/homebrew/Formula/vibemix.rb + packaging/scoop/vibemix.json + scripts/launch/sync_packaging.sh + .github/workflows/packaging-audit.yml + docs/release-process.md split-rationale + tests/repo/test_packaging_scaffolds_present.py (OSS-05)
 - [ ] 69-05-PLAN.md — Wave 4: cut_release.sh --dry-run v0.1.0-rc1 re-verify + KAAN-ACTION §SHIP-V4 v7.0 OSS-04 sub-section + docs/release-process.md autonomous-mode-route section + tests/repo/test_ship_v4_section_exists.py (OSS-04)
 
@@ -130,7 +130,7 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
 |-------|-----------|----------------|--------|-----------|
 | 67. All Tests Pass | v7.0 | 5/5 | Complete   | 2026-05-23 |
 | 68. All Devices Ready | v7.0 | 5/5 | Complete (Waves 0-4 / 68P01..68P05 all shipped 2026-05-23 — atomic catalog reconciliation + 10×2 parametrized contract/smoke + 3-profile hot-plug matrix + 4-fixture audio backend matrix + contributor recipe + §V7-LIVE-07..10 KAAN-ACTION clusters; DEV-01..05 all closed engineering-side; live-hardware confirmations ride Kaan's clock via §V7-LIVE-07..10) | 2026-05-23 |
-| 69. OSS Fully Integrated | v7.0 | 2/5 | In Progress|  |
+| 69. OSS Fully Integrated | v7.0 | 3/5 | In Progress|  |
 | 70. GitHub Sexified, Generated, Tested | v7.0 | 0/0 | Not started | - |
 
 **Coverage:** 19/19 v7.0 requirements mapped ✓ (no orphans, no duplicates) — TEST-01..04 → P67 · DEV-01..05 → P68 · OSS-01..05 → P69 · GH-01..05 → P70
