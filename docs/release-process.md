@@ -157,6 +157,21 @@ Sequence at execution time:
 
 This split keeps the v7.0 surface clean: scaffolds + CI gate + helper script land now; the user-visible install upgrade ships as its own deliverable.
 
+## Autonomous-mode release path
+
+Under `gsd-autonomous fully` (the autonomous overnight-run mode used for v7.0 milestone execution), the engineering side of OSS-04 — the actual v0.1.0-rc1 public release publish — ships green via Plan 69-05 WITHOUT blocking on the external signature clock (Apple Dev Agreement signed by Francesco + SignPath OSS Foundation cert granted to Kaan, ~1-week SLA).
+
+The contract is:
+
+1. The pre-flight script `scripts/launch/cut_release.sh --dry-run v0.1.0-rc1` is re-verified GREEN on every v7.0 milestone close (Plan 69-05 / Wave 4). If a Phase 67/68 source change drifts a pre-flight gate, Plan 69-05 fixes it inline or routes the drift to `KAAN-ACTION-LEGAL.md §SHIP-V4` as a Wave 4 follow-on item.
+2. The exact pre-staged real-cut invocation + post-pre-flight `gh release create` command live in `KAAN-ACTION-LEGAL.md §SHIP-V4` "v7.0 OSS-04 autonomous-mode route" sub-section. Kaan runs the cut when the signatures land.
+3. cut_release.sh NEVER invokes `gh release create` itself — the hand-on-trigger is Kaan, regression-pinned by `tests/repo/test_cut_release_no_autonomous_publish.py`.
+4. v4.0 "SHIP" milestone (engineering-complete since 2026-05-21) closes alongside OSS-04 when the real cut fires — `MILESTONES.md` v4.0 entry flips to SHIPPED with the public release URL.
+
+Under non-autonomous mode (e.g. an interactive Kaan-driven session where Kaan wants to walk through `cut_release.sh v0.1.0-rc1` in real time), the contract is unchanged — the pre-flight script + the `gh release create` invocation + the hard-guard split between engineering-pre-flight and Kaan-trigger is the same.
+
+The test surface pinning the deferral contract is `tests/repo/test_ship_v4_section_exists.py` (Plan 69-05 / Wave 4 anti-rot gate). See `KAAN-ACTION-LEGAL.md §SHIP-V4` for the full SHIP runbook + sign-off block.
+
 ## Release-day checklist
 
 - [ ] `tauri.conf.json5` pubkey is NOT the placeholder.
