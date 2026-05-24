@@ -20,6 +20,12 @@ If you forget, fix it with: `git commit --amend -s --no-edit` (single commit) or
 
 ---
 
+## Scope: vibemix vs Bravoh
+
+vibemix is Apache-2.0. The Bravoh-side Gemini proxy at `api.altidus.world` is closed-source by design — the Bravoh proxy is closed-source by design — it is the commercial wedge that funds Bravoh's main product. Contributions to vibemix should target the client-side code in this repo (`src/vibemix/`, `tauri/`, `scripts/`, `tests/`, `docs/`). Proxy bugs, quota issues, or rate-limit reports are not in scope here; route them via `SECURITY.md` for security-sensitive matters or open a GitHub issue describing the symptom and they will be triaged onto the Bravoh ops side by the maintainers. If you would rather bypass the Bravoh proxy entirely, see `docs/byo-key.md` for the Bring-Your-Own-Key path.
+
+---
+
 ## Contribution Paths
 
 > **For hallucinated reactions or anti-slop violations**, please use the [AI misbehavior issue template](.github/ISSUE_TEMPLATE/ai_misbehavior.yml) instead of a generic bug report — it captures the grounding evidence we need to actually fix the underlying prompt or detector.
