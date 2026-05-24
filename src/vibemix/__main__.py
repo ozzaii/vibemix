@@ -274,6 +274,20 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "(DEBRIEF-01 + DEBRIEF-02)."
         ),
     )
+    # v8.0 LOG-04 — opt-in verbose logging. Default OFF keeps stderr +
+    # events.jsonl byte-identical to baseline; on, the live path appends a
+    # consolidated per-turn ``reaction_evidence`` digest (evidence packet +
+    # citation-gate decision). Mirrors the VIBEMIX_DEBUG_LOG env (the env is
+    # the floor; this flag can only raise verbosity — see runtime.debug_flags).
+    parser.add_argument(
+        "--debug-log",
+        action="store_true",
+        help=(
+            "Enable verbose diagnostics (per-turn evidence + citation-gate "
+            "decision to events.jsonl). Default off; also set by "
+            "VIBEMIX_DEBUG_LOG=1. Does not change the default console output."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -1538,6 +1552,12 @@ def cli_entry(argv: list[str] | None = None) -> None:
         sys.exit(_run_library_cli(raw_argv[1:]))
 
     args = _parse_args(argv)
+    # v8.0 LOG-04 — apply the verbose-logging switch before any dispatch so the
+    # wizard / session / debrief / live-runtime paths all honour it. The env
+    # (VIBEMIX_DEBUG_LOG) is the floor; the flag can only raise verbosity.
+    from vibemix.runtime.debug_flags import set_debug_log
+
+    set_debug_log(bool(getattr(args, "debug_log", False)))
     try:
         if args.debrief is not None:
             # Phase 25 Plan 25-03 — DEBRIEF architectural slot. Dispatched

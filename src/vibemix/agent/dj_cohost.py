@@ -70,6 +70,7 @@ from vibemix.audio import (
 from vibemix.coach import CitationLinter, StrippedRateTracker
 from vibemix.llm.thinking_gate import validate_live_config
 from vibemix.prompts import build_parts_description, build_system_instruction, filter_for_slop
+from vibemix.runtime.debug_flags import debug_log_enabled
 from vibemix.runtime.llm_to_tts_delta_meter import LLMToTTSDeltaMeter
 from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
@@ -1847,6 +1848,42 @@ class DJCoHostAgent(Agent):
                 # explicitly in the branches above.
                 if citation_action == "skip":
                     citation_action = "emit"
+
+        # ---- v8.0 LOG-02 — consolidated per-turn evidence + gate decision ----
+        # When the debug-log switch is on (``vibemix --debug-log`` /
+        # VIBEMIX_DEBUG_LOG=1), append ONE auditable ``reaction_evidence`` event
+        # per turn: a compact digest of the evidence packet the linter checked
+        # against (sources → atom count, never the payload) + the citation-gate
+        # decision. Runs for EVERY turn — suppressed, emit, bypass, strip,
+        # legacy. Default-OFF so events.jsonl is byte-identical in normal runs
+        # (the discrete citation_count/strip/bypass/ai_text events already cover
+        # the default case). Best-effort: never breaks the LLM response path.
+        if debug_log_enabled():
+            try:
+                ev_digest: dict[str, int] = {}
+                if isinstance(snapshot, dict):
+                    for _src, _keys in snapshot.items():
+                        try:
+                            ev_digest[str(_src)] = (
+                                len(_keys) if hasattr(_keys, "__len__") else 0
+                            )
+                        except Exception:
+                            continue
+                self._recorder.log_event(
+                    "reaction_evidence",
+                    response_id=response_id,
+                    event=ev_tag,
+                    evidence_sources=ev_digest,
+                    citation_count=citation_count,
+                    citation_action=citation_action,
+                    citation_valid=citation_lint_valid,
+                    citation_reason=citation_lint_reason,
+                    citation_missing=citation_lint_missing_payload,
+                    suppression=suppression,
+                    latency_s=round(elapsed, 2),
+                )
+            except Exception:
+                pass
 
         # ---- Plan 24-02 — overlay-highlight publish ----
         # Fire once per [screen:<element>] citation IFF:
