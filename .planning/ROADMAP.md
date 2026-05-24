@@ -124,9 +124,9 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
 **Plans**: 5 plans
 - [x] 70P01-asset-reproducibility-infra-PLAN.md — Wave 0: scripts/regenerate_assets.sh + docs/assets/MANIFEST.yaml + .github/workflows/asset-bitrot.yml + tests/repo/test_asset_manifest_shape.py (GH-04)
 - [x] 70P02-og-social-card-PLAN.md — Wave 1: docs/assets/sources/og-card.html + regenerator wiring + og-card.png (1200x630) + MANIFEST SHA pin + README reference (GH-03) — SHIPPED 2026-05-24 (2 atomic commits: `18418a2` og-card.html CDJ-Whisper source [Saira + JetBrains Mono + amber #ff8a3d, void+vignette+grain verbatim from mock] · `5410f3a` regenerate_assets.sh og-card branch [headless Chrome 1200×630 + Pillow deterministic re-encode, NOT npx — smaller supply-chain] + og-card.png [97 KB, sha256 089a8a91...c3728] + MANIFEST pin + README og:image doc; Rule-1 ×2: Chrome-PNG-nondeterminism → Pillow re-encode for byte-stable bitrot gate + 190KB→97KB, anti-slop comment reworded so grep 'geist|fraunces'==0; image budget untouched 97KB<<567KB headroom; default baseline 4207/26/4/2 IDENTICAL to Wave 0; zero src/vibemix/ + zero pyproject/uv.lock edits. GH-03 engineering surface shipped; final presence-test tick lands Wave 4 / 70P05.)
-- [ ] 70P03-github-pages-landing-PLAN.md — Wave 2: docs/landing/ CDJ-Whisper static site + .github/workflows/lighthouse.yml (local build, a11y>=95/perf>=90) + anti-backsliding grep + KAAN-ACTION-LEGAL.md §V7-LANDING (GH-02)
-- [ ] 70P04-demo-film-poster-PLAN.md — Wave 3: docs/assets/demo-poster.png (source-generated) + README hero repoint (PLACEHOLDER sentinel kept green) + KAAN-ACTION-LEGAL.md §ASSETS-DEMO-CUT (GH-01)
-- [ ] 70P05-presence-suite-PLAN.md — Wave 4: tests/repo/test_github_presence.py one-stop repo-presence suite (badges + demo + OG hash + hero hash + .yml issue forms + PR template + 4 OSS files) (GH-05)
+- [x] 70P03-github-pages-landing-PLAN.md — Wave 2: docs/landing/ CDJ-Whisper static site + .github/workflows/lighthouse.yml (local build, a11y>=95/perf>=90) + anti-backsliding grep + KAAN-ACTION-LEGAL.md §V7-LANDING (GH-02)
+- [x] 70P04-demo-film-poster-PLAN.md — Wave 3: docs/assets/demo-poster.png (source-generated) + README hero repoint (PLACEHOLDER sentinel kept green) + KAAN-ACTION-LEGAL.md §ASSETS-DEMO-CUT (GH-01)
+- [x] 70P05-presence-suite-PLAN.md — Wave 4: tests/repo/test_github_presence.py one-stop repo-presence suite (badges + demo + OG hash + hero hash + .yml issue forms + PR template + 4 OSS files) (GH-05)
 **UI hint**: yes — the GitHub Pages landing is a Tier-1 surface for first-time visitors; the `frontend-enforcement` skill governs the CDJ-Whisper material/typography pass and the Kaan-felt sign-off is the hard taste gate (mirrors v4.0 P57 + v5.0 P62 pattern)
 
 ## Progress (v7.0)
@@ -136,7 +136,7 @@ The journey, finer-grained so each pillar is its own independently-verifiable ch
 | 67. All Tests Pass | v7.0 | 5/5 | Complete   | 2026-05-23 |
 | 68. All Devices Ready | v7.0 | 5/5 | Complete (Waves 0-4 / 68P01..68P05 all shipped 2026-05-23 — atomic catalog reconciliation + 10×2 parametrized contract/smoke + 3-profile hot-plug matrix + 4-fixture audio backend matrix + contributor recipe + §V7-LIVE-07..10 KAAN-ACTION clusters; DEV-01..05 all closed engineering-side; live-hardware confirmations ride Kaan's clock via §V7-LIVE-07..10) | 2026-05-23 |
 | 69. OSS Fully Integrated | v7.0 | 4/5 | In Progress|  |
-| 70. GitHub Sexified, Generated, Tested | v7.0 | 2/5 | In Progress (Wave 0+1 shipped — GH-04 asset infra + GH-03 og-card) |  |
+| 70. GitHub Sexified, Generated, Tested | v7.0 | 5/5 | Complete   | 2026-05-24 |
 
 **Coverage:** 19/19 v7.0 requirements mapped ✓ (no orphans, no duplicates) — TEST-01..04 → P67 · DEV-01..05 → P68 · OSS-01..05 → P69 · GH-01..05 → P70
 
