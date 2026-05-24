@@ -1,0 +1,65 @@
+# Phase 69 Plan 69-04 — OSS-05 deliverable: packaging scaffold audit.
+#
+# Validates the Homebrew Formula + Scoop manifest scaffolds without
+# attempting to download or install the placeholder-pointing artifacts
+# (brew audit --new + scoop checkver -d are both syntax-only).
+#
+# Runs on every push to `main` and every PR. Lift the security posture
+# + SHA-pinning from full-test-matrix.yml (Phase 67P04):
+# - `on: pull_request` (NOT pull_request_target) — fork-PR secrets safe.
+# - All `uses:` SHA-pinned.
+# - `permissions.contents: read` — minimum scope.
+# - Workflow-prefixed concurrency cancel-in-progress.
+# - `timeout-minutes: 15` — both audits are fast.
+
+name: Packaging Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: packaging-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  brew-audit:
+    name: brew audit --new (macos-14)
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Ensure Homebrew is on PATH
+        run: |
+          # Homebrew is pre-installed on macos-14 runner images.
+          brew --version
+
+      - name: Run brew audit --new
+        run: |
+          brew audit --new packaging/homebrew/Formula/vibemix.rb
+
+  scoop-checkver:
+    name: scoop checkver -d (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install Scoop
+        shell: pwsh
+        run: |
+          # Scoop is not pre-installed on windows-latest.
+          # Install per https://scoop.sh — no admin required.
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          Invoke-Expression "& {$(Invoke-RestMethod get.scoop.sh)} -RunAsAdmin"
+          scoop --version
+
+      - name: Run scoop checkver -d
+        shell: pwsh
+        run: |
+          scoop checkver -d packaging/scoop/vibemix.json
