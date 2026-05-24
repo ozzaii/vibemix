@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+  docs/assets/sources/demo-poster.html — README/landing demo-video poster source (GH-01).
+
+  Phase 70 Plan 70P04 (Wave 3). This is a HEADLESS-RENDER SOURCE TEMPLATE, NOT a
+  responsive page: the root .poster is a FIXED 1280×720px canvas (16:9, the README
+  hero <video width="720"> aspect + the landing demo window). scripts/regenerate_assets.sh
+  screenshots it at viewport 1280×720, scale factor 1, producing docs/assets/demo-poster.png
+  — pinned by SHA-256 in docs/assets/MANIFEST.yaml, checked by the asset-bitrot CI gate.
+
+  ROLE: the still poster the README hero <video poster=> + the Pages landing demo window
+  show until Francesco's real 30-sec demo.mp4 lands (KAAN-ACTION §ASSETS-DEMO-CUT). It is
+  the empty/loading state from the UI-SPEC Copywriting Contract: the recessed-glass
+  .display-window LCD vocabulary + the silk-40 mono caption "demo film coming soon".
+
+  Aesthetic: CDJ Whisper, lifted VERBATIM from mocks/vibemix-direction-final.html (the
+  palette + fonts source-of-truth) — the void stack, the cinematic vignette, the two-layer
+  feTurbulence film-grain. 20/80 rule holds at poster scale: ~80% warm-black/silk, the
+  single amber accent (#ff8a3d) is the brand LED dot + the live-session play glyph. The
+  rejected-font families (the serif display + the geometric sans + the generic UI sans the
+  anti-backsliding grep forbids) appear NOWHERE — only Saira + JetBrains Mono. CSS is
+  hand-authored to keep the render byte-stable and dependency-free (no CDN beyond Google Fonts).
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>vibemix — demo poster</title>
+
+<!-- Fonts loaded exactly as the mock does (Saira display/body + JetBrains Mono numerals). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@75..125,300..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ──────────────────────────────────────────────────────────────────────────
+   CDJ WHISPER tokens — lifted VERBATIM from mocks/vibemix-direction-final.html.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Void stack */
+  --void:    #000000;
+  --void-1:  #020205;
+  --void-2:  #05070b;
+  --void-3:  #0a0c12;
+  --void-4:  #11141c;
+
+  /* Silk text */
+  --silk:     #d6cfc7;
+  --silk-65:  rgba(214, 207, 199, 0.65);
+  --silk-40:  rgba(214, 207, 199, 0.40);
+
+  /* Amber — primary deck-light accent (#ff8a3d) */
+  --amber:       #ff8a3d;
+  --amber-deep:  #ff5a1a;
+  --amber-pale:  #ffb88a;
+  --amber-22:    rgba(255, 138, 61, 0.22);
+  --amber-40:    rgba(255, 138, 61, 0.40);
+  --amber-65:    rgba(255, 138, 61, 0.65);
+
+  /* Recessed-glass display window (UI-SPEC §2 demo embed — --glass-3 near-solid) */
+  --glass-3:  rgba(2, 3, 6, 0.88);
+
+  /* Night-rave ambients — atmospheric only (verbatim from mock) */
+  --rave-magenta: rgba(192, 56, 224, 0.055);
+  --rave-pink:    rgba(255, 92, 188, 0.038);
+  --rave-cyan:    rgba(72, 152, 255, 0.042);
+  --rave-purple:  rgba(118, 56, 224, 0.030);
+  --rave-teal:    rgba(64, 220, 200, 0.022);
+
+  /* Type — Saira (display/body) + JetBrains Mono (labels). */
+  --type-display: 'Saira', system-ui, sans-serif;
+  --type-mono:    'JetBrains Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #000;
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* The poster is a FIXED 1280×720 (16:9) canvas — NOT responsive. */
+.poster {
+  position: relative;
+  width: 1280px;
+  height: 720px;
+  color: var(--silk);
+  font-family: var(--type-display);
+  overflow: hidden;
+
+  /* Cinematic vignette + restrained rave washes + deep blue undertone —
+     lifted VERBATIM from the mock's body background. */
+  background-image:
+    radial-gradient(ellipse 92% 78% at 50% 45%, transparent 0%, rgba(0,0,0,0.5) 75%, rgba(0,0,0,0.9) 100%),
+    radial-gradient(ellipse 55% 38% at 18% 22%, var(--rave-magenta), transparent 60%),
+    radial-gradient(ellipse 48% 36% at 84% 78%, var(--rave-cyan),    transparent 55%),
+    radial-gradient(ellipse 60% 42% at 55% 105%, var(--rave-pink),   transparent 60%),
+    radial-gradient(ellipse 35% 28% at 92% 12%, var(--rave-purple),  transparent 55%),
+    radial-gradient(ellipse 28% 22% at 5% 88%,  var(--rave-teal),    transparent 55%),
+    linear-gradient(180deg, #02030a 0%, #000000 55%, #030208 100%);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* MULTI-LAYER FILM TEXTURE — coarser dust + fine grain, lifted VERBATIM from
+   the mock's body::before (two feTurbulence data-URIs, overlay blend). */
+.poster::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='420' height='420'><filter id='d'><feTurbulence type='fractalNoise' baseFrequency='0.42' numOctaves='3' seed='9'/></filter><rect width='100%25' height='100%25' filter='url(%23d)' opacity='0.022'/></svg>"),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' seed='5'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.028'/></svg>");
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  z-index: 1;
+}
+
+/* The recessed-glass DISPLAY WINDOW — UI-SPEC §2 / §Materials: --glass-3
+   near-solid, deep inset shadow, top-edge specular ::after gradient. This is
+   the landing's "screen", echoing the app UI's time-hero LCD. */
+.display-window {
+  position: relative;
+  z-index: 2;
+  width: 1040px;
+  height: 540px;
+  border-radius: 16px;
+  background: var(--glass-3);
+  border: 1px solid rgba(214, 207, 199, 0.06);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.9),
+    inset 0 0 18px rgba(255, 138, 61, 0.035),
+    0 30px 80px rgba(0, 0, 0, 0.65);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  overflow: hidden;
+}
+
+/* Top-edge specular highlight (the LCD glass catch-light from the mock). */
+.display-window::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: linear-gradient(180deg, rgba(214, 207, 199, 0.05) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.stack {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  text-align: center;
+}
+
+/* The play glyph in its amber-ringed dome — the single amber accent element #1.
+   Hardware-dome treatment (inset specular + amber LED glow), static (still render). */
+.play {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, rgba(255, 138, 61, 0.16), rgba(2, 3, 6, 0.9) 70%);
+  border: 1.5px solid var(--amber-40);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 0 18px var(--amber-22),
+    0 0 36px rgba(255, 138, 61, 0.10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.play .triangle {
+  width: 0;
+  height: 0;
+  margin-left: 6px;
+  border-top: 18px solid transparent;
+  border-bottom: 18px solid transparent;
+  border-left: 30px solid var(--amber);
+  filter: drop-shadow(0 0 8px var(--amber-40));
+}
+
+/* Eyebrow: the brand LED dot + the single JetBrains-Mono micro-label. */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--type-mono);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.30em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+}
+
+/* The SINGLE amber accent element #2 — the brand LED dot (hardware-dome). */
+.led {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 6px var(--amber),
+    0 0 14px var(--amber-40);
+}
+
+/* Wordmark — Saira condensed-heavy. Deliberate weight set: wdth 82 + wght 700
+   matches the mock's wordmark axis exactly; the variable Saira axis gives
+   display weight from the single family, no second face. */
+.wordmark {
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 82, "wght" 700;
+  font-size: 92px;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  text-transform: lowercase;
+  color: var(--silk);
+}
+
+/* The empty-state caption — UI-SPEC Copywriting Contract: silk-40 JetBrains Mono,
+   "demo film coming soon". This is the demo-not-yet-captured loading state. */
+.caption {
+  font-family: var(--type-mono);
+  font-size: 19px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: lowercase;
+  color: var(--silk-40);
+}
+</style>
+</head>
+<body>
+  <div class="poster">
+    <div class="display-window">
+      <div class="stack">
+        <div class="eyebrow">
+          <span class="led" aria-hidden="true"></span>
+          LIVE SESSION
+        </div>
+        <div class="play" aria-hidden="true"><span class="triangle"></span></div>
+        <div class="wordmark">vibemix</div>
+        <div class="caption">demo film coming soon</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

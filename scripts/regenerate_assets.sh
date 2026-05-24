@@ -123,6 +123,45 @@ q.save(p, format="PNG", optimize=True, compress_level=9)
 PY
             ;;
         # ----------------------------------------------------------------
+        # Wave 3 (70P04) — GH-01 demo-poster. The CDJ-Whisper still poster the
+        # README hero <video poster=> + the Pages landing demo window show until
+        # Francesco's real 30-sec demo.mp4 lands (§ASSETS-DEMO-CUT). Same headless
+        # mechanism as og-card, sized to a FIXED 1280×720 (16:9 hero aspect).
+        # --virtual-time-budget=4000 is LOAD-BEARING for the same font-race reason
+        # documented in the og-card branch above (Saira webfont must finish loading
+        # before the screenshot, else system-ui fallback drifts the pixels). The
+        # Chrome PNG is then re-encoded through Pillow (quantize-256 + optimize,
+        # metadata-stripped) so the committed asset is byte-reproducible across runs
+        # and shrinks well under the docs/assets image budget. Pillow is a tracked
+        # dep — NO new dep; Node/Chrome stays CI-side.
+        demo-poster)
+            local chrome
+            chrome="$(_find_chrome)" || {
+                echo "Chrome not found for demo-poster render (set CHROME env or install Google Chrome)" >&2
+                return 1
+            }
+            local outdir; outdir="$(dirname "$REPO/$path")"
+            mkdir -p "$outdir"
+            "$chrome" --headless=new --disable-gpu --hide-scrollbars \
+                --force-device-scale-factor=1 --window-size=1280,720 \
+                --virtual-time-budget=4000 --default-background-color=00000000 \
+                --screenshot="$REPO/$path" \
+                "file://$REPO/$source" >/dev/null 2>&1
+            [[ -f "$REPO/$path" ]] || { echo "demo-poster render produced no file at $path" >&2; return 1; }
+            PYTHONPATH="$REPO/src" python3 - "$REPO/$path" <<'PY'
+import sys
+from PIL import Image
+
+p = sys.argv[1]
+im = Image.open(p).convert("RGB")
+# Palette-quantize (256 colors) keeps the void + silk wordmark + amber play glyph
+# crisp while cutting the file under the docs/assets image budget.
+q = im.quantize(colors=256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+# Deterministic save: no metadata, fixed compression, no time chunk.
+q.save(p, format="PNG", optimize=True, compress_level=9)
+PY
+            ;;
+        # ----------------------------------------------------------------
         *)
             echo "Unknown generator '$generator' for asset '$path'" >&2
             return 1

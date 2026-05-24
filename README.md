@@ -7,15 +7,18 @@
 <p align="center"><em>the only AI co-host that actually listens to your set</em></p>
 
 <!-- vibemix:hero-start sha256=PLACEHOLDER path=docs/assets/demo.mp4 -->
-<!-- Phase 35 ASSETS-07 + Phase 39 SHIP-02: the 30s demo film lands at
-     docs/assets/demo.mp4 via Kaan-action (KAAN-ACTION-LEGAL.md
-     ASSETS-DEMO-CUT). The <video> tag below points at it; until the
-     asset ships, the <img> fallback GIF + the sha256=PLACEHOLDER
-     sentinel keep scripts/check_readme_hero_hash.py green. When the
-     real asset lands, swap the sentinel for the actual SHA256. -->
+<!-- Phase 35 ASSETS-07 + Phase 39 SHIP-02 + Phase 70 GH-01: the 30s demo film
+     lands at docs/assets/demo.mp4 via Kaan-action (KAAN-ACTION-LEGAL.md
+     §ASSETS-DEMO-CUT). The <video> tag below points at it; until the
+     asset ships, the source-generated docs/assets/demo-poster.png
+     (CDJ-Whisper still, MANIFEST-pinned) carries the visual as the
+     <video poster=> + the <img> fallback keeps it non-broken, while the
+     sha256=PLACEHOLDER sentinel keeps scripts/check_readme_hero_hash.py
+     green. When the real asset lands, swap the sentinel for the actual
+     SHA256 (the §ASSETS-DEMO-CUT discharge does this). -->
 <p align="center">
-  <video src="docs/assets/demo.mp4" controls muted playsinline width="720" poster="docs/assets/demo-placeholder.gif">
-    <img src="docs/assets/demo-placeholder.gif" alt="vibemix demo (placeholder — real demo coming)" width="720" />
+  <video src="docs/assets/demo.mp4" controls muted playsinline width="720" poster="docs/assets/demo-poster.png">
+    <img src="docs/assets/demo-poster.png" alt="vibemix co-host live over a DJ set — the live session UI (demo film coming soon)" width="720" />
   </video>
 </p>
 <!-- vibemix:hero-end -->

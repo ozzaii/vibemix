@@ -34,6 +34,15 @@ assets:
     source: docs/assets/sources/og-card.html
     sha256: 089a8a910f9f8c0c326e774f5e983a380d5bf0425a966b7c90597215027c3728
     generator: og-card
+  # Wave 3 (70P04) — GH-01 demo-video poster. The CDJ-Whisper still the README
+  # hero <video poster=> + the landing demo window show until Francesco's real
+  # 30-sec demo.mp4 lands (§ASSETS-DEMO-CUT). Rendered 1280×720 via the
+  # `demo-poster` generator (headless Chrome + Pillow re-encode). sha256 below is
+  # the committed PNG's digest.
+  - path: docs/assets/demo-poster.png
+    source: docs/assets/sources/demo-poster.html
+    sha256: bc448645dee165c9ecc86bbacd966af6bc1d0fbc90643b27411698b1aec766a0
+    generator: demo-poster
 
 opt_out:
   # Hand-cut bespoke originals (no source-derived regenerator — kept as-is per
