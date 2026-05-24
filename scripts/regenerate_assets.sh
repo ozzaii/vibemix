@@ -90,9 +90,15 @@ regenerate_one() {
             }
             local outdir; outdir="$(dirname "$REPO/$path")"
             mkdir -p "$outdir"
+            # --virtual-time-budget=4000 is LOAD-BEARING for determinism: without
+            # it Chrome races the Google-Fonts webfont fetch and sometimes
+            # screenshots with the system-ui fallback instead of Saira, producing
+            # PIXEL-level drift run-to-run (not just encoding drift). The virtual
+            # clock advances 4 s so the webfont always finishes loading first; the
+            # render is then pixel-stable across separate invocations (verified 3×).
             "$chrome" --headless=new --disable-gpu --hide-scrollbars \
                 --force-device-scale-factor=1 --window-size=1200,630 \
-                --default-background-color=00000000 \
+                --virtual-time-budget=4000 --default-background-color=00000000 \
                 --screenshot="$REPO/$path" \
                 "file://$REPO/$source" >/dev/null 2>&1
             [[ -f "$REPO/$path" ]] || { echo "og-card render produced no file at $path" >&2; return 1; }
