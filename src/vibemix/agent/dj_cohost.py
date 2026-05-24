@@ -565,7 +565,15 @@ class DJCoHostAgent(Agent):
         self._proxy_unavailable: bool = False
         self._proxy_unavailable_message_emitted: bool = False
         self._proxy_recovery_message_emitted: bool = False
-        self._last_proxy_health_probe: float = 0.0  # monotonic seconds
+        # Phase 69 review WR-02 — never-probed sentinel is ``float("-inf")``,
+        # NOT ``0.0``. ``time.monotonic()`` has an unspecified origin; on a
+        # freshly booted host it can legitimately read < 60.0, and a ``0.0``
+        # init would make the debounce gate (``now - last < 60.0``) swallow
+        # the FIRST armed canary tick — the same off-by-one-against-a-real-
+        # clock bug class fixed for ``_last_recall_callback_at`` above (whose
+        # 30-line comment explains why ``0.0`` is wrong). ``(now - -inf)`` is
+        # always ``inf`` so the first armed tick always passes the gate.
+        self._last_proxy_health_probe: float = float("-inf")  # monotonic seconds
         # Resolve proxy_base_url from env at construction time; None ⇒ direct
         # mode and the fallback never arms (gate every state transition on
         # ``self._proxy_base_url is not None``).
