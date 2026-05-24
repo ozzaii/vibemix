@@ -26,7 +26,14 @@
 # Wave 0 (70P01) seeds this empty + opts out today's bespoke/foreign assets.
 # Wave 1 (70P02) appends the og-card entry to `assets:`.
 
-assets: []
+assets:
+  # Wave 1 (70P02) — GH-03 OG/social card. Rendered from the CDJ-Whisper source
+  # template via the `og-card` generator step in scripts/regenerate_assets.sh
+  # (headless Chrome, 1200×630). sha256 below is the committed PNG's digest.
+  - path: docs/assets/og-card.png
+    source: docs/assets/sources/og-card.html
+    sha256: 089a8a910f9f8c0c326e774f5e983a380d5bf0425a966b7c90597215027c3728
+    generator: og-card
 
 opt_out:
   # Hand-cut bespoke originals (no source-derived regenerator — kept as-is per

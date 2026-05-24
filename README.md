@@ -20,6 +20,15 @@
 </p>
 <!-- vibemix:hero-end -->
 
+<!-- OG / social card (GH-03): docs/assets/og-card.png is the 1200×630 source-generated
+     social-unfurl image (rendered from docs/assets/sources/og-card.html, pinned by SHA-256
+     in docs/assets/MANIFEST.yaml). On a Slack/Discord/Twitter unfurl it carries the brand.
+     A raw <meta property="og:image"> does NOT render in GitHub-flavoured markdown, so the
+     live <meta property="og:image" content=".../docs/assets/og-card.png"> tag lives in the
+     Wave 2 GitHub Pages landing <head>. The repo's GitHub social-preview image (Settings →
+     General → Social preview) is a manual repo-settings action → KAAN-ACTION-LEGAL.md
+     §V7-LANDING; point it at docs/assets/og-card.png. -->
+
 ## No AI slop
 
 vibemix is a real DJ friend in your ear. It reacts to the actual audio coming out of your master, what's on your DJ software's screen right now, and the controller move you just made — not a generic "AI assistant" voice riffing on the word "drop". If a hype-man can't tell you that the kick came in two bars early, you don't want it talking over your set.
