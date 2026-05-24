@@ -19,6 +19,7 @@ KAAN-ACTION-LEGAL.md §V7-PROXY synthetic-abuse snippet 5.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -385,23 +386,33 @@ def test_agent_canary_60s_debounce_and_recovery(
     agent._maybe_emit_proxy_unavailable("timeout")
     assert agent._proxy_unavailable is True
 
-    # First canary tick at t=0 (last_probe was 0.0 → 0-0=0 ≥ 60 is False; but
-    # the helper's check is ``now - last_probe < 60.0`` which is True for
-    # 0 - 0 = 0. So the first call SHOULD be a no-op since 0 < 60).
+    # Phase 69 review WR-01 — the canary is now an async coroutine (the
+    # blocking probe is offloaded to a thread executor), so it must be driven
+    # via ``asyncio.run`` rather than called synchronously. Behavior under
+    # test is unchanged: debounce gate + one-shot recovery emission.
+    #
+    # Phase 69 review WR-02 — ``_last_proxy_health_probe`` now inits to
+    # ``float("-inf")`` so the FIRST armed tick always passes the 60s gate
+    # regardless of the monotonic clock origin. The original test relied on
+    # the ``0.0`` init swallowing the t=10s tick; with the ``-inf`` sentinel
+    # that first tick WOULD probe, so we explicitly arm the debounce to t=0.0
+    # here to keep exercising the within-window no-op behavior.
+    agent._last_proxy_health_probe = 0.0
+
     # Drive the canary at t=10s — still within the 60s window, no probe.
-    agent._check_proxy_health_canary(now_monotonic=10.0)
+    asyncio.run(agent._check_proxy_health_canary(now_monotonic=10.0))
     assert probe_calls == [], "canary fired inside the 60s debounce window"
 
     # Drive the canary at t=60.0 — exactly 60s elapsed, probe fires (returns
     # False on first call → flag stays armed).
-    agent._check_proxy_health_canary(now_monotonic=60.0)
+    asyncio.run(agent._check_proxy_health_canary(now_monotonic=60.0))
     assert len(probe_calls) == 1
     assert agent._proxy_unavailable is True
     assert list(transcript_sink) == ["Co-host unavailable this session"]
 
     # Drive the canary at t=121.0 — another 61s, probe fires + returns True.
     # Recovery one-shot fires.
-    agent._check_proxy_health_canary(now_monotonic=121.0)
+    asyncio.run(agent._check_proxy_health_canary(now_monotonic=121.0))
     assert len(probe_calls) == 2
     assert agent._proxy_unavailable is False
     assert list(transcript_sink) == [
@@ -430,7 +441,10 @@ def test_agent_direct_mode_never_arms_fallback(
     # All three hooks must be no-ops.
     agent._maybe_emit_proxy_unavailable("5xx")
     agent._maybe_emit_proxy_recovery()
-    agent._check_proxy_health_canary(now_monotonic=999.0)
+    # Phase 69 review WR-01 — canary is now async; direct mode still returns
+    # early (``_proxy_base_url is None``) before any offload, but the call
+    # must be awaited via ``asyncio.run``.
+    asyncio.run(agent._check_proxy_health_canary(now_monotonic=999.0))
 
     assert agent._proxy_unavailable is False
     assert list(transcript_sink) == []

@@ -668,24 +668,38 @@ class DJCoHostAgent(Agent):
             except Exception:
                 pass
 
-    def _check_proxy_health_canary(self, now_monotonic: float) -> None:
+    async def _check_proxy_health_canary(self, now_monotonic: float) -> None:
         """Pre-call gate: if the fallback is armed AND 60s have elapsed since
         the last ``probe_proxy_health`` tick, fire one canary check; on 200
         emit the recovery one-shot line + clear the flag.
 
-        Best-effort + cheap: ``probe_proxy_health`` is a 5s-timeout sync GET;
-        it NEVER raises. If /health is not yet implemented on api.altidus.world
-        (Bravoh ops repo work — KAAN-ACTION-LEGAL.md §V7-PROXY) this returns
-        False perpetually and the recovery line never fires via the canary —
-        the next real LLM success (via _maybe_emit_proxy_recovery) is the
-        fallback.
+        Best-effort: ``probe_proxy_health`` is a 5s-timeout sync GET that NEVER
+        raises. If /health is not yet implemented on api.altidus.world (Bravoh
+        ops repo work — KAAN-ACTION-LEGAL.md §V7-PROXY) this returns False
+        perpetually and the recovery line never fires via the canary — the next
+        real LLM success (via _maybe_emit_proxy_recovery) is the fallback.
+
+        Phase 69 review WR-01 — the probe is a SYNCHRONOUS blocking GET. On the
+        happy path it returns in milliseconds, but the canary is only ever
+        armed when the proxy is DOWN, where the GET hangs to its full 5s
+        timeout. Running that directly on the asyncio event loop stalls the
+        whole reaction pipeline (audio frame delivery, TTS playback, WS
+        broadcast) for up to 5s every 60s for the duration of the outage.
+        So we offload the blocking GET to a thread executor — mirroring the
+        recall pre-dispatch offload (``set_next_event`` ~line 809) — and the
+        debounce timestamp is armed BEFORE the offload so a slow probe cannot
+        let a second canary stack up behind it.
         """
         if self._proxy_base_url is None or not self._proxy_unavailable:
             return
         if now_monotonic - self._last_proxy_health_probe < 60.0:
             return
         self._last_proxy_health_probe = now_monotonic
-        if probe_proxy_health(self._proxy_base_url):
+        loop = asyncio.get_running_loop()
+        ok = await loop.run_in_executor(
+            None, probe_proxy_health, self._proxy_base_url
+        )
+        if ok:
             self._maybe_emit_proxy_recovery()
 
     def _record_said(self, text: str, set_s_at_event: float | None = None) -> None:
@@ -1329,7 +1343,12 @@ class DJCoHostAgent(Agent):
         # If the proxy fallback is armed, fire a single canary GET against
         # /health every 60s. On 200, the recovery one-shot transcript line
         # lands and the flag clears. NEVER raises (probe is best-effort).
-        self._check_proxy_health_canary(time.monotonic())
+        # Phase 69 review WR-01 — the blocking ``probe_proxy_health`` GET is
+        # offloaded to a thread executor inside the (now async) canary so the
+        # reaction path NEVER stalls on the 5s timeout while the proxy is down
+        # (the exact state in which the canary is armed). Mirrors the recall
+        # pre-dispatch offload pattern (``set_next_event`` ~line 809).
+        await self._check_proxy_health_canary(time.monotonic())
         # ---- end Plan 69-03 canary ---------------------------------------
         try:
             if self._or_client is not None:
