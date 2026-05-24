@@ -130,10 +130,24 @@ def test_cross_references_ship_cut():
         "§SHIP-V4 must cross-reference the existing §SHIP-CUT runbook so the "
         "operator's one-button entry point stays single-source"
     )
-    # And it must NOT duplicate the 9-step sequence verbatim — a light guard:
-    # the literal `gh release create` belongs to §SHIP-CUT, not here.
-    assert "gh release create" not in sec, (
-        "§SHIP-V4 must point at §SHIP-CUT, not re-type its publish command"
+    # And the ORIGINAL §SHIP-V4 body must NOT duplicate the 9-step sequence
+    # verbatim — a light guard: the literal `gh release create` belongs to
+    # §SHIP-CUT, not the original cluster body.
+    #
+    # Exception (Plan 69-05): the appended `### v7.0 OSS-04 autonomous-mode
+    # route` sub-section DELIBERATELY pre-stages the verbatim `gh release
+    # create v0.1.0-rc1 ...` invocation captured from cut_release.sh stdout,
+    # per Phase 69 CONTEXT.md OSS-04 decision. That pre-staging is the entire
+    # point of the sub-section — when both external signatures land, no
+    # engineering discovery step is left. The guard below scopes the
+    # anti-duplication assertion to the original §SHIP-V4 body (up to the
+    # v7.0 OSS-04 sub-section); the sub-section itself is regression-pinned
+    # by tests/repo/test_ship_v4_section_exists.py (Plan 69-05).
+    pre_v7_body = sec.split("### v7.0 OSS-04 autonomous-mode route", 1)[0]
+    assert "gh release create" not in pre_v7_body, (
+        "§SHIP-V4 original body must point at §SHIP-CUT, not re-type its "
+        "publish command (the v7.0 OSS-04 sub-section is the documented "
+        "exception — see Plan 69-05)"
     )
 
 

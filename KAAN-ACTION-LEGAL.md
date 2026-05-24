@@ -3509,6 +3509,86 @@ SHIP-V4 SHIP-CUT EXECUTED on:            _____________________   (date — §SHI
 Sign-off by:                             _____________________   (Kaan)
 ```
 
+### v7.0 OSS-04 autonomous-mode route
+
+Under `gsd-autonomous fully` (v7.0 milestone mode), the engineering-side of
+OSS-04 ships green via Plan 69-05 (this plan) WITHOUT waiting for the external
+signature clock (Apple Dev Agreement + SignPath OSS Foundation cert). The
+actual public-RC cut remains Kaan's hand on the trigger — this sub-section is
+the pre-staged invocation surface so when both signatures land, no engineering
+discovery step is left.
+
+**Pre-staged invocation:**
+
+```bash
+bash scripts/launch/cut_release.sh v0.1.0-rc1
+```
+
+That command runs all pre-flight gates (Gate 1 tag-regex, Gate 2
+verify_signed.py, Gate 2b check_gate.sh, Gate 3 readme_hero_hash_sync,
+Gate 4 v4.0-MILESTONE-AUDIT, Gate 5 no-poc-files, Gate 5b
+check_bravoh_server_ready, Gate 6 bundle-id-lock, Gate 6b
+check_e2e_report). It does NOT invoke `gh release create` — that's
+intentional. cut_release.sh's hard guard: the script NEVER calls
+`gh release create` itself. The post-pre-flight Kaan command (captured
+verbatim 2026-05-24 from `bash scripts/launch/cut_release.sh --dry-run
+v0.1.0-rc1` stdout — re-verified GREEN at Plan 69-05 close):
+
+```bash
+gh release create v0.1.0-rc1 \
+  --repo bravoh/vibemix \
+  --title "vibemix v0.1.0-rc1" \
+  --notes-file /Users/ozai/projects/dj-set-ai/scripts/launch/changelog_template.md \
+  --draft \
+  --target main \
+  dist/*.dmg dist/*.msi dist/*.pkg dist/*.exe
+```
+
+Note: the `--notes-file` path falls back to
+`scripts/launch/changelog_template.md` when no `CHANGELOG-v0.1.0-rc1.md` file
+exists at repo root (per cut_release.sh lines 232-235). When Kaan authors the
+final v0.1.0-rc1 changelog before the real cut, drop it at
+`CHANGELOG-v0.1.0-rc1.md` at repo root and the script swaps the `--notes-file`
+target automatically — re-verify with `--dry-run v0.1.0-rc1` to confirm the
+new path lands in stdout.
+
+**Hard-guard reminder:** cut_release.sh NEVER invokes `gh release create`
+itself — the hand-on-trigger is Kaan, post-pre-flight. This guard is
+regression-pinned by `tests/repo/test_cut_release_no_autonomous_publish.py`
+(existing Phase 39 surface).
+
+**v4.0 closes alongside:** When this cut fires for real, `MILESTONES.md`
+v4.0 entry flips from "engineering-complete (publish on signature clock)" to
+"SHIPPED" with the published GitHub release URL. v4.0 has been kept OPEN per
+Kaan directive specifically to close alongside OSS-04 — do NOT archive v4.0
+until the cut is observable as a public release at `gh release view
+v0.1.0-rc1 --repo bravoh/vibemix`.
+
+**v7.0 milestone close behavior:** Per Phase 69 CONTEXT.md decisions, v7.0
+closes when OSS-04 either:
+- (a) fires for real (signatures landed; cut command executed; gh release
+  view shows the public RC), OR
+- (b) has its discharge artifact accepted in §SHIP-V4 (this sub-section + the
+  engineering-side wiring shipped; the cut itself rides forward on Kaan's
+  clock).
+
+Both outcomes are valid v7.0 closes under `gsd-autonomous fully`. The
+OSS-01/02/03/05 reqs ship unblocked regardless of OSS-04's signature-clock
+status (none depend on signatures).
+
+**Cross-references:**
+- `KAAN-ACTION-LEGAL.md §V7-PROXY` (Bravoh proxy server-side hardening — OSS-02 server-half; Plan 69-03 client-side already engineering-complete).
+- `docs/release-process.md` § "Autonomous-mode release path" (Plan 69-05 contract doc).
+- `scripts/launch/cut_release.sh` (Gate 1-6b logic; §SHIP-CUT-locked, byte-unchanged at Plan 69-05).
+
+**Sign-off block (v7.0 OSS-04 extension to the existing §SHIP-V4 Sign-off above):**
+
+```
+v7.0 OSS-04 engineering-side closed via Plan 69-05 on: _________   (date — Plan 69-05 SHA ____)
+v7.0 OSS-04 cut fired for real on:                     _________   (date — Kaan, signatures landed)
+v4.0 SHIPPED alongside (MILESTONES.md flip) on:        _________   (date — Kaan, gh release URL ____)
+```
+
 ## §RECALL-EAR — Phase 66 Visible Copilot Move Kaan-Ear Discharge
 
 **REQ-ID:** COPILOT-01, COPILOT-02, COPILOT-03
