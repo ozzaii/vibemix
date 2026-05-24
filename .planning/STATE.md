@@ -49,12 +49,12 @@ See: .planning/PROJECT.md (Current Milestone: v7.0 "Open House")
 
 ## Current Position
 
-Phase: 75 — Design Level-Up Loop (starting)
+Phase: v8.0 milestone audit (all 6 phases ✅ engineering-complete)
 Plan: —
-Status: P71–P74 ✅ complete — starting P75
-Last activity: 2026-05-25 — v8.0 P74 "Ease of Use" SHIPPED (engineering-side). Survey found the UX surface already mostly engineering-complete (mature 5-step wizard + crash-banner + status flags). Closed the one concrete actionable-failure gap: api-key-missing (exit-4, the #1 "co-host never speaks" cause) now surfaces actionable UI guidance via crash-banner reasonMessage() — closes the P71 loud-failure loop to the UI. Added tests/crash-banner.spec.ts (8 tests; failure surfaces had zero coverage). vitest 812 passed. Surfaced 3 findings for follow-up (top: user-level BEG/INT/PRO has no UI control — cross-stack feature). See .planning/phases/74-ease-of-use/SUMMARY.md.
+Status: P71–P76 ✅ complete — running milestone audit
+Last activity: 2026-05-25 — v8.0 P75 (design-slop gate, vitest 816) + P76 (GitHub) SHIPPED. P76: pushed live-tuning-or-brain to origin (539 commits, never pushed before) + opened PR #8 to sync main. First-ever CI on origin revealed a **GitHub account BILLING LOCK** — all jobs fast-fail in ~3s ("account is locked due to a billing issue"); code verified GREEN locally (pytest 4270/0 · vitest 816 · cargo 63). GH-02 CI-green + main-merge + signed release = KAAN-ACTION (§GH-BILLING / §GH-MAIN-MERGE / §SHIP-V4). See .planning/phases/76-github-done/SUMMARY.md.
 
-**v8.0 progress:** P71 ✅ · P72 ✅ · P73 ✅ · P74 ✅ (UX-01..04 engineering; felt-walk → KAAN-ACTION) · P75 🔵 (DESIGN-01..04) · P76 pending (GH). Mode `gsd-autonomous fully` (goal: until v8 achieved). KAAN-ACTION carveouts ride forward (signatures, real-hardware ear-passes, signed-release publish GH-04, felt UX/design sign-off — never auto-fired).
+**v8.0 progress:** P71 ✅ · P72 ✅ · P73 ✅ · P74 ✅ · P75 ✅ · P76 ✅ (GH-01..03 engineering; GH-02-green + merge → KAAN-ACTION). All 6 phases engineering-complete. Mode `gsd-autonomous fully`. **NEW blocker surfaced: §GH-BILLING — GitHub account billing lock blocks CI on origin (Kaan-only fix).** KAAN-ACTION carveouts: §GH-BILLING, §GH-MAIN-MERGE, §SHIP-V4 (signatures), felt UX/design + live-hardware ear-passes (§V7-LIVE).
 
 ## v7.0 Phase Map
 

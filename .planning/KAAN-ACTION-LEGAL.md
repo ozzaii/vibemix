@@ -259,3 +259,28 @@ that Kaan / Francesco / Bravoh team must run themselves.
   `api.altidus.world` ops repo.
 - §V7-LANDING: GitHub Pages live + Kaan-felt aesthetic sign-off + real waitlist
   URL. §ASSETS-DEMO-CUT: the real 30-sec demo film (Francesco capture day).
+
+### §GH-BILLING — GitHub Actions blocked by account billing lock (NEW, v8.0 P76)
+- **Discovered 2026-05-25:** v8.0 pushed the `live-tuning-or-brain` branch +
+  opened PR #8 (`ozzaii/vibemix#8`) to sync `origin/main` (539 commits behind).
+  This was the **first time the CI workflows ever ran on origin** (nothing had
+  been pushed to trigger PR/main CI before — cf. §V7-LIVE-05). Every job
+  fast-failed in ~3s with: *"The job was not started because your account is
+  locked due to a billing issue."*
+- **Action (Kaan only — I cannot touch billing):** resolve the GitHub billing
+  issue on the `ozzaii` account (github.com/settings/billing). Until then,
+  **GH-02 (CI green on origin) is blocked** — the code itself is verified GREEN
+  locally (`uv run pytest -q` 4270/0 · vitest 816 · cargo 63). The workflows +
+  PR machinery are correct; they just can't execute under the lock.
+- After billing is fixed: re-run PR #8's checks (`gh pr checks 8 --watch` or
+  push a no-op) to get the first green matrix → closes §V7-LIVE-05 + GH-02.
+
+### §GH-MAIN-MERGE — merge PR #8 to bring `main` current (launch-adjacent)
+- PR #8 (`live-tuning-or-brain` → `main`) is open and ready; `main` is a clean
+  fast-forward (0 behind). **Merge is Kaan's call** — it flips the public
+  default branch after 8 milestones of deliberately-stale `main`, and is
+  entangled with the staged launch sequence (T-7→T+30) + the `bravoh/vibemix`
+  repo transfer (SHIP-10). **Preserve history — do NOT squash** (539 commits).
+- The signed public release (`cut_release.sh v0.1.0-rc1` → `gh release create`,
+  §SHIP-V4) + 5-channel social stay gated on Apple Dev + SignPath signatures.
+  v8.0 pushed code to GitHub but did **not** cut a release or post anything.
