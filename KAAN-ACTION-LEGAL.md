@@ -4486,3 +4486,204 @@ Sign-off by:                                    _________   (Kaan)
 - §SHIP-V4 (this file, ~line 3387) — the v4.0 ship-discharge surface; the
   parallel top-level-cluster shape pattern.
 
+## §V7-LANDING — v7.0 GH-02 Landing Live-Surface Discharge
+
+**REQ-ID:** GH-02 (Phase 70 — "the GitHub front-porch a stranger lands on")
+**Owner:** Kaan (taste + repo-settings + canonical-URL) — soft Kaan-discharge under `gsd-autonomous fully`
+**Status:** ☐ pending — engineering side ships the buildless CDJ-Whisper landing + the local/CI Lighthouse gate + the anti-backsliding grep; the four items below are Kaan's clock
+
+Each entry below documents a discharge item for the GitHub Pages landing
+(`docs/landing/index.html`, Plan 70-03) that cannot ship green in CI under
+autonomous mode and requires Kaan — either a manual repo-settings flip, a
+taste call that is not auto-checkable, or a canonical URL that is unknown at
+execution time.
+
+**SOFT under `gsd-autonomous fully` — these do NOT gate the milestone close.**
+Engineering closes GH-02 the moment the auto-checks pass: the local/CI
+Lighthouse run (a11y ≥95 / perf ≥90) is GREEN, the anti-backsliding
+`grep -ri 'geist\|fraunces' docs/landing/` returns zero, and asset
+reproducibility holds (the og:image points at the Wave-1 hash-pinned
+`og-card.png`). The felt sign-off + Pages enablement + the real waitlist URL
++ the repo social-preview ride this cluster on Kaan's clock; the v7.0
+milestone close does NOT wait on them. This mirrors the §V7-LIVE /
+§SHIP-V4 / §RECALL-EAR soft-discharge pattern.
+
+### §V7-LANDING-01 — GitHub Pages enablement + live-URL Lighthouse run
+
+**Surface (what it gates):** The live `bravoh-ai.github.io/vibemix` URL going
+public + a Lighthouse run against that live URL (vs the local/CI build).
+
+**Why it can't ship green in CI / autonomous:** GitHub Pages is not enabled
+until Kaan flips the repo setting — a hosted CI runner has no permission to
+toggle repo Settings, and there is no live URL to point Lighthouse at until
+it is on. The CI workflow (`.github/workflows/lighthouse.yml`) therefore runs
+Lighthouse against a LOCAL static-server build of `docs/landing/` (CONTEXT
+reconciliation #4); engineering closes GH-02 on that local pass.
+
+**Fix path:**
+```
+# 1. GitHub repo → Settings → Pages → Source: "Deploy from a branch"
+#    Branch: main · Folder: /docs   (the landing lives at docs/landing/;
+#    if the Pages root must be docs/, the live URL is
+#    bravoh-ai.github.io/vibemix/landing/ — adjust to taste, or move the
+#    landing to docs/ root if a bare bravoh-ai.github.io/vibemix is wanted).
+# 2. Wait for the green Pages deploy, then run Lighthouse on the LIVE URL:
+npx lighthouse https://bravoh-ai.github.io/vibemix/landing/ \
+  --only-categories=accessibility,performance --view
+# 3. Confirm a11y ≥ 95 / perf ≥ 90 on the live URL (CI already proved the
+#    local build; this confirms CDN/Pages delivery didn't regress it).
+```
+
+**Owner-clock:** Kaan — repo Settings access; immediate (no external dependency).
+
+**Cross-reference:** `docs/landing/index.html` · `.github/workflows/lighthouse.yml` · §SHIP-V4 felt-ship precedent.
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · live URL: ____ · live Lighthouse a11y: ____ / perf: ____
+
+### §V7-LANDING-02 — Kaan-felt CDJ-Whisper aesthetic sign-off
+
+**Surface (what it gates):** The taste gate — does the landing *feel* like
+CDJ-Whisper / "a real DJ friend's product", not generic AI slop? Copy wording,
+amber-accent restraint (20/80), the hero pitch voice, the demo-window material.
+
+**Why it can't ship green in CI / autonomous:** Taste is not auto-checkable.
+CI can prove the typography lock (no Geist/Fraunces), the a11y/perf scores,
+the token presence — but not whether the page reads as *vibemix* rather than
+a templated landing. Engineering ships the UI-SPEC Copywriting-Contract draft
+verbatim (hero `THE ONLY AI CO-HOST / THAT ACTUALLY LISTENS`, the subhead,
+`GET VIBEMIX` / `JOIN THE WAITLIST`, the footer tagline); Kaan's felt sign-off
+on exact wording + visual restraint rides here and does NOT gate the close.
+
+**Fix path:**
+```
+# 1. Open the landing locally:
+python3 -m http.server 8099 --directory docs/landing
+#    → visit http://localhost:8099/  (or the live Pages URL once §V7-LANDING-01)
+# 2. Felt check (Kaan's ear, eyes):
+#    - Does the hero grab a stranger in 30 seconds? Is the voice Kaan's,
+#      not "revolutionary AI platform"?
+#    - Is amber guiding the eye (CTA, hero accent, links) — or sprinkled?
+#    - Does the demo window read as a Pioneer screen, not a flat card?
+# 3. Any wording/restraint change → edit docs/landing/index.html directly
+#    (it is buildless single-file); re-run the local Lighthouse gate to
+#    confirm a11y/perf held.
+```
+
+**Owner-clock:** Kaan — taste call; soft under autonomous mode (does NOT block close).
+
+**Cross-reference:** `docs/landing/index.html` · `.planning/phases/70-github-sexified-generated-tested/70-UI-SPEC.md` (Copywriting Contract) · `.claude/skills/frontend-enforcement/SKILL.md` · §RECALL-EAR (Kaan-ear veto pattern) · §SHIP-V4 felt-ship precedent.
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · result: ____ (felt-CDJ-Whisper Y/N · wording changes: ____)
+
+### §V7-LANDING-03 — Real canonical Bravoh-waitlist URL
+
+**Surface (what it gates):** The outbound waitlist link target. The landing
+ships with the placeholder `https://altidus.world/waitlist?utm_source=vibemix&utm_medium=landing&utm_campaign=oss`
+(the UTM shape is locked; only the base URL is provisional).
+
+**Why it can't ship green in CI / autonomous:** The real canonical Bravoh
+waitlist endpoint is unknown at execution time. The placeholder is a valid,
+non-broken outbound `<a>` (it points at a real Bravoh domain); if the
+canonical signup URL differs, only Kaan knows it. CI cannot resolve "is this
+the *right* waitlist URL" — it can only confirm the link is present + the UTM
+params + that no tracking fires on page view (the grep gate does the last).
+
+**Fix path:**
+```
+# 1. Confirm the canonical Bravoh waitlist URL (the one altidus.world actually
+#    routes signups through). If it differs from the placeholder:
+# 2. Edit the single href in docs/landing/index.html §4 Waitlist:
+#    <a class="btn wl-btn" ... href="<REAL-URL>?utm_source=vibemix&utm_medium=landing&utm_campaign=oss">
+#    Keep the locked UTM shape (utm_source=vibemix · utm_medium=landing ·
+#    utm_campaign=oss). Do NOT add any analytics <script> — default-OFF holds.
+# 3. Click-test: the link fires only on click, no network on page load.
+```
+
+**Owner-clock:** Kaan — canonical-URL knowledge; immediate.
+
+**Cross-reference:** `docs/landing/index.html` (§4 Waitlist) · `.planning/phases/70-github-sexified-generated-tested/70-CONTEXT.md` (waitlist hook — locked v3.0 funnel rule, default-OFF) · UI-SPEC §4.
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · canonical URL confirmed: ____ (placeholder kept / swapped to ____)
+
+### §V7-LANDING-04 — Repo social-preview image (GitHub Settings)
+
+**Surface (what it gates):** The GitHub repo's social-preview image (the
+unfurl shown when the repo link is shared on Slack/Discord/Twitter) — set to
+the Wave-1 `docs/assets/og-card.png` (1200×630, hash-pinned in MANIFEST.yaml).
+
+**Why it can't ship green in CI / autonomous:** Setting the repo
+social-preview is a manual repo-settings upload (Settings → General → Social
+preview); a hosted runner cannot upload it. The landing `<head>` already
+carries the live `<meta property="og:image">` pointing at `og-card.png` (that
+half is engineering-shipped); the *repo-level* preview is the manual half.
+
+**Fix path:**
+```
+# 1. GitHub repo → Settings → General → Social preview → Upload an image.
+# 2. Upload docs/assets/og-card.png (the 1200×630 hash-pinned card from
+#    Wave 1 / GH-03 — already in the tree, MANIFEST-pinned).
+# 3. Confirm the unfurl: paste the repo URL into a Slack/Discord message
+#    and verify the og-card renders at thumbnail scale.
+```
+
+**Owner-clock:** Kaan — repo Settings access; immediate.
+
+**Cross-reference:** `docs/assets/og-card.png` (Wave 1 / GH-03) · `docs/assets/MANIFEST.yaml` (SHA pin) · README OG/social-card note (lines ~23-30, which already routes the repo social-preview here) · §VIS-09 (Francesco capture-day runbook — the parallel asset-discharge pattern).
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · social-preview set Y/N · unfurl confirmed Y/N
+
+### Discharge tracking
+
+| Item | Surface | Owner-clock | Soft? | Sign-off |
+| ---- | ------- | ----------- | ----- | -------- |
+| §V7-LANDING-01 | Pages enablement + live-URL Lighthouse | Kaan — repo Settings | soft | ☐ pending |
+| §V7-LANDING-02 | Kaan-felt CDJ-Whisper aesthetic sign-off | Kaan — taste | soft | ☐ pending |
+| §V7-LANDING-03 | Real canonical Bravoh-waitlist URL | Kaan — URL knowledge | soft | ☐ pending |
+| §V7-LANDING-04 | Repo social-preview image (og-card.png) | Kaan — repo Settings | soft | ☐ pending |
+| **TOTAL** | **4 soft Kaan-discharge items — none gate the v7.0 close** | | | |
+
+### Verification (engineering-side, always-green — what CI/local DOES close)
+
+```bash
+# 1. Anti-backsliding typography lock (the load-bearing gate):
+grep -ri 'geist\|fraunces' docs/landing/   # MUST return zero
+
+# 2. The landing parses + carries the og:image + a11y landmarks:
+python3 -c "import html.parser; p=html.parser.HTMLParser(); p.feed(open('docs/landing/index.html').read()); print('parses')"
+grep -c 'og:image' docs/landing/index.html         # >= 1
+grep -c 'prefers-reduced-motion' docs/landing/index.html  # >= 1
+
+# 3. No tracking auto-loads on page view (default-OFF funnel rule):
+grep -ric 'gtag\|googletagmanager\|fbq' docs/landing/   # MUST return zero
+
+# 4. CI Lighthouse gate (local build) — a11y >= 95 / perf >= 90:
+#    runs in .github/workflows/lighthouse.yml on every push/PR.
+```
+
+### Sign-off block
+
+```
+§V7-LANDING-01 Pages enablement + live Lighthouse on:  _________   (date — Kaan, live URL ____, a11y ____ / perf ____)
+§V7-LANDING-02 Kaan-felt CDJ-Whisper aesthetic on:      _________   (date — Kaan, felt-Y/N, wording changes ____)
+§V7-LANDING-03 Real waitlist URL confirmed on:          _________   (date — Kaan, URL ____ kept/swapped)
+§V7-LANDING-04 Repo social-preview set on:              _________   (date — Kaan, unfurl confirmed Y/N)
+Sign-off by:                                              _________   (Kaan)
+```
+
+### Cross-references
+
+- `docs/landing/index.html` — the Pages landing (Plan 70-03 Task 1; the
+  surface every item above gates).
+- `.github/workflows/lighthouse.yml` — the local/CI Lighthouse gate + the
+  anti-backsliding grep gate (Plan 70-03 Task 2; what engineering closes on).
+- `docs/assets/og-card.png` + `docs/assets/MANIFEST.yaml` — the Wave-1
+  hash-pinned og:image the landing references.
+- `.planning/phases/70-github-sexified-generated-tested/70-UI-SPEC.md` — the
+  binding design contract (Copywriting Contract + Accessibility Contract).
+- `.planning/phases/70-github-sexified-generated-tested/70-CONTEXT.md`
+  `<deferred>` — the source list routing all four items here.
+- §V7-LIVE (this file, ~line 3710) — the parallel soft-discharge cluster shape
+  this section mirrors.
+- §SHIP-V4 (this file, ~line 3387) + §RECALL-EAR (~line 3510) — the v4.0
+  ship + Kaan-ear felt-sign-off precedent.
+
