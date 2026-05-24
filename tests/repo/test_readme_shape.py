@@ -32,7 +32,14 @@ def test_readme_min_length(readme_text: str) -> None:
 
 REQUIRED_ASSET_REFS = [
     "docs/assets/hero.png",
-    "docs/assets/demo-placeholder.gif",
+    # Phase 70 GH-01: the hero <video poster=> was repointed from the
+    # demo-placeholder.gif to the source-generated, MANIFEST-pinned
+    # docs/assets/demo-poster.png (the CDJ-Whisper still that carries the
+    # visual until Francesco's real demo.mp4 lands — KAAN-ACTION
+    # §ASSETS-DEMO-CUT). demo-placeholder.gif stays committed (MANIFEST
+    # opt_out) but is no longer README-referenced; the poster is the asset
+    # the README now depends on not-404-ing.
+    "docs/assets/demo-poster.png",
     "docs/assets/architecture.svg",
     "docs/assets/controllers/",
     "docs/assets/screenshots/",
