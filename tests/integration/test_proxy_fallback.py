@@ -451,3 +451,77 @@ def test_agent_direct_mode_never_arms_fallback(
     assert not any(
         k in ("proxy_unavailable", "proxy_recovered") for k, _ in recorder.events
     )
+
+
+# ---------- RELEASE-AUTH: loud connection-error surfacing ----------
+
+
+@pytest.mark.integration
+def test_emit_connection_error_logs_event_and_transcript(
+    mocker, tmp_path, monkeypatch
+) -> None:
+    """RELEASE-AUTH Fix 2: an UNCLASSIFIED LLM failure (auth/DNS/connect) must
+    surface LOUDLY — a ``connection_error`` event to events.jsonl AND a UI
+    transcript line — instead of dying to stderr only (the "events fire but
+    the co-host never speaks and nothing is logged" release blocker).
+
+    Works in direct (BYO) mode too — this is the path classify_proxy_error
+    deliberately does NOT cover (4xx auth errors), which is exactly the
+    missing-key class.
+    """
+    agent, transcript_sink, recorder = _build_agent(
+        mocker, tmp_path, mode="direct", monkeypatch=monkeypatch
+    )
+
+    err = RuntimeError("401 UNAUTHORIZED: API key not valid")
+    agent._emit_connection_error(err)
+
+    # events.jsonl line written, classified as auth, secret-free.
+    conn_events = [f for k, f in recorder.events if k == "connection_error"]
+    assert len(conn_events) == 1
+    assert conn_events[0]["error_kind"] == "auth"
+    assert conn_events[0]["error"] == "RuntimeError"
+
+    # UI transcript got the user-visible "it's broken" signal.
+    assert any("can't reach Gemini" in line for line in transcript_sink)
+
+
+@pytest.mark.integration
+def test_emit_connection_error_is_one_shot(
+    mocker, tmp_path, monkeypatch
+) -> None:
+    """The loud surface fires ONCE per error streak — a persistent auth
+    failure (10Hz coach loop) must not spam events.jsonl / the transcript."""
+    agent, transcript_sink, recorder = _build_agent(
+        mocker, tmp_path, mode="direct", monkeypatch=monkeypatch
+    )
+    for _ in range(5):
+        agent._emit_connection_error(RuntimeError("403 permission denied"))
+
+    conn_events = [f for k, f in recorder.events if k == "connection_error"]
+    assert len(conn_events) == 1, "must be one-shot per streak"
+    assert sum("can't reach Gemini" in line for line in transcript_sink) == 1
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "msg,expected_kind",
+    [
+        ("401 unauthorized", "auth"),
+        ("API key not valid", "auth"),
+        ("getaddrinfo failed", "dns"),
+        ("connection refused", "connection"),
+        ("request timed out", "connection"),
+        ("something weird happened", "unknown"),
+    ],
+)
+def test_emit_connection_error_classification(
+    mocker, tmp_path, monkeypatch, msg, expected_kind
+) -> None:
+    """Coarse, secret-free classification used for the log line."""
+    agent, _sink, recorder = _build_agent(
+        mocker, tmp_path, mode="direct", monkeypatch=monkeypatch
+    )
+    agent._emit_connection_error(RuntimeError(msg))
+    conn = [f for k, f in recorder.events if k == "connection_error"]
+    assert conn and conn[0]["error_kind"] == expected_kind

@@ -565,6 +565,14 @@ class DJCoHostAgent(Agent):
         self._proxy_unavailable: bool = False
         self._proxy_unavailable_message_emitted: bool = False
         self._proxy_recovery_message_emitted: bool = False
+        # Loud-failure guard — when the LLM call raises an UNCLASSIFIED error
+        # (auth 401/403, missing/invalid key, DNS, TLS, connection refused on
+        # the DIRECT path, etc.), we surface ONE clear connection_error event
+        # to events.jsonl + the UI transcript instead of dying silently. This
+        # closes the "events fire but the co-host never speaks and nothing is
+        # logged" release blocker. One-shot per error streak so a persistent
+        # auth failure doesn't spam the timeline; reset on the next success.
+        self._connection_error_emitted: bool = False
         # Phase 69 review WR-02 — never-probed sentinel is ``float("-inf")``,
         # NOT ``0.0``. ``time.monotonic()`` has an unspecified origin; on a
         # freshly booted host it can legitimately read < 60.0, and a ``0.0``
@@ -675,6 +683,80 @@ class DJCoHostAgent(Agent):
                 self._recorder.log_event("proxy_recovered", path="live_coach")
             except Exception:
                 pass
+
+    def _emit_connection_error(self, err: BaseException) -> None:
+        """LOUD, never-silent surfacing of an LLM connect/auth failure.
+
+        Fires from the ``llm_node`` exception handler for ANY error that the
+        proxy classifier did NOT already handle. Covers the release-blocker
+        case: a direct-mode session whose Gemini key is missing/invalid (or
+        whose connection is refused) used to print ``[llm err]`` to stderr
+        ONLY — no ``events.jsonl`` line, no UI signal — so the co-host fell
+        silent with zero diagnostics. Now we:
+
+          1. log a ``connection_error`` event to ``events.jsonl`` (with a
+             coarse, key-free classification so logs never leak secrets), and
+          2. push a one-shot ``"Co-host can't reach Gemini — check API key /
+             connection"`` line onto the UI transcript sink.
+
+        One-shot per error streak (``_connection_error_emitted``) so a
+        persistent failure logs once, not 10×/second. Cleared on the next
+        successful stream (see the ``else`` branch in ``llm_node``).
+
+        Best-effort: every side-effect is wrapped — surfacing the error must
+        never itself crash the turn.
+        """
+        if self._connection_error_emitted:
+            return
+        self._connection_error_emitted = True
+
+        msg = str(err)
+        low = msg.lower()
+        # Coarse, secret-free classification for the log line.
+        if any(
+            tok in low
+            for tok in ("401", "403", "unauthorized", "permission", "api key", "api_key", "invalid key", "authenticat")
+        ):
+            kind = "auth"
+        elif any(tok in low for tok in ("getaddrinfo", "name resolution", "dns")):
+            kind = "dns"
+        elif any(tok in low for tok in ("refused", "connection reset", "ssl", "tls", "timed out", "timeout")):
+            kind = "connection"
+        else:
+            kind = "unknown"
+
+        # 1. events.jsonl — the durable diagnostic that was missing before.
+        try:
+            self._recorder.log_event(
+                "connection_error",
+                error_kind=kind,
+                error=type(err).__name__,
+                # repr() can echo request bodies/headers on some SDK errors;
+                # str() is the safer surface and we've already classified.
+                detail=msg[:300],
+                path="live_coach",
+            )
+        except Exception:
+            pass
+
+        # 2. stderr — keep the human-readable banner the Tauri log captures.
+        hint = {
+            "auth": "Gemini rejected the credentials — check GEMINI_API_KEY.",
+            "dns": "DNS lookup failed — check network connectivity.",
+            "connection": "could not connect to Gemini — check network / firewall.",
+            "unknown": "the LLM call failed — see detail above.",
+        }[kind]
+        print(
+            f"\n[FATAL-SOFT] co-host connection_error ({kind}): {hint}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+        # 3. UI transcript sink — the user-visible "it's broken" signal.
+        try:
+            self._push_transcript("Co-host can't reach Gemini — check API key / connection")
+        except Exception:
+            pass
 
     async def _check_proxy_health_canary(self, now_monotonic: float) -> None:
         """Pre-call gate: if the fallback is armed AND 60s have elapsed since
@@ -1469,6 +1551,14 @@ class DJCoHostAgent(Agent):
             _unavail = classify_proxy_error(e)
             if _unavail is not None:
                 self._maybe_emit_proxy_unavailable(_unavail.reason)
+            else:
+                # NOT a proxy-classified transient (5xx/timeout/refused/bad
+                # body). This is the silent-death class: a direct-mode auth
+                # failure (bad/missing GEMINI_API_KEY → 401/403), a DNS/TLS
+                # error, or any other connect failure on either path. Surface
+                # it LOUDLY — events.jsonl + UI transcript — instead of dying
+                # to stderr-only as before (the release blocker).
+                self._emit_connection_error(e)
             # ---- end Plan 69-03 classification ----------------------------
             llm_err = repr(e)
             print(f"\n[llm err] {e}", file=sys.stderr)
@@ -1482,6 +1572,19 @@ class DJCoHostAgent(Agent):
             if self._proxy_unavailable:
                 self._maybe_emit_proxy_recovery()
             # ---- end Plan 69-03 recovery ----------------------------------
+            # Reset the loud connection-error one-shot — the next failure in a
+            # fresh streak should log again. A successful stream means the
+            # connection/auth is healthy now.
+            if self._connection_error_emitted:
+                self._connection_error_emitted = False
+                try:
+                    self._recorder.log_event("connection_recovered", path="live_coach")
+                except Exception:
+                    pass
+                try:
+                    self._push_transcript("Co-host reconnected")
+                except Exception:
+                    pass
         # === end Plan 41-04 streaming pipe-through ===
 
         print()
