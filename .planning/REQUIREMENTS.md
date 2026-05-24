@@ -106,8 +106,8 @@ The product's hard line holds: **grounded, never hallucinating, no AI slop.** No
 | OSS-05 | Phase 69 | Mapped (planning) |
 | GH-01 | Phase 70 | Mapped (planning) — §ASSETS-DEMO-CUT discharge consumed |
 | GH-02 | Phase 70 | Mapped (planning) — Kaan-felt sign-off on landing aesthetic rides `§V7-LANDING` |
-| GH-03 | Phase 70 | Mapped (planning) |
-| GH-04 | Phase 70 | Mapped (planning) |
+| GH-03 | Phase 70 | Shipped engineering-side 2026-05-24 (70P02 / Wave 1) — `docs/assets/og-card.png` (1200×630, 97 KB) generated from `docs/assets/sources/og-card.html` via `scripts/regenerate_assets.sh` og-card branch (headless Chrome + Pillow deterministic re-encode), pinned by SHA-256 `089a8a91...c3728` in MANIFEST.yaml, referenced from README (og:image doc + repo-social-preview → §V7-LANDING). Final presence-test tick (`test_github_presence.py::test_og_card_present_and_hash_matches`) lands Wave 4 / 70P05 |
+| GH-04 | Phase 70 | Shipped engineering-side 2026-05-24 (70P01 / Wave 0) — `scripts/regenerate_assets.sh` + `docs/assets/MANIFEST.yaml` + `.github/workflows/asset-bitrot.yml` + `tests/repo/test_asset_manifest_shape.py` (6/6 GREEN) |
 | GH-05 | Phase 70 | Mapped (planning) |
 
 **Coverage:** 19/19 requirements mapped to exactly one phase each — no orphans, no duplicates (TEST-01..04 → Phase 67 · DEV-01..05 → Phase 68 · OSS-01..05 → Phase 69 · GH-01..05 → Phase 70). **Confirmed by roadmapper 2026-05-23.**
