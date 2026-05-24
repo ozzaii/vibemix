@@ -1,0 +1,24 @@
+v8.0 P73 — opt-in marker-grid run (TEST-02)
+Command: uv run pytest -q -m "integration or slow or cli or network or e2e or macos_audio or windows_only"
+Date: 2026-05-25 · Host: Kaan's Mac (Darwin 25.3.0, Python 3.12)
+
+RESULT: 111 passed, 7 skipped, 4178 deselected, 4 xpassed, 0 failed (52.62s) — exit 0
+
+Skips (all hardware/OS-gated — KAAN-ACTION §V7-LIVE carveouts, NOT failures):
+  - tests/test_audio_windows_live.py            Windows only (CI windows-latest)
+  - tests/test_main_live.py                     opt-in live smoke (VIBEMIX_LIVE_SMOKE=1)
+  - tests/test_midi_macos_live.py               no FLX4 connected — plug DDJ-FLX4 USB (§V7-LIVE-10)
+  - tests/test_midi_windows_live.py (×2)        Windows only
+  - tests/test_screen_windows_live.py           Windows only
+  - tests/test_track_windows_live.py            Windows only
+
+XPASS (hardware-gated live, pass opportunistically on this host — §V7-LIVE-01/04):
+  - tests/sidecar/test_wizard_entrypoint.py::test_wizard_starts_and_terminates_cleanly  (§V7-LIVE-04)
+  - tests/test_audio_macos_live.py::test_blackhole_device_present_at_48khz_or_raises    (§V7-LIVE-01)
+  - tests/test_audio_macos_live.py::test_open_voice_output_completes_without_real_audio_device (§V7-LIVE-01)
+  - tests/test_audio_macos_live.py::test_blackhole_input_is_48k_for_live_capture        (§V7-LIVE-01)
+
+VERDICT: TEST-02 satisfied — every marked test is green or a justified Windows/hardware
+KAAN-ACTION carveout. The Windows-only markers run green on the CI windows-latest matrix
+(full-test-matrix.yml); the live-hardware markers are software-simulated by
+scripts/sim/simulate_session.py (P72).

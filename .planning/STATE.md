@@ -49,12 +49,12 @@ See: .planning/PROJECT.md (Current Milestone: v7.0 "Open House")
 
 ## Current Position
 
-Phase: 72 — Logged & Simulated (starting)
+Phase: 74 — Ease of Use (starting)
 Plan: —
-Status: P71 ✅ complete — starting P72
-Last activity: 2026-05-25 — v8.0 P71 "Land & Verify" SHIPPED: the in-flight live-tuning-or-brain work (device-capture fix + robust .env + loud connection_error surfacing + unified debug-log surface + tray-mood) landed in 3 atomic commits; suites green (pytest 4256 / vitest 804 / cargo 63). See .planning/phases/71-land-and-verify/SUMMARY.md.
+Status: P71–P73 ✅ complete — starting P74
+Last activity: 2026-05-25 — v8.0 P73 "Reported · Tested · Fixed · Verified" SHIPPED. Full suite 4270 passed / 0 failed; marker grid 111 passed / 0 failed (7 skips = Windows/live-FLX4 KAAN-ACTION); TS 804 + Rust 63 green. All 4 deep-audit findings closed (TEST-04). No fix loop needed. Reports: 73-MARKER-GRID.txt + sim_report.json + 73 SUMMARY (RPT-01..03). See .planning/phases/73-reported-tested-fixed-verified/SUMMARY.md.
 
-**v8.0 progress:** P71 ✅ · P72 🔵 (LOG-02/04 + SIM-01..03) · P73–P76 pending. Mode `gsd-autonomous fully` (goal: until v8 achieved). KAAN-ACTION carveouts ride forward (signatures, real-hardware ear-passes, signed-release publish GH-04 — never auto-fired).
+**v8.0 progress:** P71 ✅ (LOG-01/03) · P72 ✅ (LOG-02/04 + SIM-01..03 + everybody×every-interaction) · P73 ✅ (RPT-01..03 + TEST-01..05 + audit findings closed) · P74 🔵 (UX-01..04) · P75 pending (DESIGN) · P76 pending (GH). Mode `gsd-autonomous fully` (goal: until v8 achieved). KAAN-ACTION carveouts ride forward (signatures, real-hardware ear-passes, signed-release publish GH-04 — never auto-fired).
 
 ## v7.0 Phase Map
 
