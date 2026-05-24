@@ -1,0 +1,53 @@
+# Phase 70 Plan 70P01 — GH-04 deliverable: asset-bitrot gate.
+#
+# Runs scripts/regenerate_assets.sh then `git diff --exit-code docs/assets/`.
+# Any committed docs/assets/ asset that drifts from its regenerated form fails
+# CI — that drift IS the bitrot this gate exists to catch. Only MANIFEST.yaml
+# `assets:` entries are in scope; opt_out + foreign-generator assets are not
+# regenerated, so the gate never fails on an asset it does not own.
+#
+# Runs on every push to `main` and every PR. Security posture lifted verbatim
+# from packaging-audit.yml (Phase 69-04) / full-test-matrix.yml (Phase 67P04):
+# - `on: pull_request` (the plain trigger, never the *_target variant) —
+#   fork-PR secrets safe: fork PRs get a read-only token and no secrets.
+# - All `uses:` SHA-pinned.
+# - `permissions.contents: read` — minimum scope.
+# - Workflow-prefixed concurrency cancel-in-progress.
+# - `timeout-minutes: 15` — the regenerator is fast (no-op at empty-assets wave).
+#
+# At Wave 0 the MANIFEST `assets:` list is empty, so the regenerator is a no-op
+# and the diff is clean → this workflow is green at landing. Wave 1+ populates it.
+
+name: Asset Bitrot
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: asset-bitrot-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  asset-bitrot:
+    name: regenerate + diff (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Regenerate source-derived assets
+        run: bash scripts/regenerate_assets.sh
+
+      - name: Fail on committed-asset drift
+        run: |
+          if ! git diff --exit-code docs/assets/; then
+            echo "::error::A committed docs/assets/ asset drifted from its regenerated form."
+            echo "Re-run scripts/regenerate_assets.sh and commit the result, or add the"
+            echo "asset to docs/assets/MANIFEST.yaml opt_out if it is hand-cut bespoke."
+            exit 1
+          fi
