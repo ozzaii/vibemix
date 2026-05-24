@@ -53,6 +53,11 @@ from livekit.agents import tts as agents_tts
 from vibemix.agent._streaming_pipe import find_sentence_end, passes_head_gate
 from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL
+from vibemix.agent.proxy_client import (
+    ProxyUnavailable,
+    classify_proxy_error,
+    probe_proxy_health,
+)
 from vibemix.audio import (
     INVOKE_AUDIO_SECONDS,
     MIC_AUDIO_PART_PRESENCE_RMS,
@@ -544,6 +549,35 @@ class DJCoHostAgent(Agent):
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         # ipc.session.snapshot transcript sink (see __init__ kwarg docstring).
         self._transcript_sink: "collections.deque | None" = transcript_sink
+
+        # ---- Phase 69 Plan 69-03 (OSS-02) — proxy fallback state ----------
+        # In proxy mode, when the upstream Bravoh proxy returns 5xx / times
+        # out / refuses the connection / returns non-JSON body, the brain
+        # refuses to lie (anti-slop): a one-shot "Co-host unavailable this
+        # session" transcript line lands, LLM emission skips for the
+        # duration, and a 60s ``probe_proxy_health`` canary auto-clears the
+        # flag when /health returns 200 (or whenever a real LLM call next
+        # succeeds — whichever fires first).
+        #
+        # All five attributes default-init to "not armed" so direct mode
+        # (BYO) and tests that never touch the proxy path are byte-identical
+        # to v5.0 behavior.
+        self._proxy_unavailable: bool = False
+        self._proxy_unavailable_message_emitted: bool = False
+        self._proxy_recovery_message_emitted: bool = False
+        self._last_proxy_health_probe: float = 0.0  # monotonic seconds
+        # Resolve proxy_base_url from env at construction time; None ⇒ direct
+        # mode and the fallback never arms (gate every state transition on
+        # ``self._proxy_base_url is not None``).
+        _llm_mode = os.environ.get("VIBEMIX_LLM_MODE", "direct").strip().lower()
+        self._proxy_base_url: str | None = (
+            os.environ.get(
+                "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
+            ).rstrip("/")
+            if _llm_mode == "proxy"
+            else None
+        )
+        # ---- end Plan 69-03 state -----------------------------------------
         # Both the LiveKit-side ``instructions`` AND the google.genai-side
         # ``GenerateContentConfig.system_instruction`` use the same cell.
         self._gen_cfg = types.GenerateContentConfig(
@@ -575,6 +609,84 @@ class DJCoHostAgent(Agent):
             self._transcript_sink.append(text)
         except Exception:
             pass
+
+    def _maybe_emit_proxy_unavailable(self, reason: str) -> None:
+        """Arm the proxy-unavailable fallback flag + emit the one-shot
+        "Co-host unavailable this session" transcript line (Plan 69-03 / OSS-02).
+
+        Gates:
+        - Only fires when ``self._proxy_base_url is not None`` (proxy mode).
+          Direct mode (BYO) never arms — BYO users see their own network
+          errors per existing v3.x behavior.
+        - The transcript line emits EXACTLY ONCE per unavailable-streak;
+          subsequent ticks while still unavailable do not spam the transcript.
+
+        Best-effort: a recorder / transcript-sink hiccup must never perturb
+        the LLM turn — every side-effect is wrapped.
+        """
+        if self._proxy_base_url is None:
+            return
+        # Arm the flag + reset the recovery one-shot guard (the next recovery
+        # is a fresh event).
+        if not self._proxy_unavailable:
+            self._proxy_unavailable = True
+            self._proxy_recovery_message_emitted = False
+        if not self._proxy_unavailable_message_emitted:
+            self._proxy_unavailable_message_emitted = True
+            self._push_transcript("Co-host unavailable this session")
+            try:
+                self._recorder.log_event(
+                    "proxy_unavailable", reason=reason, path="live_coach"
+                )
+            except Exception:
+                pass
+
+    def _maybe_emit_proxy_recovery(self) -> None:
+        """Emit the one-shot "Co-host back online" transcript line and clear
+        the proxy-unavailable flag (Plan 69-03 / OSS-02).
+
+        Called from two paths:
+        1. After a successful LLM call when ``self._proxy_unavailable`` was
+           True — the next real LLM success implicitly clears the fallback.
+        2. The pre-call 60s ``probe_proxy_health`` canary when /health
+           returns 200.
+
+        Best-effort + one-shot: only fires once per recovery; the next
+        unavailable-streak resets the guard.
+        """
+        if self._proxy_base_url is None:
+            return
+        if not self._proxy_unavailable:
+            return
+        self._proxy_unavailable = False
+        self._proxy_unavailable_message_emitted = False
+        if not self._proxy_recovery_message_emitted:
+            self._proxy_recovery_message_emitted = True
+            self._push_transcript("Co-host back online")
+            try:
+                self._recorder.log_event("proxy_recovered", path="live_coach")
+            except Exception:
+                pass
+
+    def _check_proxy_health_canary(self, now_monotonic: float) -> None:
+        """Pre-call gate: if the fallback is armed AND 60s have elapsed since
+        the last ``probe_proxy_health`` tick, fire one canary check; on 200
+        emit the recovery one-shot line + clear the flag.
+
+        Best-effort + cheap: ``probe_proxy_health`` is a 5s-timeout sync GET;
+        it NEVER raises. If /health is not yet implemented on api.altidus.world
+        (Bravoh ops repo work — KAAN-ACTION-LEGAL.md §V7-PROXY) this returns
+        False perpetually and the recovery line never fires via the canary —
+        the next real LLM success (via _maybe_emit_proxy_recovery) is the
+        fallback.
+        """
+        if self._proxy_base_url is None or not self._proxy_unavailable:
+            return
+        if now_monotonic - self._last_proxy_health_probe < 60.0:
+            return
+        self._last_proxy_health_probe = now_monotonic
+        if probe_proxy_health(self._proxy_base_url):
+            self._maybe_emit_proxy_recovery()
 
     def _record_said(self, text: str, set_s_at_event: float | None = None) -> None:
         """Append a spoken line to the no-repeat memory, prefixed with the
@@ -1213,6 +1325,12 @@ class DJCoHostAgent(Agent):
         # state-changes, not chunk arrivals.
         last_cache_hit_emitted: int = 0
         # ---- end Plan 41-02 telemetry block ----
+        # ---- Plan 69-03 (OSS-02) — pre-call 60s /health canary -----------
+        # If the proxy fallback is armed, fire a single canary GET against
+        # /health every 60s. On 200, the recovery one-shot transcript line
+        # lands and the flag clears. NEVER raises (probe is best-effort).
+        self._check_proxy_health_canary(time.monotonic())
+        # ---- end Plan 69-03 canary ---------------------------------------
         try:
             if self._or_client is not None:
                 # 2026-05-21 — OpenRouter brain. Same ``contents`` (text +
@@ -1312,8 +1430,31 @@ class DJCoHostAgent(Agent):
                     # invalid.
                     yield txt
         except Exception as e:
+            # ---- Plan 69-03 (OSS-02) — proxy unavailable classification ---
+            # Classify the exception against the 4 documented trigger classes
+            # (5xx / timeout / connection_refused / bad_body). On match, arm
+            # the fallback flag + emit the one-shot "Co-host unavailable
+            # this session" transcript line; the LLM-turn skip is implicit
+            # (full_text stays "" → downstream silence-short-circuit fires
+            # naturally → no TTS, no playback). 4xx / 429 / programming
+            # errors fall through to the original [llm err] path so the
+            # existing per-error messaging surfaces unchanged.
+            _unavail = classify_proxy_error(e)
+            if _unavail is not None:
+                self._maybe_emit_proxy_unavailable(_unavail.reason)
+            # ---- end Plan 69-03 classification ----------------------------
             llm_err = repr(e)
             print(f"\n[llm err] {e}", file=sys.stderr)
+        else:
+            # ---- Plan 69-03 (OSS-02) — implicit recovery on next success --
+            # When the stream completed without raising AND the proxy
+            # fallback flag is currently armed, this is the "next real LLM
+            # call succeeded" recovery path (the second of two recovery
+            # triggers; the other is the 60s /health canary). One-shot
+            # guard means a duplicate emission is impossible.
+            if self._proxy_unavailable:
+                self._maybe_emit_proxy_recovery()
+            # ---- end Plan 69-03 recovery ----------------------------------
         # === end Plan 41-04 streaming pipe-through ===
 
         print()
