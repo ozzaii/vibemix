@@ -49,10 +49,12 @@ See: .planning/PROJECT.md (Current Milestone: v7.0 "Open House")
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 72 — Logged & Simulated (starting)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-24 — Milestone v8.0 started
+Status: P71 ✅ complete — starting P72
+Last activity: 2026-05-25 — v8.0 P71 "Land & Verify" SHIPPED: the in-flight live-tuning-or-brain work (device-capture fix + robust .env + loud connection_error surfacing + unified debug-log surface + tray-mood) landed in 3 atomic commits; suites green (pytest 4256 / vitest 804 / cargo 63). See .planning/phases/71-land-and-verify/SUMMARY.md.
+
+**v8.0 progress:** P71 ✅ · P72 🔵 (LOG-02/04 + SIM-01..03) · P73–P76 pending. Mode `gsd-autonomous fully` (goal: until v8 achieved). KAAN-ACTION carveouts ride forward (signatures, real-hardware ear-passes, signed-release publish GH-04 — never auto-fired).
 
 ## v7.0 Phase Map
 
