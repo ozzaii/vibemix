@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# docs/assets/MANIFEST.yaml — asset reproducibility manifest (GH-04).
+#
+# This manifest enumerates ONLY the assets that scripts/regenerate_assets.sh
+# regenerates from a tracked source. Each `assets:` entry is checked by the
+# asset-bitrot CI gate: re-running the regenerator must reproduce the committed
+# file byte-for-byte (or differ only by an intentional source edit).
+#
+# Assets that have their OWN generator (architecture.svg via
+# scripts/dist/render_architecture.py, screenshots/*.png via
+# docs/assets/screenshots/regen.sh) or that are hand-cut bespoke originals
+# (social-card.png, hero.png, the demo/readme placeholders) are listed under
+# `opt_out:` so the bitrot gate stays SCOPED, not global — it never fails on an
+# asset it is not responsible for regenerating.
+#
+# Schema (pinned by tests/repo/test_asset_manifest_shape.py):
+#   assets:  list of {path, source, sha256, generator}
+#            - path:      repo-relative output path (e.g. docs/assets/og-card.png)
+#            - source:    repo-relative source the asset is rendered from
+#            - sha256:    64-char lowercase hex of the committed output, or the
+#                         literal PENDING for a not-yet-generated asset
+#            - generator: the regenerate_assets.sh dispatch step that builds it
+#   opt_out: list of repo-relative paths the bitrot gate MUST NOT check
+#
+# Wave 0 (70P01) seeds this empty + opts out today's bespoke/foreign assets.
+# Wave 1 (70P02) appends the og-card entry to `assets:`.
+
+assets: []
+
+opt_out:
+  # Hand-cut bespoke originals (no source-derived regenerator — kept as-is per
+  # CONTEXT reconciliation option (a); social-card.png is og-card.png's hand-cut
+  # predecessor, superseded by the Wave 1 source-generated successor but retained).
+  - docs/assets/social-card.png
+  - docs/assets/hero.png
+  - docs/assets/demo-placeholder.gif
+  - docs/assets/readme-hero.png
+  - docs/assets/readme-hero.webm
+  # Foreign-generated — produced by their own generators, out of regenerate_assets.sh scope.
+  - docs/assets/architecture.svg            # scripts/dist/render_architecture.py
+  - docs/assets/screenshots/wizard.png      # docs/assets/screenshots/regen.sh
+  - docs/assets/screenshots/mode-picker.png # docs/assets/screenshots/regen.sh
+  - docs/assets/screenshots/voice-picker.png # docs/assets/screenshots/regen.sh
+  - docs/assets/screenshots/session.png     # docs/assets/screenshots/regen.sh
+  - docs/assets/screenshots/recordings.png  # docs/assets/screenshots/regen.sh
+  - docs/assets/controllers/hercules-inpulse-300.svg
+  - docs/assets/controllers/hercules-inpulse-500.svg
+  - docs/assets/controllers/numark-party-mix-live.svg
+  - docs/assets/controllers/pioneer-ddj-1000.svg
+  - docs/assets/controllers/pioneer-ddj-400.svg
+  - docs/assets/controllers/pioneer-ddj-flx10.svg
+  - docs/assets/controllers/pioneer-ddj-flx4.svg
+  - docs/assets/controllers/pioneer-ddj-flx6.svg
+  - docs/assets/controllers/pioneer-ddj-sx3.svg
+  - docs/assets/controllers/pioneer-xdj-rx3.svg
+  - docs/assets/dj-software/djay-pro.svg
+  - docs/assets/dj-software/mixxx.svg
+  - docs/assets/dj-software/rekordbox.svg
+  - docs/assets/dj-software/serato.svg
+  - docs/assets/dj-software/traktor.svg
+  - docs/assets/dj-software/virtualdj.svg
