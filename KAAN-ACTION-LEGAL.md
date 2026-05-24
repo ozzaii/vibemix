@@ -4122,6 +4122,69 @@ docstring and is Kaan-manual).
 
 **Sign-off:** ☐ pending · ☐ done — date: ____ · SHA: ____ · cycles completed: ____ / 3 · id(ControllerState) preserved across all: ____ (Y/N) · AI co-host felt alive: ____ (Y/N) · events.jsonl artifact: ____
 
+### §V7-LIVE-11 — BYO fresh-account walk
+
+**Tests (cluster size = 10 mock anti-rot rows + 1 live confirmation):**
+- `tests/repo/test_byo_doc_shape.py` (10 GREEN anti-rot rows pinning the
+  6 required sections + 2 env var names + the
+  `https://aistudio.google.com/apikey` URL — closes the engineering side
+  of P69 OSS-03; what stays Kaan-clock is the live fresh-account
+  confirmation)
+- live confirmation: walk `docs/byo-key.md` end-to-end on a fresh macOS
+  or Windows account (no prior vibemix install, no prior `GEMINI_API_KEY`
+  env var in shell history, no prior `~/.zshrc` lines from this project)
+
+**Why it can't ship green in CI alone:** No hosted GitHub runner carries
+a *fresh user account* free of vibemix dotfiles, prior `GEMINI_API_KEY`
+env vars, or prior `~/.zshrc` entries. The doc's load-bearing claim is
+that a stranger can follow it from `aistudio.google.com/apikey` →
+environment-variable export → `uv run python -m vibemix` → first AI
+co-host reply in under 5 minutes with no prior context. CI can verify
+the shape (`test_byo_doc_shape.py` does), but only a fresh-account walk
+verifies the felt-quality (does the doc actually *teach*, or does it
+just *list*?). Plan 69-02 closes the engineering side; the fresh-account
+walk is the felt-quality discharge.
+
+**Fix path:**
+```bash
+# 1. On a fresh macOS or Windows account (or a fresh user shell with
+#    `unset GEMINI_API_KEY VIBEMIX_LLM_MODE`):
+#    Open https://aistudio.google.com/apikey, create a Gemini API key,
+#    copy it.
+
+# 2. Follow docs/byo-key.md §"Set the env vars" exactly:
+export VIBEMIX_LLM_MODE=direct
+export GEMINI_API_KEY=<paste-key-here>
+
+# 3. Run the verify smoke from docs/byo-key.md §"Verify":
+uv run python -c "from google import genai; import os; c = genai.Client(api_key=os.environ['GEMINI_API_KEY']); print('OK')"
+
+# 4. Launch vibemix and confirm a real coach turn fires within 60s:
+uv run python -m vibemix
+
+# 5. Capture the walk-through (timestamps, pain points, doc fixes
+#    needed) into:
+#    docs/byo-key-walk.md
+```
+Note: if the verify smoke fails, file the failure as a Plan 69-02
+follow-on bug — the doc's load-bearing claim has rotted.
+
+**Owner-clock:** Kaan, or a trusted user (Francis Tural, Francesco)
+willing to test on a clean account. Expected wall-clock: 5-10 minutes
+if the doc is correct; longer if the doc misleads (which is itself a
+useful signal — file the friction back into Plan 69-02 as a doc fix).
+
+**Cross-reference:**
+- `docs/byo-key.md` (engineering-side artifact; Plan 69-02 Task 1)
+- `tests/repo/test_byo_doc_shape.py` (engineering-side gate; Plan
+  69-02 Task 2)
+- `src/vibemix/runtime/session_loop.py:842` (the actual
+  `VIBEMIX_LLM_MODE` branch the doc documents)
+- Overlaps §V7-LIVE-07 (Phase 68 DEV-05 contributor-recipe <30-min
+  smoke) — same felt-quality discharge pattern, different doc.
+
+**Sign-off:** ☐ pending · ☐ done — date: ____ · account type: ____ (fresh macOS / fresh Windows / friend's account) · wall-clock minutes: ____ · doc friction points captured in docs/byo-key-walk.md: ____ (Y/N)
+
 ### Discharge tracking
 
 | Cluster | Tests | Owner-clock | Sign-off |
@@ -4136,7 +4199,8 @@ docstring and is Kaan-manual).
 | §V7-LIVE-08 | 5 mock + 1 live (P68 DEV-04) | Kaan's Mac (BlackHole installed) | ☐ pending |
 | §V7-LIVE-09 | 2 mock + 1 live (P68 DEV-04) | Kaan's Win 11 VM (Parallels/UTM) | ☐ pending |
 | §V7-LIVE-10 | 3 mock parametrized + 1 live (P68 DEV-03) | Kaan's Mac + plugged FLX4 | ☐ pending |
-| **TOTAL** | **11 tests + 1 workflow + 1 recurring + 4 P68 live clusters** | | |
+| §V7-LIVE-11 | 10 doc-shape (P69 OSS-03) + 1 live fresh-account walk | Kaan or trusted user — fresh account | ☐ pending |
+| **TOTAL** | **11 tests + 1 workflow + 1 recurring + 4 P68 live clusters + 1 P69 doc-walk cluster** | | |
 
 ### Verification (engineering-side, always-green)
 
@@ -4164,6 +4228,7 @@ V7-LIVE-07 Controller-recipe <30-min smoke (DEV-05) on: _________   (date — Ka
 V7-LIVE-08 macOS BlackHole live capture (DEV-04)    on: _________   (date — Kaan, SHA ____)
 V7-LIVE-09 Windows WASAPI live capture (DEV-04)     on: _________   (date — Kaan, SHA ____)
 V7-LIVE-10 Live FLX4 plug/unplug ear (DEV-03)       on: _________   (date — Kaan, SHA ____, 3 cycles ____)
+V7-LIVE-11 BYO fresh-account walk (OSS-03)          on: _________   (date — Kaan or trusted user, account type ____, wall-clock ____ min, friction ____)
 Sign-off by:                                           _________   (Kaan)
 ```
 
