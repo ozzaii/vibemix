@@ -218,3 +218,44 @@ that Kaan / Francesco / Bravoh team must run themselves.
 - Bravoh team deploys `GET /vibemix/healthz` endpoint.
 - Issue `BRAVOH_UPDATE_TOKEN` for CI → upload at one-token-per-release rotation.
 - Mark `done` here when all 3 endpoints respond 200 OK on smoke check.
+
+---
+
+## v7.0 / v8.0 external-clock discharge surface (added v8.0 P73)
+
+> Added to close `ALL-MILESTONES-DEEP-AUDIT.md` finding #4: many planning docs
+> (PROJECT.md, ROADMAP.md, REQUIREMENTS.md, the v7.0/v8.0 phase artifacts) cite
+> `KAAN-ACTION-LEGAL.md §SHIP-V4` and `§V7-LIVE-*`, but no literal anchor lived
+> here. This section is that anchor. **All items below are gated on the external
+> signature clock or real hardware — they NEVER block `gsd-autonomous` work.**
+
+### §SHIP-V4 — public signed-release publish (HARD external clock)
+- **Blocked on:** Apple Developer Agreement update (Francesco) + SignPath OSS
+  Foundation certificate (Kaan, ~1-week SLA). Until both land, this cannot fire.
+- **Runbook:** `cut_release.sh --dry-run v0.1.0-rc1` already exits GREEN
+  (everything-but-the-signature ready; the publish hard-guard is regression-
+  pinned and NEVER auto-runs `gh release create`). When signatures land:
+  `bash scripts/release/cut_release.sh v0.1.0-rc1` → review the draft →
+  `gh release create` as documented in the script. This is v8.0 **GH-04** and
+  closes v4.0 "SHIP" alongside.
+- **Do NOT auto-fire.** v8.0 pushes code to GitHub (GH-01..03) but explicitly
+  leaves the signed public release + the 5-channel social publish to Kaan.
+
+### §V7-LIVE-01..11 — live-hardware ear-passes (real-hardware clock)
+- Real BlackHole on a hosted/fresh Mac (§V7-LIVE-01/08), Windows 11 WASAPI
+  desktop (§V7-LIVE-09), real DDJ-FLX4 over USB hot-plug + "moves register" ear
+  (§V7-LIVE-10), live full-stack wizard bind (§V7-LIVE-04), first-CI-green
+  observation (§V7-LIVE-05), recurring re-baseline (§V7-LIVE-06), and the
+  controller-recipe <30-min smoke (§V7-LIVE-07). CI-mocked tests pass today;
+  these confirm on real hardware on Kaan's clock.
+- **v8.0 software stand-in:** `scripts/sim/simulate_session.py` (P72) exercises
+  these paths headlessly with synthetic device + FLX4 fixtures + the offline
+  reaction harness — the deterministic proxy until the hardware ear-passes run.
+
+### §RECALL-EAR / §V7-PROXY / §V7-LANDING / §ASSETS-DEMO-CUT (ride forward)
+- §RECALL-EAR: `VIBEMIX_RECALL_ENABLED=1` flip after Kaan's memory-callback
+  felt-quality pass (independent clock).
+- §V7-PROXY: Bravoh server-side proxy hardening lives in the out-of-tree
+  `api.altidus.world` ops repo.
+- §V7-LANDING: GitHub Pages live + Kaan-felt aesthetic sign-off + real waitlist
+  URL. §ASSETS-DEMO-CUT: the real 30-sec demo film (Francesco capture day).

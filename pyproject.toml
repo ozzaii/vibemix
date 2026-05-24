@@ -71,12 +71,12 @@ dependencies = [
     # verifies the binary never lands in dist/. See tests/library/
     # test_pyrekordbox_install.py for the sys.modules dormancy gate.
     #
-    # sqlite-vec architectural slot — bundled, NOT exercised in v2.0
-    # (LIBRARY-08 + CONTEXT D-08). v2.0 ships text-match lookup only;
-    # Gemini Embedding 2 audio space + sqlite-vec ANN search ships v2.1.
-    # The pyproject.toml entry is intentionally OMITTED until v2.1 — the
-    # STATE.md STACK.md slot reservation is the architectural commitment;
-    # shipping the dep lean in v2.0 stays under the 350 MB bundle cap.
+    # sqlite-vec — SHIPPED and exercised (library vibe-search v2.1; memory
+    # store v6.0). Historical note: it began as a v2.0 architectural slot
+    # (LIBRARY-08 + CONTEXT D-08, text-match only) with the dep deliberately
+    # omitted to stay under the bundle cap; that reservation was realised in
+    # v2.1+ and sqlite-vec is now a declared runtime dependency. (Corrected
+    # v8.0 P73 — the old "NOT exercised / ships v2.1" wording was doc-drift.)
     # Phase 8: mss is win32-only now. macOS uses ScreenCaptureKit (pyobjc-
     # framework-ScreenCaptureKit, added below); the deprecated
     # ``CGWindowListCreateImageFromArray`` path that mss wraps is obsolete

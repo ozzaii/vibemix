@@ -463,7 +463,10 @@ class DJCoHostAgent(Agent):
         # compat for tests that don't drive the meter. When non-None,
         # set_next_event records the event-fired timestamp and llm_node
         # records the first non-empty stream chunk timestamp; the rolling
-        # average feeds AckBank.should_fire(rolling_ttft_avg_ms=...).
+        # average is exposed as live latency telemetry. (Historically it also
+        # fed AckBank.should_fire(); the ack-bank was retired 2026-05-19 —
+        # strip-to-silence replaced pre-canned acks — so this meter is now
+        # telemetry-only.)
         self._ttft_meter: TTFTMeter | None = ttft_meter
         # Plan 41-04 / LAT-04 — per-turn (event_fired → first_sentence
         # _yielded) delta meter. Always-on (unlike _ttft_meter which is

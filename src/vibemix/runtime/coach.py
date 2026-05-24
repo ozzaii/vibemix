@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """coach_loop — verbatim port of cohost_v4.py:1754-1852, with the
-post-ack_bank latency-stack wiring (CancelGate + TTFTMeter + PlaybackQueue)
-and Plan 20-04 periodic ipc.session.citation publish to the Tauri Settings →
-Diagnostics surface (GROUND-06 anti-slop telemetry channel).
+latency-stack wiring that replaced the retired ack-bank (CancelGate +
+TTFTMeter + PlaybackQueue; the ack-bank was deleted 2026-05-19 — strip-to-
+silence replaced pre-canned acks) and Plan 20-04 periodic ipc.session.citation
+publish to the Tauri Settings → Diagnostics surface (GROUND-06 anti-slop
+telemetry channel).
 
 Polls MusicState for events at 10Hz, fires AI reactions via
 ``session.generate_reply``. Single-in-flight enforcement (stale-clear at
