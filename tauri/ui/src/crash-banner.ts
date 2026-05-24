@@ -38,12 +38,21 @@ let bannerEls: {
   restartBtn: HTMLButtonElement;
 } | null = null;
 
-function reasonMessage(reason: string | undefined, fallback: string): string {
+// Exported for unit testing (tests/crash-banner.spec.ts) — a pure
+// reason→message map, so the actionable guidance for each fatal sentinel is
+// pinned independently of the DOM wiring.
+export function reasonMessage(reason: string | undefined, fallback: string): string {
   switch (reason) {
     case "port-in-use":
       return "Another vibemix is already running. Quit it (Cmd+Q) and try again.";
     case "audio-device-missing":
       return "BlackHole 2ch audio driver isn't installed. Run `brew install blackhole-2ch` or visit existential.audio/blackhole.";
+    case "api-key-missing":
+      // Exit-4 sentinel (src/vibemix/__main__.py — the #1 "co-host never
+      // speaks" cause: a bundled launch can't find its key). Mirror the
+      // Python [FATAL] guidance so the UI gives the SAME actionable fix the
+      // stderr banner does, instead of a generic "crashed" line.
+      return "vibemix needs a Gemini API key to talk. Add GEMINI_API_KEY to your .env (dev) or to ~/Library/Application Support/vibemix/.env (installed app), then restart.";
     case "session-mount-failed":
       return fallback || "Session UI failed to mount.";
     case "ws-unreachable":
