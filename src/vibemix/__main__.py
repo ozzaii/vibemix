@@ -1358,6 +1358,24 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_embed_folder.set_defaults(func=_cmd_library_embed_folder)
 
+    # Viber Agent Phase 1 — theme → curated playlist (M3U/JSON)
+    sp_curate = sub.add_parser(
+        "curate",
+        help="Curate a playlist from a theme with the Viber agent",
+        description=(
+            "Bounded Gemini function-calling agent. It vibe-searches YOUR "
+            "library for the theme and writes a neutral M3U/JSON playlist to "
+            "~/.cache/vibemix/playlists/. Every track is grounded — the agent "
+            "can only use tracks search returned, never invented ones."
+        ),
+    )
+    sp_curate.add_argument("theme", help="natural-language playlist theme")
+    sp_curate.add_argument(
+        "--name", default=None, help="playlist name (default: derived from theme)"
+    )
+    sp_curate.add_argument("--json", action="store_true")
+    sp_curate.set_defaults(func=_cmd_library_curate)
+
     # Plan 28-08 — budget telemetry + projection
     sp_budget = sub.add_parser(
         "budget", help="Show monthly Gemini Embedding cost projection"
@@ -1510,6 +1528,68 @@ def _cmd_library_similar(args: argparse.Namespace) -> int:
         indent=2,
     )
     sys.stdout.write("\n")
+    return 0
+
+
+def _cmd_library_curate(args: argparse.Namespace) -> int:
+    """Viber Agent Phase 1 — theme → curated playlist (M3U/JSON)."""
+    import json as _json
+
+    from vibemix.library import (
+        LibraryEmbedder,
+        RekordboxLibrary,
+        ViberAgent,
+        open_store,
+    )
+
+    client, err = _library_genai_client()
+    if err is not None:
+        print(_json.dumps(err), file=sys.stderr)
+        return 1
+
+    lib = RekordboxLibrary()
+    if not lib.try_load_cache():
+        print(
+            _json.dumps(
+                {
+                    "error": (
+                        "No library cache. Drag a Rekordbox XML onto "
+                        "Settings → Library (or run `library embed-folder`) first."
+                    ),
+                    "playlist": None,
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    embedder = LibraryEmbedder(client)
+    store = open_store()
+    try:
+        agent = ViberAgent(client, embedder, store, lib)
+        result = agent.curate(args.theme)
+        # The agent names the playlist via the tool call; --name is advisory
+        # and only surfaces in human output (the model picks the persisted name).
+    finally:
+        store.close()
+
+    out = result.to_dict()
+    if result.playlist is None:
+        print(_json.dumps(out, indent=2), file=sys.stderr)
+        print(
+            f"[viber] no playlist created (stop_reason={result.stop_reason})",
+            file=sys.stderr,
+        )
+        return 1
+
+    _json.dump(out, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    pl = result.playlist
+    print(
+        f"-> playlist '{pl.name}' ({len(pl.track_ids)} tracks) "
+        f"saved: {pl.m3u_path}",
+        file=sys.stderr,
+    )
     return 0
 
 

@@ -37,6 +37,7 @@ _ROUTES: dict[str, tuple[str, ServiceTier | None]] = {
     "debrief": ("gemini-3-pro-preview", ServiceTier.FLEX),
     "debrief_tts": ("gemini-3-flash-tts-preview", ServiceTier.FLEX),
     "library_auto_tag": ("gemini-3-flash-preview", ServiceTier.FLEX),
+    "library_agent": ("gemini-3-flash-preview", ServiceTier.FLEX),
     "embedding": ("gemini-embedding-2", ServiceTier.FLEX),
 }
 

@@ -11,6 +11,12 @@ Public surface:
 """
 
 from vibemix.library._cosine import EMBEDDING_DIM, cosine_topk, l2_normalize
+from vibemix.library.agent import CurateResult, ViberAgent
+from vibemix.library.create_playlist import (
+    PLAYLISTS_DIR,
+    PlaylistResult,
+    create_playlist,
+)
 from vibemix.library.embed import (
     CUE_ANCHORED_STRATEGY_VERSION,
     DEFAULT_EMBED_STRATEGY,
@@ -73,6 +79,11 @@ __all__ = [
     "Citation",
     "CostProjection",
     "CuePoint",
+    "CurateResult",
+    "PLAYLISTS_DIR",
+    "PlaylistResult",
+    "ViberAgent",
+    "create_playlist",
     "DEFAULT_EMBED_STRATEGY",
     "EMBED_STRATEGIES",
     "EMBEDDING_DIM",
