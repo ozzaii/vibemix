@@ -76,10 +76,10 @@ Single packaged app under `src/vibemix/`. Entry point: `python -m vibemix` → `
 - `agent/` — LiveKit `RealtimeModel` session + the Gemini reaction path (`dj_cohost.py`).
 - `llm/` — `model_router.py` (config-driven model resolution, no hardcoded literals) + `thinking_gate.py`.
 - `coach/`, `prompts/`, `profile/` — persona/prompt templates per user level; long-term DJ profile.
-- `library/` — Gemini-embedding + sqlite-vec vibe search (macOS sqlite-vec / Windows numpy, bit-identical top-K parity). **State on disk** under `~/.cache/vibemix/`: `library.db` (sqlite-vec vectors), `embeddings.db` (content-hash embed cache), `library.pkl` (track-title cache), `library_centroid.npy` (cached query centroid, auto-recomputed on store change). **Gotcha:** library/rekordbox tests MUST monkeypatch `RekordboxLibrary.CACHE_PATH` to a tmp dir, or they overwrite the real `library.pkl`.
+- `library/` — Gemini-embedding (1536-dim) + sqlite-vec vibe search (macOS sqlite-vec / Windows numpy, bit-identical top-K parity); also home to `next_suggestion.py` (the pill's mean-centered "what's next" engine, grounded by Invariant #2) and the Viber curator core (`toolset.py`/`agent.py`/`codex_curate.py`/`mcp_server.py`/`telegram_bridge.py`). **State on disk** under `~/.cache/vibemix/`: `library.db` (sqlite-vec vectors), `embeddings.db` (content-hash embed cache), `library.pkl` (track-title cache), `library_centroid.npy` (cached query centroid, auto-recomputed on store change). **Gotcha:** library/rekordbox tests MUST monkeypatch `RekordboxLibrary.CACHE_PATH` to a tmp dir, or they overwrite the real `library.pkl`.
 - `memory/` — local `memory.db` copilot store (sqlite-vec); gated behind `VIBEMIX_RECALL_ENABLED` (default off).
 - `debrief/` — post-session review UI (second Tauri window, port 8766).
-- `events/`, `midi/` (10-controller `profiles/` — the single-source catalog), `install/`, `ui_bus/`, `runtime/` (`ws_bus`, `wizard`, `session_loop`, `soak`, `ttft`, recordings index).
+- `events/`, `midi/` (10-controller `profiles/` — the single-source catalog), `install/`, `ui_bus/`, `runtime/` (`ws_bus`, `wizard`, `session_loop`, `soak`, `ttft`, recordings index, `suggestion.py` = the pill's `SuggestionService`).
 
 ### Cardinal invariants (test-enforced — do not break)
 1. **Single-writer** — only the state-refresh loop writes `MusicState`; everything else reads.
@@ -146,7 +146,7 @@ Opt-in markers (default run skips them): `-m macos_audio`, `-m windows_only`, `-
 uv run python -m vibemix library embed-folder "<dir>" [--strategy mean_excerpt|cue_anchored]  # walk+embed a folder, no Rekordbox XML needed
 uv run python -m vibemix library search "<text vibe>" [-k N]      # text→tracks (cross-modal)
 uv run python -m vibemix library similar "<track_id|file path>"   # track→similar
-uv run python -m vibemix library curate "<theme>" [--backend gemini|codex]  # Viber agent → grounded M3U/JSON playlist (docs/codex-agent.md)
+uv run python -m vibemix library curate "<theme>" [--interactive] [--backend gemini|codex]  # Viber agent → grounded M3U/JSON playlist; --interactive = agent asks→builds (docs/codex-agent.md)
 uv run python -m vibemix library telegram                         # Viber mobile surface — long-poll bot, curate from your phone
 uv run python -m vibemix library budget --json                    # offline cost telemetry
 ```
@@ -163,7 +163,7 @@ Embeds need `GEMINI_API_KEY` (client picks direct key first, else proxy JWT). em
 
 ## Planning Home
 
-`.planning/` is the GSD source of truth — `ROADMAP.md`, `REQUIREMENTS.md`, `PROJECT.md`, `STATE.md`, plus `codebase/*.md` (codebase maps) and `research/*.md` (pre-roadmap research). The codebase maps in `.planning/codebase/` feed the GSD-managed sections of this file. `MILESTONES.md` tracks shipped milestones (v0.1.0 → v7.0 "Open House" shipped 2026-05-24; phases run continuously, currently 70+).
+`.planning/` is the GSD source of truth — `ROADMAP.md`, `REQUIREMENTS.md`, `PROJECT.md`, `STATE.md`, plus `codebase/*.md` (codebase maps) and `research/*.md` (pre-roadmap research). The codebase maps in `.planning/codebase/` feed the GSD-managed sections of this file. `MILESTONES.md` tracks shipped milestones (v0.1.0 → v8.0 "Proof & Polish" shipped 2026-05-25; phases run continuously, currently 76+).
 
 When a phase is active, its planning artifacts live under `.planning/phases/<NN>-<slug>/` (CONTEXT.md, RESEARCH.md, PLAN.md, etc.). Read those before touching code on that phase.
 
