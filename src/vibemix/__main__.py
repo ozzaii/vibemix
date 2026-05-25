@@ -1373,6 +1373,16 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_curate.add_argument(
         "--name", default=None, help="playlist name (default: derived from theme)"
     )
+    sp_curate.add_argument(
+        "--backend",
+        choices=("gemini", "codex"),
+        default="gemini",
+        help=(
+            "reasoning backend: 'gemini' (built-in fn-calling, default) or "
+            "'codex' (your flat-rate ChatGPT sub via `codex exec` + MCP; "
+            "needs `codex login`)"
+        ),
+    )
     sp_curate.add_argument("--json", action="store_true")
     sp_curate.set_defaults(func=_cmd_library_curate)
 
@@ -1532,21 +1542,19 @@ def _cmd_library_similar(args: argparse.Namespace) -> int:
 
 
 def _cmd_library_curate(args: argparse.Namespace) -> int:
-    """Viber Agent Phase 1 — theme → curated playlist (M3U/JSON)."""
+    """Viber Agent Phase 1 — theme → curated playlist (M3U/JSON).
+
+    Two reasoning backends, one grounded tool surface (LibraryToolset):
+    ``gemini`` (built-in function-calling) or ``codex`` (the user's flat-rate
+    ChatGPT sub via ``codex exec`` + the MCP server). Both can only emit tracks
+    that search returned — grounding is enforced at the tool boundary.
+    """
     import json as _json
 
-    from vibemix.library import (
-        LibraryEmbedder,
-        RekordboxLibrary,
-        ViberAgent,
-        open_store,
-    )
+    from vibemix.library import RekordboxLibrary
 
-    client, err = _library_genai_client()
-    if err is not None:
-        print(_json.dumps(err), file=sys.stderr)
-        return 1
-
+    # The library cache is needed by both backends (Gemini agent reads it
+    # directly; Codex uses it for result-boundary grounding re-validation).
     lib = RekordboxLibrary()
     if not lib.try_load_cache():
         print(
@@ -1561,6 +1569,16 @@ def _cmd_library_curate(args: argparse.Namespace) -> int:
             ),
             file=sys.stderr,
         )
+        return 1
+
+    if getattr(args, "backend", "gemini") == "codex":
+        return _cmd_library_curate_codex(args, lib)
+
+    from vibemix.library import LibraryEmbedder, ViberAgent, open_store
+
+    client, err = _library_genai_client()
+    if err is not None:
+        print(_json.dumps(err), file=sys.stderr)
         return 1
 
     embedder = LibraryEmbedder(client)
@@ -1588,6 +1606,44 @@ def _cmd_library_curate(args: argparse.Namespace) -> int:
     print(
         f"-> playlist '{pl.name}' ({len(pl.track_ids)} tracks) "
         f"saved: {pl.m3u_path}",
+        file=sys.stderr,
+    )
+    return 0
+
+
+def _cmd_library_curate_codex(args: argparse.Namespace, lib) -> int:
+    """Codex backend for `library curate` — spawn `codex exec` + MCP server.
+
+    No genai client needed here: Codex talks to the MCP server (which holds the
+    embedder/store). We pass the loaded library only for result-boundary
+    grounding re-validation.
+    """
+    import json as _json
+
+    from vibemix.library.codex_curate import curate_with_codex
+
+    result = curate_with_codex(args.theme, lib, name=args.name)
+    out = result.to_dict()
+
+    if result.stop_reason != "created":
+        print(_json.dumps(out, indent=2), file=sys.stderr)
+        hint = {
+            "codex_not_installed": (
+                "Install Codex: `npm i -g @openai/codex` (or `brew install "
+                "codex`), then `codex login`."
+            ),
+            "codex_auth_required": "Run `codex login` to connect your ChatGPT plan.",
+            "timeout": "Codex took too long — try a narrower theme.",
+        }.get(result.stop_reason, result.error or "no playlist created")
+        print(f"[viber/codex] {result.stop_reason}: {hint}", file=sys.stderr)
+        return 1
+
+    _json.dump(out, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    where = result.m3u_path or "~/.cache/vibemix/playlists/"
+    print(
+        f"-> playlist '{result.playlist_name}' ({len(result.track_ids)} tracks) "
+        f"via Codex saved: {where}",
         file=sys.stderr,
     )
     return 0

@@ -80,8 +80,9 @@ def test_router_path_error_is_keyerror_subclass() -> None:
 def test_router_paths_is_frozen_tuple() -> None:
     """ROUTER_PATHS is a tuple (not list) — defensive against mutation."""
     assert isinstance(ROUTER_PATHS, tuple)
-    # The router-paths table in 41-01-PLAN.md ships 8 keys.
-    assert len(ROUTER_PATHS) == 8
+    # The router-paths table in 41-01-PLAN.md shipped 8 keys; the Viber agent
+    # (2026-05-25) added `library_agent` → 9.
+    assert len(ROUTER_PATHS) == 9
     expected = {
         "live_coach",
         "live_coach_tts",
@@ -90,6 +91,7 @@ def test_router_paths_is_frozen_tuple() -> None:
         "debrief",
         "debrief_tts",
         "library_auto_tag",
+        "library_agent",
         "embedding",
     }
     assert set(ROUTER_PATHS) == expected

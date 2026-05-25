@@ -29,20 +29,18 @@ Design contract (see ``/tmp/audit/agent-harness-design.md`` §6 Phase 1):
 from __future__ import annotations
 
 import concurrent.futures
-import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from google.genai import types
 
-from vibemix.library.create_playlist import PlaylistResult, create_playlist
+from vibemix.library.create_playlist import PlaylistResult
 from vibemix.library.embed import LibraryEmbedder
 from vibemix.library.rekordbox import RekordboxLibrary
-from vibemix.library.search import vibe_search
 from vibemix.library.store import LibraryStore
+from vibemix.library.toolset import LibraryToolset
 from vibemix.llm import model_router
-from vibemix.state import harmonics
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +48,9 @@ logger = logging.getLogger(__name__)
 # search → (optional feature peeks) → create_playlist — yet hard-caps a model
 # that loops. One create_playlist per run is enforced by exiting on the first.
 MAX_TOOL_ITERATIONS = 12
-# Hard wall-clock per Gemini call and per tool call. A hung network or a
-# pathological handler can never park the loop past these.
+# Hard wall-clock per Gemini call. A hung network can never park the loop.
+# (Per-tool timeout lives in LibraryToolset.dispatch.)
 GEMINI_CALL_TIMEOUT_S = 60.0
-TOOL_CALL_TIMEOUT_S = 30.0
 
 _SYSTEM_INSTRUCTION = (
     "You are Viber, a DJ's crate-digging co-pilot. Build a playlist from the "
@@ -178,122 +175,24 @@ class ViberAgent:
         model: str | None = None,
     ) -> None:
         self._client = client
-        self._embedder = embedder
-        self._store = store
-        self._library = library
         # Resolve the model through the router — never a hardcoded literal.
         self._model = model or model_router.resolve("library_agent")[0]
-        # The grounding spine: ids any search_vibe returned THIS run.
-        self._seen: set[str] = set()
-        self._created: PlaylistResult | None = None
+        # The grounded tool core (handlers + seen-set gate + per-tool timeout),
+        # shared verbatim with the Codex MCP server so grounding never drifts.
+        self._toolset = LibraryToolset(embedder, store, library)
 
-    # -- tool handlers (RETURN error strings, never raise) ------------------ #
+    # -- grounding state lives on the shared toolset ------------------------ #
 
-    def _tool_search_vibe(self, args: dict[str, Any]) -> dict[str, Any]:
-        query = args.get("query")
-        if not isinstance(query, str) or not query.strip():
-            return {"error": "search_vibe: 'query' must be a non-empty string"}
-        k = args.get("k", 15)
-        try:
-            k = int(k)
-        except (TypeError, ValueError):
-            k = 15
-        k = max(1, min(50, k))
-        try:
-            results, _cache_hit = vibe_search(
-                self._embedder, self._store, self._library, query, k=k
-            )
-        except Exception as e:  # noqa: BLE001 — handler must not raise
-            logger.warning("[viber] search_vibe failed: %s", e)
-            return {"error": f"search_vibe failed: {type(e).__name__}"}
-        for r in results:
-            self._seen.add(r.track_id)
-        return {
-            "results": [
-                {
-                    "track_id": r.track_id,
-                    "title": r.title,
-                    "artist": r.artist,
-                    "bpm": r.bpm,
-                    "confidence": r.confidence,
-                }
-                for r in results
-            ]
-        }
+    @property
+    def _seen(self) -> set[str]:
+        return self._toolset.seen
 
-    def _tool_get_track_features(self, args: dict[str, Any]) -> dict[str, Any]:
-        track_id = args.get("track_id")
-        if not isinstance(track_id, str) or not track_id:
-            return {"error": "get_track_features: 'track_id' must be a string"}
-        entry = self._library.lookup_by_id(track_id)
-        if entry is None:
-            return {"error": f"unknown track_id {track_id!r}"}
-        # Camelot is deterministic — harmonics.to_camelot, never LLM-computed.
-        camelot = harmonics.to_camelot(entry.key) if entry.key else None
-        return {
-            "track_id": entry.track_id,
-            "title": entry.title,
-            "artist": entry.artist,
-            "bpm": entry.bpm if (entry.bpm and entry.bpm > 0) else None,
-            "key": camelot,  # honest null when unrecognized/absent
-            "duration_s": entry.duration_s or None,
-            "genre": None,  # library genre is best-effort only (Phase 1: null)
-        }
-
-    def _tool_create_playlist(self, args: dict[str, Any]) -> dict[str, Any]:
-        name = args.get("name")
-        track_ids = args.get("track_ids")
-        if not isinstance(name, str) or not name.strip():
-            return {"error": "create_playlist: 'name' must be a non-empty string"}
-        if not isinstance(track_ids, list) or not track_ids:
-            return {"error": "create_playlist: 'track_ids' must be a non-empty list"}
-        # GROUNDING gate #1: every id must be in this run's seen-set. An id the
-        # model produced without a prior search_vibe is a hallucination —
-        # reject the whole call so it cannot smuggle one in.
-        invented = [
-            t for t in track_ids if not (isinstance(t, str) and t in self._seen)
-        ]
-        if invented:
-            return {
-                "error": (
-                    "rejected: these track_ids were never returned by "
-                    f"search_vibe this run (invented): {invented}. Only use "
-                    "ids from a search_vibe result."
-                )
-            }
-        try:
-            result = create_playlist(self._library, name, track_ids)
-        except Exception as e:  # noqa: BLE001 — handler must not raise
-            logger.warning("[viber] create_playlist failed: %s", e)
-            return {"error": f"create_playlist failed: {type(e).__name__}"}
-        self._created = result
-        return {
-            "created": True,
-            "name": result.name,
-            "track_count": len(result.track_ids),
-            "m3u_path": str(result.m3u_path),
-            "json_path": str(result.json_path),
-            "dropped_ids": result.dropped_ids,
-        }
+    @property
+    def _created(self) -> PlaylistResult | None:
+        return self._toolset.created
 
     def _dispatch(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
-        handlers: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
-            "search_vibe": self._tool_search_vibe,
-            "get_track_features": self._tool_get_track_features,
-            "create_playlist": self._tool_create_playlist,
-        }
-        handler = handlers.get(name)
-        if handler is None:
-            return {"error": f"unknown tool {name!r}"}
-        # Hard per-tool timeout — a pathological handler can never park the loop.
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-            fut = ex.submit(handler, args)
-            try:
-                return fut.result(timeout=TOOL_CALL_TIMEOUT_S)
-            except concurrent.futures.TimeoutError:
-                return {"error": f"tool {name!r} timed out"}
-            except Exception as e:  # noqa: BLE001 — defensive; handlers return errors
-                return {"error": f"tool {name!r} crashed: {type(e).__name__}"}
+        return self._toolset.dispatch(name, args)
 
     def _gemini_call(self, contents: list[types.Content], cfg: dict[str, Any]):
         """One generate_content call under a hard wall-clock timeout."""
@@ -369,14 +268,12 @@ class ViberAgent:
             # Loop exhausted MAX_TOOL_ITERATIONS without breaking.
             stop_reason = "max_iters"
 
-        # Normalize: stop_reason reflects reality. A playlist was either
-        # created or it wasn't.
+        # Normalize: stop_reason reflects reality. self._created (set only by
+        # a successful create_playlist) is the single source of truth — if a
+        # playlist exists the run "created" one, otherwise keep whatever the
+        # loop decided (model_done / max_iters).
         if self._created is not None:
             stop_reason = "created"
-        elif stop_reason == "model_done":
-            stop_reason = "model_done"  # model stopped talking, no playlist
-        elif stop_reason == "created":  # defensive: never created but flagged
-            stop_reason = "no_create"
 
         return CurateResult(
             theme=theme,

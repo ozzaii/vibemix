@@ -116,6 +116,13 @@ dependencies = [
     # tracks the latest beta until Microsoft graduates to 1.0.0.
     "winsdk>=1.0.0b10 ; sys_platform == 'win32'",
     "sqlite-vec>=0.1.9",
+    # Viber Agent — Codex backend. The MCP SDK (FastMCP) exposes the 3 grounded
+    # library tools (search_vibe / get_track_features / create_playlist) over
+    # STDIO to the native Codex CLI (`codex exec`, provider: openai-codex — the
+    # Hermes pattern). Pure-Python, no native build → green on the one-click-
+    # install bar. Only the OPTIONAL playlist-curation agent needs it; the live
+    # co-host never imports it.
+    "mcp>=1.2.0",
 ]
 
 [project.urls]

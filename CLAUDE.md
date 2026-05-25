@@ -146,8 +146,11 @@ Opt-in markers (default run skips them): `-m macos_audio`, `-m windows_only`, `-
 uv run python -m vibemix library embed-folder "<dir>" [--strategy mean_excerpt|cue_anchored]  # walk+embed a folder, no Rekordbox XML needed
 uv run python -m vibemix library search "<text vibe>" [-k N]      # text→tracks (cross-modal)
 uv run python -m vibemix library similar "<track_id|file path>"   # track→similar
+uv run python -m vibemix library curate "<theme>" [--backend gemini|codex]  # Viber agent → grounded M3U/JSON playlist (docs/codex-agent.md)
 uv run python -m vibemix library budget --json                    # offline cost telemetry
 ```
+
+The Viber agent (`library/toolset.py` = shared grounded tool core) has two backends: `gemini` (built-in fn-calling, default) and `codex` (BYO ChatGPT-sub via `codex exec` + `library/mcp_server.py` MCP STDIO server — needs `codex login`). Grounding (seen-set + library re-validation) is identical across both. Codex is NOT bundled; `--backend codex` fails actionably when absent.
 
 Embeds need `GEMINI_API_KEY` (client picks direct key first, else proxy JWT). embed-folder is resumable: a content-hash cache skips already-embedded files for free, and per-file errors are logged + skipped, never fatal. Ranking is mean-centered by default (anisotropy fix) — query-side only, persisted vectors untouched.
 

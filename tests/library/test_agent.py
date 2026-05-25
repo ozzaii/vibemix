@@ -93,7 +93,7 @@ def test_loop_runs_and_emits_playlist(
 ):
     """Happy path: search_vibe → create_playlist → a real playlist file."""
     # Stub vibe_search so no embedder/store/network is exercised.
-    from vibemix.library import agent as agent_mod
+    from vibemix.library import toolset as tool_mod
 
     real_ids = ["t000", "t001", "t002"]
 
@@ -110,10 +110,10 @@ def test_loop_runs_and_emits_playlist(
         ]
         return results, False
 
-    monkeypatch.setattr(agent_mod, "vibe_search", fake_vibe_search)
+    monkeypatch.setattr(tool_mod, "vibe_search", fake_vibe_search)
     # Persist playlists into tmp_path, not the user cache.
     monkeypatch.setattr(
-        agent_mod,
+        tool_mod,
         "create_playlist",
         lambda lib, name, ids: create_playlist(
             lib, name, ids, out_dir=tmp_path
@@ -145,7 +145,7 @@ def test_grounding_rejects_invented_track_id(
     """An id never returned by search_vibe is rejected — the agent cannot
     smuggle in a hallucinated track. After the rejection it recovers and
     creates a playlist from only-real ids."""
-    from vibemix.library import agent as agent_mod
+    from vibemix.library import toolset as tool_mod
 
     def fake_vibe_search(emb, st, lib, query, k=15):
         return (
@@ -161,9 +161,9 @@ def test_grounding_rejects_invented_track_id(
             False,
         )
 
-    monkeypatch.setattr(agent_mod, "vibe_search", fake_vibe_search)
+    monkeypatch.setattr(tool_mod, "vibe_search", fake_vibe_search)
     monkeypatch.setattr(
-        agent_mod,
+        tool_mod,
         "create_playlist",
         lambda lib, name, ids: create_playlist(lib, name, ids, out_dir=tmp_path),
     )
@@ -217,10 +217,10 @@ def test_bounded_loop_terminates_at_max_iters(
 ):
     """A model that never calls create_playlist must still terminate at the
     iteration cap — the loop never wedges."""
-    from vibemix.library import agent as agent_mod
+    from vibemix.library import toolset as tool_mod
 
     monkeypatch.setattr(
-        agent_mod,
+        tool_mod,
         "vibe_search",
         lambda *a, **k: (
             [
@@ -258,10 +258,10 @@ def test_tool_handler_returns_error_not_raise(
     """A bad arg makes a tool handler RETURN an error dict (the loop keeps
     going), never raise. We assert via the dispatcher directly + via a run
     where the model recovers."""
-    from vibemix.library import agent as agent_mod
+    from vibemix.library import toolset as tool_mod
 
     monkeypatch.setattr(
-        agent_mod,
+        tool_mod,
         "create_playlist",
         lambda lib, name, ids: create_playlist(lib, name, ids, out_dir=tmp_path),
     )
