@@ -812,7 +812,16 @@ class LibraryEmbedder:
         if row is None:
             return None
         blob = row[0]
-        return np.frombuffer(blob, dtype=np.float32).copy()
+        vec = np.frombuffer(blob, dtype=np.float32).copy()
+        # Dim guard: the content-hash key does not encode EMBEDDING_DIM, so a
+        # cache row written at a different dim (e.g. a 768→1536 bump without
+        # clearing embed_cache) would otherwise be returned and crash the
+        # fail-loud dim asserts downstream. Treat a wrong-dim row as a clean
+        # MISS → lazy re-embed at the current dim. Correct-dim rows still hit,
+        # so an in-progress 1536 run stays fully resumable for free.
+        if vec.shape[0] != EMBEDDING_DIM:
+            return None
+        return vec
 
     def _cache_put(self, key: str, vector: np.ndarray) -> None:
         import time as _time
