@@ -64,6 +64,9 @@ from vibemix.agent import (
     get_or_create_install_uuid,
     get_or_refresh_jwt,
 )
+# Re-exported for test_main_smoke SMOKE-07 (asserts __main__ surfaces the
+# persona cell symbol) — not referenced in code here, so noqa the F401.
+from vibemix.agent import SYSTEM_INSTRUCTION  # noqa: F401
 from vibemix.agent.cache import GeminiContextCache
 from vibemix.coach import (
     STRIPPED_RATE_THRESHOLD,
