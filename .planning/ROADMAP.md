@@ -53,7 +53,7 @@
 
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
-| 77 | WIRE — Connect the Islands | The live co-host shares the curator's grounding brain, the unified persona/lens, and a populated memory store; the app loads its key cleanly | WIRE-01, WIRE-02 ✅, WIRE-03 ✅, WIRE-04, WIRE-05, WIRE-06 | 5 |
+| 77 | WIRE — Connect the Islands | 1/4 | In Progress|  |
 | 78 | PERCEIVE — Deeper, Generalized Ear | The prompt carries deltas + calibrated confidence + multi-scale trajectory + embedding-driven genre, so Gemini reads change over time and can abstain | PERCEIVE-01, PERCEIVE-02, PERCEIVE-03 | 4 |
 | 79 | LENS — Three Grounded Modes | hype / critique / tutor exist as three grounded lenses over the same state, selectable across both surfaces | LENS-01, LENS-02 | 3 |
 | 80 | GROUND — Gemini as Secondary Ear | Gemini hears the audio alongside the structured evidence, hallucination-guarded, with the reaction model config-resolved | GROUND-01, GROUND-02 | 3 |
@@ -74,7 +74,7 @@
   5. The app loads `GEMINI_API_KEY` from `.env` even when a stale shell env var is present — `.env` wins (override or clear the ghost key), verified by a test that sets a decoy env var (WIRE-06).
 **Plans**: 4 plans
 Plans:
-- [ ] 77-01-PLAN.md — Wave 0: failing test scaffolds for WIRE-01/04/05/06 + WIRE-02/03 regression pins
+- [x] 77-01-PLAN.md — Wave 0: failing test scaffolds for WIRE-01/04/05/06 + WIRE-02/03 regression pins
 - [ ] 77-02-PLAN.md — Wave 1: WIRE-04 — build_curator_instruction seam; both curator backends read it
 - [ ] 77-03-PLAN.md — Wave 1: WIRE-06 — .env override=True (funded key wins over ghost shell var)
 - [ ] 77-04-PLAN.md — Wave 2: WIRE-01 (grounding→agent off-loop seam) + WIRE-05 (gated memory.db ingest on live path)

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v8.1
 milestone_name: One Mind
-status: planning
-last_updated: "2026-05-25T21:30:00.000Z"
+status: executing
+last_updated: "2026-05-25T21:42:28.456Z"
 last_activity: 2026-05-25
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 4
+  completed_plans: 1
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 - **Six categories → six phases:** WIRE (P77) · PERCEIVE (P78) · LENS (P79) · GROUND (P80) · BENCH (P81) · CURATE (P82). Dependency spine: WIRE → PERCEIVE → (LENS ‖ GROUND) → BENCH → CURATE.
 - **Hard constraints (locked, every phase):** ship-not-over-engineer (one connected, tested wire per phase) · Gemini-only AI/embedding provider · **NO new MIR libraries / NO new DSP detectors** (GPL/AGPL/NC license wall vs Apache-2.0 + Bravoh reuse) · no new ws ports / no new IPC envelopes / no managed-memory frameworks · four cardinal invariants hold by **ADDITIVE design** (gated-off cold path byte-identical to v8.0 baseline) · honest green (unit-testable without the API; live e2e on the funded key `...32u744`, project 709533190790) — never fake results.
 - **Cardinal invariants:** single-writer (only the refresh loop writes `MusicState`; embedding-genre must write THERE) · citation-grounding (every emitted citation resolves in `EvidenceRegistry`; un-cited strips to ack-bank — the anti-slop gate) · trust-the-audio (live evidence is authoritative; Gemini's audio is SECONDARY, hallucination-guarded) · one-socket (mascot/wizard bus = `127.0.0.1:8765`, debrief = `8766`; no new port).
-- **Current focus:** Phase 77 (WIRE — Connect the Islands) — not started; plan via `/gsd:plan-phase 77`.
+- **Current focus:** Phase 77 — WIRE — Connect the Islands
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
 - **Autonomy mode:** `gsd-autonomous fully` — blockers (Gemini billing — resolved; any live-hardware ear-pass) ride forward to KAAN-ACTION; only the privacy rule + destructive risk still pause.
 
@@ -37,10 +37,19 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 
 ## Current Position
 
-Phase: 77 (WIRE — Connect the Islands) — not started
-Plan: —
-Status: Roadmapped; awaiting `/gsd:plan-phase 77`
-Last activity: 2026-05-25 — Milestone v8.1 "One Mind" roadmapped (6 phases, 18 REQ-IDs)
+Phase: 77 (WIRE — Connect the Islands) — EXECUTING
+Plan: 2 of 4 (Plan 01 complete)
+Status: Ready to execute Plan 77-02
+Last activity: 2026-05-26 -- Plan 77-01 complete (WIRE test scaffolds; full suite 4441/0)
+
+### Plan 77-01 — WIRE test scaffolds (complete 2026-05-26)
+
+Wave-0 RED scaffolds for the four unimplemented wires + green pins for the two shipped ones:
+- **WIRE-01/04/05/06** → `xfail(strict=True)` failing tests that flip to a real pass when their implementation plan lands (04 / 02 / 04 / 03). Files: `tests/agent/test_dj_cohost_grounding.py`, `tests/memory/test_ingest_wiring.py` (extended), `tests/library/test_curator_persona_seam.py`, `tests/runtime/test_load_env_override.py`.
+- **WIRE-02/03** → green regression pins in `tests/repo/test_wire_regression_pins.py` (8 genre-chain detectors yield real tasks; `genre=<name>` evidence confidence-gated at 0.5 floor).
+- Green now: cold-path byte-identity, citation-gate `[track:<id>]`→registry, env-key-not-logged security pin (V7).
+- Honest green: no `genai.Client`, no `GEMINI_API_KEY`. Full suite **4441 passed / 0 failed / 11 xfailed** (5 new). Commits `caa4ada`, `a560e29`, `07e400e`.
+- Decisions: WIRE-03 pin matches the *shipped* `genre=<name>` format (not `(conf)` as plan text said); WIRE-02 genre-chain measurements are narrate-only (not registry-citable per `coach.py:594`) so the pin asserts payload-in-task.
 
 ### Quick Tasks Completed
 
@@ -77,7 +86,7 @@ Last activity: 2026-05-25 — Milestone v8.1 "One Mind" roadmapped (6 phases, 18
 | Phases complete (v8.0) | 6 / 6 engineering-green (KAAN-ACTION §GH-BILLING / §SHIP-V4 ride forward) |
 | v8.1 phase count | 6 (Phases 77–82) |
 | Phases complete (v8.1) | 0 / 6 (roadmapped; not started) |
-| Plans complete (v8.1) | 0 / TBD |
+| Plans complete (v8.1) | 1 / TBD (P77 Plan 01 — WIRE test scaffolds) |
 | v8.1 REQ-IDs mapped | 18 / 18 ✓ (100% coverage, no orphans, no duplicates) |
 | v8.1 REQ-IDs complete | 2 / 18 (WIRE-02 `ccf4930` + WIRE-03 `a9979b8` already shipped) |
 | v8.1 per-phase REQ counts | P77=6 (WIRE) · P78=3 (PERCEIVE) · P79=2 (LENS) · P80=2 (GROUND) · P81=3 (BENCH) · P82=2 (CURATE) |
@@ -97,6 +106,7 @@ v8.1 "One Mind" roadmapped into **6 phases (77–82)** continuing numbering from
 **Already shipped (no new work, pinned in P77):** WIRE-02 (`ccf4930` — 8 genre-chain detectors surface measured evidence to prompt + register in `EvidenceRegistry`) + WIRE-03 (`a9979b8` — `detected_genre` surfaced in prompt evidence, confidence-gated). Both are TRUE today; P77 places them in its WIRE phase marked DONE and pins them with regression tests. P77's remaining real work is WIRE-01 (grounding→agent), WIRE-04 (persona/lens unify), WIRE-05 (memory ingest on live path), WIRE-06 (env-key override).
 
 **Top-5 wires (from `connection-map.md`, ranked by leverage):**
+
 1. ⭐ Wire `Grounding` ("what's playing") into the live agent — built + armed at boot (`__main__.py:1147`) but `DJCoHostAgent.__init__` has no `grounding` kwarg → fully orphaned. Highest leverage. → WIRE-01 / P77.
 2. 8 genre-chain detectors → evidence + real task (`event_detector.py:444-447` returns without `_fire`; `coach.py task_for_event` has no branch → "React naturally."). → WIRE-02 (DONE `ccf4930`).
 3. Unify persona/lens across surfaces (`library/agent.py:58,189` hardcodes its voice; doesn't import `prompts`/`coach`/`profile`). → WIRE-04 / P77 (+ LENS P79, CURATE P82).
