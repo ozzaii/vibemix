@@ -102,7 +102,7 @@ def test_staleness_nudge_logs_when_xml_older_than_30d(
     assert "days old" in nudges[0].getMessage()
 
 
-def test_no_sqlcipher_module_imported_after_load(isolated_cache):
+def test_no_sqlcipher_module_imported_after_load(isolated_cache, tmp_path):
     """SQLCipher path stays dormant even after a full XML load.
 
     We allow ``pyrekordbox.db6`` to land in ``sys.modules`` because the
@@ -110,10 +110,20 @@ def test_no_sqlcipher_module_imported_after_load(isolated_cache):
     by-design upstream. What MUST stay zero is any module matching
     ``*sqlcipher*``. A fresh interpreter (subprocess) is the cleanest way
     to assert this independent of the test runner's pre-existing imports.
+
+    ISOLATION: the ``isolated_cache`` fixture monkeypatches
+    ``RekordboxLibrary.CACHE_PATH`` IN-PROCESS only — it does NOT cross the
+    subprocess boundary. ``load_xml`` writes the pickle cache as a side
+    effect, so without an explicit override the child would clobber the
+    developer's real ``~/.cache/vibemix/library.pkl`` (this happened during
+    a live embed run). We therefore repoint CACHE_PATH inside the child to a
+    tmp_path-rooted file so the spawned interpreter never touches real cache.
     """
+    child_cache = tmp_path / "subproc_library.pkl"
     script = (
         f"import sys\n"
         f"from vibemix.library.rekordbox import RekordboxLibrary\n"
+        f"RekordboxLibrary.CACHE_PATH = __import__('pathlib').Path({str(child_cache)!r})\n"
         f"lib = RekordboxLibrary()\n"
         f"lib.load_xml({str(FIXTURE)!r})\n"
         f"assert len(lib) == 5, f'expected 5 tracks, got {{len(lib)}}'\n"
