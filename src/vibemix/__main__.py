@@ -1079,6 +1079,7 @@ async def main() -> None:
     # agent reads ``grounding`` via kwargs (Pitfall P53); the agent path
     # tolerates ``None`` and falls back to nowplaying-cli citations only.
     grounding = None
+    suggestion_service = None
     if library_cache.exists():
         try:
             from vibemix.library import (
@@ -1092,6 +1093,17 @@ async def main() -> None:
             _library_store = _open_store()
             grounding = _Grounding(_library_embedder, _library_store)
             print("-> grounding: armed (event-gated, threshold=0.7)")
+            # PILL next-suggestion: reuse the SAME store + cache-warm library so
+            # the pill suggests from the embedded library (Phase 1, embedding-
+            # only; needs deck_library for track-id resolution). Off-loop,
+            # recomputed on TRACK_CHANGE by coach_loop; read by ws_broadcast.
+            if deck_library is not None:
+                from vibemix.runtime.suggestion import SuggestionService
+
+                suggestion_service = SuggestionService(
+                    _library_store, deck_library
+                )
+                print("-> pill next-suggestion: armed")
         except Exception as e:
             print(f"-> grounding: disabled ({e})", file=sys.stderr)
             grounding = None
@@ -1130,6 +1142,7 @@ async def main() -> None:
             stop_event,
             transcript_buf=transcript_buf,
             controller_state=midi_macos.controller_state,
+            suggestion_holder=suggestion_service,
         )
     )
     diag_task = asyncio.create_task(diag_loop(levels, state, stop_event))
@@ -1175,6 +1188,7 @@ async def main() -> None:
             playback=playback,
             ipc_bus=citation_shim,
             citation_telemetry=_citation_telemetry if anti_slop_enabled else None,
+            suggestion_service=suggestion_service,
         )
     )
 

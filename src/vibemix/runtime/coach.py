@@ -60,7 +60,7 @@ import json
 import sys
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from vibemix.audio import AI_TALK_THRESHOLD, MIC_TALK_THRESHOLD, Levels, VoiceRecorder
 from vibemix.state import EventDetector, MusicState
@@ -81,6 +81,17 @@ if TYPE_CHECKING:
 CITATION_PUBLISH_INTERVAL_S = 2.0
 
 
+def _log_suggestion_error(fut: Any) -> None:
+    """Done-callback for the off-loop suggestion compute — surface its error to
+    stderr without ever propagating into the reaction loop."""
+    try:
+        exc = fut.exception()
+    except Exception:  # noqa: BLE001 — cancelled future, etc.
+        return
+    if exc is not None:
+        print(f"\n[coach suggestion err] {exc}", file=sys.stderr)
+
+
 async def coach_loop(
     session: AgentSession,
     agent: DJCoHostAgent,
@@ -97,6 +108,7 @@ async def coach_loop(
     playback: PlaybackQueue | None = None,
     ipc_bus: IpcBus | None = None,
     citation_telemetry: Callable[[], dict] | None = None,
+    suggestion_service: Any | None = None,
 ) -> None:
     """Polls MusicState for events at 10Hz. On event → prompt AI. Single
     in-flight generation at a time. Mic detection happens here against
@@ -189,6 +201,24 @@ async def coach_loop(
             manual_trigger.clear()
 
         ev = event_detector.detect(state, kaan_just_spoke=kaan_just_spoke, manual=manual)
+
+        # PILL next-suggestion (additive, off-loop): the seed track changed, so
+        # the "what's next" must change. Recompute in an executor so the store
+        # read NEVER blocks the reaction path; fire-and-forget with an error
+        # callback. Independent of whether this event also fires an AI reaction.
+        if (
+            suggestion_service is not None
+            and ev is not None
+            and ev.type == "TRACK_CHANGE"
+        ):
+            try:
+                fut = asyncio.get_running_loop().run_in_executor(
+                    None, suggestion_service.compute_from_state, state
+                )
+                fut.add_done_callback(_log_suggestion_error)
+            except Exception as e:  # noqa: BLE001 — never wedge the loop
+                print(f"\n[coach suggestion] {e}", file=sys.stderr)
+
         if ev is None:
             continue
 

@@ -26,6 +26,7 @@
 
 import { renderCitationStrip, type CitationChip } from "../session/components/citation-strip.js";
 import { renderDeckChips, type DeckStateWire } from "./deck-chips.js";
+import { renderNextSuggestion, type NextSuggestionWire } from "./next-suggestion.js";
 import {
   applyFrame,
   initialPillState,
@@ -156,6 +157,28 @@ export function readDeckState(msg: unknown): DeckStateWire | null {
 }
 
 /**
+ * Read the `next_suggestion` wire field off a raw frame. THREE outcomes, so
+ * the tri-state return is load-bearing (cf. readDeckState, where `null` doubles
+ * as "hold last"; here `null` is a real value — the explicit "no suggestion"):
+ *   - frame OMITS `next_suggestion` (a bridged ipc.session.snapshot says nothing
+ *     about it) → `undefined` → the caller HOLDS the last suggestion.
+ *   - frame carries `next_suggestion: null` (the SuggestionService has no
+ *     grounded pick — honest silence) → `null` → the caller CLEARS the card.
+ *   - frame carries the object → the suggestion (passed through verbatim;
+ *     renderNextSuggestion owns the honest-null render, never fabricates).
+ */
+export function readNextSuggestion(
+  msg: unknown,
+): NextSuggestionWire | null | undefined {
+  if (msg == null || typeof msg !== "object") return undefined;
+  const m = msg as Record<string, unknown>;
+  if (!("next_suggestion" in m)) return undefined; // omitted → hold last
+  const ns = m.next_suggestion;
+  if (ns == null || typeof ns !== "object") return null; // explicit clear
+  return ns as NextSuggestionWire;
+}
+
+/**
  * Pure reduce: apply one raw wire message to the pill state. Exported for
  * tests so the frame→state map is asserted without the bus or DOM.
  */
@@ -179,6 +202,12 @@ interface PillView {
   /** Latest deck_state read off the wire (read-only meta — held on the view, not
    *  PillState). null until the first frame carrying deck_state arrives. */
   deckState: DeckStateWire | null;
+  /** The #pill-next mount (created in boot, appended below #pill-decks). */
+  nextMount: HTMLElement;
+  /** Latest next_suggestion read off the wire (read-only meta — held on the
+   *  view). null = no grounded suggestion (honest silence → no card). */
+  nextSuggestion: NextSuggestionWire | null;
+  lastNextKey: string;
   /** Render-memo keys for the cheap rebuild-only-on-change guards. WR-05: held
    *  PER-VIEW (not module globals) so two pill instances — or two vitest mounts
    *  — can't leak each other's last-render key and skip a legitimate rebuild. */
@@ -211,6 +240,9 @@ function render(view: PillView, state: PillState, baseLabel: string): void {
     // deck/key is unresolved (PILL-03). renderDeckChips owns the honest-null +
     // amber-only-when-resolved rendering; the pill never fabricates a key (T-62-15).
     syncDeckChips(view);
+    // Next-track suggestion card (below the deck chips). Honest silence: a null
+    // suggestion renders nothing — the pill never shows a fabricated next track.
+    syncNextSuggestion(view);
   }
 }
 
@@ -274,6 +306,29 @@ function syncDeckChips(view: PillView): void {
   decksMount.style.display = "flex";
 }
 
+/**
+ * Populate the #pill-next mount with the next-track suggestion card. Rebuilds
+ * only when the suggestion changes (cheap key over track_id + why) — the rAF
+ * loop calls render() every frame. Honest silence: a null suggestion clears the
+ * mount and renders nothing (renderNextSuggestion returns null). Tagged
+ * [data-no-drag] so the card never starts a window drag.
+ */
+function syncNextSuggestion(view: PillView): void {
+  const mount = view.nextMount;
+  const s = view.nextSuggestion;
+  // Cheap change key — track_id (the pick) + why (key/bpm refine can change the
+  // line without the pick changing). null suggestion → empty key.
+  const key = s ? `${s.track_id}:${s.why}` : "";
+  if (key === view.lastNextKey) return;
+  view.lastNextKey = key;
+  mount.replaceChildren();
+  const card = renderNextSuggestion(s);
+  if (card) {
+    card.setAttribute("data-no-drag", "");
+    mount.append(card);
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────
 
 function boot(): void {
@@ -295,6 +350,14 @@ function boot(): void {
   waveEl.setAttribute("data-no-drag", "");
   waveMount.append(waveEl);
 
+  // The next-suggestion mount lives below the deck chips in the expand panel.
+  // Created here (not in the HTML skeleton) so the skeleton stays minimal and
+  // the missing-mount guard above is unaffected; tagged no-drag.
+  const nextMount = document.createElement("div");
+  nextMount.id = "pill-next";
+  nextMount.setAttribute("data-no-drag", "");
+  decksMount.insertAdjacentElement("afterend", nextMount);
+
   const view: PillView = {
     root,
     label,
@@ -304,8 +367,11 @@ function boot(): void {
     waveEl,
     decksMount,
     deckState: null,
+    nextMount,
+    nextSuggestion: null,
     lastChipsKey: "",
     lastDeckKey: "",
+    lastNextKey: "",
   };
 
   let state = initialPillState(performance.now());
@@ -355,6 +421,12 @@ function boot(): void {
       // decks, so it must not wipe them).
       const ds = readDeckState(msg);
       if (ds !== null) view.deckState = ds;
+      // next_suggestion rides the SAME flat 30Hz frame. Tri-state read: omitted
+      // (undefined) → hold last; explicit null → clear (honest silence); object
+      // → the grounded pick. Only an object/null UPDATES the held value, so a
+      // bridged snapshot (which omits the field) never wipes the suggestion.
+      const ns = readNextSuggestion(msg);
+      if (ns !== undefined) view.nextSuggestion = ns;
     });
     // 62-UI-SPEC §Copywriting: NO error UI on the pill — silence is the honest
     // empty state; bus-health surfaces in the main session window, not here.

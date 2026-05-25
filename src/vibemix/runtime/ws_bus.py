@@ -234,6 +234,7 @@ async def ws_broadcast(
     *,
     transcript_buf: deque | None = None,
     controller_state: Any | None = None,
+    suggestion_holder: Any | None = None,
 ) -> None:
     """30Hz outbound mascot broadcast + inbound manual-trigger handler.
 
@@ -341,6 +342,20 @@ async def ws_broadcast(
                 # (``_tick_once``) is upstream and untouched.
                 "deck_state": _serialize_deck_state(state),
             }
+            # Phase (PILL next-suggestion) — additive, read-only. The pill's
+            # "what's next" card reads ``next_suggestion`` = the latest grounded
+            # suggestion dict ({track_id, title, artist, similarity, why,
+            # camelot, bpm}) or ``null`` (honest silence — never a fabricated
+            # track). Computed off-loop by the SuggestionService on TRACK_CHANGE;
+            # this is a PURE READ of its holder at the serialize edge (mirrors
+            # how deck_state rides the frame). Guarded so a holder fault can
+            # never break the wire; absent when no holder is wired (golden-
+            # equivalent for existing subscribers).
+            if suggestion_holder is not None:
+                try:
+                    mascot_frame["next_suggestion"] = suggestion_holder.current()
+                except Exception as e:  # noqa: BLE001 — never break the wire
+                    print(f"[ws] suggestion read failed: {e}", file=sys.stderr)
             # Emit-boundary guard (BRINGUP-04): never serialize an empty or
             # meter-less payload onto the wire. ``Levels.snapshot()`` always
             # returns the 3 meter keys and the static keys above are literal,

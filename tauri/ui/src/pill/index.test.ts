@@ -18,7 +18,7 @@
 import { describe, expect, it } from "vitest";
 
 import { initialPillState } from "./state-machine.js";
-import { reduceFrame, readDeckState, toPillFrame } from "./index.js";
+import { reduceFrame, readDeckState, readNextSuggestion, toPillFrame } from "./index.js";
 
 const T0 = 2_000_000;
 
@@ -142,6 +142,29 @@ describe("readDeckState — latest-frame deck context (WR-03)", () => {
     expect(readDeckState({ type: "snapshot", meters: {} })).toBeNull();
     expect(readDeckState({})).toBeNull();
     expect(readDeckState(null)).toBeNull();
+  });
+});
+
+describe("readNextSuggestion — tri-state (omitted / null / object)", () => {
+  it("returns the suggestion object verbatim", () => {
+    const ns = readNextSuggestion({
+      next_suggestion: {
+        track_id: "t1", title: "X", artist: "A", similarity: 0.8,
+        why: "similar vibe", camelot: null, bpm: null,
+      },
+    });
+    expect(ns).not.toBeNull();
+    expect((ns as { track_id: string }).track_id).toBe("t1");
+  });
+
+  it("explicit null → null (the SuggestionService has no grounded pick → clear)", () => {
+    expect(readNextSuggestion({ next_suggestion: null })).toBeNull();
+  });
+
+  it("OMITTED field → undefined (a bridged snapshot says nothing → hold last)", () => {
+    expect(readNextSuggestion({ type: "snapshot" })).toBeUndefined();
+    expect(readNextSuggestion({})).toBeUndefined();
+    expect(readNextSuggestion(null)).toBeUndefined();
   });
 });
 
