@@ -1172,6 +1172,19 @@ async def main() -> None:
             print(f"-> grounding: disabled ({e})", file=sys.stderr)
             grounding = None
 
+    # ── Phase 77 Plan 04 — WIRE-01: attach the armed Grounding engine ──
+    # The agent is built ABOVE (its construction depends on inputs available
+    # before deck_library is resolved); the Grounding engine is built HERE,
+    # after deck_library + library registration. Rather than reorder the
+    # build, the agent was constructed with grounding=None and we attach the
+    # engine now via the post-construction setter (smaller, cleaner diff —
+    # see 77-04 SUMMARY for the build-reorder-vs-setter rationale). When
+    # grounding is None (no library cache / disabled), the agent's cold path
+    # stays byte-identical: set_next_event dispatches nothing, llm_node
+    # injects nothing. The injected ``[track:<id>]`` resolves against the
+    # register_library-seeded ids above (invariant #2 — no linter change).
+    agent.attach_grounding(grounding)
+
     session = AgentSession(llm=llm_inst, tts=tts_inst)
     session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
     print(f"-> AgentSession headless (no Room); audio out → PlaybackQueue @ {OUTPUT_SR}Hz")
@@ -1210,6 +1223,10 @@ async def main() -> None:
     from vibemix.runtime.ws_bus import IpcRouterBus  # noqa: PLC0415
 
     ipc_router: "IpcRouterBus | None" = IpcRouterBus()
+    # Phase 77 Plan 04 — WIRE-05: the live SessionLoop handle. Initialized to
+    # None BEFORE the try so the name is always bound in the finally-block
+    # close-ingest call (the except path below leaves it unset otherwise).
+    _session_ipc = None
     try:
         _settings_config = load_config()
         _live_settings_applier = SettingsApplier(
@@ -1234,8 +1251,22 @@ async def main() -> None:
             "-> session IPC handlers wired onto mascot bus "
             f"({len(ipc_router._handlers)} types: settings/profile/recordings)"
         )
+        # Phase 77 Plan 04 — WIRE-05: fire the BOOT memory-ingest sweep on the
+        # SAME _session_ipc instance. main() builds SessionLoop but only calls
+        # register_handlers() (never run()), so the boot+close ingest sweeps
+        # that SessionLoop.run() would normally fire never ran on the live
+        # path → memory.db stayed empty. We call ``_fire_ingest("boot")``
+        # DIRECTLY — NOT the combined boot-sweep method, which ALSO re-runs
+        # retention (main() already ran the boot retention sweep at :650;
+        # the combined method would DOUBLE-prune). Gated on recall_enabled
+        # (VIBEMIX_RECALL_ENABLED, default OFF) → additive no-op for the
+        # default user (memory stays opt-in; recall has no fuel until Kaan
+        # flips §RECALL-EAR). Off-loop + best-effort inside _fire_ingest.
+        if recall_enabled and _session_ipc is not None:
+            asyncio.create_task(_session_ipc._fire_ingest("boot"))
     except Exception as _e:  # pragma: no cover — never block boot on this
         ipc_router = None
+        _session_ipc = None
         print(f"-> session IPC handlers NOT wired: {_e!r}", file=sys.stderr)
 
     # --- Asyncio tasks (6) ---
@@ -1369,6 +1400,24 @@ async def main() -> None:
             recorder.close()
         except Exception as e:
             print(f"[close recorder err] {e}", file=sys.stderr)
+        # Phase 77 Plan 04 — WIRE-05: fire the CLOSE memory-ingest for the
+        # just-finished session on the SAME _session_ipc instance. Placed
+        # AFTER recorder.close() so session.json is finalized (the layout
+        # ingest_session expects). We await ``_fire_ingest("close", ...)``
+        # directly (this finally block is inside ``async def main()`` so the
+        # await is valid) — NOT the combined session-close method, which
+        # ALSO re-runs retention (the close retention sweep runs just below
+        # at the run_retention_sweep call; the combined method would
+        # DOUBLE-prune). Gated on recall_enabled (default OFF) → additive
+        # no-op by default. _session_ipc is None on the handler-wire except
+        # path, so guard it. Best-effort + off-loop inside _fire_ingest.
+        if recall_enabled and _session_ipc is not None:
+            try:
+                await _session_ipc._fire_ingest(
+                    "close", session_dir=recorder.session_dir
+                )
+            except Exception as e:  # pragma: no cover — best-effort
+                print(f"[close ingest err] {e}", file=sys.stderr)
         # Phase 15 Plan 03 — session-close retention sweep trigger. Fires
         # AFTER recorder.close() so the just-finished session's session.json
         # is finalized (matches the data layout the sweep expects). Reads

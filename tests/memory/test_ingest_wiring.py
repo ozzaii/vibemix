@@ -276,9 +276,6 @@ def _main_source() -> str:
     return src_path.read_text(encoding="utf-8")
 
 
-@pytest.mark.xfail(
-    reason="WIRE-05 main()-path ingest not yet wired (Plan 04)", strict=True
-)
 def test_main_fires_boot_and_close_ingest() -> None:
     """main() calls _fire_ingest for boot AND close on the live _session_ipc."""
     src = _main_source()
@@ -289,9 +286,6 @@ def test_main_fires_boot_and_close_ingest() -> None:
     assert "session_dir=" in src
 
 
-@pytest.mark.xfail(
-    reason="WIRE-05 main()-path ingest not yet wired (Plan 04)", strict=True
-)
 def test_main_ingest_is_gated_behind_recall_enabled() -> None:
     """The main()-path ingest is gated on recall_enabled (additive no-op default)."""
     src = _main_source()

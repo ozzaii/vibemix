@@ -850,6 +850,19 @@ class DJCoHostAgent(Agent):
         stamp = f"{int(set_s // 60)}:{int(set_s % 60):02d}"
         self._ai_text_history.append(f"[{stamp}] {text}")
 
+    def attach_grounding(self, grounding: "Grounding | None") -> None:
+        """Post-construction wiring for the WIRE-01 Grounding engine.
+
+        Phase 77 Plan 04. ``main()`` builds the agent BEFORE the Grounding
+        engine (the grounding build depends on ``deck_library``, which is
+        resolved after the agent). Rather than reorder the build (which would
+        be a large, churny diff), the orchestrator constructs the agent with
+        ``grounding=None`` and calls this setter once the engine is armed.
+        Passing ``None`` (no library → no grounding) leaves the cold path
+        byte-identical. Idempotent — safe to call at most once per agent.
+        """
+        self._grounding = grounding
+
     def set_next_event(self, ev: Event) -> None:
         self._pending_event = ev
         # Plan 19-05 — start the TTFT measurement window. Overwriting an
