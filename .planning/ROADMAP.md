@@ -45,7 +45,7 @@
 ## Phases
 
 - [ ] **Phase 77: WIRE — Connect the Islands** — Grounding→live agent + persona/lens unify + memory ingest on live path + env-key override fix (WIRE-02/03 already shipped).
-- [ ] **Phase 78: PERCEIVE — Deeper, Generalized Ear** — deltas + calibrated confidence + multi-scale trajectory + mean-centered genre-prototype lookup (no new DSP, no MIR libs).
+- [ ] **Phase 78: PERCEIVE — Deeper, Generalized Ear** — deltas + calibrated confidence + multi-scale trajectory + mean-centered genre-prototype lookup (no new DSP, no MIR libs). **4 plans, 3 waves.**
 - [ ] **Phase 79: LENS — Three Grounded Modes** — hype / critique / tutor as prompt lenses over one structured state, lens selection shared across surfaces.
 - [ ] **Phase 80: GROUND — Gemini as Secondary Ear** — audio part fed alongside structured evidence, hallucination-guarded; reaction model config-resolved by the bench.
 - [ ] **Phase 81: BENCH — The Validation Instrument** — multi-dimensional bench (model × grounding × prompting × contexting × lens × taste) + auto first-pass eval + Kaan's-ear review surface.
@@ -88,7 +88,11 @@ Plans:
   2. The prompt carries a multi-scale trajectory (phrase position / energy-arc / recent DJ moves) so a reaction can reference where the set has been and is going, not just the current bar (PERCEIVE-02).
   3. `detected_genre` is driven by a mean-centered nearest-prototype cosine lookup over cached embeddings — written ONLY by the single-writer refresh loop, confidence-floored so a genre is never asserted the audio doesn't support (PERCEIVE-03).
   4. When trajectory/genre signal is cold or below the confidence floor, the prompt is byte-identical to the v8.0 baseline (additive-design invariant holds; the cold path adds nothing).
-**Plans**: TBD
+**Plans:** 4 plans (3 waves)
+- [ ] 78-01-PLAN.md — Wave-0 RED scaffolds (xfail-strict) for PERCEIVE-01/02/03 + the cold-path byte-identity REAL-GREEN pin [wave 1]
+- [ ] 78-02-PLAN.md — PERCEIVE-01 deltas + calibrated confidence & PERCEIVE-02 multi-scale trajectory (additive MusicState fields, deltas.py, single-writer + gated render) [wave 2]
+- [ ] 78-03-PLAN.md — PERCEIVE-03 mechanism: library/genre_prototypes.py (mean-centered nearest-prototype build/classify + thread-safe holder, no state writes) [wave 2, parallel with 78-02]
+- [ ] 78-04-PLAN.md — PERCEIVE-03 wiring: genre_reconcile.py (centered-cosine→0.5-render-band normalization, the flagged risk) + single-writer refresh feed [wave 3]
 
 ### Phase 79: LENS — Three Grounded Modes
 **Goal:** Make hype / critique / tutor three real grounded lenses over the SAME structured state — not three separate brains — with lens selection shared across the co-host and the curator. The tutor lens explains DJing based on who you are + the semantics + reality + taste; the critique lens says what to fix; hype is the party voice. All three read the same wired+deepened evidence.
@@ -141,7 +145,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 77. WIRE — Connect the Islands | 0/TBD | Not started | - |
-| 78. PERCEIVE — Deeper, Generalized Ear | 0/TBD | Not started | - |
+| 78. PERCEIVE — Deeper, Generalized Ear | 0/4 | Planned | - |
 | 79. LENS — Three Grounded Modes | 0/TBD | Not started | - |
 | 80. GROUND — Gemini as Secondary Ear | 0/TBD | Not started | - |
 | 81. BENCH — The Validation Instrument | 0/TBD | Not started | - |
