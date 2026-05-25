@@ -16,6 +16,10 @@ findings:
   info: 2
   total: 6
 status: issues_found
+fix_status: critical_warning_resolved
+fixed: [CR-01, WR-01, WR-02, WR-03]
+deferred: [IN-01, IN-02]
+fixed_at: 2026-05-26
 ---
 
 # Phase 77: Code Review Report
