@@ -2,21 +2,20 @@
 gsd_state_version: 1.0
 milestone: v8.1
 milestone_name: One Mind
-status: ready_to_plan
-last_updated: 2026-05-25T22:24:52.305Z
-last_activity: 2026-05-25
+status: executing
+last_updated: "2026-05-25T23:10:56.179Z"
+last_activity: 2026-05-26 -- Phase 78 Plan 01 (PERCEIVE Wave-0 RED scaffolds) complete
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 30
+  total_plans: 8
+  completed_plans: 5
   percent: 17
-stopped_at: Phase 77 complete (4/4) — ready to discuss Phase 78
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-26 — **Phase 77 (WIRE) COMPLETE.** P77 WIRE-01 + WIRE-05 shipped (Plan 77-04, commits `e020a91` + `5ac3a9d`): the live co-host now grounds reactions on what's playing (Grounding wired into `DJCoHostAgent` via the Phase-65 4-point off-loop seam; `[track:<id>]` resolves against `register_library`; cold path byte-identical), and `memory.db` fills on the live `main()` path via gated `_fire_ingest` boot+close (no double retention). Full suite **4451/0** (no API key). All 4 plans of Phase 77 complete (WIRE-01..06 landed) → ready for verification.
+**Last updated:** 2026-05-26 — **Phase 78 (PERCEIVE) Plan 01 COMPLETE.** Wave-0 RED scaffolds for all three PERCEIVE requirements + the genre-reconciliation gate are in place as `xfail(strict=True)`, plus a REAL-GREEN cold-path byte-identity pin capturing the v8.0 baseline implementation must preserve (commits `82a6452` + `a08a074`). 3 new test files (`test_coach_perceive.py`, `test_refresh_perceive.py`, `test_genre_prototypes.py`) + shared synthetic fixtures in `tests/state/conftest.py`. No `src/` change. Full suite **4456 passed / 0 failed / 10 xfailed (1 pre-existing budget + 9 new) / 4 xpassed (live-hardware)** — honest green, no API key. Real `~/.cache/vibemix/library.pkl` mtime verified unchanged (T-78-01-01). **Phase 77 (WIRE) shipped prior** — all 6 WIRE reqs landed.
 
 ---
 
@@ -30,7 +29,7 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 - **Six categories → six phases:** WIRE (P77) · PERCEIVE (P78) · LENS (P79) · GROUND (P80) · BENCH (P81) · CURATE (P82). Dependency spine: WIRE → PERCEIVE → (LENS ‖ GROUND) → BENCH → CURATE.
 - **Hard constraints (locked, every phase):** ship-not-over-engineer (one connected, tested wire per phase) · Gemini-only AI/embedding provider · **NO new MIR libraries / NO new DSP detectors** (GPL/AGPL/NC license wall vs Apache-2.0 + Bravoh reuse) · no new ws ports / no new IPC envelopes / no managed-memory frameworks · four cardinal invariants hold by **ADDITIVE design** (gated-off cold path byte-identical to v8.0 baseline) · honest green (unit-testable without the API; live e2e on the funded key `...32u744`, project 709533190790) — never fake results.
 - **Cardinal invariants:** single-writer (only the refresh loop writes `MusicState`; embedding-genre must write THERE) · citation-grounding (every emitted citation resolves in `EvidenceRegistry`; un-cited strips to ack-bank — the anti-slop gate) · trust-the-audio (live evidence is authoritative; Gemini's audio is SECONDARY, hallucination-guarded) · one-socket (mascot/wizard bus = `127.0.0.1:8765`, debrief = `8766`; no new port).
-- **Current focus:** Phase 78 — perceive — deeper, generalized ear
+- **Current focus:** Phase 78 — PERCEIVE — Deeper, Generalized Ear
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
 - **Autonomy mode:** `gsd-autonomous fully` — blockers (Gemini billing — resolved; any live-hardware ear-pass) ride forward to KAAN-ACTION; only the privacy rule + destructive risk still pause.
 
@@ -38,10 +37,20 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 
 ## Current Position
 
-Phase: 78
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-25
+Phase: 78 (PERCEIVE — Deeper, Generalized Ear) — EXECUTING
+Plan: 2 of 4
+Status: Plan 01 (Wave-0 RED scaffolds) complete; Plan 02 (deltas + trajectory impl) next
+Last activity: 2026-05-26
+
+### Plan 78-01 — PERCEIVE Wave-0 RED scaffolds + cold-path byte-identity pin (complete 2026-05-26)
+
+- **3 new test files + shared fixtures, no `src/` change.** Installs the Nyquist safety net BEFORE any PERCEIVE implementation: every acceptance criterion gets a failing `xfail(strict=True)` test that flips to a real pass when its plan lands (02/03/04); a silent early-pass becomes a HARD failure.
+- **Cold-path byte-identity (REAL GREEN pin):** `test_coach_perceive.py` pins a cold audible `MusicState` (no prior snapshot, empty trajectory) byte-for-byte to the v8.0 baseline (golden copied verbatim from `test_coach.py`) + asserts NO `trajectory[`/`Δ`/`rose`/`fell` tokens. This must KEEP passing through Plans 02/04.
+- **xfail-strict scaffolds (9):** PERCEIVE-01/02 render (delta above/below floor, trajectory warm) in `test_coach_perceive.py`; single-writer `prev_perceive`-in-lock, trajectory composed+bounded, genre fed via `_tick_once` holder, genre reconciliation (confident-embedding-wins / sub-floor→DSP-fallback) in `test_refresh_perceive.py`; `build_prototypes` centered-means + `classify` floor/tie-margin abstain in `test_genre_prototypes.py`.
+- **Shared fixtures** in `tests/state/conftest.py` (was empty): `perceive_state_pair` (controllable scalar-delta MusicState pair) + `synthetic_corpus` (anisotropic 1536-dim labeled vectors).
+- **T-78-01-01 mitigation:** autouse tmp_path routing of `RekordboxLibrary.CACHE_PATH` + `centering.CENTROID_PATH/META` + the (not-yet-existing) prototype sidecar, with `raising=False` no-op until Plan 03; real `library.pkl` mtime verified unchanged.
+- Honest green: no `genai.Client`, no `GEMINI_API_KEY`. Full suite **4456 passed / 0 failed / 10 xfailed / 4 xpassed** (243s). Commits `82a6452` (Task 1), `a08a074` (Task 2).
+- **Next:** Plan 02 flips PERCEIVE-01/02 (5 xfails), Plan 03 flips the 2 prototype xfails, Plan 04 flips the 2 genre-feed/reconcile xfails.
 
 ### Plan 77-04 — WIRE-01 grounding→agent + WIRE-05 live-path memory ingest (complete 2026-05-26)
 

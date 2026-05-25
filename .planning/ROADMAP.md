@@ -54,7 +54,7 @@
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
 | 77 | WIRE — Connect the Islands | 4/4 | Complete    | 2026-05-25 |
-| 78 | PERCEIVE — Deeper, Generalized Ear | The prompt carries deltas + calibrated confidence + multi-scale trajectory + embedding-driven genre, so Gemini reads change over time and can abstain | PERCEIVE-01, PERCEIVE-02, PERCEIVE-03 | 4 |
+| 78 | PERCEIVE — Deeper, Generalized Ear | 1/4 | In Progress|  |
 | 79 | LENS — Three Grounded Modes | hype / critique / tutor exist as three grounded lenses over the same state, selectable across both surfaces | LENS-01, LENS-02 | 3 |
 | 80 | GROUND — Gemini as Secondary Ear | Gemini hears the audio alongside the structured evidence, hallucination-guarded, with the reaction model config-resolved | GROUND-01, GROUND-02 | 3 |
 | 81 | BENCH — The Validation Instrument | A multi-dimensional bench runs the architecture/model axes on real tracks, auto-scores each cell, and surfaces cells for Kaan's-ear final judgment | BENCH-01, BENCH-02, BENCH-03 | 4 |
@@ -89,7 +89,7 @@ Plans:
   3. `detected_genre` is driven by a mean-centered nearest-prototype cosine lookup over cached embeddings — written ONLY by the single-writer refresh loop, confidence-floored so a genre is never asserted the audio doesn't support (PERCEIVE-03).
   4. When trajectory/genre signal is cold or below the confidence floor, the prompt is byte-identical to the v8.0 baseline (additive-design invariant holds; the cold path adds nothing).
 **Plans:** 4 plans (3 waves)
-- [ ] 78-01-PLAN.md — Wave-0 RED scaffolds (xfail-strict) for PERCEIVE-01/02/03 + the cold-path byte-identity REAL-GREEN pin [wave 1]
+- [x] 78-01-PLAN.md — Wave-0 RED scaffolds (xfail-strict) for PERCEIVE-01/02/03 + the cold-path byte-identity REAL-GREEN pin [wave 1]
 - [ ] 78-02-PLAN.md — PERCEIVE-01 deltas + calibrated confidence & PERCEIVE-02 multi-scale trajectory (additive MusicState fields, deltas.py, single-writer + gated render) [wave 2]
 - [ ] 78-03-PLAN.md — PERCEIVE-03 mechanism: library/genre_prototypes.py (mean-centered nearest-prototype build/classify + thread-safe holder, no state writes) [wave 2, parallel with 78-02]
 - [ ] 78-04-PLAN.md — PERCEIVE-03 wiring: genre_reconcile.py (centered-cosine→0.5-render-band normalization, the flagged risk) + single-writer refresh feed [wave 3]
