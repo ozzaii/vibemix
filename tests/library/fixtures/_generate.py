@@ -8,7 +8,7 @@ Usage:
     python tests/library/fixtures/_generate.py
 
 Outputs:
-    tests/library/fixtures/synthetic_embeddings.npy   # (1000, 768) float32 L2-normalized
+    tests/library/fixtures/synthetic_embeddings.npy   # (1000, 1536) float32 L2-normalized
     tests/library/fixtures/synthetic_queries.json     # 50 queries + ground-truth top-10
 """
 
@@ -34,7 +34,7 @@ QUERIES_PATH = OUT_DIR / "synthetic_queries.json"
 def main() -> None:
     rng = np.random.default_rng(SEED)
 
-    # 1000 × 768 corpus, L2-normalized.
+    # 1000 × EMBEDDING_DIM (1536) corpus, L2-normalized.
     corpus = rng.standard_normal((N_TRACKS, EMBEDDING_DIM)).astype(np.float32)
     corpus = np.stack([l2_normalize(row) for row in corpus])
     np.save(EMBEDDINGS_PATH, corpus, allow_pickle=False)

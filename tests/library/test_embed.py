@@ -154,7 +154,7 @@ def test_short_track_single_call(
     mock_client: MagicMock,
     short_track: TrackEntry,
 ) -> None:
-    """60s track → 1 audio embed call, float32 (768,), L2-normalized."""
+    """60s track → 1 audio embed call, float32 (1536,), L2-normalized."""
     vec = embedder.embed_track(short_track)
 
     assert vec.dtype == np.float32
@@ -262,7 +262,7 @@ def test_content_hash_skip_on_reimport(
 def test_text_query_embed(
     embedder: LibraryEmbedder, mock_client: MagicMock
 ) -> None:
-    """embed_query → 1 text embed call, float32 (768,), L2-normalized."""
+    """embed_query → 1 text embed call, float32 (1536,), L2-normalized."""
     vec = embedder.embed_query("driving acid techno around 138 BPM")
 
     assert vec.dtype == np.float32
@@ -283,7 +283,7 @@ def test_model_id_locked() -> None:
     """
     assert GEMINI_EMBEDDING_MODEL == "gemini-embedding-2"
     assert EXCERPT_STRATEGY_VERSION == "v1-3excerpt-mean"
-    assert EMBEDDING_DIM == 768
+    assert EMBEDDING_DIM == 1536
 
 
 def test_no_task_type_param(

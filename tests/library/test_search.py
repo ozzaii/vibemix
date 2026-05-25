@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from vibemix.library._cosine import EMBEDDING_DIM
 from vibemix.library.rekordbox import TrackEntry
 from vibemix.library.search import (
     QUERY_CACHE_TTL,
@@ -44,7 +45,7 @@ def fake_library() -> MagicMock:
 @pytest.fixture
 def fake_embedder() -> MagicMock:
     e = MagicMock()
-    e.embed_query.return_value = np.zeros(768, dtype=np.float32)
+    e.embed_query.return_value = np.zeros(EMBEDDING_DIM, dtype=np.float32)
     return e
 
 

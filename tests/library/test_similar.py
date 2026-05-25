@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from vibemix.library._cosine import EMBEDDING_DIM
 from vibemix.library.rekordbox import TrackEntry
 from vibemix.library.similar import SimilarResult, similar_to
 
@@ -37,7 +38,7 @@ def fake_library() -> MagicMock:
 @pytest.fixture
 def fake_embedder() -> MagicMock:
     e = MagicMock()
-    e.embed_track.return_value = np.ones(768, dtype=np.float32)
+    e.embed_track.return_value = np.ones(EMBEDDING_DIM, dtype=np.float32)
     return e
 
 

@@ -23,8 +23,11 @@ LIBRARY-04 + LIBRARY-10 hold because this module cannot bypass the proxy.
 4. Every embed is keyed by SHA256 of
    ``(file_bytes || model_id || strategy_version)`` and persisted to
    ``~/.cache/vibemix/embeddings.db`` so re-imports do 0 API calls.
-5. Output dimensionality is locked to 768 (CONTEXT D-cost-balanced;
-   MRL-truncated from Gemini Embedding 2's native 3072).
+5. Output dimensionality is single-sourced from
+   ``_cosine.EMBEDDING_DIM`` (1536 as of quick-260525-gz2;
+   MRL-truncated from Gemini Embedding 2's native 3072). Sub-3072 MRL
+   prefixes are NOT auto-normalized by Google, so every embed is passed
+   through ``l2_normalize`` before return (see embed_track / embed_query).
 
 # Critical corrections (Phase 28 RESEARCH Open Qs)
 ===============================================
@@ -261,8 +264,8 @@ class LibraryEmbedder:
         ``cache_db`` defaults to ``~/.cache/vibemix/embeddings.db``.
 
     Public API:
-        ``embed_track(track)`` → 768-dim float32 L2-normalized vector.
-        ``embed_query(query)`` → 768-dim float32 L2-normalized vector (no
+        ``embed_track(track)`` → EMBEDDING_DIM float32 L2-normalized vector.
+        ``embed_query(query)`` → EMBEDDING_DIM float32 L2-normalized vector (no
             content-hash cache here; Plan 03 owns the 24h query cache).
 
     Thread safety:
@@ -326,7 +329,7 @@ class LibraryEmbedder:
     # ─── Public surface ────────────────────────────────────────────────────
 
     def embed_track(self, track: TrackEntry) -> np.ndarray:
-        """Embed a track, returning a 768-dim float32 L2-normalized vector.
+        """Embed a track, returning an EMBEDDING_DIM float32 L2-normalized vector.
 
         Decision tree:
             1. content-hash cache hit → return cached

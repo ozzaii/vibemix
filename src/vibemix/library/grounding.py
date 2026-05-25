@@ -30,6 +30,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
 from vibemix.library.embed import GEMINI_EMBEDDING_MODEL, LibraryEmbedder
 from vibemix.library.store import LibraryStore
 
@@ -122,12 +123,11 @@ def identify_playing(
         result = embedder._client.models.embed_content(
             model=GEMINI_EMBEDDING_MODEL,
             contents=[_types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)],
-            config=_types.EmbedContentConfig(output_dimensionality=768),
+            config=_types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIM),
         )
         # Plan 28-08 — grounding audio embed telemetry.
         from vibemix.library.budget import get_telemetry as _gt
         _gt().increment_audio_embed()
-        from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
 
         vec = np.asarray(
             list(result.embeddings[0].values), dtype=np.float32

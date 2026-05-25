@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from vibemix.library._cosine import EMBEDDING_DIM
 from vibemix.library.importer import LibraryImporter, import_library_async
 from vibemix.library.rekordbox import TrackEntry
 
@@ -40,7 +41,7 @@ def fake_embedder(tmp_path: Path) -> MagicMock:
     )
     e._track_hash = MagicMock(side_effect=lambda t: f"hash_{t.track_id}")
     e.embed_track = MagicMock(
-        side_effect=lambda t: np.zeros(768, dtype=np.float32)
+        side_effect=lambda t: np.zeros(EMBEDDING_DIM, dtype=np.float32)
     )
 
     # Public probe added in REVIEW WR-02 fix — test must provide a real
@@ -132,7 +133,7 @@ def test_importer_skips_failed_track_continues_batch(
         call_idx[0] += 1
         if call_idx[0] == 2:
             raise RuntimeError("simulated bad audio file")
-        return np.zeros(768, dtype=np.float32)
+        return np.zeros(EMBEDDING_DIM, dtype=np.float32)
 
     fake_embedder.embed_track = embed_track_with_failure
 

@@ -30,16 +30,21 @@ from __future__ import annotations
 
 import numpy as np
 
-# Locked at 768 per CONTEXT D-cost-balanced and RESEARCH Open Q9.
-# Gemini Embedding 2 supports MRL truncation to 768/1536/3072; we ship 768.
-# Bumping this constant requires a cache invalidation (EXCERPT_STRATEGY_VERSION).
+# Locked at 1536 per quick-260525-gz2 (real-folder embed bring-up).
+# Gemini Embedding 2 supports MRL truncation to 768/1536/3072; we ship 1536.
+# IMPORTANT: sub-3072 MRL prefixes are NOT auto-L2-normalized by Google, so
+# every embed MUST be passed through l2_normalize before store/search (the
+# embed.py + grounding.py paths already do). Bumping this constant requires a
+# cache invalidation (EXCERPT_STRATEGY_VERSION) only if cached vectors change
+# dim — the on-disk vec0/numpy index recreates at the new dim automatically,
+# and a stale-dim index is caught fail-loud by folder_ingest's dim guard.
 #
 # Plan 41-05 rollback note (LAT-06):
-#     If production telemetry surfaces top-K parity drift between v1
-#     (full-precision 3072) and v2 (768-truncated) — e.g. citation
-#     quality regresses or "what's playing" grounding hallucinates more
-#     than the v2.1 baseline — the documented rollback path is:
-#         1. Bump EMBEDDING_DIM 768 → 1024.
+#     If production telemetry surfaces top-K parity drift between the
+#     truncated dim and full-precision 3072 — e.g. citation quality
+#     regresses or "what's playing" grounding hallucinates more than the
+#     baseline — the documented rollback path is:
+#         1. Bump EMBEDDING_DIM 1536 → 3072 (the full native dim).
 #         2. Bump embed.EXCERPT_STRATEGY_VERSION (so cache invalidates).
 #         3. Re-run tests/library/test_embeddings_parity.py with the
 #            new dim — recall threshold of >=9/10 positions identical
@@ -47,8 +52,8 @@ import numpy as np
 #         4. Run scripts/library/migrate_embeddings_2.py --re-embed-all
 #            against affected user libraries (or rely on lazy first-launch
 #            re-embed once the version bump ships).
-#     Storage impact: ~33% larger index per row (768 → 1024 = +33%).
-EMBEDDING_DIM = 768
+#     Storage impact: 3072 = +100% per row vs 1536.
+EMBEDDING_DIM = 1536
 
 
 def l2_normalize(vec: np.ndarray) -> np.ndarray:

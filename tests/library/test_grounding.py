@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from vibemix.library._cosine import EMBEDDING_DIM
 from vibemix.library.grounding import (
     CITATION_THRESHOLD,
     TRACK_AWARE_EVENTS,
@@ -24,7 +25,7 @@ def fake_embedder() -> MagicMock:
     e = MagicMock()
     e._client = MagicMock()
     e._client.models.embed_content.return_value = SimpleNamespace(
-        embeddings=[SimpleNamespace(values=[0.1] * 768)]
+        embeddings=[SimpleNamespace(values=[0.1] * EMBEDDING_DIM)]
     )
     return e
 

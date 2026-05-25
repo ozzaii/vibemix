@@ -37,6 +37,7 @@ from scripts.library.migrate_embeddings_2 import (
     main,
     reembed_all,
 )
+from vibemix.library._cosine import EMBEDDING_DIM
 
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -105,7 +106,7 @@ def test_audit_with_client_runs_probe(tmp_cache: Path) -> None:
     """When a client is supplied, audit_cache invokes the GA probe."""
     client = MagicMock()
     client.models.embed_content.return_value = SimpleNamespace(
-        embeddings=[SimpleNamespace(values=[0.1] * 768)]
+        embeddings=[SimpleNamespace(values=[0.1] * EMBEDDING_DIM)]
     )
 
     audit = audit_cache(client=client, cache_path=tmp_cache)
