@@ -100,10 +100,11 @@ export default defineConfig({
         // debrief window. Opened by tauri/src-tauri/src/debrief_window.rs
         // ::open_debrief_window with `?session=<encoded>` query param.
         debrief: resolve(projectRoot, "debrief.html"),
-        // Library / vibe-engine window entry. Opened by
-        // tauri/src-tauri/src/library_cmds.rs::open_library_window (window
-        // label "library"). Without this rollup input `vite build` would not
-        // emit dist/library.html and the window would 404 in production.
+        // Vibe Engine — fifth webview entry for the library / vibe-search
+        // window. Opened by the Rust bridge's `open_library_window` command;
+        // backend contract is direct Tauri commands (library_search /
+        // library_similar / library_stats / library_embed_folder) + the
+        // library://embed-progress | embed-done events. See src/library/.
         library: resolve(projectRoot, "library.html"),
       },
     },

@@ -5,38 +5,159 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>vibemix · vibe engine</title>
     <!--
-      Library / vibe-engine window entry.
-
-      Second-window entry opened by
-      tauri/src-tauri/src/library_cmds.rs::open_library_window (window label
-      "library", ~1180×760). The frontend (owned by the frontend agent) lives
-      at /src/library/index.ts — it invokes the library_search / library_similar
-      / library_stats / library_embed_folder Tauri commands and listens for the
-      `library://embed-progress` + `library://embed-done` events.
-
-      This file is intentionally bare: a CDJ-dark body background (so first
-      paint matches the visual direction before CSS loads), one #app root, and
-      the module script. The frontend agent fills the rest.
+      Vibe Engine — the library / vibe-search window. Fifth Tauri webview entry,
+      opened by the Rust bridge's `open_library_window` command (tauri/src-tauri
+      owns that side). Backend contract is direct Tauri commands + library://
+      embed-* events; see src/library/api.ts. CDJ Whisper v5 surface — design
+      contract mocks/vibemix-library-ui.html. Tokens come from tokens.css.
     -->
-    <style>
-      /* CDJ Whisper warm-black baseline — avoids a white flash before the
-         frontend's tokens.css / library styles mount. */
-      html,
-      body {
-        margin: 0;
-        height: 100%;
-        background: #0f0f11;
-        color: #e8e6e1;
-        font-family:
-          "Saira", system-ui, -apple-system, sans-serif;
-      }
-      #app {
-        height: 100%;
-      }
-    </style>
+    <link rel="stylesheet" href="/src/tokens.css" />
+    <link rel="stylesheet" href="/src/library/library.css" />
   </head>
-  <body>
-    <div id="app"></div>
+  <body data-mode="search">
+    <div id="app">
+      <div class="vmx-lib-app">
+        <!-- titlebar -->
+        <div class="vmx-lib-titlebar" data-tauri-drag-region>
+          <div class="vmx-lib-brand" data-tauri-drag-region>
+            <span class="dot"></span><b>vibemix</b><span class="sub">vibe engine</span>
+          </div>
+          <div class="spacer"></div>
+          <div class="vmx-lib-keystat">
+            <span class="led"></span>gemini-embedding-2 · 1536d · direct key
+          </div>
+        </div>
+
+        <div class="vmx-lib-frame">
+          <!-- LEFT — query console -->
+          <aside class="vmx-lib-panel">
+            <div class="vmx-lib-panel-hd"><span class="vmx-lib-label">Console</span></div>
+            <div class="vmx-lib-panel-bd" style="display: flex; flex-direction: column">
+              <div class="vmx-lib-modeswitch" role="tablist">
+                <button role="tab" aria-selected="true" data-mode="search">Search</button>
+                <button role="tab" aria-selected="false" data-mode="similar">Similar</button>
+                <button role="tab" aria-selected="false" data-mode="ingest">Ingest</button>
+              </div>
+
+              <!-- search / similar field -->
+              <div class="vmx-lib-field" data-for="search similar">
+                <span class="vmx-lib-label" id="vmx-lib-qlabel">Vibe query</span>
+                <div class="vmx-lib-qbox" data-for="search">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                       stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+                  </svg>
+                  <input id="vmx-lib-q" placeholder="describe a vibe…" />
+                </div>
+                <div class="vmx-lib-chips" data-for="search">
+                  <span class="vmx-lib-chip" data-chip="dark hypnotic rolling">dark hypnotic rolling</span>
+                  <span class="vmx-lib-chip" data-chip="euphoric melodic">euphoric melodic</span>
+                  <span class="vmx-lib-chip" data-chip="hyperpop glitchy">hyperpop glitchy</span>
+                  <span class="vmx-lib-chip" data-chip="deep dub">deep dub</span>
+                </div>
+
+                <!-- similar: drop a track -->
+                <div class="vmx-lib-dropzone" data-for="similar" style="display: none">
+                  <div class="big">Drop a track, or pick from library</div>
+                  <span class="vmx-lib-label">wav · mp3 · m4a · flac</span>
+                  <div class="seed">
+                    <span class="led"></span>
+                    <span class="name vmx-lib-mono" id="vmx-lib-seed-name">ygmf_Remix.wav</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ingest field -->
+              <div class="vmx-lib-field" data-for="ingest" style="display: none">
+                <span class="vmx-lib-label">Folder to embed</span>
+                <div class="vmx-lib-qbox">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                       stroke="currentColor" stroke-width="2">
+                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  </svg>
+                  <input id="vmx-lib-folder" value="~/Music" />
+                </div>
+                <div class="vmx-lib-chips">
+                  <span class="vmx-lib-chip" data-strategy="mean" aria-pressed="false">strategy · mean</span>
+                  <span class="vmx-lib-chip" data-strategy="cue-anchored" aria-pressed="true">strategy · cue-anchored</span>
+                </div>
+              </div>
+
+              <button class="vmx-lib-run" id="vmx-lib-runbtn">▸ Run search</button>
+
+              <!-- corpus readout -->
+              <div class="vmx-lib-corpus">
+                <div class="vmx-lib-stat">
+                  <div class="k">Indexed</div>
+                  <div class="v" id="vmx-lib-stat-indexed">·<small> / 1547</small></div>
+                </div>
+                <div class="vmx-lib-stat">
+                  <div class="k">Backend</div>
+                  <div class="v backend" id="vmx-lib-stat-backend">·</div>
+                </div>
+                <div class="vmx-lib-stat">
+                  <div class="k">Spent</div>
+                  <div class="v amber" id="vmx-lib-stat-spent">·</div>
+                </div>
+                <div class="vmx-lib-stat">
+                  <div class="k">Failed</div>
+                  <div class="v" id="vmx-lib-stat-failed">·</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <!-- CENTER — results -->
+          <section class="vmx-lib-panel">
+            <div class="vmx-lib-panel-hd">
+              <span class="vmx-lib-label">Pulled</span>
+              <span class="vmx-lib-qecho">vibe · <span class="term" id="vmx-lib-echo">·</span></span>
+              <span class="spacer" style="flex: 1"></span>
+              <span class="vmx-lib-count" id="vmx-lib-rcount">·</span>
+            </div>
+            <div class="vmx-lib-panel-bd">
+              <div class="vmx-lib-results" id="vmx-lib-results"></div>
+
+              <!-- ingest progress -->
+              <div class="vmx-lib-ingest">
+                <div>
+                  <div class="vmx-lib-proghead">
+                    <div class="n" id="vmx-lib-prog-n">0<small> / 0</small></div>
+                    <div class="cost" id="vmx-lib-prog-cost">~€0.00</div>
+                  </div>
+                  <div class="vmx-lib-progress"><i id="vmx-lib-progress-fill"></i></div>
+                </div>
+                <div class="vmx-lib-loglist" id="vmx-lib-loglist"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- RIGHT — vibe scope -->
+          <aside class="vmx-lib-panel">
+            <div class="vmx-lib-panel-hd">
+              <span class="vmx-lib-label">Vibe scope</span>
+              <span class="spacer" style="flex: 1"></span>
+              <span class="vmx-lib-count vmx-lib-mono" id="vmx-lib-scope-state"
+                    style="font-size: 10px">·</span>
+            </div>
+            <div class="vmx-lib-panel-bd vmx-lib-scope-wrap">
+              <div class="vmx-lib-scope">
+                <svg id="vmx-lib-scope" viewBox="0 0 300 300" aria-hidden="true"></svg>
+              </div>
+              <div class="vmx-lib-legend">
+                <div class="ln"><span class="sw origin"></span>Query / seed<span class="d">origin</span></div>
+                <div class="ln"><span class="sw near"></span>Near neighbour<span class="d">&lt; 0.30</span></div>
+                <div class="ln"><span class="sw far"></span>Distant<span class="d">&gt; 0.60</span></div>
+              </div>
+              <div class="vmx-lib-scope-note">
+                Distance is <b>vibe distance</b> in 1536-d space, mean-centered so
+                the cone collapses and real separation shows. Closer rings mix cleaner.
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/library/index.ts"></script>
   </body>
 </html>

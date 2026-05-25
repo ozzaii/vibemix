@@ -1,0 +1,490 @@
+/* SPDX-License-Identifier: Apache-2.0
+ * Vibe Engine — CDJ Whisper v5 surface for the library window.
+ *
+ * Faithful port of mocks/vibemix-library-ui.html using the tokens.css vars
+ * (--void-*, --silk-*, --amber*, --led-*, --glass-*, --glow-*, Saira +
+ * JetBrains Mono). No duplicated hexes — every color resolves to a token.
+ * Classes are `vmx-lib-` namespaced so they never collide with the wizard /
+ * session / debrief surfaces that share tokens.css.
+ *
+ * No-AI-slop guardrails honored: the segmented LED match meter is discrete
+ * cells (NOT a gradient fill bar); scores are mono tabular-nums; the glass is
+ * the established CDJ material (token-defined), not decorative glassmorphism;
+ * no gradient text, no side-stripe borders.
+ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+  font-family: var(--type-body);
+  color: var(--silk);
+  background: var(--void);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  /* deep void with one faint amber light bleeding from the top-left,
+     like a booth lamp — the only warm source in the room. */
+  background:
+    radial-gradient(120% 90% at 8% -10%, rgba(255, 138, 61, 0.06), transparent 46%),
+    radial-gradient(80% 70% at 100% 110%, rgba(72, 120, 200, 0.030), transparent 55%),
+    var(--void-1);
+}
+
+.vmx-lib-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+}
+.vmx-lib-mono {
+  font-family: var(--type-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+/* ── window shell ───────────────────────────────────────── */
+.vmx-lib-app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  gap: 12px;
+}
+.vmx-lib-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 4px;
+  height: 30px;
+  flex: none;
+}
+.vmx-lib-brand { display: flex; align-items: baseline; gap: 9px; }
+.vmx-lib-brand b { font-weight: 700; font-size: 15px; letter-spacing: 0.04em; }
+.vmx-lib-brand .sub {
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+}
+.vmx-lib-brand .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: var(--glow-soft);
+  align-self: center;
+  animation: vmx-lib-breathe 3.4s ease-in-out infinite;
+}
+@keyframes vmx-lib-breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.vmx-lib-titlebar .spacer { flex: 1; }
+.vmx-lib-keystat {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--silk-65);
+}
+.vmx-lib-keystat .led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--led-ok);
+  box-shadow: 0 0 6px var(--led-ok);
+}
+
+.vmx-lib-frame {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 300px 1fr 340px;
+  gap: 12px;
+}
+.vmx-lib-panel {
+  position: relative;
+  border-radius: var(--rad-lg);
+  background: var(--glass-2);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border: 1px solid var(--glass-edge);
+  box-shadow: 0 1px 0 var(--glass-top) inset, 0 24px 60px -30px var(--void);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* top-edge light — the frosted-glass material seal, not a decorative float */
+.vmx-lib-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--glass-edge-up) 40%,
+    var(--glass-edge-up) 60%,
+    transparent
+  );
+}
+.vmx-lib-panel-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px 12px;
+}
+.vmx-lib-panel-hd .vmx-lib-label { flex: 1; }
+.vmx-lib-panel-bd {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 18px 18px;
+}
+.vmx-lib-panel-bd::-webkit-scrollbar { width: 8px; }
+.vmx-lib-panel-bd::-webkit-scrollbar-thumb {
+  background: var(--silk-12);
+  border-radius: 4px;
+}
+
+/* ── left console: mode switch + query ──────────────────── */
+.vmx-lib-modeswitch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--void-3);
+  border-radius: var(--rad-md);
+  border: 1px solid var(--glass-edge);
+}
+.vmx-lib-modeswitch button {
+  flex: 1;
+  font-family: var(--type-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  background: transparent;
+  border: 0;
+  border-radius: var(--rad-sm);
+  padding: 9px 0;
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s;
+}
+.vmx-lib-modeswitch button[aria-selected="true"] {
+  color: var(--amber);
+  background: var(--glass-1);
+  box-shadow: 0 0 0 1px var(--amber-22) inset, var(--glow-soft);
+}
+.vmx-lib-modeswitch button:hover:not([aria-selected="true"]) {
+  color: var(--silk-65);
+}
+
+.vmx-lib-field { margin-top: 18px; }
+.vmx-lib-field .vmx-lib-label { display: block; margin-bottom: 8px; }
+.vmx-lib-qbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--void-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  padding: 12px 13px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.vmx-lib-qbox:focus-within {
+  border-color: var(--amber-40);
+  box-shadow: 0 0 0 1px var(--amber-22), var(--glow-soft);
+}
+.vmx-lib-qbox svg { flex: none; color: var(--silk-40); }
+.vmx-lib-qbox input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--silk);
+  font-family: var(--type-body);
+  font-size: 14px;
+}
+.vmx-lib-qbox input::placeholder { color: var(--silk-22); }
+
+.vmx-lib-dropzone {
+  margin-top: 14px;
+  border: 1px dashed var(--silk-22);
+  border-radius: var(--rad-md);
+  padding: 20px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.vmx-lib-dropzone:hover,
+.vmx-lib-dropzone.dragging {
+  border-color: var(--amber-40);
+  background: rgba(255, 138, 61, 0.03);
+}
+.vmx-lib-dropzone .big { font-size: 13px; color: var(--silk-65); margin-bottom: 4px; }
+.vmx-lib-dropzone .seed {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-content: center;
+}
+.vmx-lib-dropzone .seed .led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: var(--glow-soft);
+}
+.vmx-lib-dropzone .seed .name { font-size: 12px; color: var(--silk); }
+
+.vmx-lib-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.vmx-lib-chip {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--silk-65);
+  background: var(--void-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: 0.18s;
+}
+.vmx-lib-chip:hover { color: var(--amber); border-color: var(--amber-22); }
+.vmx-lib-chip[aria-pressed="true"] { color: var(--amber); border-color: var(--amber-22); }
+
+.vmx-lib-run {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  font-family: var(--type-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: var(--glass-1);
+  border: 1px solid var(--amber-22);
+  border-radius: var(--rad-sm);
+  padding: 13px 0;
+  cursor: pointer;
+  transition: 0.2s;
+  box-shadow: var(--glow-soft);
+}
+.vmx-lib-run:hover {
+  background: rgba(255, 138, 61, 0.08);
+  box-shadow: var(--glow-strong);
+}
+.vmx-lib-run:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+
+/* corpus readout block */
+.vmx-lib-corpus {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--glass-edge);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 10px;
+}
+.vmx-lib-stat .k {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  margin-bottom: 5px;
+}
+.vmx-lib-stat .v {
+  font-family: var(--type-mono);
+  font-size: 18px;
+  color: var(--silk);
+  font-variant-numeric: tabular-nums;
+}
+.vmx-lib-stat .v small { font-size: 11px; color: var(--silk-40); }
+.vmx-lib-stat .v.amber { color: var(--amber); }
+.vmx-lib-stat .v.backend { font-size: 13px; letter-spacing: 0; }
+
+/* ── center: results deck ───────────────────────────────── */
+.vmx-lib-count { font-family: var(--type-mono); font-size: 11px; color: var(--silk-40); }
+.vmx-lib-qecho { font-size: 13px; color: var(--silk-65); font-style: normal; }
+.vmx-lib-qecho .term { color: var(--amber); font-weight: 500; }
+
+.vmx-lib-row {
+  display: grid;
+  grid-template-columns: 30px 1fr 88px;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 12px;
+  border-radius: var(--rad-md);
+  cursor: default;
+  border: 1px solid transparent;
+  transition: background 0.16s, border-color 0.16s;
+}
+.vmx-lib-row + .vmx-lib-row { margin-top: 3px; }
+.vmx-lib-row:hover { background: var(--glass-1); border-color: var(--glass-edge); }
+.vmx-lib-row .rank {
+  font-family: var(--type-mono);
+  font-size: 12px;
+  color: var(--silk-22);
+  text-align: right;
+}
+.vmx-lib-row.top .rank { color: var(--amber); }
+.vmx-lib-row .title {
+  font-size: 14px;
+  color: var(--silk);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vmx-lib-row .meta {
+  font-family: var(--type-mono);
+  font-size: 10.5px;
+  color: var(--silk-40);
+  margin-top: 3px;
+  letter-spacing: 0.05em;
+}
+.vmx-lib-row .score { text-align: right; }
+.vmx-lib-row .score .num {
+  font-family: var(--type-mono);
+  font-size: 14px;
+  color: var(--silk);
+  font-variant-numeric: tabular-nums;
+}
+.vmx-lib-row.top .score .num { color: var(--amber); }
+
+/* segmented match meter — hardware LED bar, discrete cells, never a gradient. */
+.vmx-lib-meter { display: flex; gap: 2px; margin-top: 5px; justify-content: flex-end; }
+.vmx-lib-meter i { width: 5px; height: 8px; border-radius: 1px; background: var(--silk-12); }
+.vmx-lib-meter i.on { background: var(--amber); box-shadow: 0 0 4px var(--amber-40); }
+.vmx-lib-meter i.dim { background: var(--amber-22); }
+
+.vmx-lib-empty {
+  padding: 32px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--silk-40);
+}
+
+/* ── right: vibe scope ──────────────────────────────────── */
+.vmx-lib-scope-wrap { display: flex; flex-direction: column; height: 100%; }
+.vmx-lib-scope { position: relative; aspect-ratio: 1; width: 100%; margin-top: 4px; }
+.vmx-lib-scope svg { display: block; width: 100%; height: 100%; }
+.vmx-lib-ringlabel {
+  font-family: var(--type-mono);
+  font-size: 8.5px;
+  fill: var(--silk-22);
+  letter-spacing: 0.1em;
+}
+.vmx-lib-dot-near { filter: drop-shadow(0 0 5px var(--amber-40)); }
+.vmx-lib-dot-origin { filter: drop-shadow(0 0 7px var(--amber-65)); }
+
+.vmx-lib-legend {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--glass-edge);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.vmx-lib-legend .ln {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--silk-65);
+}
+.vmx-lib-legend .ln .sw { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.vmx-lib-legend .ln .sw.origin { background: var(--amber); box-shadow: var(--glow-soft); }
+.vmx-lib-legend .ln .sw.near { background: var(--amber-pale); }
+.vmx-lib-legend .ln .sw.far { background: var(--silk-40); }
+.vmx-lib-legend .ln .d {
+  margin-left: auto;
+  font-family: var(--type-mono);
+  font-size: 11px;
+  color: var(--silk-40);
+}
+.vmx-lib-scope-note { margin-top: 14px; font-size: 11.5px; line-height: 1.5; color: var(--silk-40); }
+.vmx-lib-scope-note b { color: var(--silk-65); font-weight: 500; }
+
+/* sonar ping on the origin dot */
+@keyframes vmx-lib-ping {
+  0% { r: 3; opacity: 0.9; }
+  70% { r: 13; opacity: 0; }
+  100% { opacity: 0; }
+}
+.vmx-lib-seed-ping { animation: vmx-lib-ping 2.8s ease-out infinite; }
+
+/* ── ingest mode (overlays center when active) ──────────── */
+.vmx-lib-ingest { display: none; flex-direction: column; gap: 14px; }
+body[data-mode="ingest"] .vmx-lib-results { display: none; }
+body[data-mode="ingest"] .vmx-lib-ingest { display: flex; }
+body[data-mode="ingest"] .vmx-lib-qecho { display: none; }
+
+.vmx-lib-progress {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--void-3);
+  border: 1px solid var(--glass-edge);
+  overflow: hidden;
+  position: relative;
+}
+.vmx-lib-progress i {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  background: linear-gradient(90deg, var(--amber-deep), var(--amber));
+  box-shadow: var(--glow-soft);
+  transition: width 0.3s ease-out;
+}
+.vmx-lib-proghead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+.vmx-lib-proghead .n { font-family: var(--type-mono); font-size: 22px; color: var(--silk); }
+.vmx-lib-proghead .n small { font-size: 13px; color: var(--silk-40); }
+.vmx-lib-proghead .cost { font-family: var(--type-mono); font-size: 13px; color: var(--amber); }
+
+.vmx-lib-loglist {
+  margin-top: 6px;
+  font-family: var(--type-mono);
+  font-size: 11px;
+  line-height: 1.9;
+  color: var(--silk-65);
+}
+.vmx-lib-loglist .ll {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.vmx-lib-loglist .st { width: 30px; font-weight: 500; }
+.vmx-lib-loglist .st.ok { color: var(--led-ok); }
+.vmx-lib-loglist .st.skip { color: var(--silk-40); }
+.vmx-lib-loglist .st.err { color: var(--led-fault); }
+.vmx-lib-loglist .fn { flex: 1; overflow: hidden; text-overflow: ellipsis; color: var(--silk-65); }
+.vmx-lib-loglist .c { color: var(--silk-40); }
+
+/* staggered result settle — set inline initial opacity/transform in JS, then
+   add this class on the next frame to animate in. */
+.vmx-lib-row {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.vmx-lib-row.settled {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vmx-lib-row { opacity: 1; transform: none; }
+  .vmx-lib-row.settled { transition: none; }
+  .vmx-lib-seed-ping { animation: none; }
+  .vmx-lib-brand .dot { animation: none; }
+}

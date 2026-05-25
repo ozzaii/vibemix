@@ -64,7 +64,9 @@ const FONT_DECLS: { file: string; decl: string }[] = [];
 for (const f of FILES) {
   const text = readFileSync(f, "utf-8");
   for (const m of text.matchAll(/font-family:\s*([^;}\n]+)/gi)) {
-    FONT_DECLS.push({ file: f.replace(SRC, "src"), decl: m[1].trim() });
+    const decl = m[1];
+    if (decl === undefined) continue;
+    FONT_DECLS.push({ file: f.replace(SRC, "src"), decl: decl.trim() });
   }
 }
 
@@ -87,7 +89,7 @@ describe("design-slop gate — no AI-slop fonts", () => {
 
   it("every font-family stack starts with a brand font or a --type-* token", () => {
     const offenders = FONT_DECLS.filter(({ decl }) => {
-      const first = decl.replace(/['"]/g, "").split(",")[0].trim();
+      const first = (decl.replace(/['"]/g, "").split(",")[0] ?? "").trim();
       const isToken = first.startsWith("var(--type-");
       const isBrand = ALLOWED_FONTS.some((a) => first.toLowerCase() === a.toLowerCase());
       // `inherit` / `unset` / empty are neutral (don't impose a face).
