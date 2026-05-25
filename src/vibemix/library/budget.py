@@ -145,6 +145,184 @@ def project_monthly_cost(
     )
 
 
+# ─── Per-session token + cost meter (quick task 260525-fuv) ─────────────────────
+#
+# SessionMeter records per-call token usage keyed by ROUTER-PATH (never a raw
+# Gemini model literal — CI grep gate forbids model names outside
+# _router_config.py). It computes the fresh/cached/output billing split so a
+# DJ set's true € cost and the € saved by the Gemini context cache are visible
+# at session end.
+#
+# ROUTE_PRICING — USD per 1M tokens, May 2026 (see PLAN <pricing_facts>):
+#   - cache-eligible paths carry a "cached_input" rate (90% discount on
+#     live_coach: 0.15 vs 1.50);
+#   - tts / embedding paths have no cache → cached_input == input (the split
+#     degenerates to "all fresh", savings 0).
+ROUTE_PRICING: dict[str, dict[str, float]] = {
+    # path:            input,  output, cached_input  (USD per 1M tokens)
+    "live_coach":     {"input": 1.50, "output": 9.00, "cached_input": 0.15},
+    "live_coach_tts": {"input": 1.00, "output": 20.00, "cached_input": 1.00},
+    "debrief":        {"input": 2.00, "output": 12.00, "cached_input": 0.20},
+    "debrief_tts":    {"input": 1.00, "output": 20.00, "cached_input": 1.00},
+    "embedding":      {"input": 0.20, "output": 0.00, "cached_input": 0.20},
+}
+
+# Paths whose cached_input is a genuine discount feed the cache-hit-rate /
+# savings numerator. tts/embedding carry no real cache → excluded so the rate
+# reflects only paths where caching actually saves money.
+_CACHE_ELIGIBLE_PATHS = frozenset(
+    p for p, r in ROUTE_PRICING.items() if r["cached_input"] < r["input"]
+)
+
+
+class SessionMeter:
+    """Token-level per-session cost meter, keyed by router-path.
+
+    Mirrors ``BudgetTelemetry``'s lock-guarded, singleton-accessed style.
+    ``record()`` is called from the LLM stream consumer hot path — it MUST
+    NEVER raise (T-fuv-01); all arithmetic is defensive. Unknown router paths
+    are tracked under their key with zero cost rather than crashing (T-fuv-02).
+    """
+
+    def __init__(self) -> None:
+        # path -> {"input_tokens", "cached_tokens", "output_tokens",
+        #          "cost_usd", "savings_usd", "known"}
+        self._paths: dict[str, dict[str, float]] = {}
+        self._untracked_calls = 0
+        self._lock = threading.Lock()
+
+    def record(
+        self,
+        path: str,
+        *,
+        prompt: int = 0,
+        cached: int = 0,
+        output: int = 0,
+    ) -> None:
+        """Record one call's token usage and bill it per the path's rates.
+
+        ``prompt`` is the TOTAL input token count (cached tokens included),
+        matching Gemini ``usage_metadata.prompt_token_count``. ``cached`` is
+        ``cached_content_token_count``; ``output`` is
+        ``candidates_token_count``. Never raises.
+        """
+        try:
+            prompt = max(int(prompt or 0), 0)
+            cached = max(int(cached or 0), 0)
+            output = max(int(output or 0), 0)
+            # cached can never legitimately exceed prompt; clamp so the
+            # fresh-input split and the cache-hit-rate stay sane.
+            cached = min(cached, prompt)
+            fresh_input = prompt - cached
+
+            rate = ROUTE_PRICING.get(path)
+            known = rate is not None
+            if rate is None:
+                cost_usd = 0.0
+                savings_usd = 0.0
+            else:
+                cost_usd = (
+                    fresh_input * rate["input"] / 1e6
+                    + cached * rate["cached_input"] / 1e6
+                    + output * rate["output"] / 1e6
+                )
+                savings_usd = cached * (rate["input"] - rate["cached_input"]) / 1e6
+
+            with self._lock:
+                acc = self._paths.setdefault(
+                    path,
+                    {
+                        "input_tokens": 0.0,
+                        "cached_tokens": 0.0,
+                        "output_tokens": 0.0,
+                        "cost_usd": 0.0,
+                        "savings_usd": 0.0,
+                        "known": 1.0 if known else 0.0,
+                    },
+                )
+                acc["input_tokens"] += prompt
+                acc["cached_tokens"] += cached
+                acc["output_tokens"] += output
+                acc["cost_usd"] += cost_usd
+                acc["savings_usd"] += savings_usd
+                if known:
+                    acc["known"] = 1.0
+        except Exception:
+            # Hot-path safety (T-fuv-01): a meter write must never wedge the
+            # LLM stream consumer.
+            pass
+
+    def record_untracked(self) -> None:
+        """Count a generation whose token usage is unavailable (OpenRouter
+        brain path returns ``usage_metadata=None``). No cost is fabricated."""
+        try:
+            with self._lock:
+                self._untracked_calls += 1
+        except Exception:
+            pass
+
+    def summary(self) -> dict:
+        """Return the per-path tokens + cost block written to session.json.
+
+        Keys: ``per_path`` (per router-path {input_tokens, cached_tokens,
+        output_tokens, cost_eur}), ``total_cost_eur``, ``total_savings_eur``,
+        ``cache_hit_rate`` (cached/input over cache-eligible paths, 0.0 when no
+        input, clamped to [0, 1]), ``untracked_calls``.
+        """
+        with self._lock:
+            per_path: dict[str, dict[str, float]] = {}
+            total_cost_usd = 0.0
+            total_savings_usd = 0.0
+            cache_input = 0
+            cache_cached = 0
+            for path, acc in self._paths.items():
+                per_path[path] = {
+                    "input_tokens": int(acc["input_tokens"]),
+                    "cached_tokens": int(acc["cached_tokens"]),
+                    "output_tokens": int(acc["output_tokens"]),
+                    "cost_eur": acc["cost_usd"] * USD_TO_EUR,
+                }
+                total_cost_usd += acc["cost_usd"]
+                total_savings_usd += acc["savings_usd"]
+                if path in _CACHE_ELIGIBLE_PATHS:
+                    cache_input += int(acc["input_tokens"])
+                    cache_cached += int(acc["cached_tokens"])
+            untracked = self._untracked_calls
+
+        if cache_input > 0:
+            cache_hit_rate = cache_cached / cache_input
+            cache_hit_rate = max(0.0, min(1.0, cache_hit_rate))
+        else:
+            cache_hit_rate = 0.0
+
+        return {
+            "per_path": per_path,
+            "total_cost_eur": total_cost_usd * USD_TO_EUR,
+            "total_savings_eur": total_savings_usd * USD_TO_EUR,
+            "cache_hit_rate": cache_hit_rate,
+            "untracked_calls": untracked,
+        }
+
+    def reset(self) -> None:
+        """Test-only reset — production code never resets."""
+        with self._lock:
+            self._paths.clear()
+            self._untracked_calls = 0
+
+
+_SESSION_METER: SessionMeter | None = None
+_SESSION_METER_LOCK = threading.Lock()
+
+
+def get_session_meter() -> SessionMeter:
+    """Module-level SessionMeter singleton (mirrors ``get_telemetry()``)."""
+    global _SESSION_METER
+    with _SESSION_METER_LOCK:
+        if _SESSION_METER is None:
+            _SESSION_METER = SessionMeter()
+        return _SESSION_METER
+
+
 # ─── Runtime telemetry singleton ───────────────────────────────────────────────
 
 
@@ -239,7 +417,10 @@ __all__ = [
     "CostProjection",
     "DEFAULT_GROUNDING_EVENTS_PER_SESSION",
     "PRICING",
+    "ROUTE_PRICING",
+    "SessionMeter",
     "USD_TO_EUR",
+    "get_session_meter",
     "get_telemetry",
     "project_monthly_cost",
 ]
