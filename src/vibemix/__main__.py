@@ -1227,6 +1227,10 @@ async def main() -> None:
     # None BEFORE the try so the name is always bound in the finally-block
     # close-ingest call (the except path below leaves it unset otherwise).
     _session_ipc = None
+    # Phase 77 review WR-02 — strong-ref holder for fire-and-forget tasks
+    # (the boot memory-ingest below). Bound before the try so the name is
+    # always available; tasks add a self-removing done-callback.
+    _background_tasks: set[asyncio.Task] = set()
     try:
         _settings_config = load_config()
         _live_settings_applier = SettingsApplier(
@@ -1262,8 +1266,22 @@ async def main() -> None:
         # (VIBEMIX_RECALL_ENABLED, default OFF) → additive no-op for the
         # default user (memory stays opt-in; recall has no fuel until Kaan
         # flips §RECALL-EAR). Off-loop + best-effort inside _fire_ingest.
+        #
+        # Phase 77 review WR-02 — retain a STRONG reference to the boot
+        # ingest task. The event loop holds only a WEAK reference to a task
+        # (CPython docs), so a bare ``asyncio.create_task(...)`` whose return
+        # value is discarded can be garbage-collected mid-flight and silently
+        # cancelled — leaving memory.db un-seeded even with
+        # VIBEMIX_RECALL_ENABLED=1. Stash it in a long-lived set with a
+        # self-removing done-callback so the loop keeps a strong ref until the
+        # ingest completes. (The close-path ingest in the finally already
+        # ``await``s, so only this boot path was exposed.)
         if recall_enabled and _session_ipc is not None:
-            asyncio.create_task(_session_ipc._fire_ingest("boot"))
+            _boot_ingest_task = asyncio.create_task(
+                _session_ipc._fire_ingest("boot")
+            )
+            _background_tasks.add(_boot_ingest_task)
+            _boot_ingest_task.add_done_callback(_background_tasks.discard)
     except Exception as _e:  # pragma: no cover — never block boot on this
         ipc_router = None
         _session_ipc = None
@@ -1395,6 +1413,17 @@ async def main() -> None:
                 _agent_task.cancel()
                 try:
                     await _agent_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+        # Phase 77 review WR-02 — drain any still-running fire-and-forget
+        # background task (the boot memory-ingest) on shutdown so it doesn't
+        # leak past the loop teardown. Snapshot the set first (the done-
+        # callback mutates it on completion).
+        for _bg_task in list(_background_tasks):
+            if not _bg_task.done():
+                _bg_task.cancel()
+                try:
+                    await _bg_task
                 except (asyncio.CancelledError, Exception):
                     pass
         for stream in (voice_stream, pass_stream, input_stream):
