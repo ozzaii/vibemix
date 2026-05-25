@@ -138,7 +138,6 @@ def _kwargs(mocker, tmp_path: Path) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="WIRE-01 not yet wired (Plan 04)", strict=True)
 def test_agent_references_grounding_engine() -> None:
     """dj_cohost.py consults the grounding engine (kwarg + latest-citation pull)."""
     src = _dj_cohost_source()
@@ -146,7 +145,6 @@ def test_agent_references_grounding_engine() -> None:
     assert "get_latest_citation" in src
 
 
-@pytest.mark.xfail(reason="WIRE-01 not yet wired (Plan 04)", strict=True)
 def test_grounding_dispatch_is_off_loop_run_in_executor() -> None:
     """The grounding consult is dispatched OFF the loop (run_in_executor arg).
 
@@ -168,9 +166,6 @@ def test_grounding_dispatch_is_off_loop_run_in_executor() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason="WIRE-01 dispatch not yet wired (Plan 04)", strict=True
-)
 def test_track_change_dispatches_grounding_off_loop(
     mocker, tmp_path: Path
 ) -> None:

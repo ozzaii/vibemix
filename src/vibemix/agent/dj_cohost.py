@@ -81,6 +81,7 @@ from vibemix.ui_bus import SessionCohostReaction, SessionOverlayHighlight
 if TYPE_CHECKING:  # pragma: no cover — typing-only
     from vibemix.audio.buffers import PlaybackQueue
     from vibemix.audio.lookahead import LookaheadProvider
+    from vibemix.library.grounding import Grounding
     from vibemix.memory.retrieval import MemoryRecall
     from vibemix.runtime.ws_bus import IpcBus
 
@@ -419,6 +420,23 @@ class DJCoHostAgent(Agent):
         # real corpus); the seam ships wired + tested regardless.
         recall: "MemoryRecall | None" = None,
         recall_enabled: bool = False,
+        # Phase 77 Plan 04 — WIRE-01: the "what's playing" Grounding engine.
+        # Built + armed at boot (``__main__.py``) but historically orphaned —
+        # never passed downstream. This kwarg wires it in, mirroring the
+        # Phase-65 MemoryRecall 4-point seam: track-aware events pre-dispatch
+        # ``Grounding.on_event`` OFF the loop (run_in_executor) so the embed
+        # never blocks the reaction hot path (TTFT non-regression); llm_node
+        # pulls ``get_latest_citation()`` and, when CITED, injects the
+        # ``[track:<id>]`` reference into the prompt (it resolves in the
+        # EvidenceRegistry because ``register_library`` already seeded every
+        # library track id — invariant #2, no linter change); the latch is
+        # cleared at turn end alongside the recall clear. Grounding is
+        # consulted STRICTLY READ-ONLY — it never writes MusicState
+        # (single-writer invariant #1). Default ``None`` → cold path
+        # BYTE-IDENTICAL to the v8.0 baseline (``grounding is None`` IS the
+        # gate; no separate enabled flag, since the live build already
+        # conditions grounding creation on library presence).
+        grounding: "Grounding | None" = None,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -516,6 +534,15 @@ class DJCoHostAgent(Agent):
         # llm_node) — passing only the service is not enough.
         self._recall: "MemoryRecall | None" = recall
         self._recall_enabled: bool = recall_enabled and recall is not None
+        # Phase 77 Plan 04 — WIRE-01: the Grounding service reference + its
+        # off-loop pre-dispatch task ref. ``grounding is not None`` is the
+        # gate (see __init__ kwarg docstring). The task ref mirrors
+        # ``self._recall_task``: ``set_next_event`` creates a cancellable
+        # background task per track-aware event; llm_node leaves it alone and
+        # pulls ``get_latest_citation()``. Default None → cold path
+        # byte-identical (no dispatch, no injection, no clear).
+        self._grounding: "Grounding | None" = grounding
+        self._grounding_task: "asyncio.Task | None" = None
         # Phase 66 (COPILOT-02) — wall-clock timestamp of the last recall
         # callback that REACHED the audience (the ``await self._ipc_bus.
         # emit(...)`` returned without raising on a turn that emitted a
@@ -851,6 +878,113 @@ class DJCoHostAgent(Agent):
         #     TTFT regression.
         # The flag-OFF / no-service path is byte-identical to today.
         self._maybe_dispatch_recall(ev)
+        # Phase 77 Plan 04 — WIRE-01: pre-dispatch Grounding.on_event OFF the
+        # event loop for track-aware events, exactly like the recall seam
+        # above. The "what's playing" cosine embed is the expensive part; it
+        # MUST NOT be inline-awaited in llm_node (TTFT regression — the whole
+        # reason the pre-dispatch+latch+pull pattern exists). The grounding=
+        # None / no-loop paths are byte-identical to today.
+        self._maybe_dispatch_grounding(ev)
+
+    def _maybe_dispatch_grounding(self, ev: Event) -> None:
+        """Pre-dispatch ``Grounding.on_event`` off-loop for track-aware events.
+
+        WIRE-01 (Phase 77 Plan 04). Mirrors ``_maybe_dispatch_recall``: a
+        no-op when no grounding service is wired / the event is not
+        track-aware / no running asyncio loop is available (e.g. agent
+        constructed outside a live coach loop, as several unit tests do).
+        Best-effort — every step is guarded so a grounding-side failure
+        CANNOT perturb a reaction turn; at worst, no citation is injected.
+
+        Schedules an asyncio task wrapping
+        ``loop.run_in_executor(None, grounding.on_event, …)`` in
+        ``asyncio.wait_for(timeout=RECALL_DEADLINE_S)`` (reuses the proven
+        recall deadline constant — both are off-hot-path Gemini embeds). On
+        timeout / exception the latch is cleared so a missed/late lookup
+        never bleeds into the turn. NEVER inline-awaits the embed in llm_node.
+        """
+        grounding = self._grounding
+        if grounding is None:
+            return
+        # Lazy import — keeps the track-aware event gate colocated with the
+        # grounding module (the single source of TRACK_AWARE_EVENTS) and
+        # avoids a top-level agent→library coupling at import time.
+        try:
+            from vibemix.library.grounding import TRACK_AWARE_EVENTS
+        except Exception as _e:  # pragma: no cover — defensive only
+            print(f"[grounding dispatch import err] {_e}", file=sys.stderr)
+            return
+        # Event gate — short-circuit BEFORE any executor / loop work on the
+        # high-frequency event classes (HEARTBEAT, etc.). on_event ALSO gates
+        # internally (defense in depth), but checking here avoids burning a
+        # task + executor slot. (TRACK_AWARE_EVENTS = TRACK_CHANGE /
+        # LAYER_ARRIVAL / MIX_MOVE.)
+        if ev.type not in TRACK_AWARE_EVENTS:
+            return
+        # We need a running loop to schedule the task. set_next_event is
+        # called from coach_loop (async context) so a loop is normally
+        # available; in test contexts that construct the agent without a
+        # running loop, fall through silently — the grounding path is opt-in
+        # and the no-grounding path is byte-identical.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        # Snapshot the clean-audio buffer to WAV bytes HERE (synchronous,
+        # cheap buffer read) and hand the bytes to the executor. Reuse the
+        # same ``self._clean_audio_buf`` snapshot that llm_node feeds Gemini
+        # — do NOT add a second capture path (A3). identify_playing tolerates
+        # audio_bytes=None → below-threshold Citation, so a snapshot failure
+        # degrades to "no citation", never a crash.
+        try:
+            audio_bytes = snapshot_wav(self._clean_audio_buf, INVOKE_AUDIO_SECONDS)
+        except Exception as _e:
+            print(f"[grounding snapshot err] {_e}", file=sys.stderr)
+            audio_bytes = None
+        # Resolve the off-loop deadline. Reuse the recall constant — both are
+        # off-hot-path Gemini embeds with the same TTFT budget. Defensive
+        # fallback keeps grounding working even if the memory module is
+        # unavailable in a stripped build.
+        try:
+            from vibemix.memory.retrieval import RECALL_DEADLINE_S as _DEADLINE_S
+        except Exception:
+            _DEADLINE_S = 2.0
+        ev_type = ev.type
+
+        async def _run() -> None:
+            try:
+                await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        grounding.on_event,
+                        ev_type,
+                        audio_bytes,
+                    ),
+                    timeout=_DEADLINE_S,
+                )
+            except asyncio.CancelledError:
+                # A new event preempted this dispatch (cancel + replace
+                # below). Re-raise without clearing — the new event's own
+                # on_event will latch its own fresh citation; clearing here
+                # would torpedo the new dispatch. Mirrors the recall seam.
+                raise
+            except (TimeoutError, asyncio.TimeoutError):
+                # Late grounding is worse than none — clear so the stale
+                # latch from a prior turn cannot bleed into this one.
+                grounding.clear()
+            except Exception as _e:
+                # Any other failure also clears, then swallows — grounding
+                # can never break a reaction turn.
+                grounding.clear()
+                print(f"[grounding dispatch err] {_e}", file=sys.stderr)
+
+        # Overwriting an existing pending pre-dispatch is intentional — the
+        # prior event was preempted, so its grounding result is no longer
+        # relevant. Cancel + replace.
+        prev = self._grounding_task
+        if prev is not None and not prev.done():
+            prev.cancel()
+        self._grounding_task = asyncio.create_task(_run())
 
     def _maybe_dispatch_recall(self, ev: Event) -> None:
         """Pre-dispatch ``MemoryRecall.on_event`` off-loop for track-aware events.
@@ -1176,6 +1310,24 @@ class DJCoHostAgent(Agent):
                 Event(type="MANUAL", state=self._state, extra={}),
                 **_bp_kwargs,
             )
+
+        # Phase 77 Plan 04 — WIRE-01: pull the latest CITED grounding citation
+        # (latched off-loop by _maybe_dispatch_grounding) and inject it as a
+        # ``[track:<id>]`` reference into the prompt. The id resolves in the
+        # EvidenceRegistry because ``register_library`` already seeded every
+        # library track id (invariant #2) — so the CitationLinter keeps the
+        # turn with NO linter change. STRICTLY READ-ONLY: we never write
+        # MusicState (single-writer invariant #1). The grounding=None path
+        # (cold path) skips this entirely → byte-identical. NEVER inline-await
+        # the embed here — get_latest_citation() is a cheap lock-guarded read
+        # of the already-computed latch (the off-loop dispatch did the work).
+        if self._grounding is not None:
+            try:
+                cit = self._grounding.get_latest_citation()
+                if cit is not None and cit.is_cited and cit.track_id:
+                    text_prompt = f"{text_prompt} [track:{cit.track_id}]"
+            except Exception as _e:
+                print(f"[grounding pull err] {_e}", file=sys.stderr)
 
         audio_wav = snapshot_wav(self._clean_audio_buf, audio_seconds)
         # Per-invocation dump folder — full audit trail for rapid dev.
@@ -2120,6 +2272,18 @@ class DJCoHostAgent(Agent):
                 self._recall.clear()
             except Exception as _e:  # pragma: no cover — defensive only
                 print(f"[recall clear err] {_e}", file=sys.stderr)
+        # Phase 77 Plan 04 — WIRE-01: clear the latched grounding citation at
+        # turn end (mirrors the recall clear + library/grounding.py::
+        # Grounding.clear() lifecycle). A single [track:<id>] must not be
+        # replayed across multiple prompts; the next track-aware event
+        # overwrites _latest cleanly via its own on_event dispatch. The
+        # grounding=None cold path skips this → byte-identical. Best-effort —
+        # a clear() failure cannot perturb the turn that already completed.
+        if self._grounding is not None:
+            try:
+                self._grounding.clear()
+            except Exception as _e:  # pragma: no cover — defensive only
+                print(f"[grounding clear err] {_e}", file=sys.stderr)
 
     async def invalidate_cache(self) -> None:
         """Invalidate the context cache — Plan 19-03 cancel-aware chokepoint.
