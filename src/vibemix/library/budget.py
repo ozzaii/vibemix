@@ -37,9 +37,21 @@ PRICING = {
     "audio_per_1m_tokens_usd": 6.50,
 }
 
-# Empirical per-call cost (60s clip ≈ 1000 audio tokens × $6.50/1M).
-COST_PER_AUDIO_EMBED_USD = 0.0006
-# 50-token query × $0.20/1M, rounded up.
+# Gemini tokenizes audio at a fixed 32 tokens/second (official docs:
+# ai.google.dev/gemini-api/docs/tokens). The per-embed audio cost is therefore
+# DERIVED from the real excerpt duration, never a guessed flat constant — a
+# hardcoded value silently drifts when the clip length changes. (The prior
+# 0.0006 was ~20× too low and internally inconsistent with its own comment.)
+# For the fixed 60s excerpt: 60 × 32 = 1920 tokens × $6.50/1M = $0.01248.
+AUDIO_TOKENS_PER_SECOND = 32
+EXCERPT_SECONDS = 60.0  # mirrors embed.EXCERPT_DURATION
+COST_PER_AUDIO_EMBED_USD = (
+    EXCERPT_SECONDS
+    * AUDIO_TOKENS_PER_SECOND
+    * PRICING["audio_per_1m_tokens_usd"]
+    / 1e6
+)  # = 0.01248
+# Text query: variable length; ~500-token worst case × $0.20/1M (explicit est.).
 COST_PER_TEXT_QUERY_USD = 0.0001
 
 # Default call-rate assumptions (locked at "land under €50" rates).
