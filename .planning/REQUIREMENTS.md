@@ -24,7 +24,7 @@
 ### PERCEIVE — deeper, generalized ear (no new DSP, no MIR libs)
 - [x] **PERCEIVE-01**: Prompt evidence carries deltas + calibrated confidence per fact (not raw absolute scalars), so Gemini reads changes and can abstain.
 - [x] **PERCEIVE-02**: The prompt carries a multi-scale trajectory (phrase / energy-arc / recent-moves) so Gemini reasons over time, not a single snapshot.
-- [ ] **PERCEIVE-03**: `detected_genre` is driven by a mean-centered nearest-prototype lookup over cached embeddings (86.5%-validated, €0).
+- [x] **PERCEIVE-03**: `detected_genre` is driven by a mean-centered nearest-prototype lookup over cached embeddings (86.5%-validated, €0).
 
 ### LENS — three modes
 - [ ] **LENS-01**: hype / critique / tutor exist as three grounded prompt lenses over the same structured state.
@@ -72,7 +72,7 @@ Every v8.1 REQ-ID maps to exactly one phase (6 phases, 77–82; numbering contin
 | WIRE-06 | Phase 77 | Complete |
 | PERCEIVE-01 | Phase 78 | Complete |
 | PERCEIVE-02 | Phase 78 | Complete |
-| PERCEIVE-03 | Phase 78 | Pending |
+| PERCEIVE-03 | Phase 78 | Complete |
 | LENS-01 | Phase 79 | Pending |
 | LENS-02 | Phase 79 | Pending |
 | GROUND-01 | Phase 80 | Pending |

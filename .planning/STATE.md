@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v8.1
 milestone_name: One Mind
-status: executing
-last_updated: "2026-05-25T23:30:43.484Z"
+status: verifying
+last_updated: "2026-05-25T23:41:42.393Z"
 last_activity: 2026-05-25
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 8
-  completed_plans: 7
-  percent: 17
+  completed_plans: 8
+  percent: 33
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-26 — **Phase 78 (PERCEIVE) Plan 03 COMPLETE — PERCEIVE-03 genre-prototype MECHANISM SHIPPED.** New `library/genre_prototypes.py` delivers the €0 mean-centered nearest-prototype genre lookup: `build_prototypes` (one centered-mean prototype per folder-label, SAME corpus centroid as ranking), `classify` (floor/tie-margin anti-slop abstain), and a `GenrePrototypeLookup` thread-safe holder (generation-token discard, mirrors `Grounding`) that NEVER writes the live state dataclass — composing `centering`+`_cosine`+`rekordbox` with zero duplicated math (grep-gated). Flipped the 2 PERCEIVE-03 prototype xfails → real green; the 2 genre-feed/reconcile xfails stay for Plan 04. Full suite **4471 passed / 3 xfailed (1 budget + 2 PERCEIVE-03) / 4 xpassed (live-hardware) / 26 skipped** — honest green, no Gemini client, no API key. Commits `aac9683` + `8894e1a`. **Phase 78 → 3/4.** _Prior:_ **Phase 78 (PERCEIVE) Plan 02 — PERCEIVE-01 + PERCEIVE-02 SHIPPED.** The EAR now speaks in CHANGE: two additive single-writer `MusicState` fields (`prev_perceive`, `trajectory_narrative`) + a new pure `state/deltas.py` (`render_delta` abstains below the 10% floor / on cold prior; `calibrate_confidence` bucket map) feed gated `Δ[kick density rose 18% (clear)]` + `trajectory[build→drop→groove; building; last move: bass-swap 20s ago]` render branches in `coach.evidence_line` (commits `24e8dcb` + `826c6a4`). Single-writer captures live inside `_tick_once`'s lock batch (grep gate empty); cold path stays byte-identical to v8.0. The 5 PERCEIVE-01/02 xfail scaffolds flipped to real green; the 4 PERCEIVE-03 stay xfail (Plans 03/04). Full suite **4465 passed / 26 skipped / 5 xfailed (1 pre-existing budget + 4 PERCEIVE-03) / 4 xpassed (live-hardware)** — honest green, no API key. **Phase 78 → 2/4. Plan 01 (Wave-0 RED scaffolds + byte-identity pin) shipped prior** (`82a6452` + `a08a074`); **Phase 77 (WIRE) all 6 reqs landed.**
+**Last updated:** 2026-05-26 — **Phase 78 (PERCEIVE) Plan 04 COMPLETE — PERCEIVE-03 CLOSED; phase 78 done (4/4, ready for verification).** New pure `state/genre/genre_reconcile.py` solves THE flagged risk: `normalize_embedding_confidence` affine-rescales the embedding lookup's centered-cosine confidence (≈0.25 floor) into coach.py's `>= 0.5` render band (anchor `PROTO_FLOOR→0.5`, `1.0→1.0`, clamped + monotone — pinned by a known-cosine→above/below-0.5 unit test), and `reconcile_genre` fuses embedding+DSP into one coherent label (embedding-wins-when-confident, else DSP fallback). `refresh._tick_once` gains a `genre_source` kwarg: the single writer READS `GenrePrototypeLookup.get_latest()` inside the lock, reconciles with DSP `score_genre`, writes `detected_genre`/`genre_confidence` ONCE (invariant #1); the lookup is dispatched OFF-loop on TRACK_CHANGE (`clear()`-first generation token + daemon thread + try-guarded → never wedges the tick). The confident embedding (once-per-track, high-trust) commits immediately + resyncs hysteresis; the noisy per-tick DSP path stays 3-tick dwell-debounced; `genre_source=None`/empty/sub-floor → DSP-through-hysteresis → v8.0 byte-identical. Flipped the final 2 PERCEIVE-03 genre-feed/reconcile xfails → real green. Single-writer + no-API grep gates pass. Full suite **4481 passed / 1 xfailed (pre-existing budget gate) / 4 xpassed (live-hardware) / 26 skipped** — honest green, €0, no Gemini client, no API key. Commits `3f38a5c` + `66dd2b1`. **Phase 78 → 4/4 COMPLETE.** _Prior:_ **Plan 03 — PERCEIVE-03 genre-prototype MECHANISM SHIPPED.** `library/genre_prototypes.py` delivers the €0 mean-centered nearest-prototype genre lookup: `build_prototypes` (one centered-mean prototype per folder-label, SAME corpus centroid as ranking), `classify` (floor/tie-margin anti-slop abstain), and a `GenrePrototypeLookup` thread-safe holder (generation-token discard, mirrors `Grounding`) that NEVER writes the live state dataclass — composing `centering`+`_cosine`+`rekordbox` with zero duplicated math (grep-gated). Flipped the 2 PERCEIVE-03 prototype xfails → real green; the 2 genre-feed/reconcile xfails stay for Plan 04. Full suite **4471 passed / 3 xfailed (1 budget + 2 PERCEIVE-03) / 4 xpassed (live-hardware) / 26 skipped** — honest green, no Gemini client, no API key. Commits `aac9683` + `8894e1a`. **Phase 78 → 3/4.** _Prior:_ **Phase 78 (PERCEIVE) Plan 02 — PERCEIVE-01 + PERCEIVE-02 SHIPPED.** The EAR now speaks in CHANGE: two additive single-writer `MusicState` fields (`prev_perceive`, `trajectory_narrative`) + a new pure `state/deltas.py` (`render_delta` abstains below the 10% floor / on cold prior; `calibrate_confidence` bucket map) feed gated `Δ[kick density rose 18% (clear)]` + `trajectory[build→drop→groove; building; last move: bass-swap 20s ago]` render branches in `coach.evidence_line` (commits `24e8dcb` + `826c6a4`). Single-writer captures live inside `_tick_once`'s lock batch (grep gate empty); cold path stays byte-identical to v8.0. The 5 PERCEIVE-01/02 xfail scaffolds flipped to real green; the 4 PERCEIVE-03 stay xfail (Plans 03/04). Full suite **4465 passed / 26 skipped / 5 xfailed (1 pre-existing budget + 4 PERCEIVE-03) / 4 xpassed (live-hardware)** — honest green, no API key. **Phase 78 → 2/4. Plan 01 (Wave-0 RED scaffolds + byte-identity pin) shipped prior** (`82a6452` + `a08a074`); **Phase 77 (WIRE) all 6 reqs landed.**
 
 ---
 
@@ -37,10 +37,21 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 
 ## Current Position
 
-Phase: 78 (PERCEIVE — Deeper, Generalized Ear) — EXECUTING
+Phase: 78 (PERCEIVE — Deeper, Generalized Ear) — COMPLETE (ready for verification)
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-05-26
+
+### Plan 78-04 — PERCEIVE-03 genre-feed + reconcile WIRING (complete 2026-05-26)
+
+- **PERCEIVE-03 CLOSED — phase 78 done (4/4).** The embedding genre now actually drives the prompt, reconciled with DSP into one coherent label per tick, single-writer.
+- **`state/genre/genre_reconcile.py` (pure, the flagged-risk fix):** `normalize_embedding_confidence(cosine)` = deterministic monotone affine rescale anchoring `PROTO_FLOOR(0.25)→0.5` and `1.0→1.0`, clamped to `[0,1]` — a centered cosine clearing the floor maps to `>= 0.5` (clears coach.py:334), sub-floor maps `< 0.5` (suppressed). `reconcile_genre(emb_label, emb_conf, dsp_label, dsp_conf)` = embedding wins when it's a real label AND its normalized confidence clears the render floor, else DSP fallback at native conf. No state write, no API, no model literal.
+- **`refresh._tick_once` `genre_source` wiring (invariant #1):** reads `genre_source.get_latest()` INSIDE the lock batch, reconciles with the DSP `(raw_genre, raw_genre_conf)`, writes `detected_genre`/`genre_confidence` ONCE. `_dispatch_genre_lookup` fires `classify_playing` OFF-loop on TRACK_CHANGE (`clear()`-first generation token + daemon thread + try-guarded → a lookup failure logs, never wedges the 10Hz tick). The worker NEVER writes the live state dataclass (single-writer grep gate empty).
+- **Hysteresis policy:** the confident embedding genre (dispatched once-per-track, high-trust) commits IMMEDIATELY + resyncs `GenreHysteresis` (re-debouncing a non-flickering signal through the 3-tick dwell would suppress a correct genre for the first 3 ticks of every track); the noisy per-tick DSP score stays dwell-debounced. `genre_source=None` / empty holder / sub-floor embedding → pure DSP-through-hysteresis → v8.0 byte-identical.
+- Flipped the **final 2 PERCEIVE-03 xfails → real green** (`test_genre_fed_single_writer`, `test_genre_reconciliation`) + added 12 reconcile/normalize unit tests (the known-cosine→render-band pin = the flagged-risk proof).
+- **Deviation (Rule 1):** the embedding commit had to bypass the 3-tick hysteresis dwell (commit immediately + resync) — the dwell debounces the per-tick DSP flicker, not the once-per-track embedding. **Deviation (Rule 3):** kwarg named `genre_source` per the authoritative xfail-strict scaffold (plan body said `genre_lookup`).
+- Honest green: €0, no Gemini client, no API key. Full suite **4481 passed / 26 skipped / 1 xfailed (budget gate) / 4 xpassed (live-hardware)** (240s). Commits `3f38a5c` (Task 1), `66dd2b1` (Task 2).
+- **Next:** phase 78 verification → then P79 (LENS) ‖ P80 (GROUND) over the deepened evidence surface. Live-set genre accuracy = soft KAAN-ACTION (Phase-81 BENCH + ear-pass).
 
 ### Plan 78-03 — PERCEIVE-03 genre-prototype MECHANISM (complete 2026-05-26)
 
@@ -142,9 +153,9 @@ Wave-0 RED scaffolds for the four unimplemented wires + green pins for the two s
 | Phases complete (v8.0) | 6 / 6 engineering-green (KAAN-ACTION §GH-BILLING / §SHIP-V4 ride forward) |
 | v8.1 phase count | 6 (Phases 77–82) |
 | Phases complete (v8.1) | 0 / 6 (roadmapped; not started) |
-| Plans complete (v8.1) | P78 → 3 / 4 (01 scaffolds + 02 PERCEIVE-01/02 + 03 PERCEIVE-03 mechanism); P77 → 4 / 4 |
+| Plans complete (v8.1) | P78 → 4 / 4 COMPLETE (01 scaffolds + 02 PERCEIVE-01/02 + 03 PERCEIVE-03 mechanism + 04 PERCEIVE-03 wiring); P77 → 4 / 4 |
 | v8.1 REQ-IDs mapped | 18 / 18 ✓ (100% coverage, no orphans, no duplicates) |
-| v8.1 REQ-IDs complete | 3 / 18 (WIRE-02 `ccf4930` + WIRE-03 `a9979b8` shipped; WIRE-04 `556b9c2` Plan 02) |
+| v8.1 REQ-IDs complete | 4 / 18 (WIRE-02 `ccf4930` + WIRE-03 `a9979b8` + WIRE-04 `556b9c2` + PERCEIVE-03 `66dd2b1`; PERCEIVE-01/02 ship as part of P78 too) |
 | v8.1 per-phase REQ counts | P77=6 (WIRE) · P78=3 (PERCEIVE) · P79=2 (LENS) · P80=2 (GROUND) · P81=3 (BENCH) · P82=2 (CURATE) |
 | v8.1 net-new AI/embedding providers | 0 (Gemini-only, locked) |
 | v8.1 net-new MIR libs / DSP detectors | 0 (license wall — additive perception only) |
