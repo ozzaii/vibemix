@@ -60,4 +60,26 @@
 
 ## Traceability
 
-(filled by roadmap — every REQ-ID maps to exactly one phase; WIRE-02 + WIRE-03 already satisfied via `ccf4930` + `a9979b8`)
+Every v8.1 REQ-ID maps to exactly one phase (6 phases, 77–82; numbering continues from v8.0's last phase 76 — no reset). 18/18 mapped, no orphans, no duplicates. WIRE-02 + WIRE-03 already satisfied (no new work planned).
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| WIRE-01 | Phase 77 | Pending |
+| WIRE-02 | Phase 77 | ✅ Done (shipped `ccf4930`) |
+| WIRE-03 | Phase 77 | ✅ Done (shipped `a9979b8`) |
+| WIRE-04 | Phase 77 | Pending |
+| WIRE-05 | Phase 77 | Pending |
+| WIRE-06 | Phase 77 | Pending |
+| PERCEIVE-01 | Phase 78 | Pending |
+| PERCEIVE-02 | Phase 78 | Pending |
+| PERCEIVE-03 | Phase 78 | Pending |
+| LENS-01 | Phase 79 | Pending |
+| LENS-02 | Phase 79 | Pending |
+| GROUND-01 | Phase 80 | Pending |
+| GROUND-02 | Phase 80 | Pending |
+| BENCH-01 | Phase 81 | Pending |
+| BENCH-02 | Phase 81 | Pending |
+| BENCH-03 | Phase 81 | Pending |
+| CURATE-01 | Phase 82 | Pending |
+| CURATE-02 | Phase 82 | Pending |
+

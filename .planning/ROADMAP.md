@@ -1,8 +1,8 @@
 # vibemix — Roadmap
 
 **Project:** vibemix — AI DJ Co-Host
-**Last shipped:** v7.0 "Open House" — 2026-05-24 (tech_debt accepted; KAAN-ACTION §V7-LIVE / §V7-PROXY / §V7-LANDING / §ASSETS-DEMO-CUT / §SHIP-V4 ride forward on Kaan's clock)
-**Current milestone:** none active — v8.0 "Proof & Polish" SHIPPED 2026-05-25 (tech_debt accepted); run `/gsd:new-milestone` for the next cycle
+**Last shipped:** v8.0 "Proof & Polish" — 2026-05-25 (tech_debt accepted; KAAN-ACTION §GH-BILLING / §GH-MAIN-MERGE / §SHIP-V4 / §V7-LIVE ride forward on Kaan's clock)
+**Current milestone:** v8.1 "One Mind" — IN PROGRESS (Phases 77–82; started 2026-05-25) — connect the disconnected islands into ONE grounded product; `gsd-autonomous fully`
 **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on the external Apple Dev + SignPath signature clock (NOT archived) — **v7.0's OSS-04 discharges §SHIP-V4 for real; v4.0 closes alongside when the real cut fires**
 
 ---
@@ -19,6 +19,128 @@
 - ✅ **v6.0 The Memory Turn** — Phases 63–66 (shipped 2026-05-23, tech_debt accepted) — see `.planning/milestones/v6.0-ROADMAP.md`
 - ✅ **v7.0 Open House** — Phases 67–70 (shipped 2026-05-24, tech_debt accepted) — see `.planning/milestones/v7.0-ROADMAP.md`
 - ✅ **v8.0 Proof & Polish** — Phases 71–76 (shipped 2026-05-25, tech_debt accepted) — *this file, below* · audit `.planning/v8.0-MILESTONE-AUDIT.md`
+- 🔨 **v8.1 One Mind** — Phases 77–82 (IN PROGRESS, started 2026-05-25) — *this file, below* · charter `.planning/research/one-mind-charter.md`
+
+---
+
+# v8.1 "One Mind" — IN PROGRESS (started 2026-05-25)
+
+**Goal:** Connect vibemix's disconnected islands into ONE grounded product — *"an AI that hears music with you, and gets you."* The shallowness isn't a Gemini limit; it's a **wiring gap** + asking Gemini to be the ear. Make the DSP/MIDI/embedding stack the **EAR** (structured state + multi-scale trajectory + the DJ's moves + genre), Gemini the taste/culture **VOICE**, with a shared **taste layer** and **three lenses** (hype / critique / tutor) across both surfaces (live co-host + library curator).
+
+**Anti-creep acid test (v8.1):** *"Does this CONNECT an existing-but-orphaned capability into the one grounded product, or make the grounded reaction measurably deeper / less-slop — WITHOUT adding a new AI/embedding provider, a new MIR library, a new ws port, or a new IPC envelope?"* If not, defer. Gemini-only holds. No CLAP/MERT/OpenL3/torch; no Mem0/Letta/Zep/Cognee.
+
+**Hard constraints (locked, encoded in every phase):**
+- **Ship, don't over-engineer** — each phase ships ONE connected, tested wire (the DSP rabbit-hole was the lesson).
+- **Gemini-only** AI provider; **no new MIR libraries / no new DSP detectors** (GPL/AGPL/NC license wall vs Apache-2.0 + Bravoh reuse); no new ws ports; no new IPC envelopes; no managed-memory frameworks.
+- **Four cardinal invariants hold by ADDITIVE design** (single-writer · citation-grounding · trust-the-audio · one-socket) — the gated-off cold path stays **byte-identical** to the v8.0 baseline.
+- **Honest green** — unit-testable without the API; live e2e on the funded key (`...32u744`, project 709533190790). Never fake results.
+- **`gsd-autonomous fully`** — blockers (Gemini billing — resolved; any live-hardware ear-pass) ride forward to KAAN-ACTION; never pause.
+
+**Empirical grounding:** 3 frontier models returned 3 different genres for one track (raw-audio bench floor) → Gemini's raw ear isn't reliable; ground it. Genre-from-embeddings hit **86.5%** nearest-prototype accuracy at **€0** (cached vectors). An env-var ghost key shadowing `.env` was found + fixed (WIRE-06).
+
+**Charter + research:** `.planning/research/one-mind-charter.md` · `connection-map.md` (top-5 wires, file:line) · `genre-from-embeddings.md` (the 86.5% win) · `gemini-audio-truth-test.md` (floor data) · `gsd-operational-playbook.md`.
+
+**Dependency spine:** P77 (WIRE — connect the islands; the grounding→agent wire is highest leverage) → P78 (PERCEIVE — deltas/confidence/trajectory/genre-prototype, riding on the wired evidence) → P79 (LENS) ‖ P80 (GROUND) [both build on the wired+deepened prompt] → P81 (BENCH — the instrument that benches model × grounding × prompting × contexting × lens × taste; depends on GROUND + LENS being in place to bench them) → P82 (CURATE — unify curator + co-host on the proven shared engine / taste / lens).
+
+## Phases
+
+- [ ] **Phase 77: WIRE — Connect the Islands** — Grounding→live agent + persona/lens unify + memory ingest on live path + env-key override fix (WIRE-02/03 already shipped).
+- [ ] **Phase 78: PERCEIVE — Deeper, Generalized Ear** — deltas + calibrated confidence + multi-scale trajectory + mean-centered genre-prototype lookup (no new DSP, no MIR libs).
+- [ ] **Phase 79: LENS — Three Grounded Modes** — hype / critique / tutor as prompt lenses over one structured state, lens selection shared across surfaces.
+- [ ] **Phase 80: GROUND — Gemini as Secondary Ear** — audio part fed alongside structured evidence, hallucination-guarded; reaction model config-resolved by the bench.
+- [ ] **Phase 81: BENCH — The Validation Instrument** — multi-dimensional bench (model × grounding × prompting × contexting × lens × taste) + auto first-pass eval + Kaan's-ear review surface.
+- [ ] **Phase 82: CURATE — Unify Curator + Co-Host** — both surfaces share the perception engine + structured-state contract + taste layer + persona.
+
+| # | Phase | Goal | REQ-IDs | SC count |
+|---|-------|------|---------|----------|
+| 77 | WIRE — Connect the Islands | The live co-host shares the curator's grounding brain, the unified persona/lens, and a populated memory store; the app loads its key cleanly | WIRE-01, WIRE-02 ✅, WIRE-03 ✅, WIRE-04, WIRE-05, WIRE-06 | 5 |
+| 78 | PERCEIVE — Deeper, Generalized Ear | The prompt carries deltas + calibrated confidence + multi-scale trajectory + embedding-driven genre, so Gemini reads change over time and can abstain | PERCEIVE-01, PERCEIVE-02, PERCEIVE-03 | 4 |
+| 79 | LENS — Three Grounded Modes | hype / critique / tutor exist as three grounded lenses over the same state, selectable across both surfaces | LENS-01, LENS-02 | 3 |
+| 80 | GROUND — Gemini as Secondary Ear | Gemini hears the audio alongside the structured evidence, hallucination-guarded, with the reaction model config-resolved | GROUND-01, GROUND-02 | 3 |
+| 81 | BENCH — The Validation Instrument | A multi-dimensional bench runs the architecture/model axes on real tracks, auto-scores each cell, and surfaces cells for Kaan's-ear final judgment | BENCH-01, BENCH-02, BENCH-03 | 4 |
+| 82 | CURATE — Unify Curator + Co-Host | Curator and co-host are two facets of one engine — shared perception/state contract + shared taste/persona | CURATE-01, CURATE-02 | 3 |
+
+## Phase Details
+
+### Phase 77: WIRE — Connect the Islands
+**Goal:** Turn the strongest islands into one grounded mind — the live co-host references what is actually playing (via the already-armed-but-orphaned Grounding engine), both surfaces speak with one persona/lens, the recall store actually fills on a real session, and the app loads its API key without a ghost env var shadowing `.env`.
+**Depends on:** Nothing (first v8.1 phase). Builds additively on the v8.0 reaction path.
+**Requirements:** WIRE-01, WIRE-02 (✅ shipped `ccf4930` — NO new work), WIRE-03 (✅ shipped `a9979b8` — NO new work), WIRE-04, WIRE-05, WIRE-06
+**Success Criteria** (what must be TRUE):
+  1. On a track-aware event, the live co-host cites the actual track from `library.db` — `DJCoHostAgent` now takes a `grounding` kwarg, the armed `Grounding` object is passed in, and `identify_playing` injects a `[track:<id>]` citation that survives the citation-grounding gate (WIRE-01).
+  2. The 8 genre-chain detectors' measured evidence appears in the prompt and registers in `EvidenceRegistry` (WIRE-02 — already TRUE via `ccf4930`; pinned by a regression test, no new work), and `detected_genre` is surfaced confidence-gated in the prompt evidence (WIRE-03 — already TRUE via `a9979b8`; pinned, no new work).
+  3. The hype/critique/tutor persona is resolved from `prompts/matrix.py` by BOTH the live co-host and the library curator — `ViberAgent` stops hardcoding `_SYSTEM_INSTRUCTION` and reads a curator-context variant of the same lens (WIRE-04).
+  4. `memory.db` is populated on the live `main()` path — the boot + session-close ingest sweeps fire in a real session (lifted out of the never-called `SessionLoop.run()`), so recall has fuel to retrieve (WIRE-05).
+  5. The app loads `GEMINI_API_KEY` from `.env` even when a stale shell env var is present — `.env` wins (override or clear the ghost key), verified by a test that sets a decoy env var (WIRE-06).
+**Plans**: TBD
+
+### Phase 78: PERCEIVE — Deeper, Generalized Ear
+**Goal:** Make the existing ear *speak in change, not snapshots* — the prompt evidence carries deltas + calibrated per-fact confidence (so Gemini can abstain), a multi-scale trajectory (phrase / energy-arc / recent-moves) so it reasons over time, and an embedding-driven mean-centered genre prototype lookup (86.5%-validated, €0). All additive to the single-writer `MusicState`; **NO new DSP, NO MIR libs.**
+**Depends on:** Phase 77 (the wired evidence_line + grounding are the surface these enrich)
+**Requirements:** PERCEIVE-01, PERCEIVE-02, PERCEIVE-03
+**Success Criteria** (what must be TRUE):
+  1. Prompt evidence carries deltas + a calibrated confidence per fact (not raw absolute scalars) — Gemini reads "kick density rose 18%" rather than a bare number, and can abstain when confidence is low (PERCEIVE-01).
+  2. The prompt carries a multi-scale trajectory (phrase position / energy-arc / recent DJ moves) so a reaction can reference where the set has been and is going, not just the current bar (PERCEIVE-02).
+  3. `detected_genre` is driven by a mean-centered nearest-prototype cosine lookup over cached embeddings — written ONLY by the single-writer refresh loop, confidence-floored so a genre is never asserted the audio doesn't support (PERCEIVE-03).
+  4. When trajectory/genre signal is cold or below the confidence floor, the prompt is byte-identical to the v8.0 baseline (additive-design invariant holds; the cold path adds nothing).
+**Plans**: TBD
+
+### Phase 79: LENS — Three Grounded Modes
+**Goal:** Make hype / critique / tutor three real grounded lenses over the SAME structured state — not three separate brains — with lens selection shared across the co-host and the curator. The tutor lens explains DJing based on who you are + the semantics + reality + taste; the critique lens says what to fix; hype is the party voice. All three read the same wired+deepened evidence.
+**Depends on:** Phase 77 (unified persona seam), Phase 78 (the deepened evidence the lenses interpret)
+**Requirements:** LENS-01, LENS-02
+**Success Criteria** (what must be TRUE):
+  1. hype / critique / tutor exist as three grounded prompt lenses over the same structured state — switching lens changes the voice/intent, not the underlying grounded facts (LENS-01).
+  2. Lens selection is shared across the co-host and curator surfaces — choosing "tutor" once flows to both (LENS-02).
+  3. Each lens still passes the citation-grounding gate — a lens may change tone but cannot fabricate evidence; un-cited output strips to the ack-bank fallback regardless of lens.
+**Plans**: TBD
+
+### Phase 80: GROUND — Gemini as Secondary Ear
+**Goal:** Let Gemini *also* hear the audio as a secondary grounding input ("if it can hear in hollow space, use it") — fed alongside the structured DSP evidence, never as the primary perceiver — hallucination-guarded throughout. The reaction model is config-resolved via `model_router` (zero hardcoded literals) and the actual choice is decided by the bench (P81).
+**Depends on:** Phase 77 (wired evidence), Phase 78 (deepened evidence the audio rides alongside)
+**Requirements:** GROUND-01, GROUND-02
+**Success Criteria** (what must be TRUE):
+  1. The audio part is fed to Gemini alongside the structured evidence — and a Gemini claim that contradicts or isn't backed by the DSP evidence is hallucination-guarded (strips / abstains), so trust-the-audio still wins (GROUND-01).
+  2. The reaction model is resolved via `model_router.resolve(...)` with zero hardcoded model literals (CI grep-gate holds), so the bench's winning model can be swapped in by config alone (GROUND-02).
+  3. With the audio-secondary path gated off, the prompt + reaction are byte-identical to the v8.0 baseline (additive design).
+**Plans**: TBD
+
+### Phase 81: BENCH — The Validation Instrument
+**Goal:** Build the experiment that PROVES the architecture — a multi-dimensional bench over model × input-grounding (raw audio | DSP-evidence-only/no-audio | audio+DSP | audio+DSP+trajectory+genre) × prompting (generic | structured) × contexting (snapshot | trajectory) × lens (hype/critique/tutor) × taste (with/without rubric), run on real tracks. An automated first-pass scores each cell (groundedness vs DSP facts, specificity, mode-fidelity); the cells are then surfaced for **Kaan's ear as the final judge** (Phase-16 rule). The "no-audio" cell tests "does the intelligence reside elsewhere."
+**Depends on:** Phase 80 (the GROUND audio-secondary path) + Phase 79 (the three lenses) must exist to be benched; Phase 78 (trajectory/genre) supplies the grounding axes.
+**Requirements:** BENCH-01, BENCH-02, BENCH-03
+**Success Criteria** (what must be TRUE):
+  1. A multi-dimensional bench harness runs model × grounding × prompting × contexting × lens × taste on real tracks and records each cell's output (BENCH-01).
+  2. An automated first-pass eval scores groundedness (vs DSP facts), specificity, and mode-fidelity per cell — unit-testable on fixtures without the live API (BENCH-02).
+  3. Bench cells are surfaced for Kaan's-ear final judgment via a KAAN-ACTION review surface — the automated score ranks, Kaan's ear decides the winning architecture + model (BENCH-03).
+  4. The bench runs honest-green offline (mocked/fixture cells unit-testable) AND has a documented live e2e path on the funded key — results are never faked.
+**Plans**: TBD
+
+### Phase 82: CURATE — Unify Curator + Co-Host
+**Goal:** Close the diamond — the agentic library/Viber curator and the live co-host become two facets of "AI that hears music with you," sharing ONE perception engine + structured-state contract and ONE taste layer + persona. The curator can curate "for this DJ"; the co-host can lean on what the DJ's library says about their taste.
+**Depends on:** Phase 77 (unified persona seam + shared grounding), Phase 78 (shared perception/state contract), Phase 79 (shared lens), Phase 81 (the bench-proven engine choice)
+**Requirements:** CURATE-01, CURATE-02
+**Success Criteria** (what must be TRUE):
+  1. Curator and co-host share the perception engine + the structured-state contract — both read one "what is true about this music / track" representation, not two parallel ones (CURATE-01).
+  2. Curator and co-host share the taste layer + persona — the long-term DJ profile + the hype/critique/tutor lens reach both surfaces (CURATE-02).
+  3. The unification is additive — the existing `library curate` / Telegram CLI surfaces keep working, and the four cardinal invariants still hold (no new ws port, no new IPC envelope, single-writer untouched).
+**Plans**: TBD
+
+### v8.1 Coverage
+
+✓ All 18 v8.1 REQ-IDs mapped to exactly one phase (WIRE-01..06 → P77 · PERCEIVE-01..03 → P78 · LENS-01..02 → P79 · GROUND-01..02 → P80 · BENCH-01..03 → P81 · CURATE-01..02 → P82). No orphans, no duplicates.
+✓ WIRE-02 (`ccf4930`) + WIRE-03 (`a9979b8`) already satisfied — placed in P77, marked DONE, no new work planned (P77's remaining work is WIRE-01/04/05/06).
+
+### v8.1 Progress Table
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 77. WIRE — Connect the Islands | 0/TBD | Not started | - |
+| 78. PERCEIVE — Deeper, Generalized Ear | 0/TBD | Not started | - |
+| 79. LENS — Three Grounded Modes | 0/TBD | Not started | - |
+| 80. GROUND — Gemini as Secondary Ear | 0/TBD | Not started | - |
+| 81. BENCH — The Validation Instrument | 0/TBD | Not started | - |
+| 82. CURATE — Unify Curator + Co-Host | 0/TBD | Not started | - |
 
 ---
 
@@ -211,7 +333,11 @@ Full archive: `.planning/milestones/v3.1-ROADMAP.md` · Requirements: `.planning
 | v5.0 The Useful Cut | 59–62 | ✅ Shipped (tech_debt) | 2026-05-22 |
 | v6.0 The Memory Turn | 63–66 | ✅ Shipped (tech_debt) | 2026-05-23 |
 | v7.0 Open House | 67–70 | ✅ Shipped (tech_debt) | 2026-05-24 |
+| v8.0 Proof & Polish | 71–76 | ✅ Shipped (tech_debt) | 2026-05-25 |
+| v8.1 One Mind | 77–82 | 🔨 In progress | - |
 
 ---
 
 *Roadmap extended 2026-05-23 for v7.0 "Open House" — **4 phases (67–70)** continuing numbering from v6.0 (which ran 63–66). v4.0 "SHIP" stays OPEN and unarchived above — its publish closes alongside v7.0's OSS-04 (KAAN-ACTION §SHIP-V4 discharge fires `cut_release.sh v0.1.0-rc1` for real). v7.0 derives from 19 requirements across 4 pillars (TEST · DEV · OSS · GH), one phase per pillar, sized by `.planning/REQUIREMENTS.md` Traceability — 4/5/5/5 REQ-IDs per phase, zero orphans, zero duplicates. **Hard scope rule (locked):** v7.0 is WIRING + DISCHARGE + POLISH — zero new product capability, zero new AI providers, zero new managed-memory frameworks, zero new ws ports, zero new IPC envelopes. The four cardinal invariants (single-writer / citation grounding / "trust the audio" / one socket) hold by zero-touch — no phase modifies the reaction path. The v4.0 external signature clock is unchanged. Critical path: P67 (test infrastructure, dependency-free) → P68 (controller catalog reconciliation + audio backends, lands on P67's CI matrix) → P69 (OSS surface + actual publish gated on §SHIP-V4) → P70 (GitHub front-porch + Kaan-felt landing-page sign-off). Under `gsd-autonomous fully`, OSS-04 routes to §SHIP-V4 if signatures haven't landed at execution; the other 18 REQ-IDs ship unblocked.*
+
+*Roadmap extended 2026-05-25 for v8.1 "One Mind" — **6 phases (77–82)** continuing numbering from v8.0 (which ran 71–76) — NO reset. 18 v8.1 REQ-IDs mapped to exactly one phase (100% coverage, no orphans, no duplicates): WIRE-01..06 → P77 (6; WIRE-02 `ccf4930` + WIRE-03 `a9979b8` already SHIPPED — placed in P77, marked DONE, no new work) · PERCEIVE-01..03 → P78 (3) · LENS-01..02 → P79 (2) · GROUND-01..02 → P80 (2) · BENCH-01..03 → P81 (3) · CURATE-01..02 → P82 (2). **Hard scope rule (locked):** ship-not-over-engineer (one connected, tested wire per phase) · Gemini-only · NO new MIR libraries / NO new DSP detectors · no new ws ports / no new IPC envelopes · the four cardinal invariants (single-writer / citation-grounding / trust-the-audio / one-socket) hold by ADDITIVE design (gated-off cold path byte-identical to the v8.0 baseline) · honest green (unit-testable without the API; live e2e on the funded key). Dependency spine: P77 (WIRE) → P78 (PERCEIVE) → P79 (LENS) ‖ P80 (GROUND) → P81 (BENCH — depends on GROUND + LENS being in place to bench them) → P82 (CURATE). Under `gsd-autonomous fully`, blockers (Gemini billing — resolved; any live-hardware ear-pass) ride forward to KAAN-ACTION — they never block. Charter: `.planning/research/one-mind-charter.md`.*
