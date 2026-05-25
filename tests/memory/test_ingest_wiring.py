@@ -244,3 +244,79 @@ def test_close_seam_falls_back_to_sweep_without_recorder(
         "close with no session_dir should fall back to run_ingest_sweep"
     )
     assert _stub_ingest["close_tid"] is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 77 Plan 01 (Wave 0) — WIRE-05: ingest fires on the LIVE main() path.
+#
+# The SessionLoop tests above prove the seam dispatches correctly; but the live
+# runtime builds ``_session_ipc = SessionLoop(...)`` and only calls
+# ``register_handlers()`` — it NEVER calls ``run()``, so the boot+close ingest
+# sweeps never fire on a real session (only the stub SessionLoop.run path did).
+# WIRE-05 lifts ``_fire_ingest("boot")`` + ``_fire_ingest("close", ...)`` into
+# ``main()`` on that SAME instance, gated behind ``recall_enabled``.
+#
+# CRITICAL anti-double-retention guard: main() must call ``_fire_ingest`` —
+# NOT ``run_boot_sweeps`` / ``on_session_close`` (those fire BOTH retention AND
+# ingest, and main() already runs its own retention sweeps → double prune).
+#
+# This is a SOURCE-TEXT tier (the behavioural wiring lives behind a live
+# orchestrator that cannot be driven without audio devices). xfail-strict until
+# Plan 04 wires it; flips to a real pass when the executor removes the marker.
+# ---------------------------------------------------------------------------
+
+
+def _main_source() -> str:
+    src_path = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "vibemix"
+        / "__main__.py"
+    )
+    return src_path.read_text(encoding="utf-8")
+
+
+@pytest.mark.xfail(
+    reason="WIRE-05 main()-path ingest not yet wired (Plan 04)", strict=True
+)
+def test_main_fires_boot_and_close_ingest() -> None:
+    """main() calls _fire_ingest for boot AND close on the live _session_ipc."""
+    src = _main_source()
+    # Boot + close ingest triggers appear on the live path.
+    assert '_fire_ingest("boot"' in src or "_fire_ingest('boot'" in src
+    assert '_fire_ingest("close"' in src or "_fire_ingest('close'" in src
+    # The close call carries the just-finished session dir.
+    assert "session_dir=" in src
+
+
+@pytest.mark.xfail(
+    reason="WIRE-05 main()-path ingest not yet wired (Plan 04)", strict=True
+)
+def test_main_ingest_is_gated_behind_recall_enabled() -> None:
+    """The main()-path ingest is gated on recall_enabled (additive no-op default)."""
+    src = _main_source()
+    assert "recall_enabled" in src
+    # Heuristic proximity gate: a recall_enabled guard appears in the same
+    # source region as the _fire_ingest call (additive-gated cold path).
+    idx = src.find("_fire_ingest")
+    assert idx != -1, "_fire_ingest not present in main() yet"
+    window = src[max(0, idx - 1200) : idx + 1200]
+    assert "recall_enabled" in window, (
+        "_fire_ingest on the main() path must be gated behind recall_enabled"
+    )
+
+
+def test_main_does_not_call_combined_retention_methods() -> None:
+    """main() must NOT call run_boot_sweeps / on_session_close (double-retention).
+
+    GREEN now AND after Plan 04 — main() owns its own retention sweeps, so the
+    WIRE-05 lift uses the ingest-only ``_fire_ingest``, never the combined
+    SessionLoop methods that also re-run retention.
+    """
+    src = _main_source()
+    assert "run_boot_sweeps(" not in src, (
+        "main() must not call run_boot_sweeps — it double-runs retention"
+    )
+    assert "on_session_close(" not in src, (
+        "main() must not call on_session_close — it double-runs retention"
+    )
