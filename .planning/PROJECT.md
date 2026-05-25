@@ -10,7 +10,25 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current State: v8.0 "Proof & Polish" SHIPPED 2026-05-25 (tech_debt accepted) — no active milestone
+## Current Milestone: v8.1 "One Mind"
+
+**Goal:** Connect vibemix's disconnected islands into ONE grounded product — *"an AI that hears music with you, and gets you."* The shallowness isn't a Gemini limit; it's a wiring gap + asking Gemini to be the ear. Make the DSP/MIDI/embedding stack the **EAR** (structured state + multi-scale trajectory + the DJ's moves + genre), Gemini the taste/culture **VOICE**, with a shared **taste layer** and **three lenses** (hype / critique / tutor) across both surfaces (live co-host + library curator).
+
+**Target features (6 categories → phases 77+):**
+- **WIRE** — connect the islands: Grounding→live agent · detectors→prompt+registry (✅ shipped `ccf4930`) · detected_genre→evidence (✅ shipped `a9979b8`) · persona/lens unify · memory ingest on live path · env-key override fix.
+- **PERCEIVE** — deeper, generalized ear: deltas + calibrated confidence · multi-scale trajectory/phrase contexting · genre-prototype from cached embeddings. *No new DSP, no MIR libs.*
+- **LENS** — three modes (hype / critique / tutor) as grounded lenses, shared across surfaces.
+- **GROUND** — Gemini as a secondary audio ear, hallucination-guarded; model choice decided by the bench.
+- **BENCH** — multi-dimensional validation instrument (model × grounding × prompting × contexting × lens × taste); **Kaan's ear = final judge**.
+- **CURATE** — unify curator + co-host on the shared engine / taste / lens.
+
+**Constraints (locked):** ship-not-over-engineer (one connected, tested wire per phase) · Gemini-only AI provider · no new MIR libraries (GPL/AGPL/NC vs Apache-2.0 + Bravoh reuse) · no new ws ports · four cardinal invariants hold by additive design · honest green (unit-testable without API; live e2e on the funded key). **Charter + research:** `.planning/research/one-mind-charter.md` (+ connection-map · genre-from-embeddings · gemini-audio-truth-test · gsd-operational-playbook).
+
+**Empirical grounding:** 3 frontier models returned 3 different genres for one track (raw-audio bench floor) → Gemini's raw ear isn't reliable; ground it. Genre-from-embeddings hit **86.5%** nearest-prototype accuracy at **€0** (cached). An env-var ghost key shadowing `.env` was found + fixed.
+
+---
+
+## Prior State: v8.0 "Proof & Polish" SHIPPED 2026-05-25 (tech_debt accepted) — no active milestone
 
 **v8.0 shipped engineering-complete** (6/6 phases 71–76): everything logged · simulated (everybody × every interaction) · reported · tested (pytest 4270/0 · marker grid 111/0 · vitest 816 · cargo 63) · fixed (all 4 deep-audit findings closed) · verified · on GitHub (539-commit backlog pushed + PR #8 to sync main). Plus a design-slop gate + the api-key-missing UX loop. Zero new capability/dep/port/envelope, zero reaction-path rewrite (562 insertions / 7 src files). **Remaining work is all KAAN-ACTION:** §GH-BILLING (resolve GitHub billing → CI green), §GH-MAIN-MERGE (merge PR #8, no squash), §SHIP-V4 (signed release + social — Apple/SignPath signatures; v4.0 closes alongside), §V7-LIVE (real-hardware ear-passes — software-simulated by P72), felt UX/design sign-off, and the user-level UI control (cross-stack follow-up). **Next:** `/gsd:new-milestone` for the next cycle, or discharge the KAAN-ACTION items. Full audit: `.planning/v8.0-MILESTONE-AUDIT.md`.
 

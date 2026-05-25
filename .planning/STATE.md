@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v8.0
-milestone_name: Proof & Polish
-status: shipped
-last_updated: "2026-05-25T00:00:00.000Z"
-last_activity: 2026-05-25 — v8.0 SHIPPED (tech_debt accepted)
+milestone: v8.1
+milestone_name: One Mind
+status: planning
+last_updated: "2026-05-25T20:50:01.889Z"
+last_activity: 2026-05-25
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # vibemix — State
@@ -49,12 +49,10 @@ See: .planning/PROJECT.md (Current Milestone: v7.0 "Open House")
 
 ## Current Position
 
-Phase: none active — v8.0 "Proof & Polish" SHIPPED 2026-05-25 (tech_debt accepted)
+Phase: Not started (defining requirements)
 Plan: —
-Status: ✅ v8.0 COMPLETE (6/6 phases) — milestone audited + archived. No active milestone.
-Last activity: 2026-05-25 — v8.0 "Proof & Polish" SHIPPED + audited. 6/6 phases (71–76), all REQ-IDs satisfied or KAAN-ACTION. everything logged·simulated(everybody×every-interaction)·reported·tested(pytest 4270/0 · marker grid 111/0 · vitest 816 · cargo 63)·fixed(4 deep-audit findings)·verified·on-GitHub(539-commit backlog pushed + PR #8). Zero new capability/dep/port/envelope, zero reaction-path rewrite (562 ins/7 files). Audit: .planning/v8.0-MILESTONE-AUDIT.md.
-
-**KAAN-ACTION (ride forward, never blocked):** §GH-BILLING (GitHub account billing lock blocks CI on origin — Kaan-only fix at github.com/settings/billing → re-run PR #8 → GH-02 green + §V7-LIVE-05) · §GH-MAIN-MERGE (merge PR #8, no squash, to sync main) · §SHIP-V4/GH-04 (signed release + social — Apple Dev + SignPath signatures; v4.0 closes alongside) · §V7-LIVE (real-hardware ear-passes — software-simulated by P72) · felt UX/design sign-off · user-level (BEG/INT/PRO) UI control (cross-stack follow-up, surfaced not half-built). **Next:** `/gsd:new-milestone` or discharge KAAN-ACTION items.
+Status: Defining requirements
+Last activity: 2026-05-25 — Milestone v8.1 started
 
 ### Quick Tasks Completed
 
