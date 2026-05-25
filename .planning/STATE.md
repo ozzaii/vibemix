@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v8.1
 milestone_name: One Mind
 status: executing
-last_updated: "2026-05-25T23:10:56.179Z"
-last_activity: 2026-05-26 -- Phase 78 Plan 01 (PERCEIVE Wave-0 RED scaffolds) complete
+last_updated: "2026-05-25T23:30:43.484Z"
+last_activity: 2026-05-25
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 7
   percent: 17
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-26 — **Phase 78 (PERCEIVE) Plan 02 COMPLETE — PERCEIVE-01 + PERCEIVE-02 SHIPPED.** The EAR now speaks in CHANGE: two additive single-writer `MusicState` fields (`prev_perceive`, `trajectory_narrative`) + a new pure `state/deltas.py` (`render_delta` abstains below the 10% floor / on cold prior; `calibrate_confidence` bucket map) feed gated `Δ[kick density rose 18% (clear)]` + `trajectory[build→drop→groove; building; last move: bass-swap 20s ago]` render branches in `coach.evidence_line` (commits `24e8dcb` + `826c6a4`). Single-writer captures live inside `_tick_once`'s lock batch (grep gate empty); cold path stays byte-identical to v8.0. The 5 PERCEIVE-01/02 xfail scaffolds flipped to real green; the 4 PERCEIVE-03 stay xfail (Plans 03/04). Full suite **4465 passed / 26 skipped / 5 xfailed (1 pre-existing budget + 4 PERCEIVE-03) / 4 xpassed (live-hardware)** — honest green, no API key. **Phase 78 → 2/4. Plan 01 (Wave-0 RED scaffolds + byte-identity pin) shipped prior** (`82a6452` + `a08a074`); **Phase 77 (WIRE) all 6 reqs landed.**
+**Last updated:** 2026-05-26 — **Phase 78 (PERCEIVE) Plan 03 COMPLETE — PERCEIVE-03 genre-prototype MECHANISM SHIPPED.** New `library/genre_prototypes.py` delivers the €0 mean-centered nearest-prototype genre lookup: `build_prototypes` (one centered-mean prototype per folder-label, SAME corpus centroid as ranking), `classify` (floor/tie-margin anti-slop abstain), and a `GenrePrototypeLookup` thread-safe holder (generation-token discard, mirrors `Grounding`) that NEVER writes the live state dataclass — composing `centering`+`_cosine`+`rekordbox` with zero duplicated math (grep-gated). Flipped the 2 PERCEIVE-03 prototype xfails → real green; the 2 genre-feed/reconcile xfails stay for Plan 04. Full suite **4471 passed / 3 xfailed (1 budget + 2 PERCEIVE-03) / 4 xpassed (live-hardware) / 26 skipped** — honest green, no Gemini client, no API key. Commits `aac9683` + `8894e1a`. **Phase 78 → 3/4.** _Prior:_ **Phase 78 (PERCEIVE) Plan 02 — PERCEIVE-01 + PERCEIVE-02 SHIPPED.** The EAR now speaks in CHANGE: two additive single-writer `MusicState` fields (`prev_perceive`, `trajectory_narrative`) + a new pure `state/deltas.py` (`render_delta` abstains below the 10% floor / on cold prior; `calibrate_confidence` bucket map) feed gated `Δ[kick density rose 18% (clear)]` + `trajectory[build→drop→groove; building; last move: bass-swap 20s ago]` render branches in `coach.evidence_line` (commits `24e8dcb` + `826c6a4`). Single-writer captures live inside `_tick_once`'s lock batch (grep gate empty); cold path stays byte-identical to v8.0. The 5 PERCEIVE-01/02 xfail scaffolds flipped to real green; the 4 PERCEIVE-03 stay xfail (Plans 03/04). Full suite **4465 passed / 26 skipped / 5 xfailed (1 pre-existing budget + 4 PERCEIVE-03) / 4 xpassed (live-hardware)** — honest green, no API key. **Phase 78 → 2/4. Plan 01 (Wave-0 RED scaffolds + byte-identity pin) shipped prior** (`82a6452` + `a08a074`); **Phase 77 (WIRE) all 6 reqs landed.**
 
 ---
 
@@ -38,9 +38,19 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 ## Current Position
 
 Phase: 78 (PERCEIVE — Deeper, Generalized Ear) — EXECUTING
-Plan: 3 of 4
-Status: Plans 01 (scaffolds) + 02 (deltas + trajectory) complete; Plan 03 (genre prototypes) next
+Plan: 4 of 4
+Status: Ready to execute
 Last activity: 2026-05-26
+
+### Plan 78-03 — PERCEIVE-03 genre-prototype MECHANISM (complete 2026-05-26)
+
+- **`library/genre_prototypes.py` shipped** — the €0 mean-centered nearest-prototype genre lookup MECHANISM (no state wiring; that's Plan 04). COMPOSES `centering` + `_cosine` + `rekordbox`, zero duplicated math (grep gate empty).
+- **`build_prototypes(vectors, ids, label_of)`:** one centered-mean prototype per folder-label (proxy = `Path(TrackEntry.filepath).parent.name`), each L2-normalized, `(n_labels, 1536)` float32, using the SAME `load_or_compute_centroid` chokepoint the ranking path uses (Pitfall 2). N<2 → empty `(0,1536)` + `[]`.
+- **`classify(emb, protos, labels, centroid, *, floor=0.25, margin=0.05)`:** centers query with the SAME centroid, ranks via `cosine_topk`, abstains `("unknown", conf)` below floor OR within tie-margin (anti-slop #2/#3). Floor/margin are centered-cosine-scale; the `>=0.5` render-band reconciliation is Plan 04's job.
+- **`GenrePrototypeLookup` holder:** mirrors `Grounding` — lock + per-dispatch generation token discards a write superseded by `clear()`. `classify_playing` is €0 (cached vectors), abstains `("unknown", 0.0)` WITHOUT a live embed for unknown-to-library tracks (RESEARCH A1). NEVER writes the live state dataclass (grep gate empty); `get_latest()` is the Plan-04 single-writer read.
+- Flipped the **2 PERCEIVE-03 prototype xfails → real green** + added 3 holder unit tests. `load_or_build_prototypes` intentionally orphaned until Plan 04 (orphans.csv baseline refreshed).
+- Honest green: no Gemini client, no API key. Full suite **4471 passed / 26 skipped / 3 xfailed (1 budget + 2 PERCEIVE-03 genre-feed/reconcile) / 4 xpassed (live-hardware)** (241s). Commits `aac9683` (Task 1), `8894e1a` (Task 2).
+- **Next:** Plan 04 adds the `genre_source` holder kwarg + reconciliation to `_tick_once` (reads `get_latest()`, reconciles into `>=0.5` band, `apply_genre_hysteresis`) — flips the last 2 PERCEIVE-03 xfails.
 
 ### Plan 78-02 — PERCEIVE-01 deltas + calibrated confidence & PERCEIVE-02 multi-scale trajectory (complete 2026-05-26)
 
@@ -132,7 +142,7 @@ Wave-0 RED scaffolds for the four unimplemented wires + green pins for the two s
 | Phases complete (v8.0) | 6 / 6 engineering-green (KAAN-ACTION §GH-BILLING / §SHIP-V4 ride forward) |
 | v8.1 phase count | 6 (Phases 77–82) |
 | Phases complete (v8.1) | 0 / 6 (roadmapped; not started) |
-| Plans complete (v8.1) | 2 / 4 in P77 (Plan 01 scaffolds + Plan 02 WIRE-04 seam) |
+| Plans complete (v8.1) | P78 → 3 / 4 (01 scaffolds + 02 PERCEIVE-01/02 + 03 PERCEIVE-03 mechanism); P77 → 4 / 4 |
 | v8.1 REQ-IDs mapped | 18 / 18 ✓ (100% coverage, no orphans, no duplicates) |
 | v8.1 REQ-IDs complete | 3 / 18 (WIRE-02 `ccf4930` + WIRE-03 `a9979b8` shipped; WIRE-04 `556b9c2` Plan 02) |
 | v8.1 per-phase REQ counts | P77=6 (WIRE) · P78=3 (PERCEIVE) · P79=2 (LENS) · P80=2 (GROUND) · P81=3 (BENCH) · P82=2 (CURATE) |
