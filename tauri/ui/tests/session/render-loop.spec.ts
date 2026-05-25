@@ -108,6 +108,7 @@ describe("renderSessionFrame — CSS variable hot path", () => {
         settings: {
           voice: "kore",
           mode: "hype",
+          skill: "intermediate",
           genre: "techno",
           output_device_id: null,
           output_profile: "hp",
@@ -156,6 +157,7 @@ describe("renderSessionFrame — CSS variable hot path", () => {
       settings: {
         voice: "kore",
         mode: "hype",
+        skill: "intermediate",
         genre: "techno",
         output_device_id: null,
         output_profile: "hp",
@@ -201,6 +203,7 @@ describe("renderSessionFrame — CSS variable hot path", () => {
       settings: {
         voice: "kore",
         mode: "hype",
+        skill: "intermediate",
         genre: "techno",
         output_device_id: null,
         output_profile: "hp",
@@ -331,6 +334,7 @@ describe("layout projection", () => {
       settings: {
         voice: "kore",
         mode: "hype" as const,
+        skill: "intermediate" as const,
         genre: "techno",
         output_device_id: null,
         output_profile: "hp" as const,
@@ -374,6 +378,7 @@ describe("layout projection", () => {
       settings: {
         voice: "kore",
         mode: "coach",
+        skill: "intermediate",
         genre: "techno",
         output_device_id: null,
         output_profile: "spk",

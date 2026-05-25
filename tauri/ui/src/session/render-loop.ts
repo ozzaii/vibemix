@@ -262,10 +262,11 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       errors: {},
     },
     persona: {
-      // Phase 12-05 (settings drawer) wires the rocker callbacks — the
-      // session window itself only consumes these as initial-render
-      // defaults. Skill/interaction/mood live in the drawer.
-      skill: "INT",
+      // 2026-05-25 — the deck is now a read-only glanceable mirror; the
+      // settings drawer owns every write. Skill round-trips through
+      // ipc.settings.state, so the deck reflects the persisted value
+      // instead of the prior hardcoded "INT".
+      skill: skillFromSettings(s.settings.skill),
       interaction: s.settings.mode === "coach" ? "COACH" : "HYPE",
       mood: moodFromSettings(s.settings.mood),
       voice: s.settings.voice,
@@ -305,6 +306,23 @@ function recFromMuted(
 /** Map the wire-level mood enum ("hype-man" | "teacher" | "coach") onto
  *  the persona-panel's UPPERCASE 3-state vocabulary. The settings drawer
  *  is the authoritative write surface; the session panel is read-only. */
+/** Map the wire-level skill enum ("beginner" | "intermediate" | "pro") onto
+ *  the deck's compact 3-state vocabulary (BEG / INT / PRO). The settings
+ *  drawer is the authoritative write surface; the deck is read-only. */
+function skillFromSettings(
+  skill: BridgeSessionState["settings"]["skill"],
+): "BEG" | "INT" | "PRO" {
+  switch (skill) {
+    case "beginner":
+      return "BEG";
+    case "pro":
+      return "PRO";
+    case "intermediate":
+    default:
+      return "INT";
+  }
+}
+
 function moodFromSettings(
   mood: BridgeSessionState["settings"]["mood"],
 ): "HYPE" | "TEACH" | "COACH" {

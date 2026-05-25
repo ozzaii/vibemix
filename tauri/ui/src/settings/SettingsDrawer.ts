@@ -623,6 +623,27 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   genreWrap.append(overlay);
   personaBody.append(genreWrap);
 
+  // Skill rocker (2026-05-25) — persona level (beginner/intermediate/pro).
+  // Migrated off the live deck: the deck is now a read-only glanceable
+  // mirror and the drawer owns every persona write. Sends the wire enum
+  // verbatim; the sidecar echoes ipc.settings.state which re-syncs the
+  // deck readout.
+  personaBody.append(
+    renderRocker({
+      ariaLabel: "skill level",
+      options: [
+        { id: "beginner", label: "BEG" },
+        { id: "intermediate", label: "INT" },
+        { id: "pro", label: "PRO" },
+      ],
+      active: settings.skill,
+      variant: "rocker",
+      onChange: (id) => {
+        void sendSettingsField("skill", id);
+      },
+    }),
+  );
+
   body.append(
     renderSettingsGroup({
       header: "PERSONA",

@@ -47,7 +47,7 @@ import {
   getSessionState,
   setSessionState,
 } from "./state.js";
-import type { LevelPair, MascotMood, MetersTriple } from "./state.js";
+import type { LevelPair, MascotMood, MetersTriple, SkillLevel } from "./state.js";
 import type { PhaseChunk } from "./components/phase-tape.js";
 import type { MidiEvent } from "./components/event-ribbon.js";
 import type { CitationChip } from "./components/citation-strip.js";
@@ -105,6 +105,10 @@ interface WireSettingsStatePayload {
   retention_days: number;
   push_to_mute_hotkey: string;
   muted: boolean;
+  // --- 2026-05-25 (persona-level) — the sidecar emits this once skill is
+  //     persisted in ConfigStore.extra; absent on pre-skill disk state, so
+  //     we narrow defensively and keep the current value when it's missing.
+  skill?: SkillLevel | string;
   // --- Phase 13 (mascot overlay) additions — sidecar wires these in Plan
   //     13-05; until then they arrive as undefined and we keep the
   //     SessionState defaults. Narrowed defensively in applySettingsState
@@ -360,6 +364,17 @@ function narrowMood(value: unknown, fallback: MascotMood): MascotMood {
     : fallback;
 }
 
+/** Whitelist of valid skill levels — anything else from the wire (or a
+ *  pre-skill sidecar that omits the field) keeps the current value. */
+const VALID_SKILLS: readonly SkillLevel[] = ["beginner", "intermediate", "pro"];
+
+function narrowSkill(value: unknown, fallback: SkillLevel): SkillLevel {
+  if (typeof value !== "string") return fallback;
+  return (VALID_SKILLS as readonly string[]).includes(value)
+    ? (value as SkillLevel)
+    : fallback;
+}
+
 export function applySettingsState(p: WireSettingsStatePayload): void {
   // Preserve current Phase 13 fields if the sidecar hasn't sent them yet
   // (Plan 13-05 extends the sidecar payload). Defensive narrowing keeps a
@@ -369,6 +384,7 @@ export function applySettingsState(p: WireSettingsStatePayload): void {
     settings: {
       voice: p.voice,
       mode: p.mode,
+      skill: narrowSkill(p.skill, current.skill),
       genre: p.genre,
       output_device_id: p.output_device_id,
       output_profile: p.output_profile,

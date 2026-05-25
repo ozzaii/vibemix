@@ -59,9 +59,18 @@ export interface StatusFlags {
  *  current value. */
 export type MascotMood = "hype-man" | "teacher" | "coach";
 
+/** Persona skill level — drives prompts.matrix.build_system_instruction.
+ *  The deck surfaces this read-only (BEG/INT/PRO); the settings drawer is
+ *  the write surface. Mirrors the wire enum the sidecar persists. */
+export type SkillLevel = "beginner" | "intermediate" | "pro";
+
 export interface SettingsView {
   voice: string;
   mode: "hype" | "coach";
+  /** Persona skill level (beginner/intermediate/pro). Round-tripped through
+   *  ipc.settings.state; written from the settings drawer. Default
+   *  "intermediate" (the v4-tuned, load-bearing cell). */
+  skill: SkillLevel;
   genre: string;
   output_device_id: string | null;
   output_profile: "hp" | "spk";
@@ -168,6 +177,7 @@ function makeDefault(): SessionState {
     settings: {
       voice: "kore",
       mode: "hype",
+      skill: "intermediate",
       genre: "techno",
       output_device_id: null,
       output_profile: "hp",
