@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -66,24 +67,26 @@ _SYSTEM_PROMPT = (
     "artist, BPM, or key. Call search_vibe to find candidates.\n"
     "2. Keys/BPM come from get_track_features (deterministic) — never compute "
     "or guess them.\n"
-    "3. When you have chosen the tracks, call create_playlist exactly once "
-    "with the ordered track_ids. That ends the run.\n"
-    "4. Keep it tight — a focused set beats a padded one.\n"
-    "Return a final JSON object: {name, track_ids, rationale}."
+    "3. When you have chosen the tracks, return them as the final JSON object "
+    "{name, track_ids, rationale} with track_ids in play order. The app "
+    "persists the playlist — you do NOT need to call create_playlist.\n"
+    "4. Keep it tight — a focused set beats a padded one."
 )
 
-# JSON Schema enforced on Codex's final message (--output-schema).
+# JSON Schema enforced on Codex's final message (--output-schema). OpenAI strict
+# structured outputs require `additionalProperties: false` AND every property in
+# `required` (no truly-optional fields) — otherwise a 400 invalid_json_schema.
+# We keep it to the three fields we actually consume; the M3U/JSON paths come
+# from the MCP create_playlist tool's persisted file, not this final message.
 _OUTPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "name": {"type": "string"},
         "track_ids": {"type": "array", "items": {"type": "string"}},
         "rationale": {"type": "string"},
-        "m3u_path": {"type": "string"},
-        "json_path": {"type": "string"},
     },
-    "required": ["name", "track_ids"],
-    "additionalProperties": True,
+    "required": ["name", "track_ids", "rationale"],
+    "additionalProperties": False,
 }
 
 
@@ -132,6 +135,7 @@ def build_argv(
     schema_path: str,
     out_path: str,
     prompt: str,
+    bypass_sandbox: bool = False,
 ) -> list[str]:
     """Build the ``codex exec`` argv.
 
@@ -139,13 +143,28 @@ def build_argv(
     never touch the user's global ``~/.codex/config.toml``. Auth still comes
     from the default ``~/.codex`` (the user's own ``codex login``); only the
     server wiring is overridden per-invocation.
+
+    **Sandbox / the upstream MCP-approval bug.** Ideally we run
+    ``--sandbox read-only`` (tools write, never the shell). But codex has an
+    OPEN regression (openai/codex#16685, #24135): in non-interactive
+    ``codex exec`` every MCP tool call is auto-cancelled ("user cancelled MCP
+    tool call") UNLESS ``--dangerously-bypass-approvals-and-sandbox`` is set —
+    ``default_tools_approval_mode="auto"`` does NOT take effect in exec mode.
+    So MCP-backed curation is impossible today without the bypass, which also
+    drops the shell sandbox. ``bypass_sandbox`` is therefore a CONSCIOUS opt-in
+    (env ``VIBEMIX_CODEX_ALLOW_SHELL``), gated by the caller; the default path
+    stays read-only and surfaces the honest "blocked by upstream bug" error.
     """
     server = "mcp_servers.vibemix_library"
+    sandbox_args = (
+        ["--dangerously-bypass-approvals-and-sandbox"]
+        if bypass_sandbox
+        else ["--sandbox", "read-only"]
+    )
     return [
         codex_path,
         "exec",
-        "--sandbox",
-        "read-only",  # tools do the writing, not the shell
+        *sandbox_args,
         "--skip-git-repo-check",
         "--output-schema",
         schema_path,
@@ -160,7 +179,7 @@ def build_argv(
         "-c",
         f"{server}.tool_timeout_sec={_MCP_TOOL_TIMEOUT_S}",
         "-c",
-        f'{server}.default_tools_approval_mode="auto"',  # headless: no prompts
+        f'{server}.default_tools_approval_mode="auto"',  # no-op today (upstream bug)
         prompt,
     ]
 
@@ -193,14 +212,30 @@ def curate_with_codex(
     codex_path: str | None = None,
     mcp_command: str | None = None,
     mcp_args: list[str] | None = None,
+    allow_shell: bool | None = None,
     _runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
 ) -> CodexCurateResult:
     """Run one curation via ``codex exec`` against the MCP server.
+
+    ``allow_shell`` opts into ``--dangerously-bypass-approvals-and-sandbox`` —
+    REQUIRED today because of the open codex regression (openai/codex#16685)
+    that auto-cancels every MCP tool call in non-interactive exec otherwise.
+    ``None`` (default) reads env ``VIBEMIX_CODEX_ALLOW_SHELL``. Without it, the
+    run uses the safe read-only sandbox and returns an honest "blocked by
+    upstream bug" result instead of silently granting shell access.
 
     ``_runner`` is injectable so tests exercise every guard branch without
     Codex installed. ``library`` is used only for the result-boundary
     grounding re-validation (read-only).
     """
+    if allow_shell is None:
+        allow_shell = os.environ.get("VIBEMIX_CODEX_ALLOW_SHELL", "").strip() not in (
+            "",
+            "0",
+            "false",
+            "no",
+        )
+
     codex = find_codex(codex_path)
     if codex is None:
         return CodexCurateResult(
@@ -210,6 +245,24 @@ def curate_with_codex(
                 "Codex CLI not found. Install it (`npm i -g @openai/codex` or "
                 "`brew install codex`) and run `codex login` to enable AI "
                 "playlists."
+            ),
+        )
+
+    # Upstream regression gate: without the bypass, codex exec auto-cancels
+    # every MCP tool call (openai/codex#16685) → curation can't run. Rather than
+    # fail cryptically, surface the honest choice up-front. The user opts into
+    # the bypass (which grants codex shell access) consciously.
+    if not allow_shell:
+        return CodexCurateResult(
+            theme=theme,
+            stop_reason="codex_mcp_blocked",
+            error=(
+                "Codex's MCP tool calls are auto-cancelled in non-interactive "
+                "mode (upstream bug openai/codex#16685). Running them needs "
+                "`--dangerously-bypass-approvals-and-sandbox`, which also grants "
+                "codex shell access. To use the Codex backend anyway, set "
+                "VIBEMIX_CODEX_ALLOW_SHELL=1. Otherwise use the default Gemini "
+                "backend (no bypass needed): `library curate \"<theme>\"`."
             ),
         )
 
@@ -231,6 +284,7 @@ def curate_with_codex(
             schema_path=schema_path,
             out_path=out_path,
             prompt=build_prompt(theme),
+            bypass_sandbox=allow_shell,
         )
 
         try:
@@ -239,6 +293,11 @@ def curate_with_codex(
                 capture_output=True,
                 text=True,
                 timeout=timeout_s,
+                # `codex exec` reads extra instructions from stdin when it's
+                # piped/inherited; a non-TTY child stdin makes it block/err with
+                # "Reading additional input from stdin...". DEVNULL = the prompt
+                # is the positional arg, full stop.
+                stdin=subprocess.DEVNULL,
             )
         except FileNotFoundError:
             # Race: binary vanished between which() and spawn.
@@ -317,15 +376,30 @@ def curate_with_codex(
             error="No returned track_id resolved in the library (grounding).",
         )
 
-    m3u = payload.get("m3u_path")
-    jsn = payload.get("json_path")
+    # PERSIST — the wrapper is the single validated writer (codex SELECTS, we
+    # WRITE), so a playlist file always lands even if the model didn't call the
+    # MCP create_playlist tool. create_playlist re-validates every id against the
+    # library (gate #2) and writes the neutral M3U + JSON.
+    playlist_name = name or str(payload.get("name") or theme)
+    m3u_path: str | None = None
+    json_path: str | None = None
+    try:
+        from vibemix.library.create_playlist import create_playlist as _persist
+
+        res = _persist(library, playlist_name, validated)
+        m3u_path = str(res.m3u_path)
+        json_path = str(res.json_path)
+        validated = res.track_ids  # the persisted, de-duped, validated order
+    except Exception as e:  # noqa: BLE001 — never raise; report what we have
+        logger.warning("[codex] persist failed: %s", e)
+
     return CodexCurateResult(
         theme=theme,
         stop_reason="created",
-        playlist_name=name or str(payload.get("name") or theme),
+        playlist_name=playlist_name,
         track_ids=validated,
-        m3u_path=m3u if (isinstance(m3u, str) and Path(m3u).exists()) else None,
-        json_path=jsn if (isinstance(jsn, str) and Path(jsn).exists()) else None,
+        m3u_path=m3u_path,
+        json_path=json_path,
         rationale=str(payload.get("rationale", "")),
     )
 

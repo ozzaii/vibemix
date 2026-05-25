@@ -52,12 +52,32 @@ crashes or silently degrades.
 ## Usage
 
 ```bash
-# Codex reasons; vibemix's tools search your library and write the playlist.
-uv run python -m vibemix library curate "warm-up hypnotic 122-126" --backend codex
+# Codex reasons; vibemix's tools search your library, the app writes the playlist.
+VIBEMIX_CODEX_ALLOW_SHELL=1 \
+  uv run python -m vibemix library curate "warm-up hypnotic 122-126" --backend codex
 
-# Default (no Codex needed):
+# Default Gemini backend (no Codex, no bypass needed):
 uv run python -m vibemix library curate "peak-time rolling techno"
 ```
+
+### ⚠️ The `VIBEMIX_CODEX_ALLOW_SHELL` opt-in (upstream bug)
+
+Codex has an **open regression** ([openai/codex#16685](https://github.com/openai/codex/issues/16685),
+[#24135](https://github.com/openai/codex/issues/24135)): in non-interactive
+`codex exec`, **every MCP tool call is auto-cancelled** ("user cancelled MCP tool
+call") unless `--dangerously-bypass-approvals-and-sandbox` is set —
+`default_tools_approval_mode = "auto"` does NOT take effect in exec mode. That
+bypass also drops codex's shell sandbox.
+
+So the Codex backend needs you to opt in with `VIBEMIX_CODEX_ALLOW_SHELL=1`,
+which consciously accepts that codex runs with shell access for that invocation.
+Without it, `--backend codex` returns an honest `codex_mcp_blocked` error
+pointing here. **The default Gemini backend works with none of this** — it's the
+recommended path until codex fixes the regression.
+
+Division of labour: **Codex SELECTS** (search + reason + order) and **vibemix
+WRITES** (the wrapper persists the validated M3U/JSON — the single grounded
+write — so a file always lands even if the model doesn't call the persist tool).
 
 Output is a neutral **M3U + JSON** playlist in `~/.cache/vibemix/playlists/`
 (not a Rekordbox-XML write-back — that path is unsafe for the master DB).
