@@ -822,3 +822,76 @@ def build_system_instruction(
             body = body + COACH_CLOSING_BLOCK
 
     return body
+
+
+# Phase 77 Plan 02 — WIRE-04: charter lens → matrix mood vocabulary.
+# The product charter names lenses {hype, coach, tutor}; the matrix persona
+# dict (MOOD_PERSONAS) is keyed {hype-man, teacher, coach}. The curator default
+# is "tutor", which maps onto the "teacher" persona vocabulary (RESEARCH Open
+# Q2). Anti-prompt-injection (T-77-02-01): this map keys a FIXED dict — the lens
+# is never sourced from user input; the user theme stays in the data slot of
+# build_prompt(), never the system voice.
+_CURATOR_LENS_TO_MOOD: dict[str, str] = {
+    "tutor": "teacher",
+    "hype": "hype-man",
+    "critique": "coach",
+}
+
+
+def build_curator_instruction(lens: str = "tutor") -> str:
+    """Return the shared curator persona voice for ``lens`` (default "tutor").
+
+    WHY THIS IS A SEPARATE FUNCTION (not a reuse of ``build_system_instruction``):
+    the live co-host instruction appends runtime-only blocks that are WRONG for
+    a text playlist curator —
+
+      * :data:`CITATION_GRAMMAR_BLOCK` (live-event ``[citation]`` grammar),
+      * :data:`IM_LISTENING_FRAGMENT` (the audio fail-soft rule),
+      * :data:`TTS_TAG_DSL_BLOCK` / :data:`COACH_TAG_DSL_BLOCK` /
+        :data:`COACH_CLOSING_BLOCK` (Gemini TTS expressivity tags).
+
+    A curator emits a text M3U/JSON playlist — it has no voice delivery and no
+    live-event stream, so those blocks would be noise (or worse, misleading
+    instructions). ``build_curator_instruction`` composes ONLY the persona
+    CHARACTER (drawn from the fixed :data:`MOOD_PERSONAS` dict) plus a short
+    text-curator framing. The curator backends then prepend it to their own
+    verbatim grounding RULES (seen-set / never-invent-a-track_id) — which this
+    function deliberately does NOT own, because the gemini and codex backends
+    carry slightly different rule #3 (create_playlist vs. final-JSON).
+
+    Args:
+        lens: One of ``"tutor"`` / ``"hype"`` / ``"critique"`` (the charter
+            lenses). Maps onto the matrix mood vocabulary via
+            :data:`_CURATOR_LENS_TO_MOOD`. Defaults to ``"tutor"`` (the
+            curator-appropriate lens → the ``"teacher"`` persona).
+
+    Returns:
+        The curator persona voice string — persona vocabulary + text-curator
+        framing, with NO co-host-runtime blocks.
+
+    Raises:
+        ValueError: ``lens`` not in the charter lens set — fail loud (mirrors
+            the unknown-mood guard in :func:`build_system_instruction`), so a
+            typo'd lens never silently degrades to a default voice.
+
+    Anti-prompt-injection (T-77-02-01): the persona vocabulary comes from the
+    fixed :data:`MOOD_PERSONAS` dict; ``lens`` only SELECTS a fragment. No user
+    input enters the persona text.
+    """
+    lens_norm = lens.lower().strip()
+    if lens_norm not in _CURATOR_LENS_TO_MOOD:
+        raise ValueError(
+            f"unknown lens {lens!r} — must be one of "
+            f"{sorted(_CURATOR_LENS_TO_MOOD.keys())}"
+        )
+
+    persona = MOOD_PERSONAS[_CURATOR_LENS_TO_MOOD[lens_norm]]
+    # The text-curator framing: who Viber is + the surface it speaks on. This
+    # is the persona-only seam — the verbatim grounding RULES are appended by
+    # each backend (library/agent.py, library/codex_curate.py), not here.
+    return (
+        "You are Viber, a DJ's crate-digging co-pilot. "
+        f"{persona} "
+        "You build a playlist from the user's OWN library that fits their "
+        "theme — a text curator, not a live voice co-host."
+    )

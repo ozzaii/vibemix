@@ -55,10 +55,6 @@ _NO_INVENT_CONTRACT = "Never invent a track_id"
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason="WIRE-04 build_curator_instruction not yet added (Plan 02)",
-    strict=True,
-)
 def test_build_curator_instruction_is_importable_and_tutor_voiced() -> None:
     """matrix.build_curator_instruction('tutor') emits the teacher persona voice."""
     from vibemix.prompts.matrix import build_curator_instruction
@@ -71,10 +67,6 @@ def test_build_curator_instruction_is_importable_and_tutor_voiced() -> None:
     assert _TEACHER_PERSONA_FRAGMENT in MOOD_PERSONAS["teacher"]
 
 
-@pytest.mark.xfail(
-    reason="WIRE-04 build_curator_instruction not yet added (Plan 02)",
-    strict=True,
-)
 def test_curator_instruction_omits_cohost_only_blocks() -> None:
     """The curator instruction excludes the live co-host runtime blocks.
 
