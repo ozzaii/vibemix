@@ -13,11 +13,14 @@ LIBRARY-04 + LIBRARY-10 hold because this module cannot bypass the proxy.
 # Strategy
 ========
 
-1. Tracks with ``duration_s > 180`` are split into 3 mp3 excerpts
-   (intro / mid / outro, 60s each via ffmpeg) and the mean of their
-   embeddings is used. Mitigates Pitfall P54 (Gemini Embedding 2's 180s
-   audio cap).
-2. Tracks <= 180s pass the raw file as a single audio Part.
+1. Tracks with ``duration_s > AUDIO_SINGLE_CALL_MAX_SECONDS`` (80s) are
+   split into 3 mp3 excerpts (intro / mid / outro, 60s each via ffmpeg)
+   and the mean of their embeddings is used. Mitigates Pitfall P54
+   (Gemini Embedding 2's 180s docs cap) AND the observed real-world
+   ~80s single-call reliability ceiling on the GA SKU: we proactively
+   excerpt 80-180s tracks instead of gambling a full-track upload that
+   may fail mid-flight on a slow connection.
+2. Tracks <= 80s pass the raw file as a single audio Part (fast path).
 3. Streaming-only tracks (no local file) fall back to text-only embed of
    ``"title by artist | bpm BPM | key K"``.
 4. Every embed is keyed by SHA256 of
@@ -88,8 +91,19 @@ EXCERPT_STRATEGY_VERSION = "v1-3excerpt-mean"
 # key, forcing the lazy re-embed migration path.
 EXCERPT_STRATEGY_VERSION_GA_RENAME = "v2-3excerpt-mean-emb2-ga"
 
-# Gemini Embedding 2 hard audio cap. P54.
+# Gemini Embedding 2 hard audio cap (Google docs, re-confirmed 2026-05-25).
+# P54. Used ONLY by the _is_audio_cap_error heuristic now — the single-call
+# routing decision uses AUDIO_SINGLE_CALL_MAX_SECONDS below.
 AUDIO_CAP_SECONDS = 180
+
+# Conservative single-call threshold (quick-260525-gz2). Docs say 180s, but
+# Kaan's research flagged real-world single-call audio embed failures in the
+# 80-180s band on the emb-2 GA SKU. We proactively route 80-180s tracks to
+# the proven 3-excerpt path so a slow-connection bring-up never wastes a
+# full-track upload + retry on a clip the server will reject anyway. The
+# single-call -> cap-error -> force_excerpts fallback stays as defense-in-depth
+# for <=80s clips the API still rejects.
+AUDIO_SINGLE_CALL_MAX_SECONDS = 80
 
 # Per excerpt length in the 3-excerpt path.
 EXCERPT_DURATION = 60
@@ -110,6 +124,7 @@ __all__ = [
     "EXCERPT_STRATEGY_VERSION_GA_RENAME",
     "EMBEDDING_DIM",
     "AUDIO_CAP_SECONDS",
+    "AUDIO_SINGLE_CALL_MAX_SECONDS",
     "EMBED_CACHE_DB_PATH",
     "_probe_ga_model_id",
 ]
@@ -388,9 +403,11 @@ class LibraryEmbedder:
 
     def _embed_audio(self, audio_path: Path, duration_s: float) -> np.ndarray:
         """Audio embed path. Returns L2-normalized float32 vector."""
-        # Short track — try single call first; on cap-error, force-fallback.
+        # Short track (<=80s) — try single call first; on cap-error,
+        # force-fallback. 80-180s tracks skip this and go straight to the
+        # 3-excerpt path (no single-call gamble) per gz2 audio-cap hardening.
         force_excerpts = False
-        if duration_s <= AUDIO_CAP_SECONDS:
+        if duration_s <= AUDIO_SINGLE_CALL_MAX_SECONDS:
             try:
                 clip = audio_path.read_bytes()
                 mime = self._mime_for_path(audio_path)
@@ -459,13 +476,13 @@ class LibraryEmbedder:
         Each excerpt is 60s, encoded as MP3 at 128 kbps. Tempfiles are
         cleaned up before return.
 
-        For tracks <= 180s, normally we should not be here (single-call
-        path handles them); defensive guard returns the whole file as 1
-        excerpt. Pass ``force=True`` to override (used when the single-call
-        path fails with an audio-cap error and we want a 3-excerpt
-        fallback even on a short-duration track).
+        For tracks <= 80s (the single-call threshold), normally we should
+        not be here (the single-call path handles them); defensive guard
+        returns the whole file as 1 excerpt. Pass ``force=True`` to override
+        (used when the single-call path fails with an audio-cap error and we
+        want a 3-excerpt fallback even on a short-duration track).
         """
-        if duration_s <= AUDIO_CAP_SECONDS and not force:
+        if duration_s <= AUDIO_SINGLE_CALL_MAX_SECONDS and not force:
             return [audio_path.read_bytes()]
 
         ffmpeg = _require_ffmpeg()

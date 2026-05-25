@@ -27,6 +27,8 @@ import numpy as np
 import pytest
 
 from vibemix.library.embed import (
+    AUDIO_CAP_SECONDS,
+    AUDIO_SINGLE_CALL_MAX_SECONDS,
     EMBEDDING_DIM,
     EXCERPT_STRATEGY_VERSION,
     GEMINI_EMBEDDING_MODEL,
@@ -190,6 +192,43 @@ def test_long_track_split_into_3_excerpts(
     assert vec.dtype == np.float32
     assert vec.shape == (EMBEDDING_DIM,)
     # L2-normalized so we lose absolute scale; verify length.
+    assert abs(float(np.linalg.norm(vec)) - 1.0) < 1e-3
+
+
+def test_audio_cap_constants_locked() -> None:
+    """gz2 audio-cap hardening: single-call threshold lowered to 80s, hard
+    cap stays 180s (for the _is_audio_cap_error heuristic)."""
+    assert AUDIO_SINGLE_CALL_MAX_SECONDS <= 80
+    assert AUDIO_CAP_SECONDS == 180
+
+
+def test_gray_zone_track_uses_excerpts(
+    embedder: LibraryEmbedder,
+    mock_client: MagicMock,
+    fake_ffmpeg: None,
+    tmp_path: Path,
+) -> None:
+    """A 120s track (80-180s gray zone) takes the 3-excerpt path WITHOUT a
+    single-call attempt → exactly 3 embed calls (not 4)."""
+    audio = tmp_path / "grayzone.mp3"
+    audio.write_bytes(b"fakeid3" + b"\x00" * 1024)
+    gray_track = TrackEntry(
+        track_id="t-gray",
+        title="Gray Zone Track",
+        artist="Tester",
+        album="Album G",
+        bpm=135.0,
+        key="D min",
+        duration_s=120.0,
+        cues=(),
+        filepath=str(audio),
+    )
+
+    vec = embedder.embed_track(gray_track)
+
+    # 3 excerpt calls, NO single-call attempt at 120s (would have been 4).
+    assert mock_client.models.embed_content.call_count == 3
+    assert vec.shape == (EMBEDDING_DIM,)
     assert abs(float(np.linalg.norm(vec)) - 1.0) < 1e-3
 
 
