@@ -119,7 +119,6 @@ def test_trajectory_composed_bounded():
 # ---------- PERCEIVE-03 — genre fed via single writer ----------
 
 
-@pytest.mark.xfail(strict=True, reason="PERCEIVE-03 — flips when Plan 04 lands")
 def test_genre_fed_single_writer():
     """``state.detected_genre`` / ``genre_confidence`` are written ONLY by
     ``_tick_once`` reading an off-loop embedding-genre holder (the deck-holder
@@ -150,7 +149,6 @@ def test_genre_fed_single_writer():
     assert state.genre_confidence >= 0.5
 
 
-@pytest.mark.xfail(strict=True, reason="PERCEIVE-03 — flips when Plan 04 lands")
 def test_genre_reconciliation():
     """Embedding-genre vs DSP-genre reconcile to ONE coherent ``detected_genre``
     per tick (the flagged-risk pin):

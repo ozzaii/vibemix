@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import threading
 import time
 from collections import deque
 from typing import TYPE_CHECKING
@@ -75,6 +76,7 @@ from vibemix.state.genre import (
     validate_bpm,
 )
 from vibemix.state.deck_poller import DECK_CITE_MIN_CONF
+from vibemix.state.genre.genre_reconcile import reconcile_genre
 from vibemix.state.emotion_router import derive_emotion
 from vibemix.state.harmonics import to_camelot
 from vibemix.state.music_state import MusicState
@@ -228,6 +230,30 @@ def _compose_trajectory(
     return "; ".join(parts)
 
 
+def _dispatch_genre_lookup(genre_source, track_id: str) -> None:
+    """Fire the embedding genre lookup OFF the 10Hz tick (PERCEIVE-03).
+
+    Mirrors the Grounding off-loop dispatch: ``clear()`` discards any superseded
+    in-flight lookup (generation token), then a daemon thread runs
+    ``classify_playing`` which fills the holder's OWN ``_latest`` — the worker
+    NEVER writes MusicState (invariant #1; ``_tick_once`` is the sole writer that
+    READS ``get_latest()``). Best-effort + try-guarded so a lookup failure logs
+    to stderr and never wedges the tick or the ``in_flight`` gate (T-78-04-04).
+    """
+    try:
+        genre_source.clear()
+
+        def _worker() -> None:
+            try:
+                genre_source.classify_playing(track_id)
+            except Exception as e:  # never let an off-loop failure escape
+                print(f"[genre lookup err] {e}", file=sys.stderr)
+
+        threading.Thread(target=_worker, name="genre-lookup", daemon=True).start()
+    except Exception as e:  # clear()/thread-spawn failure must not wedge the tick
+        print(f"[genre dispatch err] {e}", file=sys.stderr)
+
+
 if TYPE_CHECKING:
     from vibemix.platform._midi_macos import ControllerState
     from vibemix.platform._track_macos import TrackInfo
@@ -252,6 +278,7 @@ def _tick_once(
     evidence_registry: EvidenceRegistry | None = None,
     genre_hysteresis: GenreHysteresis | None = None,
     deck_source=None,
+    genre_source=None,
 ) -> tuple[float, float, float, float]:
     """One iteration of the state_refresh_loop body. Extracted so tests can
     drive single ticks deterministically with fake time and fake snapshots.
@@ -392,9 +419,46 @@ def _tick_once(
             smoothed_crest,
             _cached_profiles(),
         )
-        committed_genre = apply_genre_hysteresis(raw_genre, genre_hysteresis)
-        state.detected_genre = committed_genre
-        state.genre_confidence = round(raw_genre_conf, 2)
+        # Phase 78 (PERCEIVE-03) — reconcile the embedding-genre lookup with the
+        # DSP score. The off-loop GenrePrototypeLookup worker (dispatched on
+        # TRACK_CHANGE below) fills its OWN holder; here the single writer READS
+        # get_latest() (the deck-snapshot copy-in idiom — never the worker
+        # writing state.*) and fuses it with the DSP (raw_genre, raw_genre_conf)
+        # via reconcile_genre: embedding wins when its NORMALIZED centered-cosine
+        # confidence clears coach.py's >=0.5 render band, else DSP fallback.
+        #
+        # Hysteresis policy: the per-tick DSP score is noisy bar-to-bar, so it is
+        # debounced through apply_genre_hysteresis (3-tick dwell). The embedding
+        # genre is the opposite — it is dispatched ONLY on TRACK_CHANGE (once per
+        # track, not per-tick) and is a high-trust 86.5%-validated signal, so
+        # re-debouncing it through the dwell would wrongly suppress a correct
+        # genre for the first 3 ticks of every track. When the embedding wins we
+        # therefore commit it IMMEDIATELY and RESYNC the hysteresis state to it
+        # (mirrors how "unknown" commits immediately) so subsequent DSP ticks do
+        # not instantly flip away. genre_source=None / empty holder / sub-floor
+        # embedding → pure DSP-through-hysteresis path → v8.0 byte-identical.
+        emb_won = False
+        if genre_source is not None:
+            latest = genre_source.get_latest()
+            if latest is not None:
+                emb_label, emb_conf = latest
+                rec_label, rec_conf = reconcile_genre(
+                    emb_label, emb_conf, raw_genre, raw_genre_conf
+                )
+                # reconcile_genre returns the EMBEDDING label only when it cleared
+                # the floor; a DSP fallback returns raw_genre verbatim.
+                if rec_label == emb_label and emb_label not in ("unknown", raw_genre):
+                    genre_hysteresis.current_label = rec_label
+                    genre_hysteresis.pending_label = None
+                    genre_hysteresis.pending_ticks = 0
+                    committed_genre = rec_label
+                    state.detected_genre = committed_genre
+                    state.genre_confidence = round(rec_conf, 2)
+                    emb_won = True
+        if not emb_won:
+            committed_genre = apply_genre_hysteresis(raw_genre, genre_hysteresis)
+            state.detected_genre = committed_genre
+            state.genre_confidence = round(raw_genre_conf, 2)
 
         # Env override wins: only re-point the active profile when the user did
         # NOT explicitly pin a genre (is_auto_enabled), the detector committed a
@@ -504,6 +568,16 @@ def _tick_once(
                 state.track_history.append((now, tt))
                 if len(state.track_history) > 6:
                     state.track_history.pop(0)
+                # Phase 78 (PERCEIVE-03) — TRACK_CHANGE → dispatch the embedding
+                # genre lookup OFF the 10Hz tick (mirrors the Grounding off-loop
+                # dispatch). clear() FIRST so any superseded in-flight lookup is
+                # discarded (generation-token contract from Plan 03); then the
+                # worker fills its OWN holder and the next tick READS get_latest()
+                # — the worker NEVER writes the live state dataclass (invariant
+                # #1). Best-effort: a lookup failure logs and never wedges the
+                # tick or the in_flight gate (T-78-04-04).
+                if genre_source is not None:
+                    _dispatch_genre_lookup(genre_source, tt)
         state.audible_track = tt
         state.audible_track_confidence = tc
 
@@ -612,6 +686,7 @@ async def state_refresh_loop(
     *,
     evidence_registry: EvidenceRegistry | None = None,
     deck_source=None,
+    genre_source=None,
 ) -> None:
     """Updates MusicState every 100ms from all sources. The ONLY writer to state.
     Audible flag is debounced — sustained samples required to flip in either
@@ -668,6 +743,7 @@ async def state_refresh_loop(
                 evidence_registry=evidence_registry,
                 genre_hysteresis=genre_hysteresis,
                 deck_source=deck_source,
+                genre_source=genre_source,
             )
         except Exception as e:
             print(f"[state refresh err] {e}", file=sys.stderr)
