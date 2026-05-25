@@ -76,7 +76,7 @@ Single packaged app under `src/vibemix/`. Entry point: `python -m vibemix` → `
 - `agent/` — LiveKit `RealtimeModel` session + the Gemini reaction path (`dj_cohost.py`).
 - `llm/` — `model_router.py` (config-driven model resolution, no hardcoded literals) + `thinking_gate.py`.
 - `coach/`, `prompts/`, `profile/` — persona/prompt templates per user level; long-term DJ profile.
-- `library/` — Gemini-embedding + sqlite-vec vibe search (macOS sqlite-vec / Windows numpy, bit-identical top-K parity).
+- `library/` — Gemini-embedding + sqlite-vec vibe search (macOS sqlite-vec / Windows numpy, bit-identical top-K parity). **State on disk** under `~/.cache/vibemix/`: `library.db` (sqlite-vec vectors), `embeddings.db` (content-hash embed cache), `library.pkl` (track-title cache), `library_centroid.npy` (cached query centroid, auto-recomputed on store change). **Gotcha:** library/rekordbox tests MUST monkeypatch `RekordboxLibrary.CACHE_PATH` to a tmp dir, or they overwrite the real `library.pkl`.
 - `memory/` — local `memory.db` copilot store (sqlite-vec); gated behind `VIBEMIX_RECALL_ENABLED` (default off).
 - `debrief/` — post-session review UI (second Tauri window, port 8766).
 - `events/`, `midi/` (10-controller `profiles/` — the single-source catalog), `install/`, `ui_bus/`, `runtime/` (`ws_bus`, `wizard`, `session_loop`, `soak`, `ttft`, recordings index).
@@ -139,6 +139,17 @@ source .venv/bin/activate && PYTHONPATH=src python3 -m pytest -q
 ```
 
 Opt-in markers (default run skips them): `-m macos_audio`, `-m windows_only`, `-m integration`, `-m slow`, `-m e2e`, `-m cli`, `-m network`. See `[tool.pytest.ini_options]` in `pyproject.toml`.
+
+**Library / vibe-search CLI** (the embedding workflow — see `docs/library.md`):
+
+```bash
+uv run python -m vibemix library embed-folder "<dir>" [--strategy mean_excerpt|cue_anchored]  # walk+embed a folder, no Rekordbox XML needed
+uv run python -m vibemix library search "<text vibe>" [-k N]      # text→tracks (cross-modal)
+uv run python -m vibemix library similar "<track_id|file path>"   # track→similar
+uv run python -m vibemix library budget --json                    # offline cost telemetry
+```
+
+Embeds need `GEMINI_API_KEY` (client picks direct key first, else proxy JWT). embed-folder is resumable: a content-hash cache skips already-embedded files for free, and per-file errors are logged + skipped, never fatal. Ranking is mean-centered by default (anisotropy fix) — query-side only, persisted vectors untouched.
 
 **Required environment:** `.env` at repo root with `GEMINI_API_KEY=...` (and `OPENROUTER_API_KEY=...` for the TTS fallback chain). Read via `python-dotenv`.
 
