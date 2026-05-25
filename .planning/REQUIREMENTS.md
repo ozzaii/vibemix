@@ -17,7 +17,7 @@
 - [ ] **WIRE-01**: The live co-host's reactions are grounded by the audio→library Grounding engine (passed into `DJCoHostAgent`), so it references what is actually playing.
 - [x] **WIRE-02**: The 8 genre-chain detectors surface their measured evidence to the prompt and register in the `EvidenceRegistry` (shipped `ccf4930`).
 - [x] **WIRE-03**: `detected_genre` is surfaced in the prompt evidence, confidence-gated against hallucination (shipped `a9979b8`).
-- [ ] **WIRE-04**: The hype/critique/tutor persona is shared across the live co-host and the library curator (curator stops hardcoding its voice).
+- [ ] **WIRE-04**: The hype/critique/tutor persona is shared across the live co-host and the library curator — BOTH curator backends, gemini (`library/agent.py`) and codex (`library/codex_curate.py` + `library/mcp_server.py`) — which stop hardcoding their voice and read the shared lens.
 - [ ] **WIRE-05**: `memory.db` ingest runs on the live `main()` path so recall personalization works in a real session.
 - [ ] **WIRE-06**: The app loads its API key without a stale shell env var shadowing `.env` (override the ghost key, or clear it).
 
@@ -40,8 +40,8 @@
 - [ ] **BENCH-03**: Bench cells are surfaced for Kaan's-ear final judgment (KAAN-ACTION review surface).
 
 ### CURATE — unify curator + co-host
-- [ ] **CURATE-01**: Curator and co-host share the perception engine + the structured-state contract.
-- [ ] **CURATE-02**: Curator and co-host share the taste layer + persona.
+- [ ] **CURATE-01**: Curator and co-host share the perception engine + the structured-state contract. ("Curator" = the shared grounded `library/toolset.py` core driving BOTH backends — gemini `agent.py` and codex `codex_curate.py`/`mcp_server.py` — plus the Telegram + `next_suggestion` transports over it. Neither backend is orphaned.)
+- [ ] **CURATE-02**: Curator (both gemini + codex backends) and co-host share the taste layer + persona/lens.
 
 ---
 
