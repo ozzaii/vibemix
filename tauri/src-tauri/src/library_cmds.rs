@@ -218,13 +218,22 @@ fn map_search_results(raw: &Value) -> Value {
                 .or_else(|| r.get("score"))
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.0);
-            // meta: the full raw record (artist, bpm, snippet, etc.) so the
-            // UI keeps every field without a second contract.
+            // meta: a SHORT caption STRING for the row's mono sub-line. The
+            // UI types `meta` as a string and renders it directly, so we must
+            // not hand it the raw record object (that stringifies to
+            // "[object Object]"). Prefer the CLI's `snippet`; fall back to the
+            // track_id when a result carries no snippet.
+            let meta = r
+                .get("snippet")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .unwrap_or(&track_id)
+                .to_string();
             json!({
                 "track_id": track_id,
                 "title": title,
                 "score": score,
-                "meta": r.clone(),
+                "meta": meta,
             })
         })
         .collect();
@@ -661,9 +670,9 @@ mod tests {
         assert_eq!(r["track_id"], "t1");
         assert_eq!(r["title"], "A");
         assert!((r["score"].as_f64().unwrap() - 0.91).abs() < 1e-9);
-        // meta carries the full original record.
-        assert_eq!(r["meta"]["artist"], "X");
-        assert_eq!(r["meta"]["snippet"], "A — X @ 124 BPM");
+        // meta is the short caption STRING (the CLI's snippet) — NOT the raw
+        // object (which would render "[object Object]" in the UI).
+        assert_eq!(r["meta"], "A — X @ 124 BPM");
         // defaults when CLI omits centering metadata.
         assert_eq!(mapped["centered"], false);
         assert_eq!(mapped["corpus_size"], 1);
@@ -680,6 +689,9 @@ mod tests {
         });
         let mapped = map_search_results(&raw);
         assert!((mapped["results"][0]["score"].as_f64().unwrap() - 0.77).abs() < 1e-9);
+        // No snippet on the similar payload → meta falls back to track_id
+        // (still a STRING, never the raw object).
+        assert_eq!(mapped["results"][0]["meta"], "t2");
     }
 
     #[test]

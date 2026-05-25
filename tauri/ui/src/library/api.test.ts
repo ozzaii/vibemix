@@ -48,7 +48,7 @@ describe("dev fallback (no Tauri bridge)", () => {
   });
 
   it("libraryEmbedFolder returns false (no bridge → caller drives replay)", async () => {
-    expect(await libraryEmbedFolder("~/Music", "cue-anchored")).toBe(false);
+    expect(await libraryEmbedFolder("~/Music", "cue_anchored")).toBe(false);
   });
 
   it("exposes the captured embed log (8 entries, mixed ok/skip)", () => {

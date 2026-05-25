@@ -66,8 +66,8 @@ describe("transitions are immutable", () => {
     expect(s.seed).toBe("track.wav");
     s = setFolder(s, "/x");
     expect(s.folder).toBe("/x");
-    s = setStrategy(s, "mean");
-    expect(s.strategy).toBe("mean");
+    s = setStrategy(s, "mean_excerpt");
+    expect(s.strategy).toBe("mean_excerpt");
     // query survived the later mutations (immutable spread, not aliasing)
     expect(s.query).toBe("deep dub");
   });

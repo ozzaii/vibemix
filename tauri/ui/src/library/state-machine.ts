@@ -35,7 +35,7 @@ export const initialLibraryState: LibraryState = {
   query: "hard aggressive techno",
   seed: "ygmf_Remix.wav",
   folder: "~/Music",
-  strategy: "cue-anchored",
+  strategy: "cue_anchored",
 };
 
 /** The left-console field label for the active mode. */

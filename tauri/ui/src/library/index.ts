@@ -27,6 +27,7 @@ import {
   onEmbedProgress,
   type EmbedDone,
   type EmbedProgress,
+  type EmbedStrategy,
   type LibraryStats,
   type SearchResult,
 } from "./api.js";
@@ -105,6 +106,20 @@ function renderResults(result: SearchResult, mode: LibraryMode): void {
   $("vmx-lib-rcount").textContent = `${result.results.length} of ${result.corpus_size}`;
   $("vmx-lib-scope-state").textContent = result.centered ? "centered" : "raw";
   $("vmx-lib-scope").innerHTML = renderScope(result, mode);
+}
+
+/** Surface a REAL backend error in the results panel — honest failure, not the
+ *  fake sample data. The message is the bridge's own error string (e.g.
+ *  "No library cache.", "invalid strategy …"). */
+function renderError(err: unknown): void {
+  const msg =
+    err instanceof Error
+      ? err.message
+      : typeof err === "string"
+        ? err
+        : String(err);
+  const el = $("vmx-lib-results");
+  el.innerHTML = `<div class="vmx-lib-error"><div class="vmx-lib-error-title">engine error</div><div class="vmx-lib-error-msg">${esc(msg)}</div></div>`;
 }
 
 function renderStats(stats: LibraryStats): void {
@@ -224,8 +239,17 @@ export function mountLibrary(): void {
         return; // ingest manages its own busy lifecycle (events or replay)
       }
     } catch (err) {
+      // A REAL backend error (empty cache, missing key, bad strategy) — show it
+      // honestly instead of masking it with fake data (anti-slop). The ingest
+      // path lands here too on a real bridge error, so we must release its
+      // busy/disabled lifecycle here rather than leaving the button wedged.
       // eslint-disable-next-line no-console
       console.error("[vmx-lib] run failed:", err);
+      renderError(err);
+      if (state.mode === "ingest") {
+        busy = false;
+        runBtn.disabled = false;
+      }
     } finally {
       if (state.mode !== "ingest") {
         busy = false;
@@ -271,13 +295,17 @@ export function mountLibrary(): void {
     });
   });
 
-  // strategy chips (ingest mode)
+  // strategy chips (ingest mode). The chip's `data-strategy` is the nice
+  // user-facing token ("mean" / "cue-anchored"); map it to the EXACT wire
+  // value the Rust bridge accepts ("mean_excerpt" / "cue_anchored").
   document.querySelectorAll<HTMLElement>("[data-strategy]").forEach((chip) => {
     chip.addEventListener("click", () => {
-      const strat = chip.dataset.strategy === "mean" ? "mean" : "cue-anchored";
+      const strat: EmbedStrategy =
+        chip.dataset.strategy === "mean" ? "mean_excerpt" : "cue_anchored";
       state = setStrategy(state, strat);
       document.querySelectorAll<HTMLElement>("[data-strategy]").forEach((c) => {
-        c.setAttribute("aria-pressed", String(c.dataset.strategy === strat));
+        const wire = c.dataset.strategy === "mean" ? "mean_excerpt" : "cue_anchored";
+        c.setAttribute("aria-pressed", String(wire === strat));
       });
     });
   });

@@ -17,17 +17,28 @@
  * commands are direct Tauri commands — Rust runs the embedder + sqlite-vec
  * search in-process, so there is no JSON-schema validator on this seam.
  *
- * DEV FALLBACK: when `invoke()` is unavailable (plain `vite` dev, jsdom tests)
- * or throws (bridge not landed yet), every call resolves with the real sample
- * data captured from the 2026-05-25 subset run — the same numbers baked into
- * mocks/vibemix-library-ui.html — so the window renders fully without Rust.
+ * DEV FALLBACK: when `invoke()` is genuinely UNAVAILABLE (plain `vite` dev,
+ * jsdom tests — `getInvoke()` returns null), every call resolves with the real
+ * sample data captured from the 2026-05-25 subset run — the same numbers baked
+ * into mocks/vibemix-library-ui.html — so the window renders fully without Rust.
+ *
+ * CRITICAL (anti-slop): the fallback fires ONLY for the no-Tauri case. When
+ * invoke IS available (real app) and the backend call THROWS — empty cache,
+ * missing key, bad strategy — we PROPAGATE the error instead of masking it with
+ * canned sample data, so the UI can show a real error state. Silently returning
+ * fake 142-track data on a real failure would make a broken backend look like
+ * success — exactly the AI-slop failure mode this product blocks on.
  */
 
 import { listen as tauriListen, type UnlistenFn } from "@tauri-apps/api/event";
 
 // ── Wire types (the bridge contract) ───────────────────────────────────────
 
-export type EmbedStrategy = "mean" | "cue-anchored";
+/** Embed strategy — the EXACT wire values the Rust bridge accepts
+ *  (library_cmds.rs validates against `mean_excerpt` | `cue_anchored`).
+ *  The UI shows nicer labels ("Mean" / "Cue-anchored") but the value sent
+ *  over `invoke` MUST be one of these. */
+export type EmbedStrategy = "mean_excerpt" | "cue_anchored";
 
 /** One pulled track row. `meta` is a short mono caption (folder hash + dims,
  *  or `centered · cos` for the similar path). */
@@ -79,10 +90,27 @@ type InvokeFn = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
 
 let _invoke: InvokeFn | null | undefined;
 
-/** Resolve the Tauri `invoke` lazily. Returns null when the Tauri API is not
- *  present (plain browser / vitest) so callers fall through to the dev data. */
+/** Resolve the Tauri `invoke` lazily. Returns null when Tauri is genuinely not
+ *  present (plain browser / vitest / jsdom) so callers fall through to the dev
+ *  data — and ONLY then.
+ *
+ *  The `@tauri-apps/api/core` MODULE resolves even under vitest, but its
+ *  `invoke` dereferences `window.__TAURI_INTERNALS__`, which only exists inside
+ *  a real Tauri webview. We gate on that global so the null-path means "no
+ *  Tauri" (→ demo data) while a resolved invoke that THROWS means a real
+ *  backend error (→ propagated, never masked with fake data). */
 async function getInvoke(): Promise<InvokeFn | null> {
   if (_invoke !== undefined) return _invoke;
+  // Genuine Tauri presence check: the runtime injects __TAURI_INTERNALS__ into
+  // the webview's window. Absent (vitest / plain vite) → no Tauri → dev data.
+  const hasTauriRuntime =
+    typeof window !== "undefined" &&
+    (window as unknown as { __TAURI_INTERNALS__?: unknown })
+      .__TAURI_INTERNALS__ != null;
+  if (!hasTauriRuntime) {
+    _invoke = null;
+    return _invoke;
+  }
   try {
     const mod = await import("@tauri-apps/api/core");
     _invoke = mod.invoke as InvokeFn;
@@ -160,53 +188,45 @@ export const DEV_FALLBACK = {
 /** Text vibe query → ranked tracks + scope geometry. */
 export async function librarySearch(query: string, k = 6): Promise<SearchResult> {
   const invoke = await getInvoke();
-  if (!invoke) return DEV_SEARCH;
-  try {
-    return await invoke<SearchResult>("library_search", { query, k });
-  } catch {
-    return DEV_SEARCH;
-  }
+  if (!invoke) return DEV_SEARCH; // no Tauri (plain vite / jsdom) → demo data
+  // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
+  return invoke<SearchResult>("library_search", { query, k });
 }
 
 /** Seed (track_id or dropped file path) → nearest neighbours. */
 export async function librarySimilar(seed: string, k = 6): Promise<SearchResult> {
   const invoke = await getInvoke();
-  if (!invoke) return DEV_SIMILAR;
-  try {
-    return await invoke<SearchResult>("library_similar", { seed, k });
-  } catch {
-    return DEV_SIMILAR;
-  }
+  if (!invoke) return DEV_SIMILAR; // no Tauri (plain vite / jsdom) → demo data
+  // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
+  return invoke<SearchResult>("library_similar", { seed, k });
 }
 
 /** Corpus readout for the left console. */
 export async function libraryStats(): Promise<LibraryStats> {
   const invoke = await getInvoke();
-  if (!invoke) return DEV_STATS;
-  try {
-    return await invoke<LibraryStats>("library_stats");
-  } catch {
-    return DEV_STATS;
-  }
+  if (!invoke) return DEV_STATS; // no Tauri (plain vite / jsdom) → demo data
+  // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
+  return invoke<LibraryStats>("library_stats");
 }
 
 /** Kick off a folder embed. Progress + completion arrive as Tauri events —
  *  subscribe with `onEmbedProgress` / `onEmbedDone` BEFORE calling this.
  *
- *  Returns `true` when the real bridge accepted the job, `false` when we fell
- *  through to the dev replay (so the caller can drive the replay itself). */
+ *  Returns `true` when the real bridge accepted the job, `false` when there is
+ *  no Tauri bridge (plain vite / jsdom) so the caller drives the dev replay.
+ *
+ *  A real backend error (bad strategy, missing folder, spawn failure) is
+ *  PROPAGATED — not swallowed into a `false` that would silently animate the
+ *  fake 8-file replay and look like a successful embed. */
 export async function libraryEmbedFolder(
   path: string,
   strategy: EmbedStrategy,
 ): Promise<boolean> {
   const invoke = await getInvoke();
-  if (!invoke) return false;
-  try {
-    await invoke("library_embed_folder", { path, strategy });
-    return true;
-  } catch {
-    return false;
-  }
+  if (!invoke) return false; // no Tauri (plain vite / jsdom) → caller replays
+  // Real bridge: let a backend error PROPAGATE — never fall to the fake replay.
+  await invoke("library_embed_folder", { path, strategy });
+  return true;
 }
 
 // ── Event subscriptions ─────────────────────────────────────────────────────

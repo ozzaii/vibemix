@@ -56,6 +56,7 @@ const MENU_ID_MOOD_COACH: &str = "mood-coach";
 const MENU_ID_MUTE: &str = "mute-mic";
 const MENU_ID_TOGGLE_MASCOT: &str = "toggle-mascot";
 const MENU_ID_OPEN_SESSION: &str = "open-session";
+const MENU_ID_OPEN_LIBRARY: &str = "open-library";
 const MENU_ID_RECALIBRATE: &str = "re-run-calibration";
 const MENU_ID_SETTINGS: &str = "open-settings";
 const MENU_ID_QUIT: &str = "quit-vibemix";
@@ -173,6 +174,16 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         None::<&str>,
     )?;
+    // Vibe Engine = the second app window (library/vibe-search). The
+    // `open_library_window` command is registered but had no caller; this is
+    // its discoverable entry point, mirroring "Open Session UI".
+    let open_library = MenuItem::with_id(
+        app,
+        MENU_ID_OPEN_LIBRARY,
+        "Open Vibe Engine",
+        true,
+        None::<&str>,
+    )?;
     let recalibrate = MenuItem::with_id(
         app,
         MENU_ID_RECALIBRATE,
@@ -206,6 +217,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         .item(&mute)
         .item(&toggle_mascot)
         .item(&open_session)
+        .item(&open_library)
         .item(&recalibrate)
         .item(&settings)
         .item(&separator)
@@ -288,6 +300,17 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
                 let _ = window.show();
                 let _ = window.set_focus();
             }
+        }
+        MENU_ID_OPEN_LIBRARY => {
+            // Open (or focus) the Vibe Engine window via the same command the
+            // invoke handler exposes. It is async (builds a WebviewWindow), so
+            // run it on the async runtime; errors are logged, never fatal.
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = crate::library_cmds::open_library_window(app_handle).await {
+                    tracing::warn!("open Vibe Engine from tray failed: {e}");
+                }
+            });
         }
         MENU_ID_RECALIBRATE => {
             // Phase 12 Settings drawer owns the confirm-dialog flow —
@@ -709,6 +732,7 @@ mod tests {
             MENU_ID_MUTE,
             MENU_ID_TOGGLE_MASCOT,
             MENU_ID_OPEN_SESSION,
+            MENU_ID_OPEN_LIBRARY,
             MENU_ID_RECALIBRATE,
             MENU_ID_SETTINGS,
             MENU_ID_QUIT,

@@ -366,6 +366,29 @@ body {
   color: var(--silk-40);
 }
 
+/* Real backend error — surfaced honestly instead of masking with fake data.
+   Single amber accent (CDJ Whisper), restrained: a label + the raw message. */
+.vmx-lib-error {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--silk-40);
+}
+.vmx-lib-error .vmx-lib-error-title {
+  color: var(--amber);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.vmx-lib-error .vmx-lib-error-msg {
+  font-family: var(--type-mono);
+  font-size: 12px;
+  color: var(--silk-40);
+  word-break: break-word;
+}
+
 /* ── right: vibe scope ──────────────────────────────────── */
 .vmx-lib-scope-wrap { display: flex; flex-direction: column; height: 100%; }
 .vmx-lib-scope { position: relative; aspect-ratio: 1; width: 100%; margin-top: 4px; }
