@@ -1328,6 +1328,25 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_similar.add_argument("--k", type=int, default=10)
     sp_similar.set_defaults(func=_cmd_library_similar)
 
+    # quick-260525-gz2 — embed-folder: ingest a raw audio folder (not XML)
+    sp_embed_folder = sub.add_parser(
+        "embed-folder",
+        help="Embed every supported audio file under a folder (recursive)",
+        description=(
+            "Walk a raw audio folder, embed each track via Gemini Embedding "
+            "2, persist 1536-d vectors + a library.pkl so search/similar "
+            "resolve filenames. Resumable, partial-failure-tolerant. Uses "
+            "GEMINI_API_KEY (direct) when set, else VIBEMIX_PROXY_JWT (proxy)."
+        ),
+    )
+    sp_embed_folder.add_argument("path", help="folder to ingest (recursive)")
+    sp_embed_folder.add_argument(
+        "--json",
+        action="store_true",
+        help="emit the IngestReport as JSON (suppress per-track progress)",
+    )
+    sp_embed_folder.set_defaults(func=_cmd_library_embed_folder)
+
     # Plan 28-08 — budget telemetry + projection
     sp_budget = sub.add_parser(
         "budget", help="Show monthly Gemini Embedding cost projection"
@@ -1473,6 +1492,96 @@ def _cmd_library_similar(args: argparse.Namespace) -> int:
         indent=2,
     )
     sys.stdout.write("\n")
+    return 0
+
+
+def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
+    """quick-260525-gz2 — embed a raw audio folder.
+
+    Client selection (direct-first so Kaan can run NOW with his .env key):
+        1. GEMINI_API_KEY set → DIRECT genai.Client(api_key=...) — the SAME
+           construction the live session's mode=direct path uses.
+        2. else VIBEMIX_PROXY_JWT set → proxy client (build_proxy_genai_client).
+        3. else → clear stderr error + exit 1.
+    """
+    import json as _json
+    import os as _os
+    from pathlib import Path as _Path
+
+    from vibemix.library import (
+        LibraryEmbedder,
+        ingest_folder,
+        open_store,
+    )
+
+    # ── Client selection: direct key first, proxy JWT fallback ──
+    api_key = _os.environ.get("GEMINI_API_KEY")
+    proxy_jwt = _os.environ.get("VIBEMIX_PROXY_JWT")
+    proxy_url = _os.environ.get(
+        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
+    )
+
+    if api_key:
+        # Same direct-client construction as main()'s mode=direct path.
+        client = genai.Client(api_key=api_key)
+        print("-> embed-folder: client=direct (GEMINI_API_KEY)", file=sys.stderr)
+    elif proxy_jwt:
+        from vibemix.agent.proxy_client import build_proxy_genai_client
+
+        client = build_proxy_genai_client(proxy_jwt, proxy_url)
+        print("-> embed-folder: client=proxy (VIBEMIX_PROXY_JWT)", file=sys.stderr)
+    else:
+        print(
+            "[FATAL] embed-folder needs an API client: set GEMINI_API_KEY "
+            "(direct, recommended for local runs) in your .env/environment, "
+            "or VIBEMIX_PROXY_JWT (Bravoh proxy). Neither is set.",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
+
+    folder = _Path(args.path)
+    if not folder.is_dir():
+        print(
+            f"[FATAL] embed-folder: {args.path!r} is not a directory.",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
+
+    embedder = LibraryEmbedder(client)
+    store = open_store()
+    as_json = bool(getattr(args, "json", False))
+
+    def _progress(line: str) -> None:
+        if not as_json:
+            print(line, flush=True)
+
+    try:
+        report = ingest_folder(
+            folder, embedder, store, persist_library=True, progress=_progress
+        )
+    finally:
+        store.close()
+
+    if as_json:
+        _json.dump(report.as_dict(), sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 0
+
+    from vibemix.library.rekordbox import RekordboxLibrary
+
+    print(
+        f"\nembed-folder done: embedded={report.embedded} "
+        f"skipped_cached={report.skipped_cached} failed={report.failed} "
+        f"total={report.total}  ~€{report.cost_estimate_eur:.4f}"
+    )
+    print(f"-> library cache: {RekordboxLibrary.CACHE_PATH}")
+    print(
+        '-> query it: `vibemix library search "<vibe text>"` or '
+        "`vibemix library similar <folder:hash>` "
+        "(re-run with --json to copy a track_id seed)."
+    )
     return 0
 
 

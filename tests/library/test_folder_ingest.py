@@ -265,3 +265,68 @@ def test_dim_mismatch_store_fails_loud(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="different dimensionality"):
         ingest_folder(music, FakeEmbedder(), StaleStore(), probe=_const_probe())
+
+
+def test_empty_stale_dim_table_auto_recreates(
+    tmp_path: Path, numpy_store: LibraryStore
+) -> None:
+    """An EMPTY stale-dim (768) table is auto-recreated at EMBEDDING_DIM —
+    no manual file deletion needed (gz2: DB has 0 rows = clean wipe)."""
+    music = tmp_path / "music"
+    _touch(music / "x.mp3")
+
+    class EmptyStaleStore:
+        def __init__(self) -> None:
+            self.recreated = False
+            self.added: list = []
+
+        def vector_dim(self):
+            return 768  # stale
+
+        def row_count(self):
+            return 0  # empty → safe to wipe
+
+        def recreate_table(self):
+            self.recreated = True
+
+        def search(self, q, k=1):  # noqa: ANN001
+            return []
+
+        def add_batch(self, items):  # noqa: ANN001
+            self.added.extend(items)
+
+    store = EmptyStaleStore()
+    report = ingest_folder(music, FakeEmbedder(), store, probe=_const_probe(),
+                           persist_library=False)
+
+    assert store.recreated is True
+    assert report.embedded == 1
+    assert len(store.added) == 1
+
+
+def test_populated_stale_dim_table_never_wiped(tmp_path: Path) -> None:
+    """A POPULATED stale-dim table fails loud — we never silently destroy
+    real embeddings."""
+    music = tmp_path / "music"
+    _touch(music / "x.mp3")
+
+    class PopulatedStaleStore:
+        def vector_dim(self):
+            return 768
+
+        def row_count(self):
+            return 42  # has real data → must NOT auto-wipe
+
+        def recreate_table(self):  # pragma: no cover
+            raise AssertionError("must never wipe a populated table")
+
+        def search(self, q, k=1):  # noqa: ANN001
+            return []
+
+        def add_batch(self, items):  # pragma: no cover
+            raise AssertionError("should never reach add_batch")
+
+    with pytest.raises(RuntimeError, match="different dimensionality"):
+        ingest_folder(
+            music, FakeEmbedder(), PopulatedStaleStore(), probe=_const_probe()
+        )

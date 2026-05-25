@@ -39,6 +39,7 @@ def test_drag_drop_xml_then_live_track_citation_validates(
     tmp_path,
 ) -> None:
     """Full P48 chain: register library → grounding fires → linter passes."""
+    from vibemix.library._cosine import EMBEDDING_DIM
     from vibemix.library.grounding import Grounding
     from vibemix.state.evidence_registry import EvidenceRegistry
 
@@ -61,7 +62,7 @@ def test_drag_drop_xml_then_live_track_citation_validates(
     fake_embedder = MagicMock()
     fake_embedder._client = MagicMock()
     fake_embedder._client.models.embed_content.return_value = SimpleNamespace(
-        embeddings=[SimpleNamespace(values=[0.1] * 768)]
+        embeddings=[SimpleNamespace(values=[0.1] * EMBEDDING_DIM)]
     )
     fake_store = MagicMock()
     fake_store.search.return_value = [("t000", 0.85)]

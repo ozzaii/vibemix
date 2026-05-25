@@ -106,6 +106,50 @@ class SqliteVecStore:
         )
         self.db.commit()
 
+    def vector_dim(self) -> int | None:
+        """Return the declared ``FLOAT[N]`` dim of the vec0 table, or None.
+
+        Reads the stored ``CREATE VIRTUAL TABLE ... vec0(... FLOAT[N] ...)``
+        DDL from sqlite_master and parses N. Used by folder_ingest's
+        dim-mismatch guard to catch a STALE-but-EMPTY 768-dim table (the
+        ``IF NOT EXISTS`` clause does not recreate an existing table at the
+        new EMBEDDING_DIM, so an empty table still carries the old schema
+        and rejects a 1536-d insert). Returns None if the DDL can't be read.
+        """
+        import re
+
+        row = self.db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' "
+            "AND name='vec_library'"
+        ).fetchone()
+        if not row or not row[0]:
+            return None
+        m = re.search(r"FLOAT\[(\d+)\]", row[0])
+        return int(m.group(1)) if m else None
+
+    def row_count(self) -> int:
+        """Number of stored vectors."""
+        return int(
+            self.db.execute("SELECT COUNT(*) FROM vec_library").fetchone()[0]
+        )
+
+    def recreate_table(self) -> None:
+        """Drop + recreate the vec0 table at the current EMBEDDING_DIM.
+
+        Used by folder_ingest's dim-mismatch guard to wipe a STALE-BUT-EMPTY
+        768-dim table (0 rows = no real data) so a 1536-d ingest can proceed
+        without manual file deletion. NEVER call this on a populated table —
+        the guard only invokes it when row_count() == 0.
+        """
+        self.db.execute("DROP TABLE IF EXISTS vec_library")
+        self.db.execute(
+            f"CREATE VIRTUAL TABLE vec_library USING vec0("
+            f"track_id TEXT PRIMARY KEY, "
+            f"embedding FLOAT[{EMBEDDING_DIM}] distance_metric=cosine"
+            f")"
+        )
+        self.db.commit()
+
     def snapshot_hash(self) -> str:
         rows = self.db.execute(
             "SELECT track_id FROM vec_library ORDER BY track_id ASC"

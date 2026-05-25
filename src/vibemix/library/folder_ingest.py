@@ -196,11 +196,49 @@ def folder_to_track_entry(path: Path, duration_s: float) -> TrackEntry:
 def _assert_store_dim_compatible(store: _Store) -> None:
     """Fail-loud if the store holds vectors at a different dim than EMBEDDING_DIM.
 
-    Probes with a zero query of the current dim. An empty store no-ops
-    (cosine_topk returns [] for N==0). A stale-dim store raises an
-    Assertion/Value/shape error inside cosine_topk, which we re-raise as an
-    actionable RuntimeError.
+    Two-layer check:
+      1. If the backend can introspect its declared vector dim
+         (``vector_dim()`` — sqlite-vec reads the FLOAT[N] schema), compare
+         it to EMBEDDING_DIM. This catches a STALE-BUT-EMPTY 768 vec0 table
+         that the row-data cosine path below would miss (the table's
+         ``CREATE ... IF NOT EXISTS`` keeps the old dim, so a 1536-d insert
+         fails deep in the extension with a cryptic error).
+      2. Probe with a zero query of the current dim. An empty store no-ops
+         (cosine_topk returns [] for N==0). A stale-dim store with rows
+         raises an Assertion/Value/shape error inside cosine_topk.
+
+    Either failure re-raises as an actionable RuntimeError.
     """
+    _stale_dim_error = RuntimeError(
+        f"Library store holds vectors at a different dimensionality than "
+        f"EMBEDDING_DIM={EMBEDDING_DIM}. The on-disk index is stale "
+        f"(likely a 768-dim build). Delete ~/.cache/vibemix/library.db "
+        f"(and library_vectors.npy / library_ids.json for the numpy "
+        f"backend) and re-run embed-folder."
+    )
+
+    dim_fn = getattr(store, "vector_dim", None)
+    if callable(dim_fn):
+        stored = dim_fn()
+        if stored is not None and stored != EMBEDDING_DIM:
+            # An EMPTY stale-dim table carries no real data — auto-recreate
+            # it at the new dim (clean wipe, per gz2 research: the DB has 0
+            # rows). A POPULATED stale-dim table would lose real embeddings,
+            # so we NEVER auto-wipe it — fail loud and let the user decide.
+            count_fn = getattr(store, "row_count", None)
+            count = count_fn() if callable(count_fn) else None
+            recreate_fn = getattr(store, "recreate_table", None)
+            if count == 0 and callable(recreate_fn):
+                logger.warning(
+                    "[ingest] store table is empty but pinned at dim %s != "
+                    "EMBEDDING_DIM=%s — recreating it (clean wipe, no data).",
+                    stored,
+                    EMBEDDING_DIM,
+                )
+                recreate_fn()
+            else:
+                raise _stale_dim_error
+
     try:
         store.search(np.zeros(EMBEDDING_DIM, dtype=np.float32), k=1)
     except (AssertionError, ValueError) as e:

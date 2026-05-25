@@ -63,6 +63,33 @@ class LibraryStore:
     def delete(self, track_ids: list[str]) -> None:
         self._backend.delete(track_ids)
 
+    def vector_dim(self) -> int | None:
+        """On-disk vector dim, or None if the backend can't introspect it.
+
+        Catches a stale-but-empty vec0 schema (768) that the row-data
+        cosine path would miss. NumpyStore has no fixed schema (it raises
+        at load time on a stale .npy), so it returns None here.
+        """
+        fn = getattr(self._backend, "vector_dim", None)
+        return fn() if callable(fn) else None
+
+    def row_count(self) -> int | None:
+        """Stored vector count, or None if the backend can't report it."""
+        fn = getattr(self._backend, "row_count", None)
+        return fn() if callable(fn) else None
+
+    def recreate_table(self) -> bool:
+        """Drop + recreate the backend table at the current EMBEDDING_DIM.
+
+        Returns True if the backend supports it (sqlite-vec). NumpyStore
+        returns False — its stale .npy is caught fail-loud at load time.
+        """
+        fn = getattr(self._backend, "recreate_table", None)
+        if callable(fn):
+            fn()
+            return True
+        return False
+
     def snapshot_hash(self) -> str:
         return self._backend.snapshot_hash()
 
