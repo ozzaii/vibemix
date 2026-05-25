@@ -1345,6 +1345,17 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="emit the IngestReport as JSON (suppress per-track progress)",
     )
+    sp_embed_folder.add_argument(
+        "--strategy",
+        choices=("mean_excerpt", "cue_anchored"),
+        default="mean_excerpt",
+        help=(
+            "embed strategy. 'mean_excerpt' (DEFAULT) = intro/mid/outro 60s "
+            "excerpts, mean of embeddings. 'cue_anchored' (opt-in, Path 2) = "
+            "offline auto-cue detection, embed ~80s windows anchored at the "
+            "mixable structural points, mean of cue-region vectors."
+        ),
+    )
     sp_embed_folder.set_defaults(func=_cmd_library_embed_folder)
 
     # Plan 28-08 — budget telemetry + projection
@@ -1549,9 +1560,12 @@ def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
         )
         return 1
 
-    embedder = LibraryEmbedder(client)
+    strategy = getattr(args, "strategy", "mean_excerpt")
+    embedder = LibraryEmbedder(client, embed_strategy=strategy)
     store = open_store()
     as_json = bool(getattr(args, "json", False))
+    if strategy != "mean_excerpt":
+        print(f"-> embed-folder: strategy={strategy}", file=sys.stderr)
 
     def _progress(line: str) -> None:
         if not as_json:
@@ -1559,7 +1573,12 @@ def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
 
     try:
         report = ingest_folder(
-            folder, embedder, store, persist_library=True, progress=_progress
+            folder,
+            embedder,
+            store,
+            persist_library=True,
+            progress=_progress,
+            embed_strategy=strategy,
         )
     finally:
         store.close()

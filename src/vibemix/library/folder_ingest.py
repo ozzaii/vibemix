@@ -90,6 +90,9 @@ class IngestReport:
     failed: int = 0
     cost_estimate_eur: float = 0.0
     failures: list[tuple[str, str]] = field(default_factory=list)
+    # Which embed strategy this run used (Path 2). "mean_excerpt" (default) or
+    # "cue_anchored". Surfaced so the CLI / caller can confirm the opt-in took.
+    embed_strategy: str = "mean_excerpt"
 
     def as_dict(self) -> dict:
         return {
@@ -97,6 +100,7 @@ class IngestReport:
             "embedded": self.embedded,
             "skipped_cached": self.skipped_cached,
             "failed": self.failed,
+            "embed_strategy": self.embed_strategy,
             "cost_estimate_eur": round(self.cost_estimate_eur, 6),
             "failures": [
                 {"filepath": fp, "error": err} for fp, err in self.failures
@@ -291,6 +295,7 @@ def ingest_folder(
     persist_library: bool = True,
     progress: Callable[[str], None] | None = None,
     probe: ProbeFn = probe_duration_s,
+    embed_strategy: str | None = None,
 ) -> IngestReport:
     """Walk ``root``, embed each supported audio file, persist to ``store``.
 
@@ -305,6 +310,12 @@ def ingest_folder(
             handled tracks so search/similar resolve titles.
         progress: optional callback receiving a per-track human line.
         probe: duration probe (injectable for tests).
+        embed_strategy: informational label for the report (Path 2). The
+            actual strategy is decided at ``LibraryEmbedder`` construction; if
+            ``None`` we read it off the embedder's ``_embed_strategy`` attribute
+            when present, else default "mean_excerpt". This NEVER changes
+            embedding behavior — it's a report annotation so the caller can
+            confirm the opt-in took.
 
     Returns:
         :class:`IngestReport`.
@@ -314,8 +325,11 @@ def ingest_folder(
     root = Path(root)
     _assert_store_dim_compatible(store)
 
+    if embed_strategy is None:
+        embed_strategy = getattr(embedder, "_embed_strategy", "mean_excerpt")
+
     files = scan_folder(root)
-    report = IngestReport(total=len(files))
+    report = IngestReport(total=len(files), embed_strategy=embed_strategy)
     handled: dict[str, TrackEntry] = {}
 
     for idx, path in enumerate(files, start=1):

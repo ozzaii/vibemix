@@ -58,10 +58,15 @@ def numpy_store(tmp_path: Path) -> LibraryStore:
 class FakeEmbedder:
     """Records calls; returns a fixed L2-normalized vector. No network."""
 
-    def __init__(self, cached: set[str] | None = None) -> None:
+    def __init__(
+        self, cached: set[str] | None = None, embed_strategy: str = "mean_excerpt"
+    ) -> None:
         self.cached = cached or set()
         self.embed_calls: list[str] = []
         self._vec = l2_normalize(np.ones(EMBEDDING_DIM, dtype=np.float32))
+        # Mirror the real LibraryEmbedder attribute so ingest_folder can read
+        # the strategy off the embedder for the report annotation.
+        self._embed_strategy = embed_strategy
 
     def has_cached_embedding(self, track) -> bool:  # noqa: ANN001
         return track.track_id in self.cached
@@ -330,3 +335,78 @@ def test_populated_stale_dim_table_never_wiped(tmp_path: Path) -> None:
         ingest_folder(
             music, FakeEmbedder(), PopulatedStaleStore(), probe=_const_probe()
         )
+
+
+# ─── embed strategy threading (Path 2) ──────────────────────────────────────────
+
+
+def test_ingest_default_strategy_is_mean_excerpt(
+    tmp_path: Path, numpy_store: LibraryStore
+) -> None:
+    """DEFAULT behavior unchanged: report records mean_excerpt with no opt-in."""
+    music = tmp_path / "music"
+    _touch(music / "a.mp3")
+    report = ingest_folder(music, FakeEmbedder(), numpy_store, probe=_const_probe())
+    assert report.embed_strategy == "mean_excerpt"
+    assert report.as_dict()["embed_strategy"] == "mean_excerpt"
+
+
+def test_ingest_reads_cue_anchored_strategy_off_embedder(
+    tmp_path: Path, numpy_store: LibraryStore
+) -> None:
+    """A cue_anchored embedder threads its strategy into the report — no
+    behavior change to the ingest loop itself (still embeds + stores)."""
+    music = tmp_path / "music"
+    _touch(music / "a.mp3")
+    _touch(music / "b.mp3")
+    emb = FakeEmbedder(embed_strategy="cue_anchored")
+    report = ingest_folder(music, emb, numpy_store, probe=_const_probe())
+    assert report.embed_strategy == "cue_anchored"
+    assert report.embedded == 2  # loop behavior identical to default
+    ids, vecs = numpy_store._backend.load_all()
+    assert len(ids) == 2
+
+
+def test_ingest_explicit_strategy_override(
+    tmp_path: Path, numpy_store: LibraryStore
+) -> None:
+    """Explicit embed_strategy arg wins over the embedder attribute (report)."""
+    music = tmp_path / "music"
+    _touch(music / "a.mp3")
+    emb = FakeEmbedder(embed_strategy="mean_excerpt")
+    report = ingest_folder(
+        music, emb, numpy_store, probe=_const_probe(),
+        embed_strategy="cue_anchored",
+    )
+    assert report.embed_strategy == "cue_anchored"
+
+
+def test_embedder_rejects_unknown_strategy() -> None:
+    """LibraryEmbedder construction validates the strategy selector."""
+    from vibemix.library.embed import LibraryEmbedder
+
+    with pytest.raises(ValueError, match="unknown embed_strategy"):
+        LibraryEmbedder(client=object(), probe_on_init=False, embed_strategy="bogus")
+
+
+def test_cue_anchored_namespaces_cache_key() -> None:
+    """A cue_anchored embedder produces a DIFFERENT content-hash key than a
+    mean_excerpt embedder for the same file — cached vectors never collide."""
+    import sqlite3
+
+    from vibemix.library.embed import LibraryEmbedder
+    from vibemix.library.rekordbox import TrackEntry
+
+    mean_emb = LibraryEmbedder(
+        client=object(), cache_db=sqlite3.connect(":memory:"),
+        probe_on_init=False, embed_strategy="mean_excerpt",
+    )
+    cue_emb = LibraryEmbedder(
+        client=object(), cache_db=sqlite3.connect(":memory:"),
+        probe_on_init=False, embed_strategy="cue_anchored",
+    )
+    track = TrackEntry(
+        track_id="t1", title="x", artist="", album="", bpm=0.0, key="",
+        duration_s=120.0, cues=(), filepath="",  # streaming-only marker path
+    )
+    assert mean_emb._track_hash(track) != cue_emb._track_hash(track)

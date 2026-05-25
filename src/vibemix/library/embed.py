@@ -85,6 +85,40 @@ from vibemix.llm._router_config import EMBEDDING_GA_CANDIDATES as GEMINI_EMBEDDI
 # Bump to invalidate ALL cached embeddings. Format: vN-<strategy-name>.
 EXCERPT_STRATEGY_VERSION = "v1-3excerpt-mean"
 
+# ── Embed strategies ──────────────────────────────────────────────────────────
+#
+# "mean_excerpt"  — DEFAULT. The historical intro/mid/outro 3-excerpt path
+#                   (60s each, mean of the embeddings). Strategy version =
+#                   EXCERPT_STRATEGY_VERSION above.
+# "cue_anchored"  — OPT-IN (Path 2). Offline auto-cue detection
+#                   (``library.cue_detect.detect_cues``) finds the mixable
+#                   structural points (intro mix-in / breakdown / drop /
+#                   phrase boundaries); we embed a <=80s window anchored at
+#                   each cue and MEAN the cue-region vectors (single-vector
+#                   contract preserved). A future multi-vector mode can store
+#                   the per-cue vectors instead of meaning them — see the
+#                   `# MULTI-VECTOR SEAM` comment in `_embed_audio_cue_anchored`.
+#
+# Each strategy carries its OWN cache-key namespace so a cached mean_excerpt
+# vector is NEVER confused with a cue_anchored one (the strategy string is
+# hashed into the content-hash key alongside the model id).
+EMBED_STRATEGIES = ("mean_excerpt", "cue_anchored")
+DEFAULT_EMBED_STRATEGY = "mean_excerpt"
+
+# Cache-key namespace for the cue-anchored strategy. Distinct from
+# EXCERPT_STRATEGY_VERSION so the two strategies never collide in embed_cache.
+CUE_ANCHORED_STRATEGY_VERSION = "v1-cueanchored-mean"
+
+# Window length (seconds) embedded around each detected cue. Must stay <= the
+# emb-2 single-call audio cap (AUDIO_SINGLE_CALL_MAX_SECONDS = 80) so each
+# cue-region embed is a single fast call. The window is anchored AT the cue
+# (cue is the start) so the embedding represents what plays FROM the mix point.
+CUE_WINDOW_SECONDS = 80
+
+# Max cues to detect + embed per track in the cue-anchored path. Keeps the
+# per-track API-call count bounded (<= MAX_CUES_PER_TRACK audio embeds).
+MAX_CUES_PER_TRACK = 4
+
 # Plan 41-05 — version bump that runs the moment the GA-rename probe
 # resolves to the GA-renamed candidate (first entry of EMBEDDING_GA_CANDIDATES
 # in `_router_config.py`). The new cache-key bytes diverge from the legacy
@@ -122,6 +156,11 @@ __all__ = [
     "GEMINI_EMBEDDING_MODEL_GA_CANDIDATES",
     "EXCERPT_STRATEGY_VERSION",
     "EXCERPT_STRATEGY_VERSION_GA_RENAME",
+    "EMBED_STRATEGIES",
+    "DEFAULT_EMBED_STRATEGY",
+    "CUE_ANCHORED_STRATEGY_VERSION",
+    "CUE_WINDOW_SECONDS",
+    "MAX_CUES_PER_TRACK",
     "EMBEDDING_DIM",
     "AUDIO_CAP_SECONDS",
     "AUDIO_SINGLE_CALL_MAX_SECONDS",
@@ -297,9 +336,18 @@ class LibraryEmbedder:
         *,
         probe_on_init: bool = True,
         recorder: object | None = None,
+        embed_strategy: str = DEFAULT_EMBED_STRATEGY,
     ) -> None:
         self._client = client
         self._recorder = recorder
+        # Embed strategy selector (Path 2). DEFAULT stays mean_excerpt — the
+        # cue_anchored path is opt-in and never changes default behavior.
+        if embed_strategy not in EMBED_STRATEGIES:
+            raise ValueError(
+                f"unknown embed_strategy {embed_strategy!r}; "
+                f"expected one of {EMBED_STRATEGIES}"
+            )
+        self._embed_strategy = embed_strategy
         if cache_db is None:
             self._cache = _open_default_cache_db()
             self._owns_cache = True
@@ -368,7 +416,12 @@ class LibraryEmbedder:
                 local_path = p
 
         if local_path is not None:
-            vector = self._embed_audio(local_path, track.duration_s)
+            if self._embed_strategy == "cue_anchored":
+                vector = self._embed_audio_cue_anchored(
+                    local_path, track.duration_s
+                )
+            else:
+                vector = self._embed_audio(local_path, track.duration_s)
         else:
             text = self._text_signature(track)
             vector = self._call_gemini_text(text)
@@ -433,6 +486,129 @@ class LibraryEmbedder:
             vecs.append(vec)
         mean = np.mean(np.stack(vecs), axis=0).astype(np.float32)
         return l2_normalize(mean)
+
+    def _embed_audio_cue_anchored(
+        self, audio_path: Path, duration_s: float
+    ) -> np.ndarray:
+        """Cue-anchored audio embed path (Path 2, opt-in).
+
+        Pipeline:
+            1. Offline auto-cue detection (``cue_detect.detect_cues``) — pure
+               DSP, NO network. Finds the mixable structural points.
+            2. For each cue, ffmpeg-slice a <=CUE_WINDOW_SECONDS (80s) window
+               anchored AT the cue (cue = window start), embed it as a single
+               audio Part, collect the vectors.
+            3. MEAN the cue-region vectors → one EMBEDDING_DIM L2-normalized
+               vector (single-vector contract preserved).
+
+        Falls back to the mean_excerpt path if cue detection finds nothing
+        usable (e.g. ffmpeg unavailable, or a track with no detectable
+        structure) — never returns a faked vector, never raises on a
+        no-structure track.
+
+        # MULTI-VECTOR SEAM
+        A future multi-vector mode would store the per-cue ``vecs`` list
+        (one row per cue, with the cue's ``start_s`` + hot-cue number) instead
+        of meaning them — that's what powers "enter on hot cue 2" retrieval.
+        The store + search layers take a single vector today, so we MEAN here
+        and leave the per-cue vectors + their CuePoint metadata as the natural
+        extension point.
+        """
+        from vibemix.library.cue_detect import detect_cues
+
+        try:
+            cues = detect_cues(audio_path, max_cues=MAX_CUES_PER_TRACK)
+        except Exception as e:
+            logger.warning(
+                "cue detection failed for %s (%s); falling back to "
+                "mean_excerpt embed.",
+                audio_path,
+                e,
+            )
+            return self._embed_audio(audio_path, duration_s)
+
+        # A lone "load" cue at 0.0s means cue detection found no real structure
+        # (silence / too short). Fall back to the proven mean_excerpt path
+        # rather than embedding a single 0..80s window that's no better than
+        # the intro excerpt.
+        usable = [c for c in cues if c.type == "cue"]
+        if not usable:
+            return self._embed_audio(audio_path, duration_s)
+
+        vecs: list[np.ndarray] = []
+        for cue in usable:
+            start = max(0.0, float(cue.start_s))
+            # Anchor the window AT the cue; clamp so we never request audio
+            # past the end-of-track (ffmpeg -t past EOF just yields a short
+            # clip, which embeds fine, but clamping keeps the call honest).
+            window = float(CUE_WINDOW_SECONDS)
+            if duration_s > 0:
+                window = min(window, max(1.0, duration_s - start))
+            try:
+                clip = self._slice_window(audio_path, start, window)
+                vec = self._call_gemini_audio_single(
+                    clip, mime_type="audio/mpeg"
+                )
+                vecs.append(vec)
+            except Exception as e:  # one bad cue must not abort the track
+                logger.warning(
+                    "cue-region embed failed at %.1fs for %s (%s); skipping "
+                    "this cue.",
+                    start,
+                    audio_path,
+                    e,
+                )
+                continue
+
+        if not vecs:
+            # Every cue-region embed failed — fall back rather than fake.
+            return self._embed_audio(audio_path, duration_s)
+
+        # MULTI-VECTOR SEAM (see docstring) — single-vector contract: mean.
+        mean = np.mean(np.stack(vecs), axis=0).astype(np.float32)
+        return l2_normalize(mean)
+
+    def _slice_window(
+        self, audio_path: Path, start_s: float, length_s: float
+    ) -> bytes:
+        """ffmpeg-slice a single mp3 window [start_s, start_s+length_s).
+
+        Same ffmpeg invocation shape as ``_extract_excerpts`` (libmp3lame,
+        128k, tempfile, cleaned up) but for a single arbitrary-start window.
+        """
+        ffmpeg = _require_ffmpeg()
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        try:
+            cmd = [
+                ffmpeg,
+                "-y",
+                "-loglevel",
+                "error",
+                "-ss",
+                f"{start_s:.3f}",
+                "-i",
+                str(audio_path),
+                "-t",
+                f"{length_s:.3f}",
+                "-acodec",
+                "libmp3lame",
+                "-b:a",
+                "128k",
+                str(tmp_path),
+            ]
+            subprocess.run(
+                cmd,
+                check=True,
+                timeout=FFMPEG_TIMEOUT_SECONDS,
+                capture_output=True,
+            )
+            return tmp_path.read_bytes()
+        finally:
+            try:
+                tmp_path.unlink()
+            except FileNotFoundError:
+                pass
 
     @staticmethod
     def _mime_for_path(path: Path) -> str:
@@ -618,6 +794,13 @@ class LibraryEmbedder:
         h.update(self._model.encode())
         h.update(b"||")
         h.update(self._excerpt_strategy_version.encode())
+        # Strategy namespace: cue_anchored vectors must NEVER cache-collide
+        # with mean_excerpt vectors for the same file. mean_excerpt keeps the
+        # legacy key bytes (no extra component) so existing cache rows still
+        # hit; cue_anchored appends its own version string.
+        if self._embed_strategy == "cue_anchored":
+            h.update(b"||")
+            h.update(CUE_ANCHORED_STRATEGY_VERSION.encode())
         return h.hexdigest()
 
     # ─── Internal: cache get/put ──────────────────────────────────────────

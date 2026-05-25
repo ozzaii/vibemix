@@ -12,10 +12,14 @@ Public surface:
 
 from vibemix.library._cosine import EMBEDDING_DIM, cosine_topk, l2_normalize
 from vibemix.library.embed import (
+    CUE_ANCHORED_STRATEGY_VERSION,
+    DEFAULT_EMBED_STRATEGY,
+    EMBED_STRATEGIES,
     EXCERPT_STRATEGY_VERSION,
     GEMINI_EMBEDDING_MODEL,
     LibraryEmbedder,
 )
+from vibemix.library.cue_detect import detect_cues
 from vibemix.library.index_numpy import NumpyStore
 from vibemix.library.rekordbox import (
     CuePoint,
@@ -65,11 +69,15 @@ __all__ = [
     "BUDGET_CEILING_EUR",
     "BudgetTelemetry",
     "CITATION_THRESHOLD",
+    "CUE_ANCHORED_STRATEGY_VERSION",
     "Citation",
     "CostProjection",
     "CuePoint",
+    "DEFAULT_EMBED_STRATEGY",
+    "EMBED_STRATEGIES",
     "EMBEDDING_DIM",
     "EXCERPT_STRATEGY_VERSION",
+    "detect_cues",
     "GEMINI_EMBEDDING_MODEL",
     "Grounding",
     "IngestReport",
