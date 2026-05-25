@@ -171,11 +171,20 @@ export function renderRocker(props: RockerProps): HTMLElement {
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
+      // Read the LIVE active segment from the DOM, not the captured
+      // `props.active` — setRockerActive() flips data-active without
+      // updating that closure, so the mount-default segment (e.g. INT for
+      // skill, HYPE for mood) would otherwise forever match the stale
+      // props.active and no-op. (2026-05-25: this was the real "HYPE/INT
+      // don't work" bug — both are the mount-default actives.)
+      const liveActive = root.querySelector<HTMLElement>(
+        '.vmx-rocker__seg[data-active="true"]',
+      )?.dataset.id;
       vmxLog("[vmx:click]", `rocker · ${props.ariaLabel ?? props.variant ?? "rocker"}`, {
         id: opt.id,
-        noop: opt.id === props.active,
+        noop: opt.id === liveActive,
       });
-      if (opt.id === props.active) return;
+      if (opt.id === liveActive) return;
       props.onChange?.(opt.id);
     });
     root.append(btn);
