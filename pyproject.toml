@@ -123,6 +123,11 @@ dependencies = [
     # install bar. Only the OPTIONAL playlist-curation agent needs it; the live
     # co-host never imports it.
     "mcp>=1.2.0",
+    # Viber Agent — Telegram mobile surface (OPTIONAL). Long-poll bot (no public
+    # URL; runs alongside the desktop app), chat_id allow-list = the v1 auth, so
+    # the user can curate playlists from their phone. Pure-Python; lazily
+    # imported only by the `telegram` subcommand — the co-host never imports it.
+    "python-telegram-bot>=21",
 ]
 
 [project.urls]

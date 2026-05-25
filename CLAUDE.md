@@ -147,8 +147,11 @@ uv run python -m vibemix library embed-folder "<dir>" [--strategy mean_excerpt|c
 uv run python -m vibemix library search "<text vibe>" [-k N]      # text→tracks (cross-modal)
 uv run python -m vibemix library similar "<track_id|file path>"   # track→similar
 uv run python -m vibemix library curate "<theme>" [--backend gemini|codex]  # Viber agent → grounded M3U/JSON playlist (docs/codex-agent.md)
+uv run python -m vibemix library telegram                         # Viber mobile surface — long-poll bot, curate from your phone
 uv run python -m vibemix library budget --json                    # offline cost telemetry
 ```
+
+The Telegram bridge (`library/telegram_bridge.py`, lazy-imports `python-telegram-bot`) needs `VIBEMIX_TELEGRAM_TOKEN` (BotFather) + `VIBEMIX_TELEGRAM_ALLOWED_CHATS` (numeric chat-id allow-list = the v1 auth, fail-closed). Pure logic (allow-list/leak-strip/reply-format) is dep-free + unit-tested; outbound messages are path-scrubbed (privacy); each request runs the Gemini agent under a wall-clock timeout (no-hang).
 
 The Viber agent (`library/toolset.py` = shared grounded tool core) has two backends: `gemini` (built-in fn-calling, default) and `codex` (BYO ChatGPT-sub via `codex exec` + `library/mcp_server.py` MCP STDIO server — needs `codex login`). Grounding (seen-set + library re-validation) is identical across both. Codex is NOT bundled; `--backend codex` fails actionably when absent.
 

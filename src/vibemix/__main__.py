@@ -1400,6 +1400,19 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_curate.add_argument("--json", action="store_true")
     sp_curate.set_defaults(func=_cmd_library_curate)
 
+    # Viber Agent — Telegram mobile surface (long-poll; chat_id allow-list auth)
+    sp_telegram = sub.add_parser(
+        "telegram",
+        help="Run the Telegram bot so you can curate playlists from your phone",
+        description=(
+            "Long-poll Telegram bot: send a theme, get a grounded playlist back. "
+            "Needs VIBEMIX_TELEGRAM_TOKEN (from @BotFather) + "
+            "VIBEMIX_TELEGRAM_ALLOWED_CHATS (your numeric chat id(s), the auth). "
+            "Runs alongside the desktop app; Ctrl-C to stop."
+        ),
+    )
+    sp_telegram.set_defaults(func=_cmd_library_telegram)
+
     # Plan 28-08 — budget telemetry + projection
     sp_budget = sub.add_parser(
         "budget", help="Show monthly Gemini Embedding cost projection"
@@ -1660,6 +1673,76 @@ def _cmd_library_curate_codex(args: argparse.Namespace, lib) -> int:
         f"via Codex saved: {where}",
         file=sys.stderr,
     )
+    return 0
+
+
+def _cmd_library_telegram(args: argparse.Namespace) -> int:
+    """Run the Telegram mobile surface — curate playlists from your phone.
+
+    Wires the SAME Gemini Viber agent the CLI uses behind a long-poll bot. A
+    FRESH ViberAgent per message (the grounding seen-set is per-run). Blocking
+    until Ctrl-C.
+    """
+    import json as _json
+
+    from vibemix.library import (
+        LibraryEmbedder,
+        RekordboxLibrary,
+        ViberAgent,
+        open_store,
+    )
+    from vibemix.library.telegram_bridge import build_bridge_from_env
+
+    lib = RekordboxLibrary()
+    if not lib.try_load_cache():
+        print(
+            _json.dumps(
+                {
+                    "error": (
+                        "No library cache. Import a Rekordbox XML or run "
+                        "`library embed-folder` first."
+                    )
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    client, err = _library_genai_client()
+    if err is not None:
+        print(_json.dumps(err), file=sys.stderr)
+        return 1
+
+    embedder = LibraryEmbedder(client)
+    store = open_store()
+
+    def curate_fn(theme: str) -> dict:
+        # Fresh agent per message — the seen-set must be per-run (grounding).
+        agent = ViberAgent(client, embedder, store, lib)
+        result = agent.curate(theme)
+        if result.playlist is None:
+            return {"ok": False, "error": f"no playlist ({result.stop_reason})"}
+        titles: list[str] = []
+        for tid in result.playlist.track_ids:
+            e = lib.lookup_by_id(tid)
+            if e is None:
+                continue  # grounding: only real tracks ever reach the chat
+            titles.append(f"{e.artist} - {e.title}".strip(" -"))
+        return {"ok": True, "name": result.playlist.name, "titles": titles}
+
+    bridge, berr = build_bridge_from_env(curate_fn)
+    if berr is not None:
+        print(_json.dumps({"error": berr}), file=sys.stderr)
+        print(f"[viber/telegram] {berr}", file=sys.stderr)
+        store.close()
+        return 1
+
+    print("-> Telegram bridge: long-poll started (Ctrl-C to stop)", file=sys.stderr)
+    try:
+        assert bridge is not None
+        bridge.run()  # blocking until interrupted
+    finally:
+        store.close()
     return 0
 
 

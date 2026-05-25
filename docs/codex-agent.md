@@ -81,6 +81,29 @@ codex exec  ──(STDIO MCP)──>  python -m vibemix.library.mcp_server
   spawn timeout, empty-output degrade, and result-boundary grounding
   re-validation.
 
+## Mobile surface (Telegram)
+
+Curate from your phone: run `library telegram` and the same Viber agent answers
+a long-poll Telegram bot.
+
+```bash
+export VIBEMIX_TELEGRAM_TOKEN=...            # from @BotFather
+export VIBEMIX_TELEGRAM_ALLOWED_CHATS=123456 # your numeric chat id(s) — the auth
+uv run python -m vibemix library telegram
+```
+
+- **Auth = a chat_id allow-list** (fail-closed: an empty list authorizes
+  nobody). No public URL — long-poll, so it runs alongside the desktop app with
+  nothing exposed. To find your chat id, message the bot and check the rejection
+  log, or use a `@userinfobot`.
+- **Privacy:** outbound messages are path-scrubbed — a result lists tracks by
+  `artist - title`, never your local filesystem paths. The M3U/JSON still lands
+  in `~/.cache/vibemix/playlists/` on your machine.
+- **Grounding holds:** the bot only ever relays REAL library tracks (the agent's
+  seen-set + library re-validation), never invented ones.
+- Each request runs under a wall-clock timeout in an executor, so a slow
+  curation can never wedge the poll loop (no-hang).
+
 ## Distribution note
 
 Phase 1 is **BYO-Codex** (each user's own login): €0 to us, ToS-clean, no
