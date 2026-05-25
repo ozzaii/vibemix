@@ -111,6 +111,10 @@ def test_router_resolves_all_paths() -> None:
         "debrief": ("gemini-3-pro-preview", ServiceTier.FLEX),
         "debrief_tts": ("gemini-3-flash-tts-preview", ServiceTier.FLEX),
         "library_auto_tag": ("gemini-3-flash-preview", ServiceTier.FLEX),
+        # Viber curator agent (2026-05-25) — same Flash SKU/FLEX tier as
+        # the other library-side paths; added to ROUTER_PATHS + _ROUTES when
+        # the agent shipped, this expected-table mirror trailed behind.
+        "library_agent": ("gemini-3-flash-preview", ServiceTier.FLEX),
         "embedding": ("gemini-embedding-2", ServiceTier.FLEX),
     }
     # Sanity — ROUTER_PATHS and _ROUTES agree.
