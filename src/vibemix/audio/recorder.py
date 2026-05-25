@@ -30,6 +30,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import sys
 import threading
 import time
 import wave
@@ -325,6 +326,37 @@ class VoiceRecorder:
             except (TypeError, ValueError):
                 pass
 
+    @staticmethod
+    def _print_cost_summary(summary: dict) -> None:
+        """Print a concise human-readable cost recap to stderr (quick task
+        260525-fuv). Total tokens per router-path, total EUR, cache-hit rate,
+        and EUR saved by the Gemini context cache. Best-effort — never raises
+        out (the caller wraps it too)."""
+        per_path = summary.get("per_path", {}) or {}
+        total_eur = float(summary.get("total_cost_eur", 0.0) or 0.0)
+        saved_eur = float(summary.get("total_savings_eur", 0.0) or 0.0)
+        hit_rate = float(summary.get("cache_hit_rate", 0.0) or 0.0)
+        untracked = int(summary.get("untracked_calls", 0) or 0)
+
+        lines = ["[session cost] ---------------------------------------"]
+        for path, acc in per_path.items():
+            in_tok = int(acc.get("input_tokens", 0) or 0)
+            cached_tok = int(acc.get("cached_tokens", 0) or 0)
+            out_tok = int(acc.get("output_tokens", 0) or 0)
+            path_eur = float(acc.get("cost_eur", 0.0) or 0.0)
+            lines.append(
+                f"  {path:<16} in={in_tok} (cached={cached_tok}) "
+                f"out={out_tok}  €{path_eur:.4f}"
+            )
+        if untracked:
+            lines.append(f"  untracked calls: {untracked} (no usage metadata)")
+        lines.append(
+            f"  TOTAL €{total_eur:.4f}  |  cache-hit {hit_rate * 100:.1f}%  |  "
+            f"saved €{saved_eur:.4f}"
+        )
+        lines.append("------------------------------------------------------")
+        print("\n".join(lines), file=sys.stderr)
+
     def _finalize_session_meta(self) -> None:
         """Rewrite session.json with ended_at + duration + byte counts.
 
@@ -375,9 +407,30 @@ class VoiceRecorder:
             except OSError:
                 pass
 
+            # quick task 260525-fuv — write the per-session cost block from
+            # the SessionMeter. Its own try/except so a meter failure never
+            # aborts the session.json finalize (T-fuv-02). The cost block is
+            # local-only telemetry, same trust level as events.jsonl.
+            cost_summary = None
+            try:
+                from vibemix.library.budget import get_session_meter
+
+                cost_summary = get_session_meter().summary()
+                self._session_meta["cost"] = cost_summary
+            except Exception:
+                pass
+
             _atomic_write_json(
                 self.session_dir / "session.json", self._session_meta
             )
+
+            # Human-readable cost recap to stderr at session end (mirrors the
+            # recorder's existing print-to-stderr convention). Best-effort.
+            if cost_summary is not None:
+                try:
+                    self._print_cost_summary(cost_summary)
+                except Exception:
+                    pass
         except Exception as e:
             # POC parity — recorder shutdown stays best-effort.
             print(f"[recorder finalize err] {e}")

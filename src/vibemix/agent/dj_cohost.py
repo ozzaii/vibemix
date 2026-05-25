@@ -68,6 +68,7 @@ from vibemix.audio import (
     snapshot_wav,
 )
 from vibemix.coach import CitationLinter, StrippedRateTracker
+from vibemix.library.budget import get_session_meter
 from vibemix.llm.thinking_gate import validate_live_config
 from vibemix.prompts import build_parts_description, build_system_instruction, filter_for_slop
 from vibemix.runtime.debug_flags import debug_log_enabled
@@ -1433,6 +1434,13 @@ class DJCoHostAgent(Agent):
         # state-changes, not chunk arrivals.
         last_cache_hit_emitted: int = 0
         # ---- end Plan 41-02 telemetry block ----
+        # ---- quick task 260525-fuv — per-session cost meter -----------------
+        # usage_metadata repeats across chunks; only the final chunk carries
+        # authoritative totals. Capture the last-seen usage here and record()
+        # ONCE after the stream completes (the `else` branch below) to avoid
+        # double-billing — mirrors the last_cache_hit_emitted dedup intent.
+        last_usage = None
+        # ---- end quick task 260525-fuv -------------------------------------
         # ---- Plan 69-03 (OSS-02) — pre-call 60s /health canary -----------
         # If the proxy fallback is armed, fire a single canary GET against
         # /health every 60s. On 200, the recovery one-shot transcript line
@@ -1475,6 +1483,10 @@ class DJCoHostAgent(Agent):
                 # count for the whole stream.
                 usage = getattr(chunk, "usage_metadata", None)
                 if usage is not None:
+                    # quick task 260525-fuv — keep the last-seen usage; the
+                    # final chunk's totals are authoritative. Recorded ONCE
+                    # post-stream (see the `else` branch) to avoid double-bill.
+                    last_usage = usage
                     cached_tokens = (
                         getattr(usage, "cached_content_token_count", None) or 0
                     )
@@ -1567,6 +1579,27 @@ class DJCoHostAgent(Agent):
             llm_err = repr(e)
             print(f"\n[llm err] {e}", file=sys.stderr)
         else:
+            # ---- quick task 260525-fuv — once-per-stream cost record -------
+            # The stream completed without raising. Bill the live_coach usage
+            # ONCE here using the last-seen authoritative totals. The
+            # OpenRouter brain path yields chunks with usage_metadata=None →
+            # last_usage stays None → count the generation as untracked (no
+            # fabricated tokens). Best-effort: a meter write must NEVER break
+            # the stream consumer (T-fuv-01).
+            try:
+                if last_usage is not None:
+                    get_session_meter().record(
+                        "live_coach",
+                        prompt=getattr(last_usage, "prompt_token_count", 0) or 0,
+                        cached=getattr(last_usage, "cached_content_token_count", 0)
+                        or 0,
+                        output=getattr(last_usage, "candidates_token_count", 0) or 0,
+                    )
+                elif self._or_client is not None:
+                    get_session_meter().record_untracked()
+            except Exception:
+                pass
+            # ---- end quick task 260525-fuv ---------------------------------
             # ---- Plan 69-03 (OSS-02) — implicit recovery on next success --
             # When the stream completed without raising AND the proxy
             # fallback flag is currently armed, this is the "next real LLM
