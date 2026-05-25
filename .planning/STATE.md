@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v8.1
 milestone_name: One Mind
 status: executing
-last_updated: "2026-05-26T00:00:00.000Z"
-last_activity: 2026-05-26
+last_updated: "2026-05-25T22:04:48.488Z"
+last_activity: 2026-05-25
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-25 — **v8.1 "One Mind" ROADMAPPED** under `gsd-autonomous fully`. 6 phases (77–82) continuing numbering from v8.0 (ran 71–76) — NO reset. 18/18 v8.1 REQ-IDs mapped to exactly one phase (100% coverage, no orphans, no duplicates). WIRE-02 (`ccf4930`) + WIRE-03 (`a9979b8`) already SHIPPED — placed in P77, marked DONE, no new work. Next: `/gsd:plan-phase 77`.
+**Last updated:** 2026-05-26 — **P77 WIRE-06 shipped** (Plan 77-03, commit `b6040e2`): `.env` now wins over a ghost shell `GEMINI_API_KEY` (`override=True`); full suite 4446/0. Plans 01–03 of 4 complete; only Plan 77-04 (WIRE-01 grounding→agent + WIRE-05 memory ingest) remains in Phase 77.
 
 ---
 
@@ -38,9 +38,17 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 ## Current Position
 
 Phase: 77 (WIRE — Connect the Islands) — EXECUTING
-Plan: 3 of 4 (Plans 01–02 complete)
+Plan: 4 of 4 (Plans 01–03 complete)
 Status: Ready to execute
 Last activity: 2026-05-26
+
+### Plan 77-03 — WIRE-06 env-key override (complete 2026-05-26)
+
+- `_load_env_robust()` in `src/vibemix/__main__.py` now loads `.env` with `override=True` at BOTH `load_dotenv` call sites (per-candidate `:173` + no-`.env` fallback `:182`). Fixes the diagnosed live bug where a stale/ghost shell `GEMINI_API_KEY` (`...QSFyBQ`) shadowed the funded `.env` key (`...32u744`), leaving the runtime on a credit-less key.
+- Docstring rewritten to record the **deliberate reversal** of the prior Tauri-injection (`override=False`) precedence + a **KAAN-ACTION (A1) knob note**: if a Tauri-bundled install ever needs a process-env-injected key to win over `.env`, flip back to `override=False` here (WIRE-06 / 77-RESEARCH Pitfall 3).
+- Diagnostic print at `:184+` left fully untouched — still prints the file PATH, never the key value (security pin V7 / T-77-03-01 stays green).
+- Un-xfailed `tests/runtime/test_load_env_override.py::test_dotenv_overrides_ghost_shell_env` → real GREEN pass.
+- Honest green: no `genai.Client`, no `GEMINI_API_KEY` (decoy/real literals only). Full suite **4446 passed / 0 failed / 6 xfailed** (the WIRE-06 xfail flipped to a real pass). Commit `b6040e2`.
 
 ### Plan 77-02 — WIRE-04 shared curator persona seam (complete 2026-05-26)
 
