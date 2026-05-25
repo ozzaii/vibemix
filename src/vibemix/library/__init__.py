@@ -37,6 +37,14 @@ from vibemix.library.budget import (
     get_telemetry,
     project_monthly_cost,
 )
+from vibemix.library.folder_ingest import (
+    SUPPORTED_SUFFIXES,
+    IngestReport,
+    folder_to_track_entry,
+    ingest_folder,
+    probe_duration_s,
+    scan_folder,
+)
 from vibemix.library.search import (
     QUERY_CACHE_TTL,
     VibeSearchResult,
@@ -64,6 +72,12 @@ __all__ = [
     "EXCERPT_STRATEGY_VERSION",
     "GEMINI_EMBEDDING_MODEL",
     "Grounding",
+    "IngestReport",
+    "SUPPORTED_SUFFIXES",
+    "folder_to_track_entry",
+    "ingest_folder",
+    "probe_duration_s",
+    "scan_folder",
     "LibraryEmbedder",
     "LibraryStore",
     "NumpyStore",
