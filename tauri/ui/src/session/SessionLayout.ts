@@ -18,13 +18,9 @@
  * UI-SPEC declared them as local-to-live-session tokens; this avoids
  * polluting tokens.css with Phase-12-only grid columns. */
 
-import { emitIpc } from "../ipc/client.js";
-import { sendSettings } from "./ws-bridge.js";
 import { registerStyle } from "./components/_style-registry.js";
 import { renderTitlebar, setTitlebarClock, setTitlebarPill, type PillLevel } from "./components/titlebar.js";
 import { renderPanel } from "./components/panel.js";
-import { renderRocker, setRockerActive } from "./components/rocker.js";
-import { renderPicker } from "./components/picker.js";
 import { renderMeter, setMeterLevels } from "./components/meter.js";
 import { renderTimecode, setTimecode } from "./components/timecode.js";
 import { renderPhaseTape, setPhaseTape, type PhaseChunk } from "./components/phase-tape.js";
@@ -41,7 +37,6 @@ import {
 import type { CitationChip } from "./components/citation-strip.js";
 import { renderStatusBar, type BadgeState } from "./components/status-bar.js";
 import { SCREW_SVG } from "./icons/screw.svg.js";
-import { HEADPHONES_SVG } from "./icons/headphones.svg.js";
 
 export interface SessionState {
   titlebar: {
@@ -125,6 +120,10 @@ export interface SessionState {
 export interface Mounted {
   root: HTMLElement;
   titlebar: HTMLElement;
+  /** Glanceable read-only persona readout on the left rail. The render
+   *  loop updates its mood/skill/genre/voice text in place; clicking it
+   *  opens the settings drawer (the sole persona write surface). */
+  personaStatus: HTMLElement;
   meters: {
     music: HTMLElement;
     voice: HTMLElement;
@@ -253,6 +252,84 @@ const LAYOUT_CSS = `
     justify-content: space-around;
     padding: var(--sp-4) 0 0;
   }
+  /* Glanceable persona readout (2026-05-25 rebuild). A recessed glass tile,
+   * not a control: flat at rest, lifts a hair on hover, amber focus ring on
+   * keyboard. Mood is the silk headline; the caption carries the one mood
+   * tint (set inline) so the block feels alive without a second amber. */
+  .vmx-persona-status {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    align-items: stretch;
+    text-align: left;
+    width: 100%;
+    padding: var(--sp-4);
+    background: var(--glass-2);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-md);
+    box-shadow: inset 0 1px 0 var(--glass-top), inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+    color: var(--silk);
+    transition: background var(--motion-step) ease-out,
+      border-color var(--motion-step) ease-out;
+  }
+  .vmx-persona-status:hover {
+    background: var(--glass-1);
+    border-color: var(--glass-edge-up);
+  }
+  .vmx-persona-status:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+    box-shadow: var(--glow-soft);
+  }
+  .vmx-persona-status__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .vmx-persona-status__title {
+    font-family: var(--type-display);
+    font-variation-settings: 'wdth' 85, 'wght' 600;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--silk-40);
+  }
+  .vmx-persona-status__edit {
+    font-family: var(--type-display);
+    font-variation-settings: 'wdth' 85, 'wght' 600;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--silk-22);
+    transition: color var(--motion-step) ease-out;
+  }
+  .vmx-persona-status:hover .vmx-persona-status__edit { color: var(--silk-40); }
+  .vmx-persona-status__mood {
+    font-family: var(--type-display);
+    font-variation-settings: 'wdth' 85, 'wght' 700;
+    font-size: 22px;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--silk);
+  }
+  .vmx-persona-status__caption {
+    font-family: var(--type-body);
+    font-variation-settings: 'wdth' 100, 'wght' 400;
+    font-size: 11px;
+    line-height: 1.35;
+    letter-spacing: 0.02em;
+    color: var(--silk-40);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    transition: color var(--motion-step) ease-out;
+  }
+  .vmx-persona-status__meta {
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--silk-40);
+  }
   @media (max-width: 1100px) {
     .vmx-session__grid {
       grid-template-columns: 1fr;
@@ -306,25 +383,20 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const grid = document.createElement("div");
   grid.className = "vmx-session__grid";
 
-  // Left column
+  // Left column — a slim status rail, NOT a control panel. The 2026-05-25
+  // rebuild evicted the live deck's persona/output config (skill, mood,
+  // voice, genre, output device, HP/SPK) into the settings drawer, which
+  // already hosted duplicates of all of them. What a DJ needs mid-set is a
+  // glance, not a form: who's in my ear, and is audio flowing. So the rail
+  // carries one read-only persona readout (click → settings) plus the live
+  // meters. This is the "one CDJ unit, mostly void — not a grid of widgets"
+  // contract from DESIGN.md, finally honored on the busiest surface.
   const leftCol = document.createElement("section");
   leftCol.className = "vmx-session__col";
   leftCol.dataset.col = "left";
 
-  const personaPanel = renderPanel({
-    header: "PERSONA",
-    badge: "CFG",
-    spec: "GEMINI · TTS",
-    children: buildPersonaPanelBody(state),
-  });
-  leftCol.append(personaPanel);
-
-  const outputPanel = renderPanel({
-    header: "OUTPUT",
-    spec: "24-BIT · 48K",
-    children: buildOutputPanelBody(state),
-  });
-  leftCol.append(outputPanel);
+  const personaStatus = buildPersonaStatus(state);
+  leftCol.append(personaStatus);
 
   // Meter strip
   const meterMusic = renderMeter({ label: "music" });
@@ -411,6 +483,7 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   const mounted: Mounted = {
     root,
     titlebar,
+    personaStatus,
     meters: { music: meterMusic, voice: meterVoice, mic: meterMic },
     timecode,
     phaseTape,
@@ -493,39 +566,6 @@ export function voiceProfileToCode(profile: string): string {
   return VOICE_PROFILE_TO_CODE[profile] ?? "kore";
 }
 
-/** Map the deck mood rocker's UPPERCASE vocabulary (HYPE / TEACH / COACH)
- *  onto the wire-level mood enum the sidecar persists
- *  ("hype-man" | "teacher" | "coach"). Mirror of moodFromSettings() in
- *  render-loop.ts, inverted. Defaults to "hype-man" for any unknown id. */
-function deckMoodToWire(id: string): "hype-man" | "teacher" | "coach" {
-  switch (id) {
-    case "TEACH":
-      return "teacher";
-    case "COACH":
-      return "coach";
-    case "HYPE":
-    default:
-      return "hype-man";
-  }
-}
-
-/** Map the deck skill rocker's UPPERCASE vocabulary (BEG / INT / PRO) onto
- *  the wire-level skill enum the sidecar persists + feeds to
- *  prompts.matrix.build_system_instruction ("beginner" | "intermediate" |
- *  "pro"). Defaults to "intermediate" (the v4-tuned, load-bearing cell)
- *  for any unknown id. */
-function deckSkillToWire(id: string): "beginner" | "intermediate" | "pro" {
-  switch (id) {
-    case "BEG":
-      return "beginner";
-    case "PRO":
-      return "pro";
-    case "INT":
-    default:
-      return "intermediate";
-  }
-}
-
 /** Map the active mood to a 1-line DJ-vocabulary caption.
  *  Round 3 critique lift (H6): users shouldn't have to remember what
  *  HYPE / TEACH / COACH each do. The caption renders under the rocker
@@ -571,201 +611,84 @@ function moodCaptionColor(mood: string): string {
   }
 }
 
-function buildPersonaPanelBody(state: SessionState): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.className = "vmx-session__persona-body";
-  wrap.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-md);";
+/** Build the glanceable, read-only persona readout for the left rail.
+ *  The 2026-05-25 rebuild evicted the deck's PERSONA + OUTPUT control
+ *  panels (skill/mood/voice/genre/device/HP-SPK) into the settings drawer,
+ *  which already hosted duplicates of every one of them. Mid-set a DJ wants
+ *  a glance — who's in my ear — not a form, so the deck shows the mood as a
+ *  headline, its 1-line behavioral caption, and a skill·genre·voice meta
+ *  line; clicking anywhere opens the drawer (the sole persona write
+ *  surface). This is DESIGN.md's "one CDJ unit, mostly void" finally
+ *  honored on the busiest surface. */
+function buildPersonaStatus(state: SessionState): HTMLElement {
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = "vmx-persona-status";
 
-  // Bug (2026-05-25) — the skill rocker shipped as a static read-only
-  // mirror with NO onChange (Wave 3 "12-04 will wire it" never landed) AND
-  // no backend field existed, so BEG/INT/PRO was fully dead end-to-end.
-  // Wire it like the mood rocker: optimistic flip + the canonical skill
-  // write. Sidecar round-trips ipc.settings.state and re-syncs. The deck
-  // vocabulary (BEG/INT/PRO) maps to the wire enum (beginner/…/pro) that
-  // prompts.matrix.build_system_instruction consumes.
-  const skillRocker = renderRocker({
-    ariaLabel: "skill mode",
-    options: [
-      { id: "BEG", label: "BEG" },
-      { id: "INT", label: "INT" },
-      { id: "PRO", label: "PRO" },
-    ],
-    active: state.persona.skill,
-    variant: "rocker",
-    onChange: (id) => {
-      setRockerActive(skillRocker, id);
-      void sendSettings("skill", deckSkillToWire(id)).catch(
-        (err: unknown) => {
-          // eslint-disable-next-line no-console
-          console.warn("[session-layout] skill set failed:", err);
-        },
-      );
-    },
+  const head = document.createElement("span");
+  head.className = "vmx-persona-status__head";
+  const title = document.createElement("span");
+  title.className = "vmx-persona-status__title";
+  title.textContent = "PERSONA";
+  const edit = document.createElement("span");
+  edit.className = "vmx-persona-status__edit";
+  edit.textContent = "EDIT ▸";
+  head.append(title, edit);
+  el.append(head);
+
+  const mood = document.createElement("span");
+  mood.className = "vmx-persona-status__mood";
+  el.append(mood);
+
+  const caption = document.createElement("span");
+  caption.className = "vmx-persona-status__caption";
+  el.append(caption);
+
+  const meta = document.createElement("span");
+  meta.className = "vmx-persona-status__meta";
+  el.append(meta);
+
+  // Click anywhere on the readout opens the settings drawer — the sole
+  // persona/output write surface. Dynamic import keeps the wizard bundle
+  // from pulling settings (mirrors the titlebar gear button).
+  el.addEventListener("click", () => {
+    void import("../settings/SettingsDrawer.js").then((m) => m.openSettings());
   });
-  wrap.append(skillRocker);
 
-  const moodRocker = renderRocker({
-    ariaLabel: "mood",
-    options: [
-      { id: "HYPE", label: "HYPE" },
-      { id: "TEACH", label: "TEACH" },
-      { id: "COACH", label: "COACH" },
-    ],
-    active: state.persona.mood,
-    variant: "interaction",
-    // Bug 1 (2026-05-24) — the deck mood rocker was a read-only mirror
-    // with no click handler; clicking it did nothing. Wire it to the
-    // canonical mood write (same as the mascot-group pills + tray). The
-    // uppercase deck vocabulary maps to the wire enum. The sidecar
-    // round-trips ipc.settings.state which re-syncs every mood surface.
-    // The persona panel body is built once at mount and is NOT rebuilt by
-    // the render loop, so flip the active segment optimistically here so
-    // the control reads as alive the instant it's pressed; the round-trip
-    // confirms it.
-    onChange: (id) => {
-      setRockerActive(moodRocker, id);
-      void emitIpc("ipc.settings.set", {
-        field: "mood",
-        value: deckMoodToWire(id),
-      }).catch((err: unknown) => {
-        // eslint-disable-next-line no-console
-        console.warn("[session-layout] mood set failed:", err);
-      });
-    },
-  });
-  wrap.append(moodRocker);
-
-  // 2026-05-19 /impeccable critique round 3 lift (H6): 1-line caption
-  // under the active mood rocker so the user doesn't have to recall
-  // what each mode means. Static lookup keyed by state.persona.mood;
-  // render-loop's snapshot rebuilds the persona body when mood flips,
-  // so the caption stays in sync without a separate subscription.
-  const moodCaption = document.createElement("div");
-  moodCaption.className = "vmx-session__mood-caption";
-  moodCaption.dataset.role = "mood-caption";
-  moodCaption.dataset.mood = state.persona.mood;
-  moodCaption.style.cssText =
-    "font-family: var(--type-body);" +
-    "font-variation-settings: 'wdth' 100, 'wght' 400;" +
-    "font-size: 11px;" +
-    "line-height: 1.35;" +
-    `color: ${moodCaptionColor(state.persona.mood)};` +
-    "letter-spacing: 0.02em;" +
-    "padding: 0 var(--sp-1);" +
-    "text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);" +
-    "transition: color var(--motion-step) ease-out;";
-  moodCaption.textContent = moodCaptionFor(state.persona.mood);
-  wrap.append(moodCaption);
-
-  wrap.append(
-    renderPicker({
-      label: "VOICE",
-      value: voiceCodeToProfile(state.persona.voice),
-      avatar: true,
-      autoPill: true,
-      // 2026-05-19 /impeccable critique round 4 (Kaan: "SEXIFY"):
-      // collapsed 8 mythological Gemini codenames into 3 named
-      // profiles. The IPC payload still carries the underlying
-      // codename (kore / aoede / fenrir) — only the user-facing
-      // surface uses the profile abstraction. Codename → profile
-      // mapping in voiceCodeToProfile + voiceProfileToCode below.
-      options: [
-        { id: "CALM",  label: "CALM",  sub: "calm, watchful" },
-        { id: "WARM",  label: "WARM",  sub: "warm, never sleepy" },
-        { id: "GRUFF", label: "GRUFF", sub: "rough, cutting" },
-      ],
-      // Bug 1 (2026-05-24) — wire the deck voice picker. The picker IDs are
-      // the profile abstraction (CALM/WARM/GRUFF); the wire field carries
-      // the underlying Gemini codename, so map through voiceProfileToCode.
-      onChange: (id) => {
-        void sendSettings("voice", voiceProfileToCode(id)).catch(
-          (err: unknown) => {
-            // eslint-disable-next-line no-console
-            console.warn("[session-layout] voice set failed:", err);
-          },
-        );
-      },
-    }),
-  );
-
-  wrap.append(
-    renderPicker({
-      label: "GENRE",
-      value: state.persona.genre,
-      autoPill: true,
-      options: [
-        { id: "house", label: "house" },
-        { id: "tech-house", label: "tech-house" },
-        { id: "techno", label: "techno" },
-        { id: "dnb", label: "dnb" },
-        { id: "trance", label: "trance" },
-        { id: "hip-hop", label: "hip-hop" },
-        { id: "edm-generic", label: "edm-generic" },
-      ],
-      // Bug 1 (2026-05-24) — wire the deck genre picker to the genre field.
-      onChange: (id) => {
-        void sendSettings("genre", id).catch((err: unknown) => {
-          // eslint-disable-next-line no-console
-          console.warn("[session-layout] genre set failed:", err);
-        });
-      },
-    }),
-  );
-
-  return wrap;
+  setPersonaStatus(el, state);
+  return el;
 }
 
-function buildOutputPanelBody(state: SessionState): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.className = "vmx-session__output-body";
-  wrap.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-md);";
+/** Idempotent update of the persona readout. Called on mount and whenever
+ *  the render loop sees a persona field change. Writes textContent + the
+ *  mood data-attr / caption tint only — no DOM rebuild. */
+export function setPersonaStatus(el: HTMLElement, state: SessionState): void {
+  const { mood, skill, genre, voice } = state.persona;
+  const voiceProfile = voiceCodeToProfile(voice);
 
-  wrap.append(
-    renderPicker({
-      label: "DEVICE",
-      value: state.output.device,
-      iconSvg: HEADPHONES_SVG,
-      autoPill: true,
-      options: [], // Wave 3 (12-04) populates from ipc.settings.state
-      // Bug 1 (2026-05-24) — wire device selection. "auto" maps to null on
-      // the wire (sidecar picks the default device). Real device IDs flow
-      // through verbatim once the sidecar populates the option list.
-      onChange: (id) => {
-        void sendSettings(
-          "output_device_id",
-          id === "auto" || id === "AUTO" ? null : id,
-        ).catch((err: unknown) => {
-          // eslint-disable-next-line no-console
-          console.warn("[session-layout] output device set failed:", err);
-        });
-      },
-    }),
+  const moodEl = el.querySelector<HTMLElement>(".vmx-persona-status__mood");
+  if (moodEl) {
+    if (moodEl.textContent !== mood) moodEl.textContent = mood;
+    moodEl.dataset.mood = mood;
+  }
+
+  const captionEl = el.querySelector<HTMLElement>(
+    ".vmx-persona-status__caption",
   );
+  if (captionEl) {
+    const text = moodCaptionFor(mood);
+    if (captionEl.textContent !== text) captionEl.textContent = text;
+    captionEl.style.color = moodCaptionColor(mood);
+  }
 
-  const profileRocker = renderRocker({
-    ariaLabel: "output profile",
-    options: [
-      { id: "HP", label: "HP" },
-      { id: "SPK", label: "SPK" },
-    ],
-    active: state.output.profile,
-    variant: "rocker",
-    // Bug 1 (2026-05-24) — wire the HP/SPK profile rocker. Deck IDs are
-    // uppercase; the wire field is lowercase ("hp" | "spk"). Optimistic
-    // flip for the same not-rebuilt-by-render-loop reason as the mood rocker.
-    onChange: (id) => {
-      setRockerActive(profileRocker, id);
-      void sendSettings("output_profile", id.toLowerCase()).catch(
-        (err: unknown) => {
-          // eslint-disable-next-line no-console
-          console.warn("[session-layout] output profile set failed:", err);
-        },
-      );
-    },
-  });
-  wrap.append(profileRocker);
+  const metaEl = el.querySelector<HTMLElement>(".vmx-persona-status__meta");
+  const metaText = `${skill} · ${genre} · ${voiceProfile}`;
+  if (metaEl && metaEl.textContent !== metaText) metaEl.textContent = metaText;
 
-  return wrap;
+  el.setAttribute(
+    "aria-label",
+    `Persona: ${mood}, ${skill}, ${genre}, ${voiceProfile} voice — open settings to change`,
+  );
 }
 
 /** Idempotent hot-update. Walks the diff between mounted.current and the
@@ -826,6 +749,20 @@ export function renderSessionFrame(mounted: Mounted, next: SessionState): void {
   // Timecode — DSEG7 hero clock + meta cells. setTimecode internally
   // diffs textContent so unchanged digits don't repaint.
   setTimecode(mounted.timecode, next.timecode);
+
+  // Persona readout — glanceable mirror of the drawer's persona writes.
+  // Cheap textContent pokes, gated on the four fields the readout shows so
+  // an unchanged 30Hz tick is a no-op.
+  const pPrev = mounted.current.persona;
+  const pNext = next.persona;
+  if (
+    pPrev.mood !== pNext.mood ||
+    pPrev.skill !== pNext.skill ||
+    pPrev.genre !== pNext.genre ||
+    pPrev.voice !== pNext.voice
+  ) {
+    setPersonaStatus(mounted.personaStatus, next);
+  }
 
   // === Rebuild-on-ref-change paths ========================================
   // These bodies are heavier (DOM rebuild) so we gate them on array ref
