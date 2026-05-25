@@ -103,6 +103,16 @@
           ],
           "cmd": "control.exe",
           "name": "control"
+        },
+        {
+          "args": true,
+          "cmd": "python3",
+          "name": "vibemix-library-python"
+        },
+        {
+          "args": true,
+          "cmd": "uv",
+          "name": "vibemix-library-uv"
         }
       ],
       "identifier": "shell:allow-execute"
@@ -141,6 +151,7 @@
   ],
   "windows": [
     "debrief",
+    "library",
     "main",
     "mascot",
     "overlay-*",

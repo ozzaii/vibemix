@@ -44,6 +44,13 @@ EXCLUDED_PATHS = (
     "tauri/ui/src/wizard/__tests__/",
     "tauri/ui/tests/",
     "tauri/ui/src/ipc/validator.spec.ts",  # tests the schema
+    # Read-only crash-banner error message (no <input>): mirrors the
+    # Python exit-4 [FATAL] guidance (src/vibemix/__main__.py) for the
+    # direct-mode "GEMINI_API_KEY not set" case. It surfaces *where to put*
+    # a key, it does not *capture* one — so it's not the entry surface this
+    # gate forbids. The actual entry-surface subtrees (wizard/settings) are
+    # still fully covered by test_no_api_key_input_field_in_wizard_or_settings.
+    "tauri/ui/src/crash-banner.ts",
 )
 
 # Regex catalogue.

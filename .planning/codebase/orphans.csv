@@ -1,8 +1,9 @@
 symbol,file,kind
 GeminiClientProtocol,src/vibemix/debrief/tldr.py,class
 VoiceWavMeta,src/vibemix/debrief/session_loader.py,class
-IngestResult,src/vibemix/memory/ingest.py,class
 OutboundEndpoint,src/vibemix/runtime/sec_check.py,class
+build_toolset,src/vibemix/library/mcp_server.py,function
+build_server,src/vibemix/library/mcp_server.py,function
 replace_decktrack,src/vibemix/state/deck_poller.py,function
 DeckSlot,src/vibemix/state/deck_vision.py,class
 DeckRead,src/vibemix/state/deck_vision.py,class

@@ -33,6 +33,7 @@
 | `livekit-agents` | 1.5.8 | see uv.lock | Gemini Live API wrapper (cohost_v2/lk variants). Pure-Python. | 🟢 Green |  |
 | `livekit-plugins-google` | 1.5.8 | see uv.lock | LiveKit Gemini adapter — the seam through which all Gemini Live audio flows. | 🟢 Green |  |
 | `livekit-plugins-openai` | 1.5.8 | see uv.lock | [CULL-BLOCKED] Used by src/vibemix/agent/tts_chain.py for the proxy TTS fallback chain. Cannot remove without rewiring the TTS chain — out of scope for Phase 46. | 🟡 Yellow |  |
+| `mcp` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `mido` | 1.3.3 | see uv.lock | MIDI message parsing (DDJ-FLX4 controller decode). Pure-Python. | 🟢 Green |  |
 | `mss` | 10.2.0 | see uv.lock | Win32 screen capture (CoreGraphics on Mac uses ScreenCaptureKit). Pure-Python. | 🟢 Green |  |
 | `numpy` | 2.4.4 | see uv.lock | Audio math (RMS / FFT / BPM autocorr). Prebuilt wheels Mac arm64+x86_64 + Win64. | 🟡 Yellow |  |
@@ -49,6 +50,7 @@
 | `python-dateutil` | 2.9.0.post0 | see uv.lock | pyrekordbox transitive — date parsing. Pure-Python. | 🟢 Green |  |
 | `python-dotenv` | 1.2.2 | see uv.lock | load_dotenv() for GEMINI_API_KEY ingest. Pure-Python. | 🟢 Green |  |
 | `python-rtmidi` | 1.5.8 | see uv.lock | Low-level MIDI I/O (mido backend). Prebuilt wheels Mac+Win64. | 🟡 Yellow |  |
+| `python-telegram-bot` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `pywin32` | 311 | see uv.lock | Win32 API bindings (Win-only). Prebuilt wheels. | 🟡 Yellow |  |
 | `scipy` | 1.17.1 | see uv.lock | scipy.signal.resample_poly for 48kHz to 16kHz. Prebuilt wheels all platforms. | 🟡 Yellow |  |
 | `sounddevice` | 0.5.5 | see uv.lock | CoreAudio (Mac) + WASAPI (Win) bridge. Pure-Python over CFFI; system PortAudio resolved by the installer. | 🟡 Yellow |  |
