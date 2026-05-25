@@ -323,6 +323,17 @@ class AICoach:
             else:
                 e.append("decks=unknown")
 
+        # WIRE #4 — auto-detected genre. ADDITIVE + gated exactly like the
+        # decks[…] block above so the default MusicState (detected_genre=
+        # "unknown") emits ZERO bytes and the v4/silent-state golden stays
+        # byte-identical. Floor of 0.5 is the anti-hallucination confidence
+        # gate (above the 0.3 track/deck floor — a wrong genre label is more
+        # priming than a wrong title, so it demands more certainty). Below
+        # floor / unknown → nothing. NOT added to _evidence_line_compact
+        # (diet/ack path stays lean).
+        if state.detected_genre != "unknown" and state.genre_confidence >= 0.5:
+            e.append(f"genre={state.detected_genre}")
+
         # Per-event ages so the AI can reason in seconds (e.g. "you held that 6s").
         now_ts = time.time()
         if state.phase_history:

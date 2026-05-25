@@ -250,6 +250,77 @@ def test_evidence_line_track_quoted_at_exact_03_boundary():
     assert "track=unknown" not in out
 
 
+# ---------- WIRE #4: detected_genre → gated evidence_line field ----------
+# MusicState.detected_genre + genre_confidence already exist but are discarded
+# at the prompt boundary. Add ONE gated `genre=<name>` field, mirroring the
+# decks= gate: emit ONLY when detected_genre != "unknown" AND
+# genre_confidence >= 0.5. Below floor / unknown → emit NOTHING (byte-identical).
+
+
+def test_evidence_line_genre_emitted_when_confident():
+    state = MusicState(
+        audible=True,
+        rms=0.05,
+        bpm=128.0,
+        bands={"sub": 0.2, "low": 0.3, "mid": 0.3, "high": 0.2},
+        detected_genre="hard_techno",
+        genre_confidence=0.82,
+    )
+    out = AICoach.evidence_line(state)
+    assert "genre=hard_techno" in out
+
+
+def test_evidence_line_genre_omitted_when_unknown():
+    state = MusicState(
+        audible=True,
+        rms=0.05,
+        bpm=128.0,
+        bands={"sub": 0.2, "low": 0.3, "mid": 0.3, "high": 0.2},
+        detected_genre="unknown",
+        genre_confidence=0.99,
+    )
+    out = AICoach.evidence_line(state)
+    assert "genre=" not in out
+
+
+def test_evidence_line_genre_omitted_below_confidence_floor():
+    state = MusicState(
+        audible=True,
+        rms=0.05,
+        bpm=128.0,
+        bands={"sub": 0.2, "low": 0.3, "mid": 0.3, "high": 0.2},
+        detected_genre="house",
+        genre_confidence=0.49,
+    )
+    out = AICoach.evidence_line(state)
+    assert "genre=" not in out
+
+
+def test_evidence_line_genre_emitted_at_exact_floor():
+    """Gate uses >= so 0.5 itself emits (mirrors the >= track/deck gates)."""
+    state = MusicState(
+        audible=True,
+        rms=0.05,
+        bpm=128.0,
+        bands={"sub": 0.2, "low": 0.3, "mid": 0.3, "high": 0.2},
+        detected_genre="techno",
+        genre_confidence=0.5,
+    )
+    out = AICoach.evidence_line(state)
+    assert "genre=techno" in out
+
+
+def test_evidence_line_genre_default_state_byte_identical():
+    """Default MusicState (detected_genre='unknown') must stay byte-identical to
+    the silent-state golden — the gate is OFF by default."""
+    state = MusicState()
+    out = AICoach.evidence_line(state)
+    assert out == (
+        "hearing[silent] | track=unknown | deck=none | set_time=0:00 | recent_moves[8s]: NONE"
+    )
+    assert "genre=" not in out
+
+
 def test_evidence_line_HAS_NO_phase_field():
     """LOAD-BEARING ANTI-HALLUCINATION: v4:1350-1351 removed `phase=`.
     Verify the substring is ABSENT for every non-silent phase label."""
