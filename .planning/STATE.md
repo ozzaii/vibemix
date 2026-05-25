@@ -56,6 +56,12 @@ Last activity: 2026-05-25 — v8.0 "Proof & Polish" SHIPPED + audited. 6/6 phase
 
 **KAAN-ACTION (ride forward, never blocked):** §GH-BILLING (GitHub account billing lock blocks CI on origin — Kaan-only fix at github.com/settings/billing → re-run PR #8 → GH-02 green + §V7-LIVE-05) · §GH-MAIN-MERGE (merge PR #8, no squash, to sync main) · §SHIP-V4/GH-04 (signed release + social — Apple Dev + SignPath signatures; v4.0 closes alongside) · §V7-LIVE (real-hardware ear-passes — software-simulated by P72) · felt UX/design sign-off · user-level (BEG/INT/PRO) UI control (cross-stack follow-up, surfaced not half-built). **Next:** `/gsd:new-milestone` or discharge KAAN-ACTION items.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 260525-fuv | Token + cost counter for live sessions (SessionMeter + ROUTE_PRICING + session.json cost block + stderr recap; cache-hit savings) | 2026-05-25 | 4799730 | Verified (full suite 4284/0) | [260525-fuv-token-and-cost-counter-for-live-sessions](./quick/260525-fuv-token-and-cost-counter-for-live-sessions/) |
+
 ## v7.0 Phase Map
 
 | Phase | Goal | Requirements (count) | Depends on | UI |
