@@ -57,10 +57,19 @@ _MCP_TOOL_TIMEOUT_S = 30
 # genuine runtime error — used to surface the actionable `codex login` hint.
 _AUTH_HINTS = ("login", "log in", "auth", "sign in", "not authenticated", "401")
 
-_SYSTEM_PROMPT = (
-    "You are Viber, a DJ's crate-digging co-pilot. Build a playlist from the "
-    "user's OWN library that fits the theme below, using ONLY the provided "
-    "tools.\n"
+# WIRE-04 (Phase 77 Plan 02): persona opener sourced from the shared matrix
+# seam (build_curator_instruction) — the same voice the gemini backend and the
+# live co-host speak. The "Use ONLY the provided tools" bridge is codex-specific
+# (MCP tool surface) and the RULES below — including codex's distinct rule #3
+# (return final JSON, no create_playlist) — are PRESERVED VERBATIM.
+#
+# The seam is imported LAZILY (inside the builder), so importing this module
+# does NOT pull ``vibemix.prompts`` into ``sys.modules`` — preserving the memory
+# storage spine's no-live-path import boundary (tests/memory/
+# test_no_live_path_import.py). ``_SYSTEM_PROMPT`` is exposed via PEP 562
+# ``__getattr__`` so attribute access stays a plain string.
+_RULES_BLOCK = (
+    "Use ONLY the provided tools.\n"
     "RULES (non-negotiable):\n"
     "1. You may ONLY put a track in a playlist if a prior search_vibe call "
     "returned its track_id in THIS run. Never invent a track_id, title, "
@@ -72,6 +81,26 @@ _SYSTEM_PROMPT = (
     "persists the playlist — you do NOT need to call create_playlist.\n"
     "4. Keep it tight — a focused set beats a padded one."
 )
+
+_SYSTEM_PROMPT_CACHE: str | None = None
+
+
+def _system_prompt() -> str:
+    """Build (and cache) the codex curator system prompt from the matrix seam."""
+    global _SYSTEM_PROMPT_CACHE
+    if _SYSTEM_PROMPT_CACHE is None:
+        from vibemix.prompts.matrix import build_curator_instruction
+
+        _SYSTEM_PROMPT_CACHE = build_curator_instruction("tutor") + " " + _RULES_BLOCK
+    return _SYSTEM_PROMPT_CACHE
+
+
+def __getattr__(name: str) -> Any:
+    # PEP 562 — _SYSTEM_PROMPT builds the matrix seam on first access, keeping
+    # the import-time no-live-path boundary clean.
+    if name == "_SYSTEM_PROMPT":
+        return _system_prompt()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # JSON Schema enforced on Codex's final message (--output-schema). OpenAI strict
 # structured outputs require `additionalProperties: false` AND every property in
@@ -124,7 +153,7 @@ def find_codex(codex_path: str | None = None) -> str | None:
 
 
 def build_prompt(theme: str) -> str:
-    return f"{_SYSTEM_PROMPT}\n\nTheme: {theme.strip()}"
+    return f"{_system_prompt()}\n\nTheme: {theme.strip()}"
 
 
 def build_argv(

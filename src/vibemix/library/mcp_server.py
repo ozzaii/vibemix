@@ -32,6 +32,15 @@ import os
 import sys
 from typing import Any
 
+# WIRE-04 (Phase 77 Plan 02) — voice inherited via the codex_curate seam
+# (verified — no own prompt). This server carries NO system prompt / persona of
+# its own: it only exposes the 3 grounded tools over STDIO, and grounding lives
+# at the tool boundary (LibraryToolset seen-set gate), not in a prompt. The
+# curator voice reaches Codex through ``library.codex_curate._SYSTEM_PROMPT``,
+# which now sources its persona from ``prompts.matrix.build_curator_instruction``
+# — so this backend is provably NOT persona-blind (CURATE acid test), with no
+# change needed here.
+
 logger = logging.getLogger(__name__)
 
 

@@ -55,9 +55,20 @@ MAX_INTERACTIVE_ITERATIONS = 24
 # (Per-tool timeout lives in LibraryToolset.dispatch.)
 GEMINI_CALL_TIMEOUT_S = 60.0
 
-_SYSTEM_INSTRUCTION = (
-    "You are Viber, a DJ's crate-digging co-pilot. Build a playlist from the "
-    "user's OWN library that fits their theme.\n"
+# WIRE-04 (Phase 77 Plan 02): the persona opener is sourced from the shared
+# matrix seam (build_curator_instruction) instead of a hardcoded literal — the
+# co-host's matrix vocabulary is now the single source of truth for voice. The
+# grounding RULES below are PRESERVED VERBATIM (the seen-set / never-invent-id
+# contract is the anti-slop invariant #2 and must never drift on a voice swap).
+#
+# The seam lives in ``vibemix.prompts.matrix`` and is imported LAZILY (inside
+# the builder) — not at module top-level — so importing the curator does NOT
+# drag ``vibemix.prompts`` into ``sys.modules``. This keeps the memory storage
+# spine's no-live-path import boundary intact (tests/memory/
+# test_no_live_path_import.py: ``vibemix.prompts`` is a forbidden surface).
+# The constants are exposed via PEP 562 ``__getattr__`` (mirroring
+# ``state/__init__``) so attribute access stays a plain string for callers/tests.
+_RULES_BLOCK = (
     "RULES (non-negotiable):\n"
     "1. You may ONLY put a track in a playlist if a prior search_vibe call "
     "returned its track_id in THIS conversation. Never invent a track_id, a "
@@ -69,6 +80,57 @@ _SYSTEM_INSTRUCTION = (
     "with the ordered track_ids. That ends the run.\n"
     "4. Keep it tight — a focused set beats a padded one."
 )
+
+_INTERACTIVE_FLOW_BLOCK = (
+    "FLOW:\n"
+    "1. Open by asking 1-3 SHORT clarifying questions with ask_user (e.g. the "
+    "mood/occasion, how long the set is, the energy arc). Ask ONE at a time. "
+    "Don't over-interrogate — 3 questions max, then build.\n"
+    "2. search_vibe their library for the vibe you heard (the ONLY way to find "
+    "tracks). Every track_id you use MUST come from a search_vibe result — "
+    "never invent a track, title, artist, BPM, or key.\n"
+    "3. Keys/BPM come from get_track_features (deterministic) — never guess.\n"
+    "4. Call create_playlist ONCE with the ordered track_ids. That ends the "
+    "run. Keep it tight — a focused set beats a padded one."
+)
+
+# Lazily-built + cached so the seam import fires only on first real use.
+_SYSTEM_INSTRUCTION_CACHE: str | None = None
+_INTERACTIVE_SYSTEM_INSTRUCTION_CACHE: str | None = None
+
+
+def _system_instruction() -> str:
+    """Build (and cache) the one-shot curator system instruction from the seam."""
+    global _SYSTEM_INSTRUCTION_CACHE
+    if _SYSTEM_INSTRUCTION_CACHE is None:
+        from vibemix.prompts.matrix import build_curator_instruction
+
+        _SYSTEM_INSTRUCTION_CACHE = (
+            build_curator_instruction("tutor") + "\n" + _RULES_BLOCK
+        )
+    return _SYSTEM_INSTRUCTION_CACHE
+
+
+def _interactive_system_instruction() -> str:
+    """Build (and cache) the interactive curator system instruction."""
+    global _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE
+    if _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE is None:
+        from vibemix.prompts.matrix import build_curator_instruction
+
+        _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE = (
+            build_curator_instruction("tutor") + "\n" + _INTERACTIVE_FLOW_BLOCK
+        )
+    return _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE
+
+
+def __getattr__(name: str) -> str:
+    # PEP 562 — expose the system instructions as module attributes that build
+    # the matrix seam on first access (keeps the import-time boundary clean).
+    if name == "_SYSTEM_INSTRUCTION":
+        return _system_instruction()
+    if name == "_INTERACTIVE_SYSTEM_INSTRUCTION":
+        return _interactive_system_instruction()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 @dataclass(slots=True)
@@ -186,22 +248,6 @@ def _tool_declarations(interactive: bool = False) -> list[types.FunctionDeclarat
     return decls
 
 
-_INTERACTIVE_SYSTEM_INSTRUCTION = (
-    "You are Viber, a DJ's crate-digging co-pilot, talking with the DJ live to "
-    "build a playlist from their OWN library.\n"
-    "FLOW:\n"
-    "1. Open by asking 1-3 SHORT clarifying questions with ask_user (e.g. the "
-    "mood/occasion, how long the set is, the energy arc). Ask ONE at a time. "
-    "Don't over-interrogate — 3 questions max, then build.\n"
-    "2. search_vibe their library for the vibe you heard (the ONLY way to find "
-    "tracks). Every track_id you use MUST come from a search_vibe result — "
-    "never invent a track, title, artist, BPM, or key.\n"
-    "3. Keys/BPM come from get_track_features (deterministic) — never guess.\n"
-    "4. Call create_playlist ONCE with the ordered track_ids. That ends the "
-    "run. Keep it tight — a focused set beats a padded one."
-)
-
-
 # --------------------------------------------------------------------------- #
 # The agent.                                                                  #
 # --------------------------------------------------------------------------- #
@@ -261,7 +307,7 @@ class ViberAgent:
         return self._run_loop(
             theme=theme,
             contents=contents,
-            system_instruction=_SYSTEM_INSTRUCTION,
+            system_instruction=_system_instruction(),
             interactive=False,
             ask_fn=None,
             max_iters=MAX_TOOL_ITERATIONS,
@@ -292,7 +338,7 @@ class ViberAgent:
         return self._run_loop(
             theme=opening or "(interactive)",
             contents=contents,
-            system_instruction=_INTERACTIVE_SYSTEM_INSTRUCTION,
+            system_instruction=_interactive_system_instruction(),
             interactive=True,
             ask_fn=ask_fn,
             max_iters=max_iters,

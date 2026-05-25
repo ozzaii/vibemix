@@ -29,8 +29,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 import vibemix.library.agent as agent_mod
 import vibemix.library.codex_curate as codex_mod
 from vibemix.prompts.matrix import MOOD_PERSONAS
@@ -130,9 +128,6 @@ def _curator_source(mod_name: str) -> str:
     return src_path.read_text(encoding="utf-8")
 
 
-@pytest.mark.xfail(
-    reason="WIRE-04 voice-from-seam swap not yet wired (Plan 02)", strict=True
-)
 def test_gemini_curator_voice_sourced_from_matrix_seam() -> None:
     """library/agent.py sources its persona voice from build_curator_instruction."""
     src = _curator_source("agent.py")
@@ -144,9 +139,6 @@ def test_gemini_curator_voice_sourced_from_matrix_seam() -> None:
     assert voice.split("\n", 1)[0] in agent_mod._SYSTEM_INSTRUCTION
 
 
-@pytest.mark.xfail(
-    reason="WIRE-04 voice-from-seam swap not yet wired (Plan 02)", strict=True
-)
 def test_codex_curator_voice_sourced_from_matrix_seam() -> None:
     """library/codex_curate.py sources its persona voice from the matrix seam."""
     src = _curator_source("codex_curate.py")
