@@ -26,7 +26,16 @@ def test_cli_similar_help() -> None:
     assert "USER-ASKED" in proc.stdout
 
 
-def test_cli_similar_no_jwt_exits_clean(tmp_path) -> None:
+def test_cli_similar_without_jwt_uses_direct_key(tmp_path) -> None:
+    """Fix 1: similar no longer hard-requires VIBEMIX_PROXY_JWT. With only a
+    direct GEMINI_API_KEY (loaded from the repo-root .env by _load_env_robust,
+    which finds it via __main__.py's location regardless of CWD/HOME), the
+    command builds a direct client and proceeds — failing only later on the
+    empty/missing library cache under the tmp HOME, NOT on a missing JWT.
+
+    The pure no-creds error path is covered in-process by
+    tests/scripts/test_cli_library_search.py::test_no_client_returns_json_error.
+    """
     env = {**os.environ, "HOME": str(tmp_path)}
     env.pop("VIBEMIX_PROXY_JWT", None)
     proc = subprocess.run(
@@ -38,7 +47,9 @@ def test_cli_similar_no_jwt_exits_clean(tmp_path) -> None:
     )
     assert proc.returncode == 1
     parsed = json.loads(proc.stderr.strip())
-    assert "VIBEMIX_PROXY_JWT" in parsed["error"]
+    # No JWT, but a direct key got us past client-build to the cache check.
+    assert "VIBEMIX_PROXY_JWT" not in parsed["error"]
+    assert "No library cache" in parsed["error"]
 
 
 def test_cli_similar_no_library_exits_clean(tmp_path) -> None:
