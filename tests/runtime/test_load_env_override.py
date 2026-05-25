@@ -49,9 +49,6 @@ def _restore_env():
             os.environ["GEMINI_API_KEY"] = saved  # type: ignore[assignment]
 
 
-@pytest.mark.xfail(
-    reason="WIRE-06 override=True not yet flipped (Plan 03)", strict=True
-)
 def test_dotenv_overrides_ghost_shell_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _restore_env
 ) -> None:

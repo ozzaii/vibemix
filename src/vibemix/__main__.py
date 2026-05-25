@@ -126,11 +126,22 @@ def _load_env_robust() -> None:
     release blocker.
 
     We therefore probe an ordered list of candidate ``.env`` paths and load
-    the first that exists. Earlier-loaded values win (``override=False``), so
-    a key already injected into the real process environment by the Tauri
-    shell (the preferred, secure delivery channel) is never clobbered by a
-    stale on-disk ``.env``. SECURITY: no key is ever embedded here — every
-    candidate is a runtime file or the inherited process env.
+    the first that exists. ``.env`` values WIN (``override=True``): the
+    on-disk ``.env`` is the source of truth for the dev/local path, so a
+    stale/ghost ``GEMINI_API_KEY`` lingering in the shell process environment
+    can no longer shadow the funded key in ``.env`` (WIRE-06 — the diagnosed
+    live bug where a dead ghost key ``...QSFyBQ`` shadowed the funded
+    ``.env`` key ``...32u744``, leaving the runtime on a key with no credits).
+    SECURITY: no key is ever embedded here — every candidate is a runtime
+    file or the inherited process env.
+
+    KAAN-ACTION (A1 — Tauri-injection precedence reversal): this flip
+    DELIBERATELY REVERSES the prior ``override=False`` decision, which let a
+    key injected into the process env by the Tauri shell win over a stale
+    on-disk ``.env``. If a Tauri-bundled install ever needs to inject the key
+    via process env INSTEAD of ``.env`` (so the process-env key must win),
+    THIS is the knob to revisit — flip back to ``override=False`` here. See
+    WIRE-06 / 77-RESEARCH Pitfall 3.
 
     Candidate order (first existing wins):
       1. CWD-relative ``.env`` (``find_dotenv`` — the dev/repo path).
@@ -170,7 +181,7 @@ def _load_env_robust() -> None:
     for cand in candidates:
         try:
             if cand.is_file():
-                load_dotenv(dotenv_path=str(cand), override=False)
+                load_dotenv(dotenv_path=str(cand), override=True)
                 if loaded_from is None:
                     loaded_from = str(cand)
         except Exception:
@@ -179,7 +190,7 @@ def _load_env_robust() -> None:
     if loaded_from is None:
         # No .env anywhere — rely entirely on the inherited process env
         # (the Tauri shell forwards GEMINI_API_KEY / OPENROUTER_API_KEY).
-        load_dotenv(override=False)
+        load_dotenv(override=True)
 
     # Diagnostic to stderr — but ONLY for the live-runtime / wizard / session
     # paths the Tauri log captures. The `vibemix library <sub>` CLI emits a
