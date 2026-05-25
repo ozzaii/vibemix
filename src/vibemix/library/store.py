@@ -60,6 +60,35 @@ class LibraryStore:
         ids, vectors = self._backend.load_all()
         return cosine_topk(query_vector, vectors, ids, k)
 
+    def search_centered(
+        self, query_vector: np.ndarray, k: int = 10
+    ) -> list[tuple[str, float]]:
+        """Mean-centered top-K cosine search (the anisotropy fix).
+
+        Loads all vectors once, derives (or reuses) the corpus centroid keyed
+        on the store snapshot, centers BOTH the query and every candidate with
+        that centroid, then ranks via the same ``cosine_topk`` chokepoint (P55
+        parity preserved — only the inputs are centered).
+
+        Degenerate guard: when the corpus has < 2 vectors there is no
+        meaningful centroid, so this transparently falls back to the raw
+        ``search`` path (byte-identical ranking to pre-fix behaviour).
+        """
+        from vibemix.library.centering import (
+            center_and_renorm,
+            load_or_compute_centroid,
+        )
+
+        ids, vectors = self._backend.load_all()
+        centroid = load_or_compute_centroid(
+            vectors, self._backend.snapshot_hash()
+        )
+        if centroid is None:
+            return cosine_topk(query_vector, vectors, ids, k)
+        q_centered = center_and_renorm(query_vector, centroid)
+        v_centered = center_and_renorm(vectors, centroid)
+        return cosine_topk(q_centered, v_centered, ids, k)
+
     def delete(self, track_ids: list[str]) -> None:
         self._backend.delete(track_ids)
 

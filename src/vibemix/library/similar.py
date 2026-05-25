@@ -76,8 +76,12 @@ def similar_to(
         return []
     qvec = l2_normalize(seed_vec.astype(np.float32, copy=False))
 
-    # k+1 so we can drop the seed from results.
-    topk = store.search(qvec, k=k + 1)
+    # k+1 so we can drop the seed from results. Mean-centered ranking (the
+    # anisotropy fix) is the DEFAULT — the store centers the seed + every
+    # candidate with the corpus centroid before cosine_topk, and falls back
+    # to raw cosine for N < 2 (no centroid). This is what gives each seed a
+    # distinct neighbour set instead of "everything ~0.92 similar".
+    topk = store.search_centered(qvec, k=k + 1)
     out: list[SimilarResult] = []
     for tid, sim in topk:
         if tid == seed_track_id:

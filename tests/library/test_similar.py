@@ -51,7 +51,8 @@ def fake_store() -> MagicMock:
 def test_similar_returns_top_k_excluding_seed(
     fake_embedder, fake_store, fake_library
 ) -> None:
-    fake_store.search.return_value = [
+    # similar_to ranks via the mean-centered path (the anisotropy fix).
+    fake_store.search_centered.return_value = [
         ("t000", 1.0),  # seed itself
         ("t001", 0.9),
         ("t002", 0.85),
@@ -104,7 +105,7 @@ def test_similar_result_to_dict() -> None:
 def test_similar_skips_unknown_track_ids(
     fake_embedder, fake_store, fake_library
 ) -> None:
-    fake_store.search.return_value = [
+    fake_store.search_centered.return_value = [
         ("t000", 1.0),  # seed
         ("t-ghost", 0.9),  # not in library
         ("t001", 0.8),

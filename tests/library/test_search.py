@@ -53,11 +53,15 @@ def fake_embedder() -> MagicMock:
 def fake_store() -> MagicMock:
     s = MagicMock()
     s.snapshot_hash.return_value = "snapshot_hash_v1"
-    s.search.return_value = [
+    # vibe_search ranks via the mean-centered path (the anisotropy fix);
+    # mock that method. search() (raw) is the N<2 fallback only.
+    topk = [
         ("t000", 0.9123),
         ("t001", 0.7456),
         ("t002", 0.6789),
     ]
+    s.search.return_value = topk
+    s.search_centered.return_value = topk
     return s
 
 
@@ -179,6 +183,7 @@ def test_confidence_clamped_above_one(
     s = MagicMock()
     s.snapshot_hash.return_value = "snap"
     s.search.return_value = [("t000", 1.00009)]
+    s.search_centered.return_value = [("t000", 1.00009)]
     results, _ = vibe_search(
         fake_embedder, s, fake_library, "x", cache_db=cache_db
     )
@@ -191,6 +196,7 @@ def test_confidence_clamped_below_zero(
     s = MagicMock()
     s.snapshot_hash.return_value = "snap"
     s.search.return_value = [("t000", -0.0001)]
+    s.search_centered.return_value = [("t000", -0.0001)]
     results, _ = vibe_search(
         fake_embedder, s, fake_library, "x", cache_db=cache_db
     )
@@ -208,6 +214,7 @@ def test_skips_unknown_track_ids(
         ("t-unknown", 0.8),
         ("t001", 0.7),
     ]
+    s.search_centered.return_value = s.search.return_value
     results, _ = vibe_search(
         fake_embedder, s, fake_library, "x", cache_db=cache_db
     )

@@ -31,6 +31,11 @@ logger = logging.getLogger(__name__)
 QUERY_CACHE_TTL = 86400
 QUERY_CACHE_TABLE = "query_cache"
 
+# Bump when the ranking transform changes so stale cached results (computed
+# under a different transform) are never served. v1 = raw cosine; v2 = corpus
+# mean-centered cosine (the anisotropy fix). Folded into the cache key.
+RANKING_VERSION = "v2-centered"
+
 
 def _open_query_cache(
     db_path: Path | None = None,
@@ -97,7 +102,7 @@ def vibe_search(
 
     snapshot = store.snapshot_hash()
     cache_key = hashlib.sha256(
-        f"{query}|{snapshot}".encode("utf-8")
+        f"{query}|{snapshot}|{RANKING_VERSION}".encode("utf-8")
     ).hexdigest()
     own_conn = cache_db is None
     conn = cache_db if cache_db is not None else _open_query_cache()
@@ -119,7 +124,10 @@ def vibe_search(
                 )
 
         qvec = embedder.embed_query(query)
-        topk = store.search(qvec, k=k)
+        # Mean-centered ranking (the anisotropy fix) is the DEFAULT — it is
+        # strictly more discriminative on anisotropic Gemini embeddings. The
+        # store transparently falls back to raw cosine for N < 2 (no centroid).
+        topk = store.search_centered(qvec, k=k)
 
         # Build track_id → TrackEntry lookup once per call.
         index = {t.track_id: t for t in tracks}
