@@ -86,13 +86,11 @@ def _route_caches_to_tmp(tmp_path: Path, monkeypatch):
 # ---------- PERCEIVE-03 — prototype build ----------
 
 
-@pytest.mark.xfail(strict=True, reason="PERCEIVE-03 — flips when Plan 03 lands")
 def test_build_centered_means():
     """``build_prototypes`` produces ONE centered-mean prototype per label, each
     L2-normalized, shape ``(n_labels, EMBEDDING_DIM)``.
 
-    RED today: ``vibemix.library.genre_prototypes`` does not exist — the import
-    raises ModuleNotFoundError (the xfail trigger).
+    GREEN since Plan 03: ``vibemix.library.genre_prototypes`` builds the table.
     """
     from vibemix.library.genre_prototypes import build_prototypes
 
@@ -110,12 +108,11 @@ def test_build_centered_means():
 # ---------- PERCEIVE-03 — classify floor + margin ----------
 
 
-@pytest.mark.xfail(strict=True, reason="PERCEIVE-03 — flips when Plan 03 lands")
 def test_classify_floor_and_margin():
     """``classify`` returns the nearest-prototype label above floor; below floor
     OR within tie-margin → ``("unknown", conf)`` (anti-slop abstain).
 
-    RED today: the import raises ModuleNotFoundError.
+    GREEN since Plan 03.
     """
     from vibemix.library.centering import compute_centroid
     from vibemix.library.genre_prototypes import build_prototypes, classify
