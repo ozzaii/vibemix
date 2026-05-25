@@ -53,7 +53,7 @@
 
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
-| 77 | WIRE — Connect the Islands | 4/4 | Complete   | 2026-05-25 |
+| 77 | WIRE — Connect the Islands | 4/4 | Complete    | 2026-05-25 |
 | 78 | PERCEIVE — Deeper, Generalized Ear | The prompt carries deltas + calibrated confidence + multi-scale trajectory + embedding-driven genre, so Gemini reads change over time and can abstain | PERCEIVE-01, PERCEIVE-02, PERCEIVE-03 | 4 |
 | 79 | LENS — Three Grounded Modes | hype / critique / tutor exist as three grounded lenses over the same state, selectable across both surfaces | LENS-01, LENS-02 | 3 |
 | 80 | GROUND — Gemini as Secondary Ear | Gemini hears the audio alongside the structured evidence, hallucination-guarded, with the reaction model config-resolved | GROUND-01, GROUND-02 | 3 |
