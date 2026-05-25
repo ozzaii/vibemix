@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v8.1
 milestone_name: One Mind
 status: executing
-last_updated: "2026-05-25T21:42:28.456Z"
-last_activity: 2026-05-25
+last_updated: "2026-05-26T00:00:00.000Z"
+last_activity: 2026-05-26
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -38,13 +38,22 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 ## Current Position
 
 Phase: 77 (WIRE — Connect the Islands) — EXECUTING
-Plan: 2 of 4 (Plan 01 complete)
-Status: Ready to execute Plan 77-02
-Last activity: 2026-05-26 -- Plan 77-01 complete (WIRE test scaffolds; full suite 4441/0)
+Plan: 3 of 4 (Plans 01–02 complete)
+Status: Ready to execute
+Last activity: 2026-05-26
+
+### Plan 77-02 — WIRE-04 shared curator persona seam (complete 2026-05-26)
+
+- NEW `build_curator_instruction(lens="tutor")` sibling in `prompts/matrix.py` — the single curator-voice source. Draws persona from the fixed `MOOD_PERSONAS` dict (anti-injection); omits the co-host-runtime blocks (TTS tag DSL / citation grammar / fail-soft fragment). Lens map: tutor→teacher / hype→hype-man / critique→coach.
+- Both curator backends consume the seam: `library/agent.py` (`_SYSTEM_INSTRUCTION` + `_INTERACTIVE_SYSTEM_INSTRUCTION`) + `library/codex_curate.py` (`_SYSTEM_PROMPT`). Grounding RULES (seen-set / never-invent-id) + codex `_OUTPUT_SCHEMA` preserved VERBATIM. `model_router.resolve("library_agent")` untouched (no model literal).
+- `mcp_server.py` verified persona-blind-free: no own system prompt; voice inherited via the codex path (LibraryToolset grounding at the tool boundary). Documented with a code comment.
+- **Deviation (Rule 1):** the eager seam import regressed `tests/memory/test_no_live_path_import.py` (`vibemix.prompts` is a forbidden surface on the memory storage-spine boundary). Fixed by importing the seam LAZILY inside cached builders + exposing the constants via PEP 562 `__getattr__` — the curators consume the seam without dragging `vibemix.prompts` into `sys.modules` on import.
+- Honest green: no `genai.Client`, no `GEMINI_API_KEY`. Full suite **4445 passed / 0 failed / 7 xfailed** (4 WIRE-04 xfails flipped to real passes). Commits `18f9b61` (Task 1), `556b9c2` (Task 2).
 
 ### Plan 77-01 — WIRE test scaffolds (complete 2026-05-26)
 
 Wave-0 RED scaffolds for the four unimplemented wires + green pins for the two shipped ones:
+
 - **WIRE-01/04/05/06** → `xfail(strict=True)` failing tests that flip to a real pass when their implementation plan lands (04 / 02 / 04 / 03). Files: `tests/agent/test_dj_cohost_grounding.py`, `tests/memory/test_ingest_wiring.py` (extended), `tests/library/test_curator_persona_seam.py`, `tests/runtime/test_load_env_override.py`.
 - **WIRE-02/03** → green regression pins in `tests/repo/test_wire_regression_pins.py` (8 genre-chain detectors yield real tasks; `genre=<name>` evidence confidence-gated at 0.5 floor).
 - Green now: cold-path byte-identity, citation-gate `[track:<id>]`→registry, env-key-not-logged security pin (V7).
@@ -86,9 +95,9 @@ Wave-0 RED scaffolds for the four unimplemented wires + green pins for the two s
 | Phases complete (v8.0) | 6 / 6 engineering-green (KAAN-ACTION §GH-BILLING / §SHIP-V4 ride forward) |
 | v8.1 phase count | 6 (Phases 77–82) |
 | Phases complete (v8.1) | 0 / 6 (roadmapped; not started) |
-| Plans complete (v8.1) | 1 / TBD (P77 Plan 01 — WIRE test scaffolds) |
+| Plans complete (v8.1) | 2 / 4 in P77 (Plan 01 scaffolds + Plan 02 WIRE-04 seam) |
 | v8.1 REQ-IDs mapped | 18 / 18 ✓ (100% coverage, no orphans, no duplicates) |
-| v8.1 REQ-IDs complete | 2 / 18 (WIRE-02 `ccf4930` + WIRE-03 `a9979b8` already shipped) |
+| v8.1 REQ-IDs complete | 3 / 18 (WIRE-02 `ccf4930` + WIRE-03 `a9979b8` shipped; WIRE-04 `556b9c2` Plan 02) |
 | v8.1 per-phase REQ counts | P77=6 (WIRE) · P78=3 (PERCEIVE) · P79=2 (LENS) · P80=2 (GROUND) · P81=3 (BENCH) · P82=2 (CURATE) |
 | v8.1 net-new AI/embedding providers | 0 (Gemini-only, locked) |
 | v8.1 net-new MIR libs / DSP detectors | 0 (license wall — additive perception only) |
