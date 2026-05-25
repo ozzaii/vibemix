@@ -629,6 +629,63 @@ def test_event_detector_routes_genre_event_when_no_baseline_fires(mocker):
     assert ev.type == "SUB_LAYER_ARRIVAL"
 
 
+# WIRE #2 — genre-chain events must register in the EvidenceRegistry. Before
+# this wire the chain loop returned the detector Event WITHOUT calling _fire,
+# so the deepest perception never produced an [ev:<TYPE>] observation.
+
+
+def test_genre_chain_event_registers_in_evidence_registry(mocker):
+    """Drive a SUB_LAYER_ARRIVAL through detect() with a registry wired; assert
+    the fired genre-chain event writes an [ev:SUB_LAYER_ARRIVAL] observation."""
+    registry = EvidenceRegistry()
+    d = EventDetector(evidence_registry=registry)
+    ms = _state(
+        bands={"sub": 0.10, "low": 0.30, "mid": 0.30, "high": 0.30},
+        rms=0.06,
+        phase="groove",
+    )
+    ms.active_genre = "house"
+    ms.set_start_at = 900.0
+    t = _prime_music_playing(d, ms, mocker, t0=1000.0)
+
+    d.detect(ms, kaan_just_spoke=False, manual=False)  # seed baseline_sub
+    t.return_value = 1030.0
+    ms.bands = {"sub": 0.45, "low": 0.20, "mid": 0.20, "high": 0.15}
+    ev = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert ev is not None and ev.type == "SUB_LAYER_ARRIVAL"
+
+    snap = registry.snapshot()
+    assert "SUB_LAYER_ARRIVAL" in snap.get("ev", {})
+    assert len(snap["ev"]["SUB_LAYER_ARRIVAL"]) >= 1
+
+
+def test_genre_chain_fire_does_not_break_detector_self_cooldown(mocker):
+    """_fire only records timestamps + a best-effort registry write; it must NOT
+    re-fire the same genre event on the next immediate tick (the detector's own
+    last_event_at self-gate plus the global gap still hold)."""
+    registry = EvidenceRegistry()
+    d = EventDetector(evidence_registry=registry)
+    ms = _state(
+        bands={"sub": 0.10, "low": 0.30, "mid": 0.30, "high": 0.30},
+        rms=0.06,
+        phase="groove",
+    )
+    ms.active_genre = "house"
+    ms.set_start_at = 900.0
+    t = _prime_music_playing(d, ms, mocker, t0=1000.0)
+
+    d.detect(ms, kaan_just_spoke=False, manual=False)
+    t.return_value = 1030.0
+    ms.bands = {"sub": 0.45, "low": 0.20, "mid": 0.20, "high": 0.15}
+    first = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert first is not None and first.type == "SUB_LAYER_ARRIVAL"
+
+    # Immediate next tick (1s later) — global gap + detector cooldown block a refire.
+    t.return_value = 1031.0
+    second = d.detect(ms, kaan_just_spoke=False, manual=False)
+    assert second is None or second.type != "SUB_LAYER_ARRIVAL"
+
+
 def test_event_detector_baseline_priority_wins_when_both_fire(mocker):
     """When BOTH a baseline rule (TRACK_CHANGE) AND a genre-chain detector
     could fire on the same tick, the baseline rule wins (it executes first

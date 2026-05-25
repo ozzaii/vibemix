@@ -459,6 +459,135 @@ def test_task_fallback_unknown_type():
     assert out == "React naturally."
 
 
+# ---------- WIRE #2: genre-chain detectors → grounded narrate-only tasks ----------
+# The 8 genre-chain detectors fire Events with rich MEASURED payloads in
+# ev.extra. Before this wire they hit the "React naturally." fallthrough — the
+# deepest perception in the system discarded at the prompt boundary. Each branch
+# now hands Gemini the SPECIFIC measurement and instructs it to narrate that fact
+# in working-DJ language, grounded only in the measurement (MIX_MOVE narrate-style,
+# NOT KEY_CLASH forced [key:] cites — these aren't registry-citable tokens, so
+# forcing cites would trip the CitationLinter). Every branch carries the
+# "output a single space to stay silent" escape hatch.
+
+
+def test_task_acid_line_entry_grounds_on_formant_and_q():
+    out = AICoach.task_for_event(
+        _ev("ACID_LINE_ENTRY", {"formant_hz": 820.5, "resonance_q": 4.2})
+    )
+    assert out != "React naturally."
+    assert "820.5" in out
+    assert "4.2" in out
+    assert "output a single space to stay silent" in out
+
+
+def test_task_kick_swap_grounds_on_centroid_delta():
+    out = AICoach.task_for_event(
+        _ev(
+            "KICK_SWAP",
+            {"prev_centroid_hz": 120.0, "new_centroid_hz": 180.0, "delta_hz": 60.0},
+        )
+    )
+    assert out != "React naturally."
+    assert "120" in out
+    assert "180" in out
+    assert "60" in out
+    assert "output a single space to stay silent" in out
+
+
+def test_task_sub_layer_arrival_grounds_on_sub_jump():
+    out = AICoach.task_for_event(
+        _ev("SUB_LAYER_ARRIVAL", {"prev_sub": 0.12, "new_sub": 0.45, "sub_jump": 0.33})
+    )
+    assert out != "React naturally."
+    assert "0.12" in out
+    assert "0.45" in out
+    assert "0.33" in out
+    assert "output a single space to stay silent" in out
+
+
+def test_task_kick_density_shift_grounds_on_density_delta():
+    out = AICoach.task_for_event(
+        _ev(
+            "KICK_DENSITY_SHIFT",
+            {"prev_density": 0.40, "new_density": 0.75, "delta": 0.35},
+        )
+    )
+    assert out != "React naturally."
+    assert "0.4" in out
+    assert "0.75" in out
+    assert "0.35" in out
+    assert "output a single space to stay silent" in out
+
+
+def test_task_distortion_climb_grounds_on_distortion_db():
+    out = AICoach.task_for_event(
+        _ev("DISTORTION_CLIMB", {"chain_position": 3, "distortion_db": -12.5})
+    )
+    assert out != "React naturally."
+    assert "-12.5" in out
+    assert "output a single space to stay silent" in out
+
+
+def test_task_breakdown_kick_kill_grounds_on_sub_drop():
+    out = AICoach.task_for_event(
+        _ev(
+            "BREAKDOWN_KICK_KILL",
+            {"prev_sub": 0.50, "new_sub": 0.05, "sub_drop": 0.45, "rms": 0.04},
+        )
+    )
+    assert out != "React naturally."
+    assert "0.45" in out
+    assert "output a single space to stay silent" in out
+
+
+def test_task_reentry_kick_land_grounds_on_kill_age():
+    out = AICoach.task_for_event(
+        _ev(
+            "REENTRY_KICK_LAND",
+            {"kill_age_s": 14.0, "sub_at_reentry": 0.42, "beat_phase": 0.02},
+        )
+    )
+    assert out != "React naturally."
+    assert "14.0" in out
+    assert "output a single space to stay silent" in out
+
+
+def test_task_phrase_boundary_grounds_on_phrase_geometry():
+    out = AICoach.task_for_event(
+        _ev(
+            "PHRASE_BOUNDARY",
+            {
+                "phrase_length_bars": 16,
+                "bar_index_in_phrase": 16,
+                "beat_phase": 0.01,
+                "bpm": 128.0,
+            },
+        )
+    )
+    assert out != "React naturally."
+    assert "16" in out
+    assert "output a single space to stay silent" in out
+
+
+def test_task_genre_branches_do_NOT_force_key_citations():
+    """These measurements are NOT registry-citable tokens — forcing [key:]/[ev:]
+    cites would trip the CitationLinter. Mirror MIX_MOVE narrate-style: no forced
+    bracket-citation instruction in any of the 8 genre branches."""
+    for t in (
+        "ACID_LINE_ENTRY",
+        "KICK_SWAP",
+        "SUB_LAYER_ARRIVAL",
+        "KICK_DENSITY_SHIFT",
+        "DISTORTION_CLIMB",
+        "BREAKDOWN_KICK_KILL",
+        "REENTRY_KICK_LAND",
+        "PHRASE_BOUNDARY",
+    ):
+        out = AICoach.task_for_event(_ev(t, {}))
+        assert "Cite" not in out, f"{t} must not force citations"
+        assert "[key:" not in out, f"{t} must not template a key citation"
+
+
 # ---------- Phase 61 Wave-0 gap: KEY_CLASH / TRANSITION harmonic voice ----------
 # 61-RESEARCH flagged that NO test fenced the Phase-60 harmonic arms. These two
 # fence the live arm text (coach.py:267-316) so a future cell/persona edit cannot

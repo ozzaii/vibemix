@@ -572,6 +572,115 @@ class AICoach:
                 f"and [key:{b_side}:{b_cam}]. Do NOT invent a key. If there's "
                 f"nothing worth saying, output a single space to stay silent."
             )
+        # WIRE #2 (Phase 17 genre-chain → prompt boundary). The 8 genre-chain
+        # detectors fire Events carrying MEASURED payloads in ev.extra; before
+        # this wire they all hit the "React naturally." fallthrough below and the
+        # measurement was discarded — the deepest perception in the system never
+        # reached Gemini. Each branch hands the model the SPECIFIC measured fact
+        # and tells it to narrate THAT in working-DJ language, grounded only in
+        # the number. These are MIX_MOVE narrate-style (NOT KEY_CLASH forced
+        # [key:] cites): the measurements are not registry-citable tokens, so a
+        # forced [citation] would have no registry survivor and the existence-only
+        # CitationLinter would strip the whole turn. Every branch keeps the
+        # "output a single space to stay silent" escape so a non-notable event
+        # produces no slop.
+        if t == "ACID_LINE_ENTRY":
+            formant = ev.extra.get("formant_hz")
+            q = ev.extra.get("resonance_q")
+            return (
+                f"A 303-style acid line is OPENING UP — the system measured the "
+                f"filter cutoff sitting around {formant} Hz with resonance Q "
+                f"climbing to {q}. That's a real filter sweep with the resonance "
+                f"biting. React to how that acid line FEELS as it opens — squelchy, "
+                f"tense, peaking — grounded only in that measured sweep. If it's not "
+                f"worth a call, output a single space to stay silent."
+            )
+        if t == "KICK_SWAP":
+            prev = ev.extra.get("prev_centroid_hz")
+            new = ev.extra.get("new_centroid_hz")
+            delta = ev.extra.get("delta_hz")
+            return (
+                f"The KICK TONE just shifted — the system measured the kick-band "
+                f"centroid move from {prev} Hz to {new} Hz ({delta} Hz jump). That's "
+                f"a new kick character within the track. React to how the kick FEELS "
+                f"now — punchier, boomier, tighter, dirtier — grounded only in that "
+                f"measured tone shift. If it's not worth a call, output a single "
+                f"space to stay silent."
+            )
+        if t == "SUB_LAYER_ARRIVAL":
+            prev = ev.extra.get("prev_sub")
+            new = ev.extra.get("new_sub")
+            jump = ev.extra.get("sub_jump")
+            return (
+                f"A SUB-BASS layer just ARRIVED — the system measured the sub band "
+                f"jump from {prev} to {new} (+{jump}) under a stable tempo. That's "
+                f"real low-end weight landing under the track. React to what that "
+                f"new sub DOES to the groove — fills it out, adds weight, makes it "
+                f"move — grounded only in that measured sub jump. If it's not worth "
+                f"a call, output a single space to stay silent."
+            )
+        if t == "KICK_DENSITY_SHIFT":
+            prev = ev.extra.get("prev_density")
+            new = ev.extra.get("new_density")
+            delta = ev.extra.get("delta")
+            direction = "denser" if isinstance(delta, (int, float)) and delta > 0 else "sparser"
+            return (
+                f"The KICK PATTERN density just changed — the system measured it "
+                f"move from {prev} to {new} ({delta:+}), the pattern got {direction}. "
+                f"React to what that does to the drive — busier, more rolling, "
+                f"stripped-back, more space — grounded only in that measured density "
+                f"shift. If it's not worth a call, output a single space to stay "
+                f"silent."
+            ) if isinstance(delta, (int, float)) else (
+                f"The KICK PATTERN density just changed — the system measured it "
+                f"move from {prev} to {new}. React to what that does to the drive, "
+                f"grounded only in that measured shift. If it's not worth a call, "
+                f"output a single space to stay silent."
+            )
+        if t == "DISTORTION_CLIMB":
+            db = ev.extra.get("distortion_db")
+            pos = ev.extra.get("chain_position")
+            return (
+                f"SATURATION is CLIMBING — the system measured distortion rising to "
+                f"{db} dB (step {pos} in this session's climb). The track is getting "
+                f"dirtier, more driven. React to how that grit/saturation FEELS as it "
+                f"builds — grounded only in that measured distortion climb. If it's "
+                f"not worth a call, output a single space to stay silent."
+            )
+        if t == "BREAKDOWN_KICK_KILL":
+            drop = ev.extra.get("sub_drop")
+            new = ev.extra.get("new_sub")
+            return (
+                f"The KICK and SUB just DROPPED OUT — a breakdown — the system "
+                f"measured the sub fall by {drop} (down to {new}) while the track is "
+                f"still playing. The floor just opened up. React to that breakdown "
+                f"moment — the tension, the suspended feel, what's left without the "
+                f"low-end — grounded only in that measured drop. If it's not worth a "
+                f"call, output a single space to stay silent."
+            )
+        if t == "REENTRY_KICK_LAND":
+            age = ev.extra.get("kill_age_s")
+            sub = ev.extra.get("sub_at_reentry")
+            return (
+                f"The KICK just LANDED BACK IN after a breakdown — the system "
+                f"measured it return {age}s after the kill, on the downbeat, with the "
+                f"sub back at {sub}. That's the drop hitting after the tension. React "
+                f"to that re-entry moment — the release, the punch coming back — "
+                f"grounded only in that measured landing. If it's not worth a call, "
+                f"output a single space to stay silent."
+            )
+        if t == "PHRASE_BOUNDARY":
+            bars = ev.extra.get("phrase_length_bars")
+            bpm = ev.extra.get("bpm")
+            return (
+                f"A PHRASE just CLOSED on the downbeat — the system measured a "
+                f"{bars}-bar phrase boundary at {bpm} BPM. That's a natural switch "
+                f"point — the spot where a section turns over. React to where the "
+                f"track sits at this turn, or flag it as a mix/transition window if "
+                f"that's what it is — grounded only in that measured phrase "
+                f"boundary. If there's nothing worth saying, output a single space "
+                f"to stay silent."
+            )
         return "React naturally."
 
     @staticmethod

@@ -444,6 +444,15 @@ class EventDetector:
         for det in self.router.active_chain():
             ev = det.detect(state, self.audio_buf, now)
             if ev is not None:
+                # WIRE #2 — register the genre-chain event in the EvidenceRegistry
+                # (and bump cooldown bookkeeping) exactly like every baseline
+                # event does. Before this the chain returned the Event WITHOUT
+                # _fire, so the deepest perception in the system produced no
+                # [ev:<TYPE>] observation. The detectors self-gate via their own
+                # last_event_at, so _fire here only records timestamps + a
+                # best-effort registry write — it does not re-arm their internal
+                # cooldowns.
+                self._fire(ev.type, now, state)
                 return ev
 
         # 6) Heartbeat — long silence in conversation while music is going
