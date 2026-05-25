@@ -55,6 +55,26 @@ class MusicState:
     detected_genre: str = "unknown"
     genre_confidence: float = 0.0
 
+    # Phase 78 (PERCEIVE-01/02) — Δ-deltas + multi-scale trajectory. SINGLE-WRITER
+    # (_tick_once only). Both make the EAR speak in CHANGE, not snapshots.
+    #
+    # `prev_perceive` is the PRIOR tick's scalar snapshot (rms / sub-low-mid-high
+    # band shares / onset_density / bpm / crest). Written LAST inside the lock so
+    # the NEXT tick reads a consistent prior; default {} means the first tick has
+    # no prior → coach.render_delta returns None → abstain (anti-slop).
+    #
+    # `trajectory_narrative` is ONE bounded multi-scale narrative composed each
+    # tick from the already-bounded fields (phase_history / buildup_score /
+    # recent_moves) — recomputed, never accumulated. Default "" so the gated
+    # render branch omits on the cold path.
+    #
+    # Additive falsy defaults preserve golden-equivalence: a cold MusicState
+    # renders byte-identical to the v8.0 baseline until _tick_once writes these
+    # AND coach.py's `if <field>:`-gated branches fire. Anti-slop lives at the
+    # render edge (render_delta abstains below floor; trajectory gate omits on "").
+    prev_perceive: dict = field(default_factory=dict)
+    trajectory_narrative: str = ""
+
     # Phase 59 (DECK-01) — embedded per-deck state (currently-loaded track +
     # key/BPM/energy per deck). SINGLE-WRITER (_tick_once only, DECK-04): the
     # read-only deck poller writes its OWN holder; only state_refresh_loop.

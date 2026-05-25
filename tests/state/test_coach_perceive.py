@@ -53,6 +53,47 @@ def _audible_baseline_state() -> MusicState:
     )
 
 
+# ---------- Pure render_delta unit coverage (PERCEIVE-01) ----------
+
+
+def test_render_delta_rendered_above_floor():
+    """A relative change clearing the floor renders ``<label> rose/fell N%``."""
+    from vibemix.state.deltas import render_delta
+
+    out = render_delta("kick density", 0.59, 0.50, floor=0.1)
+    assert out is not None
+    assert "kick density" in out
+    assert "rose" in out
+    out_down = render_delta("RMS", 0.04, 0.094, floor=0.1)
+    assert out_down is not None and "fell" in out_down
+
+
+def test_render_delta_abstains_cold():
+    """``prev is None`` (cold) or ``prev == 0.0`` → abstain (None)."""
+    from vibemix.state.deltas import render_delta
+
+    assert render_delta("kick", 0.59, None, floor=0.1) is None
+    assert render_delta("kick", 0.59, 0.0, floor=0.1) is None
+
+
+def test_render_delta_abstains_below_floor():
+    """A sub-floor relative change → abstain (None), never a 0% line."""
+    from vibemix.state.deltas import render_delta
+
+    assert render_delta("kick", 0.501, 0.500, floor=0.1) is None
+
+
+def test_calibrate_confidence_monotone_buckets():
+    """The calibration map is deterministic + monotone over rel-magnitude."""
+    from vibemix.state.deltas import calibrate_confidence
+
+    assert calibrate_confidence(0.50) == "strong"
+    assert calibrate_confidence(0.20) == "clear"
+    assert calibrate_confidence(0.11) == "slight"
+    # symmetric in sign
+    assert calibrate_confidence(-0.50) == "strong"
+
+
 # ---------- Cold-path byte-identity (REAL GREEN pin) ----------
 
 
