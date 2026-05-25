@@ -459,3 +459,62 @@ def test_pkg_05_runtime_package_surface():
         "watch_parent",
         "ws_broadcast",
     }
+
+
+# ---------------------------------------------------------------------------
+# IpcRouterBus — 2026-05-25 GUI-control fix. Lets the live main() path run
+# SessionLoop's request handlers over ws_broadcast's socket (no second
+# listener). Without this every ipc.settings.*/profile/recordings request
+# from the Tauri session window timed out (controls looked dead).
+# ---------------------------------------------------------------------------
+
+
+def test_ipc_router_dispatches_to_registered_handler():
+    from vibemix.runtime.ws_bus import IpcRouterBus
+
+    router = IpcRouterBus()
+    seen: list[dict] = []
+    sent: list[dict] = []
+
+    async def _settings_get(msg: dict) -> None:
+        seen.append(msg)
+        await router.emit({"type": "ipc.settings.state", "echo": msg["type"]})
+
+    router.register_handler("ipc.settings.get", _settings_get)
+
+    async def _emit(d: dict) -> None:
+        sent.append(d)
+
+    router.bind_emit(_emit)
+
+    async def go():
+        handled = await router.dispatch({"type": "ipc.settings.get", "payload": {}})
+        unknown = await router.dispatch({"type": "ipc.nope"})
+        return handled, unknown
+
+    handled, unknown = asyncio.run(go())
+    assert handled is True and unknown is False
+    assert len(seen) == 1
+    assert sent == [{"type": "ipc.settings.state", "echo": "ipc.settings.get"}]
+
+
+def test_ipc_router_handler_exception_is_swallowed():
+    """A faulting handler must not wedge the ws read loop — dispatch returns
+    True (recognized) but never raises."""
+    from vibemix.runtime.ws_bus import IpcRouterBus
+
+    router = IpcRouterBus()
+
+    async def _boom(_msg: dict) -> None:
+        raise RuntimeError("handler fault")
+
+    router.register_handler("ipc.settings.set", _boom)
+    handled = asyncio.run(router.dispatch({"type": "ipc.settings.set", "payload": {}}))
+    assert handled is True  # recognized + ran (fault swallowed, no raise)
+
+
+def test_ws_broadcast_accepts_ipc_router_param():
+    """ws_broadcast must accept the optional ipc_router kwarg (the seam main()
+    uses to wire SessionLoop's handlers onto the live socket)."""
+    sig = inspect.signature(ws_broadcast)
+    assert "ipc_router" in sig.parameters

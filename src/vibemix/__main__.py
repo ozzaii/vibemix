@@ -1186,6 +1186,47 @@ async def main() -> None:
     midi_watcher_stop = asyncio.Event()
     midi_watcher_task = midi_macos.start_port_watcher(midi_watcher_stop)
 
+    # 2026-05-25 — wire the GUI session-control IPC handlers onto the live
+    # ws_broadcast socket. Until now the Tauri renderer's ipc.settings.* /
+    # ipc.profile.* / ipc.recordings.* requests had NO responder in the live
+    # path (ws_broadcast only handled the manual-trigger action; SessionLoop,
+    # which owns these handlers, was never instantiated here) — so every
+    # persona/output control + settings page silently timed out. We run
+    # SessionLoop's tested handlers via the IpcRouterBus adapter routed through
+    # ws_broadcast's existing socket (no second listener — One Socket invariant).
+    from vibemix.runtime.session_loop import SessionLoop  # noqa: PLC0415
+    from vibemix.runtime.settings import SettingsApplier  # noqa: PLC0415
+    from vibemix.runtime.ws_bus import IpcRouterBus  # noqa: PLC0415
+
+    ipc_router: "IpcRouterBus | None" = IpcRouterBus()
+    try:
+        _settings_config = load_config()
+        _live_settings_applier = SettingsApplier(
+            config_store=_settings_config,
+            music_state=state,  # mood applies live + emits mascot.mood_change
+            ws_bus=ipc_router,  # mood-change + acks reach every connected client
+            recordings_root=recordings_root,
+        )
+        _session_ipc = SessionLoop(
+            ipc_router,
+            config_store=_settings_config,
+            settings_applier=_live_settings_applier,
+            music_state=state,
+            recordings_root=recordings_root,
+            active_recorder=recorder,
+            evidence_registry=evidence_registry,
+        )
+        # Register handlers ONLY — never call run() (ws_broadcast owns the
+        # server + the snapshot loop; SessionLoop here is a handler bag).
+        _session_ipc.register_handlers()
+        print(
+            "-> session IPC handlers wired onto mascot bus "
+            f"({len(ipc_router._handlers)} types: settings/profile/recordings)"
+        )
+    except Exception as _e:  # pragma: no cover — never block boot on this
+        ipc_router = None
+        print(f"-> session IPC handlers NOT wired: {_e!r}", file=sys.stderr)
+
     # --- Asyncio tasks (6) ---
     ws_task = asyncio.create_task(
         ws_broadcast(
@@ -1197,6 +1238,7 @@ async def main() -> None:
             controller_state=midi_macos.controller_state,
             suggestion_holder=suggestion_service,
             tracer=tracer,
+            ipc_router=ipc_router,
         )
     )
     diag_task = asyncio.create_task(diag_loop(levels, state, stop_event, tracer=tracer))

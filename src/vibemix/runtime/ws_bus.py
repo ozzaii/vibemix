@@ -226,6 +226,66 @@ def _build_session_snapshot(
     return json.loads(msg.to_json())
 
 
+class IpcRouterBus:
+    """Minimal WizardBus-shaped adapter so the LIVE ``main()`` path can run
+    ``SessionLoop``'s request handlers (ipc.settings.*, ipc.profile.*,
+    ipc.recordings.*) over the SAME socket ``ws_broadcast`` already owns.
+
+    Why this exists (2026-05-25): the Tauri GUI session window emits
+    ipc.settings.set/get + ipc.profile.view + ipc.recordings.list and waits
+    for a reply. But the live ``main()`` path serves the bus via
+    ``ws_broadcast`` (outbound mascot/snapshot broadcast + manual-trigger only)
+    and never instantiated ``SessionLoop`` — so every request silently
+    dropped and the renderer timed out (controls looked dead, settings pages
+    blank). We can't bind a second listener (One Socket invariant). This
+    adapter bridges the gap: ``SessionLoop`` registers its handlers here, and
+    ``ws_broadcast`` routes inbound ipc.* frames into ``dispatch`` + lends its
+    client set via ``bind_emit`` so handler replies reach every connected
+    surface. Reuses SessionLoop's tested handlers verbatim — no duplication.
+
+    Implements only the WizardBus surface SessionLoop touches:
+    ``register_handler`` + ``emit``. ``start``/``stop`` are no-ops (ws_broadcast
+    owns the server; we never call ``SessionLoop.run()``, only
+    ``register_handlers()``).
+    """
+
+    def __init__(self) -> None:
+        self._handlers: dict[str, Any] = {}
+        self._emit: Any | None = None
+
+    def register_handler(self, message_type: str, handler: Any) -> None:
+        self._handlers[message_type] = handler
+
+    def bind_emit(self, emit_fn: Any) -> None:
+        """ws_broadcast hands us its 'send dict to all clients' coroutine."""
+        self._emit = emit_fn
+
+    async def emit(self, msg: dict) -> None:
+        if self._emit is not None:
+            await self._emit(msg)
+
+    async def start(self) -> None:  # pragma: no cover — never called
+        return None
+
+    async def stop(self) -> None:  # pragma: no cover — never called
+        return None
+
+    async def dispatch(self, msg: dict) -> bool:
+        """Route one inbound frame to its registered handler. Returns True if
+        a handler ran (so the caller knows it was a recognized ipc request),
+        False otherwise. Never raises — a handler fault is logged + swallowed
+        so the ws read loop never wedges."""
+        mtype = msg.get("type")
+        handler = self._handlers.get(mtype) if isinstance(mtype, str) else None
+        if handler is None:
+            return False
+        try:
+            await handler(msg)
+        except Exception as e:  # pragma: no cover — defensive
+            print(f"[ipc-router] handler {mtype} failed: {e!r}", file=sys.stderr)
+        return True
+
+
 async def ws_broadcast(
     levels: Levels,
     state: MusicState,
@@ -236,6 +296,7 @@ async def ws_broadcast(
     controller_state: Any | None = None,
     suggestion_holder: Any | None = None,
     tracer: Any | None = None,
+    ipc_router: "IpcRouterBus | None" = None,
 ) -> None:
     """30Hz outbound mascot broadcast + inbound manual-trigger handler.
 
@@ -266,6 +327,25 @@ async def ws_broadcast(
         except Exception:
             pass
 
+    async def _send_all(payload: dict) -> None:
+        """Send one schema-shaped dict to every connected client (handler
+        replies — settings.state, profile/recordings results). Dead sockets
+        are dropped, mirroring the broadcast loop's send guard."""
+        msg = json.dumps(payload)
+        dead: list = []
+        for c in list(clients):
+            try:
+                await c.send(msg)
+            except Exception:
+                dead.append(c)
+        for c in dead:
+            clients.discard(c)
+
+    # Let SessionLoop's handlers (registered on ipc_router) reply over our
+    # client set — see IpcRouterBus. Bound once, before any client connects.
+    if ipc_router is not None:
+        ipc_router.bind_emit(_send_all)
+
     async def handler(ws):
         clients.add(ws)
         _tr("client_connect", clients=len(clients))
@@ -279,6 +359,12 @@ async def ws_broadcast(
                     print("\n[ws] manual trigger requested")
                     _tr("manual_trigger")
                     manual_trigger.set()
+                elif ipc_router is not None and isinstance(data.get("type"), str):
+                    # Route ipc.settings.* / ipc.profile.* / ipc.recordings.*
+                    # into SessionLoop's handlers (2026-05-25 GUI-control fix).
+                    handled = await ipc_router.dispatch(data)
+                    if handled:
+                        _tr("ipc_request", type=data.get("type"))
         except Exception:
             pass
         finally:
