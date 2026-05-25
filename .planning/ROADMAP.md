@@ -72,7 +72,12 @@
   3. The hype/critique/tutor persona is resolved from `prompts/matrix.py` by BOTH the live co-host and the library curator — `ViberAgent` stops hardcoding `_SYSTEM_INSTRUCTION` and reads a curator-context variant of the same lens (WIRE-04).
   4. `memory.db` is populated on the live `main()` path — the boot + session-close ingest sweeps fire in a real session (lifted out of the never-called `SessionLoop.run()`), so recall has fuel to retrieve (WIRE-05).
   5. The app loads `GEMINI_API_KEY` from `.env` even when a stale shell env var is present — `.env` wins (override or clear the ghost key), verified by a test that sets a decoy env var (WIRE-06).
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 77-01-PLAN.md — Wave 0: failing test scaffolds for WIRE-01/04/05/06 + WIRE-02/03 regression pins
+- [ ] 77-02-PLAN.md — Wave 1: WIRE-04 — build_curator_instruction seam; both curator backends read it
+- [ ] 77-03-PLAN.md — Wave 1: WIRE-06 — .env override=True (funded key wins over ghost shell var)
+- [ ] 77-04-PLAN.md — Wave 2: WIRE-01 (grounding→agent off-loop seam) + WIRE-05 (gated memory.db ingest on live path)
 
 ### Phase 78: PERCEIVE — Deeper, Generalized Ear
 **Goal:** Make the existing ear *speak in change, not snapshots* — the prompt evidence carries deltas + calibrated per-fact confidence (so Gemini can abstain), a multi-scale trajectory (phrase / energy-arc / recent-moves) so it reasons over time, and an embedding-driven mean-centered genre prototype lookup (86.5%-validated, €0). All additive to the single-writer `MusicState`; **NO new DSP, NO MIR libs.**
