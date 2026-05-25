@@ -48,6 +48,14 @@ log = logging.getLogger("vibemix.runtime.settings")
 # Phase 13-05 — mood enum (anti-hallucination guard for T-13-05-01).
 _VALID_MOODS: frozenset[str] = frozenset({"hype-man", "teacher", "coach"})
 
+# 2026-05-25 — skill (persona-level) enum + env-var name. Mirrors
+# ``DJCoHostAgent``'s ENV_SKILL_LEVEL / build_system_instruction skill arg
+# (vibemix.agent.dj_cohost). The name is duplicated as a plain string rather
+# than imported because dj_cohost drags the whole LiveKit/genai stack in —
+# SettingsApplier must stay import-light. Keep in sync with dj_cohost.py:106.
+_VALID_SKILLS: frozenset[str] = frozenset({"beginner", "intermediate", "pro"})
+_ENV_SKILL_LEVEL = "VIBEMIX_SKILL_LEVEL"
+
 
 # ---------------------------------------------------------------------------
 # Structural hook protocols — duck-typed; the real implementations live
@@ -176,6 +184,8 @@ class SettingsApplier:
                 return await self._apply_hotkey(value)
             if field == "mood":
                 return await self._apply_mood(value)
+            if field == "skill":
+                return await self._apply_skill(value)
             if field == "click_through":
                 return await self._apply_click_through(value)
             if field == "lighter_blur":
@@ -394,6 +404,35 @@ class SettingsApplier:
             log.warning("ws_bus.emit failed for ipc.mascot.mood_change: %r", e)
             return (False, f"emit failed: {type(e).__name__}: {e}")
 
+        return (True, None)
+
+    async def _apply_skill(self, value: Any) -> tuple[bool, str | None]:
+        """Apply a persona-level (skill) swap: validate enum → set the
+        ``VIBEMIX_SKILL_LEVEL`` env var → persist to ConfigStore.extra.
+
+        ``DJCoHostAgent`` resolves its prompt cell from this env var at
+        instantiation (``_resolve_prompt_cell`` → ``build_system_instruction``),
+        so the new level takes effect on the next agent build — the same
+        lifecycle mood rides on (Plan 13-06 agent re-instantiation). Persisting
+        to ``extra`` (not a typed top-level field) mirrors the mood path and
+        survives relaunch without a config-store schema bump.
+
+        Like mood, an invalid skill is rejected at this trust boundary with
+        ``(False, "<reason>")`` — no silent fallback that would mask a typo.
+        """
+        if not isinstance(value, str) or value not in _VALID_SKILLS:
+            return (
+                False,
+                f"skill must be one of {sorted(_VALID_SKILLS)}, got {value!r}",
+            )
+        # os imported at module top would be ideal; settings.py already uses
+        # only stdlib + config_store. Inline import keeps the top import block
+        # untouched and the dependency obvious at the one call site.
+        import os  # noqa: PLC0415
+
+        os.environ[_ENV_SKILL_LEVEL] = value
+        self.config_store.extra["skill"] = value
+        save_config(self.config_store)
         return (True, None)
 
     async def _apply_click_through(self, value: Any) -> tuple[bool, str | None]:

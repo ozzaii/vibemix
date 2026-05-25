@@ -308,6 +308,44 @@ def test_hotkey_empty_rejected(store):
 
 
 # ---------------------------------------------------------------------------
+# skill (persona level) — 2026-05-25
+# ---------------------------------------------------------------------------
+
+
+def test_skill_happy_path(store, monkeypatch):
+    """No runtime hook — persists to extra + sets the env var the agent's
+    prompt-cell resolver reads at its next build."""
+    monkeypatch.delenv("VIBEMIX_SKILL_LEVEL", raising=False)
+    applier = SettingsApplier(config_store=store)
+    success, error = _apply(applier, "skill", "pro")
+    assert (success, error) == (True, None)
+    assert store.extra["skill"] == "pro"
+    import os
+
+    assert os.environ["VIBEMIX_SKILL_LEVEL"] == "pro"
+
+
+def test_skill_invalid_value_rejected(store, monkeypatch):
+    monkeypatch.delenv("VIBEMIX_SKILL_LEVEL", raising=False)
+    applier = SettingsApplier(config_store=store)
+    success, error = _apply(applier, "skill", "expert")
+    assert success is False
+    assert "skill" in error
+    assert "skill" not in store.extra
+    import os
+
+    # Rejected at the trust boundary — env var untouched.
+    assert "VIBEMIX_SKILL_LEVEL" not in os.environ
+
+
+def test_skill_non_string_rejected(store):
+    applier = SettingsApplier(config_store=store)
+    success, error = _apply(applier, "skill", 3)
+    assert success is False
+    assert "skill" not in store.extra
+
+
+# ---------------------------------------------------------------------------
 # Unknown field
 # ---------------------------------------------------------------------------
 

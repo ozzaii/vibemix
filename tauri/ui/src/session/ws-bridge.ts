@@ -165,6 +165,7 @@ const SETTINGS_FIELDS = [
   "mood",            // Plan 13-05
   "click_through",   // Plan 13-05
   "lighter_blur",    // Plan 14-04
+  "skill",           // 2026-05-25 — persona-level (beginner/intermediate/pro)
 ] as const;
 export type SettingsField = (typeof SETTINGS_FIELDS)[number];
 

@@ -335,6 +335,7 @@ class SettingsSetPayload:
         "mood",
         "click_through",
         "lighter_blur",
+        "skill",
     ]
     value: str | int | bool | None
 
@@ -363,6 +364,9 @@ class SettingsStatePayload:
     # via _strip_none_optionals — see SettingsState.make).
     mood: Literal["hype-man", "teacher", "coach"] | None = None
     click_through: bool | None = None
+    # 2026-05-25 — optional persona level so the skill field round-trips
+    # through a SettingsState snapshot (same None-strip contract as mood).
+    skill: Literal["beginner", "intermediate", "pro"] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -922,6 +926,7 @@ class SettingsState:
         # don't (tests, boot smoke) leave defaulted-None.
         mood: Literal["hype-man", "teacher", "coach"] | None = None,
         click_through: bool | None = None,
+        skill: Literal["beginner", "intermediate", "pro"] | None = None,
     ) -> SettingsState:
         return cls(
             type="ipc.settings.state",
@@ -938,6 +943,7 @@ class SettingsState:
                 lighter_blur=lighter_blur,
                 mood=mood,
                 click_through=click_through,
+                skill=skill,
             ),
         )
 

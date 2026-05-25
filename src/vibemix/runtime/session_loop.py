@@ -50,7 +50,7 @@ import time
 from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 
 import jsonschema
 
@@ -1176,6 +1176,16 @@ class SessionLoop:
         click_through: bool | None = (
             click_through_raw if isinstance(click_through_raw, bool) else None
         )
+        # 2026-05-25 — round-trip the persona level too so the deck skill
+        # rocker re-syncs to the persisted value on every state snapshot.
+        # _apply_skill persists it to ConfigStore.extra (same path as mood/
+        # click_through); validate the enum here before it hits the wire.
+        skill_raw = self.config_store.extra.get("skill")
+        skill: str | None = (
+            skill_raw
+            if skill_raw in ("beginner", "intermediate", "pro")
+            else None
+        )
         state = SettingsState.make(
             voice=self.config_store.voice,
             mode=self.config_store.mode,  # type: ignore[arg-type]
@@ -1188,6 +1198,7 @@ class SessionLoop:
             lighter_blur=self.config_store.lighter_blur,
             mood=mood,  # type: ignore[arg-type]
             click_through=click_through,
+            skill=skill,  # type: ignore[arg-type]
         )
         await self.bus.emit(json.loads(state.to_json()))
 

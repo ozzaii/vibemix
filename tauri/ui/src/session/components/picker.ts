@@ -273,7 +273,10 @@ const CSS = `
     height: 4px;
     border-radius: 50%;
     background: var(--amber);
-    box-shadow: var(--glow-faint);
+    /* Active/selected row carries the DEEPER glow (the comment above + the
+     * 20/80 active-state rule: the one selected option is where the eye lands).
+     * Inactive :hover keeps --glow-faint; the selected dot gets --glow-soft. */
+    box-shadow: var(--glow-soft);
     flex-shrink: 0;
     margin-right: 2px;
   }
@@ -361,11 +364,34 @@ export function renderPicker(props: PickerProps): HTMLElement {
         label: opt.label,
       });
       closeList();
+      // Optimistic select — the picker analog of rocker.setRockerActive.
+      // Without this the row label stayed frozen until the sidecar
+      // round-tripped ipc.settings.state; in dev (no live session) that
+      // echo never arrives, so every dropdown read as dead even though
+      // onChange fired. Flip the displayed value + selected marks the
+      // instant a choice is made; the round-trip (when it comes) re-renders
+      // the panel with the authoritative value and self-corrects any drift.
+      selectOption(opt.label);
       props.onChange?.(opt.id);
     });
     list.append(btn);
   }
   root.append(list);
+
+  // Optimistic select: update the row label + the option selected-marks to
+  // reflect a freshly chosen value without waiting for a backend re-render.
+  // Matches the displayed value by option LABEL (the row shows labels, and
+  // option labels are unique within a picker). Exposed so callers can also
+  // drive it from an authoritative ipc.settings.state echo if they want.
+  function selectOption(label: string): void {
+    lbl.textContent = label;
+    list.querySelectorAll<HTMLElement>(".vmx-picker__opt").forEach((o) => {
+      const t = o.querySelector("span")?.textContent ?? "";
+      const sel = t === label;
+      o.dataset.selected = sel ? "true" : "false";
+      o.setAttribute("aria-selected", sel ? "true" : "false");
+    });
+  }
 
   // The dropdown is `position: fixed`, so its coordinates are viewport-
   // relative and must be recomputed from the row's live bounding rect each

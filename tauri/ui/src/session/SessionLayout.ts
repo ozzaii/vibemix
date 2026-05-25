@@ -509,6 +509,23 @@ function deckMoodToWire(id: string): "hype-man" | "teacher" | "coach" {
   }
 }
 
+/** Map the deck skill rocker's UPPERCASE vocabulary (BEG / INT / PRO) onto
+ *  the wire-level skill enum the sidecar persists + feeds to
+ *  prompts.matrix.build_system_instruction ("beginner" | "intermediate" |
+ *  "pro"). Defaults to "intermediate" (the v4-tuned, load-bearing cell)
+ *  for any unknown id. */
+function deckSkillToWire(id: string): "beginner" | "intermediate" | "pro" {
+  switch (id) {
+    case "BEG":
+      return "beginner";
+    case "PRO":
+      return "pro";
+    case "INT":
+    default:
+      return "intermediate";
+  }
+}
+
 /** Map the active mood to a 1-line DJ-vocabulary caption.
  *  Round 3 critique lift (H6): users shouldn't have to remember what
  *  HYPE / TEACH / COACH each do. The caption renders under the rocker
@@ -559,18 +576,33 @@ function buildPersonaPanelBody(state: SessionState): HTMLElement {
   wrap.className = "vmx-session__persona-body";
   wrap.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-md);";
 
-  wrap.append(
-    renderRocker({
-      ariaLabel: "skill mode",
-      options: [
-        { id: "BEG", label: "BEG" },
-        { id: "INT", label: "INT" },
-        { id: "PRO", label: "PRO" },
-      ],
-      active: state.persona.skill,
-      variant: "rocker",
-    }),
-  );
+  // Bug (2026-05-25) — the skill rocker shipped as a static read-only
+  // mirror with NO onChange (Wave 3 "12-04 will wire it" never landed) AND
+  // no backend field existed, so BEG/INT/PRO was fully dead end-to-end.
+  // Wire it like the mood rocker: optimistic flip + the canonical skill
+  // write. Sidecar round-trips ipc.settings.state and re-syncs. The deck
+  // vocabulary (BEG/INT/PRO) maps to the wire enum (beginner/…/pro) that
+  // prompts.matrix.build_system_instruction consumes.
+  const skillRocker = renderRocker({
+    ariaLabel: "skill mode",
+    options: [
+      { id: "BEG", label: "BEG" },
+      { id: "INT", label: "INT" },
+      { id: "PRO", label: "PRO" },
+    ],
+    active: state.persona.skill,
+    variant: "rocker",
+    onChange: (id) => {
+      setRockerActive(skillRocker, id);
+      void sendSettings("skill", deckSkillToWire(id)).catch(
+        (err: unknown) => {
+          // eslint-disable-next-line no-console
+          console.warn("[session-layout] skill set failed:", err);
+        },
+      );
+    },
+  });
+  wrap.append(skillRocker);
 
   const moodRocker = renderRocker({
     ariaLabel: "mood",

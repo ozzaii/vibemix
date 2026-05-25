@@ -1257,7 +1257,8 @@
                 "push_to_mute_hotkey",
                 "mood",
                 "click_through",
-                "lighter_blur"
+                "lighter_blur",
+                "skill"
               ]
             },
             "value": {
@@ -1397,6 +1398,22 @@
               "type": [
                 "boolean",
                 "null"
+              ]
+            },
+            "skill": {
+              "$comment": "2026-05-25 \u2014 optional persona level (beginner/intermediate/pro). Null means the field is absent from ConfigStore.extra (pre-skill-wiring disk state). enum mirrors prompts.matrix.build_system_instruction skill arg + the deckSkillToWire map in SessionLayout.ts.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "beginner",
+                    "intermediate",
+                    "pro"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
               ]
             }
           }

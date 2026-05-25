@@ -288,7 +288,8 @@ export interface SettingsSet {
       | "push_to_mute_hotkey"
       | "mood"
       | "click_through"
-      | "lighter_blur";
+      | "lighter_blur"
+      | "skill";
     value: string | number | boolean | null;
   };
 }
@@ -312,6 +313,7 @@ export interface SettingsState {
     lighter_blur: boolean;
     mood?: ("hype-man" | "teacher" | "coach") | null;
     click_through?: boolean | null;
+    skill?: ("beginner" | "intermediate" | "pro") | null;
   };
 }
 export interface StatusRecheck {
