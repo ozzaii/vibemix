@@ -183,6 +183,51 @@ def _compute_buildup_score(curve: list, window_s: float, hop_s: float = 1.0) -> 
         return 1.0
     return score
 
+
+def _compose_trajectory(
+    phase_history: list, buildup_score: float, recent_moves: list
+) -> str:
+    """PERCEIVE-02: compose ONE bounded multi-scale trajectory narrative from
+    the already-bounded MusicState fields. PURE — no state write, no I/O; called
+    from the single-writer ``_tick_once``.
+
+    Three scales joined into one compact string (e.g.
+    ``"build→drop→groove; building; last move: bass-swap 20s ago"``):
+      - **phrase** — last-3 phase chain from ``phase_history`` (capped 6 upstream).
+      - **energy-arc** — ``buildup_score`` → "building" (>= 0.5) / "settled".
+      - **moves** — newest ``recent_moves`` entry + its age in seconds.
+
+    Bounded: inputs are themselves capped (phase_history ≤ 6 → last 3 here;
+    one move; one arc label), so the output length cannot grow across ticks. A
+    fully-cold state (no phases, no moves, buildup 0) → "" so the coach gate omits
+    (cold-path byte-identity).
+    """
+    parts: list[str] = []
+
+    # Phrase scale — last-3 phase chain (mirror coach's phase_history render).
+    if phase_history:
+        chain: list[str] = []
+        for i, (_, fr, to) in enumerate(phase_history[-3:]):
+            if i == 0:
+                chain.append(str(fr))
+            chain.append(str(to))
+        if chain:
+            parts.append("→".join(chain))
+
+    # Energy-arc scale — only assert a label when there is a phrase or a move to
+    # anchor it (a bare "settled" on a cold state would break byte-identity).
+    if parts or recent_moves:
+        parts.append("building" if buildup_score >= 0.5 else "settled")
+
+    # Moves scale — newest move + its age (recent_moves is a (age, label) list,
+    # smallest age = newest; mirror coach's recent_moves[8s] sort).
+    if recent_moves:
+        age, label = min(recent_moves, key=lambda m: m[0])
+        parts.append(f"last move: {label} {age:.0f}s ago")
+
+    return "; ".join(parts)
+
+
 if TYPE_CHECKING:
     from vibemix.platform._midi_macos import ControllerState
     from vibemix.platform._track_macos import TrackInfo
@@ -507,6 +552,19 @@ def _tick_once(
         # 16k ring buffer, ~1ms)
         state.long_arc = long_arc_curve(audio_buf, seconds=120.0, hop=10.0)
 
+        # Phase 78 (PERCEIVE-02) — multi-scale trajectory narrative. Composed
+        # HERE (after phase_history / recent_moves / long_arc are written this
+        # tick) from the ALREADY-bounded fields so it reads consistent values:
+        #   - phrase scale: last-3 phase chain from phase_history (capped 6)
+        #   - energy-arc scale: buildup_score → "building" / "settled" label
+        #   - moves scale: newest recent_moves entry + its age
+        # Recomputed each tick from bounded inputs — NEVER accumulated, so the
+        # string length is bounded (no unbounded growth). Falsy "" on a cold
+        # state → coach's gated branch omits → byte-identity holds.
+        state.trajectory_narrative = _compose_trajectory(
+            state.phase_history, state.buildup_score, state.recent_moves
+        )
+
         # Phase 18 Plan 02 — aud-source per-tick writes, GATED on state.audible.
         # Silent ticks do NOT register aud observations — closes the
         # "Gemini cites aud:rms@45.2 at a silent moment" hallucination class.
@@ -525,6 +583,22 @@ def _tick_once(
                 evidence_registry.write("aud", "high_share", t_session)
             except Exception:
                 pass
+
+        # Phase 78 (PERCEIVE-01) — prior-tick scalar snapshot. Captured as the
+        # LAST write inside the lock so the NEXT tick diffs current-vs-this and
+        # the prior it reads is consistent with this tick's committed scalars.
+        # SINGLE-WRITER: this is the ONLY assignment of state.prev_perceive.
+        # Default {} (no prior) makes the first tick abstain in coach.render_delta.
+        state.prev_perceive = {
+            "rms": state.rms,
+            "sub": state.bands.get("sub", 0.0),
+            "low": state.bands.get("low", 0.0),
+            "mid": state.bands.get("mid", 0.0),
+            "high": state.bands.get("high", 0.0),
+            "onset_density": state.onset_density,
+            "bpm": state.bpm,
+            "crest": state.crest_factor,
+        }
 
     return last_audible_high, last_audible_low, bpm_cache, last_bpm_at
 

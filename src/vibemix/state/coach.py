@@ -29,6 +29,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+from vibemix.state.deltas import DELTA_FLOOR, render_delta
 from vibemix.state.event import Event
 from vibemix.state.music_state import MusicState
 
@@ -287,6 +288,28 @@ class AICoach:
                 f"hearing[rms={state.rms:.3f} sub={b['sub']:.2f} low={b['low']:.2f} "
                 f"mid={b['mid']:.2f} high={b['high']:.2f} bpm={state.bpm:.0f}]"
             )
+            # Phase 78 (PERCEIVE-01) — Δ-phrasing for the scalars that moved
+            # since the prior tick. ADDITIVE + gated exactly like the decks[…] /
+            # recent_moves[8s] blocks: when `prev_perceive` is the falsy default
+            # ({}) the loop produces ZERO appends and the v8.0 cold-path golden
+            # stays byte-identical. The RAW scalars above are NOT removed (CONTEXT
+            # contract — the Δ-line is alongside, not instead). render_delta
+            # abstains (returns None) on cold prior OR a sub-floor move, so a fact
+            # that didn't meaningfully move is never asserted as a 0% delta
+            # (anti-slop invariant #2/#3).
+            prev = state.prev_perceive
+            if prev:
+                deltas = []
+                for label, cur, key in (
+                    ("kick density", b["sub"], "sub"),
+                    ("RMS", state.rms, "rms"),
+                    ("onset density", state.onset_density, "onset_density"),
+                ):
+                    phr = render_delta(label, cur, prev.get(key), floor=DELTA_FLOOR)
+                    if phr is not None:
+                        deltas.append(phr)
+                if deltas:
+                    e.append("Δ[" + "; ".join(deltas) + "]")
         else:
             e.append("hearing[silent]")
 
@@ -351,6 +374,15 @@ class AICoach:
             e.append(f"recent_moves[8s]: {mv}")
         else:
             e.append("recent_moves[8s]: NONE")
+
+        # Phase 78 (PERCEIVE-02) — multi-scale trajectory narrative. ADDITIVE +
+        # gated exactly like the decks[…] / recent_moves blocks: a falsy ""
+        # (cold MusicState, no phases/moves) appends ZERO bytes → the v8.0
+        # byte-identity golden holds. _tick_once recomputes this each tick from
+        # the already-bounded fields. NOT added to _evidence_line_compact — like
+        # decks[…], the trajectory is substantive full-payload, off the diet path.
+        if state.trajectory_narrative:
+            e.append(f"trajectory[{state.trajectory_narrative}]")
 
         # Set-arc — coarse 2-minute energy shape so the AI can see set context
         if state.long_arc and len(state.long_arc) >= 2:

@@ -73,7 +73,6 @@ def _tick(state: MusicState, *, now: float = 1000.0) -> None:
 # ---------- PERCEIVE-01 — prev-snapshot single-writer ----------
 
 
-@pytest.mark.xfail(strict=True, reason="PERCEIVE-01 — flips when Plan 02 lands")
 def test_prev_snapshot_written_in_lock():
     """After a ``_tick_once``, ``state.prev_perceive`` holds the just-written
     scalar set (rms/bands/onset_density/bpm/crest) — captured LAST inside the
@@ -95,7 +94,6 @@ def test_prev_snapshot_written_in_lock():
 # ---------- PERCEIVE-02 — trajectory compose, bounded ----------
 
 
-@pytest.mark.xfail(strict=True, reason="PERCEIVE-02 — flips when Plan 02 lands")
 def test_trajectory_composed_bounded():
     """On a state with non-empty phase_history / recent_moves / buildup_score,
     ``_tick_once`` composes ``state.trajectory_narrative`` as a non-empty BOUNDED

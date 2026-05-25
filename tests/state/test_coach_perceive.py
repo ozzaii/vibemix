@@ -148,7 +148,6 @@ def test_empty_trajectory_omitted(mocker):
 # ---------- PERCEIVE-01/02 render scaffolds (xfail-strict) ----------
 
 
-@pytest.mark.xfail(strict=True, reason="PERCEIVE-01/02 — flips when Plan 02 lands")
 def test_delta_rendered_when_change_significant(mocker):
     """A state whose ``prev_perceive`` holds prior scalars + a current change
     above the floor renders DELTA phrasing in place of the bare scalar.
@@ -177,7 +176,6 @@ def test_delta_rendered_when_change_significant(mocker):
     assert ("rose" in out) or ("fell" in out) or ("Δ" in out) or ("%" in out)
 
 
-@pytest.mark.xfail(strict=True, reason="PERCEIVE-01/02 — flips when Plan 02 lands")
 def test_delta_abstains_below_floor(mocker):
     """Prior present but the change is BELOW the floor → abstain (omit), never a
     ``0%``/``Δ0`` delta line. Anti-slop contract (invariant #2/#3): a fact that
@@ -210,7 +208,6 @@ def test_delta_abstains_below_floor(mocker):
     assert "fell 0" not in out
 
 
-@pytest.mark.xfail(strict=True, reason="PERCEIVE-02 — flips when Plan 02 lands")
 def test_trajectory_rendered_when_warm(mocker):
     """A warm ``trajectory_narrative`` renders a gated ``trajectory[…]`` token.
 
