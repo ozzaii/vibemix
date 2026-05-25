@@ -70,7 +70,17 @@ class SqliteVecMemoryStore:
     def __init__(self, db_path: Path) -> None:
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(str(self._db_path))
+        # check_same_thread=False: the recall path (MemoryRecall.on_event) and
+        # the post-session ingest run OFF the asyncio loop in
+        # ``loop.run_in_executor`` worker threads (dj_cohost.py:_maybe_dispatch_
+        # recall), while this connection is opened on the constructing thread.
+        # Both touch ``self.db`` (vec_memory load_all/add/delete) and the shared
+        # ``moments`` table from a DIFFERENT thread than the one that opened it.
+        # Access is SERIALIZED by the caller (one recall dispatch at a time,
+        # gated by the per-generation token + the single in-flight reaction), so
+        # the connection is never used concurrently — only cross-thread. Mirrors
+        # library/index_sqlite_vec.py:51 (the identical Viber-agent rationale).
+        self.db = sqlite3.connect(str(self._db_path), check_same_thread=False)
         # Guard all post-connect work: on a host with no sqlite-vec extension
         # wheel (Win ARM64, Assumption A2 — the EXPECTED fallback path), the
         # ``sqlite_vec.load`` below re-raises so ``open_memory_store`` can fall

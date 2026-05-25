@@ -239,7 +239,15 @@ class MemoryStore:
         else:
             moments_path = self._db_path.parent / "memory_moments.db"
             moments_path.parent.mkdir(parents=True, exist_ok=True)
-            self._moments = sqlite3.connect(str(moments_path))
+            # check_same_thread=False: the numpy-path moments connection is read
+            # cross-thread for the same reason the sqlite-vec path is — the
+            # recall/ingest paths run in run_in_executor worker threads while the
+            # store is constructed on the loop thread. Serialized by the caller
+            # (one recall dispatch / one ingest at a time), so cross-thread but
+            # never concurrent. Mirrors SqliteVecMemoryStore.db + library store.
+            self._moments = sqlite3.connect(
+                str(moments_path), check_same_thread=False
+            )
             self._owns_moments = True
             self._ensure_moments_schema()
 

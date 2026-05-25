@@ -36,6 +36,14 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 MEM = REPO / "src" / "vibemix" / "memory"
 
+# The runtime leak that once forced these gates to xfail (eager
+# ``library/__init__`` -> ``library.toolset`` -> ``from vibemix.state import
+# harmonics`` -> ``state/__init__`` eagerly importing ``state.coach`` +
+# ``state.refresh``) is FIXED: ``state/__init__`` now lazy-loads ``AICoach`` +
+# ``state_refresh_loop`` via PEP 562 ``__getattr__``, so importing a pure state
+# helper no longer drags the live stack into ``sys.modules``. These gates are
+# hard passes again — do NOT re-add xfail to make a future regression "green".
+
 # The live reaction path + state surfaces memory must never import.
 FORBIDDEN_IMPORTS: tuple[str, ...] = (
     "vibemix.state.coach",

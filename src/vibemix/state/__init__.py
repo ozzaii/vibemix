@@ -25,7 +25,8 @@ Wave layout:
 
 from __future__ import annotations
 
-from vibemix.state.coach import AICoach
+from typing import TYPE_CHECKING
+
 from vibemix.state.event import Event
 from vibemix.state.event_detector import EventDetector
 from vibemix.state.evidence_registry import (
@@ -50,8 +51,39 @@ from vibemix.state.genre import (
 from vibemix.state.genre_router import GenreRouter
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
-from vibemix.state.refresh import state_refresh_loop
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
+
+if TYPE_CHECKING:  # type-only; never executed at runtime → no live-path import
+    from vibemix.state.coach import AICoach
+    from vibemix.state.refresh import state_refresh_loop
+
+# PEP 562 lazy re-export. ``AICoach`` (the live AI coach) and
+# ``state_refresh_loop`` (the 10Hz single-writer loop) ARE the live-session path.
+# Eagerly importing them here meant that touching ANY pure state helper (e.g.
+# ``vibemix.state.harmonics`` via ``library.toolset``) dragged the whole live
+# stack into ``sys.modules`` — which broke the memory package's no-live-path
+# dormancy boundary (``tests/memory/test_no_live_path_import.py``). Loading them
+# on first attribute access keeps ``from vibemix.state import AICoach`` working
+# for the live agent while leaving them dormant for pure-helper importers.
+_LAZY_EXPORTS = {
+    "AICoach": ("vibemix.state.coach", "AICoach"),
+    "state_refresh_loop": ("vibemix.state.refresh", "state_refresh_loop"),
+}
+
+
+def __getattr__(name: str):  # noqa: D401 — PEP 562 module hook
+    target = _LAZY_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    import importlib
+
+    obj = getattr(importlib.import_module(target[0]), target[1])
+    globals()[name] = obj  # cache → subsequent access is a plain attribute
+    return obj
+
+
+def __dir__() -> list[str]:
+    return sorted(__all__)
 
 __all__ = [
     "AICoach",
