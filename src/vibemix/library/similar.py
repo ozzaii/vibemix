@@ -57,7 +57,10 @@ def similar_to(
 
     Empty library or unknown seed → returns ``[]``.
     """
-    tracks = list(library.tracks)
+    # RekordboxLibrary.tracks is canonically a dict {track_id: TrackEntry};
+    # tolerate a bare list too.
+    raw = library.tracks
+    tracks = list(raw.values()) if isinstance(raw, dict) else list(raw)
     if not tracks:
         return []
 

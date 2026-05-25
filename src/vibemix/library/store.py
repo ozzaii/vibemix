@@ -145,7 +145,7 @@ def open_store(prefer_sqlite_vec: bool = True) -> LibraryStore:
             backend: _Backend = SqliteVecStore()
             print(
                 f"-> library store: backend=SqliteVecStore reason=ok",
-                file=sys.stdout,
+                file=sys.stderr,
                 flush=True,
             )
             return LibraryStore(backend)
@@ -157,14 +157,14 @@ def open_store(prefer_sqlite_vec: bool = True) -> LibraryStore:
             )
             print(
                 f"-> library store: backend=NumpyStore reason=sqlite_vec_unavailable ({e})",
-                file=sys.stdout,
+                file=sys.stderr,
                 flush=True,
             )
 
     backend = NumpyStore()
     print(
         f"-> library store: backend=NumpyStore reason=preferred",
-        file=sys.stdout,
+        file=sys.stderr,
         flush=True,
     )
     return LibraryStore(backend)

@@ -96,7 +96,10 @@ def vibe_search(
 
     Empty library short-circuits — no embed call, no API spend.
     """
-    tracks = list(library.tracks)
+    # RekordboxLibrary.tracks is canonically a dict {track_id: TrackEntry}
+    # (try_load_cache stores `dict(blob.tracks)`); tolerate a bare list too.
+    raw = library.tracks
+    tracks = list(raw.values()) if isinstance(raw, dict) else list(raw)
     if not tracks:
         return [], False
 
