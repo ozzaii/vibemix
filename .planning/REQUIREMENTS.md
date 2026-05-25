@@ -14,11 +14,11 @@
 ## v8.1 Requirements
 
 ### WIRE — connect the islands
-- [ ] **WIRE-01**: The live co-host's reactions are grounded by the audio→library Grounding engine (passed into `DJCoHostAgent`), so it references what is actually playing.
+- [x] **WIRE-01**: The live co-host's reactions are grounded by the audio→library Grounding engine (passed into `DJCoHostAgent`), so it references what is actually playing.
 - [x] **WIRE-02**: The 8 genre-chain detectors surface their measured evidence to the prompt and register in the `EvidenceRegistry` (shipped `ccf4930`).
 - [x] **WIRE-03**: `detected_genre` is surfaced in the prompt evidence, confidence-gated against hallucination (shipped `a9979b8`).
 - [x] **WIRE-04**: The hype/critique/tutor persona is shared across the live co-host and the library curator — BOTH curator backends, gemini (`library/agent.py`) and codex (`library/codex_curate.py` + `library/mcp_server.py`) — which stop hardcoding their voice and read the shared lens.
-- [ ] **WIRE-05**: `memory.db` ingest runs on the live `main()` path so recall personalization works in a real session.
+- [x] **WIRE-05**: `memory.db` ingest runs on the live `main()` path so recall personalization works in a real session.
 - [x] **WIRE-06**: The app loads its API key without a stale shell env var shadowing `.env` (override the ghost key, or clear it).
 
 ### PERCEIVE — deeper, generalized ear (no new DSP, no MIR libs)
@@ -64,11 +64,11 @@ Every v8.1 REQ-ID maps to exactly one phase (6 phases, 77–82; numbering contin
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WIRE-01 | Phase 77 | Pending |
+| WIRE-01 | Phase 77 | Complete |
 | WIRE-02 | Phase 77 | ✅ Done (shipped `ccf4930`) |
 | WIRE-03 | Phase 77 | ✅ Done (shipped `a9979b8`) |
 | WIRE-04 | Phase 77 | Complete |
-| WIRE-05 | Phase 77 | Pending |
+| WIRE-05 | Phase 77 | Complete |
 | WIRE-06 | Phase 77 | Complete |
 | PERCEIVE-01 | Phase 78 | Pending |
 | PERCEIVE-02 | Phase 78 | Pending |

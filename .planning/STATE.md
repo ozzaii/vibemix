@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v8.1
 milestone_name: One Mind
-status: executing
-last_updated: "2026-05-25T22:04:48.488Z"
+status: verifying
+last_updated: "2026-05-25T22:16:09.178Z"
 last_activity: 2026-05-25
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 0
+  completed_plans: 4
+  percent: 17
 ---
 
 # vibemix — State
 
-**Last updated:** 2026-05-26 — **P77 WIRE-06 shipped** (Plan 77-03, commit `b6040e2`): `.env` now wins over a ghost shell `GEMINI_API_KEY` (`override=True`); full suite 4446/0. Plans 01–03 of 4 complete; only Plan 77-04 (WIRE-01 grounding→agent + WIRE-05 memory ingest) remains in Phase 77.
+**Last updated:** 2026-05-26 — **Phase 77 (WIRE) COMPLETE.** P77 WIRE-01 + WIRE-05 shipped (Plan 77-04, commits `e020a91` + `5ac3a9d`): the live co-host now grounds reactions on what's playing (Grounding wired into `DJCoHostAgent` via the Phase-65 4-point off-loop seam; `[track:<id>]` resolves against `register_library`; cold path byte-identical), and `memory.db` fills on the live `main()` path via gated `_fire_ingest` boot+close (no double retention). Full suite **4451/0** (no API key). All 4 plans of Phase 77 complete (WIRE-01..06 landed) → ready for verification.
 
 ---
 
@@ -37,10 +37,19 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 
 ## Current Position
 
-Phase: 77 (WIRE — Connect the Islands) — EXECUTING
-Plan: 4 of 4 (Plans 01–03 complete)
-Status: Ready to execute
+Phase: 77 (WIRE — Connect the Islands) — COMPLETE (ready for verification)
+Plan: 4 of 4 (all plans complete)
+Status: Phase complete — ready for verification
 Last activity: 2026-05-26
+
+### Plan 77-04 — WIRE-01 grounding→agent + WIRE-05 live-path memory ingest (complete 2026-05-26)
+
+- **WIRE-01** — `DJCoHostAgent` gains the grounding 4-point seam mirroring the Phase-65 MemoryRecall pre-dispatch: (1) `grounding: "Grounding | None" = None` kwarg + `self._grounding`/`self._grounding_task`; (2) `_maybe_dispatch_grounding(ev)` (called from `set_next_event`) dispatches `Grounding.on_event` OFF the loop (`run_in_executor` + `wait_for(RECALL_DEADLINE_S)`, cancel/replace, clear-on-timeout) on `TRACK_AWARE_EVENTS`, reusing the `self._clean_audio_buf` WAV snapshot (no second capture); (3) `llm_node` pulls `get_latest_citation()` and injects `[track:{id}]` (resolves via the `register_library`-seeded ids — invariant #2, NO linter change); (4) turn-end `clear()`. Read-only — never writes MusicState (invariant #1). Cold path (`grounding=None`) byte-identical — `test_dj_cohost.py` golden green unchanged.
+- **WIRE-01 wiring** — `attach_grounding()` setter (chosen over build-reorder because grounding's build depends on `deck_library`, resolved after the agent build); `main()` constructs the agent then calls `agent.attach_grounding(grounding)`.
+- **WIRE-05** — `main()` fires `_session_ipc._fire_ingest("boot")` at boot + `await _session_ipc._fire_ingest("close", session_dir=recorder.session_dir)` in the async `finally` (after `recorder.close()`), both gated on `recall_enabled` (default OFF → additive no-op) + guarded `_session_ipc is not None`. `_fire_ingest` ONLY — NOT the combined sweep methods → no double retention (main() already runs boot+close retention sweeps).
+- Flipped all 5 Wave-0 xfail-strict scaffolds (3 WIRE-01 + 2 WIRE-05) to real passes. **Deviation (Rule 3):** reworded two comments that literally contained `run_boot_sweeps(`/`on_session_close(` (tripped the anti-double-retention source-text grep) — calls were always correct, only prose changed.
+- Honest green: no `genai.Client`, no `GEMINI_API_KEY`. Full suite **4451 passed / 0 failed / 1 xfailed (pre-existing budget gate) / 4 xpassed (pre-existing live-hardware)** (244s). Commits `e020a91` (Task 1), `5ac3a9d` (Task 2).
+- **KAAN-ACTION (live e2e, soft):** play a known track → confirm real `[track:<id>]` in a reaction; with `VIBEMIX_RECALL_ENABLED=1` confirm `memory.db` fills. Unit-fakeable here; real-audio/real-store confirmation rides Kaan's machine.
 
 ### Plan 77-03 — WIRE-06 env-key override (complete 2026-05-26)
 
