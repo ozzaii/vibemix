@@ -15,7 +15,7 @@ progress:
 
 # vibemix — State
 
-**Last updated:** 2026-05-26 — **Phase 78 (PERCEIVE) Plan 01 COMPLETE.** Wave-0 RED scaffolds for all three PERCEIVE requirements + the genre-reconciliation gate are in place as `xfail(strict=True)`, plus a REAL-GREEN cold-path byte-identity pin capturing the v8.0 baseline implementation must preserve (commits `82a6452` + `a08a074`). 3 new test files (`test_coach_perceive.py`, `test_refresh_perceive.py`, `test_genre_prototypes.py`) + shared synthetic fixtures in `tests/state/conftest.py`. No `src/` change. Full suite **4456 passed / 0 failed / 10 xfailed (1 pre-existing budget + 9 new) / 4 xpassed (live-hardware)** — honest green, no API key. Real `~/.cache/vibemix/library.pkl` mtime verified unchanged (T-78-01-01). **Phase 77 (WIRE) shipped prior** — all 6 WIRE reqs landed.
+**Last updated:** 2026-05-26 — **Phase 78 (PERCEIVE) Plan 02 COMPLETE — PERCEIVE-01 + PERCEIVE-02 SHIPPED.** The EAR now speaks in CHANGE: two additive single-writer `MusicState` fields (`prev_perceive`, `trajectory_narrative`) + a new pure `state/deltas.py` (`render_delta` abstains below the 10% floor / on cold prior; `calibrate_confidence` bucket map) feed gated `Δ[kick density rose 18% (clear)]` + `trajectory[build→drop→groove; building; last move: bass-swap 20s ago]` render branches in `coach.evidence_line` (commits `24e8dcb` + `826c6a4`). Single-writer captures live inside `_tick_once`'s lock batch (grep gate empty); cold path stays byte-identical to v8.0. The 5 PERCEIVE-01/02 xfail scaffolds flipped to real green; the 4 PERCEIVE-03 stay xfail (Plans 03/04). Full suite **4465 passed / 26 skipped / 5 xfailed (1 pre-existing budget + 4 PERCEIVE-03) / 4 xpassed (live-hardware)** — honest green, no API key. **Phase 78 → 2/4. Plan 01 (Wave-0 RED scaffolds + byte-identity pin) shipped prior** (`82a6452` + `a08a074`); **Phase 77 (WIRE) all 6 reqs landed.**
 
 ---
 
@@ -38,9 +38,19 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 ## Current Position
 
 Phase: 78 (PERCEIVE — Deeper, Generalized Ear) — EXECUTING
-Plan: 2 of 4
-Status: Plan 01 (Wave-0 RED scaffolds) complete; Plan 02 (deltas + trajectory impl) next
+Plan: 3 of 4
+Status: Plans 01 (scaffolds) + 02 (deltas + trajectory) complete; Plan 03 (genre prototypes) next
 Last activity: 2026-05-26
+
+### Plan 78-02 — PERCEIVE-01 deltas + calibrated confidence & PERCEIVE-02 multi-scale trajectory (complete 2026-05-26)
+
+- **PERCEIVE-01 + PERCEIVE-02 SHIPPED.** The EAR speaks in CHANGE: two additive single-writer `MusicState` fields (`prev_perceive: dict = {}`, `trajectory_narrative: str = ""`) + a new pure `state/deltas.py`.
+- **`deltas.py` (pure, analog `genre_autodetect.py`):** `render_delta(label, cur, prev, *, floor, fmt)` returns Δ-phrasing (`"kick density rose 18% (clear)"`) above the 10% relative floor; returns `None` (abstain) on cold prior / zero baseline / sub-floor move — anti-slop invariant #2/#3 (never a 0% line). `calibrate_confidence` = deterministic strong/clear/slight bucket map. No state write, no library, no API.
+- **`refresh._tick_once` single-writer (invariant #1):** `_compose_trajectory` joins phrase chain (last-3 `phase_history`) + energy-arc (`buildup_score`→building/settled) + newest `recent_moves`+age into ONE bounded string, recomputed each tick (no new buffers, no accumulation), written after the phase_history/recent_moves/long_arc writes. `prev_perceive` captured as the LAST write before lock release so the NEXT tick diffs a consistent prior. Grep gate (`state.prev_perceive=`/`state.trajectory_narrative=` outside refresh.py) returns EMPTY.
+- **`coach.evidence_line` gated render:** `Δ[...]` branch (only when `prev_perceive` non-empty + a scalar over sub/rms/onset clears the floor) + `trajectory[...]` branch (only when non-empty). Both `if <field>:`-guarded; raw `hearing[...]` scalars retained; diet/compact path untouched → cold path byte-identical to v8.0.
+- Flipped 5 PERCEIVE-01/02 xfail scaffolds → real green; 4 PERCEIVE-03 stay xfail (Plans 03/04). Added 4 focused `render_delta`/`calibrate_confidence` unit tests.
+- Honest green: no `genai.Client`, no `GEMINI_API_KEY`. Full suite **4465 passed / 26 skipped / 5 xfailed (1 budget + 4 PERCEIVE-03) / 4 xpassed (live-hardware)** (240s). Commits `24e8dcb` (Task 1), `826c6a4` (Task 2).
+- **Next:** Plan 03 creates `library/genre_prototypes.py` (flips 2 prototype xfails); Plan 04 adds the `genre_source` holder + reconciliation to `_tick_once` (flips 2 genre-feed/reconcile xfails).
 
 ### Plan 78-01 — PERCEIVE Wave-0 RED scaffolds + cold-path byte-identity pin (complete 2026-05-26)
 
