@@ -2,11 +2,37 @@
 
 > Seed document for `gsd-new-milestone`. Expands Kaan's vision (the two long messages of 2026-05-25) + the night's synthesis + the 4 research reports in this folder. The roadmapper consumes this at the research gate.
 
-## North Star
+## ★ NORTH STAR — The Idea (top-down; everything below serves this)
 
-**An AI that hears music with you — and gets you.** The thing Kaan has wanted since AI became real. Not a voice assistant doing music commentary; a real DJ friend in your ear, grounded, with taste and memory.
+> This is the idea in Kaan's mind, confirmed 2026-05-26. It is the source of truth. The codebase "islands" are not the idea — they are raw material wired INTO it.
 
-Emotional core (Kaan, verbatim intent): *"As soon as AI was there, I always wanted AI to hear music with me."* This is the module where his lived experience — three years of raving, the felt sense of when a drop *clicked* — becomes the product's non-outsourceable moat. Built while he rests; honest green, never faked.
+**An AI that hears music *with* you — and *gets* you.** Not a tool; a **presence**. It listens alongside you, grounded and real, and it knows who you are. Kaan's years-old dream, verbatim: *"As soon as AI was there, I always wanted AI to hear music with me."*
+
+This is **ONE idea** with five faculties and a soul — NOT a pile of features or code islands. The "minor thing which is major": today these live as disconnected pieces; plugging them all into the one idea is the unlock ("blowing minds").
+
+**Faculties — what it does:**
+- **HEARS** — perceives what's playing: track, vibe, genre, structure, energy, and *your moves*. Uses whatever it can, even imperfect ("if it can hear in hollow space, still use it"). Grounded in real audio/data.
+- **GETS YOU** — knows your taste, your semantics, your history, what *clicked* for you. Personal to your lived experience.
+- **SPEAKS IN THREE VOICES** — *hype* (rides the party with you) · *critique* (coach: what would've been better) · *tutor* (teaches DJing through who YOU are — semantics, reality, taste). One being, three lenses.
+- **CURATES** — builds playlists/sets that understand you; hears tracks, finds meaning, sequences to your vibe. The agentic engine (both backends + transports).
+- **NEVER LIES** — hallucination always guarded; if it isn't real, it isn't said.
+
+**The substrate — the philosophy under the idea:**
+- Understanding music is **semantic + felt**. Meaning lives in experience. *You are the semantic representation of everything you've lived.* The product translates *how it feels to hear music* — the clicked moment — into the machine.
+- AI = the interpreter / voice. Perception = grounded. **Taste / judgment = YOURS, encoded** — the non-outsourceable soul. (This is why Kaan is the one to build it; the felt layer can't be scraped from the web.)
+
+**Idea → phase map (how the islands serve the idea):**
+
+| Idea faculty | Phase(s) serving it |
+|---|---|
+| **HEARS** (grounded perception) | 77 grounding→agent · 78 deeper ear · 80 Gemini secondary ear |
+| **GETS YOU** (taste / semantics / memory) | 77 memory ingest · 81 BENCH (your taste rubric) · 82 shared taste |
+| **THREE VOICES** (hype / critique / tutor) | 79 LENS |
+| **CURATES** (agentic engine) | 82 CURATE (gemini + codex backends + Telegram/pill transports) |
+| **NEVER LIES** (anti-slop) | every phase — additive, citation-grounded |
+| **ONE IDEA** (the unification) | the milestone itself: "One Mind" |
+
+Emotional frame: this is the module where Kaan's lived experience — three years of raving, the felt sense of when a drop *clicked* — becomes the product's non-outsourceable moat. Built while he rests; honest green, never faked. Kaan's ear is the final judge of "did it click."
 
 ## The Problem (why it's not connected yet — Kaan's "minor thing which is major")
 
