@@ -1380,6 +1380,23 @@ async def main() -> None:
             await session.aclose()
         except Exception as e:
             print(f"[close session err] {e}", file=sys.stderr)
+        # Phase 77 review WR-01 — cancel the agent's off-loop pre-dispatch
+        # tasks (grounding + recall) so an event firing just before SIGINT
+        # doesn't leak an orphaned executor embed / a "Task was destroyed but
+        # it is pending" warning. Both are cancellable best-effort: the field
+        # is None until the first track-aware event, and may be done already.
+        # WIRE-01 added _grounding_task; _recall_task is the pre-existing
+        # Phase-65 sibling — cancel both here so neither leaks.
+        for _agent_task in (
+            getattr(agent, "_grounding_task", None),
+            getattr(agent, "_recall_task", None),
+        ):
+            if _agent_task is not None and not _agent_task.done():
+                _agent_task.cancel()
+                try:
+                    await _agent_task
+                except (asyncio.CancelledError, Exception):
+                    pass
         for stream in (voice_stream, pass_stream, input_stream):
             try:
                 stream.stop()
