@@ -286,6 +286,58 @@ def test_tool_handler_returns_error_not_raise(
     assert "error" in out
 
 
+def test_interactive_asks_then_curates(
+    library, embedder, store, monkeypatch, tmp_path
+):
+    """Conversational mode: the agent ask_user's the DJ, gets answers via the
+    injected ask_fn, then searches + builds. The ask_user tool is dispatched to
+    ask_fn (NOT the grounded toolset) and grounding still holds."""
+    from vibemix.library import toolset as tool_mod
+
+    real_ids = ["t000", "t001"]
+    monkeypatch.setattr(
+        tool_mod,
+        "vibe_search",
+        lambda *a, **k: (
+            [
+                SimpleNamespace(
+                    track_id=t, title=f"T{t}", artist="A", bpm=124.0, confidence=0.9
+                )
+                for t in real_ids
+            ],
+            False,
+        ),
+    )
+    monkeypatch.setattr(
+        tool_mod,
+        "create_playlist",
+        lambda lib, name, ids: create_playlist(lib, name, ids, out_dir=tmp_path),
+    )
+
+    responses = [
+        _response([_fc("ask_user", {"question": "What mood and how long?"})]),
+        _response([_fc("ask_user", {"question": "Peak-time energy?"})]),
+        _response([_fc("search_vibe", {"query": "dark peak techno", "k": 2})]),
+        _response([_fc("create_playlist", {"name": "Live Set", "track_ids": real_ids})]),
+    ]
+    client = _scripted_client(responses)
+
+    asked: list[str] = []
+    answers = iter(["90 min, dark", "yeah peak-time"])
+
+    def ask_fn(q: str) -> str:
+        asked.append(q)
+        return next(answers)
+
+    agent = ViberAgent(client, embedder, store, library, model="fake-model")
+    result = agent.curate_interactive(ask_fn, opening="build me a set")
+
+    assert asked == ["What mood and how long?", "Peak-time energy?"]  # both asked
+    assert result.stop_reason == "created"
+    assert result.playlist is not None
+    assert result.playlist.track_ids == real_ids
+
+
 def test_get_track_features_camelot_is_deterministic(
     library, embedder, store
 ):

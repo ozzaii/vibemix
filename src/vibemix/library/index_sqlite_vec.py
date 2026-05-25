@@ -41,7 +41,14 @@ class SqliteVecStore:
     def __init__(self, db_path: Path = DB_PATH) -> None:
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(str(self._db_path))
+        # check_same_thread=False: the Viber agent's tool dispatch runs each
+        # handler in a worker thread (per-tool timeout), and the live
+        # SuggestionService computes off-loop in an executor — both touch this
+        # connection from a thread other than the one that opened it. Access is
+        # SERIALIZED by the caller (the agent dispatches one tool at a time with
+        # max_workers=1; suggestion recompute is TRACK_CHANGE-debounced), so the
+        # connection is never used concurrently — only from a different thread.
+        self.db = sqlite3.connect(str(self._db_path), check_same_thread=False)
         self.db.enable_load_extension(True)
         # If the host has no sqlite-vec extension wheel, this raises and the
         # caller (open_store) catches → numpy fallback. Assumption A2.

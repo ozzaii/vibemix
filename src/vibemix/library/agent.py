@@ -31,7 +31,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from google.genai import types
 
@@ -48,6 +48,9 @@ logger = logging.getLogger(__name__)
 # search → (optional feature peeks) → create_playlist — yet hard-caps a model
 # that loops. One create_playlist per run is enforced by exiting on the first.
 MAX_TOOL_ITERATIONS = 12
+# Interactive mode needs more turns (1-3 ask_user rounds + searches + create),
+# so it gets a higher cap — still hard-bounded so a chatty model can't loop.
+MAX_INTERACTIVE_ITERATIONS = 24
 # Hard wall-clock per Gemini call. A hung network can never park the loop.
 # (Per-tool timeout lives in LibraryToolset.dispatch.)
 GEMINI_CALL_TIMEOUT_S = 60.0
@@ -95,8 +98,8 @@ class CurateResult:
 # --------------------------------------------------------------------------- #
 
 
-def _tool_declarations() -> list[types.FunctionDeclaration]:
-    return [
+def _tool_declarations(interactive: bool = False) -> list[types.FunctionDeclaration]:
+    decls = [
         types.FunctionDeclaration(
             name="search_vibe",
             description=(
@@ -155,6 +158,48 @@ def _tool_declarations() -> list[types.FunctionDeclaration]:
             ),
         ),
     ]
+    if interactive:
+        # Conversational mode only: let the agent ask the DJ short clarifying
+        # questions before/while curating. Dispatched to the injected ask_fn
+        # (CLI stdin), NOT the grounded toolset — it touches no library state.
+        decls.append(
+            types.FunctionDeclaration(
+                name="ask_user",
+                description=(
+                    "Ask the DJ ONE short clarifying question (mood, set length, "
+                    "energy arc, genre, BPM range, occasion). Use this when the "
+                    "brief is vague — but keep it to 1-3 questions total, then "
+                    "build. Returns the DJ's answer."
+                ),
+                parameters=types.Schema(
+                    type=types.Type.OBJECT,
+                    properties={
+                        "question": types.Schema(
+                            type=types.Type.STRING,
+                            description="a single, short, concrete question",
+                        )
+                    },
+                    required=["question"],
+                ),
+            )
+        )
+    return decls
+
+
+_INTERACTIVE_SYSTEM_INSTRUCTION = (
+    "You are Viber, a DJ's crate-digging co-pilot, talking with the DJ live to "
+    "build a playlist from their OWN library.\n"
+    "FLOW:\n"
+    "1. Open by asking 1-3 SHORT clarifying questions with ask_user (e.g. the "
+    "mood/occasion, how long the set is, the energy arc). Ask ONE at a time. "
+    "Don't over-interrogate — 3 questions max, then build.\n"
+    "2. search_vibe their library for the vibe you heard (the ONLY way to find "
+    "tracks). Every track_id you use MUST come from a search_vibe result — "
+    "never invent a track, title, artist, BPM, or key.\n"
+    "3. Keys/BPM come from get_track_features (deterministic) — never guess.\n"
+    "4. Call create_playlist ONCE with the ordered track_ids. That ends the "
+    "run. Keep it tight — a focused set beats a padded one."
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -206,25 +251,79 @@ class ViberAgent:
             return fut.result(timeout=GEMINI_CALL_TIMEOUT_S)
 
     def curate(self, theme: str) -> CurateResult:
-        """Run the bounded curation loop for ``theme``."""
-        tools = [types.Tool(function_declarations=_tool_declarations())]
-        cfg: dict[str, Any] = {
-            "system_instruction": _SYSTEM_INSTRUCTION,
-            "tools": tools,
-            # Manual dispatch — disable the SDK's automatic function calling so
-            # the seen-set / validation gate runs on every tool call.
-            "automatic_function_calling": {"disable": True},
-        }
+        """Run the bounded one-shot curation loop for ``theme``."""
         contents: list[types.Content] = [
             types.Content(
                 role="user",
                 parts=[types.Part.from_text(text=f"Theme: {theme}")],
             )
         ]
+        return self._run_loop(
+            theme=theme,
+            contents=contents,
+            system_instruction=_SYSTEM_INSTRUCTION,
+            interactive=False,
+            ask_fn=None,
+            max_iters=MAX_TOOL_ITERATIONS,
+        )
+
+    def curate_interactive(
+        self,
+        ask_fn: Callable[[str], str],
+        *,
+        opening: str | None = None,
+        max_iters: int = MAX_INTERACTIVE_ITERATIONS,
+    ) -> CurateResult:
+        """Conversational curation: the agent asks the DJ clarifying questions
+        (via ``ask_fn``) and builds from their library.
+
+        ``ask_fn(question) -> answer`` is injected — the CLI passes ``input()``;
+        tests pass a scripted answerer. The grounding contract is unchanged
+        (every track still comes from a search_vibe result; ask_user touches no
+        library state). The first user turn is ``opening`` (a seed brief) or a
+        generic "build me a set" nudge so the agent opens with a question.
+        """
+        seed = (opening or "").strip() or (
+            "Help me build a set from my library. Ask me what you need to know."
+        )
+        contents: list[types.Content] = [
+            types.Content(role="user", parts=[types.Part.from_text(text=seed)])
+        ]
+        return self._run_loop(
+            theme=opening or "(interactive)",
+            contents=contents,
+            system_instruction=_INTERACTIVE_SYSTEM_INSTRUCTION,
+            interactive=True,
+            ask_fn=ask_fn,
+            max_iters=max_iters,
+        )
+
+    def _run_loop(
+        self,
+        *,
+        theme: str,
+        contents: list[types.Content],
+        system_instruction: str,
+        interactive: bool,
+        ask_fn: Callable[[str], str] | None,
+        max_iters: int,
+    ) -> CurateResult:
+        """The shared bounded tool-dispatch loop (one-shot + interactive)."""
+        tools = [
+            types.Tool(function_declarations=_tool_declarations(interactive))
+        ]
+        cfg: dict[str, Any] = {
+            "system_instruction": system_instruction,
+            "tools": tools,
+            # Manual dispatch — disable the SDK's automatic function calling so
+            # the seen-set / validation gate runs on every tool call.
+            "automatic_function_calling": {"disable": True},
+        }
 
         stop_reason = "max_iters"
         rationale = ""
-        for i in range(MAX_TOOL_ITERATIONS):
+        i = 0
+        for i in range(max_iters):
             try:
                 response = self._gemini_call(contents, cfg)
             except concurrent.futures.TimeoutError:
@@ -252,7 +351,17 @@ class ViberAgent:
             tool_parts: list[types.Part] = []
             for call in calls:
                 args = dict(call.args or {})
-                result = self._dispatch(call.name, args)
+                if call.name == "ask_user" and ask_fn is not None:
+                    # Interactive-only — dispatched to the injected answerer
+                    # (CLI stdin), never the grounded toolset.
+                    question = str(args.get("question", "")).strip() or "?"
+                    try:
+                        answer = ask_fn(question)
+                    except (EOFError, KeyboardInterrupt):
+                        answer = ""  # user bailed → let the model wrap up
+                    result: dict[str, Any] = {"answer": answer}
+                else:
+                    result = self._dispatch(call.name, args)
                 tool_parts.append(
                     types.Part.from_function_response(
                         name=call.name, response=result
@@ -265,7 +374,7 @@ class ViberAgent:
                 stop_reason = "created"
                 break
         else:
-            # Loop exhausted MAX_TOOL_ITERATIONS without breaking.
+            # Loop exhausted max_iters without breaking.
             stop_reason = "max_iters"
 
         # Normalize: stop_reason reflects reality. self._created (set only by
@@ -297,6 +406,7 @@ def _first_candidate_content(response: Any) -> types.Content | None:
 
 __all__ = [
     "MAX_TOOL_ITERATIONS",
+    "MAX_INTERACTIVE_ITERATIONS",
     "CurateResult",
     "ViberAgent",
 ]

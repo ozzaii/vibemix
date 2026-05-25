@@ -1383,7 +1383,18 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
             "can only use tracks search returned, never invented ones."
         ),
     )
-    sp_curate.add_argument("theme", help="natural-language playlist theme")
+    sp_curate.add_argument(
+        "theme",
+        nargs="?",
+        default=None,
+        help="natural-language playlist theme (optional with --interactive)",
+    )
+    sp_curate.add_argument(
+        "-i",
+        "--interactive",
+        action="store_true",
+        help="conversational mode — the agent asks you questions, then builds",
+    )
     sp_curate.add_argument(
         "--name", default=None, help="playlist name (default: derived from theme)"
     )
@@ -1608,11 +1619,33 @@ def _cmd_library_curate(args: argparse.Namespace) -> int:
         print(_json.dumps(err), file=sys.stderr)
         return 1
 
+    interactive = getattr(args, "interactive", False)
+    if not interactive and not args.theme:
+        print(
+            _json.dumps(
+                {"error": "Give a theme, or use --interactive to be asked."}
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
     embedder = LibraryEmbedder(client)
     store = open_store()
     try:
         agent = ViberAgent(client, embedder, store, lib)
-        result = agent.curate(args.theme)
+        if interactive:
+            # Conversational: the agent asks via ask_user → we read stdin. The
+            # questions go to stderr (stdout stays pure JSON for the bridge).
+            def _ask(question: str) -> str:
+                print(f"\nViber> {question}", file=sys.stderr)
+                try:
+                    return input("you> ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    return ""
+
+            result = agent.curate_interactive(_ask, opening=args.theme)
+        else:
+            result = agent.curate(args.theme)
         # The agent names the playlist via the tool call; --name is advisory
         # and only surfaces in human output (the model picks the persisted name).
     finally:
