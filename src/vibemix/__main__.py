@@ -1376,11 +1376,47 @@ def _run_library_cli(argv: list[str]) -> int:
     return int(args.func(args) or 0)
 
 
+def _library_genai_client():
+    """Resolve a genai client for the library query CLI (search / similar).
+
+    Mirrors ``_cmd_library_embed_folder``'s direct-first selection so a local
+    user with only ``GEMINI_API_KEY`` (loaded from ``.env`` by the
+    module-level ``_load_env_robust()`` call) can run vibe-search / similar
+    without provisioning a Bravoh proxy JWT:
+
+        1. GEMINI_API_KEY set → DIRECT ``genai.Client(api_key=...)`` — the
+           SAME construction the live session's mode=direct path uses.
+        2. else VIBEMIX_PROXY_JWT set → proxy client.
+        3. else → ``None`` (caller emits the JSON error + exits 1).
+
+    Returns ``(client, error_dict_or_None)``. ``.env`` is already loaded at
+    import time, so no extra dotenv work is needed here.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY")
+    proxy_jwt = os.environ.get("VIBEMIX_PROXY_JWT")
+    proxy_url = os.environ.get(
+        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
+    )
+
+    if api_key:
+        return genai.Client(api_key=api_key), None
+    if proxy_jwt:
+        from vibemix.agent.proxy_client import build_proxy_genai_client
+
+        return build_proxy_genai_client(proxy_jwt, proxy_url), None
+    return None, {
+        "error": (
+            "No API client: set GEMINI_API_KEY (direct, recommended for "
+            "local runs) in your .env/environment, or VIBEMIX_PROXY_JWT "
+            "(Bravoh proxy). Neither is set."
+        ),
+        "results": [],
+    }
+
+
 def _cmd_library_search(args: argparse.Namespace) -> int:
     import json as _json
-    import os as _os
 
-    from vibemix.agent.proxy_client import build_proxy_genai_client
     from vibemix.library import (
         LibraryEmbedder,
         RekordboxLibrary,
@@ -1388,23 +1424,9 @@ def _cmd_library_search(args: argparse.Namespace) -> int:
         vibe_search,
     )
 
-    proxy_jwt = _os.environ.get("VIBEMIX_PROXY_JWT")
-    proxy_url = _os.environ.get(
-        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
-    )
-    if not proxy_jwt:
-        print(
-            _json.dumps(
-                {
-                    "error": (
-                        "VIBEMIX_PROXY_JWT not set. Export the sidecar JWT "
-                        "or run via the Tauri shell."
-                    ),
-                    "results": [],
-                }
-            ),
-            file=sys.stderr,
-        )
+    client, err = _library_genai_client()
+    if err is not None:
+        print(_json.dumps(err), file=sys.stderr)
         return 1
 
     lib = RekordboxLibrary()
@@ -1423,7 +1445,6 @@ def _cmd_library_search(args: argparse.Namespace) -> int:
         )
         return 1
 
-    client = build_proxy_genai_client(proxy_jwt, proxy_url)
     embedder = LibraryEmbedder(client)
     store = open_store()
     try:
@@ -1449,9 +1470,7 @@ def _cmd_library_search(args: argparse.Namespace) -> int:
 def _cmd_library_similar(args: argparse.Namespace) -> int:
     """Plan 28-05 — USER-ASKED similar-track query."""
     import json as _json
-    import os as _os
 
-    from vibemix.agent.proxy_client import build_proxy_genai_client
     from vibemix.library import (
         LibraryEmbedder,
         RekordboxLibrary,
@@ -1459,20 +1478,9 @@ def _cmd_library_similar(args: argparse.Namespace) -> int:
     )
     from vibemix.library.similar import similar_to
 
-    proxy_jwt = _os.environ.get("VIBEMIX_PROXY_JWT")
-    proxy_url = _os.environ.get(
-        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
-    )
-    if not proxy_jwt:
-        print(
-            _json.dumps(
-                {
-                    "error": "VIBEMIX_PROXY_JWT not set.",
-                    "results": [],
-                }
-            ),
-            file=sys.stderr,
-        )
+    client, err = _library_genai_client()
+    if err is not None:
+        print(_json.dumps(err), file=sys.stderr)
         return 1
 
     lib = RekordboxLibrary()
@@ -1485,7 +1493,6 @@ def _cmd_library_similar(args: argparse.Namespace) -> int:
         )
         return 1
 
-    client = build_proxy_genai_client(proxy_jwt, proxy_url)
     embedder = LibraryEmbedder(client)
     store = open_store()
     try:

@@ -73,27 +73,44 @@ def test_cli_search_help(tmp_path: Path) -> None:
     assert "--k" in proc.stdout
 
 
-def test_cli_no_jwt_exits_with_json_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_no_client_returns_json_error(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Without VIBEMIX_PROXY_JWT, CLI exits 1 with structured JSON error."""
-    env = {**os.environ, "HOME": str(tmp_path)}
-    env.pop("VIBEMIX_PROXY_JWT", None)
+    """With NEITHER GEMINI_API_KEY nor VIBEMIX_PROXY_JWT, the client resolver
+    returns a structured error (the CLI emits it as JSON + exits 1).
 
-    proc = subprocess.run(
-        [sys.executable, "-m", "vibemix", "library", "search", "x"],
-        capture_output=True,
-        text=True,
-        env=env,
-        timeout=15,
-    )
-    assert proc.returncode == 1
-    err = proc.stderr.strip()
-    assert err
-    # Must be parseable JSON.
-    parsed = json.loads(err)
-    assert "VIBEMIX_PROXY_JWT" in parsed["error"]
-    assert parsed["results"] == []
+    In-process (not subprocess): ``_load_env_robust`` loads the repo-root
+    ``.env`` for any ``python -m vibemix`` spawned from the repo (find_dotenv
+    walks up from ``__main__.py``'s location, not CWD), so a subprocess can't
+    reliably hit the no-creds branch. We test the resolver directly with a
+    cleared env — the same code both ``search`` and ``similar`` route through
+    (Fix 1).
+    """
+    from vibemix.__main__ import _library_genai_client
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("VIBEMIX_PROXY_JWT", raising=False)
+
+    client, err = _library_genai_client()
+    assert client is None
+    assert err is not None
+    # Error message names both supported credential sources.
+    assert "GEMINI_API_KEY" in err["error"]
+    assert "VIBEMIX_PROXY_JWT" in err["error"]
+    assert err["results"] == []
+
+
+def test_direct_key_builds_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fix 1: a bare GEMINI_API_KEY (no proxy JWT) yields a direct client —
+    the local-user path that previously hard-failed with exit 1."""
+    from vibemix.__main__ import _library_genai_client
+
+    monkeypatch.setenv("GEMINI_API_KEY", "AIza-test-dummy-key")
+    monkeypatch.delenv("VIBEMIX_PROXY_JWT", raising=False)
+
+    client, err = _library_genai_client()
+    assert err is None
+    assert client is not None
 
 
 def test_cli_no_library_cache_exits_clean(
