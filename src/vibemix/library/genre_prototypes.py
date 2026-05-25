@@ -4,11 +4,11 @@
 Replaces the coarse 3-band DSP genre proxy with the embedding-driven genre the
 Phase-78 research validated (86.5% folder-proxy agreement), at **€0**: it ranks
 a track's ALREADY-CACHED library embedding against one centered-mean prototype
-vector per folder-label. No live embed, no ``genai.Client``, no API key on any
+vector per folder-label. No live embed, no Gemini client, no API key on any
 path here.
 
-This module is the pure mechanism + a thread-safe holder. It NEVER writes
-``MusicState`` (invariant #1, single-writer). It returns values / fills a
+This module is the pure mechanism + a thread-safe holder. It NEVER writes the
+live state dataclass (invariant #1, single-writer). It returns values / fills a
 ``GenrePrototypeLookup`` holder that the single-writer refresh loop reads — the
 refresh wiring is Plan 04's job, not this module's.
 
@@ -240,7 +240,7 @@ class GenrePrototypeLookup:
 
     **Anti-second-writer (Pitfall 1):** this holder is the ONLY place the genre
     result lives off-loop. ``refresh._tick_once`` READS ``get_latest()`` and is
-    the single writer of ``MusicState`` — this class NEVER touches ``MusicState``.
+    the single writer of the live state dataclass — this class NEVER touches it.
     Wiring that read is Plan 04.
     """
 

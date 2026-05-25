@@ -142,6 +142,94 @@ def test_classify_floor_and_margin():
     assert label_margin == "unknown"
 
 
+# ---------- PERCEIVE-03 — thread-safe holder (GenrePrototypeLookup) ----------
+
+
+def test_holder_late_write_discarded_after_clear():
+    """A stale ``classify_playing`` write that completes AFTER ``clear()`` is
+    discarded by the generation token (anti-second-writer, mirrors Grounding).
+
+    Simulates the race manually: capture a generation, bump it via ``clear()``,
+    then assert a write guarded by the stale generation does not latch.
+    """
+    from vibemix.library.genre_prototypes import GenrePrototypeLookup
+
+    holder = GenrePrototypeLookup(store=object())  # store unused on this path
+
+    # Dispatch A captures gen=1.
+    with holder._lock:
+        holder._inflight_gen += 1
+        my_gen = holder._inflight_gen
+
+    # clear() runs (e.g. end of turn / superseded) → bumps gen to 2, latch None.
+    holder.clear()
+    assert holder.get_latest() is None
+
+    # Dispatch A's late write must be discarded (my_gen != _inflight_gen).
+    with holder._lock:
+        if my_gen == holder._inflight_gen:
+            holder._latest = ("hardtechno", 0.9)
+    assert holder.get_latest() is None  # stale write dropped
+
+    # A fresh dispatch (current gen) DOES latch.
+    with holder._lock:
+        holder._inflight_gen += 1
+        fresh = holder._inflight_gen
+    with holder._lock:
+        if fresh == holder._inflight_gen:
+            holder._latest = ("house", 0.7)
+    assert holder.get_latest() == ("house", 0.7)
+
+
+def test_classify_playing_unknown_track_abstains_no_api(monkeypatch):
+    """``classify_playing`` on a track NOT in the library returns
+    ``("unknown", 0.0)`` WITHOUT any live embed (RESEARCH A1, €0)."""
+    import vibemix.library.genre_prototypes as gp
+
+    from vibemix.library.genre_prototypes import GenrePrototypeLookup
+
+    vectors, ids, label_of = _labeled_corpus(n=12)
+
+    class _FakeBackend:
+        def load_all(self):
+            return ids, vectors
+
+        def snapshot_hash(self):
+            return "snap-test"
+
+    class _FakeStore:
+        def __init__(self):
+            self._backend = _FakeBackend()
+
+        def snapshot_hash(self):
+            return self._backend.snapshot_hash()
+
+    # Build prototypes from the library (cached folder labels via monkeypatched lib).
+    monkeypatch.setattr(
+        gp, "_label_of_from_library", lambda ids_, lib=None: label_of, raising=True
+    )
+
+    holder = GenrePrototypeLookup(store=_FakeStore())
+    label, conf = holder.classify_playing("NOT-IN-LIBRARY-id")
+    assert (label, conf) == ("unknown", 0.0)
+    # A known track classifies (proves the path is live, still €0 cached vectors).
+    known_label, known_conf = holder.classify_playing(ids[0])
+    assert isinstance(known_label, str)
+    assert 0.0 <= known_conf <= 1.0
+
+
+def test_holder_never_writes_music_state():
+    """The holder exposes only get_latest() — no MusicState write path."""
+    from vibemix.library.genre_prototypes import GenrePrototypeLookup
+
+    holder = GenrePrototypeLookup(store=object())
+    assert holder.get_latest() is None
+    # get_latest snapshots the lock-guarded latch.
+    with holder._lock:
+        holder._latest = ("trance", 0.6)
+    assert holder.get_latest() == ("trance", 0.6)
+
+
 # ---------- T-78-01-01 mitigation pin (real green) ----------
 
 
