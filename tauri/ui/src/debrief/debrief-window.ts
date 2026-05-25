@@ -3,7 +3,12 @@
 
 import { mountChapterList, type ChapterPayload } from "./components/chapter-list.js";
 import { mountDrillsPanel, type DrillPayload } from "./components/drills-panel.js";
-import { mountTldrPlayer, type TldrPayload } from "./components/tldr-player.js";
+import {
+  mountTldrPlayer,
+  renderVerdictLine,
+  buildVerdictText,
+  type TldrPayload,
+} from "./components/tldr-player.js";
 import {
   mountTimelinePlaceholder,
   type TimelineChapter,
@@ -46,6 +51,9 @@ const tooltip = document.getElementById("vmx-debrief-tooltip");
 const chaptersEl = document.getElementById("vmx-debrief-chapters");
 const drillsEl = document.getElementById("vmx-debrief-drills-list");
 const tldrEl = document.getElementById("vmx-debrief-tldr-player");
+// The TL;DR panel host (carries the silk section title) — the verdict
+// headline (P1-a uplift 3) is inserted here, above the player.
+const tldrPanelEl = document.getElementById("vmx-debrief-tldr");
 const waveformEl = document.getElementById("vmx-debrief-waveform");
 const earTestToggleEl = document.getElementById("vmx-debrief-ear-test-toggle");
 const bravohWaitlistToggleEl = document.getElementById(
@@ -106,6 +114,16 @@ if (!sessionDir) {
     if (waveformEl && totalDurationS > 0) {
       mountTimelinePlaceholder(waveformEl, chapters, totalDurationS);
     }
+    // P1-a uplift 3 — the verdict headline. Built from REAL session
+    // structure (track count + duration), not invented. Lands as soon
+    // as the chapter-list frame arrives so the peak-end focal point is
+    // present before the voiced TL;DR finishes generating.
+    if (tldrPanelEl) {
+      renderVerdictLine(
+        tldrPanelEl,
+        buildVerdictText(chapters.length, totalDurationS),
+      );
+    }
   });
 
   client.addEventListener("drills", (e: Event) => {
@@ -115,7 +133,14 @@ if (!sessionDir) {
 
   client.addEventListener("tldr-audio", (e: Event) => {
     const detail = (e as CustomEvent).detail as TldrPayload;
-    if (tldrEl) mountTldrPlayer(tldrEl, detail, sessionDir);
+    // P1-a uplift 1 — hand the timeline container + full session
+    // duration to the player so TL;DR playback sweeps the amber playhead
+    // across the master-waveform timeline.
+    if (tldrEl)
+      mountTldrPlayer(tldrEl, detail, sessionDir, {
+        timelineEl: waveformEl,
+        sessionDurationS: totalDurationS,
+      });
   });
 
   client.addEventListener("citation-tooltip", (e: Event) => {

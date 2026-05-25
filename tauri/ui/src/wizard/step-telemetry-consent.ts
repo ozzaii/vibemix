@@ -20,6 +20,7 @@
 import { PrimaryPanel } from "./components/primary-panel.js";
 import { Button } from "./components/button.js";
 import { renderTelemetryConsentCard } from "./components/telemetry-consent.js";
+import { withStepLeadGlyph } from "./step1-permissions.js";
 import { registerStyle } from "./components/_style-registry.js";
 
 /* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep for the telemetry-
@@ -65,6 +66,7 @@ export function renderStepTelemetryConsent(
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
   heading.textContent = "STEP 5 / 5 · TELEMETRY";
+  withStepLeadGlyph(heading, 5);
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
@@ -81,6 +83,7 @@ export function renderStepTelemetryConsent(
   );
 
   const panel = PrimaryPanel({ children: body });
+  panel.classList.add("wizard-step__panel-rise");
 
   const ctaRow = document.createElement("div");
   ctaRow.className = "wizard-step__cta-row";

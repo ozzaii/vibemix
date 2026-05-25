@@ -88,6 +88,13 @@
         <div class="pill__reaction" id="pill-reaction"></div>
         <div class="pill__decks" id="pill-decks"></div>
       </div>
+      <!-- Collapsed-hover PEEK card mount (Phase-1b). The next-track suggestion
+           surfaces here on pointer-hover of the COLLAPSED pill, as a small
+           floating card below the row — NOT the full expand panel. Hidden at
+           rest; revealed under .pill[data-peek="true"] (CSS). Honest silence:
+           index.ts renders NOTHING here when there is no grounded suggestion.
+           [data-no-drag] so hovering the card never starts a window drag. -->
+      <div class="pill__peek" id="pill-peek" data-no-drag aria-live="polite"></div>
     </div>
     <script type="module" src="/src/pill/index.ts"></script>
   </body>

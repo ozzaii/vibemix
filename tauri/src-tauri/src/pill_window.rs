@@ -155,10 +155,14 @@ pub fn create_pill_window(
 ) -> tauri::Result<Option<tauri::WebviewWindow>> {
     let state = load_pill_state(app).unwrap_or_default();
 
-    // Resolve initial geometry. Missing width/height → UI-SPEC collapsed
-    // 280×44. Missing x/y → top-right offset from the primary monitor width.
-    let width = state.width.unwrap_or(PILL_COLLAPSED_W as u32);
-    let height = state.height.unwrap_or(PILL_COLLAPSED_H as u32);
+    // The pill is FIXED-size: `resizable(false)` and the expand panel grows via
+    // CSS height inside the webview, NEVER a window resize. So persisted
+    // width/height are meaningless — and a corrupted save (observed in the wild:
+    // 8960×1408, from a physical-vs-logical pixel scale bug in an old geometry
+    // write) would restore an insanely huge window. ALWAYS use the locked
+    // collapsed dims; only x/y are restored from saved state.
+    let width = PILL_COLLAPSED_W as u32;
+    let height = PILL_COLLAPSED_H as u32;
     let (default_x, default_y) = default_top_right(app, width);
     let mut x = state.x.unwrap_or(default_x);
     let mut y = state.y.unwrap_or(default_y);

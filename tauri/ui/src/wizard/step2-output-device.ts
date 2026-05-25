@@ -12,6 +12,7 @@ import { DropdownDevice, type DropdownDevice as DropdownDeviceItem } from "./com
 import { AudioTestButton, type AudioTestState } from "./components/audio-test-button.js";
 import { WindowPicker, type WindowPickerMode } from "./components/window-picker.js";
 import { Button } from "./components/button.js";
+import { withStepLeadGlyph } from "./step1-permissions.js";
 import { registerStyle } from "./components/_style-registry.js";
 
 /* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep for the output-device
@@ -78,6 +79,7 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
   heading.className = "wizard-step__heading";
   // UI-SPEC §Step 2 H1 — VERBATIM
   heading.textContent = "STEP 2 / 5 · OUTPUT DEVICE";
+  withStepLeadGlyph(heading, 2);
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
@@ -143,6 +145,7 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
   }
 
   const panel = PrimaryPanel({ children: body });
+  panel.classList.add("wizard-step__panel-rise");
 
   const ctaRow = document.createElement("div");
   ctaRow.className = "wizard-step__cta-row";

@@ -45,19 +45,63 @@
   background: var(--glass-3);
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-lg);
-  /* Top inner-light seam (the sealed-glass read) + a dark bottom inset for the
-   * recessed lozenge feel — same language as the .vmx-tile glass shell. */
-  box-shadow:
-    inset 0 1px 0 var(--glass-top),
-    inset 0 -1px 0 var(--void-50);
-  /* Progressive enhancement ONLY — layered on top of the opaque-enough rgba.
-   * Never the sole opacity source (Windows / DMG have no vibrancy). */
-  backdrop-filter: var(--blur-glass-light);
-  -webkit-backdrop-filter: var(--blur-glass-light);
+  /* LIQUID-GLASS material (2026-05-25 pilot). The pill is the floating
+   * navigation layer Apple's Liquid Glass is reserved for — so this surface
+   * earns the full material: a specular crown on the top edge (light raking
+   * across the lozenge), the upper-face highlight fall-off, the bottom rim
+   * receding into the void (edge lensing), and a soft blue-black depth drop so
+   * the lozenge HOVERS over the desktop. One token carries the whole stack;
+   * see tokens.css --lg-surface-shadow. Replaces the old flat --glass-top seam.
+   * Amber is untouched — the specular is neutral silk light, not a 2nd accent. */
+  box-shadow: var(--lg-surface-shadow);
+  /* The single lensing layer — one backdrop-filter, NOT nested (the specular
+   * sweep below is a paint-only pseudo, no second blur). saturate() lets the
+   * desktop colour bleeding through read as bent/concentrated light (lensing)
+   * rather than washed-out frost. Downgrades under reduced-motion / low-power
+   * via the --lg-lens-blur token. Still progressive enhancement ON TOP of the
+   * opaque-enough --glass-3 rgba — never the sole opacity source (Win / DMG). */
+  backdrop-filter: var(--lg-lens-blur);
+  -webkit-backdrop-filter: var(--lg-lens-blur);
   overflow: hidden;
   font-family: var(--type-display);
   color: var(--silk);
   cursor: default;
+}
+
+/* Specular sweep — the ONE liquid-glass light effect: a faint diagonal silk
+ * highlight raked across the top-left of the lozenge, like a single overhead
+ * stage light catching smoked glass. Paint-only (a gradient on a pseudo —
+ * NO second backdrop-filter, GPU-cheap), pinned to the top so it reads as
+ * light on the crown, fading out before the reaction text so it never hurts
+ * legibility (Apple's "never over content" rule). z-index 0: sits under the
+ * pill's children (which are positioned by their own rules / the flex flow).
+ * Neutral silk, chroma-reduced — never amber, never pure white. */
+.pill::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px; /* crown band — drag strip + a touch of the collapsed row */
+  border-radius: var(--rad-lg) var(--rad-lg) 0 0;
+  background:
+    linear-gradient(
+      105deg,
+      var(--lg-spec-mid) 0%,
+      var(--lg-spec-lo) 28%,
+      transparent 60%
+    );
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: screen; /* light ADDS — reads as a catch, not a film over the face */
+}
+/* Keep the real content above the specular crown so text never sits under it.
+ * (.pill__peek is position:absolute below — it gets its z-index there.) */
+.pill__drag,
+.pill__row,
+.pill__expand {
+  position: relative;
+  z-index: 1;
 }
 
 /* ── Drag strip — top 28px (62-UI-SPEC §Drag handle) ─────────────────────── *
@@ -192,6 +236,77 @@
   gap: var(--sp-2);
 }
 
+/* Deck chips under liquid glass (2026-05-25 pilot). The chips are small
+ * read-only meta tiles INSIDE the expand panel — Apple's rule says do NOT
+ * stack glass-on-glass or blur content, so these get NO second backdrop-filter
+ * (the chip styling itself lives in deck-chips.ts; this rule only layers the
+ * specular EDGE so the chips catch the same overhead light as the lozenge and
+ * read as embossed glass, not flat stickers). A faint silk top-rim crown + a
+ * void recess at the bottom = a tiny lensed bevel. Neutral silk — the amber on
+ * a --resolved key (set in deck-chips.ts) stays the only accent. The chip's own
+ * box-shadow was unset (flat); this is purely additive, no regression. */
+.pill__decks .vmx-deck-chip {
+  box-shadow:
+    inset 0 1px 0 var(--lg-spec-mid),
+    inset 0 -1px 0 var(--lg-rim-void);
+}
+
+/* ── Collapsed-hover PEEK card (Phase-1b — the next-track glance) ─────────── *
+ * On pointer-hover of the COLLAPSED pill, the next-track suggestion surfaces as
+ * a small floating card just below the collapsed row — a quiet "what's next"
+ * glance that does NOT trigger the full expand panel. The card MARKUP is owned
+ * by next-suggestion.ts (.vmx-next-card — ONE source of truth, reused verbatim
+ * from the expand panel); this rule only positions + reveals the mount.
+ *
+ * Positioned absolutely inside .pill (which is `overflow:hidden` + `inset:0`
+ * filling the always-on-top window), anchored below the 28px drag strip + the
+ * collapsed row so it floats under the lozenge without resizing the window or
+ * disturbing the expand panel's flow. Material: the same --glass-3 dark-glass
+ * surface + hairline silk edge + top inner-light seam as .pill (sealed-glass
+ * read), with the recessed bottom inset — it reads as a small drawer sliding out
+ * of the pill, not a flat tooltip.
+ *
+ * Motion (frontend-enforcement rule 6 — intentional, atmospheric, no bounce):
+ * ONE orchestrated ease-out reveal — opacity 0→1 + a 4px translateY settle under
+ * --motion-transition. At rest it is opacity:0 + pointer-events:none so it never
+ * intercepts a click or shows a flash. Revealed only under
+ * .pill[data-peek="true"] (index.ts sets data-peek from the pure setPeek flag),
+ * AND only when the mount actually has a card child (honest silence: index.ts
+ * leaves the mount EMPTY when there is no grounded suggestion, so an empty peek
+ * never paints an empty box). */
+.pill__peek {
+  position: absolute;
+  z-index: 1; /* above the .pill::before specular crown */
+  top: 64px; /* below the 28px drag strip + ~36px collapsed row */
+  left: var(--sp-3);
+  right: var(--sp-3);
+  padding: var(--sp-1);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  background: var(--glass-3);
+  /* Liquid-glass: a small drawer sliding out of the pill — same floating-layer
+   * material as the lozenge (specular crown + void rim + depth drop), one
+   * shared token. The peek floats ABOVE the desktop too, so it earns the
+   * depth shadow that the old flat seam lacked. */
+  box-shadow: var(--lg-surface-shadow);
+  backdrop-filter: var(--lg-lens-blur);
+  -webkit-backdrop-filter: var(--lg-lens-blur);
+  /* At rest: invisible + inert + nudged up, so the reveal settles DOWN into place. */
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition:
+    opacity var(--motion-transition) ease-out,
+    transform var(--motion-transition) ease-out;
+}
+/* Reveal: only when hovering (data-peek) AND a card is present. The :empty guard
+ * is the CSS belt to index.ts's honest-silence (an empty mount stays invisible —
+ * no empty box ever flashes on hover when there's no grounded suggestion). */
+.pill[data-peek="true"] .pill__peek:not(:empty) {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* ── Reduced-motion guard (a11y) ──────────────────────────────────────────── *
  * An always-on-top, always-visible pulsing dot sits in the user's peripheral
  * vision — exactly the motion-sensitivity case `prefers-reduced-motion` exists
@@ -211,5 +326,11 @@
   }
   .pill__expand {
     transition: none;
+  }
+  /* The peek card still appears on hover — it just snaps in (no fade/slide),
+   * the accessible read for a motion-sensitive user. */
+  .pill__peek {
+    transition: none;
+    transform: none;
   }
 }

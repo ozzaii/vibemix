@@ -290,6 +290,28 @@ const CSS = `
   .vmx-settings-drawer [data-interactive]:focus-visible {
     box-shadow: var(--glow-faint);
   }
+  /* P1-b finding #3 — DEMOTE the blanket glow, reserve a brighter signal for
+   * the ACTIVE control. The faint-glow-on-everything-hovered rule above is the
+   * OPPOSITE of 20/80: nothing reads as "the selected one." Here the currently-
+   * active mode segment and the open/focused picker row carry the ONLY soft
+   * outer halo in the drawer, so the eye lands on where the surface actually IS
+   * right now (hover stays one rung lower at --glow-faint).
+   *
+   * Why filter:drop-shadow(currentColor) instead of box-shadow:--glow-soft:
+   *   1. COMPOSES — rocker.ts / picker.ts already own a multi-layer INSET
+   *      box-shadow on these active states; a box-shadow rule from here would
+   *      clobber that whole recess. filter is an independent layer, so the
+   *      inset bezel stays intact and we only ADD the outer halo.
+   *   2. NO new accent — currentColor inherits the active tile's own ink: amber
+   *      for the picker, mood-color (magenta/green/blue) for the interaction
+   *      rocker. So we don't paint amber over a mood-colored COACH/HYPE tile
+   *      (that would break mood-color ownership + 20/80). Zero hardcoded color.
+   * GPU-cheap (static two-stop drop-shadow, no animation), reduced-motion-safe
+   * by construction (it's not motion). The "soft" radii mirror --glow-soft. */
+  .vmx-settings-drawer .vmx-rocker__seg[data-active="true"],
+  .vmx-settings-drawer .vmx-picker[data-open="true"] .vmx-picker__row {
+    filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 12px currentColor);
+  }
   .vmx-settings-drawer__modal-slot {
     position: relative;
     z-index: 60;
@@ -354,6 +376,7 @@ export function mountSettingsDrawer(root: HTMLElement): void {
   const drawer = document.createElement("aside");
   drawer.className = "vmx-settings-drawer";
   drawer.dataset.open = "false";
+  drawer.dataset.settling = "false";
   drawer.setAttribute("aria-label", "settings");
   drawer.setAttribute("role", "complementary");
 
@@ -452,6 +475,15 @@ export function openSettings(): void {
   // Re-render with fresh settings (sidecar may have broadcast updates
   // while the drawer was closed).
   mountedHandle.refresh();
+  // P1-b finding #2 — STAGE 2 trigger. Stage 1 is the drawer's 250ms
+  // translateX (CSS, fires on the data-open flip above). We arm the group
+  // micro-settle ONLY on this explicit open path (not on the subscribeSettingsUI
+  // refreshes that fire mid-session), so the seat animation plays once per open
+  // and never replays on a genre reload / recordings refresh. The flag is
+  // cleared after the longest staggered settle has finished. group.ts gates the
+  // actual animation behind prefers-reduced-motion: no-preference, so this flag
+  // is a no-op visual for reduced-motion users.
+  armDrawerSettle();
   // Phase 15 Plan 05 — fire the recordings.list IPC on drawer open,
   // debounced 1s to absorb flickering re-opens (Plan §Task 2 must-haves).
   const now = Date.now();
@@ -459,6 +491,22 @@ export function openSettings(): void {
     lastLoadAt = now;
     void loadRecordings();
   }
+}
+
+// P1-b finding #2 — settle-flag lifecycle. Total budget = stage-1 land (250ms)
+// + last stagger delay (~418ms) + settle duration (120ms) ≈ 540ms; clear at
+// 560ms with margin. A re-open inside that window resets the timer so the flag
+// always clears.
+let settleClearTimer: ReturnType<typeof setTimeout> | null = null;
+function armDrawerSettle(): void {
+  if (!mountedHandle) return;
+  const { drawer } = mountedHandle;
+  drawer.dataset.settling = "true";
+  if (settleClearTimer !== null) clearTimeout(settleClearTimer);
+  settleClearTimer = setTimeout(() => {
+    drawer.dataset.settling = "false";
+    settleClearTimer = null;
+  }, 560);
 }
 
 /** Slide the drawer out. Idempotent. */
@@ -471,6 +519,10 @@ export function closeSettings(): void {
 
 /** Test-only — tear down the singleton so a fresh vitest case can mount. */
 export function _resetDrawerForTests(): void {
+  if (settleClearTimer !== null) {
+    clearTimeout(settleClearTimer);
+    settleClearTimer = null;
+  }
   if (mountedHandle) {
     mountedHandle.unsubscribe();
     try {

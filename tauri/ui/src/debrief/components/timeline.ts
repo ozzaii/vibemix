@@ -68,6 +68,17 @@ export function mountTimelinePlaceholder(
     container.append(region);
   }
 
+  // P1-a uplift 1 — thin amber playhead. Appended once over the regions;
+  // the tldr-player drives it via setTimelinePlayhead() on audio
+  // timeupdate. It stays hidden (data-active unset) until the first
+  // position update, so a stopped/never-played TL;DR shows no stray line.
+  const playhead = document.createElement("div");
+  playhead.className = "vmx-debrief-playhead";
+  playhead.setAttribute("aria-hidden", "true");
+  container.append(playhead);
+  (container as unknown as { __vmxPlayhead?: HTMLElement }).__vmxPlayhead =
+    playhead;
+
   // Phase 44-03 / LAUNCH-02 — listen for chip-click deep-link events
   // dispatched from `debrief-window.ts` after a session-cohost-reaction
   // chip is clicked in the live session UI. The handler looks up the
@@ -144,6 +155,32 @@ function cssEscape(s: string): string {
   }
   // Minimal fallback — escape the characters we actually expect.
   return s.replace(/(["\\.:@\[\]#])/g, "\\$1");
+}
+
+/**
+ * P1-a uplift 1 — position the timeline playhead.
+ *
+ * Driven by the TL;DR audio element's `timeupdate` (and play/pause/ended)
+ * in tldr-player.ts. `fraction` is the playback position 0..1 across the
+ * full session duration. Passing `active=false` (e.g. on pause/ended)
+ * hides the line. No-ops cleanly when the timeline hasn't mounted a
+ * playhead yet (chapters not yet rendered), so call ordering is safe.
+ */
+export function setTimelinePlayhead(
+  container: HTMLElement,
+  fraction: number,
+  active: boolean,
+): void {
+  const playhead = (container as unknown as { __vmxPlayhead?: HTMLElement })
+    .__vmxPlayhead;
+  if (!playhead) return;
+  if (!active) {
+    delete playhead.dataset.active;
+    return;
+  }
+  const clamped = Math.min(1, Math.max(0, fraction));
+  playhead.style.setProperty("--vmx-playhead", `${clamped * 100}%`);
+  playhead.dataset.active = "true";
 }
 
 function formatTime(s: number): string {

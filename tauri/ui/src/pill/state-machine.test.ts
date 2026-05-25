@@ -25,6 +25,7 @@ import {
   baseState,
   EXPAND_MS,
   initialPillState,
+  setPeek,
   tickCollapse,
 } from "./state-machine.js";
 
@@ -61,6 +62,67 @@ describe("initialPillState — boot", () => {
     expect(s.reactionText).toBe("");
     expect(s.chips).toEqual([]);
     expect(s.voiceRms).toBe(0);
+    expect(s.peek).toBe(false);
+  });
+});
+
+describe("setPeek — collapsed-pill hover flag (Phase-1b)", () => {
+  it("turns peek on / off without touching mode or the reaction payload", () => {
+    const s0 = applyFrame(initialPillState(T0), { cohostStatus: "LISTENING" }, T0 + 1);
+    const on = setPeek(s0, true);
+    expect(on.peek).toBe(true);
+    // peek is orthogonal to mode — the collapsed state is untouched.
+    expect(on.mode).toBe("listening");
+    expect(on.cohostStatus).toBe("LISTENING");
+    const off = setPeek(on, false);
+    expect(off.peek).toBe(false);
+    expect(off.mode).toBe("listening");
+  });
+
+  it("never enters/leaves expand — peek does not drive the panel", () => {
+    const expanded = applyFrame(
+      initialPillState(T0),
+      { type: "cohost-reaction", text: "x", chips: SAMPLE_CHIPS },
+      T0,
+    );
+    const peeked = setPeek(expanded, true);
+    expect(peeked.mode).toBe("expand"); // expand untouched
+    expect(peeked.reactionText).toBe("x"); // payload untouched
+    expect(peeked.chips).toEqual(SAMPLE_CHIPS);
+  });
+
+  it("returns the SAME reference when the flag is unchanged (cheap skip)", () => {
+    const s = initialPillState(T0);
+    expect(setPeek(s, false)).toBe(s); // already false
+    const on = setPeek(s, true);
+    expect(setPeek(on, true)).toBe(on); // already true
+  });
+
+  it("is immutable — does not mutate the input state", () => {
+    const s0 = initialPillState(T0);
+    const s1 = setPeek(s0, true);
+    expect(s0.peek).toBe(false);
+    expect(s1).not.toBe(s0);
+  });
+
+  it("peek survives subsequent READER frames (frame spread preserves it)", () => {
+    const peeked = setPeek(initialPillState(T0), true);
+    const afterFrame = applyFrame(peeked, { cohostStatus: "TALKING", voiceRms: 0.4 }, T0 + 10);
+    expect(afterFrame.peek).toBe(true);
+    // and survives a collapse tick (non-expanded → no-op, ref preserved)
+    expect(tickCollapse(afterFrame, T0 + 999).peek).toBe(true);
+  });
+
+  it("peek survives an expand→collapse tick (carried through the revert)", () => {
+    const expanded = applyFrame(
+      { ...initialPillState(T0), cohostStatus: "LISTENING" },
+      { type: "cohost-reaction", text: "x", chips: SAMPLE_CHIPS },
+      T0,
+    );
+    const peeked = setPeek(expanded, true);
+    const collapsed = tickCollapse(peeked, T0 + EXPAND_MS);
+    expect(collapsed.mode).toBe("listening");
+    expect(collapsed.peek).toBe(true);
   });
 });
 

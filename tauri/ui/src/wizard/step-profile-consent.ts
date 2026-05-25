@@ -14,6 +14,7 @@
 import { PrimaryPanel } from "./components/primary-panel.js";
 import { Button } from "./components/button.js";
 import { renderProfileConsentCard } from "./components/profile-consent.js";
+import { withStepLeadGlyph } from "./step1-permissions.js";
 import { registerStyle } from "./components/_style-registry.js";
 
 /* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep for the profile-consent
@@ -59,6 +60,7 @@ export function renderStepProfileConsent(
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
   heading.textContent = "STEP 4 / 5 · PROFILE";
+  withStepLeadGlyph(heading, 4);
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
@@ -75,6 +77,7 @@ export function renderStepProfileConsent(
   );
 
   const panel = PrimaryPanel({ children: body });
+  panel.classList.add("wizard-step__panel-rise");
 
   const ctaRow = document.createElement("div");
   ctaRow.className = "wizard-step__cta-row";

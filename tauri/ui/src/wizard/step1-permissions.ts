@@ -65,6 +65,25 @@ const CSS = `
     margin: 0 0 var(--sp-2);
     text-transform: uppercase;
   }
+  /* One amber lead glyph per interior header — the step0 hero gives the "V"
+   * the single amber moment; every interior step header inherits the same
+   * one-accent signature via a small JetBrains Mono index ("01·" / "02·").
+   * 20/80 law: this is the ONLY amber on the silk header (the heading text
+   * itself stays silk), so the eye still lands on a single accent. The "·"
+   * is dimmed to amber-40 so the digits carry the glow, not the separator. */
+  .wizard-step__heading-index {
+    font-family: var(--type-mono);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    color: var(--amber);
+    text-shadow: 0 0 6px var(--amber-40);
+    margin-right: var(--sp-2);
+    vertical-align: 0.12em;
+  }
+  .wizard-step__heading-index .wizard-step__heading-dot {
+    color: var(--amber-40);
+    text-shadow: none;
+  }
   .wizard-step__subtitle {
     font-family: var(--type-body);
     font-variation-settings: "wdth" 100, "wght" 400;
@@ -77,6 +96,23 @@ const CSS = `
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
+  }
+  /* Boot settle — interior steps used to instant-swap their panel after the
+   * router's cross-fade slide. step0's hero correctly has a vmx-intro-rise
+   * first-paint settle; interior steps now inherit the same mechanical-
+   * deliberate beat. A single ~250ms translateY settle on the primary panel
+   * as it mounts (not an instant paint) — composes with the router's X-axis
+   * cross-fade on the wrapper (different axis, no fight). GPU-cheap. Fully
+   * gated on prefers-reduced-motion: no-preference (reduced-motion users get
+   * the panel at rest, no settle). */
+  @media (prefers-reduced-motion: no-preference) {
+    .wizard-step__panel-rise {
+      animation: vmx-step-rise var(--motion-step) ease-out both;
+    }
+  }
+  @keyframes vmx-step-rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
   .wizard-step__cta-row {
     display: flex;
@@ -122,6 +158,25 @@ const CSS = `
 
 registerStyle("wizard-step", CSS);
 
+/** Prepend the single amber lead-glyph index ("01·") to an interior step
+ *  heading. The verbatim H1 copy is preserved as a trailing text node; the
+ *  glyph is a separate inline span so it carries the lone amber accent
+ *  without smearing colour across the heading text (20/80 law). Shared by
+ *  every interior step so the step0 one-accent signature is uniform.
+ *  `index` is the 1-based step ordinal (1 → "01·"). */
+export function withStepLeadGlyph(heading: HTMLElement, index: number): void {
+  const glyph = document.createElement("span");
+  glyph.className = "wizard-step__heading-index";
+  glyph.setAttribute("aria-hidden", "true");
+  const num = document.createElement("span");
+  num.textContent = String(index).padStart(2, "0");
+  const dot = document.createElement("span");
+  dot.className = "wizard-step__heading-dot";
+  dot.textContent = "·";
+  glyph.append(num, dot);
+  heading.prepend(glyph);
+}
+
 export function renderStep1(state: Step1State, cb: Step1Callbacks): HTMLElement {
   const body = document.createElement("div");
 
@@ -129,6 +184,7 @@ export function renderStep1(state: Step1State, cb: Step1Callbacks): HTMLElement 
   heading.className = "wizard-step__heading";
   // UI-SPEC §Step 1 H1 — VERBATIM
   heading.textContent = "STEP 1 / 5 · PERMISSIONS";
+  withStepLeadGlyph(heading, 1);
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
@@ -166,6 +222,7 @@ export function renderStep1(state: Step1State, cb: Step1Callbacks): HTMLElement 
     header: undefined,
     children: body,
   });
+  panel.classList.add("wizard-step__panel-rise");
 
   const ctaRow = document.createElement("div");
   ctaRow.className = "wizard-step__cta-row";

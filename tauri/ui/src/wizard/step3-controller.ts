@@ -8,6 +8,7 @@
 import { PrimaryPanel } from "./components/primary-panel.js";
 import { ControllerProbe, type ControllerProbeState } from "./components/controller-probe.js";
 import { Button } from "./components/button.js";
+import { withStepLeadGlyph } from "./step1-permissions.js";
 import { registerStyle } from "./components/_style-registry.js";
 
 /* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep for the controller
@@ -57,6 +58,7 @@ export function renderStep3(state: Step3State, cb: Step3Callbacks): HTMLElement 
   heading.className = "wizard-step__heading";
   // UI-SPEC §Step 3 H1 — VERBATIM
   heading.textContent = "STEP 3 / 5 · CONTROLLER";
+  withStepLeadGlyph(heading, 3);
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
@@ -77,6 +79,7 @@ export function renderStep3(state: Step3State, cb: Step3Callbacks): HTMLElement 
   );
 
   const panel = PrimaryPanel({ children: body });
+  panel.classList.add("wizard-step__panel-rise");
 
   const ctaRow = document.createElement("div");
   ctaRow.className = "wizard-step__cta-row";

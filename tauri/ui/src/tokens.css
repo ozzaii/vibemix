@@ -124,6 +124,67 @@
   --glow-soft:   0 0 6px var(--amber-40), 0 0 14px var(--amber-22);
   --glow-strong: 0 0 8px var(--amber-65), 0 0 18px var(--amber-22);
 
+  /* === Liquid Glass material (2026-05-25, ADDITIVE — pill pilot) ========== *
+   * Evolves the existing "sealed-glass" reads (--glass-1/2/3, --glass-top,
+   * the inset top-seam) into a TRUE liquid-glass material WITHOUT becoming
+   * iOS-light frosted slop. Apple's Liquid Glass (iOS 26 / macOS Tahoe) is
+   * defined materially by: LENSING (light concentrated/bent at edges, not
+   * scattered like flat blur), SPECULAR HIGHLIGHTS (a bright top-lit edge that
+   * responds to light), ADAPTIVE TRANSLUCENCY, and DEPTH LAYERING — reserved
+   * for the floating navigation layer, NEVER painted onto content.
+   *
+   * vibemix's reading of that: the pill is exactly that floating nav layer,
+   * sitting on the DARK anodised void substrate. So liquid glass here = a
+   * cool phosphor-silk SPECULAR light raked across a near-opaque dark-glass
+   * lozenge, with the top edge catching the most light and the bottom edge
+   * receding into the void (a piece of smoked glass under a single overhead
+   * stage light, not a frosted iOS panel). Amber is UNTOUCHED — the specular
+   * light is NEUTRAL/STRUCTURAL silk, never a second accent (20/80 holds).
+   *
+   * Anti-slop guards baked into the values:
+   *   - NO pure #fff / #000 — highlights are silk-tinted, chroma reduced at the
+   *     extremes (warm silk rgb 255,251,244 capped ≤ 12% alpha), shadows are
+   *     blue-black void, not neutral grey.
+   *   - ONE backdrop-filter layer only (the consumer uses --blur-glass-light);
+   *     the lensing/specular is done with cheap layered box-shadows + a single
+   *     conic/linear pseudo-sweep — no SVG displacement (Safari/Firefox can't
+   *     feed SVG into backdrop-filter anyway, and the GPU cost is the iOS-26
+   *     13%-battery problem we must not import into an always-on-top overlay).
+   *   - reduced-motion + low-power fallbacks live in the @media block below
+   *     (mirrors the existing --blur-glass downgrade pattern). */
+
+  /* Specular light — cool-warm silk, the "overhead stage light" hitting glass.
+   * NOT white: a faintly warm silk so it reads as light on anodised metal, not
+   * a frosted iOS sheen. Three intensities for the top-edge rake. */
+  --lg-spec-hi:   rgba(255, 251, 244, 0.12);  /* brightest catch — top-edge crown */
+  --lg-spec-mid:  rgba(255, 251, 244, 0.06);  /* upper-face fall-off */
+  --lg-spec-lo:   rgba(255, 251, 244, 0.025); /* lower-face residue (near gone) */
+  /* Edge lensing — the rim where light concentrates. A 1px outer rim-light
+   * (top-lit) + the deep void recess at the bottom = the "lens" read. */
+  --lg-rim-light: rgba(255, 251, 244, 0.16);  /* concentrated top rim catch */
+  --lg-rim-void:  rgba(2, 3, 8, 0.55);        /* bottom rim recess into void (tinted to void hue, never pure #000) */
+
+  /* Depth shadow — the floating-layer drop. Blue-black (matches the void
+   * undertone), soft + wide so the lozenge reads as hovering over the desktop,
+   * not stamped onto it. Two-stop: a tight contact + a wide ambient. */
+  --lg-depth: 0 2px 8px rgba(2, 3, 8, 0.5), 0 12px 32px rgba(2, 3, 8, 0.42);
+
+  /* Lens blur — the single backdrop layer. Slightly MORE saturated than the
+   * stock glass-light so the desktop colour bleeding through reads as bent
+   * light (lensing concentrates colour) rather than washed-out frost. Still
+   * one layer, still downgraded under reduced-motion / low-power. */
+  --lg-lens-blur: blur(18px) saturate(135%);
+
+  /* The composed liquid-glass shadow stack — drop this on a floating surface
+   * for the full read in one declaration:
+   *   top specular crown + upper rake + bottom void recess + outer depth.
+   * Consumers still own their backdrop-filter (one layer) + background fill. */
+  --lg-surface-shadow:
+    inset 0 1px 0 var(--lg-rim-light),
+    inset 0 6px 12px -8px var(--lg-spec-hi),
+    inset 0 -1px 0 var(--lg-rim-void),
+    var(--lg-depth);
+
   /* --- Type --- */
   --type-display: 'Saira', system-ui, sans-serif;
   --type-body:    'Saira', system-ui, sans-serif;
@@ -299,6 +360,9 @@
     --blur-glass-light:   blur(8px);
     --blur-glass-display: blur(4px);
     --motion-border-sweep: 0s;
+    /* Liquid-glass lens drops to a cheap blur (no saturate boost) — the
+     * specular box-shadows + fill still carry the material read statically. */
+    --lg-lens-blur:       blur(10px);
   }
   .border-anim { animation: none; opacity: 0.6; }
 }
@@ -307,6 +371,8 @@ html[data-blur-perf="on"] {
   --blur-glass:         blur(16px);
   --blur-glass-light:   blur(8px);
   --blur-glass-display: blur(4px);
+  /* Low-power escape hatch: same lens-blur downgrade as reduced-motion. */
+  --lg-lens-blur:       blur(10px);
 }
 
 /* === Reset ============================================================= */

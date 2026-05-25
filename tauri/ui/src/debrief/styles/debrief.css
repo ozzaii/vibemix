@@ -99,6 +99,38 @@
   padding: var(--sp-5);
 }
 
+/* === Arrival orchestration — P1-a uplift 2 ============================
+ * The review ASSEMBLES in front of the DJ: each section settles in with
+ * a staggered rise (reusing the wizard's vmx-intro-rise shape — 8px up,
+ * fade-in, over --motion-step / 250ms). The stagger builds a deliberate
+ * crescendo that lands on the TL;DR last — the peak-end moment is the
+ * final element to arrive. GPU-cheap (opacity + transform only).
+ *
+ * HARD gate: prefers-reduced-motion. Under `reduce` the whole block is
+ * skipped, so every section is fully opaque + untransformed at paint —
+ * no FOUC, no hidden content, identical to the pre-uplift static layout.
+ * `both` fill keeps the from-state pre-animation so nothing flashes. */
+@media (prefers-reduced-motion: no-preference) {
+  .vmx-debrief-sidebar,
+  .vmx-debrief-timeline,
+  .vmx-debrief-drills,
+  .vmx-debrief-tldr {
+    animation: vmx-debrief-rise var(--motion-step) ease-out both;
+  }
+  /* Crescendo staircase — sidebar first, peak (TL;DR) last. Each step is
+   * ~half --motion-step so four sections settle over ~0.6s total, brisk
+   * enough to feel like a power-up sequence, not a slow splash. */
+  .vmx-debrief-sidebar  { animation-delay: 0ms; }
+  .vmx-debrief-timeline { animation-delay: 120ms; }
+  .vmx-debrief-drills   { animation-delay: 240ms; }
+  .vmx-debrief-tldr     { animation-delay: 360ms; }
+}
+
+@keyframes vmx-debrief-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* === Sidebar (chapter list) ============================================ */
 
 .vmx-debrief-sidebar {
@@ -172,6 +204,24 @@
   min-height: 140px;
 }
 
+/* P1-a uplift 3 — the verdict line. ONE amber focal point on the whole
+ * debrief: the session's standout stat, in JetBrains Mono amber, sitting
+ * above the TL;DR player and below the silk section title. This is the
+ * single warm note the DJ's eye lands on before the Bravoh ask — 20/80
+ * holds because it's the ONLY amber text on the surface (regions glow,
+ * playhead, and this line all share the one accent; nothing else does).
+ * Tabular nums so the stat reads as an instrument readout, not prose. */
+.vmx-debrief-verdict {
+  margin: 0 0 var(--sp-3);
+  font-family: var(--type-mono);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 6px var(--amber-22);
+}
+
 .vmx-debrief-tldr-audio {
   width: 100%;
   margin-top: var(--sp-2);
@@ -187,7 +237,22 @@
   position: relative;
   height: 96px;
   width: 100%;
-  background: var(--glass-3);
+  /* P1-a uplift 1 — read the timeline as the master waveform on a
+   * CDJ-3000 screen, not a flat box. A vertical LED-comb texture sits
+   * UNDER the regions: a 4px-pitch repeating gradient reusing the exact
+   * resting-segment tokens the session meter + pill waveform use
+   * (--silk-06 peak, --silk-025 flanks), composited over the glass-3
+   * panel. The comb is felt at idle, the regions light up over it. */
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--silk-025) 0px,
+      var(--silk-06) 1px,
+      var(--silk-025) 2px,
+      transparent 2px,
+      transparent 4px),
+    var(--glass-3);
+  box-shadow: inset 0 0 0 0.5px var(--seg-hi-018);
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-sm);
   overflow: hidden;
@@ -209,14 +274,43 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: background var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out;
+  /* P1-a uplift 1 — each lit region carries a --glow-faint so it reads
+   * as an illuminated waveform band over the LED-comb floor, not a flat
+   * amber box. 20/80: amber stays the ONLY accent — the glow is the
+   * weakest amber-22 ring (matches the wizard hero CTA resting glow). */
+  box-shadow: var(--glow-faint);
+  transition: background var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out, box-shadow var(--motion-snap) ease-out;
 }
 
 .vmx-debrief-region:hover,
 .vmx-debrief-region:focus-visible {
   background: var(--amber-40);
   border-color: var(--amber);
+  box-shadow: var(--glow-soft);
   outline: none;
+}
+
+/* P1-a uplift 1 — thin amber playhead. A 1px vertical amber rule that
+ * tracks TL;DR audio playback across the timeline. Positioned via the
+ * --vmx-playhead inline custom property set by tldr-player.ts on
+ * timeupdate; hidden (display:none) until the first frame so a stopped
+ * player shows no stray line. GPU-cheap: only `left` animates, and it's
+ * driven by rAF-free native timeupdate (~4Hz). */
+.vmx-debrief-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--vmx-playhead, 0%);
+  width: 1px;
+  background: var(--amber);
+  box-shadow: var(--glow-soft);
+  pointer-events: none;
+  display: none;
+  z-index: 2;
+}
+
+.vmx-debrief-playhead[data-active="true"] {
+  display: block;
 }
 
 /* Phase 44-03 / LAUNCH-02 — citation deep-link highlight pulse. Applied

@@ -109,20 +109,42 @@ const CSS = `
   .cmp-step-indicator__node-wrap[data-state="complete"] .cmp-step-indicator__label {
     color: var(--silk-65);
   }
-  /* Connector — faint silk hairline at idle, amber when the path is
-   * active (prev complete + here active/complete). Solid, not dashed. */
+  /* Connector — faint silk hairline at idle. When the path becomes active
+   * (prev complete + here active/complete), an amber fill TRAVELS the
+   * segment left→right like a CDJ loop bar charging — segment-LED
+   * ballistics, not an instant flip. The travelling fill is a ::after
+   * overlay that scaleX(0→1) from the left edge over --motion-step; the
+   * 1px silk rail underneath stays as the unlit track. GPU-cheap (transform
+   * + opacity only). Reduced-motion → fill snaps in with no travel. */
   .cmp-step-indicator__connector {
+    position: relative;
     flex: 0 0 64px;
     height: 1px;
     margin: 0 var(--sp-3);
     margin-bottom: 18px;  /* align with circle vertical center, not labels */
     background: var(--silk-12);
-    transition: background var(--motion-transition) ease-in-out,
-                box-shadow var(--motion-transition) ease-in-out;
+    overflow: visible;
   }
-  .cmp-step-indicator__connector[data-active="true"] {
+  .cmp-step-indicator__connector::after {
+    content: "";
+    position: absolute;
+    inset: 0;
     background: var(--amber);
     box-shadow: 0 0 4px var(--amber-22);
+    transform: scaleX(0);
+    transform-origin: left center;
+    opacity: 0;
+    transition: transform var(--motion-step) ease-out,
+                opacity var(--motion-step) ease-out;
+  }
+  .cmp-step-indicator__connector[data-active="true"]::after {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cmp-step-indicator__connector::after {
+      transition: none;
+    }
   }
   @keyframes cmp-step-pulse {
     0%, 100% { opacity: 1; }
@@ -138,6 +160,12 @@ export function StepIndicator(props: StepIndicatorProps): HTMLElement {
   root.setAttribute("role", "navigation");
   root.setAttribute("aria-label", "wizard progress");
 
+  // Connectors that should read as filled. We flip data-active on the NEXT
+  // frame (not at build time) so the scaleX(0→1) travel transition actually
+  // fires when the strip re-mounts on a step advance — setting it inline at
+  // creation would paint pre-filled with no animation. Reduced-motion users
+  // get the same end-state instantly (the ::after transition is disabled).
+  const toActivate: HTMLElement[] = [];
   props.steps.forEach((step, i) => {
     if (i > 0) {
       const conn = document.createElement("div");
@@ -146,7 +174,7 @@ export function StepIndicator(props: StepIndicatorProps): HTMLElement {
       const here = step;
       // Connector "active" = both adjacent nodes complete, OR previous complete + here active
       const active = prev?.state === "complete" && (here.state === "complete" || here.state === "active");
-      if (active) conn.dataset.active = "true";
+      if (active) toActivate.push(conn);
       root.append(conn);
     }
     const wrap = document.createElement("div");
@@ -162,6 +190,17 @@ export function StepIndicator(props: StepIndicatorProps): HTMLElement {
     wrap.append(node, label);
     root.append(wrap);
   });
+  // Defer the fill one frame so the L→R travel transition fires on mount.
+  // requestAnimationFrame is absent under jsdom (unit tests) — fall back to
+  // an immediate set so the end-state (filled) still holds for assertions.
+  if (toActivate.length) {
+    const flip = () => toActivate.forEach((c) => (c.dataset.active = "true"));
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(flip);
+    } else {
+      flip();
+    }
+  }
   return root;
 }
 

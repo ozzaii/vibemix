@@ -35,7 +35,13 @@ const CSS = `
       inset 0 -1px 0 rgba(0, 0, 0, 0.4),
       0 6px 20px rgba(0, 0, 0, 0.35);
   }
+  /* P1-b "sexification" — the header SITS ON the raised --glass-2 group
+   * face (a slim top-lit seam crowns it), while the body below is recessed
+   * INTO that face (see __body). The header is the bezel ledge; controls
+   * drop below it into the panel. Knurled/recessed-bezel CDJ feel that the
+   * pre-uplift flat-rectangle group was missing. */
   .vmx-settings-group__header {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -43,6 +49,7 @@ const CSS = `
     padding: 10px var(--sp-4);
     border-bottom: 1px solid var(--glass-edge);
     background: rgba(0, 0, 0, 0.25);
+    box-shadow: inset 0 1px 0 var(--glass-top);
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 9px;
@@ -65,11 +72,19 @@ const CSS = `
     line-height: 1;
     text-shadow: 0 0 4px var(--amber-22);
   }
+  /* P1-b finding #1 — RECESS the control well. Pre-uplift this was a flat
+   * --glass-2 rectangle flush with the header. Now: a darker recessed fill
+   * (--glass-3, the canonical "recessed display window" token) + a top inset
+   * shadow so controls read as set DOWN INTO the panel below the header
+   * bezel. The inset top-seam on __header above is the raised lip; this is
+   * the well it overhangs. GPU-cheap (static box-shadow, no filter). */
   .vmx-settings-group__body {
     padding: var(--sp-4);
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
+    background: var(--glass-3);
+    box-shadow: inset 0 2px 6px var(--void-50);
   }
   .vmx-settings-group__footer {
     padding: 8px var(--sp-4);
@@ -80,6 +95,38 @@ const CSS = `
     color: var(--led-fault);
     line-height: 1.35;
     text-shadow: 0 0 4px rgba(212, 65, 58, 0.18);
+  }
+
+  /* P1-b finding #2 — two-stage mechanical slide-in: STAGE 2 (the settle).
+   * Stage 1 is the drawer body's 250ms translateX (owned by SettingsDrawer
+   * .vmx-settings-drawer). When the drawer lands, each group row does a short
+   * ~120ms micro-settle (10px up → seat) on a per-group stagger so the tray
+   * reads as sliding in THEN seating into place — a mechanical drawer, not a
+   * single CSS slide. The trigger is data-settling="true", set on the drawer
+   * ONLY by openSettings() and cleared after the run, so mid-session body
+   * rebuilds (genre reload, recordings refresh) do NOT replay it.
+   *
+   * Stage-2 delays START at ~250ms (after stage 1 has landed) and step by
+   * 28ms per group. GPU-cheap (transform + opacity only).
+   *
+   * prefers-reduced-motion GATE: the settle (and its stagger) is wrapped in
+   * the no-preference media query, so reduced-motion users get the seated end
+   * state with no transform at all. */
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes vmx-group-settle {
+      from { transform: translateY(10px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .vmx-settings-drawer[data-settling="true"] .vmx-settings-group {
+      animation: vmx-group-settle 120ms ease-out both;
+    }
+    .vmx-settings-drawer[data-settling="true"] .vmx-settings-group:nth-child(1) { animation-delay: 250ms; }
+    .vmx-settings-drawer[data-settling="true"] .vmx-settings-group:nth-child(2) { animation-delay: 278ms; }
+    .vmx-settings-drawer[data-settling="true"] .vmx-settings-group:nth-child(3) { animation-delay: 306ms; }
+    .vmx-settings-drawer[data-settling="true"] .vmx-settings-group:nth-child(4) { animation-delay: 334ms; }
+    .vmx-settings-drawer[data-settling="true"] .vmx-settings-group:nth-child(5) { animation-delay: 362ms; }
+    .vmx-settings-drawer[data-settling="true"] .vmx-settings-group:nth-child(6) { animation-delay: 390ms; }
+    .vmx-settings-drawer[data-settling="true"] .vmx-settings-group:nth-child(n+7) { animation-delay: 418ms; }
   }
 `;
 

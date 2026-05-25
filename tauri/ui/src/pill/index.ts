@@ -30,6 +30,7 @@ import { renderNextSuggestion, type NextSuggestionWire } from "./next-suggestion
 import {
   applyFrame,
   initialPillState,
+  setPeek,
   tickCollapse,
   type CohostStatus,
   type PillFrame,
@@ -204,10 +205,16 @@ interface PillView {
   deckState: DeckStateWire | null;
   /** The #pill-next mount (created in boot, appended below #pill-decks). */
   nextMount: HTMLElement;
+  /** The #pill-peek mount (collapsed-hover next-track card, Phase-1b). Floats
+   *  below the collapsed row; reveals on hover via .pill[data-peek]. */
+  peekMount: HTMLElement;
   /** Latest next_suggestion read off the wire (read-only meta — held on the
    *  view). null = no grounded suggestion (honest silence → no card). */
   nextSuggestion: NextSuggestionWire | null;
   lastNextKey: string;
+  /** Render-memo key for the collapsed peek card (Phase-1b). Held per-view (WR-05)
+   *  so a peek rebuild only fires when the suggestion changes, not every frame. */
+  lastPeekKey: string;
   /** Render-memo keys for the cheap rebuild-only-on-change guards. WR-05: held
    *  PER-VIEW (not module globals) so two pill instances — or two vitest mounts
    *  — can't leak each other's last-render key and skip a legitimate rebuild. */
@@ -226,10 +233,34 @@ const STATE_LABEL: Record<PillState["mode"], string> = {
 };
 
 /** Repaint the DOM from the pill state. Idempotent; called from the rAF loop. */
+// Collapsed-hover PEEK (Phase-1b) — DEFERRED, gated OFF (code review CR-01).
+// The peek card is positioned absolutely at top:64px inside `.pill`, which is
+// `inset:0` + `overflow:hidden` on a FIXED 280×44 transparent window (see
+// pill_window.rs: `resizable(false)`, no resize-on-state by deliberate design —
+// the authors avoided window resize to dodge flicker + geometry-persist thrash).
+// While COLLAPSED the window is only 44px tall, so a 64px-offset card paints
+// below the clipped edge and is never visible. Showing it needs a window-geometry
+// decision (a taller transparent + click-through-below collapsed window, or an
+// opt-in hover resize) that must be verified live in the GUI. Until then the
+// collapsed-hover stays gated OFF — the next-track suggestion still reaches the
+// DJ via the EXPAND panel (#pill-next), its original working home. Flip this to
+// `true` once the window can host the card (then re-verify hit-testing). The pure
+// `setPeek` state + its unit tests remain live so the wiring doesn't bit-rot.
+const COLLAPSED_PEEK_ENABLED = false;
+
 function render(view: PillView, state: PillState, baseLabel: string): void {
   // data-state drives the dot pulse cadence + the expand panel visibility (CSS).
   view.root.dataset.state = state.mode;
   view.label.textContent = baseLabel;
+
+  // See COLLAPSED_PEEK_ENABLED above — gated OFF (CR-01) until the collapsed
+  // window can actually host the card. Honest silence is otherwise preserved
+  // twice over (syncPeekCard renders nothing without a grounded suggestion, and
+  // the CSS `:not(:empty)` guard hides an empty mount).
+  const peekVisible =
+    COLLAPSED_PEEK_ENABLED && state.peek && state.mode !== "expand";
+  view.root.dataset.peek = peekVisible ? "true" : "false";
+  syncPeekCard(view);
 
   if (state.mode === "expand") {
     // Reaction text rendered VERBATIM as a text node (T-62-11 — never innerHTML).
@@ -329,6 +360,32 @@ function syncNextSuggestion(view: PillView): void {
   }
 }
 
+/**
+ * Populate the collapsed-hover #pill-peek mount with the next-track suggestion
+ * card (Phase-1b). REUSES renderNextSuggestion — the SAME card the expand panel
+ * shows (one source of truth, no duplicated markup). Rebuilds only when the
+ * suggestion changes (cheap key over track_id + why) — the rAF loop calls
+ * render() every frame. HONEST SILENCE: a null/undefined suggestion clears the
+ * mount and renders nothing (renderNextSuggestion returns null) — the pill never
+ * fabricates a "next" on hover; an empty mount stays invisible via the CSS
+ * `:not(:empty)` guard. The card is tagged [data-no-drag] so hovering it never
+ * starts a window drag. The mount is always present; only its visibility is
+ * gated by .pill[data-peek] (set in render()), so this can run every frame.
+ */
+function syncPeekCard(view: PillView): void {
+  const mount = view.peekMount;
+  const s = view.nextSuggestion;
+  const key = s ? `${s.track_id}:${s.why}` : "";
+  if (key === view.lastPeekKey) return;
+  view.lastPeekKey = key;
+  mount.replaceChildren();
+  const card = renderNextSuggestion(s);
+  if (card) {
+    card.setAttribute("data-no-drag", "");
+    mount.append(card);
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────
 
 function boot(): void {
@@ -339,7 +396,17 @@ function boot(): void {
   const waveMount = document.getElementById("pill-wave");
   const dragStrip = document.getElementById("pill-drag");
   const decksMount = document.getElementById("pill-decks");
-  if (!root || !label || !reaction || !expand || !waveMount || !dragStrip || !decksMount) {
+  const peekMount = document.getElementById("pill-peek");
+  if (
+    !root ||
+    !label ||
+    !reaction ||
+    !expand ||
+    !waveMount ||
+    !dragStrip ||
+    !decksMount ||
+    !peekMount
+  ) {
     console.error(`${TAG} pill DOM skeleton missing — cannot mount`);
     return;
   }
@@ -368,13 +435,27 @@ function boot(): void {
     decksMount,
     deckState: null,
     nextMount,
+    peekMount,
     nextSuggestion: null,
     lastChipsKey: "",
     lastDeckKey: "",
     lastNextKey: "",
+    lastPeekKey: "",
   };
 
   let state = initialPillState(performance.now());
+
+  // ── Collapsed-hover PEEK (Phase-1b) — pointer-enter/leave flips the pure
+  // `peek` flag; render() reads it into data-peek for the CSS ease-out reveal.
+  // We hover the whole pill (not just a sub-element) so the next-track glance is
+  // reachable anywhere on the lozenge. peek is orthogonal to the expand state
+  // machine — it only toggles the floating peek card, never the expand panel. ──
+  root.addEventListener("pointerenter", () => {
+    state = setPeek(state, true);
+  });
+  root.addEventListener("pointerleave", () => {
+    state = setPeek(state, false);
+  });
 
   // ── Drag-to-move — clone the mascot's explicit JS startDragging(), scoped
   // to the top 28px drag strip (62-UI-SPEC §Drag handle). data-tauri-drag-region

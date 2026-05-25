@@ -58,6 +58,12 @@ export type PillMode = "idle" | "listening" | "speaking" | "expand";
  * - `chips`: the citation strip carried by the active reaction (empty when
  *   not expanded). Rendered verbatim via renderCitationStrip — the pill never
  *   fabricates or adds chips (T-62-12).
+ * - `peek`: pointer-hover flag for the COLLAPSED pill (Phase-1b). When true the
+ *   pill reveals the next-track suggestion as a small floating peek card. This is
+ *   ORTHOGONAL to `mode` — peek never changes the mode (the collapsed pill stays
+ *   idle/listening/speaking underneath); it is a hover overlay only. The DOM glue
+ *   in index.ts gates the visible peek on `peek && !expanded && a grounded
+ *   suggestion exists` (honest silence — no card when nothing grounds).
  */
 export interface PillState {
   mode: PillMode;
@@ -67,6 +73,7 @@ export interface PillState {
   collapseAt: number | null;
   reactionText: string;
   chips: CitationChip[];
+  peek: boolean;
 }
 
 /**
@@ -130,7 +137,24 @@ export function initialPillState(_now: number): PillState {
     collapseAt: null,
     reactionText: "",
     chips: [],
+    peek: false,
   };
+}
+
+// ── setPeek ───────────────────────────────────────────────────────────────
+
+/**
+ * Pure hover transition (Phase-1b). Sets the collapsed-pill `peek` flag from a
+ * pointer-enter / pointer-leave. Pure — never mutates `state`, returns the SAME
+ * reference when the flag is unchanged (so the rAF loop can cheaply skip a
+ * re-render). Peek is orthogonal to `mode`: it does NOT enter/leave `expand` and
+ * never touches the reaction payload — it is purely the "show me the next track
+ * on hover" overlay flag. The DOM glue decides whether a card actually paints
+ * (honest silence: no grounded suggestion → nothing shows even while peek=true).
+ */
+export function setPeek(state: PillState, peek: boolean): PillState {
+  if (state.peek === peek) return state; // unchanged ref — cheap skip
+  return { ...state, peek };
 }
 
 // ── applyFrame ────────────────────────────────────────────────────────────
