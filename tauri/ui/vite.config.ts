@@ -100,6 +100,11 @@ export default defineConfig({
         // debrief window. Opened by tauri/src-tauri/src/debrief_window.rs
         // ::open_debrief_window with `?session=<encoded>` query param.
         debrief: resolve(projectRoot, "debrief.html"),
+        // Library / vibe-engine window entry. Opened by
+        // tauri/src-tauri/src/library_cmds.rs::open_library_window (window
+        // label "library"). Without this rollup input `vite build` would not
+        // emit dist/library.html and the window would 404 in production.
+        library: resolve(projectRoot, "library.html"),
       },
     },
   },

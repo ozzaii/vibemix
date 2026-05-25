@@ -419,6 +419,38 @@ fn repo_root_from_manifest() -> PathBuf {
         .unwrap_or(manifest)
 }
 
+/// Resolve how to launch the `vibemix` CLI for a ONE-SHOT library subcommand
+/// (search / similar / embed-folder / budget).
+///
+/// This reuses the SAME dev-vs-bundled decision as the sidecar watchdog
+/// (`resolve_sidecar_invocation`) with `wizard_mode = false` — the library
+/// bridge never runs the wizard. The landmine-safe rule is preserved: the
+/// bundled path (`resource_dir()`) is ONLY resolved on the Bundled arm, so a
+/// `cargo tauri dev` run (where `resource_dir()` points at a non-existent
+/// bundle) never touches it.
+///
+/// `library_cmds.rs` consumes the returned `SidecarInvocation` to construct
+/// the actual command, then appends the `library <sub> …` args + relays the
+/// `FORWARDED_ENV_KEYS`. Sharing this decision point means the dev/release
+/// split has exactly one home (this file), matching the watchdog.
+pub(crate) fn resolve_sidecar_invocation_for_library(
+    app: &AppHandle,
+) -> Result<SidecarInvocation, String> {
+    let bundled = if std::env::var("VIBEMIX_DEV_SIDECAR").as_deref() == Ok("1") {
+        None
+    } else {
+        // Only resolved on the Bundled arm below; under the dev flag this is
+        // None and resource_dir() is never consulted.
+        Some(resolve_sidecar_path(app).map_err(|e| format!("sidecar lookup failed: {e}"))?)
+    };
+    Ok(resolve_sidecar_invocation(
+        bundled,
+        /* wizard */ false,
+        &repo_root_from_manifest(),
+        &|k: &str| std::env::var(k).ok(),
+    ))
+}
+
 /// Resolve the bundled sidecar binary path inside the .app/.exe.
 ///
 /// Tauri's `bundle.resources` puts each pattern's match under

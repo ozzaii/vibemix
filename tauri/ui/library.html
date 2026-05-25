@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>vibemix · vibe engine</title>
+    <!--
+      Library / vibe-engine window entry.
+
+      Second-window entry opened by
+      tauri/src-tauri/src/library_cmds.rs::open_library_window (window label
+      "library", ~1180×760). The frontend (owned by the frontend agent) lives
+      at /src/library/index.ts — it invokes the library_search / library_similar
+      / library_stats / library_embed_folder Tauri commands and listens for the
+      `library://embed-progress` + `library://embed-done` events.
+
+      This file is intentionally bare: a CDJ-dark body background (so first
+      paint matches the visual direction before CSS loads), one #app root, and
+      the module script. The frontend agent fills the rest.
+    -->
+    <style>
+      /* CDJ Whisper warm-black baseline — avoids a white flash before the
+         frontend's tokens.css / library styles mount. */
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0f0f11;
+        color: #e8e6e1;
+        font-family:
+          "Saira", system-ui, -apple-system, sans-serif;
+      }
+      #app {
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/library/index.ts"></script>
+  </body>
+</html>

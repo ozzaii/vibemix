@@ -22,6 +22,7 @@ mod debug_log;
 mod debrief_window;
 mod djay_ax;
 mod hotkey;
+mod library_cmds;
 mod mascot_window;
 mod overlay;
 mod permissions;
@@ -95,6 +96,12 @@ fn main() {
             wizard_cmds::run_companion_fetch,
             wizard_cmds::run_audio_config,
             wizard_cmds::open_audio_settings,
+            // Library / vibe-engine bridge — `vibemix library` CLI subprocess.
+            library_cmds::library_search,
+            library_cmds::library_similar,
+            library_cmds::library_stats,
+            library_cmds::library_embed_folder,
+            library_cmds::open_library_window,
         ])
         .manage(SidecarHandle::default())
         .manage(DebriefSidecarHandle::default())
