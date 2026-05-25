@@ -184,6 +184,19 @@ class Grounding:
         self._store = store
         self._lock = threading.Lock()
         self._latest: Citation | None = None
+        # Phase 77 review CR-01 — per-dispatch generation token, mirroring
+        # ``MemoryRecall._inflight_gen`` (Phase 65 review CR-04). Incremented
+        # at the start of every ``on_event`` AND every ``clear``; captured by
+        # the executor thread at dispatch time, and re-checked before the
+        # final ``_latest = citation`` write. The WIRE-01 dispatch wraps
+        # ``on_event`` in ``asyncio.wait_for(timeout=_DEADLINE_S)`` and calls
+        # ``clear()`` on timeout — but ``wait_for`` timing out does NOT stop
+        # the executor thread, so ``identify_playing`` keeps running and would
+        # otherwise latch a stale citation AFTER ``clear()`` ran, resurrecting
+        # a prior track's ``[track:<id>]`` for the wrong track (invariant #3
+        # — "trust the audio"). The token check below detects the intervening
+        # ``clear()`` and DISCARDS the late write. Guarded by ``_lock``.
+        self._inflight_gen: int = 0
 
     def on_event(
         self,
@@ -194,7 +207,24 @@ class Grounding:
         mime_type: str = "audio/wav",
     ) -> Citation | None:
         """Run grounding for an emitted event. Stores the result for
-        ``get_latest_citation()``. Returns None when event is not track-aware."""
+        ``get_latest_citation()``. Returns None when event is not track-aware.
+
+        Phase 77 review CR-01 — a per-dispatch generation token is captured
+        BEFORE the (potentially slow) embed + library cosine and re-checked
+        before the final latch write. If ``clear()`` was called in between
+        (the asyncio deadline wrapper fired ``TimeoutError`` mid-embed), the
+        token check fails and ``_latest`` is NOT mutated — the stale citation
+        is silently dropped instead of resurrecting a wrong ``[track:<id>]``.
+        The Citation is still returned to the caller so the synchronous unit
+        path (and telemetry) still observe the result.
+        """
+        # Capture the generation BEFORE the slow work — held across the embed
+        # + cosine window. A concurrent ``clear()`` bumps ``_inflight_gen``
+        # while we're outside the lock, which the final check below detects.
+        with self._lock:
+            self._inflight_gen += 1
+            my_gen = self._inflight_gen
+
         citation = identify_playing(
             self._embedder,
             self._store,
@@ -205,7 +235,13 @@ class Grounding:
         )
         if citation is not None and citation.is_cited:
             with self._lock:
-                self._latest = citation
+                # Token check — if the agent's deadline wrapper fired
+                # ``clear()`` between dispatch and now, ``_inflight_gen`` has
+                # been bumped and this citation is stale. Drop it without
+                # touching ``_latest`` so the deadline-miss "no citation this
+                # turn" contract holds (matches the recall race-discard).
+                if my_gen == self._inflight_gen:
+                    self._latest = citation
         return citation
 
     def get_latest_citation(self) -> Citation | None:
@@ -215,8 +251,16 @@ class Grounding:
 
     def clear(self) -> None:
         """Drop the latest citation — called at end of each Gemini turn so
-        a single citation isn't replayed across multiple prompts."""
+        a single citation isn't replayed across multiple prompts.
+
+        Phase 77 review CR-01 — bumps ``_inflight_gen`` so any in-flight
+        ``on_event`` whose executor thread is still mid-embed will fail its
+        token check at write-time and discard its (now-stale) citation
+        instead of overwriting the cleared latch. This is the deadline-miss
+        path's contract: the dispatch we are cancelling IS the one whose
+        write we must invalidate (mirrors ``MemoryRecall.clear``)."""
         with self._lock:
+            self._inflight_gen += 1
             self._latest = None
 
 

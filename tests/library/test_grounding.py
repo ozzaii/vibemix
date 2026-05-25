@@ -141,6 +141,48 @@ def test_grounding_clear(fake_embedder, fake_store) -> None:
     assert g.get_latest_citation() is None
 
 
+def test_clear_during_inflight_on_event_discards_stale_citation(
+    fake_embedder, fake_store
+) -> None:
+    """Phase 77 review CR-01 — generation token discards a stale on_event write.
+
+    Simulates the WIRE-01 race where the agent's ``asyncio.wait_for`` fires
+    ``TimeoutError`` and calls ``grounding.clear()`` while the executor thread
+    is still inside ``on_event`` (between embed/cosine and the final
+    ``_latest = citation`` write). The per-dispatch generation token in
+    ``Grounding.on_event`` must detect the intervening ``clear()`` and DROP
+    the (now-stale) citation instead of resurrecting it — otherwise a
+    timed-out lookup's late write resurrects a wrong ``[track:<id>]`` for the
+    wrong track (invariant #3). Mirrors the recall race test
+    ``test_clear_during_inflight_on_event_discards_stale_latch``.
+
+    The race is staged by wrapping ``store.search`` with a callable that
+    fires ``g.clear()`` after the generation token has been captured (bumped
+    at the very start of ``on_event``) but BEFORE the final lock-protected
+    write — the same window the executor thread sits in under live load.
+    """
+    g = Grounding(fake_embedder, fake_store)
+    fake_store.search.return_value = [("t000", 0.85)]
+
+    original_search = fake_store.search
+
+    def racing_search(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202 — test shim
+        result = original_search(*args, **kwargs)
+        g.clear()  # bumps _inflight_gen between dispatch and write
+        return result
+
+    fake_store.search = racing_search  # type: ignore[method-assign]
+
+    citation = g.on_event("TRACK_CHANGE", b"audio")
+    # The caller still sees the cited result (embed + cosine happened) but
+    # the latch was NOT mutated — the deadline contract holds.
+    assert citation is not None
+    assert citation.is_cited is True
+    assert g.get_latest_citation() is None, (
+        "stale executor write must be discarded after intervening clear()"
+    )
+
+
 def test_event_id_format() -> None:
     c = Citation(
         event_id="ev-test",
