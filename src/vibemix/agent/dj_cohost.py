@@ -1271,1027 +1271,1045 @@ class DJCoHostAgent(Agent):
             # model holds even if recall pull/registration raises.
             self._pending_event = None
 
-        # Plan 18-03 — snapshot the EvidenceRegistry FRESH per turn so the
-        # AICoach.evidence_line corpus footer reflects observations written
-        # by state_refresh_loop + EventDetector since the last invocation.
-        # snapshot() is O(N) over total observations and lock-guarded; with
-        # the cohost_v4 cooldown gates a 1h DJ session caps at ~500 obs, so
-        # this fits well under 1ms per turn (cheap). When _registry is None
-        # (default Phase 4 backward-compat path), pass None — AICoach skips
-        # the corpus footer and the v4 byte-identical evidence_line is
-        # preserved. This is the production-corpus seeding loop:
-        #   registry → snapshot → AICoach evidence_corpus footer → Gemini
-        # plus the citation-grammar block in the system instruction
-        # (Task 1) tells Gemini HOW to cite against that corpus.
-        #
-        # Phase 65 Plan 04 — recall survivors MUST already be written
-        # above so they appear in this snapshot. The linter's existence-
-        # only branch reads snapshot["recall"]; missing survivors would
-        # strip a legitimate turn.
-        snapshot = self._registry.snapshot() if self._registry is not None else None
+        # Phase 77 review WR-03 — wrap the stream/emit body so the
+        # turn-end recall + grounding latch clears ALWAYS run, even if
+        # an uncaught exception is raised between the inner guarded
+        # blocks (or the generator is closed early). Previously the
+        # clears sat at the body tail AFTER this region, so a mid-stream
+        # raise skipped them and a [track:<id>] / [recall:<id>] latch
+        # persisted into the next turn (widening the CR-01 window).
+        try:
+            # Plan 18-03 — snapshot the EvidenceRegistry FRESH per turn so the
+            # AICoach.evidence_line corpus footer reflects observations written
+            # by state_refresh_loop + EventDetector since the last invocation.
+            # snapshot() is O(N) over total observations and lock-guarded; with
+            # the cohost_v4 cooldown gates a 1h DJ session caps at ~500 obs, so
+            # this fits well under 1ms per turn (cheap). When _registry is None
+            # (default Phase 4 backward-compat path), pass None — AICoach skips
+            # the corpus footer and the v4 byte-identical evidence_line is
+            # preserved. This is the production-corpus seeding loop:
+            #   registry → snapshot → AICoach evidence_corpus footer → Gemini
+            # plus the citation-grammar block in the system instruction
+            # (Task 1) tells Gemini HOW to cite against that corpus.
+            #
+            # Phase 65 Plan 04 — recall survivors MUST already be written
+            # above so they appear in this snapshot. The linter's existence-
+            # only branch reads snapshot["recall"]; missing survivors would
+            # strip a legitimate turn.
+            snapshot = self._registry.snapshot() if self._registry is not None else None
 
-        # Plan 19-02 — diet dispatch. Ack-eligible events (HEARTBEAT,
-        # MIX_MOVE, LAYER_ARRIVAL, KAAN_SPOKE) shrink to a 6s audio window
-        # + the compact 5-field evidence_line; non-ack events keep the full
-        # 18s window + full evidence_line + corpus footer. An unknown
-        # ev.type defaults safely to diet=False (full payload) — erring
-        # toward correctness over latency (T-19-02-02 mitigation).
-        ev_type_for_diet = ev.type if ev is not None else "MANUAL"
-        diet = ev_type_for_diet in ACK_ELIGIBLE_EVENTS
-        audio_seconds = DIET_AUDIO_SECONDS if diet else INVOKE_AUDIO_SECONDS
-        skip_screen = ev_type_for_diet in SCREEN_SKIP_EVENTS
+            # Plan 19-02 — diet dispatch. Ack-eligible events (HEARTBEAT,
+            # MIX_MOVE, LAYER_ARRIVAL, KAAN_SPOKE) shrink to a 6s audio window
+            # + the compact 5-field evidence_line; non-ack events keep the full
+            # 18s window + full evidence_line + corpus footer. An unknown
+            # ev.type defaults safely to diet=False (full payload) — erring
+            # toward correctness over latency (T-19-02-02 mitigation).
+            ev_type_for_diet = ev.type if ev is not None else "MANUAL"
+            diet = ev_type_for_diet in ACK_ELIGIBLE_EVENTS
+            audio_seconds = DIET_AUDIO_SECONDS if diet else INVOKE_AUDIO_SECONDS
+            skip_screen = ev_type_for_diet in SCREEN_SKIP_EVENTS
 
-        # Build grounded text packet (same evidence + task v2 used).
-        # Phase 65 Plan 04 — thread ``recall_moments`` ONLY when non-empty
-        # so every existing dj_cohost call-shape test stays BYTE-IDENTICAL
-        # (the cold/feature-off path is the v5.0 baseline). An empty list
-        # and a missing kwarg are semantically identical (the falsy-gate
-        # in evidence_line treats None and [] the same), but the existing
-        # mocker.assert_called_once_with(..., registry_snapshot=..., diet=)
-        # tests pin the EXACT kwargs — so we omit recall_moments when
-        # there's nothing to inject. The non-diet path with survivors
-        # passes the kwarg; the diet path NEVER receives it (diet =
-        # ACK_ELIGIBLE_EVENTS, never a retrieval event).
-        _bp_kwargs: dict[str, Any] = {"registry_snapshot": snapshot, "diet": diet}
-        if recall_moments and not diet:
-            _bp_kwargs["recall_moments"] = recall_moments
-        if ev is not None:
-            text_prompt = AICoach.build_prompt(ev, **_bp_kwargs)
-        else:
-            # No event context (e.g. generate_reply called without prep) — fall back
-            text_prompt = AICoach.build_prompt(
-                Event(type="MANUAL", state=self._state, extra={}),
-                **_bp_kwargs,
+            # Build grounded text packet (same evidence + task v2 used).
+            # Phase 65 Plan 04 — thread ``recall_moments`` ONLY when non-empty
+            # so every existing dj_cohost call-shape test stays BYTE-IDENTICAL
+            # (the cold/feature-off path is the v5.0 baseline). An empty list
+            # and a missing kwarg are semantically identical (the falsy-gate
+            # in evidence_line treats None and [] the same), but the existing
+            # mocker.assert_called_once_with(..., registry_snapshot=..., diet=)
+            # tests pin the EXACT kwargs — so we omit recall_moments when
+            # there's nothing to inject. The non-diet path with survivors
+            # passes the kwarg; the diet path NEVER receives it (diet =
+            # ACK_ELIGIBLE_EVENTS, never a retrieval event).
+            _bp_kwargs: dict[str, Any] = {"registry_snapshot": snapshot, "diet": diet}
+            if recall_moments and not diet:
+                _bp_kwargs["recall_moments"] = recall_moments
+            if ev is not None:
+                text_prompt = AICoach.build_prompt(ev, **_bp_kwargs)
+            else:
+                # No event context (e.g. generate_reply called without prep) — fall back
+                text_prompt = AICoach.build_prompt(
+                    Event(type="MANUAL", state=self._state, extra={}),
+                    **_bp_kwargs,
+                )
+
+            # Phase 77 Plan 04 — WIRE-01: pull the latest CITED grounding citation
+            # (latched off-loop by _maybe_dispatch_grounding) and inject it as a
+            # ``[track:<id>]`` reference into the prompt. The id resolves in the
+            # EvidenceRegistry because ``register_library`` already seeded every
+            # library track id (invariant #2) — so the CitationLinter keeps the
+            # turn with NO linter change. STRICTLY READ-ONLY: we never write
+            # MusicState (single-writer invariant #1). The grounding=None path
+            # (cold path) skips this entirely → byte-identical. NEVER inline-await
+            # the embed here — get_latest_citation() is a cheap lock-guarded read
+            # of the already-computed latch (the off-loop dispatch did the work).
+            if self._grounding is not None:
+                try:
+                    cit = self._grounding.get_latest_citation()
+                    if cit is not None and cit.is_cited and cit.track_id:
+                        text_prompt = f"{text_prompt} [track:{cit.track_id}]"
+                except Exception as _e:
+                    print(f"[grounding pull err] {_e}", file=sys.stderr)
+
+            audio_wav = snapshot_wav(self._clean_audio_buf, audio_seconds)
+            # Per-invocation dump folder — full audit trail for rapid dev.
+            invoke_ts = time.strftime("%H%M%S")
+            invoke_n = getattr(self, "_invoke_counter", 0) + 1
+            self._invoke_counter = invoke_n
+            invoke_dir = (
+                self._recorder.session_dir
+                / "invocations"
+                / f"{invoke_n:04d}_{invoke_ts}_{ev.type if ev else 'MANUAL'}"
             )
-
-        # Phase 77 Plan 04 — WIRE-01: pull the latest CITED grounding citation
-        # (latched off-loop by _maybe_dispatch_grounding) and inject it as a
-        # ``[track:<id>]`` reference into the prompt. The id resolves in the
-        # EvidenceRegistry because ``register_library`` already seeded every
-        # library track id (invariant #2) — so the CitationLinter keeps the
-        # turn with NO linter change. STRICTLY READ-ONLY: we never write
-        # MusicState (single-writer invariant #1). The grounding=None path
-        # (cold path) skips this entirely → byte-identical. NEVER inline-await
-        # the embed here — get_latest_citation() is a cheap lock-guarded read
-        # of the already-computed latch (the off-loop dispatch did the work).
-        if self._grounding is not None:
             try:
-                cit = self._grounding.get_latest_citation()
-                if cit is not None and cit.is_cited and cit.track_id:
-                    text_prompt = f"{text_prompt} [track:{cit.track_id}]"
+                invoke_dir.mkdir(parents=True, exist_ok=True)
+                (invoke_dir / "audio.wav").write_bytes(audio_wav)
+                # Also keep top-level shortcut to the latest dump.
+                (self._recorder.session_dir / "last_gemini_audio.wav").write_bytes(audio_wav)
             except Exception as _e:
-                print(f"[grounding pull err] {_e}", file=sys.stderr)
+                print(f"[dump err] {_e}", file=sys.stderr)
+            # Single-modality: audio only. Screen + MIDI metadata caused hallucination.
+            # Plan 19-02 pre-wiring: when v2.x re-enables screen capture, the
+            # gate becomes ``screen_jpeg = None if skip_screen else
+            # self._screen_buf.latest()[0]`` — for v2.0 the line stays None per
+            # the v4 anti-hallucination invariant. The screen Part append below
+            # gets a ``not skip_screen`` guard so the diet rule is enforced
+            # the moment the screen frame becomes non-None.
+            screen_jpeg = None
 
-        audio_wav = snapshot_wav(self._clean_audio_buf, audio_seconds)
-        # Per-invocation dump folder — full audit trail for rapid dev.
-        invoke_ts = time.strftime("%H%M%S")
-        invoke_n = getattr(self, "_invoke_counter", 0) + 1
-        self._invoke_counter = invoke_n
-        invoke_dir = (
-            self._recorder.session_dir
-            / "invocations"
-            / f"{invoke_n:04d}_{invoke_ts}_{ev.type if ev else 'MANUAL'}"
-        )
-        try:
-            invoke_dir.mkdir(parents=True, exist_ok=True)
-            (invoke_dir / "audio.wav").write_bytes(audio_wav)
-            # Also keep top-level shortcut to the latest dump.
-            (self._recorder.session_dir / "last_gemini_audio.wav").write_bytes(audio_wav)
-        except Exception as _e:
-            print(f"[dump err] {_e}", file=sys.stderr)
-        # Single-modality: audio only. Screen + MIDI metadata caused hallucination.
-        # Plan 19-02 pre-wiring: when v2.x re-enables screen capture, the
-        # gate becomes ``screen_jpeg = None if skip_screen else
-        # self._screen_buf.latest()[0]`` — for v2.0 the line stays None per
-        # the v4 anti-hallucination invariant. The screen Part append below
-        # gets a ``not skip_screen`` guard so the diet rule is enforced
-        # the moment the screen frame becomes non-None.
-        screen_jpeg = None
+            # Short-term verbal memory — don't repeat or rephrase what you just said
+            history_clause = ""
+            if self._ai_text_history:
+                recent = " | ".join(f'"{t}"' for t in self._ai_text_history)
+                history_clause = (
+                    f"\n\nRECENT THINGS YOU JUST SAID (each tagged [M:SS] with the set-time you "
+                    f"said it — compare against the current set_time in the evidence packet to know "
+                    f"how long ago that was). Do NOT repeat, rephrase, or re-react to a moment you "
+                    f"already covered, and don't re-quote a set-time you already mentioned. Find a "
+                    f"FRESH angle on what's happening NOW: {recent}"
+                )
 
-        # Short-term verbal memory — don't repeat or rephrase what you just said
-        history_clause = ""
-        if self._ai_text_history:
-            recent = " | ".join(f'"{t}"' for t in self._ai_text_history)
-            history_clause = (
-                f"\n\nRECENT THINGS YOU JUST SAID (each tagged [M:SS] with the set-time you "
-                f"said it — compare against the current set_time in the evidence packet to know "
-                f"how long ago that was). Do NOT repeat, rephrase, or re-react to a moment you "
-                f"already covered, and don't re-quote a set-time you already mentioned. Find a "
-                f"FRESH angle on what's happening NOW: {recent}"
-            )
-
-        # Plan 40-01 / AUDIO-01 — mic-as-2nd-Gemini-Part decision. Three
-        # gates; all must pass for Part 2 to attach:
-        #   1. self._mic_audio_buf is not None
-        #   2. now - state.last_kaan_spoke_at <= MIC_AUDIO_PART_RECENCY_S
-        #   3. snapshot ring RMS > MIC_AUDIO_PART_PRESENCE_RMS * 32767
-        # The snapshot/RMS work runs ONCE; the result + skip-reason feed
-        # both the prompt suffix and the structured log line. Plan 40-03
-        # will append a 3rd lookahead Part immediately after this block.
-        mic_wav: bytes | None = None
-        mic_skip_reason: str | None = None
-        kaan_spoke_age_s: float | None = None
-        mic_rms_int16: float = 0.0
-        if self._mic_audio_buf is None:
-            mic_skip_reason = "no_mic_audio_buf"
-        else:
-            kaan_spoke_age_s = time.time() - self._state.last_kaan_spoke_at
-            if kaan_spoke_age_s > MIC_AUDIO_PART_RECENCY_S:
-                mic_skip_reason = "kaan_spoke_not_recent"
+            # Plan 40-01 / AUDIO-01 — mic-as-2nd-Gemini-Part decision. Three
+            # gates; all must pass for Part 2 to attach:
+            #   1. self._mic_audio_buf is not None
+            #   2. now - state.last_kaan_spoke_at <= MIC_AUDIO_PART_RECENCY_S
+            #   3. snapshot ring RMS > MIC_AUDIO_PART_PRESENCE_RMS * 32767
+            # The snapshot/RMS work runs ONCE; the result + skip-reason feed
+            # both the prompt suffix and the structured log line. Plan 40-03
+            # will append a 3rd lookahead Part immediately after this block.
+            mic_wav: bytes | None = None
+            mic_skip_reason: str | None = None
+            kaan_spoke_age_s: float | None = None
+            mic_rms_int16: float = 0.0
+            if self._mic_audio_buf is None:
+                mic_skip_reason = "no_mic_audio_buf"
             else:
-                # Snapshot the ring at the v4-baseline 8s window and check
-                # presence. snapshot_wav already peak-normalizes — read the
-                # raw int16 pcm via buf.snapshot() for an honest RMS gate.
-                import numpy as _np  # local import — keeps top-level clean
-
-                n = int(MIC_AUDIO_PART_SECONDS * self._mic_audio_buf._sr)
-                pcm = self._mic_audio_buf.snapshot(n)
-                if pcm.size == 0:
-                    mic_skip_reason = "mic_ring_empty"
+                kaan_spoke_age_s = time.time() - self._state.last_kaan_spoke_at
+                if kaan_spoke_age_s > MIC_AUDIO_PART_RECENCY_S:
+                    mic_skip_reason = "kaan_spoke_not_recent"
                 else:
-                    mic_rms_int16 = float(
-                        _np.sqrt(_np.mean(pcm.astype(_np.float32) ** 2))
-                    )
-                    presence_floor_int16 = MIC_AUDIO_PART_PRESENCE_RMS * 32767.0
-                    if mic_rms_int16 < presence_floor_int16:
-                        mic_skip_reason = "mic_silent"
+                    # Snapshot the ring at the v4-baseline 8s window and check
+                    # presence. snapshot_wav already peak-normalizes — read the
+                    # raw int16 pcm via buf.snapshot() for an honest RMS gate.
+                    import numpy as _np  # local import — keeps top-level clean
+
+                    n = int(MIC_AUDIO_PART_SECONDS * self._mic_audio_buf._sr)
+                    pcm = self._mic_audio_buf.snapshot(n)
+                    if pcm.size == 0:
+                        mic_skip_reason = "mic_ring_empty"
                     else:
-                        mic_wav = snapshot_wav(
-                            self._mic_audio_buf, MIC_AUDIO_PART_SECONDS
+                        mic_rms_int16 = float(
+                            _np.sqrt(_np.mean(pcm.astype(_np.float32) ** 2))
                         )
-
-        # Plan 40-03 / AUDIO-02 + AUDIO-04 — source-file lookahead Part 3
-        # decision. Belt-and-braces try/except wrapping: the provider's
-        # snapshot_wav() already returns ``(None, meta)`` on every observed
-        # failure path (T-40-02-* threat register), but the wrapper here
-        # guarantees ``llm_node`` cannot crash even if the provider
-        # misbehaves (T-40-03-02 mitigation). When self._lookahead is
-        # None (Phase 4/40-01 backward-compat default), Part 3 is never
-        # attempted and the meta dict carries an explicit "no_lookahead"
-        # reason — feeds the lookahead_part_skipped event below.
-        lookahead_wav: bytes | None = None
-        lookahead_meta: dict = {"ok": False, "reason": "no_lookahead"}
-        if self._lookahead is not None:
-            try:
-                lookahead_wav, lookahead_meta = self._lookahead.snapshot_wav()
-            except Exception as e:  # noqa: BLE001 — graceful degrade per T-40-03-02
-                print(f"[lookahead err] {e}", file=sys.stderr)
-                lookahead_wav = None
-                lookahead_meta = {"ok": False, "reason": f"exception: {e!r}"}
-        mic_attached = mic_wav is not None
-        lookahead_attached = lookahead_wav is not None
-
-        # Plan 40-03 — Part-aware prompt suffix via build_parts_description.
-        # Delegates the 4-way string dispatch (1-Part baseline / mic-only /
-        # lookahead-only / 3-Part full) to the locked builder in
-        # vibemix.prompts.matrix. The builder encodes CONTEXT.md Q2:
-        # lookahead-present variants carry "NOT YET HEARD BY AUDIENCE" +
-        # anti-prediction guard language.
-        parts_clause = build_parts_description(
-            audio_seconds=float(audio_seconds),
-            has_mic_part=mic_attached,
-            has_lookahead_part=lookahead_attached,
-        )
-
-        contents: list = [
-            text_prompt + parts_clause + history_clause,
-            types.Part.from_bytes(data=audio_wav, mime_type="audio/wav"),
-        ]
-        if mic_attached:
-            contents.append(types.Part.from_bytes(data=mic_wav, mime_type="audio/wav"))
-            self._recorder.log_event(
-                "mic_part_attached",
-                duration_s=MIC_AUDIO_PART_SECONDS,
-                rms_int16=mic_rms_int16,
-                kaan_spoke_age_s=kaan_spoke_age_s,
-                bytes=len(mic_wav),
-            )
-        else:
-            self._recorder.log_event(
-                "mic_part_skipped",
-                reason=mic_skip_reason or "unknown",
-                kaan_spoke_age_s=kaan_spoke_age_s,
-                rms_int16=mic_rms_int16,
-            )
-        # Plan 40-03 — Part 3 (lookahead) attach + structured event. The
-        # mic_part_* / lookahead_part_* pair forms a uniform diagnostic
-        # surface for coach-loop tails + Settings → Diagnostics; per-turn
-        # both events fire (one of each pair from each side). The lookahead
-        # event carries the provider's full meta dict so events.jsonl
-        # consumers see title / file / seek / duration / reason.
-        if lookahead_attached:
-            contents.append(
-                types.Part.from_bytes(data=lookahead_wav, mime_type="audio/wav")
-            )
-            self._recorder.log_event(
-                "lookahead_part_attached",
-                bytes=len(lookahead_wav),
-                **{k: v for k, v in lookahead_meta.items() if k != "bytes"},
-            )
-        else:
-            self._recorder.log_event(
-                "lookahead_part_skipped",
-                **lookahead_meta,
-            )
-        if screen_jpeg and not skip_screen:
-            contents.append(types.Part.from_bytes(data=screen_jpeg, mime_type="image/jpeg"))
-
-        ev_tag = ev.type if ev else "MANUAL"
-        full_prompt = contents[0] if contents else text_prompt
-        try:
-            (invoke_dir / "prompt.txt").write_text(full_prompt)
-        except Exception:
-            pass
-
-        # ---- Plan 19-03 — context-cache dispatch ----
-        # Three branches:
-        #   1. cache is None at construction → cache_state="disabled", reuse
-        #      self._gen_cfg by reference (Phase 4 byte-identical path).
-        #   2. cache non-None but current_name()=None (warm-up window OR
-        #      post-invalidate gap) → cache_state="cold", same fallback as
-        #      disabled (system_instruction in self._gen_cfg drives the call).
-        #   3. cache non-None AND current_name() returns a string → cache_
-        #      state="warm", build a per-call gen_cfg with cached_content set
-        #      and system_instruction OMITTED (Gemini rejects passing both).
-        #      thinking_config + temperature + max_output_tokens preserved.
-        if self._cache is None:
-            gen_cfg = self._gen_cfg
-            cache_state = "disabled"
-        else:
-            cache_name = self._cache.current_name()
-            if cache_name is None:
-                gen_cfg = self._gen_cfg
-                cache_state = "cold"
-            else:
-                gen_cfg = types.GenerateContentConfig(
-                    cached_content=cache_name,
-                    thinking_config=types.ThinkingConfig(thinking_level="minimal"),
-                    temperature=1.0,
-                    max_output_tokens=1024,  # 2026-05-20 — lifted from 220 for gemini-3.5-flash (thinking shares budget); Kaan: don't cap output
-                )
-                cache_state = "warm"
-
-        self._recorder.log_event(
-            "llm_invoke",
-            event=ev_tag,
-            audible=self._state.audible,
-            deck=self._state.audible_deck,
-            track=self._state.audible_track,
-            phase=self._state.phase,
-            audio_bytes=len(audio_wav),
-            has_screen=bool(screen_jpeg),
-            audio_seconds=int(audio_seconds),
-            diet=diet,
-            cache_state=cache_state,
-            prompt=text_prompt,
-            invoke_dir=str(invoke_dir),
-        )
-        # Plan 20-01: surface the linter wiring state in the per-turn
-        # log line so coach-loop tails show the gate decision next to
-        # cache state. Actual gate decision (valid|invalid|skip) is
-        # logged after the stream — see the meta.json dump below.
-        linter_state = "wired" if self._linter_wired else "skip"
-        print(
-            f"\n[llm {ev_tag} #{invoke_n:04d}] audio={len(audio_wav) // 1024}KB"
-            f"({int(audio_seconds)}s) diet={diet} cache={cache_state} "
-            f"linter={linter_state} "
-            f"screen={'yes' if screen_jpeg else 'no'} dump={invoke_dir.name}"
-        )
-
-        # === Plan 41-04 streaming pipe-through (LAT-04) ===
-        # Refactor: replace buffer-then-yield with streaming sentence-
-        # boundary yield + dual-phase gate. The head is yielded
-        # SPECULATIVELY as soon as ``find_sentence_end`` returns a
-        # boundary AND ``passes_head_gate`` clears the head text. The
-        # tail then streams as-it-arrives.
-        #
-        # ``buffered_chunks`` is still maintained so the post-stream
-        # legacy emit path (citation linter + suppression) keeps its
-        # contract for non-speculative paths (head never fired, short
-        # response, suppression). When a head was speculatively yielded,
-        # the post-stream gates run on ``full_text`` — if they fail, a
-        # silence-pad frame is pushed to ``self._playback`` (cancel-on-
-        # trailing-slop per Open Q2 auto-resolution; Pitfall 8 fallback
-        # documented below).
-        #
-        # Streaming pipe state:
-        #   accum             — running concat of chunk text since last
-        #                       boundary scan; reset (cleared) on first
-        #                       boundary, then unused (tail streams).
-        #   head_yielded      — True iff the speculative head was emitted.
-        #                       Drives post-stream branching (cancel-with-
-        #                       silence-pad vs legacy emit-from-buffer).
-        full_text = ""
-        buffered_chunks: list[str] = []
-        accum = ""
-        head_yielded = False
-        t_start = time.time()
-        llm_err: str | None = None
-        # Plan 19-05 — record first-chunk arrival exactly once per turn for
-        # the TTFT meter. Skipped when no meter wired (Phase 4 backward-compat).
-        first_chunk_recorded = False
-        # ---- Plan 41-02 telemetry — Plan 41-04 may refactor this loop further ----
-        # Surface Gemini's UsageMetadata.cached_content_token_count to
-        # events.jsonl on every chunk that reports a non-zero hit. The
-        # SDK emits the same usage_metadata snapshot on multiple chunks
-        # within one stream, so dedupe per-turn against the LAST emitted
-        # value to keep the log line count proportional to interesting
-        # state-changes, not chunk arrivals.
-        last_cache_hit_emitted: int = 0
-        # ---- end Plan 41-02 telemetry block ----
-        # ---- quick task 260525-fuv — per-session cost meter -----------------
-        # usage_metadata repeats across chunks; only the final chunk carries
-        # authoritative totals. Capture the last-seen usage here and record()
-        # ONCE after the stream completes (the `else` branch below) to avoid
-        # double-billing — mirrors the last_cache_hit_emitted dedup intent.
-        last_usage = None
-        # ---- end quick task 260525-fuv -------------------------------------
-        # ---- Plan 69-03 (OSS-02) — pre-call 60s /health canary -----------
-        # If the proxy fallback is armed, fire a single canary GET against
-        # /health every 60s. On 200, the recovery one-shot transcript line
-        # lands and the flag clears. NEVER raises (probe is best-effort).
-        # Phase 69 review WR-01 — the blocking ``probe_proxy_health`` GET is
-        # offloaded to a thread executor inside the (now async) canary so the
-        # reaction path NEVER stalls on the 5s timeout while the proxy is down
-        # (the exact state in which the canary is armed). Mirrors the recall
-        # pre-dispatch offload pattern (``set_next_event`` ~line 809).
-        await self._check_proxy_health_canary(time.monotonic())
-        # ---- end Plan 69-03 canary ---------------------------------------
-        try:
-            if self._or_client is not None:
-                # 2026-05-21 — OpenRouter brain. Same ``contents`` (text +
-                # inline-audio Parts) converted to OpenAI-compat messages by
-                # the adapter; system instruction passed explicitly (no
-                # Gemini context cache on this path). Yields genai-shaped
-                # chunks so the downstream loop is byte-identical.
-                from vibemix.agent.openrouter_llm import stream_or
-
-                stream = stream_or(
-                    self._or_client,
-                    model=self._or_model,
-                    system_instruction=self._prompt_body,
-                    contents=contents,
-                    temperature=1.0,
-                )
-            else:
-                stream = await self._genai_client.aio.models.generate_content_stream(
-                    model=LLM_MODEL,
-                    contents=contents,
-                    config=gen_cfg,
-                )
-            async for chunk in stream:
-                txt = getattr(chunk, "text", None) or ""
-                # ---- Plan 41-02 cache_hit telemetry ---------------------
-                # Inspect usage_metadata BEFORE the empty-text continue —
-                # the chunk that carries the final UsageMetadata may have
-                # no text payload but still reports the cache-hit token
-                # count for the whole stream.
-                usage = getattr(chunk, "usage_metadata", None)
-                if usage is not None:
-                    # quick task 260525-fuv — keep the last-seen usage; the
-                    # final chunk's totals are authoritative. Recorded ONCE
-                    # post-stream (see the `else` branch) to avoid double-bill.
-                    last_usage = usage
-                    cached_tokens = (
-                        getattr(usage, "cached_content_token_count", None) or 0
-                    )
-                    if cached_tokens > 0 and cached_tokens != last_cache_hit_emitted:
-                        try:
-                            self._recorder.log_event(
-                                "cache_hit",
-                                cached_tokens=cached_tokens,
-                                model=LLM_MODEL,
-                                path="live_coach",
-                                cache_state=cache_state,
+                        presence_floor_int16 = MIC_AUDIO_PART_PRESENCE_RMS * 32767.0
+                        if mic_rms_int16 < presence_floor_int16:
+                            mic_skip_reason = "mic_silent"
+                        else:
+                            mic_wav = snapshot_wav(
+                                self._mic_audio_buf, MIC_AUDIO_PART_SECONDS
                             )
-                        except Exception:
-                            # best-effort; never let telemetry write
-                            # failures break the LLM stream consumer
-                            pass
-                        last_cache_hit_emitted = cached_tokens
-                # ---- end Plan 41-02 cache_hit telemetry -----------------
-                if not txt:
-                    continue
-                if not first_chunk_recorded and self._ttft_meter is not None:
-                    self._ttft_meter.record_first_chunk()
-                    first_chunk_recorded = True
-                print(txt, end="", flush=True)
-                full_text += txt
-                buffered_chunks.append(txt)
-                # Plan 41-04 — speculative head emit. Run only while we
-                # haven't yet committed to a streaming yield path. Once
-                # ``head_yielded`` is True we stream subsequent chunks
-                # as-they-arrive (the speculative commitment is the
-                # binding signal — trailing audio just keeps the listener
-                # in flow). The legacy buffered_chunks list is still
-                # populated for post-stream citation linting on the full
-                # response text.
-                if not head_yielded:
-                    accum += txt
-                    end_idx = find_sentence_end(accum)
-                    if end_idx is not None:
-                        head = accum[:end_idx]
-                        if passes_head_gate(head):
-                            head_yielded = True
-                            self._llm_to_tts_meter.record_first_sentence()
-                            yield head
-                            # Any trailing portion of ``accum`` past the
-                            # boundary becomes the first trailing chunk
-                            # — yield it now so the stream stays
-                            # contiguous.
-                            tail_remainder = accum[end_idx:]
-                            if tail_remainder:
-                                yield tail_remainder
-                            accum = ""
-                        # else: head failed the gate — silence-token or
-                        # slop prefix. SUPPRESS the speculative emit
-                        # entirely; the post-stream silence/slop pipeline
-                        # is the authority and will fire the appropriate
-                        # suppression event. Keep accumulating into accum
-                        # so a later sentence boundary could still fire
-                        # on cleaner trailing text (unlikely in practice
-                        # but it's the correct boundary semantics).
-                elif head_yielded:
-                    # Stream trailing chunks as-they-arrive. The head
-                    # already bound the speculative path; trailing audio
-                    # streams without further boundary gating. The post-
-                    # stream gate (citation linter) is the authority for
-                    # cancel-with-silence-pad if the full response is
-                    # invalid.
-                    yield txt
-        except Exception as e:
-            # ---- Plan 69-03 (OSS-02) — proxy unavailable classification ---
-            # Classify the exception against the 4 documented trigger classes
-            # (5xx / timeout / connection_refused / bad_body). On match, arm
-            # the fallback flag + emit the one-shot "Co-host unavailable
-            # this session" transcript line; the LLM-turn skip is implicit
-            # (full_text stays "" → downstream silence-short-circuit fires
-            # naturally → no TTS, no playback). 4xx / 429 / programming
-            # errors fall through to the original [llm err] path so the
-            # existing per-error messaging surfaces unchanged.
-            _unavail = classify_proxy_error(e)
-            if _unavail is not None:
-                self._maybe_emit_proxy_unavailable(_unavail.reason)
+
+            # Plan 40-03 / AUDIO-02 + AUDIO-04 — source-file lookahead Part 3
+            # decision. Belt-and-braces try/except wrapping: the provider's
+            # snapshot_wav() already returns ``(None, meta)`` on every observed
+            # failure path (T-40-02-* threat register), but the wrapper here
+            # guarantees ``llm_node`` cannot crash even if the provider
+            # misbehaves (T-40-03-02 mitigation). When self._lookahead is
+            # None (Phase 4/40-01 backward-compat default), Part 3 is never
+            # attempted and the meta dict carries an explicit "no_lookahead"
+            # reason — feeds the lookahead_part_skipped event below.
+            lookahead_wav: bytes | None = None
+            lookahead_meta: dict = {"ok": False, "reason": "no_lookahead"}
+            if self._lookahead is not None:
+                try:
+                    lookahead_wav, lookahead_meta = self._lookahead.snapshot_wav()
+                except Exception as e:  # noqa: BLE001 — graceful degrade per T-40-03-02
+                    print(f"[lookahead err] {e}", file=sys.stderr)
+                    lookahead_wav = None
+                    lookahead_meta = {"ok": False, "reason": f"exception: {e!r}"}
+            mic_attached = mic_wav is not None
+            lookahead_attached = lookahead_wav is not None
+
+            # Plan 40-03 — Part-aware prompt suffix via build_parts_description.
+            # Delegates the 4-way string dispatch (1-Part baseline / mic-only /
+            # lookahead-only / 3-Part full) to the locked builder in
+            # vibemix.prompts.matrix. The builder encodes CONTEXT.md Q2:
+            # lookahead-present variants carry "NOT YET HEARD BY AUDIENCE" +
+            # anti-prediction guard language.
+            parts_clause = build_parts_description(
+                audio_seconds=float(audio_seconds),
+                has_mic_part=mic_attached,
+                has_lookahead_part=lookahead_attached,
+            )
+
+            contents: list = [
+                text_prompt + parts_clause + history_clause,
+                types.Part.from_bytes(data=audio_wav, mime_type="audio/wav"),
+            ]
+            if mic_attached:
+                contents.append(types.Part.from_bytes(data=mic_wav, mime_type="audio/wav"))
+                self._recorder.log_event(
+                    "mic_part_attached",
+                    duration_s=MIC_AUDIO_PART_SECONDS,
+                    rms_int16=mic_rms_int16,
+                    kaan_spoke_age_s=kaan_spoke_age_s,
+                    bytes=len(mic_wav),
+                )
             else:
-                # NOT a proxy-classified transient (5xx/timeout/refused/bad
-                # body). This is the silent-death class: a direct-mode auth
-                # failure (bad/missing GEMINI_API_KEY → 401/403), a DNS/TLS
-                # error, or any other connect failure on either path. Surface
-                # it LOUDLY — events.jsonl + UI transcript — instead of dying
-                # to stderr-only as before (the release blocker).
-                self._emit_connection_error(e)
-            # ---- end Plan 69-03 classification ----------------------------
-            llm_err = repr(e)
-            print(f"\n[llm err] {e}", file=sys.stderr)
-        else:
-            # ---- quick task 260525-fuv — once-per-stream cost record -------
-            # The stream completed without raising. Bill the live_coach usage
-            # ONCE here using the last-seen authoritative totals. The
-            # OpenRouter brain path yields chunks with usage_metadata=None →
-            # last_usage stays None → count the generation as untracked (no
-            # fabricated tokens). Best-effort: a meter write must NEVER break
-            # the stream consumer (T-fuv-01).
+                self._recorder.log_event(
+                    "mic_part_skipped",
+                    reason=mic_skip_reason or "unknown",
+                    kaan_spoke_age_s=kaan_spoke_age_s,
+                    rms_int16=mic_rms_int16,
+                )
+            # Plan 40-03 — Part 3 (lookahead) attach + structured event. The
+            # mic_part_* / lookahead_part_* pair forms a uniform diagnostic
+            # surface for coach-loop tails + Settings → Diagnostics; per-turn
+            # both events fire (one of each pair from each side). The lookahead
+            # event carries the provider's full meta dict so events.jsonl
+            # consumers see title / file / seek / duration / reason.
+            if lookahead_attached:
+                contents.append(
+                    types.Part.from_bytes(data=lookahead_wav, mime_type="audio/wav")
+                )
+                self._recorder.log_event(
+                    "lookahead_part_attached",
+                    bytes=len(lookahead_wav),
+                    **{k: v for k, v in lookahead_meta.items() if k != "bytes"},
+                )
+            else:
+                self._recorder.log_event(
+                    "lookahead_part_skipped",
+                    **lookahead_meta,
+                )
+            if screen_jpeg and not skip_screen:
+                contents.append(types.Part.from_bytes(data=screen_jpeg, mime_type="image/jpeg"))
+
+            ev_tag = ev.type if ev else "MANUAL"
+            full_prompt = contents[0] if contents else text_prompt
             try:
-                if last_usage is not None:
-                    get_session_meter().record(
-                        "live_coach",
-                        prompt=getattr(last_usage, "prompt_token_count", 0) or 0,
-                        cached=getattr(last_usage, "cached_content_token_count", 0)
-                        or 0,
-                        output=getattr(last_usage, "candidates_token_count", 0) or 0,
-                    )
-                elif self._or_client is not None:
-                    get_session_meter().record_untracked()
+                (invoke_dir / "prompt.txt").write_text(full_prompt)
             except Exception:
                 pass
-            # ---- end quick task 260525-fuv ---------------------------------
-            # ---- Plan 69-03 (OSS-02) — implicit recovery on next success --
-            # When the stream completed without raising AND the proxy
-            # fallback flag is currently armed, this is the "next real LLM
-            # call succeeded" recovery path (the second of two recovery
-            # triggers; the other is the 60s /health canary). One-shot
-            # guard means a duplicate emission is impossible.
-            if self._proxy_unavailable:
-                self._maybe_emit_proxy_recovery()
-            # ---- end Plan 69-03 recovery ----------------------------------
-            # Reset the loud connection-error one-shot — the next failure in a
-            # fresh streak should log again. A successful stream means the
-            # connection/auth is healthy now.
-            if self._connection_error_emitted:
-                self._connection_error_emitted = False
-                try:
-                    self._recorder.log_event("connection_recovered", path="live_coach")
-                except Exception:
-                    pass
-                try:
-                    self._push_transcript("Co-host reconnected")
-                except Exception:
-                    pass
-        # === end Plan 41-04 streaming pipe-through ===
 
-        print()
-        elapsed = time.time() - t_start
-        stripped = full_text.strip()
+            # ---- Plan 19-03 — context-cache dispatch ----
+            # Three branches:
+            #   1. cache is None at construction → cache_state="disabled", reuse
+            #      self._gen_cfg by reference (Phase 4 byte-identical path).
+            #   2. cache non-None but current_name()=None (warm-up window OR
+            #      post-invalidate gap) → cache_state="cold", same fallback as
+            #      disabled (system_instruction in self._gen_cfg drives the call).
+            #   3. cache non-None AND current_name() returns a string → cache_
+            #      state="warm", build a per-call gen_cfg with cached_content set
+            #      and system_instruction OMITTED (Gemini rejects passing both).
+            #      thinking_config + temperature + max_output_tokens preserved.
+            if self._cache is None:
+                gen_cfg = self._gen_cfg
+                cache_state = "disabled"
+            else:
+                cache_name = self._cache.current_name()
+                if cache_name is None:
+                    gen_cfg = self._gen_cfg
+                    cache_state = "cold"
+                else:
+                    gen_cfg = types.GenerateContentConfig(
+                        cached_content=cache_name,
+                        thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+                        temperature=1.0,
+                        max_output_tokens=1024,  # 2026-05-20 — lifted from 220 for gemini-3.5-flash (thinking shares budget); Kaan: don't cap output
+                    )
+                    cache_state = "warm"
 
-        # ---- Plan 18-04: citation-count telemetry ----
-        # Count citations in the FULL response text BEFORE the suppression
-        # gate. Even silence/slop suppressed turns get their emissions
-        # counted — Phase 16 ear-test reads ``registry.citation_telemetry()``
-        # as Gemini's TRUE emission rate (not the post-suppression rate)
-        # to gate Phase 20 enforcement readiness.
-        #
-        # response_id format ``f"{invoke_n:04d}_{invoke_ts}"`` matches the
-        # per-invocation dump folder name pattern (line ~202) so the
-        # events.jsonl line cross-references the dump folder trivially.
-        # The recorder.log_event auto-injects ``t = time.time() -
-        # self.start_time`` (recorder.py:303) — DO NOT pass ``t`` manually.
-        #
-        # Best-effort: every step is wrapped in try/except: pass — a
-        # parser failure or recorder write failure MUST NOT break the LLM
-        # response path (matches v4 anti-pattern parity, threat T-18-04-03).
-        try:
-            citation_pairs = parse_citations(full_text)
-            citation_count = len(citation_pairs)
-        except Exception:
-            citation_count = 0
-
-        response_id = f"{invoke_n:04d}_{invoke_ts}"
-        try:
             self._recorder.log_event(
-                "citation_count",
-                count=citation_count,
-                response_id=response_id,
+                "llm_invoke",
+                event=ev_tag,
+                audible=self._state.audible,
+                deck=self._state.audible_deck,
+                track=self._state.audible_track,
+                phase=self._state.phase,
+                audio_bytes=len(audio_wav),
+                has_screen=bool(screen_jpeg),
+                audio_seconds=int(audio_seconds),
+                diet=diet,
+                cache_state=cache_state,
+                prompt=text_prompt,
+                invoke_dir=str(invoke_dir),
             )
-        except Exception:
-            pass  # best-effort; recorder write failure must not block LLM path
+            # Plan 20-01: surface the linter wiring state in the per-turn
+            # log line so coach-loop tails show the gate decision next to
+            # cache state. Actual gate decision (valid|invalid|skip) is
+            # logged after the stream — see the meta.json dump below.
+            linter_state = "wired" if self._linter_wired else "skip"
+            print(
+                f"\n[llm {ev_tag} #{invoke_n:04d}] audio={len(audio_wav) // 1024}KB"
+                f"({int(audio_seconds)}s) diet={diet} cache={cache_state} "
+                f"linter={linter_state} "
+                f"screen={'yes' if screen_jpeg else 'no'} dump={invoke_dir.name}"
+            )
 
-        if self._registry is not None:
+            # === Plan 41-04 streaming pipe-through (LAT-04) ===
+            # Refactor: replace buffer-then-yield with streaming sentence-
+            # boundary yield + dual-phase gate. The head is yielded
+            # SPECULATIVELY as soon as ``find_sentence_end`` returns a
+            # boundary AND ``passes_head_gate`` clears the head text. The
+            # tail then streams as-it-arrives.
+            #
+            # ``buffered_chunks`` is still maintained so the post-stream
+            # legacy emit path (citation linter + suppression) keeps its
+            # contract for non-speculative paths (head never fired, short
+            # response, suppression). When a head was speculatively yielded,
+            # the post-stream gates run on ``full_text`` — if they fail, a
+            # silence-pad frame is pushed to ``self._playback`` (cancel-on-
+            # trailing-slop per Open Q2 auto-resolution; Pitfall 8 fallback
+            # documented below).
+            #
+            # Streaming pipe state:
+            #   accum             — running concat of chunk text since last
+            #                       boundary scan; reset (cleared) on first
+            #                       boundary, then unused (tail streams).
+            #   head_yielded      — True iff the speculative head was emitted.
+            #                       Drives post-stream branching (cancel-with-
+            #                       silence-pad vs legacy emit-from-buffer).
+            full_text = ""
+            buffered_chunks: list[str] = []
+            accum = ""
+            head_yielded = False
+            t_start = time.time()
+            llm_err: str | None = None
+            # Plan 19-05 — record first-chunk arrival exactly once per turn for
+            # the TTFT meter. Skipped when no meter wired (Phase 4 backward-compat).
+            first_chunk_recorded = False
+            # ---- Plan 41-02 telemetry — Plan 41-04 may refactor this loop further ----
+            # Surface Gemini's UsageMetadata.cached_content_token_count to
+            # events.jsonl on every chunk that reports a non-zero hit. The
+            # SDK emits the same usage_metadata snapshot on multiple chunks
+            # within one stream, so dedupe per-turn against the LAST emitted
+            # value to keep the log line count proportional to interesting
+            # state-changes, not chunk arrivals.
+            last_cache_hit_emitted: int = 0
+            # ---- end Plan 41-02 telemetry block ----
+            # ---- quick task 260525-fuv — per-session cost meter -----------------
+            # usage_metadata repeats across chunks; only the final chunk carries
+            # authoritative totals. Capture the last-seen usage here and record()
+            # ONCE after the stream completes (the `else` branch below) to avoid
+            # double-billing — mirrors the last_cache_hit_emitted dedup intent.
+            last_usage = None
+            # ---- end quick task 260525-fuv -------------------------------------
+            # ---- Plan 69-03 (OSS-02) — pre-call 60s /health canary -----------
+            # If the proxy fallback is armed, fire a single canary GET against
+            # /health every 60s. On 200, the recovery one-shot transcript line
+            # lands and the flag clears. NEVER raises (probe is best-effort).
+            # Phase 69 review WR-01 — the blocking ``probe_proxy_health`` GET is
+            # offloaded to a thread executor inside the (now async) canary so the
+            # reaction path NEVER stalls on the 5s timeout while the proxy is down
+            # (the exact state in which the canary is armed). Mirrors the recall
+            # pre-dispatch offload pattern (``set_next_event`` ~line 809).
+            await self._check_proxy_health_canary(time.monotonic())
+            # ---- end Plan 69-03 canary ---------------------------------------
             try:
-                self._registry.record_citation_count(citation_count)
+                if self._or_client is not None:
+                    # 2026-05-21 — OpenRouter brain. Same ``contents`` (text +
+                    # inline-audio Parts) converted to OpenAI-compat messages by
+                    # the adapter; system instruction passed explicitly (no
+                    # Gemini context cache on this path). Yields genai-shaped
+                    # chunks so the downstream loop is byte-identical.
+                    from vibemix.agent.openrouter_llm import stream_or
+
+                    stream = stream_or(
+                        self._or_client,
+                        model=self._or_model,
+                        system_instruction=self._prompt_body,
+                        contents=contents,
+                        temperature=1.0,
+                    )
+                else:
+                    stream = await self._genai_client.aio.models.generate_content_stream(
+                        model=LLM_MODEL,
+                        contents=contents,
+                        config=gen_cfg,
+                    )
+                async for chunk in stream:
+                    txt = getattr(chunk, "text", None) or ""
+                    # ---- Plan 41-02 cache_hit telemetry ---------------------
+                    # Inspect usage_metadata BEFORE the empty-text continue —
+                    # the chunk that carries the final UsageMetadata may have
+                    # no text payload but still reports the cache-hit token
+                    # count for the whole stream.
+                    usage = getattr(chunk, "usage_metadata", None)
+                    if usage is not None:
+                        # quick task 260525-fuv — keep the last-seen usage; the
+                        # final chunk's totals are authoritative. Recorded ONCE
+                        # post-stream (see the `else` branch) to avoid double-bill.
+                        last_usage = usage
+                        cached_tokens = (
+                            getattr(usage, "cached_content_token_count", None) or 0
+                        )
+                        if cached_tokens > 0 and cached_tokens != last_cache_hit_emitted:
+                            try:
+                                self._recorder.log_event(
+                                    "cache_hit",
+                                    cached_tokens=cached_tokens,
+                                    model=LLM_MODEL,
+                                    path="live_coach",
+                                    cache_state=cache_state,
+                                )
+                            except Exception:
+                                # best-effort; never let telemetry write
+                                # failures break the LLM stream consumer
+                                pass
+                            last_cache_hit_emitted = cached_tokens
+                    # ---- end Plan 41-02 cache_hit telemetry -----------------
+                    if not txt:
+                        continue
+                    if not first_chunk_recorded and self._ttft_meter is not None:
+                        self._ttft_meter.record_first_chunk()
+                        first_chunk_recorded = True
+                    print(txt, end="", flush=True)
+                    full_text += txt
+                    buffered_chunks.append(txt)
+                    # Plan 41-04 — speculative head emit. Run only while we
+                    # haven't yet committed to a streaming yield path. Once
+                    # ``head_yielded`` is True we stream subsequent chunks
+                    # as-they-arrive (the speculative commitment is the
+                    # binding signal — trailing audio just keeps the listener
+                    # in flow). The legacy buffered_chunks list is still
+                    # populated for post-stream citation linting on the full
+                    # response text.
+                    if not head_yielded:
+                        accum += txt
+                        end_idx = find_sentence_end(accum)
+                        if end_idx is not None:
+                            head = accum[:end_idx]
+                            if passes_head_gate(head):
+                                head_yielded = True
+                                self._llm_to_tts_meter.record_first_sentence()
+                                yield head
+                                # Any trailing portion of ``accum`` past the
+                                # boundary becomes the first trailing chunk
+                                # — yield it now so the stream stays
+                                # contiguous.
+                                tail_remainder = accum[end_idx:]
+                                if tail_remainder:
+                                    yield tail_remainder
+                                accum = ""
+                            # else: head failed the gate — silence-token or
+                            # slop prefix. SUPPRESS the speculative emit
+                            # entirely; the post-stream silence/slop pipeline
+                            # is the authority and will fire the appropriate
+                            # suppression event. Keep accumulating into accum
+                            # so a later sentence boundary could still fire
+                            # on cleaner trailing text (unlikely in practice
+                            # but it's the correct boundary semantics).
+                    elif head_yielded:
+                        # Stream trailing chunks as-they-arrive. The head
+                        # already bound the speculative path; trailing audio
+                        # streams without further boundary gating. The post-
+                        # stream gate (citation linter) is the authority for
+                        # cancel-with-silence-pad if the full response is
+                        # invalid.
+                        yield txt
+            except Exception as e:
+                # ---- Plan 69-03 (OSS-02) — proxy unavailable classification ---
+                # Classify the exception against the 4 documented trigger classes
+                # (5xx / timeout / connection_refused / bad_body). On match, arm
+                # the fallback flag + emit the one-shot "Co-host unavailable
+                # this session" transcript line; the LLM-turn skip is implicit
+                # (full_text stays "" → downstream silence-short-circuit fires
+                # naturally → no TTS, no playback). 4xx / 429 / programming
+                # errors fall through to the original [llm err] path so the
+                # existing per-error messaging surfaces unchanged.
+                _unavail = classify_proxy_error(e)
+                if _unavail is not None:
+                    self._maybe_emit_proxy_unavailable(_unavail.reason)
+                else:
+                    # NOT a proxy-classified transient (5xx/timeout/refused/bad
+                    # body). This is the silent-death class: a direct-mode auth
+                    # failure (bad/missing GEMINI_API_KEY → 401/403), a DNS/TLS
+                    # error, or any other connect failure on either path. Surface
+                    # it LOUDLY — events.jsonl + UI transcript — instead of dying
+                    # to stderr-only as before (the release blocker).
+                    self._emit_connection_error(e)
+                # ---- end Plan 69-03 classification ----------------------------
+                llm_err = repr(e)
+                print(f"\n[llm err] {e}", file=sys.stderr)
+            else:
+                # ---- quick task 260525-fuv — once-per-stream cost record -------
+                # The stream completed without raising. Bill the live_coach usage
+                # ONCE here using the last-seen authoritative totals. The
+                # OpenRouter brain path yields chunks with usage_metadata=None →
+                # last_usage stays None → count the generation as untracked (no
+                # fabricated tokens). Best-effort: a meter write must NEVER break
+                # the stream consumer (T-fuv-01).
+                try:
+                    if last_usage is not None:
+                        get_session_meter().record(
+                            "live_coach",
+                            prompt=getattr(last_usage, "prompt_token_count", 0) or 0,
+                            cached=getattr(last_usage, "cached_content_token_count", 0)
+                            or 0,
+                            output=getattr(last_usage, "candidates_token_count", 0) or 0,
+                        )
+                    elif self._or_client is not None:
+                        get_session_meter().record_untracked()
+                except Exception:
+                    pass
+                # ---- end quick task 260525-fuv ---------------------------------
+                # ---- Plan 69-03 (OSS-02) — implicit recovery on next success --
+                # When the stream completed without raising AND the proxy
+                # fallback flag is currently armed, this is the "next real LLM
+                # call succeeded" recovery path (the second of two recovery
+                # triggers; the other is the 60s /health canary). One-shot
+                # guard means a duplicate emission is impossible.
+                if self._proxy_unavailable:
+                    self._maybe_emit_proxy_recovery()
+                # ---- end Plan 69-03 recovery ----------------------------------
+                # Reset the loud connection-error one-shot — the next failure in a
+                # fresh streak should log again. A successful stream means the
+                # connection/auth is healthy now.
+                if self._connection_error_emitted:
+                    self._connection_error_emitted = False
+                    try:
+                        self._recorder.log_event("connection_recovered", path="live_coach")
+                    except Exception:
+                        pass
+                    try:
+                        self._push_transcript("Co-host reconnected")
+                    except Exception:
+                        pass
+            # === end Plan 41-04 streaming pipe-through ===
+
+            print()
+            elapsed = time.time() - t_start
+            stripped = full_text.strip()
+
+            # ---- Plan 18-04: citation-count telemetry ----
+            # Count citations in the FULL response text BEFORE the suppression
+            # gate. Even silence/slop suppressed turns get their emissions
+            # counted — Phase 16 ear-test reads ``registry.citation_telemetry()``
+            # as Gemini's TRUE emission rate (not the post-suppression rate)
+            # to gate Phase 20 enforcement readiness.
+            #
+            # response_id format ``f"{invoke_n:04d}_{invoke_ts}"`` matches the
+            # per-invocation dump folder name pattern (line ~202) so the
+            # events.jsonl line cross-references the dump folder trivially.
+            # The recorder.log_event auto-injects ``t = time.time() -
+            # self.start_time`` (recorder.py:303) — DO NOT pass ``t`` manually.
+            #
+            # Best-effort: every step is wrapped in try/except: pass — a
+            # parser failure or recorder write failure MUST NOT break the LLM
+            # response path (matches v4 anti-pattern parity, threat T-18-04-03).
+            try:
+                citation_pairs = parse_citations(full_text)
+                citation_count = len(citation_pairs)
             except Exception:
-                pass  # best-effort; registry update failure must not block LLM path
+                citation_count = 0
 
-        # ---- Silence + slop gate (Phase 10) ----
-        suppression: str | None = None
-        slop_matches: list[str] = []
-        if stripped == SILENCE_TOKEN or stripped.startswith(SILENCE_TOKEN):
-            suppression = "silence"
-        else:
-            # Run filter_for_slop on the FULL accumulated text; suppress turn
-            # if any banned phrase matches.
-            _filtered, slop_matches = filter_for_slop(full_text)
-            if slop_matches:
-                suppression = "slop"
-
-        # Plan 20-01 meta.json fields — initialized here so the dump
-        # path at the bottom can reference them regardless of which
-        # branch ran. "skip" means the wired path was not taken (legacy
-        # path or suppression beat the linter to it).
-        citation_action: str = "skip"
-        citation_lint_valid: bool | None = None
-        citation_lint_reason: str | None = None
-        citation_lint_missing_payload: list[list[str]] | None = None
-
-        # Plan 41-04 — cancel-with-silence-pad on speculative-emit failure.
-        # When ``head_yielded`` is True AND the post-stream gate fails
-        # (silence / slop / citation_failure), push a 500ms zero-fill
-        # frame into the playback queue (when wired) and emit a
-        # ``streaming_cancel`` event. This is the Open Q2 auto-
-        # resolution; the LiveKit cancel-race fallback (Pitfall 8) is
-        # documented in the module — head may play through to completion
-        # if frames are already in the OPUS encoder when we push the pad.
-        def _push_silence_pad_and_cancel(reason: str) -> None:
-            try:
-                if self._playback is not None:
-                    self._playback.push(b"\x00" * SILENCE_PAD_BYTES)
-            except Exception as _e:
-                print(f"[silence-pad err] {_e}", file=sys.stderr)
+            response_id = f"{invoke_n:04d}_{invoke_ts}"
             try:
                 self._recorder.log_event(
-                    "streaming_cancel",
-                    reason=reason,
-                    head_yielded=True,
+                    "citation_count",
+                    count=citation_count,
+                    response_id=response_id,
+                )
+            except Exception:
+                pass  # best-effort; recorder write failure must not block LLM path
+
+            if self._registry is not None:
+                try:
+                    self._registry.record_citation_count(citation_count)
+                except Exception:
+                    pass  # best-effort; registry update failure must not block LLM path
+
+            # ---- Silence + slop gate (Phase 10) ----
+            suppression: str | None = None
+            slop_matches: list[str] = []
+            if stripped == SILENCE_TOKEN or stripped.startswith(SILENCE_TOKEN):
+                suppression = "silence"
+            else:
+                # Run filter_for_slop on the FULL accumulated text; suppress turn
+                # if any banned phrase matches.
+                _filtered, slop_matches = filter_for_slop(full_text)
+                if slop_matches:
+                    suppression = "slop"
+
+            # Plan 20-01 meta.json fields — initialized here so the dump
+            # path at the bottom can reference them regardless of which
+            # branch ran. "skip" means the wired path was not taken (legacy
+            # path or suppression beat the linter to it).
+            citation_action: str = "skip"
+            citation_lint_valid: bool | None = None
+            citation_lint_reason: str | None = None
+            citation_lint_missing_payload: list[list[str]] | None = None
+
+            # Plan 41-04 — cancel-with-silence-pad on speculative-emit failure.
+            # When ``head_yielded`` is True AND the post-stream gate fails
+            # (silence / slop / citation_failure), push a 500ms zero-fill
+            # frame into the playback queue (when wired) and emit a
+            # ``streaming_cancel`` event. This is the Open Q2 auto-
+            # resolution; the LiveKit cancel-race fallback (Pitfall 8) is
+            # documented in the module — head may play through to completion
+            # if frames are already in the OPUS encoder when we push the pad.
+            def _push_silence_pad_and_cancel(reason: str) -> None:
+                try:
+                    if self._playback is not None:
+                        self._playback.push(b"\x00" * SILENCE_PAD_BYTES)
+                except Exception as _e:
+                    print(f"[silence-pad err] {_e}", file=sys.stderr)
+                try:
+                    self._recorder.log_event(
+                        "streaming_cancel",
+                        reason=reason,
+                        head_yielded=True,
+                        response_chars=len(full_text),
+                        latency_s=round(elapsed, 2),
+                    )
+                except Exception:
+                    pass
+
+            if suppression == "silence":
+                self._recorder.log_event(
+                    "silence_short_circuit",
+                    event=ev_tag,
                     response_chars=len(full_text),
                     latency_s=round(elapsed, 2),
                 )
-            except Exception:
-                pass
-
-        if suppression == "silence":
-            self._recorder.log_event(
-                "silence_short_circuit",
-                event=ev_tag,
-                response_chars=len(full_text),
-                latency_s=round(elapsed, 2),
-            )
-            print("[ai_text] <silence/> (suppressed)", flush=True)
-            if head_yielded:
-                _push_silence_pad_and_cancel("silence")
-        elif suppression == "slop":
-            self._recorder.log_event(
-                "slop_suppressed",
-                event=ev_tag,
-                matches=slop_matches,
-                response_chars=len(full_text),
-                latency_s=round(elapsed, 2),
-            )
-            print(f"[ai_text] <slop suppressed: {slop_matches}>", flush=True)
-            if head_yielded:
-                _push_silence_pad_and_cancel("slop")
-        else:
-            # Plan 20-01 — citation linter chokepoint runs HERE, after the
-            # silence/slop gate, before yielding chunks. The wired path
-            # (all 4 kwargs non-None) runs the binary response-level linter
-            # against the same registry snapshot already taken at line ~216
-            # (REUSE — never call self._registry.snapshot() twice per turn,
-            # races would be possible). The legacy path emits unchanged.
-            #
-            # Decision ladder (when wired AND suppression is None):
-            #   1. valid → emit + tracker.record(False) + ai_text log.
-            #   2. invalid + bypass → emit anyway + record(False) +
-            #      citation_bypass log + "[ai_text:unverified]" stdout.
-            #      Bypass is one-shot per breach window (T-20-01-02).
-            #   3. invalid + strip → DO NOT yield + record(True) +
-            #      citation_strip log. silence > invented citation.
-            #      (The pre-recorded ack-bank substitution was retired —
-            #      see the strip block below.)
-            if self._linter_wired and self._linter is not None:
-                lint_result = self._linter.check(
-                    full_text, snapshot, mode="live"
+                print("[ai_text] <silence/> (suppressed)", flush=True)
+                if head_yielded:
+                    _push_silence_pad_and_cancel("silence")
+            elif suppression == "slop":
+                self._recorder.log_event(
+                    "slop_suppressed",
+                    event=ev_tag,
+                    matches=slop_matches,
+                    response_chars=len(full_text),
+                    latency_s=round(elapsed, 2),
                 )
-                citation_lint_valid = lint_result.valid
-                citation_lint_reason = lint_result.reason
-                citation_lint_missing_payload = [list(t) for t in lint_result.missing]
+                print(f"[ai_text] <slop suppressed: {slop_matches}>", flush=True)
+                if head_yielded:
+                    _push_silence_pad_and_cancel("slop")
+            else:
+                # Plan 20-01 — citation linter chokepoint runs HERE, after the
+                # silence/slop gate, before yielding chunks. The wired path
+                # (all 4 kwargs non-None) runs the binary response-level linter
+                # against the same registry snapshot already taken at line ~216
+                # (REUSE — never call self._registry.snapshot() twice per turn,
+                # races would be possible). The legacy path emits unchanged.
+                #
+                # Decision ladder (when wired AND suppression is None):
+                #   1. valid → emit + tracker.record(False) + ai_text log.
+                #   2. invalid + bypass → emit anyway + record(False) +
+                #      citation_bypass log + "[ai_text:unverified]" stdout.
+                #      Bypass is one-shot per breach window (T-20-01-02).
+                #   3. invalid + strip → DO NOT yield + record(True) +
+                #      citation_strip log. silence > invented citation.
+                #      (The pre-recorded ack-bank substitution was retired —
+                #      see the strip block below.)
+                if self._linter_wired and self._linter is not None:
+                    lint_result = self._linter.check(
+                        full_text, snapshot, mode="live"
+                    )
+                    citation_lint_valid = lint_result.valid
+                    citation_lint_reason = lint_result.reason
+                    citation_lint_missing_payload = [list(t) for t in lint_result.missing]
 
-                if lint_result.valid:
-                    citation_action = "emit"
-                    # Plan 41-04 — head_yielded means the streaming pipe
-                    # already emitted the head + trailing chunks
-                    # in-flight; the legacy re-yield from buffered_chunks
-                    # would duplicate audio. Skip it.
+                    if lint_result.valid:
+                        citation_action = "emit"
+                        # Plan 41-04 — head_yielded means the streaming pipe
+                        # already emitted the head + trailing chunks
+                        # in-flight; the legacy re-yield from buffered_chunks
+                        # would duplicate audio. Skip it.
+                        if not head_yielded:
+                            for txt in buffered_chunks:
+                                yield txt
+                        if self._stripped_tracker is not None:
+                            self._stripped_tracker.record(False)
+                        if stripped:
+                            print(f"[ai_text] {stripped!r}", flush=True)
+                            self._recorder.log_event(
+                                "ai_text",
+                                text=full_text,
+                                latency_s=round(elapsed, 2),
+                            )
+                            # WR-04 — stamp from event-fired set_seconds, not the
+                            # post-stream/lint/bus set_seconds (multi-second drift).
+                            self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
+                            self._push_transcript(stripped[:140])
+                        else:
+                            print("[ai_text] <empty> (skip TTS)", flush=True)
+                    else:
+                        # Invalid — consult the one-shot bypass before stripping.
+                        bypass_active = (
+                            self._stripped_tracker.should_bypass()
+                            if self._stripped_tracker is not None
+                            else False
+                        )
+                        if bypass_active:
+                            citation_action = "bypass"
+                            # Plan 41-04 — same head_yielded guard as the
+                            # valid path: chunks already in-flight, no
+                            # re-yield from buffer.
+                            if not head_yielded:
+                                for txt in buffered_chunks:
+                                    yield txt
+                            # Bypass means we did NOT strip — tracker records
+                            # the actual outcome (False = "we let it through").
+                            # Plan 55-03 — surface the raw reply as the
+                            # last-unverified text: the user HEARD this unverified
+                            # line, so the diagnostics strip must show it.
+                            if self._stripped_tracker is not None:
+                                self._stripped_tracker.record(
+                                    False, unverified_text=full_text
+                                )
+                            self._recorder.log_event(
+                                "citation_bypass",
+                                response_id=response_id,
+                                raw_text=full_text,
+                                missing=citation_lint_missing_payload,
+                                reason=lint_result.reason,
+                                latency_s=round(elapsed, 2),
+                            )
+                            print(
+                                f"[ai_text:unverified] {stripped!r}", flush=True
+                            )
+                            # History appended on bypass — the user heard the
+                            # text, so the no-repeat memory must reflect it.
+                            if stripped:
+                                # WR-04 — stamp from event-fired set_seconds.
+                                self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
+                                self._push_transcript(stripped[:140])
+                        else:
+                            # Strip path — no chunks yielded. Pre-recorded
+                            # ack substitution is retired (English placeholder
+                            # clips fought the anti-slop thesis and the
+                            # Turkish persona). On head_yielded turns the
+                            # speculative head is already in flight, so we
+                            # cancel with a silence pad to mask the
+                            # mid-utterance cut. Otherwise this strip is
+                            # exactly the persona's "say NOTHING" path.
+                            citation_action = "strip"
+                            if head_yielded:
+                                _push_silence_pad_and_cancel("citation_failure")
+                            # Plan 55-03 — surface the raw reply as the
+                            # last-unverified text: this is the line the user did
+                            # NOT hear, but the diagnostics strip should show what
+                            # got silenced. Mirrors the raw_text= log field below.
+                            if self._stripped_tracker is not None:
+                                self._stripped_tracker.record(
+                                    True, unverified_text=full_text
+                                )
+                            self._recorder.log_event(
+                                "citation_strip",
+                                response_id=response_id,
+                                raw_text=full_text,
+                                missing=citation_lint_missing_payload,
+                                reason=lint_result.reason,
+                                latency_s=round(elapsed, 2),
+                            )
+                            print(
+                                f"[ai_text:stripped] reason={lint_result.reason}",
+                                flush=True,
+                            )
+                            # History NOT appended — nothing was emitted.
+                else:
+                    # Legacy Phase 18/19 path — clean turn, yield buffered chunks
+                    # in their original order and run the v4 ai_text logging
+                    # path (history append + log event). Byte-identical to the
+                    # pre-Plan-20 behavior (locked by
+                    # tests/agent/test_dj_cohost.py + test_dj_cohost_silence_*).
+                    # Plan 41-04 — when ``head_yielded`` is True the streaming
+                    # path already emitted the chunks in-flight; skip the
+                    # buffer re-yield to avoid duplicate audio.
                     if not head_yielded:
                         for txt in buffered_chunks:
                             yield txt
-                    if self._stripped_tracker is not None:
-                        self._stripped_tracker.record(False)
                     if stripped:
                         print(f"[ai_text] {stripped!r}", flush=True)
                         self._recorder.log_event(
-                            "ai_text",
-                            text=full_text,
-                            latency_s=round(elapsed, 2),
+                            "ai_text", text=full_text, latency_s=round(elapsed, 2)
                         )
-                        # WR-04 — stamp from event-fired set_seconds, not the
-                        # post-stream/lint/bus set_seconds (multi-second drift).
+                        # WR-04 — stamp from event-fired set_seconds.
                         self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
                         self._push_transcript(stripped[:140])
                     else:
                         print("[ai_text] <empty> (skip TTS)", flush=True)
-                else:
-                    # Invalid — consult the one-shot bypass before stripping.
-                    bypass_active = (
-                        self._stripped_tracker.should_bypass()
-                        if self._stripped_tracker is not None
-                        else False
-                    )
-                    if bypass_active:
-                        citation_action = "bypass"
-                        # Plan 41-04 — same head_yielded guard as the
-                        # valid path: chunks already in-flight, no
-                        # re-yield from buffer.
-                        if not head_yielded:
-                            for txt in buffered_chunks:
-                                yield txt
-                        # Bypass means we did NOT strip — tracker records
-                        # the actual outcome (False = "we let it through").
-                        # Plan 55-03 — surface the raw reply as the
-                        # last-unverified text: the user HEARD this unverified
-                        # line, so the diagnostics strip must show it.
-                        if self._stripped_tracker is not None:
-                            self._stripped_tracker.record(
-                                False, unverified_text=full_text
-                            )
-                        self._recorder.log_event(
-                            "citation_bypass",
-                            response_id=response_id,
-                            raw_text=full_text,
-                            missing=citation_lint_missing_payload,
-                            reason=lint_result.reason,
-                            latency_s=round(elapsed, 2),
-                        )
-                        print(
-                            f"[ai_text:unverified] {stripped!r}", flush=True
-                        )
-                        # History appended on bypass — the user heard the
-                        # text, so the no-repeat memory must reflect it.
-                        if stripped:
-                            # WR-04 — stamp from event-fired set_seconds.
-                            self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
-                            self._push_transcript(stripped[:140])
-                    else:
-                        # Strip path — no chunks yielded. Pre-recorded
-                        # ack substitution is retired (English placeholder
-                        # clips fought the anti-slop thesis and the
-                        # Turkish persona). On head_yielded turns the
-                        # speculative head is already in flight, so we
-                        # cancel with a silence pad to mask the
-                        # mid-utterance cut. Otherwise this strip is
-                        # exactly the persona's "say NOTHING" path.
-                        citation_action = "strip"
-                        if head_yielded:
-                            _push_silence_pad_and_cancel("citation_failure")
-                        # Plan 55-03 — surface the raw reply as the
-                        # last-unverified text: this is the line the user did
-                        # NOT hear, but the diagnostics strip should show what
-                        # got silenced. Mirrors the raw_text= log field below.
-                        if self._stripped_tracker is not None:
-                            self._stripped_tracker.record(
-                                True, unverified_text=full_text
-                            )
-                        self._recorder.log_event(
-                            "citation_strip",
-                            response_id=response_id,
-                            raw_text=full_text,
-                            missing=citation_lint_missing_payload,
-                            reason=lint_result.reason,
-                            latency_s=round(elapsed, 2),
-                        )
-                        print(
-                            f"[ai_text:stripped] reason={lint_result.reason}",
-                            flush=True,
-                        )
-                        # History NOT appended — nothing was emitted.
-            else:
-                # Legacy Phase 18/19 path — clean turn, yield buffered chunks
-                # in their original order and run the v4 ai_text logging
-                # path (history append + log event). Byte-identical to the
-                # pre-Plan-20 behavior (locked by
-                # tests/agent/test_dj_cohost.py + test_dj_cohost_silence_*).
-                # Plan 41-04 — when ``head_yielded`` is True the streaming
-                # path already emitted the chunks in-flight; skip the
-                # buffer re-yield to avoid duplicate audio.
-                if not head_yielded:
-                    for txt in buffered_chunks:
-                        yield txt
-                if stripped:
-                    print(f"[ai_text] {stripped!r}", flush=True)
-                    self._recorder.log_event(
-                        "ai_text", text=full_text, latency_s=round(elapsed, 2)
-                    )
-                    # WR-04 — stamp from event-fired set_seconds.
-                    self._record_said(stripped[:140], set_s_at_event=ev_set_seconds)
-                    self._push_transcript(stripped[:140])
-                else:
-                    print("[ai_text] <empty> (skip TTS)", flush=True)
-                # Legacy path = no linter wired; treat as if citation_action
-                # were "emit" for the overlay publish (the user heard the
-                # text). Plan 20-01 wired-path callers set citation_action
-                # explicitly in the branches above.
-                if citation_action == "skip":
-                    citation_action = "emit"
+                    # Legacy path = no linter wired; treat as if citation_action
+                    # were "emit" for the overlay publish (the user heard the
+                    # text). Plan 20-01 wired-path callers set citation_action
+                    # explicitly in the branches above.
+                    if citation_action == "skip":
+                        citation_action = "emit"
 
-        # ---- v8.0 LOG-02 — consolidated per-turn evidence + gate decision ----
-        # When the debug-log switch is on (``vibemix --debug-log`` /
-        # VIBEMIX_DEBUG_LOG=1), append ONE auditable ``reaction_evidence`` event
-        # per turn: a compact digest of the evidence packet the linter checked
-        # against (sources → atom count, never the payload) + the citation-gate
-        # decision. Runs for EVERY turn — suppressed, emit, bypass, strip,
-        # legacy. Default-OFF so events.jsonl is byte-identical in normal runs
-        # (the discrete citation_count/strip/bypass/ai_text events already cover
-        # the default case). Best-effort: never breaks the LLM response path.
-        if debug_log_enabled():
-            try:
-                ev_digest: dict[str, int] = {}
-                if isinstance(snapshot, dict):
-                    for _src, _keys in snapshot.items():
-                        try:
-                            ev_digest[str(_src)] = (
-                                len(_keys) if hasattr(_keys, "__len__") else 0
-                            )
-                        except Exception:
+            # ---- v8.0 LOG-02 — consolidated per-turn evidence + gate decision ----
+            # When the debug-log switch is on (``vibemix --debug-log`` /
+            # VIBEMIX_DEBUG_LOG=1), append ONE auditable ``reaction_evidence`` event
+            # per turn: a compact digest of the evidence packet the linter checked
+            # against (sources → atom count, never the payload) + the citation-gate
+            # decision. Runs for EVERY turn — suppressed, emit, bypass, strip,
+            # legacy. Default-OFF so events.jsonl is byte-identical in normal runs
+            # (the discrete citation_count/strip/bypass/ai_text events already cover
+            # the default case). Best-effort: never breaks the LLM response path.
+            if debug_log_enabled():
+                try:
+                    ev_digest: dict[str, int] = {}
+                    if isinstance(snapshot, dict):
+                        for _src, _keys in snapshot.items():
+                            try:
+                                ev_digest[str(_src)] = (
+                                    len(_keys) if hasattr(_keys, "__len__") else 0
+                                )
+                            except Exception:
+                                continue
+                    self._recorder.log_event(
+                        "reaction_evidence",
+                        response_id=response_id,
+                        event=ev_tag,
+                        evidence_sources=ev_digest,
+                        citation_count=citation_count,
+                        citation_action=citation_action,
+                        citation_valid=citation_lint_valid,
+                        citation_reason=citation_lint_reason,
+                        citation_missing=citation_lint_missing_payload,
+                        suppression=suppression,
+                        latency_s=round(elapsed, 2),
+                    )
+                except Exception:
+                    pass
+
+            # ---- Plan 24-02 — overlay-highlight publish ----
+            # Fire once per [screen:<element>] citation IFF:
+            #   1. ipc_bus is wired (sidecar publish path enabled).
+            #   2. citation_action is a "user-heard-the-text" action — "emit"
+            #      (normal flow) or "bypass" (unverified-but-spoken via the
+            #      one-shot bypass guard). "strip" and "skip"-from-suppression
+            #      do NOT publish: a ring without audio is ghost-firing.
+            # Best-effort: every step wrapped in try/except so a malformed
+            # element_id, schema validation error, or bus emit failure
+            # cannot break the LLM response path (T-18-04-03-style mitigation).
+            if self._ipc_bus is not None and citation_action in ("emit", "bypass"):
+                try:
+                    for source, body in parse_citations(full_text):
+                        if source != "screen":
                             continue
-                self._recorder.log_event(
-                    "reaction_evidence",
-                    response_id=response_id,
-                    event=ev_tag,
-                    evidence_sources=ev_digest,
-                    citation_count=citation_count,
-                    citation_action=citation_action,
-                    citation_valid=citation_lint_valid,
-                    citation_reason=citation_lint_reason,
-                    citation_missing=citation_lint_missing_payload,
-                    suppression=suppression,
-                    latency_s=round(elapsed, 2),
+                        # The body of a [screen:<key>] atom is the element_id
+                        # verbatim — no @t suffix per evidence_registry grammar.
+                        element_id = body.strip()
+                        if not element_id:
+                            continue
+                        msg = SessionOverlayHighlight.make(
+                            element_id=element_id,
+                            color=OVERLAY_COLOR,
+                            duration_ms=OVERLAY_DURATION_MS,
+                        )
+                        await self._ipc_bus.emit(msg.to_dict())
+                except Exception as e:  # noqa: BLE001 — best-effort telemetry
+                    print(f"\n[overlay publish err] {e}", file=sys.stderr)
+
+            # ---- Plan 44-03 / LAUNCH-02 — cohost-reaction broadcast ----
+            # Same guard as overlay-highlight: fire only when the user actually
+            # heard the reaction (citation_action in {emit, bypass}). When the
+            # linter stripped the text or suppression beat the linter to it,
+            # no chips fire — chips below a silent reaction would be ghost UI.
+            # When the registry is None (Phase 4 backward-compat path) or has
+            # no matching observations, `citation_strip` is an empty list and
+            # the message still fires — the UI then renders the transcript
+            # line without a chip strip beneath it (correct behavior, not a
+            # missed broadcast).
+            # Best-effort: any exception in chip building OR the bus emit is
+            # logged + swallowed; the LLM response path must NEVER crash on
+            # the launch-marketing surface (T-18-04-03-style mitigation).
+            if self._ipc_bus is not None and citation_action in ("emit", "bypass"):
+                try:
+                    strip = (
+                        _build_citation_strip(
+                            reaction_text=full_text,
+                            registry=self._registry,
+                        )
+                        if self._registry is not None
+                        else []
+                    )
+                    reaction_msg = SessionCohostReaction.make(
+                        text=full_text,
+                        event_id=ev_tag,
+                        citation_strip=strip,
+                    )
+                    await self._ipc_bus.emit(reaction_msg.to_dict())
+                except Exception as e:  # noqa: BLE001 — best-effort telemetry
+                    print(f"\n[cohost-reaction publish err] {e}", file=sys.stderr)
+                else:
+                    # Phase 66 (COPILOT-02) — arm the recall-callback cooldown
+                    # ONLY when the chip reached the audience. The ``else:``
+                    # branch runs iff the try body completed without raising —
+                    # i.e. ``_ipc_bus.emit(...)`` returned cleanly. A bus-emit
+                    # failure jumps to the except above and this arm never runs;
+                    # this is the strict semantic locked in CONTEXT.md Area 1
+                    # Q3 + RESEARCH §Pitfall 2 + §Open Q5: cooldown reflects
+                    # "a recall callback REACHED the audience", not "a recall
+                    # callback was MERELY ATTEMPTED". One-way (arm only); no
+                    # reset path — the wall-clock progression naturally drains
+                    # the 120s window. Inner narrow try/except is defense in
+                    # depth: a fault in ``chip.get`` (e.g. a future wire-format
+                    # change) must not propagate and crash the turn — the
+                    # outer ``else:`` placement already guarantees this code
+                    # only runs on a clean bus emit, but the inner wrapper
+                    # matches the project idiom (Pattern B in 66-PATTERNS.md).
+                    try:
+                        if any(
+                            chip.get("event_id", "").startswith("recall:")
+                            for chip in strip
+                        ):
+                            self._last_recall_callback_at = time.time()
+                    except Exception as _e:  # noqa: BLE001
+                        print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
+            elif self._ipc_bus is None and citation_action in ("emit", "bypass"):
+                # Phase 66 (COPILOT-02) — bus-less arm path. When ``_ipc_bus`` is
+                # None (test contexts that don't wire the UI broadcast surface,
+                # or production agents that skip the IPC bus) the chip surface
+                # never publishes, but the AUDIO surface still delivered the
+                # reaction to the audience via the TTS chunks (citation_action
+                # in {emit, bypass} = "user heard the text"). The strict
+                # "REACHED the audience" semantic locked in CONTEXT.md Area 1
+                # Q3 still applies here: the audience heard the recall callback
+                # via audio even though no chip was broadcast.
+                #
+                # Phase 66 review CR-01 — mirror the bus path's STRUCTURAL filter.
+                # Previously this arm used ``parse_citations(full_text)`` raw,
+                # which arms on ANY ``("recall", <body>)`` atom found — INCLUDING
+                # a FABRICATED ``[recall:<unregistered>]`` that the one-shot
+                # bypass let through after the linter said invalid. The bus
+                # path correctly uses ``_build_citation_strip`` which ONLY counts
+                # atoms that resolve in the registry, so a fabricated recall id
+                # under bypass NEVER reaches the audience as a registered chip
+                # and never arms there. The two paths MUST yield the same
+                # arm/no-arm decision per the "REACHED the audience" semantic.
+                # Reuse the same lens here. The flag-OFF guard up-front (recall
+                # disabled or no registry) closes a secondary leak: today the
+                # outer condition only checks ``citation_action`` + bus-None, so
+                # if a future flag-OFF code path ever emitted a ``[recall:...]``
+                # atom this arm would fire with no recall service in play. The
+                # explicit ``_recall_enabled`` / ``_registry is None`` guards
+                # make the arm spec-correct under every state.
+                # Best-effort try/except so a parse failure cannot crash the
+                # turn (project Pattern B).
+                if not self._recall_enabled or self._registry is None:
+                    pass  # feature OFF or no registry — never arm without backing state
+                else:
+                    try:
+                        strip = _build_citation_strip(
+                            reaction_text=full_text,
+                            registry=self._registry,
+                        )
+                        if any(
+                            chip.get("event_id", "").startswith("recall:")
+                            for chip in strip
+                        ):
+                            self._last_recall_callback_at = time.time()
+                    except Exception as _e:  # noqa: BLE001
+                        print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
+
+            # ---- Per-invocation dump (always written, even on suppression) ----
+            try:
+                (invoke_dir / "response.txt").write_text(full_text)
+                (invoke_dir / "meta.json").write_text(
+                    json.dumps(
+                        {
+                            "event": ev_tag,
+                            "ts": invoke_ts,
+                            "invoke_n": invoke_n,
+                            "audible": self._state.audible,
+                            "deck": self._state.audible_deck,
+                            "track": self._state.audible_track,
+                            "track_confidence": round(self._state.audible_track_confidence, 2),
+                            "phase": self._state.phase,
+                            "rms": round(self._state.rms, 4),
+                            "bpm": round(self._state.bpm, 1),
+                            "audio_bytes": len(audio_wav),
+                            "audio_seconds": audio_seconds,
+                            "diet": diet,
+                            "llm_latency_s": round(elapsed, 2),
+                            "llm_error": llm_err,
+                            "response_chars": len(full_text),
+                            "suppression": suppression,
+                            "slop_matches": slop_matches,
+                            # Plan 20-01 — citation linter chokepoint outcome.
+                            # When wired==False, all four are None (skip path).
+                            "citation_lint_valid": citation_lint_valid,
+                            "citation_lint_reason": citation_lint_reason,
+                            "citation_lint_missing": citation_lint_missing_payload,
+                            "citation_action": citation_action,
+                            # Plan 41-04 — streaming-pipe outcome. True iff
+                            # the speculative head was emitted before stream
+                            # completion; False on suppression/short-response.
+                            "head_yielded": head_yielded,
+                        },
+                        indent=2,
+                        ensure_ascii=False,
+                    )
                 )
             except Exception:
                 pass
 
-        # ---- Plan 24-02 — overlay-highlight publish ----
-        # Fire once per [screen:<element>] citation IFF:
-        #   1. ipc_bus is wired (sidecar publish path enabled).
-        #   2. citation_action is a "user-heard-the-text" action — "emit"
-        #      (normal flow) or "bypass" (unverified-but-spoken via the
-        #      one-shot bypass guard). "strip" and "skip"-from-suppression
-        #      do NOT publish: a ring without audio is ghost-firing.
-        # Best-effort: every step wrapped in try/except so a malformed
-        # element_id, schema validation error, or bus emit failure
-        # cannot break the LLM response path (T-18-04-03-style mitigation).
-        if self._ipc_bus is not None and citation_action in ("emit", "bypass"):
+            # Plan 41-04 — emit llm_to_tts_delta_ms event (skip when no head
+            # was yielded — keeps the per-turn metric stream tight).
             try:
-                for source, body in parse_citations(full_text):
-                    if source != "screen":
-                        continue
-                    # The body of a [screen:<key>] atom is the element_id
-                    # verbatim — no @t suffix per evidence_registry grammar.
-                    element_id = body.strip()
-                    if not element_id:
-                        continue
-                    msg = SessionOverlayHighlight.make(
-                        element_id=element_id,
-                        color=OVERLAY_COLOR,
-                        duration_ms=OVERLAY_DURATION_MS,
-                    )
-                    await self._ipc_bus.emit(msg.to_dict())
-            except Exception as e:  # noqa: BLE001 — best-effort telemetry
-                print(f"\n[overlay publish err] {e}", file=sys.stderr)
-
-        # ---- Plan 44-03 / LAUNCH-02 — cohost-reaction broadcast ----
-        # Same guard as overlay-highlight: fire only when the user actually
-        # heard the reaction (citation_action in {emit, bypass}). When the
-        # linter stripped the text or suppression beat the linter to it,
-        # no chips fire — chips below a silent reaction would be ghost UI.
-        # When the registry is None (Phase 4 backward-compat path) or has
-        # no matching observations, `citation_strip` is an empty list and
-        # the message still fires — the UI then renders the transcript
-        # line without a chip strip beneath it (correct behavior, not a
-        # missed broadcast).
-        # Best-effort: any exception in chip building OR the bus emit is
-        # logged + swallowed; the LLM response path must NEVER crash on
-        # the launch-marketing surface (T-18-04-03-style mitigation).
-        if self._ipc_bus is not None and citation_action in ("emit", "bypass"):
-            try:
-                strip = (
-                    _build_citation_strip(
-                        reaction_text=full_text,
-                        registry=self._registry,
-                    )
-                    if self._registry is not None
-                    else []
-                )
-                reaction_msg = SessionCohostReaction.make(
-                    text=full_text,
-                    event_id=ev_tag,
-                    citation_strip=strip,
-                )
-                await self._ipc_bus.emit(reaction_msg.to_dict())
-            except Exception as e:  # noqa: BLE001 — best-effort telemetry
-                print(f"\n[cohost-reaction publish err] {e}", file=sys.stderr)
-            else:
-                # Phase 66 (COPILOT-02) — arm the recall-callback cooldown
-                # ONLY when the chip reached the audience. The ``else:``
-                # branch runs iff the try body completed without raising —
-                # i.e. ``_ipc_bus.emit(...)`` returned cleanly. A bus-emit
-                # failure jumps to the except above and this arm never runs;
-                # this is the strict semantic locked in CONTEXT.md Area 1
-                # Q3 + RESEARCH §Pitfall 2 + §Open Q5: cooldown reflects
-                # "a recall callback REACHED the audience", not "a recall
-                # callback was MERELY ATTEMPTED". One-way (arm only); no
-                # reset path — the wall-clock progression naturally drains
-                # the 120s window. Inner narrow try/except is defense in
-                # depth: a fault in ``chip.get`` (e.g. a future wire-format
-                # change) must not propagate and crash the turn — the
-                # outer ``else:`` placement already guarantees this code
-                # only runs on a clean bus emit, but the inner wrapper
-                # matches the project idiom (Pattern B in 66-PATTERNS.md).
-                try:
-                    if any(
-                        chip.get("event_id", "").startswith("recall:")
-                        for chip in strip
-                    ):
-                        self._last_recall_callback_at = time.time()
-                except Exception as _e:  # noqa: BLE001
-                    print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
-        elif self._ipc_bus is None and citation_action in ("emit", "bypass"):
-            # Phase 66 (COPILOT-02) — bus-less arm path. When ``_ipc_bus`` is
-            # None (test contexts that don't wire the UI broadcast surface,
-            # or production agents that skip the IPC bus) the chip surface
-            # never publishes, but the AUDIO surface still delivered the
-            # reaction to the audience via the TTS chunks (citation_action
-            # in {emit, bypass} = "user heard the text"). The strict
-            # "REACHED the audience" semantic locked in CONTEXT.md Area 1
-            # Q3 still applies here: the audience heard the recall callback
-            # via audio even though no chip was broadcast.
-            #
-            # Phase 66 review CR-01 — mirror the bus path's STRUCTURAL filter.
-            # Previously this arm used ``parse_citations(full_text)`` raw,
-            # which arms on ANY ``("recall", <body>)`` atom found — INCLUDING
-            # a FABRICATED ``[recall:<unregistered>]`` that the one-shot
-            # bypass let through after the linter said invalid. The bus
-            # path correctly uses ``_build_citation_strip`` which ONLY counts
-            # atoms that resolve in the registry, so a fabricated recall id
-            # under bypass NEVER reaches the audience as a registered chip
-            # and never arms there. The two paths MUST yield the same
-            # arm/no-arm decision per the "REACHED the audience" semantic.
-            # Reuse the same lens here. The flag-OFF guard up-front (recall
-            # disabled or no registry) closes a secondary leak: today the
-            # outer condition only checks ``citation_action`` + bus-None, so
-            # if a future flag-OFF code path ever emitted a ``[recall:...]``
-            # atom this arm would fire with no recall service in play. The
-            # explicit ``_recall_enabled`` / ``_registry is None`` guards
-            # make the arm spec-correct under every state.
-            # Best-effort try/except so a parse failure cannot crash the
-            # turn (project Pattern B).
-            if not self._recall_enabled or self._registry is None:
-                pass  # feature OFF or no registry — never arm without backing state
-            else:
-                try:
-                    strip = _build_citation_strip(
-                        reaction_text=full_text,
-                        registry=self._registry,
-                    )
-                    if any(
-                        chip.get("event_id", "").startswith("recall:")
-                        for chip in strip
-                    ):
-                        self._last_recall_callback_at = time.time()
-                except Exception as _e:  # noqa: BLE001
-                    print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
-
-        # ---- Per-invocation dump (always written, even on suppression) ----
-        try:
-            (invoke_dir / "response.txt").write_text(full_text)
-            (invoke_dir / "meta.json").write_text(
-                json.dumps(
-                    {
+                self._llm_to_tts_meter.log_turn(
+                    self._recorder,
+                    extra={
                         "event": ev_tag,
-                        "ts": invoke_ts,
-                        "invoke_n": invoke_n,
-                        "audible": self._state.audible,
-                        "deck": self._state.audible_deck,
-                        "track": self._state.audible_track,
-                        "track_confidence": round(self._state.audible_track_confidence, 2),
-                        "phase": self._state.phase,
-                        "rms": round(self._state.rms, 4),
-                        "bpm": round(self._state.bpm, 1),
-                        "audio_bytes": len(audio_wav),
-                        "audio_seconds": audio_seconds,
-                        "diet": diet,
-                        "llm_latency_s": round(elapsed, 2),
-                        "llm_error": llm_err,
-                        "response_chars": len(full_text),
-                        "suppression": suppression,
-                        "slop_matches": slop_matches,
-                        # Plan 20-01 — citation linter chokepoint outcome.
-                        # When wired==False, all four are None (skip path).
-                        "citation_lint_valid": citation_lint_valid,
-                        "citation_lint_reason": citation_lint_reason,
-                        "citation_lint_missing": citation_lint_missing_payload,
-                        "citation_action": citation_action,
-                        # Plan 41-04 — streaming-pipe outcome. True iff
-                        # the speculative head was emitted before stream
-                        # completion; False on suppression/short-response.
+                        "response_id": response_id,
                         "head_yielded": head_yielded,
                     },
-                    indent=2,
-                    ensure_ascii=False,
                 )
-            )
-        except Exception:
-            pass
+            except Exception as _e:
+                print(f"[delta-meter err] {_e}", file=sys.stderr)
+        finally:
+            self._clear_turn_latches()
 
-        # Plan 41-04 — emit llm_to_tts_delta_ms event (skip when no head
-        # was yielded — keeps the per-turn metric stream tight).
-        try:
-            self._llm_to_tts_meter.log_turn(
-                self._recorder,
-                extra={
-                    "event": ev_tag,
-                    "response_id": response_id,
-                    "head_yielded": head_yielded,
-                },
-            )
-        except Exception as _e:
-            print(f"[delta-meter err] {_e}", file=sys.stderr)
+    def _clear_turn_latches(self) -> None:
+        """Phase 77 review WR-03 — clear the recall + grounding turn-end
+        latches, called from the ``finally`` that wraps the ``llm_node``
+        stream/emit body so the clears ALWAYS run regardless of how the turn
+        exits (normal completion, a mid-stream exception between the inner
+        guarded blocks, or generator close).
 
-        # Phase 65 Plan 04 — clear the latched recall survivors at end of
-        # turn (mirrors library/grounding.py::Grounding.clear() lifecycle).
-        # Two reasons: (1) the next HEARTBEAT turn never retrieves, so a
-        # stale latch from this turn must NOT be re-injected as memory;
-        # (2) the next track-aware event will overwrite _latest cleanly
-        # via its own on_event dispatch. Best-effort — a clear() failure
-        # cannot perturb the turn that already completed.
+        Previously these clears sat at the function-body tail AFTER the
+        ``finally`` at the recall-pull block, so any uncaught exception in
+        the streaming/lint/emit phase skipped them and a ``[track:<id>]`` /
+        ``[recall:<id>]`` latch persisted into the next turn — widening the
+        CR-01 stale-citation window. Moving them into a wrapping ``finally``
+        guarantees the latch is cleared on every exit path. Both clears are
+        best-effort: a clear() failure cannot perturb the turn that already
+        completed.
+
+        Phase 65 Plan 04 / Phase 77 Plan 04 — clear reasons unchanged:
+        (1) the next HEARTBEAT turn never retrieves/grounds, so a stale latch
+        must NOT be re-injected; (2) the next track-aware event overwrites
+        ``_latest`` cleanly via its own on_event dispatch. The cold/feature-
+        off paths (recall disabled / grounding=None) skip → byte-identical.
+        """
         if self._recall_enabled and self._recall is not None:
             try:
                 self._recall.clear()
             except Exception as _e:  # pragma: no cover — defensive only
                 print(f"[recall clear err] {_e}", file=sys.stderr)
-        # Phase 77 Plan 04 — WIRE-01: clear the latched grounding citation at
-        # turn end (mirrors the recall clear + library/grounding.py::
-        # Grounding.clear() lifecycle). A single [track:<id>] must not be
-        # replayed across multiple prompts; the next track-aware event
-        # overwrites _latest cleanly via its own on_event dispatch. The
-        # grounding=None cold path skips this → byte-identical. Best-effort —
-        # a clear() failure cannot perturb the turn that already completed.
         if self._grounding is not None:
             try:
                 self._grounding.clear()
