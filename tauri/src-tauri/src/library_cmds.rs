@@ -299,32 +299,164 @@ pub async fn library_similar(
     Ok(map_search_results(&raw))
 }
 
+/// Map a raw `library curate --json` payload into the UI-facing curate shape:
+///
+///   `{ "name": str, "rationale": str, "stop_reason": str,
+///      "tracks": [ { "track_id","title","meta" } ], "count": n }`
+///
+/// CLI contract (verified against src/vibemix/__main__.py `_cmd_library_curate`
+/// + library/agent.py `ViberAgentResult.to_dict` + library/create_playlist.py
+/// `PlaylistResult.to_dict`):
+///
+///   `{ "theme", "playlist": { "name", "track_ids":[str], "m3u_path",
+///       "json_path", "dropped_ids":[str] } | null,
+///      "rationale", "iterations", "stop_reason", "seen_track_ids":[str] }`
+///
+/// HONESTY (anti-slop): the in-memory `PlaylistResult` carries only `track_ids`
+/// (strings) — NO per-track titles (the rich title/artist/bpm record lives only
+/// in the persisted JSON file, which this one-shot bridge does not re-read). So
+/// each row's `title` IS the track_id and `meta` is "track <id>". We never
+/// fabricate a human title the CLI did not give us. If a future CLI surfaces a
+/// title field per track, it is read here when present and the id is the
+/// fallback — forward-compatible by construction.
+///
+/// `name` defaults to the theme when the agent did not name the playlist;
+/// `count` is the validated track count.
+fn map_curate_result(raw: &Value) -> Value {
+    let theme = raw.get("theme").and_then(|v| v.as_str()).unwrap_or("");
+    let rationale = raw
+        .get("rationale")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let stop_reason = raw
+        .get("stop_reason")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let playlist = raw.get("playlist");
+    // `name` — the agent-chosen playlist name; fall back to the theme.
+    let name = playlist
+        .and_then(|p| p.get("name"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(theme)
+        .to_string();
+
+    let empty: Vec<Value> = Vec::new();
+    // The playlist may carry future-proof rich track objects OR (today) a flat
+    // `track_ids` string list. Handle both: if `tracks` array of objects is
+    // present use it; else map `track_ids`.
+    let tracks: Vec<Value> = if let Some(arr) = playlist
+        .and_then(|p| p.get("tracks"))
+        .and_then(|t| t.as_array())
+    {
+        arr.iter()
+            .map(|t| {
+                let track_id = t
+                    .get("track_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                // title: a real title field WHEN PRESENT, else the id (honest).
+                let title = t
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or(&track_id)
+                    .to_string();
+                let meta = t
+                    .get("artist")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .map(|a| a.to_string())
+                    .unwrap_or_else(|| format!("track {track_id}"));
+                json!({ "track_id": track_id, "title": title, "meta": meta })
+            })
+            .collect()
+    } else {
+        let ids = playlist
+            .and_then(|p| p.get("track_ids"))
+            .and_then(|t| t.as_array())
+            .unwrap_or(&empty);
+        ids.iter()
+            .map(|v| {
+                let track_id = v.as_str().unwrap_or("").to_string();
+                // No title in the flat id list → id IS the title (no fabrication).
+                json!({
+                    "track_id": track_id,
+                    "title": track_id,
+                    "meta": format!("track {track_id}"),
+                })
+            })
+            .collect()
+    };
+
+    let count = tracks.len() as u64;
+    json!({
+        "name": name,
+        "rationale": rationale,
+        "stop_reason": stop_reason,
+        "tracks": tracks,
+        "count": count,
+    })
+}
+
+/// `library_curate` — theme → AI-curated playlist (one-shot, NOT interactive).
+///
+/// Runs `library curate <theme> --json`, maps the raw curate JSON into the
+/// stable UI shape `{ name, rationale, stop_reason, tracks:[{track_id,title,
+/// meta}], count }`. A backend failure (no library cache, no key, model
+/// produced no playlist) surfaces via `parse_cli_json` as an Err — the
+/// frontend renders the real error, never fake data (anti-slop).
+#[tauri::command]
+pub async fn library_curate(app: AppHandle, theme: String) -> Result<Value, String> {
+    let (stdout, stderr, code) =
+        run_library_to_completion(&app, &["library", "curate", &theme, "--json"]).await?;
+    let raw = parse_cli_json(&stdout, &stderr, code)?;
+    Ok(map_curate_result(&raw))
+}
+
 /// `library_stats` — lightweight engine status for the UI header.
 ///
-/// Returns `{ indexed:n, backend:"sqlite-vec", spent_eur:f, failed:n }`.
+/// Returns `{ indexed:n, backend:"sqlite-vec"|"numpy", spent_eur:f, failed:n }`.
 ///
-/// SOURCE (documented per the task): there is NO `library stats --json`
-/// subcommand in the Python CLI at HEAD. The cheapest CLI-only signal that
-/// makes NO Gemini network call is `library budget --json` — it is fully
-/// offline (pure projection math + in-process `BudgetTelemetry`; no genai /
-/// httpx import). We read `telemetry.current_cost_estimate_eur` for
-/// `spent_eur`.
+/// Two OFFLINE CLI calls (neither makes a Gemini/network call):
+///   * `library stats --json`  → `{ indexed, backend, failed }` — the store
+///     row-count via `LibraryStore.row_count()` (added so this header no longer
+///     hardcodes `indexed:0`). `failed` has no persisted source yet → `0`.
+///   * `library budget --json`  → `telemetry.current_cost_estimate_eur` for
+///     `spent_eur` (the running-cost readout; stats does not carry cost).
 ///
-/// `indexed` + `failed` have no zero-network CLI source today (the store
-/// row-count lives behind the Python `LibraryStore.row_count()` with no CLI
-/// surface, and a probe `search` would cost a Gemini embed). They are reported
-/// as `0` with `backend` hard-set to the canonical `"sqlite-vec"` value.
-/// DEFERRED: a real `indexed`/`failed` count needs a tiny `library stats
-/// --json` subcommand on the Python side (owned by the Python agent) — wiring
-/// it here is then a one-line args change.
+/// Resilience is PARTIAL and the boundary matters: a parse/exit-code hiccup is
+/// tolerated — `stats` falls back to `indexed:0 / backend:"sqlite-vec"`, `budget`
+/// to `spent_eur:0.0` — so a malformed-JSON glitch never crashes the header. But
+/// a sidecar SPAWN failure (binary missing/unlaunchable) on either call still
+/// `?`-propagates as `Err`, which surfaces to the UI as a thrown invoke. A spawn
+/// failure on the `stats` call short-circuits before `budget` runs, so it is the
+/// whole-command failure mode — not a graceful fallback.
 #[tauri::command]
 pub async fn library_stats(app: AppHandle) -> Result<Value, String> {
-    let (stdout, stderr, code) =
-        run_library_to_completion(&app, &["library", "budget", "--json"]).await?;
+    // 1) indexed + backend + failed — from the offline `stats` subcommand.
+    let (s_out, s_err, s_code) =
+        run_library_to_completion(&app, &["library", "stats", "--json"]).await?;
+    let (indexed, backend, failed) = match parse_cli_json(&s_out, &s_err, s_code) {
+        Ok(v) => (
+            v.get("indexed").and_then(|n| n.as_u64()).unwrap_or(0),
+            v.get("backend")
+                .and_then(|b| b.as_str())
+                .unwrap_or("sqlite-vec")
+                .to_string(),
+            v.get("failed").and_then(|n| n.as_u64()).unwrap_or(0),
+        ),
+        Err(_) => (0, "sqlite-vec".to_string(), 0),
+    };
 
-    // budget is offline + always exits 0; tolerate parse hiccups gracefully so
-    // the UI header never hard-fails on a stats glitch.
-    let spent_eur = match parse_cli_json(&stdout, &stderr, code) {
+    // 2) spent_eur — from the offline `budget` telemetry (stats has no cost).
+    let (b_out, b_err, b_code) =
+        run_library_to_completion(&app, &["library", "budget", "--json"]).await?;
+    let spent_eur = match parse_cli_json(&b_out, &b_err, b_code) {
         Ok(v) => v
             .get("telemetry")
             .and_then(|t| t.get("current_cost_estimate_eur"))
@@ -334,10 +466,10 @@ pub async fn library_stats(app: AppHandle) -> Result<Value, String> {
     };
 
     Ok(json!({
-        "indexed": 0,
-        "backend": "sqlite-vec",
+        "indexed": indexed,
+        "backend": backend,
         "spent_eur": spent_eur,
-        "failed": 0,
+        "failed": failed,
     }))
 }
 
@@ -705,6 +837,77 @@ mod tests {
         let mapped = map_search_results(&raw);
         assert_eq!(mapped["centered"], true);
         assert_eq!(mapped["corpus_size"], 4096);
+    }
+
+    #[test]
+    fn maps_curate_result_from_flat_track_ids() {
+        // The real CLI shape today: playlist carries `track_ids` (strings only),
+        // no per-track titles. We map id → {track_id, title=id, meta="track <id>"}.
+        let raw = json!({
+            "theme": "warm sunset rooftop",
+            "playlist": {
+                "name": "Golden Hour",
+                "track_ids": ["t1", "t2", "t3"],
+                "m3u_path": "/x/golden.m3u8",
+                "json_path": "/x/golden.json",
+                "dropped_ids": []
+            },
+            "rationale": "Built a slow-burn arc from dusk to dark.",
+            "iterations": 3,
+            "stop_reason": "created",
+            "seen_track_ids": ["t1", "t2", "t3", "t9"]
+        });
+        let m = map_curate_result(&raw);
+        assert_eq!(m["name"], "Golden Hour");
+        assert_eq!(m["stop_reason"], "created");
+        assert_eq!(m["rationale"], "Built a slow-burn arc from dusk to dark.");
+        assert_eq!(m["count"], 3);
+        assert_eq!(m["tracks"][0]["track_id"], "t1");
+        // honest: title IS the id (CLI gave no human title), meta names the id.
+        assert_eq!(m["tracks"][0]["title"], "t1");
+        assert_eq!(m["tracks"][0]["meta"], "track t1");
+    }
+
+    #[test]
+    fn curate_name_falls_back_to_theme_and_uses_rich_tracks_when_present() {
+        // Forward-compat: if a future CLI surfaces rich `tracks` objects with
+        // titles/artists, prefer them; `name` falls back to the theme when the
+        // playlist is unnamed.
+        let raw = json!({
+            "theme": "rolling hypnotic",
+            "playlist": {
+                "name": "",
+                "tracks": [
+                    { "track_id": "a1", "title": "Quälgeist", "artist": "Brutalismus" }
+                ],
+                "track_ids": ["a1"],
+                "dropped_ids": []
+            },
+            "rationale": "",
+            "stop_reason": "created"
+        });
+        let m = map_curate_result(&raw);
+        assert_eq!(m["name"], "rolling hypnotic"); // empty name → theme
+        assert_eq!(m["count"], 1);
+        assert_eq!(m["tracks"][0]["title"], "Quälgeist");
+        assert_eq!(m["tracks"][0]["meta"], "Brutalismus");
+    }
+
+    #[test]
+    fn curate_empty_playlist_maps_to_zero_tracks() {
+        // The "no playlist created" path still exits 0 in some flows; a null
+        // playlist maps to an honest empty track list (UI shows the stop_reason).
+        let raw = json!({
+            "theme": "impossible vibe",
+            "playlist": null,
+            "rationale": "Nothing in the library matched.",
+            "stop_reason": "no_create"
+        });
+        let m = map_curate_result(&raw);
+        assert_eq!(m["name"], "impossible vibe");
+        assert_eq!(m["count"], 0);
+        assert_eq!(m["stop_reason"], "no_create");
+        assert!(m["tracks"].as_array().unwrap().is_empty());
     }
 
     #[test]

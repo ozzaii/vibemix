@@ -19,12 +19,14 @@
 
 import {
   DEV_FALLBACK,
+  libraryCurate,
   libraryEmbedFolder,
   librarySearch,
   librarySimilar,
   libraryStats,
   onEmbedDone,
   onEmbedProgress,
+  type CurateResult,
   type EmbedDone,
   type EmbedProgress,
   type EmbedStrategy,
@@ -44,6 +46,7 @@ import {
   setQuery,
   setSeed,
   setStrategy,
+  setTheme,
   type LibraryMode,
   type LibraryState,
 } from "./state-machine.js";
@@ -108,10 +111,76 @@ function renderResults(result: SearchResult, mode: LibraryMode): void {
   $("vmx-lib-scope").innerHTML = renderScope(result, mode);
 }
 
+/** Render an AI-curated playlist: a numbered set (reusing the row styling, but
+ *  WITHOUT the score meter — a curated set is ordered by the agent's arc, not a
+ *  cosine score) plus the agent's plain-language set notes. The track titles are
+ *  whatever the CLI gave (often the id when no human title exists — honest, no
+ *  fabrication). */
+function renderCurate(result: CurateResult): void {
+  const bodyEl = $("vmx-lib-rationale-body");
+  bodyEl.textContent = result.rationale || "No set notes returned.";
+  $("vmx-lib-rationale-meta").textContent =
+    `${result.count} tracks · ${result.stop_reason}`;
+
+  const el = $("vmx-lib-results");
+  el.innerHTML = "";
+  if (result.tracks.length === 0) {
+    el.innerHTML = `<div class="vmx-lib-empty">No set built (${esc(result.stop_reason)}). Try a different theme, or embed more tracks first.</div>`;
+  } else {
+    result.tracks.forEach((t, i) => {
+      const top = i === 0 ? " top" : "";
+      el.insertAdjacentHTML(
+        "beforeend",
+        `<div class="vmx-lib-row${top}">
+          <div class="rank">${String(i + 1).padStart(2, "0")}</div>
+          <div><div class="title">${esc(t.title)}</div><div class="meta">${esc(t.meta)}</div></div>
+          <div class="score"></div>
+        </div>`,
+      );
+    });
+    Array.from(el.children).forEach((row, i) => {
+      requestAnimationFrame(() =>
+        setTimeout(() => row.classList.add("settled"), i * 55),
+      );
+    });
+  }
+
+  $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;
+}
+
+/** Clear the curate set-notes block so a stale rationale never lingers under a
+ *  fresh error, or after switching away from curate mode (the block is only
+ *  hidden by `body[data-mode]`, not emptied — without this it leaks the prior
+ *  run's notes back into view the next time curate is shown). */
+function clearRationale(): void {
+  $("vmx-lib-rationale-body").textContent = "";
+  $("vmx-lib-rationale-meta").textContent = "";
+}
+
+/** Working state while the Gemini agent builds the set (it can take several
+ *  seconds). Skeleton rows + a "building" note so the surface never reads as
+ *  hung — the run button merely disabling is not enough feedback (visibility of
+ *  status). Replaced wholesale by renderCurate / renderError when the run lands. */
+function renderCurateLoading(theme: string): void {
+  $("vmx-lib-rationale-body").textContent = `Building a set for "${theme}"…`;
+  $("vmx-lib-rationale-meta").textContent = "viber · working";
+  const el = $("vmx-lib-results");
+  el.innerHTML = "";
+  for (let i = 0; i < 4; i++) {
+    el.insertAdjacentHTML(
+      "beforeend",
+      `<div class="vmx-lib-row vmx-lib-skeleton"><div class="rank">${String(i + 1).padStart(2, "0")}</div><div><div class="title"></div><div class="meta"></div></div><div class="score"></div></div>`,
+    );
+  }
+  $("vmx-lib-rcount").textContent = "building…";
+}
+
 /** Surface a REAL backend error in the results panel — honest failure, not the
  *  fake sample data. The message is the bridge's own error string (e.g.
  *  "No library cache.", "invalid strategy …"). */
 function renderError(err: unknown): void {
+  // Clear any stale curate set-notes so they never sit above a fresh error.
+  clearRationale();
   const msg =
     err instanceof Error
       ? err.message
@@ -152,6 +221,7 @@ export function mountLibrary(): void {
 
   const qInput = $("vmx-lib-q") as HTMLInputElement;
   const folderInput = $("vmx-lib-folder") as HTMLInputElement;
+  const themeInput = $("vmx-lib-theme") as HTMLInputElement;
   const runBtn = $("vmx-lib-runbtn") as HTMLButtonElement;
   const echoEl = $("vmx-lib-echo");
   const qlabelEl = $("vmx-lib-qlabel");
@@ -160,6 +230,7 @@ export function mountLibrary(): void {
   // restore initial field values from state
   qInput.value = state.query;
   folderInput.value = state.folder;
+  themeInput.value = state.theme;
   seedNameEl.textContent = state.seed;
 
   function applyModeVisibility(): void {
@@ -191,6 +262,13 @@ export function mountLibrary(): void {
   async function runSimilar(): Promise<void> {
     echoEl.textContent = state.seed;
     renderResults(await librarySimilar(state.seed), "similar");
+  }
+
+  async function runCurate(): Promise<void> {
+    state = setTheme(state, themeInput.value.trim() || state.theme);
+    echoEl.textContent = state.theme;
+    renderCurateLoading(state.theme); // working state before the (slow) agent call
+    renderCurate(await libraryCurate(state.theme));
   }
 
   /** Drive the ingest progress bar + log. If the bridge accepts the job, the
@@ -234,6 +312,7 @@ export function mountLibrary(): void {
     try {
       if (state.mode === "search") await runSearch();
       else if (state.mode === "similar") await runSimilar();
+      else if (state.mode === "curate") await runCurate();
       else {
         await runIngest();
         return; // ingest manages its own busy lifecycle (events or replay)
@@ -268,12 +347,16 @@ export function mountLibrary(): void {
   folderInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && state.mode === "ingest") void run();
   });
+  themeInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && state.mode === "curate") void run();
+  });
 
   document.querySelectorAll<HTMLElement>(".vmx-lib-modeswitch button").forEach((b) => {
     b.addEventListener("click", () => {
       const mode = (b.dataset.mode ?? "search") as LibraryMode;
       state = setMode(state, mode);
       applyModeVisibility();
+      if (mode !== "curate") clearRationale(); // don't leak stale set-notes
       if (mode === "ingest") {
         // show last-known progress shape, don't auto-run
         $("vmx-lib-loglist").innerHTML = "";
@@ -292,6 +375,18 @@ export function mountLibrary(): void {
       qInput.value = q;
       state = setQuery(state, q);
       echoEl.textContent = q;
+    });
+  });
+
+  // theme suggestion chips (curate mode) — set the theme + run.
+  document.querySelectorAll<HTMLElement>("[data-theme]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      if (state.mode !== "curate") return;
+      const t = chip.dataset.theme ?? chip.textContent ?? "";
+      themeInput.value = t;
+      state = setTheme(state, t);
+      echoEl.textContent = t;
+      void run();
     });
   });
 

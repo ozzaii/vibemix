@@ -53,7 +53,6 @@ from vibemix.agent import (
     MIC_DEVICE,
     OPENROUTER_TTS_MODEL,
     OUTPUT_DEVICE,
-    SYSTEM_INSTRUCTION,
     TTS_FALLBACK_MODEL,
     TTS_MODEL,
     VOICE,
@@ -645,6 +644,52 @@ async def main() -> None:
 
     recorder = VoiceRecorder(root=recordings_root)
 
+    # SessionTracer — comprehensive per-session trace.jsonl next to events.jsonl
+    # (same session dir, same lock, same time origin). Default ON; gate via
+    # VIBEMIX_TRACE=0. Fully fail-soft — never null-checked at call sites.
+    from vibemix.runtime import SessionTracer
+
+    tracer = SessionTracer.attach(recorder)
+    if tracer.enabled:
+        print(f"-> session trace -> {recorder.session_dir.name}/trace.jsonl")
+
+    # Fan events.jsonl ``log_event`` kinds (mostly emitted by the agent path in
+    # dj_cohost) into the categorized trace.jsonl — so AI_CALL / AI_RESP / TTS /
+    # citation outcomes land in the trace without threading a tracer through the
+    # agent's invariant control flow. Pure mirror; fully fail-soft in recorder.
+    _TRACE_KIND_CATEGORY = {
+        "llm_invoke": ("AI_CALL", "llm_invoke"),
+        "cache_hit": ("AI_CALL", "cache_hit"),
+        "mic_part_attached": ("AI_CALL", "mic_part_attached"),
+        "mic_part_skipped": ("AI_CALL", "mic_part_skipped"),
+        "lookahead_part_attached": ("AI_CALL", "lookahead_part_attached"),
+        "lookahead_part_skipped": ("AI_CALL", "lookahead_part_skipped"),
+        "ai_text": ("AI_RESP", "ai_text"),
+        "citation_count": ("AI_RESP", "citation_count"),
+        "citation_bypass": ("AI_RESP", "citation_bypass"),
+        "citation_strip": ("AI_RESP", "citation_strip"),
+        "slop_suppressed": ("AI_RESP", "slop_suppressed"),
+        "silence_short_circuit": ("AI_RESP", "silence_short_circuit"),
+        "streaming_cancel": ("AI_RESP", "streaming_cancel"),
+        "reaction_evidence": ("AI_RESP", "reaction_evidence"),
+        "proxy_unavailable": ("ERROR", "proxy_unavailable"),
+        "proxy_recovered": ("AI_CALL", "proxy_recovered"),
+        "connection_error": ("ERROR", "connection_error"),
+        "connection_recovered": ("AI_CALL", "connection_recovered"),
+    }
+
+    # ``event`` is already traced richer in coach_loop (EVENT/emit) — skip its
+    # mirror here so we don't double-log the same EventDetector emit.
+    _TRACE_KIND_SKIP = {"event"}
+
+    def _recorder_trace_sink(kind: str, fields: dict) -> None:
+        if kind in _TRACE_KIND_SKIP:
+            return
+        cat, ev = _TRACE_KIND_CATEGORY.get(kind, ("STATE", kind))
+        tracer.trace(cat, ev, **fields)
+
+    recorder.trace_sink = _recorder_trace_sink
+
     registry = BufferRegistry(
         audio=audio_buf,
         clean_audio=clean_audio_buf,
@@ -657,6 +702,11 @@ async def main() -> None:
     # --- Phase 3 sensing/state backends ---
     screen_macos = ScreenMacOS()
     midi_macos = MidiMacOS()
+    # MIDI trace hook — every de-duplicated controller move (button/fader/knob)
+    # is forwarded to the tracer. Set on the shared controller_state so the
+    # single-state hot-plug rebuild path (which mutates this object in place)
+    # keeps the hook. Fail-soft inside ControllerState._record_move.
+    midi_macos.controller_state.on_move = lambda label, ts: tracer.midi("move", label=label)
     track_macos = TrackMacOS()
     state = MusicState()
     # 2026-05-21 — seed mood from VIBEMIX_MOOD at boot. MusicState.mood defaults
@@ -1143,9 +1193,10 @@ async def main() -> None:
             transcript_buf=transcript_buf,
             controller_state=midi_macos.controller_state,
             suggestion_holder=suggestion_service,
+            tracer=tracer,
         )
     )
-    diag_task = asyncio.create_task(diag_loop(levels, state, stop_event))
+    diag_task = asyncio.create_task(diag_loop(levels, state, stop_event, tracer=tracer))
     screen_task = asyncio.create_task(screen_macos.run_capture_loop(state, stop_event))
     track_task = asyncio.create_task(track_macos.run_poll_loop(stop_event))
 
@@ -1189,6 +1240,7 @@ async def main() -> None:
             ipc_bus=citation_shim,
             citation_telemetry=_citation_telemetry if anti_slop_enabled else None,
             suggestion_service=suggestion_service,
+            tracer=tracer,
         )
     )
 
@@ -1253,6 +1305,10 @@ async def main() -> None:
                 mic_stream.close()
             except Exception as e:
                 print(f"[close mic err] {e}", file=sys.stderr)
+        try:
+            tracer.close()
+        except Exception as e:
+            print(f"[close tracer err] {e}", file=sys.stderr)
         try:
             recorder.close()
         except Exception as e:
@@ -1433,6 +1489,13 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_budget.add_argument("--json", action="store_true")
     sp_budget.set_defaults(func=_cmd_library_budget)
+
+    sp_stats = sub.add_parser(
+        "stats",
+        help="Offline indexed/backend counts for the desktop header (no network)",
+    )
+    sp_stats.add_argument("--json", action="store_true")
+    sp_stats.set_defaults(func=_cmd_library_stats)
 
 
 def _run_library_cli(argv: list[str]) -> int:
@@ -1883,7 +1946,6 @@ def _cmd_library_budget(args: argparse.Namespace) -> int:
     from dataclasses import asdict as _asdict
 
     from vibemix.library.budget import (
-        BUDGET_CEILING_EUR,
         get_telemetry,
         project_monthly_cost,
     )
@@ -1905,13 +1967,13 @@ def _cmd_library_budget(args: argparse.Namespace) -> int:
         return 0
 
     print(f"\nPhase 28 Cost Projection @ DAU={args.dau}\n")
-    print(f"  Feature                         Monthly (EUR)")
+    print("  Feature                         Monthly (EUR)")
     print(f"  One-time library indexing       {p.indexing_eur:>8.2f}")
     print(f"  Vibe-search NL queries          {p.vibe_search_eur:>8.2f}")
     print(f'  "What\'s playing" grounding      {p.grounding_eur:>8.2f}')
     print(f"  Track-to-track similarity       {p.similar_eur:>8.2f}")
     print(f"  Session-end retrieval embed     {p.session_retrieval_eur:>8.2f}")
-    print(f"  ────────────────────────────────────────────")
+    print("  ────────────────────────────────────────────")
     print(f"  Total                           {p.total_eur:>8.2f}")
     print(f"  Ceiling                         {p.ceiling_eur:>8.2f}")
     print(f"  Under budget                    {p.under_budget}")
@@ -1923,6 +1985,54 @@ def _cmd_library_budget(args: argparse.Namespace) -> int:
     print(f"  cache_hits:                 {td['cache_hits']}")
     print(f"  current_cost_estimate_eur:  {td['current_cost_estimate_eur']:.4f}")
     print(f"  cost_warning_active:        {td['cost_warning_active']}")
+    return 0
+
+
+def _cmd_library_stats(args: argparse.Namespace) -> int:
+    """Offline library-store stats for the desktop Vibe Engine header.
+
+    Reads ONLY the local sqlite-vec / numpy store row count — no Gemini /
+    genai / httpx call, mirroring ``library budget --json`` (offline by
+    design). The Rust bridge (``library_cmds.rs::library_stats``) hardcodes
+    ``indexed:0, failed:0`` today because no zero-network source existed;
+    this is that source.
+
+    Emits ``{"indexed": <row_count>, "backend": "sqlite-vec"|"numpy",
+    "failed": 0}``. ``failed`` has no persisted source today, so it is
+    honestly ``0`` (not invented). Never crashes / never networks: if the
+    store cannot be opened, falls back to ``indexed:0, backend:"unknown"``.
+    """
+    import json as _json
+
+    indexed = 0
+    backend = "unknown"
+    try:
+        from vibemix.library.store import open_store
+
+        store = open_store()
+        try:
+            # backend_name is the class name (SqliteVecStore / NumpyStore);
+            # map to the friendly tag the header expects.
+            cls = store.backend_name
+            backend = "sqlite-vec" if cls == "SqliteVecStore" else "numpy"
+            count = store.row_count()
+            indexed = int(count) if count is not None else 0
+        finally:
+            store.close()
+    except Exception as e:  # never network, never crash — header must render
+        print(f"[library stats] store unavailable: {e}", file=sys.stderr)
+
+    payload = {"indexed": indexed, "backend": backend, "failed": 0}
+
+    if getattr(args, "json", False):
+        _json.dump(payload, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 0
+
+    print("\nLibrary stats")
+    print(f"  indexed:  {indexed}")
+    print(f"  backend:  {backend}")
+    print("  failed:   0")
     return 0
 
 

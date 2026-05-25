@@ -323,6 +323,28 @@ body {
 }
 .vmx-lib-row + .vmx-lib-row { margin-top: 3px; }
 .vmx-lib-row:hover { background: var(--glass-1); border-color: var(--glass-edge); }
+
+/* Curate "building set…" skeleton — placeholder rows shown while the Gemini
+ * agent works (seconds). The title/meta bars pulse on the same breathe keyframe
+ * as the rest of the console so the wait reads as the instrument thinking, not a
+ * hang. Reduced-motion freezes the pulse to a static dim bar below. */
+.vmx-lib-row.vmx-lib-skeleton { cursor: default; }
+.vmx-lib-row.vmx-lib-skeleton .title,
+.vmx-lib-row.vmx-lib-skeleton .meta {
+  height: 9px;
+  border-radius: var(--rad-sm);
+  background: var(--glass-2);
+  animation: vmx-lib-breathe 1.4s ease-in-out infinite;
+}
+.vmx-lib-row.vmx-lib-skeleton .title { width: 62%; margin-bottom: 6px; }
+.vmx-lib-row.vmx-lib-skeleton .meta { width: 34%; height: 7px; }
+.vmx-lib-row.vmx-lib-skeleton:nth-child(2) .title { animation-delay: 0.12s; }
+.vmx-lib-row.vmx-lib-skeleton:nth-child(3) .title { animation-delay: 0.24s; }
+.vmx-lib-row.vmx-lib-skeleton:nth-child(4) .title { animation-delay: 0.36s; }
+@media (prefers-reduced-motion: reduce) {
+  .vmx-lib-row.vmx-lib-skeleton .title,
+  .vmx-lib-row.vmx-lib-skeleton .meta { animation: none; opacity: 0.55; }
+}
 .vmx-lib-row .rank {
   font-family: var(--type-mono);
   font-size: 12px;
@@ -387,6 +409,33 @@ body {
   font-size: 12px;
   color: var(--silk-40);
   word-break: break-word;
+}
+
+/* ── curate mode: the AI set-notes readout ──────────────────
+   Shown ONLY in curate mode, above the numbered playlist (which reuses the
+   .vmx-lib-results rows). Material panel, single amber accent on the label —
+   restrained, not a decorative card. */
+.vmx-lib-rationale { display: none; }
+body[data-mode="curate"] .vmx-lib-rationale {
+  display: block;
+  margin-bottom: 16px;
+  padding: 14px 15px;
+  border-radius: var(--rad-md);
+  background: var(--void-3);
+  border: 1px solid var(--glass-edge);
+  box-shadow: 0 1px 0 var(--glass-top) inset;
+}
+.vmx-lib-rationale .vmx-lib-label { color: var(--amber); margin-bottom: 9px; display: block; }
+.vmx-lib-rationale .body {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--silk-65);
+}
+.vmx-lib-rationale .meta {
+  margin-top: 10px;
+  font-size: 10.5px;
+  color: var(--silk-40);
+  letter-spacing: 0.05em;
 }
 
 /* ── right: vibe scope ──────────────────────────────────── */

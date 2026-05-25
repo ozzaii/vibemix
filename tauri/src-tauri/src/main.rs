@@ -99,6 +99,7 @@ fn main() {
             // Library / vibe-engine bridge — `vibemix library` CLI subprocess.
             library_cmds::library_search,
             library_cmds::library_similar,
+            library_cmds::library_curate,
             library_cmds::library_stats,
             library_cmds::library_embed_folder,
             library_cmds::open_library_window,

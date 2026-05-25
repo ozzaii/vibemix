@@ -8,15 +8,16 @@
  *     and the per-mode run-button label all live here as data; index.ts is the
  *     thin DOM renderer that maps this state onto the panels.
  *
- * The three modes (mocks/vibemix-library-ui.html):
+ * The four modes (mocks/vibemix-library-ui.html + curate extension):
  *   - search   ← text vibe query → ranked tracks + scope
  *   - similar  ← seed track (id or dropped file) → nearest neighbours + scope
  *   - ingest   ← folder path + strategy → embed progress + live log
+ *   - curate   ← theme → AI-curated playlist (numbered set + rationale)
  */
 
 import type { EmbedStrategy } from "./api.js";
 
-export type LibraryMode = "search" | "similar" | "ingest";
+export type LibraryMode = "search" | "similar" | "ingest" | "curate";
 
 export interface LibraryState {
   mode: LibraryMode;
@@ -28,6 +29,8 @@ export interface LibraryState {
   folder: string;
   /** Embed strategy chip (ingest mode). */
   strategy: EmbedStrategy;
+  /** Free-text theme for the AI curator (curate mode). */
+  theme: string;
 }
 
 export const initialLibraryState: LibraryState = {
@@ -36,6 +39,7 @@ export const initialLibraryState: LibraryState = {
   seed: "ygmf_Remix.wav",
   folder: "~/Music",
   strategy: "cue_anchored",
+  theme: "warm sunset rooftop, dusk to dark",
 };
 
 /** The left-console field label for the active mode. */
@@ -45,6 +49,8 @@ export function fieldLabel(mode: LibraryMode): string {
       return "Seed track";
     case "ingest":
       return "Folder to embed";
+    case "curate":
+      return "Curate a set";
     case "search":
     default:
       return "Vibe query";
@@ -58,6 +64,8 @@ export function runLabel(mode: LibraryMode): string {
       return "▸ Find similar";
     case "ingest":
       return "▸ Embed folder";
+    case "curate":
+      return "▸ Curate playlist";
     case "search":
     default:
       return "▸ Run search";
@@ -66,7 +74,14 @@ export function runLabel(mode: LibraryMode): string {
 
 /** The text echoed in the center header for the active mode. */
 export function echoText(state: LibraryState): string {
-  return state.mode === "similar" ? state.seed : state.query;
+  switch (state.mode) {
+    case "similar":
+      return state.seed;
+    case "curate":
+      return state.theme;
+    default:
+      return state.query;
+  }
 }
 
 // ── Transitions (immutable) ─────────────────────────────────────────────────
@@ -85,6 +100,10 @@ export function setSeed(state: LibraryState, seed: string): LibraryState {
 
 export function setFolder(state: LibraryState, folder: string): LibraryState {
   return { ...state, folder };
+}
+
+export function setTheme(state: LibraryState, theme: string): LibraryState {
+  return { ...state, theme };
 }
 
 export function setStrategy(

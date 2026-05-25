@@ -65,6 +65,27 @@ export interface LibraryStats {
   failed: number;
 }
 
+/** One curated track row. `meta` is a short mono caption (artist, or
+ *  `track <id>` when the CLI gave only the id — never a fabricated title). */
+export interface CurateTrack {
+  track_id: string;
+  title: string;
+  meta: string;
+}
+
+/** Result of an AI-curated playlist (`library curate <theme> --json`, mapped by
+ *  the Rust bridge into `{ name, rationale, stop_reason, tracks, count }`). */
+export interface CurateResult {
+  /** Agent-chosen playlist name (falls back to the theme). */
+  name: string;
+  /** The agent's plain-language explanation of the set it built. */
+  rationale: string;
+  /** "created" | "max_iters" | "no_create" | "model_done" — why it stopped. */
+  stop_reason: string;
+  tracks: CurateTrack[];
+  count: number;
+}
+
 /** Per-file progress frame from `library://embed-progress`. */
 export interface EmbedProgress {
   n: number;
@@ -162,6 +183,32 @@ const DEV_STATS: LibraryStats = {
   failed: 0,
 };
 
+// A representative curate run over the same 2026-05-25 subset — the agent built
+// a 6-track set from the indexed library and explained the arc. Each row mirrors
+// the REAL bridge contract exactly: `title = track_id`, `meta = "track <id>"`
+// (Rust `map_curate_result`'s flat-id branch). The in-memory `PlaylistResult`
+// carries only track_ids — no human titles — so fabricating pretty titles here
+// would train the eye to expect rows the shipped product cannot produce
+// (anti-slop). Dev-only: fires solely when `getInvoke()` is falsy (no Tauri), so
+// it can never reach the packaged app — but it still reads exactly like prod.
+const DEV_CURATE: CurateResult = {
+  name: "Dusk to Dark",
+  stop_reason: "created",
+  rationale:
+    "Opened soft and melodic, then bent the energy down into rolling, " +
+    "hypnotic territory — each step tightens the groove without breaking the " +
+    "floor. Kept the BPM drift under ±4% so the blends stay seamless.",
+  count: 6,
+  tracks: [
+    { track_id: "7f9f9052", title: "7f9f9052", meta: "track 7f9f9052" },
+    { track_id: "b8d4da96", title: "b8d4da96", meta: "track b8d4da96" },
+    { track_id: "a0b1a41b", title: "a0b1a41b", meta: "track a0b1a41b" },
+    { track_id: "911ea756", title: "911ea756", meta: "track 911ea756" },
+    { track_id: "a8f148f3", title: "a8f148f3", meta: "track a8f148f3" },
+    { track_id: "23381471", title: "23381471", meta: "track 23381471" },
+  ],
+};
+
 /** The 8-file embed log from the subset run — replayed in dev to animate the
  *  ingest progress bar + live log without a real folder embed. */
 const DEV_EMBED_LOG: Array<[EmbedProgress["status"], string, number]> = [
@@ -179,6 +226,7 @@ const DEV_EMBED_LOG: Array<[EmbedProgress["status"], string, number]> = [
 export const DEV_FALLBACK = {
   search: DEV_SEARCH,
   similar: DEV_SIMILAR,
+  curate: DEV_CURATE,
   stats: DEV_STATS,
   embedLog: DEV_EMBED_LOG,
 } as const;
@@ -199,6 +247,14 @@ export async function librarySimilar(seed: string, k = 6): Promise<SearchResult>
   if (!invoke) return DEV_SIMILAR; // no Tauri (plain vite / jsdom) → demo data
   // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
   return invoke<SearchResult>("library_similar", { seed, k });
+}
+
+/** Theme → AI-curated playlist (one-shot, NOT interactive). */
+export async function libraryCurate(theme: string): Promise<CurateResult> {
+  const invoke = await getInvoke();
+  if (!invoke) return DEV_CURATE; // no Tauri (plain vite / jsdom) → demo data
+  // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
+  return invoke<CurateResult>("library_curate", { theme });
 }
 
 /** Corpus readout for the left console. */
