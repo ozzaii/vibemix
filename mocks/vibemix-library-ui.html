@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<!-- vibemix — Library / Vibe Engine. CDJ Whisper v5. Design contract mock.
+     Surfaces: INGEST (embed-folder), SEARCH (text->tracks), SIMILAR (track->tracks).
+     Data shown is real output from the 2026-05-25 subset run (runnin over my body). -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>vibemix · vibe engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --void:#000000; --void-1:#020205; --void-2:#05070b; --void-3:#0a0c12; --void-4:#11141c;
+  --glass-1:rgba(8,10,16,.78); --glass-2:rgba(12,14,22,.62); --glass-3:rgba(2,3,6,.88);
+  --glass-edge:rgba(255,255,255,.065); --glass-edge-up:rgba(255,255,255,.11); --glass-top:rgba(255,255,255,.055);
+  --silk:#d6cfc7; --silk-65:rgba(214,207,199,.65); --silk-40:rgba(214,207,199,.40);
+  --silk-22:rgba(214,207,199,.22); --silk-12:rgba(214,207,199,.12);
+  --amber:#ff8a3d; --amber-deep:#ff5a1a; --amber-pale:#ffb88a;
+  --amber-22:rgba(255,138,61,.22); --amber-40:rgba(255,138,61,.40); --amber-65:rgba(255,138,61,.65);
+  --led-ok:#6dd44a; --led-warn:#f4c542; --led-fault:#d4413a;
+  --blur-glass:blur(32px) saturate(140%); --blur-light:blur(16px) saturate(120%);
+  --glow-soft:0 0 6px var(--amber-40),0 0 14px var(--amber-22);
+  --glow-strong:0 0 8px var(--amber-65),0 0 18px var(--amber-22);
+  --type:'Saira',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:40px;
+  --rad-sm:2px;--rad-md:6px;--rad-lg:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--type); color:var(--silk); background:var(--void);
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+  /* deep void with one faint amber light bleeding from the top-left, like a booth lamp */
+  background:
+    radial-gradient(120% 90% at 8% -10%, rgba(255,138,61,.06), transparent 46%),
+    radial-gradient(80% 70% at 100% 110%, rgba(72,120,200,.030), transparent 55%),
+    var(--void-1);
+}
+.label{font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--silk-40)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:.06em}
+
+/* ── window shell ───────────────────────────────────────── */
+.app{height:100vh;display:flex;flex-direction:column;padding:14px;gap:12px}
+.titlebar{
+  display:flex;align-items:center;gap:14px;padding:0 4px;height:30px;flex:none;
+}
+.brand{display:flex;align-items:baseline;gap:9px}
+.brand b{font-weight:700;font-size:15px;letter-spacing:.04em}
+.brand .sub{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--silk-40)}
+.brand .dot{width:5px;height:5px;border-radius:50%;background:var(--amber);box-shadow:var(--glow-soft);align-self:center;animation:breathe 3.4s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.55}50%{opacity:1}}
+.titlebar .spacer{flex:1}
+.keystat{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--silk-65)}
+.keystat .led{width:6px;height:6px;border-radius:50%;background:var(--led-ok);box-shadow:0 0 6px var(--led-ok)}
+
+.frame{
+  flex:1;min-height:0;display:grid;grid-template-columns:300px 1fr 340px;gap:12px;
+}
+.panel{
+  position:relative;border-radius:var(--rad-lg);background:var(--glass-2);
+  backdrop-filter:var(--blur-glass);border:1px solid var(--glass-edge);
+  box-shadow:0 1px 0 var(--glass-top) inset, 0 24px 60px -30px #000;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.panel::before{ /* top edge light — the frosted-glass material, not decorative float */
+  content:"";position:absolute;inset:0 0 auto 0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--glass-edge-up) 40%,var(--glass-edge-up) 60%,transparent);
+}
+.panel-hd{display:flex;align-items:center;gap:10px;padding:16px 18px 12px}
+.panel-hd .label{flex:1}
+.panel-bd{flex:1;min-height:0;overflow:auto;padding:0 18px 18px}
+.panel-bd::-webkit-scrollbar{width:8px}
+.panel-bd::-webkit-scrollbar-thumb{background:var(--silk-12);border-radius:4px}
+
+/* ── left console: mode switch + query ──────────────────── */
+.modeswitch{display:flex;gap:2px;padding:3px;background:var(--void-3);border-radius:var(--rad-md);border:1px solid var(--glass-edge)}
+.modeswitch button{
+  flex:1;font-family:var(--type);font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--silk-40);background:transparent;border:0;border-radius:var(--rad-sm);padding:9px 0;cursor:pointer;
+  transition:color .18s, background .18s;
+}
+.modeswitch button[aria-selected="true"]{color:var(--amber);background:var(--glass-1);box-shadow:0 0 0 1px var(--amber-22) inset, var(--glow-soft)}
+.modeswitch button:hover:not([aria-selected="true"]){color:var(--silk-65)}
+
+.field{margin-top:18px}
+.field .label{display:block;margin-bottom:8px}
+.qbox{
+  display:flex;align-items:center;gap:10px;background:var(--void-3);border:1px solid var(--glass-edge);
+  border-radius:var(--rad-md);padding:12px 13px;transition:border-color .2s, box-shadow .2s;
+}
+.qbox:focus-within{border-color:var(--amber-40);box-shadow:0 0 0 1px var(--amber-22),var(--glow-soft)}
+.qbox svg{flex:none;color:var(--silk-40)}
+.qbox input{flex:1;background:transparent;border:0;outline:0;color:var(--silk);font-family:var(--type);font-size:14px}
+.qbox input::placeholder{color:var(--silk-22)}
+
+.dropzone{
+  margin-top:14px;border:1px dashed var(--silk-22);border-radius:var(--rad-md);
+  padding:20px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;
+}
+.dropzone:hover{border-color:var(--amber-40);background:rgba(255,138,61,.03)}
+.dropzone .big{font-size:13px;color:var(--silk-65);margin-bottom:4px}
+.dropzone .seed{margin-top:12px;display:flex;align-items:center;gap:9px;justify-content:center}
+.dropzone .seed .led{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:var(--glow-soft)}
+.dropzone .seed .name{font-size:12px;color:var(--silk)}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.chip{font-size:11px;letter-spacing:.04em;color:var(--silk-65);background:var(--void-3);border:1px solid var(--glass-edge);
+  border-radius:999px;padding:5px 11px;cursor:pointer;transition:.18s}
+.chip:hover{color:var(--amber);border-color:var(--amber-22)}
+
+.run{
+  margin-top:auto;display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
+  font-family:var(--type);font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--amber);background:var(--glass-1);border:1px solid var(--amber-22);border-radius:var(--rad-sm);
+  padding:13px 0;cursor:pointer;transition:.2s;box-shadow:var(--glow-soft)
+}
+.run:hover{background:rgba(255,138,61,.08);box-shadow:var(--glow-strong)}
+
+/* corpus readout block */
+.corpus{margin-top:18px;padding-top:16px;border-top:1px solid var(--glass-edge);display:grid;grid-template-columns:1fr 1fr;gap:14px 10px}
+.stat .k{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--silk-40);margin-bottom:5px}
+.stat .v{font-family:var(--mono);font-size:18px;color:var(--silk);font-variant-numeric:tabular-nums}
+.stat .v small{font-size:11px;color:var(--silk-40)}
+.stat .v.amber{color:var(--amber)}
+
+/* ── center: results deck ───────────────────────────────── */
+.center .panel-hd .count{font-family:var(--mono);font-size:11px;color:var(--silk-40)}
+.qecho{font-size:13px;color:var(--silk-65);font-style:normal}
+.qecho .term{color:var(--amber);font-weight:500}
+.row{
+  display:grid;grid-template-columns:30px 1fr 88px;align-items:center;gap:14px;
+  padding:13px 12px;border-radius:var(--rad-md);cursor:default;
+  border:1px solid transparent;transition:background .16s,border-color .16s;
+}
+.row+.row{margin-top:3px}
+.row:hover{background:var(--glass-1);border-color:var(--glass-edge)}
+.row .rank{font-family:var(--mono);font-size:12px;color:var(--silk-22);text-align:right}
+.row.top .rank{color:var(--amber)}
+.row .title{font-size:14px;color:var(--silk);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .meta{font-family:var(--mono);font-size:10.5px;color:var(--silk-40);margin-top:3px;letter-spacing:.05em}
+.row .score{text-align:right}
+.row .score .num{font-family:var(--mono);font-size:14px;color:var(--silk);font-variant-numeric:tabular-nums}
+.row.top .score .num{color:var(--amber)}
+/* segmented match meter — hardware LED bar, not a gradient fill */
+.meter{display:flex;gap:2px;margin-top:5px;justify-content:flex-end}
+.meter i{width:5px;height:8px;border-radius:1px;background:var(--silk-12)}
+.meter i.on{background:var(--amber);box-shadow:0 0 4px var(--amber-40)}
+.meter i.dim{background:var(--amber-22)}
+
+/* ── right: vibe scope ──────────────────────────────────── */
+.scope-wrap{display:flex;flex-direction:column;height:100%}
+.scope{position:relative;aspect-ratio:1;width:100%;margin-top:4px}
+.scope svg{display:block;width:100%;height:100%}
+.scope .ringlabel{font-family:var(--mono);font-size:8.5px;fill:var(--silk-22);letter-spacing:.1em}
+.legend{margin-top:14px;padding-top:14px;border-top:1px solid var(--glass-edge);display:flex;flex-direction:column;gap:10px}
+.legend .ln{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--silk-65)}
+.legend .ln .sw{width:9px;height:9px;border-radius:50%;flex:none}
+.legend .ln .d{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--silk-40)}
+.scope-note{margin-top:14px;font-size:11.5px;line-height:1.5;color:var(--silk-40)}
+.scope-note b{color:var(--silk-65);font-weight:500}
+
+/* dot pulse */
+@keyframes ping{0%{r:3;opacity:.9}70%{r:13;opacity:0}100%{opacity:0}}
+.seed-ping{animation:ping 2.8s ease-out infinite}
+
+/* ── ingest mode (overlays center when active) ──────────── */
+.ingest{display:none;flex-direction:column;gap:14px}
+body[data-mode="ingest"] .results{display:none}
+body[data-mode="ingest"] .ingest{display:flex}
+body[data-mode="ingest"] .qecho{display:none}
+.progress{height:10px;border-radius:999px;background:var(--void-3);border:1px solid var(--glass-edge);overflow:hidden;position:relative}
+.progress i{position:absolute;inset:0;width:9.2%;background:linear-gradient(90deg,var(--amber-deep),var(--amber));box-shadow:var(--glow-soft)}
+.proghead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px}
+.proghead .n{font-family:var(--mono);font-size:22px;color:var(--silk)}
+.proghead .n small{font-size:13px;color:var(--silk-40)}
+.proghead .cost{font-family:var(--mono);font-size:13px;color:var(--amber)}
+.loglist{margin-top:6px;font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--silk-65)}
+.loglist .ll{display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden}
+.loglist .st{width:30px;font-weight:500}
+.loglist .st.ok{color:var(--led-ok)} .loglist .st.skip{color:var(--silk-40)} .loglist .st.err{color:var(--led-fault)}
+.loglist .fn{flex:1;overflow:hidden;text-overflow:ellipsis;color:var(--silk-65)}
+.loglist .c{color:var(--silk-40)}
+</style>
+</head>
+<body data-mode="search">
+<div class="app">
+
+  <!-- titlebar -->
+  <div class="titlebar">
+    <div class="brand"><span class="dot"></span><b>vibemix</b><span class="sub">vibe engine</span></div>
+    <div class="spacer"></div>
+    <div class="keystat"><span class="led"></span>gemini-embedding-2 · 1536d · direct key</div>
+  </div>
+
+  <div class="frame">
+
+    <!-- LEFT — query console -->
+    <aside class="panel">
+      <div class="panel-hd"><span class="label">Console</span></div>
+      <div class="panel-bd" style="display:flex;flex-direction:column">
+        <div class="modeswitch" role="tablist">
+          <button role="tab" aria-selected="true" onclick="setMode('search',this)">Search</button>
+          <button role="tab" aria-selected="false" onclick="setMode('similar',this)">Similar</button>
+          <button role="tab" aria-selected="false" onclick="setMode('ingest',this)">Ingest</button>
+        </div>
+
+        <!-- search field -->
+        <div class="field" data-for="search similar">
+          <span class="label" id="qlabel">Vibe query</span>
+          <div class="qbox">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="q" value="hard aggressive techno" />
+          </div>
+          <div class="chips" data-for="search">
+            <span class="chip">dark hypnotic rolling</span>
+            <span class="chip">euphoric melodic</span>
+            <span class="chip">hyperpop glitchy</span>
+            <span class="chip">deep dub</span>
+          </div>
+          <!-- similar: drop a track -->
+          <div class="dropzone" data-for="similar" style="display:none">
+            <div class="big">Drop a track, or pick from library</div>
+            <span class="label">wav · mp3 · m4a · flac</span>
+            <div class="seed"><span class="led"></span><span class="name mono">ygmf_Remix.wav</span></div>
+          </div>
+        </div>
+
+        <!-- ingest field -->
+        <div class="field" data-for="ingest" style="display:none">
+          <span class="label">Folder to embed</span>
+          <div class="qbox"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <input value="~/Music" /></div>
+          <div class="chips">
+            <span class="chip">strategy · mean</span>
+            <span class="chip" style="color:var(--amber);border-color:var(--amber-22)">strategy · cue-anchored</span>
+            <span class="chip">center · on</span>
+          </div>
+        </div>
+
+        <button class="run" id="runbtn">▸ Run search</button>
+
+        <!-- corpus readout -->
+        <div class="corpus">
+          <div class="stat"><div class="k">Indexed</div><div class="v">142<small> / 1547</small></div></div>
+          <div class="stat"><div class="k">Backend</div><div class="v" style="font-size:13px;letter-spacing:0">sqlite-vec</div></div>
+          <div class="stat"><div class="k">Spent</div><div class="v amber">€0.19</div></div>
+          <div class="stat"><div class="k">Failed</div><div class="v">0</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER — results -->
+    <section class="panel center">
+      <div class="panel-hd">
+        <span class="label">Pulled</span>
+        <span class="qecho">vibe · <span class="term" id="echo">hard aggressive techno</span></span>
+        <span class="spacer" style="flex:1"></span>
+        <span class="count" id="rcount">6 of 142</span>
+      </div>
+      <div class="panel-bd">
+        <div class="results" id="results"></div>
+
+        <!-- ingest progress -->
+        <div class="ingest">
+          <div>
+            <div class="proghead"><div class="n">120<small> / 128 · runnin over my body</small></div><div class="cost">~€0.19</div></div>
+            <div class="progress"><i style="width:93.7%"></i></div>
+          </div>
+          <div class="loglist" id="loglist"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT — vibe scope -->
+    <aside class="panel">
+      <div class="panel-hd"><span class="label">Vibe scope</span><span class="spacer" style="flex:1"></span><span class="count mono" style="font-size:10px;color:var(--silk-40)">centered</span></div>
+      <div class="panel-bd scope-wrap">
+        <div class="scope"><svg id="scope" viewBox="0 0 300 300" aria-hidden="true"></svg></div>
+        <div class="legend">
+          <div class="ln"><span class="sw" style="background:var(--amber);box-shadow:var(--glow-soft)"></span>Query / seed<span class="d">origin</span></div>
+          <div class="ln"><span class="sw" style="background:var(--amber-pale)"></span>Near neighbour<span class="d">&lt; 0.30</span></div>
+          <div class="ln"><span class="sw" style="background:var(--silk-40)"></span>Distant<span class="d">&gt; 0.60</span></div>
+        </div>
+        <div class="scope-note">Distance is <b>vibe distance</b> in 1536-d space, mean-centered so the cone collapses and real separation shows. Closer rings mix cleaner.</div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<script>
+// ── real data from the 2026-05-25 subset run ───────────────────────
+const DATA = {
+  search: {
+    label:"Vibe query", echo:"hard aggressive techno", run:"▸ Run search",
+    rows:[
+      {t:"Raffertie — The Substance", m:"folder:23381471 · 1536d", s:0.764},
+      {t:"ARTLUS - i like the way you kiss me (Remix)", m:"folder:b8d4da96 · 1536d", s:0.758},
+      {t:"Quälgeist", m:"folder:911ea756 · 1536d", s:0.751},
+      {t:"FLKN - I Need Acid (Original mix)", m:"folder:a8f148f3 · 1536d", s:0.739},
+      {t:"Charli XCX - Guess (DJ Daddy Trance Edit)", m:"folder:7f9f9052 · 1536d", s:0.737},
+      {t:"Brutalismus 3000 - nur mein körper und die angst", m:"folder:a0b1a41b · 1536d", s:0.734},
+    ]},
+  similar:{
+    label:"Seed track", echo:"ygmf_Remix.wav", run:"▸ Find similar",
+    rows:[
+      {t:"Girl Like Me", m:"centered · cos", s:0.369},
+      {t:"FKA Twigs - Wild And Alone", m:"centered · cos", s:0.313},
+      {t:"Troye Sivan - One of Your Girls", m:"centered · cos", s:0.308},
+      {t:"Beatback", m:"centered · cos", s:0.305},
+      {t:"Kylie Minogue - Stateside", m:"centered · cos", s:0.299},
+      {t:"i hate u (demo) ft. Tor Miller", m:"centered · cos", s:0.279},
+    ]},
+};
+const LOG = [
+  ["ok","jecta — purrr (at the goth club).mp3","~€0.191"],
+  ["ok","Just Like You.mp3","~€0.190"],
+  ["skip","Brutalismus 3000 - badthiings.mp3","cached"],
+  ["ok","Safeword [BABYNYMPH Remix].mp3","~€0.145"],
+  ["ok","FLKN - I Need Acid (Original mix).mp3","~€0.121"],
+  ["ok","Anti.mp3","~€0.121"],
+  ["ok","ARTLUS - i like the way you kiss me (Remix).mp3","~€0.011"],
+  ["ok","9mm.mp3","~€0.009"],
+];
+
+function meter(score, mode){
+  // map score to 10 segments; search scores ~0.7, centered ~0.3 — scale per mode
+  const max = mode==='similar'?0.40:0.80, min = mode==='similar'?0.20:0.60;
+  const norm = Math.max(0,Math.min(1,(score-min)/(max-min)));
+  const on = Math.round(norm*10);
+  let h="";for(let i=0;i<10;i++){h+=`<i class="${i<on?'on':(i<on+1?'dim':'')}"></i>`}
+  return h;
+}
+function renderRows(mode){
+  const d=DATA[mode]; const el=document.getElementById('results'); el.innerHTML="";
+  d.rows.forEach((r,i)=>{
+    const top=i===0?' top':'';
+    el.insertAdjacentHTML('beforeend',
+      `<div class="row${top}" style="opacity:0;transform:translateY(6px)">
+        <div class="rank">${String(i+1).padStart(2,'0')}</div>
+        <div><div class="title">${r.t}</div><div class="meta">${r.m}</div></div>
+        <div class="score"><div class="num">${r.s.toFixed(3)}</div><div class="meter">${meter(r.s,mode)}</div></div>
+      </div>`);
+  });
+  // staggered ease-out settle
+  [...el.children].forEach((row,i)=>{
+    requestAnimationFrame(()=>setTimeout(()=>{
+      row.style.transition="opacity .4s cubic-bezier(.22,1,.36,1), transform .5s cubic-bezier(.22,1,.36,1)";
+      row.style.opacity=1;row.style.transform="translateY(0)";
+    }, i*55));
+  });
+  document.getElementById('rcount').textContent = `${d.rows.length} of 142`;
+  document.getElementById('echo').textContent = d.echo;
+  drawScope(mode);
+}
+function renderLog(){
+  const el=document.getElementById('loglist');el.innerHTML="";
+  LOG.forEach(([st,fn,c],i)=>el.insertAdjacentHTML('beforeend',
+    `<div class="ll"><span class="st ${st}">${st}</span><span class="fn">${fn}</span><span class="c">${c}</span></div>`));
+}
+function drawScope(mode){
+  const svg=document.getElementById('scope'); const cx=150,cy=150;
+  const rings=[{r:42,l:"0.30"},{r:84,l:"0.60"},{r:126,l:"0.90"}];
+  let h="";
+  // crosshair + concentric range rings (instrument scope)
+  rings.forEach(rg=>{h+=`<circle cx="${cx}" cy="${cy}" r="${rg.r}" fill="none" stroke="rgba(214,207,199,.10)"/>`+
+    `<text class="ringlabel" x="${cx+4}" y="${cy-rg.r+11}">${rg.l}</text>`;});
+  h+=`<line x1="${cx}" y1="14" x2="${cx}" y2="286" stroke="rgba(214,207,199,.055)"/>`+
+     `<line x1="14" y1="${cy}" x2="286" y2="${cy}" stroke="rgba(214,207,199,.055)"/>`;
+  // neighbours: distance = (1 - score) mapped onto radius; angle deterministic by index
+  const rows=DATA[mode].rows;
+  rows.forEach((r,i)=>{
+    const dist = mode==='similar' ? (1-r.s) : (1-r.s);          // closer = more similar
+    const rad = 42 + (dist-(mode==='similar'?0.6:0.2))* (mode==='similar'?210:330);
+    const rr = Math.max(30,Math.min(132,rad));
+    const ang = (-Math.PI/2) + i*(2*Math.PI/rows.length) + (i%2?0.18:-0.18);
+    const x=cx+Math.cos(ang)*rr, y=cy+Math.sin(ang)*rr;
+    const near=i<2;
+    h+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${near?'var(--amber-22)':'rgba(214,207,199,.08)'}"/>`;
+    h+=`<circle cx="${x}" cy="${y}" r="${near?4.5:3.5}" fill="${near?'var(--amber-pale)':'var(--silk-40)'}"${near?' style="filter:drop-shadow(0 0 5px var(--amber-40))"':''}/>`;
+  });
+  // origin (query/seed) with sonar ping
+  h+=`<circle class="seed-ping" cx="${cx}" cy="${cy}" r="3" fill="none" stroke="var(--amber)"/>`+
+     `<circle cx="${cx}" cy="${cy}" r="4.5" fill="var(--amber)" style="filter:drop-shadow(0 0 7px var(--amber-65))"/>`;
+  svg.innerHTML=h;
+}
+function setMode(mode,btn){
+  document.body.dataset.mode=mode;
+  document.querySelectorAll('.modeswitch button').forEach(b=>b.setAttribute('aria-selected', b===btn));
+  document.querySelectorAll('[data-for]').forEach(el=>{
+    el.style.display = el.dataset.for.split(' ').includes(mode) ? '' : 'none';
+  });
+  document.getElementById('qlabel').textContent = mode==='similar'?'Seed track':'Vibe query';
+  const runlabels={search:'▸ Run search',similar:'▸ Find similar',ingest:'▸ Embed folder'};
+  document.getElementById('runbtn').textContent=runlabels[mode];
+  if(mode==='ingest'){renderLog();} else {renderRows(mode);}
+}
+document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{
+  if(document.body.dataset.mode!=='search')return;
+  document.getElementById('q').value=c.textContent; document.getElementById('echo').textContent=c.textContent;
+}));
+renderRows('search');
+</script>
+</body>
+</html>
