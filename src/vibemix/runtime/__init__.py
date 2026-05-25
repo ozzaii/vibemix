@@ -25,12 +25,14 @@ from vibemix.runtime.sec_check import (
     print_security_banner,
 )
 from vibemix.runtime.session_loop import SessionLoop, run_session
+from vibemix.runtime.tracer import SessionTracer
 from vibemix.runtime.wizard import WizardLoop, run_wizard
 from vibemix.runtime.ws_bus import ws_broadcast
 
 __all__ = [
     "OUTBOUND_ENDPOINTS",
     "SessionLoop",
+    "SessionTracer",
     "WizardLoop",
     "banner_lines",
     "coach_loop",

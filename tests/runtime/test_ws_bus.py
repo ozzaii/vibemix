@@ -448,6 +448,7 @@ def test_pkg_05_runtime_package_surface():
     assert set(runtime_pkg.__all__) == {
         "OUTBOUND_ENDPOINTS",
         "SessionLoop",
+        "SessionTracer",
         "WizardLoop",
         "banner_lines",
         "coach_loop",

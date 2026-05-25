@@ -202,6 +202,13 @@ class VoiceRecorder:
         # to ``None`` preserves the v4 zero-arg construction contract used
         # by the test suite + cohost_v4 callers (POC compatibility rule).
         self._evidence_registry = evidence_registry
+        # SessionTracer fan-out hook (additive, optional). When set to a callable
+        # ``fn(kind: str, fields: dict)``, every ``log_event`` mirrors itself to
+        # it so the comprehensive trace.jsonl picks up the agent's AI_CALL /
+        # AI_RESP / TTS / citation events without threading a tracer through
+        # dj_cohost's invariant control flow. Invoked fail-soft inside log_event;
+        # a sink error never perturbs the events.jsonl write or the caller.
+        self.trace_sink = None
         rec_dir = root if root is not None else Path.cwd() / "recordings"
         rec_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         # Defensively chmod — mkdir(mode=) interacts with umask on some platforms
@@ -313,6 +320,15 @@ class VoiceRecorder:
         """
         rel = time.time() - self.start_time
         rec = {"t": round(rel, 3), "kind": kind, **fields}
+        # Mirror to the SessionTracer (if attached) BEFORE taking the lock so a
+        # slow/broken sink can't extend the lock-hold for events.jsonl. The sink
+        # is fully fail-soft and side-effect-free w.r.t. this method.
+        sink = self.trace_sink
+        if sink is not None:
+            try:
+                sink(kind, dict(fields))
+            except Exception:
+                pass
         with self._lock:
             self._write_event_locked(rec)
             # Mirror the JSONL write count. session_start is line 0 written

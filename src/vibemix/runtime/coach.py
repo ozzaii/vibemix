@@ -109,6 +109,7 @@ async def coach_loop(
     ipc_bus: IpcBus | None = None,
     citation_telemetry: Callable[[], dict] | None = None,
     suggestion_service: Any | None = None,
+    tracer: Any | None = None,
 ) -> None:
     """Polls MusicState for events at 10Hz. On event → prompt AI. Single
     in-flight generation at a time. Mic detection happens here against
@@ -131,6 +132,17 @@ async def coach_loop(
         and playback is not None
     )
     citation_wired = ipc_bus is not None and citation_telemetry is not None
+
+    # SessionTracer hook — additive, side-effect-free, fully fail-soft. A None
+    # tracer (or a tracer raising) must NEVER perturb the in_flight gate or the
+    # reaction control flow below. ``_tr`` is a tiny shim so call-sites stay terse.
+    def _tr(method: str, ev_name: str, **detail: object) -> None:
+        if tracer is None:
+            return
+        try:
+            getattr(tracer, method)(ev_name, **detail)
+        except Exception:  # noqa: BLE001 — tracing is observation only
+            pass
 
     while not stop_event.is_set():
         await asyncio.sleep(0.1)
@@ -162,7 +174,9 @@ async def coach_loop(
             if age > 12.0:
                 print(f"\n[coach] in_flight stale {age:.1f}s — clearing", file=sys.stderr)
                 trigger_state["in_flight"] = False
+                _tr("ai_call", "in_flight_stale_clear", age_s=round(age, 2))
             else:
+                _tr("ai_call", "skipped_in_flight", age_s=round(age, 2))
                 mic_active_frames = 0
                 mic_silence_since = 0.0
                 continue
@@ -202,6 +216,30 @@ async def coach_loop(
 
         ev = event_detector.detect(state, kaan_just_spoke=kaan_just_spoke, manual=manual)
 
+        # STATE delta trace — debounced, only logs when a tracked field changes
+        # (note_change is a no-op on unchanged values, so the 10Hz tick stays cheap).
+        if tracer is not None:
+            try:
+                tracer.note_change("STATE", "phase", "state.phase", state.phase)
+                tracer.note_change(
+                    "STATE", "audible_track", "state.audible_track", state.audible_track
+                )
+                tracer.note_change("STATE", "audible_deck", "state.audible_deck", state.audible_deck)
+                tracer.note_change("STATE", "bpm", "state.bpm", round(float(state.bpm or 0.0), 1))
+            except Exception:  # noqa: BLE001 — tracing is observation only
+                pass
+
+        if ev is not None:
+            _tr(
+                "event",
+                "emit",
+                type=ev.type,
+                manual=manual,
+                kaan_just_spoke=kaan_just_spoke,
+                audible=state.audible,
+                deck=state.audible_deck,
+            )
+
         # PILL next-suggestion (additive, off-loop): the seed track changed, so
         # the "what's next" must change. Recompute in an executor so the store
         # read NEVER blocks the reaction path; fire-and-forget with an error
@@ -212,10 +250,31 @@ async def coach_loop(
             and ev.type == "TRACK_CHANGE"
         ):
             try:
+                _tr("suggestion", "recompute_dispatched", seed_track=state.audible_track)
                 fut = asyncio.get_running_loop().run_in_executor(
                     None, suggestion_service.compute_from_state, state
                 )
-                fut.add_done_callback(_log_suggestion_error)
+
+                def _trace_suggestion_done(f: Any) -> None:
+                    _log_suggestion_error(f)
+                    if tracer is None:
+                        return
+                    try:
+                        if f.exception() is not None:
+                            return
+                        result = f.result()
+                        if result is None:
+                            tracer.suggestion("result", chosen=None, why="no_candidate")
+                        else:
+                            tracer.suggestion(
+                                "result",
+                                chosen=result.get("track_id") or result.get("title"),
+                                detail=result,
+                            )
+                    except Exception:  # noqa: BLE001 — tracing is observation only
+                        pass
+
+                fut.add_done_callback(_trace_suggestion_done)
             except Exception as e:  # noqa: BLE001 — never wedge the loop
                 print(f"\n[coach suggestion] {e}", file=sys.stderr)
 
@@ -258,6 +317,8 @@ async def coach_loop(
             # multimodal prompt (text evidence + audio Part + screen Part).
             agent.set_next_event(ev)
 
+            _tr("ai_call", "generate_reply", type=tag, wired=wired)
+            _call_started = time.time()
             try:
                 if wired:
                     handle = session.generate_reply(allow_interruptions=True)
@@ -269,7 +330,19 @@ async def coach_loop(
                 await asyncio.wait_for(handle.wait_for_playout(), timeout=20.0)
                 if wired:
                     trigger_state["last_response_at"] = time.monotonic()
+                _tr(
+                    "ai_resp",
+                    "playout_done",
+                    type=tag,
+                    latency_ms=round((time.time() - _call_started) * 1000, 1),
+                )
             except TimeoutError:
+                _tr(
+                    "ai_resp",
+                    "playout_timeout",
+                    type=tag,
+                    latency_ms=round((time.time() - _call_started) * 1000, 1),
+                )
                 print("[coach] generate_reply timed out", file=sys.stderr)
             finally:
                 trigger_state["in_flight"] = False
@@ -280,4 +353,5 @@ async def coach_loop(
                     trigger_state["in_flight_ev"] = None
         except Exception as e:
             trigger_state["in_flight"] = False
+            _tr("error", "coach_loop", err=str(e))
             print(f"\n[coach err] {e}", file=sys.stderr)

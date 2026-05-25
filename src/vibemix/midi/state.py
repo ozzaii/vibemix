@@ -42,6 +42,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from vibemix.midi.generic import GENERIC_MIDI_ID
 from vibemix.midi.profile import ButtonBinding, ControlBinding, ControllerProfile
@@ -166,6 +167,14 @@ class ControllerState:
         self._connected = False
         self.port_name = ""
 
+        # SessionTracer hook (additive, optional). When set to a callable, every
+        # de-duplicated human-meaningful move label (button press, fader/knob
+        # twist, xfader cut) is forwarded for tracing. Invoked inside
+        # ``_record_move`` while ``self._lock`` is held, so it MUST be cheap and
+        # MUST NOT raise — ``_record_move`` wraps it in a fail-soft guard. This
+        # is observation only; it never touches the moves/events rings.
+        self.on_move: Any | None = None
+
         # Build lookup tables from the profile bindings (replaces v4 module
         # globals). Keys are (channel, cc) and (channel, note) tuples — same
         # shape as v4 _CC_MAP / _NOTE_MAP so existing call patterns transfer.
@@ -214,6 +223,16 @@ class ControllerState:
         cutoff = now - 12.0
         while self._moves and self._moves[0][0] < cutoff:
             self._moves.pop(0)
+        # SessionTracer hook — forward the de-duplicated move label. Fail-soft:
+        # a tracer error must never break MIDI decode (we hold self._lock here,
+        # so this must also stay cheap). Pure observation; the rings above are
+        # already updated and are untouched by this call.
+        cb = self.on_move
+        if cb is not None:
+            try:
+                cb(label, now)
+            except Exception:
+                pass
 
     def _record_event(
         self,

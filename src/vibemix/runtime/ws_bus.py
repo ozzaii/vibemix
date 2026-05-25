@@ -235,6 +235,7 @@ async def ws_broadcast(
     transcript_buf: deque | None = None,
     controller_state: Any | None = None,
     suggestion_holder: Any | None = None,
+    tracer: Any | None = None,
 ) -> None:
     """30Hz outbound mascot broadcast + inbound manual-trigger handler.
 
@@ -255,8 +256,19 @@ async def ws_broadcast(
     tick = 0
     last_move_ts: list[float] = [time.time()]
 
+    def _tr(event: str, **detail: Any) -> None:
+        # Fail-soft WS trace shim. WS frames at 30Hz are NOT traced (too noisy);
+        # only high-signal inbound user actions + client (dis)connects are.
+        if tracer is None:
+            return
+        try:
+            tracer.ws(event, **detail)
+        except Exception:
+            pass
+
     async def handler(ws):
         clients.add(ws)
+        _tr("client_connect", clients=len(clients))
         try:
             async for msg in ws:
                 try:
@@ -265,11 +277,13 @@ async def ws_broadcast(
                     data = {}
                 if data.get("action") == "trigger":
                     print("\n[ws] manual trigger requested")
+                    _tr("manual_trigger")
                     manual_trigger.set()
         except Exception:
             pass
         finally:
             clients.discard(ws)
+            _tr("client_disconnect", clients=len(clients))
 
     server = await websockets.serve(handler, WS_HOST, WS_PORT)
     print(f"-> mascot bus on ws://{WS_HOST}:{WS_PORT} (send {{action: trigger}} for manual fire)")
@@ -446,7 +460,6 @@ import sys as _sys
 
 import jsonschema as _jsonschema
 
-from vibemix.audio import WS_HOST, WS_PORT
 from vibemix.ui_bus.validator import validate_message as _validate_outbound
 
 IpcHandler = Callable[[dict], Awaitable[None]]
