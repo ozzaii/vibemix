@@ -87,7 +87,7 @@ def build_toolset() -> Any:
     except Exception:  # noqa: BLE001 — dotenv optional; env may already be set
         pass
 
-    from vibemix.library.embed import LibraryEmbedder
+    from vibemix.library.embed import build_embedder
     from vibemix.library.rekordbox import RekordboxLibrary
     from vibemix.library.store import open_store
     from vibemix.library.toolset import LibraryToolset
@@ -102,7 +102,7 @@ def build_toolset() -> Any:
             file=sys.stderr,
             flush=True,
         )
-    embedder = LibraryEmbedder(client)
+    embedder = build_embedder(client)
     store = open_store()
     return LibraryToolset(embedder, store, library)
 

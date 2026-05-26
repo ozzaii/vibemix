@@ -439,6 +439,19 @@ class LibraryEmbedder:
         vec = self._call_gemini_text(query)
         return l2_normalize(vec)
 
+    def embed_audio_bytes(self, data: bytes, mime: str) -> np.ndarray:
+        """Embed raw audio bytes → EMBEDDING_DIM float32 L2-normalized vector.
+
+        The 'what's playing' grounding path (short ≤30s buffer). Phase 90: this
+        is the public seam ``grounding.py`` routes through so a ClapEmbedder
+        (no ``_client``) is a drop-in — it no longer reaches into
+        ``embedder._client.models.embed_content`` directly.
+        """
+        from vibemix.library.budget import get_telemetry as _gt
+        _gt().increment_audio_embed()
+        vec = self._call_gemini_audio_single(data, mime)
+        return l2_normalize(vec)
+
     def has_cached_embedding(self, track: TrackEntry) -> bool:
         """Return True iff a content-hash cache hit would occur.
 
@@ -527,21 +540,24 @@ class LibraryEmbedder:
             )
             return self._embed_audio(audio_path, duration_s)
 
-        # A lone "load" cue at 0.0s means cue detection found no real structure
-        # (silence / too short). Fall back to the proven mean_excerpt path
-        # rather than embedding a single 0..80s window that's no better than
-        # the intro excerpt.
-        usable = [c for c in cues if c.type == "cue"]
+        # An EMPTY list means the auto-cue engine found no real structure
+        # (silence / too short / failed dance gate with nothing to anchor).
+        # Fall back to the proven mean_excerpt path rather than embedding a
+        # single 0..80s window that's no better than the intro excerpt.
+        usable = list(cues)
         if not usable:
             return self._embed_audio(audio_path, duration_s)
 
         vecs: list[np.ndarray] = []
         for cue in usable:
             start = max(0.0, float(cue.start_s))
-            # Anchor the window AT the cue; clamp so we never request audio
-            # past the end-of-track (ffmpeg -t past EOF just yields a short
-            # clip, which embeds fine, but clamping keeps the call honest).
-            window = float(CUE_WINDOW_SECONDS)
+            # Use the phrase-aligned mixable window the engine sized into the
+            # anchor (end_s − start_s, already ≤80s) instead of a hardcoded
+            # CUE_WINDOW_SECONDS — the engine knows how long the mix region is.
+            # Clamp so we never request audio past the end-of-track (ffmpeg -t
+            # past EOF just yields a short clip, which embeds fine, but clamping
+            # keeps the call honest).
+            window = max(1.0, float(cue.end_s) - start)
             if duration_s > 0:
                 window = min(window, max(1.0, duration_s - start))
             try:
@@ -833,3 +849,28 @@ class LibraryEmbedder:
             (key, vector.tobytes(), _time.time()),
         )
         self._cache.commit()
+
+
+# ─── Phase 90: backend-aware embedder factory ──────────────────────────────────
+def build_embedder(
+    client: "genai.Client | None" = None,
+    cache_db: sqlite3.Connection | None = None,
+    **kwargs: object,
+):
+    """Return the embedder for the active backend (``VIBEMIX_EMBED_BACKEND``).
+
+    ``clap``  → :class:`vibemix.library.embed_clap.ClapEmbedder` (local Xenova
+    ONNX, 512-dim; ``client`` is unused; ``embed_strategy``/probe kwargs ignored).
+    anything else (default ``gemini``) → :class:`LibraryEmbedder` (cloud, 1536-dim).
+
+    This is the SINGLE construction seam — call sites pass the genai ``client``
+    unconditionally; it is simply unused on the clap path. Pairs with the
+    ``_cosine.EMBED_BACKEND`` dim seam so dim + class flip together off one env var.
+    """
+    from vibemix.library._cosine import EMBED_BACKEND
+
+    if EMBED_BACKEND == "clap":
+        from vibemix.library.embed_clap import ClapEmbedder
+
+        return ClapEmbedder(cache_db=cache_db)
+    return LibraryEmbedder(client, cache_db=cache_db, **kwargs)

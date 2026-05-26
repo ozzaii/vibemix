@@ -1170,13 +1170,13 @@ async def main() -> None:
     if library_cache.exists():
         try:
             from vibemix.library import (
-                LibraryEmbedder as _LibraryEmbedder,
+                build_embedder as _build_embedder,
                 Grounding as _Grounding,
                 open_store as _open_store,
             )
 
             _embed_client = genai_client  # already proxy-wired upstream
-            _library_embedder = _LibraryEmbedder(_embed_client)
+            _library_embedder = _build_embedder(_embed_client)
             _library_store = _open_store()
             grounding = _Grounding(_library_embedder, _library_store)
             print("-> grounding: armed (event-gated, threshold=0.7)")
@@ -2021,7 +2021,7 @@ def _cmd_library_curate(args: argparse.Namespace) -> int:
     if getattr(args, "backend", "gemini") == "codex":
         return _cmd_library_curate_codex(args, lib)
 
-    from vibemix.library import LibraryEmbedder, ViberAgent, open_store
+    from vibemix.library import ViberAgent, build_embedder, open_store
 
     client, err = _library_genai_client()
     if err is not None:

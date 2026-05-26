@@ -837,7 +837,7 @@ class SessionLoop:
 
         from google import genai
 
-        from vibemix.library.embed import LibraryEmbedder
+        from vibemix.library.embed import build_embedder
 
         mode = os.environ.get("VIBEMIX_LLM_MODE", "direct").strip().lower()
         if mode == "proxy":
@@ -857,7 +857,7 @@ class SessionLoop:
                 log.info("[ingest] no GEMINI_API_KEY — skip embed")
                 return None
             client = genai.Client(api_key=api_key)
-        return LibraryEmbedder(client)
+        return build_embedder(client)
 
     async def _fire_ingest(self, trigger: str, *, session_dir: Path | None = None) -> None:
         """Enqueue a memory ingest off the hot path — best-effort, never-raise.

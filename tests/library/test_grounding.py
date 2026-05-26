@@ -22,10 +22,11 @@ from vibemix.library.grounding import (
 
 @pytest.fixture
 def fake_embedder() -> MagicMock:
+    # Phase 90: grounding now routes through the public ``embed_audio_bytes``
+    # seam (backend-agnostic), no longer ``_client.models.embed_content``.
     e = MagicMock()
-    e._client = MagicMock()
-    e._client.models.embed_content.return_value = SimpleNamespace(
-        embeddings=[SimpleNamespace(values=[0.1] * EMBEDDING_DIM)]
+    e.embed_audio_bytes.return_value = np.asarray(
+        [0.1] * EMBEDDING_DIM, dtype=np.float32
     )
     return e
 
@@ -81,7 +82,7 @@ def test_non_track_aware_event_skipped(fake_embedder, fake_store) -> None:
         fake_embedder, fake_store, b"audio", event_type="HEARTBEAT"
     )
     assert c is None
-    fake_embedder._client.models.embed_content.assert_not_called()
+    fake_embedder.embed_audio_bytes.assert_not_called()
 
 
 def test_no_audio_returns_below_threshold(fake_embedder, fake_store) -> None:
@@ -89,11 +90,11 @@ def test_no_audio_returns_below_threshold(fake_embedder, fake_store) -> None:
         fake_embedder, fake_store, None, event_type="TRACK_CHANGE"
     )
     assert c.decision == "below_threshold"
-    fake_embedder._client.models.embed_content.assert_not_called()
+    fake_embedder.embed_audio_bytes.assert_not_called()
 
 
 def test_embed_failure_graceful(fake_embedder, fake_store) -> None:
-    fake_embedder._client.models.embed_content.side_effect = RuntimeError(
+    fake_embedder.embed_audio_bytes.side_effect = RuntimeError(
         "proxy 502"
     )
     c = identify_playing(

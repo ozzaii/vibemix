@@ -28,6 +28,8 @@ Determinism rules locked here:
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 
 # Locked at 1536 per quick-260525-gz2 (real-folder embed bring-up).
@@ -53,7 +55,17 @@ import numpy as np
 #            against affected user libraries (or rely on lazy first-launch
 #            re-embed once the version bump ships).
 #     Storage impact: 3072 = +100% per row vs 1536.
-EMBEDDING_DIM = 1536
+#
+# Phase 90 (CLAP swap): the embedding backend is selected by the
+# ``VIBEMIX_EMBED_BACKEND`` env var (gemini | clap) — the SINGLE seam that flips
+# both the embedder class (embed.build_embedder) AND this dim. Gemini Embedding 2
+# = 1536; the local CLAP (Xenova ONNX) path = 512. Default stays ``gemini`` so
+# the cold path + the whole existing test suite are byte-identical. A backend
+# change diverges every content-hash cache key (model tag differs) + recreates
+# the vec0/numpy index at the new dim; the _cache_get wrong-dim guard turns any
+# stale-dim row into a clean miss → lazy re-embed.
+EMBED_BACKEND = os.environ.get("VIBEMIX_EMBED_BACKEND", "gemini").strip().lower()
+EMBEDDING_DIM = 512 if EMBED_BACKEND == "clap" else 1536
 
 
 def l2_normalize(vec: np.ndarray) -> np.ndarray:

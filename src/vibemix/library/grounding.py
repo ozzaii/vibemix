@@ -31,7 +31,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
-from vibemix.library.embed import GEMINI_EMBEDDING_MODEL, LibraryEmbedder
+from vibemix.library.embed import LibraryEmbedder
 from vibemix.library.store import LibraryStore
 
 logger = logging.getLogger(__name__)
@@ -115,27 +115,15 @@ def identify_playing(
         )
 
     try:
-        # Re-use embed.py's single-call audio path. The audio buffer is
-        # short (≤ 30s typical), well under the 180s cap.
-        from google.genai import types as _types
-
-        # Plan 41-01: model id is router-derived via library.embed.
-        result = embedder._client.models.embed_content(
-            model=GEMINI_EMBEDDING_MODEL,
-            contents=[_types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)],
-            config=_types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIM),
+        # Phase 90: route through the embedder's public ``embed_audio_bytes``
+        # seam — backend-agnostic. The Gemini ``LibraryEmbedder`` runs its
+        # single-call audio path (short ≤30s buffer, under the 180s cap + telemetry
+        # inside); a ``ClapEmbedder`` runs the local CLAP audio encoder. NO more
+        # reaching into ``embedder._client`` (CLAP has none).
+        qvec = embedder.embed_audio_bytes(audio_bytes, mime_type)
+        assert qvec.shape == (EMBEDDING_DIM,), (
+            f"grounding: embed returned {qvec.shape}, expected ({EMBEDDING_DIM},)"
         )
-        # Plan 28-08 — grounding audio embed telemetry.
-        from vibemix.library.budget import get_telemetry as _gt
-        _gt().increment_audio_embed()
-
-        vec = np.asarray(
-            list(result.embeddings[0].values), dtype=np.float32
-        )
-        assert vec.shape == (EMBEDDING_DIM,), (
-            f"grounding: embed returned {vec.shape}, expected ({EMBEDDING_DIM},)"
-        )
-        qvec = l2_normalize(vec)
     except Exception as e:
         logger.warning("grounding embed failed: %s", e)
         return Citation(

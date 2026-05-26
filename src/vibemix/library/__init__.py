@@ -24,8 +24,10 @@ from vibemix.library.embed import (
     EXCERPT_STRATEGY_VERSION,
     GEMINI_EMBEDDING_MODEL,
     LibraryEmbedder,
+    build_embedder,
 )
 from vibemix.library.cue_detect import detect_cues
+from vibemix.library.cue_types import CueAnchor
 from vibemix.library.index_numpy import NumpyStore
 from vibemix.library.rekordbox import (
     CuePoint,
@@ -88,6 +90,7 @@ __all__ = [
     "EMBED_STRATEGIES",
     "EMBEDDING_DIM",
     "EXCERPT_STRATEGY_VERSION",
+    "CueAnchor",
     "detect_cues",
     "GEMINI_EMBEDDING_MODEL",
     "Grounding",
@@ -98,6 +101,7 @@ __all__ = [
     "probe_duration_s",
     "scan_folder",
     "LibraryEmbedder",
+    "build_embedder",
     "LibraryStore",
     "NumpyStore",
     "QUERY_CACHE_TTL",
