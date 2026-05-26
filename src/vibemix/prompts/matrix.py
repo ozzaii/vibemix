@@ -624,9 +624,11 @@ def build_parts_description(
             baseline (the flag-OFF cold path adds nothing — not even
             trailing whitespace). When True, a short "secondary grounding
             signal" framing clause is appended uniformly to all 4 branches:
-            it names the Part-1 live audio a *secondary* grounding signal,
-            declares the structured evidence authoritative, and forbids
-            claiming an event the evidence does not list. The Part-1 audio
+            it frames the structured evidence as a *secondary* corroborating
+            signal alongside the live audio (the ears stay the referee — this
+            COMPLEMENTS, never inverts, Invariant #3 / the EARS-WIN refrain),
+            and forbids claiming an event the evidence does not list (the
+            GROUND-01 anti-fabrication guard). The Part-1 audio
             attach itself is UNCONDITIONAL (gated in neither path) — this
             flag gates only the prompt framing text. Threaded from a
             default-OFF ``VIBEMIX_GROUND_SECONDARY_EAR`` env read →
@@ -658,14 +660,24 @@ def build_parts_description(
     # flag is True; the empty-string default keeps every branch byte-identical
     # to the v8.0 baseline on the cold path. Mirrors the anti-prediction guard
     # phrasing style above ("do NOT describe Part N as if it has played ...").
-    # Names the audio a *secondary* grounding signal, declares the structured
-    # evidence authoritative, and forbids claiming an unlisted event.
+    #
+    # WR-01 (Phase-80 review): the clause must COMPLEMENT — never invert —
+    # "your ears are the referee" / CLAUDE.md Cardinal Invariant #3 ("trust the
+    # audio; live audio evidence is authoritative"). So it frames the structured
+    # evidence as a *secondary corroborating signal alongside* what the ears
+    # hear (use it to sharpen the read), and keeps ONLY the anti-fabrication
+    # half of GROUND-01: never claim an event the evidence does not list. It does
+    # NOT assert "the evidence is authoritative over your ears" — that wording
+    # contradicted the system instruction's EARS-WIN refrain and Invariant #3.
+    # The "secondary grounding signal" token is retained (pinned by
+    # tests/agent/test_dj_cohost_ground_secondary.py::test_flag_on_audio_framed).
     secondary_clause = ""
     if secondary_ear:
         secondary_clause = (
-            " The live audio is a secondary grounding signal — the structured "
-            "evidence above is authoritative; never claim an event the evidence "
-            "does not list."
+            " The structured evidence above is a secondary grounding signal "
+            "alongside the live audio — your ears stay the referee on what is "
+            "happening now; use the evidence to make your read more specific, "
+            "but never claim an event the evidence does not list."
         )
 
     if not has_mic_part and not has_lookahead_part:

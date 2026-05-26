@@ -203,8 +203,16 @@ def test_flag_on_audio_framed(mocker, tmp_path) -> None:
     inline = contents[1].inline_data
     assert inline.mime_type == "audio/wav"
     assert inline.data.startswith(b"RIFF")
+    text_packet = contents[0]
     # The secondary-ear framing token is now present in the text packet.
-    assert "secondary grounding signal" in contents[0]
+    assert "secondary grounding signal" in text_packet
+    # WR-01: the clause keeps the GROUND-01 anti-fabrication guard …
+    assert "never claim an event the evidence does not list" in text_packet
+    # … and COMPLEMENTS (never inverts) Invariant #3 / the EARS-WIN refrain:
+    # the ears stay the referee and the clause must NOT assert the inverted
+    # "the structured evidence above is authoritative" priority.
+    assert "your ears stay the referee" in text_packet
+    assert "evidence above is authoritative" not in text_packet
 
 
 def test_unbacked_audio_claim_strips(mocker, tmp_path) -> None:
