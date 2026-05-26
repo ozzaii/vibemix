@@ -1,10 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""BENCH-01 — cell-assembly scaffolds (flip in Plan 02 = the harness).
+"""BENCH-01 — cell-assembly tests (REAL-GREEN — flipped in Plan 02).
 
-Each behavioral assertion that depends on the not-yet-built ``vibemix.bench.*``
-modules is ``xfail(strict=True)`` so it fails today (clean ImportError) and
-flips to a REAL pass when Plan 02 lands the harness — a silent early-pass
-becomes ``xpassed`` → HARD failure.
+The Wave-0 scaffolds (``xfail(strict=True)``) flipped to real passes when
+Plan 02 landed ``vibemix.bench.{cell,assemble,matrix,fixtures}``.
 
 The assembler's job (81-RESEARCH §Dimension→Seam Map, 81-PATTERNS "assemble.py"):
 compose ONE prompt per ``BenchCell`` by calling the REAL product seams
@@ -15,13 +13,10 @@ comes from the router, never a literal (Pitfall 4).
 
 from __future__ import annotations
 
-import pytest
-
 from vibemix.prompts.matrix import build_lens_instruction
 from vibemix.llm import model_router
 
 
-@pytest.mark.xfail(strict=True, reason="bench/assemble + bench/cell land in Plan 02")
 def test_hype_cell_reuses_lens_seam() -> None:
     """A hype cell's system instruction reuses build_lens_instruction('hype', ...)
     output — the bench measures the REAL product voice, not a baked literal."""
@@ -42,7 +37,6 @@ def test_hype_cell_reuses_lens_seam() -> None:
     assert expected_voice[:80] in system
 
 
-@pytest.mark.xfail(strict=True, reason="bench/assemble lands in Plan 02")
 def test_no_audio_cell() -> None:
     """THE empirical heart — the dsp_only cell sends ZERO audio Parts yet a
     NON-EMPTY evidence body. If Gemini grounds a sharp reaction on the DSP
@@ -71,7 +65,6 @@ def test_no_audio_cell() -> None:
     assert "hearing" in body or "groove" in body or "bpm" in body.lower()
 
 
-@pytest.mark.xfail(strict=True, reason="bench/assemble lands in Plan 02")
 def test_structured_passes_snapshot_generic_passes_none() -> None:
     """The prompting axis: a structured cell passes a registry_snapshot to the
     coach (full anti-slop stack); a generic cell passes None (the no-structure
@@ -95,7 +88,6 @@ def test_structured_passes_snapshot_generic_passes_none() -> None:
     assert sys_struct != sys_generic
 
 
-@pytest.mark.xfail(strict=True, reason="bench/assemble lands in Plan 02")
 def test_model_from_router_not_literal() -> None:
     """The model axis resolves through model_router.resolve — NEVER a literal.
     The resolved id must equal the router's id for the cell's alias (asserted
