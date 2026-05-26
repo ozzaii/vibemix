@@ -574,10 +574,16 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   }
 
   // --- grounding-failure timer ---
-  if (isMount) {
-    mounted.groundedFalseSinceMs = next.cohost.grounded ? null : Date.now();
-  } else if (prev.cohost.grounded !== next.cohost.grounded) {
-    mounted.groundedFalseSinceMs = next.cohost.grounded ? null : Date.now();
+  // Only runs while the co-host is ACTIVE. At IDLE there's no music to ground
+  // to, so grounded=false is EXPECTED — not a failure. Counting it at idle is
+  // what made a quiet session falsely flip to "gemini unreachable" after 5s
+  // (fault mode → blank hero, the recurring "empty screen / always broken").
+  // The clock starts once when the co-host is active+ungrounded and clears the
+  // instant it grounds a reaction or returns to idle.
+  if (next.cohost.status === "IDLE" || next.cohost.grounded) {
+    mounted.groundedFalseSinceMs = null;
+  } else if (mounted.groundedFalseSinceMs == null) {
+    mounted.groundedFalseSinceMs = Date.now();
   }
   const failureElapsedMs =
     mounted.groundedFalseSinceMs != null ? Date.now() - mounted.groundedFalseSinceMs : null;
