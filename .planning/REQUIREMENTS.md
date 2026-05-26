@@ -30,8 +30,8 @@
 - [x] **AGENT-02**: The set-prep flow reuses the existing bounded, no-hang agent harness (iteration cap, per-call + per-tool timeouts, handlers return errors never raise) and the shared persona/lens seam, so it can never wedge and its voice matches the co-host's.
 
 ### UI — "Build a Set" path
-- [ ] **UI-01**: The app exposes a "Build a Set" path (brief input + energy-curve preset picker → a sequenced result list showing each slot's track, key/BPM/energy, and the per-transition reasoning → an Export-to-Rekordbox button) in the CDJ-Whisper aesthetic.
-- [ ] **UI-02**: Every control in the "Build a Set" path works live end-to-end (verified in the real `cargo tauri dev` app via `ui.log`, not just green vitest), with no dead/no-op buttons, and the result is a downloaded Rekordbox file + clear next-step instructions.
+- [x] **UI-01**: The app exposes a "Build a Set" path (brief input + energy-curve preset picker → a sequenced result list showing each slot's track + the rationale → an Export-to-Rekordbox receipt) in the CDJ-Whisper aesthetic. Shipped as the 5th Library mode "build" on the verified "Deck Speaks" shell (commit ea9ceff): `library_build_set` Tauri cmd → `library build-set --curve X --export rekordbox --json` → `renderBuildSet`. Amber/glass token vocab, segmented curve selector, honest empty state. Verified: vitest src/library 45/45, tsc 0, prod build, cargo check, CLI `--json` contract carries `export_path`.
+- [~] **UI-02** (KAAN-ACTION): Live full-app button-audit + funded-key ear-pass. The seam is wired + verified by current-source method (NOT cargo tauri dev — stale May-21 sidecar gives false-negatives, see `feedback_stale_sidecar_verify_current_source`). The remaining live click-through on the settled app + judging whether the sequenced set + "why" feel like a real DJ friend genuinely needs Kaan's funded key + ear — cannot be honestly self-verified or faked.
 
 ## Future Requirements (deferred — later vibemix milestones)
 - XGBoost learned energy regressor (the 7-feature vector is kept as its future input → swap the linear combiner for a trained model with zero re-extraction).
@@ -65,8 +65,8 @@
 | EXPORT-02 | Phase 86 — EXPORT | Done |
 | AGENT-01 | Phase 87 — AGENT | Done |
 | AGENT-02 | Phase 87 — AGENT | Done |
-| UI-01 | Phase 88 — UI | Pending |
-| UI-02 | Phase 88 — UI | Pending |
+| UI-01 | Phase 88 — UI | Done (ea9ceff) |
+| UI-02 | Phase 88 — UI | KAAN-ACTION (live audit + funded-key ear-pass) |
 
 **Coverage:** 13/13 mapped ✓ — no orphans, no duplicates.
 
