@@ -102,7 +102,10 @@ Plans:
   1. hype / critique / tutor exist as three grounded prompt lenses over the same structured state — switching lens changes the voice/intent, not the underlying grounded facts (LENS-01).
   2. Lens selection is shared across the co-host and curator surfaces — choosing "tutor" once flows to both (LENS-02).
   3. Each lens still passes the citation-grounding gate — a lens may change tone but cannot fabricate evidence; un-cited output strips to the ack-bank fallback regardless of lens.
-**Plans**: TBD
+**Plans:** 3 plans, 3 waves
+  - [ ] 79-01-PLAN.md — Wave-0 RED scaffolds (xfail-strict for LENS-01/02) + default-lens / cold-path byte-identity pin
+  - [ ] 79-02-PLAN.md — LENS-01: LENS_TO_MODE_MOOD map + build_lens_instruction selector over the untouched build_system_instruction
+  - [ ] 79-03-PLAN.md — LENS-02: shared ConfigStore.extra["lens"] selection (_apply_lens) read by both co-host + curator, no IPC/schema bump
 
 ### Phase 80: GROUND — Gemini as Secondary Ear
 **Goal:** Let Gemini *also* hear the audio as a secondary grounding input ("if it can hear in hollow space, use it") — fed alongside the structured DSP evidence, never as the primary perceiver — hallucination-guarded throughout. The reaction model is config-resolved via `model_router` (zero hardcoded literals) and the actual choice is decided by the bench (P81).
