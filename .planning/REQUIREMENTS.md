@@ -28,7 +28,7 @@
 
 ### LENS — three modes
 - [x] **LENS-01**: hype / critique / tutor exist as three grounded prompt lenses over the same structured state.
-- [ ] **LENS-02**: Lens selection is shared across the co-host and curator surfaces.
+- [x] **LENS-02**: Lens selection is shared across the co-host and curator surfaces.
 
 ### GROUND — Gemini as secondary ear
 - [ ] **GROUND-01**: The audio part is fed to Gemini alongside the structured evidence, hallucination-guarded.
