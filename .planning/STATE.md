@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v8.2
 milestone_name: Set Builder
 status: planning
-last_updated: "2026-05-26T10:20:04.545Z"
-last_activity: 2026-05-26
+last_updated: "2026-05-26T13:15:57.911Z"
+last_activity: 2026-05-26 — Phase 89 Plan 02 complete (Rekordbox metadata richness)
 progress:
-  total_phases: 6
-  completed_phases: 5
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 12
+  completed_phases: 6
+  total_plans: 19
+  completed_plans: 19
+  percent: 50
 ---
 
 # vibemix — State
@@ -37,10 +37,18 @@ See: .planning/PROJECT.md (Current Milestone: v8.2 "Set Builder")
 
 ## Current Position
 
-Phase: Not started — v8.2 "Set Builder" roadmapped (Phases 83–88)
-Plan: —
-Status: Roadmapped; ready to plan Phase 83 (ENERGY)
-Last activity: 2026-05-26 — v8.2 roadmap written (6 phases, 13/13 REQ-IDs mapped)
+Phase: 89 (DJ-Library Ingest, Rekordbox MVP slice) — Plan 02 COMPLETE; v8.2 "Set Builder" roadmapped (Phases 83–88)
+Plan: 89-02 done (1/3 plans summarized; 89-01 + 89-03 in flight, parallel)
+Status: 89-02 enriched-Rekordbox-parse landed; ready to plan Phase 83 (ENERGY) / continue Phase 89
+Last activity: 2026-05-26 — Phase 89 Plan 02 complete (Rekordbox metadata richness)
+
+### Plan 89-02 — Rekordbox metadata-richness refinement (complete 2026-05-26)
+
+- **`library/rekordbox.py` enriched-parse SHIPPED (additive, honest).** `TrackEntry` now carries `genre`/`label`/`rating`(0..5 stars)/`play_count`/`comments`/`camelot`/`beatgrid` — all default-coerced (Invariant #3: missing stays missing). New `TempoNode` (inizio_s/bpm/metro/battito) + `_track_to_beatgrid` reads the TEMPO beatgrid defensively (variable-grid aware; `()` when absent, never fabricated).
+- **Camelot computed at parse via the deterministic `harmonics.to_camelot` table** (LLM never computes keys); raw classical `key` preserved untouched; `camelot` is `None` on odd/empty key (honest, never guessed). Rating byte ladder `{0,51,102,153,204,255}` → 0..5 stars (never raise on odd value). `_mark_to_cue` upgraded to real Type→label fidelity (cue/fadein/fadeout/load/loop), handling both pyrekordbox's resolved label string and a raw int.
+- **`SCHEMA_VERSION` 1→2** so stale v1 `library.pkl` invalidates cleanly under the existing unpickle version guard. SQLCipher path stays dormant (grep gate has only docstring mentions; zero real import/call); `rekordbox.py` import is heavy-dep-free (harmonics is pure — no torch/laion_clap).
+- TDD: Task 1 RED (enriched fixture + 6 strict-xfail tests) committed `41d6afd`; Task 2 GREEN (the parser + xfail flips) committed `5699f20`. **18/18 `test_rekordbox.py` tests pass.** Full offline suite **4719 passed / 27 skipped / 4 xfailed / 4 xpassed / 6 failed** — all 6 failures are OUTSIDE the 89-02 scope fence (4 = Plan-89-01's `test_sources_rekordbox.py` RED tests awaiting their impl; 1 = an unrelated UI/security guard) and logged to `deferred-items.md`. Scope fence held: only `library/rekordbox.py` + its tests/fixture touched.
+- **Next:** Plan 89-01 (sources/ + ingest LibrarySource Protocol) + Plan 89-03 (cue-anchor mapping, consumes the real cue Type) flip their RED; or `/gsd:plan-phase 83` (ENERGY).
 
 ### Plan 82-02 — CURATE: the two unification seams + regression gate (complete 2026-05-26)
 
