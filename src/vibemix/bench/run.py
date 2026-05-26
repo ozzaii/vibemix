@@ -21,15 +21,43 @@ Documented produce step:
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import os
 from pathlib import Path
 
 from vibemix.bench.assemble import build_cell_prompt
 from vibemix.bench.cell import BenchCell, BenchResult
-from vibemix.library.budget import get_session_meter
+from vibemix.library.budget import ROUTE_PRICING, get_session_meter
 
 __all__ = ["run_study", "resolve_track_path", "results_to_json"]
+
+# WR-03: hard wall-clock per real generate_content call (mirrors
+# library/agent.py:GEMINI_CALL_TIMEOUT_S). A silent network/server hang short
+# of an HTTP error never blocks the whole sweep forever — the timeout raises,
+# the existing per-cell fail-safe parks the cell, and the sweep CONTINUES.
+_BENCH_CALL_TIMEOUT_S = 60.0
+
+
+def _pricing_path_for(model_alias: str) -> str:
+    """Map a bench cell's router ALIAS to a ``ROUTE_PRICING`` key for billing.
+
+    WR-01: ``meter.record`` prices by ``ROUTE_PRICING.get(path)``, whose keys are
+    billing lanes (``live_coach`` / ``debrief`` / ``embedding`` …) — NOT the
+    full router-alias set. The bench's reaction-model aliases (``library_auto_tag``
+    for the whole STUDY_A sweep, plus ``live_coach``) would otherwise fall into
+    the ``rate is None`` branch → every cell billing $0.00 and the cost summary
+    silently under-reporting the real spend (defeating the cost-bounding gate).
+
+    Aliases that ARE pricing keys (e.g. ``live_coach``) bill against themselves;
+    any other reaction-model alias bills against ``live_coach`` as the
+    conservative reaction-model proxy (it carries the highest output rate of the
+    live lanes, so worst-case spend is never under-stated). No model LITERAL is
+    introduced — only router-path / pricing-lane names.
+    """
+    if model_alias in ROUTE_PRICING:
+        return model_alias
+    return "live_coach"
 
 
 def _bench_data_dir() -> Path:
@@ -132,26 +160,55 @@ def run_study(
                 )
 
         # --- THE 429 FAIL-SAFE — per-cell; never abort, never fabricate ---- #
+        # WR-03: the call runs under a hard wall-clock timeout so a silent hang
+        # (network wedge / server stall short of an HTTP error) raises
+        # TimeoutError instead of blocking the sweep forever — the broad except
+        # below then parks the cell and the sweep CONTINUES.
         try:
-            resp = client.models.generate_content(
-                model=model,
-                contents=call_contents,
-                config=None,
-            )
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(
+                    client.models.generate_content,
+                    model=model,
+                    contents=call_contents,
+                    config=None,
+                )
+                resp = fut.result(timeout=_BENCH_CALL_TIMEOUT_S)
             usage = _usage_dict(getattr(resp, "usage_metadata", None))
+            # WR-02: the real SDK returns ``None`` from ``response.text`` on a
+            # blocked / no-text / function-call-only candidate. A None output is
+            # neither a real reaction nor a parked error — recording it as a
+            # success (output=None, error=None) violates the produce-and-park
+            # contract (output=="" == parked, non-empty == success). Coerce an
+            # empty/blocked candidate into the PARKED state, never a fabricated
+            # success.
+            text = resp.text or ""
+            if not text:
+                results.append(
+                    BenchResult(
+                        cell=cell,
+                        prompt=prompt_text,
+                        output="",  # parked — never fabricate output
+                        dsp_snapshot=fixture_snapshot_for(cell),
+                        usage=usage,
+                        error="blocked: no text candidate",
+                    )
+                )
+                continue
             results.append(
                 BenchResult(
                     cell=cell,
                     prompt=prompt_text,
-                    output=resp.text,
+                    output=text,
                     dsp_snapshot=fixture_snapshot_for(cell),
                     usage=usage,
                     error=None,
                 )
             )
-            # Cost bounding — feed the real usage to the session meter.
+            # Cost bounding — feed the real usage to the session meter, billed
+            # against the alias's pricing LANE (WR-01) so the cost summary
+            # reports real spend instead of $0.00 for every reaction-model cell.
             meter.record(
-                cell.model_path,
+                _pricing_path_for(cell.model_path),
                 prompt=int(usage.get("prompt_token_count") or 0),
                 cached=int(usage.get("cached_content_token_count") or 0),
                 output=int(usage.get("candidates_token_count") or 0),

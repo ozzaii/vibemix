@@ -59,3 +59,26 @@ def test_result_carries_usage_from_fake(fake_client) -> None:
     assert first.usage.get("prompt_token_count") == 1900
     assert first.usage.get("candidates_token_count") == 40
     assert first.usage.get("total_token_count") == 1940
+
+
+def test_study_a_records_nonzero_known_cost(fake_client) -> None:
+    """WR-01: a STUDY_A cell (router alias ``library_auto_tag``, NOT a pricing
+    key) must record a NON-ZERO KNOWN cost — the bench bills it against the
+    ``live_coach`` pricing lane, not $0.00. Before the fix, the alias missed
+    ROUTE_PRICING entirely → every STUDY_A cell billed $0.00 (cost-bounding
+    silently no-op). Offline: the fake usage drives the meter, no live API."""
+    from vibemix.bench.matrix import STUDY_A
+    from vibemix.bench.run import run_study
+    from vibemix.library.budget import get_session_meter
+
+    meter = get_session_meter()
+    meter.reset()
+    run_study(STUDY_A, client=fake_client)
+    summary = meter.summary()
+    # STUDY_A's aliases all bill against live_coach — the known-priced lane.
+    assert "live_coach" in summary["per_path"]
+    # Real spend is reported, not the silent $0.00 of the alias-miss bug.
+    assert summary["total_cost_eur"] > 0.0
+    meter.reset()
+
+
