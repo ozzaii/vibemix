@@ -143,6 +143,10 @@ export interface Mounted {
   citeChip: CitationChip | null;
 }
 
+// Calm idle hero line shown in silent mode before the co-host's first reaction
+// (honest placeholder, dimmed by the silent CSS — never a fabricated reaction).
+const IDLE_HERO_LINE = "listening for the mix…";
+
 const METER_ATTACK = 0.16;
 const METER_PEAK_DECAY = 0.04;
 const METER_CEIL = 86;
@@ -603,7 +607,13 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   const nowLine = lines.length ? lines[lines.length - 1]! : null;
   const g1Line = lines.length >= 2 ? lines[lines.length - 2]! : null;
   const g2Line = lines.length >= 3 ? lines[lines.length - 3]! : null;
-  const nowText = nowLine ? nowLine.text : "";
+  // Idle affordance: before the co-host's first line (empty transcript) the
+  // hero — the centerpiece of "The Deck Speaks" — would otherwise be blank,
+  // reading as a dead/empty screen. In silent mode show a calm, dimmed prompt
+  // (the silent CSS already greys .vmx-now to silk-40, so it reads as a
+  // placeholder, NOT a fabricated reaction). Real lines replace it the instant
+  // the co-host speaks. Live mode keeps "" (a live deck always has a line).
+  const nowText = nowLine ? nowLine.text : mode === "silent" ? IDLE_HERO_LINE : "";
   if (mounted.now.textContent !== nowText) mounted.now.textContent = nowText;
   setGhost(mounted.ghosts[0], g1Line);
   setGhost(mounted.ghosts[1], g2Line);
