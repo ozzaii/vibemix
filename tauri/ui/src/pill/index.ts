@@ -285,6 +285,7 @@ function syncCitationStrip(view: PillView, chips: CitationChip[]): void {
   if (key === view.lastChipsKey) return;
   view.lastChipsKey = key;
   expandEl.querySelector(".vmx-citation-strip")?.remove();
+  expandEl.querySelector(".pill__receipt-rule")?.remove();
   const strip = renderCitationStrip({
     chips,
     // v1: no-op. A future plan deep-links to the debrief at the cited moment.
@@ -296,6 +297,14 @@ function syncCitationStrip(view: PillView, chips: CitationChip[]): void {
     // Insert before the deck-chips mount (the deck chips sit BELOW the citation
     // strip per 62-UI-SPEC §States).
     const decks = expandEl.querySelector("#pill-decks");
+    // "The Deck Speaks" receipt echo (2026-05-26 rebuild): a 1px amber rule
+    // draws in above the citation — the session deck's signature gesture
+    // ("it spoke, then drew its receipt") carried to the pill in miniature.
+    // Inserted fresh per reaction so the draw replays on each new reaction.
+    const rule = document.createElement("span");
+    rule.className = "pill__receipt-rule";
+    rule.setAttribute("aria-hidden", "true");
+    expandEl.insertBefore(rule, decks);
     expandEl.insertBefore(strip, decks);
   }
 }

@@ -223,6 +223,26 @@
   overflow: hidden;
 }
 
+/* ── Receipt rule (2026-05-26 "The Deck Speaks" echo) ────────────────────── *
+ * A 1px amber hairline that draws left-to-right above the citation strip when
+ * the pill expands on a reaction — the session deck's signature gesture ("the
+ * sentence draws its receipt") carried to the pill in miniature. One amber, one
+ * draw, on void glass. Inserted fresh per reaction (index.ts) so the draw
+ * replays each time; frozen complete under reduced-motion. */
+.pill__receipt-rule {
+  align-self: stretch;
+  height: 1px;
+  background: linear-gradient(90deg, var(--amber-40), var(--amber));
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: pill-receipt-draw 520ms cubic-bezier(0.22, 1, 0.36, 1) 80ms forwards;
+}
+@keyframes pill-receipt-draw {
+  to {
+    transform: scaleX(1);
+  }
+}
+
 /* ── Deck-context chips mount (62-05 — PILL-03) ──────────────────────────── *
  * 62-04 stubbed `.pill__decks { display: none }`; 62-05 un-hides it. index.ts
  * sets `display: flex` inline when it populates the mount with renderDeckChips
@@ -326,6 +346,10 @@
   }
   .pill__expand {
     transition: none;
+  }
+  .pill__receipt-rule {
+    animation: none;
+    transform: scaleX(1);
   }
   /* The peek card still appears on hover — it just snaps in (no fade/slide),
    * the accessible read for a motion-sensitive user. */
