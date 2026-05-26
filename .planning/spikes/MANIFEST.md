@@ -44,4 +44,10 @@ off (`vision_enabled=False`). Re-evaluating that path is spike 003 (proposed).
 |---|------|------|-----------|---------|------|
 | 001 | prodj-link-probe | standard | UDP 50000-50002 → BPM + beat-in-bar + pitch ground truth | INVALIDATED laptop-only / CONDITIONAL on hardware | prodj-link, beat-phase |
 | 002 | ableton-link-probe | standard | Link → tempo + beat phase tracking the audible mix | PARTIAL (flows, but decoupled single tempo, no per-deck) | ableton-link, beat-phase |
-| 003 | deck-vision-revisit | standard | Screen read (existing `deck_vision.py`) → per-deck title/BPM/key/pitch, any software | TODO (proposed) | vision, universal, laptop-only |
+| 003 | rekordbox-data-exhaust | standard | Read rekordbox local files/DB → beatgrid/cues/**phrase structure** + library + track-change, no hw/vision | PARTIAL→VALIDATED (ANLZ static works now; live transport = fragile rkbx_link) | rekordbox, anlz, phrase, auto-cue |
+
+## Vision path — DROPPED
+
+Kaan (2026-05-26): "I don't want the vision part." Screen-vision/OCR (`deck_vision.py`)
+is off the table for ground-truth ingest. Pursue rekordbox's local data exhaust instead
+(spike 003).
