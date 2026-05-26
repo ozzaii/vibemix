@@ -366,3 +366,58 @@ def test_real_cache_untouched(_route_caches_to_tmp):
     assert str(RekordboxLibrary.CACHE_PATH).startswith(str(tmp))
     assert str(centering_mod.CENTROID_PATH).startswith(str(tmp))
     assert str(centering_mod.CENTROID_META_PATH).startswith(str(tmp))
+
+
+# ---------- WR-02: per-track lookup does not reload the corpus per call ----------
+
+
+def test_cached_embedding_corpus_loaded_at_most_once(monkeypatch):
+    """WR-02 — the per-track embedding lookup must memoize the corpus.
+
+    Before the fix, ``_cached_embedding`` called ``store._backend.load_all()``
+    (the whole ~9 MB corpus) on EVERY ``classify_playing`` — so curating N tracks
+    reloaded the corpus N times. Spy on ``load_all`` and assert it is NOT called
+    once-per-track: the count must stay flat as we classify many distinct tracks.
+    """
+    import vibemix.library.genre_prototypes as gp
+    from vibemix.library.genre_prototypes import GenrePrototypeLookup
+
+    vectors, ids, label_of = _labeled_corpus(n=12)
+    calls = {"load_all": 0}
+
+    class _CountingBackend:
+        def load_all(self):
+            calls["load_all"] += 1
+            return ids, vectors
+
+        def snapshot_hash(self):
+            return "snap-test"
+
+    class _FakeStore:
+        def __init__(self):
+            self._backend = _CountingBackend()
+
+        def snapshot_hash(self):
+            return self._backend.snapshot_hash()
+
+    monkeypatch.setattr(
+        gp, "_label_of_from_library", lambda ids_, lib=None: label_of, raising=True
+    )
+
+    holder = GenrePrototypeLookup(store=_FakeStore())
+
+    # Classify every track in the corpus — many distinct lookups in one "run".
+    for tid in ids:
+        holder.classify_playing(tid)
+    # ...plus a miss (not-in-library) which must also not trigger a reload.
+    holder.classify_playing("NOT-IN-LIBRARY-id")
+
+    after_many = calls["load_all"]
+    # The per-track lookup memoizes: ``_ensure_corpus`` loads once and
+    # ``_cached_embedding`` reuses it. ``load_or_build_prototypes`` also loads
+    # once during the one-time prototype build. So the TOTAL is a small constant
+    # (<= 2), and crucially does NOT scale with the 13 lookups above.
+    assert after_many <= 2, (
+        f"WR-02: load_all() ran {after_many}x across 13 lookups — the per-track "
+        "corpus load is not memoized (should be a small constant, not N)"
+    )

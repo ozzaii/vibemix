@@ -262,6 +262,14 @@ class GenrePrototypeLookup:
         self._protos: np.ndarray | None = None
         self._labels: list[str] = []
         self._centroid: np.ndarray | None = None
+        # WR-02 — memoized corpus for the per-track embedding lookup. The whole
+        # (N, EMBEDDING_DIM) vector array + an id->row-index map, loaded ONCE per
+        # instance. Without this, `_cached_embedding` called `load_all()` (the
+        # full ~9 MB corpus) on EVERY `get_track_features` call — so curating N
+        # tracks re-loaded + re-scanned the corpus N times. The prototype-table
+        # memoization only covers the prototypes, not this lookup.
+        self._corpus_vectors: np.ndarray | None = None
+        self._corpus_index: dict[str, int] | None = None
 
     def _ensure_store(self):
         # WR-02 — double-checked lock. Each TRACK_CHANGE spawns a fresh daemon
@@ -296,15 +304,41 @@ class GenrePrototypeLookup:
             if self._protos is None:
                 self._protos, self._labels, self._centroid = protos, labels, centroid
 
-    def _cached_embedding(self, track_id: str) -> np.ndarray | None:
-        """Fetch the track's CACHED library embedding by id (€0 — no live embed)."""
+    def _ensure_corpus(self) -> None:
+        """Load the cached corpus ONCE per instance (WR-02).
+
+        Materializes ``(ids, vectors)`` from ``load_all()`` a single time and
+        builds an ``id -> row index`` dict so per-track lookups are O(1) instead
+        of a fresh full-corpus load + linear ``ids.index`` scan per call. Mirrors
+        ``_ensure_prototypes``: build outside the lock (the expensive ~9 MB load),
+        then publish the two fields atomically under the holder's lock with a
+        double-check so concurrent off-loop workers do at most one load that
+        wins and a reader never sees a torn vectors/index pair. Serialized
+        dispatch (the curator path) hits this lock-free after the first call.
+        """
+        if self._corpus_index is not None:
+            return
         store = self._ensure_store()
         ids, vectors = store._backend.load_all()
-        try:
-            idx = ids.index(track_id)
-        except ValueError:
+        vectors = np.asarray(vectors, dtype=np.float32)
+        index = {tid: i for i, tid in enumerate(ids)}
+        with self._lock:
+            if self._corpus_index is None:
+                self._corpus_vectors, self._corpus_index = vectors, index
+
+    def _cached_embedding(self, track_id: str) -> np.ndarray | None:
+        """Fetch the track's CACHED library embedding by id (€0 — no live embed).
+
+        WR-02 — reads from the per-instance memoized corpus (loaded once via
+        ``_ensure_corpus``), so this is an O(1) dict lookup, not a per-call
+        ``load_all()`` of the whole ~9 MB vector array.
+        """
+        self._ensure_corpus()
+        assert self._corpus_index is not None and self._corpus_vectors is not None
+        idx = self._corpus_index.get(track_id)
+        if idx is None:
             return None
-        return np.asarray(vectors[idx], dtype=np.float32)
+        return np.asarray(self._corpus_vectors[idx], dtype=np.float32)
 
     def classify_playing(self, track_id: str) -> tuple[str, float]:
         """Off-loop worker entry: classify the playing track from cached vectors.
