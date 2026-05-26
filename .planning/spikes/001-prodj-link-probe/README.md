@@ -3,7 +3,7 @@ spike: 001
 name: prodj-link-probe
 type: standard
 validates: "Given rekordbox broadcasting on the LAN, when we listen passively on UDP 50000+50001, then we decode loaded-deck BPM + beat-in-bar phase + pitch as ground truth"
-verdict: PENDING
+verdict: INVALIDATED (laptop-only) / CONDITIONAL (with hardware)
 related: []
 tags: [ingest, prodj-link, ground-truth, beat-phase, rekordbox]
 ---
@@ -92,4 +92,30 @@ plus first-of-type hexdumps to stdout, plus an exit summary with derived stats.
 
 ## Results
 
-PENDING — awaiting a live capture against Kaan's rekordbox.
+**INVALIDATED for laptop-only rekordbox; CONDITIONAL on Pioneer hardware.**
+
+Live capture on Kaan's rig (2026-05-26), rekordbox in PERFORMANCE mode, two decks
+loaded + playing, Ableton Link enabled:
+
+- **Socket bind failed** — `lsof` confirmed rekordbox holds UDP 50000/50001/50002
+  itself (no `SO_REUSEPORT`), so the passive listener can't co-bind on the same
+  host. Pivoted to a wire capture.
+- **Wire capture (`sudo tcpdump 'udp portrange 50000-50002'`)**: `0 packets
+  captured, 173433 packets received by filter`. Zero PRO DJ LINK traffic on the
+  LAN. rekordbox alone (no CDJ/mixer/peer) does **not** broadcast the Pioneer
+  protocol — confirms the "laptop-only" caveat.
+
+So spike 001 is invalidated *for a laptop-only setup*. It remains the best
+ground-truth path **when Pioneer hardware (CDJs/DJM) is on the LAN** — that's
+exactly the scenario where rekordbox/CDJs broadcast device + beat + status
+packets, and where this probe (with the iteration-2 virtual-CDJ announce for
+port 50002 track-id) would light up. That's a real, large market segment (club /
+serious DJs), just not Kaan's test rig.
+
+**Not run** (blocked by laptop-only): port 50002 virtual-CDJ announce, beat-packet
+offset verification against real bytes.
+
+### Open follow-up
+rekordbox was in PERFORMANCE mode; some reports say PRO DJ LINK broadcasts only
+in EXPORT mode. Low-cost retest: flip to EXPORT and re-capture. Deferred — does
+not change the laptop-only conclusion for the common case.

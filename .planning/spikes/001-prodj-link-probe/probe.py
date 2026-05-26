@@ -90,6 +90,12 @@ def main() -> int:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        # rekordbox itself holds 50000-50002 when PRO DJ LINK is on. On macOS,
+        # SO_REUSEPORT lets us co-bind; broadcast/multicast packets are delivered
+        # to *all* sockets in the reuseport group, so we listen without stealing
+        # them from rekordbox (unicast would load-balance — beats are broadcast).
+        if hasattr(socket, "SO_REUSEPORT"):
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         try:
             s.bind(("0.0.0.0", port))
         except OSError as e:
