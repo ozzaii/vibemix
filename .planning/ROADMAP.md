@@ -57,7 +57,7 @@
 | 78 | PERCEIVE — Deeper, Generalized Ear | 4/4 | Complete    | 2026-05-26 |
 | 79 | LENS — Three Grounded Modes | 3/3 | Complete    | 2026-05-26 |
 | 80 | GROUND — Gemini as Secondary Ear | 2/2 | Complete    | 2026-05-26 |
-| 81 | BENCH — The Validation Instrument | A multi-dimensional bench runs the architecture/model axes on real tracks, auto-scores each cell, and surfaces cells for Kaan's-ear final judgment | BENCH-01, BENCH-02, BENCH-03 | 4 |
+| 81 | BENCH — The Validation Instrument | 1/4 | In Progress|  |
 | 82 | CURATE — Unify Curator + Co-Host | Curator and co-host are two facets of one engine — shared perception/state contract + shared taste/persona | CURATE-01, CURATE-02 | 3 |
 
 ## Phase Details
@@ -130,7 +130,7 @@ Plans:
   4. The bench runs honest-green offline (mocked/fixture cells unit-testable) AND has a documented live e2e path on the funded key — results are never faked.
 **Plans**: 4 plans (4 waves)
 Plans:
-- [ ] 81-01-PLAN.md — Wave 0: failing xfail-strict scaffolds for BENCH-01/02/03 + _FakeClient/_RaisingClient fixtures + in-repo .mp3 data + the bench model-literal guard
+- [x] 81-01-PLAN.md — Wave 0: failing xfail-strict scaffolds for BENCH-01/02/03 + _FakeClient/_RaisingClient fixtures + in-repo .mp3 data + the bench model-literal guard
 - [ ] 81-02-PLAN.md — BENCH-01: the harness (cell/matrix/fixtures/assemble/run) composing the real seams + the no-audio cell + the 429 fail-safe + `vibemix bench` CLI
 - [ ] 81-03-PLAN.md — BENCH-02: pure eval scorers (groundedness via reused CitationLinter + specificity + lens-fidelity; ranks, never decides)
 - [ ] 81-04-PLAN.md — BENCH-03: the ranked KAAN-ACTION review surface (EMPTY verdict) + docs/bench.md (produce step + parked verdict/rubric)
