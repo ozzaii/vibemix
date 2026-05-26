@@ -48,7 +48,7 @@
 - [ ] **Phase 78: PERCEIVE — Deeper, Generalized Ear** — deltas + calibrated confidence + multi-scale trajectory + mean-centered genre-prototype lookup (no new DSP, no MIR libs). **4 plans, 3 waves.**
 - [ ] **Phase 79: LENS — Three Grounded Modes** — hype / critique / tutor as prompt lenses over one structured state, lens selection shared across surfaces.
 - [x] **Phase 80: GROUND — Gemini as Secondary Ear** — audio part fed alongside structured evidence, hallucination-guarded; reaction model config-resolved by the bench.
-- [ ] **Phase 81: BENCH — The Validation Instrument** — multi-dimensional bench (model × grounding × prompting × contexting × lens × taste) + auto first-pass eval + Kaan's-ear review surface.
+- [ ] **Phase 81: BENCH — The Validation Instrument** — multi-dimensional bench (model × grounding × prompting × contexting × lens × taste) + auto first-pass eval + Kaan's-ear review surface. **4 plans, 4 waves.**
 - [ ] **Phase 82: CURATE — Unify Curator + Co-Host** — both surfaces share the perception engine + structured-state contract + taste layer + persona.
 
 | # | Phase | Goal | REQ-IDs | SC count |
@@ -128,7 +128,12 @@ Plans:
   2. An automated first-pass eval scores groundedness (vs DSP facts), specificity, and mode-fidelity per cell — unit-testable on fixtures without the live API (BENCH-02).
   3. Bench cells are surfaced for Kaan's-ear final judgment via a KAAN-ACTION review surface — the automated score ranks, Kaan's ear decides the winning architecture + model (BENCH-03).
   4. The bench runs honest-green offline (mocked/fixture cells unit-testable) AND has a documented live e2e path on the funded key — results are never faked.
-**Plans**: TBD
+**Plans**: 4 plans (4 waves)
+Plans:
+- [ ] 81-01-PLAN.md — Wave 0: failing xfail-strict scaffolds for BENCH-01/02/03 + _FakeClient/_RaisingClient fixtures + in-repo .mp3 data + the bench model-literal guard
+- [ ] 81-02-PLAN.md — BENCH-01: the harness (cell/matrix/fixtures/assemble/run) composing the real seams + the no-audio cell + the 429 fail-safe + `vibemix bench` CLI
+- [ ] 81-03-PLAN.md — BENCH-02: pure eval scorers (groundedness via reused CitationLinter + specificity + lens-fidelity; ranks, never decides)
+- [ ] 81-04-PLAN.md — BENCH-03: the ranked KAAN-ACTION review surface (EMPTY verdict) + docs/bench.md (produce step + parked verdict/rubric)
 
 ### Phase 82: CURATE — Unify Curator + Co-Host
 **Goal:** Close the diamond — the agentic library/Viber curator and the live co-host become two facets of "AI that hears music with you," sharing ONE perception engine + structured-state contract and ONE taste layer + persona. The curator can curate "for this DJ"; the co-host can lean on what the DJ's library says about their taste.
@@ -153,7 +158,7 @@ Plans:
 | 78. PERCEIVE — Deeper, Generalized Ear | 0/4 | Planned | - |
 | 79. LENS — Three Grounded Modes | 0/TBD | Not started | - |
 | 80. GROUND — Gemini as Secondary Ear | 0/2 | Planned | - |
-| 81. BENCH — The Validation Instrument | 0/TBD | Not started | - |
+| 81. BENCH — The Validation Instrument | 0/4 | Planned | - |
 | 82. CURATE — Unify Curator + Co-Host | 0/TBD | Not started | - |
 
 ---
