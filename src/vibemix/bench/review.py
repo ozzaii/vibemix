@@ -59,36 +59,60 @@ def _truncate(text: str, limit: int) -> str:
     return text[:limit].rstrip() + " …[truncated]"
 
 
+def _cell_of(result: object) -> object | None:
+    """Pull the cell off a BenchResult OR a JSON-reloaded dict stand-in.
+
+    WR-04: ``results_to_json`` serializes the cell as a NESTED dict
+    (``result["cell"]["grounding"]``), so the dict path must reach into
+    ``result["cell"]`` — reading a top-level ``result["grounding"]`` always
+    missed and every reloaded cell fell under ``_UNGROUPED``.
+    """
+    if isinstance(result, dict):
+        return result.get("cell")
+    return getattr(result, "cell", None)
+
+
+def _cell_axis(cell: object | None, name: str, default: str) -> str:
+    """Read one axis off a BenchCell object OR its nested-dict stand-in."""
+    if cell is None:
+        return default
+    if isinstance(cell, dict):
+        val = cell.get(name)
+    else:
+        val = getattr(cell, name, None)
+    return str(val) if val else default
+
+
 def _group_key(score: CellScore, result: object) -> str:
     """The dimension a cell is grouped under — its grounding (architecture) axis.
 
     Grounding is the milestone's empirical axis (dsp_only / audio+dsp / …), so
     grouping by it lets Kaan read 'which architecture clicks' at a glance. A
-    result with no recorded cell falls under ``_UNGROUPED``.
+    result with no recorded cell falls under ``_UNGROUPED``. Reads the nested
+    dict cell on a JSON-reloaded run (WR-04), not just the live object.
     """
-    cell = getattr(result, "cell", None)
-    if isinstance(result, dict):
-        cell = result.get("cell", cell)
-    grounding = getattr(cell, "grounding", None)
-    return str(grounding) if grounding else _UNGROUPED
+    cell = _cell_of(result)
+    return _cell_axis(cell, "grounding", _UNGROUPED)
 
 
 def _coordinates_line(result: object) -> str | None:
-    """Render the cell's 6-D coordinates, or ``None`` when no cell was recorded."""
-    cell = getattr(result, "cell", None)
-    if isinstance(result, dict):
-        cell = result.get("cell", cell)
+    """Render the cell's 6-D coordinates, or ``None`` when no cell was recorded.
+
+    Handles both the live BenchResult and a JSON-reloaded nested-dict cell
+    (WR-04), so a re-scored persisted run renders its REAL coordinates.
+    """
+    cell = _cell_of(result)
     if cell is None:
         return None
     parts = [
-        f"model=`{getattr(cell, 'model_path', '?')}`",
-        f"grounding=`{getattr(cell, 'grounding', '?')}`",
-        f"prompting=`{getattr(cell, 'prompting', '?')}`",
-        f"contexting=`{getattr(cell, 'contexting', '?')}`",
-        f"lens=`{getattr(cell, 'lens', '?')}`",
-        f"taste=`{getattr(cell, 'taste', '?')}`",
+        f"model=`{_cell_axis(cell, 'model_path', '?')}`",
+        f"grounding=`{_cell_axis(cell, 'grounding', '?')}`",
+        f"prompting=`{_cell_axis(cell, 'prompting', '?')}`",
+        f"contexting=`{_cell_axis(cell, 'contexting', '?')}`",
+        f"lens=`{_cell_axis(cell, 'lens', '?')}`",
+        f"taste=`{_cell_axis(cell, 'taste', '?')}`",
     ]
-    track = getattr(cell, "track", None)
+    track = cell.get("track") if isinstance(cell, dict) else getattr(cell, "track", None)
     if track:
         parts.append(f"track=`{_scrub(str(track))}`")
     return " · ".join(parts)

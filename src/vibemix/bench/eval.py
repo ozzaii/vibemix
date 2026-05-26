@@ -81,13 +81,35 @@ def _error_of(result: object) -> str | None:
     return getattr(result, "error", None)
 
 
+def _cell_of(result: object) -> object | None:
+    """Pull the cell off a BenchResult OR a JSON-reloaded dict stand-in.
+
+    WR-04: ``results_to_json`` serializes the cell as a NESTED dict
+    (``result["cell"]["lens"]``), so the dict path must reach into
+    ``result["cell"]`` — reading a top-level ``result["lens"]`` always missed
+    and every reloaded cell fell back to the default lens/grouping.
+    """
+    if isinstance(result, dict):
+        return result.get("cell")
+    return getattr(result, "cell", None)
+
+
+def _axis(cell: object | None, name: str, default: str) -> str:
+    """Read one axis off a BenchCell object OR its nested-dict stand-in."""
+    if cell is None:
+        return default
+    if isinstance(cell, dict):
+        return str(cell.get(name) or default)
+    return str(getattr(cell, name, None) or default)
+
+
 def _lens_of(result: object) -> str:
-    """Pull the cell's lens axis (hype/critique/tutor); default hype."""
-    cell = result.get("cell") if isinstance(result, dict) else getattr(result, "cell", None)
-    lens = getattr(cell, "lens", None) if cell is not None else None
-    if isinstance(result, dict) and lens is None:
-        lens = result.get("lens")
-    return str(lens or "hype")
+    """Pull the cell's lens axis (hype/critique/tutor); default hype.
+
+    Handles both the live BenchResult and a JSON-reloaded nested-dict cell
+    (WR-04), so a re-scored persisted run scores its REAL lens, not the fallback.
+    """
+    return _axis(_cell_of(result), "lens", "hype")
 
 
 def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
