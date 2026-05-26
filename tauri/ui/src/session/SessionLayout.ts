@@ -723,7 +723,7 @@ export function setPersonaStatus(el: HTMLElement, state: SessionState): void {
     // and the cycle so it isn't read as a static label.
     moodEl.setAttribute(
       "aria-label",
-      `co-host mood: ${mood}. tap to cycle hype, teach, coach.`,
+      `cohost mood: ${mood}. tap to cycle hype, teach, coach.`,
     );
   }
 

@@ -71,7 +71,7 @@ describe("Cohost grounding-failure recovery (H9)", () => {
     // 2026-05-26 /impeccable critique P3: label tells the truth — the
     // button restarts the co-host (restart_sidecar), it isn't a
     // lightweight reconnect.
-    expect(retry?.textContent).toContain("RESTART CO-HOST");
+    expect(retry?.textContent).toContain("RESTART COHOST");
   });
 
   it("grounded=true clears the failure state regardless of elapsed", () => {
