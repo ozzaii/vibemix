@@ -22,42 +22,33 @@ export interface SettingsGroupProps {
 }
 
 const CSS = `
+  /* "The Deck Speaks" rebuild (2026-05-26): the drawer is ALREADY one glass
+   * surface, so a group is no longer a glass card stacked inside it (the old
+   * --glass-2 face + drop-shadow + recessed --glass-3 body read as cards-in-a-
+   * card). A group is now a hairline-divided SECTION on the drawer's void: a
+   * quiet silk label, then its controls, separated from the next section by a
+   * single 1px rule. No card fill, no drop shadow — rows on hairlines. */
   .vmx-settings-group {
     position: relative;
-    background: var(--glass-2);
-    backdrop-filter: var(--blur-glass-display);
-    -webkit-backdrop-filter: var(--blur-glass-display);
-    border: 1px solid var(--glass-edge);
-    border-radius: var(--rad-md);
-    overflow: hidden;
-    box-shadow:
-      inset 0 1px 0 var(--glass-top),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-      0 6px 20px rgba(0, 0, 0, 0.35);
+    border-top: 1px solid var(--glass-edge);
   }
-  /* P1-b "sexification" — the header SITS ON the raised --glass-2 group
-   * face (a slim top-lit seam crowns it), while the body below is recessed
-   * INTO that face (see __body). The header is the bezel ledge; controls
-   * drop below it into the panel. Knurled/recessed-bezel CDJ feel that the
-   * pre-uplift flat-rectangle group was missing. */
+  .vmx-settings-group:first-child {
+    border-top: 0;
+  }
   .vmx-settings-group__header {
     position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
-    padding: 10px var(--sp-4);
-    border-bottom: 1px solid var(--glass-edge);
-    background: rgba(0, 0, 0, 0.25);
-    box-shadow: inset 0 1px 0 var(--glass-top);
+    padding: var(--sp-4) var(--sp-4) var(--sp-2);
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 9px;
     letter-spacing: 0.28em;
     text-transform: uppercase;
-    color: var(--silk);
+    color: var(--silk-40);
     line-height: 1;
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .vmx-settings-group__badge {
     font-family: var(--type-mono);
@@ -72,19 +63,11 @@ const CSS = `
     line-height: 1;
     text-shadow: 0 0 4px var(--amber-22);
   }
-  /* P1-b finding #1 — RECESS the control well. Pre-uplift this was a flat
-   * --glass-2 rectangle flush with the header. Now: a darker recessed fill
-   * (--glass-3, the canonical "recessed display window" token) + a top inset
-   * shadow so controls read as set DOWN INTO the panel below the header
-   * bezel. The inset top-seam on __header above is the raised lip; this is
-   * the well it overhangs. GPU-cheap (static box-shadow, no filter). */
   .vmx-settings-group__body {
-    padding: var(--sp-4);
+    padding: 0 var(--sp-4) var(--sp-4);
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    background: var(--glass-3);
-    box-shadow: inset 0 2px 6px var(--void-50);
   }
   .vmx-settings-group__footer {
     padding: 8px var(--sp-4);
