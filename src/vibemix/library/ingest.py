@@ -10,11 +10,16 @@ so ``library search`` / ``similar`` resolve ingested titles.
 
 Posture (mirrors :mod:`vibemix.library.folder_ingest`, the proven loop shape):
 
+    * CUE-ANCHORED (Plan 03) — instead of embedding the whole file, each track
+      is embedded over its cue-anchored ≤80s mixable windows (DJ cues first, the
+      offline ``detect_cues`` auto engine as fallback), mean-pooled to one
+      vector. A track with no structure at all degrades to a whole-track embed —
+      never anchor-less, never a faked vector.
     * RESUMABLE — a content-hash cache hit re-stores the cached vector cheaply
       (counted ``skipped_cached``); a re-run does ~0 embeds. The cache key is
-      ``sha256(file-bytes) || clap-backend-tag || INGEST_STRATEGY_VERSION`` in a
-      DISTINCT ``~/.cache/vibemix/clap_embeddings.db`` (namespaced away from
-      embed.py's Gemini-keyed embeddings.db).
+      ``sha256(file-bytes) || clap-backend-tag || INGEST_CUE_STRATEGY_VERSION``
+      in a DISTINCT ``~/.cache/vibemix/clap_embeddings.db`` (namespaced away from
+      embed.py's Gemini-keyed embeddings.db AND from the whole-track strategy).
     * HONEST partial failure — a missing/unreadable file or an embed raise is
       LOGGED + counted ``failed`` and the loop CONTINUES. A failed file NEVER
       produces a faked vector (Invariant #3 — trust the audio).
@@ -33,20 +38,32 @@ from __future__ import annotations
 import hashlib
 import logging
 import sqlite3
+import subprocess
+import tempfile
 import urllib.parse
 from pathlib import Path
 from typing import Callable, Iterable, Protocol
 
 import numpy as np
 
+from vibemix.library.excerpt import anchors_for_track, cut_windows
 from vibemix.library.folder_ingest import IngestReport, _write_library_cache
 from vibemix.library.rekordbox import TrackEntry
 
 logger = logging.getLogger(__name__)
 
-# Bump this when the embed pipeline changes shape (whole-track → cue-anchored in
-# Plan 03) so cached vectors invalidate cleanly. Part of the content-hash key.
+# The whole-track strategy tag (Plan 01). Retained as the FALLBACK strategy and
+# kept distinct from the cue-anchored tag below so the two never cache-collide.
 INGEST_STRATEGY_VERSION = "v1-clap-wholetrack"
+
+# Plan 03 — the cue-anchored strategy tag. A cue-anchored mean-pooled vector for
+# a file must NEVER collide with that file's whole-track vector in the
+# content-hash cache, so this distinct version is folded into the cache key
+# (T-89-10). "cueanchored" in the tag is asserted by the test.
+INGEST_CUE_STRATEGY_VERSION = "v1-clap-cueanchored"
+
+# ffmpeg window-slice budget (mirrors embed.py's FFMPEG_TIMEOUT_SECONDS posture).
+_FFMPEG_TIMEOUT_SECONDS = 60.0
 
 # The CLAP content-hash cache. DISTINCT from embed.py's Gemini-keyed
 # ~/.cache/vibemix/embeddings.db — a CLAP 512-d vector must never collide with a
@@ -58,6 +75,10 @@ _HASH_CHUNK_BYTES = 64 * 1024
 
 
 class _Embedder(Protocol):  # pragma: no cover - structural typing only
+    # Window path (cue-anchored): embed an ffmpeg-sliced ≤80s clip.
+    def embed_audio_bytes(self, data: bytes, mime: str) -> np.ndarray: ...
+
+    # Whole-track fallback: embed the file when there are no usable windows.
     def embed_audio_file(self, path: str) -> np.ndarray: ...
 
 
@@ -164,7 +185,9 @@ def _content_hash_key(path: Path, backend_tag: str) -> str:
     h.update(b"||")
     h.update(backend_tag.encode("utf-8"))
     h.update(b"||")
-    h.update(INGEST_STRATEGY_VERSION.encode("utf-8"))
+    # Cue-anchored strategy tag — namespaces the key so a cue-anchored vector
+    # never collides with Plan 01's whole-track vector for the same file (T-89-10).
+    h.update(INGEST_CUE_STRATEGY_VERSION.encode("utf-8"))
     return h.hexdigest()
 
 
@@ -237,6 +260,126 @@ def _reconcile_store_dim(store: _Store, embedded_dim: int) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Cue-anchored window embedding                                                #
+# --------------------------------------------------------------------------- #
+
+
+def _default_slicer(path: str, start_s: float, length_s: float) -> bytes:
+    """ffmpeg-slice a single mp3 window ``[start_s, start_s+length_s)``.
+
+    Mirrors :meth:`embed.LibraryEmbedder._slice_window` (libmp3lame, 128k,
+    tempfile, cleaned up). Injectable so tests stub it — NO real ffmpeg runs in
+    the offline suite. ffmpeg is resolved lazily here so importing this module
+    never shells out.
+    """
+    import shutil
+
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise RuntimeError("ffmpeg not found on PATH")
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-loglevel",
+            "error",
+            "-ss",
+            f"{start_s:.3f}",
+            "-i",
+            str(path),
+            "-t",
+            f"{length_s:.3f}",
+            "-acodec",
+            "libmp3lame",
+            "-b:a",
+            "128k",
+            str(tmp_path),
+        ]
+        subprocess.run(
+            cmd, check=True, timeout=_FFMPEG_TIMEOUT_SECONDS, capture_output=True
+        )
+        return tmp_path.read_bytes()
+    finally:
+        try:
+            tmp_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _embed_track_cue_anchored(
+    track: TrackEntry,
+    local: Path,
+    embedder: _Embedder,
+    *,
+    slicer: Callable[[str, float, float], bytes] | None = None,
+) -> np.ndarray:
+    """Embed a track over its cue-anchored ≤80s windows, mean-pooled.
+
+    Pipeline (mirrors :meth:`embed.LibraryEmbedder._embed_audio_cue_anchored`):
+        1. ``anchors_for_track`` — dj-first, auto fallback (``[]`` honestly when
+           no structure).
+        2. ``cut_windows`` — clamp each anchor to a 1..80s window.
+        3. Per window: ``slicer`` → ``embedder.embed_audio_bytes`` (per-window
+           try/except → skip; one bad window must not abort — T-89-11).
+        4. ``np.mean`` the per-window vectors → ``l2_normalize`` → one vector.
+
+    Falls back to ``embedder.embed_audio_file`` (whole-track) when there are no
+    usable windows OR every window embed fails — NEVER a faked vector (the
+    fallback re-embeds the real file). Any exception in the whole-track fallback
+    propagates to the caller's honest-failure handler.
+    """
+    from vibemix.library._cosine import l2_normalize
+
+    # Resolve the slicer at call time (not as a default arg) so a test that
+    # monkeypatches the module-level ``_default_slicer`` is honored.
+    if slicer is None:
+        slicer = _default_slicer
+
+    # anchors_for_track may shell out to detect_cues (the auto fallback decodes
+    # audio via ffmpeg). A detection failure must degrade to the whole-track
+    # embed, NOT abort the track (T-89-09: never anchor-less). Mirror embed.py's
+    # _embed_audio_cue_anchored fallback posture.
+    try:
+        anchors = anchors_for_track(track)
+    except Exception as e:  # noqa: BLE001 — degrade, don't abort
+        logger.warning(
+            "[ingest] cue anchoring failed for %s (%s); falling back to "
+            "whole-track embed.",
+            local,
+            e,
+        )
+        anchors = []
+    windows = cut_windows(anchors, float(track.duration_s or 0.0))
+
+    vecs: list[np.ndarray] = []
+    for start_s, end_s in windows:
+        length_s = end_s - start_s
+        try:
+            clip = slicer(str(local), start_s, length_s)
+            vec = embedder.embed_audio_bytes(clip, "audio/mpeg")
+        except Exception as e:  # noqa: BLE001 — one bad window must not abort
+            logger.warning(
+                "[ingest] cue-window embed failed at %.1fs for %s (%s); "
+                "skipping this window.",
+                start_s,
+                local,
+                e,
+            )
+            continue
+        vecs.append(np.asarray(vec, dtype=np.float32))
+
+    if not vecs:
+        # No usable windows OR every window failed → whole-track fallback. A
+        # real re-embed of the file, never a faked/zero vector (Invariant #3).
+        return np.asarray(embedder.embed_audio_file(str(local)), dtype=np.float32)
+
+    mean = np.mean(np.stack(vecs), axis=0).astype(np.float32)
+    return l2_normalize(mean)
+
+
+# --------------------------------------------------------------------------- #
 # The orchestrator                                                             #
 # --------------------------------------------------------------------------- #
 
@@ -276,7 +419,7 @@ def ingest_source(
 
     backend_tag = str(getattr(embedder, "backend", "clap"))
 
-    report = IngestReport(embed_strategy=INGEST_STRATEGY_VERSION)
+    report = IngestReport(embed_strategy=INGEST_CUE_STRATEGY_VERSION)
     handled: dict[str, TrackEntry] = {}
     dim_reconciled = False
 
@@ -318,9 +461,11 @@ def ingest_source(
                 _emit(progress, idx, "skip", label)
                 continue
 
-            # Cache miss → embed. Broad-except so one bad file never aborts.
+            # Cache miss → embed the cue-anchored windows (mean-pooled), with a
+            # whole-track fallback baked into the helper. Broad-except so one bad
+            # file never aborts the run.
             try:
-                vec = embedder.embed_audio_file(str(local))
+                vec = _embed_track_cue_anchored(track, local, embedder)
             except Exception as e:  # noqa: BLE001 — one bad file must not abort
                 logger.error("[ingest err] %s: %s", local, e)
                 report.failed += 1
@@ -375,6 +520,7 @@ def _emit(
 
 __all__ = [
     "INGEST_STRATEGY_VERSION",
+    "INGEST_CUE_STRATEGY_VERSION",
     "CLAP_EMBED_CACHE_DB_PATH",
     "ingest_source",
 ]

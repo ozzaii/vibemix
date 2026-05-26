@@ -131,6 +131,21 @@ def isolated_cache(tmp_path, monkeypatch):
     return cache
 
 
+@pytest.fixture(autouse=True)
+def _stub_detect_cues(monkeypatch):
+    """Default: the auto-cue engine finds no structure (honest-green, no ffmpeg).
+
+    The Plan-01 e2e/resumability/failure tracks carry no DJ cues, so
+    ``anchors_for_track`` would otherwise shell ``detect_cues`` → real ffmpeg on
+    fake bytes. Stubbing it to ``[]`` keeps the suite offline + ffmpeg-free and
+    drives the whole-track fallback path the Plan-01 tests assert. Tests that
+    need a specific auto result override this with their own monkeypatch.
+    """
+    import vibemix.library.cue_detect as cue_detect
+
+    monkeypatch.setattr(cue_detect, "detect_cues", lambda *a, **k: [])
+
+
 def _make_collection_xml(tmp_path: Path, n: int = 5) -> Path:
     """Write a real collection.xml whose tracks point at real tmp audio files.
 
