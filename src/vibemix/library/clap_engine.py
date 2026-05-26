@@ -1,0 +1,284 @@
+# SPDX-License-Identifier: Apache-2.0
+"""ClapEngine — local, on-device CLAP audio/text embedder (512-dim).
+
+STAGED, NOT WIRED. This module exists so the future embedding-swap phase has a
+tested, import-safe seam to plug into; it does NOT yet replace the live Gemini
+embedding path (that is the 14-file wiring phase — see ``docs/clap-engine.md``).
+
+# What it is
+============
+
+A deterministic, on-device embedder built on the LAION-CLAP ``HTSAT-tiny``
+music checkpoint. It maps both audio and text into ONE 512-dim space (the same
+cross-modal property Gemini Embedding 2 has), so the library vibe-search /
+curator / next-suggestion layer can run with ZERO API cost and audio that never
+leaves the device. CLAP is an on-device *embedding* model, NOT a second LLM
+provider — the Gemini-only provider rule for the conversational co-host brain
+is unaffected.
+
+# The proven pipeline (ported byte-for-byte from bravoh-gpu-worker/clap_mix_only.py)
+=================================================================================
+
+    load audio → mono (mean across channels) → resample to 48kHz
+      ├─ total <= CHUNK_SAMPLES (10s): zero-pad to one CHUNK_SAMPLES chunk
+      └─ else: non-overlapping 10s slices; a trailing remainder >= 5s is
+               zero-padded and kept as a final chunk
+    per chunk: CLAP.get_audio_embedding_from_data(batch, use_tensor=False)
+    L2-normalize EACH chunk emb (norm + 1e-8) → mean-pool → re-L2-normalize
+    → (512,) float32
+
+WHY the 10s-chunk + mean-pool: it is DETERMINISTIC. CLAP's fusion path applies a
+random truncation when fed a clip longer than its native 10s ``clip_samples``;
+feeding it exact 10s chunks bypasses that randomness, so re-embedding the same
+file yields a bit-identical vector (proven: re-embed cos = 1.000000, max|Δ| = 0).
+
+# Lazy-import contract (the load-bearing acceptance)
+==================================================
+
+The heavy deps — ``torch`` / ``torchaudio`` / ``laion_clap`` (torch backend) and
+``onnxruntime`` (the future ship backend) — are NEVER imported at module top
+level. They are imported INSIDE ``_ensure_model`` / ``_load_and_chunk`` only.
+This mirrors ``library/telegram_bridge.py``'s convention for
+``python-telegram-bot``: ``import vibemix.library.clap_engine`` succeeds in CI
+and in the live co-host bundle where none of those deps are installed. The
+module top level pulls only numpy + stdlib + ``__future__``.
+
+# Backends
+=========
+
+* ``torch`` (default) — the LAION-CLAP reference path above. Requires
+  ``torch`` + ``torchaudio`` + ``laion_clap`` to be installed at call time.
+* ``onnx`` — the eventual cross-platform ship path (onnxruntime, ~13-18MB wheel
+  vs torch's ~88-123MB tree). It is a ``NotImplementedError`` STUB until the
+  parity gate in ``docs/clap-engine.md`` passes — it MUST NOT silently return a
+  wrong-distribution vector.
+
+Select via the ``backend=`` arg or the ``VIBEMIX_CLAP_BACKEND`` env var
+(default ``"torch"``).
+"""
+
+from __future__ import annotations
+
+import os
+import tempfile
+from pathlib import Path
+
+import numpy as np
+
+# --------------------------------------------------------------------------- #
+# Proven pipeline constants — ported VERBATIM from clap_mix_only.py.           #
+# Do not re-tune: these define the determinism + the 512-dim contract.        #
+# --------------------------------------------------------------------------- #
+CLAP_SR = 48000  # CLAP's native sample rate
+CHUNK_SAMPLES = 480000  # 10s @ 48kHz — CLAP's native clip_samples
+CHUNK_BATCH = 128  # chunks per CLAP forward pass
+CLAP_DIM = 512  # output embedding dimensionality
+
+_ENV_BACKEND = "VIBEMIX_CLAP_BACKEND"
+_DEFAULT_BACKEND = "torch"
+_VALID_BACKENDS = ("torch", "onnx")
+
+# MIME suffix mapping for the bytes path (mirrors embed._mime_for_path's idea,
+# inverted: mime → tempfile suffix). Default .mp3.
+_MIME_TO_SUFFIX = {
+    "audio/wav": ".wav",
+    "audio/x-wav": ".wav",
+    "audio/flac": ".flac",
+    "audio/x-flac": ".flac",
+    "audio/mp4": ".m4a",
+    "audio/aac": ".aac",
+    "audio/mpeg": ".mp3",
+    "audio/mp3": ".mp3",
+}
+
+
+def _l2(vec: np.ndarray) -> np.ndarray:
+    """L2-normalize a 1-D vector with the same 1e-8 floor the reference uses."""
+    return vec / (np.linalg.norm(vec) + 1e-8)
+
+
+class ClapEngine:
+    """Local on-device CLAP 512-dim embedder (audio + text, one space).
+
+    Import-safe: constructing the engine never imports a heavy dep. The model is
+    lazy-loaded ONCE on the first embed call and cached on ``self._model`` (warm
+    reuse — never reloaded per call). Public contract mirrors what a future
+    ``ClapEmbedder`` will expose 1:1:
+
+        embed_audio_file(path)        -> (512,) float32, L2-normalized
+        embed_audio_bytes(data, mime) -> (512,) float32, L2-normalized
+        embed_query(text)             -> (512,) float32, L2-normalized
+    """
+
+    def __init__(self, backend: str | None = None) -> None:
+        resolved = (backend or os.environ.get(_ENV_BACKEND) or _DEFAULT_BACKEND)
+        resolved = resolved.lower().strip()
+        if resolved not in _VALID_BACKENDS:
+            raise ValueError(
+                f"ClapEngine backend must be one of {_VALID_BACKENDS}, "
+                f"got {resolved!r}"
+            )
+        self.backend = resolved
+        # Lazy: the model object (torch CLAP_Module) is loaded on first use and
+        # cached here. Construction stays import-safe — no heavy import here.
+        self._model = None
+
+    # ------------------------------------------------------------------ #
+    # Model loading (lazy, heavy imports live HERE — never at top level)  #
+    # ------------------------------------------------------------------ #
+    def _ensure_model(self):
+        """Load + cache the CLAP model once. Raises for the onnx stub backend."""
+        if self._model is not None:
+            return self._model
+
+        if self.backend == "onnx":
+            raise NotImplementedError(
+                "The 'onnx' backend is a STAGING STUB — it is not yet "
+                "trustworthy. The ONNX parity gate (export larger_clap_music → "
+                "ONNX with a matched numpy mel, then >=0.98 mean cosine vs the "
+                "proven torch path over 50 tracks) must pass before this backend "
+                "returns a real vector. See docs/clap-engine.md → 'The parity "
+                "gate'. Use VIBEMIX_CLAP_BACKEND=torch until then."
+            )
+
+        # ----- torch backend (the proven reference path) -----
+        # MPS fallback so an unsupported op on Apple silicon falls back to CPU
+        # rather than erroring (clap_mix_only sets this before loading).
+        os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
+        import torch  # lazy — heavy
+
+        # The two monkeypatches are MANDATORY for newer torch loading the older
+        # LAION checkpoint: (1) torch.load defaults to weights_only=True on
+        # recent torch and refuses the pickled checkpoint; (2) the checkpoint's
+        # state_dict has minor key drift, so load_state_dict must be strict=False.
+        # BOTH originals are restored after load so the rest of the process is
+        # untouched.
+        _real_load = torch.load
+        torch.load = lambda *a, **kw: _real_load(  # type: ignore[assignment]
+            *a, **{**kw, "weights_only": False}
+        )
+
+        import laion_clap  # lazy — heavy (and itself imports torch)
+
+        _orig_lsd = torch.nn.Module.load_state_dict
+        torch.nn.Module.load_state_dict = lambda self, sd, **kw: _orig_lsd(  # type: ignore[assignment]
+            self, sd, strict=False, **{k: v for k, v in kw.items() if k != "strict"}
+        )
+
+        try:
+            clap = laion_clap.CLAP_Module(
+                enable_fusion=True, amodel="HTSAT-tiny", device="cpu"
+            )
+            clap.load_ckpt(model_id=3)  # the music checkpoint
+        finally:
+            # Restore the originals whether or not the load succeeded.
+            torch.nn.Module.load_state_dict = _orig_lsd
+            torch.load = _real_load
+
+        self._model = clap
+        return self._model
+
+    # ------------------------------------------------------------------ #
+    # Audio loading + chunking (ported EXACTLY from load_and_chunk)        #
+    # ------------------------------------------------------------------ #
+    def _load_and_chunk(self, path: str) -> list[np.ndarray]:
+        """Load → mono → 48kHz → list of (CHUNK_SAMPLES,) float32 chunks.
+
+        Ported verbatim from clap_mix_only.load_and_chunk: the <=CHUNK_SAMPLES
+        zero-pad single-chunk branch, the non-overlapping slice loop, and the
+        trailing remainder >= 5s rule.
+        """
+        import torchaudio  # lazy — heavy
+
+        wav, sr = torchaudio.load(path)
+
+        # Mix to mono (mean across channels), then squeeze to (samples,).
+        if wav.shape[0] > 1:
+            wav = wav.mean(dim=0, keepdim=True)
+        wav = wav[0]
+
+        # Resample to 48kHz.
+        if sr != CLAP_SR:
+            wav = torchaudio.functional.resample(wav, sr, CLAP_SR)
+
+        samples = wav.numpy()
+        total = len(samples)
+
+        if total <= CHUNK_SAMPLES:
+            padded = np.zeros(CHUNK_SAMPLES, dtype=np.float32)
+            padded[:total] = samples
+            return [padded]
+
+        chunks: list[np.ndarray] = []
+        for start in range(0, total - CHUNK_SAMPLES + 1, CHUNK_SAMPLES):
+            chunks.append(samples[start : start + CHUNK_SAMPLES].astype(np.float32))
+
+        remainder = total % CHUNK_SAMPLES
+        if remainder >= CLAP_SR * 5:  # keep a trailing chunk >= 5s
+            padded = np.zeros(CHUNK_SAMPLES, dtype=np.float32)
+            padded[:remainder] = samples[-remainder:]
+            chunks.append(padded)
+
+        return chunks
+
+    # ------------------------------------------------------------------ #
+    # Chunk embedding (ported EXACTLY from embed_chunks)                   #
+    # ------------------------------------------------------------------ #
+    def _embed_chunks(self, chunks: list[np.ndarray]) -> np.ndarray:
+        """Batch-embed chunks → per-chunk L2 → mean-pool → re-L2 → (512,) f32."""
+        clap = self._ensure_model()
+        all_embs: list[np.ndarray] = []
+        for i in range(0, len(chunks), CHUNK_BATCH):
+            batch = chunks[i : i + CHUNK_BATCH]
+            batch_np = np.stack(batch)
+            embs = clap.get_audio_embedding_from_data(batch_np, use_tensor=False)
+            norms = np.linalg.norm(embs, axis=1, keepdims=True) + 1e-8
+            embs = embs / norms
+            all_embs.append(embs)
+
+        stacked = np.concatenate(all_embs, axis=0)
+        mean_emb = stacked.mean(axis=0)
+        mean_emb = mean_emb / (np.linalg.norm(mean_emb) + 1e-8)
+        return mean_emb.astype(np.float32)
+
+    # ------------------------------------------------------------------ #
+    # Public contract                                                     #
+    # ------------------------------------------------------------------ #
+    def embed_audio_file(self, path: str) -> np.ndarray:
+        """Embed an audio file → (512,) float32, L2-normalized, deterministic."""
+        self._ensure_model()
+        chunks = self._load_and_chunk(path)
+        if not chunks:
+            # Trust-the-audio / no-slop: never fabricate a zero vector for an
+            # unreadable or empty file — surface it honestly.
+            raise ValueError(f"ClapEngine: no audio chunks produced from {path!r}")
+        return self._embed_chunks(chunks)
+
+    def embed_audio_bytes(self, data: bytes, mime: str) -> np.ndarray:
+        """Embed raw audio bytes → (512,) float32 — same pipeline as a file.
+
+        Writes the bytes to a tempfile with a MIME-appropriate suffix (defaults
+        to ``.mp3``), routes through the SAME load → chunk → embed path, then
+        cleans up the tempfile.
+        """
+        suffix = _MIME_TO_SUFFIX.get((mime or "").lower().strip(), ".mp3")
+        tmp_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as fh:
+                fh.write(data)
+                tmp_path = fh.name
+            return self.embed_audio_file(tmp_path)
+        finally:
+            if tmp_path is not None:
+                try:
+                    Path(tmp_path).unlink()
+                except OSError:
+                    pass
+
+    def embed_query(self, text: str) -> np.ndarray:
+        """Embed a text query → (512,) float32, L2-normalized — same space."""
+        clap = self._ensure_model()
+        embs = clap.get_text_embedding([text], use_tensor=False)
+        vec = np.asarray(embs)[0]
+        return _l2(vec).astype(np.float32)
