@@ -1,5 +1,30 @@
 # vibemix — Milestones
 
+## v8.1 One Mind (Shipped: 2026-05-26)
+
+**Phases completed:** 6 phases, 19 plans, 29 tasks
+
+**Key accomplishments:**
+
+- 1. [Rule 1 - Bug] Eager seam import regressed the memory no-live-path boundary
+- The live co-host now grounds reactions on what's actually playing — the armed Grounding engine is wired into DJCoHostAgent via the proven Phase-65 4-point off-loop seam ([track:<id>] injection resolves against register_library, cold path byte-identical) — and memory.db finally fills on the live main() path via gated _fire_ingest boot+close, without doubling retention.
+- Three new test files install the Nyquist safety net for PERCEIVE — 9 strict-xfail behavior scaffolds (deltas / trajectory / genre-prototype build+classify / genre single-writer feed / genre reconciliation) plus a REAL-GREEN cold-path byte-identity pin that captures the v8.0 baseline implementation must preserve.
+- The EAR now speaks in CHANGE: two additive single-writer MusicState fields (`prev_perceive`, `trajectory_narrative`) + a pure `deltas.py` feed gated `Δ[kick density rose 18% (clear)]` and `trajectory[build→drop→groove; building; last move: bass-swap 20s ago]` into the prompt — abstaining below floor (anti-slop) and byte-identical to the v8.0 baseline on the cold path.
+- `library/genre_prototypes.py` delivers the €0 mean-centered nearest-prototype genre lookup — build centered-mean prototypes per folder-label, classify a cached track embedding with floor/tie-margin anti-slop abstain, and hold the result in a thread-safe `GenrePrototypeLookup` (generation-token discard) that NEVER writes the live state dataclass — composing `centering` + `_cosine` + `rekordbox` with zero duplicated math.
+- A pure `state/genre/genre_reconcile.py` solves THE flagged risk — an affine rescale that maps the embedding lookup's centered-cosine confidence (≈0.25 floor) into coach.py's `>= 0.5` render band, plus an embedding-wins-when-confident reconciliation — and `refresh._tick_once` now reads the off-loop `GenrePrototypeLookup` holder inside its lock, reconciles it with the DSP `score_genre`, and writes ONE coherent `detected_genre`/`genre_confidence` (single-writer invariant #1), dispatching the lookup off-loop on TRACK_CHANGE. PERCEIVE-03 closes; phase 78 complete.
+- Task 1 — `tests/prompts/test_lens.py` (NEW, 213 lines):
+- `LENS_TO_MODE_MOOD` map + `build_lens_instruction` validate-and-delegate wrapper — three grounded lenses (hype/critique/tutor) over the SAME untouched `build_system_instruction`, default hype byte-identical to today's co-host default.
+- ONE shared `ConfigStore.extra["lens"]` (set via the new `_apply_lens` settings-bus handler) is read by BOTH the live co-host AND the curator — choose the lens once, it flows to both. Extra-only: no IPC envelope, no schema bump, no codegen. Both cold paths byte-identical.
+- Task 1 — real-green pins (must KEEP passing through Plan 02):
+- Task 1 — gated secondary-ear framing in `build_parts_description` (`matrix.py`):
+- Installed the offline honest-green gate for Phase 81 BEFORE any `bench/` source: 14 xfail-strict scaffolds pinning every BENCH-01/02/03 acceptance criterion (flip in Plans 02/03/04), a zero-network `_FakeClient`/`_RaisingClient` + real `MusicState`/snapshot fixture suite, 6 in-repo `.mp3` excerpts, and a real-green bench-scoped model-literal guard.
+- Built the `src/vibemix/bench/` harness as THIN COMPOSITION over the real Phase 77-80 seams: a `BenchCell` 6-D point -> `build_cell_prompt` (reuses `build_lens_instruction` / `AICoach.build_prompt` / `build_parts_description` / `model_router.resolve`, never re-authored text) -> `run_study` with an injected client + the mandatory per-cell 429 fail-safe + a verbatim JSON recorder + SessionMeter cost feed -> the `vibemix bench run` CLI. Flipped the 7 BENCH-01 assemble/run xfail scaffolds to real-green; zero model literals under `bench/`.
+- Built `src/vibemix/bench/eval.py` as three PURE, deterministic, offline scorers over a recorded `BenchResult` plus a SORT-ONLY ranker. Groundedness REUSES `CitationLinter.check(output, dsp_snapshot, mode="debrief")` VERBATIM (the linter IS the product's anti-slop gate, Invariant #2 — no bespoke atom parser). Specificity is a deterministic `NEGATIVE_PHRASES` penalty + concrete-measure reward; lens-fidelity hits the per-lens `LENS_ANCHORS` vocab. `score_cell` composes all three into a `CellScore` with a weighted-mean `aggregate` for sorting only; `rank_cells` SORTS by aggregate — there is NO winner/verdict/decision anywhere (Pitfall 5 / T-81-07; Kaan's ear is BENCH-03). An errored cell scores all-zero + `errored=True` so it sinks in the rank, never fabricated-high. Flipped the 4 BENCH-02 eval xfail scaffolds to real-green.
+- Built `src/vibemix/bench/review.py` — `render_review(results, scores) -> str`, a PURE JSON→Markdown renderer that lays the recorded bench cells out for Kaan's ear. It ranks each grounding-dimension group by auto-score (via `rank_cells`, a SORT), renders every cell's 6-D coordinates + the three auto-scores + the assembled prompt + the recorded output, and ends with a literally-EMPTY `## VERDICT (Kaan fills this)` block. THE HARD HUMAN GATE is honored: no code path writes a winner, picks an architecture, or synthesizes a verdict (Pitfall 5 / T-81-09). An errored cell renders `
+- 1. [Rule 3 - Blocking] Reframed pin (f) no-MusicState from a sys.modules scan to a static-attribute check
+
+---
+
 ## v8.0 Proof & Polish (Shipped: 2026-05-25)
 
 **Phases completed:** 6 phases (71–76), `tech_debt` accepted, `gsd-autonomous fully`.

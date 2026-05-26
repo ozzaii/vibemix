@@ -10,7 +10,12 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v8.1 "One Mind"
+## Prior State: v8.1 "One Mind" SHIPPED 2026-05-26 (audit PASSED) — no active milestone
+
+**v8.1 shipped code-complete** (6/6 phases 77–82, 18/18 requirements, audit PASSED, honest-green 4540/0, no API key). The disconnected islands are now ONE grounded product — *"an AI that hears music with you, and gets you."* Delivered: the live co-host grounds on what's actually playing (WIRE-01) + memory fills on the live path (WIRE-05) + env-key fix (WIRE-06); the EAR speaks in **change not snapshots** — deltas/calibrated-confidence + multi-scale trajectory + €0 mean-centered nearest-prototype genre (PERCEIVE); **three grounded lenses** hype/critique/tutor on one shared selection across both surfaces (LENS); Gemini hears the audio as a **secondary** ear, hallucination-guarded, model bench-swappable (GROUND); a **multi-dimensional bench instrument** + auto first-pass eval + a Kaan's-ear review surface (BENCH); and the **diamond closed** — curator + co-host share ONE genre mechanism + ONE consent-gated taste layer + ONE lens (CURATE). The code-review gate caught a real bug every phase (grounding stale-citation race · over-suppression · lens-dead-on-live-path · invariant-#3 inversion · bench cost/None-text/timeout · consent-gate bypass) — all fixed. **Remaining work is all KAAN-ACTION (produced-and-parked, never faked):** the BENCH-03 verdict (run `vibemix bench run`, read the review surface, pick the winning architecture × model — the milestone's central empirical decision), the live ear-passes per phase on the funded key, the TASTE_RUBRIC wording (Kaan's IP), and the deferred UI lens-picker. **Next:** `/gsd:new-milestone`, or discharge the KAAN-ACTION queue. Full audit: `.planning/milestones/v8.1-MILESTONE-AUDIT.md`; charter: `.planning/research/one-mind-charter.md`.
+
+<details>
+<summary>v8.1 "One Mind" — original milestone goal (shipped)</summary>
 
 **Goal:** Connect vibemix's disconnected islands into ONE grounded product — *"an AI that hears music with you, and gets you."* The shallowness isn't a Gemini limit; it's a wiring gap + asking Gemini to be the ear. Make the DSP/MIDI/embedding stack the **EAR** (structured state + multi-scale trajectory + the DJ's moves + genre), Gemini the taste/culture **VOICE**, with a shared **taste layer** and **three lenses** (hype / critique / tutor) across both surfaces (live co-host + library curator).
 
@@ -25,6 +30,8 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 **Constraints (locked):** ship-not-over-engineer (one connected, tested wire per phase) · Gemini-only AI provider · no new MIR libraries (GPL/AGPL/NC vs Apache-2.0 + Bravoh reuse) · no new ws ports · four cardinal invariants hold by additive design · honest green (unit-testable without API; live e2e on the funded key). **Charter + research:** `.planning/research/one-mind-charter.md` (+ connection-map · genre-from-embeddings · gemini-audio-truth-test · gsd-operational-playbook).
 
 **Empirical grounding:** 3 frontier models returned 3 different genres for one track (raw-audio bench floor) → Gemini's raw ear isn't reliable; ground it. Genre-from-embeddings hit **86.5%** nearest-prototype accuracy at **€0** (cached). An env-var ghost key shadowing `.env` was found + fixed.
+
+</details>
 
 ---
 
@@ -459,4 +466,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-24 — **v7.0 "Open House" SHIPPED** (tech_debt accepted) under `gsd-autonomous fully` mode. 4/4 phases (67–70), 19/19 REQ-IDs engineering-side, 20 plans. Earlier: v7.0 STARTED 2026-05-23. Finishing milestone: "all tests pass, all devices ready, OSS fully integrated, GitHub fully sexified / generated / tested". Four pillars (TEST · DEV · OSS · GH) = wiring + discharge + polish, **zero new product capability**, zero new AI providers, zero new deps (red-class), zero new ws ports. Closes v4.0 SHIP carryover (public RC publish on external Apple Dev + SignPath clock) and turns v6.0's engineering-green capabilities into a publishable OSS repo. v6.0's `VIBEMIX_RECALL_ENABLED=1` flip stays on its independent §RECALL-EAR Kaan-ear clock — not in v7.0 scope. Last shipped: v6.0 2026-05-23.*
+*Last updated: 2026-05-26 — **v8.1 "One Mind" SHIPPED** (audit PASSED) under `gsd-autonomous fully` mode. 6/6 phases (77–82), 18/18 REQ-IDs, 19 plans, honest-green 4540/0 (no API key). The disconnected islands → ONE grounded product: live co-host grounded + deeper ear (deltas/trajectory/€0 genre) + three shared lenses + Gemini-secondary-ear + the bench instrument + curator/co-host unified (one genre mechanism, one consent-gated taste, one lens). Code-review gate caught + fixed a real bug every phase. KAAN-ACTION parked (never faked): the BENCH-03 verdict (run the bench, pick the winning architecture × model — the milestone's central empirical decision), live ear-passes, the TASTE_RUBRIC wording, the deferred UI lens-picker. Earlier: v8.0 "Proof & Polish" 2026-05-25; v7.0 "Open House" 2026-05-24.*

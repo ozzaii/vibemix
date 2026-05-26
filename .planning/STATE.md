@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v8.1
 milestone_name: One Mind
-status: milestone_complete
-last_updated: 2026-05-26T05:01:59.227Z
-last_activity: 2026-05-26
+status: Awaiting next milestone
+last_updated: "2026-05-26T05:10:00.702Z"
+last_activity: 2026-05-26 — Milestone v8.1 completed and archived
 progress:
   total_phases: 6
   completed_phases: 6
   total_plans: 19
-  completed_plans: 45
+  completed_plans: 19
   percent: 100
-stopped_at: Milestone complete (Phase 82 was final phase)
 ---
 
 # vibemix — State
@@ -38,10 +37,10 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 
 ## Current Position
 
-Phase: 82
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-05-26
+Phase: Milestone v8.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-26 — Milestone v8.1 completed and archived
 
 ### Plan 82-02 — CURATE: the two unification seams + regression gate (complete 2026-05-26)
 
@@ -316,4 +315,4 @@ Retained for audit-trail continuity (pinned by `tests/repo/test_gate_42_hybrid_i
 
 ## Operator Next Steps
 
-- Plan Phase 77 (WIRE) with `/gsd:plan-phase 77`.
+- Start the next milestone with /gsd-new-milestone
