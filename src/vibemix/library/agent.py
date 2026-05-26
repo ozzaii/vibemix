@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -101,6 +102,13 @@ _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE: str | None = None
 # requests (the same process) must rebuild, not serve the stale voice (Flag #3).
 _SYSTEM_INSTRUCTION_LENS: str | None = None
 _INTERACTIVE_SYSTEM_INSTRUCTION_LENS: str | None = None
+# WR-04: the gemini agent runs the model call under a ThreadPoolExecutor, so two
+# threads can enter the check-then-set on a concurrent lens change, both rebuild,
+# and interleave the (_CACHE, _LENS) writes — leaving _CACHE built under lens A
+# while _LENS records lens B (wrong voice served until the next change). Guard the
+# whole check-rebuild-store under one module lock. The build is cheap and only on
+# the cache-miss path, so the lock is uncontended in the steady state.
+_CACHE_LOCK = threading.Lock()
 
 
 def _shared_lens() -> str:
@@ -130,31 +138,36 @@ def _system_instruction() -> str:
     """Build (and cache) the one-shot curator system instruction from the seam."""
     global _SYSTEM_INSTRUCTION_CACHE, _SYSTEM_INSTRUCTION_LENS
     lens = _shared_lens()
-    if _SYSTEM_INSTRUCTION_CACHE is None or _SYSTEM_INSTRUCTION_LENS != lens:
-        from vibemix.prompts.matrix import build_curator_instruction
+    # WR-04: serialize the check-then-set so concurrent lens-change rebuilds can't
+    # interleave the (_CACHE, _LENS) writes and serve the wrong voice.
+    with _CACHE_LOCK:
+        if _SYSTEM_INSTRUCTION_CACHE is None or _SYSTEM_INSTRUCTION_LENS != lens:
+            from vibemix.prompts.matrix import build_curator_instruction
 
-        _SYSTEM_INSTRUCTION_CACHE = (
-            build_curator_instruction(lens) + "\n" + _RULES_BLOCK
-        )
-        _SYSTEM_INSTRUCTION_LENS = lens
-    return _SYSTEM_INSTRUCTION_CACHE
+            _SYSTEM_INSTRUCTION_CACHE = (
+                build_curator_instruction(lens) + "\n" + _RULES_BLOCK
+            )
+            _SYSTEM_INSTRUCTION_LENS = lens
+        return _SYSTEM_INSTRUCTION_CACHE
 
 
 def _interactive_system_instruction() -> str:
     """Build (and cache) the interactive curator system instruction."""
     global _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE, _INTERACTIVE_SYSTEM_INSTRUCTION_LENS
     lens = _shared_lens()
-    if (
-        _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE is None
-        or _INTERACTIVE_SYSTEM_INSTRUCTION_LENS != lens
-    ):
-        from vibemix.prompts.matrix import build_curator_instruction
+    # WR-04: same check-then-set guard as _system_instruction.
+    with _CACHE_LOCK:
+        if (
+            _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE is None
+            or _INTERACTIVE_SYSTEM_INSTRUCTION_LENS != lens
+        ):
+            from vibemix.prompts.matrix import build_curator_instruction
 
-        _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE = (
-            build_curator_instruction(lens) + "\n" + _INTERACTIVE_FLOW_BLOCK
-        )
-        _INTERACTIVE_SYSTEM_INSTRUCTION_LENS = lens
-    return _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE
+            _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE = (
+                build_curator_instruction(lens) + "\n" + _INTERACTIVE_FLOW_BLOCK
+            )
+            _INTERACTIVE_SYSTEM_INSTRUCTION_LENS = lens
+        return _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE
 
 
 def __getattr__(name: str) -> str:

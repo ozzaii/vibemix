@@ -37,6 +37,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -85,6 +86,10 @@ _RULES_BLOCK = (
 _SYSTEM_PROMPT_CACHE: str | None = None
 # Phase 79 LENS-02 — the lens the cache was built under (rebuild on change).
 _SYSTEM_PROMPT_LENS: str | None = None
+# WR-04: guard the check-then-set so a concurrent lens-change rebuild can't
+# interleave the (_CACHE, _LENS) writes and serve the wrong voice. Mirrors the
+# gemini agent seam; uncontended on the steady-state cache hit.
+_CACHE_LOCK = threading.Lock()
 
 
 def _shared_lens() -> str:
@@ -112,12 +117,14 @@ def _system_prompt() -> str:
     """Build (and cache) the codex curator system prompt from the matrix seam."""
     global _SYSTEM_PROMPT_CACHE, _SYSTEM_PROMPT_LENS
     lens = _shared_lens()
-    if _SYSTEM_PROMPT_CACHE is None or _SYSTEM_PROMPT_LENS != lens:
-        from vibemix.prompts.matrix import build_curator_instruction
+    # WR-04: serialize the check-then-set (see _CACHE_LOCK rationale above).
+    with _CACHE_LOCK:
+        if _SYSTEM_PROMPT_CACHE is None or _SYSTEM_PROMPT_LENS != lens:
+            from vibemix.prompts.matrix import build_curator_instruction
 
-        _SYSTEM_PROMPT_CACHE = build_curator_instruction(lens) + " " + _RULES_BLOCK
-        _SYSTEM_PROMPT_LENS = lens
-    return _SYSTEM_PROMPT_CACHE
+            _SYSTEM_PROMPT_CACHE = build_curator_instruction(lens) + " " + _RULES_BLOCK
+            _SYSTEM_PROMPT_LENS = lens
+        return _SYSTEM_PROMPT_CACHE
 
 
 def __getattr__(name: str) -> Any:
