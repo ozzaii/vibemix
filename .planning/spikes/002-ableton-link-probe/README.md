@@ -47,14 +47,17 @@ low for a manually-mixing DJ.**
 Live evidence (2026-05-26, Kaan's rig):
 - Link traffic confirmed: `192.168.1.46.57554 > 224.76.78.75.20808 UDP len 107`
   every ~250 ms (~4 Hz). Joinable, no sudo, no port contention.
-- **But the shared tempo is decoupled from the audible mix.** The Ableton Link
-  window showed master tempo **123.71** while deck A played at **160.53 BPM**
-  (DATSKO, native 158, +1.6% pitch) and deck B at **120.00** (AZYR, native 165.8,
-  −27.6%). The decks' per-deck LINK buttons were off, so Link broadcast an idle
-  master tempo unrelated to anything playing.
-- rekordbox's Link only ever exposes **one global tempo**, never per-deck BPM /
-  loaded track / play state. And a DJ beat-matching by hand won't Link-lock decks
-  (it would override their pitch faders and defeat manual mixing).
+- The Link window showed tempo **123.71** while decks played 160.53 / 120.00 —
+  **but Kaan confirmed 123.71 was his manual TAP**, not a decoupled auto-tempo.
+  So that number is a tap artifact, NOT evidence that Link can't follow a deck.
+- The real limitation stands on protocol grounds, not that one number: rekordbox
+  Link broadcasts **one global session tempo + phase**, never per-deck BPM /
+  loaded track / play state. To make it reflect the audible mix you must engage a
+  **deck's LINK button** (that deck then masters/follows the Link tempo). With no
+  deck Link-locked, the session tempo is whatever was last set (tap/idle).
+- A DJ beat-matching by hand typically won't Link-lock decks (it overrides the
+  pitch faders), so passively we can't assume Link carries audible truth. And even
+  Link-locked, it's still one tempo — no track/per-deck/cue data.
 
 So Link is only a useful clock **if the DJ opts into Link-locking the master
 deck** — a workflow change we can't assume. As a passive ground-truth source for
