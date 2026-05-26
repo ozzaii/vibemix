@@ -115,6 +115,16 @@ fn build_library_command(
         }
     }
 
+    // Codex backend opt-in. The `--backend codex` curator path runs `codex exec`
+    // against an MCP server; an upstream Codex regression broke MCP tool-approval
+    // mode, so the wrapper fails closed (`codex_mcp_blocked`) unless
+    // VIBEMIX_CODEX_ALLOW_SHELL=1 is set. The desktop app is a trusted local
+    // context, so we set it WHEN (and only when) the codex backend is requested.
+    // Unused/harmless for every other library subcommand.
+    if library_args.iter().any(|a| *a == "codex") {
+        cmd = cmd.env("VIBEMIX_CODEX_ALLOW_SHELL", "1");
+    }
+
     Ok(cmd)
 }
 
@@ -336,9 +346,12 @@ fn map_curate_result(raw: &Value) -> Value {
         .to_string();
 
     let playlist = raw.get("playlist");
-    // `name` — the agent-chosen playlist name; fall back to the theme.
+    // `name` — the agent-chosen playlist name. The Gemini backend nests it under
+    // `playlist.name`; the Codex backend surfaces it top-level as `playlist_name`.
+    // Fall back to the theme when neither names the set.
     let name = playlist
         .and_then(|p| p.get("name"))
+        .or_else(|| raw.get("playlist_name"))
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .unwrap_or(theme)
@@ -376,8 +389,11 @@ fn map_curate_result(raw: &Value) -> Value {
             })
             .collect()
     } else {
+        // Flat id list. Gemini nests it under `playlist.track_ids`; the Codex
+        // backend surfaces it top-level as `track_ids`. Try nested, then top-level.
         let ids = playlist
             .and_then(|p| p.get("track_ids"))
+            .or_else(|| raw.get("track_ids"))
             .and_then(|t| t.as_array())
             .unwrap_or(&empty);
         ids.iter()
@@ -411,15 +427,22 @@ fn map_curate_result(raw: &Value) -> Value {
 
 /// `library_curate` — theme → AI-curated playlist (one-shot, NOT interactive).
 ///
-/// Runs `library curate <theme> --json`, maps the raw curate JSON into the
-/// stable UI shape `{ name, rationale, stop_reason, tracks:[{track_id,title,
-/// meta}], count }`. A backend failure (no library cache, no key, model
-/// produced no playlist) surfaces via `parse_cli_json` as an Err — the
-/// frontend renders the real error, never fake data (anti-slop).
+/// Runs `library curate <theme> --backend codex --json` — the curator reasons on
+/// the user's own ChatGPT-plan Codex session (NOT Gemini), grounded through the
+/// MCP server's seen-set + library re-validation. `map_curate_result` maps the
+/// Codex JSON shape (top-level `playlist_name` / `track_ids`) into the stable UI
+/// shape `{ name, rationale, stop_reason, tracks:[{track_id,title,meta}], count }`.
+/// A backend failure (codex not installed / not logged in, no library cache, no
+/// playlist) surfaces via `parse_cli_json` as an Err — the frontend renders the
+/// real error, never fake data (anti-slop). `VIBEMIX_CODEX_ALLOW_SHELL=1` is set
+/// by `build_library_command` for the codex path.
 #[tauri::command]
 pub async fn library_curate(app: AppHandle, theme: String) -> Result<Value, String> {
-    let (stdout, stderr, code) =
-        run_library_to_completion(&app, &["library", "curate", &theme, "--json"]).await?;
+    let (stdout, stderr, code) = run_library_to_completion(
+        &app,
+        &["library", "curate", &theme, "--backend", "codex", "--json"],
+    )
+    .await?;
     let raw = parse_cli_json(&stdout, &stderr, code)?;
     Ok(map_curate_result(&raw))
 }
@@ -445,11 +468,13 @@ pub async fn library_curate(app: AppHandle, theme: String) -> Result<Value, Stri
 /// before spawn so an out-of-band value never reaches the CLI as a confusing
 /// argparse error.
 ///
-/// HONESTY (anti-slop): build-set runs the Gemini agent (needs a key). Without
-/// one the CLI returns `stop_reason == "max_iters"` with no playlist — the UI
-/// renders that as an honest empty/error state, never fabricated rows. A hard
-/// backend failure (no library cache, no key) surfaces via `parse_cli_json` as
-/// an Err — the frontend renders the real error, never fake data.
+/// HONESTY (anti-slop): build-set runs the Codex backend (`--backend codex`) —
+/// set-prep reasoning on the user's own ChatGPT-plan Codex session via the MCP
+/// server, grounded through discover/sequence/export tools.
+/// `VIBEMIX_CODEX_ALLOW_SHELL=1` is set by `build_library_command` for the codex
+/// path. A backend failure (codex not installed / not logged in, no library
+/// cache, no set) surfaces via `parse_cli_json` as an Err — the frontend renders
+/// the real error, never fake data.
 #[tauri::command]
 pub async fn library_build_set(
     app: AppHandle,
@@ -473,6 +498,8 @@ pub async fn library_build_set(
             &curve,
             "--export",
             "rekordbox",
+            "--backend",
+            "codex",
             "--json",
         ],
     )
@@ -929,6 +956,33 @@ mod tests {
         // honest: title IS the id (CLI gave no human title), meta names the id.
         assert_eq!(m["tracks"][0]["title"], "t1");
         assert_eq!(m["tracks"][0]["meta"], "track t1");
+    }
+
+    #[test]
+    fn maps_curate_result_from_codex_backend_shape() {
+        // The Codex backend (`library curate --backend codex --json`) emits a
+        // FLAT shape: `playlist_name` + `track_ids` at the top level (no nested
+        // `playlist` object) — see CodexCurateResult.to_dict. The mapper must read
+        // both the Gemini-nested and Codex-flat shapes through one contract.
+        let raw = json!({
+            "theme": "dark hypnotic peak-time",
+            "stop_reason": "created",
+            "playlist_name": "Codex Vibe Set",
+            "track_ids": ["folder:aa", "folder:bb"],
+            "m3u_path": "/x/codex-vibe-set.m3u8",
+            "json_path": "/x/codex-vibe-set.json",
+            "rationale": "A peak-time pressure curve.",
+            "error": null
+        });
+        let m = map_curate_result(&raw);
+        assert_eq!(m["name"], "Codex Vibe Set");
+        assert_eq!(m["stop_reason"], "created");
+        assert_eq!(m["rationale"], "A peak-time pressure curve.");
+        assert_eq!(m["count"], 2);
+        assert_eq!(m["tracks"][0]["track_id"], "folder:aa");
+        assert_eq!(m["tracks"][1]["track_id"], "folder:bb");
+        // honest: no per-track title from the flat id list → id IS the title.
+        assert_eq!(m["tracks"][0]["title"], "folder:aa");
     }
 
     #[test]

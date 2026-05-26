@@ -1674,6 +1674,16 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_build_set.add_argument(
         "--name", default=None, help="set name (default: derived from the brief)"
     )
+    sp_build_set.add_argument(
+        "--backend",
+        choices=("gemini", "codex"),
+        default="gemini",
+        help=(
+            "reasoning backend: 'gemini' (built-in fn-calling, default) or "
+            "'codex' (your ChatGPT-plan Codex CLI via the MCP server). Codex "
+            "needs `codex login` + VIBEMIX_CODEX_ALLOW_SHELL=1."
+        ),
+    )
     sp_build_set.add_argument("--json", action="store_true")
     sp_build_set.set_defaults(func=_cmd_library_build_set)
 
@@ -1882,6 +1892,7 @@ def _cmd_library_search(args: argparse.Namespace) -> int:
 
     from vibemix.library import (
         LibraryEmbedder,
+        build_embedder,
         RekordboxLibrary,
         open_store,
         vibe_search,
@@ -1908,7 +1919,7 @@ def _cmd_library_search(args: argparse.Namespace) -> int:
         )
         return 1
 
-    embedder = LibraryEmbedder(client)
+    embedder = build_embedder(client)
     store = open_store()
     try:
         results, cache_hit = vibe_search(
@@ -1936,6 +1947,7 @@ def _cmd_library_similar(args: argparse.Namespace) -> int:
 
     from vibemix.library import (
         LibraryEmbedder,
+        build_embedder,
         RekordboxLibrary,
         open_store,
     )
@@ -1956,7 +1968,7 @@ def _cmd_library_similar(args: argparse.Namespace) -> int:
         )
         return 1
 
-    embedder = LibraryEmbedder(client)
+    embedder = build_embedder(client)
     store = open_store()
     try:
         results = similar_to(
@@ -2026,7 +2038,7 @@ def _cmd_library_curate(args: argparse.Namespace) -> int:
         )
         return 1
 
-    embedder = LibraryEmbedder(client)
+    embedder = build_embedder(client)
     store = open_store()
     try:
         agent = ViberAgent(client, embedder, store, lib)
@@ -2106,6 +2118,50 @@ def _cmd_library_curate_codex(args: argparse.Namespace, lib) -> int:
     return 0
 
 
+def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
+    """Codex backend for `library build-set` — set-prep via `codex exec` + MCP.
+
+    Codex drives the discover → sequence → export tool surface on the MCP server;
+    we pass the loaded library only for result-boundary grounding re-validation.
+    Emits the SAME JSON contract as the Gemini path's `to_dict` (playlist_name /
+    track_ids / rationale / export_path) so the Tauri `map_curate_result` bridge
+    reads both backends through one shape.
+    """
+    import json as _json
+
+    from vibemix.library.codex_curate import build_set_with_codex
+
+    result = build_set_with_codex(
+        args.brief,
+        lib,
+        curve=getattr(args, "curve", None),
+        name=getattr(args, "name", None),
+    )
+    out = result.to_dict()
+
+    if result.stop_reason != "created":
+        print(_json.dumps(out, indent=2), file=sys.stderr)
+        hint = {
+            "codex_not_installed": (
+                "Install Codex: `npm i -g @openai/codex` (or `brew install "
+                "codex`), then `codex login`."
+            ),
+            "codex_auth_required": "Run `codex login` to connect your ChatGPT plan.",
+            "timeout": "Codex took too long — try a narrower brief.",
+        }.get(result.stop_reason, result.error or "no set created")
+        print(f"[viber/codex] {result.stop_reason}: {hint}", file=sys.stderr)
+        return 1
+
+    _json.dump(out, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    print(
+        f"-> set '{result.playlist_name}' ({len(result.track_ids)} tracks) via Codex"
+        + (f"; exported: {result.export_path}" if result.export_path else ""),
+        file=sys.stderr,
+    )
+    return 0
+
+
 def _cmd_library_build_set(args: argparse.Namespace) -> int:
     """Vibe Mix set-prep co-host — brief → discovered + sequenced set.
 
@@ -2118,6 +2174,7 @@ def _cmd_library_build_set(args: argparse.Namespace) -> int:
 
     from vibemix.library import (
         LibraryEmbedder,
+        build_embedder,
         RekordboxLibrary,
         ViberAgent,
         open_store,
@@ -2139,6 +2196,11 @@ def _cmd_library_build_set(args: argparse.Namespace) -> int:
         )
         return 1
 
+    # Codex backend: Codex talks to the MCP server (which holds embedder/store);
+    # no local genai client needed. Mirrors `_cmd_library_curate_codex`.
+    if getattr(args, "backend", "gemini") == "codex":
+        return _cmd_library_build_set_codex(args, lib)
+
     client, err = _library_genai_client()
     if err is not None:
         print(_json.dumps(err), file=sys.stderr)
@@ -2159,7 +2221,7 @@ def _cmd_library_build_set(args: argparse.Namespace) -> int:
     if hints:
         brief = f"{brief} ({'; '.join(hints)})"
 
-    embedder = LibraryEmbedder(client)
+    embedder = build_embedder(client)
     store = open_store()
     try:
         agent = ViberAgent(client, embedder, store, lib)
@@ -2351,6 +2413,7 @@ def _cmd_library_telegram(args: argparse.Namespace) -> int:
 
     from vibemix.library import (
         LibraryEmbedder,
+        build_embedder,
         RekordboxLibrary,
         ViberAgent,
         open_store,
@@ -2377,7 +2440,7 @@ def _cmd_library_telegram(args: argparse.Namespace) -> int:
         print(_json.dumps(err), file=sys.stderr)
         return 1
 
-    embedder = LibraryEmbedder(client)
+    embedder = build_embedder(client)
     store = open_store()
 
     def curate_fn(theme: str) -> dict:
@@ -2425,6 +2488,7 @@ def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
 
     from vibemix.library import (
         LibraryEmbedder,
+        build_embedder,
         ingest_folder,
         open_store,
     )
@@ -2465,7 +2529,7 @@ def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
         return 1
 
     strategy = getattr(args, "strategy", "mean_excerpt")
-    embedder = LibraryEmbedder(client, embed_strategy=strategy)
+    embedder = build_embedder(client, embed_strategy=strategy)
     store = open_store()
     as_json = bool(getattr(args, "json", False))
     if strategy != "mean_excerpt":

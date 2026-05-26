@@ -49,6 +49,9 @@ logger = logging.getLogger(__name__)
 # Outer wall-clock guard. Codex bounds tool calls (tool_timeout_sec) and its
 # own loop; this is the belt-and-braces kill for a wedged process.
 DEFAULT_TIMEOUT_S = 120.0
+# Set-prep (build_set_with_codex) is multi-step — discover → energy → sequence →
+# export — so it needs a longer outer wall-clock than one-shot curate.
+BUILD_SET_TIMEOUT_S = 300.0
 # MCP tool/startup timeouts handed to Codex via -c overrides (its harness owns
 # enforcement; we only set the values).
 _MCP_STARTUP_TIMEOUT_S = 15
@@ -172,6 +175,9 @@ class CodexCurateResult:
     json_path: str | None = None
     rationale: str = ""
     error: str | None = None
+    # Set-prep only: the Rekordbox XML path written by the export_set MCP tool
+    # during a `build_set_with_codex` run. None for plain curation.
+    export_path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -474,11 +480,263 @@ def curate_with_codex(
     )
 
 
+# ---------------------------------------------------------------------------- #
+# Set-prep (build-set) over Codex — discover → sequence → export.               #
+# ---------------------------------------------------------------------------- #
+
+# The set-prep tools (discover_pool / get_track_energy / sequence_set /
+# export_set) are exposed by the SAME MCP server as the curate tools, so the
+# grounding gate (seen-set + library re-validation) is identical. Only the
+# prompt + output schema differ: the model must SEQUENCE on an energy curve and
+# EXPORT to a Rekordbox-importable XML, then return the export path.
+_BUILD_SET_RULES = (
+    "You are preparing a DJ SET (an ordered, mixable sequence), not just a "
+    "playlist. Use ONLY the provided tools.\n"
+    "WORKFLOW (in order):\n"
+    "1. discover_pool — find a grounded candidate pool for the brief (optionally "
+    "bounded by bpm/duration). This is the ONLY way to introduce track_ids.\n"
+    "2. get_track_energy — inspect candidates' perceived energy as needed.\n"
+    "3. sequence_set — order the chosen track_ids on the requested energy curve. "
+    "Pass ONLY track_ids returned by discover_pool this run.\n"
+    "4. export_set — write the final ordered set to a Rekordbox XML. Capture the "
+    "returned `path`.\n"
+    "RULES (non-negotiable):\n"
+    "1. NEVER invent a track_id, title, artist, BPM, or key. Every track_id MUST "
+    "have come from a discover_pool result in THIS run.\n"
+    "2. Keys/BPM/energy come from the tools (deterministic) — never compute or "
+    "guess them.\n"
+    "3. Return the final JSON object {name, track_ids, export_path, rationale}: "
+    "the ORDERED track_ids in play order, the export_set `path` as export_path "
+    "(empty string if you did not export), and a short rationale for the arc.\n"
+    "4. Keep it tight and mixable — a focused, well-sequenced set beats a padded "
+    "one."
+)
+
+# Strict structured-output schema (OpenAI strict mode: every prop in `required`,
+# additionalProperties: false). export_path is required-but-may-be-empty so the
+# model always surfaces the field; we treat "" as "not exported".
+_BUILD_SET_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "track_ids": {"type": "array", "items": {"type": "string"}},
+        "export_path": {"type": "string"},
+        "rationale": {"type": "string"},
+    },
+    "required": ["name", "track_ids", "export_path", "rationale"],
+    "additionalProperties": False,
+}
+
+
+def build_set_prompt(
+    brief: str, *, curve: str | None = None, name: str | None = None
+) -> str:
+    """Compose the set-prep prompt: shared persona/lens + set-prep rules + brief.
+
+    Curve / name are folded in as grounded hints; the agent still owns the tool
+    calls (mirrors the Gemini `_cmd_library_build_set` hint-folding).
+    """
+    hints: list[str] = []
+    if curve:
+        hints.append(f"prefer the '{curve}' energy curve")
+    if name:
+        hints.append(f"name the set '{name}'")
+    brief_line = brief.strip()
+    if hints:
+        brief_line = f"{brief_line} ({'; '.join(hints)})"
+    # Reuse the shared lens/persona prefix from the curate system prompt, then
+    # swap the rule block for the set-prep workflow.
+    persona = _system_prompt().rsplit(_RULES_BLOCK, 1)[0].rstrip()
+    return f"{persona} {_BUILD_SET_RULES}\n\nSet brief: {brief_line}"
+
+
+def build_set_with_codex(
+    brief: str,
+    library: RekordboxLibrary,
+    *,
+    curve: str | None = None,
+    name: str | None = None,
+    timeout_s: float = BUILD_SET_TIMEOUT_S,
+    codex_path: str | None = None,
+    mcp_command: str | None = None,
+    mcp_args: list[str] | None = None,
+    allow_shell: bool | None = None,
+    _runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+) -> CodexCurateResult:
+    """Run one set-prep (discover → sequence → export) via ``codex exec``.
+
+    Mirrors :func:`curate_with_codex` (same guards, MCP wiring, result-boundary
+    grounding) but drives the set-prep tool surface and surfaces the Rekordbox
+    ``export_path`` written by the ``export_set`` MCP tool. The export tool is
+    itself grounded (seen-set + library re-validation), so the written XML never
+    references an invented track.
+    """
+    if allow_shell is None:
+        allow_shell = os.environ.get("VIBEMIX_CODEX_ALLOW_SHELL", "").strip() not in (
+            "",
+            "0",
+            "false",
+            "no",
+        )
+
+    codex = find_codex(codex_path)
+    if codex is None:
+        return CodexCurateResult(
+            theme=brief,
+            stop_reason="codex_not_installed",
+            error=(
+                "Codex CLI not found. Install it (`npm i -g @openai/codex` or "
+                "`brew install codex`) and run `codex login` to enable AI sets."
+            ),
+        )
+
+    if not allow_shell:
+        return CodexCurateResult(
+            theme=brief,
+            stop_reason="codex_mcp_blocked",
+            error=(
+                "Codex's MCP tool calls are auto-cancelled in non-interactive "
+                "mode (upstream bug openai/codex#16685). Running them needs "
+                "`--dangerously-bypass-approvals-and-sandbox`. To use the Codex "
+                "backend, set VIBEMIX_CODEX_ALLOW_SHELL=1."
+            ),
+        )
+
+    command = mcp_command or sys.executable
+    args = mcp_args if mcp_args is not None else ["-m", "vibemix.library.mcp_server"]
+
+    with tempfile.TemporaryDirectory(prefix="viber-codex-set-") as td:
+        schema_path = str(Path(td) / "schema.json")
+        out_path = str(Path(td) / "out.json")
+        Path(schema_path).write_text(json.dumps(_BUILD_SET_SCHEMA), encoding="utf-8")
+
+        argv = build_argv(
+            codex,
+            mcp_command=command,
+            mcp_args=args,
+            schema_path=schema_path,
+            out_path=out_path,
+            prompt=build_set_prompt(brief, curve=curve, name=name),
+            bypass_sandbox=allow_shell,
+        )
+
+        try:
+            proc = _runner(
+                argv,
+                capture_output=True,
+                text=True,
+                timeout=timeout_s,
+                stdin=subprocess.DEVNULL,
+            )
+        except FileNotFoundError:
+            return CodexCurateResult(
+                theme=brief,
+                stop_reason="codex_not_installed",
+                error="Codex CLI disappeared at spawn time.",
+            )
+        except subprocess.TimeoutExpired:
+            return CodexCurateResult(
+                theme=brief,
+                stop_reason="timeout",
+                error=f"Codex did not finish within {timeout_s:.0f}s.",
+            )
+
+        stderr = proc.stderr or ""
+        if proc.returncode != 0:
+            low = stderr.lower()
+            if any(h in low for h in _AUTH_HINTS):
+                return CodexCurateResult(
+                    theme=brief,
+                    stop_reason="codex_auth_required",
+                    error="Codex is not logged in. Run `codex login`.",
+                )
+            return CodexCurateResult(
+                theme=brief,
+                stop_reason="error",
+                error=f"codex exec failed (exit {proc.returncode}): {stderr.strip()[:400]}",
+            )
+
+        try:
+            raw = Path(out_path).read_text(encoding="utf-8").strip()
+        except OSError:
+            raw = ""
+        if not raw:
+            return CodexCurateResult(
+                theme=brief, stop_reason="empty_output", error="Codex produced no output."
+            )
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            return CodexCurateResult(
+                theme=brief,
+                stop_reason="empty_output",
+                error="Codex output was not valid JSON.",
+            )
+        if not isinstance(payload, dict):
+            return CodexCurateResult(
+                theme=brief,
+                stop_reason="empty_output",
+                error="Codex output was not a JSON object.",
+            )
+
+    raw_ids = payload.get("track_ids")
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return CodexCurateResult(
+            theme=brief,
+            stop_reason="no_playlist",
+            rationale=str(payload.get("rationale", "")),
+            error="Codex returned no track_ids.",
+        )
+
+    validated = _validate_against_library(raw_ids, library)
+    if not validated:
+        return CodexCurateResult(
+            theme=brief,
+            stop_reason="no_playlist",
+            rationale=str(payload.get("rationale", "")),
+            error="No returned track_id resolved in the library (grounding).",
+        )
+
+    # export_path comes from the export_set tool (grounded writer). Trust only a
+    # path that actually exists on disk — an empty/missing path means "no export".
+    raw_export = str(payload.get("export_path") or "").strip()
+    export_path: str | None = raw_export if raw_export and Path(raw_export).exists() else None
+
+    # Persist a neutral M3U/JSON too (mirror curate: the wrapper is the validated
+    # writer), so the set has a playlist artifact alongside the Rekordbox XML.
+    playlist_name = name or str(payload.get("name") or brief)
+    m3u_path: str | None = None
+    json_path: str | None = None
+    try:
+        from vibemix.library.create_playlist import create_playlist as _persist
+
+        res = _persist(library, playlist_name, validated)
+        m3u_path = str(res.m3u_path)
+        json_path = str(res.json_path)
+        validated = res.track_ids
+    except Exception as e:  # noqa: BLE001 — never raise; report what we have
+        logger.warning("[codex] set persist failed: %s", e)
+
+    return CodexCurateResult(
+        theme=brief,
+        stop_reason="created",
+        playlist_name=playlist_name,
+        track_ids=validated,
+        m3u_path=m3u_path,
+        json_path=json_path,
+        rationale=str(payload.get("rationale", "")),
+        export_path=export_path,
+    )
+
+
 __all__ = [
+    "BUILD_SET_TIMEOUT_S",
     "DEFAULT_TIMEOUT_S",
     "CodexCurateResult",
     "build_argv",
     "build_prompt",
+    "build_set_prompt",
+    "build_set_with_codex",
     "curate_with_codex",
     "find_codex",
 ]
