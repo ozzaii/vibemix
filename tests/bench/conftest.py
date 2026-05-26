@@ -137,6 +137,35 @@ class _NoTextClient:
         )
 
 
+class _HangingClient:
+    """Offline client whose ``generate_content`` blocks longer than the bench
+    wall-clock timeout — a silent hang short of an HTTP error.
+
+    WR-03: a stalled connection that never raises must NOT block the sweep
+    forever. The runner wraps the call in a wall-clock timeout; this client's
+    sleep exceeds it so the ThreadPoolExecutor raises TimeoutError, the per-cell
+    fail-safe parks the cell, and the sweep CONTINUES. The test monkeypatches the
+    bench timeout down so the suite stays fast + offline.
+    """
+
+    def __init__(self) -> None:
+        self.models = self
+        self.calls: list[dict[str, object]] = []
+
+    def generate_content(
+        self,
+        *,
+        model: str,
+        contents: object,
+        config: object = None,
+    ) -> SimpleNamespace:  # pragma: no cover - the timeout fires before return
+        import time
+
+        self.calls.append({"model": model, "contents": contents, "config": config})
+        time.sleep(5.0)  # exceeds the (monkeypatched-down) bench timeout
+        return SimpleNamespace(text="never returned", usage_metadata=None)
+
+
 # --------------------------------------------------------------------------- #
 # Client fixtures
 # --------------------------------------------------------------------------- #
@@ -158,6 +187,12 @@ def raising_client() -> _RaisingClient:
 def no_text_client() -> _NoTextClient:
     """A zero-network client returning text=None — the WR-02 blocked-candidate driver."""
     return _NoTextClient()
+
+
+@pytest.fixture
+def hanging_client() -> _HangingClient:
+    """A zero-network client that hangs past the timeout — the WR-03 stall driver."""
+    return _HangingClient()
 
 
 # --------------------------------------------------------------------------- #

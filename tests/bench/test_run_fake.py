@@ -98,3 +98,18 @@ def test_none_text_response_parks_cell(no_text_client) -> None:
         assert "no text candidate" in r.error
 
 
+def test_hang_times_out_and_sweep_continues(hanging_client, monkeypatch) -> None:
+    """WR-03: a silent hang (no exception) must not block the sweep forever — the
+    wall-clock timeout raises, the per-cell fail-safe parks the cell, and the
+    sweep CONTINUES to completion. The bench timeout is monkeypatched down so the
+    test is fast + fully offline."""
+    import vibemix.bench.run as run_mod
+    from vibemix.bench.matrix import STUDY_A
+
+    monkeypatch.setattr(run_mod, "_BENCH_CALL_TIMEOUT_S", 0.05)
+    results = run_mod.run_study(STUDY_A, client=hanging_client)
+    # The sweep did NOT wedge: every cell produced a (parked) result.
+    assert len(results) == len(STUDY_A)
+    for r in results:
+        assert r.error is not None  # the timeout was caught + parked
+        assert not r.output  # NEVER fabricate output for a hung cell
