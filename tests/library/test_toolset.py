@@ -123,9 +123,9 @@ def test_dispatch_errors_never_raise(toolset):
 # reads (state/refresh.py:254 -> GenrePrototypeLookup.classify_playing), so the
 # curator and co-host derive genre from ONE source — not two parallel notions.
 #
-# These scaffolds are xfail(strict=True): RED today (genre is None), they flip
-# to a real pass ONLY when Plan 02 lands the seam. A silent early-pass becomes
-# an xpassed -> HARD failure (strict), so Plan 02 can never fake green.
+# Plan 02 (this commit) landed the seam: get_track_features now routes genre
+# through GenrePrototypeLookup.classify_playing, so these are real-green (the
+# xfail scaffolds flipped). Honest-null on the mechanism's abstain.
 #
 # Honest green: NO genai.Client, NO GEMINI_API_KEY. The in-memory `library`
 # fixture sets `lib.tracks` directly and never writes RekordboxLibrary.CACHE_PATH
@@ -137,7 +137,6 @@ def test_dispatch_errors_never_raise(toolset):
 from vibemix.library import genre_prototypes as _proto_mod  # noqa: E402
 
 
-@pytest.mark.xfail(strict=True, reason="CURATE-01 SEAM #1 — Plan 02 wires genre via genre_prototypes")
 def test_genre_via_prototypes_when_classified(toolset, monkeypatch):
     """get_track_features routes genre through the shared prototype mechanism.
 
@@ -162,7 +161,6 @@ def test_genre_via_prototypes_when_classified(toolset, monkeypatch):
     )
 
 
-@pytest.mark.xfail(strict=True, reason="CURATE-01 SEAM #1 — Plan 02 honest-null on prototype abstain")
 def test_genre_honest_none_on_abstain(toolset, monkeypatch):
     """On prototype abstain (("unknown", 0.0)), genre is honest-null, never fabricated.
 

@@ -70,6 +70,12 @@ class LibraryToolset:
         # The grounding spine: ids any search_vibe returned THIS run.
         self.seen: set[str] = set()
         self.created: PlaylistResult | None = None
+        # SEAM #1 (CURATE-01): lazily-built genre lookup, the SAME mechanism the
+        # co-host reads (genre_prototypes.GenrePrototypeLookup). Built on first
+        # get_track_features call so __init__ stays import-boundary clean (no
+        # genre_prototypes import here) and repeated feature lookups in one run
+        # reuse the built prototype table.
+        self._genre_lookup: Any | None = None
 
     # -- tool handlers (RETURN error strings, never raise) ------------------ #
 
@@ -121,8 +127,38 @@ class LibraryToolset:
             "bpm": entry.bpm if (entry.bpm and entry.bpm > 0) else None,
             "key": camelot,  # honest null when unrecognized/absent
             "duration_s": entry.duration_s or None,
-            "genre": None,  # library genre is best-effort only (Phase 1: null)
+            # SEAM #1 (CURATE-01): genre is a deterministic library-side fact,
+            # resolved through the ONE genre_prototypes mechanism the co-host
+            # reads (refresh.py -> GenrePrototypeLookup.classify_playing). Honest
+            # null on abstain — the model NEVER supplies genre (invariant #3).
+            "genre": self._resolve_genre(track_id),
         }
+
+    def _resolve_genre(self, track_id: str) -> str | None:
+        """Resolve genre via the SHARED genre_prototypes mechanism (CURATE-01).
+
+        Routes through the SAME ``GenrePrototypeLookup.classify_playing`` the
+        co-host reads, so the curator and co-host derive genre from ONE source.
+        Reads the track's CACHED library embedding at €0 (no live embed). On the
+        mechanism's own abstain (``("unknown", _)`` — track not in the library /
+        degenerate prototype table) returns ``None`` (honest-null, byte-identical
+        class to the prior hardcoded ``genre: None``), never a fabricated label.
+
+        Per Pitfall 2 ALL prototype-distance math is delegated to
+        genre_prototypes — this method adds none (no re-rolled centering).
+        Lazy-import + lazy lookup-build keep the
+        import-boundary discipline (Pattern 1). Guarded: any failure degrades to
+        honest-null so a feature lookup never raises.
+        """
+        try:
+            if self._genre_lookup is None:
+                from vibemix.library.genre_prototypes import GenrePrototypeLookup
+
+                self._genre_lookup = GenrePrototypeLookup(self._store)
+            label, _conf = self._genre_lookup.classify_playing(track_id)
+            return label if label and label != "unknown" else None
+        except Exception:  # noqa: BLE001 — feature lookup must not raise
+            return None
 
     def create_playlist(self, args: dict[str, Any]) -> dict[str, Any]:
         name = args.get("name")
