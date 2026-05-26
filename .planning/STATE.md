@@ -40,7 +40,7 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 Phase: Milestone v8.1 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-05-26 — Milestone v8.1 completed and archived
+Last activity: 2026-05-26 — Completed quick task 260526-i3j: staged CLAP engine + docs (CLAP de-risked: determinism cos=1.0, cross-modal genre separation 100%; ship path = on-device ONNX)
 
 ### Plan 82-02 — CURATE: the two unification seams + regression gate (complete 2026-05-26)
 
@@ -190,6 +190,7 @@ Wave-0 RED scaffolds for the four unimplemented wires + green pins for the two s
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
 | 260525-fuv | Token + cost counter for live sessions (SessionMeter + ROUTE_PRICING + session.json cost block + stderr recap; cache-hit savings) | 2026-05-25 | 4799730 | Verified (full suite 4284/0) | [260525-fuv-token-and-cost-counter-for-live-sessions](./quick/260525-fuv-token-and-cost-counter-for-live-sessions/) |
+| 260526-i3j | Stage import-safe CLAP engine (local 512-dim, proven 10s-chunk/mean-pool pipeline) + docs/clap-engine.md (reliability evidence, ONNX ship path, parity gate, wiring change-map). STAGING + DOCS only — not the embedding swap. | 2026-05-26 | 5cea087 | Staged (import-safe w/o heavy deps; tests/library 261/0) | [260526-i3j-stage-clap-engine](./quick/260526-i3j-stage-clap-engine/) |
 
 ## v8.1 Phase Map
 
