@@ -73,8 +73,8 @@ Every v8.1 REQ-ID maps to exactly one phase (6 phases, 77–82; numbering contin
 | PERCEIVE-01 | Phase 78 | Complete |
 | PERCEIVE-02 | Phase 78 | Complete |
 | PERCEIVE-03 | Phase 78 | Complete |
-| LENS-01 | Phase 79 | Pending |
-| LENS-02 | Phase 79 | Pending |
+| LENS-01 | Phase 79 | In Progress |
+| LENS-02 | Phase 79 | In Progress |
 | GROUND-01 | Phase 80 | Pending |
 | GROUND-02 | Phase 80 | Pending |
 | BENCH-01 | Phase 81 | Pending |
