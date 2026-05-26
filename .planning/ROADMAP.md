@@ -58,7 +58,7 @@
 | 79 | LENS — Three Grounded Modes | 3/3 | Complete    | 2026-05-26 |
 | 80 | GROUND — Gemini as Secondary Ear | 2/2 | Complete    | 2026-05-26 |
 | 81 | BENCH — The Validation Instrument | 4/4 | Complete    | 2026-05-26 |
-| 82 | CURATE — Unify Curator + Co-Host | 1/2 | In Progress|  |
+| 82 | CURATE — Unify Curator + Co-Host | 2/2 | Complete   | 2026-05-26 |
 
 ## Phase Details
 
@@ -146,7 +146,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 82-01-PLAN.md — Wave-0 RED scaffolds (CURATE-01/02 xfail) + lens/no-MusicState/no-leak/surfaces real-green pins
-- [ ] 82-02-PLAN.md — SEAM #1 genre-via-genre_prototypes (toolset) + SEAM #2 _taste_hint reads shared profile (gemini+interactive+codex)
+- [x] 82-02-PLAN.md — SEAM #1 genre-via-genre_prototypes (toolset) + SEAM #2 _taste_hint reads shared profile (gemini+interactive+codex)
 
 ### v8.1 Coverage
 

@@ -40,8 +40,8 @@
 - [x] **BENCH-03**: Bench cells are surfaced for Kaan's-ear final judgment (KAAN-ACTION review surface).
 
 ### CURATE — unify curator + co-host
-- [ ] **CURATE-01**: Curator and co-host share the perception engine + the structured-state contract. ("Curator" = the shared grounded `library/toolset.py` core driving BOTH backends — gemini `agent.py` and codex `codex_curate.py`/`mcp_server.py` — plus the Telegram + `next_suggestion` transports over it. Neither backend is orphaned.)
-- [ ] **CURATE-02**: Curator (both gemini + codex backends) and co-host share the taste layer + persona/lens.
+- [x] **CURATE-01**: Curator and co-host share the perception engine + the structured-state contract. ("Curator" = the shared grounded `library/toolset.py` core driving BOTH backends — gemini `agent.py` and codex `codex_curate.py`/`mcp_server.py` — plus the Telegram + `next_suggestion` transports over it. Neither backend is orphaned.)
+- [x] **CURATE-02**: Curator (both gemini + codex backends) and co-host share the taste layer + persona/lens.
 
 ---
 
@@ -80,6 +80,6 @@ Every v8.1 REQ-ID maps to exactly one phase (6 phases, 77–82; numbering contin
 | BENCH-01 | Phase 81 | Complete |
 | BENCH-02 | Phase 81 | Complete |
 | BENCH-03 | Phase 81 | Complete |
-| CURATE-01 | Phase 82 | Pending |
-| CURATE-02 | Phase 82 | Pending |
+| CURATE-01 | Phase 82 | Complete |
+| CURATE-02 | Phase 82 | Complete |
 
