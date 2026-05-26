@@ -82,3 +82,19 @@ def test_study_a_records_nonzero_known_cost(fake_client) -> None:
     meter.reset()
 
 
+def test_none_text_response_parks_cell(no_text_client) -> None:
+    """WR-02: a blocked / no-text candidate (resp.text is None) is coerced into
+    the PARKED state — output=="" + a descriptive error — never a fabricated
+    success (output=None, error=None). The default fake client returns a string,
+    so this no-text client is what exercises the contract offline."""
+    from vibemix.bench.matrix import STUDY_A
+    from vibemix.bench.run import run_study
+
+    results = run_study(STUDY_A, client=no_text_client)
+    assert len(results) == len(STUDY_A)
+    for r in results:
+        assert r.output == ""  # parked — never None, never fabricated
+        assert r.error is not None  # descriptive parked reason recorded
+        assert "no text candidate" in r.error
+
+

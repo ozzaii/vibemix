@@ -103,6 +103,40 @@ class _RaisingClient:
         raise RuntimeError("429 RESOURCE_EXHAUSTED: quota exceeded (fake)")
 
 
+class _NoTextClient:
+    """Offline client whose ``generate_content`` returns ``text=None``.
+
+    WR-02: the real google-genai SDK returns ``None`` from ``response.text`` on a
+    blocked / no-text / function-call-only candidate. The default ``_FakeClient``
+    always returns a string, so the offline gate cannot catch the None case — this
+    client reproduces it so the runner's coerce-to-parked path is exercised
+    offline. Carries a synthetic usage_metadata (a blocked call still bills its
+    prompt tokens).
+    """
+
+    def __init__(self) -> None:
+        self.models = self
+        self.calls: list[dict[str, object]] = []
+
+    def generate_content(
+        self,
+        *,
+        model: str,
+        contents: object,
+        config: object = None,
+    ) -> SimpleNamespace:
+        self.calls.append({"model": model, "contents": contents, "config": config})
+        return SimpleNamespace(
+            text=None,  # blocked / no-text candidate — the WR-02 surface
+            usage_metadata=SimpleNamespace(
+                prompt_token_count=1900,
+                candidates_token_count=0,
+                total_token_count=1900,
+                cached_content_token_count=0,
+            ),
+        )
+
+
 # --------------------------------------------------------------------------- #
 # Client fixtures
 # --------------------------------------------------------------------------- #
@@ -118,6 +152,12 @@ def fake_client() -> _FakeClient:
 def raising_client() -> _RaisingClient:
     """A zero-network client that always raises a fake 429 — the fail-safe driver."""
     return _RaisingClient()
+
+
+@pytest.fixture
+def no_text_client() -> _NoTextClient:
+    """A zero-network client returning text=None — the WR-02 blocked-candidate driver."""
+    return _NoTextClient()
 
 
 # --------------------------------------------------------------------------- #
