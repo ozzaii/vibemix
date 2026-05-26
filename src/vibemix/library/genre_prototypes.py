@@ -124,7 +124,16 @@ def build_prototypes(
 
     centered = center_and_renorm(vectors, centroid)  # (N, D)
 
-    labels = sorted(set(label_of.get(tid, "unknown") for tid in ids))
+    # WR-04 — EXCLUDE the "unknown" folder-proxy sentinel from the prototype
+    # table. Any track absent from the Rekordbox cache maps to "unknown"; if it
+    # became a real centered-mean prototype row it would compete in classify's
+    # cosine_topk(k=2): it could be the runner-up and shrink the
+    # `best_sim - second_sim` gap below PROTO_MARGIN, forcing a correct genre into
+    # abstain — or itself win as best_label="unknown" at high cosine. Abstain is
+    # decided by the floor / tie-margin, NOT by a junk "unknown" cluster winning.
+    labels = sorted({label_of.get(tid, "unknown") for tid in ids} - {"unknown"})
+    if not labels:  # all-"unknown" corpus → empty table → ("unknown", 0.0) abstain
+        return (np.empty((0, EMBEDDING_DIM), dtype=np.float32), [])
     protos: list[np.ndarray] = []
     for label in labels:
         rows = centered[[i for i, tid in enumerate(ids) if label_of.get(tid, "unknown") == label]]

@@ -105,6 +105,78 @@ def test_build_centered_means():
     assert np.allclose(norms, 1.0, atol=1e-4)
 
 
+# ---------- PERCEIVE-03 — WR-04 "unknown" never competes as a prototype ----------
+
+
+def test_unknown_excluded_from_prototypes():
+    """WR-04 — the "unknown" folder-proxy sentinel must NOT become a prototype
+    row. Tracks absent from the Rekordbox cache map to "unknown"; if that became
+    a real centered-mean prototype it could margin-suppress a correct genre or
+    win as best_label="unknown" at high cosine. Abstain is the floor/margin's
+    job, not an "unknown" cluster's.
+    """
+    from vibemix.library.genre_prototypes import build_prototypes
+
+    vectors = _anisotropic_corpus(n=12)
+    ids = [f"t{i:03d}" for i in range(12)]
+    # Half the corpus is "unknown" (cache-miss tracks); the rest are "techno".
+    label_of = {tid: ("unknown" if i % 2 == 0 else "techno") for i, tid in enumerate(ids)}
+
+    protos, labels = build_prototypes(vectors, ids, label_of)
+    assert "unknown" not in labels, "unknown must never be a competing prototype"
+    assert labels == ["techno"]
+    assert protos.shape[0] == len(labels)
+
+
+def test_all_unknown_corpus_yields_empty_table():
+    """WR-04 — an all-"unknown" corpus yields an empty prototype table, so
+    classify abstains ("unknown", 0.0) rather than building a junk prototype."""
+    from vibemix.library.genre_prototypes import build_prototypes, classify
+    from vibemix.library.centering import compute_centroid
+
+    vectors = _anisotropic_corpus(n=8)
+    ids = [f"t{i:03d}" for i in range(8)]
+    label_of = {tid: "unknown" for tid in ids}
+
+    protos, labels = build_prototypes(vectors, ids, label_of)
+    assert labels == []
+    assert protos.shape == (0, EMBEDDING_DIM)
+    # The empty table → classify abstains regardless of the query.
+    centroid = compute_centroid(vectors)
+    assert classify(vectors[0], protos, labels, centroid) == ("unknown", 0.0)
+
+
+def test_correct_genre_not_margin_suppressed_by_unknown():
+    """WR-04 — a track that belongs to a real genre still classifies as that
+    genre even when many cache-miss "unknown" tracks share the corpus. With the
+    fix the "unknown" rows never enter cosine_topk, so they cannot become the
+    runner-up that shrinks best-vs-second below PROTO_MARGIN.
+    """
+    from vibemix.library.centering import compute_centroid
+    from vibemix.library.genre_prototypes import build_prototypes, classify
+
+    # Three genres + a pile of unknowns drawn from the same anisotropic shape.
+    vectors = _anisotropic_corpus(n=18)
+    ids = [f"t{i:03d}" for i in range(18)]
+    real = ("techno", "house", "trance")
+    label_of = {}
+    for i, tid in enumerate(ids):
+        label_of[tid] = real[i % 3] if i < 9 else "unknown"
+
+    protos, labels = build_prototypes(vectors, ids, label_of)
+    assert "unknown" not in labels
+    centroid = compute_centroid(vectors)
+    assert centroid is not None
+
+    # A real-genre track classifies as its own label (floor/margin relaxed so the
+    # test isolates the "unknown does not compete" property, not the cosine
+    # geometry of the synthetic corpus).
+    own = label_of[ids[0]]
+    label, conf = classify(vectors[0], protos, labels, centroid, floor=0.0, margin=0.0)
+    assert label == own
+    assert label != "unknown"
+
+
 # ---------- PERCEIVE-03 — classify floor + margin ----------
 
 
