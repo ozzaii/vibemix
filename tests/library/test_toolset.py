@@ -113,3 +113,89 @@ def test_dispatch_errors_never_raise(toolset):
     assert "error" in toolset.dispatch("get_track_features", {"track_id": "NOPE"})
     assert "error" in toolset.dispatch("create_playlist", {"name": "x", "track_ids": []})
     assert "error" in toolset.dispatch("does_not_exist", {})
+
+
+# ---------------------------------------------------------------------------
+# Phase 82 Wave 0 — CURATE-01 SEAM #1: genre via the ONE perception mechanism
+#
+# Today `get_track_features` hardcodes `genre: None` (toolset.py:124). Plan 02
+# routes it through the SHARED `genre_prototypes` mechanism the co-host already
+# reads (state/refresh.py:254 -> GenrePrototypeLookup.classify_playing), so the
+# curator and co-host derive genre from ONE source — not two parallel notions.
+#
+# These scaffolds are xfail(strict=True): RED today (genre is None), they flip
+# to a real pass ONLY when Plan 02 lands the seam. A silent early-pass becomes
+# an xpassed -> HARD failure (strict), so Plan 02 can never fake green.
+#
+# Honest green: NO genai.Client, NO GEMINI_API_KEY. The in-memory `library`
+# fixture sets `lib.tracks` directly and never writes RekordboxLibrary.CACHE_PATH
+# (the library.pkl gotcha) — we monkeypatch the prototype mechanism instead.
+# Pitfall 2: the assertions pin that the curator routes through `genre_prototypes`
+# (classify_playing), NEVER a fresh np.mean/cosine classifier in toolset.py.
+# ---------------------------------------------------------------------------
+
+from vibemix.library import genre_prototypes as _proto_mod  # noqa: E402
+
+
+@pytest.mark.xfail(strict=True, reason="CURATE-01 SEAM #1 — Plan 02 wires genre via genre_prototypes")
+def test_genre_via_prototypes_when_classified(toolset, monkeypatch):
+    """get_track_features routes genre through the shared prototype mechanism.
+
+    Monkeypatch the ONE perception mechanism (GenrePrototypeLookup.classify_playing)
+    to return a real label for the known track; assert the seam surfaces that
+    library-derived label — NOT the hardcoded `None` of today.
+    """
+
+    def fake_classify_playing(self, track_id: str):
+        return ("hardtechno", 0.91) if track_id == "t000" else ("unknown", 0.0)
+
+    # Patch the class method — robust to however the seam binds the lookup.
+    monkeypatch.setattr(
+        _proto_mod.GenrePrototypeLookup,
+        "classify_playing",
+        fake_classify_playing,
+        raising=True,
+    )
+    out = toolset.get_track_features({"track_id": "t000"})
+    assert out["genre"] == "hardtechno", (
+        "CURATE-01: genre must be the prototype-resolved label, not None"
+    )
+
+
+@pytest.mark.xfail(strict=True, reason="CURATE-01 SEAM #1 — Plan 02 honest-null on prototype abstain")
+def test_genre_honest_none_on_abstain(toolset, monkeypatch):
+    """On prototype abstain (("unknown", 0.0)), genre is honest-null, never fabricated.
+
+    This pins TWO things at once: (1) the seam actually CONSULTS the shared
+    prototype mechanism (it must be called — proven by the spy), and (2) on its
+    abstain the genre is honest-null (None/"unknown"), byte-identical class to
+    today's `genre: None` and the Camelot honest-null at toolset.py:116. The
+    model NEVER invents a genre (invariant #3, Trust the audio).
+
+    RED today because the seam does not yet call the mechanism (the spy is never
+    hit); it flips GREEN only when Plan 02 routes the curator genre through
+    `genre_prototypes` — a strict xfail, so the "genre is already None" path can
+    never silently satisfy it.
+    """
+    called: list[str] = []
+
+    def fake_abstain(self, track_id: str):
+        called.append(track_id)
+        return ("unknown", 0.0)
+
+    monkeypatch.setattr(
+        _proto_mod.GenrePrototypeLookup,
+        "classify_playing",
+        fake_abstain,
+        raising=True,
+    )
+    out = toolset.get_track_features({"track_id": "t000"})
+    # The seam MUST route through the shared mechanism (Pitfall 2: no parallel
+    # classifier) — proven by the spy firing for this track_id.
+    assert called == ["t000"], (
+        "CURATE-01: get_track_features must consult genre_prototypes, not a "
+        "parallel np.mean/cosine classifier"
+    )
+    assert out["genre"] in (None, "unknown"), (
+        "CURATE-01: prototype abstain must yield honest-null genre, never a fabrication"
+    )
