@@ -56,7 +56,7 @@
 | 77 | WIRE — Connect the Islands | 4/4 | Complete    | 2026-05-25 |
 | 78 | PERCEIVE — Deeper, Generalized Ear | 4/4 | Complete    | 2026-05-26 |
 | 79 | LENS — Three Grounded Modes | 3/3 | Complete    | 2026-05-26 |
-| 80 | GROUND — Gemini as Secondary Ear | 2/2 | Complete   | 2026-05-26 |
+| 80 | GROUND — Gemini as Secondary Ear | 2/2 | Complete    | 2026-05-26 |
 | 81 | BENCH — The Validation Instrument | A multi-dimensional bench runs the architecture/model axes on real tracks, auto-scores each cell, and surfaces cells for Kaan's-ear final judgment | BENCH-01, BENCH-02, BENCH-03 | 4 |
 | 82 | CURATE — Unify Curator + Co-Host | Curator and co-host are two facets of one engine — shared perception/state contract + shared taste/persona | CURATE-01, CURATE-02 | 3 |
 

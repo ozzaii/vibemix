@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v8.1
 milestone_name: One Mind
-status: executing
-last_updated: "2026-05-26T01:53:00.000Z"
+status: ready_to_plan
+last_updated: 2026-05-26T02:22:58.694Z
 last_activity: 2026-05-26 -- Phase 80 Plan 01 complete (Wave-0 safety net)
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 13
-  completed_plans: 12
-  percent: 54
+  completed_plans: 39
+  percent: 50
+stopped_at: Phase 80 complete (2/2) — ready to discuss Phase 81
 ---
 
 # vibemix — State
@@ -29,7 +30,7 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 - **Six categories → six phases:** WIRE (P77) · PERCEIVE (P78) · LENS (P79) · GROUND (P80) · BENCH (P81) · CURATE (P82). Dependency spine: WIRE → PERCEIVE → (LENS ‖ GROUND) → BENCH → CURATE.
 - **Hard constraints (locked, every phase):** ship-not-over-engineer (one connected, tested wire per phase) · Gemini-only AI/embedding provider · **NO new MIR libraries / NO new DSP detectors** (GPL/AGPL/NC license wall vs Apache-2.0 + Bravoh reuse) · no new ws ports / no new IPC envelopes / no managed-memory frameworks · four cardinal invariants hold by **ADDITIVE design** (gated-off cold path byte-identical to v8.0 baseline) · honest green (unit-testable without the API; live e2e on the funded key `...32u744`, project 709533190790) — never fake results.
 - **Cardinal invariants:** single-writer (only the refresh loop writes `MusicState`; embedding-genre must write THERE) · citation-grounding (every emitted citation resolves in `EvidenceRegistry`; un-cited strips to ack-bank — the anti-slop gate) · trust-the-audio (live evidence is authoritative; Gemini's audio is SECONDARY, hallucination-guarded) · one-socket (mascot/wizard bus = `127.0.0.1:8765`, debrief = `8766`; no new port).
-- **Current focus:** Phase 80 — GROUND — Gemini as Secondary Ear
+- **Current focus:** Phase 81 — bench — the validation instrument
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
 - **Autonomy mode:** `gsd-autonomous fully` — blockers (Gemini billing — resolved; any live-hardware ear-pass) ride forward to KAAN-ACTION; only the privacy rule + destructive risk still pause.
 
@@ -37,10 +38,10 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 
 ## Current Position
 
-Phase: 80 (GROUND — Gemini as Secondary Ear) — COMPLETE (2/2, ready for verification)
-Plan: 2 of 2 COMPLETE
-Status: Phase 80 complete
-Last activity: 2026-05-26 -- Phase 80 Plan 02 complete (GROUND-01/02 closed; commits 44d9594 + bdbe11b)
+Phase: 81
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-26
 
 ### Plan 79-03 — LENS-02 one shared lens selection (complete 2026-05-26)
 
