@@ -22,10 +22,12 @@ from pathlib import Path
 
 import numpy as np
 
-from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
+from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize, store_suffix
 
-VECTORS_PATH = Path.home() / ".cache" / "vibemix" / "library_vectors.npy"
-IDS_PATH = Path.home() / ".cache" / "vibemix" / "library_ids.json"
+# Backend-namespaced (see _cosine.store_suffix) so clap (512) and gemini (1536)
+# stores never collide. gemini → bare "library_vectors.npy" (unchanged).
+VECTORS_PATH = Path.home() / ".cache" / "vibemix" / f"library{store_suffix()}_vectors.npy"
+IDS_PATH = Path.home() / ".cache" / "vibemix" / f"library{store_suffix()}_ids.json"
 
 
 class NumpyStore:

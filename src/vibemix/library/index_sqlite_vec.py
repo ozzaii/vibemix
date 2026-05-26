@@ -22,9 +22,11 @@ from pathlib import Path
 import numpy as np
 import sqlite_vec
 
-from vibemix.library._cosine import EMBEDDING_DIM
+from vibemix.library._cosine import EMBEDDING_DIM, store_suffix
 
-DB_PATH = Path.home() / ".cache" / "vibemix" / "library.db"
+# Backend-namespaced so a clap (512) store never clobbers the gemini (1536)
+# library.db — see _cosine.store_suffix. gemini → "library.db" (unchanged).
+DB_PATH = Path.home() / ".cache" / "vibemix" / f"library{store_suffix()}.db"
 
 
 class SqliteVecStore:

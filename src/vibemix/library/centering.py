@@ -38,18 +38,22 @@ from pathlib import Path
 
 import numpy as np
 
-from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
+from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize, store_suffix
 
 logger = logging.getLogger(__name__)
 
 # Sibling of ~/.cache/vibemix/library.db (the sqlite-vec store) and
 # library_vectors.npy (the numpy store). One centroid serves whichever
-# backend open_store() selected — they store the same vectors.
-CENTROID_PATH = Path.home() / ".cache" / "vibemix" / "library_centroid.npy"
+# backend open_store() selected — they store the same vectors. Backend-
+# namespaced (see _cosine.store_suffix): the clap (512) centroid must not
+# overwrite the gemini (1536) centroid or the dim guard would thrash.
+CENTROID_PATH = (
+    Path.home() / ".cache" / "vibemix" / f"library{store_suffix()}_centroid.npy"
+)
 # Tiny sidecar recording the snapshot_hash the cached centroid was computed
 # for, so we can cheaply detect a stale cache without re-reading all vectors.
 CENTROID_META_PATH = (
-    Path.home() / ".cache" / "vibemix" / "library_centroid.meta.json"
+    Path.home() / ".cache" / "vibemix" / f"library{store_suffix()}_centroid.meta.json"
 )
 
 

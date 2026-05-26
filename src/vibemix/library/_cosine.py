@@ -68,6 +68,25 @@ EMBED_BACKEND = os.environ.get("VIBEMIX_EMBED_BACKEND", "gemini").strip().lower(
 EMBEDDING_DIM = 512 if EMBED_BACKEND == "clap" else 1536
 
 
+def store_suffix() -> str:
+    """On-disk store-file suffix that namespaces the persisted vectors by
+    embedding backend — so flipping ``VIBEMIX_EMBED_BACKEND`` never clobbers
+    another backend's store.
+
+    This matters because the vec0 table is dim-typed and the store's
+    dim-mismatch handler DROPs + recreates the table: switching to clap (512)
+    against an existing 1536-dim gemini ``library.db`` would otherwise WIPE the
+    gemini library. With a suffix the clap store lives in its own file
+    (``library-clap.db`` / ``library-clap_vectors.npy`` / …) and the gemini
+    store is left intact, so switching back finds it unchanged.
+
+    Returns ``""`` for gemini (the historical bare filenames — fully backward
+    compatible: the existing suite + on-disk libraries are untouched) and
+    ``"-<backend>"`` otherwise (e.g. ``"-clap"``).
+    """
+    return "" if EMBED_BACKEND == "gemini" else f"-{EMBED_BACKEND}"
+
+
 def l2_normalize(vec: np.ndarray) -> np.ndarray:
     """L2-normalize a float32 vector. Returns float32.
 
