@@ -486,8 +486,20 @@ class SettingsApplier:
         Unlike skill, lens does NOT export an env var: the co-host reads
         ``extra["lens"]`` directly via ``read_shared_lens`` at build time. This
         is the ONE consistent read (Pitfall 3 — do NOT route lens through the
-        orphaned ``VIBEMIX_MODE`` env). It takes effect on the next agent build
-        (co-host) / next curator request (curator cache invalidates on change).
+        orphaned ``VIBEMIX_MODE`` env).
+
+        WR-02 — REBUILD PARITY WITH ``_apply_skill``: this handler validates +
+        persists and returns ``(True, None)``, exactly like ``_apply_skill``.
+        Neither handler triggers a co-host rebuild itself; both take effect on
+        the NEXT agent build, which rides the SAME Plan 13-06 agent
+        re-instantiation lifecycle that mood swaps trigger (``_apply_mood`` is
+        the one that owns the rebuild emit; skill + lens ride that build). So
+        the live co-host picks up a lens change on the next re-instantiation
+        (mood swap, settings re-open, or process restart) — same window skill
+        has, by design. The curator side is independent: it reloads config +
+        invalidates its instruction cache per request, so it sees a lens change
+        on the very next curation. This is deliberate parity, NOT a missing
+        rebuild — do not invent a new lens-only rebuild mechanism.
 
         Like mood/skill, an invalid lens is rejected at this trust boundary with
         ``(False, "<reason>")`` — no silent fallback that would mask a typo.
