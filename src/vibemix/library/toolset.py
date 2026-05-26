@@ -151,6 +151,15 @@ class LibraryToolset:
         honest-null so a feature lookup never raises.
         """
         try:
+            # WR-03: this lazy-init is an unguarded check-then-set, which is safe
+            # ONLY because dispatch serializes tool calls within a run — `dispatch`
+            # runs each handler on a fresh single-worker ThreadPoolExecutor and the
+            # agent loop dispatches calls one at a time, so two `get_track_features`
+            # never race this line. If a future caller ever dispatches tool calls
+            # concurrently against the same toolset, guard this with a per-instance
+            # lock. (The inner GenrePrototypeLookup is itself thread-safe via
+            # double-checked locks, so the worst case today is wasted work, never
+            # corruption.)
             if self._genre_lookup is None:
                 from vibemix.library.genre_prototypes import GenrePrototypeLookup
 
