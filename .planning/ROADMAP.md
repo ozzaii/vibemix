@@ -482,6 +482,20 @@ Full archive: `.planning/milestones/v3.1-ROADMAP.md` · Requirements: `.planning
 | v8.1 One Mind | 77–82 | ✅ Shipped (audit PASSED) | 2026-05-26 |
 | v8.2 Set Builder | 83–88 | 🔨 In progress | - |
 
+### Phase 89: DJ-Library Ingest — auto-detect DJ library (Rekordbox/Serato/Traktor), parse clean metadata, cut cue-anchored excerpts, embed on-device via clap_engine, store in sqlite-vec, watch for changes
+
+**Goal:** As a DJ, I want to have vibemix auto-detect my Rekordbox library and embed my tracks on-device, so that my library is searchable and ready in minutes.
+**Mode:** mvp
+**Requirements**: TBD
+**Depends on:** staged `clap_engine` (embed seam) + `cue_types.CueAnchor` (both already shipped by concurrent sessions). NOT the v8.2 UI phase.
+**Scope (MVP slice):** Rekordbox-only, end-to-end walking skeleton (detect → parse `collection.xml` → cue-anchored excerpts → `clap_engine` embed → sqlite-vec store). Serato/Traktor adapters + the file watcher are deferred to follow-up phases (90, 91). Design spec: `docs/superpowers/specs/2026-05-26-dj-library-ingest-design.md`.
+**Plans:** 3 plans
+
+Plans:
+- [ ] 89-01-PLAN.md — Walking-skeleton ingest slice: auto-detect collection.xml + LibrarySource protocol + ingest_source orchestrator (detect → parse → on-device clap embed → sqlite-vec store, resumable/honest) + `library ingest` CLI
+- [ ] 89-02-PLAN.md — Metadata-richness slice: extend rekordbox.py to read genre/label/rating/play_count/comments + TEMPO beatgrid + Camelot-at-parse + cue Type fidelity; SCHEMA_VERSION bump
+- [ ] 89-03-PLAN.md — Cue-anchored excerpt slice: excerpt.py (dj-first CueAnchors, detect_cues auto fallback) → ≤80s windows; rewire ingest to mean-pool cue-anchored CLAP vectors
+
 ---
 
 *Roadmap extended 2026-05-23 for v7.0 "Open House" — **4 phases (67–70)** continuing numbering from v6.0 (which ran 63–66). v4.0 "SHIP" stays OPEN and unarchived above — its publish closes alongside v7.0's OSS-04 (KAAN-ACTION §SHIP-V4 discharge fires `cut_release.sh v0.1.0-rc1` for real). v7.0 derives from 19 requirements across 4 pillars (TEST · DEV · OSS · GH), one phase per pillar, sized by `.planning/REQUIREMENTS.md` Traceability — 4/5/5/5 REQ-IDs per phase, zero orphans, zero duplicates. **Hard scope rule (locked):** v7.0 is WIRING + DISCHARGE + POLISH — zero new product capability, zero new AI providers, zero new managed-memory frameworks, zero new ws ports, zero new IPC envelopes. The four cardinal invariants (single-writer / citation grounding / "trust the audio" / one socket) hold by zero-touch — no phase modifies the reaction path. The v4.0 external signature clock is unchanged. Critical path: P67 (test infrastructure, dependency-free) → P68 (controller catalog reconciliation + audio backends, lands on P67's CI matrix) → P69 (OSS surface + actual publish gated on §SHIP-V4) → P70 (GitHub front-porch + Kaan-felt landing-page sign-off). Under `gsd-autonomous fully`, OSS-04 routes to §SHIP-V4 if signatures haven't landed at execution; the other 18 REQ-IDs ship unblocked.*
