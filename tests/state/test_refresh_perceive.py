@@ -116,6 +116,83 @@ def test_trajectory_composed_bounded():
     assert len(state.trajectory_narrative) <= bound + 64, "trajectory must stay bounded"
 
 
+# ---------- PERCEIVE-02 — WR-03 trajectory move window matches coach's 8s ----------
+
+
+def test_trajectory_last_move_uses_8s_window():
+    """WR-03 — the trajectory "last move" must use the SAME 8s window the coach's
+    recent_moves[8s] block uses. state.recent_moves spans 12s, so a move older
+    than 8s must NOT appear in the trajectory (it would contradict the coach
+    saying recent_moves[8s]: NONE — internal inconsistency reads as slop).
+    """
+    # A single move 11s old (inside the 12s recent_moves window, outside coach's
+    # 8s window) must NOT be reported.
+    out = _compose_trajectory(
+        phase_history=[(990.0, "build", "drop")],
+        buildup_score=0.7,
+        recent_moves=[(11.0, "bass-swap")],
+    )
+    assert "last move" not in out, "a >8s-old move must not appear (matches coach 8s)"
+
+    # A move within 8s IS reported.
+    out2 = _compose_trajectory(
+        phase_history=[(990.0, "build", "drop")],
+        buildup_score=0.7,
+        recent_moves=[(3.0, "bass-swap")],
+    )
+    assert "last move: bass-swap 3s ago" in out2
+
+    # With both a stale (11s) and a fresh (4s) move, only the fresh one is picked.
+    out3 = _compose_trajectory(
+        phase_history=[(990.0, "build", "drop")],
+        buildup_score=0.7,
+        recent_moves=[(11.0, "filter"), (4.0, "bass-swap")],
+    )
+    assert "last move: bass-swap 4s ago" in out3
+    assert "filter" not in out3
+
+
+# ---------- PERCEIVE-03 — WR-01 agreement render-band regression ----------
+
+
+def test_genre_embedding_dsp_agreement_commits_render_band_conf(monkeypatch):
+    """WR-01 regression — when the embedding and the DSP score AGREE on the label
+    but the per-tick DSP confidence is low (<0.5), ``_tick_once`` must commit
+    ``reconcile_genre``'s fused render-band confidence (would clear coach's >=0.5
+    gate), NOT the raw low DSP confidence (which would be suppressed).
+
+    The reviewer's exact case: reconcile_genre("techno", 0.9, "techno", 0.3) ->
+    ("techno", 0.9333). Before the fix the commit guard's `emb_label not in
+    (..., raw_genre)` clause EXCLUDED the agreement case, so the genre fell to the
+    DSP branch and committed genre_confidence = 0.3 -> suppressed at coach.py:357.
+    """
+    import vibemix.state.refresh as refresh_mod
+
+    # Force DSP to AGREE on "techno" at a low per-tick confidence (the common
+    # coarse-3-band case the reviewer describes).
+    monkeypatch.setattr(refresh_mod, "score_genre", lambda *a, **k: ("techno", 0.3))
+
+    state = MusicState()
+    holder = MagicMock()
+    holder.get_latest.return_value = ("techno", 0.9)  # confident embedding, AGREES
+    _tick_once(
+        state,
+        _audible_buf(),
+        _ctrl_mock(),
+        _track_mock(),
+        now=1000.0,
+        last_audible_high=1000.0,
+        last_audible_low=0.0,
+        bpm_cache=126.0,
+        last_bpm_at=1000.0,
+        genre_source=holder,
+    )
+    assert state.detected_genre == "techno"
+    # The committed confidence is reconcile's render-band value (~0.93), NOT 0.3.
+    assert state.genre_confidence >= 0.5, "agreement must commit the render-band conf, not raw DSP 0.3"
+    assert state.genre_confidence == pytest.approx(0.93, abs=0.01)
+
+
 # ---------- PERCEIVE-03 — genre fed via single writer ----------
 
 

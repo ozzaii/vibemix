@@ -451,12 +451,28 @@ def _tick_once(
                 rec_label, rec_conf = reconcile_genre(
                     emb_label, emb_conf, raw_genre, raw_genre_conf
                 )
-                # reconcile_genre returns the EMBEDDING label only when it cleared
-                # the floor; a DSP fallback returns raw_genre verbatim.
-                if rec_label == emb_label and emb_label not in ("unknown", raw_genre):
-                    genre_hysteresis.current_label = rec_label
-                    genre_hysteresis.pending_label = None
-                    genre_hysteresis.pending_ticks = 0
+                # WR-01 — Trust reconcile_genre's output instead of re-deriving the
+                # win from labels. reconcile already fused the render-band
+                # confidence and decided the win: the embedding won iff it returned
+                # the (real, non-"unknown") embedding label at render-band conf
+                # (>=0.5). This INCLUDES the embedding↔DSP agreement case
+                # (emb_label == raw_genre) — the old guard `emb_label not in
+                # (..., raw_genre)` wrongly EXCLUDED agreement, so an agreed-on
+                # genre fell back to the low per-tick DSP confidence (e.g. 0.3) and
+                # was suppressed at coach.py's >=0.5 render gate even though both
+                # signals confidently agreed (RESEARCH Pitfall 4 — the exact
+                # over-suppression this path exists to fix). We now commit
+                # reconcile's fused render-band confidence so agreement RENDERS.
+                # Sub-floor / "unknown" embedding still falls through to the DSP
+                # path below (abstain-safety preserved).
+                if rec_label == emb_label and emb_label != "unknown" and rec_conf >= 0.5:
+                    # Resync the hysteresis dwell only when the committed label is
+                    # actually changing (mirrors how "unknown" commits immediately)
+                    # so subsequent noisy DSP ticks don't instantly flip away.
+                    if genre_hysteresis.current_label != rec_label:
+                        genre_hysteresis.current_label = rec_label
+                        genre_hysteresis.pending_label = None
+                        genre_hysteresis.pending_ticks = 0
                     committed_genre = rec_label
                     state.detected_genre = committed_genre
                     state.genre_confidence = round(rec_conf, 2)
