@@ -262,3 +262,81 @@ ACID_SWEEP_WINDOW_S: float = 3.0
 ACID_RESONANCE_LOW_MAX: float = 3.0  # early-window Q must drop below this
 ACID_RESONANCE_HIGH_MIN: float = 8.0  # late-window Q must climb above this
 ACID_SNAPSHOT_WINDOW_S: float = 1.5  # samples snapshot per tick
+
+# ---- Perceived-dancefloor-energy (library.energy.score_energy) ----
+# A 0-100 "how hard does it hit the floor" score — NOT loudness. The whole
+# design intent is genre-robustness: a quiet hypnotic after-hours track must
+# NOT read low, and a loud-but-sparse intro must NOT read high. Every feature is
+# normalised to [0,1] via a FIXED perceptual window (np.clip), never a
+# corpus min-max (a single loud track would skew the whole library and the
+# result would be non-reproducible). Weights + windows are module constants
+# (one-line-edit ethos) so a re-tune after a listening session is a single edit.
+#
+# Weights sum to 1.0. Spectral flux carries the most weight (0.22) because it is
+# the single most genre-robust "drive" signal — it measures how much the
+# spectrum *moves* frame-to-frame (busy, churning, energetic) independent of how
+# LOUD the track is. Loudness is deliberately the SECOND-lowest structural
+# weight (0.18) so a compressed-loud-but-static master can't dominate.
+ENERGY_WEIGHTS: dict[str, float] = {
+    "loudness": 0.18,
+    "sub_share": 0.15,
+    "onset_rate": 0.15,
+    "spectral_flux": 0.22,
+    "brightness": 0.15,
+    "beat_regularity": 0.08,
+    "dynamic_range": 0.07,
+}
+
+# Analysis window: a centred ~80s mid-excerpt (skips intro/outro dead air) or
+# the whole track if shorter. 80s matches the cue-anchored embed excerpt cap so
+# energy + embedding read the same musical "meat" of the track.
+ENERGY_EXCERPT_SECONDS: float = 80.0
+
+# Per-frame RMS window for the busy-frame mask + the loudness / dynamic-range
+# curves. 0.25s ≈ 1 beat at 240 BPM .. 1.6 beats at 128 BPM — short enough to
+# track a kick pattern, long enough that a single transient doesn't dominate.
+ENERGY_RMS_FRAME_S: float = 0.25
+# A frame counts as "busy" (musical content, not dead air) when its RMS exceeds
+# this fraction of the track's peak RMS. Aggregating over busy frames only is
+# what stops a long silent intro/outro from dragging the score down — the score
+# describes the track's ACTIVE character, not its average including silence.
+ENERGY_BUSY_RMS_FRAC: float = 0.05
+
+# Spectral-flux + brightness analysis FFT. 4096 @ 16kHz ≈ 256ms / frame with a
+# 2048 hop (50% overlap) — fine enough to catch frame-to-frame spectral motion
+# (the flux signal) without the per-frame cost of the 16384 window the live
+# band-split uses (that window is sized for 1Hz sub-band resolution; flux only
+# needs broadband motion).
+ENERGY_FLUX_FFT: int = 4096
+ENERGY_FLUX_HOP: int = 2048
+
+# Fixed perceptual normalisation windows — (lo, hi) mapped to [0,1] via clip.
+# Each was chosen from the physical range of the underlying feature, NOT fitted
+# to a corpus, so the score is reproducible run-to-run and machine-to-machine.
+#
+# Loudness: P80 of busy-frame RMS in dBFS. -30 dBFS (quiet but present) → 0;
+# -6 dBFS (a hot, compressed master ceiling) → 1. Crest-corrected upstream so a
+# squashed master and a dynamic one at the same perceived level land together.
+ENERGY_LOUDNESS_WINDOW: tuple[float, float] = (-30.0, -6.0)
+# Sub-bass SHARE (fraction of energy in 20-100Hz). 0.05 (thin / no kick) → 0;
+# 0.45 (sub-dominant club system fodder) → 1. A SHARE not an absolute, so a
+# quiet hypnotic track with a present-but-soft kick still reads its sub.
+ENERGY_SUB_SHARE_WINDOW: tuple[float, float] = (0.05, 0.45)
+# Onset rate (onsets / sec). 0.5 (sparse ambient) → 0; 6.0 (busy hat-driven
+# techno) → 1.
+ENERGY_ONSET_WINDOW: tuple[float, float] = (0.5, 6.0)
+# Spectral flux (mean half-wave-rectified positive spectral difference, summed
+# over bins, normalised by frame magnitude so loud≠high-flux). 0.0 → 0; 0.30 → 1.
+# The upper edge is empirical against synthetic busy-noise fixtures.
+ENERGY_FLUX_WINDOW: tuple[float, float] = (0.0, 0.30)
+# Brightness = spectral centroid (Hz). 800Hz (dark, sub-heavy) → 0; 4000Hz
+# (bright, hat/lead-forward) → 1.
+ENERGY_BRIGHTNESS_WINDOW: tuple[float, float] = (800.0, 4000.0)
+# Beat regularity: autocorr peak prominence as a z-score of the RMS-envelope
+# autocorrelation. 1.0σ (weak / no steady beat) → 0; 6.0σ (machine-tight 4/4) → 1.
+ENERGY_BEAT_REGULARITY_WINDOW: tuple[float, float] = (1.0, 6.0)
+# Dynamic range = coefficient of variation (std/mean) of the busy-frame RMS
+# curve. INVERTED in scoring — high CoV = dynamic/peaky (often less floor-driving
+# than a steady wall of energy), low CoV = sustained. 0.05 (dead-steady) → 0;
+# 0.60 (very peaky) → 1.
+ENERGY_DYNAMIC_RANGE_WINDOW: tuple[float, float] = (0.05, 0.60)
