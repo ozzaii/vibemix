@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v8.1
 milestone_name: One Mind
-status: ready_to_plan
-last_updated: 2026-05-26T03:57:41.883Z
+status: executing
+last_updated: "2026-05-26T04:25:55.781Z"
 last_activity: 2026-05-26
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 17
-  completed_plans: 43
+  total_plans: 19
+  completed_plans: 18
   percent: 83
-stopped_at: Phase 81 complete (4/4) — ready to discuss Phase 82
 ---
 
 # vibemix — State
@@ -30,7 +29,7 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 - **Six categories → six phases:** WIRE (P77) · PERCEIVE (P78) · LENS (P79) · GROUND (P80) · BENCH (P81) · CURATE (P82). Dependency spine: WIRE → PERCEIVE → (LENS ‖ GROUND) → BENCH → CURATE.
 - **Hard constraints (locked, every phase):** ship-not-over-engineer (one connected, tested wire per phase) · Gemini-only AI/embedding provider · **NO new MIR libraries / NO new DSP detectors** (GPL/AGPL/NC license wall vs Apache-2.0 + Bravoh reuse) · no new ws ports / no new IPC envelopes / no managed-memory frameworks · four cardinal invariants hold by **ADDITIVE design** (gated-off cold path byte-identical to v8.0 baseline) · honest green (unit-testable without the API; live e2e on the funded key `...32u744`, project 709533190790) — never fake results.
 - **Cardinal invariants:** single-writer (only the refresh loop writes `MusicState`; embedding-genre must write THERE) · citation-grounding (every emitted citation resolves in `EvidenceRegistry`; un-cited strips to ack-bank — the anti-slop gate) · trust-the-audio (live evidence is authoritative; Gemini's audio is SECONDARY, hallucination-guarded) · one-socket (mascot/wizard bus = `127.0.0.1:8765`, debrief = `8766`; no new port).
-- **Current focus:** Phase 82 — curate — unify curator + co host
+- **Current focus:** Phase 82 — CURATE — Unify Curator + Co-Host
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
 - **Autonomy mode:** `gsd-autonomous fully` — blockers (Gemini billing — resolved; any live-hardware ear-pass) ride forward to KAAN-ACTION; only the privacy rule + destructive risk still pause.
 
@@ -38,10 +37,20 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 
 ## Current Position
 
-Phase: 82
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-26
+Phase: 82 (CURATE — Unify Curator + Co-Host) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute (Plan 82-01 complete)
+Last activity: 2026-05-26 -- Phase 82 Plan 01 COMPLETE (Wave-0 scaffolds + invariant pins)
+
+### Plan 82-01 — CURATE Wave-0 scaffolds + invariant pins (complete 2026-05-26)
+
+- **The Nyquist safety net for Phase 82 — no `src/vibemix/` file touched.** Every CURATE-01/02 acceptance criterion now has a failing `xfail(strict=True)` scaffold that flips green only when Plan 02 lands the seam; a silent early-pass `xpasses` → HARD failure (strict). Plus five REAL-GREEN "must-stay-true" pins.
+- **Task 1 — `tests/library/test_toolset.py` (extend):** 2 CURATE-01 genre-via-prototypes scaffolds. `test_genre_via_prototypes_when_classified` monkeypatches `GenrePrototypeLookup.classify_playing` → asserts `get_track_features(...)["genre"]` is the prototype label, not `None`. `test_genre_honest_none_on_abstain` uses a **call-spy** so it is genuinely RED today (the seam does not yet consult the mechanism — a bare `genre in (None,"unknown")` would xpass against today's hardcoded `genre: None`) AND asserts honest-null on abstain (invariant #3). In-memory fixture discipline kept — no `RekordboxLibrary.CACHE_PATH` write (the `library.pkl` gotcha). 6 existing grounding-gate tests stay green.
+- **Task 2 — `tests/library/test_curate_unify.py` (new):** CURATE-02 taste scaffolds (a) gemini `_system_instruction()` carries the `preferred_genre` token when profile set + (c) codex `_system_prompt()` too (the acid test — neither backend orphaned), both xfail-strict. Plus REAL-GREEN pins: (b) cold-path byte-identity when no profile, (d) `render_profile_for_cache` no track-title leak (T-82-01), (e) lens shared across BOTH backends via `extra["lens"]="critique"` (Phase-79 regression — persona half DONE, do-not-re-implement), (f) curator never imports the live `MusicState`/`EventDetector` OBJECT into its namespace (invariant #1), (g) `ViberAgent`/`build_toolset`/`next_suggestion`/`telegram_bridge` all still import.
+- **Deviation (Rule 3):** pin (f) reframed from the plan's literal `sys.modules` scan to a static-**attribute** check — `toolset.py:43` does `from vibemix.state import harmonics` and `state/__init__` eagerly binds `MusicState` as a side effect, so the module is transitively in `sys.modules` regardless; the attribute check matches `test_no_live_path_import`'s `FORBIDDEN_NAMES` gate (the true meaning of invariant #1 — no read/write of the live object) and is REAL-GREEN today.
+- **Deviation (Rule 1):** Task-1 abstain scaffold hardened with a call-spy (see above) to be genuinely RED, not a strict-xpass.
+- Honest green: no `genai.Client`, no `GEMINI_API_KEY`, no package install; `tests/memory/test_no_live_path_import.py` stays CLEAN. Full suite **4534 passed / 26 skipped / 5 xfailed (1 pre-existing budget gate + 4 new CURATE scaffolds) / 4 xpassed (pre-existing live-hardware)**, exit 0 (baseline 4523/1xf → +11 passed, +4 xfailed, zero new failures, no strict-xpass). Commits `e1c1e56` (Task 1) + `5898855` (Task 2). **Phase 82 → 1/2.**
+- **Next:** Plan 82-02 — land SEAM #1 (`toolset.get_track_features` genre via `genre_prototypes`) + SEAM #2 (`_taste_hint()` appended at `agent.py:147`/`:166` + `codex_curate.py:125`), flipping the 4 CURATE scaffolds green while keeping the 5 pins green.
 
 ### Plan 81-04 — BENCH-03 review surface + docs/bench.md (complete 2026-05-26)
 
