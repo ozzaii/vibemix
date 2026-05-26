@@ -27,7 +27,7 @@
 - [x] **PERCEIVE-03**: `detected_genre` is driven by a mean-centered nearest-prototype lookup over cached embeddings (86.5%-validated, €0).
 
 ### LENS — three modes
-- [ ] **LENS-01**: hype / critique / tutor exist as three grounded prompt lenses over the same structured state.
+- [x] **LENS-01**: hype / critique / tutor exist as three grounded prompt lenses over the same structured state.
 - [ ] **LENS-02**: Lens selection is shared across the co-host and curator surfaces.
 
 ### GROUND — Gemini as secondary ear

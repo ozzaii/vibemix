@@ -55,7 +55,7 @@
 |---|-------|------|---------|----------|
 | 77 | WIRE — Connect the Islands | 4/4 | Complete    | 2026-05-25 |
 | 78 | PERCEIVE — Deeper, Generalized Ear | 4/4 | Complete    | 2026-05-26 |
-| 79 | LENS — Three Grounded Modes | 1/3 | In Progress|  |
+| 79 | LENS — Three Grounded Modes | 2/3 | In Progress|  |
 | 80 | GROUND — Gemini as Secondary Ear | Gemini hears the audio alongside the structured evidence, hallucination-guarded, with the reaction model config-resolved | GROUND-01, GROUND-02 | 3 |
 | 81 | BENCH — The Validation Instrument | A multi-dimensional bench runs the architecture/model axes on real tracks, auto-scores each cell, and surfaces cells for Kaan's-ear final judgment | BENCH-01, BENCH-02, BENCH-03 | 4 |
 | 82 | CURATE — Unify Curator + Co-Host | Curator and co-host are two facets of one engine — shared perception/state contract + shared taste/persona | CURATE-01, CURATE-02 | 3 |
@@ -104,7 +104,7 @@ Plans:
   3. Each lens still passes the citation-grounding gate — a lens may change tone but cannot fabricate evidence; un-cited output strips to the ack-bank fallback regardless of lens.
 **Plans:** 3 plans, 3 waves
   - [x] 79-01-PLAN.md — Wave-0 RED scaffolds (xfail-strict for LENS-01/02) + default-lens / cold-path byte-identity pin
-  - [ ] 79-02-PLAN.md — LENS-01: LENS_TO_MODE_MOOD map + build_lens_instruction selector over the untouched build_system_instruction
+  - [x] 79-02-PLAN.md — LENS-01: LENS_TO_MODE_MOOD map + build_lens_instruction selector over the untouched build_system_instruction
   - [ ] 79-03-PLAN.md — LENS-02: shared ConfigStore.extra["lens"] selection (_apply_lens) read by both co-host + curator, no IPC/schema bump
 
 ### Phase 80: GROUND — Gemini as Secondary Ear
