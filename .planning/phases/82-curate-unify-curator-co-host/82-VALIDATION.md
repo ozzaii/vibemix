@@ -1,8 +1,8 @@
 ---
 phase: 82
 slug: curate-unify-curator-co-host
-status: draft
-nyquist_compliant: false
+status: planned
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-05-26
 ---
@@ -43,11 +43,15 @@ created: 2026-05-26
 
 ## Per-Task Verification Map
 
-> Populated by the planner. No API key. Both seams are pure reads testable on cached `library.db` + a fixture profile.
+> No API key. Both seams are pure reads testable on cached `library.db` + a fixture profile.
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Status |
 |---------|------|------|-------------|-----------|-------------------|--------|
-| TBD | — | 0 | CURATE-01/02 | unit | Wave-0 test stubs | ⬜ pending |
+| P01-T1 | 82-01 | 1 | CURATE-01 | unit (xfail scaffold) | `pytest -q tests/library/test_toolset.py --runxfail -x` | ⬜ pending |
+| P01-T2 | 82-01 | 1 | CURATE-02 + invariants | unit (xfail scaffold + real-green pins) | `pytest -q tests/library/test_curate_unify.py ; pytest -q tests/memory/test_no_live_path_import.py` | ⬜ pending |
+| P02-T1 | 82-02 | 2 | CURATE-01 | unit (flip green) | `pytest -q tests/library/test_toolset.py` | ⬜ pending |
+| P02-T2 | 82-02 | 2 | CURATE-02 (taste) | unit (flip green) | `pytest -q tests/library/test_curate_unify.py tests/library/test_curator_persona_seam.py` | ⬜ pending |
+| P02-T3 | 82-02 | 2 | CURATE-01/02 + invariants | unit (regression + full suite) | `pytest -q tests/library/ tests/profile/ tests/memory/test_no_live_path_import.py` | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -55,13 +59,13 @@ created: 2026-05-26
 
 ## Wave 0 Requirements
 
-- [ ] Test for CURATE-01: the curator's `get_track_features` resolves genre via `genre_prototypes.classify` — the SAME mechanism the co-host reads (`refresh.py`); assert both surfaces derive genre from one source (no parallel genre notion); `genre` is no longer `None` for a library track.
-- [ ] Test for CURATE-02 (taste): the curator lazy-reads `load_profile()` and biases curation "for this DJ"; the read is GUARDED (absent/empty profile → graceful default) and LAZY (does not regress `tests/memory/test_no_live_path_import.py`).
-- [ ] Test for CURATE-02 (persona — regression pin only, already shared Phase 79): both curator backends + Telegram still read the shared `extra["lens"]`.
-- [ ] Test that the curator reads the LIBRARY representation, NOT `MusicState` (invariant #1 — grep/assert no curator import of the live state object).
-- [ ] Regression pins: existing `library curate` / Telegram / `next_suggestion` (pill) / codex `mcp_server` surfaces still work; both seams reach BOTH backends (shared `toolset.py`/`ViberAgent` core); no new ws port (invariant #4), no new IPC envelope.
+- [ ] Test for CURATE-01: the curator's `get_track_features` resolves genre via `genre_prototypes.classify` — the SAME mechanism the co-host reads (`refresh.py`); assert both surfaces derive genre from one source (no parallel genre notion); `genre` is no longer `None` for a library track. *(Plan 01 Task 1)*
+- [ ] Test for CURATE-02 (taste): the curator lazy-reads `load_profile()` and biases curation "for this DJ"; the read is GUARDED (absent/empty profile → graceful default) and LAZY (does not regress `tests/memory/test_no_live_path_import.py`). *(Plan 01 Task 2 a/c)*
+- [ ] Test for CURATE-02 (persona — regression pin only, already shared Phase 79): both curator backends + Telegram still read the shared `extra["lens"]`. *(Plan 01 Task 2 e)*
+- [ ] Test that the curator reads the LIBRARY representation, NOT `MusicState` (invariant #1 — subprocess sys.modules assert, no curator import of the live state object). *(Plan 01 Task 2 f)*
+- [ ] Regression pins: existing `library curate` / Telegram / `next_suggestion` (pill) / codex `mcp_server` surfaces still work; both seams reach BOTH backends (shared `toolset.py`/`ViberAgent` core); no new ws port (invariant #4), no new IPC envelope. *(Plan 01 Task 2 g + Plan 02 Task 3)*
 
-*Existing pytest infrastructure covers all phase requirements — extend `tests/library/test_toolset.py`. No framework install needed.*
+*Existing pytest infrastructure covers all phase requirements — extend `tests/library/test_toolset.py` + new `tests/library/test_curate_unify.py`. No framework install needed.*
 
 ---
 
@@ -77,11 +81,11 @@ created: 2026-05-26
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 120s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 120s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** planned (wave_0_complete flips when Plan 02 Task 3 lands)
