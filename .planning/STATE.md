@@ -268,6 +268,10 @@ v8.2 "Set Builder" roadmapped into **6 phases (83–88)** continuing numbering f
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 89 added (2026-05-26): DJ-Library Ingest — auto-detect DJ library (Rekordbox/Serato/Traktor), parse clean metadata, cut cue-anchored excerpts, embed on-device via `clap_engine`, store in sqlite-vec, watch for changes. The upstream "tracks ready in minutes" foundation under Set Builder. Design spec: `docs/superpowers/specs/2026-05-26-dj-library-ingest-design.md`. Disjoint NEW files only; must not touch `clap_engine.py`/`cue_types.py`/`cue_detect.py`/Set-Builder modules (concurrent sessions own those).
+
 ### v8.1 Roadmap Decisions Locked (2026-05-25)
 
 v8.1 "One Mind" roadmapped into **6 phases (77–82)** continuing numbering from v8.0 (ran 71–76) — NO reset. 18/18 REQ-IDs mapped to exactly one phase. The 6 categories (WIRE/PERCEIVE/LENS/GROUND/BENCH/CURATE) are the charter's pre-decided cut; the roadmap keeps "one connected wire per phase" + dependency order. Derived from `.planning/REQUIREMENTS.md` (the v8.1 REQ-IDs) cross-checked against `one-mind-charter.md` (vision + "Requirement Categories → Phases") and `connection-map.md` (top-5 wires, file:line evidence).
