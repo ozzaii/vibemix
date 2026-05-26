@@ -111,11 +111,19 @@ def _shared_lens() -> str:
     sets a lens once (via the settings bus ``_apply_lens``), that SAME value
     drives both the curator and the live co-host. Lazy-imported so the seam
     keeps the import-time no-live-path boundary clean (matrix-seam pattern).
-    """
-    from vibemix.runtime.config_store import load_config
-    from vibemix.runtime.settings import read_shared_lens
 
-    return read_shared_lens(load_config(), default="tutor")
+    WR-03: the read is guarded (mirrors the co-host ``_resolve_prompt_cell``
+    guard). ``load_config`` already swallows OSError/JSONDecodeError, but any
+    OTHER read failure must NOT break curation — fall back to the ``"tutor"``
+    cold-path default on any exception so the curator seam degrades gracefully.
+    """
+    try:
+        from vibemix.runtime.config_store import load_config
+        from vibemix.runtime.settings import read_shared_lens
+
+        return read_shared_lens(load_config(), default="tutor") or "tutor"
+    except Exception:  # pragma: no cover — guard: any read fail = cold default
+        return "tutor"
 
 
 def _system_instruction() -> str:

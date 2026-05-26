@@ -94,11 +94,18 @@ def _shared_lens() -> str:
     backend reads the SAME ``ConfigStore.extra["lens"]`` selection, so choosing a
     lens once drives every curator backend AND the live co-host. Lazy-imported to
     keep the import-time no-live-path boundary clean.
-    """
-    from vibemix.runtime.config_store import load_config
-    from vibemix.runtime.settings import read_shared_lens
 
-    return read_shared_lens(load_config(), default="tutor")
+    WR-03: guarded read (mirrors the gemini curator seam + the co-host
+    ``_resolve_prompt_cell`` guard). Any read failure falls back to ``"tutor"``
+    so a malformed ``extra`` can never break curation.
+    """
+    try:
+        from vibemix.runtime.config_store import load_config
+        from vibemix.runtime.settings import read_shared_lens
+
+        return read_shared_lens(load_config(), default="tutor") or "tutor"
+    except Exception:  # pragma: no cover — guard: any read fail = cold default
+        return "tutor"
 
 
 def _system_prompt() -> str:
