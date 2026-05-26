@@ -264,15 +264,37 @@ class GenrePrototypeLookup:
         self._centroid: np.ndarray | None = None
 
     def _ensure_store(self):
-        if self._store is None:
-            self._store = open_store()
+        # WR-02 — double-checked lock. Each TRACK_CHANGE spawns a fresh daemon
+        # worker with no in-flight guard, so two workers can race here; an
+        # unguarded `self._store = open_store()` could open the store twice (and
+        # a future reader could observe a half-published handle). The cheap
+        # outside-lock fast path keeps the steady-state hot path lock-free.
+        if self._store is not None:
+            return self._store
+        store = open_store()
+        with self._lock:
+            if self._store is None:
+                self._store = store
         return self._store
 
     def _ensure_prototypes(self) -> None:
-        """Lazy-build the prototype table on first use (cached, snapshot-keyed)."""
-        if self._protos is None:
-            store = self._ensure_store()
-            self._protos, self._labels, self._centroid = load_or_build_prototypes(store)
+        """Lazy-build the prototype table on first use (cached, snapshot-keyed).
+
+        WR-02 — the tuple assign `self._protos, self._labels, self._centroid =
+        ...` is THREE separate attribute stores; two concurrent off-loop workers
+        could otherwise interleave them so a reader observes `_protos` set while
+        `_centroid` is still None (or a `_protos`/`_centroid` pair from different
+        builds). Build outside the lock (the expensive part), then publish the
+        three fields atomically under the holder's existing lock with a
+        double-check so only one build wins and no torn multi-store is visible.
+        """
+        if self._protos is not None:
+            return
+        store = self._ensure_store()
+        protos, labels, centroid = load_or_build_prototypes(store)
+        with self._lock:
+            if self._protos is None:
+                self._protos, self._labels, self._centroid = protos, labels, centroid
 
     def _cached_embedding(self, track_id: str) -> np.ndarray | None:
         """Fetch the track's CACHED library embedding by id (€0 — no live embed)."""

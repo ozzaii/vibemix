@@ -290,6 +290,53 @@ def test_classify_playing_unknown_track_abstains_no_api(monkeypatch):
     assert 0.0 <= known_conf <= 1.0
 
 
+def test_ensure_prototypes_concurrent_no_torn_publish(monkeypatch):
+    """WR-02 — concurrent off-loop workers calling ``_ensure_prototypes`` must
+    publish ``(_protos, _labels, _centroid)`` atomically under the lock and never
+    leave a torn multi-store (``_protos`` set while ``_centroid`` is still None).
+
+    Drives many threads through ``_ensure_prototypes`` while a slow build runs;
+    asserts every observed published state is internally consistent and the
+    final triple is coherent.
+    """
+    import threading
+    import time
+
+    import vibemix.library.genre_prototypes as gp
+    from vibemix.library.genre_prototypes import GenrePrototypeLookup
+
+    fake_protos = np.zeros((2, EMBEDDING_DIM), dtype=np.float32)
+    fake_labels = ["house", "techno"]
+    fake_centroid = np.zeros(EMBEDDING_DIM, dtype=np.float32)
+
+    def _slow_build(_store):
+        time.sleep(0.02)  # widen the race window
+        return fake_protos, fake_labels, fake_centroid
+
+    monkeypatch.setattr(gp, "load_or_build_prototypes", _slow_build, raising=True)
+
+    holder = GenrePrototypeLookup(store=object())  # _ensure_store short-circuits
+
+    torn = []
+
+    def _worker():
+        holder._ensure_prototypes()
+        # Read the published fields; a torn publish would show one set, one None.
+        p, c = holder._protos, holder._centroid
+        if (p is None) != (c is None):
+            torn.append((p is None, c is None))
+
+    threads = [threading.Thread(target=_worker) for _ in range(16)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not torn, f"torn publish observed (protos/centroid out of sync): {torn}"
+    assert holder._protos is not None and holder._centroid is not None
+    assert holder._labels == fake_labels
+
+
 def test_holder_never_writes_music_state():
     """The holder exposes only get_latest() — no MusicState write path."""
     from vibemix.library.genre_prototypes import GenrePrototypeLookup
