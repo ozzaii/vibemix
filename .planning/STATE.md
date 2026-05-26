@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v8.1
 milestone_name: One Mind
-status: verifying
-last_updated: "2026-05-26T03:29:08.109Z"
+status: ready_to_plan
+last_updated: 2026-05-26T03:57:41.883Z
 last_activity: 2026-05-26
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 17
-  completed_plans: 17
+  completed_plans: 43
   percent: 83
+stopped_at: Phase 81 complete (4/4) — ready to discuss Phase 82
 ---
 
 # vibemix — State
@@ -29,7 +30,7 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 - **Six categories → six phases:** WIRE (P77) · PERCEIVE (P78) · LENS (P79) · GROUND (P80) · BENCH (P81) · CURATE (P82). Dependency spine: WIRE → PERCEIVE → (LENS ‖ GROUND) → BENCH → CURATE.
 - **Hard constraints (locked, every phase):** ship-not-over-engineer (one connected, tested wire per phase) · Gemini-only AI/embedding provider · **NO new MIR libraries / NO new DSP detectors** (GPL/AGPL/NC license wall vs Apache-2.0 + Bravoh reuse) · no new ws ports / no new IPC envelopes / no managed-memory frameworks · four cardinal invariants hold by **ADDITIVE design** (gated-off cold path byte-identical to v8.0 baseline) · honest green (unit-testable without the API; live e2e on the funded key `...32u744`, project 709533190790) — never fake results.
 - **Cardinal invariants:** single-writer (only the refresh loop writes `MusicState`; embedding-genre must write THERE) · citation-grounding (every emitted citation resolves in `EvidenceRegistry`; un-cited strips to ack-bank — the anti-slop gate) · trust-the-audio (live evidence is authoritative; Gemini's audio is SECONDARY, hallucination-guarded) · one-socket (mascot/wizard bus = `127.0.0.1:8765`, debrief = `8766`; no new port).
-- **Current focus:** Phase 81 — BENCH — The Validation Instrument
+- **Current focus:** Phase 82 — curate — unify curator + co host
 - **Project mode:** standard. **Granularity:** fine. **Model profile:** quality (all agents on Opus, all checkpoints on).
 - **Autonomy mode:** `gsd-autonomous fully` — blockers (Gemini billing — resolved; any live-hardware ear-pass) ride forward to KAAN-ACTION; only the privacy rule + destructive risk still pause.
 
@@ -37,9 +38,9 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 
 ## Current Position
 
-Phase: 81 (BENCH — The Validation Instrument) — COMPLETE (4/4, ready for verification)
-Plan: 4 of 4 — DONE
-Status: Phase complete — ready for verification
+Phase: 82
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-05-26
 
 ### Plan 81-04 — BENCH-03 review surface + docs/bench.md (complete 2026-05-26)
