@@ -91,12 +91,14 @@ const CSS = `
     background: rgba(15, 18, 24, 0.85);
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
+  /* "The Deck Speaks" rebuild (2026-05-26): the LIVE pill no longer burns a
+   * green "listening" LED — that was the relocated voice-assistant tell the
+   * rebuild killed everywhere else (deck, mascot, footer). When fine, status
+   * reads quiet silk; only a dropped input (data-state="down") lights red, and
+   * REC keeps its red record-light. So an OK pill is just a calm silk dome. */
   .vmx-titlebar__pill[data-state="ok"] .vmx-titlebar__pill-led {
-    background: var(--led-ok);
-    box-shadow:
-      0 0 3px var(--led-ok),
-      0 0 6px rgba(109, 212, 74, 0.28),
-      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    background: var(--silk);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
   .vmx-titlebar__pill[data-state="ok"] { color: var(--silk); border-color: var(--silk-22); }
   .vmx-titlebar__pill[data-key="rec"][data-state="ok"] .vmx-titlebar__pill-led {

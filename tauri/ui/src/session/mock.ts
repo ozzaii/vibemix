@@ -15,9 +15,11 @@ import { mountSettingsDrawer } from "../settings/SettingsDrawer.js";
 import {
   setSessionState,
   appendTranscript,
+  appendReaction,
   appendMidiEvents,
   getSessionState,
 } from "./state.js";
+import type { CitationChip } from "./components/citation-strip.js";
 import type { PhaseChunk } from "./components/phase-tape.js";
 
 let animatorHandle: number | null = null;
@@ -32,6 +34,25 @@ const TRANSCRIPT_TEXTS: string[] = [
   "EQ that low-mid back when you bring the vocal",
   "great call swapping decks here",
   "tempo's drifting a touch, sync it back",
+];
+
+/* "The Deck Speaks" rebuild (2026-05-26): the signature gesture (line rises →
+ * amber rule draws → cite ignites) only fires when a reaction carries a citation
+ * strip joined to the now-line by `ts`. The Phase-12 mock only appended bare
+ * transcript lines, so the dev preview never SHOWED the deck's whole reason to
+ * exist. Each text now ships a grounded citation atom (one per line, parallel
+ * index) so `?dev=session-mock` demonstrates the receipt igniting. The first
+ * line is deliberately citation-free (`null`) — "warming up" cites nothing yet,
+ * which exercises the calm no-receipt path right next to the lit one. */
+const CITATION_VERBS: (Omit<CitationChip, "event_id"> | null)[] = [
+  null, // "warming up, listening for the room" — nothing cited yet
+  { verb: "steady kick", timestamp_s: 31 }, // groove settling
+  { verb: "filter rise", timestamp_s: 48 }, // filter swell
+  { verb: "build energy", timestamp_s: 61 }, // drop in 8 bars
+  { verb: "drop hit", timestamp_s: 73 }, // clean drop
+  { verb: "low-mid clash", timestamp_s: 88 }, // EQ the low-mid
+  { verb: "deck swap", timestamp_s: 96 }, // swapping decks
+  { verb: "bpm drift", timestamp_s: 109 }, // tempo drifting
 ];
 
 const MIDI_LABELS: string[] = [
@@ -73,6 +94,17 @@ let lastMidiAt = 0;
 let transcriptIdx = 0;
 let midiIdx = 0;
 let dropBars: number | null = 16;
+
+/** Append a cohost reaction joined to a transcript line by `ts`. The citation
+ * strip is the parallel-indexed atom (or empty for the citation-free line), so
+ * the render-loop lights the receipt under exactly the right now-line. */
+function appendReactionFor(idx: number, text: string, ts: string): void {
+  const atom = CITATION_VERBS[idx % CITATION_VERBS.length] ?? null;
+  const strip: CitationChip[] = atom
+    ? [{ event_id: `ev:${atom.verb.replace(/\s+/g, "_").toUpperCase()}@${atom.timestamp_s}`, ...atom }]
+    : [];
+  appendReaction({ ts, text, event_id: `mock-react-${idx}`, citation_strip: strip });
+}
 
 function tick(): void {
   const now = performance.now();
@@ -119,10 +151,14 @@ function tick(): void {
     dropBars = null;
   }
 
-  // Append a transcript line every ~5s.
+  // Append a transcript line every ~5s — plus its grounded citation so the
+  // receipt gesture re-fires on the new now-line (joined by `ts`).
   if (elapsed - lastTranscriptAt > 5000) {
-    const text = TRANSCRIPT_TEXTS[transcriptIdx % TRANSCRIPT_TEXTS.length]!;
-    appendTranscript([{ role: "ai", text, ts: tsHHMMSS(elapsed) }]);
+    const idx = transcriptIdx % TRANSCRIPT_TEXTS.length;
+    const text = TRANSCRIPT_TEXTS[idx]!;
+    const ts = tsHHMMSS(elapsed);
+    appendTranscript([{ role: "ai", text, ts }]);
+    appendReactionFor(idx, text, ts);
     transcriptIdx++;
     lastTranscriptAt = elapsed;
   }
@@ -153,13 +189,11 @@ export async function routeSessionMock(rootEl?: HTMLElement): Promise<void> {
 
   // Pre-seed transcript with the first 5 lines so the panel doesn't start
   // empty (more dramatic first paint).
-  appendTranscript(
-    TRANSCRIPT_TEXTS.slice(0, 5).map((text, i) => ({
-      role: "ai" as const,
-      text,
-      ts: tsHHMMSS((i + 1) * 4000),
-    })),
-  );
+  TRANSCRIPT_TEXTS.slice(0, 5).forEach((text, i) => {
+    const ts = tsHHMMSS((i + 1) * 4000);
+    appendTranscript([{ role: "ai" as const, text, ts }]);
+    appendReactionFor(i, text, ts);
+  });
 
   // Mount layout + drawer.
   const m = mountSessionLayout(root);
