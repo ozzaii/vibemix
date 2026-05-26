@@ -35,9 +35,9 @@
 - [x] **GROUND-02**: The reaction model is config-resolved via `model_router` and chosen by the bench result.
 
 ### BENCH — validation instrument
-- [ ] **BENCH-01**: A multi-dimensional bench harness runs model × grounding × prompting × contexting × lens × taste on real tracks.
-- [ ] **BENCH-02**: An automated first-pass eval scores groundedness (vs DSP facts), specificity, and mode-fidelity per cell.
-- [ ] **BENCH-03**: Bench cells are surfaced for Kaan's-ear final judgment (KAAN-ACTION review surface).
+- [x] **BENCH-01**: A multi-dimensional bench harness runs model × grounding × prompting × contexting × lens × taste on real tracks.
+- [x] **BENCH-02**: An automated first-pass eval scores groundedness (vs DSP facts), specificity, and mode-fidelity per cell.
+- [x] **BENCH-03**: Bench cells are surfaced for Kaan's-ear final judgment (KAAN-ACTION review surface).
 
 ### CURATE — unify curator + co-host
 - [ ] **CURATE-01**: Curator and co-host share the perception engine + the structured-state contract. ("Curator" = the shared grounded `library/toolset.py` core driving BOTH backends — gemini `agent.py` and codex `codex_curate.py`/`mcp_server.py` — plus the Telegram + `next_suggestion` transports over it. Neither backend is orphaned.)
@@ -77,9 +77,9 @@ Every v8.1 REQ-ID maps to exactly one phase (6 phases, 77–82; numbering contin
 | LENS-02 | Phase 79 | Complete |
 | GROUND-01 | Phase 80 | Complete |
 | GROUND-02 | Phase 80 | Complete |
-| BENCH-01 | Phase 81 | Pending |
-| BENCH-02 | Phase 81 | Pending |
-| BENCH-03 | Phase 81 | Pending |
+| BENCH-01 | Phase 81 | Complete |
+| BENCH-02 | Phase 81 | Complete |
+| BENCH-03 | Phase 81 | Complete |
 | CURATE-01 | Phase 82 | Pending |
 | CURATE-02 | Phase 82 | Pending |
 
