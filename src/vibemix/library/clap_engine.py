@@ -78,6 +78,20 @@ _ENV_BACKEND = "VIBEMIX_CLAP_BACKEND"
 _DEFAULT_BACKEND = "torch"
 _VALID_BACKENDS = ("torch", "onnx")
 
+# ---- onnx backend (Xenova/larger_clap_music_and_speech, non-fusion) ----------
+# The ONNX ship path. Model dir holds the HF-format repo snapshot:
+#   onnx/audio_model.onnx  (ClapAudioModelWithProjection, input "input_features")
+#   onnx/text_model.onnx   (ClapTextModelWithProjection, input "input_ids" ONLY)
+#   preprocessor_config.json + tokenizer files (for ClapFeatureExtractor / Roberta)
+# Override the dir with VIBEMIX_CLAP_ONNX_DIR; default is the vibemix cache.
+_ENV_ONNX_DIR = "VIBEMIX_CLAP_ONNX_DIR"
+_DEFAULT_ONNX_DIR = Path.home() / ".cache" / "vibemix" / "clap-onnx"
+_ONNX_AUDIO_REL = "onnx/audio_model.onnx"
+_ONNX_TEXT_REL = "onnx/text_model.onnx"
+# Non-fusion Xenova mel is 10s @ 48k; one 10s segment per ONNX forward (batch=1
+# model). Non-overlapping slices match the validated parity run (techno+psy 100%).
+_ONNX_TEXT_MAXLEN = 77  # CLAP text is trained/used at length 77
+
 # MIME suffix mapping for the bytes path (mirrors embed._mime_for_path's idea,
 # inverted: mime → tempfile suffix). Default .mp3.
 _MIME_TO_SUFFIX = {
@@ -132,14 +146,7 @@ class ClapEngine:
             return self._model
 
         if self.backend == "onnx":
-            raise NotImplementedError(
-                "The 'onnx' backend is a STAGING STUB — it is not yet "
-                "trustworthy. The ONNX parity gate (export larger_clap_music → "
-                "ONNX with a matched numpy mel, then >=0.98 mean cosine vs the "
-                "proven torch path over 50 tracks) must pass before this backend "
-                "returns a real vector. See docs/clap-engine.md → 'The parity "
-                "gate'. Use VIBEMIX_CLAP_BACKEND=torch until then."
-            )
+            return self._ensure_onnx_model()
 
         # ----- torch backend (the proven reference path) -----
         # MPS fallback so an unsupported op on Apple silicon falls back to CPU
@@ -243,10 +250,94 @@ class ClapEngine:
         return mean_emb.astype(np.float32)
 
     # ------------------------------------------------------------------ #
+    # ONNX backend (Xenova non-fusion; onnxruntime + HF mel/tokenizer)     #
+    # Heavy imports (onnxruntime/transformers/librosa) live HERE only.     #
+    # ------------------------------------------------------------------ #
+    def _ensure_onnx_model(self):
+        """Load + cache the Xenova ONNX sessions + feature extractor + tokenizer.
+
+        Cached on ``self._model`` as a dict. The model dir (env
+        ``VIBEMIX_CLAP_ONNX_DIR`` or the vibemix cache) must hold the HF-format
+        snapshot — see ``_DEFAULT_ONNX_DIR`` doc above. Raises a clear, actionable
+        error (NOT a wrong vector) when the model files are absent.
+        """
+        import onnxruntime as ort  # lazy — ship dep
+        from transformers import ClapFeatureExtractor, RobertaTokenizer  # lazy
+
+        mdir = Path(os.environ.get(_ENV_ONNX_DIR) or _DEFAULT_ONNX_DIR)
+        audio_path = mdir / _ONNX_AUDIO_REL
+        text_path = mdir / _ONNX_TEXT_REL
+        if not audio_path.exists() or not text_path.exists():
+            raise FileNotFoundError(
+                f"ClapEngine onnx backend: model files not found under {mdir}. "
+                f"Expected {_ONNX_AUDIO_REL} + {_ONNX_TEXT_REL} (+ preprocessor/"
+                f"tokenizer config). Download Xenova/larger_clap_music_and_speech "
+                f"or set {_ENV_ONNX_DIR}."
+            )
+
+        feat = ClapFeatureExtractor.from_pretrained(str(mdir))
+        tok = RobertaTokenizer.from_pretrained(str(mdir))
+        providers = ["CPUExecutionProvider"]
+        audio_sess = ort.InferenceSession(str(audio_path), providers=providers)
+        text_sess = ort.InferenceSession(str(text_path), providers=providers)
+        # The Xenova text ONNX takes ONLY input_ids (no attention_mask). Detect
+        # which inputs it accepts so we never feed an unknown tensor.
+        text_inputs = {i.name for i in text_sess.get_inputs()}
+        self._model = {
+            "feat": feat,
+            "tok": tok,
+            "audio": audio_sess,
+            "text": text_sess,
+            "text_inputs": text_inputs,
+        }
+        return self._model
+
+    def _onnx_embed_audio_file(self, path: str) -> np.ndarray:
+        """ONNX audio embed: non-overlapping 10s segs → HF mel → audio ONNX →
+        mean-pool → L2 → (512,). Matches the validated parity pipeline."""
+        import librosa  # lazy
+
+        m = self._ensure_onnx_model()
+        y, _ = librosa.load(path, sr=CLAP_SR, mono=True)
+        if len(y) == 0:
+            raise ValueError(f"ClapEngine: empty audio from {path!r}")
+        if len(y) < CHUNK_SAMPLES:  # repeat-pad short clips to one 10s window
+            reps = int(np.ceil(CHUNK_SAMPLES / len(y)))
+            y = np.tile(y, reps)[:CHUNK_SAMPLES]
+        segs = [
+            y[i : i + CHUNK_SAMPLES]
+            for i in range(0, len(y) - CHUNK_SAMPLES + 1, CHUNK_SAMPLES)
+        ] or [y[:CHUNK_SAMPLES]]
+
+        embs: list[np.ndarray] = []
+        for seg in segs:
+            feats = m["feat"](seg, sampling_rate=CLAP_SR, return_tensors="np")
+            inp = feats["input_features"].astype(np.float32)
+            out = m["audio"].run(None, {"input_features": inp})[0]
+            embs.append(out[0])
+        mean_emb = np.mean(np.stack(embs), axis=0)
+        return _l2(mean_emb).astype(np.float32)
+
+    def _onnx_embed_text(self, text: str) -> np.ndarray:
+        """ONNX text embed: ONE query, UNPADDED (the text ONNX has no
+        attention_mask → padding tokens collapse the output) → (512,) L2."""
+        m = self._ensure_onnx_model()
+        enc = m["tok"](
+            text, truncation=True, max_length=_ONNX_TEXT_MAXLEN, return_tensors="np"
+        )
+        feed = {"input_ids": enc["input_ids"].astype(np.int64)}
+        if "attention_mask" in m["text_inputs"]:
+            feed["attention_mask"] = enc["attention_mask"].astype(np.int64)
+        out = m["text"].run(None, feed)[0][0]
+        return _l2(np.asarray(out)).astype(np.float32)
+
+    # ------------------------------------------------------------------ #
     # Public contract                                                     #
     # ------------------------------------------------------------------ #
     def embed_audio_file(self, path: str) -> np.ndarray:
         """Embed an audio file → (512,) float32, L2-normalized, deterministic."""
+        if self.backend == "onnx":
+            return self._onnx_embed_audio_file(path)
         self._ensure_model()
         chunks = self._load_and_chunk(path)
         if not chunks:
@@ -278,6 +369,8 @@ class ClapEngine:
 
     def embed_query(self, text: str) -> np.ndarray:
         """Embed a text query → (512,) float32, L2-normalized — same space."""
+        if self.backend == "onnx":
+            return self._onnx_embed_text(text)
         clap = self._ensure_model()
         embs = clap.get_text_embedding([text], use_tensor=False)
         vec = np.asarray(embs)[0]
