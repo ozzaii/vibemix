@@ -27,7 +27,7 @@ import pytest
 from tests.audio.conftest import int16_sine
 from vibemix.audio import AudioBuffer
 from vibemix.state import MusicState
-from vibemix.state.refresh import _tick_once
+from vibemix.state.refresh import _compose_trajectory, _tick_once
 
 
 def _audible_buf() -> AudioBuffer:

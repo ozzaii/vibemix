@@ -222,9 +222,15 @@ def _compose_trajectory(
         parts.append("building" if buildup_score >= 0.5 else "settled")
 
     # Moves scale — newest move + its age (recent_moves is a (age, label) list,
-    # smallest age = newest; mirror coach's recent_moves[8s] sort).
-    if recent_moves:
-        age, label = min(recent_moves, key=lambda m: m[0])
+    # smallest age = newest). WR-03 — filter to the SAME 8s window coach uses
+    # (coach.py:369, `age <= 8.0`) before picking the newest. state.recent_moves
+    # is populated over a wider 12s window (refresh.py moves_since(now - 12.0)),
+    # so without this filter the trajectory could report "last move: bass-swap
+    # 11s ago" while the coach's recent_moves[8s] block simultaneously says NONE —
+    # the two surfaces contradicting reads as AI slop.
+    recent_8s = [m for m in recent_moves if m[0] <= 8.0]
+    if recent_8s:
+        age, label = min(recent_8s, key=lambda m: m[0])
         parts.append(f"last move: {label} {age:.0f}s ago")
 
     return "; ".join(parts)
