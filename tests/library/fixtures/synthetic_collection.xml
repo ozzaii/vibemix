@@ -2,10 +2,13 @@
 <DJ_PLAYLISTS Version="1.0.0">
   <PRODUCT Name="vibemix" Version="1.0.0" Company="vibemix-test" />
   <COLLECTION Entries="5">
-    <TRACK Location="file://localhost//Users/test/Music/track-1.mp3" TrackID="1" Name="Test Track One" Artist="Artist A" Album="Album X" AverageBpm="124.0" Tonality="Am" TotalTime="240">
+    <TRACK Location="file://localhost//Users/test/Music/track-1.mp3" TrackID="1" Name="Test Track One" Artist="Artist A" Album="Album X" Genre="Techno" Label="Drumcode" Rating="204" PlayCount="42" Comments="/* 8A - Energy 8 */" AverageBpm="124.0" Tonality="Am" TotalTime="240">
+      <TEMPO Inizio="0.12" Bpm="124.0" Metro="4/4" Battito="1" />
+      <TEMPO Inizio="120.5" Bpm="125.0" Metro="4/4" Battito="1" />
       <POSITION_MARK Name="intro" Type="0" Start="8.0" Num="1" />
       <POSITION_MARK Name="drop" Type="0" Start="32.0" Num="2" />
       <POSITION_MARK Name="breakdown" Type="0" Start="96.0" Num="3" />
+      <POSITION_MARK Name="load" Type="3" Start="0.0" Num="-1" />
     </TRACK>
     <TRACK Location="file://localhost//Users/test/Music/track-2.mp3" TrackID="2" Name="Test Track Two" Artist="Artist B" Album="Album Y" AverageBpm="128.0" Tonality="Cm" TotalTime="300">
       <POSITION_MARK Name="intro" Type="0" Start="8.0" Num="1" />

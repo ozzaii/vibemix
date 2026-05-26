@@ -24,6 +24,27 @@ from vibemix.library.rekordbox import CuePoint, RekordboxLibrary, TrackEntry
 FIXTURE = Path(__file__).parent / "fixtures" / "synthetic_collection.xml"
 
 
+def _write_minimal_track_xml(tmp_path, *, track_attrs: str, body: str = "") -> Path:
+    """Emit a 1-track collection.xml so a single edge case can be asserted in
+    isolation without perturbing the canonical 5-track fixture's counts."""
+    dst = tmp_path / "edge_collection.xml"
+    dst.write_text(
+        "<?xml version='1.0' encoding='utf-8'?>\n"
+        '<DJ_PLAYLISTS Version="1.0.0">\n'
+        '  <PRODUCT Name="vibemix" Version="1.0.0" Company="vibemix-test" />\n'
+        '  <COLLECTION Entries="1">\n'
+        f'    <TRACK Location="file://localhost//Users/test/Music/edge.mp3" '
+        f'TrackID="edge" Name="Edge" {track_attrs}>\n'
+        f"{body}"
+        "    </TRACK>\n"
+        "  </COLLECTION>\n"
+        '  <PLAYLISTS><NODE Name="ROOT" Type="0" Count="0" /></PLAYLISTS>\n'
+        "</DJ_PLAYLISTS>",
+        encoding="utf-8",
+    )
+    return dst
+
+
 @pytest.fixture
 def isolated_cache(tmp_path, monkeypatch):
     """Point ``RekordboxLibrary.CACHE_PATH`` at a tmpdir-isolated location."""
@@ -198,3 +219,124 @@ def test_cache_miss_on_corrupted_blob(isolated_cache):
     isolated_cache.write_bytes(b"not a pickle")
     lib = RekordboxLibrary()
     assert lib.try_load_cache() is False
+
+
+# ===================================================================== #
+# Plan 89-02 — enriched metadata / Camelot-at-parse / beatgrid / cue    #
+# Type fidelity. These pin the enriched parse contract; RED until the   #
+# parser lands in Task 2 (strict-xfail, flipped green there).           #
+# ===================================================================== #
+
+
+@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
+def test_enriched_metadata_fields(isolated_cache):
+    """Track 1 surfaces genre / label / rating(stars) / play_count / comments."""
+    lib = RekordboxLibrary()
+    lib.load_xml(FIXTURE)
+    track1 = lib.lookup_by_id("1")
+    assert track1 is not None
+    assert track1.genre == "Techno"
+    assert track1.label == "Drumcode"
+    assert track1.rating == 4  # Rekordbox byte 204 -> 4 stars
+    assert track1.play_count == 42
+    assert track1.comments == "/* 8A - Energy 8 */"
+
+
+@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
+def test_enriched_metadata_honest_empty_when_absent(isolated_cache):
+    """Tracks with no genre/label/comments coerce to typed empties (Invariant #3)."""
+    lib = RekordboxLibrary()
+    lib.load_xml(FIXTURE)
+    track2 = lib.lookup_by_id("2")
+    assert track2 is not None
+    assert track2.genre == ""
+    assert track2.label == ""
+    assert track2.comments == ""
+    assert track2.rating == 0
+    assert track2.play_count == 0
+
+
+@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
+def test_camelot_computed_at_parse_raw_key_preserved(isolated_cache):
+    """track1.camelot is the deterministic Camelot; raw classical key untouched."""
+    lib = RekordboxLibrary()
+    lib.load_xml(FIXTURE)
+    track1 = lib.lookup_by_id("1")
+    assert track1 is not None
+    assert track1.camelot == "8A"  # Am -> 8A via harmonics.to_camelot
+    assert track1.key == "Am"  # raw classical preserved
+    # Track 2: Cm -> 5A
+    track2 = lib.lookup_by_id("2")
+    assert track2 is not None
+    assert track2.camelot == "5A"
+    assert track2.key == "Cm"
+
+
+@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
+def test_camelot_honest_none_on_empty_key(isolated_cache, tmp_path):
+    """An empty Tonality -> camelot is None, key is "" (honest, never guessed)."""
+    edge = _write_minimal_track_xml(
+        tmp_path, track_attrs='AverageBpm="120.0" Tonality="" TotalTime="180"'
+    )
+    lib = RekordboxLibrary()
+    lib.load_xml(edge)
+    track = lib.lookup_by_id("edge")
+    assert track is not None
+    assert track.key == ""
+    assert track.camelot is None
+
+
+@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
+def test_beatgrid_tempo_nodes_variable_grid(isolated_cache):
+    """track1 carries a >=2-node TempoNode beatgrid (variable grid)."""
+    from vibemix.library.rekordbox import TempoNode
+
+    lib = RekordboxLibrary()
+    lib.load_xml(FIXTURE)
+    track1 = lib.lookup_by_id("1")
+    assert track1 is not None
+    assert isinstance(track1.beatgrid, tuple)
+    assert len(track1.beatgrid) >= 2
+    first = track1.beatgrid[0]
+    assert isinstance(first, TempoNode)
+    assert first.inizio_s == 0.12
+    assert first.bpm == 124.0
+    assert first.metro == "4/4"
+    assert first.battito == 1
+
+
+@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
+def test_beatgrid_empty_when_absent(isolated_cache):
+    """A track with NO TEMPO children -> beatgrid == () (honest empty)."""
+    lib = RekordboxLibrary()
+    lib.load_xml(FIXTURE)
+    track2 = lib.lookup_by_id("2")
+    assert track2 is not None
+    assert track2.beatgrid == ()
+
+
+def test_cue_type_fidelity_load(isolated_cache):
+    """track1 carries a load mark (Type=3 -> "load"), not a default "cue".
+
+    pyrekordbox 0.4.4 already maps PositionMark.Type int -> label string via
+    its GETTERS, so this contract holds today; Task 2 hardens _mark_to_cue to
+    int-coerce defensively (handles a raw int Type without regressing this).
+    """
+    lib = RekordboxLibrary()
+    lib.load_xml(FIXTURE)
+    track1 = lib.lookup_by_id("1")
+    assert track1 is not None
+    loads = [c for c in track1.cues if c.type == "load"]
+    assert len(loads) == 1
+
+
+def test_cue_type_fidelity_loop_and_plain(isolated_cache):
+    """track3 loop cue is "loop" (Type=4); plain hot cues stay "cue" (Type=0)."""
+    lib = RekordboxLibrary()
+    lib.load_xml(FIXTURE)
+    track3 = lib.lookup_by_id("3")
+    assert track3 is not None
+    loops = [c for c in track3.cues if c.type == "loop"]
+    assert len(loops) == 1
+    plain = [c for c in track3.cues if c.type == "cue"]
+    assert len(plain) == 3  # intro/drop/breakdown all Type=0
