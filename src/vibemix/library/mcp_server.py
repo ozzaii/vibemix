@@ -140,6 +140,65 @@ def build_server(toolset: Any) -> Any:
         Call once, with the tracks in play order. This ends the run."""
         return toolset.create_playlist({"name": name, "track_ids": track_ids})
 
+    # -- set-prep tools (Vibe Mix engine; grounding identical to above) ----- #
+
+    @mcp.tool()
+    def get_track_energy(track_id: str) -> dict[str, Any]:
+        """Deterministic perceived dancefloor energy (0-100), computed from the
+        audio. Honest null when no file / undecodable. Reason about the energy
+        arc with it — never invent an energy value."""
+        return toolset.get_track_energy({"track_id": track_id})
+
+    @mcp.tool()
+    def discover_pool(
+        query: str | None = None,
+        ref_track_ids: list[str] | None = None,
+        k: int = 50,
+        bpm_min: float | None = None,
+        bpm_max: float | None = None,
+        min_duration_s: float | None = None,
+        max_duration_s: float | None = None,
+        exclude_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Build a diverse candidate POOL from the DJ's library for a vibe and/or
+        reference tracks. A grounded discovery path like search_vibe — every
+        track_id it returns may be sequenced/exported, none is invented."""
+        return toolset.discover_pool(
+            {
+                "query": query,
+                "ref_track_ids": ref_track_ids,
+                "k": k,
+                "bpm_min": bpm_min,
+                "bpm_max": bpm_max,
+                "min_duration_s": min_duration_s,
+                "max_duration_s": max_duration_s,
+                "exclude_ids": exclude_ids,
+            }
+        )
+
+    @mcp.tool()
+    def sequence_set(
+        track_ids: list[str], curve: str, n_slots: int | None = None
+    ) -> dict[str, Any]:
+        """Order grounded track_ids into a set following an energy CURVE preset
+        (opener / peak_time / after_hours / festival). Returns 3-5 ranked
+        candidates with energy_fit / avg_coherence / relaxed_transitions. Every
+        track_id must come from a prior search_vibe/discover_pool result."""
+        return toolset.sequence_set(
+            {"track_ids": track_ids, "curve": curve, "n_slots": n_slots}
+        )
+
+    @mcp.tool()
+    def export_set(
+        name: str, track_ids: list[str], out_path: str | None = None
+    ) -> dict[str, Any]:
+        """Export the chosen ordered set to a Rekordbox-importable XML (order +
+        key + BPM + cues). Every track_id must have come from a prior discovery
+        result. Call once when the DJ accepts a set."""
+        return toolset.export_set(
+            {"name": name, "track_ids": track_ids, "out_path": out_path}
+        )
+
     return mcp
 
 

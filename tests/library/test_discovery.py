@@ -49,8 +49,10 @@ def _track(
 class _FakeBackend:
     def __init__(self, ids, vectors):
         self._ids, self._vectors = ids, vectors
+        self.load_all_calls = 0
 
     def load_all(self):
+        self.load_all_calls += 1
         return self._ids, self._vectors
 
 
@@ -132,6 +134,22 @@ def test_intent_centroid_empty_raises():
         intent_centroid([])
     with pytest.raises(ValueError):
         intent_centroid([], text_vector=None)
+
+
+def test_intent_centroid_zero_text_vector_raises():
+    """WR-04: a zero text embedding cannot ground a direction → ValueError, not
+    a silently-returned zero/un-normalized vector."""
+    zero = np.zeros(8, dtype=np.float32)
+    with pytest.raises(ValueError, match="zero embedding"):
+        intent_centroid([], text_vector=zero)
+
+
+def test_intent_centroid_zero_refs_raises():
+    """WR-04 (blended/ref path): all-zero refs yield a degenerate centroid →
+    ValueError rather than a zero vector that grounds nothing."""
+    zeros = [np.zeros(8, dtype=np.float32), np.zeros(8, dtype=np.float32)]
+    with pytest.raises(ValueError, match="zero embedding"):
+        intent_centroid(zeros)
 
 
 # --------------------------------------------------------------------------- #
@@ -399,3 +417,19 @@ def test_discover_pool_missing_ref_vector_raises(library):
     store = _FakeStore([("t0", 0.99)], ids=["t0"], vectors=np.eye(1, 8, dtype=np.float32))
     with pytest.raises(ValueError):
         discover_pool(store, library, ref_track_ids=["nope"], k=10)
+
+
+def test_discover_pool_loads_store_once(library):
+    """WR-05: the store is loaded ONCE per call, not once per ref + per filtered
+    candidate. With several candidates the load_all count must stay O(1)."""
+    ids = [f"t{i}" for i in range(6)]
+    vectors = np.eye(6, 8, dtype=np.float32)
+    ranked = [("t0", 0.99), ("t1", 0.9), ("t2", 0.85), ("t3", 0.8), ("t4", 0.7)]
+    store = _FakeStore(ranked, ids=ids, vectors=vectors)
+
+    pool = discover_pool(
+        store, library, ref_track_ids=["t0"], k=10, exclude_ids={"t0"}
+    )
+    assert pool  # several candidates survived (so the old code would re-load)
+    # The whole store is read exactly once regardless of candidate count.
+    assert store._backend.load_all_calls == 1

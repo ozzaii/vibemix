@@ -1641,6 +1641,62 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_curate.add_argument("--json", action="store_true")
     sp_curate.set_defaults(func=_cmd_library_curate)
 
+    # Vibe Mix engine — set-prep co-host flow (discover → sequence → export)
+    sp_build_set = sub.add_parser(
+        "build-set",
+        help="Prep a full DJ set from a brief (discover → sequence → export)",
+        description=(
+            "Set-prep co-host: the Viber agent discovers a pool from YOUR "
+            "library, picks an energy curve, sequences it into a mixable set, "
+            "and explains the critical transitions. Every track is grounded — "
+            "the agent can only use tracks discovery returned, never invented "
+            "ones. Optionally exports a Rekordbox-importable XML."
+        ),
+    )
+    sp_build_set.add_argument("brief", help="natural-language set brief")
+    sp_build_set.add_argument(
+        "--curve",
+        default=None,
+        help=(
+            "energy curve preset hint (opener / peak_time / after_hours / "
+            "festival). Advisory — the agent picks if omitted."
+        ),
+    )
+    sp_build_set.add_argument(
+        "--n-slots", type=int, default=None, help="target set length (slots)"
+    )
+    sp_build_set.add_argument(
+        "--export",
+        choices=("rekordbox",),
+        default=None,
+        help="auto-export the chosen set (rekordbox = Rekordbox XML)",
+    )
+    sp_build_set.add_argument(
+        "--name", default=None, help="set name (default: derived from the brief)"
+    )
+    sp_build_set.add_argument("--json", action="store_true")
+    sp_build_set.set_defaults(func=_cmd_library_build_set)
+
+    # Vibe Mix engine — export a saved JSON set to Rekordbox XML
+    sp_export_set = sub.add_parser(
+        "export-set",
+        help="Export a saved JSON set to a Rekordbox-importable XML",
+        description=(
+            "Read a JSON set (a list of track dicts, or {tracks:[...]}) and "
+            "write a Rekordbox-importable collection.xml carrying order + key "
+            "+ BPM + cues. The neutral, portable handoff to your DJ software."
+        ),
+    )
+    sp_export_set.add_argument("set_json", help="path to the JSON set file")
+    sp_export_set.add_argument(
+        "--out", required=True, help="destination .xml path"
+    )
+    sp_export_set.add_argument(
+        "--name", default="vibemix set", help="playlist name in the XML"
+    )
+    sp_export_set.add_argument("--json", action="store_true")
+    sp_export_set.set_defaults(func=_cmd_library_export_set)
+
     # Viber Agent — Telegram mobile surface (long-poll; chat_id allow-list auth)
     sp_telegram = sub.add_parser(
         "telegram",
@@ -2016,6 +2072,240 @@ def _cmd_library_curate_codex(args: argparse.Namespace, lib) -> int:
     print(
         f"-> playlist '{result.playlist_name}' ({len(result.track_ids)} tracks) "
         f"via Codex saved: {where}",
+        file=sys.stderr,
+    )
+    return 0
+
+
+def _cmd_library_build_set(args: argparse.Namespace) -> int:
+    """Vibe Mix set-prep co-host — brief → discovered + sequenced set.
+
+    Mirrors ``_cmd_library_curate``'s client/embedder/store/library setup, then
+    runs ``ViberAgent.build_set`` (the set-prep tool surface). Prints the chosen
+    sequence slot-by-slot + the agent's per-transition rationale + any export
+    path. Fail-actionable when the library cache is missing.
+    """
+    import json as _json
+
+    from vibemix.library import (
+        LibraryEmbedder,
+        RekordboxLibrary,
+        ViberAgent,
+        open_store,
+    )
+
+    lib = RekordboxLibrary()
+    if not lib.try_load_cache():
+        print(
+            _json.dumps(
+                {
+                    "error": (
+                        "No library cache. Drag a Rekordbox XML onto "
+                        "Settings → Library (or run `library embed-folder`) first."
+                    ),
+                    "set": None,
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    client, err = _library_genai_client()
+    if err is not None:
+        print(_json.dumps(err), file=sys.stderr)
+        return 1
+
+    # Curve / length / export are advisory hints folded into the brief — the
+    # agent owns the tool calls (the curve preset is its choice, grounded).
+    brief = args.brief
+    hints: list[str] = []
+    if getattr(args, "curve", None):
+        hints.append(f"prefer the '{args.curve}' energy curve")
+    if getattr(args, "n_slots", None):
+        hints.append(f"aim for about {args.n_slots} tracks")
+    if getattr(args, "export", None):
+        hints.append("export the chosen set to Rekordbox XML when done")
+    if getattr(args, "name", None):
+        hints.append(f"name the set '{args.name}'")
+    if hints:
+        brief = f"{brief} ({'; '.join(hints)})"
+
+    embedder = LibraryEmbedder(client)
+    store = open_store()
+    try:
+        agent = ViberAgent(client, embedder, store, lib)
+        result = agent.build_set(brief)
+    finally:
+        store.close()
+
+    out = result.to_dict()
+    if getattr(args, "json", False):
+        _json.dump(out, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 0
+
+    # Human-readable: the agent's rationale + the tracks it surfaced.
+    print(f"-> set brief: {args.brief}", file=sys.stderr)
+    if result.rationale:
+        print(result.rationale, file=sys.stderr)
+    if result.seen_track_ids:
+        print(
+            f"-> {len(result.seen_track_ids)} grounded tracks discovered",
+            file=sys.stderr,
+        )
+    if result.playlist is not None:
+        print(
+            f"-> playlist '{result.playlist.name}' saved: "
+            f"{result.playlist.m3u_path}",
+            file=sys.stderr,
+        )
+    # BL-02: surface the exported Rekordbox XML path when the agent exported.
+    if result.export_path:
+        print(
+            f"-> set exported to Rekordbox XML: {result.export_path}",
+            file=sys.stderr,
+        )
+    _json.dump(out, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
+def _validate_export_tracks_against_library(
+    tracks: list, library
+) -> tuple[list, list[dict]]:
+    """WR-03: re-validate each set item against the live library (grounding).
+
+    A track resolves if its ``track_id`` is a known library id OR its
+    ``filepath`` (normpath) matches a library entry's filepath. Unresolved
+    items are dropped and returned in a ``dropped`` list (with a reason) so the
+    caller can report the count honestly — the export must never reference a
+    track the library does not contain.
+    """
+    import os as _os
+
+    known_ids = set(library.tracks)
+    known_paths = {
+        _os.path.normpath(e.filepath)
+        for e in library.tracks.values()
+        if getattr(e, "filepath", None)
+    }
+    kept: list = []
+    dropped: list[dict] = []
+    for item in tracks:
+        if not isinstance(item, dict):
+            dropped.append({"item": repr(item)[:80], "reason": "not a track dict"})
+            continue
+        tid = item.get("track_id")
+        fp = item.get("filepath")
+        fp_norm = _os.path.normpath(str(fp)) if fp else None
+        if (tid in known_ids) or (fp_norm is not None and fp_norm in known_paths):
+            kept.append(item)
+        else:
+            dropped.append(
+                {
+                    "track_id": tid,
+                    "title": item.get("title", ""),
+                    "reason": "not in library (ungrounded)",
+                }
+            )
+    return kept, dropped
+
+
+def _cmd_library_export_set(args: argparse.Namespace) -> int:
+    """Export a saved JSON set to a Rekordbox-importable XML.
+
+    Reads ``set_json`` (a list of track dicts, or a ``{"tracks": [...]}``
+    wrapper), and writes the XML via ``export_rekordbox.export_set``.
+
+    WR-03 grounding: when a library cache is present, every track is
+    re-validated against the live library (by track_id or filepath) and
+    ungrounded entries are DROPPED before export (count reported). Without a
+    cache the export still runs, but prints a clear "advanced/unvalidated"
+    notice — the operator owns the JSON's correctness.
+    """
+    import json as _json
+
+    from vibemix.library import RekordboxLibrary, export_rekordbox
+
+    try:
+        with open(args.set_json, encoding="utf-8") as fh:
+            data = _json.load(fh)
+    except OSError as e:
+        print(_json.dumps({"error": f"cannot read set file: {e}"}), file=sys.stderr)
+        return 1
+    except ValueError as e:
+        print(_json.dumps({"error": f"invalid JSON set: {e}"}), file=sys.stderr)
+        return 1
+
+    if isinstance(data, dict):
+        tracks = data.get("tracks")
+        name = data.get("name") or args.name
+    else:
+        tracks = data
+        name = args.name
+    if not isinstance(tracks, list) or not tracks:
+        print(
+            _json.dumps(
+                {"error": "set file must be a non-empty list of track dicts "
+                          "(or {tracks:[...]})."}
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    # WR-03: re-validate against the live library when a cache is present.
+    ungrounded: list[dict] = []
+    lib = RekordboxLibrary()
+    if lib.try_load_cache():
+        tracks, ungrounded = _validate_export_tracks_against_library(tracks, lib)
+        if ungrounded:
+            print(
+                f"-> dropped {len(ungrounded)} ungrounded track(s) "
+                "(not in library)",
+                file=sys.stderr,
+            )
+        if not tracks:
+            print(
+                _json.dumps(
+                    {
+                        "error": "no track resolved in the library — nothing to "
+                        "export (all entries ungrounded).",
+                        "dropped_ungrounded": ungrounded,
+                    }
+                ),
+                file=sys.stderr,
+            )
+            return 1
+    else:
+        print(
+            "-> WARNING: no library cache — exporting UNVALIDATED tracks "
+            "(advanced mode). Import a Rekordbox XML or run `library "
+            "embed-folder` to enable grounding.",
+            file=sys.stderr,
+        )
+
+    try:
+        result = export_rekordbox.export_set(tracks, name, args.out)
+    except Exception as e:  # noqa: BLE001 — surface the failure actionably
+        print(
+            _json.dumps({"error": f"export failed: {type(e).__name__}: {e}"}),
+            file=sys.stderr,
+        )
+        return 1
+
+    summary = {
+        "exported": True,
+        "path": str(result.path),
+        "written": result.written,
+        "referenced": result.referenced,
+        "dropped": result.dropped,
+        "dropped_ungrounded": ungrounded,
+    }
+    _json.dump(summary, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    print(
+        f"-> set '{name}' exported: {result.path} "
+        f"({result.written} tracks, {result.referenced} slots)",
         file=sys.stderr,
     )
     return 0

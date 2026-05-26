@@ -336,7 +336,9 @@ ENERGY_BRIGHTNESS_WINDOW: tuple[float, float] = (800.0, 4000.0)
 # autocorrelation. 1.0σ (weak / no steady beat) → 0; 6.0σ (machine-tight 4/4) → 1.
 ENERGY_BEAT_REGULARITY_WINDOW: tuple[float, float] = (1.0, 6.0)
 # Dynamic range = coefficient of variation (std/mean) of the busy-frame RMS
-# curve. INVERTED in scoring — high CoV = dynamic/peaky (often less floor-driving
-# than a steady wall of energy), low CoV = sustained. 0.05 (dead-steady) → 0;
-# 0.60 (very peaky) → 1.
+# curve. This window maps the RAW CoV: 0.05 (dead-steady wall) → 0.0, 0.60 (very
+# peaky) → 1.0. The scorer then INVERTS it (1.0 - norm) so the CONTRIBUTION runs
+# the other way: a sustained wall of energy (low CoV) drives the floor MORE →
+# high contribution, while a peaky/dynamic track (high CoV) drives it LESS → low
+# contribution. The inversion lives in energy._score_array (BL-01), not here.
 ENERGY_DYNAMIC_RANGE_WINDOW: tuple[float, float] = (0.05, 0.60)

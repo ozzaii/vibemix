@@ -98,7 +98,13 @@ def intent_centroid(
                 "intent_centroid needs at least one reference vector or a "
                 "text vector — nothing to build an intent from."
             )
-        return _l2(text_vector)
+        out = _l2(text_vector)
+        # WR-04: a zero / degenerate text vector cannot ground a direction.
+        if float(np.linalg.norm(out)) < 1e-12:
+            raise ValueError(
+                "cannot build a grounded intent from a zero embedding"
+            )
+        return out
 
     refs = [np.asarray(v, dtype=np.float32) for v in ref_vectors]
     if weights is None:
@@ -122,6 +128,11 @@ def intent_centroid(
     if text_vector is not None:
         text = _l2(text_vector)
         centroid = _l2(alpha * centroid + (1.0 - alpha) * text)
+
+    # WR-04: refuse a degenerate centroid (e.g. all-zero refs, or a blend that
+    # exactly cancels) — an un-normalized/zero intent grounds nothing.
+    if float(np.linalg.norm(centroid)) < 1e-12:
+        raise ValueError("cannot build a grounded intent from a zero embedding")
 
     return centroid
 
@@ -301,16 +312,26 @@ def discover_pool(
     ref_track_ids = ref_track_ids or []
     exclude = exclude_ids or set()
 
+    # WR-05: load the whole store ONCE and index it id→vector. Previously
+    # ``_seed_vector`` ran ``load_all()`` per ref AND per filtered candidate — on
+    # a large library that is hundreds of full-store loads per discovery call and
+    # a 30s dispatch-timeout risk. One load + a dict lookup is O(1) per id.
+    all_ids, all_vectors = store._backend.load_all()
+    vec_index: dict[str, np.ndarray] = {}
+    for idx, tid in enumerate(all_ids):
+        if idx < len(all_vectors):
+            vec_index[tid] = np.asarray(all_vectors[idx], dtype=np.float32)
+
     # 1. Load reference vectors from the store (grounding: must exist on disk).
     ref_vectors: list[np.ndarray] = []
     for tid in ref_track_ids:
-        v = _seed_vector(store, tid)
+        v = vec_index.get(tid)
         if v is None:
             raise ValueError(
                 f"ref_track_id {tid!r} has no stored vector — cannot build a "
                 "grounded intent from a missing seed."
             )
-        ref_vectors.append(v)
+        ref_vectors.append(v.copy())
 
     # 2. Optional text vector (lazy — only embeds when a query is given).
     text_vector: np.ndarray | None = None
@@ -358,10 +379,11 @@ def discover_pool(
         exclude_ids=exclude_all,
     )
 
-    # 7. MMR diversity rerank. Need per-candidate vectors for pairwise sim.
+    # 7. MMR diversity rerank. Reuse the single store load (WR-05) for the
+    # per-candidate vectors instead of re-reading the store per candidate.
     vectors_by_id: dict[str, np.ndarray] = {}
     for tid, _ in filtered:
-        v = _seed_vector(store, tid)
+        v = vec_index.get(tid)
         if v is not None:
             vectors_by_id[tid] = v
     sim_by_id = {tid: sim for tid, sim in filtered}

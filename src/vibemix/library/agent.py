@@ -82,6 +82,26 @@ _RULES_BLOCK = (
     "4. Keep it tight — a focused set beats a padded one."
 )
 
+_SET_PREP_BLOCK = (
+    "SET-PREP FLOW (you are prepping a full DJ set, not a flat playlist):\n"
+    "1. discover_pool a candidate pool from the DJ's library for the brief "
+    "(use the vibe and/or any reference tracks). This is a grounded discovery "
+    "path on par with search_vibe — every track_id you later use MUST come "
+    "from discover_pool or search_vibe, NEVER invent one.\n"
+    "2. Pick an energy CURVE that fits the brief: opener (warm-up climb), "
+    "peak_time (prime-time plateau), after_hours (hypnotic high), or festival "
+    "(multi-peak). Peek get_track_energy / get_track_features when it helps "
+    "you reason — energy/key/BPM are deterministic facts from the tools, never "
+    "your guesses.\n"
+    "3. sequence_set the pool into the curve. It returns 3-5 ranked candidates; "
+    "choose the best one (lowest cost / cleanest transitions).\n"
+    "4. In 1-2 sentences explain WHY the critical transitions work — name the "
+    "key/BPM/energy/vibe reason. Surface any relaxed_transitions honestly "
+    "(a BPM jump or key bridge is a warning, not a hidden flaw).\n"
+    "5. Offer to export_set (Rekordbox XML) when the DJ is happy. Keep it tight "
+    "— a focused, well-sequenced set beats a padded one."
+)
+
 _INTERACTIVE_FLOW_BLOCK = (
     "FLOW:\n"
     "1. Open by asking 1-3 SHORT clarifying questions with ask_user (e.g. the "
@@ -98,6 +118,8 @@ _INTERACTIVE_FLOW_BLOCK = (
 # Lazily-built + cached so the seam import fires only on first real use.
 _SYSTEM_INSTRUCTION_CACHE: str | None = None
 _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE: str | None = None
+_SET_PREP_SYSTEM_INSTRUCTION_CACHE: str | None = None
+_SET_PREP_SYSTEM_INSTRUCTION_LENS: str | None = None
 # Phase 79 LENS-02 — the lens each cache was built under. A lens change between
 # requests (the same process) must rebuild, not serve the stale voice (Flag #3).
 _SYSTEM_INSTRUCTION_LENS: str | None = None
@@ -179,6 +201,31 @@ def _interactive_system_instruction() -> str:
     return base + _taste_hint()
 
 
+def _set_prep_system_instruction() -> str:
+    """Build (and cache) the set-prep curator system instruction.
+
+    Reuses the SAME shared curator voice (build_curator_instruction(lens)) the
+    plain curator uses + the SET-PREP flow block. The grounding contract is
+    enforced at the toolset boundary (seen-set gate), but the flow block keeps
+    the never-invent-id discipline front-of-mind for the model too.
+    """
+    global _SET_PREP_SYSTEM_INSTRUCTION_CACHE, _SET_PREP_SYSTEM_INSTRUCTION_LENS
+    lens = _shared_lens()
+    with _CACHE_LOCK:
+        if (
+            _SET_PREP_SYSTEM_INSTRUCTION_CACHE is None
+            or _SET_PREP_SYSTEM_INSTRUCTION_LENS != lens
+        ):
+            from vibemix.prompts.matrix import build_curator_instruction
+
+            _SET_PREP_SYSTEM_INSTRUCTION_CACHE = (
+                build_curator_instruction(lens) + "\n" + _SET_PREP_BLOCK
+            )
+            _SET_PREP_SYSTEM_INSTRUCTION_LENS = lens
+        base = _SET_PREP_SYSTEM_INSTRUCTION_CACHE
+    return base + _taste_hint()
+
+
 def __getattr__(name: str) -> str:
     # PEP 562 — expose the system instructions as module attributes that build
     # the matrix seam on first access (keeps the import-time boundary clean).
@@ -186,6 +233,8 @@ def __getattr__(name: str) -> str:
         return _system_instruction()
     if name == "_INTERACTIVE_SYSTEM_INSTRUCTION":
         return _interactive_system_instruction()
+    if name == "_SET_PREP_SYSTEM_INSTRUCTION":
+        return _set_prep_system_instruction()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -197,8 +246,12 @@ class CurateResult:
     playlist: PlaylistResult | None
     rationale: str
     iterations: int
-    stop_reason: str  # "created" | "max_iters" | "no_create" | "model_done"
+    # "created" | "exported" | "max_iters" | "no_create" | "model_done"
+    stop_reason: str
     seen_track_ids: list[str] = field(default_factory=list)
+    # BL-02: the Rekordbox XML path a set-prep run exported, when export_set
+    # ran. ``None`` for plain curation / a run that never exported.
+    export_path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -208,6 +261,7 @@ class CurateResult:
             "iterations": self.iterations,
             "stop_reason": self.stop_reason,
             "seen_track_ids": self.seen_track_ids,
+            "export_path": self.export_path,
         }
 
 
@@ -216,7 +270,121 @@ class CurateResult:
 # --------------------------------------------------------------------------- #
 
 
-def _tool_declarations(interactive: bool = False) -> list[types.FunctionDeclaration]:
+def _set_prep_declarations() -> list[types.FunctionDeclaration]:
+    """The 4 extra set-prep tools (Vibe Mix engine) layered on the base 3.
+
+    These mirror the toolset handlers. They keep grounding identical: every
+    track_id sequenced/exported MUST have come from discover_pool / search_vibe.
+    """
+    return [
+        types.FunctionDeclaration(
+            name="discover_pool",
+            description=(
+                "Build a diverse candidate POOL from the DJ's library for a "
+                "vibe and/or reference tracks. Like search_vibe it is a "
+                "grounded discovery path — every track_id it returns may be "
+                "sequenced/exported. Returns track_id/title/artist/bpm/camelot/"
+                "similarity. Prefer this over search_vibe for a full set."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "query": types.Schema(
+                        type=types.Type.STRING,
+                        description="natural-language vibe (optional if refs given)",
+                    ),
+                    "ref_track_ids": types.Schema(
+                        type=types.Type.ARRAY,
+                        items=types.Schema(type=types.Type.STRING),
+                        description="seed track_ids to anchor the pool (optional)",
+                    ),
+                    "k": types.Schema(type=types.Type.INTEGER),
+                    "bpm_min": types.Schema(type=types.Type.NUMBER),
+                    "bpm_max": types.Schema(type=types.Type.NUMBER),
+                    "min_duration_s": types.Schema(type=types.Type.NUMBER),
+                    "max_duration_s": types.Schema(type=types.Type.NUMBER),
+                    "exclude_ids": types.Schema(
+                        type=types.Type.ARRAY,
+                        items=types.Schema(type=types.Type.STRING),
+                    ),
+                },
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="get_track_energy",
+            description=(
+                "Deterministic perceived dancefloor energy (0-100) computed "
+                "from the audio for one track_id. Honest null when no file / "
+                "undecodable. Use to reason about the energy arc — never invent."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={"track_id": types.Schema(type=types.Type.STRING)},
+                required=["track_id"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="sequence_set",
+            description=(
+                "Order grounded track_ids into a set that follows an energy "
+                "CURVE preset (opener / peak_time / after_hours / festival). "
+                "Returns 3-5 ranked candidates with energy_fit, avg_coherence, "
+                "and any relaxed_transitions (BPM/key warnings). Every track_id "
+                "must come from a prior discover_pool/search_vibe result."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "track_ids": types.Schema(
+                        type=types.Type.ARRAY,
+                        items=types.Schema(type=types.Type.STRING),
+                        description="grounded candidate track_ids to order",
+                    ),
+                    "curve": types.Schema(
+                        type=types.Type.STRING,
+                        description=(
+                            "energy curve preset: opener | peak_time | "
+                            "after_hours | festival"
+                        ),
+                    ),
+                    "n_slots": types.Schema(
+                        type=types.Type.INTEGER,
+                        description="set length (default = number of track_ids)",
+                    ),
+                },
+                required=["track_ids", "curve"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="export_set",
+            description=(
+                "Export the chosen ordered set to a Rekordbox-importable XML "
+                "(order + key + BPM + cues). Every track_id must have come from "
+                "a prior discovery result. Call once when the DJ accepts a set."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "name": types.Schema(type=types.Type.STRING),
+                    "track_ids": types.Schema(
+                        type=types.Type.ARRAY,
+                        items=types.Schema(type=types.Type.STRING),
+                        description="ordered set track_ids (the chosen sequence)",
+                    ),
+                    "out_path": types.Schema(
+                        type=types.Type.STRING,
+                        description="optional XML destination path",
+                    ),
+                },
+                required=["name", "track_ids"],
+            ),
+        ),
+    ]
+
+
+def _tool_declarations(
+    interactive: bool = False, set_prep: bool = False
+) -> list[types.FunctionDeclaration]:
     decls = [
         types.FunctionDeclaration(
             name="search_vibe",
@@ -301,6 +469,8 @@ def _tool_declarations(interactive: bool = False) -> list[types.FunctionDeclarat
                 ),
             )
         )
+    if set_prep:
+        decls.extend(_set_prep_declarations())
     return decls
 
 
@@ -338,6 +508,11 @@ class ViberAgent:
     def _created(self) -> PlaylistResult | None:
         return self._toolset.created
 
+    @property
+    def _exported(self) -> Any | None:
+        # BL-02: the set-prep export terminal signal (ExportResult | None).
+        return self._toolset.exported
+
     def _dispatch(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         return self._toolset.dispatch(name, args)
 
@@ -367,6 +542,34 @@ class ViberAgent:
             interactive=False,
             ask_fn=None,
             max_iters=MAX_TOOL_ITERATIONS,
+        )
+
+    def build_set(self, brief: str) -> CurateResult:
+        """Run the bounded SET-PREP loop: discover → sequence → (offer) export.
+
+        Same bounded no-hang harness as ``curate`` (``MAX_TOOL_ITERATIONS``,
+        per-call timeouts, handlers-return-errors), but with the full set-prep
+        tool surface (the 3 base tools + discover_pool / get_track_energy /
+        sequence_set / export_set) and the SET-PREP system instruction. Grounding
+        is unchanged — every track_id is gated through the shared seen-set.
+
+        The set-prep loop may need a couple of extra turns (discover → energy
+        peeks → sequence → export), so it runs at the higher interactive cap.
+        """
+        contents: list[types.Content] = [
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=f"Set brief: {brief}")],
+            )
+        ]
+        return self._run_loop(
+            theme=brief,
+            contents=contents,
+            system_instruction=_set_prep_system_instruction(),
+            interactive=False,
+            ask_fn=None,
+            max_iters=MAX_INTERACTIVE_ITERATIONS,
+            set_prep=True,
         )
 
     def curate_interactive(
@@ -409,10 +612,13 @@ class ViberAgent:
         interactive: bool,
         ask_fn: Callable[[str], str] | None,
         max_iters: int,
+        set_prep: bool = False,
     ) -> CurateResult:
-        """The shared bounded tool-dispatch loop (one-shot + interactive)."""
+        """The shared bounded tool-dispatch loop (one-shot + interactive + set-prep)."""
         tools = [
-            types.Tool(function_declarations=_tool_declarations(interactive))
+            types.Tool(
+                function_declarations=_tool_declarations(interactive, set_prep)
+            )
         ]
         cfg: dict[str, Any] = {
             "system_instruction": system_instruction,
@@ -475,17 +681,28 @@ class ViberAgent:
                 # create_playlist succeeded — one write per run, we're done.
                 stop_reason = "created"
                 break
+            # BL-02: in set-prep, a successful export_set is the terminal write —
+            # break with "exported" so the loop stops instead of running to the
+            # cap. (Plain curation never exports, so this only fires on set-prep.)
+            if set_prep and self._exported is not None:
+                stop_reason = "exported"
+                break
         else:
             # Loop exhausted max_iters without breaking.
             stop_reason = "max_iters"
 
         # Normalize: stop_reason reflects reality. self._created (set only by
         # a successful create_playlist) is the single source of truth — if a
-        # playlist exists the run "created" one, otherwise keep whatever the
-        # loop decided (model_done / max_iters).
+        # playlist exists the run "created" one. A set-prep export is the next
+        # terminal signal; otherwise keep whatever the loop decided.
         if self._created is not None:
             stop_reason = "created"
+        elif self._exported is not None:
+            stop_reason = "exported"
 
+        export_path = (
+            str(self._exported.path) if self._exported is not None else None
+        )
         return CurateResult(
             theme=theme,
             playlist=self._created,
@@ -493,6 +710,7 @@ class ViberAgent:
             iterations=i + 1,
             stop_reason=stop_reason,
             seen_track_ids=sorted(self._seen),
+            export_path=export_path,
         )
 
 

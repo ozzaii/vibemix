@@ -338,6 +338,153 @@ def test_interactive_asks_then_curates(
     assert result.playlist.track_ids == real_ids
 
 
+def test_build_set_runs_bounded_and_returns_result(
+    library, embedder, store, monkeypatch
+):
+    """Set-prep flow: discover_pool → sequence_set → the agent wraps up with
+    text. The bounded harness terminates without hanging and returns a
+    CurateResult whose seen-set holds the discovered (grounded) ids."""
+    from vibemix.library import toolset as tool_mod
+
+    pool_ids = ["t000", "t001", "t002"]
+
+    # Stub the engine handlers so the loop exercises the set-prep tool surface
+    # without touching the store/audio (offline). The toolset's seen-set gate is
+    # the real one — discover_pool records ids, sequence_set checks them.
+    def fake_discover_pool(self, args):
+        for tid in pool_ids:
+            self.seen.add(tid)
+        return {
+            "pool": [
+                {
+                    "track_id": tid,
+                    "title": f"T{tid}",
+                    "artist": "A",
+                    "bpm": 124.0,
+                    "camelot": "8A",
+                    "similarity": 0.9,
+                }
+                for tid in pool_ids
+            ]
+        }
+
+    def fake_sequence_set(self, args):
+        # The real grounding gate still runs first (ids must be in seen).
+        invented = [t for t in args["track_ids"] if t not in self.seen]
+        if invented:
+            return {"error": f"invented: {invented}"}
+        return {
+            "candidates": [
+                {
+                    "track_ids": args["track_ids"],
+                    "energy_fit": 4.2,
+                    "avg_coherence": 0.88,
+                    "relaxed_transitions": [],
+                }
+            ]
+        }
+
+    monkeypatch.setattr(tool_mod.LibraryToolset, "discover_pool", fake_discover_pool)
+    monkeypatch.setattr(tool_mod.LibraryToolset, "sequence_set", fake_sequence_set)
+
+    responses = [
+        _response([_fc("discover_pool", {"query": "dark peak techno", "k": 10})]),
+        _response([_fc("sequence_set", {"track_ids": pool_ids, "curve": "peak_time"})]),
+        # Agent explains the set in text → loop ends cleanly (model_done).
+        _response(text="Built a tight peak-time set: 8A throughout, 124 BPM."),
+    ]
+    client = _scripted_client(responses)
+
+    agent = ViberAgent(client, embedder, store, library, model="fake-model")
+    result = agent.build_set("90-minute dark peak-time set")
+
+    assert result.stop_reason == "model_done"
+    assert set(pool_ids).issubset(set(result.seen_track_ids))
+    assert "peak-time" in result.rationale
+    # Bounded: it did not loop to the cap.
+    assert result.iterations <= 3
+
+
+def test_build_set_export_is_terminal(
+    library, embedder, store, monkeypatch
+):
+    """BL-02: in set-prep, a successful export_set is a terminal write — the
+    loop breaks with stop_reason='exported', CurateResult carries the export
+    path, and the run does NOT continue to the iteration cap."""
+    from vibemix.library import toolset as tool_mod
+    from vibemix.library.export_rekordbox import ExportResult
+    from pathlib import Path
+
+    pool_ids = ["t000", "t001"]
+
+    def fake_discover_pool(self, args):
+        for tid in pool_ids:
+            self.seen.add(tid)
+        return {"pool": [{"track_id": t, "title": f"T{t}", "artist": "A",
+                          "bpm": 124.0, "camelot": "8A", "similarity": 0.9}
+                         for t in pool_ids]}
+
+    def fake_export_set(self, args):
+        # The real grounding gate still applies; record exported like the real one.
+        invented = [t for t in args["track_ids"] if t not in self.seen]
+        if invented:
+            return {"error": f"invented: {invented}"}
+        self.exported = ExportResult(path=Path("/tmp/built-set.xml"), written=2,
+                                     referenced=2)
+        return {"exported": True, "path": "/tmp/built-set.xml",
+                "written": 2, "referenced": 2, "dropped": []}
+
+    monkeypatch.setattr(tool_mod.LibraryToolset, "discover_pool", fake_discover_pool)
+    monkeypatch.setattr(tool_mod.LibraryToolset, "export_set", fake_export_set)
+
+    responses = [
+        _response([_fc("discover_pool", {"query": "dark peak techno"})]),
+        _response([_fc("export_set", {"name": "Built", "track_ids": pool_ids})]),
+        # A 3rd response exists but must NEVER be consumed — export is terminal.
+        _response([_fc("discover_pool", {"query": "again"})]),
+    ]
+    client = _scripted_client(responses)
+
+    agent = ViberAgent(client, embedder, store, library, model="fake-model")
+    result = agent.build_set("90-minute dark peak-time set, export when done")
+
+    assert result.stop_reason == "exported"
+    assert result.export_path == "/tmp/built-set.xml"
+    assert result.to_dict()["export_path"] == "/tmp/built-set.xml"
+    # Terminal: it stopped after the export call (iter 2), not at the cap.
+    assert result.iterations == 2
+    assert client.models.generate_content.call_count == 2
+
+
+def test_build_set_grounding_rejects_invented_id(
+    library, embedder, store, monkeypatch
+):
+    """In set-prep, an id never discovered cannot be sequenced — the real
+    seen-set gate rejects it (grounding holds on the new surface)."""
+    from vibemix.library import toolset as tool_mod
+
+    def fake_discover_pool(self, args):
+        self.seen.add("t000")
+        return {"pool": [{"track_id": "t000", "title": "T", "artist": "A",
+                          "bpm": 124.0, "camelot": "8A", "similarity": 0.9}]}
+
+    monkeypatch.setattr(tool_mod.LibraryToolset, "discover_pool", fake_discover_pool)
+
+    responses = [
+        _response([_fc("discover_pool", {"query": "x"})]),
+        # Model tries to sequence a GHOST it never discovered.
+        _response([_fc("sequence_set", {"track_ids": ["t000", "GHOST"], "curve": "peak_time"})]),
+        _response(text="done"),
+    ]
+    client = _scripted_client(responses)
+
+    agent = ViberAgent(client, embedder, store, library, model="fake-model")
+    result = agent.build_set("set")
+
+    assert "GHOST" not in result.seen_track_ids
+    assert result.stop_reason in ("model_done", "max_iters")
+
+
 def test_get_track_features_camelot_is_deterministic(
     library, embedder, store
 ):

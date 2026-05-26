@@ -328,6 +328,69 @@ def test_returns_written_path(tmp_path):
 # --------------------------------------------------------------------- #
 
 
+# --------------------------------------------------------------------- #
+# WR-03: the CLI export-set re-validates against the live library        #
+# --------------------------------------------------------------------- #
+
+
+def test_cli_export_set_drops_ungrounded_when_library_present():
+    """WR-03. The CLI validation helper drops a set item that resolves to no
+    library track (by id or filepath), keeping only grounded entries."""
+    from vibemix.__main__ import _validate_export_tracks_against_library
+    from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
+
+    lib = RekordboxLibrary()
+    lib.tracks = {
+        "t1": TrackEntry(
+            track_id="t1",
+            title="Real",
+            artist="A",
+            album="",
+            bpm=124.0,
+            key="8A",
+            duration_s=300.0,
+            cues=(),
+            filepath="/Music/real.wav",
+        )
+    }
+    tracks = [
+        {"track_id": "t1", "filepath": "/Music/real.wav", "title": "Real"},
+        {"track_id": "GHOST", "filepath": "/Music/ghost.wav", "title": "Ghost"},
+    ]
+    kept, dropped = _validate_export_tracks_against_library(tracks, lib)
+    kept_ids = [t["track_id"] for t in kept]
+    assert kept_ids == ["t1"]  # only the grounded id survived
+    assert len(dropped) == 1
+    assert dropped[0]["track_id"] == "GHOST"
+    assert "ungrounded" in dropped[0]["reason"]
+
+
+def test_cli_export_set_resolves_by_filepath():
+    """A track with an unknown id but a matching filepath is still grounded."""
+    from vibemix.__main__ import _validate_export_tracks_against_library
+    from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
+
+    lib = RekordboxLibrary()
+    lib.tracks = {
+        "lib-id": TrackEntry(
+            track_id="lib-id",
+            title="Real",
+            artist="A",
+            album="",
+            bpm=124.0,
+            key="8A",
+            duration_s=300.0,
+            cues=(),
+            filepath="/Music/real.wav",
+        )
+    }
+    # id mismatch but filepath matches (normpath) → kept.
+    tracks = [{"track_id": "other-id", "filepath": "/Music/./real.wav"}]
+    kept, dropped = _validate_export_tracks_against_library(tracks, lib)
+    assert len(kept) == 1
+    assert dropped == []
+
+
 def test_file_round_trips_through_pyrekordbox(tmp_path):
     from pyrekordbox.rbxml import RekordboxXml
 

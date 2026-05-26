@@ -222,6 +222,66 @@ def test_busy_frame_mask_ignores_dead_air():
     assert abs(s_core.score - s_padded.score) <= 6.0
 
 
+# ─── BL-01: dynamic_range is INVERTED (sustained wall > peaky) ────────────────
+
+
+def test_dynamic_range_steady_outscores_peaky():
+    """BL-01 direction pin. A STEADY (low-CoV) busy buffer must score a HIGHER
+    ``dynamic_range`` contribution than a PEAKY (high-CoV) one — a sustained
+    wall of energy reads as MORE floor-driving than a track that pumps in and
+    out. Re-breaking the inversion (dropping the ``1.0 -``) flips this and the
+    test fails.
+    """
+    # Steady wall: full-level broadband noise the whole way → tiny RMS variation.
+    steady = _white_noise(12.0, amp=0.6, seed=1)
+    # Peaky: the SAME busy noise but amplitude-modulated by a slow envelope so
+    # the per-frame RMS swings hard (high CoV) while staying busy spectrally.
+    t = np.arange(steady.size, dtype=np.float32) / SR
+    env = (0.5 + 0.5 * np.sin(2 * np.pi * 0.5 * t)).astype(np.float32)  # 0.5Hz pump
+    peaky = (_white_noise(12.0, amp=0.6, seed=1) * env).astype(np.float32)
+
+    s_steady = energy._score_array(steady, SR)
+    s_peaky = energy._score_array(peaky, SR)
+    assert s_steady is not None and s_peaky is not None
+    # Sanity: the peaky buffer really has the higher raw CoV.
+    rms_steady = energy._rms_curve(
+        energy._busy_excerpt(steady, SR), SR, energy.ENERGY_RMS_FRAME_S
+    )
+    rms_peaky = energy._rms_curve(
+        energy._busy_excerpt(peaky, SR), SR, energy.ENERGY_RMS_FRAME_S
+    )
+    assert energy._coeff_of_variation(rms_peaky) > energy._coeff_of_variation(
+        rms_steady
+    )
+    # The INVERTED feature: steady wall contributes MORE dynamic_range energy.
+    assert (
+        s_steady.breakdown["dynamic_range"] > s_peaky.breakdown["dynamic_range"]
+    )
+
+
+# ─── WR-01: brightness reflects the WHOLE excerpt, not just the head ──────────
+
+
+def test_brightness_reflects_whole_excerpt_not_just_head():
+    """WR-01. A track that starts DARK and BRIGHTENS later must yield a centroid
+    between the two halves — proving the centroid is averaged over the whole
+    busy excerpt, not read off the leading ~256ms window (which would read dark
+    forever).
+    """
+    dark = _sine(200.0, 6.0, amp=0.6)  # low-frequency → low centroid
+    bright = _sine(6000.0, 6.0, amp=0.6)  # high-frequency → high centroid
+    dark_then_bright = np.concatenate([dark, bright]).astype(np.float32)
+
+    head_only_dark = energy._brightness(dark, SR)
+    whole = energy._brightness(dark_then_bright, SR)
+    head_only_bright = energy._brightness(bright, SR)
+
+    # The whole-excerpt centroid sits ABOVE the dark head and BELOW the bright
+    # tail — it averaged both halves rather than freezing on the dark head.
+    assert whole > head_only_dark * 1.5
+    assert whole < head_only_bright
+
+
 # ─── normalisation discipline ─────────────────────────────────────────────────
 
 

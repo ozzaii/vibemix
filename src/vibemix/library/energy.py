@@ -32,6 +32,9 @@ returns ``None`` — never a raise, never a fabricated 0.
 
 from __future__ import annotations
 
+import json
+import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -61,7 +64,16 @@ from vibemix.state.detectors._dsp import sub_share
 # normal compressed-dance-master band — we treat that as the neutral reference.
 from vibemix.state.genre.crest_factor import crest_factor
 
-__all__ = ["EnergyScore", "score_energy", "spectral_flux"]
+__all__ = ["EnergyScore", "score_energy", "score_energy_cached", "spectral_flux"]
+
+logger = logging.getLogger("vibemix.library")
+
+# On-disk energy cache (ENERGY-03 — "cached by content signature, re-runs free").
+# Keyed by a CHEAP content signature (abspath + os.stat size + mtime ns), NOT a
+# byte hash: a track's energy is fixed by its bytes, and size+mtime is the
+# standard cheap proxy ffmpeg-decode-then-DSP wants to avoid repeating. A
+# corrupt/missing cache silently degrades to recompute; the cache NEVER raises.
+ENERGY_CACHE_PATH = Path.home() / ".cache" / "vibemix" / "energy.json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,17 +206,46 @@ def _busy_excerpt(samples: np.ndarray, sample_rate: int) -> np.ndarray | None:
 
 
 def _brightness(samples: np.ndarray, sample_rate: int) -> float:
-    """Spectral centroid (Hz) = sum(freq*|S|)/sum(|S|) over a Hanning rfft."""
+    """Mean spectral centroid (Hz) averaged over framed windows.
+
+    WR-01: a single leading window only describes the first ~256ms — a track
+    that starts dark and brightens later would read as dark forever. We frame
+    the WHOLE excerpt the same way ``spectral_flux`` does (n_fft / hop) and
+    average the per-frame centroids so the value reflects the whole busy
+    excerpt's tonal balance, not just its head. Frames with no magnitude
+    (silence) are skipped — they have no defined centroid.
+    """
     n_fft = min(ENERGY_FLUX_FFT, samples.size)
     if n_fft < 2:
         return 0.0
-    x = samples[:n_fft] * np.hanning(n_fft)
-    mag = np.abs(np.fft.rfft(x))
+    hop = ENERGY_FLUX_HOP
+    window = np.hanning(n_fft).astype(np.float32)
     freqs = np.fft.rfftfreq(n_fft, d=1.0 / sample_rate)
-    total = float(mag.sum())
-    if total <= 0.0:
-        return 0.0
-    return float((freqs * mag).sum() / total)
+    n_frames = 1 + (samples.size - n_fft) // hop if samples.size >= n_fft else 0
+
+    centroid_sum = 0.0
+    counted = 0
+    for i in range(max(n_frames, 0)):
+        start = i * hop
+        frame = samples[start : start + n_fft]
+        if frame.size < n_fft:  # ragged tail guard
+            break
+        mag = np.abs(np.fft.rfft(frame * window))
+        total = float(mag.sum())
+        if total > 0.0:
+            centroid_sum += float((freqs * mag).sum() / total)
+            counted += 1
+
+    if counted == 0:
+        # Excerpt shorter than one full frame, or all-silent → single-window
+        # fallback (preserves the prior behaviour for sub-frame inputs).
+        x = samples[:n_fft] * window
+        mag = np.abs(np.fft.rfft(x))
+        total = float(mag.sum())
+        if total <= 0.0:
+            return 0.0
+        return float((freqs * mag).sum() / total)
+    return centroid_sum / counted
 
 
 def _onset_rate(samples: np.ndarray, sample_rate: int) -> float:
@@ -336,7 +377,10 @@ def _score_array(samples: np.ndarray, sample_rate: int) -> EnergyScore | None:
         "spectral_flux": _norm(raw_flux, ENERGY_FLUX_WINDOW),
         "brightness": _norm(raw_brightness, ENERGY_BRIGHTNESS_WINDOW),
         "beat_regularity": _norm(raw_regularity, ENERGY_BEAT_REGULARITY_WINDOW),
-        "dynamic_range": _norm(raw_cov, ENERGY_DYNAMIC_RANGE_WINDOW),
+        # BL-01: INVERTED. A sustained "wall of energy" (low CoV) reads as MORE
+        # floor-driving; a peaky/dynamic track (high CoV) reads as LESS. So a high
+        # raw CoV must LOWER the contribution — hence 1.0 - _norm(...).
+        "dynamic_range": 1.0 - _norm(raw_cov, ENERGY_DYNAMIC_RANGE_WINDOW),
     }
 
     score = sum(ENERGY_WEIGHTS[k] * breakdown[k] for k in ENERGY_WEIGHTS) * 100.0
@@ -362,3 +406,98 @@ def score_energy(audio_path: str, *, sample_rate: int = 16000) -> EnergyScore | 
     if samples is None or getattr(samples, "size", 0) == 0:
         return None
     return _score_array(samples, sample_rate)
+
+
+# ─── content-signature cache (ENERGY-03) ──────────────────────────────────────
+
+
+def _content_signature(audio_path: str) -> str | None:
+    """Cheap content signature: abspath + file size + mtime ns. None if absent.
+
+    Energy is a pure function of the audio bytes; size+mtime is the standard
+    cheap stand-in for "did the bytes change?" — far cheaper than a byte hash on
+    a multi-MB track, and the only failure mode (a same-size, same-mtime edit) is
+    pathological. Any stat failure returns None → the caller recomputes.
+    """
+    try:
+        st = os.stat(audio_path)
+    except OSError:
+        return None
+    return f"{os.path.abspath(audio_path)}::{st.st_size}::{st.st_mtime_ns}"
+
+
+def _load_energy_cache() -> dict:
+    """Read the on-disk cache. Corrupt/missing → empty dict (never raises)."""
+    try:
+        with open(ENERGY_CACHE_PATH, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _store_energy_cache(cache: dict) -> None:
+    """Persist the cache atomically (best-effort, never raises).
+
+    WR-02: a reader must never observe a half-written file. We serialize to a
+    uniquely-named temp file in the SAME directory (so ``os.replace`` is an
+    atomic rename on the same filesystem), then swap it into place. A failed
+    write leaves the prior cache intact; the temp file is cleaned up on error.
+    """
+    import tempfile
+
+    try:
+        ENERGY_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as e:  # pragma: no cover - defensive
+        logger.debug("[energy] cache dir create failed: %s", e)
+        return
+
+    tmp_path: str | None = None
+    try:
+        fd, tmp_path = tempfile.mkstemp(
+            dir=str(ENERGY_CACHE_PATH.parent), prefix=".energy-", suffix=".tmp"
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(cache, fh)
+        os.replace(tmp_path, ENERGY_CACHE_PATH)
+        tmp_path = None  # ownership transferred to the final path
+    except (OSError, TypeError, ValueError) as e:  # pragma: no cover - defensive
+        logger.debug("[energy] cache write failed: %s", e)
+    finally:
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+
+def score_energy_cached(
+    audio_path: str, *, sample_rate: int = 16000
+) -> EnergyScore | None:
+    """``score_energy`` with a transparent on-disk content-signature cache.
+
+    A hit (same path + size + mtime as a prior run) returns the cached score for
+    free — no ffmpeg decode, no DSP. A miss computes via ``score_energy`` and
+    persists the result keyed by the signature. Honest-null (``None`` — no audio
+    / undecodable) is NOT cached: a file that becomes decodable later should get
+    a real score without a cache wipe. The cache layer never raises: a corrupt
+    cache, an unstattable path, or a write failure all degrade to a fresh
+    recompute, preserving ``score_energy``'s exact semantics.
+    """
+    sig = _content_signature(audio_path)
+    cache = _load_energy_cache() if sig is not None else {}
+    if sig is not None:
+        hit = cache.get(sig)
+        if isinstance(hit, dict) and isinstance(hit.get("score"), (int, float)):
+            breakdown = hit.get("breakdown")
+            return EnergyScore(
+                score=float(hit["score"]),
+                breakdown=breakdown if isinstance(breakdown, dict) else {},
+            )
+
+    result = score_energy(audio_path, sample_rate=sample_rate)
+    # Only cache real verdicts — honest-null stays uncached (see docstring).
+    if result is not None and sig is not None:
+        cache[sig] = {"score": result.score, "breakdown": dict(result.breakdown)}
+        _store_energy_cache(cache)
+    return result
