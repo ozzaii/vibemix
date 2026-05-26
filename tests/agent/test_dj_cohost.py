@@ -1209,7 +1209,6 @@ import vibemix.agent.dj_cohost as dj_mod  # noqa: E402
 from vibemix.prompts.matrix import build_system_instruction  # noqa: E402
 
 
-@pytest.mark.xfail(strict=True, reason="LENS-02 — Plan 03 not landed")
 def test_resolve_prompt_cell_uses_shared_lens(tmp_path, monkeypatch) -> None:
     """A shared lens 'critique' resolves the (coach, coach) cell.
 

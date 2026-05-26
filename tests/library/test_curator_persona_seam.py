@@ -173,7 +173,6 @@ def _reset_seam_caches() -> None:
     codex_mod._SYSTEM_PROMPT_CACHE = None
 
 
-@pytest.mark.xfail(strict=True, reason="LENS-02 — Plan 03 not landed")
 def test_curator_seam_reads_shared_lens(tmp_path, monkeypatch) -> None:
     """With extra['lens']='hype', the curator voice reflects the shared lens.
 

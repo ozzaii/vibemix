@@ -97,29 +97,55 @@ _INTERACTIVE_FLOW_BLOCK = (
 # Lazily-built + cached so the seam import fires only on first real use.
 _SYSTEM_INSTRUCTION_CACHE: str | None = None
 _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE: str | None = None
+# Phase 79 LENS-02 — the lens each cache was built under. A lens change between
+# requests (the same process) must rebuild, not serve the stale voice (Flag #3).
+_SYSTEM_INSTRUCTION_LENS: str | None = None
+_INTERACTIVE_SYSTEM_INSTRUCTION_LENS: str | None = None
+
+
+def _shared_lens() -> str:
+    """Read the ONE shared lens (LENS-02), defaulting to ``"tutor"`` when unset.
+
+    Per-surface default-when-unset: the curator cold path is byte-identical to
+    the ``build_curator_instruction("tutor")`` it shipped with. When the user
+    sets a lens once (via the settings bus ``_apply_lens``), that SAME value
+    drives both the curator and the live co-host. Lazy-imported so the seam
+    keeps the import-time no-live-path boundary clean (matrix-seam pattern).
+    """
+    from vibemix.runtime.config_store import load_config
+    from vibemix.runtime.settings import read_shared_lens
+
+    return read_shared_lens(load_config(), default="tutor")
 
 
 def _system_instruction() -> str:
     """Build (and cache) the one-shot curator system instruction from the seam."""
-    global _SYSTEM_INSTRUCTION_CACHE
-    if _SYSTEM_INSTRUCTION_CACHE is None:
+    global _SYSTEM_INSTRUCTION_CACHE, _SYSTEM_INSTRUCTION_LENS
+    lens = _shared_lens()
+    if _SYSTEM_INSTRUCTION_CACHE is None or _SYSTEM_INSTRUCTION_LENS != lens:
         from vibemix.prompts.matrix import build_curator_instruction
 
         _SYSTEM_INSTRUCTION_CACHE = (
-            build_curator_instruction("tutor") + "\n" + _RULES_BLOCK
+            build_curator_instruction(lens) + "\n" + _RULES_BLOCK
         )
+        _SYSTEM_INSTRUCTION_LENS = lens
     return _SYSTEM_INSTRUCTION_CACHE
 
 
 def _interactive_system_instruction() -> str:
     """Build (and cache) the interactive curator system instruction."""
-    global _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE
-    if _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE is None:
+    global _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE, _INTERACTIVE_SYSTEM_INSTRUCTION_LENS
+    lens = _shared_lens()
+    if (
+        _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE is None
+        or _INTERACTIVE_SYSTEM_INSTRUCTION_LENS != lens
+    ):
         from vibemix.prompts.matrix import build_curator_instruction
 
         _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE = (
-            build_curator_instruction("tutor") + "\n" + _INTERACTIVE_FLOW_BLOCK
+            build_curator_instruction(lens) + "\n" + _INTERACTIVE_FLOW_BLOCK
         )
+        _INTERACTIVE_SYSTEM_INSTRUCTION_LENS = lens
     return _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE
 
 

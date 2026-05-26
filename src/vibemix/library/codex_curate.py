@@ -83,15 +83,33 @@ _RULES_BLOCK = (
 )
 
 _SYSTEM_PROMPT_CACHE: str | None = None
+# Phase 79 LENS-02 — the lens the cache was built under (rebuild on change).
+_SYSTEM_PROMPT_LENS: str | None = None
+
+
+def _shared_lens() -> str:
+    """Read the ONE shared lens (LENS-02), defaulting to ``"tutor"`` when unset.
+
+    Same per-surface default-when-unset as the gemini curator seam — the codex
+    backend reads the SAME ``ConfigStore.extra["lens"]`` selection, so choosing a
+    lens once drives every curator backend AND the live co-host. Lazy-imported to
+    keep the import-time no-live-path boundary clean.
+    """
+    from vibemix.runtime.config_store import load_config
+    from vibemix.runtime.settings import read_shared_lens
+
+    return read_shared_lens(load_config(), default="tutor")
 
 
 def _system_prompt() -> str:
     """Build (and cache) the codex curator system prompt from the matrix seam."""
-    global _SYSTEM_PROMPT_CACHE
-    if _SYSTEM_PROMPT_CACHE is None:
+    global _SYSTEM_PROMPT_CACHE, _SYSTEM_PROMPT_LENS
+    lens = _shared_lens()
+    if _SYSTEM_PROMPT_CACHE is None or _SYSTEM_PROMPT_LENS != lens:
         from vibemix.prompts.matrix import build_curator_instruction
 
-        _SYSTEM_PROMPT_CACHE = build_curator_instruction("tutor") + " " + _RULES_BLOCK
+        _SYSTEM_PROMPT_CACHE = build_curator_instruction(lens) + " " + _RULES_BLOCK
+        _SYSTEM_PROMPT_LENS = lens
     return _SYSTEM_PROMPT_CACHE
 
 

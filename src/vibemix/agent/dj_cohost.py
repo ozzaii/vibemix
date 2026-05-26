@@ -319,10 +319,39 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
             non-None ``mood`` arg wins over the env var (used by Plan
             13-06's agent-rebuild-on-mood-change path).
 
+    Phase 79 LENS-02: when a shared lens is set in ``ConfigStore.extra["lens"]``
+    (the ONE selection shared with the curator), it resolves ``(mode, mood)`` via
+    ``LENS_TO_MODE_MOOD`` and drives the cell — choosing the lens once flows here
+    AND to the curator. Precedence is preserved: an explicit ``mood`` arg (the
+    live ``MusicState.mood`` rebuild path) still WINS over the shared lens, which
+    in turn wins over the env/``DEFAULT_*`` cold path. When NO lens is set, the
+    resolution is byte-identical to today (Pitfall 3: route through the one
+    ``extra["lens"]`` read, NOT the orphaned ``VIBEMIX_MODE`` env). A config-read
+    failure falls through to the env/``DEFAULT_*`` path so the cold path never
+    regresses.
+
     Raises ``ValueError`` on unknown skill, mode, or mood (fail loud —
     silent fallback would mask env-var typos).
     """
     skill = os.environ.get(ENV_SKILL_LEVEL, DEFAULT_SKILL_LEVEL)
+
+    # Shared lens read (LENS-02). Lazy + guarded: config_store is import-light
+    # but a read failure must NEVER regress the cold path. An explicit mood arg
+    # wins, so only consult the lens when no mood override was passed.
+    if mood is None:
+        try:
+            from vibemix.runtime.config_store import load_config
+            from vibemix.runtime.settings import read_shared_lens
+
+            lens = read_shared_lens(load_config())
+        except Exception:  # pragma: no cover — guard: any read fail = cold path
+            lens = None
+        if lens is not None:
+            from vibemix.prompts.matrix import LENS_TO_MODE_MOOD
+
+            mode, lens_mood = LENS_TO_MODE_MOOD[lens]
+            return build_system_instruction(skill, mode, lens_mood)
+
     mode = os.environ.get(ENV_MODE, DEFAULT_MODE)
     if mood is None:
         mood = os.environ.get(ENV_MOOD, DEFAULT_MOOD)

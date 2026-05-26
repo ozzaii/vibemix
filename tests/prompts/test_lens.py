@@ -47,9 +47,8 @@ _TEACHER_FRAGMENT = "framework-anchored"
 # not a MOOD_PERSONAS fragment.
 _HYPE_DEFAULT_FRAGMENT = "Kaan's friend in his studio"
 
-# LENS-01 (Plan 02) has landed — its five scaffolds are now real-green; only the
-# LENS-02 (Plan 03) shared-selection scaffold remains xfail-strict.
-_LENS_REASON_02 = "LENS-02 — Plan 03 not landed"
+# LENS-01 (Plan 02) + LENS-02 (Plan 03) have landed — all lens scaffolds are now
+# real-green; no remaining xfail-strict gates in this file.
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +183,6 @@ def test_three_lenses_pass_the_same_gate() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason=_LENS_REASON_02)
 def test_shared_selection_flows_to_both_builders(tmp_path, monkeypatch) -> None:
     """A single shared lens selection drives BOTH the co-host AND the curator.
 
