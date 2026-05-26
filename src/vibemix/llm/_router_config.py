@@ -24,6 +24,10 @@ from google.genai.types import ServiceTier
 # the OpenRouter API is consumed by the LiveKit OpenAI plugin, not by the
 # Gemini SDK, so ServiceTier has no semantic meaning there.
 _ROUTES: dict[str, tuple[str, ServiceTier | None]] = {
+    # Phase 80 / GROUND-02 — "live_coach" is the Phase-81 BENCH bench-swap
+    # alias for the reaction model. Swap the winning model here (one-line edit,
+    # no code change); it resolves at agent/config.py:25 via
+    # resolve("live_coach") and flows to dj_cohost.py as model=LLM_MODEL.
     "live_coach": ("gemini-3.5-flash", ServiceTier.STANDARD),
     "live_coach_tts": ("gemini-3.1-flash-tts-preview", ServiceTier.STANDARD),
     "live_coach_tts_fallback": (

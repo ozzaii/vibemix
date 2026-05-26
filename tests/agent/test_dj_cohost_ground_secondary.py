@@ -43,7 +43,6 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-import pytest
 from google.genai import types
 from livekit.agents import Agent
 
@@ -177,18 +176,13 @@ def test_model_via_router() -> None:
 # ---------- Task 2: RED scaffolds (xfail-strict; flip to green in Plan 02) ----------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Plan 02 adds the secondary_ear kwarg + the 'secondary grounding "
-    "signal' framing clause; today the kwarg/substring do not exist.",
-)
 def test_flag_on_audio_framed(mocker, tmp_path) -> None:
     """Flag ON → Part 1 still present AND the framing token now appears.
 
     Plan 02 threads ``secondary_ear`` as a default-False ``DJCoHostAgent``
     kwarg and appends a "secondary grounding signal" clause to the parts_clause.
-    Today this raises TypeError on the unknown kwarg (or the substring is
-    missing) → xfail-strict.
+    Real-green as of Plan 02: the kwarg exists and the substring lands in
+    ``contents[0]`` while the unconditional Part-1 audio survives.
     """
     agent, gen_client, _, state = _build_agent(
         mocker, tmp_path, mic_audio_buf=None, secondary_ear=True
@@ -213,11 +207,6 @@ def test_flag_on_audio_framed(mocker, tmp_path) -> None:
     assert "secondary grounding signal" in contents[0]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="The flag-ON construction path (the secondary_ear kwarg) does not "
-    "exist yet; Plan 02 wires it and flips this guard to real-green.",
-)
 def test_unbacked_audio_claim_strips(mocker, tmp_path) -> None:
     """THE core guard (T-80-01): an audio-derived claim for an undetected event
     strips the WHOLE turn to ``<silence/>`` — the audio Part cannot widen the
@@ -236,8 +225,8 @@ def test_unbacked_audio_claim_strips(mocker, tmp_path) -> None:
     strip. A fresh ``StrippedRateTracker`` has ``rate()==0.0`` so
     ``should_bypass()`` is False → the strip path (not bypass) fires.
 
-    xfail-strict because the agent cannot be constructed with ``secondary_ear``
-    today; Plan 02 adds the kwarg and this becomes a real pass.
+    Real-green as of Plan 02: the ``secondary_ear`` kwarg now exists, so the
+    flag-ON construction succeeds and the strip chokepoint actually runs.
     """
     # --- registry: seed a real observation, NEVER the phantom ---
     registry = EvidenceRegistry()

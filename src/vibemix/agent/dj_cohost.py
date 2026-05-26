@@ -484,6 +484,16 @@ class DJCoHostAgent(Agent):
         # gate; no separate enabled flag, since the live build already
         # conditions grounding creation on library presence).
         grounding: "Grounding | None" = None,
+        # Phase 80 Plan 02 — GROUND-01: secondary-ear framing flag. Default
+        # False keeps the cold path BYTE-IDENTICAL to the v8.0 baseline (the
+        # Part-1 audio attach is unconditional regardless; this flag gates ONLY
+        # the prompt framing clause built in ``build_parts_description``). When
+        # True, the parts_clause names the live audio a *secondary grounding
+        # signal* and reaffirms the structured evidence is authoritative.
+        # Threaded from a default-OFF ``VIBEMIX_GROUND_SECONDARY_EAR`` env read
+        # in ``__main__.py``. The judgment "is the second ear worth it / which
+        # model wins" is Phase-81 BENCH + KAAN-ACTION.
+        secondary_ear: bool = False,
     ):
         # Resolve which prompt cell to use BEFORE super().__init__ — the
         # parent Agent constructor stores ``instructions`` for LiveKit's
@@ -590,6 +600,9 @@ class DJCoHostAgent(Agent):
         # byte-identical (no dispatch, no injection, no clear).
         self._grounding: "Grounding | None" = grounding
         self._grounding_task: "asyncio.Task | None" = None
+        # Phase 80 Plan 02 — GROUND-01 secondary-ear framing gate. Default
+        # False → parts_clause/contents byte-identical to v8.0.
+        self._secondary_ear: bool = secondary_ear
         # Phase 66 (COPILOT-02) — wall-clock timestamp of the last recall
         # callback that REACHED the audience (the ``await self._ipc_bus.
         # emit(...)`` returned without raising on a turn that emitted a
@@ -1506,6 +1519,11 @@ class DJCoHostAgent(Agent):
                 audio_seconds=float(audio_seconds),
                 has_mic_part=mic_attached,
                 has_lookahead_part=lookahead_attached,
+                # Phase 80 / GROUND-01 — gated framing only; the Part-1 audio
+                # attach below stays UNCONDITIONAL (gating it breaks byte-
+                # identity). Shared by both the genai + OpenRouter brain paths
+                # via contents[0] — no path-specific branch.
+                secondary_ear=self._secondary_ear,
             )
 
             contents: list = [

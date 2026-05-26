@@ -1038,6 +1038,19 @@ async def main() -> None:
         "false",
         "",
     )
+    # Phase 80 Plan 02 — GROUND-01: secondary-ear framing flag, default OFF.
+    # When OFF the reaction request is byte-identical to the v8.0 baseline (the
+    # Part-1 audio still feeds, no new framing). When ON the prompt names the
+    # live audio a *secondary grounding signal* with the structured evidence
+    # authoritative. Gates ONLY the prompt clause — never the Part-1 attach.
+    ground_secondary_ear = os.environ.get(
+        "VIBEMIX_GROUND_SECONDARY_EAR", "0"
+    ).strip().lower() not in ("0", "off", "false", "no", "")
+    print(
+        "-> secondary-ear: ON"
+        if ground_secondary_ear
+        else "-> secondary-ear: OFF (set VIBEMIX_GROUND_SECONDARY_EAR=1 to flip)"
+    )
     try:
         from vibemix.library.embed import LibraryEmbedder as _LibEmbedderForRecall
         from vibemix.memory.retrieval import MemoryRecall as _MemoryRecall
@@ -1098,6 +1111,10 @@ async def main() -> None:
         # the agent's cold path is byte-identical to v5.0.
         recall=recall_svc,
         recall_enabled=recall_enabled,
+        # Phase 80 Plan 02 — GROUND-01 secondary-ear framing gate (default OFF
+        # via VIBEMIX_GROUND_SECONDARY_EAR). Omitting the env var = v8.0
+        # byte-identical behavior.
+        secondary_ear=ground_secondary_ear,
     )
 
     # ── Plan 27-05 final-mile wiring (closes v2.0 register_library orphan, P48) ──
