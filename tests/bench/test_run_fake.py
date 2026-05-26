@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""BENCH-01 — fake-client sweep + per-cell fail-safe (flip in Plan 02).
+"""BENCH-01 — fake-client sweep + per-cell fail-safe (REAL-GREEN, flipped in Plan 02).
 
 The runner takes the client by INJECTION (``library/agent.py:306`` idiom), so
 the offline ``_FakeClient`` / ``_RaisingClient`` fixtures make the whole sweep
-green with ZERO API calls (honest green). Each behavioral assertion is
-``xfail(strict=True)`` until Plan 02 lands ``vibemix.bench.run`` /
+green with ZERO API calls (honest green). The Wave-0 ``xfail(strict=True)``
+scaffolds flipped to real passes when Plan 02 landed ``vibemix.bench.run`` /
 ``vibemix.bench.matrix``.
 
 The fail-safe (Pitfall 2): a per-cell error records ``result.error`` (non-None)
@@ -14,10 +14,7 @@ output. The floor study's real 429 billing block is the documented reason.
 
 from __future__ import annotations
 
-import pytest
 
-
-@pytest.mark.xfail(strict=True, reason="bench/run + bench/matrix land in Plan 02")
 def test_sweep_records_cells_zero_network(fake_client) -> None:
     """A study sweep with the FAKE client records one BenchResult per cell,
     each carrying prompt/output/dsp_snapshot/usage — and makes zero API calls.
@@ -36,7 +33,6 @@ def test_sweep_records_cells_zero_network(fake_client) -> None:
         assert r.error is None
 
 
-@pytest.mark.xfail(strict=True, reason="bench/run fail-safe lands in Plan 02")
 def test_fail_safe_parks_cell_and_continues(raising_client) -> None:
     """With the raising client, each cell's error is recorded as result.error
     (non-None) and the sweep CONTINUES — no abort, no fabricated output."""
@@ -51,7 +47,6 @@ def test_fail_safe_parks_cell_and_continues(raising_client) -> None:
         assert not r.output  # NEVER fabricate output for a failed cell
 
 
-@pytest.mark.xfail(strict=True, reason="bench/run usage capture lands in Plan 02")
 def test_result_carries_usage_from_fake(fake_client) -> None:
     """Each recorded BenchResult carries the cell's usage tokens — the bench
     feeds these to SessionMeter for the real run's cost report."""

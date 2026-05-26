@@ -198,7 +198,9 @@ def _load_env_robust() -> None:
     # not prepend a banner there. argv[1] == "library" is the dispatch guard
     # used by cli_entry below.
     _argv = sys.argv[1:]
-    if not (_argv and _argv[0] == "library"):
+    # Phase 81 — the `vibemix bench <sub>` CLI is a dev-instrument surface; like
+    # `library`, it must not carry the live-runtime startup banner on stderr.
+    if not (_argv and _argv[0] in ("library", "bench")):
         if loaded_from is None:
             print(
                 "-> env: no .env found; using inherited process environment",
@@ -1673,6 +1675,81 @@ def _run_library_cli(argv: list[str]) -> int:
     return int(args.func(args) or 0)
 
 
+# =============================================================================
+# Phase 81 — `vibemix bench <subcommand>` (the validation instrument)
+# =============================================================================
+
+
+def _build_bench_subparsers(parser: argparse.ArgumentParser) -> None:
+    """Build the `bench` subparser tree (Phase 81 / BENCH-01).
+
+    Mirrors ``_build_library_subparsers``: a single ``run`` subcommand drives a
+    bounded study sweep over the funded key. The offline harness/eval are the
+    honest-green proof; this is the documented PRODUCE step (a parked
+    KAAN-ACTION — it never gates the autonomous suite).
+    """
+    sub = parser.add_subparsers(dest="bench_command", required=True)
+
+    sp_run = sub.add_parser(
+        "run",
+        help="Run a bounded bench study on the funded key (the produce step)",
+        description=(
+            "Run one focused bench study (A = arch-axis, B = model-axis, "
+            "no-audio = the decisive dsp_only cell) over the real Gemini key, "
+            "recording each cell verbatim. Per-cell 429 fail-safe: any "
+            "rate-limit/auth/network error parks the cell as {error:...} and "
+            "the sweep continues — never fabricated, never aborted. Prints the "
+            "SessionMeter cost summary on completion."
+        ),
+    )
+    sp_run.add_argument(
+        "--study",
+        choices=("A", "B", "no-audio"),
+        default="A",
+        help="which study to run (default A = the architecture axis)",
+    )
+    sp_run.add_argument(
+        "--out",
+        default=None,
+        help="results JSON path (default: bench_run.json in the cwd)",
+    )
+    sp_run.set_defaults(func=_cmd_bench_run)
+
+
+def _cmd_bench_run(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vibemix.bench.matrix import STUDIES
+    from vibemix.bench.run import run_study
+    from vibemix.library.budget import get_session_meter
+
+    client, err = _library_genai_client()
+    if err is not None:
+        # Fail-safe: no funded client → park as KAAN-ACTION, never block.
+        print(_json.dumps(err), file=sys.stderr)
+        return 1
+
+    cells = STUDIES[args.study]
+    out_path = Path(args.out) if args.out else Path("bench_run.json")
+    results = run_study(cells, client=client, results_path=out_path)
+
+    errored = sum(1 for r in results if r.error is not None)
+    print(
+        f"-> bench: study {args.study} — {len(results)} cells "
+        f"({errored} parked on error) -> {out_path}",
+        file=sys.stderr,
+    )
+    print(_json.dumps(get_session_meter().summary(), indent=2))
+    return 0
+
+
+def _run_bench_cli(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="vibemix bench")
+    _build_bench_subparsers(parser)
+    args = parser.parse_args(argv)
+    return int(args.func(args) or 0)
+
+
 def _library_genai_client():
     """Resolve a genai client for the library query CLI (search / similar).
 
@@ -2229,6 +2306,10 @@ def cli_entry(argv: list[str] | None = None) -> None:
     raw_argv = sys.argv[1:] if argv is None else list(argv)
     if raw_argv and raw_argv[0] == "library":
         sys.exit(_run_library_cli(raw_argv[1:]))
+    # Phase 81 — `vibemix bench <sub>` (the validation-instrument produce step),
+    # dispatched the same way as `library` so the legacy flag layer is untouched.
+    if raw_argv and raw_argv[0] == "bench":
+        sys.exit(_run_bench_cli(raw_argv[1:]))
 
     args = _parse_args(argv)
     # v8.0 LOG-04 — apply the verbose-logging switch before any dispatch so the
