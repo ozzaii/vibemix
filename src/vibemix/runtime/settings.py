@@ -56,6 +56,40 @@ _VALID_MOODS: frozenset[str] = frozenset({"hype-man", "teacher", "coach"})
 _VALID_SKILLS: frozenset[str] = frozenset({"beginner", "intermediate", "pro"})
 _ENV_SKILL_LEVEL = "VIBEMIX_SKILL_LEVEL"
 
+# Phase 79 LENS-02 — the canonical persona-axis enum. MUST equal the keys of
+# ``vibemix.prompts.matrix.LENS_TO_MODE_MOOD`` (the single source of truth for
+# the lens vocabulary, added Plan 02). The set is duplicated as a plain literal
+# rather than imported because matrix drags genai/prompt machinery in and
+# SettingsApplier must stay import-light (same rationale as _VALID_SKILLS above).
+# Keep in sync with matrix.LENS_TO_MODE_MOOD / matrix._CURATOR_LENS_TO_MOOD.
+_VALID_LENSES: frozenset[str] = frozenset({"hype", "critique", "tutor"})
+
+
+def read_shared_lens(
+    store: ConfigStore, default: str | None = None
+) -> str | None:
+    """The ONE shared-lens read consumed by BOTH surfaces (LENS-02).
+
+    Returns ``store.extra["lens"]`` when set (the single shared selection that
+    flows to both the co-host and the curator), else ``default``. The default is
+    PER-SURFACE so each cold path stays byte-identical to today:
+
+      * co-host passes ``default=None`` → falls through to the existing
+        env/``DEFAULT_*`` resolution in ``_resolve_prompt_cell`` (cold path
+        unchanged → ``hype``).
+      * curator passes ``default="tutor"`` → the curator cold path is the
+        hardcoded ``"tutor"`` voice it shipped with.
+
+    This lives in ``settings`` (import-light: stdlib + config_store only) so the
+    curator can lazy-import it without dragging the live/genai stack in. The
+    builders re-validate the returned lens against their own fixed enum
+    (defense-in-depth against a corrupt persisted value — T-79-03-02).
+    """
+    lens = store.extra.get("lens")
+    if isinstance(lens, str) and lens:
+        return lens
+    return default
+
 
 # ---------------------------------------------------------------------------
 # Structural hook protocols — duck-typed; the real implementations live
@@ -186,6 +220,8 @@ class SettingsApplier:
                 return await self._apply_mood(value)
             if field == "skill":
                 return await self._apply_skill(value)
+            if field == "lens":
+                return await self._apply_lens(value)
             if field == "click_through":
                 return await self._apply_click_through(value)
             if field == "lighter_blur":
@@ -432,6 +468,36 @@ class SettingsApplier:
 
         os.environ[_ENV_SKILL_LEVEL] = value
         self.config_store.extra["skill"] = value
+        save_config(self.config_store)
+        return (True, None)
+
+    async def _apply_lens(self, value: Any) -> tuple[bool, str | None]:
+        """Apply the shared persona lens: validate enum → persist to
+        ``ConfigStore.extra["lens"]``.
+
+        Lens is the canonical persona axis (LENS-02): ONE selection read by
+        BOTH the live co-host (``_resolve_prompt_cell`` → ``build_system_instruction``)
+        AND the curator (``build_curator_instruction`` seam). Choosing a lens
+        once flows to both surfaces. Persisting to ``extra`` (an untyped dict,
+        like mood/skill/click_through) survives relaunch without a config-store
+        schema bump — and crucially WITHOUT touching the IPC envelope /
+        ``messages.schema.json`` (no ``npm run codegen:ipc``).
+
+        Unlike skill, lens does NOT export an env var: the co-host reads
+        ``extra["lens"]`` directly via ``read_shared_lens`` at build time. This
+        is the ONE consistent read (Pitfall 3 — do NOT route lens through the
+        orphaned ``VIBEMIX_MODE`` env). It takes effect on the next agent build
+        (co-host) / next curator request (curator cache invalidates on change).
+
+        Like mood/skill, an invalid lens is rejected at this trust boundary with
+        ``(False, "<reason>")`` — no silent fallback that would mask a typo.
+        """
+        if not isinstance(value, str) or value not in _VALID_LENSES:
+            return (
+                False,
+                f"lens must be one of {sorted(_VALID_LENSES)}, got {value!r}",
+            )
+        self.config_store.extra["lens"] = value
         save_config(self.config_store)
         return (True, None)
 

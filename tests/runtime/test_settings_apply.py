@@ -388,7 +388,6 @@ def test_skill_non_string_rejected(store):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="LENS-02 — Plan 03 not landed")
 def test_apply_lens_happy_path(store, _redirect_config_path):
     """apply('lens','critique') → (True, None) and persists extra['lens']."""
     applier = SettingsApplier(config_store=store)
