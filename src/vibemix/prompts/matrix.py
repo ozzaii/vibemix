@@ -600,6 +600,7 @@ def build_parts_description(
     audio_seconds: float,
     has_mic_part: bool,
     has_lookahead_part: bool,
+    secondary_ear: bool = False,
 ) -> str:
     """Anti-slop Part-aware prompt suffix for the DJCoHostAgent llm_node.
 
@@ -618,6 +619,18 @@ def build_parts_description(
             returned non-None bytes). When True AND ``has_mic_part``
             False, lookahead occupies P2; when both True, lookahead
             is P3.
+        secondary_ear: Phase 80 / GROUND-01 gated framing flag. Default
+            False keeps EVERY returned string byte-identical to the v8.0
+            baseline (the flag-OFF cold path adds nothing — not even
+            trailing whitespace). When True, a short "secondary grounding
+            signal" framing clause is appended uniformly to all 4 branches:
+            it names the Part-1 live audio a *secondary* grounding signal,
+            declares the structured evidence authoritative, and forbids
+            claiming an event the evidence does not list. The Part-1 audio
+            attach itself is UNCONDITIONAL (gated in neither path) — this
+            flag gates only the prompt framing text. Threaded from a
+            default-OFF ``VIBEMIX_GROUND_SECONDARY_EAR`` env read →
+            ``DJCoHostAgent(secondary_ear=...)`` → this call.
 
     Returns:
         The full suffix string starting with ``"\\n\\nAttached: "`` and
@@ -641,41 +654,55 @@ def build_parts_description(
     )
     secs = int(audio_seconds)
 
+    # Phase 80 / GROUND-01 — gated secondary-ear framing. Built ONLY when the
+    # flag is True; the empty-string default keeps every branch byte-identical
+    # to the v8.0 baseline on the cold path. Mirrors the anti-prediction guard
+    # phrasing style above ("do NOT describe Part N as if it has played ...").
+    # Names the audio a *secondary* grounding signal, declares the structured
+    # evidence authoritative, and forbids claiming an unlisted event.
+    secondary_clause = ""
+    if secondary_ear:
+        secondary_clause = (
+            " The live audio is a secondary grounding signal — the structured "
+            "evidence above is authoritative; never claim an event the evidence "
+            "does not list."
+        )
+
     if not has_mic_part and not has_lookahead_part:
         # 1-Part baseline — no mic, no lookahead. Mention only P1.
-        return (
+        base = (
             f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
             f"(audience perspective). {refrain}"
         )
-
-    if has_mic_part and not has_lookahead_part:
+    elif has_mic_part and not has_lookahead_part:
         # 2-Part (mic) — P1 mix + P2 mic. No "NOT YET HEARD" labeling.
-        return (
+        base = (
             f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
             f"(audience perspective). P2 = your mic (last 8s, Kaan's "
             f"literal voice). {refrain}"
         )
-
-    if not has_mic_part and has_lookahead_part:
+    elif not has_mic_part and has_lookahead_part:
         # 2-Part (lookahead at P2) — slot numbering stays contiguous when
         # mic is absent. Anti-prediction guard refers to Part 2.
-        return (
+        base = (
             f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
             f"(audience perspective). P2 = 18s from the source file "
             f"ending ~3s past now — NOT YET HEARD BY AUDIENCE; do NOT "
             f"describe Part 2 as if it has played. Use it only to ground "
             f"what you HEAR in Part 1 about to happen. {refrain}"
         )
+    else:
+        # Both True — 3-Part full contract. Mic at P2, lookahead at P3.
+        base = (
+            f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
+            f"(audience perspective). P2 = your mic (last 8s, Kaan's literal "
+            f"voice). P3 = 18s from the source file ending ~3s past now — "
+            f"NOT YET HEARD BY AUDIENCE; do NOT describe Part 3 as if it has "
+            f"played. Use it only to ground what you HEAR in Part 1 about to "
+            f"happen. {refrain}"
+        )
 
-    # Both True — 3-Part full contract. Mic at P2, lookahead at P3.
-    return (
-        f"\n\nAttached: P1 = last {secs}s of live BlackHole audio "
-        f"(audience perspective). P2 = your mic (last 8s, Kaan's literal "
-        f"voice). P3 = 18s from the source file ending ~3s past now — "
-        f"NOT YET HEARD BY AUDIENCE; do NOT describe Part 3 as if it has "
-        f"played. Use it only to ground what you HEAR in Part 1 about to "
-        f"happen. {refrain}"
-    )
+    return base + secondary_clause
 
 
 # ---------------------------------------------------------------------------
