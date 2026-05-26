@@ -508,6 +508,41 @@ pub async fn library_build_set(
     Ok(map_curate_result(&raw))
 }
 
+/// `library_chat` — one conversational, tool-using Viber turn.
+///
+/// Thin bridge over `vibemix library chat <message> --history <json> --json`.
+/// The Python CLI owns the agent/tool logic and returns `ChatResult.to_dict()`:
+/// `{ reply, tool_trace, playlist, export_path, seen_track_ids, iterations,
+/// stop_reason }`. The bridge intentionally does not reshape it so the frontend
+/// can consume the same DTO that backend tests pin.
+#[tauri::command]
+pub async fn library_chat(
+    app: AppHandle,
+    message: String,
+    history: Option<Value>,
+) -> Result<Value, String> {
+    let history_json = history
+        .as_ref()
+        .map(serde_json::to_string)
+        .transpose()
+        .map_err(|e| format!("invalid chat history: {e}"))?;
+
+    // CODEX is the agentic engine (Kaan: "codex default, gemini no"). Passing
+    // it explicitly also trips build_library_command's `any(== "codex")` gate
+    // that sets VIBEMIX_CODEX_ALLOW_SHELL=1 — without it the codex MCP tool
+    // calls are auto-cancelled (upstream bug) and chat returns codex_mcp_blocked.
+    let mut args = vec![
+        "library", "chat", &message, "--backend", "codex", "--json",
+    ];
+    if let Some(ref h) = history_json {
+        args.push("--history");
+        args.push(h.as_str());
+    }
+
+    let (stdout, stderr, code) = run_library_to_completion(&app, &args).await?;
+    parse_cli_json(&stdout, &stderr, code)
+}
+
 /// `library_stats` — lightweight engine status for the UI header.
 ///
 /// Returns `{ indexed:n, backend:"sqlite-vec"|"numpy", spent_eur:f, failed:n }`.
