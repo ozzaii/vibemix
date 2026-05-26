@@ -34,7 +34,7 @@ def _write_minimal_track_xml(tmp_path, *, track_attrs: str, body: str = "") -> P
         '  <PRODUCT Name="vibemix" Version="1.0.0" Company="vibemix-test" />\n'
         '  <COLLECTION Entries="1">\n'
         f'    <TRACK Location="file://localhost//Users/test/Music/edge.mp3" '
-        f'TrackID="edge" Name="Edge" {track_attrs}>\n'
+        f'TrackID="9001" Name="Edge" {track_attrs}>\n'
         f"{body}"
         "    </TRACK>\n"
         "  </COLLECTION>\n"
@@ -228,7 +228,6 @@ def test_cache_miss_on_corrupted_blob(isolated_cache):
 # ===================================================================== #
 
 
-@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
 def test_enriched_metadata_fields(isolated_cache):
     """Track 1 surfaces genre / label / rating(stars) / play_count / comments."""
     lib = RekordboxLibrary()
@@ -242,7 +241,6 @@ def test_enriched_metadata_fields(isolated_cache):
     assert track1.comments == "/* 8A - Energy 8 */"
 
 
-@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
 def test_enriched_metadata_honest_empty_when_absent(isolated_cache):
     """Tracks with no genre/label/comments coerce to typed empties (Invariant #3)."""
     lib = RekordboxLibrary()
@@ -256,7 +254,6 @@ def test_enriched_metadata_honest_empty_when_absent(isolated_cache):
     assert track2.play_count == 0
 
 
-@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
 def test_camelot_computed_at_parse_raw_key_preserved(isolated_cache):
     """track1.camelot is the deterministic Camelot; raw classical key untouched."""
     lib = RekordboxLibrary()
@@ -272,7 +269,6 @@ def test_camelot_computed_at_parse_raw_key_preserved(isolated_cache):
     assert track2.key == "Cm"
 
 
-@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
 def test_camelot_honest_none_on_empty_key(isolated_cache, tmp_path):
     """An empty Tonality -> camelot is None, key is "" (honest, never guessed)."""
     edge = _write_minimal_track_xml(
@@ -280,13 +276,12 @@ def test_camelot_honest_none_on_empty_key(isolated_cache, tmp_path):
     )
     lib = RekordboxLibrary()
     lib.load_xml(edge)
-    track = lib.lookup_by_id("edge")
+    track = lib.lookup_by_id("9001")
     assert track is not None
     assert track.key == ""
     assert track.camelot is None
 
 
-@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
 def test_beatgrid_tempo_nodes_variable_grid(isolated_cache):
     """track1 carries a >=2-node TempoNode beatgrid (variable grid)."""
     from vibemix.library.rekordbox import TempoNode
@@ -305,7 +300,6 @@ def test_beatgrid_tempo_nodes_variable_grid(isolated_cache):
     assert first.battito == 1
 
 
-@pytest.mark.xfail(strict=True, reason="enriched parse lands in Task 2")
 def test_beatgrid_empty_when_absent(isolated_cache):
     """A track with NO TEMPO children -> beatgrid == () (honest empty)."""
     lib = RekordboxLibrary()

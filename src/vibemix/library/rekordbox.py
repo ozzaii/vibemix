@@ -39,7 +39,27 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-__all__ = ["CuePoint", "RekordboxLibrary", "TrackEntry"]
+from vibemix.state.harmonics import to_camelot
+
+__all__ = ["CuePoint", "RekordboxLibrary", "TempoNode", "TrackEntry"]
+
+
+# Rekordbox export writes Rating as a byte from a fixed 6-value ladder; map it
+# to a 0..5 star int. pyrekordbox 0.4.4 ALSO already int-coerces to 0..5 in
+# some paths, so the table passes those through unchanged via the .get fallback.
+_RATING_BYTE_TO_STARS: dict[int, int] = {0: 0, 51: 1, 102: 2, 153: 3, 204: 4, 255: 5}
+
+# PositionMark.Type int -> label. pyrekordbox 0.4.4 already resolves this in its
+# GETTERS, so mark.Type is usually a label string already; this table is the
+# defensive fallback for a raw int (schema drift / older exports).
+_CUE_TYPE_INT_TO_LABEL: dict[int, str] = {
+    0: "cue",
+    1: "fadein",
+    2: "fadeout",
+    3: "load",
+    4: "loop",
+}
+_CUE_TYPE_LABELS: frozenset[str] = frozenset(_CUE_TYPE_INT_TO_LABEL.values())
 
 
 logger = logging.getLogger("vibemix.library")
@@ -67,6 +87,23 @@ class CuePoint:
 
 
 @dataclass(frozen=True, slots=True)
+class TempoNode:
+    """A single Rekordbox TEMPO beatgrid node (``Tempo.ATTRIBS``).
+
+    One node = a constant-tempo grid; multiple nodes = a variable-tempo grid
+    (live / unquantized tracks). ``inizio_s`` is the grid-anchor offset in
+    seconds, ``battito`` the beat-in-bar phase (1..4 for 4/4) — together they
+    give the first-downbeat phase for free. Absent TEMPO -> the owning
+    ``TrackEntry.beatgrid`` is ``()`` (honest empty, never fabricated).
+    """
+
+    inizio_s: float  # Tempo.Inizio — grid-anchor offset in seconds
+    bpm: float  # Tempo.Bpm — BPM at this anchor (variable grid detection)
+    metro: str  # Tempo.Metro — meter, e.g. "4/4"; "" when absent
+    battito: int  # Tempo.Battito — beat-in-bar phase (1..4 for 4/4)
+
+
+@dataclass(frozen=True, slots=True)
 class TrackEntry:
     """A Rekordbox track row joined with its position marks.
 
@@ -91,6 +128,16 @@ class TrackEntry:
     duration_s: float
     cues: tuple[CuePoint, ...]
     filepath: str
+    # Plan 89-02 enrichment — additive, default-coerced (Invariant #3: missing
+    # stays missing). The SCHEMA_VERSION bump invalidates stale v1 caches so
+    # this widened shape never unpickles a short blob.
+    genre: str = ""
+    label: str = ""
+    rating: int = 0  # 0..5 stars (Rekordbox byte ladder normalized)
+    play_count: int = 0
+    comments: str = ""
+    camelot: str | None = None  # to_camelot(key) at parse; None on odd/empty key
+    beatgrid: tuple[TempoNode, ...] = ()  # TEMPO nodes; () when absent
 
 
 @dataclass(slots=True)
@@ -115,7 +162,7 @@ class RekordboxLibrary:
         Source path of the most recent successful load. ``""`` before load.
     """
 
-    SCHEMA_VERSION: int = 1
+    SCHEMA_VERSION: int = 2  # bumped in Plan 89-02 (TrackEntry shape widened)
     STALE_AGE_DAYS: int = 30
 
     # Class attribute (NOT a default arg) so tests can monkeypatch the
@@ -300,6 +347,17 @@ def _track_to_entry(track: Any) -> TrackEntry:
 
     cues = tuple(_mark_to_cue(mark) for mark in getattr(track, "marks", []) or [])
 
+    # --- Plan 89-02 enrichment (all default-coerced; never raise) --- #
+    genre = str(_safe_get(track, "Genre", default="") or "")
+    label = str(_safe_get(track, "Label", default="") or "")
+    comments = str(_safe_get(track, "Comments", default="") or "")
+    rating = _rating_to_stars(_safe_get(track, "Rating", default=0))
+    play_count = _coerce_int(_safe_get(track, "PlayCount", default=0), default=0)
+    # Camelot at parse via the deterministic harmonics table; raw key untouched.
+    # to_camelot is total + honest-None — a false-confident key never surfaces.
+    camelot = to_camelot(key) if key else None
+    beatgrid = _track_to_beatgrid(track)
+
     return TrackEntry(
         track_id=track_id,
         title=title,
@@ -310,13 +368,77 @@ def _track_to_entry(track: Any) -> TrackEntry:
         duration_s=duration_s,
         cues=cues,
         filepath=filepath,
+        genre=genre,
+        label=label,
+        rating=rating,
+        play_count=play_count,
+        comments=comments,
+        camelot=camelot,
+        beatgrid=beatgrid,
     )
+
+
+def _track_to_beatgrid(track: Any) -> tuple[TempoNode, ...]:
+    """Read the TEMPO beatgrid defensively; ``()`` when absent (honest empty).
+
+    pyrekordbox 0.4.4 exposes the TEMPO children via ``track.tempos`` (a list
+    of ``Tempo`` elements). Access is duck-typed + guarded so an older/odd
+    export with no accessor degrades to an empty grid rather than raising.
+    """
+    nodes = _safe_get(track, "tempos", default=None)
+    if not nodes:
+        return ()
+    out: list[TempoNode] = []
+    for node in nodes:
+        inizio = _coerce_float(_safe_get(node, "Inizio", default=0.0), default=0.0)
+        bpm = _coerce_float(_safe_get(node, "Bpm", default=0.0), default=0.0)
+        metro = str(_safe_get(node, "Metro", default="") or "")
+        battito = _coerce_int(_safe_get(node, "Battito", default=1), default=1)
+        out.append(
+            TempoNode(inizio_s=inizio, bpm=bpm, metro=metro, battito=battito)
+        )
+    return tuple(out)
+
+
+def _rating_to_stars(raw: Any) -> int:
+    """Normalize a Rekordbox Rating to a 0..5 star int (never raises).
+
+    The XML byte ladder is {0,51,102,153,204,255} -> 0..5 stars; pyrekordbox
+    0.4.4 may already int-coerce to 0..5. Map a known byte, pass through an
+    already-0..5 value, and clamp anything odd to 0 (Invariant #3 / T-89-05).
+    """
+    val = _coerce_int(raw, default=0)
+    if val in _RATING_BYTE_TO_STARS:
+        return _RATING_BYTE_TO_STARS[val]
+    if 0 <= val <= 5:
+        return val
+    return 0  # odd/garbage value — honest 0, never raise
+
+
+def _coerce_int(raw: Any, *, default: int) -> int:
+    """int(raw) with a total fallback — never raises (T-89-05)."""
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _coerce_float(raw: Any, *, default: float) -> float:
+    """float(raw) with a total fallback — never raises (T-89-05)."""
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
 
 
 def _mark_to_cue(mark: Any) -> CuePoint:
     """Convert a ``pyrekordbox.rbxml.PositionMark`` element to CuePoint."""
     name = str(_safe_get(mark, "Name", default="") or "")
-    mark_type = str(_safe_get(mark, "Type", default="cue") or "cue")
+    mark_type = _resolve_cue_type(_safe_get(mark, "Type", default=0))
     start_val = _safe_get(mark, "Start", default=0.0)
     start_s = float(start_val) if start_val is not None else 0.0
     end_val = _safe_get(mark, "End", default=None)
@@ -333,6 +455,21 @@ def _mark_to_cue(mark: Any) -> CuePoint:
         end_s=end_s,
         number=number,
     )
+
+
+def _resolve_cue_type(raw: Any) -> str:
+    """Map a PositionMark.Type to its label vocabulary; "cue" on unknown.
+
+    pyrekordbox 0.4.4 already resolves the int -> label string in its GETTERS,
+    so ``raw`` is usually one of {"cue","fadein","fadeout","load","loop"} —
+    passed through unchanged. The defensive path int-coerces a raw int Type
+    (schema drift / older exports) and maps it; anything unknown / odd falls
+    back to "cue" (T-89-05 — never raise on a garbage Type).
+    """
+    if isinstance(raw, str) and raw in _CUE_TYPE_LABELS:
+        return raw  # already a known label (the pyrekordbox 0.4.4 common case)
+    type_int = _coerce_int(raw, default=0)
+    return _CUE_TYPE_INT_TO_LABEL.get(type_int, "cue")
 
 
 def _safe_get(obj: Any, attr: str, default: Any = None) -> Any:
