@@ -20,3 +20,13 @@ and lie outside its scope fence — left untouched per the executor scope bounda
   Pre-existing in the working tree; outside 89-02 scope fence.
 
 89-02's own surface (`tests/library/test_rekordbox.py`) is fully green: 18 passed.
+
+## Update from 89-01 executor (2026-05-26)
+
+- The four `tests/library/test_sources_rekordbox.py` tests above are now GREEN — 89-01
+  landed `RekordboxSource` + `ingest_source` and removed the strict-xfail markers.
+- `tests/security/test_no_api_key_surface.py::test_no_api_key_label_text_anywhere_in_ui`
+  STILL fails: offender is `tauri/ui/src/library/index.ts:217` ("Add a Gemini key…"),
+  committed in Phase 88 (`ea9ceff`), unmodified by 89-01, frontend, outside the 89-01
+  Python scope fence. Left untouched per the executor scope boundary — a frontend/Phase-88
+  owner must reword that empty-state string.

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v8.2
 milestone_name: Set Builder
 status: planning
-last_updated: "2026-05-26T13:15:57.911Z"
-last_activity: 2026-05-26 — Phase 89 Plan 02 complete (Rekordbox metadata richness)
+last_updated: "2026-05-26T13:24:14.245Z"
+last_activity: 2026-05-26 — Phase 89 Plan 01 complete (DJ-library ingest walking skeleton: RekordboxSource + ingest_source + library ingest CLI)
 progress:
   total_phases: 12
   completed_phases: 6
-  total_plans: 19
-  completed_plans: 19
+  total_plans: 20
+  completed_plans: 20
   percent: 50
 ---
 
@@ -37,10 +37,21 @@ See: .planning/PROJECT.md (Current Milestone: v8.2 "Set Builder")
 
 ## Current Position
 
-Phase: 89 (DJ-Library Ingest, Rekordbox MVP slice) — Plan 02 COMPLETE; v8.2 "Set Builder" roadmapped (Phases 83–88)
-Plan: 89-02 done (1/3 plans summarized; 89-01 + 89-03 in flight, parallel)
-Status: 89-02 enriched-Rekordbox-parse landed; ready to plan Phase 83 (ENERGY) / continue Phase 89
-Last activity: 2026-05-26 — Phase 89 Plan 02 complete (Rekordbox metadata richness)
+Phase: 89 (DJ-Library Ingest, Rekordbox MVP slice) — Plans 01 + 02 COMPLETE; v8.2 "Set Builder" roadmapped (Phases 83–88)
+Plan: 89-01 + 89-02 done (2/3 plans summarized; 89-03 cue-anchored embed in flight)
+Status: 89-01 ingest walking skeleton landed (detect→parse→CLAP-embed→store); ready to plan Phase 83 (ENERGY) / continue Phase 89 (89-03)
+Last activity: 2026-05-26 — Phase 89 Plan 01 complete (DJ-library ingest walking skeleton)
+
+### Plan 89-01 — DJ-library ingest walking skeleton (complete 2026-05-26)
+
+- **The thinnest viable detect→parse→embed→store vertical SHIPPED on ONE source (Rekordbox), keyless + on-device.** `vibemix library ingest` (no args) auto-detects the Rekordbox `collection.xml`, parses each track via the existing `RekordboxLibrary`, embeds it via the staged `ClapEngine` (512-dim, no Gemini key, audio never leaves the machine), and stores the vectors resumably + honestly.
+- **`library/sources/base.py` — `LibrarySource` `@runtime_checkable` Protocol** (detect/default_paths/iter_tracks + `name`): the firewall so ingest depends on the contract, not a concrete source — Serato/Traktor slot in with zero `ingest.py` edits. Lazy-import-clean (typing+pathlib only; no torch).
+- **`library/sources/rekordbox.py` — `RekordboxSource`:** probes standard macOS + Windows export locations (OS-tolerant `expanduser`), records `resolved_path`, iterates `TrackEntry` over `RekordboxLibrary` (cache-warm then `load_xml`). XML-only — SQLCipher `master.db` never opened (AST repo-scrub gate clean; only docstring mentions of the ban).
+- **`library/ingest.py` — `ingest_source`:** mirrors `folder_ingest`'s resumable/honest loop. Resumable via a CLAP-namespaced content-hash cache (`clap_embeddings.db`, key = sha256(file-bytes)‖backend‖`INGEST_STRATEGY_VERSION="v1-clap-wholetrack"`) → ~0 re-embeds on re-run. Honest: missing/unreadable file or embed raise → `failed`+continue, never a faked vector (Invariant #3). Dim-posture-locked: recreate empty-mismatch store; fail-loud RuntimeError on a NON-empty dim mismatch (defers the 512↔1536 reconciliation to the CLAP-wiring session). Writes `library.pkl` for title resolution.
+- **`__main__.py` — `library ingest [path] [--json]` CLI:** keyless `ClapEngine`, actionable "no collection.xml found" message + exit 1 on miss.
+- **TDD:** Task 1 RED (`6aa9686`) + Task 2 GREEN (`927a4e6`). **11/11 ingest+source tests pass.** Full offline suite **4735 passed / 27 skipped / 1 xfailed / 4 xpassed / 1 failed** — the 1 failure (`tests/security/test_no_api_key_surface.py`, `tauri/ui/src/library/index.ts:217` "Add a Gemini key…", committed Phase 88) is frontend, pre-existing, outside the 89-01 Python scope fence; logged to `deferred-items.md`.
+- **Deviations (2 Rule-1 bugs):** (1) `default_paths()` `expanduser` RuntimeError on wrong-OS `~\…` Windows defaults → tolerant per-candidate fallback; (2) `_resolve_local_path` missed pyrekordbox's slash-stripped `private/var/…` host-relative `Location` form → candidate-list slash restore (this was production-blocking — ingest would have found zero files on a real Mac).
+- **Next:** Plan 89-03 (cue-anchored embed — refines whole-track to cue-region windows; the cache version tag `v1-clap-wholetrack` invalidates cleanly on the swap); or `/gsd:plan-phase 83` (ENERGY).
 
 ### Plan 89-02 — Rekordbox metadata-richness refinement (complete 2026-05-26)
 

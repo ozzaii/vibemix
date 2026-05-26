@@ -492,7 +492,7 @@ Full archive: `.planning/milestones/v3.1-ROADMAP.md` · Requirements: `.planning
 **Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 89-01-PLAN.md — Walking-skeleton ingest slice: auto-detect collection.xml + LibrarySource protocol + ingest_source orchestrator (detect → parse → on-device clap embed → sqlite-vec store, resumable/honest) + `library ingest` CLI
+- [x] 89-01-PLAN.md — Walking-skeleton ingest slice: auto-detect collection.xml + LibrarySource protocol + ingest_source orchestrator (detect → parse → on-device clap embed → sqlite-vec store, resumable/honest) + `library ingest` CLI
 - [x] 89-02-PLAN.md — Metadata-richness slice: extend rekordbox.py to read genre/label/rating/play_count/comments + TEMPO beatgrid + Camelot-at-parse + cue Type fidelity; SCHEMA_VERSION bump
 - [ ] 89-03-PLAN.md — Cue-anchored excerpt slice: excerpt.py (dj-first CueAnchors, detect_cues auto fallback) → ≤80s windows; rewire ingest to mean-pool cue-anchored CLAP vectors
 
