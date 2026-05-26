@@ -729,14 +729,253 @@ def build_set_with_codex(
     )
 
 
+# --------------------------------------------------------------------------- #
+# Viber CHAT over Codex — the conversational co-host on the agentic engine.    #
+# Same MCP grounded-tool surface + same guards as curate; free-text reply.     #
+# --------------------------------------------------------------------------- #
+
+# Chat is multi-turn + may chain several tools (search → quote → web → reply),
+# so it gets the longer outer wall-clock like set-prep.
+CHAT_TIMEOUT_S = 300.0
+
+# Structured final message for a chat turn. Like _OUTPUT_SCHEMA: every property
+# is `required` + additionalProperties:false (structured-output constraint).
+_CHAT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "reply": {"type": "string"},
+        "tools_used": {"type": "array", "items": {"type": "string"}},
+        "track_ids": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["reply", "tools_used", "track_ids"],
+    "additionalProperties": False,
+}
+
+_CHAT_RULES_BLOCK = (
+    "You are in an ongoing CHAT with a DJ — talk like a real friend in their "
+    "ear: concrete, tight, no generic AI filler. Use ONLY the provided tools to "
+    "ground facts.\n"
+    "RULES (non-negotiable):\n"
+    "1. Only name a track that a search_vibe / discover_pool call returned THIS "
+    "run. Never invent a track, title, artist, BPM, or key.\n"
+    "2. Keys / BPM / energy come from the tools (get_track_features / "
+    "get_track_energy), never your memory.\n"
+    "3. Ground a web / technique / YouTube claim with the matching tool "
+    "(web_search / retrieve_dj_knowledge / ingest_youtube) — let the source "
+    "show.\n"
+    "4. You do NOT have to call a tool every turn; if they're just chatting, "
+    "chat back.\n"
+    "5. When done, return the final JSON {reply, tools_used, track_ids}: reply "
+    "is your spoken answer to the DJ; tools_used lists the tool names you "
+    "called this turn; track_ids is any library track you referenced (in "
+    "order, empty if none)."
+)
+
+
+def _chat_system_prompt() -> str:
+    """Codex chat system prompt — shared curator voice + chat rules + taste."""
+    from vibemix.prompts.matrix import build_curator_instruction
+
+    return (
+        build_curator_instruction(_shared_lens())
+        + "\n"
+        + _CHAT_RULES_BLOCK
+        + _taste_hint()
+    )
+
+
+def chat_prompt(message: str, history: list[dict[str, Any]] | None = None) -> str:
+    """Render the chat system prompt + the conversation so far + the new turn."""
+    convo = ""
+    for turn in history or []:
+        if not isinstance(turn, dict):
+            continue
+        text = str(turn.get("text") or "").strip()
+        if not text:
+            continue
+        speaker = "You" if turn.get("role") == "viber" else "DJ"
+        convo += f"{speaker}: {text}\n"
+    convo += f"DJ: {message.strip()}"
+    return (
+        f"{_chat_system_prompt()}\n\nConversation so far:\n{convo}\n\n"
+        "Reply to the DJ's last message."
+    )
+
+
+@dataclass(slots=True)
+class CodexChatResult:
+    """Outcome of one Codex chat turn (normalized to the Gemini ChatResult shape)."""
+
+    reply: str = ""
+    tools_used: list[str] = field(default_factory=list)
+    track_ids: list[str] = field(default_factory=list)
+    stop_reason: str = "model_done"
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        # Match agent.ChatResult.to_dict so the Tauri bridge reads ONE shape
+        # regardless of backend. tools_used → tool_trace rows; track_ids →
+        # seen_track_ids. An error degrades into a spoken reply so the chat UI
+        # always shows something honest.
+        reply = self.reply or (self.error or "")
+        return {
+            "reply": reply,
+            "tool_trace": [
+                {"name": n, "arg": "", "ok": True} for n in self.tools_used
+            ],
+            "playlist": None,
+            "export_path": None,
+            "seen_track_ids": self.track_ids,
+            "iterations": 0,
+            "stop_reason": self.stop_reason,
+        }
+
+
+def chat_with_codex(
+    message: str,
+    library: RekordboxLibrary,
+    *,
+    history: list[dict[str, Any]] | None = None,
+    timeout_s: float = CHAT_TIMEOUT_S,
+    codex_path: str | None = None,
+    mcp_command: str | None = None,
+    mcp_args: list[str] | None = None,
+    allow_shell: bool | None = None,
+    _runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+) -> CodexChatResult:
+    """One conversational Viber turn via ``codex exec`` + the MCP grounded tools.
+
+    Mirrors :func:`curate_with_codex` (same guards: not-installed / mcp-blocked /
+    timeout / auth / parse / grounding re-validation), but the model returns a
+    free-text ``reply`` plus the tools it used. ``library`` is read-only — only
+    for re-validating any ``track_ids`` the reply referenced (Invariant #2 at the
+    result boundary).
+    """
+    if allow_shell is None:
+        allow_shell = os.environ.get("VIBEMIX_CODEX_ALLOW_SHELL", "").strip() not in (
+            "",
+            "0",
+            "false",
+            "no",
+        )
+
+    codex = find_codex(codex_path)
+    if codex is None:
+        return CodexChatResult(
+            stop_reason="codex_not_installed",
+            error=(
+                "Codex CLI not found. Install it (`npm i -g @openai/codex` or "
+                "`brew install codex`) and run `codex login`."
+            ),
+        )
+    if not allow_shell:
+        return CodexChatResult(
+            stop_reason="codex_mcp_blocked",
+            error=(
+                "Codex's MCP tool calls are auto-cancelled in non-interactive "
+                "mode (upstream bug openai/codex#16685). Set "
+                "VIBEMIX_CODEX_ALLOW_SHELL=1 to use the Codex backend."
+            ),
+        )
+
+    command = mcp_command or sys.executable
+    args = mcp_args if mcp_args is not None else ["-m", "vibemix.library.mcp_server"]
+
+    with tempfile.TemporaryDirectory(prefix="viber-codex-chat-") as td:
+        schema_path = str(Path(td) / "schema.json")
+        out_path = str(Path(td) / "out.json")
+        Path(schema_path).write_text(json.dumps(_CHAT_SCHEMA), encoding="utf-8")
+
+        argv = build_argv(
+            codex,
+            mcp_command=command,
+            mcp_args=args,
+            schema_path=schema_path,
+            out_path=out_path,
+            prompt=chat_prompt(message, history),
+            bypass_sandbox=allow_shell,
+        )
+
+        try:
+            proc = _runner(
+                argv,
+                capture_output=True,
+                text=True,
+                timeout=timeout_s,
+                stdin=subprocess.DEVNULL,
+            )
+        except FileNotFoundError:
+            return CodexChatResult(
+                stop_reason="codex_not_installed",
+                error="Codex CLI disappeared at spawn time.",
+            )
+        except subprocess.TimeoutExpired:
+            return CodexChatResult(
+                stop_reason="timeout",
+                error=f"Codex did not finish within {timeout_s:.0f}s.",
+            )
+
+        stderr = proc.stderr or ""
+        if proc.returncode != 0:
+            low = stderr.lower()
+            if any(h in low for h in _AUTH_HINTS):
+                return CodexChatResult(
+                    stop_reason="codex_auth_required",
+                    error="Codex is not logged in. Run `codex login`.",
+                )
+            return CodexChatResult(
+                stop_reason="error",
+                error=f"codex exec failed (exit {proc.returncode}): {stderr.strip()[:400]}",
+            )
+
+        try:
+            raw = Path(out_path).read_text(encoding="utf-8").strip()
+        except OSError:
+            raw = ""
+        if not raw:
+            return CodexChatResult(
+                stop_reason="empty_output", error="Codex produced no output."
+            )
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            return CodexChatResult(
+                stop_reason="empty_output", error="Codex output was not valid JSON."
+            )
+        if not isinstance(payload, dict):
+            return CodexChatResult(
+                stop_reason="empty_output", error="Codex output was not an object."
+            )
+
+    reply = str(payload.get("reply", "")).strip()
+    tools_used = [t for t in (payload.get("tools_used") or []) if isinstance(t, str)]
+    raw_ids = [t for t in (payload.get("track_ids") or []) if isinstance(t, str)]
+    # Grounding at the result boundary: keep only ids that resolve in the library.
+    track_ids = _validate_against_library(raw_ids, library)
+    if not reply and not tools_used:
+        return CodexChatResult(
+            stop_reason="empty_output", error="Codex returned an empty reply."
+        )
+    return CodexChatResult(
+        reply=reply,
+        tools_used=tools_used,
+        track_ids=track_ids,
+        stop_reason="model_done",
+    )
+
+
 __all__ = [
     "BUILD_SET_TIMEOUT_S",
+    "CHAT_TIMEOUT_S",
     "DEFAULT_TIMEOUT_S",
+    "CodexChatResult",
     "CodexCurateResult",
     "build_argv",
     "build_prompt",
     "build_set_prompt",
     "build_set_with_codex",
+    "chat_prompt",
+    "chat_with_codex",
     "curate_with_codex",
     "find_codex",
 ]

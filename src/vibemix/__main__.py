@@ -1687,6 +1687,40 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_build_set.add_argument("--json", action="store_true")
     sp_build_set.set_defaults(func=_cmd_library_build_set)
 
+    # Viber chat — the conversational co-host (one turn per invocation; the
+    # caller threads prior turns via --history so the CLI stays stateless and
+    # the Tauri bridge can drive a live conversation).
+    sp_chat = sub.add_parser(
+        "chat",
+        help="Talk to Viber — conversational, tool-using DJ co-host (one turn)",
+        description=(
+            "One conversational turn with the Viber co-host. The model may call "
+            "any grounded tool (search/discover/quote/web/youtube/knowledge/"
+            "curate/build) before it replies. Stateless: pass the prior "
+            "conversation via --history (JSON) to continue it. Emits a JSON "
+            "ChatResult (reply / tool_trace / playlist / export_path)."
+        ),
+    )
+    sp_chat.add_argument("message", help="the user's message this turn")
+    sp_chat.add_argument(
+        "--history",
+        default=None,
+        help='prior turns as JSON: [{"role":"you"|"viber","text":...}, ...]',
+    )
+    sp_chat.add_argument(
+        "--backend",
+        choices=("codex", "gemini"),
+        default="codex",
+        help=(
+            "reasoning backend: 'codex' (the agentic engine — your ChatGPT-plan "
+            "Codex CLI via the MCP server, default) or 'gemini' (built-in "
+            "fn-calling fallback). Codex needs `codex login` + "
+            "VIBEMIX_CODEX_ALLOW_SHELL=1."
+        ),
+    )
+    sp_chat.add_argument("--json", action="store_true")
+    sp_chat.set_defaults(func=_cmd_library_chat)
+
     # Vibe Mix engine — export a saved JSON set to Rekordbox XML
     sp_export_set = sub.add_parser(
         "export-set",
@@ -2075,6 +2109,72 @@ def _cmd_library_curate(args: argparse.Namespace) -> int:
     print(
         f"-> playlist '{pl.name}' ({len(pl.track_ids)} tracks) "
         f"saved: {pl.m3u_path}",
+        file=sys.stderr,
+    )
+    return 0
+
+
+def _cmd_library_chat(args: argparse.Namespace) -> int:
+    """Viber chat — one conversational, tool-using co-host turn → JSON.
+
+    Stateless per invocation: the caller threads prior turns via ``--history``
+    so the Tauri bridge can drive a live conversation. Unlike curate/build-set
+    this does NOT hard-fail on a missing library cache — chat can still answer
+    technique / web / YouTube questions; an empty library just means search
+    honestly returns nothing.
+    """
+    import json as _json
+
+    from vibemix.library import RekordboxLibrary
+
+    lib = RekordboxLibrary()
+    lib.try_load_cache()  # best-effort; chat works with an empty library too
+
+    history = None
+    if getattr(args, "history", None):
+        try:
+            parsed = _json.loads(args.history)
+            if isinstance(parsed, list):
+                history = parsed
+        except (ValueError, TypeError):
+            history = None  # malformed history degrades to a fresh turn
+
+    # CODEX is the agentic engine (default). It owns the conversational loop +
+    # MCP grounded tools; the library is read-only for result-boundary grounding.
+    if getattr(args, "backend", "codex") == "codex":
+        from vibemix.library.codex_curate import chat_with_codex
+
+        result = chat_with_codex(args.message, lib, history=history)
+        _json.dump(result.to_dict(), sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        print(
+            f"-> viber chat [codex] ({len(result.tools_used)} tools, "
+            f"stop={result.stop_reason})",
+            file=sys.stderr,
+        )
+        return 0
+
+    # Gemini fallback (built-in fn-calling conversational loop).
+    from vibemix.library import ViberAgent, build_embedder, open_store
+
+    client, err = _library_genai_client()
+    if err is not None:
+        print(_json.dumps(err), file=sys.stderr)
+        return 1
+
+    embedder = build_embedder(client)
+    store = open_store()
+    try:
+        agent = ViberAgent(client, embedder, store, lib)
+        result = agent.chat(args.message, history)
+    finally:
+        store.close()
+
+    _json.dump(result.to_dict(), sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    print(
+        f"-> viber chat ({len(result.tool_trace)} tool calls, "
+        f"stop={result.stop_reason})",
         file=sys.stderr,
     )
     return 0

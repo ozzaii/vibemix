@@ -1,0 +1,445 @@
+<!doctype html>
+<!--
+  vibemix — VIBER AI CHAT (design contract)
+  =========================================
+  Direction: "The Deck Speaks — in conversation."
+  A Codex-style chat where you talk to Viber, the grounded DJ co-host/curator.
+  Viber reasons out loud the way a real DJ friend would — and every capability
+  it just gained (web search, YouTube listening, quote-a-moment, DJ-knowledge,
+  curate/build) is made VISIBLE as it works, then settles into hardware cards.
+
+  Aesthetic (frontend-enforcement): retro-futurist DJ hardware, 20/80.
+  - 80%: void-black console + silk ink (the room is dark, the deck glows faint).
+  - 20%: phosphor amber — and ONLY on Viber's voice, active tool LEDs, and the
+    "receipt" a citation ignites. User ink is cool silk (recessed, you typing
+    into the deck). Magenta appears once, as a clip/alert, never decoration.
+  - Signature gesture: as Viber speaks, an amber underline DRAWS under the line;
+    when it grounds a claim, the source "ignites" as a receipt chip.
+  Tokens copied verbatim from tauri/ui/src/tokens.css so this mock is the
+  real surface, not an approximation. Fonts via Google (Saira + JetBrains Mono)
+  so the file renders standalone; the shipped app uses the bundled woff2.
+-->
+<html lang="en" data-backend="codex">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>vibemix · Viber</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --void:#000;--void-1:#020205;--void-2:#05070b;--void-3:#0a0c12;--void-4:#11141c;
+  --glass-1:rgba(8,10,16,.78);--glass-2:rgba(12,14,22,.62);--glass-3:rgba(2,3,6,.88);
+  --glass-edge:rgba(255,255,255,.065);--glass-edge-up:rgba(255,255,255,.110);--glass-top:rgba(255,255,255,.055);
+  --silk:#d6cfc7;--silk-65:rgba(214,207,199,.65);--silk-40:rgba(214,207,199,.40);--silk-22:rgba(214,207,199,.22);--silk-12:rgba(214,207,199,.12);--silk-06:rgba(214,207,199,.06);
+  --amber:#ff8a3d;--amber-deep:#ff5a1a;--amber-pale:#ffb88a;
+  --amber-22:rgba(255,138,61,.22);--amber-40:rgba(255,138,61,.40);--amber-65:rgba(255,138,61,.65);--amber-78:rgba(255,138,61,.78);
+  --led-ok:#6dd44a;--led-warn:#f4c542;--led-fault:#d4413a;
+  --meter-clip:#ff2d8f;--meter-clip-22:rgba(255,45,143,.22);--meter-clip-40:rgba(255,45,143,.4);
+  --blur-light:blur(16px) saturate(120%);
+  --glow-faint:0 0 5px var(--amber-22);
+  --glow-soft:0 0 6px var(--amber-40),0 0 14px var(--amber-22);
+  --glow-strong:0 0 8px var(--amber-65),0 0 18px var(--amber-22);
+  --c-chip-fg:var(--amber-pale);--c-chip-bg:rgba(255,138,61,.04);--c-chip-bd:var(--amber-22);--c-chip-bd-h:var(--amber-40);--c-chip-bg-h:rgba(255,138,61,.09);
+  --type-display:'Saira',system-ui,sans-serif;--type-body:'Saira',system-ui,sans-serif;--type-mono:'JetBrains Mono',ui-monospace,monospace;
+  --rad-sm:2px;--rad-md:6px;--rad-lg:10px;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:40px;
+  --titlebar-h:56px;--statusbar-h:40px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{
+  color:var(--silk);font-family:var(--type-body);font-size:14px;line-height:1.5;
+  font-variation-settings:"wght" 400;-webkit-font-smoothing:antialiased;
+  background-color:var(--void);
+  background-image:
+    radial-gradient(ellipse 92% 78% at 50% 38%,transparent 0%,rgba(0,0,0,.55) 72%,rgba(0,0,0,.92) 100%),
+    linear-gradient(180deg,#04050b,#000 52%,#030206);
+  background-attachment:fixed;
+}
+/* film grain + fine scanline — surfaces are THINGS, not flat fills */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='5'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>"),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 1px,transparent 1px 3px);
+  mix-blend-mode:overlay;
+}
+
+/* ── console frame ─────────────────────────────────────────────── */
+.console{display:grid;grid-template-rows:var(--titlebar-h) minmax(0,1fr) auto;height:100vh;max-width:760px;margin:0 auto;position:relative}
+
+/* titlebar — VIBER wordmark + backend LED */
+.bar{
+  display:flex;align-items:center;justify-content:space-between;padding:0 var(--sp-5);
+  background:rgba(0,0,0,.55);backdrop-filter:var(--blur-light);
+  border-bottom:1px solid var(--glass-edge);user-select:none;
+}
+.brand{display:flex;align-items:baseline;gap:var(--sp-3)}
+.wordmark{font-family:var(--type-display);font-variation-settings:"wght" 800,"wdth" 88;font-size:19px;letter-spacing:.10em;text-transform:uppercase;line-height:1;color:var(--silk)}
+.wordmark b{color:var(--amber);text-shadow:var(--glow-faint)}
+.sub{font-family:var(--type-mono);font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--silk-40)}
+.backend{display:flex;align-items:center;gap:7px;font-family:var(--type-mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--silk-65)}
+.backend .led{width:7px;height:7px;border-radius:50%;background:var(--led-ok);box-shadow:0 0 6px var(--led-ok),0 0 2px #fff inset;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* thread */
+.thread{overflow-y:auto;padding:var(--sp-6) var(--sp-5) var(--sp-5);scrollbar-gutter:stable;scroll-behavior:smooth}
+.thread::-webkit-scrollbar{width:6px}
+.thread::-webkit-scrollbar-thumb{background:var(--silk-22);border-radius:3px}
+.thread::-webkit-scrollbar-thumb:hover{background:var(--silk-40)}
+
+.turn{margin-bottom:var(--sp-6);animation:rise .42s cubic-bezier(.2,.7,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* role label — segment-LED style tag above each turn */
+.who{font-family:var(--type-mono);font-size:9.5px;letter-spacing:.3em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.who::before{content:"";width:14px;height:1px;background:currentColor;opacity:.5}
+.turn.user .who{color:var(--silk-40)}
+.turn.viber .who{color:var(--amber-78)}
+
+/* user ink — recessed, cool, you typing into the deck */
+.turn.user .body{
+  color:var(--silk-65);font-size:14.5px;
+  border-left:2px solid var(--silk-12);padding-left:var(--sp-4);
+  font-variation-settings:"wght" 400;
+}
+
+/* viber voice — lit hero type on void; the line earns an amber underline */
+.turn.viber .body{font-size:16px;line-height:1.62;color:var(--silk);font-variation-settings:"wght" 400;max-width:60ch}
+.turn.viber .body .lead{color:var(--amber-pale)}
+.turn.viber .body p{margin:0 0 .7em}
+.turn.viber .body .mark{
+  color:var(--silk);position:relative;background-image:linear-gradient(var(--amber),var(--amber));
+  background-repeat:no-repeat;background-position:0 100%;background-size:0% 1.5px;
+  padding-bottom:1px;animation:underline .6s .25s ease-out forwards;
+}
+@keyframes underline{to{background-size:100% 1.5px}}
+
+/* ── tool activity — the "boom boom clap" capabilities, made visible+quiet ─ */
+.tools{display:flex;flex-direction:column;gap:5px;margin:0 0 var(--sp-4)}
+.tool{
+  display:flex;align-items:center;gap:10px;font-family:var(--type-mono);font-size:11px;
+  letter-spacing:.05em;color:var(--silk-40);padding:5px 11px;border-radius:var(--rad-sm);
+  background:linear-gradient(180deg,var(--silk-06),transparent);border:1px solid var(--glass-edge);
+  width:fit-content;animation:rise .3s both;
+}
+.tool .gem{width:6px;height:6px;border-radius:1px;flex:none;background:var(--silk-40);transform:rotate(45deg)}
+.tool .what{color:var(--silk-65)}
+.tool .arg{color:var(--silk-40)}
+.tool.live{color:var(--amber-78);border-color:var(--amber-22);background:linear-gradient(180deg,rgba(255,138,61,.05),transparent)}
+.tool.live .gem{background:var(--amber);box-shadow:var(--glow-faint);animation:pulse 1s ease-in-out infinite}
+.tool.live .what{color:var(--amber-pale)}
+.tool.done .gem{background:var(--led-ok);box-shadow:0 0 5px var(--led-ok)}
+.tool .ms{margin-left:auto;color:var(--silk-22);font-size:10px;padding-left:14px}
+
+/* ── grounded artifact cards — hardware, not flat boxes ─────────── */
+.card{
+  position:relative;border:1px solid var(--glass-edge);border-radius:var(--rad-md);
+  background:var(--glass-2);backdrop-filter:var(--blur-light);overflow:hidden;
+  margin-top:var(--sp-3);box-shadow:inset 0 1px 0 var(--glass-top),inset 0 -1px rgba(0,0,0,.45),0 12px 28px rgba(0,0,0,.45);
+  animation:rise .4s .1s both;
+}
+.card .cap{
+  display:flex;align-items:center;gap:9px;padding:9px 14px;border-bottom:1px solid var(--glass-edge);
+  font-family:var(--type-mono);font-size:9.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--silk-40);
+  background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);
+}
+.card .cap .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:var(--glow-faint)}
+.card .cap .spacer{flex:1}
+
+/* playlist / set card */
+.set .row{display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid var(--silk-06);font-size:13.5px}
+.set .row:last-child{border-bottom:none}
+.set .row .ix{font-family:var(--type-mono);font-size:11px;color:var(--silk-22);width:18px;text-align:right}
+.set .row .ti{flex:1;color:var(--silk);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.set .row .ti small{color:var(--silk-40);font-weight:400}
+.set .row .key{font-family:var(--type-mono);font-size:11px;color:var(--amber-pale);letter-spacing:.04em}
+.set .row .bpm{font-family:var(--type-mono);font-size:11px;color:var(--silk-65);width:42px;text-align:right}
+.set .foot{display:flex;align-items:center;gap:12px;padding:11px 14px;background:rgba(0,0,0,.25)}
+.set .foot .why{flex:1;font-size:12px;color:var(--silk-65);line-height:1.45}
+
+/* quote-a-moment card — a clip Viber points at */
+.quote{padding:12px 14px}
+.quote .head{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.quote .tag{font-family:var(--type-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--void);background:var(--amber);padding:2px 7px;border-radius:var(--rad-sm);font-weight:600}
+.quote .where{font-family:var(--type-mono);font-size:12px;color:var(--amber-pale)}
+.quote .track{font-size:13px;color:var(--silk-65)}
+.quote .scrub{position:relative;height:30px;border-radius:var(--rad-sm);background:repeating-linear-gradient(90deg,var(--silk-12) 0 1px,transparent 1px 4px);border:1px solid var(--glass-edge);overflow:hidden}
+.quote .scrub .win{position:absolute;top:0;bottom:0;left:34%;width:18%;background:linear-gradient(180deg,rgba(255,138,61,.28),rgba(255,138,61,.10));border-left:1.5px solid var(--amber);border-right:1.5px solid var(--amber);box-shadow:var(--glow-faint)}
+.quote .play{display:inline-flex;align-items:center;gap:7px;margin-top:10px;font-family:var(--type-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);cursor:pointer}
+.quote .play .tri{width:0;height:0;border-left:9px solid var(--amber);border-top:6px solid transparent;border-bottom:6px solid transparent;filter:drop-shadow(var(--glow-faint))}
+
+/* youtube "listened" line */
+.yt{display:flex;align-items:center;gap:11px;padding:11px 14px}
+.yt .ic{font-family:var(--type-mono);font-size:11px;color:var(--amber);border:1px solid var(--amber-22);border-radius:var(--rad-sm);padding:3px 6px;letter-spacing:.08em}
+.yt .meta{flex:1;min-width:0}
+.yt .meta .t{font-size:13px;color:var(--silk);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.yt .meta .u{font-family:var(--type-mono);font-size:11px;color:var(--silk-40)}
+
+/* ── receipt chips — the citation ignites under a grounded claim ── */
+.receipts{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--type-mono);font-size:10.5px;letter-spacing:.04em;
+  color:var(--c-chip-fg);background:var(--c-chip-bg);border:1px solid var(--c-chip-bd);
+  padding:3px 9px;border-radius:999px;cursor:pointer;transition:.18s;
+  animation:ignite .5s var(--d,.4s) both;
+}
+.chip:hover{border-color:var(--c-chip-bd-h);background:var(--c-chip-bg-h);box-shadow:var(--glow-faint)}
+.chip .n{color:var(--silk-40)}
+@keyframes ignite{from{opacity:0;transform:translateY(3px) scale(.96);filter:brightness(2)}to{opacity:1;transform:none;filter:none}}
+
+/* ── composer — deck-style input ───────────────────────────────── */
+.composer{
+  padding:var(--sp-4) var(--sp-5) var(--sp-5);background:linear-gradient(0deg,var(--void) 30%,transparent);
+}
+.feed{display:flex;gap:8px;margin-bottom:11px;flex-wrap:wrap}
+.feed button{
+  font-family:var(--type-mono);font-size:10.5px;letter-spacing:.06em;color:var(--silk-65);
+  border:1px solid var(--glass-edge);border-radius:999px;padding:5px 12px;cursor:pointer;transition:.15s;
+  background:linear-gradient(180deg,var(--silk-06),transparent);
+}
+.feed button:hover{color:var(--amber-pale);border-color:var(--amber-22);box-shadow:var(--glow-faint)}
+.inputwrap{
+  display:flex;align-items:flex-end;gap:10px;padding:10px 10px 10px 16px;border-radius:var(--rad-lg);
+  background:var(--glass-3);border:1px solid var(--glass-edge-up);
+  box-shadow:inset 0 1px 0 var(--glass-top),inset 0 -2px 8px rgba(0,0,0,.5),0 8px 24px rgba(0,0,0,.4);
+}
+.inputwrap:focus-within{border-color:var(--amber-40);box-shadow:inset 0 1px 0 var(--glass-top),inset 0 0 14px var(--amber-22),var(--glow-soft)}
+.inputwrap .prompt{font-family:var(--type-mono);color:var(--amber);font-size:15px;line-height:1.7;user-select:none}
+#in{flex:1;background:none;border:none;color:var(--silk);font-family:var(--type-body);font-size:15px;resize:none;outline:none;line-height:1.6;max-height:120px;padding:2px 0}
+#in::placeholder{color:var(--silk-22)}
+.send{
+  flex:none;width:38px;height:38px;border-radius:var(--rad-md);cursor:pointer;display:grid;place-items:center;
+  color:var(--amber);border:1px solid var(--amber-40);
+  background:linear-gradient(180deg,rgba(255,138,61,.16),rgba(255,138,61,.05));
+  box-shadow:inset 0 1px rgba(255,255,255,.1),inset 0 0 12px var(--amber-22);transition:.15s;
+}
+.send:hover{background:linear-gradient(180deg,rgba(255,138,61,.26),rgba(255,138,61,.09));box-shadow:var(--glow-soft)}
+.send .tri{width:0;height:0;border-left:12px solid var(--amber);border-top:8px solid transparent;border-bottom:8px solid transparent;filter:drop-shadow(0 0 4px var(--amber-65))}
+.hint{font-family:var(--type-mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--silk-22);text-align:center;margin-top:9px}
+.hint b{color:var(--silk-40)}
+
+/* typing caret while Viber composes */
+.caret{display:inline-block;width:8px;height:1.05em;vertical-align:-2px;background:var(--amber);margin-left:2px;animation:blink .9s steps(1) infinite;box-shadow:var(--glow-faint)}
+@keyframes blink{50%{opacity:0}}
+</style>
+</head>
+<body>
+<div class="console">
+
+  <!-- titlebar -->
+  <header class="bar">
+    <div class="brand">
+      <span class="wordmark">VI<b>BER</b></span>
+      <span class="sub">co-host · curator</span>
+    </div>
+    <div class="backend"><span class="led"></span> codex · grounded</div>
+  </header>
+
+  <!-- conversation -->
+  <main class="thread" id="thread">
+
+    <!-- opening: Viber greets, lit -->
+    <div class="turn viber">
+      <div class="who">viber</div>
+      <div class="body">
+        <p><span class="lead">Hey — I'm in your library and online.</span> Ask me to dig something up, build a set, point at a moment in a track, or just talk shop. I'll show my work and never put a track in front of you that I can't actually find.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- composer -->
+  <footer class="composer">
+    <div class="feed" id="feed">
+      <button data-q="build me a peak-time warehouse set, dark and hypnotic">build me a peak-time set</button>
+      <button data-q="what's the breakdown you'd mix out of in my track Helix?">quote a moment</button>
+      <button data-q="how do I avoid two basslines clashing on a transition?">ask a technique</button>
+      <button data-q="what is charlotte de witte playing lately?">search the web</button>
+      <button data-q="listen to this and tell me the vibe https://youtu.be/dQw4w9WgXcQ">drop a youtube link</button>
+    </div>
+    <div class="inputwrap">
+      <span class="prompt">›</span>
+      <textarea id="in" rows="1" placeholder="talk to Viber…"></textarea>
+      <button class="send" id="send" aria-label="send"><span class="tri"></span></button>
+    </div>
+    <div class="hint">grounded on your library · <b>enter</b> to send · shift+enter for newline</div>
+  </footer>
+
+</div>
+
+<script>
+/* ───────────────────────────────────────────────────────────────
+   Front-end demo brain. NOT the real agent — a scripted stand-in so
+   the INTERACTION and AESTHETIC are reviewable in a plain browser.
+   Each flow shows: tool activity (live→done) → Viber's voice (with the
+   underline-draw) → grounded artifact card → receipt chips. The real
+   wiring routes the input to the Codex Viber agent + its MCP tools.
+   ─────────────────────────────────────────────────────────────── */
+const thread = document.getElementById('thread');
+const input  = document.getElementById('in');
+const send   = document.getElementById('send');
+const sleep  = ms => new Promise(r => setTimeout(r, ms));
+const scroll = () => thread.scrollTop = thread.scrollHeight;
+const esc    = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function userTurn(text){
+  const el = document.createElement('div');
+  el.className = 'turn user';
+  el.innerHTML = `<div class="who">you</div><div class="body">${esc(text)}</div>`;
+  thread.appendChild(el); scroll();
+}
+
+/* a Viber turn we can stream tool rows + body + artifacts into */
+function viberTurn(){
+  const el = document.createElement('div');
+  el.className = 'turn viber';
+  el.innerHTML = `<div class="who">viber</div><div class="tools"></div><div class="body"></div>`;
+  thread.appendChild(el); scroll();
+  return { tools: el.querySelector('.tools'), body: el.querySelector('.body') };
+}
+
+/* one tool-activity row: appears live (amber, pulsing), then resolves done */
+async function tool(host, gem, what, arg, ms){
+  const row = document.createElement('div');
+  row.className = 'tool live';
+  row.innerHTML = `<span class="gem"></span><span class="what">${what}</span> <span class="arg">${esc(arg)}</span><span class="ms"></span>`;
+  host.appendChild(row); scroll();
+  await sleep(ms);
+  row.classList.remove('live'); row.classList.add('done');
+  row.querySelector('.ms').textContent = ms + 'ms';
+  row.querySelector('.gem').textContent = '';
+}
+
+/* type Viber's sentence; .mark spans draw their amber underline */
+async function say(host, html){
+  const p = document.createElement('p'); host.appendChild(p);
+  const caret = document.createElement('span'); caret.className = 'caret';
+  p.appendChild(caret);
+  // reveal in word chunks for a "composing" feel
+  const tmp = document.createElement('div'); tmp.innerHTML = html;
+  const full = tmp.innerHTML;
+  let shown = '';
+  const tokens = full.split(/(\s+)/);
+  for (const t of tokens){ shown += t; p.innerHTML = shown; p.appendChild(caret); scroll(); await sleep(28); }
+  caret.remove();
+}
+
+function receipts(host, items){
+  const r = document.createElement('div'); r.className = 'receipts';
+  items.forEach((it,i)=>{
+    const c = document.createElement('span'); c.className='chip'; c.style.setProperty('--d',(i*.08+.2)+'s');
+    c.innerHTML = `<span class="n">↳</span> ${esc(it)}`;
+    r.appendChild(c);
+  });
+  host.appendChild(r); scroll();
+}
+
+function card(host, html){
+  const c = document.createElement('div'); c.className='card'; c.innerHTML = html;
+  host.appendChild(c); scroll(); return c;
+}
+
+/* ── flows ─────────────────────────────────────────────────────── */
+async function flowSet(t){
+  await tool(t.tools,'◆','discover_pool','dark · hypnotic · 128–134', 720);
+  await tool(t.tools,'◆','get_track_energy','× 9 candidates', 430);
+  await tool(t.tools,'◆','sequence_set','curve: peak_time', 560);
+  await say(t.body, `Here's a <span class="mark">9-track peak-time arc</span> — opens controlled at 128, rides a hypnotic plateau, lands the heavier 132s late. I kept every transition inside a key-step.`);
+  card(t.body, `
+    <div class="cap"><span class="dot"></span> set · peak_time<span class="spacer"></span>9 tracks · 41 min</div>
+    <div class="set">
+      <div class="row"><span class="ix">1</span><span class="ti">Vorraum <small>· Stigmata</small></span><span class="key">8A</span><span class="bpm">128</span></div>
+      <div class="row"><span class="ix">2</span><span class="ti">Helix <small>· Anetha</small></span><span class="key">8A</span><span class="bpm">130</span></div>
+      <div class="row"><span class="ix">3</span><span class="ti">Null Position <small>· Kobosil</small></span><span class="key">9A</span><span class="bpm">131</span></div>
+      <div class="row"><span class="ix">4</span><span class="ti">Drum Machine <small>· Trym</small></span><span class="key">9A</span><span class="bpm">132</span></div>
+      <div class="row"><span class="ix">5</span><span class="ti">Forge <small>· SPFDJ</small></span><span class="key">9B</span><span class="bpm">133</span></div>
+      <div class="foot">
+        <span class="why">3→4 is the one to watch: same key, +1 BPM, but #4's drop is 8 bars longer — start the blend on its breakdown.</span>
+      </div>
+    </div>`);
+  receipts(t.body, ['Camelot key-step verified','energy curve fit 0.91','exportable → Rekordbox XML']);
+}
+
+async function flowQuote(t){
+  await tool(t.tools,'◆','search_vibe','"Helix"', 380);
+  await tool(t.tools,'◆','quote_moment','Helix · 3:12–3:48', 410);
+  await say(t.body, `The <span class="mark">breakdown at 3:12</span> is your mix-out — the bass drops away and the pad holds for 36 bars. Blend the next intro in right here.`);
+  card(t.body, `
+    <div class="cap"><span class="dot"></span> quote · grounded moment</div>
+    <div class="quote">
+      <div class="head"><span class="tag">breakdown</span><span class="where">3:12 – 3:48</span></div>
+      <div class="track">Helix — Anetha · 8A · 130 BPM</div>
+      <div class="scrub" style="margin-top:10px"><span class="win"></span></div>
+      <span class="play"><span class="tri"></span> play moment</span>
+    </div>`);
+  receipts(t.body, ['resolved in your library','window = 36 bars']);
+}
+
+async function flowTechnique(t){
+  await tool(t.tools,'◆','retrieve_dj_knowledge','topic: eq · bass clash', 520);
+  await say(t.body, `Cut the <span class="mark">low EQ on the incoming track</span> until your swap point — two basslines stacked is what muddies a blend. Swap the bass on a phrase boundary so the kicks trade cleanly, not mid-bar.`);
+  receipts(t.body, ['DJ TechTools — EQ-ing transitions','phrasing: 8/16-bar boundary']);
+}
+
+async function flowWeb(t){
+  await tool(t.tools,'◆','web_search','charlotte de witte 2026 sets', 680);
+  await say(t.body, `Lately she's leaning <span class="mark">harder and faster — 140-ish acid techno</span>, lots of her own KNTXT material and a recurring Häxan alias edit. Want me to find what in your library sits next to that?`);
+  receipts(t.body, ['mixmag.net','residentadvisor.net','1001tracklists.com']);
+}
+
+async function flowYoutube(t){
+  await tool(t.tools,'◆','ingest_youtube','youtu.be/dQw4w9WgXcQ', 1450);
+  await say(t.body, `Listened. It's <span class="mark">upbeat 80s dance-pop</span> — bright synth hook, ~113 BPM, joyful and a little tongue-in-cheek. Structurally a clean verse/chorus, not really a peak-time techno tool — but the intro's drum-machine groove could warm up an early set.`);
+  card(t.body, `
+    <div class="cap"><span class="dot"></span> listened · youtube</div>
+    <div class="yt">
+      <span class="ic">▶ YT</span>
+      <div class="meta"><div class="t">Never Gonna Give You Up</div><div class="u">youtu.be/dQw4w9WgXcQ · ~113 BPM · dance-pop</div></div>
+    </div>`);
+  receipts(t.body, ['gemini · native video','timestamps are hints']);
+}
+
+async function flowDefault(t, text){
+  await tool(t.tools,'◆','search_vibe', text.slice(0,32), 520);
+  await say(t.body, `On it — searching your library for <span class="mark">${esc(text.slice(0,40))}</span> and pulling what actually sits in that pocket. I'll only name tracks I can find on your drive.`);
+  receipts(t.body, ['grounded · your library']);
+}
+
+function route(text){
+  const s = text.toLowerCase();
+  if (/youtu\.?be|youtube|listen/.test(s)) return flowYoutube;
+  if (/set|build|peak|warehouse|arc|sequence/.test(s)) return flowSet;
+  if (/quote|breakdown|moment|mix out|mix-out/.test(s)) return flowQuote;
+  if (/eq|clash|bass|technique|how do i|phras/.test(s)) return flowTechnique;
+  if (/web|charlotte|playing|lately|news|who is/.test(s)) return flowWeb;
+  return (t)=>flowDefault(t,text);
+}
+
+let busy = false;
+async function submit(text){
+  text = (text||'').trim(); if(!text || busy) return;
+  busy = true; input.value=''; input.style.height='auto';
+  userTurn(text);
+  await sleep(280);
+  const t = viberTurn();
+  await sleep(160);
+  await route(text)(t);
+  busy = false; input.focus();
+}
+
+/* wiring */
+send.addEventListener('click', ()=>submit(input.value));
+input.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); submit(input.value); }
+});
+input.addEventListener('input', ()=>{ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,120)+'px'; });
+document.getElementById('feed').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(b) submit(b.dataset.q);
+});
+input.focus();
+</script>
+</body>
+</html>

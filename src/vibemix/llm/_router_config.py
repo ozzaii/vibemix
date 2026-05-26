@@ -38,10 +38,10 @@ _ROUTES: dict[str, tuple[str, ServiceTier | None]] = {
         "google/gemini-3.1-flash-tts-preview",
         None,
     ),
-    "debrief": ("gemini-3-pro-preview", ServiceTier.FLEX),
+    "debrief": ("gemini-3.5-flash", ServiceTier.FLEX),
     "debrief_tts": ("gemini-3-flash-tts-preview", ServiceTier.FLEX),
-    "library_auto_tag": ("gemini-3-flash-preview", ServiceTier.FLEX),
-    "library_agent": ("gemini-3-flash-preview", ServiceTier.FLEX),
+    "library_auto_tag": ("gemini-3.5-flash", ServiceTier.FLEX),
+    "library_agent": ("gemini-3.5-flash", ServiceTier.FLEX),
     "embedding": ("gemini-embedding-2", ServiceTier.FLEX),
 }
 

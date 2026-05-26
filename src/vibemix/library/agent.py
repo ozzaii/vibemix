@@ -55,6 +55,10 @@ MAX_INTERACTIVE_ITERATIONS = 24
 # Hard wall-clock per Gemini call. A hung network can never park the loop.
 # (Per-tool timeout lives in LibraryToolset.dispatch.)
 GEMINI_CALL_TIMEOUT_S = 60.0
+# Transient-overload retry (503/UNAVAILABLE/"high demand" on the Flash preview
+# tier). Bounded so a wedged backend still surfaces an error promptly.
+_GEMINI_RETRIES = 3
+_GEMINI_BACKOFF_S = 2.0
 
 # WIRE-04 (Phase 77 Plan 02): the persona opener is sourced from the shared
 # matrix seam (build_curator_instruction) instead of a hardcoded literal — the
@@ -100,6 +104,27 @@ _SET_PREP_BLOCK = (
     "(a BPM jump or key bridge is a warning, not a hidden flaw).\n"
     "5. Offer to export_set (Rekordbox XML) when the DJ is happy. Keep it tight "
     "— a focused, well-sequenced set beats a padded one."
+)
+
+_CHAT_BLOCK = (
+    "CHAT MODE (you are a DJ co-host in an ongoing conversation, not a one-shot "
+    "playlist bot):\n"
+    "1. Talk like a real DJ friend in their ear — warm, concrete, never generic "
+    "AI filler. Answer the actual question; keep it tight.\n"
+    "2. You have grounded tools and SHOULD use them when they help: search_vibe "
+    "/ discover_pool (find tracks in their library), get_track_features / "
+    "get_track_energy (deterministic facts), quote_moment (point at a [start,end] "
+    "moment in a library track), web_search / fetch_url (facts the library can't "
+    "supply — cite the url), ingest_youtube (listen to a YouTube link), "
+    "retrieve_dj_knowledge (technique with citations), sequence_set + export_set "
+    "(prep a full set), create_playlist (save a curated list).\n"
+    "3. GROUNDING (non-negotiable): only ever name a track that a search_vibe / "
+    "discover_pool call returned THIS conversation. Never invent a track, title, "
+    "artist, BPM, or key. Keys/BPM/energy come from the tools, not your memory. "
+    "When you state a web/technique fact, ground it with a tool and let the "
+    "source show.\n"
+    "4. You do NOT have to call a tool every turn — if they're just chatting, "
+    "chat back. End your turn with a normal spoken reply (not a tool call)."
 )
 
 _INTERACTIVE_FLOW_BLOCK = (
@@ -180,6 +205,19 @@ def _system_instruction() -> str:
     return base + _taste_hint()
 
 
+def _chat_system_instruction() -> str:
+    """Build the conversational chat system instruction (curator voice + CHAT).
+
+    Reuses the SAME shared curator voice (build_curator_instruction(lens)) plus
+    the CHAT flow block. Computed per call (cheap string build; a chat turn is
+    already gated by a network call) so a lens/profile change is always live —
+    no separate cache to invalidate. Grounding lives at the toolset boundary.
+    """
+    from vibemix.prompts.matrix import build_curator_instruction
+
+    return build_curator_instruction(_shared_lens()) + "\n" + _CHAT_BLOCK + _taste_hint()
+
+
 def _interactive_system_instruction() -> str:
     """Build (and cache) the interactive curator system instruction."""
     global _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE, _INTERACTIVE_SYSTEM_INSTRUCTION_LENS
@@ -236,6 +274,40 @@ def __getattr__(name: str) -> str:
     if name == "_SET_PREP_SYSTEM_INSTRUCTION":
         return _set_prep_system_instruction()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+@dataclass(slots=True)
+class ChatResult:
+    """Outcome of one conversational chat turn.
+
+    The chat surface (the "normal Viber AI chat") is multi-turn and tool-using:
+    the model may call any grounded tool (search/discover/quote/web/youtube/
+    knowledge/curate/build) before it replies. ``reply`` is Viber's spoken text;
+    ``tool_trace`` is the ordered list of tools it ran THIS turn (name + a short
+    arg echo + whether it succeeded) so the UI can "show its work" honestly;
+    ``playlist`` / ``export_path`` carry a terminal artifact when the turn
+    produced one. Grounding is unchanged — the trace reflects real tool calls,
+    never narration.
+    """
+
+    reply: str
+    tool_trace: list[dict[str, Any]] = field(default_factory=list)
+    playlist: PlaylistResult | None = None
+    export_path: str | None = None
+    seen_track_ids: list[str] = field(default_factory=list)
+    iterations: int = 0
+    stop_reason: str = "model_done"  # "model_done" | "created" | "exported" | "max_iters"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "reply": self.reply,
+            "tool_trace": self.tool_trace,
+            "playlist": self.playlist.to_dict() if self.playlist else None,
+            "export_path": self.export_path,
+            "seen_track_ids": self.seen_track_ids,
+            "iterations": self.iterations,
+            "stop_reason": self.stop_reason,
+        }
 
 
 @dataclass(slots=True)
@@ -689,15 +761,41 @@ class ViberAgent:
         return self._toolset.dispatch(name, args)
 
     def _gemini_call(self, contents: list[types.Content], cfg: dict[str, Any]):
-        """One generate_content call under a hard wall-clock timeout."""
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-            fut = ex.submit(
-                self._client.models.generate_content,
-                model=self._model,
-                contents=contents,
-                config=cfg,
-            )
-            return fut.result(timeout=GEMINI_CALL_TIMEOUT_S)
+        """One generate_content call under a hard wall-clock timeout.
+
+        Transient server overload (503 / UNAVAILABLE / "high demand") is common
+        on the Flash preview tier and would otherwise leave a turn with an empty
+        reply — so retry a few times with short backoff. Non-transient errors
+        (and the wall-clock timeout) are re-raised to the caller's per-loop
+        handler unchanged.
+        """
+        import time as _time
+
+        last_exc: Exception | None = None
+        for attempt in range(_GEMINI_RETRIES + 1):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(
+                    self._client.models.generate_content,
+                    model=self._model,
+                    contents=contents,
+                    config=cfg,
+                )
+                try:
+                    return fut.result(timeout=GEMINI_CALL_TIMEOUT_S)
+                except concurrent.futures.TimeoutError:
+                    raise  # wall-clock — do not retry, the caller decides
+                except Exception as e:  # noqa: BLE001
+                    msg = str(e).lower()
+                    transient = any(
+                        h in msg
+                        for h in ("503", "unavailable", "overloaded", "high demand", "rate")
+                    )
+                    if not transient or attempt == _GEMINI_RETRIES:
+                        raise
+                    last_exc = e
+                    _time.sleep(_GEMINI_BACKOFF_S * (attempt + 1))
+        if last_exc is not None:  # pragma: no cover — loop returns or raises above
+            raise last_exc
 
     def curate(self, theme: str) -> CurateResult:
         """Run the bounded one-shot curation loop for ``theme``."""
@@ -773,6 +871,110 @@ class ViberAgent:
             interactive=True,
             ask_fn=ask_fn,
             max_iters=max_iters,
+        )
+
+    def chat(
+        self, message: str, history: list[dict[str, Any]] | None = None
+    ) -> ChatResult:
+        """One conversational turn of the Viber chat (multi-turn, tool-using).
+
+        ``history`` is the prior conversation as ``[{"role": "you"|"viber",
+        "text": ...}, ...]`` (oldest first); ``message`` is the new user turn.
+        The model may call any grounded tool before replying. Returns a
+        :class:`ChatResult` with the spoken reply, the ordered tool trace (for
+        the UI to show its work), and any terminal artifact (playlist / export).
+        Grounding is enforced at the toolset boundary exactly as in curate.
+        """
+        contents: list[types.Content] = []
+        for turn in history or []:
+            text = str(turn.get("text") or "").strip()
+            if not text:
+                continue
+            # Gemini roles: the model's prior turns are role="model".
+            role = "model" if turn.get("role") == "viber" else "user"
+            contents.append(
+                types.Content(role=role, parts=[types.Part.from_text(text=text)])
+            )
+        contents.append(
+            types.Content(role="user", parts=[types.Part.from_text(text=message)])
+        )
+        return self._chat_loop(contents)
+
+    def _chat_loop(self, contents: list[types.Content]) -> ChatResult:
+        """Bounded conversational tool-dispatch loop (no forced create)."""
+        # Full capability surface: base 3 + web/youtube/quote/knowledge (base)
+        # + discover/energy/sequence/export/export_cues (set_prep).
+        tools = [
+            types.Tool(function_declarations=_tool_declarations(set_prep=True))
+        ]
+        cfg: dict[str, Any] = {
+            "system_instruction": _chat_system_instruction(),
+            "tools": tools,
+            "automatic_function_calling": {"disable": True},
+        }
+
+        trace: list[dict[str, Any]] = []
+        reply = ""
+        stop_reason = "max_iters"
+        i = 0
+        for i in range(MAX_INTERACTIVE_ITERATIONS):
+            try:
+                response = self._gemini_call(contents, cfg)
+            except concurrent.futures.TimeoutError:
+                logger.warning("[viber] chat Gemini call timed out at iter %d", i)
+                break
+            except Exception as e:  # noqa: BLE001
+                logger.warning("[viber] chat Gemini call failed: %s", e)
+                break
+
+            calls = list(getattr(response, "function_calls", None) or [])
+            cand_content = _first_candidate_content(response)
+            if cand_content is not None:
+                contents.append(cand_content)
+
+            if not calls:
+                # Model spoke — that's the turn's reply.
+                reply = (getattr(response, "text", "") or "").strip()
+                stop_reason = "model_done"
+                break
+
+            tool_parts: list[types.Part] = []
+            for call in calls:
+                args = dict(call.args or {})
+                result = self._dispatch(call.name, args)
+                trace.append(
+                    {
+                        "name": call.name,
+                        "arg": _short_arg(args),
+                        "ok": isinstance(result, dict) and "error" not in result,
+                    }
+                )
+                tool_parts.append(
+                    types.Part.from_function_response(
+                        name=call.name, response=result
+                    )
+                )
+            contents.append(types.Content(role="user", parts=tool_parts))
+        else:
+            stop_reason = "max_iters"
+
+        # Terminal artifacts (if the turn produced one) override the stop reason.
+        if self._created is not None:
+            stop_reason = "created"
+        elif self._exported is not None:
+            stop_reason = "exported"
+
+        export_path = (
+            str(self._exported.path) if self._exported is not None else None
+        )
+        return ChatResult(
+            reply=reply,
+            tool_trace=trace,
+            playlist=self._created,
+            export_path=export_path,
+            seen_track_ids=sorted(self._seen),
+            iterations=i + 1,
+            stop_reason=stop_reason,
         )
 
     def _run_loop(
@@ -886,6 +1088,20 @@ class ViberAgent:
         )
 
 
+def _short_arg(args: dict[str, Any]) -> str:
+    """A short, human arg echo for the chat tool-trace (UI 'shows its work').
+
+    Picks the most telling field (query / track_id / url / theme / name / brief)
+    and truncates — never dumps the whole arg dict into the UI.
+    """
+    for key in ("query", "url", "theme", "brief", "name", "track_id", "curve"):
+        v = args.get(key)
+        if isinstance(v, str) and v.strip():
+            v = v.strip()
+            return v[:40] + "…" if len(v) > 40 else v
+    return ""
+
+
 def _first_candidate_content(response: Any) -> types.Content | None:
     """Extract the model turn's Content for transcript continuity."""
     candidates = getattr(response, "candidates", None)
@@ -899,6 +1115,7 @@ def _first_candidate_content(response: Any) -> types.Content | None:
 __all__ = [
     "MAX_TOOL_ITERATIONS",
     "MAX_INTERACTIVE_ITERATIONS",
+    "ChatResult",
     "CurateResult",
     "ViberAgent",
 ]
