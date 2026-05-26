@@ -127,12 +127,12 @@ describe("renderSessionFrame — CSS variable hot path", () => {
     });
     renderSessionFrame(m, layout);
 
-    expect(m.root.style.getPropertyValue("--meter-music-rms")).toBe("0.42");
-    expect(m.root.style.getPropertyValue("--meter-voice-rms")).toBe("0.11");
-    expect(m.root.style.getPropertyValue("--meter-mic-rms")).toBe("0");
-    expect(m.root.style.getPropertyValue("--phase-now-pct")).toBe("0.6");
-    expect(m.root.style.getPropertyValue("--bpm-period-ms")).toBe("500ms");
-    expect(m.root.style.getPropertyValue("--clock-text")).toContain("12:34:56");
+    // "The Deck Speaks": the single master meter is smoothed (0.16 attack
+    // from 0) and the foot readouts mirror the snapshot. LISTENING + grounded
+    // + all inputs ok → live mode ("").
+    expect(m.meterFill.style.width).toBe("6.7%"); // 0.42*100*0.16
+    expect(m.bpm.textContent).toBe("120.0");
+    expect(m.root.dataset.mode).toBe("");
   });
 
   it("clamps out-of-range values to [0, 1]", () => {
@@ -168,17 +168,17 @@ describe("renderSessionFrame — CSS variable hot path", () => {
         lighter_blur: false,
       },
       muted: false,
-      cohostStatus: "IDLE",
+      cohostStatus: "LISTENING",
       latencyMs: null,
-      grounded: false,
+      grounded: true,
       clockText: "00:00:00",
     });
     renderSessionFrame(m, layout);
 
-    expect(m.root.style.getPropertyValue("--meter-music-rms")).toBe("1");
-    expect(m.root.style.getPropertyValue("--meter-voice-rms")).toBe("0");
-    expect(m.root.style.getPropertyValue("--meter-mic-rms")).toBe("0");
-    expect(m.root.style.getPropertyValue("--phase-now-pct")).toBe("1");
+    // music rms 1.5 clamps to 1 → 100% target; 0.16 attack from 0 = 16.0%.
+    // NaN/negative inputs are irrelevant to the single master meter.
+    expect(m.meterFill.style.width).toBe("16%"); // CSSOM normalizes "16.0%"
+    expect(m.root.dataset.mode).toBe("");
   });
 
   it("omits --bpm-period-ms when bpmPeriodMs is null", () => {
@@ -243,70 +243,10 @@ describe("hotkey formatter", () => {
   });
 });
 
-describe("sticky-bottom transcript behaviour", () => {
-  it("starts in sticky mode (userScrolledUp=false)", () => {
-    const root = host();
-    const m = mountSessionLayout(root);
-    expect(m.userScrolledUp).toBe(false);
-    const tr = m.cohost.querySelector<HTMLElement>(
-      ".vmx-cohost__transcript",
-    );
-    expect(tr).toBeTruthy();
-    expect(tr?.dataset.sticky).toBe("true");
-  });
-
-  it("scroll listener flips userScrolledUp when distance from bottom > 40px", () => {
-    const root = host();
-    const m = mountSessionLayout(root);
-    const tr = m.cohost.querySelector<HTMLElement>(
-      ".vmx-cohost__transcript",
-    );
-    expect(tr).toBeTruthy();
-
-    // jsdom doesn't compute layout; we stub the geometry getters with
-    // configured property descriptors so the listener sees "user is
-    // scrolled up 60px from bottom".
-    Object.defineProperty(tr!, "scrollHeight", {
-      configurable: true,
-      get: () => 1000,
-    });
-    Object.defineProperty(tr!, "clientHeight", {
-      configurable: true,
-      get: () => 400,
-    });
-    // scrollTop is a normal property in jsdom; set directly.
-    tr!.scrollTop = 540; // distFromBottom = 1000 - (540 + 400) = 60 > 40
-    tr!.dispatchEvent(new Event("scroll"));
-
-    expect(m.userScrolledUp).toBe(true);
-    expect(tr!.dataset.sticky).toBe("false");
-  });
-
-  it("scrolling back into the bottom 40px band resets to sticky", () => {
-    const root = host();
-    const m = mountSessionLayout(root);
-    const tr = m.cohost.querySelector<HTMLElement>(
-      ".vmx-cohost__transcript",
-    );
-    Object.defineProperty(tr!, "scrollHeight", {
-      configurable: true,
-      get: () => 1000,
-    });
-    Object.defineProperty(tr!, "clientHeight", {
-      configurable: true,
-      get: () => 400,
-    });
-
-    tr!.scrollTop = 540;
-    tr!.dispatchEvent(new Event("scroll"));
-    expect(m.userScrolledUp).toBe(true);
-
-    tr!.scrollTop = 580; // distFromBottom = 1000 - 980 = 20 <= 40
-    tr!.dispatchEvent(new Event("scroll"));
-    expect(m.userScrolledUp).toBe(false);
-    expect(tr!.dataset.sticky).toBe("true");
-  });
-});
+// The sticky-bottom scrolling-transcript behaviour was removed in the
+// "The Deck Speaks" rebuild (2026-05-26): there is no scrolling chat log —
+// the now-line is the hero and prior lines recede as fixed ghost type, so
+// there is nothing to keep stuck to the bottom.
 
 describe("layout projection", () => {
   it("maps muted → REC pill 'off' and unmuted → 'ok'", () => {

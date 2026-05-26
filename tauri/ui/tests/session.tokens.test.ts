@@ -37,15 +37,18 @@ describe("session surface tokens (wave 2)", () => {
     );
   });
 
-  it("SessionLayout has .border-anim as its first child", async () => {
+  it("SessionLayout drops the perimeter border-anim sweep (Deck Speaks)", async () => {
+    // "The Deck Speaks" rebuild (2026-05-26): the rotating amber perimeter
+    // sweep was removed (an AI-"thinking" gesture at odds with "Pioneer at
+    // rest"). The one breathing amber is now the per-reaction receipt, not a
+    // chasing border.
     const { mountSessionLayout } = await import(
       "../src/session/SessionLayout.js"
     );
     const host = document.createElement("div");
     document.body.append(host);
     const mounted = mountSessionLayout(host);
-    expect(mounted.root.firstElementChild?.classList.contains("border-anim"))
-      .toBe(true);
+    expect(mounted.root.querySelector(".border-anim")).toBeNull();
   });
 
   it("Titlebar renders without legacy token refs", async () => {

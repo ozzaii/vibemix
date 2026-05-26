@@ -115,26 +115,33 @@ describe("cohost MUTED pill — Wave 6 H3", () => {
     expect(panel.querySelector(".vmx-cohost__muted-pill")).toBeNull();
   });
 
-  it("SessionLayout forwards status.muted into the cohost panel", () => {
+  // "The Deck Speaks" rebuild (2026-05-26): mute is no longer a cohost-panel
+  // pill — it's the deck rail's mute control (data-on + label flip).
+  it("SessionLayout reflects status.muted on the deck mute control", () => {
     const root = host();
     const initial = defaultState();
     initial.status.muted = true;
     mountSessionLayout(root, initial);
-    expect(root.querySelector(".vmx-cohost__muted-pill")).toBeTruthy();
+    const mute = root.querySelector<HTMLElement>('[data-action="mute"]');
+    expect(mute?.dataset.on).toBe("true");
+    expect(mute?.textContent).toBe("muted");
   });
 
-  it("renderSessionFrame flips the MUTED pill on status.muted change", () => {
+  it("renderSessionFrame flips the deck mute control on status.muted change", () => {
     const root = host();
     const initial = defaultState();
     const mounted = mountSessionLayout(root, initial);
-    expect(root.querySelector(".vmx-cohost__muted-pill")).toBeNull();
+    const mute = root.querySelector<HTMLElement>('[data-action="mute"]');
+    expect(mute?.dataset.on).toBe("false");
 
     const muted = { ...defaultState(), status: { ...initial.status, muted: true } };
     renderSessionFrame(mounted, muted);
-    expect(root.querySelector(".vmx-cohost__muted-pill")).toBeTruthy();
+    expect(mute?.dataset.on).toBe("true");
+    expect(mute?.textContent).toBe("muted");
 
     const unmuted = { ...defaultState(), status: { ...initial.status, muted: false } };
     renderSessionFrame(mounted, unmuted);
-    expect(root.querySelector(".vmx-cohost__muted-pill")).toBeNull();
+    expect(mute?.dataset.on).toBe("false");
+    expect(mute?.textContent).toBe("mute");
   });
 });

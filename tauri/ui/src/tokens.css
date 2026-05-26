@@ -399,18 +399,19 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* v5 body background — cinematic vignette + restrained rave washes +
- * deep cold base. Replaces the FL-Studio charcoal radial gradients. */
+/* Pure CDJ void (2026-05-26 "The Deck Speaks" rebuild — Kaan ratified).
+ * The five --rave-* aurora washes were cut: two independent /impeccable
+ * critiques flagged them as "neither felt nor absent" hedged slop on a
+ * surface whose whole point is restraint. The floor is now a cinematic
+ * vignette + deep cold linear base only; the film grain (body::before)
+ * still carries the physical-material feel. The --rave-* tokens remain
+ * defined above for any opt-in consumer, but the body no longer paints
+ * them. */
 body {
   background-color: var(--void);
   background-image:
-    radial-gradient(ellipse 92% 78% at 50% 45%, transparent 0%, rgba(0, 0, 0, 0.5) 75%, rgba(0, 0, 0, 0.9) 100%),
-    radial-gradient(ellipse 55% 38% at 18% 22%, var(--rave-magenta), transparent 60%),
-    radial-gradient(ellipse 48% 36% at 84% 78%, var(--rave-cyan),    transparent 55%),
-    radial-gradient(ellipse 60% 42% at 55% 105%, var(--rave-pink),   transparent 60%),
-    radial-gradient(ellipse 35% 28% at 92% 12%, var(--rave-purple),  transparent 55%),
-    radial-gradient(ellipse 28% 22% at 5% 88%,  var(--rave-teal),    transparent 55%),
-    linear-gradient(180deg, #02030a 0%, #000000 55%, #030208 100%);
+    radial-gradient(ellipse 92% 78% at 50% 42%, transparent 0%, rgba(0, 0, 0, 0.55) 72%, rgba(0, 0, 0, 0.92) 100%),
+    linear-gradient(180deg, #04050b 0%, #000000 52%, #030206 100%);
   background-attachment: fixed;
 }
 

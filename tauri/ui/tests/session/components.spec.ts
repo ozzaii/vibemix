@@ -686,22 +686,27 @@ describe("renderTimecode", () => {
 // === SessionLayout — composer smoke ===========================================
 
 describe("SessionLayout", () => {
-  it("mounts the full DOM tree with screws + titlebar + 3-col grid + status bar", () => {
+  it("mounts the deck: titlebar + rail/speak/foot + status row (no card, no screws)", () => {
     const root = host();
     mountSessionLayout(root);
     expect(root.querySelector(".vmx-session")).toBeTruthy();
-    expect(root.querySelectorAll(".vmx-session__screw")).toHaveLength(4);
     expect(root.querySelector(".vmx-titlebar")).toBeTruthy();
-    expect(root.querySelectorAll(".vmx-session__col")).toHaveLength(3);
-    expect(root.querySelector(".vmx-statusbar")).toBeTruthy();
+    expect(root.querySelector(".vmx-deck__rail")).toBeTruthy();
+    expect(root.querySelector(".vmx-deck__speak")).toBeTruthy();
+    expect(root.querySelector(".vmx-deck__foot")).toBeTruthy();
+    expect(root.querySelector(".vmx-statusrow")).toBeTruthy();
+    // "The Deck Speaks" rebuild: open void — no glass card, no corner screws,
+    // no 3-column grid.
+    expect(root.querySelectorAll(".vmx-session__screw")).toHaveLength(0);
+    expect(root.querySelectorAll(".vmx-session__col")).toHaveLength(0);
   });
 
   it("renderSessionFrame is idempotent — same state does not duplicate nodes", () => {
     const root = host();
     const mounted = mountSessionLayout(root);
-    const before = root.querySelectorAll(".vmx-meter").length;
+    const before = root.querySelectorAll(".vmx-now").length;
     renderSessionFrame(mounted, defaultState());
-    const after = root.querySelectorAll(".vmx-meter").length;
+    const after = root.querySelectorAll(".vmx-now").length;
     expect(after).toBe(before);
   });
 

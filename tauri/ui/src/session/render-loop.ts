@@ -48,6 +48,18 @@ function cohostRetryHandler(): void {
   });
 }
 
+/** "The Deck Speaks" rebuild — the deck rail's mute control. Toggles the
+ *  co-host mute over the same real channel the push-to-mute hotkey + status
+ *  bar use (ipc.session.mute); the sidecar echoes `ipc.session.mute { muted }`
+ *  which the bridge applies, and the control reflects it on the next frame.
+ *  Fire-and-forget. */
+function cohostMuteHandler(): void {
+  void emitIpc("ipc.session.mute", { toggle: true }).catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.warn("[render-loop] mute emitIpc failed:", err);
+  });
+}
+
 /** 2026-05-26 /impeccable critique P1 — in-deck mood cycle. Advances the
  *  co-host mood HYPE → TEACH → COACH → HYPE and writes it through the same
  *  real, already-wired knob the settings drawer uses
@@ -272,6 +284,8 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       // "see all <N> reactions" footer routes to the debrief window
       // with no deep-link so the user lands at the latest moment.
       onOpenAllReactions: cohostOpenAllHandler,
+      // "The Deck Speaks" — deck rail mute control → ipc.session.mute.
+      onMute: cohostMuteHandler,
     },
     status: {
       livekit: s.status.livekit,

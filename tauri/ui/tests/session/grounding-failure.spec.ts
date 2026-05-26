@@ -160,25 +160,27 @@ describe("Cohost grounding-failure recovery (H9)", () => {
   });
 });
 
-describe("SessionLayout grounding-failure timer (H9)", () => {
-  it("foot does not show failure copy immediately on boot with grounded=false", () => {
+describe("SessionLayout grounding-failure → fault state (H9)", () => {
+  // "The Deck Speaks" rebuild (2026-05-26): a sustained ungrounded co-host
+  // surfaces as the deck's `data-mode="fault"` state (the fault liveness
+  // label names the cause), replacing the old cohost-panel foot copy.
+  it("does not show the fault state immediately on boot with grounded=false", () => {
     const root = host();
-    const initial = defaultState();
-    // grounded is already false in defaultState — the timer starts now.
-    mountSessionLayout(root, initial);
-    const foot = root.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.dataset.failed).toBe("false");
-    expect(foot?.textContent).toContain("TUNING IN");
+    // grounded is already false in defaultState — the timer starts now, but
+    // <5s + cohost IDLE reads as calm 'silent', not 'fault'.
+    mountSessionLayout(root, defaultState());
+    expect(root.querySelector<HTMLElement>(".vmx-session")?.dataset.mode).toBe(
+      "silent",
+    );
   });
 
-  it("after >= 5s of grounded=false the foot flips to failure copy", () => {
+  it("after >= 5s of grounded=false the deck flips to the fault state", () => {
     vi.useFakeTimers();
     const t0 = 1_000_000_000;
     vi.setSystemTime(t0);
 
     const root = host();
-    const initial = defaultState();
-    const mounted = mountSessionLayout(root, initial);
+    const mounted = mountSessionLayout(root, defaultState());
     // groundedFalseSinceMs initialized to t0 on mount.
     expect(mounted.groundedFalseSinceMs).toBe(t0);
 
@@ -186,10 +188,11 @@ describe("SessionLayout grounding-failure timer (H9)", () => {
     vi.setSystemTime(t0 + GROUNDING_FAILURE_MS + 500);
     renderSessionFrame(mounted, defaultState());
 
-    const foot = root.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.dataset.failed).toBe("true");
-    expect(foot?.textContent).toContain("COULDN'T REACH GEMINI");
-    expect(root.querySelector(".vmx-cohost__foot-retry")).toBeTruthy();
+    const session = root.querySelector<HTMLElement>(".vmx-session");
+    expect(session?.dataset.mode).toBe("fault");
+    // The fault liveness label names the grounding cause.
+    const fault = root.querySelector<HTMLElement>(".vmx-live__s--fault");
+    expect(fault?.textContent).toContain("gemini");
   });
 
   it("grounded flip to true resets the timer", () => {
@@ -198,8 +201,7 @@ describe("SessionLayout grounding-failure timer (H9)", () => {
     vi.setSystemTime(t0);
 
     const root = host();
-    const initial = defaultState();
-    const mounted = mountSessionLayout(root, initial);
+    const mounted = mountSessionLayout(root, defaultState());
 
     // Boot grounded → reset timer.
     const grounded = defaultState();
@@ -214,8 +216,9 @@ describe("SessionLayout grounding-failure timer (H9)", () => {
     renderSessionFrame(mounted, unground);
     expect(mounted.groundedFalseSinceMs).toBe(t0 + 10_000);
 
-    // Foot is still TUNING IN at this point. only just flipped.
-    const foot = root.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.dataset.failed).toBe("false");
+    // Only just flipped (<5s) → not fault yet.
+    expect(
+      root.querySelector<HTMLElement>(".vmx-session")?.dataset.mode,
+    ).not.toBe("fault");
   });
 });
