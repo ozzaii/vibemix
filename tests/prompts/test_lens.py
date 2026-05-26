@@ -47,7 +47,8 @@ _TEACHER_FRAGMENT = "framework-anchored"
 # not a MOOD_PERSONAS fragment.
 _HYPE_DEFAULT_FRAGMENT = "Kaan's friend in his studio"
 
-_LENS_REASON_01 = "LENS-01 — Plan 02 not landed"
+# LENS-01 (Plan 02) has landed — its five scaffolds are now real-green; only the
+# LENS-02 (Plan 03) shared-selection scaffold remains xfail-strict.
 _LENS_REASON_02 = "LENS-02 — Plan 03 not landed"
 
 
@@ -79,7 +80,6 @@ def test_v4_golden_anchor_present() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason=_LENS_REASON_01)
 def test_lens_map_covers_three_canonical_lenses() -> None:
     """LENS_TO_MODE_MOOD maps all 3 canonical lenses to valid (mode, mood) cells."""
     from vibemix.prompts.matrix import LENS_TO_MODE_MOOD
@@ -94,7 +94,6 @@ def test_lens_map_covers_three_canonical_lenses() -> None:
         assert mood in MOOD_PERSONAS, f"lens {lens!r} mood {mood!r} not a real persona"
 
 
-@pytest.mark.xfail(strict=True, reason=_LENS_REASON_01)
 def test_lens_prompt_shape_per_lens() -> None:
     """Each lens yields a DISTINCT grounded prompt over the same builder.
 
@@ -117,7 +116,6 @@ def test_lens_prompt_shape_per_lens() -> None:
     assert len({hype, critique, tutor}) == 3
 
 
-@pytest.mark.xfail(strict=True, reason=_LENS_REASON_01)
 def test_unknown_lens_raises_value_error() -> None:
     """build_lens_instruction fails loud on an unknown lens (mirrors mood/skill)."""
     from vibemix.prompts.matrix import build_lens_instruction
@@ -126,7 +124,6 @@ def test_unknown_lens_raises_value_error() -> None:
         build_lens_instruction("bogus")
 
 
-@pytest.mark.xfail(strict=True, reason=_LENS_REASON_01)
 def test_default_lens_byte_identical_to_cohost_default() -> None:
     """The default (hype) lens cold path equals today's co-host default byte-for-byte.
 
@@ -141,7 +138,6 @@ def test_default_lens_byte_identical_to_cohost_default() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True, reason=_LENS_REASON_01)
 def test_three_lenses_pass_the_same_gate() -> None:
     """The citation-grounding strip DECISION is lens-independent (invariant #2).
 

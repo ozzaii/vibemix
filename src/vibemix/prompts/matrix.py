@@ -895,3 +895,72 @@ def build_curator_instruction(lens: str = "tutor") -> str:
         "You build a playlist from the user's OWN library that fits their "
         "theme — a text curator, not a live voice co-host."
     )
+
+
+# Phase 79 Plan 02 — LENS-01: charter lens → co-host (mode, mood) cell selector.
+# This MIRRORS _CURATOR_LENS_TO_MOOD's lens VOCABULARY, adding the co-host `mode`
+# half (which _CELLS cell to pick). The lens is a validated-enum selector over the
+# UNTOUCHED build_system_instruction — never a builder fork, never sourced from
+# user input (anti-prompt-injection T-79-02-01 / T-77-02-01: an unknown lens
+# raises ValueError; user input never enters the prompt text).
+#   hype     → (hype, hype-man)  = today's co-host default → byte-identical anchor
+#   critique → (coach, coach)    = the charter `critique` == matrix coach alias (no rename)
+#   tutor    → (coach, teacher)  = the genuinely-new live teaching voice
+# v1 maps tutor onto (coach, teacher) — NO bespoke TUTOR_* cell (Pitfall 4); tutor
+# fidelity is judged by Phase-81 BENCH + Kaan's ear (parked).
+LENS_TO_MODE_MOOD: dict[str, tuple[str, str]] = {
+    "hype": ("hype", "hype-man"),
+    "critique": ("coach", "coach"),
+    "tutor": ("coach", "teacher"),
+}
+
+# Drift guard: the two surfaces (co-host + curator) MUST share one lens enum, so
+# the lens vocabulary can never fork. If a lens is added/removed on one map, this
+# assertion fails loud at import — keeping LENS-02's shared-selection contract honest.
+assert set(LENS_TO_MODE_MOOD) == set(_CURATOR_LENS_TO_MOOD), (
+    "LENS_TO_MODE_MOOD and _CURATOR_LENS_TO_MOOD must share one lens vocabulary"
+)
+
+
+def build_lens_instruction(lens: str = "hype", skill: str = "intermediate", **kw: object) -> str:
+    """Return the co-host system instruction for ``lens`` (default "hype").
+
+    The lens layer sits strictly ABOVE the untouched :func:`build_system_instruction`:
+    it VALIDATES ``lens`` against the fixed :data:`LENS_TO_MODE_MOOD` map, unpacks the
+    ``(mode, mood)`` cell, then DELEGATES to the builder. Three real grounded voices
+    over ONE structured state — never three brains, never a builder fork.
+
+    DEFAULT-LENS BYTE-IDENTITY CONTRACT: ``build_lens_instruction("hype", "intermediate")``
+    resolves to ``build_system_instruction("intermediate", "hype", "hype-man")`` — byte-identical
+    to today's co-host default because the builder is unchanged. This pins the v4 golden.
+
+    ``critique`` is the charter alias onto the matrix ``coach`` mode/mood (no rename of the
+    matrix internals). ``tutor`` is the new live teaching voice (the ``coach`` cell + the
+    ``teacher`` persona); the "does tutor teach well" judgment is Phase-81 BENCH + Kaan's ear
+    (parked) — there is deliberately NO dedicated ``TUTOR_*`` cell this phase (Pitfall 4).
+
+    Args:
+        lens: One of ``"hype"`` / ``"critique"`` / ``"tutor"``. A validated enum — the
+            user never injects free text here.
+        skill: ``"beginner"`` / ``"intermediate"`` / ``"pro"`` — forwarded to the builder.
+        **kw: Forwarded verbatim to :func:`build_system_instruction` (e.g.
+            ``include_citation_grammar``).
+
+    Returns:
+        The co-host system instruction string for the resolved ``(mode, mood)`` cell.
+
+    Raises:
+        ValueError: ``lens`` not in :data:`LENS_TO_MODE_MOOD` — fail loud (mirrors the
+            unknown-mood/skill guards in :func:`build_system_instruction` and the lens guard
+            in :func:`build_curator_instruction`), so a typo'd lens never silently degrades.
+
+    Anti-prompt-injection (T-79-02-01): ``lens`` only KEYS the fixed
+    :data:`LENS_TO_MODE_MOOD` dict; no user input enters the prompt text.
+    """
+    lens_norm = lens.lower().strip()
+    if lens_norm not in LENS_TO_MODE_MOOD:
+        raise ValueError(
+            f"unknown lens {lens!r} — must be one of {sorted(LENS_TO_MODE_MOOD)}"
+        )
+    mode, mood = LENS_TO_MODE_MOOD[lens_norm]
+    return build_system_instruction(skill, mode, mood, **kw)
