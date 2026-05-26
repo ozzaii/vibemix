@@ -1,0 +1,8 @@
+# BENCH test-data dir — the .mp3 excerpts copied from /tmp/truthtest live here.
+#
+# Pitfall 3 (81-RESEARCH): this dir lives OUTSIDE src/, so hatchling's
+# [tool.hatch.build.targets.wheel] packages=["src/vibemix"] auto-excludes it
+# from the wheel — the tracks (Kaan's own, non-redistributable) never ship.
+# The .gitkeep keeps the dir tracked even when the .mp3 files are gitignored
+# or absent on a fresh checkout; the bench_data_dir fixture honors
+# VIBEMIX_BENCH_DATA_DIR so CI/other machines can point elsewhere.
