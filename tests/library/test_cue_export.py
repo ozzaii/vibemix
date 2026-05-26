@@ -56,10 +56,13 @@ class FakeXml:
 
     def __init__(self, track: FakeTrack | None = None) -> None:
         self.track = track or FakeTrack()
+        self.add_track_location: str | None = None
         self.add_track_kwargs: dict[str, Any] | None = None
         self.saved_path: str | None = None
 
-    def add_track(self, **kwargs: Any) -> FakeTrack:
+    def add_track(self, location: str, **kwargs: Any) -> FakeTrack:
+        # location is POSITIONAL in pyrekordbox's real add_track — mirror it.
+        self.add_track_location = location
         self.add_track_kwargs = kwargs
         return self.track
 
@@ -155,8 +158,8 @@ def test_export_records_add_track_marks_and_save(tmp_path) -> None:
         "cue_count": 2,
         "track_path": "/music/track.wav",
     }
+    assert fake.add_track_location == "/music/track.wav"
     assert fake.add_track_kwargs == {
-        "Location": "/music/track.wav",
         "Name": "Night Drive",
         "Artist": "DJ Test",
         "AverageBpm": 128.0,
@@ -170,8 +173,9 @@ def test_export_omits_absent_metadata(tmp_path) -> None:
     export_cues(
         "/m/a.wav", [_cue("intro", 0.0)], str(tmp_path / "o.xml"), xml_builder=fake
     )
-    # Only Location when title/artist/bpm are None.
-    assert fake.add_track_kwargs == {"Location": "/m/a.wav"}
+    # location is positional; no metadata kwargs when title/artist/bpm are None.
+    assert fake.add_track_location == "/m/a.wav"
+    assert fake.add_track_kwargs == {}
 
 
 def test_export_empty_cues_errors(tmp_path) -> None:
@@ -190,10 +194,41 @@ def test_export_builder_raise_returns_error_no_exception(tmp_path) -> None:
 
 def test_export_add_track_raise_returns_error(tmp_path) -> None:
     class Boom:
-        def add_track(self, **kwargs: Any) -> Any:
+        def add_track(self, location: str, **kwargs: Any) -> Any:
             raise ValueError("nope")
 
     res = export_cues(
         "/m/a.wav", [_cue("drop", 10.0)], str(tmp_path / "o.xml"), xml_builder=Boom()
     )
     assert res == {"error": "export_cues failed: ValueError"}
+
+
+def test_export_against_real_pyrekordbox(tmp_path) -> None:
+    """Contract lock against the REAL pyrekordbox.rbxml.RekordboxXml.
+
+    The fake builder can't catch an add_track/add_mark signature drift (a fake
+    that mirrors the wrong shape passes while the real lib raises) — so exercise
+    the real default path: no xml_builder, then reload the written XML and
+    assert the cues survive. Skips cleanly when pyrekordbox isn't installed.
+    """
+    pytest.importorskip("pyrekordbox")
+    from pyrekordbox.rbxml import RekordboxXml
+
+    cues = [
+        _cue("intro", 0.0, 16.0),
+        _cue("build", 64.0, 96.0),
+        _cue("drop", 96.0, 128.0),
+    ]
+    out = str(tmp_path / "real.xml")
+    res = export_cues(
+        "/music/real track.aiff", cues, out,
+        title="Real", artist="DJ", bpm=128.0,
+    )
+    assert res["exported"] is True and res["cue_count"] == 3
+    # Reload the written tree: valid XML + the 3 hot cues persisted.
+    reloaded = RekordboxXml(out)
+    tracks = list(reloaded.get_tracks())
+    assert len(tracks) == 1
+    marks = tracks[0].marks
+    assert len(marks) == 3
+    assert [m.Name for m in marks] == ["INTRO", "BUILD", "DROP"]

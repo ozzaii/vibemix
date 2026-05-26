@@ -124,10 +124,10 @@ def export_cues(
     xml_builder
         Optional injected builder for tests. When ``None``, lazy-imports
         ``pyrekordbox.rbxml.RekordboxXml`` and instantiates it. The builder
-        MUST expose ``add_track(Location=..., **kw) -> track`` where ``track``
-        has ``add_mark(**kwargs) -> mark`` and ``mark`` has settable
-        ``.Red/.Green/.Blue``; the real builder is saved via
-        ``save(path=out_path)``.
+        MUST expose ``add_track(location, **kw) -> track`` (location POSITIONAL,
+        matching pyrekordbox) where ``track`` has ``add_mark(**kwargs) -> mark``
+        and ``mark`` has settable ``.Red/.Green/.Blue``; the real builder is
+        saved via ``save(path=out_path)``.
 
     Returns
     -------
@@ -149,8 +149,11 @@ def export_cues(
         else:
             xml = xml_builder
 
-        # Build TRACK kwargs: include a field ONLY when present.
-        track_kwargs: dict[str, Any] = {"Location": track_path}
+        # Build TRACK metadata kwargs: include a field ONLY when present.
+        # NOTE: pyrekordbox's ``add_track(location, **kwargs)`` takes the file
+        # path POSITIONALLY (not as a ``Location=`` kwarg — that raises
+        # TypeError). Only Name/Artist/AverageBpm travel as kwargs.
+        track_kwargs: dict[str, Any] = {}
         if title:
             track_kwargs["Name"] = str(title)
         if artist:
@@ -161,7 +164,7 @@ def export_cues(
             except (TypeError, ValueError):
                 pass
 
-        track = xml.add_track(**track_kwargs)
+        track = xml.add_track(track_path, **track_kwargs)
 
         # Pad slots ascend with the timeline: sort by start, then Num 0,1,2,…
         ordered = sorted(cues, key=lambda c: float(getattr(c, "start_s", 0.0) or 0.0))
