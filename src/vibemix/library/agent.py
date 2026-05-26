@@ -134,6 +134,29 @@ def _shared_lens() -> str:
         return "tutor"
 
 
+def _taste_hint() -> str:
+    """SEAM #2 (CURATE-02): compact, privacy-safe taste hint biasing curation
+    'for this DJ'.
+
+    Mirrors the ``_shared_lens`` lazy+guarded seam exactly: lazy-import the
+    shared ``profile/`` reader INSIDE the function (Pattern 1 — keeps the
+    import-time no-live-path boundary clean) and guard with a bare
+    ``except Exception: return ""``. ``render_profile_for_cache(load_profile())``
+    returns ``""`` when the profile is None / consent-OFF (default OFF) → the
+    cold path is byte-identical to today. Only the 5 allowlisted fields cross —
+    NO track titles / free-form (T-82-01; the renderer enforces it).
+
+    Recomputed per call (NOT cached behind the lens key) so a profile change is
+    reflected without a lens-keyed cache miss; the render is cheap.
+    """
+    try:
+        from vibemix.profile import load_profile, render_profile_for_cache
+
+        return render_profile_for_cache(load_profile())  # "" when None/consent-OFF
+    except Exception:  # pragma: no cover — guard: any read fail = cold default
+        return ""
+
+
 def _system_instruction() -> str:
     """Build (and cache) the one-shot curator system instruction from the seam."""
     global _SYSTEM_INSTRUCTION_CACHE, _SYSTEM_INSTRUCTION_LENS
@@ -148,7 +171,10 @@ def _system_instruction() -> str:
                 build_curator_instruction(lens) + "\n" + _RULES_BLOCK
             )
             _SYSTEM_INSTRUCTION_LENS = lens
-        return _SYSTEM_INSTRUCTION_CACHE
+        base = _SYSTEM_INSTRUCTION_CACHE
+    # SEAM #2: append the profile taste hint OUTSIDE the lens-keyed cache so a
+    # profile change is reflected per call; "" on the cold path → byte-identical.
+    return base + _taste_hint()
 
 
 def _interactive_system_instruction() -> str:
@@ -167,7 +193,9 @@ def _interactive_system_instruction() -> str:
                 build_curator_instruction(lens) + "\n" + _INTERACTIVE_FLOW_BLOCK
             )
             _INTERACTIVE_SYSTEM_INSTRUCTION_LENS = lens
-        return _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE
+        base = _INTERACTIVE_SYSTEM_INSTRUCTION_CACHE
+    # SEAM #2: interactive curation must not be orphaned — same taste append.
+    return base + _taste_hint()
 
 
 def __getattr__(name: str) -> str:

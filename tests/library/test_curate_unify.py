@@ -11,11 +11,11 @@ privacy-safe vehicle the co-host already uses (``render_profile_for_cache``).
 
 Three tiers (the documented Phase 77-81 Wave-0 convention):
 
-  * CURATE-02 taste scaffolds (a, c) — xfail(strict=True): the curator system
-    instruction does NOT carry a profile-derived token today. They flip GREEN
-    only when Plan 02 appends ``_taste_hint()`` at the SEAM #2 build sites
-    (agent.py:147 + codex_curate.py:125). A silent early-pass becomes an
-    xpassed -> HARD failure (strict), so Plan 02 can never fake green.
+  * CURATE-02 taste scaffolds (a, c) — real-green as of Plan 02: the curator
+    system instruction now carries a profile-derived token because Plan 02
+    appended ``_taste_hint()`` at the SEAM #2 build sites (agent.py
+    _system_instruction/_interactive + codex_curate.py _system_prompt). The
+    xfail markers flipped.
   * Real-green "must-stay-true" pins (b cold-path, d no-title-leak, e
     lens-shared, f no-MusicState, g surfaces-import) — PASS today and must STAY
     green through Plan 02.
@@ -82,7 +82,6 @@ def _patch_profile(monkeypatch, profile) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="CURATE-02 taste half — Plan 02 appends _taste_hint at agent.py:147")
 def test_curator_taste_hint_present_when_profile_set(tmp_path, monkeypatch) -> None:
     """With a populated profile, the gemini curator instruction carries a taste token.
 
@@ -144,7 +143,6 @@ def test_curator_taste_cold_path_identical_when_no_profile(tmp_path, monkeypatch
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="CURATE-02 taste half — Plan 02 appends _taste_hint at codex_curate.py:125")
 def test_taste_hint_reaches_codex_backend(tmp_path, monkeypatch) -> None:
     """SEAM #2 reaches BOTH backends — the codex prompt carries the taste token.
 

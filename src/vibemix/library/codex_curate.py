@@ -113,6 +113,24 @@ def _shared_lens() -> str:
         return "tutor"
 
 
+def _taste_hint() -> str:
+    """SEAM #2 (CURATE-02) — codex twin of the gemini ``_taste_hint``.
+
+    Same lazy+guarded shape as ``_shared_lens``: lazy-import the shared
+    ``profile/`` reader INSIDE the function and guard with ``except Exception:
+    return ""``. ``render_profile_for_cache(load_profile())`` is ``""`` when the
+    profile is None / consent-OFF → byte-identical cold path. Only the 5
+    allowlisted fields cross — NO track titles / free-form (T-82-01). The codex
+    backend MUST get this too or it is orphaned (the CURATE acid test).
+    """
+    try:
+        from vibemix.profile import load_profile, render_profile_for_cache
+
+        return render_profile_for_cache(load_profile())  # "" when None/consent-OFF
+    except Exception:  # pragma: no cover — guard: any read fail = cold default
+        return ""
+
+
 def _system_prompt() -> str:
     """Build (and cache) the codex curator system prompt from the matrix seam."""
     global _SYSTEM_PROMPT_CACHE, _SYSTEM_PROMPT_LENS
@@ -124,7 +142,10 @@ def _system_prompt() -> str:
 
             _SYSTEM_PROMPT_CACHE = build_curator_instruction(lens) + " " + _RULES_BLOCK
             _SYSTEM_PROMPT_LENS = lens
-        return _SYSTEM_PROMPT_CACHE
+        base = _SYSTEM_PROMPT_CACHE
+    # SEAM #2: append the taste hint OUTSIDE the lens-keyed cache (recompute per
+    # call); "" on the cold path → byte-identical to today.
+    return base + _taste_hint()
 
 
 def __getattr__(name: str) -> Any:
