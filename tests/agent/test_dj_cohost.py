@@ -1256,3 +1256,60 @@ def test_resolve_prompt_cell_cold_path_byte_identical(tmp_path, monkeypatch) -> 
 
     out = dj_mod._resolve_prompt_cell()
     assert out == build_system_instruction("intermediate", "hype", "hype-man")
+
+
+def test_resolve_prompt_cell_lens_wins_over_live_mood(tmp_path, monkeypatch) -> None:
+    """CR-01 production-path pin: an explicit lens WINS over the live mood arg.
+
+    The real caller ``DJCoHostAgent.__init__`` ALWAYS passes a non-None
+    ``mood=live_mood`` (``MusicState.mood`` defaults "hype-man", never None). The
+    old guard only consulted the lens when ``mood is None``, so setting the lens
+    had zero effect on the live co-host. This test exercises the REAL production
+    call shape (``mood="hype-man"``) with a ``tutor`` lens and asserts the tutor
+    cell (coach mode + teacher persona) is produced — NOT the default hype cell.
+    """
+    import vibemix.runtime.config_store as cs_mod
+
+    monkeypatch.delenv("VIBEMIX_MODE", raising=False)
+    monkeypatch.delenv("VIBEMIX_MOOD", raising=False)
+    monkeypatch.delenv("VIBEMIX_SKILL_LEVEL", raising=False)
+
+    target = tmp_path / "config.json"
+    monkeypatch.setattr(cs_mod, "config_path", lambda: target)
+    store = cs_mod.ConfigStore()
+    store.extra["lens"] = "tutor"
+    cs_mod.save_config(store)
+
+    # The exact arg the production agent passes — auto-derived live mood.
+    out = dj_mod._resolve_prompt_cell(mood="hype-man")
+    # tutor → (coach, teacher): the teacher persona fragment is substituted in,
+    # and it equals the canonical tutor cell — NOT the hype default.
+    assert "framework-anchored" in out
+    assert out == build_system_instruction("intermediate", "coach", "teacher")
+
+
+def test_resolve_prompt_cell_corrupt_lens_falls_back_no_crash(tmp_path, monkeypatch) -> None:
+    """CR-02: a corrupt persisted lens must NOT crash agent construction.
+
+    ``read_shared_lens`` returns any non-empty string unvalidated. A
+    ``config.json`` carrying ``extra["lens"]="coach"`` (a valid MOOD but not a
+    lens key) used to raise an uncaught ``KeyError`` on the raw
+    ``LENS_TO_MODE_MOOD[lens]`` subscript. The fix validates before subscripting
+    and falls through to the cold path — so with default env the result is the
+    byte-identical hype default, no exception.
+    """
+    import vibemix.runtime.config_store as cs_mod
+
+    monkeypatch.delenv("VIBEMIX_MODE", raising=False)
+    monkeypatch.delenv("VIBEMIX_MOOD", raising=False)
+    monkeypatch.delenv("VIBEMIX_SKILL_LEVEL", raising=False)
+
+    target = tmp_path / "config.json"
+    monkeypatch.setattr(cs_mod, "config_path", lambda: target)
+    store = cs_mod.ConfigStore()
+    store.extra["lens"] = "coach"  # valid mood, NOT a valid lens key
+    cs_mod.save_config(store)
+
+    # Must not raise; falls through to the cold path (default hype cell).
+    out = dj_mod._resolve_prompt_cell(mood="hype-man")
+    assert out == build_system_instruction("intermediate", "hype", "hype-man")

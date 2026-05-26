@@ -319,16 +319,29 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
             non-None ``mood`` arg wins over the env var (used by Plan
             13-06's agent-rebuild-on-mood-change path).
 
-    Phase 79 LENS-02: when a shared lens is set in ``ConfigStore.extra["lens"]``
-    (the ONE selection shared with the curator), it resolves ``(mode, mood)`` via
-    ``LENS_TO_MODE_MOOD`` and drives the cell — choosing the lens once flows here
-    AND to the curator. Precedence is preserved: an explicit ``mood`` arg (the
-    live ``MusicState.mood`` rebuild path) still WINS over the shared lens, which
-    in turn wins over the env/``DEFAULT_*`` cold path. When NO lens is set, the
-    resolution is byte-identical to today (Pitfall 3: route through the one
-    ``extra["lens"]`` read, NOT the orphaned ``VIBEMIX_MODE`` env). A config-read
-    failure falls through to the env/``DEFAULT_*`` path so the cold path never
-    regresses.
+    Phase 79 LENS-02 (CR-01 fix): when a shared lens is EXPLICITLY set in
+    ``ConfigStore.extra["lens"]`` (the ONE selection shared with the curator),
+    it resolves ``(mode, mood)`` via ``LENS_TO_MODE_MOOD`` and drives the cell —
+    choosing the lens once flows here AND to the curator. The lens is the user's
+    EXPLICIT persona choice, so it WINS over the auto-derived live
+    ``MusicState.mood`` arg (which is NOT explicit user intent — it defaults to
+    ``"hype-man"`` and is the value the production caller always passes). The
+    original "lens only when ``mood is None``" guard meant the lens was silently
+    dead on the live co-host path (production always passes a non-None mood);
+    routing the lens read BEFORE the mood arg fixes that.
+
+    When NO lens is set (unset/empty), the resolution is byte-identical to today
+    (cold path): the ``mood`` arg (live ``MusicState.mood`` rebuild path) > env >
+    ``DEFAULT_*`` (Pitfall 3: route through the one ``extra["lens"]`` read, NOT
+    the orphaned ``VIBEMIX_MODE`` env).
+
+    CR-02 fix: the persisted lens value is VALIDATED against ``LENS_TO_MODE_MOOD``
+    before it is subscripted. ``read_shared_lens`` returns any non-empty string
+    unvalidated, so a corrupt/foreign/hand-edited ``config.json`` (e.g.
+    ``extra["lens"]="coach"`` — a valid mood but NOT a lens key) would previously
+    raise an uncaught ``KeyError`` and crash agent construction. An invalid or
+    unreadable lens now falls through to the cold path — no ``KeyError`` ever
+    escapes.
 
     Raises ``ValueError`` on unknown skill, mode, or mood (fail loud —
     silent fallback would mask env-var typos).
@@ -336,19 +349,24 @@ def _resolve_prompt_cell(mood: str | None = None) -> str:
     skill = os.environ.get(ENV_SKILL_LEVEL, DEFAULT_SKILL_LEVEL)
 
     # Shared lens read (LENS-02). Lazy + guarded: config_store is import-light
-    # but a read failure must NEVER regress the cold path. An explicit mood arg
-    # wins, so only consult the lens when no mood override was passed.
-    if mood is None:
-        try:
-            from vibemix.runtime.config_store import load_config
-            from vibemix.runtime.settings import read_shared_lens
+    # but a read failure must NEVER regress the cold path. The lens is the user's
+    # EXPLICIT persona axis, so it wins over the auto-derived live mood arg — but
+    # ONLY when explicitly set AND valid. When unset/invalid, the cold path below
+    # runs byte-identically to today (mood arg > env > DEFAULT_*).
+    try:
+        from vibemix.runtime.config_store import load_config
+        from vibemix.runtime.settings import read_shared_lens
 
-            lens = read_shared_lens(load_config())
-        except Exception:  # pragma: no cover — guard: any read fail = cold path
-            lens = None
-        if lens is not None:
-            from vibemix.prompts.matrix import LENS_TO_MODE_MOOD
+        lens = read_shared_lens(load_config())
+    except Exception:  # pragma: no cover — guard: any read fail = cold path
+        lens = None
+    # CR-02: validate the persisted value against the lens enum BEFORE
+    # subscripting. An unknown/foreign value (e.g. a stray mood name) falls
+    # through to the cold path instead of raising a raw KeyError.
+    if lens is not None:
+        from vibemix.prompts.matrix import LENS_TO_MODE_MOOD
 
+        if lens in LENS_TO_MODE_MOOD:
             mode, lens_mood = LENS_TO_MODE_MOOD[lens]
             return build_system_instruction(skill, mode, lens_mood)
 
