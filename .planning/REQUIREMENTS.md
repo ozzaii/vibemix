@@ -48,4 +48,26 @@
 - **New heavy deps** (essentia = AGPL poison; librosa unnecessary; torch/Pinecone/pgvector) — pure-compute over the existing numpy/scipy + ffmpeg stack only.
 
 ## Traceability
-> Filled by the roadmapper (each REQ-ID → exactly one phase).
+> Each v8.2 REQ-ID maps to exactly one phase (100% coverage, no orphans, no duplicates). Phases continue from v8.1 (77–82) — start at 83, no reset.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| ENERGY-01 | Phase 83 — ENERGY | Pending |
+| ENERGY-02 | Phase 83 — ENERGY | Pending |
+| ENERGY-03 | Phase 83 — ENERGY | Pending |
+| DISCOVER-01 | Phase 84 — DISCOVER | Pending |
+| DISCOVER-02 | Phase 84 — DISCOVER | Pending |
+| DISCOVER-03 | Phase 84 — DISCOVER | Pending |
+| SEQUENCE-01 | Phase 85 — SEQUENCE | Pending |
+| SEQUENCE-02 | Phase 85 — SEQUENCE | Pending |
+| SEQUENCE-03 | Phase 85 — SEQUENCE | Pending |
+| EXPORT-01 | Phase 86 — EXPORT | Pending |
+| EXPORT-02 | Phase 86 — EXPORT | Pending |
+| AGENT-01 | Phase 87 — AGENT | Pending |
+| AGENT-02 | Phase 87 — AGENT | Pending |
+| UI-01 | Phase 88 — UI | Pending |
+| UI-02 | Phase 88 — UI | Pending |
+
+**Coverage:** 13/13 mapped ✓ — no orphans, no duplicates.
+
+**Dependency spine:** (P83 ENERGY ∥ P84 DISCOVER, independent) → P85 SEQUENCE (needs DISCOVER pool + optionally ENERGY curve fidelity; degrades to BPM proxy) ‖ P86 EXPORT (independent of SEQUENCE internals) → P87 AGENT (orchestrates the three tools) → P88 UI (consumes the AGENT/CLI surface).

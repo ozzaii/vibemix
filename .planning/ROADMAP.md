@@ -2,7 +2,7 @@
 
 **Project:** vibemix — AI DJ Co-Host
 **Last shipped:** v8.1 "One Mind" — 2026-05-26 (audit PASSED 18/18 reqs · 6/6 integration · 4540/0 honest-green; KAAN-ACTION human gates parked — BENCH-03 verdict + live ear-passes ride Kaan's clock). Prior: v8.0 "Proof & Polish" — 2026-05-25.
-**Current milestone:** none active — `/gsd:new-milestone` for the next. KAAN-ACTION queue rides forward (§GH-BILLING / §SHIP-V4 / §V7-LIVE + the v8.1 bench verdict).
+**Current milestone:** v8.2 "Set Builder" — 🔨 IN PROGRESS (Phases 83–88; library-local DJ set-prep: discover → energy-curve sequence → Rekordbox export → explain why, grounded). KAAN-ACTION queue rides forward (§GH-BILLING / §SHIP-V4 / §V7-LIVE + the v8.1 bench verdict).
 **Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on the external Apple Dev + SignPath signature clock (NOT archived) — **v7.0's OSS-04 discharges §SHIP-V4 for real; v4.0 closes alongside when the real cut fires**
 
 ---
@@ -20,6 +20,129 @@
 - ✅ **v7.0 Open House** — Phases 67–70 (shipped 2026-05-24, tech_debt accepted) — see `.planning/milestones/v7.0-ROADMAP.md`
 - ✅ **v8.0 Proof & Polish** — Phases 71–76 (shipped 2026-05-25, tech_debt accepted) — *this file, below* · audit `.planning/v8.0-MILESTONE-AUDIT.md`
 - ✅ **v8.1 One Mind** — Phases 77–82 (shipped 2026-05-26, audit PASSED; KAAN-ACTION human gates parked) — see `.planning/milestones/v8.1-ROADMAP.md` · audit `.planning/milestones/v8.1-MILESTONE-AUDIT.md` · charter `.planning/research/one-mind-charter.md`
+- 🔨 **v8.2 Set Builder** — Phases 83–88 (in progress; library-local set-prep — ENERGY · DISCOVER · SEQUENCE · EXPORT · AGENT · UI) — *this file, below* · charter `.planning/research/vibe-mix-agent-engine-synthesis.md`
+
+---
+
+# v8.2 "Set Builder" — 🔨 IN PROGRESS (active milestone)
+
+**Goal:** Wire the Viber agent engine into a DJ **set-prep co-host** — turn the flat-playlist curator into a tool that *discovers a pool from the DJ's OWN crate → sequences it on an energy curve with harmonically-valid transitions → exports one-click to Rekordbox → and explains why each transition works.* This is the library-local (Mode A) half of Francesco's "Vibe Mix Discovery & Sequencing" spec, built inside vibemix's locked constraints. The deep DJ value: *"give me a sequenced, harmonically-correct, energy-curved set from my own library, ready to load — and tell me why,"* the thing DJs spend hours on, grounded so it never invents a track.
+
+**Anti-creep acid test (v8.2):** *"Does this turn the flat curator into a grounded, energy-curved, harmonically-valid, exportable set-prep flow over the DJ's OWN library — WITHOUT a new dep, a new AI/embedding provider, a network catalog, an affiliate link, or breaking a cardinal invariant?"* If not, defer (→ Bravoh commercial / a later vibemix milestone).
+
+**Hard constraints (locked, encoded in every phase):**
+- **Mode A library-local ONLY.** DEFER to Bravoh-commercial (explicit out-of-scope): public catalog (Beatport/Spotify/SoundCloud) + affiliate + purchase links (Modes B/C), Chromaprint/AcoustID fingerprint, XGBoost energy regressor, 1001Tracklists scraping moat, Serato/Engine/Traktor export (Rekordbox first).
+- **Gemini-only** AI provider (the spec's Claude-Sonnet reasoning → the existing Gemini `ViberAgent`); **sqlite-vec local**; **ZERO new deps** (essentia = AGPL poison, NOT installed; librosa unnecessary; torch/Pinecone/pgvector out) — pure-compute over the existing numpy/scipy + ffmpeg + pyrekordbox(0.4.4, `--no-deps`) stack only.
+- **All four cardinal invariants hold by ADDITIVE design.** The grounding gate (seen-set + library re-validation, Invariant #2) is UNCHANGED — every track_id the agent touches flows through `discover_pool`'s seen-set; the agent can never sequence/export a track discovery didn't surface.
+- **New modules are dim-agnostic** — `discovery.py`/`sequencer.py` survive the staged 1536→512 CLAP embedding swap for free (operate on `store._backend.load_all()` vectors, never hardcode D).
+- **Honest green** — every engine module (`energy`/`discovery`/`sequencer`/`export_rekordbox`) is pure-compute, offline-unit-testable, no API key, no Gemini call. Live-app verification (`cargo tauri dev` + `ui.log`) is a **hard gate** for the UI phase (green vitest ≠ working app — `feedback_verify_live_app_not_just_tests`).
+- **Do NOT collide with concurrent sessions** cooking CLAP/CueAnchor/metadata (untracked): disjoint NEW files only — do **NOT** touch `library/clap_engine.py`, `library/cue_types.py`, `library/cue_detect.py`; do **NOT** refresh `.planning/codebase/orphans.csv` (their commit owns the orphan baseline).
+- **`gsd-autonomous fully`** — blockers ride forward to KAAN-ACTION; only the privacy rule + destructive risk pause.
+
+**Empirical grounding (research-confirmed, implementation-ready):** the energy v1 formula (7-feature linear combiner, **spectral flux 0.22** the strongest perceived-arousal term, crest-corrected loudness, fixed-window normalization — NOT corpus min-max — over busy frames only) is hardened in `vibe-mix-engine-research.md §A`; the sequencer is a fixed-length subset-select+order trellis solved by **beam search** (<100ms, M≈50, dominance-dedup pruning, relaxation ladder that TAGS never fabricates) — §B; the Rekordbox **`pyrekordbox.rbxml.RekordboxXml` WRITE path works under the `--no-deps` install** (pure-stdlib xml.etree, zero SQLCipher coupling — do NOT hand-roll ElementTree) — §C. Scope reconciliation: `vibe-mix-agent-engine-synthesis.md`. UI/IPC seams + dead-button inventory: `vibe-mix-ui-ipc-button-audit.md`.
+
+## Phases
+
+- [ ] **Phase 83: ENERGY — Perceived-Dancefloor-Energy v1** — `library/energy.py` (reuse existing DSP + new spectral-flux term, genre-robust, content-hash cached) + `get_track_energy` tool. Foundation, NON-BLOCKING for sequencing (energy is an optional input there).
+- [ ] **Phase 84: DISCOVER — Pool Building (library-local)** — `library/discovery.py` (intent centroid + hard filters + MMR) + `discover_pool` tool (every track_id through the seen-set, Invariant #2).
+- [ ] **Phase 85: SEQUENCE — Energy-Curved, Harmonically-Valid Ordering** — `library/sequencer.py` (curve presets + transition graph + beam search → 3-5 diverse paths, honest fit labels) + `sequence_set` tool.
+- [ ] **Phase 86: EXPORT — One-Click to Rekordbox** — `harmonics.to_classical` + `library/export_rekordbox.py` (RekordboxXml write path: order + key/BPM/genre + memory & hot cues + beatgrid) + `export_set` tool + `library export-set` CLI.
+- [ ] **Phase 87: AGENT — The Set-Prep Co-Host Flow** — set-prep flow in `ViberAgent` (discover→sequence→explain each transition, mentor not black-box, grounded) + `library build-set` CLI, on the existing no-hang harness + shared persona/lens.
+- [ ] **Phase 88: UI — "Build a Set" Path** — Tauri "Build a Set" path (brief + curve picker → sequenced result + per-transition why + Export) in CDJ-Whisper aesthetic + a LIVE button-audit pass (`cargo tauri dev` + `ui.log`, no dead buttons).
+
+| # | Phase | Goal | REQ-IDs | SC count |
+|---|-------|------|---------|----------|
+| 83 | ENERGY — Perceived-Dancefloor-Energy v1 | A trustworthy 0-100 per-track energy score (genre-robust, cached) + tool | ENERGY-01, ENERGY-02, ENERGY-03 | 4 |
+| 84 | DISCOVER — Pool Building | An intent-centroid + filtered + MMR-diversified candidate pool from the DJ's own crate + grounded tool | DISCOVER-01, DISCOVER-02, DISCOVER-03 | 4 |
+| 85 | SEQUENCE — Energy-Curved Ordering | 3-5 diverse, energy-curved, harmonically-valid ordered sets with honest labels + tool | SEQUENCE-01, SEQUENCE-02, SEQUENCE-03 | 4 |
+| 86 | EXPORT — One-Click to Rekordbox | A Rekordbox-importable XML (order + cues + beatgrid) + tool + CLI | EXPORT-01, EXPORT-02 | 4 |
+| 87 | AGENT — Set-Prep Co-Host Flow | A NL-brief build-set flow that discovers→sequences→explains, grounded, no-hang | AGENT-01, AGENT-02 | 4 |
+| 88 | UI — "Build a Set" Path | A live, no-dead-button "Build a Set" UI ending in a downloaded Rekordbox file | UI-01, UI-02 | 4 |
+
+## Phase Details
+
+### Phase 83: ENERGY — Perceived-Dancefloor-Energy v1
+**Goal:** Give the DJ a trustworthy 0-100 perceived-dancefloor-energy score for any track in their library — one that reflects how hard a track *hits the floor*, not just how loud it is — computed offline from the local audio file, genre-robust, cached, and exposed to the agent. This is the energy axis the sequencer's curve will (optionally) ride; it is a pure-compute foundation, NON-BLOCKING for sequencing (the sequencer degrades to a BPM proxy when energy is absent).
+**Depends on:** Nothing (first v8.2 phase). Pure-compute; reuses existing DSP primitives. Parallelizable with Phase 84 (ENERGY ∥ DISCOVER are independent).
+**Requirements:** ENERGY-01, ENERGY-02, ENERGY-03
+**Success Criteria** (what must be TRUE):
+  1. A DJ gets a 0-100 perceived-energy score for any decodable track, computed offline from the local file by reusing the existing hand-rolled DSP (`cue_detect.decode_to_mono` + `audio/features` band-split/onset/`energy_curve` + `crest_factor` + `sub_share`) PLUS a new ~15-LOC spectral-flux term — the single strongest perceived-arousal predictor (ENERGY-01).
+  2. The score is genre-robust — a pairwise-ranking + hypnotic-regression unit test proves a quiet hypnotic after-hours track does NOT read as low-energy and a loud-but-sparse intro does NOT read as high (fixed perceptual-window normalization with per-track clip + busy-frame aggregation, NOT corpus min-max; raw RMS demoted, flux/brightness/crest-corrected-loudness promoted) (ENERGY-02).
+  3. Scores are cached by content hash so re-runs are free, and `get_track_energy(track_id)` is exposed as a grounded agent tool in `LibraryToolset` (inherited by gemini + codex/MCP + Telegram) that returns an honest `null` when a track has no decodable audio (ENERGY-03).
+  4. The whole module is offline-unit-testable on synthetic fixtures — no API key, no Gemini call, no new dep; weights live as one-line-edit constants in `audio/constants.py`.
+**Plans**: TBD
+
+### Phase 84: DISCOVER — Pool Building (library-local)
+**Goal:** Turn "a vibe + some reference tracks" into a focused, varied candidate pool drawn ONLY from the DJ's own library — ranked by coherence with a single computed intent, hard-filtered to what is actually mixable tonight, and diversity-re-ranked so it is a real pool not 50 near-identical tracks. Every track_id flows through the grounding seen-set, so nothing downstream can reference a track discovery didn't surface.
+**Depends on:** Nothing structurally (operates on the existing `store` + `harmonics`). Parallelizable with Phase 83 (ENERGY ∥ DISCOVER independent). Consumed by Phase 85 (the pool) and Phase 87 (the agent).
+**Requirements:** DISCOVER-01, DISCOVER-02, DISCOVER-03
+**Success Criteria** (what must be TRUE):
+  1. A DJ provides reference tracks and/or a text vibe prompt and gets a candidate pool from their OWN library, ranked by coherence with a single computed intent centroid (weighted multi-reference vector blend + α-blended Gemini text embedding) over the local mean-centered store (`store.search_centered`) (DISCOVER-01).
+  2. The pool is hard-filtered to tonight's mixable set — BPM range, Camelot compatibility against the references (`harmonics.compatible`), usable duration, recently-played exclusion (local `played_ids`/memory, NOT Mem0), and explicit DJ excludes — then MMR-diversified (`score = λ·sim(intent) − (1−λ)·max_sim(selected)`) so the pool is varied (DISCOVER-02).
+  3. `discover_pool(query|ref_track_ids, k, bpm_min/max, key, exclude_played_days, exclude_ids)` is exposed in `LibraryToolset`, and every returned track_id is recorded in the grounding seen-set (Cardinal Invariant #2) so the agent can never sequence a track the discovery step didn't surface (DISCOVER-03).
+  4. The module is dim-agnostic (centroid/KNN/MMR operate on whatever D `load_all()` returns — survives the staged 1536→512 CLAP swap free) and offline-unit-testable on fixture vectors (no API for the vector math; text-embed path mockable).
+**Plans**: TBD
+
+### Phase 85: SEQUENCE — Energy-Curved, Harmonically-Valid Ordering
+**Goal:** Order a candidate pool into a full set that follows a chosen energy arc with technically-valid transitions throughout — and return several genuinely-different options with honest labels, so the DJ chooses, not the machine. This is the heart of the set-prep value: the harmonically-correct, energy-curved sequence DJs spend hours hand-building.
+**Depends on:** Phase 84 (the candidate pool is the input) + optionally Phase 83 (energy gives curve fidelity; **degrades gracefully to a BPM proxy** when energy is absent — sequencing is never blocked on the DSP energy pass). Consumed by Phase 87 (the agent) and Phase 88 (the UI result list).
+**Requirements:** SEQUENCE-01, SEQUENCE-02, SEQUENCE-03
+**Success Criteria** (what must be TRUE):
+  1. A DJ picks an energy-curve preset (opener / peak-time / after-hours / festival) or supplies a custom curve, and the pool is ordered into an N-slot set following that curve — the curve parameterized by normalized set-position (`np.interp` resample) so it works for any set length (SEQUENCE-01).
+  2. Every transition is technically valid — harmonically compatible (Camelot same/±1/relative via `harmonics.compatible`) and BPM within ±6% — degrading gracefully when a track lacks key/BPM (NEVER dropped for missing metadata: `compatible` returns False on unknown, so the gate rejects only when BOTH are known and incompatible), and any relaxed transition (the widen-BPM→drop-cross-letter→unknown-key-bridge ladder) is TAGGED honestly ("BPM jump here"), never silently fabricated (SEQUENCE-02).
+  3. `sequence_set(track_ids, curve_preset|curve_array, n_slots)` returns 3-5 ranked, Jaccard-diverse candidate sets (each ≥30% different tracks, or character-diverse weight presets) each with honest fit labels (energy fit, average coherence) for DJ optionality — exposed as a grounded `LibraryToolset` tool (ids must be in the seen-set) (SEQUENCE-03).
+  4. The sequencer is pure-compute (beam search, <100ms at M≈50, dominance-dedup pruning), dim-agnostic, structure-placeholder `True` until the staged `CueAnchor` contract lands (do NOT consume `cue_types.py`), and offline-unit-testable (curve-follow, transition-validity, relaxation-tagging, diversity, dead-frontier honest-short-set).
+**Plans**: TBD
+
+### Phase 86: EXPORT — One-Click to Rekordbox
+**Goal:** Let the DJ get a sequenced set out of vibemix and into Rekordbox in one action — a self-contained importable XML that preserves track ORDER plus the rich per-track metadata and cues, so the set is ready to load. The single new validated write path, mirroring `create_playlist`'s grounding gate.
+**Depends on:** Phase 85 conceptually (a sequenced set is the natural input) but the EXPORT module itself is independent of SEQUENCE internals — it serializes any ordered list of grounded track_ids; consumed by Phase 87 (the agent's final step).
+**Requirements:** EXPORT-01, EXPORT-02
+**Success Criteria** (what must be TRUE):
+  1. A DJ exports a sequenced set to a Rekordbox-importable XML file in one action, and on import into Rekordbox the playlist appears with track ORDER preserved plus per-track key/BPM/genre/colour/rating and memory + hot cues + beatgrid — written via the verified `pyrekordbox.rbxml.RekordboxXml` write path (NOT hand-rolled ElementTree; dedup by Location before add_track; use SETTER for Rating byte-mapping) (EXPORT-01).
+  2. Internal Camelot keys convert deterministically to classical notation for Rekordbox's `Tonality` field via a new `harmonics.to_classical(camelot) -> str|None` (24-entry inverse of `to_camelot`, honest-null on unknown, round-trip-testable), and export is exposed through an `export_set` agent tool + a `vibemix library export-set` CLI command (EXPORT-02).
+  3. The hot-cue-COLOR gap (pyrekordbox 0.4.4 `PositionMark.ATTRIBS` has no RGB) is documented as "colours assigned by Rekordbox" rather than faked; the guaranteed win is ORDER (cues are a bonus, most valuable for not-yet-analyzed tracks).
+  4. The writer is offline-unit-testable (build XML → parse back → assert order + Tonality + cues), adds ZERO new dep (pyrekordbox already pinned `--no-deps`), and does NOT mutate any existing Rekordbox database (file write only).
+**Plans**: TBD
+
+### Phase 87: AGENT — The Set-Prep Co-Host Flow
+**Goal:** Wire the three engines behind one natural-language conversation — the DJ asks the co-host to build a set from a brief, and the agent discovers → sequences → and explains *why* each critical transition works, acting as a mentor rather than a black box. This is where the tools become a co-host, on the existing bounded no-hang harness so it can never wedge and its voice matches the live co-host's.
+**Depends on:** Phase 84 (`discover_pool`), Phase 85 (`sequence_set`), Phase 86 (`export_set`) — the tools it orchestrates. Consumed by Phase 88 (the UI spawns this CLI surface as a subprocess).
+**Requirements:** AGENT-01, AGENT-02
+**Success Criteria** (what must be TRUE):
+  1. A DJ runs `vibemix library build-set "<brief>"` (Gemini agent) and gets a full set built from a natural-language brief — the agent discovers → sequences → and explains in 1-2 sentences why each critical transition works (key/BPM/energy/vibe), as a mentor not a black box, with every track grounded (never invented — all ids flow through the seen-set) (AGENT-01).
+  2. The set-prep flow REUSES the existing bounded no-hang `ViberAgent` harness (iteration cap `MAX_TOOL_ITERATIONS`, per-call + per-tool timeouts, handlers RETURN errors never raise) and the shared persona/lens seam (Phase-79/82), so it can never wedge and its voice matches the co-host's (AGENT-02).
+  3. The flow lands as a "set-prep" system-instruction VARIANT layered on the existing matrix/lens seam — no persona drift, no new brain; Gemini-only (the spec's Claude-Sonnet reasoning IS this Gemini agent).
+  4. The agent path is testable offline against a fake client (tool-call sequencing + grounding-gate + no-hang bounds) without the live API; the live e2e run on the funded key rides forward as a soft KAAN-ACTION ear-pass, never faked.
+**Plans**: TBD
+
+### Phase 88: UI — "Build a Set" Path
+**Goal:** Give the DJ a first-class "Build a Set" path in the app — brief + curve picker → a sequenced result they can read (each slot's track, key/BPM/energy, and the per-transition reasoning) → an Export-to-Rekordbox button — in the CDJ-Whisper aesthetic, with every control working LIVE end-to-end. This is where the engine becomes a product surface; the live button-audit is a hard gate.
+**Depends on:** Phase 87 (the CLI/agent surface the Tauri command spawns as a subprocess and parses JSON stdout). frontend-enforcement skill applies (20/80 rule, retro-futurist hardware vocabulary, no AI slop).
+**Requirements:** UI-01, UI-02
+**Success Criteria** (what must be TRUE):
+  1. The app exposes a "Build a Set" path — brief input + energy-curve preset picker → a sequenced result list showing each slot's track, key/BPM/energy, and the per-transition reasoning → an Export-to-Rekordbox button — in the CDJ-Whisper aesthetic (phosphor-amber accent on anodised charcoal, segment-LED/material treatment, no generic Tailwind slop) (UI-01).
+  2. Every control in the "Build a Set" path works live end-to-end — verified in the REAL `cargo tauri dev` app via `ui.log` (`[vmx:click]/[vmx:ipc>]/[vmx:ipc<]/[vmx:error]`), not just green vitest — with NO dead/no-op buttons, and the result is a downloaded Rekordbox file + clear next-step import instructions (UI-02).
+  3. Library/curate results flow via Tauri commands (subprocess stdout), NOT ws IPC — so NO `messages.schema.json` edit / `codegen:ipc` is required (one-socket Invariant #4 holds); if any schema edit DOES become necessary, `npm run codegen:ipc` is run (pre-compiled ajv validator).
+  4. The live-app verification is a HARD GATE per `feedback_verify_live_app_not_just_tests` — green vitest ≠ working app; launch the real app, click every control, confirm each fires + gets a reply (no timeouts) in `ui.log`.
+**Plans**: TBD
+**UI hint**: yes
+
+### v8.2 Coverage
+
+✓ All 13 v8.2 REQ-IDs mapped to exactly one phase (ENERGY-01/02/03 → P83 · DISCOVER-01/02/03 → P84 · SEQUENCE-01/02/03 → P85 · EXPORT-01/02 → P86 · AGENT-01/02 → P87 · UI-01/02 → P88). No orphans, no duplicates.
+✓ Dependency spine: (P83 ENERGY ∥ P84 DISCOVER, independent) → P85 SEQUENCE (needs DISCOVER's pool + optionally ENERGY's curve fidelity — degrades to BPM proxy) ‖ P86 EXPORT (independent of SEQUENCE internals; serializes any ordered grounded set) → P87 AGENT (orchestrates DISCOVER/SEQUENCE/EXPORT tools) → P88 UI (consumes the AGENT/CLI surface).
+
+### v8.2 Progress Table
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 83. ENERGY — Perceived-Dancefloor-Energy v1 | 0/TBD | Not started | - |
+| 84. DISCOVER — Pool Building | 0/TBD | Not started | - |
+| 85. SEQUENCE — Energy-Curved Ordering | 0/TBD | Not started | - |
+| 86. EXPORT — One-Click to Rekordbox | 0/TBD | Not started | - |
+| 87. AGENT — Set-Prep Co-Host Flow | 0/TBD | Not started | - |
+| 88. UI — "Build a Set" Path | 0/TBD | Not started | - |
 
 ---
 
@@ -356,10 +479,13 @@ Full archive: `.planning/milestones/v3.1-ROADMAP.md` · Requirements: `.planning
 | v6.0 The Memory Turn | 63–66 | ✅ Shipped (tech_debt) | 2026-05-23 |
 | v7.0 Open House | 67–70 | ✅ Shipped (tech_debt) | 2026-05-24 |
 | v8.0 Proof & Polish | 71–76 | ✅ Shipped (tech_debt) | 2026-05-25 |
-| v8.1 One Mind | 77–82 | 🔨 In progress | - |
+| v8.1 One Mind | 77–82 | ✅ Shipped (audit PASSED) | 2026-05-26 |
+| v8.2 Set Builder | 83–88 | 🔨 In progress | - |
 
 ---
 
 *Roadmap extended 2026-05-23 for v7.0 "Open House" — **4 phases (67–70)** continuing numbering from v6.0 (which ran 63–66). v4.0 "SHIP" stays OPEN and unarchived above — its publish closes alongside v7.0's OSS-04 (KAAN-ACTION §SHIP-V4 discharge fires `cut_release.sh v0.1.0-rc1` for real). v7.0 derives from 19 requirements across 4 pillars (TEST · DEV · OSS · GH), one phase per pillar, sized by `.planning/REQUIREMENTS.md` Traceability — 4/5/5/5 REQ-IDs per phase, zero orphans, zero duplicates. **Hard scope rule (locked):** v7.0 is WIRING + DISCHARGE + POLISH — zero new product capability, zero new AI providers, zero new managed-memory frameworks, zero new ws ports, zero new IPC envelopes. The four cardinal invariants (single-writer / citation grounding / "trust the audio" / one socket) hold by zero-touch — no phase modifies the reaction path. The v4.0 external signature clock is unchanged. Critical path: P67 (test infrastructure, dependency-free) → P68 (controller catalog reconciliation + audio backends, lands on P67's CI matrix) → P69 (OSS surface + actual publish gated on §SHIP-V4) → P70 (GitHub front-porch + Kaan-felt landing-page sign-off). Under `gsd-autonomous fully`, OSS-04 routes to §SHIP-V4 if signatures haven't landed at execution; the other 18 REQ-IDs ship unblocked.*
 
 *Roadmap extended 2026-05-25 for v8.1 "One Mind" — **6 phases (77–82)** continuing numbering from v8.0 (which ran 71–76) — NO reset. 18 v8.1 REQ-IDs mapped to exactly one phase (100% coverage, no orphans, no duplicates): WIRE-01..06 → P77 (6; WIRE-02 `ccf4930` + WIRE-03 `a9979b8` already SHIPPED — placed in P77, marked DONE, no new work) · PERCEIVE-01..03 → P78 (3) · LENS-01..02 → P79 (2) · GROUND-01..02 → P80 (2) · BENCH-01..03 → P81 (3) · CURATE-01..02 → P82 (2). **Hard scope rule (locked):** ship-not-over-engineer (one connected, tested wire per phase) · Gemini-only · NO new MIR libraries / NO new DSP detectors · no new ws ports / no new IPC envelopes · the four cardinal invariants (single-writer / citation-grounding / trust-the-audio / one-socket) hold by ADDITIVE design (gated-off cold path byte-identical to the v8.0 baseline) · honest green (unit-testable without the API; live e2e on the funded key). Dependency spine: P77 (WIRE) → P78 (PERCEIVE) → P79 (LENS) ‖ P80 (GROUND) → P81 (BENCH — depends on GROUND + LENS being in place to bench them) → P82 (CURATE). Under `gsd-autonomous fully`, blockers (Gemini billing — resolved; any live-hardware ear-pass) ride forward to KAAN-ACTION — they never block. Charter: `.planning/research/one-mind-charter.md`.*
+
+*Roadmap extended 2026-05-26 for v8.2 "Set Builder" — **6 phases (83–88)** continuing numbering from v8.1 (which ran 77–82) — NO reset. 13 v8.2 REQ-IDs mapped to exactly one phase (100% coverage, no orphans, no duplicates): ENERGY-01/02/03 → P83 · DISCOVER-01/02/03 → P84 · SEQUENCE-01/02/03 → P85 · EXPORT-01/02 → P86 · AGENT-01/02 → P87 · UI-01/02 → P88. **Hard scope rule (locked):** Mode A library-local ONLY (public catalog / affiliate / fingerprint / XGBoost / scraping / Serato+Engine+Traktor export all DEFER → Bravoh-commercial or later) · Gemini-only · sqlite-vec local · **ZERO new deps** (essentia AGPL excluded) · grounding seen-set gate (Invariant #2) UNCHANGED · new modules dim-agnostic (survive the staged 1536→512 CLAP swap) · honest-green offline-unit-testable engine modules · the live `cargo tauri dev` + `ui.log` button-audit is a HARD gate for P88. **Do NOT collide with concurrent sessions** — disjoint NEW files only; do NOT touch `library/clap_engine.py` / `cue_types.py` / `cue_detect.py`; do NOT refresh `.planning/codebase/orphans.csv`. Dependency spine: (P83 ENERGY ∥ P84 DISCOVER, independent) → P85 SEQUENCE (DISCOVER pool + optional ENERGY curve fidelity, degrades to BPM proxy) ‖ P86 EXPORT (independent of SEQUENCE internals) → P87 AGENT (orchestrates the three tools, on the no-hang harness + shared lens) → P88 UI ("Build a Set" path, frontend-enforcement applies). Under `gsd-autonomous fully`, blockers (live ear-pass, Apple/SignPath signature clock) ride forward to KAAN-ACTION. Charter: `.planning/research/vibe-mix-agent-engine-synthesis.md`; implementation research: `.planning/research/vibe-mix-engine-research.md`; UI/IPC seams: `.planning/research/vibe-mix-ui-ipc-button-audit.md`.*
