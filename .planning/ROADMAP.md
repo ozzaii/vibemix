@@ -488,7 +488,7 @@ Full archive: `.planning/milestones/v3.1-ROADMAP.md` · Requirements: `.planning
 **Mode:** mvp
 **Requirements**: TBD
 **Depends on:** staged `clap_engine` (embed seam) + `cue_types.CueAnchor` (both already shipped by concurrent sessions). NOT the v8.2 UI phase.
-**Scope (MVP slice):** Rekordbox-only, end-to-end walking skeleton (detect → parse `collection.xml` → cue-anchored excerpts → `clap_engine` embed → sqlite-vec store). Serato/Traktor adapters + the file watcher are deferred to follow-up phases (90, 91). Design spec: `docs/superpowers/specs/2026-05-26-dj-library-ingest-design.md`.
+**Scope (MVP slice):** Rekordbox-only, end-to-end walking skeleton (detect → parse `collection.xml` → cue-anchored excerpts → `clap_engine` embed → sqlite-vec store). Serato/Traktor adapters + the file watcher are deferred to follow-up phases (91, 92 — 90 is the CLAP embedding-swap). Design spec: `docs/superpowers/specs/2026-05-26-dj-library-ingest-design.md`.
 **Plans:** 3/3 plans complete
 
 Plans:

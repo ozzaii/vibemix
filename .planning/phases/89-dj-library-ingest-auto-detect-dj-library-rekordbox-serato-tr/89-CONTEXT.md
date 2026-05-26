@@ -12,7 +12,8 @@ vertical on ONE source: detect the user's Rekordbox library → parse clean meta
 from `collection.xml` → cut cue-anchored ≤80s excerpts → embed on-device via the
 staged `clap_engine` → store in the existing sqlite-vec library store.
 
-**Explicitly deferred to follow-up phases (90, 91):** Serato + Traktor source
+**Explicitly deferred to follow-up phases (91, 92 — Phase 90 is the CLAP
+embedding-swap, owned by a concurrent session):** Serato + Traktor source
 adapters; the real file watcher (auto re-embed on library change).
 </domain>
 
@@ -96,9 +97,9 @@ all hold by zero-touch; this phase adds NEW library-side files + extends `rekord
 
 <deferred>
 ## Deferred Ideas
-- Serato adapter (serato-tools GEOB + mutagen TKEY) → Phase 90.
-- Traktor adapter (collection.nml, stdlib xml.etree; CUE_V2 START in SECONDS) → Phase 90.
-- Real file watcher (watchdog on index files → diff → re-embed delta) → Phase 91.
+- Serato adapter (serato-tools GEOB + mutagen TKEY) → Phase 91 (90 = CLAP embedding-swap).
+- Traktor adapter (collection.nml, stdlib xml.etree; CUE_V2 START in SECONDS) → Phase 91.
+- Real file watcher (watchdog on index files → diff → re-embed delta) → Phase 92.
 - djay Pro — out (closed DB, no parser).
 </deferred>
 
