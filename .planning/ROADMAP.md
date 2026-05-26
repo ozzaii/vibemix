@@ -47,7 +47,7 @@
 - [ ] **Phase 77: WIRE — Connect the Islands** — Grounding→live agent + persona/lens unify + memory ingest on live path + env-key override fix (WIRE-02/03 already shipped).
 - [ ] **Phase 78: PERCEIVE — Deeper, Generalized Ear** — deltas + calibrated confidence + multi-scale trajectory + mean-centered genre-prototype lookup (no new DSP, no MIR libs). **4 plans, 3 waves.**
 - [ ] **Phase 79: LENS — Three Grounded Modes** — hype / critique / tutor as prompt lenses over one structured state, lens selection shared across surfaces.
-- [ ] **Phase 80: GROUND — Gemini as Secondary Ear** — audio part fed alongside structured evidence, hallucination-guarded; reaction model config-resolved by the bench.
+- [x] **Phase 80: GROUND — Gemini as Secondary Ear** — audio part fed alongside structured evidence, hallucination-guarded; reaction model config-resolved by the bench.
 - [ ] **Phase 81: BENCH — The Validation Instrument** — multi-dimensional bench (model × grounding × prompting × contexting × lens × taste) + auto first-pass eval + Kaan's-ear review surface.
 - [ ] **Phase 82: CURATE — Unify Curator + Co-Host** — both surfaces share the perception engine + structured-state contract + taste layer + persona.
 
@@ -56,7 +56,7 @@
 | 77 | WIRE — Connect the Islands | 4/4 | Complete    | 2026-05-25 |
 | 78 | PERCEIVE — Deeper, Generalized Ear | 4/4 | Complete    | 2026-05-26 |
 | 79 | LENS — Three Grounded Modes | 3/3 | Complete    | 2026-05-26 |
-| 80 | GROUND — Gemini as Secondary Ear | 1/2 | In Progress|  |
+| 80 | GROUND — Gemini as Secondary Ear | 2/2 | Complete   | 2026-05-26 |
 | 81 | BENCH — The Validation Instrument | A multi-dimensional bench runs the architecture/model axes on real tracks, auto-scores each cell, and surfaces cells for Kaan's-ear final judgment | BENCH-01, BENCH-02, BENCH-03 | 4 |
 | 82 | CURATE — Unify Curator + Co-Host | Curator and co-host are two facets of one engine — shared perception/state contract + shared taste/persona | CURATE-01, CURATE-02 | 3 |
 
@@ -117,7 +117,7 @@ Plans:
   3. With the audio-secondary path gated off, the prompt + reaction are byte-identical to the v8.0 baseline (additive design).
 **Plans**: 2 plans
 - [x] 80-01-PLAN.md — Wave-0 RED scaffolds: the un-backed-audio-claim strip guard + flag-ON framing (xfail-strict) + cold-path byte-identity & GROUND-02 router-resolve pins (real-green)
-- [ ] 80-02-PLAN.md — gated `secondary_ear` framing in `build_parts_description`, thread `VIBEMIX_GROUND_SECONDARY_EAR` → kwarg → call site, flip the guard xfails, document `live_coach` as the bench-swap alias
+- [x] 80-02-PLAN.md — gated `secondary_ear` framing in `build_parts_description`, thread `VIBEMIX_GROUND_SECONDARY_EAR` → kwarg → call site, flip the guard xfails, document `live_coach` as the bench-swap alias
 
 ### Phase 81: BENCH — The Validation Instrument
 **Goal:** Build the experiment that PROVES the architecture — a multi-dimensional bench over model × input-grounding (raw audio | DSP-evidence-only/no-audio | audio+DSP | audio+DSP+trajectory+genre) × prompting (generic | structured) × contexting (snapshot | trajectory) × lens (hype/critique/tutor) × taste (with/without rubric), run on real tracks. An automated first-pass scores each cell (groundedness vs DSP facts, specificity, mode-fidelity); the cells are then surfaced for **Kaan's ear as the final judge** (Phase-16 rule). The "no-audio" cell tests "does the intelligence reside elsewhere."

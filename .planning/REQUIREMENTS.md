@@ -31,8 +31,8 @@
 - [x] **LENS-02**: Lens selection is shared across the co-host and curator surfaces.
 
 ### GROUND — Gemini as secondary ear
-- [ ] **GROUND-01**: The audio part is fed to Gemini alongside the structured evidence, hallucination-guarded.
-- [ ] **GROUND-02**: The reaction model is config-resolved via `model_router` and chosen by the bench result.
+- [x] **GROUND-01**: The audio part is fed to Gemini alongside the structured evidence, hallucination-guarded.
+- [x] **GROUND-02**: The reaction model is config-resolved via `model_router` and chosen by the bench result.
 
 ### BENCH — validation instrument
 - [ ] **BENCH-01**: A multi-dimensional bench harness runs model × grounding × prompting × contexting × lens × taste on real tracks.
@@ -75,8 +75,8 @@ Every v8.1 REQ-ID maps to exactly one phase (6 phases, 77–82; numbering contin
 | PERCEIVE-03 | Phase 78 | Complete |
 | LENS-01 | Phase 79 | Complete |
 | LENS-02 | Phase 79 | Complete |
-| GROUND-01 | Phase 80 | Pending |
-| GROUND-02 | Phase 80 | Pending |
+| GROUND-01 | Phase 80 | Complete |
+| GROUND-02 | Phase 80 | Complete |
 | BENCH-01 | Phase 81 | Pending |
 | BENCH-02 | Phase 81 | Pending |
 | BENCH-03 | Phase 81 | Pending |
