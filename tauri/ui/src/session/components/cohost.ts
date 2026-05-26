@@ -69,10 +69,12 @@ export interface CohostPanelProps {
    *  "error recovery". The render-loop computes this; the cohost is
    *  presentation-only. Defaults to null. */
   failureElapsedMs?: number | null;
-  /** Click handler for the retry button shown after the failure threshold
-   *  elapses. Wave 6 — callers wire this to whatever reconnect IPC exists
-   *  (currently `restart_sidecar`; a dedicated `ipc.cohost.reconnect` is
-   *  a TODO). */
+  /** Click handler for the restart button shown after the failure
+   *  threshold elapses. There is no targeted `ipc.cohost.reconnect` route
+   *  yet (TODO Phase 17), so callers wire this to `restart_sidecar` — a
+   *  full co-host restart. The button label says so ("RESTART CO-HOST")
+   *  rather than implying a lightweight reconnect it can't deliver
+   *  (2026-05-26 /impeccable critique P3). */
   onRetry?: () => void;
   /** Phase 44-03 / LAUNCH-02 — citation chip strips keyed by transcript
    *  line `ts`. Optional + defaults to an empty map; missing keys just
@@ -809,9 +811,9 @@ function buildFoot(
     const retry = document.createElement("button");
     retry.type = "button";
     retry.className = "vmx-cohost__foot-retry";
-    retry.textContent = "↻ RETRY";
-    retry.setAttribute("aria-label", "retry connecting to gemini");
-    retry.setAttribute("title", "retry connecting to gemini");
+    retry.textContent = "↻ RESTART CO-HOST";
+    retry.setAttribute("aria-label", "restart the co-host to reconnect");
+    retry.setAttribute("title", "restart the co-host to reconnect");
     if (onRetry) {
       retry.addEventListener("click", (e) => {
         e.preventDefault();
@@ -841,7 +843,7 @@ function footTooltipFor(grounded: boolean, failed: boolean): string {
     return "vibemix is listening to your master output and watching your DJ window.";
   }
   if (failed) {
-    return "couldn't reach gemini. press retry to reconnect.";
+    return "couldn't reach gemini. restart the co-host to reconnect.";
   }
   return "tuning in. initializing audio + screen capture.";
 }
@@ -890,9 +892,9 @@ export function setCohost(el: HTMLElement, props: CohostPanelProps): void {
       const retry = document.createElement("button");
       retry.type = "button";
       retry.className = "vmx-cohost__foot-retry";
-      retry.textContent = "↻ RETRY";
-      retry.setAttribute("aria-label", "retry connecting to gemini");
-      retry.setAttribute("title", "retry connecting to gemini");
+      retry.textContent = "↻ RESTART CO-HOST";
+      retry.setAttribute("aria-label", "restart the co-host to reconnect");
+      retry.setAttribute("title", "restart the co-host to reconnect");
       if (props.onRetry) {
         retry.addEventListener("click", (e) => {
           e.preventDefault();

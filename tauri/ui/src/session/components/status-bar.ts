@@ -100,16 +100,21 @@ const CSS = `
       inset 0 1px 0 rgba(255, 255, 255, 0.04);
     flex-shrink: 0;
   }
-  /* OK — green dome, inset top-highlight + outer halo (mock .led) */
+  /* OK — quiet-by-default (2026-05-26 /impeccable critique P2). The 4
+   * status badges and the left-rail persona readout were two competing
+   * "is it working?" glances at opposite corners. When everything is OK
+   * the bar should recede: a dim green dot (no bloom) + silk-22 label, so
+   * the eye only stops here when a badge drops to down/connecting. The
+   * cohost foot ("READING THE ROOM") is the canonical alive-signal. */
   .vmx-statusbar__badge[data-state="ok"] .vmx-statusbar__led {
     background: var(--led-ok);
     box-shadow:
-      0 0 3px var(--led-ok),
-      0 0 6px rgba(109, 212, 74, 0.28),
-      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      0 0 2px rgba(109, 212, 74, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
       inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
+    opacity: 0.6;
   }
-  .vmx-statusbar__badge[data-state="ok"] { color: var(--silk); }
+  .vmx-statusbar__badge[data-state="ok"] { color: var(--silk-22); }
   /* CONNECTING — amber dome, pulsing (mock .led + brandPulse cadence) */
   .vmx-statusbar__badge[data-state="connecting"] .vmx-statusbar__led {
     background: var(--amber);

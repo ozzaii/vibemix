@@ -171,7 +171,9 @@ describe("renderDropChip", () => {
 // === EventRibbon =============================================================
 
 describe("renderEventRibbon", () => {
-  it("trims to last 12 events when 15 provided", () => {
+  it("trims to last 6 events when 15 provided", () => {
+    // 2026-05-26 /impeccable critique P3: cap dropped 12 → 6 (a dozen
+    // mono chips was the one un-glanceable region mid-mix).
     const events: MidiEvent[] = Array.from({ length: 15 }, (_, i) => ({
       id: `evt-${i}`,
       label: `EVT ${i}`,
@@ -180,10 +182,10 @@ describe("renderEventRibbon", () => {
     const ribbon = renderEventRibbon({ events });
     host().append(ribbon);
     const chips = ribbon.querySelectorAll(".vmx-event-chip");
-    expect(chips).toHaveLength(12);
-    // Oldest 3 (ids 0, 1, 2) trimmed — first visible should be evt-3.
-    expect((chips[0] as HTMLElement).dataset.id).toBe("evt-3");
-    expect((chips[11] as HTMLElement).dataset.id).toBe("evt-14");
+    expect(chips).toHaveLength(6);
+    // Oldest 9 (ids 0-8) trimmed — first visible should be evt-9.
+    expect((chips[0] as HTMLElement).dataset.id).toBe("evt-9");
+    expect((chips[5] as HTMLElement).dataset.id).toBe("evt-14");
   });
 
   it("buckets ages into now / warm / cool", () => {

@@ -13,18 +13,18 @@
  *   block for the semantic alpha names this module consumes.
  *
  * Each meter is 56px wide × 200px tall: a --glass-3 frame with 16
- * stacked LED segments running a Pioneer-CDJ polychrome ladder (safe at
- * the bottom in --meter-safe green, warm through the body in --amber,
- * clip at the top in --meter-clip magenta) plus a separate peak-hold
- * needle that floats above the current level.
+ * stacked LED segments running an amber ladder that brightens upward
+ * (a dim amber at the safe bottom, full amber through the warm body)
+ * with --meter-clip magenta reserved for the clip zone at the top, plus
+ * a separate peak-hold needle that floats above the current level.
  *
- * Polychrome rebrand (2026-05-19): the meter is the single polychrome
- * surface in v5 — it broke the all-amber monotone deliberately to push
- * past the "AI tool with dark mode + one amber" second-order category
- * reflex. Mood block follows; everything else stays silk/amber/glass per
- * the One-Amber Rule. The peak needle stays amber — it is the single
- * visceral CDJ Whisper signal and the polychrome lives in the ladder,
- * not the floater.
+ * One-Amber restored (2026-05-26 /impeccable critique): the meter was the
+ * single polychrome surface (green→amber→magenta), but it is also the
+ * element a DJ glances at most, so a 3-colour ladder competed with amber's
+ * "rare deck-light" meaning everywhere else. The ladder is now one amber
+ * that intensifies with level; colour only changes when something is
+ * wrong (magenta at clip). The peak needle stays amber — the single
+ * visceral CDJ Whisper signal.
  *
  * Layout-thrash-free update path: the caller writes a single CSS custom
  * property to the meter root — `--meter-rms` (0..1) and `--meter-peak`
@@ -95,20 +95,20 @@ const CSS = `
                 opacity var(--motion-snap) ease-out;
     opacity: 0.85;
   }
-  /* v5 polychrome ladder — Pioneer-CDJ style. Green at the bottom (safe),
-   * amber through the body (warm), magenta at the top (clip). The color
-   * transition IS the band marker — the v4 green hairline at segment 5
-   * was redundant in the polychrome world and was deleted with this
-   * migration. */
+  /* Amber ladder (2026-05-26) — one hue, brightening with level. Safe is
+   * a dim amber at the bottom, warm is full amber through the body; the
+   * brightness step at segment 6 IS the band marker. Magenta is reserved
+   * for the clip zone only, so colour appears exactly when something's
+   * wrong. Restores the One-Amber Rule on the most-glanced surface. */
   .vmx-meter__seg[data-lit="true"] {
     opacity: 1;
     box-shadow: none;
   }
   .vmx-meter__seg[data-zone="safe"][data-lit="true"] {
-    background: linear-gradient(180deg, var(--meter-safe-pale), var(--meter-safe-pale-70));
+    background: linear-gradient(180deg, var(--amber-78), var(--amber-40));
     box-shadow:
       inset 0 0 0 0.5px var(--seg-hi-15),
-      0 0 3px var(--meter-safe-22);
+      0 0 3px var(--amber-22);
   }
   .vmx-meter__seg[data-zone="warm"][data-lit="true"] {
     background: linear-gradient(180deg, var(--amber), var(--amber-78));

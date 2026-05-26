@@ -110,6 +110,17 @@ export interface SessionState {
     mood: "HYPE" | "TEACH" | "COACH";
     voice: string;
     genre: string;
+    /** 2026-05-26 /impeccable critique P1 — in-deck mood cycle. Tapping the
+     *  mood headline on the persona readout advances HYPE → TEACH → COACH
+     *  → HYPE without opening the drawer. The render-loop wires this to
+     *  emitIpc("ipc.settings.set", { field: "mood", … }) — the same real,
+     *  already-wired knob the settings drawer writes. Mood IS the
+     *  chattiness axis (HYPE talks over the build; COACH waits for the
+     *  mix-out), so this is the lightweight "ease off / hype up" gesture
+     *  H3 was missing, backed by a real setting (no broken promise).
+     *  Omitted (e.g. the dev mock) → the mood headline renders but tap is
+     *  a no-op. */
+    onCycleMood?: () => void;
   };
   output: {
     device: string;
@@ -252,10 +263,14 @@ const LAYOUT_CSS = `
     justify-content: space-around;
     padding: var(--sp-4) 0 0;
   }
-  /* Glanceable persona readout (2026-05-25 rebuild). A recessed glass tile,
-   * not a control: flat at rest, lifts a hair on hover, amber focus ring on
-   * keyboard. Mood is the silk headline; the caption carries the one mood
-   * tint (set inline) so the block feels alive without a second amber. */
+  /* Glanceable persona readout (2026-05-25 rebuild; 2026-05-26 critique P1).
+   * A recessed glass tile holding two affordances: the mood headline is a
+   * tap-to-cycle button (HYPE → TEACH → COACH, the real chattiness knob),
+   * and the "EDIT ▸" chip opens the drawer for full persona control. The
+   * tile itself is no longer clickable — the two buttons own the
+   * interaction so the gesture is explicit. Mood is the silk headline; the
+   * caption carries the one mood tint (set inline) so the block feels
+   * alive without a second amber. */
   .vmx-persona-status {
     display: flex;
     flex-direction: column;
@@ -268,19 +283,7 @@ const LAYOUT_CSS = `
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-md);
     box-shadow: inset 0 1px 0 var(--glass-top), inset 0 -1px 0 rgba(0, 0, 0, 0.45);
-    cursor: pointer;
     color: var(--silk);
-    transition: background var(--motion-step) ease-out,
-      border-color var(--motion-step) ease-out;
-  }
-  .vmx-persona-status:hover {
-    background: var(--glass-1);
-    border-color: var(--glass-edge-up);
-  }
-  .vmx-persona-status:focus-visible {
-    outline: 2px solid var(--amber);
-    outline-offset: 2px;
-    box-shadow: var(--glow-soft);
   }
   .vmx-persona-status__head {
     display: flex;
@@ -296,6 +299,13 @@ const LAYOUT_CSS = `
     color: var(--silk-40);
   }
   .vmx-persona-status__edit {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 2px 0;
+    margin: 0;
+    cursor: pointer;
     font-family: var(--type-display);
     font-variation-settings: 'wdth' 85, 'wght' 600;
     font-size: 9px;
@@ -304,8 +314,23 @@ const LAYOUT_CSS = `
     color: var(--silk-22);
     transition: color var(--motion-step) ease-out;
   }
-  .vmx-persona-status:hover .vmx-persona-status__edit { color: var(--silk-40); }
+  .vmx-persona-status__edit:hover { color: var(--silk-40); }
+  .vmx-persona-status__edit:focus-visible {
+    color: var(--silk-40);
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+    border-radius: var(--rad-sm);
+  }
   .vmx-persona-status__mood {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    text-align: left;
+    cursor: pointer;
+    align-self: flex-start;
     font-family: var(--type-display);
     font-variation-settings: 'wdth' 85, 'wght' 700;
     font-size: 22px;
@@ -313,6 +338,16 @@ const LAYOUT_CSS = `
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--silk);
+    transition: text-shadow var(--motion-step) ease-out;
+  }
+  /* Hover/focus light the headline amber — the "tappable, this is a live
+   * control" cue. Transient single-element glow, not a persistent second
+   * amber, so the One-Amber Rule holds. */
+  .vmx-persona-status__mood:hover { text-shadow: 0 0 8px var(--amber-22); }
+  .vmx-persona-status__mood:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 3px;
+    border-radius: var(--rad-sm);
   }
   .vmx-persona-status__caption {
     font-family: var(--type-body);
@@ -621,23 +656,39 @@ function moodCaptionColor(mood: string): string {
  *  surface). This is DESIGN.md's "one CDJ unit, mostly void" finally
  *  honored on the busiest surface. */
 function buildPersonaStatus(state: SessionState): HTMLElement {
-  const el = document.createElement("button");
-  el.type = "button";
+  const el = document.createElement("div");
   el.className = "vmx-persona-status";
+  el.setAttribute("role", "group");
+  el.setAttribute("aria-label", "persona");
 
   const head = document.createElement("span");
   head.className = "vmx-persona-status__head";
   const title = document.createElement("span");
   title.className = "vmx-persona-status__title";
   title.textContent = "PERSONA";
-  const edit = document.createElement("span");
+  // EDIT ▸ opens the settings drawer — the full persona/output write
+  // surface. Dynamic import keeps the wizard bundle from pulling settings
+  // (mirrors the titlebar gear button).
+  const edit = document.createElement("button");
+  edit.type = "button";
   edit.className = "vmx-persona-status__edit";
   edit.textContent = "EDIT ▸";
+  edit.setAttribute("aria-label", "open settings to change persona");
+  edit.addEventListener("click", () => {
+    void import("../settings/SettingsDrawer.js").then((m) => m.openSettings());
+  });
   head.append(title, edit);
   el.append(head);
 
-  const mood = document.createElement("span");
+  // Mood headline is a tap-to-cycle control (P1) — HYPE → TEACH → COACH.
+  // The handler is wired by the render-loop to the real settings.set mood
+  // IPC; the readout then reflects the echoed value on the next frame.
+  const mood = document.createElement("button");
+  mood.type = "button";
   mood.className = "vmx-persona-status__mood";
+  mood.addEventListener("click", () => {
+    state.persona.onCycleMood?.();
+  });
   el.append(mood);
 
   const caption = document.createElement("span");
@@ -647,13 +698,6 @@ function buildPersonaStatus(state: SessionState): HTMLElement {
   const meta = document.createElement("span");
   meta.className = "vmx-persona-status__meta";
   el.append(meta);
-
-  // Click anywhere on the readout opens the settings drawer — the sole
-  // persona/output write surface. Dynamic import keeps the wizard bundle
-  // from pulling settings (mirrors the titlebar gear button).
-  el.addEventListener("click", () => {
-    void import("../settings/SettingsDrawer.js").then((m) => m.openSettings());
-  });
 
   setPersonaStatus(el, state);
   return el;
@@ -670,6 +714,12 @@ export function setPersonaStatus(el: HTMLElement, state: SessionState): void {
   if (moodEl) {
     if (moodEl.textContent !== mood) moodEl.textContent = mood;
     moodEl.dataset.mood = mood;
+    // The mood headline is a tap-to-cycle control — announce the action
+    // and the cycle so it isn't read as a static label.
+    moodEl.setAttribute(
+      "aria-label",
+      `co-host mood: ${mood}. tap to cycle hype, teach, coach.`,
+    );
   }
 
   const captionEl = el.querySelector<HTMLElement>(
@@ -687,7 +737,7 @@ export function setPersonaStatus(el: HTMLElement, state: SessionState): void {
 
   el.setAttribute(
     "aria-label",
-    `Persona: ${mood}, ${skill}, ${genre}, ${voiceProfile} voice — open settings to change`,
+    `Persona: ${mood}, ${skill}, ${genre}, ${voiceProfile} voice`,
   );
 }
 

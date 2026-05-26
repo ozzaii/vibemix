@@ -1,6 +1,6 @@
 /* event-ribbon.ts — MIDI / phase event chip strip (UI-SPEC §8).
  *
- * Horizontal scroll, max 12 visible (newest right; older trimmed). Each
+ * Horizontal scroll, max 6 visible (newest right; older trimmed). Each
  * chip's age decides its CSS class: `.now` (< 600ms), `.warm` (< 4s),
  * `.cool` (4-12s) — older chips simply not in the trimmed list.
  *
@@ -21,11 +21,14 @@ export interface MidiEvent {
 
 export interface EventRibbonProps {
   events: MidiEvent[];
-  /** Max chips visible. Defaults to 12 per UI-SPEC §8. */
+  /** Max chips visible. Defaults to 6 (2026-05-26 /impeccable critique:
+   *  12 lowercase mono chips were the one un-glanceable, dashboard-y
+   *  region on a glance surface; nobody parses a dozen chips mid-mix.
+   *  6 keeps the most-recent moves; older events age out and drop. */
   max?: number;
 }
 
-const MAX_DEFAULT = 12;
+const MAX_DEFAULT = 6;
 
 const CSS = `
   .vmx-event-ribbon {
@@ -133,7 +136,7 @@ function populate(root: HTMLElement, props: EventRibbonProps): void {
 
 /** Idempotent hot-update — rebuilds the chip list. Diff would be possible
  *  via dataset.id keys; for now the simple rebuild is fine because the
- *  ribbon is small (max 12 chips). */
+ *  ribbon is small (max 6 chips). */
 export function setEventRibbon(el: HTMLElement, props: EventRibbonProps): void {
   el.replaceChildren();
   populate(el, props);

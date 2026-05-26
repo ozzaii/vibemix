@@ -1,9 +1,10 @@
 /**
  * VIS-03 (Phase 43, Plan 43-04) — meter contract.
- * Polychrome migration (2026-05-19) — decision #2 from /impeccable critique.
+ * Amber-ladder migration (2026-05-26) — /impeccable critique: One-Amber
+ * restored on the meter (was green/amber/magenta polychrome).
  *
- * Pins the hardware-LED-strip aesthetic: 16 discrete segments,
- * polychrome safe/warm/clip mapping (green / amber / magenta),
+ * Pins the hardware-LED-strip aesthetic: 16 discrete segments, amber
+ * safe/warm zones (dim→bright) with magenta reserved for clip only,
  * amber peak-hold with 1.2s decay, silk-12 minor grid lines, token-only
  * CSS (zero rgba() literals).
  *
@@ -57,14 +58,14 @@ describe("meter — VIS-03 contract", () => {
     for (let i = 14; i <= 16; i++) expect(byIndex.get(i)).toBe("clip");
   });
 
-  test("3 — polychrome zone mapping: safe=green, warm=amber, clip=magenta", () => {
-    // Pioneer-mapping the safe/warm/clip ladder. Each lit zone references
-    // its own color family — meter-safe-* for green, --amber-* for warm,
-    // --meter-clip-* for magenta. This pins decision #2 from the
-    // 2026-05-19 /impeccable critique: the meter is the single polychrome
-    // surface in v5 (mood block follows). Regressing to all-amber would
-    // drop the second-order category-reflex test back into
-    // Linear/Vercel/Railway territory.
+  test("3 — amber ladder: safe+warm amber (dim→bright), clip magenta only", () => {
+    // One-Amber restored (2026-05-26 /impeccable critique). The ladder is
+    // a single amber that brightens with level — safe is a dim amber
+    // (--amber-78 → --amber-40), warm is full amber (--amber → --amber-78).
+    // Magenta (--meter-clip-*) is reserved for the clip zone ONLY, so
+    // colour appears exactly when the signal is wrong. Regressing safe
+    // back to a green family (--meter-safe-*) would reintroduce the
+    // polychrome ladder that competed with amber's rare-deck-light meaning.
     const css = _CSS_FOR_TEST;
     const safe = css.match(
       /\.vmx-meter__seg\[data-zone="safe"\]\[data-lit="true"\]\s*\{[^}]*\}/,
@@ -78,24 +79,24 @@ describe("meter — VIS-03 contract", () => {
     expect(safe).not.toBeNull();
     expect(warm).not.toBeNull();
     expect(clip).not.toBeNull();
-    expect(safe![0]).toMatch(/var\(--meter-safe-pale\)/);
-    expect(safe![0]).toMatch(/var\(--meter-safe-pale-70\)/);
-    expect(safe![0]).toMatch(/var\(--meter-safe-22\)/);
+    // Safe + warm are both amber (dim vs bright).
+    expect(safe![0]).toMatch(/var\(--amber-78\)/);
+    expect(safe![0]).toMatch(/var\(--amber-40\)/);
     expect(warm![0]).toMatch(/var\(--amber\)/);
     expect(warm![0]).toMatch(/var\(--amber-78\)/);
+    // Clip is the only magenta zone.
     expect(clip![0]).toMatch(/var\(--meter-clip\)/);
     expect(clip![0]).toMatch(/var\(--meter-clip-deep-85\)/);
     expect(clip![0]).toMatch(/var\(--meter-clip-glow\)/);
-    // Cross-zone leak guards — safe must NOT consume amber/clip families,
-    // warm must NOT consume safe/clip, clip must NOT consume safe/amber.
-    expect(safe![0]).not.toMatch(/var\(--amber/);
-    expect(safe![0]).not.toMatch(/var\(--meter-clip/);
+    // Leak guards — no green family anywhere; magenta confined to clip;
+    // clip stays pure magenta (no amber).
+    expect(safe![0]).not.toMatch(/var\(--meter-safe/);
     expect(warm![0]).not.toMatch(/var\(--meter-safe/);
+    expect(safe![0]).not.toMatch(/var\(--meter-clip/);
     expect(warm![0]).not.toMatch(/var\(--meter-clip/);
-    expect(clip![0]).not.toMatch(/var\(--meter-safe/);
     expect(clip![0]).not.toMatch(/var\(--amber/);
-    // The pre-polychrome segment-5 green hairline rule is gone — the
-    // color transition between green and amber zones IS the marker now.
+    // No leftover segment-5 zone-boundary hairline — the brightness step
+    // between safe and warm is the marker now.
     expect(css).not.toMatch(/\.vmx-meter__seg\[data-index="5"\]::after/);
   });
 

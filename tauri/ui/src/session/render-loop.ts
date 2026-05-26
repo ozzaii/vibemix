@@ -17,6 +17,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+import { emitIpc } from "../ipc/client.js";
 import { renderSessionFrame, type Mounted } from "./SessionLayout.js";
 import type {
   SessionState as LayoutSessionState,
@@ -45,6 +46,26 @@ function cohostRetryHandler(): void {
     // eslint-disable-next-line no-console
     console.warn("[render-loop] cohost retry restart_sidecar failed:", err);
   });
+}
+
+/** 2026-05-26 /impeccable critique P1 — in-deck mood cycle. Advances the
+ *  co-host mood HYPE → TEACH → COACH → HYPE and writes it through the same
+ *  real, already-wired knob the settings drawer uses
+ *  (emitIpc "ipc.settings.set"). Reads the live mood from state at click
+ *  time (not a captured value), so repeated taps walk the cycle correctly.
+ *  Fire-and-forget; the readout reflects the echoed ipc.settings.state on
+ *  the next frame, matching the settings drawer's mascot-group pattern. */
+const MOOD_CYCLE = ["hype-man", "teacher", "coach"] as const;
+function cohostMoodCycleHandler(): void {
+  const cur = getSessionState().settings.mood;
+  const idx = MOOD_CYCLE.indexOf(cur as (typeof MOOD_CYCLE)[number]);
+  const next = MOOD_CYCLE[(idx + 1) % MOOD_CYCLE.length];
+  void emitIpc("ipc.settings.set", { field: "mood", value: next }).catch(
+    (err: unknown) => {
+      // eslint-disable-next-line no-console
+      console.warn("[render-loop] mood cycle emitIpc failed:", err);
+    },
+  );
 }
 
 /** Phase 44-03 / LAUNCH-02 — chip-click handler. Invokes the Tauri
@@ -271,6 +292,8 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       mood: moodFromSettings(s.settings.mood),
       voice: s.settings.voice,
       genre: s.settings.genre,
+      // 2026-05-26 /impeccable critique P1 — in-deck mood cycle handler.
+      onCycleMood: cohostMoodCycleHandler,
     },
     output: {
       device: s.settings.output_device_id ?? "AUTO",

@@ -68,7 +68,10 @@ describe("Cohost grounding-failure recovery (H9)", () => {
     expect(foot?.textContent).toContain("COULDN'T REACH GEMINI");
     const retry = panel.querySelector<HTMLElement>(".vmx-cohost__foot-retry");
     expect(retry).toBeTruthy();
-    expect(retry?.textContent).toContain("RETRY");
+    // 2026-05-26 /impeccable critique P3: label tells the truth — the
+    // button restarts the co-host (restart_sidecar), it isn't a
+    // lightweight reconnect.
+    expect(retry?.textContent).toContain("RESTART CO-HOST");
   });
 
   it("grounded=true clears the failure state regardless of elapsed", () => {
