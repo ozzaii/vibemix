@@ -174,19 +174,25 @@ describe("SessionLayout grounding-failure → fault state (H9)", () => {
     );
   });
 
-  it("after >= 5s of grounded=false the deck flips to the fault state", () => {
+  it("after >= 5s of grounded=false on an ACTIVE co-host the deck flips to fault", () => {
     vi.useFakeTimers();
     const t0 = 1_000_000_000;
     vi.setSystemTime(t0);
 
     const root = host();
-    const mounted = mountSessionLayout(root, defaultState());
-    // groundedFalseSinceMs initialized to t0 on mount.
+    // 2026-05-26 (c6b8b814): the grounding-failure timer only runs while the
+    // co-host is ACTIVE. At IDLE, grounded=false is expected (no music to
+    // ground to) — so an active+ungrounded state is what surfaces a real
+    // fault. defaultState boots IDLE; promote it to LISTENING here.
+    const active = defaultState();
+    active.cohost = { ...active.cohost, status: "LISTENING", grounded: false };
+    const mounted = mountSessionLayout(root, active);
+    // groundedFalseSinceMs initialized to t0 on mount (active + ungrounded).
     expect(mounted.groundedFalseSinceMs).toBe(t0);
 
     // Advance past the threshold and run a render frame.
     vi.setSystemTime(t0 + GROUNDING_FAILURE_MS + 500);
-    renderSessionFrame(mounted, defaultState());
+    renderSessionFrame(mounted, active);
 
     const session = root.querySelector<HTMLElement>(".vmx-session");
     expect(session?.dataset.mode).toBe("fault");
@@ -195,24 +201,46 @@ describe("SessionLayout grounding-failure → fault state (H9)", () => {
     expect(fault?.textContent).toContain("gemini");
   });
 
-  it("grounded flip to true resets the timer", () => {
+  it("an IDLE co-host never faults on grounded=false (empty-screen regression guard)", () => {
+    // The recurring "empty screen / GEMINI UNREACHABLE / always broken" bug:
+    // a quiet idle session (no music) is ungrounded forever, and the old timer
+    // flipped it to fault after 5s → blank hero. The fix: idle never faults.
     vi.useFakeTimers();
     const t0 = 1_000_000_000;
     vi.setSystemTime(t0);
 
     const root = host();
-    const mounted = mountSessionLayout(root, defaultState());
+    const mounted = mountSessionLayout(root, defaultState()); // status IDLE
+    // Long past the threshold — still must read as calm 'silent', never fault.
+    vi.setSystemTime(t0 + GROUNDING_FAILURE_MS * 10);
+    renderSessionFrame(mounted, defaultState());
 
-    // Boot grounded → reset timer.
+    expect(mounted.groundedFalseSinceMs).toBeNull();
+    expect(
+      root.querySelector<HTMLElement>(".vmx-session")?.dataset.mode,
+    ).toBe("silent");
+  });
+
+  it("grounded flip to true resets the timer (active co-host)", () => {
+    vi.useFakeTimers();
+    const t0 = 1_000_000_000;
+    vi.setSystemTime(t0);
+
+    const root = host();
+    const active = defaultState();
+    active.cohost = { ...active.cohost, status: "LISTENING", grounded: false };
+    const mounted = mountSessionLayout(root, active);
+
+    // Active + grounded → reset timer.
     const grounded = defaultState();
-    grounded.cohost = { ...grounded.cohost, grounded: true };
+    grounded.cohost = { ...grounded.cohost, status: "LISTENING", grounded: true };
     renderSessionFrame(mounted, grounded);
     expect(mounted.groundedFalseSinceMs).toBeNull();
 
-    // Flip back to false → timer re-arms with the current system time.
+    // Flip back to false (still active) → timer re-arms with the current time.
     vi.setSystemTime(t0 + 10_000);
     const unground = defaultState();
-    unground.cohost = { ...unground.cohost, grounded: false };
+    unground.cohost = { ...unground.cohost, status: "LISTENING", grounded: false };
     renderSessionFrame(mounted, unground);
     expect(mounted.groundedFalseSinceMs).toBe(t0 + 10_000);
 

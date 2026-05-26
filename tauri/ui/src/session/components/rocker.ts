@@ -185,6 +185,14 @@ export function renderRocker(props: RockerProps): HTMLElement {
         noop: opt.id === liveActive,
       });
       if (opt.id === liveActive) return;
+      // Optimistic repaint — flip the lit segment NOW, before the async
+      // ipc.settings.set round-trip. The drawer has no settings.state
+      // refresh path (setSessionState has no pub/sub), so without this the
+      // active segment never moves and the control looks dead even though
+      // the change persists in ~3ms. Mirrors the picker's selectOption()
+      // precedent. The round-trip is authoritative and self-corrects if the
+      // sidecar rejects the value. (2026-05-26: the real "no buttons work".)
+      setRockerActive(root, opt.id);
       props.onChange?.(opt.id);
     });
     root.append(btn);

@@ -264,6 +264,15 @@ function buildMascotGroup(): MascotGroupHandle {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       if (btn.dataset.active === "true") return;
+      // Optimistic repaint — flip the lit pill NOW. The drawer has no
+      // settings.state refresh path, so without this the active mood pill
+      // never moves and the control looks dead. The ipc.settings.set
+      // round-trip is authoritative. (Mirrors the rocker fix, 2026-05-26.)
+      moodPills.querySelectorAll<HTMLElement>(".vmx-mascot-pill").forEach((p) => {
+        const active = p === btn;
+        p.dataset.active = active ? "true" : "false";
+        p.setAttribute("aria-checked", active ? "true" : "false");
+      });
       void applyMoodChange(opt.id);
     });
     moodPills.append(btn);

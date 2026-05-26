@@ -220,6 +220,10 @@ const LAYOUT_CSS = `
     position: absolute; right: 0; top: 0; white-space: nowrap; opacity: 0;
     transition: opacity 700ms ease-out;
     font-family: var(--type-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    /* The three labels stack absolutely; opacity-0 elements still capture
+     * clicks, so suppress pointer events on all of them and re-enable only
+     * the fault label in fault mode (it's the only clickable one — restart). */
+    pointer-events: none;
   }
   .vmx-live__s--live { color: var(--silk-40); }
   .vmx-live__s--silent { color: var(--silk-22); }
@@ -228,6 +232,11 @@ const LAYOUT_CSS = `
   .vmx-session[data-mode=""] .vmx-live__s--live { opacity: 1; }
   .vmx-session[data-mode="silent"] .vmx-live__s--silent { opacity: 1; }
   .vmx-session[data-mode="fault"] .vmx-live__s--fault { opacity: 1; }
+  /* Fault recovery — the cause line doubles as the fix. Only armed (and
+   * cursor-pointer) once the deck is actually in fault mode. */
+  button.vmx-live__s { background: none; border: none; padding: 0; text-align: right; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
+  .vmx-session[data-mode="fault"] .vmx-live__s--fault { pointer-events: auto; cursor: pointer; }
+  .vmx-session[data-mode="fault"] .vmx-live__s--fault:hover { color: var(--amber); text-shadow: var(--glow-soft); }
 
   /* --- THE HERO: the co-host speaks, anchored low on void --- */
   .vmx-deck__speak {
@@ -417,7 +426,12 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   live.className = "vmx-live";
   const liveLive = makeLiveLabel("live", "reading the room");
   const liveSilent = makeLiveLabel("silent", "listening");
-  const liveFault = makeLiveLabel("fault", "");
+  // Fault label is a <button> so it can recover the session — clicking the
+  // cause line restarts the co-host (wires cohost.onRetry → restart_sidecar).
+  // CSS gates pointer-events so it's only clickable in fault mode.
+  const liveFault = makeLiveLabel("fault", "", /* clickable */ true);
+  liveFault.setAttribute("title", "restart co-host");
+  liveFault.addEventListener("click", () => state.cohost.onRetry?.());
   live.append(liveLive, liveSilent, liveFault);
 
   rail.append(persona, controls, live);
@@ -512,8 +526,13 @@ export function mountSessionLayout(rootEl: HTMLElement, initial?: SessionState):
   return mounted;
 }
 
-function makeLiveLabel(kind: "live" | "silent" | "fault", text: string): HTMLElement {
-  const el = document.createElement("span");
+function makeLiveLabel(
+  kind: "live" | "silent" | "fault",
+  text: string,
+  clickable = false,
+): HTMLElement {
+  const el = document.createElement(clickable ? "button" : "span");
+  if (clickable) (el as HTMLButtonElement).type = "button";
   el.className = `vmx-live__s vmx-live__s--${kind}`;
   el.textContent = text;
   return el;

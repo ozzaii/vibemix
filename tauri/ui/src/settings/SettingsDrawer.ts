@@ -472,6 +472,10 @@ export function openSettings(): void {
   if (!mountedHandle) return;
   vmxLog("[vmx:click]", "settings drawer open");
   openSettingsState();
+  // Arm the titlebar gear (lights amber while the drawer is open — the
+  // [data-active] style already exists in titlebar.ts but nothing flipped
+  // it). Queried by class to avoid a session→settings import cycle.
+  setGearArmed(true);
   // Re-render with fresh settings (sidecar may have broadcast updates
   // while the drawer was closed).
   mountedHandle.refresh();
@@ -514,7 +518,17 @@ export function closeSettings(): void {
   if (!mountedHandle) return;
   vmxLog("[vmx:click]", "settings drawer close");
   closeSettingsState();
+  setGearArmed(false);
   mountedHandle.refresh();
+}
+
+/** Reflect drawer open/close on the titlebar gear so it lights amber while
+ *  the drawer is open. Queried by class (not imported) to keep the
+ *  session/settings module boundary clean; no-op if the titlebar isn't
+ *  mounted (e.g. a unit test that mounts the drawer in isolation). */
+function setGearArmed(armed: boolean): void {
+  const gear = document.querySelector<HTMLElement>(".vmx-titlebar__settings");
+  if (gear) gear.dataset.active = armed ? "true" : "false";
 }
 
 /** Test-only — tear down the singleton so a fresh vitest case can mount. */
