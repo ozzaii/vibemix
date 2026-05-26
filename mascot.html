@@ -90,11 +90,15 @@
     padding: 4px 8px;
     border-radius: 4px;
   }
+  /* "The Deck Speaks" status discipline (2026-05-26): quiet silk when live
+   * (fine), amber when not connected (attention) — NO green dot, consistent
+   * with every other vibemix surface. Hex are the token values (this
+   * standalone runtime overlay has no tokens.css import). */
   #status .dot {
     display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-    background: #f55; margin-right: 6px; vertical-align: middle;
+    background: #ff8a3d; margin-right: 6px; vertical-align: middle;
   }
-  #status.live .dot { background: #5f5; box-shadow: 0 0 6px #5f5; }
+  #status.live .dot { background: #d6cfc7; box-shadow: none; }
 </style>
 </head>
 <body>
