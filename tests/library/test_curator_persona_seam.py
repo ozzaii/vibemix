@@ -29,6 +29,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import vibemix.library.agent as agent_mod
 import vibemix.library.codex_curate as codex_mod
 from vibemix.prompts.matrix import MOOD_PERSONAS
@@ -147,3 +149,73 @@ def test_codex_curator_voice_sourced_from_matrix_seam() -> None:
 
     voice = build_curator_instruction("tutor")
     assert voice.split("\n", 1)[0] in codex_mod._SYSTEM_PROMPT
+
+
+# ---------------------------------------------------------------------------
+# Phase 79 Wave 0 — curator reads the SHARED lens (xfail-strict until Plan 03)
+#
+# Plan 03 swaps the hardcoded "tutor" for a shared-lens read (defaulting to
+# "tutor" when extra["lens"] is unset — per-surface default-when-unset keeps the
+# curator cold path byte-identical). These scaffolds reset the module-global
+# caches between cases so the lens re-read is actually exercised.
+# ---------------------------------------------------------------------------
+
+# The hype lens draws the hype-man persona — a stable fragment NOT in the
+# default tutor/teacher voice. Its presence proves the seam read the shared lens.
+_HYPE_MAN_FRAGMENT = "party-anchored"
+# The default (unset) curator voice stays tutor → teacher persona.
+_TEACHER_FRAGMENT = "framework-anchored"
+
+
+def _reset_seam_caches() -> None:
+    agent_mod._SYSTEM_INSTRUCTION_CACHE = None
+    agent_mod._INTERACTIVE_SYSTEM_INSTRUCTION_CACHE = None
+    codex_mod._SYSTEM_PROMPT_CACHE = None
+
+
+@pytest.mark.xfail(strict=True, reason="LENS-02 — Plan 03 not landed")
+def test_curator_seam_reads_shared_lens(tmp_path, monkeypatch) -> None:
+    """With extra['lens']='hype', the curator voice reflects the shared lens.
+
+    NOT the hardcoded tutor/teacher — the seam reads the one shared selection.
+    xfail-strict until Plan 03 swaps the hardcoded "tutor".
+    """
+    import vibemix.runtime.config_store as cs_mod
+
+    target = tmp_path / "config.json"
+    monkeypatch.setattr(cs_mod, "config_path", lambda: target)
+    store = cs_mod.ConfigStore()
+    store.extra["lens"] = "hype"
+    cs_mod.save_config(store)
+
+    _reset_seam_caches()
+    try:
+        voice = agent_mod._system_instruction()
+        assert _HYPE_MAN_FRAGMENT in voice
+        assert _HYPE_MAN_FRAGMENT in MOOD_PERSONAS["hype-man"]
+    finally:
+        _reset_seam_caches()
+
+
+def test_curator_seam_defaults_to_tutor_when_lens_unset(tmp_path, monkeypatch) -> None:
+    """With NO extra['lens'], the curator seam builds the tutor voice.
+
+    REAL-GREEN guard: the curator cold path (lens unset) draws the teacher
+    persona today AND after Plan 03 (per-surface default-when-unset). This must
+    never regress, so it is a real-green pin, not an xfail.
+    """
+    import vibemix.runtime.config_store as cs_mod
+
+    target = tmp_path / "config.json"
+    monkeypatch.setattr(cs_mod, "config_path", lambda: target)
+    store = cs_mod.ConfigStore()
+    assert "lens" not in store.extra
+    cs_mod.save_config(store)
+
+    _reset_seam_caches()
+    try:
+        voice = agent_mod._system_instruction()
+        # The seam must DEFAULT to tutor → teacher persona when lens is unset.
+        assert _TEACHER_FRAGMENT in voice
+    finally:
+        _reset_seam_caches()

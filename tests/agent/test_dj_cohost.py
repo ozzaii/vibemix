@@ -1192,3 +1192,68 @@ def test_llm_node_threads_event_fired_set_seconds_to_record_said(
         "ev_set_seconds capture or set_s_at_event= threading dropped"
     )
     assert "clean reply" in entry
+
+
+# ---------------------------------------------------------------------------
+# Phase 79 Wave 0 — _resolve_prompt_cell reads the SHARED lens
+#
+# Plan 03 edits _resolve_prompt_cell so a shared lens (read from
+# ConfigStore.extra["lens"]) resolves (mode, mood) via LENS_TO_MODE_MOOD. When
+# NO lens is set (cold path), the existing env/DEFAULT_* resolution is unchanged
+# → byte-identical to today. xfail-strict until Plan 03.
+# ---------------------------------------------------------------------------
+
+import pytest  # noqa: E402
+
+import vibemix.agent.dj_cohost as dj_mod  # noqa: E402
+from vibemix.prompts.matrix import build_system_instruction  # noqa: E402
+
+
+@pytest.mark.xfail(strict=True, reason="LENS-02 — Plan 03 not landed")
+def test_resolve_prompt_cell_uses_shared_lens(tmp_path, monkeypatch) -> None:
+    """A shared lens 'critique' resolves the (coach, coach) cell.
+
+    The lens read wins over the DEFAULT_* env resolution — critique → coach mode
+    → a coach-cell prompt (NOT today's hype default). xfail-strict until Plan 03
+    wires _resolve_prompt_cell to read extra['lens'].
+    """
+    import vibemix.runtime.config_store as cs_mod
+
+    # No env overrides — prove the lens (not the env) drives the cell.
+    monkeypatch.delenv("VIBEMIX_MODE", raising=False)
+    monkeypatch.delenv("VIBEMIX_MOOD", raising=False)
+    monkeypatch.delenv("VIBEMIX_SKILL_LEVEL", raising=False)
+
+    target = tmp_path / "config.json"
+    monkeypatch.setattr(cs_mod, "config_path", lambda: target)
+    store = cs_mod.ConfigStore()
+    store.extra["lens"] = "critique"
+    cs_mod.save_config(store)
+
+    out = dj_mod._resolve_prompt_cell()
+    # critique → (coach, coach): the coach persona fragment is substituted in.
+    assert "post-mortem-anchored" in out
+
+
+def test_resolve_prompt_cell_cold_path_byte_identical(tmp_path, monkeypatch) -> None:
+    """With NO shared lens + default env, the cell is byte-identical to today.
+
+    REAL-GREEN co-host cold-path guard: when extra['lens'] is unset and no env
+    overrides, _resolve_prompt_cell must equal build_system_instruction(
+    'intermediate','hype','hype-man') exactly — true today AND preserved through
+    Plan 03 (the cold path is left unchanged). This guard must never regress.
+    """
+    import vibemix.runtime.config_store as cs_mod
+
+    monkeypatch.delenv("VIBEMIX_MODE", raising=False)
+    monkeypatch.delenv("VIBEMIX_MOOD", raising=False)
+    monkeypatch.delenv("VIBEMIX_SKILL_LEVEL", raising=False)
+
+    target = tmp_path / "config.json"
+    monkeypatch.setattr(cs_mod, "config_path", lambda: target)
+    store = cs_mod.ConfigStore()
+    assert "lens" not in store.extra
+    cs_mod.save_config(store)
+
+    out = dj_mod._resolve_prompt_cell()
+    assert out == build_system_instruction("intermediate", "hype", "hype-man")

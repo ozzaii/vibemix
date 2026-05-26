@@ -189,7 +189,7 @@ def test_three_lenses_pass_the_same_gate() -> None:
 
 
 @pytest.mark.xfail(strict=True, reason=_LENS_REASON_02)
-def test_shared_selection_flows_to_both_builders(tmp_path) -> None:
+def test_shared_selection_flows_to_both_builders(tmp_path, monkeypatch) -> None:
     """A single shared lens selection drives BOTH the co-host AND the curator.
 
     Set ``ConfigStore.extra["lens"]="critique"`` (persisted to a tmp path) and
@@ -200,8 +200,8 @@ def test_shared_selection_flows_to_both_builders(tmp_path) -> None:
     import vibemix.runtime.config_store as cs_mod
 
     target = tmp_path / "config.json"
-    # Patch the resolver so the round-trip is hermetic.
-    cs_mod.config_path = lambda: target  # type: ignore[assignment]
+    # Patch the resolver so the round-trip is hermetic (monkeypatch auto-undoes).
+    monkeypatch.setattr(cs_mod, "config_path", lambda: target)
 
     store = cs_mod.ConfigStore()
     store.extra["lens"] = "critique"

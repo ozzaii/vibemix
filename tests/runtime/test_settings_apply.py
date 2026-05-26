@@ -56,6 +56,33 @@ def _redirect_config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Pa
     return target
 
 
+@pytest.fixture(autouse=True)
+def _isolate_applier_env():
+    """Snapshot + restore the OS env vars the applier writes directly.
+
+    ``_apply_skill`` (and any future ``_apply_*`` that exports an env var) sets
+    ``os.environ[...]`` *inside the applier* — that is a real process-global
+    mutation, NOT a monkeypatch, so without this fixture ``VIBEMIX_SKILL_LEVEL``
+    leaks out of ``test_skill_happy_path`` and corrupts ``_resolve_prompt_cell``
+    in any test file that runs afterwards in the same process (Phase 79 Wave-0
+    finding: adjacent settings→dj_cohost runs flipped the co-host cell to the
+    leaked 'pro' persona). ``monkeypatch`` cannot undo a key it never recorded a
+    prior value for, so we capture-then-restore the raw values explicitly.
+    """
+    import os
+
+    keys = ("VIBEMIX_SKILL_LEVEL", "VIBEMIX_MODE", "VIBEMIX_MOOD")
+    saved = {k: os.environ.get(k) for k in keys}
+    try:
+        yield
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
 @pytest.fixture
 def store() -> ConfigStore:
     return ConfigStore()
@@ -343,6 +370,56 @@ def test_skill_non_string_rejected(store):
     success, error = _apply(applier, "skill", 3)
     assert success is False
     assert "skill" not in store.extra
+
+
+# ---------------------------------------------------------------------------
+# lens (shared co-host + curator lens) — Phase 79 Wave 0 scaffolds
+#
+# Mirror the skill trio: no runtime hook, persists to extra["lens"], takes
+# effect at the next builder read (co-host _resolve_prompt_cell + curator seam).
+#
+# Tier split (honest-green discipline):
+#   * happy_path is xfail-strict — extra["lens"] persistence does NOT happen
+#     until Plan 03 adds _apply_lens + the dispatch case. Flips green then.
+#   * invalid / non_string are REAL-GREEN guards — a bad lens value MUST be
+#     rejected with extra untouched both TODAY (unknown-field fallthrough) and
+#     AFTER Plan 03 (enum validation). The rejection contract must never regress
+#     to a silent persist, so these stay green through the implementation.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.xfail(strict=True, reason="LENS-02 — Plan 03 not landed")
+def test_apply_lens_happy_path(store, _redirect_config_path):
+    """apply('lens','critique') → (True, None) and persists extra['lens']."""
+    applier = SettingsApplier(config_store=store)
+    success, error = _apply(applier, "lens", "critique")
+    assert (success, error) == (True, None)
+    assert store.extra["lens"] == "critique"
+    assert _redirect_config_path.exists()
+
+
+def test_apply_lens_invalid_value_rejected(store):
+    """apply('lens','bogus') → (False, ...) and extra is untouched.
+
+    REAL-GREEN guard: a bad lens value must NEVER silently persist — true today
+    (unknown-field fallthrough) and after Plan 03 (enum validation).
+    """
+    applier = SettingsApplier(config_store=store)
+    success, error = _apply(applier, "lens", "bogus")
+    assert success is False
+    assert error is not None and "lens" in error
+    assert "lens" not in store.extra
+
+
+def test_apply_lens_non_string_rejected(store):
+    """apply('lens', 123) → (False, ...) and extra is untouched.
+
+    REAL-GREEN guard: a non-string lens must never persist.
+    """
+    applier = SettingsApplier(config_store=store)
+    success, error = _apply(applier, "lens", 123)
+    assert success is False
+    assert "lens" not in store.extra
 
 
 # ---------------------------------------------------------------------------
