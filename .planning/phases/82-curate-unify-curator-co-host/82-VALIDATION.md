@@ -1,9 +1,9 @@
 ---
 phase: 82
 slug: curate-unify-curator-co-host
-status: planned
+status: complete
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-05-26
 ---
 
@@ -47,11 +47,11 @@ created: 2026-05-26
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Status |
 |---------|------|------|-------------|-----------|-------------------|--------|
-| P01-T1 | 82-01 | 1 | CURATE-01 | unit (xfail scaffold) | `pytest -q tests/library/test_toolset.py --runxfail -x` | ⬜ pending |
-| P01-T2 | 82-01 | 1 | CURATE-02 + invariants | unit (xfail scaffold + real-green pins) | `pytest -q tests/library/test_curate_unify.py ; pytest -q tests/memory/test_no_live_path_import.py` | ⬜ pending |
-| P02-T1 | 82-02 | 2 | CURATE-01 | unit (flip green) | `pytest -q tests/library/test_toolset.py` | ⬜ pending |
-| P02-T2 | 82-02 | 2 | CURATE-02 (taste) | unit (flip green) | `pytest -q tests/library/test_curate_unify.py tests/library/test_curator_persona_seam.py` | ⬜ pending |
-| P02-T3 | 82-02 | 2 | CURATE-01/02 + invariants | unit (regression + full suite) | `pytest -q tests/library/ tests/profile/ tests/memory/test_no_live_path_import.py` | ⬜ pending |
+| P01-T1 | 82-01 | 1 | CURATE-01 | unit (xfail scaffold) | `pytest -q tests/library/test_toolset.py --runxfail -x` | ✅ green |
+| P01-T2 | 82-01 | 1 | CURATE-02 + invariants | unit (xfail scaffold + real-green pins) | `pytest -q tests/library/test_curate_unify.py ; pytest -q tests/memory/test_no_live_path_import.py` | ✅ green |
+| P02-T1 | 82-02 | 2 | CURATE-01 | unit (flip green) | `pytest -q tests/library/test_toolset.py` | ✅ green (7 passed) |
+| P02-T2 | 82-02 | 2 | CURATE-02 (taste) | unit (flip green) | `pytest -q tests/library/test_curate_unify.py tests/library/test_curator_persona_seam.py` | ✅ green (16 passed) |
+| P02-T3 | 82-02 | 2 | CURATE-01/02 + invariants | unit (regression + full suite) | `pytest -q tests/library/ tests/profile/ tests/memory/test_no_live_path_import.py` | ✅ green (323 passed, import-boundary CLEAN; full suite 4538 passed) |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -88,4 +88,4 @@ created: 2026-05-26
 - [x] Feedback latency < 120s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** planned (wave_0_complete flips when Plan 02 Task 3 lands)
+**Approval:** complete — Plan 02 Task 3 landed 2026-05-26. All 4 CURATE xfail scaffolds flipped real-green; full suite 4538 passed (baseline 4534) with zero new failures, zero CURATE xfails/xpasses; `test_no_live_path_import` CLEAN; diff touches only the 3 `src/library/*.py` + 2 test files + this VALIDATION — no `messages.schema.json` / ws_bus / port / `music_state.py`. Both seams reach both backends via the shared `toolset.py`/`ViberAgent` core; neither orphaned. The four cardinal invariants hold by additive design.
