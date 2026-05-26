@@ -49,13 +49,16 @@ describe("wizard surface tokens (wave 1)", () => {
     expect(rendered.querySelector(".border-anim")).toBeNull();
   });
 
-  it("PrimaryPanel composes the shared .vmx-tile glass-tile shell with hero density", async () => {
+  it("PrimaryPanel is a void section, not a glass-tile card (Deck Speaks)", async () => {
+    // "The Deck Speaks" rebuild (2026-05-26): the wizard step dropped the
+    // vmx-tile hero card shell — it's content on the wizard void now.
     const { PrimaryPanel } = await import("../src/wizard/components/primary-panel.js");
     const child = document.createElement("div");
     child.textContent = "child";
     const rendered = PrimaryPanel({ children: child });
-    expect(rendered.classList.contains("vmx-tile")).toBe(true);
-    expect(rendered.dataset.tile).toBe("hero");
+    expect(rendered.classList.contains("cmp-primary-panel")).toBe(true);
+    expect(rendered.classList.contains("vmx-tile")).toBe(false);
+    expect(rendered.dataset.tile).toBeUndefined();
   });
 
   it("WindowPicker renders without legacy token refs", async () => {

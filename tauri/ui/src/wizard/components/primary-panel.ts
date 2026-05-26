@@ -21,21 +21,28 @@ export interface PrimaryPanelProps {
 }
 
 const CSS = `
+  /* "The Deck Speaks" rebuild (2026-05-26): the wizard step is no longer a
+   * glass-card hero (vmx-tile drop-shadow plate). Like the deck + the settings
+   * sections, the step is content on the wizard's void — a quiet silk label,
+   * a hairline under it, then the step's controls. No card fill, no drop
+   * shadow. The wizard is form-bearing (device probe, window pick, MIDI listen)
+   * so the controls stay; only the enclosing card is removed. */
+  .cmp-primary-panel {
+    position: relative;
+  }
   .cmp-primary-panel__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-5);
+    padding: 0 0 var(--sp-3);
     border-bottom: 1px solid var(--glass-edge);
-    background: rgba(0, 0, 0, 0.22);
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 9px;
     letter-spacing: 0.28em;
     text-transform: uppercase;
-    color: var(--silk);
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    color: var(--silk-40);
     line-height: 1;
     z-index: 2;
   }
@@ -54,7 +61,7 @@ const CSS = `
   }
   .cmp-primary-panel__body {
     position: relative;
-    padding: var(--sp-4) var(--sp-5);
+    padding: var(--sp-4) 0 0;
   }
 `;
 
@@ -62,9 +69,9 @@ registerStyle("cmp-primary-panel", CSS);
 
 export function PrimaryPanel(props: PrimaryPanelProps): HTMLElement {
   const root = document.createElement("section");
-  // Glass shell from utility; border-anim + streak removed (critique 2026-05-14).
-  root.className = "cmp-primary-panel vmx-tile";
-  root.dataset.tile = "hero";
+  // "The Deck Speaks" rebuild: no glass-card shell — the step is content on the
+  // wizard void (was `vmx-tile` + data-tile="hero").
+  root.className = "cmp-primary-panel";
 
   if (props.header) {
     const head = document.createElement("div");
