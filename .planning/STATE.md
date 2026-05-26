@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v8.1
-milestone_name: One Mind
-status: Awaiting next milestone
-last_updated: "2026-05-26T05:10:00.702Z"
-last_activity: 2026-05-26 — Milestone v8.1 completed and archived
+milestone: v8.2
+milestone_name: Set Builder
+status: planning
+last_updated: "2026-05-26T10:20:04.545Z"
+last_activity: 2026-05-26
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 19
-  completed_plans: 19
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # vibemix — State
@@ -37,10 +37,10 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 
 ## Current Position
 
-Phase: Milestone v8.1 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-26 — Completed quick task 260526-i3j: staged CLAP engine + docs (CLAP de-risked: determinism cos=1.0, cross-modal genre separation 100%; ship path = on-device ONNX)
+Status: Defining requirements
+Last activity: 2026-05-26 — Milestone v8.2 started
 
 ### Plan 82-02 — CURATE: the two unification seams + regression gate (complete 2026-05-26)
 
