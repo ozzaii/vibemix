@@ -37,6 +37,7 @@
                 <button role="tab" aria-selected="true" data-mode="search">Search</button>
                 <button role="tab" aria-selected="false" data-mode="similar">Similar</button>
                 <button role="tab" aria-selected="false" data-mode="curate">Curate</button>
+                <button role="tab" aria-selected="false" data-mode="build">Build</button>
                 <button role="tab" aria-selected="false" data-mode="ingest">Ingest</button>
               </div>
 
@@ -102,6 +103,33 @@
                 </div>
               </div>
 
+              <!-- build field — the set-prep co-host: a brief + an energy
+                   curve → a discovered + sequenced set, exported to Rekordbox. -->
+              <div class="vmx-lib-field" data-for="build" style="display: none">
+                <span class="vmx-lib-label">Build a Set</span>
+                <div class="vmx-lib-qbox vmx-lib-briefbox">
+                  <textarea id="vmx-lib-brief" rows="2"
+                            placeholder="describe the set… e.g. warehouse opener, melodic into rolling — 90 min"></textarea>
+                </div>
+
+                <!-- energy-curve preset — a segmented hardware selector. The
+                     active preset is the amber LED segment; values are the exact
+                     wire tokens (opener | peak_time | after_hours | festival). -->
+                <span class="vmx-lib-label" style="display: block; margin: 14px 0 7px">Energy curve</span>
+                <div class="vmx-lib-curve" role="radiogroup" aria-label="Energy curve">
+                  <button type="button" class="vmx-lib-curveseg" data-curve="opener" aria-pressed="false">Opener</button>
+                  <button type="button" class="vmx-lib-curveseg" data-curve="peak_time" aria-pressed="true">Peak time</button>
+                  <button type="button" class="vmx-lib-curveseg" data-curve="after_hours" aria-pressed="false">After hours</button>
+                  <button type="button" class="vmx-lib-curveseg" data-curve="festival" aria-pressed="false">Festival</button>
+                </div>
+
+                <div class="vmx-lib-chips">
+                  <span class="vmx-lib-chip" data-brief="warehouse opener, melodic into rolling — 90 min">warehouse opener</span>
+                  <span class="vmx-lib-chip" data-brief="peak-time hypnotic techno, relentless — 60 min">peak-time relentless</span>
+                  <span class="vmx-lib-chip" data-brief="after-hours dub and ambient, slow burn — 2 hrs">after-hours slow burn</span>
+                </div>
+              </div>
+
               <button class="vmx-lib-run" id="vmx-lib-runbtn">▸ Run search</button>
 
               <!-- corpus readout -->
@@ -141,6 +169,17 @@
                 <div class="vmx-lib-label">Set notes</div>
                 <p class="body" id="vmx-lib-rationale-body">·</p>
                 <div class="meta vmx-lib-mono" id="vmx-lib-rationale-meta">·</div>
+              </div>
+
+              <!-- build mode: the Rekordbox export receipt. Shown only when the
+                   set-prep run actually wrote a file (toggled by index.ts). -->
+              <div class="vmx-lib-export" id="vmx-lib-export" style="display: none">
+                <div class="hd">
+                  <span class="led"></span>
+                  <span class="vmx-lib-label">Exported</span>
+                </div>
+                <div class="path vmx-lib-mono" id="vmx-lib-export-path">·</div>
+                <div class="hint">File → Import Collection in Rekordbox, then drag the set into a playlist.</div>
               </div>
 
               <div class="vmx-lib-results" id="vmx-lib-results"></div>

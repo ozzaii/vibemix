@@ -87,6 +87,15 @@ function doMockApi(): void {
   vi.doMock("./api.js", () => ({
     // libraryCurate is overridden per-test via curateMock.
     libraryCurate: (theme: string) => curateMock(theme),
+    // build mode is inert in these tests (mountLibrary imports it on boot).
+    libraryBuildSet: vi.fn(async () => ({
+      name: "x",
+      rationale: "",
+      stop_reason: "exported",
+      tracks: [],
+      count: 0,
+      export_path: null,
+    })),
     // inert stubs — mountLibrary auto-runs librarySearch + libraryStats on boot.
     librarySearch: vi.fn(async () => ({ results: [], centered: true, corpus_size: 0 })),
     librarySimilar: vi.fn(async () => ({ results: [], centered: true, corpus_size: 0 })),
@@ -108,12 +117,14 @@ function mountSkeleton(): void {
       <button data-mode="search" aria-selected="true">Search</button>
       <button data-mode="similar" aria-selected="false">Similar</button>
       <button data-mode="curate" aria-selected="false">Curate</button>
+      <button data-mode="build" aria-selected="false">Build</button>
       <button data-mode="ingest" aria-selected="false">Ingest</button>
     </div>
     <span id="vmx-lib-qlabel"></span>
     <input id="vmx-lib-q" />
     <input id="vmx-lib-folder" value="~/Music" />
     <input id="vmx-lib-theme" />
+    <textarea id="vmx-lib-brief"></textarea>
     <span id="vmx-lib-seed-name"></span>
     <button id="vmx-lib-runbtn"></button>
     <span id="vmx-lib-echo"></span>
@@ -123,6 +134,7 @@ function mountSkeleton(): void {
     <div id="vmx-lib-stat-failed"></div>
     <p id="vmx-lib-rationale-body"></p>
     <div id="vmx-lib-rationale-meta"></div>
+    <div id="vmx-lib-export" style="display: none"><div id="vmx-lib-export-path"></div></div>
     <div id="vmx-lib-results"></div>
     <span id="vmx-lib-rcount"></span>
     <div id="vmx-lib-prog-n"></div>

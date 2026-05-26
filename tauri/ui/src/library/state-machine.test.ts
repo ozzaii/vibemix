@@ -17,6 +17,8 @@ import {
   meterOn,
   METER_SEGMENTS,
   runLabel,
+  setBrief,
+  setCurve,
   setFolder,
   setMode,
   setQuery,
@@ -70,6 +72,16 @@ describe("transitions are immutable", () => {
     expect(s.strategy).toBe("mean_excerpt");
     // query survived the later mutations (immutable spread, not aliasing)
     expect(s.query).toBe("deep dub");
+  });
+
+  it("setBrief / setCurve update only their field (build mode)", () => {
+    let s = initialLibraryState;
+    s = setBrief(s, "festival mainstage");
+    expect(s.brief).toBe("festival mainstage");
+    s = setCurve(s, "festival");
+    expect(s.curve).toBe("festival");
+    // brief survived the curve mutation (immutable spread)
+    expect(s.brief).toBe("festival mainstage");
   });
 });
 

@@ -86,6 +86,20 @@ export interface CurateResult {
   count: number;
 }
 
+/** Energy-curve preset for the set-prep co-host (`--curve <preset>`). The EXACT
+ *  wire values the agent's CLI accepts; mirrors EnergyCurve in state-machine. */
+export type EnergyCurve = "opener" | "peak_time" | "after_hours" | "festival";
+
+/** Result of a set-prep run (`library build-set <brief> --curve <c> --export
+ *  rekordbox --json`, mapped by the Rust bridge). Same shape as CurateResult
+ *  plus `export_path` — the Rekordbox XML the agent wrote when it exported
+ *  (`null` when it never did, e.g. an empty/failed run). `stop_reason` may be
+ *  "exported" here (the set-prep terminal that curation never reaches). */
+export interface BuildSetResult extends CurateResult {
+  /** Absolute path to the exported Rekordbox XML, or `null` if none. */
+  export_path: string | null;
+}
+
 /** Per-file progress frame from `library://embed-progress`. */
 export interface EmbedProgress {
   n: number;
@@ -209,6 +223,33 @@ const DEV_CURATE: CurateResult = {
   ],
 };
 
+// A representative set-prep (build-set) run over the same 2026-05-25 subset —
+// the agent discovered + sequenced a set for a peak-time curve and EXPORTED it
+// to Rekordbox XML (the v8.2 set-prep terminal). Rows mirror the real bridge
+// contract exactly (title = track_id, meta = "track <id>" — the flat-id branch
+// of map_curate_result), and `export_path` is the headline artefact the build
+// surface reports. Dev-only: fires solely when getInvoke() is falsy (no Tauri),
+// so it can never reach the packaged app — but it reads exactly like prod.
+const DEV_BUILD: BuildSetResult = {
+  name: "Warehouse Opener",
+  stop_reason: "exported",
+  rationale:
+    "Opened at 122 BPM with melodic, restrained energy, then climbed a step " +
+    "per blend into rolling, hypnotic territory by slot 8 — peak-time arc, BPM " +
+    "drift held under ±4% so the transitions stay seamless. Each move is the " +
+    "nearest grounded neighbour in vibe space, not a guess.",
+  count: 6,
+  export_path: "~/Music/vibemix/Warehouse Opener.xml",
+  tracks: [
+    { track_id: "7f9f9052", title: "7f9f9052", meta: "track 7f9f9052" },
+    { track_id: "b8d4da96", title: "b8d4da96", meta: "track b8d4da96" },
+    { track_id: "a0b1a41b", title: "a0b1a41b", meta: "track a0b1a41b" },
+    { track_id: "911ea756", title: "911ea756", meta: "track 911ea756" },
+    { track_id: "a8f148f3", title: "a8f148f3", meta: "track a8f148f3" },
+    { track_id: "23381471", title: "23381471", meta: "track 23381471" },
+  ],
+};
+
 /** The 8-file embed log from the subset run — replayed in dev to animate the
  *  ingest progress bar + live log without a real folder embed. */
 const DEV_EMBED_LOG: Array<[EmbedProgress["status"], string, number]> = [
@@ -227,6 +268,7 @@ export const DEV_FALLBACK = {
   search: DEV_SEARCH,
   similar: DEV_SIMILAR,
   curate: DEV_CURATE,
+  build: DEV_BUILD,
   stats: DEV_STATS,
   embedLog: DEV_EMBED_LOG,
 } as const;
@@ -255,6 +297,20 @@ export async function libraryCurate(theme: string): Promise<CurateResult> {
   if (!invoke) return DEV_CURATE; // no Tauri (plain vite / jsdom) → demo data
   // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
   return invoke<CurateResult>("library_curate", { theme });
+}
+
+/** Brief + energy curve → set-prep co-host: a discovered + sequenced set,
+ *  auto-exported to Rekordbox XML (`export_path` on the result). One-shot; the
+ *  same propagate-don't-mask discipline as curate (a real backend error throws;
+ *  a no-key run returns stop_reason "max_iters" with no tracks, surfaced honestly). */
+export async function libraryBuildSet(
+  brief: string,
+  curve: EnergyCurve,
+): Promise<BuildSetResult> {
+  const invoke = await getInvoke();
+  if (!invoke) return DEV_BUILD; // no Tauri (plain vite / jsdom) → demo data
+  // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
+  return invoke<BuildSetResult>("library_build_set", { brief, curve });
 }
 
 /** Corpus readout for the left console. */

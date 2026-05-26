@@ -394,12 +394,18 @@ fn map_curate_result(raw: &Value) -> Value {
     };
 
     let count = tracks.len() as u64;
+    // `export_path` — present (a string) when a set-prep run exported the chosen
+    // set to Rekordbox XML; `null` for plain curation. Surfaced verbatim so the
+    // build-set UI can show the "Exported → <path>" line + import hint. Curate
+    // never exports, so this is simply absent/null on the curate path.
+    let export_path = raw.get("export_path").cloned().unwrap_or(Value::Null);
     json!({
         "name": name,
         "rationale": rationale,
         "stop_reason": stop_reason,
         "tracks": tracks,
         "count": count,
+        "export_path": export_path,
     })
 }
 
@@ -414,6 +420,63 @@ fn map_curate_result(raw: &Value) -> Value {
 pub async fn library_curate(app: AppHandle, theme: String) -> Result<Value, String> {
     let (stdout, stderr, code) =
         run_library_to_completion(&app, &["library", "curate", &theme, "--json"]).await?;
+    let raw = parse_cli_json(&stdout, &stderr, code)?;
+    Ok(map_curate_result(&raw))
+}
+
+/// `library_build_set` — the v8.2 set-prep co-host: a natural-language brief →
+/// a discovered + sequenced set, auto-exported to Rekordbox XML.
+///
+/// Mirrors `library_curate` exactly (one-shot CLI subprocess → JSON → mapped UI
+/// shape), running `library build-set <brief> --curve <curve> --export
+/// rekordbox --json`. `--export rekordbox` makes the agent write the chosen set
+/// to a Rekordbox XML; the resulting `export_path` is surfaced in the mapped
+/// shape so the UI can show the "Exported → <path>" line + import hint.
+///
+/// The agent's `build_set` returns the SAME `CurateResult.to_dict()` shape as
+/// curate (plus `export_path`), so `map_curate_result` is reused verbatim — it
+/// already tolerates `playlist: null`. A set-prep run can terminate via export
+/// (`stop_reason == "exported"`) rather than a created playlist, so the build
+/// flow leans on `export_path` + the rationale as the headline value; the rows
+/// (when present) are the same numbered set the curate path renders.
+///
+/// `curve` is one of the agent's energy-curve presets
+/// (`opener` | `peak_time` | `after_hours` | `festival`) — validated here
+/// before spawn so an out-of-band value never reaches the CLI as a confusing
+/// argparse error.
+///
+/// HONESTY (anti-slop): build-set runs the Gemini agent (needs a key). Without
+/// one the CLI returns `stop_reason == "max_iters"` with no playlist — the UI
+/// renders that as an honest empty/error state, never fabricated rows. A hard
+/// backend failure (no library cache, no key) surfaces via `parse_cli_json` as
+/// an Err — the frontend renders the real error, never fake data.
+#[tauri::command]
+pub async fn library_build_set(
+    app: AppHandle,
+    brief: String,
+    curve: String,
+) -> Result<Value, String> {
+    // Validate the curve preset before spawn (matches the CLI's choices).
+    const CURVES: [&str; 4] = ["opener", "peak_time", "after_hours", "festival"];
+    if !CURVES.contains(&curve.as_str()) {
+        return Err(format!(
+            "invalid curve {curve:?} (expected opener | peak_time | after_hours | festival)"
+        ));
+    }
+    let (stdout, stderr, code) = run_library_to_completion(
+        &app,
+        &[
+            "library",
+            "build-set",
+            &brief,
+            "--curve",
+            &curve,
+            "--export",
+            "rekordbox",
+            "--json",
+        ],
+    )
+    .await?;
     let raw = parse_cli_json(&stdout, &stderr, code)?;
     Ok(map_curate_result(&raw))
 }
@@ -908,6 +971,42 @@ mod tests {
         assert_eq!(m["count"], 0);
         assert_eq!(m["stop_reason"], "no_create");
         assert!(m["tracks"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn maps_build_set_export_path_when_present() {
+        // A set-prep run terminates via export: stop_reason "exported", no
+        // playlist, but a Rekordbox XML export_path the UI surfaces.
+        let raw = json!({
+            "theme": "warehouse opener, 90 min",
+            "playlist": {
+                "name": "Warehouse Opener",
+                "track_ids": ["t1", "t2"],
+                "dropped_ids": []
+            },
+            "rationale": "Eased in at 122, climbed to 126 by slot 8.",
+            "iterations": 5,
+            "stop_reason": "exported",
+            "seen_track_ids": ["t1", "t2"],
+            "export_path": "/Users/x/Music/vibemix-set.xml"
+        });
+        let m = map_curate_result(&raw);
+        assert_eq!(m["stop_reason"], "exported");
+        assert_eq!(m["export_path"], "/Users/x/Music/vibemix-set.xml");
+        assert_eq!(m["count"], 2);
+    }
+
+    #[test]
+    fn curate_result_export_path_is_null_when_absent() {
+        // Plain curation never exports → export_path is null (not fabricated).
+        let raw = json!({
+            "theme": "dusk to dark",
+            "playlist": { "track_ids": ["t1"], "dropped_ids": [] },
+            "rationale": "",
+            "stop_reason": "created"
+        });
+        let m = map_curate_result(&raw);
+        assert!(m["export_path"].is_null());
     }
 
     #[test]

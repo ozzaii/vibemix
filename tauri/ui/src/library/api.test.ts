@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEV_FALLBACK,
+  libraryBuildSet,
   libraryEmbedFolder,
   librarySearch,
   librarySimilar,
@@ -55,5 +56,15 @@ describe("dev fallback (no Tauri bridge)", () => {
     expect(DEV_FALLBACK.embedLog).toHaveLength(8);
     expect(DEV_FALLBACK.embedLog.some(([st]) => st === "skip")).toBe(true);
     expect(DEV_FALLBACK.embedLog.every(([st]) => st !== "err")).toBe(true);
+  });
+
+  it("libraryBuildSet returns the DEV_BUILD exported set (6 tracks, .xml export)", async () => {
+    const r = await libraryBuildSet("warehouse opener", "peak_time");
+    expect(r.tracks).toHaveLength(6);
+    expect(r.count).toBe(6);
+    expect(r.stop_reason).toBe("exported");
+    expect(r.export_path).toMatch(/\.xml$/);
+    // honest meta — no fabricated human title/artist on the flat-id rows.
+    expect(r.tracks[0]?.meta).toMatch(/^track /);
   });
 });

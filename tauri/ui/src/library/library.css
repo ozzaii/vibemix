@@ -416,7 +416,8 @@ body {
    .vmx-lib-results rows). Material panel, single amber accent on the label —
    restrained, not a decorative card. */
 .vmx-lib-rationale { display: none; }
-body[data-mode="curate"] .vmx-lib-rationale {
+body[data-mode="curate"] .vmx-lib-rationale,
+body[data-mode="build"] .vmx-lib-rationale {
   display: block;
   margin-bottom: 16px;
   padding: 14px 15px;
@@ -436,6 +437,91 @@ body[data-mode="curate"] .vmx-lib-rationale {
   font-size: 10.5px;
   color: var(--silk-40);
   letter-spacing: 0.05em;
+}
+
+/* ── build mode: set-prep co-host ───────────────────────────
+   The brief is a multi-line textarea (a set brief is a sentence, not a token)
+   wearing the same .vmx-lib-qbox glass; the energy curve is a segmented
+   hardware selector; the export block is the Rekordbox receipt. All reuse the
+   established amber/glass vocabulary — no new color, no new material. */
+.vmx-lib-briefbox { align-items: stretch; }
+.vmx-lib-briefbox textarea {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  resize: none;
+  color: var(--silk);
+  font-family: var(--type-body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.vmx-lib-briefbox textarea::placeholder { color: var(--silk-22); }
+
+/* energy-curve segmented selector — a single inset rail of LED segments, the
+   active one lit amber. Built from the .vmx-lib-modeswitch material (the same
+   recessed track) so it reads as one instrument, not a new control. */
+.vmx-lib-curve {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+  padding: 3px;
+  background: var(--void-3);
+  border-radius: var(--rad-md);
+  border: 1px solid var(--glass-edge);
+}
+.vmx-lib-curveseg {
+  font-family: var(--type-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--silk-40);
+  background: transparent;
+  border: 0;
+  border-radius: var(--rad-sm);
+  padding: 9px 6px;
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s, box-shadow 0.18s;
+}
+.vmx-lib-curveseg:hover:not([aria-pressed="true"]) { color: var(--silk-65); }
+.vmx-lib-curveseg[aria-pressed="true"] {
+  color: var(--amber);
+  background: var(--glass-1);
+  box-shadow: 0 0 0 1px var(--amber-22) inset, var(--glow-soft);
+}
+
+/* Rekordbox export receipt — shown only in build mode when a file was written.
+   A restrained material panel with one amber LED + the path in mono; the import
+   hint sits quiet below. Not a banner, not a toast — a hardware readout. */
+.vmx-lib-export {
+  margin-bottom: 16px;
+  padding: 14px 15px;
+  border-radius: var(--rad-md);
+  background: var(--void-3);
+  border: 1px solid var(--amber-22);
+  box-shadow: 0 1px 0 var(--glass-top) inset, var(--glow-soft);
+}
+.vmx-lib-export .hd { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+.vmx-lib-export .hd .led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: var(--glow-soft);
+}
+.vmx-lib-export .hd .vmx-lib-label { color: var(--amber); margin: 0; }
+.vmx-lib-export .path {
+  font-size: 12px;
+  color: var(--silk);
+  word-break: break-all;
+  letter-spacing: 0.04em;
+}
+.vmx-lib-export .hint {
+  margin-top: 9px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--silk-40);
 }
 
 /* ── right: vibe scope ──────────────────────────────────── */

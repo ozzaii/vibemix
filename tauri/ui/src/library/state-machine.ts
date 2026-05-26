@@ -8,16 +8,23 @@
  *     and the per-mode run-button label all live here as data; index.ts is the
  *     thin DOM renderer that maps this state onto the panels.
  *
- * The four modes (mocks/vibemix-library-ui.html + curate extension):
+ * The five modes (mocks/vibemix-library-ui.html + curate/build extensions):
  *   - search   ← text vibe query → ranked tracks + scope
  *   - similar  ← seed track (id or dropped file) → nearest neighbours + scope
  *   - ingest   ← folder path + strategy → embed progress + live log
  *   - curate   ← theme → AI-curated playlist (numbered set + rationale)
+ *   - build    ← brief + energy curve → set-prep co-host: discovered + sequenced
+ *               set, auto-exported to Rekordbox XML (v8.2 Vibe Mix surface)
  */
 
 import type { EmbedStrategy } from "./api.js";
 
-export type LibraryMode = "search" | "similar" | "ingest" | "curate";
+export type LibraryMode = "search" | "similar" | "ingest" | "curate" | "build";
+
+/** Energy-curve preset for the set-prep co-host (build mode). The EXACT wire
+ *  values the agent's CLI accepts (`--curve <preset>`); the UI shows nicer
+ *  labels ("Opener" / "Peak time" / …) but `invoke` sends one of these. */
+export type EnergyCurve = "opener" | "peak_time" | "after_hours" | "festival";
 
 export interface LibraryState {
   mode: LibraryMode;
@@ -31,6 +38,10 @@ export interface LibraryState {
   strategy: EmbedStrategy;
   /** Free-text theme for the AI curator (curate mode). */
   theme: string;
+  /** Natural-language set brief for the set-prep co-host (build mode). */
+  brief: string;
+  /** Chosen energy curve preset (build mode). */
+  curve: EnergyCurve;
 }
 
 export const initialLibraryState: LibraryState = {
@@ -40,6 +51,8 @@ export const initialLibraryState: LibraryState = {
   folder: "~/Music",
   strategy: "cue_anchored",
   theme: "warm sunset rooftop, dusk to dark",
+  brief: "warehouse opener, melodic into rolling — 90 min",
+  curve: "peak_time",
 };
 
 /** The left-console field label for the active mode. */
@@ -51,6 +64,8 @@ export function fieldLabel(mode: LibraryMode): string {
       return "Folder to embed";
     case "curate":
       return "Curate a set";
+    case "build":
+      return "Build a Set";
     case "search":
     default:
       return "Vibe query";
@@ -66,6 +81,8 @@ export function runLabel(mode: LibraryMode): string {
       return "▸ Embed folder";
     case "curate":
       return "▸ Curate playlist";
+    case "build":
+      return "▸ Build a Set";
     case "search":
     default:
       return "▸ Run search";
@@ -79,6 +96,8 @@ export function echoText(state: LibraryState): string {
       return state.seed;
     case "curate":
       return state.theme;
+    case "build":
+      return state.brief;
     default:
       return state.query;
   }
@@ -104,6 +123,14 @@ export function setFolder(state: LibraryState, folder: string): LibraryState {
 
 export function setTheme(state: LibraryState, theme: string): LibraryState {
   return { ...state, theme };
+}
+
+export function setBrief(state: LibraryState, brief: string): LibraryState {
+  return { ...state, brief };
+}
+
+export function setCurve(state: LibraryState, curve: EnergyCurve): LibraryState {
+  return { ...state, curve };
 }
 
 export function setStrategy(

@@ -19,6 +19,7 @@
 
 import {
   DEV_FALLBACK,
+  libraryBuildSet,
   libraryCurate,
   libraryEmbedFolder,
   librarySearch,
@@ -26,10 +27,12 @@ import {
   libraryStats,
   onEmbedDone,
   onEmbedProgress,
+  type BuildSetResult,
   type CurateResult,
   type EmbedDone,
   type EmbedProgress,
   type EmbedStrategy,
+  type EnergyCurve,
   type LibraryStats,
   type SearchResult,
 } from "./api.js";
@@ -41,6 +44,8 @@ import {
   meterOn,
   METER_SEGMENTS,
   runLabel,
+  setBrief,
+  setCurve,
   setFolder,
   setMode,
   setQuery,
@@ -155,6 +160,14 @@ function renderCurate(result: CurateResult): void {
 function clearRationale(): void {
   $("vmx-lib-rationale-body").textContent = "";
   $("vmx-lib-rationale-meta").textContent = "";
+  // The export line is shared by build mode; clear it too so a stale "Exported
+  // → …" never lingers under a fresh error or after leaving build/curate.
+  const exportEl = document.getElementById("vmx-lib-export");
+  if (exportEl) {
+    exportEl.style.display = "none";
+    const p = document.getElementById("vmx-lib-export-path");
+    if (p) p.textContent = "";
+  }
 }
 
 /** Working state while the Gemini agent builds the set (it can take several
@@ -164,6 +177,74 @@ function clearRationale(): void {
 function renderCurateLoading(theme: string): void {
   $("vmx-lib-rationale-body").textContent = `Building a set for "${theme}"…`;
   $("vmx-lib-rationale-meta").textContent = "viber · working";
+  const el = $("vmx-lib-results");
+  el.innerHTML = "";
+  for (let i = 0; i < 4; i++) {
+    el.insertAdjacentHTML(
+      "beforeend",
+      `<div class="vmx-lib-row vmx-lib-skeleton"><div class="rank">${String(i + 1).padStart(2, "0")}</div><div><div class="title"></div><div class="meta"></div></div><div class="score"></div></div>`,
+    );
+  }
+  $("vmx-lib-rcount").textContent = "building…";
+}
+
+/** Render a built set (set-prep co-host). Reuses the numbered-set rows from
+ *  renderCurate — a built set is also ordered by the agent's arc, no score
+ *  meter — but the HEADLINE value is the per-transition rationale (the "why"
+ *  behind each move) plus the Rekordbox export. When `export_path` is present we
+ *  show an "Exported → <path>" line with a one-line import hint; honest empty
+ *  state otherwise (a no-key run returns max_iters with no tracks — never faked). */
+function renderBuildSet(result: BuildSetResult): void {
+  const bodyEl = $("vmx-lib-rationale-body");
+  bodyEl.textContent = result.rationale || "No set notes returned.";
+  $("vmx-lib-rationale-meta").textContent =
+    `${result.count} tracks · ${result.stop_reason}`;
+
+  // Export line — the build flow auto-exports to Rekordbox XML. Shown only when
+  // the agent actually wrote a file (anti-slop: no path, no claim of an export).
+  const exportEl = $("vmx-lib-export");
+  if (result.export_path) {
+    exportEl.style.display = "";
+    $("vmx-lib-export-path").textContent = result.export_path;
+  } else {
+    exportEl.style.display = "none";
+    $("vmx-lib-export-path").textContent = "";
+  }
+
+  const el = $("vmx-lib-results");
+  el.innerHTML = "";
+  if (result.tracks.length === 0) {
+    el.innerHTML = `<div class="vmx-lib-empty">No set built (${esc(result.stop_reason)}). Add a Gemini key, embed more tracks, or refine the brief.</div>`;
+  } else {
+    result.tracks.forEach((t, i) => {
+      const top = i === 0 ? " top" : "";
+      el.insertAdjacentHTML(
+        "beforeend",
+        `<div class="vmx-lib-row${top}">
+          <div class="rank">${String(i + 1).padStart(2, "0")}</div>
+          <div><div class="title">${esc(t.title)}</div><div class="meta">${esc(t.meta)}</div></div>
+          <div class="score"></div>
+        </div>`,
+      );
+    });
+    Array.from(el.children).forEach((row, i) => {
+      requestAnimationFrame(() =>
+        setTimeout(() => row.classList.add("settled"), i * 55),
+      );
+    });
+  }
+
+  $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;
+}
+
+/** Working state while the set-prep agent discovers + sequences the set (it can
+ *  take several seconds — it runs the Gemini agent tool loop). Skeleton rows +
+ *  a "building" note so the surface never reads as hung. Replaced wholesale by
+ *  renderBuildSet / renderError when the run lands. */
+function renderBuildSetLoading(brief: string): void {
+  $("vmx-lib-rationale-body").textContent = `Building a set for "${brief}"…`;
+  $("vmx-lib-rationale-meta").textContent = "set-prep · working";
+  $("vmx-lib-export").style.display = "none";
   const el = $("vmx-lib-results");
   el.innerHTML = "";
   for (let i = 0; i < 4; i++) {
@@ -222,6 +303,7 @@ export function mountLibrary(): void {
   const qInput = $("vmx-lib-q") as HTMLInputElement;
   const folderInput = $("vmx-lib-folder") as HTMLInputElement;
   const themeInput = $("vmx-lib-theme") as HTMLInputElement;
+  const briefInput = $("vmx-lib-brief") as HTMLTextAreaElement;
   const runBtn = $("vmx-lib-runbtn") as HTMLButtonElement;
   const echoEl = $("vmx-lib-echo");
   const qlabelEl = $("vmx-lib-qlabel");
@@ -231,6 +313,7 @@ export function mountLibrary(): void {
   qInput.value = state.query;
   folderInput.value = state.folder;
   themeInput.value = state.theme;
+  briefInput.value = state.brief;
   seedNameEl.textContent = state.seed;
 
   function applyModeVisibility(): void {
@@ -269,6 +352,20 @@ export function mountLibrary(): void {
     echoEl.textContent = state.theme;
     renderCurateLoading(state.theme); // working state before the (slow) agent call
     renderCurate(await libraryCurate(state.theme));
+  }
+
+  async function runBuildSet(): Promise<void> {
+    state = setBrief(state, briefInput.value.trim() || state.brief);
+    echoEl.textContent = state.brief;
+    renderBuildSetLoading(state.brief); // working state before the (slow) agent call
+    renderBuildSet(await libraryBuildSet(state.brief, state.curve));
+  }
+
+  /** Reflect the active curve onto the segmented picker's pressed state. */
+  function syncCurvePicker(): void {
+    document.querySelectorAll<HTMLElement>("[data-curve]").forEach((c) => {
+      c.setAttribute("aria-pressed", String(c.dataset.curve === state.curve));
+    });
   }
 
   /** Drive the ingest progress bar + log. If the bridge accepts the job, the
@@ -313,6 +410,7 @@ export function mountLibrary(): void {
       if (state.mode === "search") await runSearch();
       else if (state.mode === "similar") await runSimilar();
       else if (state.mode === "curate") await runCurate();
+      else if (state.mode === "build") await runBuildSet();
       else {
         await runIngest();
         return; // ingest manages its own busy lifecycle (events or replay)
@@ -350,13 +448,25 @@ export function mountLibrary(): void {
   themeInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && state.mode === "curate") void run();
   });
+  // Brief is a textarea (multi-line set briefs) — Enter SUBMITS, Shift+Enter
+  // inserts a newline (the familiar chat-input contract; a brief is usually one
+  // line so plain Enter running is the fast path).
+  briefInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && state.mode === "build") {
+      e.preventDefault();
+      void run();
+    }
+  });
 
   document.querySelectorAll<HTMLElement>(".vmx-lib-modeswitch button").forEach((b) => {
     b.addEventListener("click", () => {
       const mode = (b.dataset.mode ?? "search") as LibraryMode;
       state = setMode(state, mode);
       applyModeVisibility();
-      if (mode !== "curate") clearRationale(); // don't leak stale set-notes
+      // The set-notes block is shared by curate + build; only clear it when
+      // leaving BOTH so a fresh build/curate keeps its own working state.
+      if (mode !== "curate" && mode !== "build") clearRationale();
+      if (mode === "build") syncCurvePicker();
       if (mode === "ingest") {
         // show last-known progress shape, don't auto-run
         $("vmx-lib-loglist").innerHTML = "";
@@ -405,6 +515,29 @@ export function mountLibrary(): void {
     });
   });
 
+  // energy-curve preset picker (build mode) — a segmented hardware selector.
+  // `data-curve` IS the exact wire value the agent's CLI accepts, so no label
+  // mapping is needed (unlike the strategy chips).
+  document.querySelectorAll<HTMLElement>("[data-curve]").forEach((seg) => {
+    seg.addEventListener("click", () => {
+      const curve = (seg.dataset.curve ?? "peak_time") as EnergyCurve;
+      state = setCurve(state, curve);
+      syncCurvePicker();
+    });
+  });
+
+  // build-set theme chips — set the brief + run (mirrors the curate chips).
+  document.querySelectorAll<HTMLElement>("[data-brief]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      if (state.mode !== "build") return;
+      const brief = chip.dataset.brief ?? chip.textContent ?? "";
+      briefInput.value = brief;
+      state = setBrief(state, brief);
+      echoEl.textContent = brief;
+      void run();
+    });
+  });
+
   // drop a track to seed the similar search
   void wireDropZone((path) => {
     const name = path.split(/[\\/]/).pop() ?? path;
@@ -427,6 +560,7 @@ export function mountLibrary(): void {
 
   // initial paint
   applyModeVisibility();
+  syncCurvePicker();
   void refreshStats();
   void run();
 }
