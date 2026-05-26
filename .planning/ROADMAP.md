@@ -115,7 +115,9 @@ Plans:
   1. The audio part is fed to Gemini alongside the structured evidence — and a Gemini claim that contradicts or isn't backed by the DSP evidence is hallucination-guarded (strips / abstains), so trust-the-audio still wins (GROUND-01).
   2. The reaction model is resolved via `model_router.resolve(...)` with zero hardcoded model literals (CI grep-gate holds), so the bench's winning model can be swapped in by config alone (GROUND-02).
   3. With the audio-secondary path gated off, the prompt + reaction are byte-identical to the v8.0 baseline (additive design).
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 80-01-PLAN.md — Wave-0 RED scaffolds: the un-backed-audio-claim strip guard + flag-ON framing (xfail-strict) + cold-path byte-identity & GROUND-02 router-resolve pins (real-green)
+- [ ] 80-02-PLAN.md — gated `secondary_ear` framing in `build_parts_description`, thread `VIBEMIX_GROUND_SECONDARY_EAR` → kwarg → call site, flip the guard xfails, document `live_coach` as the bench-swap alias
 
 ### Phase 81: BENCH — The Validation Instrument
 **Goal:** Build the experiment that PROVES the architecture — a multi-dimensional bench over model × input-grounding (raw audio | DSP-evidence-only/no-audio | audio+DSP | audio+DSP+trajectory+genre) × prompting (generic | structured) × contexting (snapshot | trajectory) × lens (hype/critique/tutor) × taste (with/without rubric), run on real tracks. An automated first-pass scores each cell (groundedness vs DSP facts, specificity, mode-fidelity); the cells are then surfaced for **Kaan's ear as the final judge** (Phase-16 rule). The "no-audio" cell tests "does the intelligence reside elsewhere."
@@ -150,7 +152,7 @@ Plans:
 | 77. WIRE — Connect the Islands | 0/TBD | Not started | - |
 | 78. PERCEIVE — Deeper, Generalized Ear | 0/4 | Planned | - |
 | 79. LENS — Three Grounded Modes | 0/TBD | Not started | - |
-| 80. GROUND — Gemini as Secondary Ear | 0/TBD | Not started | - |
+| 80. GROUND — Gemini as Secondary Ear | 0/2 | Planned | - |
 | 81. BENCH — The Validation Instrument | 0/TBD | Not started | - |
 | 82. CURATE — Unify Curator + Co-Host | 0/TBD | Not started | - |
 
