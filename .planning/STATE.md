@@ -9,8 +9,8 @@ progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 17
-  completed_plans: 15
-  percent: 67
+  completed_plans: 16
+  percent: 71
 ---
 
 # vibemix — State
@@ -38,9 +38,19 @@ See: .planning/PROJECT.md (Current Milestone: v8.1 "One Mind")
 ## Current Position
 
 Phase: 81 (BENCH — The Validation Instrument) — EXECUTING
-Plan: 3 of 4
-Status: Ready to execute
+Plan: 4 of 4
+Status: Ready to execute (Plan 03 complete — BENCH-02 eval shipped)
 Last activity: 2026-05-26
+
+### Plan 81-03 — BENCH-02 automated first-pass eval (complete 2026-05-26)
+
+- **`src/vibemix/bench/eval.py` — three PURE, deterministic, offline scorers + a SORT-ONLY ranker over a recorded `BenchResult`; BENCH-02 met (zero API).** `CellScore` frozen dataclass (`groundedness`/`specificity`/`lens_fidelity` floats + `errored: bool` + a SORT-ONLY `aggregate`) — deliberately NO `winner`/`verdict`/`decision` field.
+- **groundedness REUSES `CitationLinter.check(output, dsp_snapshot, mode="debrief")` VERBATIM** (the linter IS the product's anti-slop gate, Invariant #2 — no bespoke atom parser under `bench/`, T-81-08): `valid->1.0 / no_citations->0.5 / else->0.0`; an errored cell short-circuits to `0.0`. A grounded `[aud:bpm@0.0]` scores 1.0, a fabricated `[aud:bpm@99.0]` scores 0.0.
+- **specificity** = `0.3 + 0.35*concrete_hits - 0.4*slop_hits` clamped `[0,1]` (slop = `NEGATIVE_PHRASES` hits; concrete = word-bounded `\d+ unit` matches hz/khz/bpm/db/bar/bars/beat/beats/s) — "128 bpm kick" beats "As an AI, I'm here to help". **lens-fidelity** = `clamp(LENS_ANCHORS[lens] vocab hits / 2.0)` — hype-vocab line > flat line; unknown lens -> 0.0 (never raises).
+- **`score_cell`** errored -> all-zero+`errored=True` (sinks in rank, never fabricated-high); else composes the three + weighted-mean aggregate (g 0.5 / s 0.25 / lf 0.25 — tunes RANK ORDER only). **`rank_cells`** = `sorted(key=aggregate, reverse=True)` with a does-NOT-decide docstring. **RANKS-NEVER-DECIDES** (Pitfall 5 / T-81-07; Kaan's ear is BENCH-03). Dual-shape accessors read both a real `BenchResult` and the Plan-01 dict stand-in.
+- **Flipped the 4 BENCH-02 eval xfail scaffolds to real-green.** **Deviation (Rule 3):** `rank_cells` registered as a new orphan vs the committed baseline (its consumer is Plan 04's `review.py`, not yet written) -> refreshed `.planning/codebase/orphans.csv` via the documented `integration_audit.py --orphan-inventory`.
+- Honest green: zero API (fixture cells), no model literal under `bench/` (release gate exit 0; `grep gemini- bench/`->NONE), `CitationLinter`/`NEGATIVE_PHRASES` present (reuse), `winner`/`verdict`/`decide` docstring-only. Full suite **4520 passed / 26 skipped / 3 xfailed / 4 xpassed (pre-existing live-hardware)**, exit 0, zero new failures (the eval's 4 scaffolds flipped to passes; the remaining xfails are Plan 04's `test_review.py` render scaffolds + the pre-existing budget-cost decision gate). Commit `8dd8821`. BENCH-01/02/03 stay Pending (close after Plan 04 review surface + the parked KAAN-ACTION live two-study run + Kaan's ear verdict). **Phase 81 -> 3/4.**
+- **Next:** Plan 81-04 (review.py — the KAAN-ACTION review surface), then the parked live run + Kaan's verdict.
 
 ### Plan 79-03 — LENS-02 one shared lens selection (complete 2026-05-26)
 
