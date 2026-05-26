@@ -159,7 +159,6 @@ def _open_cache(tmp_path: Path) -> sqlite3.Connection:
 # --------------------------------------------------------------------------- #
 
 
-@pytest.mark.xfail(strict=True, reason="ingest_source lands in Task 2")
 def test_ingest_source_end_to_end(isolated_cache, tmp_path):
     from vibemix.library.ingest import ingest_source
     from vibemix.library.sources.rekordbox import RekordboxSource
@@ -183,7 +182,6 @@ def test_ingest_source_end_to_end(isolated_cache, tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-@pytest.mark.xfail(strict=True, reason="ingest_source lands in Task 2")
 def test_ingest_source_resumable(isolated_cache, tmp_path):
     from vibemix.library.ingest import ingest_source
     from vibemix.library.sources.rekordbox import RekordboxSource
@@ -216,7 +214,6 @@ def test_ingest_source_resumable(isolated_cache, tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-@pytest.mark.xfail(strict=True, reason="ingest_source lands in Task 2")
 def test_ingest_source_honest_failure(isolated_cache, tmp_path):
     from vibemix.library.ingest import ingest_source
     from vibemix.library.sources.rekordbox import RekordboxSource

@@ -1727,6 +1727,35 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_stats.add_argument("--json", action="store_true")
     sp_stats.set_defaults(func=_cmd_library_stats)
 
+    # Phase 89 Plan 01 — ingest: auto-detect a DJ library + embed it on-device.
+    sp_ingest = sub.add_parser(
+        "ingest",
+        help="Auto-detect your DJ library (Rekordbox) and embed it on-device (CLAP)",
+        description=(
+            "Detect your Rekordbox collection.xml at its standard export "
+            "location (or pass an explicit path), parse each track, embed it "
+            "ON-DEVICE via CLAP (512-dim, keyless — no Gemini, no API cost, "
+            "audio never leaves the machine), and store the vectors so "
+            "search/similar resolve your own crate. Resumable + "
+            "partial-failure-tolerant."
+        ),
+    )
+    sp_ingest.add_argument(
+        "path",
+        nargs="?",
+        default=None,
+        help=(
+            "explicit path to a Rekordbox collection.xml (omit to auto-detect "
+            "the standard export location)"
+        ),
+    )
+    sp_ingest.add_argument(
+        "--json",
+        action="store_true",
+        help="emit the IngestReport as JSON (suppress per-track progress)",
+    )
+    sp_ingest.set_defaults(func=_cmd_library_ingest)
+
 
 def _run_library_cli(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="vibemix library")
@@ -2475,6 +2504,81 @@ def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
         '-> query it: `vibemix library search "<vibe text>"` or '
         "`vibemix library similar <folder:hash>` "
         "(re-run with --json to copy a track_id seed)."
+    )
+    return 0
+
+
+def _cmd_library_ingest(args: argparse.Namespace) -> int:
+    """Phase 89 Plan 01 — detect → parse → CLAP-embed → store one DJ library.
+
+    KEYLESS + on-device: unlike ``embed-folder`` (Gemini, needs an API key),
+    ingest embeds via the staged ``ClapEngine`` — no genai client, no API cost,
+    audio never leaves the machine. Auto-detects the Rekordbox collection.xml at
+    its standard export location, or accepts an explicit ``path``.
+    """
+    import json as _json
+
+    from vibemix.library.clap_engine import ClapEngine
+    from vibemix.library.ingest import ingest_source
+    from vibemix.library.rekordbox import RekordboxLibrary
+    from vibemix.library.sources.rekordbox import RekordboxSource
+    from vibemix.library.store import open_store
+
+    explicit = getattr(args, "path", None)
+    source = RekordboxSource(xml_path=explicit) if explicit else RekordboxSource()
+
+    if not source.detect():
+        probed = ", ".join(str(p) for p in source.default_paths())
+        print(
+            "[FATAL] library ingest: no Rekordbox collection.xml found. Export "
+            "one via Rekordbox → File → Export Collection in xml format, then "
+            "re-run `vibemix library ingest <path>` (or place it at a standard "
+            f"location). Probed: {probed}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
+
+    print(f"-> library ingest: source=rekordbox xml={source.resolved_path}",
+          file=sys.stderr)
+    print("-> library ingest: embedder=ClapEngine (on-device, keyless)",
+          file=sys.stderr)
+
+    # The embedder exposes embed_audio_file(path) -> np.ndarray; ingest_source
+    # reads its .backend tag for the content-hash cache namespace.
+    embedder = ClapEngine()
+    store = open_store()
+    as_json = bool(getattr(args, "json", False))
+
+    def _progress(line: str) -> None:
+        if not as_json:
+            print(line, flush=True)
+
+    try:
+        report = ingest_source(
+            source,
+            embedder,
+            store,
+            persist_library=True,
+            progress=_progress,
+        )
+    finally:
+        store.close()
+
+    if as_json:
+        _json.dump(report.as_dict(), sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 0
+
+    print(
+        f"\nlibrary ingest done: embedded={report.embedded} "
+        f"skipped_cached={report.skipped_cached} failed={report.failed} "
+        f"total={report.total}"
+    )
+    print(f"-> library cache: {RekordboxLibrary.CACHE_PATH}")
+    print(
+        '-> query it: `vibemix library search "<vibe text>"` or '
+        "`vibemix library similar <track_id>`."
     )
     return 0
 

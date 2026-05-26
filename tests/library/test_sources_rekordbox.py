@@ -97,7 +97,6 @@ def test_sources_base_import_pulls_no_heavy_dep():
 # --------------------------------------------------------------------------- #
 
 
-@pytest.mark.xfail(strict=True, reason="RekordboxSource lands in Task 2")
 def test_rekordbox_source_detect_explicit_path(isolated_cache):
     """detect() returns True for an explicit collection.xml path that exists."""
     from vibemix.library.sources.rekordbox import RekordboxSource
@@ -108,7 +107,6 @@ def test_rekordbox_source_detect_explicit_path(isolated_cache):
     assert Path(src.resolved_path) == FIXTURE
 
 
-@pytest.mark.xfail(strict=True, reason="RekordboxSource lands in Task 2")
 def test_rekordbox_source_detect_missing_returns_false(isolated_cache, tmp_path):
     """detect() returns False when no collection.xml exists at the given path."""
     from vibemix.library.sources.rekordbox import RekordboxSource
@@ -117,7 +115,6 @@ def test_rekordbox_source_detect_missing_returns_false(isolated_cache, tmp_path)
     assert src.detect() is False
 
 
-@pytest.mark.xfail(strict=True, reason="RekordboxSource lands in Task 2")
 def test_rekordbox_source_iter_tracks_yields_entries(isolated_cache):
     """iter_tracks() yields all 5 fixture TrackEntry rows."""
     from vibemix.library.rekordbox import TrackEntry
@@ -131,7 +128,6 @@ def test_rekordbox_source_iter_tracks_yields_entries(isolated_cache):
     assert {e.track_id for e in entries} == {"1", "2", "3", "4", "5"}
 
 
-@pytest.mark.xfail(strict=True, reason="RekordboxSource lands in Task 2")
 def test_rekordbox_source_satisfies_protocol(isolated_cache):
     """RekordboxSource is a structural LibrarySource."""
     from vibemix.library.sources.rekordbox import RekordboxSource
@@ -139,7 +135,6 @@ def test_rekordbox_source_satisfies_protocol(isolated_cache):
     assert isinstance(RekordboxSource(xml_path=str(FIXTURE)), LibrarySource)
 
 
-@pytest.mark.xfail(strict=True, reason="RekordboxSource lands in Task 2")
 def test_rekordbox_source_no_sqlcipher_import(isolated_cache):
     """Detecting + iterating must never pull a *sqlcipher* module (XML-only)."""
     from vibemix.library.sources.rekordbox import RekordboxSource
