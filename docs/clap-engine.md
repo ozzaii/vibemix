@@ -1,11 +1,36 @@
 # CLAP engine — local on-device audio/text embedding
 
-> **Status: STAGED — not wired.** The engine (`src/vibemix/library/clap_engine.py`)
-> exists and is import-safe, but the library/curator/next-suggestion layer still
-> runs on Gemini Embedding 2. The 14-file swap (dim change + `ClapEmbedder` +
-> cache rebuild) is a **later phase** — this doc describes the engine, the
-> evidence behind it, the ship path, the one real risk (the parity gate), and
-> the change-map for that future phase.
+> **Status: WIRED (Phase 90, 2026-05-26) — OPT-IN via `VIBEMIX_EMBED_BACKEND=clap`.**
+> The `onnx` backend is live in `clap_engine.py`, `ClapEmbedder` is a drop-in for
+> `LibraryEmbedder`, the `build_embedder` factory + `_cosine.EMBED_BACKEND` seam
+> flip dim (512) + class together off ONE env var, and all 8 construction sites
+> (curate/search/similar/build-set/telegram/embed-folder CLI + co-host grounding
+> + session_loop + mcp_server) + `grounding.py` route through it. **Default stays
+> `gemini` (1536-dim) — the cold path + the whole existing suite are
+> byte-identical.** To use CLAP: `pip install -e ".[clap]"`, put the
+> `Xenova/larger_clap_music_and_speech` ONNX snapshot under
+> `~/.cache/vibemix/clap-onnx/` (or set `VIBEMIX_CLAP_ONNX_DIR`), then run with
+> `VIBEMIX_EMBED_BACKEND=clap`. **Remaining KAAN-ACTION:** the one-time model
+> download/cache UX + the live re-embed of a real library + the funded-key curate
+> ear-pass (the parity gate already passed on the engine — see below).
+>
+> ## How it's wired (Phase 90)
+>
+> - **Seam:** `_cosine.EMBED_BACKEND` (env `VIBEMIX_EMBED_BACKEND`, default
+>   `gemini`) sets `EMBEDDING_DIM` = 512 (clap) | 1536 (gemini). `embed.build_embedder()`
+>   reads the same flag and returns `ClapEmbedder` | `LibraryEmbedder`. One switch,
+>   dim + class move together.
+> - **`ClapEmbedder`** (`library/embed_clap.py`): wraps `ClapEngine(backend="onnx")`,
+>   exposes `embed_track` / `embed_query` / `embed_audio_bytes` / `has_cached_embedding`
+>   1:1 with `LibraryEmbedder`; own clap-tagged content-hash cache in the shared
+>   `embeddings.db` (never collides with the 1536-dim Gemini rows).
+> - **`grounding.py`** routes the "what's playing" embed through the public
+>   `embedder.embed_audio_bytes` seam — no more `embedder._client` reach-in (CLAP
+>   has no `_client`); `LibraryEmbedder.embed_audio_bytes` added to match.
+> - **Gate PASSED through the real shipped module** (`ClapEngine(backend="onnx")`,
+>   20 tracks): dim 512, determinism cos=1.000000, text spread 0.274,
+>   "hard techno"→{hardtechno:10}, "psy trance"→{psymind:9} — matches the proven
+>   baseline. Wiring tests: `tests/library/test_embed_clap.py` (CI-safe, fake engine).
 
 ## What it is
 

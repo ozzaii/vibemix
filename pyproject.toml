@@ -130,6 +130,23 @@ dependencies = [
     "python-telegram-bot>=21",
 ]
 
+[project.optional-dependencies]
+# Phase 90 — on-device CLAP embedding backend (VIBEMIX_EMBED_BACKEND=clap).
+# OPTIONAL: only installed when opting into the local 512-dim CLAP path
+# (Xenova/larger_clap_music_and_speech ONNX). Keeps the default install lean
+# (Gemini-embedding path needs none of these). onnxruntime is the cross-platform
+# inference runtime (~13-18MB wheel, NO torch); transformers supplies the
+# authoritative ClapFeatureExtractor mel + RoBERTa tokenizer; librosa loads +
+# resamples audio. All three are lazy-imported (clap_engine.ClapEngine /
+# embed_clap.ClapEmbedder) so `import vibemix.library.*` stays safe without them.
+# Follow-up: a pure-numpy mel (np.fft.rfft) + the lighter `tokenizers` lib could
+# drop the transformers dependency — see docs/clap-engine.md.
+clap = [
+    "onnxruntime>=1.20",
+    "transformers>=4.40",
+    "librosa>=0.10",
+]
+
 [project.urls]
 Homepage = "https://github.com/ozzaii/vibemix"
 Repository = "https://github.com/ozzaii/vibemix"
