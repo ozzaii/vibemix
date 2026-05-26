@@ -216,6 +216,32 @@ pub fn create_pill_window(
     Ok(Some(window))
 }
 
+/// Pill height ceiling: collapsed row (44) + the expand panel cap (~220) + a
+/// little slack. Clamps a bad measurement so a runaway value can never blow the
+/// window up (the historical 8960×1408 corruption class).
+const PILL_MAX_H: f64 = 300.0;
+
+/// Resize-to-content: grow the pill window DOWN (width fixed at
+/// `PILL_COLLAPSED_W`) to fit its current content height — the expand panel and
+/// the collapsed-hover peek card both live BELOW the 44px collapsed row and
+/// would otherwise clip against the fixed shell. The window stays
+/// `resizable(false)` for the USER; this is programmatic only, driven by the
+/// renderer measuring its own content (`set_pill_height` on every state change,
+/// back to 44 on collapse). Height is clamped to [collapsed, cap]. The top-left
+/// origin is untouched, so the lozenge grows downward in place — no reposition,
+/// no horizontal reflow.
+#[tauri::command]
+pub fn set_pill_height(window: tauri::WebviewWindow, height: f64) -> Result<(), String> {
+    let h = if height.is_finite() {
+        height.clamp(PILL_COLLAPSED_H, PILL_MAX_H)
+    } else {
+        PILL_COLLAPSED_H
+    };
+    window
+        .set_size(tauri::LogicalSize::new(PILL_COLLAPSED_W, h))
+        .map_err(|e| e.to_string())
+}
+
 /// Logical (width, height) of the primary monitor, or None if it can't be
 /// resolved. Logical units are what `WebviewWindowBuilder::position` and
 /// `inner_size` consume, so keeping all geometry math in logical units (not

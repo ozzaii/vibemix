@@ -91,6 +91,7 @@ fn main() {
             recordings::reveal_in_os,
             recordings::open_input_wav,
             overlay::show_overlay_highlight,
+            pill_window::set_pill_height,
             debrief_window::open_debrief_window,
             // Phase 49 — wizard install-chain commands.
             wizard_cmds::run_companion_fetch,

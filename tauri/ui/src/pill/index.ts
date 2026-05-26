@@ -39,6 +39,7 @@ import {
 import { renderWaveform, setWaveform } from "./waveform.js";
 import { connectMascotBus, type MascotBusClient } from "./ws-client.js";
 import { vmxLog } from "../debug-log.js";
+import { invoke } from "@tauri-apps/api/core";
 
 const TAG = "[pill]";
 
@@ -220,6 +221,11 @@ interface PillView {
    *  — can't leak each other's last-render key and skip a legitimate rebuild. */
   lastChipsKey: string;
   lastDeckKey: string;
+  /** Resize-to-content memo (Phase-1b). `lastWindowHKey` gates re-measuring
+   *  (scrollHeight forces a reflow — never per rAF frame), `lastWindowH` skips a
+   *  redundant set_pill_height invoke when the target height is unchanged. */
+  lastWindowHKey: string;
+  lastWindowH: number;
 }
 
 const STATE_LABEL: Record<PillState["mode"], string> = {
@@ -248,6 +254,16 @@ const STATE_LABEL: Record<PillState["mode"], string> = {
 // `setPeek` state + its unit tests remain live so the wiring doesn't bit-rot.
 const COLLAPSED_PEEK_ENABLED = false;
 
+// Resize-to-content (Phase-1b): the pill window ships fixed at 280×44; the
+// expand panel grows via CSS BELOW the collapsed row and would clip against the
+// 44px shell. On expand we grow the window down to fit (set_pill_height), back
+// to 44 on collapse — so the reaction + citation + next-track never clip. These
+// mirror pill_window.rs (PILL_COLLAPSED_H / PILL_MAX_H) and pill.css (the
+// .pill__expand max-height cap). The collapsed-hover peek card stays gated OFF
+// (it needs hover-driven resize + hit-test verification, a separate pass).
+const PILL_COLLAPSED_H = 44;
+const PILL_EXPAND_CAP = 220; // matches .pill[data-state="expand"] .pill__expand max-height
+
 function render(view: PillView, state: PillState, baseLabel: string): void {
   // data-state drives the dot pulse cadence + the expand panel visibility (CSS).
   view.root.dataset.state = state.mode;
@@ -275,6 +291,31 @@ function render(view: PillView, state: PillState, baseLabel: string): void {
     // suggestion renders nothing — the pill never shows a fabricated next track.
     syncNextSuggestion(view);
   }
+
+  // Grow/shrink the window to fit the current content (expand panel) so the
+  // reaction + citation + next-track never clip against the 44px shell. Runs
+  // after the expand block so the measurement sees the just-rendered content.
+  syncWindowHeight(view, state);
+}
+
+/** Resize the pill window to fit its content (expand panel) — collapsed 44px
+ *  otherwise. Memoised on a cheap layout key so the rAF render never forces a
+ *  reflow (scrollHeight) or a redundant Tauri invoke when nothing changed. */
+function syncWindowHeight(view: PillView, state: PillState): void {
+  const key = `${state.mode}|${view.lastChipsKey}|${state.reactionText.length}`;
+  if (key === view.lastWindowHKey) return;
+  view.lastWindowHKey = key;
+  let target = PILL_COLLAPSED_H;
+  if (state.mode === "expand") {
+    // .pill__expand reports full content height via scrollHeight even while the
+    // CSS animates max-height open; clamp to the cap, add the collapsed row.
+    target = PILL_COLLAPSED_H + Math.min(view.expand.scrollHeight, PILL_EXPAND_CAP);
+  }
+  if (target === view.lastWindowH) return;
+  view.lastWindowH = target;
+  void invoke("set_pill_height", { height: target }).catch((e: unknown) =>
+    vmxLog("[vmx:error]", "set_pill_height failed", { error: String(e) }),
+  );
 }
 
 function syncCitationStrip(view: PillView, chips: CitationChip[]): void {
@@ -450,6 +491,8 @@ function boot(): void {
     lastDeckKey: "",
     lastNextKey: "",
     lastPeekKey: "",
+    lastWindowHKey: "",
+    lastWindowH: PILL_COLLAPSED_H,
   };
 
   let state = initialPillState(performance.now());
