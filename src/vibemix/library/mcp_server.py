@@ -104,7 +104,9 @@ def build_toolset() -> Any:
         )
     embedder = build_embedder(client)
     store = open_store()
-    return LibraryToolset(embedder, store, library)
+    # Pass the raw client too — the capability tools (ingest_youtube) reason
+    # directly through it, not via the embedder.
+    return LibraryToolset(embedder, store, library, client=client)
 
 
 def build_server(toolset: Any) -> Any:
@@ -197,6 +199,89 @@ def build_server(toolset: Any) -> Any:
         result. Call once when the DJ accepts a set."""
         return toolset.export_set(
             {"name": name, "track_ids": track_ids, "out_path": out_path}
+        )
+
+    # -- DJ-knowledge / media capability tools (grounding identical above) -- #
+
+    @mcp.tool()
+    def web_search(query: str, k: int = 5) -> dict[str, Any]:
+        """Web-search for DJ knowledge the library can't supply (track/label/
+        artist facts, releases, scene context). Returns real {title, url,
+        snippet, score} hits. Needs TAVILY_API_KEY. Cite the url — never present
+        a snippet as established fact without it."""
+        return toolset.web_search({"query": query, "k": k})
+
+    @mcp.tool()
+    def fetch_url(url: str) -> dict[str, Any]:
+        """Fetch one page's readable text (a url from a prior web_search).
+        Returns {url, title, text}. http(s) only. Read sources you cite —
+        never invent page contents."""
+        return toolset.fetch_url({"url": url})
+
+    @mcp.tool()
+    def ingest_youtube(url: str, prompt: str | None = None) -> dict[str, Any]:
+        """Listen to a YouTube track/mix via Gemini (no download, deep-link).
+        Returns genre/energy/mood/structure. Timestamps are HINTS only —
+        resolve precise cut points locally, never from the summary."""
+        return toolset.ingest_youtube({"url": url, "prompt": prompt})
+
+    @mcp.tool()
+    def quote_moment(
+        track_id: str,
+        start_s: float,
+        end_s: float,
+        label: str | None = None,
+        caption: str | None = None,
+    ) -> dict[str, Any]:
+        """Point at a specific moment in a library track ("this is the breakdown
+        I'm talking about") with a grounded, resolvable [start,end] reference.
+        track_id must come from a prior search_vibe/discover_pool result."""
+        return toolset.quote_moment(
+            {
+                "track_id": track_id,
+                "start_s": start_s,
+                "end_s": end_s,
+                "label": label,
+                "caption": caption,
+            }
+        )
+
+    @mcp.tool()
+    def retrieve_dj_knowledge(
+        query: str,
+        topic: str | None = None,
+        skill_level: str | None = None,
+        k: int = 4,
+    ) -> dict[str, Any]:
+        """Ground a DJ-technique answer with cited, link-out knowledge-base
+        snippets (EQ-ing, phrasing, harmonic mixing). Never invent technique
+        facts — honest empty when the knowledge base has no match."""
+        return toolset.retrieve_dj_knowledge(
+            {"query": query, "topic": topic, "skill_level": skill_level, "k": k}
+        )
+
+    @mcp.tool()
+    def export_cues(
+        track_path: str,
+        cues: list[dict[str, Any]],
+        out_path: str | None = None,
+        title: str | None = None,
+        artist: str | None = None,
+        bpm: float | None = None,
+    ) -> dict[str, Any]:
+        """Write AI-placed structural hot cues (from the auto-cue engine) back
+        to a Rekordbox-importable XML (non-destructive — the DJ imports it).
+        ``cues`` is a serialized CueAnchor list: dicts with
+        label/start_s/end_s/confidence/source."""
+        return toolset.export_cues(
+            {
+                "track_path": track_path,
+                "cues": cues,
+                "out_path": out_path,
+                "title": title,
+                "artist": artist,
+                "bpm": bpm,
+            }
         )
 
     return mcp

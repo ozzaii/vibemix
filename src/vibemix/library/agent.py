@@ -379,6 +379,44 @@ def _set_prep_declarations() -> list[types.FunctionDeclaration]:
                 required=["name", "track_ids"],
             ),
         ),
+        types.FunctionDeclaration(
+            name="export_cues",
+            description=(
+                "Write AI-placed structural hot cues (intro/build/breakdown/"
+                "drop/outro, from the auto-cue engine) back to a Rekordbox-"
+                "importable XML for one track. Non-destructive: the DJ imports "
+                "the produced tree. 'cues' is a serialized CueAnchor list."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "track_path": types.Schema(type=types.Type.STRING),
+                    "cues": types.Schema(
+                        type=types.Type.ARRAY,
+                        items=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "label": types.Schema(type=types.Type.STRING),
+                                "start_s": types.Schema(type=types.Type.NUMBER),
+                                "end_s": types.Schema(type=types.Type.NUMBER),
+                                "confidence": types.Schema(type=types.Type.NUMBER),
+                                "source": types.Schema(type=types.Type.STRING),
+                            },
+                            required=["label", "start_s"],
+                        ),
+                        description="serialized CueAnchor list from the auto-cue engine",
+                    ),
+                    "out_path": types.Schema(
+                        type=types.Type.STRING,
+                        description="optional XML destination path",
+                    ),
+                    "title": types.Schema(type=types.Type.STRING),
+                    "artist": types.Schema(type=types.Type.STRING),
+                    "bpm": types.Schema(type=types.Type.NUMBER),
+                },
+                required=["track_path", "cues"],
+            ),
+        ),
     ]
 
 
@@ -443,6 +481,138 @@ def _tool_declarations(
                 required=["name", "track_ids"],
             ),
         ),
+        types.FunctionDeclaration(
+            name="web_search",
+            description=(
+                "Web-search for DJ knowledge the user's library can't supply "
+                "(track/label/artist facts, releases, scene context). Returns "
+                "real {title, url, snippet, score} hits. Cite the url — never "
+                "state a snippet as fact without its source."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "query": types.Schema(
+                        type=types.Type.STRING,
+                        description="natural-language web query",
+                    ),
+                    "k": types.Schema(
+                        type=types.Type.INTEGER,
+                        description="number of results (1-10)",
+                    ),
+                },
+                required=["query"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="fetch_url",
+            description=(
+                "Fetch one web page's readable text — pass a url returned by a "
+                "prior web_search. Returns {url, title, text}. http(s) only. "
+                "Read sources you cite; never invent page contents."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "url": types.Schema(
+                        type=types.Type.STRING,
+                        description="http(s) url from a web_search result",
+                    ),
+                },
+                required=["url"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="ingest_youtube",
+            description=(
+                "Listen to a YouTube track or mix and get a coarse description "
+                "(genre, energy, mood, structure: intro/build/drop/breakdown/"
+                "outro, notable moments). Deep-link only — nothing is "
+                "downloaded. Any timestamps in the summary are APPROXIMATE "
+                "HINTS, not precise cut points."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "url": types.Schema(
+                        type=types.Type.STRING,
+                        description="A YouTube watch / youtu.be / shorts URL.",
+                    ),
+                    "prompt": types.Schema(
+                        type=types.Type.STRING,
+                        description="Optional custom question about the track.",
+                    ),
+                },
+                required=["url"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="quote_moment",
+            description=(
+                "Point at a specific moment inside a library track with a "
+                "grounded, resolvable reference (e.g. 'this is the breakdown I'm "
+                "talking about'). Returns a quote with a [start_s, end_s] window "
+                "and a human caption. track_id MUST be an id returned by a prior "
+                "search_vibe/discover_pool result this run — never invent one."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "track_id": types.Schema(
+                        type=types.Type.STRING,
+                        description="A track_id from a prior search result.",
+                    ),
+                    "start_s": types.Schema(
+                        type=types.Type.NUMBER,
+                        description="Window start in seconds (>= 0).",
+                    ),
+                    "end_s": types.Schema(
+                        type=types.Type.NUMBER,
+                        description="Window end in seconds (> start_s).",
+                    ),
+                    "label": types.Schema(
+                        type=types.Type.STRING,
+                        description="Optional: intro|build|breakdown|drop|outro.",
+                    ),
+                    "caption": types.Schema(
+                        type=types.Type.STRING,
+                        description="Optional caption; auto-synthesized when omitted.",
+                    ),
+                },
+                required=["track_id", "start_s", "end_s"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="retrieve_dj_knowledge",
+            description=(
+                "Retrieve grounded DJ-technique knowledge (EQ-ing, phrasing, "
+                "harmonic mixing, gain staging) with attributed link-out "
+                "citations. Use for the TUTOR lens to ground technique answers; "
+                "never invent technique facts."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "query": types.Schema(
+                        type=types.Type.STRING,
+                        description="The technique question.",
+                    ),
+                    "topic": types.Schema(
+                        type=types.Type.STRING,
+                        description="Optional topic filter, e.g. 'eq', 'phrasing'.",
+                    ),
+                    "skill_level": types.Schema(
+                        type=types.Type.STRING,
+                        description="Optional: beginner | intermediate | pro.",
+                    ),
+                    "k": types.Schema(
+                        type=types.Type.INTEGER,
+                        description="Number of results, 1-10 (default 4).",
+                    ),
+                },
+                required=["query"],
+            ),
+        ),
     ]
     if interactive:
         # Conversational mode only: let the agent ask the DJ short clarifying
@@ -496,7 +666,9 @@ class ViberAgent:
         self._model = model or model_router.resolve("library_agent")[0]
         # The grounded tool core (handlers + seen-set gate + per-tool timeout),
         # shared verbatim with the Codex MCP server so grounding never drifts.
-        self._toolset = LibraryToolset(embedder, store, library)
+        # The raw client is threaded in so capability tools (ingest_youtube) can
+        # reason directly through Gemini.
+        self._toolset = LibraryToolset(embedder, store, library, client=client)
 
     # -- grounding state lives on the shared toolset ------------------------ #
 

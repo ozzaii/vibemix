@@ -69,10 +69,19 @@ class LibraryToolset:
         embedder: LibraryEmbedder,
         store: LibraryStore,
         library: RekordboxLibrary,
+        *,
+        client: Any | None = None,
     ) -> None:
         self._embedder = embedder
         self._store = store
         self._library = library
+        # The Gemini client (DI, same one the embedder wraps) — needed by the
+        # capability tools that reason directly (ingest_youtube). Optional: the
+        # tools degrade to an honest error when it is absent.
+        self._client = client
+        # Lazily-loaded DJ-knowledge RAG store (retrieve_dj_knowledge). Built on
+        # first use from disk; honest empty-results when no KB is present.
+        self._knowledge_store: Any | None = None
         # The grounding spine: ids any search_vibe returned THIS run.
         self.seen: set[str] = set()
         self.created: PlaylistResult | None = None
@@ -214,6 +223,36 @@ class LibraryToolset:
             "json_path": str(result.json_path),
             "dropped_ids": result.dropped_ids,
         }
+
+    # -- web research tools (grounded external lookup; module is dep-injected) #
+
+    def web_search(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Web-search for DJ knowledge the library can't supply (track/label/
+        artist facts, releases, scene context). Returns {results:[{title, url,
+        snippet, score}], query}. Needs TAVILY_API_KEY; honest error if absent.
+        Every result carries a url — cite it, never paraphrase it as fact."""
+        from vibemix.library import web_research
+
+        query = args.get("query")
+        if not isinstance(query, str) or not query.strip():
+            return {"error": "web_search: 'query' must be a non-empty string"}
+        k = args.get("k", 5)
+        try:
+            k = int(k)
+        except (TypeError, ValueError):
+            k = 5
+        return web_research.web_search(query, k=k)
+
+    def fetch_url(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Fetch one web page's readable text (from a prior web_search url).
+        Returns {url, title, text}. http(s) only; honest error otherwise. Use to
+        read a source you cited — never invent page contents."""
+        from vibemix.library import web_research
+
+        url = args.get("url")
+        if not isinstance(url, str) or not url:
+            return {"error": "fetch_url: 'url' must be a string"}
+        return web_research.fetch_url(url)
 
     # -- set-prep tools (Vibe Mix engine; lazy-import the engine modules) ---- #
 
@@ -492,6 +531,131 @@ class LibraryToolset:
             "dropped": result.dropped,
         }
 
+    # -- DJ-knowledge / media capability tools (grounded; lazy modules) ----- #
+
+    def ingest_youtube(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Summarize a YouTube track/mix via Gemini native video (no download).
+
+        Deep-link posture: nothing is downloaded; Gemini ingests the URL.
+        Returns a coarse genre/energy/mood/structure summary. Reported
+        timestamps are HINTS only (see ``note``) — never precise cut points.
+        Needs the toolset's Gemini client; honest error when it is absent.
+        """
+        url = args.get("url")
+        if not isinstance(url, str) or not url.strip():
+            return {"error": "ingest_youtube: 'url' must be a non-empty string"}
+        prompt = args.get("prompt")
+        prompt = prompt if isinstance(prompt, str) and prompt.strip() else None
+        try:
+            from vibemix.library.youtube_ingest import ingest_youtube
+
+            return ingest_youtube(url, prompt, client=self._client)
+        except Exception as e:  # noqa: BLE001 — handler must not raise
+            logger.warning("[viber] ingest_youtube failed: %s", e)
+            return {"error": f"ingest_youtube failed: {type(e).__name__}"}
+
+    def quote_moment(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Point at a specific [start,end] moment inside a grounded track.
+
+        GATE (invariant #2): track_id MUST be in ``seen`` (returned by a prior
+        search_vibe/discover_pool this run) and MUST resolve in the live library
+        — quote_moment threads ``self.seen`` so an invented id is rejected
+        before a quote is ever built. Metadata only (no audio decode).
+        """
+        track_id = args.get("track_id")
+        if not isinstance(track_id, str) or not track_id:
+            return {"available": False, "error": "quote_moment: 'track_id' must be a string"}
+        try:
+            start_s = float(args.get("start_s"))
+            end_s = float(args.get("end_s"))
+        except (TypeError, ValueError):
+            return {"available": False, "error": "quote_moment: start_s/end_s must be numbers"}
+        label = args.get("label")
+        label = label if isinstance(label, str) and label else None
+        caption = args.get("caption")
+        caption = caption if isinstance(caption, str) and caption.strip() else None
+        from vibemix.library.quote_moment import resolve_quote
+
+        return resolve_quote(
+            self._library, track_id, start_s, end_s,
+            label=label, caption=caption, seen=self.seen,
+        )
+
+    def retrieve_dj_knowledge(self, args: dict[str, Any]) -> dict[str, Any]:
+        """TUTOR-lens grounding over the DJ-knowledge text store (link-out
+        citations). Honest empty-results when no KB is on disk — never invents
+        technique facts."""
+        from vibemix.library.dj_knowledge import (
+            DEFAULT_KNOWLEDGE_DIR,
+            KnowledgeStore,
+            retrieve_dj_knowledge as _retrieve,
+        )
+
+        query = args.get("query")
+        if not isinstance(query, str) or not query.strip():
+            return {"error": "retrieve_dj_knowledge: 'query' must be a non-empty string"}
+        if self._knowledge_store is None:
+            self._knowledge_store = KnowledgeStore.load(
+                DEFAULT_KNOWLEDGE_DIR / "dj_knowledge"
+            )
+        k = args.get("k", 4)
+        return _retrieve(
+            self._knowledge_store,
+            query,
+            embedder=self._embedder,
+            topic=args.get("topic"),
+            skill_level=args.get("skill_level"),
+            k=k if isinstance(k, int) else 4,
+        )
+
+    def export_cues(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Write AI-placed structural cues (from the auto-cue engine) to a
+        Rekordbox-importable XML. ``cues`` is a serialized CueAnchor list
+        (dicts: label/start_s/end_s/confidence/source); we rebuild CueAnchors
+        and hand them to cue_export (non-destructive round-trip)."""
+        track_path = args.get("track_path")
+        if not (isinstance(track_path, str) and track_path.strip()):
+            return {"error": "export_cues: 'track_path' must be a non-empty string"}
+        raw = args.get("cues")
+        if not isinstance(raw, list) or not raw:
+            return {"error": "export_cues: 'cues' must be a non-empty list"}
+        try:
+            from vibemix.library import cue_export
+            from vibemix.library.cue_types import CueAnchor
+
+            cues = [
+                CueAnchor(
+                    label=c["label"],
+                    start_s=float(c["start_s"]),
+                    end_s=float(c.get("end_s") or 0.0),
+                    confidence=float(c.get("confidence") or 0.0),
+                    source=c.get("source") or "auto",
+                )
+                for c in raw
+                if isinstance(c, dict) and c.get("label")
+            ]
+            if not cues:
+                return {"error": "export_cues: no valid cues after parse"}
+            out_path = args.get("out_path")
+            if not (isinstance(out_path, str) and out_path.strip()):
+                from pathlib import Path as _Path
+
+                out_path = str(
+                    _Path.home() / ".cache" / "vibemix" / "cues"
+                    / (_Path(track_path).stem + ".xml")
+                )
+            return cue_export.export_cues(
+                track_path,
+                cues,
+                out_path,
+                title=args.get("title"),
+                artist=args.get("artist"),
+                bpm=args.get("bpm"),
+            )
+        except Exception as e:  # noqa: BLE001 — handler must not raise
+            logger.warning("[viber] export_cues failed: %s", e)
+            return {"error": f"export_cues failed: {type(e).__name__}"}
+
     # -- dispatch (hard per-tool timeout; never raises) --------------------- #
 
     def dispatch(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -503,6 +667,12 @@ class LibraryToolset:
             "discover_pool": self.discover_pool,
             "sequence_set": self.sequence_set,
             "export_set": self.export_set,
+            "web_search": self.web_search,
+            "fetch_url": self.fetch_url,
+            "ingest_youtube": self.ingest_youtube,
+            "quote_moment": self.quote_moment,
+            "retrieve_dj_knowledge": self.retrieve_dj_knowledge,
+            "export_cues": self.export_cues,
         }
         handler = handlers.get(name)
         if handler is None:
