@@ -93,42 +93,30 @@ _CACHE_LOCK = threading.Lock()
 
 
 def _shared_lens() -> str:
-    """Read the ONE shared lens (LENS-02), defaulting to ``"tutor"`` when unset.
+    """Read the ONE shared lens (LENS-02) — delegates to the shared seam.
 
-    Same per-surface default-when-unset as the gemini curator seam — the codex
-    backend reads the SAME ``ConfigStore.extra["lens"]`` selection, so choosing a
-    lens once drives every curator backend AND the live co-host. Lazy-imported to
-    keep the import-time no-live-path boundary clean.
-
-    WR-03: guarded read (mirrors the gemini curator seam + the co-host
-    ``_resolve_prompt_cell`` guard). Any read failure falls back to ``"tutor"``
-    so a malformed ``extra`` can never break curation.
+    IN-01: the codex backend reads the lens through the SAME
+    ``library._curator_seams.shared_lens`` the gemini backend uses, so the two
+    can never diverge. Lazy-imported to keep the import-time no-live-path
+    boundary clean.
     """
-    try:
-        from vibemix.runtime.config_store import load_config
-        from vibemix.runtime.settings import read_shared_lens
+    from vibemix.library._curator_seams import shared_lens
 
-        return read_shared_lens(load_config(), default="tutor") or "tutor"
-    except Exception:  # pragma: no cover — guard: any read fail = cold default
-        return "tutor"
+    return shared_lens()
 
 
 def _taste_hint() -> str:
-    """SEAM #2 (CURATE-02) — codex twin of the gemini ``_taste_hint``.
+    """SEAM #2 (CURATE-02) taste hint — delegates to the shared seam.
 
-    Same lazy+guarded shape as ``_shared_lens``: lazy-import the shared
-    ``profile/`` reader INSIDE the function and guard with ``except Exception:
-    return ""``. ``render_profile_for_cache(load_profile())`` is ``""`` when the
-    profile is None / consent-OFF → byte-identical cold path. Only the 5
-    allowlisted fields cross — NO track titles / free-form (T-82-01). The codex
-    backend MUST get this too or it is orphaned (the CURATE acid test).
+    IN-01 + WR-01: the codex backend calls the SAME consent-gated
+    ``library._curator_seams.taste_hint`` as the gemini backend, so the consent
+    contract is single-sourced and the codex twin can never be orphaned (the
+    CURATE acid test). Returns ``""`` when consent is OFF or the profile is
+    absent → byte-identical cold path even with a stale ``profile.json``.
     """
-    try:
-        from vibemix.profile import load_profile, render_profile_for_cache
+    from vibemix.library._curator_seams import taste_hint
 
-        return render_profile_for_cache(load_profile())  # "" when None/consent-OFF
-    except Exception:  # pragma: no cover — guard: any read fail = cold default
-        return ""
+    return taste_hint()
 
 
 def _system_prompt() -> str:

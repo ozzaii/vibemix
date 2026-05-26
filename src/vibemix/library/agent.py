@@ -112,49 +112,30 @@ _CACHE_LOCK = threading.Lock()
 
 
 def _shared_lens() -> str:
-    """Read the ONE shared lens (LENS-02), defaulting to ``"tutor"`` when unset.
+    """Read the ONE shared lens (LENS-02) — delegates to the shared seam.
 
-    Per-surface default-when-unset: the curator cold path is byte-identical to
-    the ``build_curator_instruction("tutor")`` it shipped with. When the user
-    sets a lens once (via the settings bus ``_apply_lens``), that SAME value
-    drives both the curator and the live co-host. Lazy-imported so the seam
-    keeps the import-time no-live-path boundary clean (matrix-seam pattern).
-
-    WR-03: the read is guarded (mirrors the co-host ``_resolve_prompt_cell``
-    guard). ``load_config`` already swallows OSError/JSONDecodeError, but any
-    OTHER read failure must NOT break curation — fall back to the ``"tutor"``
-    cold-path default on any exception so the curator seam degrades gracefully.
+    IN-01: the lens read is single-sourced in ``library._curator_seams`` so the
+    gemini and codex backends can never diverge. Lazy-imported so importing this
+    module does not drag the seam's runtime readers into ``sys.modules`` at
+    import time (no-live-path boundary).
     """
-    try:
-        from vibemix.runtime.config_store import load_config
-        from vibemix.runtime.settings import read_shared_lens
+    from vibemix.library._curator_seams import shared_lens
 
-        return read_shared_lens(load_config(), default="tutor") or "tutor"
-    except Exception:  # pragma: no cover — guard: any read fail = cold default
-        return "tutor"
+    return shared_lens()
 
 
 def _taste_hint() -> str:
-    """SEAM #2 (CURATE-02): compact, privacy-safe taste hint biasing curation
-    'for this DJ'.
+    """SEAM #2 (CURATE-02) taste hint — delegates to the shared seam.
 
-    Mirrors the ``_shared_lens`` lazy+guarded seam exactly: lazy-import the
-    shared ``profile/`` reader INSIDE the function (Pattern 1 — keeps the
-    import-time no-live-path boundary clean) and guard with a bare
-    ``except Exception: return ""``. ``render_profile_for_cache(load_profile())``
-    returns ``""`` when the profile is None / consent-OFF (default OFF) → the
-    cold path is byte-identical to today. Only the 5 allowlisted fields cross —
-    NO track titles / free-form (T-82-01; the renderer enforces it).
-
-    Recomputed per call (NOT cached behind the lens key) so a profile change is
-    reflected without a lens-keyed cache miss; the render is cheap.
+    IN-01 + WR-01: the consent-gated profile read is single-sourced in
+    ``library._curator_seams.taste_hint`` so the consent contract lands in BOTH
+    backends from one place (the codex twin calls the same helper). Returns
+    ``""`` when consent is OFF or the profile is absent → cold-path byte-identity
+    holds even when a stale ``profile.json`` outlives a consent toggle-OFF.
     """
-    try:
-        from vibemix.profile import load_profile, render_profile_for_cache
+    from vibemix.library._curator_seams import taste_hint
 
-        return render_profile_for_cache(load_profile())  # "" when None/consent-OFF
-    except Exception:  # pragma: no cover — guard: any read fail = cold default
-        return ""
+    return taste_hint()
 
 
 def _system_instruction() -> str:

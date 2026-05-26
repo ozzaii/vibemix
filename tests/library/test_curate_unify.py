@@ -65,16 +65,21 @@ def _reset_codex_caches() -> None:
     codex_mod._SYSTEM_PROMPT_LENS = None
 
 
-def _patch_profile(monkeypatch, profile) -> None:
-    """Point BOTH backends' lazy ``load_profile`` import at a fixed profile.
+def _patch_profile(monkeypatch, profile, *, consent: bool = True) -> None:
+    """Point BOTH backends' lazy ``load_profile``/``load_consent`` at fixtures.
 
-    The seam lazy-imports ``from vibemix.profile import load_profile, ...``
-    inside ``_taste_hint`` (Pattern 1), so we patch the source module attribute
-    that the lazy import resolves to.
+    The shared seam (``library._curator_seams.taste_hint``) lazy-imports
+    ``from vibemix.profile import load_consent, load_profile, ...`` (Pattern 1),
+    so we patch the source module attributes the lazy import resolves to.
+
+    WR-01: the seam now gates the profile read on consent. ``consent`` defaults
+    to ``True`` so the existing "taste present" pins exercise the populated
+    path; the consent-gate pin passes ``consent=False`` to prove the gate.
     """
     import vibemix.profile as profile_mod
 
     monkeypatch.setattr(profile_mod, "load_profile", lambda: profile, raising=True)
+    monkeypatch.setattr(profile_mod, "load_consent", lambda: consent, raising=True)
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +141,52 @@ def test_curator_taste_cold_path_identical_when_no_profile(tmp_path, monkeypatch
         )
     finally:
         _reset_gemini_caches()
+
+
+# ---------------------------------------------------------------------------
+# (b2) WR-01 consent gate — a stale profile.json never crosses when consent OFF
+# ---------------------------------------------------------------------------
+
+
+def test_curator_taste_gated_off_when_consent_off(tmp_path, monkeypatch) -> None:
+    """WR-01: with a populated profile on disk but consent OFF, the curator
+    instruction is byte-identical to the cold path — NO taste hint crosses.
+
+    The consent gate is the priority of the privacy contract: ``load_profile()``
+    only checks the file exists, so a ``profile.json`` outliving a consent
+    toggle-OFF must NOT feed the curator. The shared seam returns ``""`` when
+    ``load_consent()`` is False, restoring cold-path byte-identity (and the
+    preferred_genre token must be absent) even though a profile exists.
+    """
+    import vibemix.runtime.config_store as cs_mod
+    from vibemix.prompts.matrix import build_curator_instruction
+
+    target = tmp_path / "config.json"
+    monkeypatch.setattr(cs_mod, "config_path", lambda: target)
+    # A real, populated profile EXISTS on disk — but consent is OFF.
+    _patch_profile(monkeypatch, _PROFILE, consent=False)
+
+    _reset_gemini_caches()
+    _reset_codex_caches()
+    try:
+        voice = agent_mod._system_instruction()
+        expected = build_curator_instruction("tutor") + "\n" + agent_mod._RULES_BLOCK
+        assert voice == expected, (
+            "WR-01: consent-OFF must gate the profile read — the gemini curator "
+            "cold path must be byte-identical even with a profile.json on disk"
+        )
+        assert _PROFILE_GENRE not in voice, (
+            "WR-01: the preferred_genre taste token must NOT cross when consent OFF"
+        )
+        # The codex backend shares the SAME gated seam — also cold-path identical.
+        prompt = codex_mod._system_prompt()
+        assert _PROFILE_GENRE not in prompt, (
+            "WR-01: the codex curator must also gate the taste hint on consent "
+            "(shared seam — neither backend orphaned)"
+        )
+    finally:
+        _reset_gemini_caches()
+        _reset_codex_caches()
 
 
 # ---------------------------------------------------------------------------
