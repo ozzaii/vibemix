@@ -13,14 +13,12 @@ Three pure, deterministic scorers over a recorded cell:
   a flat line. Deterministic.
 
 The auto-score RANKS; it does NOT decide (Pitfall 5 — Kaan's ear is the verdict).
-Each assertion is ``xfail(strict=True)`` until Plan 03 lands ``vibemix.bench.eval``.
+Plan 03 landed ``vibemix.bench.eval``, flipping these scaffolds to real-green.
 The grounded/fabricated contract is pre-verified against the REAL linter in
-conftest's snapshot builders, so these flip to real-green when the scorers ship.
+conftest's snapshot builders.
 """
 
 from __future__ import annotations
-
-import pytest
 
 from tests.bench.conftest import _grounded_snapshot
 
@@ -31,7 +29,6 @@ def _result(output: str, snapshot):
     return {"output": output, "dsp_snapshot": snapshot}
 
 
-@pytest.mark.xfail(strict=True, reason="bench/eval.groundedness lands in Plan 03")
 def test_groundedness() -> None:
     """A cell citing an atom PRESENT in its snapshot scores high; a fabricated
     [aud:...] absent from the snapshot scores 0 — via CitationLinter (debrief)."""
@@ -45,7 +42,6 @@ def test_groundedness() -> None:
     assert fabricated == 0.0
 
 
-@pytest.mark.xfail(strict=True, reason="bench/eval.specificity lands in Plan 03")
 def test_specificity() -> None:
     """Specificity penalizes a NEGATIVE_PHRASES hit and rewards a concrete
     measure (128 bpm) — deterministic, no API."""
@@ -56,7 +52,6 @@ def test_specificity() -> None:
     assert concrete > sloppy
 
 
-@pytest.mark.xfail(strict=True, reason="bench/eval.lens_fidelity lands in Plan 03")
 def test_lens_fidelity() -> None:
     """Lens-fidelity scores a hype-vocab line higher under lens='hype' than a
     flat, vocabulary-less line."""
@@ -67,7 +62,6 @@ def test_lens_fidelity() -> None:
     assert hype_line > flat_line
 
 
-@pytest.mark.xfail(strict=True, reason="bench/eval.score_cell lands in Plan 03")
 def test_score_cell_ranks_not_decides() -> None:
     """score_cell returns a CellScore with the three dimensions — a RANKING
     signal, never a verdict (no 'winner'/'decision' field)."""

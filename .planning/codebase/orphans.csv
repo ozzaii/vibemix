@@ -4,6 +4,7 @@ VoiceWavMeta,src/vibemix/debrief/session_loader.py,class
 resolve_track_path,src/vibemix/bench/run.py,function
 fixture_snapshot_for,src/vibemix/bench/run.py,function
 results_to_json,src/vibemix/bench/run.py,function
+rank_cells,src/vibemix/bench/eval.py,function
 OutboundEndpoint,src/vibemix/runtime/sec_check.py,class
 build_toolset,src/vibemix/library/mcp_server.py,function
 build_server,src/vibemix/library/mcp_server.py,function
