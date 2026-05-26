@@ -84,9 +84,13 @@ class BenchResult:
     aborted — RESEARCH Pitfall 2).
     """
 
-    cell: BenchCell
     prompt: str
     output: str
     dsp_snapshot: dict[str, dict[str, tuple[float, ...]]] | None
+    # The 6-D coordinate this output was recorded against. Optional so a parked
+    # / fixture result can be rendered without a synthetic cell — the live
+    # runner always populates it; the review surface renders the coordinates row
+    # only when ``cell is not None``.
+    cell: BenchCell | None = None
     usage: dict = field(default_factory=dict)
     error: str | None = None

@@ -8,15 +8,13 @@ section is present but EMPTY — no code path writes a winner. Kaan's ear fills 
 An errored cell renders as ``ERRORED — parked``, never as fake output
 (81-RESEARCH Security: the fabricated-cell-filling-a-gap cardinal sin).
 
-Each assertion is ``xfail(strict=True)`` until Plan 04 lands ``vibemix.bench.review``.
+These were ``xfail(strict=True)`` scaffolds from Plan 01; Plan 04 lands
+``vibemix.bench.review`` and flips them to real-green.
 """
 
 from __future__ import annotations
 
-import pytest
 
-
-@pytest.mark.xfail(strict=True, reason="bench/review.render_review lands in Plan 04")
 def test_verdict_section_present_but_empty() -> None:
     """The VERDICT section exists with the 'Kaan fills this' placeholder and NO
     winner/verdict line — the auto-rank is a sort, not a decision."""
@@ -31,7 +29,6 @@ def test_verdict_section_present_but_empty() -> None:
     assert "the winner is" not in lowered
 
 
-@pytest.mark.xfail(strict=True, reason="bench/review render lands in Plan 04")
 def test_errored_cell_renders_as_parked() -> None:
     """An errored cell renders as 'ERRORED — parked', never as fabricated output."""
     from vibemix.bench.cell import BenchResult
@@ -49,7 +46,6 @@ def test_errored_cell_renders_as_parked() -> None:
     assert "ERRORED" in md and "parked" in md
 
 
-@pytest.mark.xfail(strict=True, reason="bench/review ranking lands in Plan 04")
 def test_render_ranks_and_groups() -> None:
     """The render produces Markdown that ranks cells by auto-score and groups
     by study/dimension (a non-empty, structured surface)."""
