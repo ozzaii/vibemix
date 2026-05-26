@@ -27,10 +27,21 @@
 > - **`grounding.py`** routes the "what's playing" embed through the public
 >   `embedder.embed_audio_bytes` seam — no more `embedder._client` reach-in (CLAP
 >   has no `_client`); `LibraryEmbedder.embed_audio_bytes` added to match.
-> - **Gate PASSED through the real shipped module** (`ClapEngine(backend="onnx")`,
->   20 tracks): dim 512, determinism cos=1.000000, text spread 0.274,
->   "hard techno"→{hardtechno:10}, "psy trance"→{psymind:9} — matches the proven
->   baseline. Wiring tests: `tests/library/test_embed_clap.py` (CI-safe, fake engine).
+> - **Mel frontend is torch-FREE.** transformers 5.9's `ClapFeatureExtractor`
+>   class top-level-imports torch, which would defeat the whole "drop torch"
+>   rationale. Instead the ONNX audio path replicates CLAP's
+>   `_np_extract_fbank_features` exactly via `transformers.audio_utils`
+>   (`mel_filter_bank` + `spectrogram` + `window_function`) — the same numpy
+>   primitives ClapFeatureExtractor uses internally, but importable without torch.
+>   For a 10s `rand_trunc` segment CLAP uses the **Slaney** filterbank
+>   (`norm="slaney"`, `mel_scale="slaney"`), Hann window, frame 1024 / hop 480,
+>   power 2.0, `log_mel="dB"`. A first hand-rolled librosa mel (htk/norm=None)
+>   degraded separation (techno 6/10) — the Slaney/audio_utils path is the fix.
+> - **Gate PASSED, torch absent** (`ClapEngine(backend="onnx")`, real shipped
+>   module, 40 tracks 20+20, isolated cache): dim 512, determinism cos=1.000000,
+>   "hard techno"→{hardtechno:10/10}, "psy trance"→{psymind:10/10} — matches the
+>   proven baseline with `torch` not installed. Wiring tests:
+>   `tests/library/test_embed_clap.py` (CI-safe, fake engine).
 
 ## What it is
 
@@ -136,9 +147,12 @@ still "work" but rank differently, and nobody would see an error.
 on-device + ONNX, just exported from the trusted weights instead of swapping to
 `larger_clap_music`.
 
-**Until this gate passes**, the `onnx` backend in `clap_engine.py` is a
-`NotImplementedError` stub (it points back at this section). The `torch` backend
-is the only one that returns a real vector today.
+**This gate PASSED (Phase 90, 2026-05-26)** — the resolved ship path used the
+pre-exported `Xenova/larger_clap_music_and_speech` ONNX (not a custom export) +
+the torch-free `audio_utils` Slaney mel (see the banner). The real shipped
+`onnx` backend reproduces the proven genre separation (techno 10/10, psy 10/10)
+with `torch` absent. The `torch` backend (laion_clap) remains as the reference
+the ONNX path was validated against.
 
 ## Future wiring change-map
 

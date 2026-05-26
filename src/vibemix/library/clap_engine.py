@@ -91,6 +91,23 @@ _ONNX_TEXT_REL = "onnx/text_model.onnx"
 # Non-fusion Xenova mel is 10s @ 48k; one 10s segment per ONNX forward (batch=1
 # model). Non-overlapping slices match the validated parity run (techno+psy 100%).
 _ONNX_TEXT_MAXLEN = 77  # CLAP text is trained/used at length 77
+# Log-mel frontend (Xenova ClapFeatureExtractor config). Computed via
+# transformers.audio_utils (mel_filter_bank/spectrogram/window_function) — the
+# EXACT numpy primitives ClapFeatureExtractor uses internally, but torch-FREE
+# (the whole point of the swap: transformers' ClapFeatureExtractor class does a
+# top-level `import torch`; audio_utils does not). A hand-rolled librosa mel was
+# tried first and DEGRADED genre separation (techno 6/10 vs 10/10) — librosa's
+# default Slaney filterbank + windowing don't match HF byte-for-byte. The fix is
+# to replicate CLAP's `_np_extract_fbank_features` exactly: for a 10s rand_trunc
+# segment CLAP uses `mel_filters_slaney` (norm="slaney", mel_scale="slaney"),
+# Hann window, frame 1024 / hop 480, power 2.0, log_mel="dB". Shape fed to the
+# audio ONNX: (1, 1, n_frames=1001, _ONNX_N_MELS=64).
+_ONNX_N_FFT = 1024
+_ONNX_HOP = 480
+_ONNX_N_MELS = 64
+_ONNX_FMIN = 50
+_ONNX_FMAX = 14000
+_ONNX_NB_FREQ_BINS = (_ONNX_N_FFT >> 1) + 1  # 513
 
 # MIME suffix mapping for the bytes path (mirrors embed._mime_for_path's idea,
 # inverted: mime → tempfile suffix). Default .mp3.
@@ -262,7 +279,7 @@ class ClapEngine:
         error (NOT a wrong vector) when the model files are absent.
         """
         import onnxruntime as ort  # lazy — ship dep
-        from transformers import ClapFeatureExtractor, RobertaTokenizer  # lazy
+        from transformers import RobertaTokenizer  # lazy (tokenizer is torch-free)
 
         mdir = Path(os.environ.get(_ENV_ONNX_DIR) or _DEFAULT_ONNX_DIR)
         audio_path = mdir / _ONNX_AUDIO_REL
@@ -270,13 +287,26 @@ class ClapEngine:
         if not audio_path.exists() or not text_path.exists():
             raise FileNotFoundError(
                 f"ClapEngine onnx backend: model files not found under {mdir}. "
-                f"Expected {_ONNX_AUDIO_REL} + {_ONNX_TEXT_REL} (+ preprocessor/"
-                f"tokenizer config). Download Xenova/larger_clap_music_and_speech "
+                f"Expected {_ONNX_AUDIO_REL} + {_ONNX_TEXT_REL} (+ tokenizer "
+                f"config). Download Xenova/larger_clap_music_and_speech "
                 f"or set {_ENV_ONNX_DIR}."
             )
 
-        feat = ClapFeatureExtractor.from_pretrained(str(mdir))
         tok = RobertaTokenizer.from_pretrained(str(mdir))
+        # CLAP's Slaney mel filterbank (norm="slaney", mel_scale="slaney") — the
+        # filter `_np_extract_fbank_features` uses for a 10s rand_trunc segment.
+        # Built via transformers.audio_utils (torch-free) so it is byte-identical
+        # to ClapFeatureExtractor without the class's top-level `import torch`.
+        from transformers.audio_utils import mel_filter_bank  # lazy, torch-free
+        mel_slaney = mel_filter_bank(
+            num_frequency_bins=_ONNX_NB_FREQ_BINS,
+            num_mel_filters=_ONNX_N_MELS,
+            min_frequency=_ONNX_FMIN,
+            max_frequency=_ONNX_FMAX,
+            sampling_rate=CLAP_SR,
+            norm="slaney",
+            mel_scale="slaney",
+        )
         providers = ["CPUExecutionProvider"]
         audio_sess = ort.InferenceSession(str(audio_path), providers=providers)
         text_sess = ort.InferenceSession(str(text_path), providers=providers)
@@ -284,13 +314,36 @@ class ClapEngine:
         # which inputs it accepts so we never feed an unknown tensor.
         text_inputs = {i.name for i in text_sess.get_inputs()}
         self._model = {
-            "feat": feat,
             "tok": tok,
             "audio": audio_sess,
             "text": text_sess,
             "text_inputs": text_inputs,
+            "mel_slaney": mel_slaney,
         }
         return self._model
+
+    @staticmethod
+    def _onnx_logmel(seg: np.ndarray, mel_filters: np.ndarray) -> np.ndarray:
+        """Log-mel for one 10s segment → (1, 1, n_frames=1001, N_MELS=64).
+
+        Torch-free (the reason the ONNX path exists). Replicates CLAP's
+        ``_np_extract_fbank_features`` EXACTLY via transformers.audio_utils:
+        Hann window, frame 1024 / hop 480, power 2.0, the Slaney mel filterbank,
+        log_mel="dB". A hand-rolled librosa mel was tried and degraded genre
+        separation (techno 6/10) — these primitives are HF byte-for-byte."""
+        from transformers.audio_utils import spectrogram, window_function  # lazy
+
+        log_mel = spectrogram(
+            np.asarray(seg, dtype=np.float64),
+            window_function(_ONNX_N_FFT, "hann"),
+            frame_length=_ONNX_N_FFT,
+            hop_length=_ONNX_HOP,
+            power=2.0,
+            mel_filters=mel_filters,
+            log_mel="dB",
+        )
+        lm = log_mel.T.astype(np.float32)  # (n_frames, n_mels)
+        return lm[np.newaxis, np.newaxis, :, :]
 
     def _onnx_embed_audio_file(self, path: str) -> np.ndarray:
         """ONNX audio embed: non-overlapping 10s segs → HF mel → audio ONNX →
@@ -311,8 +364,7 @@ class ClapEngine:
 
         embs: list[np.ndarray] = []
         for seg in segs:
-            feats = m["feat"](seg, sampling_rate=CLAP_SR, return_tensors="np")
-            inp = feats["input_features"].astype(np.float32)
+            inp = self._onnx_logmel(seg, m["mel_slaney"])
             out = m["audio"].run(None, {"input_features": inp})[0]
             embs.append(out[0])
         mean_emb = np.mean(np.stack(embs), axis=0)

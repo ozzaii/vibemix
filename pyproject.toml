@@ -136,11 +136,14 @@ dependencies = [
 # (Xenova/larger_clap_music_and_speech ONNX). Keeps the default install lean
 # (Gemini-embedding path needs none of these). onnxruntime is the cross-platform
 # inference runtime (~13-18MB wheel, NO torch); transformers supplies the
-# authoritative ClapFeatureExtractor mel + RoBERTa tokenizer; librosa loads +
-# resamples audio. All three are lazy-imported (clap_engine.ClapEngine /
+# RoBERTa tokenizer + the torch-FREE `audio_utils` mel primitives
+# (mel_filter_bank/spectrogram — byte-identical to ClapFeatureExtractor, which
+# we deliberately do NOT use because that class top-level-imports torch); librosa
+# loads + resamples audio. All three are lazy-imported (clap_engine.ClapEngine /
 # embed_clap.ClapEmbedder) so `import vibemix.library.*` stays safe without them.
-# Follow-up: a pure-numpy mel (np.fft.rfft) + the lighter `tokenizers` lib could
-# drop the transformers dependency — see docs/clap-engine.md.
+# Verified torch-free: genre parity holds (techno 10/10, psy 10/10) with torch
+# absent. Follow-up: the lighter `tokenizers` lib could drop transformers — see
+# docs/clap-engine.md.
 clap = [
     "onnxruntime>=1.20",
     "transformers>=4.40",
