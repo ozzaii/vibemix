@@ -239,8 +239,17 @@ class SettingsApplier:
         if not isinstance(value, str) or not value:
             return (False, "voice must be a non-empty string")
         if self.cascade_agent is None:
-            # TODO(phase-12-04): wire real cascade_agent ref
-            return (False, "cascade_agent not wired")
+            # LiveKit path has no live set_voice hook (cascade-era). Mirror
+            # _apply_genre: persist so the next session boots with this voice,
+            # return success (UI shows "applies on next launch") — never a dead
+            # error toast for a control that does take effect, just deferred.
+            log.warning(
+                "cascade_agent not wired — persisted voice=%r but live swap deferred",
+                value,
+            )
+            self.config_store.voice = value
+            save_config(self.config_store)
+            return (True, None)
         self.cascade_agent.set_voice(value)
         self.config_store.voice = value
         save_config(self.config_store)
@@ -250,8 +259,16 @@ class SettingsApplier:
         if value not in ("hype", "coach"):
             return (False, f"mode must be 'hype' or 'coach', got {value!r}")
         if self.event_detector is None:
-            # TODO(phase-12-04): wire real event_detector ref
-            return (False, "event_detector not wired")
+            # No live set_mode hook in the LiveKit path. Persist + succeed
+            # (deferred-live, like _apply_genre) so the control sticks and the
+            # next session boots in this mode — not a dead error.
+            log.warning(
+                "event_detector not wired — persisted mode=%r but live swap deferred",
+                value,
+            )
+            self.config_store.mode = value
+            save_config(self.config_store)
+            return (True, None)
         self.event_detector.set_mode(value)
         self.config_store.mode = value
         save_config(self.config_store)
@@ -284,8 +301,17 @@ class SettingsApplier:
         if value is not None and not isinstance(value, str):
             return (False, "output_device_id must be string or null")
         if self.audio_core is None:
-            # TODO(phase-12-04): wire real audio_core ref
-            return (False, "audio_core not wired")
+            # No live restart_output hook in the LiveKit path. Persist + succeed
+            # (deferred-live, like _apply_genre): the device sticks and the next
+            # session opens output on it — not a dead error.
+            log.warning(
+                "audio_core not wired — persisted output_device_id=%r but live "
+                "restart deferred",
+                value,
+            )
+            self.config_store.output_device_id = value
+            save_config(self.config_store)
+            return (True, None)
         self.audio_core.restart_output(value)
         self.config_store.output_device_id = value
         save_config(self.config_store)
@@ -295,8 +321,17 @@ class SettingsApplier:
         if value not in ("hp", "spk"):
             return (False, f"output_profile must be 'hp' or 'spk', got {value!r}")
         if self.audio_core is None:
-            # TODO(phase-12-04): wire real audio_core ref
-            return (False, "audio_core not wired")
+            # No live set_mic_gating_profile hook in the LiveKit path. Persist +
+            # succeed (deferred-live, like _apply_genre): the profile sticks and
+            # the next session boots with it — not a dead error.
+            log.warning(
+                "audio_core not wired — persisted output_profile=%r but live "
+                "swap deferred",
+                value,
+            )
+            self.config_store.output_profile = value
+            save_config(self.config_store)
+            return (True, None)
         self.audio_core.set_mic_gating_profile(value)
         self.config_store.output_profile = value
         save_config(self.config_store)

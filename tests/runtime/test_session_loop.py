@@ -305,7 +305,8 @@ def test_settings_set_success_emits_fresh_state(fake_bus: FakeBus) -> None:
 
 def test_settings_set_failure_emits_ipc_error(fake_bus: FakeBus) -> None:
     cfg = ConfigStore()
-    # No cascade_agent — apply will fail with "cascade_agent not wired"
+    # A genuinely-invalid value still fails (validation, not a missing hook —
+    # missing hooks now persist + succeed deferred-live). 'chill' isn't a mode.
     loop = SessionLoop(fake_bus, config_store=cfg)
     loop.register_handlers()
     _drive(
@@ -313,13 +314,13 @@ def test_settings_set_failure_emits_ipc_error(fake_bus: FakeBus) -> None:
         {
             "type": "ipc.settings.set",
             "ts": "2026-05-12T08:00:00+00:00",
-            "payload": {"field": "voice", "value": "puck"},
+            "payload": {"field": "mode", "value": "chill"},
         },
     )
     errors = fake_bus.emitted_by_type("ipc.error")
     assert len(errors) == 1
     assert errors[0]["payload"]["original_type"] == "ipc.settings.set"
-    assert "cascade_agent" in errors[0]["payload"]["reason"]
+    assert "mode" in errors[0]["payload"]["reason"]
 
 
 # ---------------------------------------------------------------------------

@@ -153,7 +153,12 @@ def _dir_name_to_iso(dir_name: str) -> Optional[str]:
         dt = datetime.strptime(dir_name, "%Y%m%d-%H%M%S")
     except ValueError:
         return None
-    return dt.isoformat(timespec="seconds")
+    # The dir name is local wall-clock. Attach the local tz offset so the
+    # emitted string is RFC 3339 `date-time` (offset mandatory) — the frontend
+    # ajv `date-time` format rejects a naive (offset-less) string, which silently
+    # drops ipc.recordings.list_result and makes the recordings/profile drawer
+    # sections time out. Matches recorder.py's already-tz-aware session.json value.
+    return dt.astimezone().isoformat(timespec="seconds")
 
 
 def _dir_name_to_unix(dir_name: str) -> float:

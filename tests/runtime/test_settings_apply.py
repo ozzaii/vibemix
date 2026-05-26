@@ -126,12 +126,16 @@ def test_voice_happy_path(store, cascade, _redirect_config_path):
     assert _redirect_config_path.exists()
 
 
-def test_voice_missing_hook_returns_error(store):
+def test_voice_missing_hook_persists_with_warning(store, caplog):
+    """No live cascade hook (LiveKit path) → persist + succeed (deferred-live),
+    like genre — the voice sticks for the next session, not a dead error."""
     applier = SettingsApplier(config_store=store)
-    success, error = _apply(applier, "voice", "puck")
-    assert success is False
-    assert "cascade_agent" in error
-    assert store.voice == "kore"  # unchanged
+    with caplog.at_level("WARNING"):
+        success, error = _apply(applier, "voice", "puck")
+    assert success is True
+    assert error is None
+    assert store.voice == "puck"
+    assert any("cascade_agent not wired" in r.message for r in caplog.records)
 
 
 def test_voice_invalid_value(store, cascade):
@@ -155,11 +159,15 @@ def test_mode_happy_path(store, event_detector):
     assert store.mode == "hype"
 
 
-def test_mode_missing_hook(store):
+def test_mode_missing_hook_persists_with_warning(store, caplog):
+    """No live event_detector hook → persist + succeed (deferred-live)."""
     applier = SettingsApplier(config_store=store)
-    success, error = _apply(applier, "mode", "hype")
-    assert success is False
-    assert "event_detector" in error
+    with caplog.at_level("WARNING"):
+        success, error = _apply(applier, "mode", "hype")
+    assert success is True
+    assert error is None
+    assert store.mode == "hype"
+    assert any("event_detector not wired" in r.message for r in caplog.records)
 
 
 def test_mode_invalid_value(store, event_detector):
@@ -240,11 +248,15 @@ def test_output_device_accepts_null(store, audio_core):
     assert store.output_device_id is None
 
 
-def test_output_device_missing_hook(store):
+def test_output_device_missing_hook_persists_with_warning(store, caplog):
+    """No live audio_core hook → persist + succeed (deferred-live)."""
     applier = SettingsApplier(config_store=store)
-    success, error = _apply(applier, "output_device_id", "dev-3")
-    assert success is False
-    assert "audio_core" in error
+    with caplog.at_level("WARNING"):
+        success, error = _apply(applier, "output_device_id", "dev-3")
+    assert success is True
+    assert error is None
+    assert store.output_device_id == "dev-3"
+    assert any("audio_core not wired" in r.message for r in caplog.records)
 
 
 def test_output_device_invalid_type(store, audio_core):
@@ -274,11 +286,15 @@ def test_output_profile_invalid_value(store, audio_core):
     audio_core.set_mic_gating_profile.assert_not_called()
 
 
-def test_output_profile_missing_hook(store):
+def test_output_profile_missing_hook_persists_with_warning(store, caplog):
+    """No live audio_core hook → persist + succeed (deferred-live)."""
     applier = SettingsApplier(config_store=store)
-    success, error = _apply(applier, "output_profile", "hp")
-    assert success is False
-    assert "audio_core" in error
+    with caplog.at_level("WARNING"):
+        success, error = _apply(applier, "output_profile", "spk")
+    assert success is True
+    assert error is None
+    assert store.output_profile == "spk"
+    assert any("audio_core not wired" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------
