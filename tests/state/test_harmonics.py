@@ -21,6 +21,7 @@ from vibemix.state.harmonics import (
     is_clash,
     semitone_distance,
     to_camelot,
+    to_classical,
 )
 
 # The 24 musical-notation → Camelot pairs (the full wheel, both enharmonic
@@ -282,3 +283,91 @@ def test_semitone_distance_anchors(a, b, expected):
 def test_semitone_distance_cross_letter_or_none_is_none(a, b):
     """Cross-letter or None-in → None (no single same-letter semitone ring)."""
     assert semitone_distance(a, b) is None
+
+
+# =====================================================================
+# to_classical — the Camelot→classical inverse the Rekordbox export needs.
+# Rekordbox's ``Tonality`` is musical notation, NOT Camelot, so the export
+# MUST translate the internal Camelot code back to one canonical classical
+# spelling. The round-trip oracle: to_camelot(to_classical(c)) == c for all
+# 24 codes (each Camelot code maps to exactly one canonical spelling, which
+# the forward table already recognizes).
+# =====================================================================
+
+# The 24 Camelot codes → their ONE canonical classical spelling (the choice
+# baked into _CAMELOT_TO_MUSICAL). Independent of the forward table's
+# many-to-one enharmonic aliases — this is the canonical pick per code.
+CAMELOT_TO_CLASSICAL_CANONICAL = [
+    ("1A", "Abm"),
+    ("2A", "Ebm"),
+    ("3A", "Bbm"),
+    ("4A", "Fm"),
+    ("5A", "Cm"),
+    ("6A", "Gm"),
+    ("7A", "Dm"),
+    ("8A", "Am"),
+    ("9A", "Em"),
+    ("10A", "Bm"),
+    ("11A", "F#m"),
+    ("12A", "C#m"),
+    ("1B", "B"),
+    ("2B", "F#"),
+    ("3B", "Db"),
+    ("4B", "Ab"),
+    ("5B", "Eb"),
+    ("6B", "Bb"),
+    ("7B", "F"),
+    ("8B", "C"),
+    ("9B", "G"),
+    ("10B", "D"),
+    ("11B", "A"),
+    ("12B", "E"),
+]
+
+
+@pytest.mark.parametrize("camelot,classical", CAMELOT_TO_CLASSICAL_CANONICAL)
+def test_to_classical_canonical_spelling(camelot, classical):
+    """Each Camelot code maps to its one canonical classical spelling."""
+    assert to_classical(camelot) == classical
+
+
+@pytest.mark.parametrize("camelot,_classical", CAMELOT_TO_CLASSICAL_CANONICAL)
+def test_to_classical_round_trips_through_to_camelot(camelot, _classical):
+    """The load-bearing invariant: every code round-trips back to itself
+    (to_camelot ∘ to_classical == identity over all 24 Camelot codes). This
+    is what guarantees the exported Rekordbox Tonality re-imports as the
+    same key vibemix reasoned on."""
+    assert to_camelot(to_classical(camelot)) == camelot
+
+
+@pytest.mark.parametrize(
+    "camelot,classical",
+    [
+        ("8a", "Am"),  # lower-case Camelot accepted
+        (" 11A ", "F#m"),  # whitespace stripped
+        ("12b", "E"),
+    ],
+)
+def test_to_classical_normalizes_input(camelot, classical):
+    """to_classical upper-cases / strips before lookup (mirror to_camelot)."""
+    assert to_classical(camelot) == classical
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "",
+        None,
+        "garbage",
+        "not-a-key",
+        "13A",  # out-of-range number
+        "0A",
+        "8C",  # invalid wheel letter
+        "Am",  # a classical key is NOT a Camelot code — honest None
+        "   ",
+    ],
+)
+def test_to_classical_unknown_returns_none_never_raises(raw):
+    """Empty / None / garbage / non-Camelot in → None, never raises (honest
+    unknown — the export OMITS Tonality rather than fabricating a key)."""
+    assert to_classical(raw) is None

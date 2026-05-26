@@ -108,6 +108,65 @@ def to_camelot(raw: str | None) -> str | None:
     return None  # unrecognized → honest None, never a guess
 
 
+# Camelot → ONE canonical classical spelling (the inverse of the forward
+# table, picking a single enharmonic spelling per code). This is what the
+# Rekordbox export writes to ``Tonality`` — Rekordbox carries musical
+# notation, never Camelot, so the export MUST translate back. By
+# construction every value here is recognized by ``to_camelot`` (the chosen
+# spelling is the canonical key in ``_MUSICAL_TO_CAMELOT``), so
+# ``to_camelot(to_classical(c)) == c`` round-trips for all 24 codes.
+_CAMELOT_TO_MUSICAL: dict[str, str] = {
+    # minors (inner wheel, "A")
+    "1A": "Abm",
+    "2A": "Ebm",
+    "3A": "Bbm",
+    "4A": "Fm",
+    "5A": "Cm",
+    "6A": "Gm",
+    "7A": "Dm",
+    "8A": "Am",
+    "9A": "Em",
+    "10A": "Bm",
+    "11A": "F#m",
+    "12A": "C#m",
+    # majors (outer wheel, "B")
+    "1B": "B",
+    "2B": "F#",
+    "3B": "Db",
+    "4B": "Ab",
+    "5B": "Eb",
+    "6B": "Bb",
+    "7B": "F",
+    "8B": "C",
+    "9B": "G",
+    "10B": "D",
+    "11B": "A",
+    "12B": "E",
+}
+
+
+def to_classical(camelot: str | None) -> str | None:
+    """Translate a Camelot code to its canonical classical spelling.
+
+    The inverse of ``to_camelot`` for the export path: Rekordbox's
+    ``Tonality`` field is musical notation (``Am`` / ``F#m``), never a
+    Camelot code, so the set exporter resolves the internal Camelot back to
+    one canonical spelling before writing the XML. Input is upper-cased /
+    stripped first (mirroring ``to_camelot``), so ``"8a"`` and ``" 11A "``
+    resolve.
+
+    Returns ``None`` on empty / ``None`` / unrecognized / out-of-range
+    input AND on a classical key fed in by mistake (``"Am"`` is not a
+    Camelot code). NEVER raises and NEVER fabricates a key — the export
+    OMITS ``Tonality`` on ``None`` rather than guessing, the same
+    honest-unknown discipline as ``to_camelot``.
+    """
+    if not camelot:
+        return None
+    code = camelot.strip().upper()
+    return _CAMELOT_TO_MUSICAL.get(code)
+
+
 # =====================================================================
 # Phase 60 (HARMONIC-01) — the deterministic Camelot-wheel clash predicate.
 #
