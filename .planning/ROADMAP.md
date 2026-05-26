@@ -58,7 +58,7 @@
 | 79 | LENS — Three Grounded Modes | 3/3 | Complete    | 2026-05-26 |
 | 80 | GROUND — Gemini as Secondary Ear | 2/2 | Complete    | 2026-05-26 |
 | 81 | BENCH — The Validation Instrument | 4/4 | Complete    | 2026-05-26 |
-| 82 | CURATE — Unify Curator + Co-Host | 2/2 | Complete   | 2026-05-26 |
+| 82 | CURATE — Unify Curator + Co-Host | 2/2 | Complete    | 2026-05-26 |
 
 ## Phase Details
 
