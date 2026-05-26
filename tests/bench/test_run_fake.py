@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: Apache-2.0
+"""BENCH-01 — fake-client sweep + per-cell fail-safe (flip in Plan 02).
+
+The runner takes the client by INJECTION (``library/agent.py:306`` idiom), so
+the offline ``_FakeClient`` / ``_RaisingClient`` fixtures make the whole sweep
+green with ZERO API calls (honest green). Each behavioral assertion is
+``xfail(strict=True)`` until Plan 02 lands ``vibemix.bench.run`` /
+``vibemix.bench.matrix``.
+
+The fail-safe (Pitfall 2): a per-cell error records ``result.error`` (non-None)
+and the sweep CONTINUES to the next cell — never aborts, never fabricates
+output. The floor study's real 429 billing block is the documented reason.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+
+@pytest.mark.xfail(strict=True, reason="bench/run + bench/matrix land in Plan 02")
+def test_sweep_records_cells_zero_network(fake_client) -> None:
+    """A study sweep with the FAKE client records one BenchResult per cell,
+    each carrying prompt/output/dsp_snapshot/usage — and makes zero API calls.
+    The fake client's call-spy proves the sweep actually issued the cells."""
+    from vibemix.bench.matrix import STUDY_A
+    from vibemix.bench.run import run_study
+
+    results = run_study(STUDY_A, client=fake_client)
+    assert len(results) == len(STUDY_A)
+    assert len(fake_client.calls) == len(STUDY_A)  # offline only — spy proves it
+    for r in results:
+        assert r.prompt
+        assert r.output  # canned cited line from the fake client
+        assert r.dsp_snapshot is not None
+        assert r.usage  # synthetic usage_metadata recorded
+        assert r.error is None
+
+
+@pytest.mark.xfail(strict=True, reason="bench/run fail-safe lands in Plan 02")
+def test_fail_safe_parks_cell_and_continues(raising_client) -> None:
+    """With the raising client, each cell's error is recorded as result.error
+    (non-None) and the sweep CONTINUES — no abort, no fabricated output."""
+    from vibemix.bench.matrix import STUDY_A
+    from vibemix.bench.run import run_study
+
+    results = run_study(STUDY_A, client=raising_client)
+    # The sweep did NOT abort: every cell produced a (parked) result.
+    assert len(results) == len(STUDY_A)
+    for r in results:
+        assert r.error is not None  # the 429 was caught + parked
+        assert not r.output  # NEVER fabricate output for a failed cell
+
+
+@pytest.mark.xfail(strict=True, reason="bench/run usage capture lands in Plan 02")
+def test_result_carries_usage_from_fake(fake_client) -> None:
+    """Each recorded BenchResult carries the cell's usage tokens — the bench
+    feeds these to SessionMeter for the real run's cost report."""
+    from vibemix.bench.matrix import STUDY_A
+    from vibemix.bench.run import run_study
+
+    results = run_study(STUDY_A, client=fake_client)
+    first = results[0]
+    # The fake usage_metadata (prompt=1900, output=40, total=1940) flows through.
+    assert first.usage.get("prompt_token_count") == 1900
+    assert first.usage.get("candidates_token_count") == 40
+    assert first.usage.get("total_token_count") == 1940
