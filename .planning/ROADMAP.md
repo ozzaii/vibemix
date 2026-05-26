@@ -56,7 +56,7 @@
 | 77 | WIRE — Connect the Islands | 4/4 | Complete    | 2026-05-25 |
 | 78 | PERCEIVE — Deeper, Generalized Ear | 4/4 | Complete    | 2026-05-26 |
 | 79 | LENS — Three Grounded Modes | 3/3 | Complete    | 2026-05-26 |
-| 80 | GROUND — Gemini as Secondary Ear | Gemini hears the audio alongside the structured evidence, hallucination-guarded, with the reaction model config-resolved | GROUND-01, GROUND-02 | 3 |
+| 80 | GROUND — Gemini as Secondary Ear | 1/2 | In Progress|  |
 | 81 | BENCH — The Validation Instrument | A multi-dimensional bench runs the architecture/model axes on real tracks, auto-scores each cell, and surfaces cells for Kaan's-ear final judgment | BENCH-01, BENCH-02, BENCH-03 | 4 |
 | 82 | CURATE — Unify Curator + Co-Host | Curator and co-host are two facets of one engine — shared perception/state contract + shared taste/persona | CURATE-01, CURATE-02 | 3 |
 
@@ -116,7 +116,7 @@ Plans:
   2. The reaction model is resolved via `model_router.resolve(...)` with zero hardcoded model literals (CI grep-gate holds), so the bench's winning model can be swapped in by config alone (GROUND-02).
   3. With the audio-secondary path gated off, the prompt + reaction are byte-identical to the v8.0 baseline (additive design).
 **Plans**: 2 plans
-- [ ] 80-01-PLAN.md — Wave-0 RED scaffolds: the un-backed-audio-claim strip guard + flag-ON framing (xfail-strict) + cold-path byte-identity & GROUND-02 router-resolve pins (real-green)
+- [x] 80-01-PLAN.md — Wave-0 RED scaffolds: the un-backed-audio-claim strip guard + flag-ON framing (xfail-strict) + cold-path byte-identity & GROUND-02 router-resolve pins (real-green)
 - [ ] 80-02-PLAN.md — gated `secondary_ear` framing in `build_parts_description`, thread `VIBEMIX_GROUND_SECONDARY_EAR` → kwarg → call site, flip the guard xfails, document `live_coach` as the bench-swap alias
 
 ### Phase 81: BENCH — The Validation Instrument
