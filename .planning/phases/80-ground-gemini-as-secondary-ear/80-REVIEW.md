@@ -13,7 +13,17 @@ findings:
   warning: 2
   info: 1
   total: 3
-status: issues_found
+status: resolved
+fix:
+  fixed_at: 2026-05-26
+  WR-01: fixed (7fb5399 — reworded the flag-ON clause to frame the structured
+    evidence as a secondary corroborating signal alongside the live audio,
+    ears stay the referee; kept the never-invent-an-unlisted-event guard;
+    dropped the "evidence is authoritative" inversion of Invariant #3)
+  WR-02: wont_fix (no startup-banner snapshot test exists; the unconditional
+    "-> secondary-ear:" print matches the established "-> recall:" precedent —
+    minimal-correct = leave it)
+  IN-01: not_fixed (Info, out of scope)
 ---
 
 # Phase 80: Code Review Report
