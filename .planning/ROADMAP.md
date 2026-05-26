@@ -489,12 +489,12 @@ Full archive: `.planning/milestones/v3.1-ROADMAP.md` · Requirements: `.planning
 **Requirements**: TBD
 **Depends on:** staged `clap_engine` (embed seam) + `cue_types.CueAnchor` (both already shipped by concurrent sessions). NOT the v8.2 UI phase.
 **Scope (MVP slice):** Rekordbox-only, end-to-end walking skeleton (detect → parse `collection.xml` → cue-anchored excerpts → `clap_engine` embed → sqlite-vec store). Serato/Traktor adapters + the file watcher are deferred to follow-up phases (90, 91). Design spec: `docs/superpowers/specs/2026-05-26-dj-library-ingest-design.md`.
-**Plans:** 1/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 89-01-PLAN.md — Walking-skeleton ingest slice: auto-detect collection.xml + LibrarySource protocol + ingest_source orchestrator (detect → parse → on-device clap embed → sqlite-vec store, resumable/honest) + `library ingest` CLI
 - [x] 89-02-PLAN.md — Metadata-richness slice: extend rekordbox.py to read genre/label/rating/play_count/comments + TEMPO beatgrid + Camelot-at-parse + cue Type fidelity; SCHEMA_VERSION bump
-- [ ] 89-03-PLAN.md — Cue-anchored excerpt slice: excerpt.py (dj-first CueAnchors, detect_cues auto fallback) → ≤80s windows; rewire ingest to mean-pool cue-anchored CLAP vectors
+- [x] 89-03-PLAN.md — Cue-anchored excerpt slice: excerpt.py (dj-first CueAnchors, detect_cues auto fallback) → ≤80s windows; rewire ingest to mean-pool cue-anchored CLAP vectors
 
 ### Phase 90: CLAP — swap library/curator embedding engine to on-device Xenova ONNX (512-dim cross-modal, replaces Gemini embedding)
 
