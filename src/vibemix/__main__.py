@@ -101,7 +101,7 @@ from vibemix.audio.recorder import sweep_crashed_sessions
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
 from vibemix.state.deck_poller import DeckPoller
-from vibemix.profile import load_profile, render_profile_for_cache
+from vibemix.profile import load_consent, load_profile, render_profile_for_cache
 from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
 from vibemix.runtime.cancel import CancelGate
 from vibemix.runtime.config_store import app_data_dir, load_config
@@ -849,7 +849,11 @@ async def main() -> None:
     # P60: profile lives in the CACHE, never in the per-turn prompt. If the
     # file is missing or invalid, ``profile_dict`` is None and the cache section
     # is the empty string — byte-identical to the pre-Phase-32 cache body.
-    profile_dict = load_profile()
+    # CURATE-02 (Phase 82): gate on consent so a stale profile.json that
+    # outlives a consent toggle-OFF never feeds the co-host cache — mirrors
+    # session_loop.py and the curator seam (_curator_seams.taste_hint). The
+    # consent-gated taste layer is now consistent across BOTH surfaces.
+    profile_dict = load_profile() if load_consent() else None
     profile_section = render_profile_for_cache(profile_dict)
     if profile_dict is not None:
         print(f"-> profile: loaded ({len(profile_section)} chars in cache section)")
