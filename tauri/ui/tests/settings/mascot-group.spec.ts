@@ -177,6 +177,14 @@ describe("MascotGroup IPC wiring", () => {
     );
     expect(coachPill).toBeTruthy();
     coachPill!.click();
+    // Optimistic repaint (2026-05-26 fix): the lit pill moves to 'coach'
+    // immediately — the drawer has no settings.state refresh path, so without
+    // this the active pill never moved and the mood control looked dead.
+    expect(coachPill!.dataset.active).toBe("true");
+    expect(
+      group.querySelector<HTMLElement>('.vmx-mascot-pill[data-id="hype-man"]')
+        ?.dataset.active,
+    ).toBe("false");
     // emitIpc → invoke('forward_ipc_to_sidecar', { message: { type, ts, payload } })
     // We can't await the void promise inline; flush the microtask queue.
     await new Promise<void>((r) => setTimeout(r, 0));

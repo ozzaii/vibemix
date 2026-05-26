@@ -568,6 +568,34 @@ describe("renderRocker", () => {
     expect(active?.dataset.id).toBe("PRO");
     r.querySelector<HTMLButtonElement>('.vmx-rocker__seg[data-id="INT"]')!.click();
     expect(changed).toBe("INT");
+    // Optimistic repaint (2026-05-26 "no buttons work" fix): the lit segment
+    // moves to the clicked id immediately, before the ipc.settings.set round-
+    // trip — the drawer has no settings.state refresh path, so without this
+    // the active segment never moved and the control looked dead.
+    expect(
+      r.querySelector<HTMLElement>('.vmx-rocker__seg[data-active="true"]')?.dataset.id,
+    ).toBe("INT");
+    expect(
+      r.querySelector<HTMLElement>('.vmx-rocker__seg[data-id="PRO"]')?.dataset.active,
+    ).toBe("false");
+  });
+
+  it("optimistic flip is a no-op when re-clicking the already-active segment", () => {
+    let calls = 0;
+    const r = renderRocker({
+      options: [
+        { id: "hp", label: "HP" },
+        { id: "spk", label: "SPK" },
+      ],
+      active: "hp",
+      onChange: () => calls++,
+    });
+    host().append(r);
+    r.querySelector<HTMLButtonElement>('.vmx-rocker__seg[data-id="hp"]')!.click();
+    expect(calls).toBe(0); // already active → guard returns before onChange
+    expect(
+      r.querySelector<HTMLElement>('.vmx-rocker__seg[data-active="true"]')?.dataset.id,
+    ).toBe("hp");
   });
 });
 
