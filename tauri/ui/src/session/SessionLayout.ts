@@ -712,7 +712,12 @@ export function setPersonaStatus(el: HTMLElement, state: SessionState): void {
 
   const moodEl = el.querySelector<HTMLElement>(".vmx-persona-status__mood");
   if (moodEl) {
-    if (moodEl.textContent !== mood) moodEl.textContent = mood;
+    if (moodEl.textContent !== mood) {
+      moodEl.textContent = mood;
+      // Delight (2026-05-26 /impeccable delight): the newly-chosen mood
+      // settles into place, rewarding the in-deck tap control. One-shot.
+      playMoodSettle(moodEl);
+    }
     moodEl.dataset.mood = mood;
     // The mood headline is a tap-to-cycle control — announce the action
     // and the cycle so it isn't read as a static label.
@@ -739,6 +744,33 @@ export function setPersonaStatus(el: HTMLElement, state: SessionState): void {
     "aria-label",
     `Persona: ${mood}, ${skill}, ${genre}, ${voiceProfile} voice`,
   );
+}
+
+/** Delight (2026-05-26 /impeccable delight) — a one-shot settle when the
+ *  mood changes, so the in-deck tap control feels acknowledged. Uses the
+ *  Web Animations API so it self-cleans and never leaves residual inline
+ *  styles. No-op under prefers-reduced-motion, and silently skipped where
+ *  the API is unavailable (jsdom under vitest) — delight is optional and
+ *  must never be fatal to a render frame. Ease-out-expo, no overshoot. */
+function playMoodSettle(el: HTMLElement): void {
+  try {
+    if (typeof el.animate !== "function") return;
+    if (
+      typeof matchMedia === "function" &&
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+    el.animate(
+      [
+        { opacity: 0.4, transform: "translateY(-3px)" },
+        { opacity: 1, transform: "translateY(0)" },
+      ],
+      { duration: 240, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+    );
+  } catch {
+    // WAAPI unavailable or threw — the mood text is already set; skip the flourish.
+  }
 }
 
 /** Idempotent hot-update. Walks the diff between mounted.current and the

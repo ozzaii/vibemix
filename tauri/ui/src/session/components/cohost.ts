@@ -324,6 +324,24 @@ const CSS = `
     color: var(--silk-40);
     font-size: 12px;
   }
+  /* Delight (2026-05-26 /impeccable delight): when the co-host SPEAKS — a
+   * brand-new reaction becomes the now-line — it rises into place once.
+   * This is the product's soul ("a friend just said something"), the one
+   * moment that earns motion on the transcript. populateTranscript flags
+   * data-arrived ONLY when the now-line's timestamp changes, so a
+   * chip-only rebuild or a status poke never re-triggers it — it stays
+   * fresh and never nags. Ease-out-expo, sub-frame, no overshoot. Frozen
+   * under prefers-reduced-motion. */
+  @keyframes vmx-cohost-now-arrive {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .vmx-cohost__msg[data-tier="now"][data-arrived="true"] {
+    animation: vmx-cohost-now-arrive 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .vmx-cohost__msg[data-tier="now"][data-arrived="true"] { animation: none; }
+  }
   .vmx-cohost__ts {
     /* 2026-05-19 /impeccable critique fix: dropped the
      * rgba(255, 138, 61, 0.05) amber wash on every transcript
@@ -776,6 +794,20 @@ function populateTranscript(
       }
     }
   });
+
+  // Delight gate (2026-05-26): flag the now-line for the one-shot arrival
+  // animation ONLY when a genuinely new line has become "now" — i.e. the
+  // last line's timestamp changed since the previous render. A chip-only
+  // rebuild (same now-ts) leaves the flag off, so the rise reads as "the
+  // co-host just spoke" and never replays on an unrelated repaint.
+  const nowTs = capped.length ? capped[capped.length - 1]!.ts : "";
+  if (nowTs && nowTs !== (el.dataset.nowTs ?? "")) {
+    const nowMsg = el.querySelector<HTMLElement>(
+      '.vmx-cohost__msg[data-tier="now"]',
+    );
+    if (nowMsg) nowMsg.dataset.arrived = "true";
+  }
+  el.dataset.nowTs = nowTs;
 }
 
 /** Wave 6 (H9) — threshold (ms) after which a sustained grounded=false
