@@ -14,7 +14,19 @@ findings:
   warning: 4
   info: 2
   total: 8
-status: issues_found
+status: fixes_applied
+fix_summary:
+  fixed:
+    - CR-01  # lens wins over auto-mood on the live co-host path
+    - CR-02  # validate persisted lens before subscript (no KeyError)
+    - WR-02  # _apply_lens rebuild parity with _apply_skill (doc the shared lifecycle)
+    - WR-03  # curator _shared_lens() read-failure guard (default tutor)
+    - WR-04  # curator instruction-cache check-then-set lock
+  deferred:
+    - WR-01  # lens absent from ipc.settings.set enum — UI wiring is a KAAN-ACTION follow-up (see below)
+  not_fixed_info:
+    - IN-01  # info, out of scope — but the new production-path test added under CR-01 closes the false-green
+    - IN-02  # info, out of scope — the co-host consumer now re-validates (CR-02), satisfying the design intent
 ---
 
 # Phase 79: Code Review Report
@@ -22,7 +34,35 @@ status: issues_found
 **Reviewed:** 2026-05-26
 **Depth:** standard
 **Files Reviewed:** 5
-**Status:** issues_found
+**Status:** fixes_applied
+
+> **FIX PASS 2026-05-26** — Both BLOCKERs and 3 of 4 WARNINGs fixed and committed
+> atomically; WR-01 is intentionally DEFERRED (UI wiring is a KAAN-ACTION
+> follow-up). Full suite green without an API key (4499 passed; the only 3
+> failures — `tests/repo/test_cut_release_dry_run.py` — are PRE-EXISTING on the
+> base commit `6aa3f6f`: they require signed `.dmg/.pkg/.msi/.exe` artifacts in
+> `dist/`, an artifact precondition unrelated to the lens code).
+>
+> - **CR-01** ✅ fixed — lens now resolved BEFORE the mood arg; an explicit valid
+>   lens wins over the auto-derived live `MusicState.mood`; cold path
+>   byte-identical. New production-path test `test_resolve_prompt_cell_lens_wins_over_live_mood`
+>   (`mood="hype-man"` + `tutor` lens → tutor cell).
+> - **CR-02** ✅ fixed — `lens in LENS_TO_MODE_MOOD` validation before subscript;
+>   corrupt persisted value falls through to cold path, no `KeyError`. New test
+>   `test_resolve_prompt_cell_corrupt_lens_falls_back_no_crash`.
+> - **WR-02** ✅ fixed (doc) — `_apply_lens` parity with `_apply_skill` made
+>   explicit; both ride the shared Plan 13-06 next-build lifecycle, no new
+>   rebuild mechanism invented.
+> - **WR-03** ✅ fixed — both curator `_shared_lens()` reads guarded, default
+>   `"tutor"` on any failure.
+> - **WR-04** ✅ fixed — module `threading.Lock` guards the check-then-set in all
+>   three curator instruction-cache builders (gemini + codex).
+> - **WR-01** ⏸ DEFERRED — see the WR-01 section. Lens persistence stays
+>   extra-only by design (no schema bump this run); UI enum + lens-picker +
+>   `codegen:ipc` + live verify is a KAAN-ACTION follow-up.
+> - **IN-01 / IN-02** — Info, not in fix scope. The CR-01/CR-02 fixes
+>   incidentally close both concerns (production-path test added; consumer now
+>   re-validates).
 
 ## Summary
 
@@ -150,6 +190,22 @@ value. Either way the raw `KeyError` must not escape.
 ## Warnings
 
 ### WR-01: `lens` is not in the IPC settings.set field enum — `_apply_lens` is unreachable from the UI
+
+> **STATUS: DEFERRED (KAAN-ACTION).** Per the fix-scope decision this run does
+> NOT touch `messages.schema.json` / run `npm run codegen:ipc`: the polished
+> lens-picker UI control is explicitly deferred in 79-CONTEXT, and a schema bump
+> needs live-app verification this autonomous run cannot do (invariant #4 — no
+> IPC/schema bump). The shared-selection MECHANISM that LENS-02 requires (both
+> surfaces read `extra["lens"]`) is implemented and now works end-to-end on the
+> live co-host (CR-01). Lens persistence remains config-/extra-only for now.
+>
+> **Deferred follow-up (KAAN-ACTION):** add `"lens"` to the `ipc.settings.set`
+> `field` enum in `tauri/ui/src/ipc/messages.schema.json`, run
+> `npm run codegen:ipc` to regenerate `validator.generated.mjs`, confirm
+> `check_ipc_schema.py` parity, wire a lens-picker control into the settings
+> drawer, then verify LIVE in `cargo tauri dev`. Until then `_apply_lens` is a
+> config-only handler, not a live UI control.
+
 
 **File:** `src/vibemix/runtime/settings.py:474-502` (handler) — root cause in
 `tauri/ui/src/ipc/messages.schema.json:1250-1262` (out of reviewed scope, flagged for completeness)
