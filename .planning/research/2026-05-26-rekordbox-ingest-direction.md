@@ -24,6 +24,46 @@ rekordbox's local data exhaust.
 is an **offline per-track structure floor** (ANLZ) joined to **live track-identity** (which
 we already resolve). Live beat-phase ground truth is a hardware-DJ (PRO DJ LINK) feature, parked.
 
+## EXHAUSTIVE live-channel verdict (every channel probed on the running instance)
+
+Kaan asked to exhaust research. All channels, ranked:
+
+| Channel | Laptop-only live deck-state? | Notes |
+|---------|------------------------------|-------|
+| PRO DJ LINK passive | ❌ dead | 0/173k packets; silent without Pioneer hardware |
+| PRO DJ LINK virtual-CDJ announce | ❌ likely dead | no documented laptop-only responder; PERFORMANCE/hardware gate; full recipe in hand if ever needed |
+| **MIDI-OUT feedback (virtual MIDI port)** | ✅ **viable** | per-deck **play/cue/loop/sync state** as a continuous LED heartbeat; reuses our `mido`/`python-rtmidi` stack; FLX4 is official → full feedback map. **LIMIT: transport only, NO track title/BPM** |
+| rekordboxAgent HTTP `:30001` | ⚠️ real but gated | confirmed live Express server (`/api/v1/data/djmd*` = library over HTTP; `agent/token`+`login` auth via `--dp` token). **No `player`/`deck` route exists** → library, not live transport. Spike-only (undocumented, fragile, ToS-murky, zero prior art) |
+| Ableton Link | ❌ tempo-only | one global tempo, **follower-only** (rekordbox can't be Link master), no per-deck/phase/track |
+| App logs (agent/PSvLink) | ❌ dead | verified on-disk: startup/handshake plumbing, no track-load/play events, track titles never appear |
+| Lighting → Art-Net/sACN/OS2L | ❌ dead | no software-only output; RB-DMX1 hardware only; rkbx_os2l uses process memory |
+| Process memory (rkbx_link) | excluded | fragile per-version; macOS free=7.2.8 only (Kaan=7.2.9); needs root/entitlement |
+
+**The hard ceiling (honest):** every rich rekordbox-state tool (`rkbx_link`, `rkbx_os2l`) gets
+loaded-track + beat + BPM together *only* by reading process memory. There is **no official
+non-memory channel** that hands us loaded-track + beat at once. Our constraint (no vision, no
+memory) genuinely caps the *direct* live feed at **deck transport (MIDI-OUT) + a separate
+identity source**.
+
+## We close the gap WITHOUT rekordbox cooperation — the recommended live-awareness stack
+
+Assemble live awareness from four cheap, independent sources we already own or can derive:
+
+1. **Identity** — `nowplaying-cli` title + MIDI deck inference (have both). Fingerprint (Panako)
+   only as a fallback confirmer; primary fingerprinting is overkill and degrades worst mid-blend.
+2. **Transport** (play/cue/which deck audible) — **MIDI-OUT feedback** on a virtual port (NEW, viable).
+3. **Playhead + phrase** — beat-track OUR captured master audio (**BeatNet**, real-time causal)
+   → anchor once via beat-sync subsequence DTW (Kim et al. aligned 99.6% of 1,564 real mixes)
+   → count downbeats against the track's known **ANLZ beatgrid** → map to ANLZ phrase
+   ("16 bars to the outro"). Empirical: real DJs barely pitch (86% <5% tempo, 2.5% key) → grid
+   alignment is robust. **Confidence-gate at transitions** (~10-15s fuzzy window — suppress
+   position claims during a blend).
+4. **Structure** — ANLZ phrase/beatgrid/cues (static, 92% coverage).
+
+New heavy dep for #3 = **BeatNet** (PyTorch, arm64-fine, CLAP-neighbor). Everything else reuses
+the existing capture + librosa + mido + now-playing + ANLZ. **This fully enables the LIVE
+Suggestion-Engine pill without PRO DJ LINK, process memory, or screen vision.**
+
 ## The data: rekordbox phrase structure (PSSI)
 
 Per-track song structure, beat-indexed, ~19 segments median. `mood` field sets the label
