@@ -610,6 +610,8 @@ def transition_payload_for_candidate(
         "from_camelot": candidate.from_camelot,
         "to_camelot": candidate.to_camelot,
         "cue_slot": candidate.cue_slot,
+        "cue_source": candidate.cue_source,
+        "cue_confidence": candidate.cue_confidence,
         "start_in_bars": candidate.start_in_bars,
         "score": candidate.score,
         "confidence": candidate.confidence,

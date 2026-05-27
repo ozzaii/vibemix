@@ -363,6 +363,8 @@ class SuggestionService:
                     "from_section_id": _str_or_none(transition.get("from_section_id")),
                     "to_section_id": _str_or_none(transition.get("to_section_id")),
                     "cue_slot": _str_or_none(transition.get("cue_slot")),
+                    "cue_source": _str_or_none(transition.get("cue_source")),
+                    "cue_confidence": _float_or(transition.get("cue_confidence"), None),
                     "score": _float_or(transition.get("score"), None),
                     "confidence": _float_or(transition.get("confidence"), None),
                     "risk_flags": [str(flag) for flag in (transition.get("risk_flags") or ())],

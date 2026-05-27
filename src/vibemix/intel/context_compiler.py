@@ -185,6 +185,9 @@ def _transition_candidate_from_payload(
             str(payload.get("cue_slot") or ""),
         )
     )
+    cue_confidence_raw = payload.get("cue_confidence")
+    if cue_confidence_raw is None:
+        cue_confidence_raw = payload.get("recommended_cue_confidence")
     return TransitionCandidate(
         candidate_id=candidate_id,
         transition_key=transition_key,
@@ -203,6 +206,10 @@ def _transition_candidate_from_payload(
         from_camelot=_optional_str(payload.get("from_camelot")),
         to_camelot=_optional_str(payload.get("to_camelot")),
         cue_slot=_optional_str(payload.get("cue_slot")),
+        cue_source=_optional_str(
+            payload.get("cue_source") or payload.get("recommended_cue_source")
+        ),
+        cue_confidence=_optional_float(cue_confidence_raw),
         start_in_bars=_optional_int(payload.get("start_in_bars")),
         score=_float_or(payload.get("score"), 0.0),
         confidence=_float_or(payload.get("confidence"), 0.0),
@@ -231,6 +238,8 @@ def _candidate_payload(candidate: TransitionCandidate) -> dict[str, Any]:
         "to_bpm": candidate.to_bpm,
         "to_camelot": candidate.to_camelot,
         "recommended_cue_slot": candidate.cue_slot,
+        "recommended_cue_source": candidate.cue_source,
+        "recommended_cue_confidence": candidate.cue_confidence,
         "start_in_bars": candidate.start_in_bars,
         "score": candidate.score,
         "confidence": candidate.confidence,

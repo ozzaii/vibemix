@@ -106,6 +106,8 @@ Important fields:
 - `from_bpm` / `to_bpm`
 - `from_camelot` / `to_camelot`
 - `cue_slot`
+- `cue_source`
+- `cue_confidence`
 - `start_in_bars`
 - `score` / `confidence`
 - `semantic_basis`
@@ -126,6 +128,12 @@ Important fields:
 
 The system must not silently claim section-level semantic certainty when it only
 has track-level or unknown evidence.
+
+Cue provenance must be explicit too. `cue_source` distinguishes DJ-authored
+Rekordbox cues from ANLZ-derived structure, auto-generated cues, fallback
+entries, or unknown cue handles. `cue_confidence` is nullable and clamped by the
+scorer; auto-generated, low-confidence, unknown, or missing cues add review risk
+flags instead of being described as trusted hot cues.
 
 ### `transition_alternatives`
 
@@ -236,6 +244,8 @@ match, the cited claims must support those facts.
 - Live blend conditions suppress unsafe timing precision and validated select
   actions, while preserving grounded transition context where possible.
 - Semantic dimension mismatches become unknown evidence, not fabricated matches.
+- Auto-generated or low-confidence target cues remain usable context, but are
+  marked with review risk and lower cue-operability confidence.
 - Missing cue, BPM, Camelot, section, or vector data stays honest-null and must
   lower confidence or add risk flags instead of inventing values.
 
@@ -275,6 +285,10 @@ npm --prefix tauri/ui run build
 The Vite build may emit existing chunk-size or dynamic-import warnings; those
 warnings are not specific to the live next-pill contract.
 
+Cue provenance coverage verifies that DJ-authored cues, auto-generated cues, and
+low-confidence cues produce distinct operability scores, risk flags, and wire
+payload fields.
+
 Replay-shaped coverage for cached shortlist live refresh lives in
 `tests/runtime/fixtures/live_next_pill_source_section_replay.json` and
 `tests/runtime/test_suggestion.py::test_live_next_replay_fixture_reselects_source_section_without_rerank`.
@@ -284,8 +298,8 @@ or fresh vector load.
 
 ## Remaining gaps
 
-- Add richer target-cue operability checks once more CUE-DETR or Rekordbox cue
-  data is available.
+- Fold richer cue-source details from future CUE-DETR/Rekordbox analysis into
+  the same provenance fields when they become available.
 - Keep improving taste thresholds and live refresh behavior so the system learns
   which technically valid transitions the DJ actually accepts without
   overfitting one session.

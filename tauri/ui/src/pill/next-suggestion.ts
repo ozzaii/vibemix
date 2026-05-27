@@ -43,6 +43,8 @@ export interface NextSuggestionTransitionWire {
   from_camelot?: string | null;
   to_camelot?: string | null;
   cue_slot?: string | null;
+  cue_source?: string | null;
+  cue_confidence?: number | null;
   start_in_bars?: number | null;
   score?: number | null;
   confidence?: number | null;

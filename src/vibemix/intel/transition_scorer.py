@@ -37,6 +37,17 @@ LIVE_SECTION_CONFIDENCE_FLOOR = 0.55
 LIVE_SELECT_CONFIDENCE_FLOOR = 0.62
 EXACT_TIMING_CONFIDENCE_FLOOR = 0.80
 MIN_USABLE_SECTION_SECONDS = 4.0
+CUE_REVIEW_CONFIDENCE_FLOOR = 0.70
+CUE_LOW_CONFIDENCE_FLOOR = 0.50
+
+CUE_SOURCE_BASE_SCORE: dict[str, float] = {
+    "dj": 1.0,
+    "rekordbox": 1.0,
+    "rb": 1.0,
+    "anlz": 0.82,
+    "auto": 0.65,
+    "fallback": 0.25,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +138,8 @@ class TransitionCandidate:
     from_camelot: str | None
     to_camelot: str | None
     cue_slot: str | None
+    cue_source: str | None
+    cue_confidence: float | None
     start_in_bars: int | None
     score: float
     confidence: float
@@ -249,20 +262,15 @@ def phrase_alignment_score(
 def cue_operability_score(section: SectionRecord) -> tuple[float, tuple[str, ...]]:
     """Grade whether the destination has a practical cue handle."""
     flags: list[str] = []
-    source = (section.cue_source or section.source or "").lower()
+    source = _normalized_cue_source(section)
     if section.cue_slot:
-        if source == "dj":
-            score = 1.0
-        elif source == "anlz":
-            score = 0.82
-        elif source == "auto":
-            score = 0.65
+        score = CUE_SOURCE_BASE_SCORE.get(source or "", 0.52)
+        if source == "auto":
             flags.append("auto_cue_review")
         elif source == "fallback":
-            score = 0.25
             flags.append("fallback_entry")
-        else:
-            score = 0.52
+        elif source is None:
+            flags.append("cue_source_unknown")
     else:
         score = 0.52
         flags.append("no_cue_slot")
@@ -272,9 +280,20 @@ def cue_operability_score(section: SectionRecord) -> tuple[float, tuple[str, ...
     if section.bar_count is not None and section.bar_count < 16:
         score -= 0.15
         flags.append("short_entry_window")
-    if section.cue_confidence is not None and section.cue_confidence < 0.5:
-        score -= 0.20
-        flags.append("auto_cue_review")
+    cue_confidence = _clamped_cue_confidence(section.cue_confidence)
+    if cue_confidence is None and section.cue_slot and source not in {"dj", "rekordbox", "rb"}:
+        score -= 0.06
+        flags.append("cue_confidence_unknown")
+    elif cue_confidence is not None and cue_confidence < CUE_LOW_CONFIDENCE_FLOOR:
+        score -= 0.25
+        flags.append("low_cue_confidence")
+        if source == "auto":
+            flags.append("auto_cue_review")
+    elif cue_confidence is not None and cue_confidence < CUE_REVIEW_CONFIDENCE_FLOOR:
+        score -= 0.10
+        flags.append("cue_needs_review")
+        if source == "auto":
+            flags.append("auto_cue_review")
     return clamp01(score), tuple(dict.fromkeys(flags))
 
 
@@ -338,6 +357,8 @@ def _score_one(
         return None
 
     cue_slot = destination.cue_slot
+    cue_source = _normalized_cue_source(destination)
+    cue_confidence = _clamped_cue_confidence(destination.cue_confidence)
     start_in_bars = _start_in_bars(scoring_input, phrase)
     transition_key = _transition_key(
         strategy_version,
@@ -364,6 +385,8 @@ def _score_one(
         from_camelot=source.camelot,
         to_camelot=destination.camelot,
         cue_slot=cue_slot,
+        cue_source=cue_source,
+        cue_confidence=cue_confidence,
         start_in_bars=start_in_bars,
         score=score,
         confidence=confidence,
@@ -618,6 +641,10 @@ def _reasons(
         "semantic_unknown": "section texture is not embedded yet",
         "semantic_dim_mismatch": "section texture vectors are not comparable yet",
         "timing_low_confidence": "timing is not locked, so exact bars are withheld",
+        "auto_cue_review": "auto-generated cue needs review before trusting it",
+        "cue_needs_review": "cue confidence is below the review threshold",
+        "low_cue_confidence": "cue confidence is low",
+        "cue_confidence_unknown": "cue confidence is unknown",
     }
     ordered_risks = [risk_reasons[flag] for flag in risk_flags if flag in risk_reasons]
     return tuple(positives[:2] + ordered_risks[:2])
@@ -673,6 +700,26 @@ def _transition_key(
     return hashlib.sha256(raw).hexdigest()[:16]
 
 
+def _normalized_cue_source(section: SectionRecord) -> str | None:
+    raw = section.cue_source or section.source
+    if raw is None:
+        return None
+    normalized = raw.strip().lower().replace("-", "_").replace(" ", "_")
+    if not normalized:
+        return None
+    if normalized in {"hotcue", "hot_cue", "memory", "memory_cue", "user"}:
+        return "dj"
+    if normalized in {"rekordbox", "rb"}:
+        return "rekordbox"
+    return normalized
+
+
+def _clamped_cue_confidence(confidence: float | None) -> float | None:
+    if confidence is None:
+        return None
+    return clamp01(confidence)
+
+
 def _camelot_parts(raw: str | None) -> tuple[int, str] | None:
     code = harmonics.to_camelot(raw)
     if code is None:
@@ -690,6 +737,8 @@ def _dedupe_flags(flags: tuple[str, ...]) -> tuple[str, ...]:
 
 
 __all__ = [
+    "CUE_LOW_CONFIDENCE_FLOOR",
+    "CUE_REVIEW_CONFIDENCE_FLOOR",
     "EXACT_TIMING_CONFIDENCE_FLOOR",
     "LIVE_SECTION_CONFIDENCE_FLOOR",
     "LIVE_SELECT_CONFIDENCE_FLOOR",

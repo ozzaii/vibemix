@@ -180,6 +180,8 @@ def test_suggestion_includes_set_aware_transition_when_cues_exist(library):
     assert s.transition["to_start_s"] == 0.0
     assert s.transition["from_camelot"] == "8A"
     assert s.transition["to_camelot"] == "9A"
+    assert s.transition["cue_source"] == "dj"
+    assert s.transition["cue_confidence"] == 1.0
     assert s.transition["start_in_bars"] is None  # no live playhead confidence yet
     assert "enter cue A" not in s.why  # the dedicated transition line owns actions
 

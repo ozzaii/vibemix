@@ -53,6 +53,8 @@ def _suggestion_transition(
         "from_camelot": "8A",
         "to_camelot": "9A",
         "cue_slot": "A",
+        "cue_source": "auto",
+        "cue_confidence": 0.62,
         "start_in_bars": 8,
         "score": 0.84,
         "confidence": 0.91,
@@ -231,6 +233,8 @@ def test_compile_suggestion_context_from_live_pill_shortlist() -> None:
     ]
     assert [candidate["to_track_id"] for candidate in envelope.candidates] == ["t2", "t3"]
     assert envelope.candidates[0]["scores"]["semantic"] == 0.92
+    assert envelope.candidates[0]["recommended_cue_source"] == "auto"
+    assert envelope.candidates[0]["recommended_cue_confidence"] == 0.62
     assert "filepath" not in envelope.current
     assert "vector" not in envelope.current
     assert envelope.constraints["raw_vectors_included"] is False

@@ -129,6 +129,10 @@ RISK_PENALTIES: dict[str, float] = {
     "bpm_unknown": 0.06,
     "key_unknown": 0.06,
     "phrase_unknown": 0.06,
+    "low_cue_confidence": 0.06,
+    "cue_source_unknown": 0.04,
+    "cue_needs_review": 0.04,
+    "cue_confidence_unknown": 0.03,
     "energy_unknown": 0.05,
     "auto_cue_review": 0.04,
 }

@@ -104,6 +104,20 @@ def test_cue_operability_dj_cue_highest() -> None:
     assert flags == ()
 
 
+def test_cue_operability_auto_cue_is_reviewable() -> None:
+    review_score, review_flags = cue_operability_score(
+        _section("t2#s000", "t2", "intro", cue_slot="A", cue_source="auto", cue_confidence=0.62)
+    )
+    low_score, low_flags = cue_operability_score(
+        _section("t2#s001", "t2", "intro", cue_slot="B", cue_source="auto", cue_confidence=0.32)
+    )
+
+    assert review_score == pytest.approx(0.63)
+    assert {"auto_cue_review", "cue_needs_review"} <= set(review_flags)
+    assert low_score < review_score
+    assert {"auto_cue_review", "low_cue_confidence"} <= set(low_flags)
+
+
 def test_scorer_ranks_grounded_cue_aware_transition() -> None:
     source = _section(
         "t1#s000",
@@ -147,6 +161,8 @@ def test_scorer_ranks_grounded_cue_aware_transition() -> None:
     assert candidate.from_camelot == "8A"
     assert candidate.to_camelot == "9A"
     assert candidate.cue_slot == "A"
+    assert candidate.cue_source == "dj"
+    assert candidate.cue_confidence == pytest.approx(0.95)
     assert candidate.score > 0.70
     assert "outro into intro is a strong role pair" in candidate.reasons
 
