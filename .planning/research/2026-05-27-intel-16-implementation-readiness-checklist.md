@@ -621,6 +621,9 @@ done: `scripts/eval/intel_gate.py` marks scorecard/provenance-stage mismatches
       replay tier, and threshold-lock hash
 done: `scripts/release/check_gate.sh` rejects INTEL artifacts whose dataset card
       id or fixture version does not match the current fixture manifest
+done: `scripts/release/check_gate.sh` validates provenance-stage replay tier,
+      fixture manifest hash, thresholds hash, and threshold-lock hash against
+      the current release evidence, not only the scorecard provenance copy
 pending: private-label release threshold recalibration note
 ```
 

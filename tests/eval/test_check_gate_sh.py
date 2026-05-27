@@ -178,6 +178,15 @@ def _make_nightly_run(
                         "valid": intel_gate_valid,
                         "dataset_card_id": intel_manifest["dataset_card_id"],
                         "fixture_version": intel_manifest["fixture_version"],
+                        "fixture_manifest_hash": _intel_fixture_manifest_hash(),
+                        "thresholds_hash": _intel_thresholds_hash(),
+                        "threshold_lock": {
+                            "source": "threshold_lock",
+                            "namespace": "intel_thresholds",
+                            "path": "eval/INTEL-THRESHOLD-LOCK.md",
+                            "hash": _intel_threshold_lock_hash(),
+                        },
+                        "replay_tier": "tier0_fixture_replay",
                     },
                 },
             },
@@ -577,6 +586,60 @@ def test_intel_gate_json_wrong_provenance_fixture_version_fails(tmp_path: Path):
     assert result.returncode == 1
     assert "BLOCKED_BY=intel" in result.stderr
     assert "provenance.fixture_version=old_fixture" in result.stderr
+
+
+def test_intel_gate_json_wrong_provenance_replay_tier_fails(tmp_path: Path):
+    """The provenance-validation stage must be the Tier 0 fixture replay."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["provenance"]["replay_tier"] = "manual_notes"
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "provenance.replay_tier=manual_notes" in result.stderr
+
+
+def test_intel_gate_json_wrong_provenance_threshold_hash_fails(tmp_path: Path):
+    """The provenance-validation stage must match current parsed INTEL thresholds."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["provenance"]["thresholds_hash"] = "sha256:" + ("2" * 64)
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "provenance.thresholds_hash mismatch" in result.stderr
+
+
+def test_intel_gate_json_wrong_provenance_threshold_lock_hash_fails(tmp_path: Path):
+    """The provenance-validation stage must match the current INTEL lock file."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["provenance"]["threshold_lock"]["hash"] = "sha256:" + ("3" * 64)
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "provenance.threshold_lock.hash mismatch" in result.stderr
 
 
 def test_intel_gate_json_missing_fixture_audit_manifest_hash_fails(tmp_path: Path):

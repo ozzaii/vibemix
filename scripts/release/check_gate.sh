@@ -24,6 +24,7 @@
 #        - artifact fixture-manifest hash matches the current fixture corpus
 #        - fixture-audit manifest hash agrees with scorecard provenance
 #        - artifact dataset card/version match the current fixture manifest
+#        - provenance stage hashes/replay tier match current evidence too
 #        - artifact thresholds hash matches current INTEL lock values
 #        - artifact threshold-lock hash matches the current INTEL lock
 #
@@ -268,6 +269,8 @@ else
             "scorecard.artifact_status contains false"
           elif .stages.scorecard.provenance.replay_tier != "tier0_fixture_replay" then
             "scorecard.provenance.replay_tier=\(.stages.scorecard.provenance.replay_tier // "missing")"
+          elif .stages.provenance.replay_tier != "tier0_fixture_replay" then
+            "provenance.replay_tier=\(.stages.provenance.replay_tier // "missing")"
           elif .stages.scorecard.provenance.dataset_card_id != $expected_dataset_card_id then
             "scorecard.provenance.dataset_card_id=\(.stages.scorecard.provenance.dataset_card_id // "missing")"
           elif .stages.provenance.dataset_card_id != $expected_dataset_card_id then
@@ -280,6 +283,10 @@ else
             "scorecard.provenance.fixture_manifest_hash missing"
           elif .stages.scorecard.provenance.fixture_manifest_hash != $expected_fixture_manifest_hash then
             "scorecard.provenance.fixture_manifest_hash mismatch"
+          elif (sha256_hash(.stages.provenance.fixture_manifest_hash // "") | not) then
+            "provenance.fixture_manifest_hash missing"
+          elif .stages.provenance.fixture_manifest_hash != $expected_fixture_manifest_hash then
+            "provenance.fixture_manifest_hash mismatch"
           elif (sha256_hash(.stages.fixture_audit.manifest_hash // "") | not) then
             "fixture_audit.manifest_hash missing"
           elif .stages.fixture_audit.manifest_hash != $expected_fixture_manifest_hash then
@@ -290,10 +297,18 @@ else
             "scorecard.provenance.thresholds_hash missing"
           elif .stages.scorecard.provenance.thresholds_hash != $expected_intel_thresholds_hash then
             "scorecard.provenance.thresholds_hash mismatch"
+          elif (sha256_hash(.stages.provenance.thresholds_hash // "") | not) then
+            "provenance.thresholds_hash missing"
+          elif .stages.provenance.thresholds_hash != $expected_intel_thresholds_hash then
+            "provenance.thresholds_hash mismatch"
           elif (sha256_hash(.stages.scorecard.provenance.threshold_lock_hash // "") | not) then
             "scorecard.provenance.threshold_lock_hash missing"
           elif .stages.scorecard.provenance.threshold_lock_hash != $expected_intel_lock_hash then
             "scorecard.provenance.threshold_lock_hash mismatch"
+          elif (sha256_hash(.stages.provenance.threshold_lock.hash // "") | not) then
+            "provenance.threshold_lock.hash missing"
+          elif .stages.provenance.threshold_lock.hash != $expected_intel_lock_hash then
+            "provenance.threshold_lock.hash mismatch"
           else
             "ok"
           end

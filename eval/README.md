@@ -63,11 +63,12 @@ write `.planning/eval-runs/<sha>/intel_gate.json` with metric, gate, artifact,
 and provenance-hash evidence; the release gate requires recent runs to report
 `"valid": true` and to match the current INTEL fixture-manifest and
 threshold-lock hashes, including the current dataset card, fixture version, and
-parsed INTEL threshold values. It also rejects artifacts where the fixture-audit
-stage and scorecard provenance disagree about the fixture manifest. The INTEL
-gate also marks artifacts invalid at generation time when scorecard provenance
-and the provenance-validation stage disagree about their dataset, fixture,
-threshold, replay-tier, or lock hashes.
+parsed INTEL threshold values. It checks both scorecard provenance and the
+provenance-validation stage. It also rejects artifacts where the fixture-audit
+stage and scorecard provenance disagree about the fixture manifest. The INTEL gate
+marks artifacts invalid at generation time when scorecard provenance and the
+provenance-validation stage disagree about their dataset, fixture, threshold,
+replay-tier, or lock hashes.
 
 ## 2-Judge Architecture (high level)
 
