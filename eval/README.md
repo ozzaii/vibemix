@@ -76,6 +76,10 @@ INTEL thresholds is tracked in
 [`eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md`](INTEL-THRESHOLD-RECALIBRATION-LOG.md);
 the public log records only redacted split counts, aggregate metrics, canonical
 report hashes, threshold hashes, privacy flags, and actions.
+`scripts/eval/intel_gold.py validate` is the executable guard for those private
+gold-label JSONL files: split names are validated as written, so typos such as a
+misspelled holdout split do not silently become calibration evidence, and the
+validate/report CLI exits non-zero when labels are invalid.
 `scripts/eval/intel_recalibration_note.py` renders that append-only entry from
 redacted private scorecard/gold/taste/gate reports, binds it to those aggregate
 reports by SHA-256, rejects malformed timestamp/run-id identity fields before
@@ -208,6 +212,7 @@ scope for v3.0:
 - [`eval/corpus/LICENSES.md`](corpus/LICENSES.md) — corpus attribution + licenses.
 - [`eval/rubrics/`](rubrics/) — judge rubric bodies (`judge_pro.md`, `judge_flash.md`).
 - [`scripts/eval/replay_harness.py`](../scripts/eval/replay_harness.py) — deterministic replay CLI.
+- [`scripts/eval/intel_gold.py`](../scripts/eval/intel_gold.py) — validates and redacts private INTEL gold-label evidence.
 - [`scripts/eval/intel_recalibration_note.py`](../scripts/eval/intel_recalibration_note.py) — renders redacted private-label INTEL recalibration log entries.
 - [`scripts/eval/intel_recalibration_log_validate.py`](../scripts/eval/intel_recalibration_log_validate.py) — validates the public INTEL recalibration log schema, current-lock hash binding, strict key-value tokens, append-order coherence, and report-hash bindings.
 - [`scripts/release/check_gate.sh`](../scripts/release/check_gate.sh) — Gate-2 umbrella that combines the hybrid gate and INTEL fixture gate.

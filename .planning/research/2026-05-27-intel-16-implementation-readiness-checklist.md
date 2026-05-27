@@ -536,6 +536,10 @@ done: scripts/eval/intel_gold.py
 done: tests/intel/test_gold_labels.py
 done: tests/intel/test_gold_sampling.py
 done: tests/eval/test_intel_gold_validation.py
+done: gold-label parsing preserves invalid split names for validation instead
+      of silently coercing them into calibration evidence
+done: `scripts/eval/intel_gold.py validate/report` exits non-zero when private
+      gold-label evidence is invalid
 done: eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md defines the redacted
       private-label calibration/holdout/canary note format for future threshold
       movement

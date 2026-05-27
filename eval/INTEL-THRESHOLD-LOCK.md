@@ -90,7 +90,9 @@ Changing any `intel_thresholds` value requires:
 3. For private-label calibration or release-gate promotion, append a redacted
    entry to `eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` with calibration,
    holdout, and canary split counts plus the measured/locked/delta values. Use
-   `scripts/eval/intel_recalibration_note.py` to render that entry from
+   `scripts/eval/intel_gold.py validate` before rendering the report; invalid
+   split names must fail rather than being coerced into calibration evidence.
+   Use `scripts/eval/intel_recalibration_note.py` to render that entry from
    redacted reports. The redacted gold-label report and scorecard hashes are
    mandatory; release-gate promotion also requires a non-null gate artifact
    hash.

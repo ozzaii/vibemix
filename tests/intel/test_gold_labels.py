@@ -89,6 +89,26 @@ def test_validate_gold_labels_requires_all_splits_and_known_ids() -> None:
     assert result.counts["splits"] == {"calibration": 1, "canary": 1, "holdout": 1}
 
 
+def test_invalid_split_survives_parse_for_validation() -> None:
+    labels = (
+        parse_gold_label(
+            {
+                "label_id": "lbl_bad_split",
+                "split": "holdot",
+                "rubric_version": RUBRIC_VERSION,
+                "candidate_id": "tr_001",
+                "label": "would_play",
+            }
+        ),
+    )
+
+    result = validate_gold_labels(labels, require_all_splits=False)
+
+    assert labels[0].split == "holdot"
+    assert result.valid is False
+    assert "lbl_bad_split:invalid_split:holdot" in result.errors
+
+
 def test_validate_gold_labels_catches_unknown_candidate_and_action_id_leak() -> None:
     labels = (
         parse_gold_label(

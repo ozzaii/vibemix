@@ -181,6 +181,8 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write("\n")
     else:
         print(_summary(result))
+    if result["schema"] in {"intel_gold_validation_v1", "intel_gold_report_v1"}:
+        return 0 if result.get("valid") is True else 1
     return 0
 
 

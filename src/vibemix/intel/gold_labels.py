@@ -99,8 +99,6 @@ def parse_gold_label(row: dict[str, Any], *, default_split: GoldSplit = "calibra
     kind = _infer_kind(row)
     label = _normalize_label(kind, str(row.get("label") or ""))
     split = str(row.get("split") or default_split)
-    if split not in ALLOWED_SPLITS:
-        split = default_split
     return GoldLabel(
         label_id=str(row.get("label_id") or ""),
         kind=kind,
