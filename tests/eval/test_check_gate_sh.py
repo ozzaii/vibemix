@@ -121,7 +121,10 @@ def _make_nightly_run(
                 "valid": intel_gate_valid,
                 "errors": [] if intel_gate_valid else ["fixture regression"],
                 "stages": {
-                    "fixture_audit": {"valid": intel_gate_valid},
+                    "fixture_audit": {
+                        "valid": intel_gate_valid,
+                        "manifest_hash": _intel_fixture_manifest_hash(),
+                    },
                     "scorecard": {
                         "valid": intel_gate_valid,
                         "passed": intel_gate_valid,
@@ -517,6 +520,42 @@ def test_intel_gate_json_stale_fixture_manifest_hash_fails(tmp_path: Path):
     assert result.returncode == 1
     assert "BLOCKED_BY=intel" in result.stderr
     assert "scorecard.provenance.fixture_manifest_hash mismatch" in result.stderr
+
+
+def test_intel_gate_json_missing_fixture_audit_manifest_hash_fails(tmp_path: Path):
+    """Fixture audit stage must carry the same manifest evidence as scorecard provenance."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["fixture_audit"].pop("manifest_hash")
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "fixture_audit.manifest_hash missing" in result.stderr
+
+
+def test_intel_gate_json_fixture_audit_manifest_hash_disagreement_fails(tmp_path: Path):
+    """The two INTEL stages cannot point at different fixture manifests."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["fixture_audit"]["manifest_hash"] = "sha256:" + ("f" * 64)
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "fixture_audit.manifest_hash mismatch" in result.stderr
 
 
 def test_intel_gate_json_stale_threshold_lock_hash_fails(tmp_path: Path):

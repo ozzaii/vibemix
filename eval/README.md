@@ -62,7 +62,8 @@ The musical-intelligence fixture gate has its own lock at
 write `.planning/eval-runs/<sha>/intel_gate.json` with metric, gate, artifact,
 and provenance-hash evidence; the release gate requires recent runs to report
 `"valid": true` and to match the current INTEL fixture-manifest and
-threshold-lock hashes.
+threshold-lock hashes. It also rejects artifacts where the fixture-audit stage
+and scorecard provenance disagree about the fixture manifest.
 
 ## 2-Judge Architecture (high level)
 

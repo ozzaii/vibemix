@@ -610,6 +610,8 @@ done: `scripts/release/check_gate.sh` rejects stale INTEL artifacts whose
       threshold-lock hash does not match the current `eval/INTEL-THRESHOLD-LOCK.md`
 done: `scripts/release/check_gate.sh` rejects stale INTEL artifacts whose
       fixture-manifest hash does not match the current `tests/intel/fixtures/MANIFEST.json`
+done: `scripts/release/check_gate.sh` rejects inconsistent INTEL artifacts whose
+      fixture-audit manifest hash disagrees with scorecard provenance
 pending: private-label release threshold recalibration note
 ```
 

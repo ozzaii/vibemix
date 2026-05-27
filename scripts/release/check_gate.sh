@@ -22,6 +22,7 @@
 #        - every artifact_status entry is true
 #        - fixture/threshold provenance hashes and replay tier are present
 #        - artifact fixture-manifest hash matches the current fixture corpus
+#        - fixture-audit manifest hash agrees with scorecard provenance
 #        - artifact threshold-lock hash matches the current INTEL lock
 #
 #   3. scripts/release/check_ear_test.sh exits 0 (≥2 ear-test sessions
@@ -236,6 +237,12 @@ else
             "scorecard.provenance.fixture_manifest_hash missing"
           elif .stages.scorecard.provenance.fixture_manifest_hash != $expected_fixture_manifest_hash then
             "scorecard.provenance.fixture_manifest_hash mismatch"
+          elif (sha256_hash(.stages.fixture_audit.manifest_hash // "") | not) then
+            "fixture_audit.manifest_hash missing"
+          elif .stages.fixture_audit.manifest_hash != $expected_fixture_manifest_hash then
+            "fixture_audit.manifest_hash mismatch"
+          elif .stages.fixture_audit.manifest_hash != .stages.scorecard.provenance.fixture_manifest_hash then
+            "fixture_audit.manifest_hash disagrees with scorecard provenance"
           elif (sha256_hash(.stages.scorecard.provenance.thresholds_hash // "") | not) then
             "scorecard.provenance.thresholds_hash missing"
           elif (sha256_hash(.stages.scorecard.provenance.threshold_lock_hash // "") | not) then
