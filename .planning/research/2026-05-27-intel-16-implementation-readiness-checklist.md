@@ -446,6 +446,8 @@ Acceptance evidence:
 - playlist/M3U/JSON creation language requires a `playlist_created` action claim;
 - completed export/playlist language requires success-valued action claims, not
   failed/planned action rows;
+- cue/playhead timestamp copy (`at 1:23`, `at 32 seconds`) requires a matching
+  `section_boundary` or `current_position` claim value;
 - stayed-quiet / suppressed-output explanations require a `decision_suppressed`
   or `blend_suppression` claim;
 - audience predictions and absolute "perfect/guaranteed" transition language are

@@ -134,6 +134,86 @@ def test_phrase_boundary_copy_requires_phrase_claim() -> None:
     assert "missing_claim_id_for_phrase" in result.errors
 
 
+def test_cue_timestamp_copy_requires_boundary_or_position_claim() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "cue_slot"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="Use cue A at 3:10.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_timestamp" in result.errors
+
+
+def test_cue_timestamp_copy_rejects_mismatched_boundary_claim_value() -> None:
+    envelope = _envelope(
+        claim_summary=(
+            _claim("clm_ctx_001_000", "cue_slot"),
+            _claim("clm_ctx_001_001", "section_boundary", value=64.0),
+        )
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="Use cue A at 3:10.",
+            cited_claim_ids=("clm_ctx_001_000", "clm_ctx_001_001"),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "timestamp_claim_value_mismatch:clm_ctx_001_001:190" in result.errors
+
+
+def test_cue_timestamp_copy_accepts_matching_boundary_claim_value() -> None:
+    envelope = _envelope(
+        claim_summary=(
+            _claim("clm_ctx_001_000", "cue_slot"),
+            _claim("clm_ctx_001_001", "section_boundary", value=190.0),
+        )
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="Use cue A at 3:10.",
+            cited_claim_ids=("clm_ctx_001_000", "clm_ctx_001_001"),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
+def test_seconds_timestamp_copy_accepts_matching_current_position_claim() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "current_position", value=32.2),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="The source position is at 32 seconds.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
 def test_loop_held_copy_requires_risk_claim() -> None:
     envelope = _envelope(claim_summary=())
 

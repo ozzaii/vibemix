@@ -5,13 +5,24 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from math import isfinite
 from typing import Any, Literal
 
 from vibemix.intel.agent_contract import AgentContextEnvelope, AgentDecision
 
 ClaimValidationStatus = Literal["accepted", "rejected"]
+_TIMESTAMP_TOLERANCE_S = 0.51
 
 _TIMING_RE = re.compile(r"\b(?:in|after)\s+\d+\s+(?:bar|bars|beat|beats|second|seconds)\b", re.I)
+_CLOCK_TIMESTAMP_RE = re.compile(
+    r"\b(?:at|around|near|from)\s+(?P<minute>\d{1,3}):(?P<second>[0-5]\d)\b", re.I
+)
+_SECONDS_TIMESTAMP_RE = re.compile(
+    r"\b(?:at|around|near|from)\s+"
+    r"(?P<seconds>\d+(?:\.\d+)?)\s*(?:s|sec|secs|second|seconds)\b",
+    re.I,
+)
+_TIMESTAMP_RE = re.compile(f"{_CLOCK_TIMESTAMP_RE.pattern}|{_SECONDS_TIMESTAMP_RE.pattern}", re.I)
 _CUE_RE = re.compile(r"\b(?:hot\s+cue|cue\s+[A-H])\b", re.I)
 _HARMONIC_RE = re.compile(r"\b(?:key|harmonic|camelot|neighboring?\s+key)\b", re.I)
 _TEMPO_RE = re.compile(r"\b(?:bpm|tempo|pitch)\b", re.I)
@@ -48,6 +59,7 @@ _UNSUPPORTED_MUSICAL_FACT_RE = re.compile(
 
 _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "timing": frozenset({"bars_until_event", "current_position"}),
+    "timestamp": frozenset({"section_boundary", "current_position"}),
     "cue": frozenset({"cue_slot", "cue_role", "cue_export_status", "cue_operability"}),
     "harmonic": frozenset({"harmonic_fit"}),
     "tempo": frozenset({"tempo_fit"}),
@@ -130,6 +142,7 @@ def validate_decision_claims(
             errors.append(f"missing_claim_id_for_{family}")
     _validate_cue_export_status_phrase(text, cited_rows, errors)
     _validate_action_success_phrases(text, cited_rows, errors)
+    _validate_timestamp_phrases(text, cited_rows, errors)
 
     return (
         ClaimValidationResult("rejected", tuple(errors))
@@ -142,6 +155,7 @@ def _claim_families_implied_by_text(text: str) -> tuple[str, ...]:
     families: list[str] = []
     checks = (
         ("timing", _TIMING_RE),
+        ("timestamp", _TIMESTAMP_RE),
         ("cue", _CUE_RE),
         ("harmonic", _HARMONIC_RE),
         ("tempo", _TEMPO_RE),
@@ -195,12 +209,69 @@ def _validate_action_success_phrases(
         errors.append(f"action_claim_not_success:{claim_id}:{claim_type}")
 
 
+def _validate_timestamp_phrases(
+    text: str,
+    cited_rows: list[dict[str, Any]],
+    errors: list[str],
+) -> None:
+    implied_seconds = _timestamp_seconds_implied_by_text(text)
+    if not implied_seconds:
+        return
+    rows = [
+        row for row in cited_rows if row.get("type") in {"section_boundary", "current_position"}
+    ]
+    if not rows:
+        return
+    for seconds in implied_seconds:
+        if any(_claim_value_matches_seconds(row.get("value"), seconds) for row in rows):
+            continue
+        claim_id = str(rows[0].get("claim_id") or "unknown")
+        errors.append(f"timestamp_claim_value_mismatch:{claim_id}:{_format_seconds(seconds)}")
+
+
 def _claim_value_is_success(value: Any) -> bool:
     if value is True:
         return True
     if not isinstance(value, str):
         return False
     return value.strip().lower() in _SUCCESS_CLAIM_VALUES
+
+
+def _timestamp_seconds_implied_by_text(text: str) -> tuple[float, ...]:
+    seconds: list[float] = []
+    for match in _CLOCK_TIMESTAMP_RE.finditer(text):
+        seconds.append(int(match.group("minute")) * 60 + int(match.group("second")))
+    for match in _SECONDS_TIMESTAMP_RE.finditer(text):
+        seconds.append(float(match.group("seconds")))
+    return tuple(dict.fromkeys(seconds))
+
+
+def _claim_value_matches_seconds(value: Any, seconds: float) -> bool:
+    parsed = _claim_value_seconds(value)
+    return parsed is not None and abs(parsed - seconds) <= _TIMESTAMP_TOLERANCE_S
+
+
+def _claim_value_seconds(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        number = float(value)
+        return number if isfinite(number) and number >= 0.0 else None
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    clock = re.fullmatch(r"(?P<minute>\d{1,3}):(?P<second>[0-5]\d)", stripped)
+    if clock is not None:
+        return int(clock.group("minute")) * 60 + int(clock.group("second"))
+    try:
+        number = float(stripped)
+    except ValueError:
+        return None
+    return number if isfinite(number) and number >= 0.0 else None
+
+
+def _format_seconds(seconds: float) -> str:
+    return str(int(seconds)) if seconds.is_integer() else f"{seconds:.3f}".rstrip("0").rstrip(".")
 
 
 def _cue_export_statuses_implied_by_text(text: str) -> tuple[str, ...]:
