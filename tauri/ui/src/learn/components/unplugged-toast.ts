@@ -17,6 +17,17 @@
 
 const AUTO_DISMISS_MS = 4000;
 
+// IN-03 fix (REVIEW.md): `setTimeout` returns `number` in the browser and
+// a `Timeout` object in node/jsdom. The prior implementation stored the
+// handle via `dataset.dismissTimer = String(handle)` and later
+// `clearTimeout(Number(stored))` — works in the browser but yields
+// `clearTimeout(NaN)` (a silent no-op) in jsdom where `String(Timeout)`
+// is `"[object Object]"`. The auto-dismiss restart on duplicate toasts
+// would leak the old timer in test fixtures. Track handles in a
+// module-scoped WeakMap keyed on the toast element so we never round-trip
+// through dataset strings; tear-down survives jsdom equally well.
+const dismissTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
+
 /**
  * Surface the unplugged toast. Idempotent — if one is already mounted
  * we replace its text in place rather than stacking.
@@ -26,11 +37,12 @@ export function showUnpluggedToast(displayName: string): void {
   if (existing) {
     existing.textContent = `${displayName} disconnected.`;
     // Restart the auto-dismiss clock.
-    const stored = existing.dataset.dismissTimer;
-    if (stored) {
-      clearTimeout(Number(stored));
+    const prior = dismissTimers.get(existing);
+    if (prior !== undefined) {
+      clearTimeout(prior);
     }
-    existing.dataset.dismissTimer = String(
+    dismissTimers.set(
+      existing,
       setTimeout(() => existing.remove(), AUTO_DISMISS_MS),
     );
     return;
@@ -41,7 +53,8 @@ export function showUnpluggedToast(displayName: string): void {
   toast.setAttribute("role", "status");
   toast.setAttribute("aria-live", "polite");
   toast.textContent = `${displayName} disconnected.`;
-  toast.dataset.dismissTimer = String(
+  dismissTimers.set(
+    toast,
     setTimeout(() => toast.remove(), AUTO_DISMISS_MS),
   );
   document.body.appendChild(toast);
