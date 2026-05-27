@@ -227,6 +227,7 @@ class SuggestionService:
         self._candidate_vector: Any | None = None
         self._candidate_vectors_by_track_id: dict[str, Any] = {}
         self._pinned_candidate_track_id: str | None = None
+        self._timing_suppressed_pairs: set[tuple[str, str]] = set()
         self._last_refresh_at = 0.0
         self._last_compute_seed_track_id: str | None = None
         self._compute_inflight = False
@@ -342,6 +343,7 @@ class SuggestionService:
         with self._lock:
             suggestion = dict(self._current) if self._current is not None else None
             seed_track_id = self._seed_track_id
+            candidate_track_id = self._candidate_track_id
             candidate_vectors_by_track_id = {
                 tid: vector.copy() for tid, vector in self._candidate_vectors_by_track_id.items()
             }
@@ -361,12 +363,22 @@ class SuggestionService:
         )
         if event is not None:
             self._emit_feedback(event)
+        if label == "accepted" and candidate_track_id is not None:
+            with self._lock:
+                if self._current is not None:
+                    self._pinned_candidate_track_id = candidate_track_id
         if label == "not_now":
             self._promote_next_backup_after_feedback(
                 suggestion,
                 candidate_vectors_by_track_id,
                 fallback_candidate_track_id=fallback_candidate_track_id,
                 fallback_candidate_vector=fallback_candidate_vector,
+                state=state,
+            )
+        if label == "wrong_timing" and seed_track_id is not None and candidate_track_id is not None:
+            self._suppress_timing_for_pair(
+                seed_track_id,
+                candidate_track_id,
                 state=state,
             )
         return event
@@ -412,6 +424,26 @@ class SuggestionService:
             self._candidate_track_id = selected_track_id
             self._candidate_vector = selected_vector.copy() if selected_vector is not None else None
             self._pinned_candidate_track_id = selected_track_id
+
+    def _suppress_timing_for_pair(
+        self,
+        seed_track_id: str,
+        candidate_track_id: str,
+        *,
+        state: Any | None,
+    ) -> None:
+        key = (seed_track_id, candidate_track_id)
+        with self._lock:
+            current = dict(self._current) if self._current is not None else None
+            self._timing_suppressed_pairs.add(key)
+        if current is None:
+            return
+        _strip_suggestion_timing(current, candidate_track_id)
+        if state is not None:
+            current["decision"] = self._safe_decision_payload_for_suggestion(state, current)
+        with self._lock:
+            if self._current is not None and self._seed_track_id == seed_track_id:
+                self._current = current
 
     def _feedback_event_for_choice(
         self,
@@ -810,6 +842,10 @@ class SuggestionService:
                 for track_id, vector in candidate_vectors_by_track_id.items()
             }
             self._pinned_candidate_track_id = None
+            if previous_seed_track_id != seed_track_id:
+                self._timing_suppressed_pairs = {
+                    pair for pair in self._timing_suppressed_pairs if pair[0] == seed_track_id
+                }
             self._last_compute_seed_track_id = seed_track_id
             self._last_refresh_at = 0.0
         if outcome_event is not None:
@@ -883,6 +919,7 @@ class SuggestionService:
                 for track_id, vector in self._candidate_vectors_by_track_id.items()
             }
             pinned_candidate_track_id = self._pinned_candidate_track_id
+            timing_suppressed_pairs = set(self._timing_suppressed_pairs)
 
         if current is None or seed_track_id is None or seed_vector is None:
             return current
@@ -905,6 +942,9 @@ class SuggestionService:
                     self._candidate_vector = None
                     self._candidate_vectors_by_track_id = {}
                     self._pinned_candidate_track_id = None
+                    self._timing_suppressed_pairs = {
+                        pair for pair in self._timing_suppressed_pairs if pair[0] != seed_track_id
+                    }
                     self._last_compute_seed_track_id = None
             if feedback_event is not None:
                 self._emit_feedback(feedback_event)
@@ -939,6 +979,10 @@ class SuggestionService:
                     destination_vector=candidate_vectors_by_track_id.get(track_id),
                     taste_scores=self._taste_scores,
                 )
+                if (seed_track_id, track_id) in timing_suppressed_pairs:
+                    refreshed_transitions[track_id] = _strip_transition_timing(
+                        refreshed_transitions[track_id]
+                    )
             alternatives = ranked_transition_alternatives(
                 alternatives,
                 refreshed_transitions,
@@ -975,6 +1019,8 @@ class SuggestionService:
                 transition,
                 _float_or(current.get("similarity"), None),
             )
+            if (seed_track_id, candidate_track_id) in timing_suppressed_pairs:
+                transition = _strip_transition_timing(transition)
             current["transition"] = transition
         current["decision"] = self._safe_decision_payload_for_suggestion(state, current)
         with self._lock:
@@ -1091,6 +1137,35 @@ def _apply_winning_alternative(
     if vector is None and track_id == fallback_candidate_track_id:
         vector = fallback_candidate_vector
     return track_id, vector
+
+
+def _strip_suggestion_timing(suggestion: dict, track_id: str) -> None:
+    transition = _dict_or_none(suggestion.get("transition"))
+    if transition is not None and transition.get("to_track_id") == track_id:
+        suggestion["transition"] = _strip_transition_timing(transition)
+    alternatives = []
+    for alternative in _coerce_transition_alternatives(suggestion.get("transition_alternatives")):
+        row = dict(alternative)
+        if row.get("track_id") == track_id:
+            row["transition"] = _strip_transition_timing(_dict_or_none(row.get("transition")))
+        alternatives.append(row)
+    if alternatives:
+        suggestion["transition_alternatives"] = tuple(alternatives)
+
+
+def _strip_transition_timing(transition: dict | None) -> dict | None:
+    if transition is None:
+        return None
+    out = dict(transition)
+    out["start_in_bars"] = None
+    out["timing_basis"] = None
+    out["timing_anchor"] = None
+    out["source_anchor_s"] = None
+    risk_flags = [str(flag) for flag in (out.get("risk_flags") or ())]
+    if "timing_feedback_suppressed" not in risk_flags:
+        risk_flags.append("timing_feedback_suppressed")
+    out["risk_flags"] = risk_flags
+    return out
 
 
 def _float_or(raw: Any, default: float | None) -> float | None:
