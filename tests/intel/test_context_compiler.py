@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from vibemix.intel.context_compiler import compile_suggestion_context, compile_transition_context
 from vibemix.intel.transition_scorer import (
     LivePosition,
@@ -282,3 +284,73 @@ def test_compile_suggestion_context_from_live_pill_shortlist() -> None:
         if claim["type"] == "bars_until_event" and claim["subject_id"] in {"t1#s000", "t1#s001"}
     ]
     assert {claim["value"] for claim in source_timing_claims} == {4}
+
+
+def test_compile_suggestion_context_sanitizes_nonfinite_and_nested_private_payloads() -> None:
+    transition = _suggestion_transition(
+        candidate_id="tr_001",
+        to_track_id="t2",
+        to_section_id="t2#s000",
+        semantic=float("nan"),
+    )
+    transition.update(
+        {
+            "from_bpm": float("inf"),
+            "cue_confidence": float("inf"),
+            "start_in_bars": float("nan"),
+            "score": float("inf"),
+            "confidence": float("nan"),
+            "scores": {
+                **transition["scores"],
+                "semantic": float("nan"),
+                "harmonic": float("inf"),
+            },
+        }
+    )
+    envelope = compile_suggestion_context(
+        packet_id="ctx_live_bad_numbers",
+        current={
+            "active_track_id": "t1",
+            "source_context": {
+                "track_id": "t1",
+                "position_s": float("inf"),
+                "playhead_confidence": float("nan"),
+                "debug_path": "/Users/ozai/Music/private.wav",
+                "raw_audio": [0, 1, 2],
+                "current_section": {
+                    "section_id": "t1#s000",
+                    "track_id": "t1",
+                    "role": "groove",
+                    "confidence": 0.9,
+                    "start_s": 0.0,
+                    "end_s": 224.0,
+                    "local_path": "/Users/ozai/Music/private.wav",
+                },
+            },
+        },
+        suggestion={"transition": transition},
+    )
+
+    candidate = envelope.candidates[0]
+    assert candidate["from_bpm"] is None
+    assert candidate["recommended_cue_confidence"] is None
+    assert candidate["start_in_bars"] is None
+    assert candidate["score"] == 0.0
+    assert candidate["confidence"] == 0.0
+    assert candidate["scores"]["semantic"] == 0.5
+    assert candidate["scores"]["harmonic"] == 0.5
+    assert envelope.constraints["exact_timing_allowed"] is False
+    assert "current_position" not in {claim["type"] for claim in envelope.claim_summary}
+
+    serialized = json.dumps(
+        {
+            "current": envelope.current,
+            "candidates": envelope.candidates,
+            "claims": envelope.claim_summary,
+        },
+        sort_keys=True,
+    )
+    assert "/Users/" not in serialized
+    assert "raw_audio" not in serialized
+    assert "NaN" not in serialized
+    assert "Infinity" not in serialized

@@ -405,6 +405,10 @@ Acceptance evidence:
 - context packets now carry compact INTEL-21 `claim_ids` and `claim_summary`;
 - no raw vectors in packet;
 - no raw local paths in packet;
+- nested `source_context` / current payload fields are recursively redacted
+  before model exposure;
+- non-finite numeric facts from legacy suggestion/current payloads are coerced to
+  unknown/default/withheld values before candidate or claim emission;
 - old agent surfaces degrade to no-op if no packet exists.
 
 Focused command:

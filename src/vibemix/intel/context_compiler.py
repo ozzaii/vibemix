@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from vibemix.intel.agent_contract import (
@@ -264,15 +265,49 @@ def _candidate_payload(candidate: TransitionCandidate) -> dict[str, Any]:
 
 
 def _redact_current(current: dict[str, Any]) -> dict[str, Any]:
-    forbidden_keys = {"filepath", "file_path", "path", "local_path", "raw_audio", "vector"}
+    forbidden_keys = {
+        "filepath",
+        "file_path",
+        "path",
+        "local_path",
+        "raw_audio",
+        "raw_vector",
+        "vector",
+    }
     redacted: dict[str, Any] = {}
     for key, value in current.items():
         if key in forbidden_keys:
             continue
-        if isinstance(value, str) and _looks_like_local_path(value):
+        clean = _redact_value(value, forbidden_keys=forbidden_keys)
+        if clean is None:
             continue
-        redacted[key] = value
+        redacted[key] = clean
     return redacted
+
+
+def _redact_value(value: Any, *, forbidden_keys: set[str]) -> Any | None:
+    if isinstance(value, dict):
+        clean: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if key_text in forbidden_keys:
+                continue
+            clean_item = _redact_value(item, forbidden_keys=forbidden_keys)
+            if clean_item is not None:
+                clean[key_text] = clean_item
+        return clean
+    if isinstance(value, list | tuple):
+        clean_items = tuple(
+            item
+            for item in (_redact_value(item, forbidden_keys=forbidden_keys) for item in value)
+            if item is not None
+        )
+        return clean_items
+    if isinstance(value, str):
+        return None if _looks_like_local_path(value) else value
+    if isinstance(value, int | float):
+        return value if math.isfinite(float(value)) else None
+    return value
 
 
 def _looks_like_local_path(value: str) -> bool:
@@ -297,9 +332,10 @@ def _str_or(raw: Any, default: str) -> str:
 
 def _float_or(raw: Any, default: float) -> float:
     try:
-        return float(raw)
+        value = float(raw)
     except (TypeError, ValueError):
         return default
+    return value if math.isfinite(value) else default
 
 
 def _optional_float(raw: Any) -> float | None:
@@ -313,9 +349,12 @@ def _optional_int(raw: Any) -> int | None:
     if raw is None:
         return None
     try:
-        return int(raw)
+        value = float(raw)
     except (TypeError, ValueError):
         return None
+    if not math.isfinite(value):
+        return None
+    return int(value)
 
 
 def _score_component(scores: dict[str, Any], key: str, default: float) -> float:
