@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from scripts.eval.intel_fixture_audit import (
@@ -16,6 +17,10 @@ def test_intel_fixture_audit_passes_committed_corpus() -> None:
     assert result.valid, result.errors
     assert result.files_checked == len(REQUIRED_FILES)
     assert result.manifest_hash
+    expected = (
+        "sha256:" + hashlib.sha256((DEFAULT_FIXTURE_DIR / "MANIFEST.json").read_bytes()).hexdigest()
+    )
+    assert result.manifest_hash == expected
 
 
 def test_intel_fixture_audit_rejects_privacy_bad_examples() -> None:

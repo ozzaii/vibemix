@@ -614,6 +614,8 @@ done: `scripts/release/check_gate.sh` rejects inconsistent INTEL artifacts whose
       fixture-audit manifest hash disagrees with scorecard provenance
 done: `scripts/release/check_gate.sh` rejects stale INTEL artifacts whose
       thresholds hash does not match the current parsed `intel_thresholds`
+done: `scripts/eval/intel_gate.py` marks cross-stage fixture-manifest
+      mismatches invalid before release-gate consumption
 pending: private-label release threshold recalibration note
 ```
 

@@ -85,11 +85,6 @@ def _sha256(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _manifest_hash(manifest: Any) -> str:
-    blob = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hashlib.sha256(blob).hexdigest()[:12]
-
-
 def _scan_privacy_text(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8", errors="ignore")
     errors = []
@@ -311,7 +306,7 @@ def validate_fixture_dir(fixture_dir: Path | str = DEFAULT_FIXTURE_DIR) -> Audit
         valid=not errors,
         errors=tuple(errors),
         files_checked=len(REQUIRED_FILES),
-        manifest_hash=_manifest_hash(manifest),
+        manifest_hash=_sha256(path / "MANIFEST.json"),
     )
 
 

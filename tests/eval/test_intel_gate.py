@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from scripts.eval.intel_gate import (
     DEFAULT_FIXTURE_DIR,
@@ -41,6 +42,10 @@ def test_run_intel_gate_passes_public_fixture_corpus() -> None:
     assert result["stages"]["scorecard"]["provenance"]["fixture_manifest_hash"].startswith(
         "sha256:"
     )
+    assert (
+        result["stages"]["fixture_audit"]["manifest_hash"]
+        == result["stages"]["scorecard"]["provenance"]["fixture_manifest_hash"]
+    )
     assert result["stages"]["scorecard"]["provenance"]["threshold_lock_hash"].startswith("sha256:")
 
 
@@ -54,6 +59,30 @@ def test_run_intel_gate_fails_on_locked_threshold_regression(tmp_path: Path) -> 
     assert result["stages"]["fixture_audit"]["valid"] is True
     assert result["stages"]["scorecard"]["passed"] is False
     assert any("section_role_hit_at_5_delta" in error for error in result["errors"])
+
+
+def test_run_intel_gate_fails_on_cross_stage_manifest_hash_mismatch(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from scripts.eval import intel_scorecard
+
+    real_score_fixture_dir = intel_scorecard.score_fixture_dir
+
+    def mismatched_scorecard(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        result = real_score_fixture_dir(*args, **kwargs)
+        result["provenance"]["fixture_manifest_hash"] = "sha256:" + ("0" * 64)
+        return result
+
+    monkeypatch.setattr(intel_scorecard, "score_fixture_dir", mismatched_scorecard)
+
+    result = run_intel_gate(
+        fixture_dir=DEFAULT_FIXTURE_DIR,
+        threshold_lock=DEFAULT_THRESHOLD_LOCK,
+    )
+
+    assert result["valid"] is False
+    assert any("provenance_consistency" in error for error in result["errors"])
+    assert any(
+        "provenance_consistency" in error for error in result["stages"]["scorecard"]["errors"]
+    )
 
 
 def test_intel_gate_cli_json(capsys) -> None:  # type: ignore[no-untyped-def]

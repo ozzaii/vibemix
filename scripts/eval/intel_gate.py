@@ -76,6 +76,10 @@ def run_intel_gate(
                 "replay_tier": scorecard_provenance.get("replay_tier"),
             },
         }
+        consistency_errors = _cross_stage_consistency_errors(fixture_result, scorecard_result)
+        if consistency_errors:
+            errors.extend(consistency_errors)
+            scorecard_result["errors"] = [*scorecard_result["errors"], *consistency_errors]
     except Exception as exc:
         errors.append(f"scorecard: {type(exc).__name__}: {exc}")
         scorecard_result = {
@@ -137,6 +141,25 @@ def _scorecard_errors(scorecard: dict[str, Any]) -> list[str]:
         ]
         errors.append(f"scorecard: failing gates {failing_gates}")
     return errors
+
+
+def _cross_stage_consistency_errors(
+    fixture_result: dict[str, Any], scorecard_result: dict[str, Any]
+) -> list[str]:
+    fixture_manifest_hash = fixture_result.get("manifest_hash")
+    scorecard_manifest_hash = (
+        (scorecard_result.get("provenance") or {}).get("fixture_manifest_hash")
+        if isinstance(scorecard_result.get("provenance"), dict)
+        else None
+    )
+    if not fixture_manifest_hash or not scorecard_manifest_hash:
+        return ["provenance_consistency: fixture manifest hash missing"]
+    if fixture_manifest_hash != scorecard_manifest_hash:
+        return [
+            "provenance_consistency: fixture_audit.manifest_hash "
+            "!= scorecard.provenance.fixture_manifest_hash"
+        ]
+    return []
 
 
 def render_markdown_summary(result: dict[str, Any]) -> str:
