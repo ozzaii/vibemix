@@ -341,6 +341,50 @@ def ranked_transition_alternatives(
     return _ranked_alternatives_from_payloads(ranked)
 
 
+def promote_transition_alternative(
+    alternatives: tuple[dict, ...],
+    *,
+    candidate_id: str | None = None,
+    track_id: str | None = None,
+) -> tuple[dict, ...]:
+    """Move an existing alternative to the selected slot without a new search.
+
+    Candidate ids are rank-local on the wire, so the promoted option is
+    re-numbered to ``tr_001`` and every following row is re-numbered in order.
+    """
+    wanted_candidate_id = candidate_id.strip() if isinstance(candidate_id, str) else ""
+    wanted_track_id = track_id.strip() if isinstance(track_id, str) else ""
+    if not wanted_candidate_id and not wanted_track_id:
+        return alternatives
+
+    selected_index: int | None = None
+    for idx, raw in enumerate(alternatives):
+        if not isinstance(raw, dict):
+            continue
+        raw_candidate_id = raw.get("candidate_id")
+        raw_track_id = raw.get("track_id")
+        if wanted_candidate_id and raw_candidate_id == wanted_candidate_id:
+            selected_index = idx
+            break
+        if wanted_track_id and raw_track_id == wanted_track_id:
+            selected_index = idx
+            break
+    if selected_index is None:
+        return alternatives
+
+    ordered = [dict(alternatives[selected_index])]
+    ordered.extend(dict(raw) for idx, raw in enumerate(alternatives) if idx != selected_index)
+    payloads = [
+        (
+            (0.0, 0.0, 0.0, -float(order)),
+            raw,
+            raw.get("transition") if isinstance(raw.get("transition"), dict) else None,
+        )
+        for order, raw in enumerate(ordered)
+    ]
+    return _ranked_alternatives_from_payloads(payloads)
+
+
 def _ranked_alternatives(
     ranked: list[tuple[tuple[float, float, float, float], _SuggestionOption, dict | None]],
 ) -> tuple[dict, ...]:
@@ -645,6 +689,7 @@ __all__ = [
     "NextSuggestion",
     "annotate_transition_selection",
     "next_suggestion",
+    "promote_transition_alternative",
     "ranked_transition_alternatives",
     "seed_vector_for_track_id",
     "transition_payload_for_candidate",

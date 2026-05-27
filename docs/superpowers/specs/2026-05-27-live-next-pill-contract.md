@@ -138,7 +138,10 @@ runtime can cite the same candidate the UI sees.
 
 The expanded pill renders non-selected alternatives as compact backup rows. The
 collapsed hover peek hides backups so the glance stays focused on the selected
-action.
+action. Backup rows send the existing websocket action
+`next_suggestion.choose` with `candidate_id` and `track_id`; the
+`SuggestionService` promotes that visible alternative, pins it across live
+refreshes, and avoids a full library rerank.
 
 ### `decision`
 
@@ -191,14 +194,15 @@ the grounded `transition` text.
 
 The expanded pill renders up to two backup alternatives from
 `transition_alternatives`. The collapsed hover peek calls the same renderer with
-backups hidden.
+backups hidden. Clicking a backup promotes it through the existing websocket
+action path and the next frame reflects the pinned selected candidate.
 
 ## Validation
 
 Focused backend and UI checks used for this slice:
 
 ```bash
-uv run pytest -q tests/runtime/test_suggestion.py tests/intel/test_context_compiler.py tests/intel/test_decision_runtime.py tests/intel/test_decision_validator.py tests/library/test_next_suggestion.py
+uv run pytest -q tests/library/test_next_suggestion.py tests/runtime/test_suggestion.py tests/runtime/test_ws_bus.py tests/intel/test_context_compiler.py tests/intel/test_decision_runtime.py tests/intel/test_decision_validator.py
 npm --prefix tauri/ui test -- next-suggestion
 npm --prefix tauri/ui test -- pill/index
 ```
@@ -216,10 +220,10 @@ warnings are not specific to the live next-pill contract.
 ## Remaining gaps
 
 - Add real-session replay coverage for live deck changes that cause the source
-  section to move while the embedding shortlist remains cached.
+  section to move while the embedding shortlist remains cached, beyond the
+  synthetic wire-level regression.
 - Add richer target-cue operability checks once more CUE-DETR or Rekordbox cue
   data is available.
-- Add a DJ command path to actively choose a rendered backup alternative without
-  forcing a full rerank.
+- Add acceptance feedback so backup choices can feed taste learning.
 - Keep improving taste learning and threshold gates so the system learns which
   technically valid transitions the DJ actually accepts.

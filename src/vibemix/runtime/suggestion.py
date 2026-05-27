@@ -40,6 +40,7 @@ from typing import Any
 from vibemix.library.next_suggestion import (
     annotate_transition_selection,
     next_suggestion,
+    promote_transition_alternative,
     ranked_transition_alternatives,
     seed_vector_for_track_id,
     transition_payload_for_candidate,
@@ -169,6 +170,7 @@ class SuggestionService:
         self._candidate_track_id: str | None = None
         self._candidate_vector: Any | None = None
         self._candidate_vectors_by_track_id: dict[str, Any] = {}
+        self._pinned_candidate_track_id: str | None = None
         self._last_refresh_at = 0.0
         self._last_compute_seed_track_id: str | None = None
         self._compute_inflight = False
@@ -193,6 +195,62 @@ class SuggestionService:
         """
         self.maybe_schedule_compute_from_state(state)
         return self.refresh_from_state(state)
+
+    def choose_alternative(
+        self,
+        *,
+        candidate_id: str | None = None,
+        track_id: str | None = None,
+        state: Any | None = None,
+    ) -> dict | None:
+        """Promote a visible transition alternative without a full rerank."""
+        with self._lock:
+            current = dict(self._current) if self._current is not None else None
+            candidate_vectors_by_track_id = {
+                tid: vector.copy() for tid, vector in self._candidate_vectors_by_track_id.items()
+            }
+            fallback_candidate_track_id = self._candidate_track_id
+            fallback_candidate_vector = (
+                self._candidate_vector.copy() if self._candidate_vector is not None else None
+            )
+
+        if current is None:
+            return None
+
+        alternatives = _coerce_transition_alternatives(current.get("transition_alternatives"))
+        promoted = promote_transition_alternative(
+            alternatives,
+            candidate_id=candidate_id,
+            track_id=track_id,
+        )
+        if promoted == alternatives:
+            if _alternative_already_selected(
+                alternatives,
+                candidate_id=candidate_id,
+                track_id=track_id,
+            ):
+                return current
+            return None
+
+        fallback_track = fallback_candidate_track_id or str(current.get("track_id") or "")
+        selected_track_id, selected_vector = _apply_winning_alternative(
+            current,
+            promoted,
+            candidate_vectors_by_track_id,
+            fallback_candidate_track_id=fallback_track,
+            fallback_candidate_vector=fallback_candidate_vector,
+        )
+        if state is not None:
+            current["decision"] = self._safe_decision_payload_for_suggestion(state, current)
+
+        with self._lock:
+            if self._current is None:
+                return None
+            self._current = current
+            self._candidate_track_id = selected_track_id
+            self._candidate_vector = selected_vector.copy() if selected_vector is not None else None
+            self._pinned_candidate_track_id = selected_track_id
+            return self._current
 
     def context_for_state(
         self,
@@ -470,6 +528,7 @@ class SuggestionService:
                 track_id: vector.copy()
                 for track_id, vector in candidate_vectors_by_track_id.items()
             }
+            self._pinned_candidate_track_id = None
             self._last_compute_seed_track_id = seed_track_id
             self._last_refresh_at = 0.0
         return d
@@ -531,6 +590,7 @@ class SuggestionService:
                 track_id: vector.copy()
                 for track_id, vector in self._candidate_vectors_by_track_id.items()
             }
+            pinned_candidate_track_id = self._pinned_candidate_track_id
 
         if current is None or seed_track_id is None or seed_vector is None:
             return current
@@ -547,6 +607,7 @@ class SuggestionService:
                     self._candidate_track_id = None
                     self._candidate_vector = None
                     self._candidate_vectors_by_track_id = {}
+                    self._pinned_candidate_track_id = None
                     self._last_compute_seed_track_id = None
             return None
 
@@ -582,6 +643,11 @@ class SuggestionService:
                 alternatives,
                 refreshed_transitions,
             )
+            if pinned_candidate_track_id:
+                alternatives = promote_transition_alternative(
+                    alternatives,
+                    track_id=pinned_candidate_track_id,
+                )
             candidate_track_id, candidate_vector = _apply_winning_alternative(
                 current,
                 alternatives,
@@ -616,6 +682,11 @@ class SuggestionService:
                 self._candidate_track_id = candidate_track_id
                 self._candidate_vector = (
                     candidate_vector.copy() if candidate_vector is not None else None
+                )
+                self._pinned_candidate_track_id = (
+                    pinned_candidate_track_id
+                    if pinned_candidate_track_id == candidate_track_id
+                    else None
                 )
                 return self._current
             return self._current
@@ -655,6 +726,23 @@ def _coerce_transition_alternatives(raw: Any) -> tuple[dict, ...]:
     if not isinstance(raw, (list, tuple)):
         return ()
     return tuple(dict(item) for item in raw if isinstance(item, dict))
+
+
+def _alternative_already_selected(
+    alternatives: tuple[dict, ...],
+    *,
+    candidate_id: str | None,
+    track_id: str | None,
+) -> bool:
+    if not alternatives:
+        return False
+    first = alternatives[0]
+    wanted_candidate_id = candidate_id.strip() if isinstance(candidate_id, str) else ""
+    wanted_track_id = track_id.strip() if isinstance(track_id, str) else ""
+    return bool(
+        (wanted_candidate_id and first.get("candidate_id") == wanted_candidate_id)
+        or (wanted_track_id and first.get("track_id") == wanted_track_id)
+    )
 
 
 def _apply_winning_alternative(

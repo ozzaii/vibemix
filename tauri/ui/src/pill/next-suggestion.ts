@@ -91,6 +91,7 @@ export interface NextSuggestionAlternativeWire {
 export interface NextSuggestionRenderOptions {
   showAlternatives?: boolean;
   maxAlternatives?: number;
+  onAlternativeSelect?: (alt: NextAlternativeView) => void;
 }
 
 /** The `next_suggestion` wire payload — mirrors
@@ -216,6 +217,23 @@ const CSS = `
     flex-direction: column;
     gap: 1px;
     min-width: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--rad-sm);
+    background: transparent;
+    text-align: left;
+  }
+  button.vmx-next-card__alt-row {
+    cursor: pointer;
+  }
+  button.vmx-next-card__alt-row:hover {
+    background: var(--glass-2);
+  }
+  button.vmx-next-card__alt-row:focus-visible {
+    outline: 1px solid var(--silk-40);
+    outline-offset: 2px;
   }
   .vmx-next-card__alt-title,
   .vmx-next-card__alt-meta {
@@ -308,6 +326,8 @@ export function nextDecisionText(
 
 export interface NextAlternativeView {
   key: string;
+  candidateId: string;
+  trackId: string;
   title: string;
   meta: string;
 }
@@ -335,6 +355,8 @@ export function nextAlternativeViews(
       : rows.length + 2;
     rows.push({
       key: candidateId,
+      candidateId,
+      trackId,
       title: `${String(rank).padStart(2, "0")} · ${title}`,
       meta: nextAlternativeMeta(alt),
     });
@@ -513,9 +535,16 @@ export function renderNextSuggestion(
       group.append(altLabel);
 
       for (const alt of alternatives) {
-        const row = document.createElement("div");
+        const row = document.createElement(options.onAlternativeSelect ? "button" : "div");
         row.className = "vmx-next-card__alt-row";
         row.dataset.candidateId = alt.key;
+        if (alt.trackId) row.dataset.trackId = alt.trackId;
+        if (options.onAlternativeSelect && row instanceof HTMLButtonElement) {
+          row.type = "button";
+          row.setAttribute("aria-label", `choose backup ${alt.title}`);
+          row.setAttribute("data-no-drag", "");
+          row.addEventListener("click", () => options.onAlternativeSelect?.(alt));
+        }
 
         const title = document.createElement("div");
         title.className = "vmx-next-card__alt-title";

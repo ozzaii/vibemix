@@ -12,6 +12,7 @@ import pytest
 from vibemix.library.next_suggestion import (
     NextSuggestion,
     next_suggestion,
+    promote_transition_alternative,
     seed_vector_for_track_id,
 )
 from vibemix.library.rekordbox import CuePoint, RekordboxLibrary, TrackEntry
@@ -218,6 +219,36 @@ def test_set_aware_transition_can_promote_lower_embedding_candidate(library):
     assert len({alt["candidate_id"] for alt in s.transition_alternatives}) == len(
         s.transition_alternatives
     )
+
+
+def test_promote_transition_alternative_reassigns_rank_local_candidate_ids():
+    alternatives = (
+        {
+            "candidate_id": "tr_001",
+            "rank": 1,
+            "selected": True,
+            "track_id": "a",
+            "transition": {"candidate_id": "tr_001", "to_track_id": "a"},
+        },
+        {
+            "candidate_id": "tr_002",
+            "rank": 2,
+            "selected": False,
+            "track_id": "b",
+            "transition": {"candidate_id": "tr_002", "to_track_id": "b"},
+        },
+    )
+
+    promoted = promote_transition_alternative(alternatives, candidate_id="tr_002")
+
+    assert promoted[0]["track_id"] == "b"
+    assert promoted[0]["candidate_id"] == "tr_001"
+    assert promoted[0]["rank"] == 1
+    assert promoted[0]["selected"] is True
+    assert promoted[0]["transition"]["candidate_id"] == "tr_001"
+    assert promoted[1]["track_id"] == "a"
+    assert promoted[1]["candidate_id"] == "tr_002"
+    assert promoted[1]["selected"] is False
 
 
 def test_section_vectors_can_promote_better_section_texture(library):

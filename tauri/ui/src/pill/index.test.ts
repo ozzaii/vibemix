@@ -18,7 +18,13 @@
 import { describe, expect, it } from "vitest";
 
 import { initialPillState } from "./state-machine.js";
-import { reduceFrame, readDeckState, readNextSuggestion, toPillFrame } from "./index.js";
+import {
+  nextSuggestionChoiceMessage,
+  reduceFrame,
+  readDeckState,
+  readNextSuggestion,
+  toPillFrame,
+} from "./index.js";
 
 const T0 = 2_000_000;
 
@@ -165,6 +171,24 @@ describe("readNextSuggestion — tri-state (omitted / null / object)", () => {
     expect(readNextSuggestion({ type: "snapshot" })).toBeUndefined();
     expect(readNextSuggestion({})).toBeUndefined();
     expect(readNextSuggestion(null)).toBeUndefined();
+  });
+});
+
+describe("nextSuggestionChoiceMessage — backup command payload", () => {
+  it("builds the existing websocket action shape for a rendered backup", () => {
+    expect(
+      nextSuggestionChoiceMessage({
+        key: "tr_002",
+        candidateId: "tr_002",
+        trackId: "t2",
+        title: "02 · Backup Heat",
+        meta: "cue B",
+      }),
+    ).toEqual({
+      action: "next_suggestion.choose",
+      candidate_id: "tr_002",
+      track_id: "t2",
+    });
   });
 });
 

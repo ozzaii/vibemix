@@ -407,6 +407,25 @@ async def ws_broadcast(
                     print("\n[ws] manual trigger requested")
                     _tr("manual_trigger")
                     manual_trigger.set()
+                elif data.get("action") == "next_suggestion.choose":
+                    if suggestion_holder is not None and hasattr(
+                        suggestion_holder, "choose_alternative"
+                    ):
+                        try:
+                            choice = suggestion_holder.choose_alternative(
+                                candidate_id=data.get("candidate_id"),
+                                track_id=data.get("track_id"),
+                                state=state,
+                            )
+                        except Exception as e:
+                            print(f"[ws] suggestion choose failed: {e}", file=sys.stderr)
+                            choice = None
+                        _tr(
+                            "next_suggestion_choose",
+                            candidate_id=data.get("candidate_id"),
+                            track_id=data.get("track_id"),
+                            ok=choice is not None,
+                        )
                 elif ipc_router is not None and isinstance(data.get("type"), str):
                     # Route ipc.settings.* / ipc.profile.* / ipc.recordings.*
                     # into SessionLoop's handlers (2026-05-25 GUI-control fix).

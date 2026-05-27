@@ -238,6 +238,8 @@ describe("nextAlternativeViews — grounded backup choices", () => {
     ).toEqual([
       {
         key: "tr_002",
+        candidateId: "tr_002",
+        trackId: "t2",
         title: "02 · Backup Heat",
         meta: "cue B @ 1:04 · in 8 bars · 9a · 127",
       },
@@ -399,6 +401,38 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     expect(card.querySelector(".vmx-next-card__alt-meta")?.textContent).toBe(
       "cue B · in 8 bars · 9a · 127",
     );
+  });
+
+  test("backup alternatives become buttons when a selection handler is provided", () => {
+    const selected: unknown[] = [];
+    const card = renderNextSuggestion(
+      _sugg({
+        transition_alternatives: [
+          {
+            candidate_id: "tr_002",
+            rank: 2,
+            track_id: "t2",
+            title: "Backup Heat",
+            transition: { candidate_id: "tr_002", cue_slot: "B" },
+          },
+        ],
+      }),
+      { onAlternativeSelect: (alt) => selected.push(alt) },
+    )!;
+    const row = card.querySelector(".vmx-next-card__alt-row") as HTMLButtonElement;
+    expect(row.tagName).toBe("BUTTON");
+    expect(row.dataset.candidateId).toBe("tr_002");
+    expect(row.dataset.trackId).toBe("t2");
+    row.click();
+    expect(selected).toEqual([
+      {
+        key: "tr_002",
+        candidateId: "tr_002",
+        trackId: "t2",
+        title: "02 · Backup Heat",
+        meta: "cue B",
+      },
+    ]);
   });
 
   test("backup alternatives can be hidden for the collapsed hover peek", () => {

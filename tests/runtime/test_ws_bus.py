@@ -138,6 +138,62 @@ def test_ws_04_inbound_non_trigger_action_does_not_set_manual_trigger(mocker):
     assert not manual_trigger.is_set()
 
 
+def test_inbound_next_suggestion_choose_action_calls_holder(mocker):
+    mock_server = _build_mock_server()
+    serve_mock = AsyncMock(return_value=mock_server)
+    mocker.patch("vibemix.runtime.ws_bus.websockets.serve", new=serve_mock)
+
+    fake_levels = MagicMock()
+    fake_levels.snapshot = MagicMock(return_value={"music": 0.0, "voice": 0.0, "mic": 0.0})
+    state = MusicState()
+    manual_trigger = asyncio.Event()
+    stop_event = asyncio.Event()
+    stop_event.set()
+
+    class Holder:
+        def __init__(self):
+            self.calls = []
+
+        def choose_alternative(self, **kwargs):
+            self.calls.append(kwargs)
+            return {"track_id": "b"}
+
+    holder = Holder()
+
+    async def fast_sleep(_s):
+        await _REAL_SLEEP(0)
+
+    mocker.patch("vibemix.runtime.ws_bus.asyncio.sleep", side_effect=fast_sleep)
+
+    asyncio.run(
+        ws_broadcast(
+            fake_levels,
+            state,
+            manual_trigger,
+            stop_event,
+            suggestion_holder=holder,
+        )
+    )
+    handler = serve_mock.await_args.args[0]
+
+    class FakeWs:
+        def __aiter__(self):
+            async def gen():
+                yield json.dumps(
+                    {
+                        "action": "next_suggestion.choose",
+                        "candidate_id": "tr_002",
+                        "track_id": "b",
+                    }
+                )
+
+            return gen()
+
+    asyncio.run(handler(FakeWs()))
+
+    assert holder.calls == [{"candidate_id": "tr_002", "track_id": "b", "state": state}]
+
+
 def test_ws_05_inbound_invalid_json_does_not_raise(mocker):
     """WS-05: malformed inbound message → handler does NOT raise,
     manual_trigger stays unset."""
@@ -436,13 +492,18 @@ def test_pkg_05_runtime_package_surface():
     + ``OUTBOUND_ENDPOINTS`` for the auditable privacy claim.
     """
     import vibemix.runtime as runtime_pkg
-    from vibemix.runtime import coach_loop, diag_loop, ws_broadcast  # noqa: F401
-    from vibemix.runtime import SessionLoop, WizardLoop, run_session, run_wizard  # noqa: F401
-    from vibemix.runtime import watch_parent  # noqa: F401
     from vibemix.runtime import (  # noqa: F401
         OUTBOUND_ENDPOINTS,
+        SessionLoop,
+        WizardLoop,
         banner_lines,
+        coach_loop,
+        diag_loop,
         print_security_banner,
+        run_session,
+        run_wizard,
+        watch_parent,
+        ws_broadcast,
     )
 
     assert set(runtime_pkg.__all__) == {

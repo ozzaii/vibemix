@@ -421,6 +421,80 @@ def test_refresh_from_state_can_reselect_inside_embedding_shortlist():
     assert store._backend.load_count == 0
 
 
+def test_choose_alternative_pins_visible_backup_without_reranking():
+    from dataclasses import replace
+
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(
+        ["s", "a", "b"],
+        [("s", 0.99), ("a", 0.92), ("b", 0.91)],
+        section_vectors={
+            "s#s000": np.array([1.0, 0.0], dtype=np.float32),
+            "s#s001": np.array([0.0, 1.0], dtype=np.float32),
+            "a#s000": np.array([0.0, 1.0], dtype=np.float32),
+            "b#s000": np.array([1.0, 0.0], dtype=np.float32),
+        },
+    )
+    lib = _lib(["s", "a", "b"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        bpm=120.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    lib.tracks["b"] = replace(
+        lib.tracks["b"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    svc = SuggestionService(store, lib)
+    state = MusicState()
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=120.0)}
+    )
+
+    first = svc.compute_from_state(state)
+    assert first is not None
+    backup = next(alt for alt in first["transition_alternatives"] if alt["track_id"] == "b")
+
+    store.search_count = 0
+    store._backend.load_count = 0
+    chosen = svc.choose_alternative(candidate_id=backup["candidate_id"], state=state)
+
+    assert chosen is not None
+    assert chosen["track_id"] == "b"
+    assert chosen["transition"]["candidate_id"] == "tr_001"
+    assert chosen["transition_alternatives"][0]["track_id"] == "b"
+    assert chosen["transition_alternatives"][0]["candidate_id"] == "tr_001"
+    assert chosen["transition_alternatives"][0]["selected"] is True
+    assert chosen["transition_alternatives"][1]["track_id"] == "a"
+    assert chosen["decision"]["action"] == "select"
+    assert chosen["decision"]["candidate_id"] == "tr_001"
+
+    refreshed = svc.refresh_from_state(state, now=10.0, min_interval_s=0.0)
+
+    assert refreshed is not None
+    assert refreshed["track_id"] == "b"
+    assert refreshed["transition_alternatives"][0]["track_id"] == "b"
+    assert refreshed["decision"]["candidate_id"] == "tr_001"
+    assert store.search_count == 0
+    assert store._backend.load_count == 0
+
+    assert svc.choose_alternative(candidate_id="tr_missing", state=state) is None
+    assert svc.current()["track_id"] == "b"
+
+
 def test_refresh_from_state_clears_stale_pick_when_seed_changes():
     store = _FakeStore(["s", "a", "b"], [("s", 0.99), ("a", 0.9), ("b", 0.8)])
     svc = SuggestionService(store, _lib(["s", "a", "b"]))
@@ -659,6 +733,78 @@ def test_payload_uses_live_suggestion_refresh_hook(mocker):
 
     assert holder.seen_state is state
     assert payload["next_suggestion"] == sugg
+
+
+def test_payload_live_refresh_reselects_cached_alternative_when_source_section_moves(mocker):
+    from dataclasses import replace
+
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(
+        ["s", "a", "b"],
+        [("s", 0.99), ("a", 0.92), ("b", 0.91)],
+        section_vectors={
+            "s#s000": np.array([1.0, 0.0], dtype=np.float32),
+            "s#s001": np.array([0.0, 1.0], dtype=np.float32),
+            "a#s000": np.array([0.0, 1.0], dtype=np.float32),
+            "b#s000": np.array([1.0, 0.0], dtype=np.float32),
+        },
+    )
+    lib = _lib(["s", "a", "b"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        bpm=120.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    lib.tracks["b"] = replace(
+        lib.tracks["b"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    svc = SuggestionService(store, lib)
+    state = MusicState()
+    state.audible = True
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=120.0)}
+    )
+
+    first = svc.compute_from_state(state)
+    assert first is not None
+    assert first["track_id"] == "a"
+    assert first["transition"]["from_section_id"] == "s#s001"
+    assert first["transition_alternatives"][0]["track_id"] == "a"
+
+    store.search_count = 0
+    store._backend.load_count = 0
+    state.audible_track_position_s = 32.0
+    state.audible_track_position_confidence = 0.85
+
+    payload = _capture_payload(state, mocker, suggestion_holder=svc)
+
+    suggestion = payload["next_suggestion"]
+    assert suggestion["track_id"] == "b"
+    assert suggestion["transition"]["from_section_id"] == "s#s000"
+    assert suggestion["transition"]["to_track_id"] == "b"
+    assert suggestion["transition"]["candidate_id"] == "tr_001"
+    assert suggestion["transition_alternatives"][0]["track_id"] == "b"
+    assert suggestion["transition_alternatives"][0]["selected"] is True
+    assert suggestion["transition_alternatives"][1]["track_id"] == "a"
+    assert suggestion["decision"]["action"] == "select"
+    assert suggestion["decision"]["candidate_id"] == "tr_001"
+    assert suggestion["decision"]["validation_status"] == "accepted"
+    assert store.search_count == 0
+    assert store._backend.load_count == 0
 
 
 def test_payload_honest_null_when_no_suggestion(mocker):

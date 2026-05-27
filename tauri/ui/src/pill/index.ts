@@ -21,7 +21,7 @@
  *
  * Frame content is rendered via textContent / contract-tested renderCitationStrip
  * — NEVER eval'd or innerHTML'd from wire data (T-62-11/T-62-12). The pill
- * registers NO message-send path — consume-only for v1 (T-62-14).
+ * only sends one live action: choosing a rendered backup transition.
  */
 
 import { renderCitationStrip, type CitationChip } from "../session/components/citation-strip.js";
@@ -29,6 +29,7 @@ import { renderDeckChips, type DeckStateWire } from "./deck-chips.js";
 import {
   nextSuggestionRenderKey,
   renderNextSuggestion,
+  type NextAlternativeView,
   type NextSuggestionWire,
 } from "./next-suggestion.js";
 import {
@@ -422,7 +423,11 @@ function syncNextSuggestion(view: PillView): void {
   if (key === view.lastNextKey) return;
   view.lastNextKey = key;
   mount.replaceChildren();
-  const card = renderNextSuggestion(s, { showAlternatives: true, maxAlternatives: 2 });
+  const card = renderNextSuggestion(s, {
+    showAlternatives: true,
+    maxAlternatives: 2,
+    onAlternativeSelect: chooseNextSuggestionAlternative,
+  });
   if (card) {
     card.setAttribute("data-no-drag", "");
     mount.append(card);
@@ -464,6 +469,24 @@ function hasRenderableSuggestion(
   s: NextSuggestionWire | null | undefined,
 ): s is NextSuggestionWire {
   return Boolean(s?.track_id && s?.title);
+}
+
+export function nextSuggestionChoiceMessage(alt: NextAlternativeView): Record<string, unknown> {
+  return {
+    action: "next_suggestion.choose",
+    candidate_id: alt.candidateId,
+    track_id: alt.trackId || null,
+  };
+}
+
+function chooseNextSuggestionAlternative(alt: NextAlternativeView): void {
+  const message = nextSuggestionChoiceMessage(alt);
+  vmxLog("[vmx:ipc>]", "choose next-suggestion backup", message);
+  void invoke("forward_ipc_to_sidecar", { message }).catch((err: unknown) => {
+    vmxLog("[vmx:error]", "next-suggestion backup choose failed", {
+      error: String(err),
+    });
+  });
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────
