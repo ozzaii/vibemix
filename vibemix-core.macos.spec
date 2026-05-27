@@ -382,7 +382,7 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=["rthooks/pyi_rth_livekit_agents.py"],
     # Exclude dev / test tooling so they never accidentally land in the
     # shipping bundle. ``pyinstaller`` itself is in dev deps; explicit
     # exclude blocks recursive bundling.
