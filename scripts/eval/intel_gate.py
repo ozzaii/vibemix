@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -245,6 +247,29 @@ def _safe_path_label(path: Path) -> str:
         return path.name
 
 
+def _atomic_write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        text=True,
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            tmp_path.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixture-dir", type=Path, default=DEFAULT_FIXTURE_DIR)
@@ -255,14 +280,23 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     result = run_intel_gate(fixture_dir=args.fixture_dir, threshold_lock=args.threshold_lock)
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(
-            json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+    write_errors: list[str] = []
     if args.summary_markdown:
-        args.summary_markdown.parent.mkdir(parents=True, exist_ok=True)
-        args.summary_markdown.write_text(render_markdown_summary(result), encoding="utf-8")
+        try:
+            _atomic_write_text(args.summary_markdown, render_markdown_summary(result))
+        except OSError as exc:
+            write_errors.append(f"summary_markdown:{exc}")
+    if not write_errors and args.output:
+        try:
+            _atomic_write_text(args.output, json.dumps(result, indent=2, sort_keys=True) + "\n")
+        except OSError as exc:
+            write_errors.append(f"output:{exc}")
+    if write_errors:
+        result = {
+            **result,
+            "valid": False,
+            "errors": [*list(result.get("errors", ())), *write_errors],
+        }
 
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))

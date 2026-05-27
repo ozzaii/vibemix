@@ -40,8 +40,10 @@ uv run python scripts/eval/intel_gate.py \
 
 The gate runs fixture audit, locked scorecard, and provenance validation. The
 persisted gate artifact includes metric values, gate statuses, artifact statuses,
-and provenance hashes. The scorecard can still be run directly for metric
-inspection; it exits non-zero when artifacts or gates fail:
+and provenance hashes. The CLI writes JSON and markdown artifacts through
+temp-file plus atomic replace so release review never consumes a half-written
+gate report. The scorecard can still be run directly for metric inspection; it
+exits non-zero when artifacts or gates fail:
 
 ```bash
 uv run python scripts/eval/intel_scorecard.py \

@@ -175,7 +175,9 @@ corpus + `GEMINI_API_KEY` and incur cost (~$1–2 per full nightly canary).
 The nightly CI workflow `.github/workflows/eval.yml` is the canonical
 real-corpus runner. Nightly persisted `.planning/eval-runs/<sha>/` evidence
 commits are DCO signed by `vibemix-eval-bot`, preserving the repo's commit
-provenance policy for release-gate evidence.
+provenance policy for release-gate evidence. The INTEL gate writes its JSON and
+markdown evidence artifacts through temp-file plus atomic replace, so release
+review never consumes a half-written gate report.
 
 ## History — why v3.0 is hybrid
 

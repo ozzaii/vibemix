@@ -609,6 +609,9 @@ done: scripts/eval/intel_gate.py runs fixture audit + locked scorecard +
 done: intel gate CLI supports `--output` for persisted JSON evidence artifacts
 done: persisted intel gate artifacts include scorecard metrics, gate statuses,
       artifact statuses, and provenance hashes for release review
+done: `scripts/eval/intel_gate.py --output/--summary-markdown` persists JSON
+      and markdown evidence artifacts with temp-file + atomic replace, and the
+      CLI reports write failures without leaving partial artifacts
 done: `.github/workflows/eval.yml` runs the INTEL fixture gate and writes
       `.planning/eval-runs/<sha>/intel_gate.json`
 done: workflow threshold-edit warning covers both `eval/THRESHOLD-LOCK.md` and

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from scripts.eval import intel_gate as gate_module
 from scripts.eval.intel_gate import (
     DEFAULT_FIXTURE_DIR,
     DEFAULT_THRESHOLD_LOCK,
@@ -170,6 +171,43 @@ def test_intel_gate_cli_writes_output_file(tmp_path: Path, capsys) -> None:  # t
     assert "transition_pairwise_accuracy" in payload["stages"]["scorecard"]["metrics"]
     assert payload["stages"]["scorecard"]["provenance"]["replay_tier"] == "tier0_fixture_replay"
     assert "INTEL gate passed" in capsys.readouterr().out
+
+
+def test_intel_gate_cli_reports_output_write_failure_without_partial_artifact(
+    tmp_path: Path,
+    monkeypatch,  # type: ignore[no-untyped-def]
+    capsys,  # type: ignore[no-untyped-def]
+) -> None:
+    output = tmp_path / "reports" / "intel_gate.json"
+
+    def fail_replace(src: Path | str, dst: Path | str) -> None:
+        raise OSError(f"simulated gate artifact replace failure for {src} -> {dst}")
+
+    monkeypatch.setattr(gate_module.os, "replace", fail_replace)
+
+    assert (
+        main(
+            [
+                "--fixture-dir",
+                str(DEFAULT_FIXTURE_DIR),
+                "--threshold-lock",
+                str(DEFAULT_THRESHOLD_LOCK),
+                "--output",
+                str(output),
+                "--json",
+            ]
+        )
+        == 1
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["valid"] is False
+    assert any(
+        "output:" in error and "simulated gate artifact replace failure" in error
+        for error in payload["errors"]
+    )
+    assert not output.exists()
+    assert not list(output.parent.glob(".intel_gate.json.*.tmp"))
 
 
 def test_render_markdown_summary_reports_stage_status() -> None:
