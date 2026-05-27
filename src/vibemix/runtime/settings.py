@@ -360,7 +360,7 @@ class SettingsApplier:
                 # off the SettingsApplier import surface (settings is
                 # imported by main() far earlier than recordings_index
                 # ever needs to be).
-                from vibemix.runtime.recordings_index import (  # noqa: PLC0415
+                from vibemix.runtime.recordings_index import (
                     RecordingsIndex,
                     run_retention_sweep,
                 )
@@ -386,7 +386,7 @@ class SettingsApplier:
                         None, index.compute_usage
                     )
                     # Inline import — RecordingsUsage is only used here.
-                    from vibemix.ui_bus.messages import (  # noqa: PLC0415
+                    from vibemix.ui_bus.messages import (
                         RecordingsUsage,
                     )
 
@@ -499,7 +499,7 @@ class SettingsApplier:
         # os imported at module top would be ideal; settings.py already uses
         # only stdlib + config_store. Inline import keeps the top import block
         # untouched and the dependency obvious at the one call site.
-        import os  # noqa: PLC0415
+        import os
 
         os.environ[_ENV_SKILL_LEVEL] = value
         self.config_store.extra["skill"] = value
@@ -602,4 +602,4 @@ class SettingsApplier:
 _ = asdict
 
 
-__all__ = ["SettingsApplier", "GENRE_OVERLAY_S"]
+__all__ = ["GENRE_OVERLAY_S", "SettingsApplier"]

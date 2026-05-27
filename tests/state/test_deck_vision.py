@@ -14,7 +14,7 @@ Coverage:
   * audio-only tier skip (no read attempted)
   * to_camelot normalization applied (musical / open-key → Camelot)
   * vision confidence is BELOW the XML floor (a misread badge is a silent error)
-  * Gemini-only: no openai/anthropic import
+  * deck vision stays on the live Gemini path: no openai/anthropic import
 """
 
 from __future__ import annotations
@@ -22,14 +22,11 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-import pytest
-
+from vibemix.state.deck_poller import VISION_CONF_FLOOR, XML_CONF_FLOOR
 from vibemix.state.deck_vision import (
     VISION_CONF,
     DeckVisionReader,
 )
-from vibemix.state.deck_poller import VISION_CONF_FLOOR, XML_CONF_FLOOR
-
 
 # ---------------------------------------------------------------------- #
 # Mock Gemini client                                                      #
@@ -238,7 +235,7 @@ def test_resolved_deck_carries_vision_conf_constant():
 
 
 # ---------------------------------------------------------------------- #
-# Gemini-only                                                             #
+# Provider boundary                                                       #
 # ---------------------------------------------------------------------- #
 
 

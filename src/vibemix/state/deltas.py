@@ -32,7 +32,7 @@ _CONF_STRONG = 0.40  # >= 40% relative move → high confidence the change is re
 _CONF_CLEAR = 0.18  # >= 18% → clear
 # below _CONF_CLEAR (but >= DELTA_FLOOR) → "slight"
 
-__all__ = ["DELTA_FLOOR", "render_delta", "calibrate_confidence"]
+__all__ = ["DELTA_FLOOR", "calibrate_confidence", "render_delta"]
 
 
 def calibrate_confidence(rel_magnitude: float) -> str:

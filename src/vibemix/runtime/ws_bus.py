@@ -19,13 +19,15 @@ import json
 import sys
 import time
 from collections import deque
+from collections.abc import Awaitable, Callable
 from typing import Any
 
+import jsonschema as _jsonschema
 import websockets
 
 from vibemix.audio import WS_HOST, WS_PORT, Levels
 from vibemix.state import MusicState
-
+from vibemix.ui_bus.validator import validate_message as _validate_outbound
 
 # ---------------------------------------------------------------------------
 # ipc.session.snapshot — wired into the LIVE runtime (the real cohost).
@@ -59,6 +61,51 @@ SNAPSHOT_EVERY_N: int = 2
 _TRANSCRIPT_DRAIN_CAP: int = 8
 # MIDI event ribbon cap per snapshot — mirrors SessionLoop.MIDI_EVENT_RING_SIZE.
 _MIDI_EVENT_CAP: int = 64
+
+# Emit one ipc.status.tick every Nth mascot tick (~1Hz at 30Hz). The status
+# badges (audio/screen/midi) are slow-changing, so 1Hz is ample and keeps the
+# screen-permission probe (a sync CGPreflight call) off the hot path. Until
+# this existed the live session emitted NO status tick, so the badges stayed
+# neutral. HONEST + NEVER-FAULTS by construction: livekit/gemini are emitted
+# "ok" (the real gemini-down signal is the SessionLayout grounding-failure
+# timer, not this tick; we have no honest audio-drop signal so livekit never
+# goes "down"), midi is the real connected-controller count, and screen is a
+# live non-prompting probe used only to light the badge — screen-denied is NOT
+# a deck fault (audio-only is a valid mode; see faultInput in SessionLayout.ts).
+# A missing capture backend reports "unavailable" instead of a false green "ok".
+STATUS_EVERY_N: int = 30
+
+
+def _probe_screen_status(screen_available: bool | None = None) -> str:
+    """Return "ok"/"denied"/"unavailable" for live screen capture status.
+
+    ``screen_available=False`` means the capture backend cannot run (missing
+    ScreenCaptureKit/Quartz/PIL, or equivalent). Permission denied is distinct:
+    the backend exists, but TCC says no. Any probe exception degrades to
+    "unavailable" so the UI does not show a false green badge.
+    """
+    if screen_available is False:
+        return "unavailable"
+    try:
+        from vibemix.platform.permissions import check_screen_recording_permission
+
+        return "ok" if check_screen_recording_permission() == "authorized" else "denied"
+    except Exception:
+        return "unavailable"
+
+
+def _probe_midi_count(controller_state: Any | None) -> int | None:
+    """Honest count of the connected controller from the shared ControllerState.
+
+    v1 tracks a single active port (``port_name``) — 1 when a controller is
+    open, 0 when none. ``None`` when no controller_state is wired (the badge
+    then reads neutral, not a fabricated zero)."""
+    if controller_state is None:
+        return None
+    try:
+        return 1 if getattr(controller_state, "port_name", "") else 0
+    except Exception:
+        return None
 
 
 def _now_iso() -> str:
@@ -99,7 +146,7 @@ def _serialize_deck_state(state: MusicState) -> dict[str, dict[str, Any]]:
         side: {
             "title": dt.title,
             "camelot": dt.camelot,  # honest-null: None -> JSON null, never fabricated
-            "key": dt.key,          # honest-null: None -> JSON null, never fabricated
+            "key": dt.key,  # honest-null: None -> JSON null, never fabricated
             # honest-null: DeckTrack defaults bpm to 0.0 (typed-empty), NOT None.
             # An unresolved deck (0.0) must NOT serialize a fabricated "0 BPM" on
             # the pill — treat a non-positive bpm as unknown (JSON null), same
@@ -296,7 +343,8 @@ async def ws_broadcast(
     controller_state: Any | None = None,
     suggestion_holder: Any | None = None,
     tracer: Any | None = None,
-    ipc_router: "IpcRouterBus | None" = None,
+    ipc_router: IpcRouterBus | None = None,
+    screen_available: bool | None = None,
 ) -> None:
     """30Hz outbound mascot broadcast + inbound manual-trigger handler.
 
@@ -446,15 +494,19 @@ async def ws_broadcast(
             # "what's next" card reads ``next_suggestion`` = the latest grounded
             # suggestion dict ({track_id, title, artist, similarity, why,
             # camelot, bpm}) or ``null`` (honest silence — never a fabricated
-            # track). Computed off-loop by the SuggestionService on TRACK_CHANGE;
-            # this is a PURE READ of its holder at the serialize edge (mirrors
-            # how deck_state rides the frame). Guarded so a holder fault can
-            # never break the wire; absent when no holder is wired (golden-
-            # equivalent for existing subscribers).
+            # track). Full ranking is computed off-loop by the SuggestionService
+            # on TRACK_CHANGE; this serialize edge may ask the holder for a
+            # throttled timing-only refresh so "in N bars" follows the live
+            # playhead without reranking the library at 30Hz. Guarded so a
+            # holder fault can never break the wire; absent when no holder is
+            # wired (golden-equivalent for existing subscribers).
             if suggestion_holder is not None:
                 try:
-                    mascot_frame["next_suggestion"] = suggestion_holder.current()
-                except Exception as e:  # noqa: BLE001 — never break the wire
+                    if hasattr(suggestion_holder, "current_for_state"):
+                        mascot_frame["next_suggestion"] = suggestion_holder.current_for_state(state)
+                    else:
+                        mascot_frame["next_suggestion"] = suggestion_holder.current()
+                except Exception as e:
                     print(f"[ws] suggestion read failed: {e}", file=sys.stderr)
             # Emit-boundary guard (BRINGUP-04): never serialize an empty or
             # meter-less payload onto the wire. ``Levels.snapshot()`` always
@@ -465,9 +517,7 @@ async def ws_broadcast(
             # snapshot returning {} or a state attr vanishing). A skipped
             # tick keeps the loop + cadence intact; we just don't send a
             # malformed frame. Logged once-per-occurrence to stderr.
-            if not mascot_frame or not all(
-                k in mascot_frame for k in ("music", "voice", "mic")
-            ):
+            if not mascot_frame or not all(k in mascot_frame for k in ("music", "voice", "mic")):
                 print(
                     "[ws] skipped malformed mascot frame "
                     f"(missing meter keys; got {sorted(mascot_frame)})",
@@ -511,6 +561,34 @@ async def ws_broadcast(
                 except Exception as e:
                     print(f"[ws snapshot] emit failed: {e}", file=sys.stderr)
 
+            # Additive ipc.status.tick @ ~1Hz (every STATUS_EVERY_N ticks).
+            # Lights the status-row badges (audio/screen/midi). Built + sent in
+            # its OWN try/except so a status fault NEVER touches the mascot or
+            # snapshot paths above. Values are honest + never-fault (see the
+            # STATUS_EVERY_N comment): livekit/gemini="ok", midi=real count,
+            # screen=live probe (badge-only, not a deck fault).
+            if tick % STATUS_EVERY_N == 0:
+                try:
+                    from vibemix.ui_bus.messages import StatusTick
+
+                    status_msg = StatusTick.make(
+                        livekit="ok",
+                        gemini="ok",
+                        midi=_probe_midi_count(controller_state),
+                        screen=_probe_screen_status(screen_available),
+                    )
+                    status_payload = status_msg.to_json()
+                    status_dead = []
+                    for c in clients:
+                        try:
+                            await c.send(status_payload)
+                        except Exception:
+                            status_dead.append(c)
+                    for c in status_dead:
+                        clients.discard(c)
+                except Exception as e:
+                    print(f"[ws status] emit failed: {e}", file=sys.stderr)
+
             await asyncio.sleep(1 / 30)
     finally:
         server.close()
@@ -540,13 +618,6 @@ async def ws_broadcast(
 # not broadcast levels/state — those are computed by the live-runtime
 # ``state_refresh_loop`` which only exists in the non-wizard process.
 
-
-from collections.abc import Awaitable, Callable
-import sys as _sys
-
-import jsonschema as _jsonschema
-
-from vibemix.ui_bus.validator import validate_message as _validate_outbound
 
 IpcHandler = Callable[[dict], Awaitable[None]]
 
@@ -585,10 +656,7 @@ class WizardBus:
         if self._server is not None:
             return
         self._server = await websockets.serve(self._handler, WS_HOST, WS_PORT)
-        print(
-            f"-> wizard bus on ws://{WS_HOST}:{WS_PORT} "
-            f"(handlers: {len(self._handlers)})"
-        )
+        print(f"-> wizard bus on ws://{WS_HOST}:{WS_PORT} (handlers: {len(self._handlers)})")
 
     async def stop(self) -> None:
         """Close the server. Safe to call multiple times."""
@@ -631,25 +699,25 @@ class WizardBus:
                 try:
                     msg = json.loads(raw)
                 except json.JSONDecodeError as e:
-                    print(f"[wizard bus] non-JSON frame: {e}", file=_sys.stderr)
+                    print(f"[wizard bus] non-JSON frame: {e}", file=sys.stderr)
                     continue
                 if not isinstance(msg, dict):
                     print(
                         f"[wizard bus] top-level not object: {type(msg).__name__}",
-                        file=_sys.stderr,
+                        file=sys.stderr,
                     )
                     continue
                 try:
                     validate_message(msg)
                 except _jsonschema.ValidationError as e:
-                    print(f"[wizard bus] schema violation: {e.message}", file=_sys.stderr)
+                    print(f"[wizard bus] schema violation: {e.message}", file=sys.stderr)
                     continue
                 msg_type = msg.get("type", "")
                 handler = self._handlers.get(msg_type)
                 if handler is None:
                     print(
                         f"[wizard bus] no handler for {msg_type}",
-                        file=_sys.stderr,
+                        file=sys.stderr,
                     )
                     continue
                 try:
@@ -658,7 +726,7 @@ class WizardBus:
                     # Handler-internal failure must not close the WS.
                     print(
                         f"[wizard bus] handler {msg_type} failed: {e}",
-                        file=_sys.stderr,
+                        file=sys.stderr,
                     )
         except Exception:
             pass
@@ -672,6 +740,7 @@ def validate_message(msg: dict) -> None:
     with monkey-patched validation without reaching into ``ui_bus``.
     """
     from vibemix.ui_bus.validator import validate_message as _v
+
     _v(msg)
 
 

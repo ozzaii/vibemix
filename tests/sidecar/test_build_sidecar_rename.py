@@ -28,6 +28,8 @@ import pytest
 # Import the script module directly. We added scripts/__init__.py in Task 2.
 from scripts import build_sidecar
 
+PROJECT_ROOT = Path(__file__).parents[2]
+
 
 # ---------------------------------------------------------------------------
 # detect_target_triple
@@ -55,7 +57,7 @@ def test_detect_target_triple_raises_when_rustc_absent(monkeypatch: pytest.Monke
     """If rustc isn't on PATH, the helper raises RuntimeError with an
     actionable install hint — not a cryptic FileNotFoundError."""
 
-    def fake_check_output(*args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+    def fake_check_output(*args, **kwargs):
         raise FileNotFoundError("rustc not found")
 
     monkeypatch.setattr(subprocess, "check_output", fake_check_output)
@@ -68,6 +70,38 @@ def test_exe_suffix_for_triple() -> None:
     assert build_sidecar.exe_suffix_for_triple("x86_64-pc-windows-msvc") == ".exe"
     assert build_sidecar.exe_suffix_for_triple("aarch64-apple-darwin") == ""
     assert build_sidecar.exe_suffix_for_triple("x86_64-unknown-linux-gnu") == ""
+
+
+def test_run_pyinstaller_installs_local_ai_extra(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The frozen sidecar build must include the local CLAP/CUE runtime deps."""
+    monkeypatch.setattr(build_sidecar, "_PROJECT_ROOT", tmp_path)
+    spec = tmp_path / "vibemix-core.macos.spec"
+    spec.write_text("# fake spec\n", encoding="utf-8")
+
+    captured: list[str] = []
+
+    def fake_run(cmd, **kwargs):
+        captured.extend(cmd)
+        out = tmp_path / "dist" / "vibemix-core"
+        out.mkdir(parents=True)
+        (out / "vibemix-core").write_bytes(b"fake")
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    out = build_sidecar.run_pyinstaller(spec)
+
+    assert out == tmp_path / "dist" / "vibemix-core"
+    assert captured[:5] == ["uv", "run", "--extra", "ai-local", "pyinstaller"]
+
+
+def test_pyav_is_a_direct_runtime_dependency() -> None:
+    """Local model/debrief audio paths import PyAV directly, not via LiveKit."""
+    text = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert '"av>=17.0.1"' in text
 
 
 # ---------------------------------------------------------------------------
@@ -88,8 +122,8 @@ def fake_onedir(tmp_path: Path) -> Path:
 
     # Lib files so the copytree feels real.
     (onedir / "libpython3.12.dylib").write_bytes(b"\0" * 1024)
-    (onedir / "internal" / "scipy").mkdir(parents=True)
-    (onedir / "internal" / "scipy" / "signal.py").write_text("# fake module\n")
+    (onedir / "internal" / "runtime").mkdir(parents=True)
+    (onedir / "internal" / "runtime" / "module.py").write_text("# fake module\n")
 
     return onedir
 
@@ -121,7 +155,7 @@ def test_install_into_tauri_binaries_renames_and_relocates(
     assert expected_binary.is_file()
     assert (expected_dir / "vibemix-core").exists() is False, "old name should be gone"
     assert (expected_dir / "libpython3.12.dylib").is_file()
-    assert (expected_dir / "internal" / "scipy" / "signal.py").is_file()
+    assert (expected_dir / "internal" / "runtime" / "module.py").is_file()
     # Executable bit preserved on POSIX (Windows os.X_OK semantics differ;
     # the suffix=="" branch only runs on macOS / Linux anyway).
     assert os.access(expected_binary, os.X_OK), "executable bit not preserved"
@@ -146,6 +180,45 @@ def test_install_into_tauri_binaries_idempotent(
     # Second install — fresh onedir.
     build_sidecar.install_into_tauri_binaries(fake_onedir, triple, exe_suffix="")
     assert (target_dir / "stale.txt").exists() is False
+
+
+def test_install_into_tauri_binaries_preserves_pyinstaller_symlinks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PyInstaller's macOS onedir uses symlinks for duplicated native libs."""
+    if os.name == "nt":
+        pytest.skip("symlink privileges vary on Windows runners")
+
+    onedir = tmp_path / "dist" / "vibemix-core"
+    onedir.mkdir(parents=True)
+    binary = onedir / "vibemix-core"
+    binary.write_bytes(b"#!/usr/bin/env python3\nprint('hi')\n")
+    binary.chmod(binary.stat().st_mode | stat.S_IXUSR)
+
+    dylib_dir = onedir / "_internal" / "av" / ".dylibs"
+    dylib_dir.mkdir(parents=True)
+    real_lib = dylib_dir / "libavcodec.62.11.100.dylib"
+    real_lib.write_bytes(b"fake-avcodec")
+    link = onedir / "_internal" / "libavcodec.62.11.100.dylib"
+    link.symlink_to("av/.dylibs/libavcodec.62.11.100.dylib")
+
+    fake_target_root = tmp_path / "tauri" / "src-tauri" / "binaries"
+    monkeypatch.setattr(build_sidecar, "_TAURI_BINARIES_DIR", fake_target_root)
+
+    build_sidecar.install_into_tauri_binaries(
+        onedir, "aarch64-apple-darwin", exe_suffix=""
+    )
+
+    copied_link = (
+        fake_target_root
+        / "vibemix-core-aarch64-apple-darwin"
+        / "_internal"
+        / "libavcodec.62.11.100.dylib"
+    )
+    assert copied_link.is_symlink()
+    assert os.readlink(copied_link) == "av/.dylibs/libavcodec.62.11.100.dylib"
+    assert copied_link.exists()
 
 
 def test_install_into_tauri_binaries_windows_suffix(
@@ -251,6 +324,177 @@ def test_assert_no_aiza_leak_raises_on_missing_dir(tmp_path: Path) -> None:
     """Missing bundle dir is a configuration error, not silent success."""
     with pytest.raises(RuntimeError, match=r"bundle dir not found"):
         build_sidecar.assert_no_aiza_leak(tmp_path / "does-not-exist")
+
+
+@pytest.mark.parametrize(
+    "spec_name",
+    ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
+)
+def test_pyinstaller_specs_collect_local_ai_runtime(spec_name: str) -> None:
+    """Lazy CLAP/CUE deps must be explicit in the frozen sidecar specs."""
+    text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
+    required = [
+        "_LOCAL_AI_SUBMODULES",
+        "av",
+        "onnxruntime",
+        "onnxruntime.capi",
+        "tokenizers",
+        "collect_dynamic_libs",
+        '"transformers"',
+    ]
+    for token in required:
+        assert token in text, f"{spec_name} missing {token}"
+    assert "transformers.audio_utils" not in text
+    assert "transformers.models.roberta" not in text
+    assert "transformers.models.detr" not in text
+    assert '    "transformers.models.detr",\n' not in text
+    assert '    "transformers.models.roberta",\n' not in text
+    assert '"hf_xet"' in text
+    assert '"hf_xet.hf_xet"' in text
+
+
+@pytest.mark.parametrize(
+    "spec_name",
+    ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
+)
+def test_pyinstaller_specs_use_slim_livekit_google_collection(spec_name: str) -> None:
+    """Gemini LLM/TTS leaves are bundled without Google Cloud STT/TTS."""
+    text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
+    dynamic_block = text.split("_DYNAMIC_PKGS = (", 1)[1].split(")", 1)[0]
+    assert '"livekit.plugins.google",' not in dynamic_block
+    assert '"google.cloud",' not in dynamic_block
+    required = [
+        "_livekit_google_slim",
+        '"livekit.plugins.google.llm"',
+        '"livekit.plugins.google.beta.gemini_tts"',
+        '"livekit.plugins.google.stt"',
+        '"livekit.plugins.google.tts"',
+        '"google.cloud"',
+        '"grpc"',
+    ]
+    for token in required:
+        assert token in text, f"{spec_name} missing {token}"
+
+
+@pytest.mark.parametrize(
+    "spec_name",
+    ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
+)
+def test_pyinstaller_specs_narrow_pillow_collection(spec_name: str) -> None:
+    """Screen/CUE need Pillow, but frozen builds should not collect all PIL tools."""
+    text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
+    required = [
+        "_PIL_MODULES",
+        '"PIL.Image"',
+        '"PIL.ImageFile"',
+        '"PIL.ImageOps"',
+        '"PIL.JpegImagePlugin"',
+        '"PIL.PngImagePlugin"',
+        '"PIL._imagingtk"',
+        '"PIL._avif"',
+    ]
+    for token in required:
+        assert token in text, f"{spec_name} missing {token}"
+    assert '    "PIL",\n' not in text
+
+
+def test_macos_pyinstaller_spec_excludes_livekit_demo_resources() -> None:
+    """The cohost needs LiveKit FFI, not bundled ambience/Jupyter demo assets."""
+    text = (PROJECT_ROOT / "vibemix-core.macos.spec").read_text(encoding="utf-8")
+    required = [
+        'collect_dynamic_libs("livekit")',
+        'collect_data_files(\n            "livekit"',
+        '"**/*.ogg"',
+        '"**/jupyter-html/**"',
+    ]
+    for token in required:
+        assert token in text, f"macOS spec missing {token}"
+
+
+@pytest.mark.parametrize(
+    "spec_name",
+    ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
+)
+def test_pyinstaller_specs_collect_sqlite_vec_extension(spec_name: str) -> None:
+    """sqlite_vec.load() needs vec0.* next to the package in frozen builds."""
+    text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
+    required = [
+        '_collect_runtime_submodules("sqlite_vec")',
+        'collect_dynamic_libs("sqlite_vec")',
+        'collect_data_files("sqlite_vec", includes=["vec0.*"])',
+        "_sqlite_vec_bin_srcs",
+    ]
+    for token in required:
+        assert token in text, f"{spec_name} missing {token}"
+
+
+@pytest.mark.parametrize(
+    "spec_name",
+    ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
+)
+def test_pyinstaller_specs_filter_test_submodules(spec_name: str) -> None:
+    """Frozen bundles must not force-include package test/demo trees."""
+    text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
+    required = [
+        "def _runtime_submodule",
+        "filter=_runtime_submodule",
+        '"tests"',
+        '"doc_examples"',
+        '"benchmarks"',
+        '"scripts"',
+        '"tools"',
+        '"cli"',
+        '"jupyter"',
+        '"vibemix.bench"',
+        '"__main__"',
+        "_collect_runtime_submodules(_pkg)",
+        "def _runtime_data_file",
+    ]
+    for token in required:
+        assert token in text, f"{spec_name} missing {token}"
+
+
+@pytest.mark.parametrize(
+    "spec_name",
+    ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
+)
+def test_pyinstaller_specs_exclude_transformers(spec_name: str) -> None:
+    """CLAP/CUE preprocessing is local; frozen builds should exclude Transformers."""
+    text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
+    required = [
+        '_ANALYSIS_EXCLUDES = [',
+        '"transformers"',
+        '"onnxruntime.backend"',
+        '"onnxruntime.capi.convert_npz_to_onnx_adapter"',
+        '"onnxruntime.datasets"',
+        '"onnxruntime.transformers"',
+        '"onnxruntime.tools"',
+    ]
+    for token in required:
+        assert token in text, f"{spec_name} missing {token}"
+    assert "_transformers_model_excludes" not in text
+
+
+@pytest.mark.parametrize(
+    "spec_name",
+    ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
+)
+def test_pyinstaller_specs_exclude_dev_cli_and_otlp_grpc(spec_name: str) -> None:
+    """Frozen sidecars should not carry dev CLIs or unusable grpc exporters."""
+    text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
+    required = [
+        '"livekit.agents.cli"',
+        '"livekit.agents.jupyter"',
+        '"telegram"',
+        '"telegram.ext"',
+        '"vibemix.bench.run"',
+        '"jsonschema.cli"',
+        '"opentelemetry.exporter.otlp.proto.grpc"',
+        '"opentelemetry.exporter.otlp.proto.grpc.trace_exporter"',
+        '"grpc"',
+    ]
+    for token in required:
+        assert token in text, f"{spec_name} missing {token}"
 
 
 # ---------------------------------------------------------------------------

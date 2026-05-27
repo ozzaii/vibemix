@@ -30,7 +30,6 @@ import asyncio
 import json
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -44,7 +43,6 @@ from vibemix.runtime.session_loop import (
 )
 from vibemix.runtime.settings import SettingsApplier
 from vibemix.ui_bus.validator import validate_message
-
 
 # ---------------------------------------------------------------------------
 # Local FakeBus — mirrors tests/wizard/conftest.py FakeBus but lives here
@@ -346,8 +344,33 @@ def test_status_recheck_emits_tick_for_known_component(
     )
     ticks = fake_bus.emitted_by_type("ipc.status.tick")
     assert len(ticks) == 1
+    assert ticks[0]["payload"]["livekit"] == "connecting"
+    assert ticks[0]["payload"]["gemini"] == "down"
     assert ticks[0]["payload"]["midi"] == 1
     assert ticks[0]["payload"]["screen"] == "ok"
+
+
+def test_live_status_recheck_mirrors_attached_runtime(fake_bus: FakeBus) -> None:
+    loop = SessionLoop(
+        fake_bus,
+        music_state=MagicMock(),
+        controller_state=MagicMock(port_name="DDJ-FLX4"),
+        screen_available=False,
+    )
+    loop.register_handlers()
+    _drive(
+        fake_bus,
+        {
+            "type": "ipc.status.recheck",
+            "ts": "2026-05-12T08:00:00+00:00",
+            "payload": {"component": "livekit"},
+        },
+    )
+    tick = fake_bus.emitted_by_type("ipc.status.tick")[-1]["payload"]
+    assert tick["livekit"] == "ok"
+    assert tick["gemini"] == "ok"
+    assert tick["midi"] == 1
+    assert tick["screen"] == "unavailable"
 
 
 def test_status_recheck_unknown_component_emits_ipc_error(fake_bus: FakeBus) -> None:

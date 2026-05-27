@@ -26,9 +26,9 @@ Design rationale (per the plan's <interfaces> + threat register):
       phrase, documented as the conservative-fallback contract (T-17-04-02
       accept disposition).
 
-scipy is a project dep (CLAUDE.md tech stack — `scipy==1.17.1`); we use
-``scipy.signal.fftconvolve`` for the autocorr step (faster than
-``numpy.correlate`` for the windows we hand it).
+Autocorrelation is implemented with numpy FFTs directly. This keeps the live
+detector path dependency-light while retaining the O(N log N) behavior we need
+for phrase windows.
 """
 
 from __future__ import annotations
@@ -36,7 +36,6 @@ from __future__ import annotations
 import math
 
 import numpy as np
-from scipy.signal import fftconvolve
 
 # Match the Phase 13 BPM-validity ceiling (vibemix.audio.features._BPM_MAX_VALID).
 # Anti-hallucination: anything outside (0, _BPM_MAX_VALID] yields (0.0, 0.0)
@@ -47,6 +46,17 @@ _BPM_MAX_VALID: float = 220.0
 # 64000 samples; comfortably long enough to capture beat periods at 60 BPM
 # (1.0s / beat) without paying for 100x lag values that no DJ BPM can hit.
 _DEFAULT_MAX_LAG_SECONDS: float = 4.0
+
+
+def _autocorr_nonnegative(samples: np.ndarray) -> np.ndarray:
+    """Return non-negative-lag autocorrelation using zero-padded FFT."""
+    arr = np.asarray(samples, dtype=np.float32)
+    if arr.size == 0:
+        return np.zeros(0, dtype=np.float32)
+    fft_len = 1 << max(1, (2 * arr.size - 1).bit_length())
+    spec = np.fft.rfft(arr, n=fft_len)
+    ac = np.fft.irfft(spec * np.conj(spec), n=fft_len)[: arr.size]
+    return ac.astype(np.float32, copy=False)
 
 
 def _band_limit_fft(samples: np.ndarray, sample_rate: int, low_hz: float, high_hz: float) -> np.ndarray:
@@ -127,11 +137,8 @@ def band_limited_autocorr(
     if full_rms > 0.0 and in_band_rms / full_rms < 0.01:
         return np.zeros(0, dtype=np.float32)
 
-    # Full autocorr via FFT convolution (signal cross-correlated with reverse).
-    full = fftconvolve(band, band[::-1], mode="full")
-    # Take the second half (lag ≥ 0) — symmetrical autocorr.
-    mid = full.size // 2
-    half = full[mid:]
+    # Full autocorr via FFT; take lag >= 0.
+    half = _autocorr_nonnegative(band)
     # Normalize by lag-0 amplitude.
     lag0 = float(half[0]) if half.size > 0 else 0.0
     if lag0 == 0.0:
@@ -271,7 +278,7 @@ def estimate_phrase_length_bars(
     candidate_lags: dict[int, int] = {}
     for bars in candidates:
         seconds = bars * 4.0 * 60.0 / bpm
-        lag_hops = int(round(seconds / hop_seconds))
+        lag_hops = round(seconds / hop_seconds)
         if lag_hops > 0:
             candidate_lags[bars] = lag_hops
 
@@ -289,9 +296,7 @@ def estimate_phrase_length_bars(
         return 16
 
     # Compute the autocorrelation of the energy curve (1D, fft-based).
-    full = fftconvolve(arr, arr[::-1], mode="full")
-    mid = full.size // 2
-    ac = full[mid:]
+    ac = _autocorr_nonnegative(arr)
     lag0 = float(ac[0]) if ac.size > 0 else 0.0
     if lag0 == 0.0:
         return 16

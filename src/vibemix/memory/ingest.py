@@ -384,8 +384,7 @@ def ingest_session(
             return IngestResult(session_id=session_id, skipped=True)
 
         events = _read_events_jsonl(events_jsonl)
-        # Model id is the cache-key model component — the probe-derived
-        # ``LibraryEmbedder._model`` (NEVER a literal). A stand-in embedder that
+        # Model id is the cache-key model component. A stand-in embedder that
         # exposes only ``embed_query`` (no ``_model``) namespaces to "" — its
         # signatures still cache by text+version, just under a stable empty
         # model component.
@@ -495,7 +494,7 @@ def run_ingest_sweep(
             result = ingest_session(Path(entry.path), store, embedder)
             if result.records_written > 0:
                 ingested.append(result.session_id)
-        except Exception as e:  # noqa: BLE001 — best-effort, never block boot
+        except Exception as e:
             logger.warning("[ingest] session %s failed: %s", name, e)
             continue
     return ingested

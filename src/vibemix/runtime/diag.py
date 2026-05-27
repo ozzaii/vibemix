@@ -52,5 +52,5 @@ async def diag_loop(
                     voice=round(float(snap["voice"]), 3),
                     deck=state.audible_deck,
                 )
-            except Exception:  # noqa: BLE001 — tracing is observation only
+            except Exception:
                 pass

@@ -22,15 +22,14 @@ import pytest
 
 from tests.audio.conftest import int16_sine
 from vibemix.audio import (
-    AudioBuffer,
     INPUT_SR_NATIVE,
     INPUT_SR_TARGET,
-    Levels,
     MIC_GAIN,
     MIC_GAIN_AT_AI_TALK,
+    AudioBuffer,
+    Levels,
     MicBuffer,
 )
-
 
 # ---------- constant surface ----------
 
@@ -95,7 +94,7 @@ def test_t2_callback_resamples_48k_to_16k() -> None:
 
     callback(indata, n_native, None, None)
 
-    # 48k → 16k via resample_poly: 1s @ 48kHz becomes 1s @ 16kHz = 16000 samples
+    # 48k -> 16k: 1s @ 48kHz becomes 1s @ 16kHz = 16000 samples
     assert mic_audio_buf._filled == INPUT_SR_TARGET
     snap = mic_audio_buf.snapshot(INPUT_SR_TARGET)
     assert snap.size == INPUT_SR_TARGET

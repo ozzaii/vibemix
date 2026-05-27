@@ -99,6 +99,7 @@ class WizardLoop:
         self._stop = asyncio.Event()
         self._status_tick_task: asyncio.Task | None = None
         self._parent_watch_task: asyncio.Task | None = None
+        self._tcc_prime_task: asyncio.Task | None = None
         self._user_heard_tone_event = asyncio.Event()
         self._user_heard_tone_result: bool | None = None
 
@@ -150,11 +151,13 @@ class WizardLoop:
         flap reconnecting until the user clicked.
         """
         await self.bus.emit(json.loads(IpcBoot.make(ready=True).to_json()))
-        asyncio.create_task(asyncio.to_thread(self._prime_tcc_registration))
+        self._tcc_prime_task = asyncio.create_task(
+            asyncio.to_thread(self._prime_tcc_registration)
+        )
 
     def _prime_tcc_registration(self) -> None:
         try:
-            from vibemix.platform import permissions  # noqa: PLC0415
+            from vibemix.platform import permissions
         except Exception as exc:  # pragma: no cover
             log.warning("permissions module unavailable: %r", exc)
             return
@@ -197,7 +200,7 @@ class WizardLoop:
         if kind not in ("screen_recording", "microphone"):
             log.warning("permission.check: unknown kind %r — ignored", kind)
             return
-        from vibemix.platform import permissions  # noqa: PLC0415
+        from vibemix.platform import permissions
 
         if kind == "screen_recording":
             status = permissions.check_screen_recording_permission()
@@ -218,7 +221,7 @@ class WizardLoop:
 
     async def _on_list_devices(self, _msg: dict) -> None:
         """Enumerate sounddevice outputs; flag BlackHole presence + variant."""
-        import sounddevice as sd  # noqa: PLC0415
+        import sounddevice as sd
 
         devices: list[DeviceInfo] = []
         blackhole_present = False
@@ -278,7 +281,7 @@ class WizardLoop:
             await self.bus.emit(json.loads(reply.to_json()))
             return
 
-        import sounddevice as sd  # noqa: PLC0415
+        import sounddevice as sd
 
         # Generate the sine — 1.5s @ 48kHz, -6 dBFS peak, 100ms fades.
         sine = self._generate_sine(freq_hz=1000.0, duration_s=1.5, sample_rate=48000)
@@ -310,7 +313,7 @@ class WizardLoop:
         try:
             await asyncio.wait_for(self._user_heard_tone_event.wait(), timeout=30.0)
             audible = self._user_heard_tone_result is True
-        except asyncio.TimeoutError:
+        except TimeoutError:
             audible = False
             err = ((err + " | ") if err else "") + "user-confirm timeout"
 
@@ -337,7 +340,7 @@ class WizardLoop:
             event = await asyncio.wait_for(
                 _drain_then_listen(drain_ms=200), timeout=timeout_s
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             reply: object = CalibrationMidiTimeout.make()
         except Exception as e:
             # mido / device error — treat as timeout for the UI; log to stderr.
@@ -356,7 +359,7 @@ class WizardLoop:
         Privacy: titles cross the WS boundary only; this handler does NOT
         log title values (T-11-W4-06).
         """
-        from vibemix.platform import windows as platform_windows  # noqa: PLC0415
+        from vibemix.platform import windows as platform_windows
 
         loop = asyncio.get_event_loop()
         try:
@@ -400,18 +403,16 @@ class WizardLoop:
         """Try the cascade greeting. Best-effort — exceptions propagate so
         ``_on_smoke_test`` can route to the offline fallback.
 
-        For Phase 11 the smoke test does NOT spin up the full live-runtime
+        The first-run smoke test does NOT spin up the full live-runtime
         ``main()`` graph (audio I/O, MusicState, etc.). Instead it plays
-        the bundled offline-greeting WAV — the actual cascade exercise
-        happens on first non-wizard launch and during Phase 16's
-        hallucination verification gate.
+        the bundled offline-greeting WAV; the live cascade is exercised on
+        first non-wizard launch and by the hallucination/ear-pass gates.
         """
-        # Phase 11 simplification: surface as "cascade not yet wired" so
-        # the fallback path runs. The real cascade-greeting wiring is
-        # Phase 12's settings-panel ``Re-run calibration`` button + a
-        # dedicated one-shot AgentSession context manager (out of scope
-        # for the structural gate).
-        raise RuntimeError("smoke test cascade not wired in Phase 11 — using offline fallback")
+        # Keep the wizard deterministic and low-risk: the greeting check proves
+        # output playback without starting the full live co-host graph.
+        raise RuntimeError(
+            "wizard smoke test uses bundled offline greeting by design"
+        )
 
     async def _on_wizard_done(self, msg: dict) -> None:
         """Sidecar logs the choices + exits cleanly. Rust shell persists
@@ -481,13 +482,13 @@ class WizardLoop:
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=1.0)
                 return
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
 
     def _probe_midi_count(self) -> int | None:
         """Return the count of MIDI input ports, or None if mido errors."""
         try:
-            import mido  # noqa: PLC0415
+            import mido
 
             return len(mido.get_input_names())
         except Exception:
@@ -496,7 +497,7 @@ class WizardLoop:
     def _probe_screen_status(self) -> str:
         """Return ``"ok"`` if screen-recording is authorized; else ``"denied"``."""
         try:
-            from vibemix.platform import permissions  # noqa: PLC0415
+            from vibemix.platform import permissions
 
             return (
                 "ok"
@@ -514,7 +515,7 @@ class WizardLoop:
         self, *, freq_hz: float, duration_s: float, sample_rate: int
     ):  # type: ignore[no-untyped-def]
         """Generate a -6 dBFS 100ms-fade-in/out 1kHz sine as float32."""
-        import numpy as np  # noqa: PLC0415
+        import numpy as np
 
         n = int(sample_rate * duration_s)
         t = np.arange(n) / sample_rate
@@ -536,8 +537,8 @@ class WizardLoop:
             )
             return
         try:
-            import numpy as np  # noqa: PLC0415
-            import sounddevice as sd  # noqa: PLC0415
+            import numpy as np
+            import sounddevice as sd
 
             with wave.open(str(_OFFLINE_GREETING_PATH), "rb") as w:
                 frames = w.readframes(w.getnframes())
@@ -597,7 +598,11 @@ class WizardLoop:
         try:
             await self._stop.wait()
         finally:
-            for task in (self._status_tick_task, self._parent_watch_task):
+            for task in (
+                self._status_tick_task,
+                self._parent_watch_task,
+                self._tcc_prime_task,
+            ):
                 if task is not None:
                     task.cancel()
                     try:
@@ -643,7 +648,7 @@ async def _drain_then_listen(*, drain_ms: int) -> dict:
     Raises ``asyncio.TimeoutError`` if the caller's ``asyncio.wait_for``
     times out before an event lands.
     """
-    import mido  # noqa: PLC0415
+    import mido
 
     from vibemix.midi.registry import find_mapping_or_generic
 

@@ -8,10 +8,10 @@ from vibemix.llm.model_router import resolve
 
 
 def test_debrief_drills_model_matches_router() -> None:
-    """drills shares the debrief router path with tldr — both Flex 3-Pro."""
+    """drills shares the debrief router path with tldr."""
     assert DEBRIEF_DRILLS_MODEL == resolve("debrief")[0]
 
 
-def test_debrief_drills_model_is_3_pro_preview() -> None:
-    """Smoke: resolved id is the locked Wave-0-A1 id."""
-    assert DEBRIEF_DRILLS_MODEL == "gemini-3-pro-preview"
+def test_debrief_drills_model_is_3_5_flash() -> None:
+    """Smoke: resolved id follows the current debrief router SKU."""
+    assert DEBRIEF_DRILLS_MODEL == "gemini-3.5-flash"

@@ -67,7 +67,7 @@ class RetentionSweepResult(NamedTuple):
 
 
 def run_memory_retention_sweep(
-    store: "MemoryStore",
+    store: MemoryStore,
     *,
     max_moments: int | None = DEFAULT_MAX_MOMENTS,
     max_age_days: int | None = DEFAULT_MAX_AGE_DAYS,
@@ -98,7 +98,7 @@ def run_memory_retention_sweep(
 
     # Group the moments table by session: (oldest_ts, newest_ts, count).
     # Read-only aggregate over the connection MemoryStore owns; no live path.
-    rows = store._moments.execute(  # noqa: SLF001 - intentional sibling access
+    rows = store._moments.execute(
         "SELECT session_id, MIN(ts) AS min_ts, MAX(ts) AS max_ts, "
         "COUNT(*) AS n FROM moments GROUP BY session_id"
     ).fetchall()
@@ -173,7 +173,7 @@ def run_memory_retention_sweep(
     return RetentionSweepResult(pruned_moments, evicted)
 
 
-def _evict(store: "MemoryStore", session_id: str) -> bool:
+def _evict(store: MemoryStore, session_id: str) -> bool:
     """Whole-session eviction via the store cascade. Best-effort (never raises)."""
     try:
         store.delete_session(session_id)
@@ -188,8 +188,8 @@ def _evict(store: "MemoryStore", session_id: str) -> bool:
 
 
 __all__ = [
+    "DEFAULT_MAX_AGE_DAYS",
+    "DEFAULT_MAX_MOMENTS",
     "RetentionSweepResult",
     "run_memory_retention_sweep",
-    "DEFAULT_MAX_MOMENTS",
-    "DEFAULT_MAX_AGE_DAYS",
 ]

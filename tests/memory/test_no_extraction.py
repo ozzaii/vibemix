@@ -3,11 +3,11 @@
 
 The milestone thesis: a memory record carries the RAW text signature + its
 embedding + (session_id, ts, kind) — NEVER an LLM-extracted "insight". The
-only model call ``src/vibemix/memory/`` may make is the embedding call
-(``embed_content`` via the reused ``LibraryEmbedder``). Any generation surface
-(``generate_content`` / ``generate_reply`` / ``.chats.`` / a
-``GenerateContentConfig``) in memory/ would re-open the confabulation surface
-the whole milestone forbids.
+only model-facing seam ``src/vibemix/memory/`` may use is the injected
+``embedder.embed_query`` protocol, currently backed by local CLAP in product
+paths. Any generation surface (``generate_content`` / ``generate_reply`` /
+``.chats.`` / a ``GenerateContentConfig``) in memory/ would re-open the
+confabulation surface the whole milestone forbids.
 
 This is a tokenize-stripped STATIC scan. The comment/docstring stripper is
 cloned from ``tests/repo/test_repo_scrub.py::_strip_comments_and_docstrings``
@@ -37,8 +37,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 MEM = REPO / "src" / "vibemix" / "memory"
 
-# Generation surfaces banned in memory/. Only ``embed_content`` may reach
-# Gemini from the store path — ``generate_content`` == extraction.
+# Generation surfaces banned in memory/. The store path may only use the
+# injected local embedding protocol — ``generate_content`` == extraction.
 FORBIDDEN: tuple[str, ...] = (
     "generate_content",
     "generate_reply",
@@ -101,7 +101,7 @@ def test_no_extraction_detector_catches_a_generation_surface() -> None:
         f"detector failed to flag a generation call; hits={hits}"
     )
 
-    doc_only = '"""We never call generate_content here — embed_content only."""\n' "x = 1\n"
+    doc_only = '"""We never call generate_content here — embeddings only."""\n' "x = 1\n"
     doc_stripped = _strip_comments_and_docstrings(doc_only)
     assert "generate_content" not in doc_stripped, (
         "stripper left a docstring mention in place — header prose would "
@@ -127,7 +127,7 @@ def test_memory_calls_only_embed_content() -> None:
             offenders[str(py.relative_to(REPO))] = hits
     assert not offenders, (
         "vibemix.memory references a generation surface (raw-in/raw-out / "
-        f"no-extraction invariant VIOLATED): {offenders}. The store's only "
-        "model call is the embedding call (embed_content via LibraryEmbedder); "
-        "never generate_content / generate_reply / a chat session."
+        f"no-extraction invariant VIOLATED): {offenders}. The store path may "
+        "only use the injected local embedding protocol; never generate_content "
+        "/ generate_reply / a chat session."
     )

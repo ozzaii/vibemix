@@ -41,7 +41,8 @@ real-screenshot accuracy eval (``eval/deck_vision/run_eval.py``) clears the
 documented floor on Kaan's rig corpus (the KAAN-ACTION checkpoint, Task 3). Vision
 must NOT feed deck-state before that — the conservative-by-default state is "off".
 
-Gemini-only (no other AI provider) per the project constraint.
+Deck vision uses the live Gemini path only. Library CLAP embeddings and the
+local Codex Viber backend are separate product surfaces.
 """
 
 from __future__ import annotations
@@ -49,7 +50,7 @@ from __future__ import annotations
 import json
 import sys
 import time
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -74,20 +75,20 @@ DEFAULT_VISION_INTERVAL_S: float = 7.0
 
 # The structured deck-read schema. Mirrors the established repo pattern —
 # ``debrief/drills.py`` passes a Pydantic ``BaseModel`` as ``response_schema``
-# (the genai schema layer expresses field-presence via ``Optional[...]``, NOT the
+# (the genai schema layer expresses field-presence via nullable annotations, NOT the
 # OpenAPI ``"nullable": True`` key, which a plain dict could leave silently
 # ignored by the SDK — WR-03). Using the model class is what makes the
 # STRUCTURED-output guarantee (guardrail ②) actually hold, so the eval gate
 # (Task 3) measures the same constrained call that ships. The null-defensive
 # ``_parse`` still protects deck-state regardless.
 class DeckSlot(BaseModel):
-    """One deck panel read off the screenshot. Every field Optional — an
+    """One deck panel read off the screenshot. Every field is nullable — an
     unreadable badge returns ``None`` (no guess), parsed null-defensively."""
 
-    side: Optional[str] = None
-    title: Optional[str] = None
-    key: Optional[str] = None
-    bpm: Optional[float] = None
+    side: str | None = None
+    title: str | None = None
+    key: str | None = None
+    bpm: float | None = None
 
 
 class DeckRead(BaseModel):
@@ -166,7 +167,7 @@ class DeckVisionReader:
         self._last_read_at = now
         try:
             raw = self._call_gemini(jpeg_bytes)
-        except Exception as e:  # noqa: BLE001 — graceful degrade (TrackInfo discipline)
+        except Exception as e:
             print(f"[deck vision err] {e}", file=sys.stderr)
             return {}
 
@@ -176,7 +177,7 @@ class DeckVisionReader:
         return decks
 
     # ------------------------------------------------------------------ #
-    # Gemini call (separate, structured, non-streaming) — Gemini-only     #
+    # Gemini call (separate, structured, non-streaming)                   #
     # ------------------------------------------------------------------ #
 
     def _call_gemini(self, jpeg_bytes: bytes) -> str:

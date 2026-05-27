@@ -71,7 +71,7 @@ _LAZY_EXPORTS = {
 }
 
 
-def __getattr__(name: str):  # noqa: D401 — PEP 562 module hook
+def __getattr__(name: str):
     target = _LAZY_EXPORTS.get(name)
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -86,9 +86,9 @@ def __dir__() -> list[str]:
     return sorted(__all__)
 
 __all__ = [
-    "AICoach",
     "EVIDENCE_CITATION_RE",
     "EVIDENCE_SOURCES",
+    "AICoach",
     "EmaSmoother",
     "Event",
     "EventDetector",

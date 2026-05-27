@@ -10,14 +10,15 @@ in an executor so it never blocks reactions).
 
 Data flow:
 
-    coach_loop sees a TRACK_CHANGE  →  service.compute_from_state(state)
-        (in an executor — store read is sync)                │
+    coach_loop sees a TRACK_CHANGE  →  service.maybe_schedule_compute_from_state(state)
+        (executor scheduled once per seed — store read is sync)│
                                                              ▼
     seed = deck_state.decks[audible_side] (track_id + camelot + bpm)
         → stored seed vector (cached, ~free) → next_suggestion(...)
         → service.current() holds the dict
+        → service.current_for_state(state) can refresh only cue/timing
                                                              │
-    ws_broadcast reads service.current() at the serialize edge (PURE READ)
+    ws_broadcast reads service.current_for_state() at the serialize edge
         → merges it onto the flat mascot frame as ``next_suggestion``
         → pill renders it.
 
@@ -29,19 +30,50 @@ suggestion rather than a fabricated one).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
+import time
+from dataclasses import dataclass
 from typing import Any
 
 from vibemix.library.next_suggestion import (
     next_suggestion,
     seed_vector_for_track_id,
+    transition_payload_for_candidate,
 )
 
 logger = logging.getLogger(__name__)
 
+BAR_LOCK_CONFIDENCE_FLOOR = 0.80
+BAR_BOUNDARY_TOLERANCE = 0.10
+LIVE_REFRESH_INTERVAL_S = 0.75
+FULL_COMPUTE_RETRY_S = 5.0
+FULL_COMPUTE_DISPATCH_GUARD_S = 0.25
 
-def resolve_seed(state: Any) -> tuple[str, str | None, float | None] | None:
+
+@dataclass(frozen=True, slots=True)
+class LiveTimingHint:
+    """Conservative live timing hint derived from the state bar lock."""
+
+    remaining_bars: int | None
+    playhead_confidence: float
+    blend_active: bool = False
+    source_position_s: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedSeed:
+    """Grounded now-playing seed plus deck context for the next move."""
+
+    track_id: str
+    camelot: str | None
+    bpm: float | None
+    source_deck: str | None = None
+    target_deck: str | None = None
+
+
+def resolve_seed_context(state: Any) -> ResolvedSeed | None:
     """Resolve the now-playing seed (track_id, camelot, bpm) from MusicState.
 
     Reads the AUDIBLE deck's ``DeckTrack`` (``deck_state.decks[side]``). Returns
@@ -55,10 +87,14 @@ def resolve_seed(state: Any) -> tuple[str, str | None, float | None] | None:
         return None
 
     side = getattr(state, "audible_deck", None)
-    dt = decks.get(side) if side in decks else None
+    source_deck = side if isinstance(side, str) and side in decks else None
+    dt = decks.get(source_deck) if source_deck is not None else None
     if dt is None:
         # "mix" / "none" / unknown side → pick the highest-confidence deck.
-        dt = max(decks.values(), key=lambda d: getattr(d, "confidence", 0.0))
+        source_deck, dt = max(
+            decks.items(),
+            key=lambda item: getattr(item[1], "confidence", 0.0),
+        )
 
     track_id = getattr(dt, "track_id", None)
     if not track_id:
@@ -66,7 +102,53 @@ def resolve_seed(state: Any) -> tuple[str, str | None, float | None] | None:
     camelot = getattr(dt, "camelot", None)
     bpm = getattr(dt, "bpm", None)
     bpm = bpm if (bpm and bpm > 0.0) else None
-    return track_id, camelot, bpm
+    return ResolvedSeed(
+        track_id=track_id,
+        camelot=camelot,
+        bpm=bpm,
+        source_deck=source_deck,
+        target_deck=_target_deck(source_deck, side),
+    )
+
+
+def resolve_seed(state: Any) -> tuple[str, str | None, float | None] | None:
+    """Backward-compatible seed tuple for older callers/tests."""
+    seed = resolve_seed_context(state)
+    if seed is None:
+        return None
+    return seed.track_id, seed.camelot, seed.bpm
+
+
+def resolve_live_timing(state: Any) -> LiveTimingHint:
+    """Resolve a bar-level timing hint from MusicState.
+
+    This is intentionally narrower than a track playhead. A confident
+    ``beat_phase`` lock can support "now / next bar" cue timing, but if the lock
+    is weak or malformed we withhold exact bars and let the scorer expose only
+    the destination cue.
+    """
+    blend_active = getattr(state, "audible_deck", None) == "mix"
+    source_position_s = _float_or(getattr(state, "audible_track_position_s", None), None)
+    position_confidence = _clamp01(
+        _float_or(getattr(state, "audible_track_position_confidence", 0.0), 0.0) or 0.0
+    )
+    if source_position_s is not None and position_confidence >= 0.5:
+        return LiveTimingHint(None, position_confidence, blend_active, source_position_s)
+
+    confidence = _float_or(getattr(state, "bpm_confidence", 0.0), 0.0)
+    confidence = _clamp01(confidence)
+    if confidence < BAR_LOCK_CONFIDENCE_FLOOR:
+        return LiveTimingHint(None, confidence, blend_active)
+
+    phase = _float_or(getattr(state, "beat_phase", None), None)
+    if phase is None:
+        phase = _float_or(getattr(state, "downbeat_phase", 0.0), None)
+    if phase is None or not 0.0 <= phase < 1.0:
+        return LiveTimingHint(None, 0.0, blend_active)
+
+    distance_to_bar_boundary = min(phase, 1.0 - phase)
+    remaining_bars = 0 if distance_to_bar_boundary <= BAR_BOUNDARY_TOLERANCE else 1
+    return LiveTimingHint(remaining_bars, confidence, blend_active)
 
 
 class SuggestionService:
@@ -79,11 +161,80 @@ class SuggestionService:
         self._lock = threading.Lock()
         self._played: set[str] = set()
         self._current: dict | None = None
+        self._seed_track_id: str | None = None
+        self._seed_vector: Any | None = None
+        self._candidate_track_id: str | None = None
+        self._candidate_vector: Any | None = None
+        self._last_refresh_at = 0.0
+        self._last_compute_seed_track_id: str | None = None
+        self._compute_inflight = False
+        self._compute_inflight_seed_track_id: str | None = None
+        self._next_compute_allowed_at = 0.0
 
     def current(self) -> dict | None:
         """Latest suggestion dict (or None). Called at the ws serialize edge."""
         with self._lock:
             return self._current
+
+    def current_for_state(self, state: Any) -> dict | None:
+        """Latest suggestion after a throttled timing-only live refresh.
+
+        This keeps the chosen next track stable between TRACK_CHANGE recomputes
+        while letting the transition payload follow the live playhead. It is
+        safe to call from the 30Hz broadcast edge: the expensive full library
+        ranking is only scheduled when no current pick exists for the live seed,
+        and this path refreshes timing at most every
+        ``LIVE_REFRESH_INTERVAL_S`` seconds.
+        """
+        self.maybe_schedule_compute_from_state(state)
+        return self.refresh_from_state(state)
+
+    def maybe_schedule_compute_from_state(
+        self,
+        state: Any,
+        *,
+        loop: asyncio.AbstractEventLoop | None = None,
+        now: float | None = None,
+    ) -> bool:
+        """Schedule a non-blocking full compute when the current seed needs one.
+
+        The broadcast loop may call this every frame. The method is intentionally
+        conservative: it schedules at most one executor job at a time, skips when
+        a current suggestion already matches the resolved seed, and backs off
+        after an unresolved/no-candidate result.
+        """
+        seed = resolve_seed_context(state)
+        if seed is None:
+            return False
+        timing = resolve_live_timing(state)
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            if self._compute_inflight:
+                return False
+            if self._current is not None and self._seed_track_id == seed.track_id:
+                return False
+            if (
+                self._current is None
+                and self._last_compute_seed_track_id == seed.track_id
+                and now < self._next_compute_allowed_at
+            ):
+                return False
+            self._compute_inflight = True
+            self._compute_inflight_seed_track_id = seed.track_id
+            self._next_compute_allowed_at = now + FULL_COMPUTE_DISPATCH_GUARD_S
+
+        try:
+            loop = loop or asyncio.get_running_loop()
+        except RuntimeError:
+            with self._lock:
+                if self._compute_inflight_seed_track_id == seed.track_id:
+                    self._compute_inflight = False
+                    self._compute_inflight_seed_track_id = None
+            return False
+
+        fut = loop.run_in_executor(None, self.compute_for_seed, seed, timing)
+        fut.add_done_callback(lambda f: self._finish_scheduled_compute(seed.track_id, f))
+        return True
 
     def compute(
         self,
@@ -91,12 +242,20 @@ class SuggestionService:
         *,
         seed_camelot: str | None = None,
         seed_bpm: float | None = None,
+        source_deck: str | None = None,
+        target_deck: str | None = None,
+        live_remaining_bars: int | None = None,
+        live_playhead_confidence: float = 0.0,
+        blend_active: bool = False,
+        source_position_s: float | None = None,
     ) -> dict | None:
         """Recompute from a seed track_id. Marks the seed played, returns +
         stores the new suggestion dict (or None). Sync — run in an executor.
         """
         vec = seed_vector_for_track_id(self._store, seed_track_id)
         if vec is None:
+            with self._lock:
+                self._last_compute_seed_track_id = seed_track_id
             return self.current()  # seed not embedded → leave current as-is
 
         with self._lock:
@@ -112,25 +271,181 @@ class SuggestionService:
                 played_ids=played,
                 seed_camelot=seed_camelot,
                 seed_bpm=seed_bpm,
+                source_deck=source_deck,
+                target_deck=target_deck,
                 k=self._k,
+                live_remaining_bars=live_remaining_bars,
+                live_playhead_confidence=live_playhead_confidence,
+                blend_active=blend_active,
+                source_position_s=source_position_s,
             )
-        except Exception as e:  # noqa: BLE001 — never let it break the loop
+        except Exception as e:
             logger.warning("[suggestion] compute failed: %s", e)
             return self.current()
 
         d = sugg.to_dict() if sugg is not None else None
+        candidate_track_id = d.get("track_id") if d is not None else None
+        candidate_vector = (
+            seed_vector_for_track_id(self._store, candidate_track_id)
+            if isinstance(candidate_track_id, str)
+            else None
+        )
         with self._lock:
             self._current = d
+            self._seed_track_id = seed_track_id if d is not None else None
+            self._seed_vector = vec.copy() if d is not None else None
+            self._candidate_track_id = (
+                candidate_track_id if isinstance(candidate_track_id, str) else None
+            )
+            self._candidate_vector = (
+                candidate_vector.copy() if candidate_vector is not None else None
+            )
+            self._last_compute_seed_track_id = seed_track_id
+            self._last_refresh_at = 0.0
         return d
+
+    def compute_for_seed(self, seed: ResolvedSeed, timing: LiveTimingHint) -> dict | None:
+        """Compute from already-resolved seed/timing facts."""
+        return self.compute(
+            seed.track_id,
+            seed_camelot=seed.camelot,
+            seed_bpm=seed.bpm,
+            source_deck=seed.source_deck,
+            target_deck=seed.target_deck,
+            live_remaining_bars=timing.remaining_bars,
+            live_playhead_confidence=timing.playhead_confidence,
+            blend_active=timing.blend_active,
+            source_position_s=timing.source_position_s,
+        )
 
     def compute_from_state(self, state: Any) -> dict | None:
         """Resolve the seed from MusicState, then compute. No-op (returns the
         current suggestion) when the now-playing track_id can't be resolved."""
-        seed = resolve_seed(state)
+        seed = resolve_seed_context(state)
         if seed is None:
             return self.current()
-        track_id, camelot, bpm = seed
-        return self.compute(track_id, seed_camelot=camelot, seed_bpm=bpm)
+        timing = resolve_live_timing(state)
+        return self.compute(
+            seed.track_id,
+            seed_camelot=seed.camelot,
+            seed_bpm=seed.bpm,
+            source_deck=seed.source_deck,
+            target_deck=seed.target_deck,
+            live_remaining_bars=timing.remaining_bars,
+            live_playhead_confidence=timing.playhead_confidence,
+            blend_active=timing.blend_active,
+            source_position_s=timing.source_position_s,
+        )
+
+    def refresh_from_state(
+        self,
+        state: Any,
+        *,
+        now: float | None = None,
+        min_interval_s: float = LIVE_REFRESH_INTERVAL_S,
+    ) -> dict | None:
+        """Refresh only the live transition payload for the current pick."""
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            if min_interval_s > 0 and now - self._last_refresh_at < min_interval_s:
+                return self._current
+            self._last_refresh_at = now
+            current = dict(self._current) if self._current is not None else None
+            seed_track_id = self._seed_track_id
+            seed_vector = self._seed_vector.copy() if self._seed_vector is not None else None
+            cached_candidate_track_id = self._candidate_track_id
+            candidate_vector = (
+                self._candidate_vector.copy() if self._candidate_vector is not None else None
+            )
+
+        if current is None or seed_track_id is None or seed_vector is None:
+            return current
+
+        seed = resolve_seed_context(state)
+        if seed is None:
+            return current
+        if seed.track_id != seed_track_id:
+            with self._lock:
+                if self._seed_track_id == seed_track_id:
+                    self._current = None
+                    self._seed_track_id = None
+                    self._seed_vector = None
+                    self._candidate_track_id = None
+                    self._candidate_vector = None
+                    self._last_compute_seed_track_id = None
+            return None
+
+        candidate_track_id = current.get("track_id")
+        if not isinstance(candidate_track_id, str) or not candidate_track_id:
+            return current
+        if candidate_track_id != cached_candidate_track_id:
+            candidate_vector = None
+
+        timing = resolve_live_timing(state)
+        transition = transition_payload_for_candidate(
+            self._store,
+            self._library,
+            seed_track_id=seed_track_id,
+            seed_vector=seed_vector,
+            candidate_track_id=candidate_track_id,
+            source_deck=seed.source_deck,
+            target_deck=seed.target_deck,
+            remaining_bars=timing.remaining_bars,
+            playhead_confidence=timing.playhead_confidence,
+            blend_active=timing.blend_active,
+            source_position_s=timing.source_position_s,
+            destination_vector=candidate_vector,
+        )
+        current["transition"] = transition
+        with self._lock:
+            if self._seed_track_id == seed_track_id and self._current is not None:
+                self._current = current
+                return self._current
+            return self._current
+
+    def _finish_scheduled_compute(self, seed_track_id: str, fut: Any) -> None:
+        try:
+            result = fut.result()
+        except Exception as e:
+            logger.warning("[suggestion] scheduled compute failed: %s", e)
+            result = None
+        with self._lock:
+            if self._compute_inflight_seed_track_id == seed_track_id:
+                self._compute_inflight = False
+                self._compute_inflight_seed_track_id = None
+            if result is None:
+                self._next_compute_allowed_at = time.monotonic() + FULL_COMPUTE_RETRY_S
+            else:
+                self._next_compute_allowed_at = 0.0
 
 
-__all__ = ["SuggestionService", "resolve_seed"]
+def _float_or(raw: Any, default: float | None) -> float | None:
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def _target_deck(source_deck: str | None, audible_deck: Any) -> str | None:
+    """Return the opposite deck only when the audible side is explicit."""
+    if source_deck not in {"A", "B"}:
+        return None
+    if audible_deck != source_deck:
+        return None
+    return "B" if source_deck == "A" else "A"
+
+
+__all__ = [
+    "FULL_COMPUTE_RETRY_S",
+    "LIVE_REFRESH_INTERVAL_S",
+    "LiveTimingHint",
+    "ResolvedSeed",
+    "SuggestionService",
+    "resolve_live_timing",
+    "resolve_seed",
+    "resolve_seed_context",
+]

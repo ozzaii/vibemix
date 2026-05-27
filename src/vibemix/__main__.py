@@ -41,39 +41,24 @@ from pathlib import Path
 import httpx
 import numpy as np
 from dotenv import load_dotenv
-from google import genai
-from livekit.agents import AgentSession
-from scipy.signal import resample_poly
 
 from vibemix import __version__
 from vibemix._main_helpers import apply_genre_env
-from vibemix.agent import (
+
+# Re-exported for test_main_smoke SMOKE-07 (asserts __main__ surfaces the
+# persona cell symbol) — not referenced in code here, so noqa the F401.
+from vibemix.agent.config import (
     INPUT_DEVICE,
     LLM_MODEL,
     MIC_DEVICE,
+    OPENROUTER_LLM_MODEL,
     OPENROUTER_TTS_MODEL,
     OUTPUT_DEVICE,
     TTS_FALLBACK_MODEL,
     TTS_MODEL,
     VOICE,
-    DJCoHostAgent,
-    PlaybackQueueAudioOutput,
-    build_llm,
-    build_proxy_genai_client,
-    build_tts_chain,
-    get_or_create_install_uuid,
-    get_or_refresh_jwt,
 )
-# Re-exported for test_main_smoke SMOKE-07 (asserts __main__ surfaces the
-# persona cell symbol) — not referenced in code here, so noqa the F401.
-from vibemix.agent import SYSTEM_INSTRUCTION  # noqa: F401
-from vibemix.agent.cache import GeminiContextCache
-from vibemix.coach import (
-    STRIPPED_RATE_THRESHOLD,
-    CitationIpcShim,
-    CitationLinter,
-    StrippedRateTracker,
-)
+from vibemix.agent.persona import SYSTEM_INSTRUCTION  # noqa: F401
 from vibemix.audio import (
     INPUT_CHUNK_FRAMES,
     INPUT_SR_NATIVE,
@@ -98,9 +83,15 @@ from vibemix.audio import (
     VoiceRecorder,
 )
 from vibemix.audio.recorder import sweep_crashed_sessions
+from vibemix.audio.resample import resample_audio
+from vibemix.coach import (
+    STRIPPED_RATE_THRESHOLD,
+    CitationIpcShim,
+    CitationLinter,
+    StrippedRateTracker,
+)
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.platform import AudioMacOS, MidiMacOS, ScreenMacOS, TrackMacOS
-from vibemix.state.deck_poller import DeckPoller
 from vibemix.profile import load_consent, load_profile, render_profile_for_cache
 from vibemix.runtime import coach_loop, diag_loop, watch_parent, ws_broadcast
 from vibemix.runtime.cancel import CancelGate
@@ -113,6 +104,94 @@ from vibemix.state import (
     MusicState,
     state_refresh_loop,
 )
+from vibemix.state.deck_poller import DeckPoller
+
+# Cohost-only imports are resolved lazily so library/model CLI commands do not
+# load LiveKit provider plugins, Google Cloud STT/TTS, or OpenAI TTS plumbing at
+# module import time. Tests patch these module globals before ``main()`` runs,
+# so the resolver preserves any non-None injected value.
+AgentSession = None
+DJCoHostAgent = None
+PlaybackQueueAudioOutput = None
+build_llm = None
+build_proxy_genai_client = None
+build_tts_chain = None
+get_or_create_install_uuid = None
+get_or_refresh_jwt = None
+GeminiContextCache = None
+
+
+class _LazyGenAI:
+    """Import ``google.genai`` only when a Gemini client is actually needed."""
+
+    def __getattr__(self, name: str):
+        from google import genai as _genai
+
+        return getattr(_genai, name)
+
+
+genai = _LazyGenAI()
+
+
+def _ensure_context_cache_dep() -> None:
+    global GeminiContextCache
+    if GeminiContextCache is None:
+        from vibemix.agent.cache import GeminiContextCache as _GeminiContextCache
+
+        GeminiContextCache = _GeminiContextCache
+
+
+def _ensure_proxy_auth_deps() -> None:
+    global get_or_create_install_uuid, get_or_refresh_jwt
+    if get_or_create_install_uuid is None:
+        from vibemix.agent.install_uuid import get_or_create_install_uuid as _get_uuid
+
+        get_or_create_install_uuid = _get_uuid
+    if get_or_refresh_jwt is None:
+        from vibemix.agent.jwt_cache import get_or_refresh_jwt as _get_jwt
+
+        get_or_refresh_jwt = _get_jwt
+
+
+def _ensure_live_llm_tts_deps() -> None:
+    global build_llm, build_tts_chain
+    if build_llm is None:
+        from vibemix.agent.llm_factory import build_llm as _build_llm
+
+        build_llm = _build_llm
+    if build_tts_chain is None:
+        from vibemix.agent.tts_chain import build_tts_chain as _build_tts_chain
+
+        build_tts_chain = _build_tts_chain
+
+
+def _ensure_proxy_client_dep() -> None:
+    global build_proxy_genai_client
+    if build_proxy_genai_client is None:
+        from vibemix.agent.proxy_client import (
+            build_proxy_genai_client as _build_proxy_genai_client,
+        )
+
+        build_proxy_genai_client = _build_proxy_genai_client
+
+
+def _ensure_live_session_deps() -> None:
+    global AgentSession, DJCoHostAgent, PlaybackQueueAudioOutput
+    if AgentSession is None:
+        from livekit.agents import AgentSession as _AgentSession
+
+        AgentSession = _AgentSession
+    if DJCoHostAgent is None:
+        from vibemix.agent.dj_cohost import DJCoHostAgent as _DJCoHostAgent
+
+        DJCoHostAgent = _DJCoHostAgent
+    if PlaybackQueueAudioOutput is None:
+        from vibemix.agent.playback_sink import (
+            PlaybackQueueAudioOutput as _PlaybackQueueAudioOutput,
+        )
+
+        PlaybackQueueAudioOutput = _PlaybackQueueAudioOutput
+
 
 def _load_env_robust() -> None:
     """Load ``.env`` from any of the known vibemix locations, robust to CWD.
@@ -219,7 +298,7 @@ _load_env_robust()
 # =============================================================================
 
 
-def _resolve_recordings_root() -> "os.PathLike[str]":
+def _resolve_recordings_root() -> os.PathLike[str]:
     """Return the OS-aware recordings root: ``app_data_dir() / "recordings"``.
 
     macOS:   ``~/Library/Application Support/vibemix/recordings``
@@ -243,33 +322,27 @@ def _resolve_recordings_root() -> "os.PathLike[str]":
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse CLI args. ``--version`` short-circuits via argparse's action.
 
-    Phase 11 Wave 1 adds ``--wizard``: routes to a stub that exits cleanly
-    after logging "wizard mode not yet implemented" to stderr. Wave 4 fills
-    in the actual ``WizardLoop`` runtime; this wave only verifies the flag
-    plumbing so the PyInstaller-built ``vibemix-core`` binary can be spawned
-    by Tauri with ``--wizard`` and not crash.
+    ``--wizard`` runs the first-run calibration wizard. Tauri can spawn the
+    PyInstaller-built ``vibemix-core`` binary with this flag for setup, then
+    use the default full live runtime afterward.
     """
     parser = argparse.ArgumentParser(prog="vibemix", description="Open-source AI DJ co-host.")
     parser.add_argument("--version", action="version", version=f"vibemix {__version__}")
     parser.add_argument(
         "--wizard",
         action="store_true",
-        help="Run first-run calibration wizard (Phase 11 — Wave 4 fills the runtime).",
+        help="Run the first-run calibration wizard.",
     )
-    # Phase 12 W2 — standalone session-loop runtime for sidecar-only IPC.
-    # The full live runtime (audio + cascade) is the default (no flag) and
-    # remains the post-wizard entry; ``--session`` is the structural surface
-    # 12-03/12-04 glue against. Phase 12-04 unifies the two paths.
+    # Standalone session-loop runtime for sidecar-only IPC. The full live
+    # runtime (audio + cascade) is the default (no flag); ``--session`` is kept
+    # for diagnostic/bootstrap checks that only need the snapshot bus.
     parser.add_argument(
         "--session",
         action="store_true",
-        help="Run the standalone session IPC loop (no cascade graph; Phase 12 W2).",
+        help="Run the standalone session IPC loop (diagnostic/bootstrap mode; no cascade graph).",
     )
-    # Phase 25 Plan 25-03 — DEBRIEF architectural slot (DEBRIEF-01). v2.0
-    # ships the entry-point + port constant + 3 IPC schema reservations
-    # only; the v2.1 implementation drops in the chaptered TL;DR + drill
-    # cards + clickable timeline behind this flag without touching the API
-    # surface (flag name, port, message types are locked here).
+    # Post-session debrief sidecar. The flag name, port, and message types are
+    # stable because the Tauri shell and debrief window invoke this path.
     # ``nargs="?"`` lets the flag take an optional SESSION_DIR — bare
     # ``--debrief`` registers the smoke / port-reservation banner; with a
     # path it logs the reserved-session intent. Absence keeps ``None`` so
@@ -284,9 +357,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Run as post-session DEBRIEF sidecar — binds the DEBRIEF ws bus on "
             "127.0.0.1:8766, emits the 3 reserved DEBRIEF schemas only, never "
             "engages audio I/O or LiveKit. SESSION_DIR is the path to a "
-            "closed recordings/* session; omit for a no-op smoke. v2.0 "
-            "architectural slot — full UI feature ships v2.1 "
-            "(DEBRIEF-01 + DEBRIEF-02)."
+            "closed recordings/* session; omit for a no-op smoke."
         ),
     )
     # v8.0 LOG-04 — opt-in verbose logging. Default OFF keeps stderr +
@@ -355,13 +426,12 @@ def _run_debrief_sidecar(session_dir: str) -> None:
 
 
 # =============================================================================
-# Wizard entrypoint — Phase 11 Wave 4 wires the real WizardLoop runtime.
+# Wizard entrypoint — opens the real WizardLoop runtime.
 # =============================================================================
 #
-# Wave 1 shipped a stub that printed "mode not yet implemented". Wave 4
-# replaces it with ``vibemix.runtime.wizard.run_wizard`` which opens the
-# WS bus, registers all 8 ipc.* handlers, drives the 3-step calibration
-# flow + smoke test, and exits cleanly on ``ipc.wizard.done``.
+# ``vibemix.runtime.wizard.run_wizard`` opens the WS bus, registers the ipc.*
+# handlers, drives calibration + smoke test, and exits cleanly on
+# ``ipc.wizard.done``.
 
 
 # =============================================================================
@@ -398,12 +468,12 @@ def _input_callback_factory(
         clean48 = music48
 
         try:
-            state16f = resample_poly(state48, INPUT_SR_TARGET, INPUT_SR_NATIVE).astype(np.float32)
+            state16f = resample_audio(state48, source_sr=INPUT_SR_NATIVE, target_sr=INPUT_SR_TARGET)
             state_pcm_16k = np.clip(state16f * 32767.0, -32768, 32767).astype(np.int16)
             audio_buf.push(state_pcm_16k)
             recorder.push_input(state_pcm_16k.tobytes())
 
-            clean16f = resample_poly(clean48, INPUT_SR_TARGET, INPUT_SR_NATIVE).astype(np.float32)
+            clean16f = resample_audio(clean48, source_sr=INPUT_SR_NATIVE, target_sr=INPUT_SR_TARGET)
             clean_pcm_16k = np.clip(clean16f * 32767.0, -32768, 32767).astype(np.int16)
             clean_audio_buf.push(clean_pcm_16k)
         except Exception as e:
@@ -443,9 +513,7 @@ def _passthrough_callback_factory(passthrough: PassthroughBuffer):
     return callback
 
 
-def _mic_callback_factory(
-    mic: MicBuffer, mic_audio_buf: "AudioBuffer | None" = None
-):
+def _mic_callback_factory(mic: MicBuffer, mic_audio_buf: AudioBuffer | None = None):
     """Verbatim port of cohost_v4.py:1965-1969 mic stream callback.
 
     Plan 40-01 (AUDIO-01): when ``mic_audio_buf`` is provided, the callback
@@ -475,9 +543,9 @@ def _mic_callback_factory(
         if mic_audio_buf is not None:
             try:
                 # Resample 48kHz → 16kHz (matches AudioBuffer._sr).
-                mic16f = resample_poly(
-                    mono_f, INPUT_SR_TARGET, INPUT_SR_NATIVE
-                ).astype(np.float32)
+                mic16f = resample_audio(
+                    mono_f, source_sr=INPUT_SR_NATIVE, target_sr=INPUT_SR_TARGET
+                )
                 # AI-talk zero-fill BEFORE the int16 clip (Pitfall 1).
                 if mic._current_gain() == MIC_GAIN_AT_AI_TALK:
                     mic16f = np.zeros_like(mic16f)
@@ -556,6 +624,7 @@ async def main() -> None:
         or_key = os.environ.get("OPENROUTER_API_KEY")  # optional
     else:  # mode == "proxy"
         try:
+            _ensure_proxy_auth_deps()
             install_uuid = get_or_create_install_uuid()
             jwt = await get_or_refresh_jwt(install_uuid, proxy_base_url, client_version)
         except RuntimeError as e:
@@ -815,23 +884,37 @@ async def main() -> None:
         mic_stream = None
 
     # --- LLM + TTS chain ---
+    _ensure_live_llm_tts_deps()
     if mode == "direct":
         print("-> mode:  direct (GEMINI_API_KEY from .env)")
         print(f"-> brain: {LLM_MODEL} (thinking=minimal, temp=1.0)")
         genai_client = genai.Client(api_key=api_key)
         llm_inst = build_llm(api_key, mode="direct")
-        tts_inst = build_tts_chain(
-            gemini_api_key=api_key, openrouter_api_key=or_key or None, mode="direct"
+        openrouter_tts_enabled = os.environ.get("VIBEMIX_TTS_OPENROUTER", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
         )
-        if or_key:
-            print(f"-> tts:   openrouter/{OPENROUTER_TTS_MODEL} (voice={VOICE}) [primary]")
+        tts_inst = build_tts_chain(
+            gemini_api_key=api_key,
+            openrouter_api_key=or_key or None,
+            openrouter_enabled=openrouter_tts_enabled,
+            mode="direct",
+        )
+        if openrouter_tts_enabled and or_key:
+            print(
+                f"-> tts:   {TTS_MODEL} → {TTS_FALLBACK_MODEL} "
+                f"→ openrouter/{OPENROUTER_TTS_MODEL} (voice={VOICE}) [standby]"
+            )
         else:
             print(
                 f"-> tts:   {TTS_MODEL} → {TTS_FALLBACK_MODEL} (voice={VOICE}) "
-                "[no OPENROUTER_API_KEY in .env]"
+                "[native primary; set VIBEMIX_TTS_OPENROUTER=1 for OpenRouter standby]"
             )
     else:  # mode == "proxy"
         print(f"-> brain: {LLM_MODEL} via proxy at {proxy_base_url}")
+        _ensure_proxy_client_dep()
         genai_client = build_proxy_genai_client(jwt, proxy_base_url)
         llm_inst = build_llm(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
         tts_inst = build_tts_chain(mode="proxy", proxy_base_url=proxy_base_url, jwt=jwt)
@@ -867,6 +950,7 @@ async def main() -> None:
     from vibemix.agent.dj_cohost import _resolve_prompt_cell
 
     cache_system_instruction = _resolve_prompt_cell()
+    _ensure_context_cache_dep()
     cache: GeminiContextCache | None = GeminiContextCache(
         client=genai_client,
         system_instruction_body=cache_system_instruction,
@@ -897,10 +981,7 @@ async def main() -> None:
     # this, every response strips with reason='no_citations').
     anti_slop_flag = os.environ.get("VIBEMIX_ANTI_SLOP", "on").strip().lower()
     anti_slop_enabled = anti_slop_flag not in ("off", "0", "false")
-    print(
-        "-> anti-slop: "
-        f"{'on' if anti_slop_enabled else 'off (VIBEMIX_ANTI_SLOP)'}"
-    )
+    print(f"-> anti-slop: {'on' if anti_slop_enabled else 'off (VIBEMIX_ANTI_SLOP)'}")
     # Plan 41-02 — mutation-driven cache refresh. When the cache is wired,
     # every EvidenceRegistry.write() call schedules a debounced refresh (5s
     # debounce + 30s min-interval guard inside the registry). When cache is
@@ -913,6 +994,10 @@ async def main() -> None:
         evidence_registry = EvidenceRegistry(on_mutation=lambda: cache.refresh())
     else:
         evidence_registry = EvidenceRegistry()
+    # EventDetector is constructed before the registry exists because audio and
+    # platform setup happen first. Attach the shared registry before coach_loop
+    # starts so [ev:<TYPE>@t] citations resolve like deck/audio evidence.
+    event_detector.attach_evidence_registry(evidence_registry)
     # Citation-linter ENFORCEMENT gate — decoupled from anti-slop 2026-05-21
     # (Kaan). The v1.0 prompt contract is "cites encouraged, not required, no
     # penalty" (CITATION_GRAMMAR_BLOCK), but a wired linter strips EVERY
@@ -930,19 +1015,14 @@ async def main() -> None:
     )
     citation_linter = CitationLinter() if citation_lint_enabled else None
     stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
-    print(
-        "-> citation lint: "
-        f"{'on' if citation_lint_enabled else 'off (VIBEMIX_CITATION_LINT)'}"
-    )
+    print(f"-> citation lint: {'on' if citation_lint_enabled else 'off (VIBEMIX_CITATION_LINT)'}")
     # In-process IpcBus shim — Plan 20-04's coach_loop publish gate
     # duck-types against ``await ipc_bus.emit(dict)``. The shim buffers each
     # SessionCitation envelope into a bounded deque (no I/O). v2.x follow-up
     # multiplexes the buffer onto the mascot ws_broadcast clients (the WS
     # port is already owned by ws_broadcast — see citation_ipc_shim docstring
     # for the two-option v2.x wiring path).
-    citation_shim: CitationIpcShim | None = (
-        CitationIpcShim() if anti_slop_enabled else None
-    )
+    citation_shim: CitationIpcShim | None = CitationIpcShim() if anti_slop_enabled else None
 
     def _citation_telemetry() -> dict:
         """Closure invoked by ``coach_loop``'s publish gate every
@@ -977,23 +1057,13 @@ async def main() -> None:
         try/except, but staying clean keeps the publish path quiet.
         """
         slop_ratio = (
-            stripped_rate_tracker.slop_ratio()
-            if stripped_rate_tracker is not None
-            else 0.0
+            stripped_rate_tracker.slop_ratio() if stripped_rate_tracker is not None else 0.0
         )
-        rate = (
-            stripped_rate_tracker.rate()
-            if stripped_rate_tracker is not None
-            else 0.0
-        )
+        rate = stripped_rate_tracker.rate() if stripped_rate_tracker is not None else 0.0
         last_unverified = (
-            stripped_rate_tracker.last_unverified()
-            if stripped_rate_tracker is not None
-            else None
+            stripped_rate_tracker.last_unverified() if stripped_rate_tracker is not None else None
         )
-        bypass_active = (
-            stripped_rate_tracker is not None and rate > STRIPPED_RATE_THRESHOLD
-        )
+        bypass_active = stripped_rate_tracker is not None and rate > STRIPPED_RATE_THRESHOLD
         return {
             "slop_ratio": float(slop_ratio),
             "stripped_rate_15s": float(rate),
@@ -1010,9 +1080,10 @@ async def main() -> None:
     # 2026-05-21 — OpenRouter brain path (opt-in via VIBEMIX_LLM_VIA_OPENROUTER=1).
     # Routes the live-coach LLM through OpenRouter (OpenAI-compat, inline-audio
     # verified) to escape free-tier Gemini 503s. Requires OPENROUTER_API_KEY.
-    # Model id overridable via VIBEMIX_OR_LLM_MODEL (default google/gemini-3.5-flash).
+    # Model id overridable via VIBEMIX_OR_LLM_MODEL; default comes from
+    # model_router through OPENROUTER_LLM_MODEL.
     or_llm_client = None
-    or_llm_model = os.environ.get("VIBEMIX_OR_LLM_MODEL", "google/gemini-3.5-flash")
+    or_llm_model = os.environ.get("VIBEMIX_OR_LLM_MODEL", OPENROUTER_LLM_MODEL)
     if os.environ.get("VIBEMIX_LLM_VIA_OPENROUTER", "0").strip().lower() not in (
         "0",
         "off",
@@ -1020,23 +1091,17 @@ async def main() -> None:
         "",
     ):
         if not or_key:
-            sys.exit(
-                "VIBEMIX_LLM_VIA_OPENROUTER=1 but OPENROUTER_API_KEY missing in .env."
-            )
+            sys.exit("VIBEMIX_LLM_VIA_OPENROUTER=1 but OPENROUTER_API_KEY missing in .env.")
         from vibemix.agent.openrouter_llm import build_or_client
 
         or_llm_client = build_or_client(or_key)
         print(f"-> brain via OpenRouter: {or_llm_model} (escapes free-tier 503)")
 
     # ── Phase 65 Plan 04 — Memory Retrieval Seam (RECALL-01..04) ──
-    # Build the MemoryRecall service lazily (best-effort): a memory.db
-    # populated by the Phase 64 ingest sweep + a LibraryEmbedder pointed at
-    # the same proxy-wired genai_client. The recall_enabled flag is the
-    # KAAN-ACTION live-relevance veto switch — DEFAULT-OFF so the seam
-    # ships wired + tested but never injects on live until Kaan flips it
-    # via VIBEMIX_RECALL_ENABLED=1 (or equivalent). Every failure path
-    # (no store, no embedder, no env var) yields ``recall=None`` /
-    # ``recall_enabled=False`` → the agent's cold path stays byte-identical.
+    # Build the MemoryRecall service lazily (best-effort) only when enabled.
+    # The recall embedder is the product CLAP factory, never the legacy Gemini
+    # embedding client; when DEFAULT-OFF, startup performs zero recall/model
+    # setup and agent behavior stays byte-identical.
     recall_svc = None
     recall_enabled = os.environ.get("VIBEMIX_RECALL_ENABLED", "0").strip().lower() not in (
         "0",
@@ -1057,23 +1122,26 @@ async def main() -> None:
         if ground_secondary_ear
         else "-> secondary-ear: OFF (set VIBEMIX_GROUND_SECONDARY_EAR=1 to flip)"
     )
-    try:
-        from vibemix.library.embed import LibraryEmbedder as _LibEmbedderForRecall
-        from vibemix.memory.retrieval import MemoryRecall as _MemoryRecall
-        from vibemix.memory.store import open_memory_store as _open_memory_store
+    if recall_enabled:
+        try:
+            from vibemix.library.embed_factory import (
+                build_embedder as _build_embedder_for_recall,
+            )
+            from vibemix.memory.retrieval import MemoryRecall as _MemoryRecall
+            from vibemix.memory.store import open_memory_store as _open_memory_store
 
-        _recall_embedder = _LibEmbedderForRecall(genai_client)
-        _recall_store = _open_memory_store()
-        recall_svc = _MemoryRecall(_recall_embedder, _recall_store)
-        if recall_enabled:
-            print("-> recall: armed (track-aware, floor=0.7, off-loop)")
-        else:
-            print("-> recall: wired but disabled (set VIBEMIX_RECALL_ENABLED=1 to flip)")
-    except Exception as e:  # pragma: no cover — best-effort, never blocks boot
-        print(f"-> recall: disabled ({e})", file=sys.stderr)
-        recall_svc = None
-        recall_enabled = False
+            _recall_embedder = _build_embedder_for_recall()
+            _recall_store = _open_memory_store()
+            recall_svc = _MemoryRecall(_recall_embedder, _recall_store)
+            print("-> recall: armed (CLAP, track-aware, floor=0.7, off-loop)")
+        except Exception as e:  # pragma: no cover — best-effort, never blocks boot
+            print(f"-> recall: disabled ({e})", file=sys.stderr)
+            recall_svc = None
+            recall_enabled = False
+    else:
+        print("-> recall: disabled (set VIBEMIX_RECALL_ENABLED=1 to flip)")
 
+    _ensure_live_session_deps()
     agent = DJCoHostAgent(
         genai_client=genai_client,
         clean_audio_buf=clean_audio_buf,
@@ -1138,7 +1206,9 @@ async def main() -> None:
         else:
             print("-> library: cache present but failed to load — skipping registration")
     else:
-        print("-> library: no cache at ~/.cache/vibemix/library.pkl — citations limited to nowplaying-cli")
+        print(
+            "-> library: no cache at ~/.cache/vibemix/library.pkl — citations limited to nowplaying-cli"
+        )
 
     # ── Plan 28-07 — 30-day staleness nudge ──
     # Once-per-boot check. emit_ipc currently logs to stdout; the renderer
@@ -1160,36 +1230,36 @@ async def main() -> None:
     except Exception as e:
         print(f"-> staleness check failed: {e}", file=sys.stderr)
 
-    # ── Plan 28-04 — grounding pipeline (event-gated, P56 cost ceiling) ──
-    # Build Grounding lazily — only when (a) library cache exists AND
-    # (b) the proxy probe shows the embedContent route is available. The
-    # agent reads ``grounding`` via kwargs (Pitfall P53); the agent path
-    # tolerates ``None`` and falls back to nowplaying-cli citations only.
+    # ── Plan 28-04 — grounding pipeline (event-gated, local CLAP) ──
+    # Build Grounding lazily when a library cache exists. Embeddings are local
+    # CLAP ONNX/512 through build_embedder(); the Gemini client is for the live
+    # co-host brain/TTS only, not for library grounding embeddings.
     grounding = None
     suggestion_service = None
     if library_cache.exists():
         try:
             from vibemix.library import (
-                build_embedder as _build_embedder,
                 Grounding as _Grounding,
+            )
+            from vibemix.library import (
                 open_store as _open_store,
             )
+            from vibemix.library.embed_factory import build_embedder as _build_embedder
 
-            _embed_client = genai_client  # already proxy-wired upstream
-            _library_embedder = _build_embedder(_embed_client)
+            _library_embedder = _build_embedder()
             _library_store = _open_store()
             grounding = _Grounding(_library_embedder, _library_store)
             print("-> grounding: armed (event-gated, threshold=0.7)")
             # PILL next-suggestion: reuse the SAME store + cache-warm library so
             # the pill suggests from the embedded library (Phase 1, embedding-
-            # only; needs deck_library for track-id resolution). Off-loop,
-            # recomputed on TRACK_CHANGE by coach_loop; read by ws_broadcast.
+            # only; needs deck_library for track-id resolution). Full ranking is
+            # recomputed on TRACK_CHANGE by coach_loop; ws_broadcast performs a
+            # throttled timing-only refresh so the pill countdown follows the
+            # live playhead without reranking at 30Hz.
             if deck_library is not None:
                 from vibemix.runtime.suggestion import SuggestionService
 
-                suggestion_service = SuggestionService(
-                    _library_store, deck_library
-                )
+                suggestion_service = SuggestionService(_library_store, deck_library)
                 print("-> pill next-suggestion: armed")
         except Exception as e:
             print(f"-> grounding: disabled ({e})", file=sys.stderr)
@@ -1241,11 +1311,11 @@ async def main() -> None:
     # persona/output control + settings page silently timed out. We run
     # SessionLoop's tested handlers via the IpcRouterBus adapter routed through
     # ws_broadcast's existing socket (no second listener — One Socket invariant).
-    from vibemix.runtime.session_loop import SessionLoop  # noqa: PLC0415
-    from vibemix.runtime.settings import SettingsApplier  # noqa: PLC0415
-    from vibemix.runtime.ws_bus import IpcRouterBus  # noqa: PLC0415
+    from vibemix.runtime.session_loop import SessionLoop
+    from vibemix.runtime.settings import SettingsApplier
+    from vibemix.runtime.ws_bus import IpcRouterBus
 
-    ipc_router: "IpcRouterBus | None" = IpcRouterBus()
+    ipc_router: IpcRouterBus | None = IpcRouterBus()
     # Phase 77 Plan 04 — WIRE-05: the live SessionLoop handle. Initialized to
     # None BEFORE the try so the name is always bound in the finally-block
     # close-ingest call (the except path below leaves it unset otherwise).
@@ -1267,6 +1337,10 @@ async def main() -> None:
             config_store=_settings_config,
             settings_applier=_live_settings_applier,
             music_state=state,
+            levels=levels,
+            playback_queue=playback,
+            controller_state=midi_macos.controller_state,
+            screen_available=screen_macos.is_available(),
             recordings_root=recordings_root,
             active_recorder=recorder,
             evidence_registry=evidence_registry,
@@ -1300,9 +1374,7 @@ async def main() -> None:
         # ingest completes. (The close-path ingest in the finally already
         # ``await``s, so only this boot path was exposed.)
         if recall_enabled and _session_ipc is not None:
-            _boot_ingest_task = asyncio.create_task(
-                _session_ipc._fire_ingest("boot")
-            )
+            _boot_ingest_task = asyncio.create_task(_session_ipc._fire_ingest("boot"))
             _background_tasks.add(_boot_ingest_task)
             _boot_ingest_task.add_done_callback(_background_tasks.discard)
     except Exception as _e:  # pragma: no cover — never block boot on this
@@ -1322,6 +1394,7 @@ async def main() -> None:
             suggestion_holder=suggestion_service,
             tracer=tracer,
             ipc_router=ipc_router,
+            screen_available=screen_macos.is_available(),
         )
     )
     diag_task = asyncio.create_task(diag_loop(levels, state, stop_event, tracer=tracer))
@@ -1482,9 +1555,7 @@ async def main() -> None:
         # path, so guard it. Best-effort + off-loop inside _fire_ingest.
         if recall_enabled and _session_ipc is not None:
             try:
-                await _session_ipc._fire_ingest(
-                    "close", session_dir=recorder.session_dir
-                )
+                await _session_ipc._fire_ingest("close", session_dir=recorder.session_dir)
             except Exception as e:  # pragma: no cover — best-effort
                 print(f"[close ingest err] {e}", file=sys.stderr)
         # Phase 15 Plan 03 — session-close retention sweep trigger. Fires
@@ -1493,9 +1564,7 @@ async def main() -> None:
         # retention_days fresh in case the user changed it mid-session.
         try:
             cfg_for_close_sweep = load_config()
-            result_close = run_retention_sweep(
-                recordings_root, cfg_for_close_sweep.retention_days
-            )
+            result_close = run_retention_sweep(recordings_root, cfg_for_close_sweep.retention_days)
             if result_close.deleted_names:
                 print(
                     f"-> retention sweep (close): pruned "
@@ -1514,7 +1583,7 @@ async def main() -> None:
 
 def _enable_line_buffering() -> None:
     """Flip stdout/stderr to line-buffered so the Tauri rotating log captures
-    diagnostic lines in real time instead of in 4–8 KB pipe-buffer batches.
+    diagnostic lines in real time instead of in 4-8 KB pipe-buffer batches.
 
     Why: CPython's default is line-buffered when isatty(), fully-buffered
     otherwise. The Tauri shell spawns the sidecar through a pipe so stderr
@@ -1542,13 +1611,9 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sub = parser.add_subparsers(dest="library_command", required=True)
 
     # Plan 28-03 — search
-    sp_search = sub.add_parser(
-        "search", help="Natural-language vibe-search against your library"
-    )
+    sp_search = sub.add_parser("search", help="Natural-language vibe-search against your library")
     sp_search.add_argument("query", help="vibe-search query string")
-    sp_search.add_argument(
-        "--k", type=int, default=10, help="number of matches (default 10)"
-    )
+    sp_search.add_argument("--k", type=int, default=10, help="number of matches (default 10)")
     sp_search.add_argument(
         "--json",
         action="store_true",
@@ -1577,10 +1642,9 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         "embed-folder",
         help="Embed every supported audio file under a folder (recursive)",
         description=(
-            "Walk a raw audio folder, embed each track via Gemini Embedding "
-            "2, persist 1536-d vectors + a library.pkl so search/similar "
-            "resolve filenames. Resumable, partial-failure-tolerant. Uses "
-            "GEMINI_API_KEY (direct) when set, else VIBEMIX_PROXY_JWT (proxy)."
+            "Walk a raw audio folder, embed each track locally with CLAP ONNX, "
+            "persist 512-d vectors + a library.pkl so search/similar resolve "
+            "filenames. Resumable, partial-failure-tolerant, and keyless."
         ),
     )
     sp_embed_folder.add_argument("path", help="folder to ingest (recursive)")
@@ -1607,10 +1671,11 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         "curate",
         help="Curate a playlist from a theme with the Viber agent",
         description=(
-            "Bounded Gemini function-calling agent. It vibe-searches YOUR "
-            "library for the theme and writes a neutral M3U/JSON playlist to "
-            "~/.cache/vibemix/playlists/. Every track is grounded — the agent "
-            "can only use tracks search returned, never invented ones."
+            "Bounded Viber agent. The product backend is local Codex via MCP. "
+            "It vibe-searches YOUR library for the theme and writes "
+            "a neutral M3U/JSON playlist to ~/.cache/vibemix/playlists/. Every "
+            "track is grounded — the agent can only use tracks search returned, "
+            "never invented ones."
         ),
     )
     sp_curate.add_argument(
@@ -1630,13 +1695,9 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_curate.add_argument(
         "--backend",
-        choices=("gemini", "codex"),
-        default="gemini",
-        help=(
-            "reasoning backend: 'gemini' (built-in fn-calling, default) or "
-            "'codex' (your flat-rate ChatGPT sub via `codex exec` + MCP; "
-            "needs `codex login`)"
-        ),
+        choices=("codex",),
+        default="codex",
+        help=("reasoning backend: 'codex' (local Codex CLI via MCP; needs `codex login`)"),
     )
     sp_curate.add_argument("--json", action="store_true")
     sp_curate.set_defaults(func=_cmd_library_curate)
@@ -1662,9 +1723,7 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
             "festival). Advisory — the agent picks if omitted."
         ),
     )
-    sp_build_set.add_argument(
-        "--n-slots", type=int, default=None, help="target set length (slots)"
-    )
+    sp_build_set.add_argument("--n-slots", type=int, default=None, help="target set length (slots)")
     sp_build_set.add_argument(
         "--export",
         choices=("rekordbox",),
@@ -1676,12 +1735,11 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_build_set.add_argument(
         "--backend",
-        choices=("gemini", "codex"),
-        default="gemini",
+        choices=("codex",),
+        default="codex",
         help=(
-            "reasoning backend: 'gemini' (built-in fn-calling, default) or "
-            "'codex' (your ChatGPT-plan Codex CLI via the MCP server). Codex "
-            "needs `codex login` + VIBEMIX_CODEX_ALLOW_SHELL=1."
+            "reasoning backend: 'codex' (local Codex CLI via MCP; needs "
+            "`codex login` + VIBEMIX_CODEX_ALLOW_SHELL=1)."
         ),
     )
     sp_build_set.add_argument("--json", action="store_true")
@@ -1695,7 +1753,7 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         help="Talk to Viber — conversational, tool-using DJ co-host (one turn)",
         description=(
             "One conversational turn with the Viber co-host. The model may call "
-            "any grounded tool (search/discover/quote/web/youtube/knowledge/"
+            "any grounded tool (search/discover/quote/web/knowledge/"
             "curate/build) before it replies. Stateless: pass the prior "
             "conversation via --history (JSON) to continue it. Emits a JSON "
             "ChatResult (reply / tool_trace / playlist / export_path)."
@@ -1709,12 +1767,11 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_chat.add_argument(
         "--backend",
-        choices=("codex", "gemini"),
+        choices=("codex",),
         default="codex",
         help=(
             "reasoning backend: 'codex' (the agentic engine — your ChatGPT-plan "
-            "Codex CLI via the MCP server, default) or 'gemini' (built-in "
-            "fn-calling fallback). Codex needs `codex login` + "
+            "Codex CLI via the MCP server). Codex needs `codex login` + "
             "VIBEMIX_CODEX_ALLOW_SHELL=1."
         ),
     )
@@ -1732,12 +1789,8 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         ),
     )
     sp_export_set.add_argument("set_json", help="path to the JSON set file")
-    sp_export_set.add_argument(
-        "--out", required=True, help="destination .xml path"
-    )
-    sp_export_set.add_argument(
-        "--name", default="vibemix set", help="playlist name in the XML"
-    )
+    sp_export_set.add_argument("--out", required=True, help="destination .xml path")
+    sp_export_set.add_argument("--name", default="vibemix set", help="playlist name in the XML")
     sp_export_set.add_argument("--json", action="store_true")
     sp_export_set.set_defaults(func=_cmd_library_export_set)
 
@@ -1754,9 +1807,10 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_telegram.set_defaults(func=_cmd_library_telegram)
 
-    # Plan 28-08 — budget telemetry + projection
+    # Plan 28-08 — legacy Gemini embedding what-if + live token telemetry
     sp_budget = sub.add_parser(
-        "budget", help="Show monthly Gemini Embedding cost projection"
+        "budget",
+        help="Show legacy Gemini embedding what-if and live token telemetry",
     )
     sp_budget.add_argument(
         "--dau", type=int, default=1000, help="daily-active users (default 1000)"
@@ -1770,6 +1824,40 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_stats.add_argument("--json", action="store_true")
     sp_stats.set_defaults(func=_cmd_library_stats)
+
+    sp_models = sub.add_parser(
+        "models",
+        help="Show local AI model cache status for CLAP and CUE-DETR",
+        description=(
+            "Offline model asset status for one-click setup. Reports where "
+            "the CLAP embedding snapshot and CUE-DETR cue model should live, "
+            "which files are missing, and which env var overrides the path."
+        ),
+    )
+    sp_models.add_argument("--json", action="store_true")
+    sp_models.add_argument(
+        "--install",
+        choices=("required", "clap", "cue", "all"),
+        default=None,
+        help=(
+            "download/install supported local model assets. 'required' "
+            "installs the first-run required assets; 'clap' installs the "
+            "Hugging Face CLAP ONNX snapshot; 'cue' reports/verifies the "
+            "manual CUE-DETR ONNX target until hosting exists; 'all' requires "
+            "both local model targets to be ready."
+        ),
+    )
+    sp_models.add_argument(
+        "--force",
+        action="store_true",
+        help="re-download model files even when checksum verification passes",
+    )
+    sp_models.add_argument(
+        "--progress",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    sp_models.set_defaults(func=_cmd_library_models)
 
     # Phase 89 Plan 01 — ingest: auto-detect a DJ library + embed it on-device.
     sp_ingest = sub.add_parser(
@@ -1877,6 +1965,14 @@ def _cmd_bench_run(args: argparse.Namespace) -> int:
 
 
 def _run_bench_cli(argv: list[str]) -> int:
+    if getattr(sys, "frozen", False):
+        print(
+            "vibemix bench is a source-only dev/eval command and is not bundled in "
+            "the shipped sidecar.",
+            file=sys.stderr,
+        )
+        return 2
+
     parser = argparse.ArgumentParser(prog="vibemix bench")
     _build_bench_subparsers(parser)
     args = parser.parse_args(argv)
@@ -1884,12 +1980,11 @@ def _run_bench_cli(argv: list[str]) -> int:
 
 
 def _library_genai_client():
-    """Resolve a genai client for the library query CLI (search / similar).
+    """Resolve a genai client for Gemini-backed eval/media helpers.
 
-    Mirrors ``_cmd_library_embed_folder``'s direct-first selection so a local
-    user with only ``GEMINI_API_KEY`` (loaded from ``.env`` by the
-    module-level ``_load_env_robust()`` call) can run vibe-search / similar
-    without provisioning a Bravoh proxy JWT:
+    Library embedding/search/similar now use local CLAP ONNX and do not need
+    this client. Legacy/eval Gemini helpers and Gemini-based media tools still
+    use the direct-first selection:
 
         1. GEMINI_API_KEY set → DIRECT ``genai.Client(api_key=...)`` — the
            SAME construction the live session's mode=direct path uses.
@@ -1901,9 +1996,7 @@ def _library_genai_client():
     """
     api_key = os.environ.get("GEMINI_API_KEY")
     proxy_jwt = os.environ.get("VIBEMIX_PROXY_JWT")
-    proxy_url = os.environ.get(
-        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
-    )
+    proxy_url = os.environ.get("VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world")
 
     if api_key:
         return genai.Client(api_key=api_key), None
@@ -1925,17 +2018,11 @@ def _cmd_library_search(args: argparse.Namespace) -> int:
     import json as _json
 
     from vibemix.library import (
-        LibraryEmbedder,
-        build_embedder,
         RekordboxLibrary,
+        build_embedder,
         open_store,
         vibe_search,
     )
-
-    client, err = _library_genai_client()
-    if err is not None:
-        print(_json.dumps(err), file=sys.stderr)
-        return 1
 
     lib = RekordboxLibrary()
     if not lib.try_load_cache():
@@ -1943,8 +2030,7 @@ def _cmd_library_search(args: argparse.Namespace) -> int:
             _json.dumps(
                 {
                     "error": (
-                        "No library cache. Drag a Rekordbox XML onto "
-                        "Settings → Library first."
+                        "No library cache. Drag a Rekordbox XML onto Settings → Library first."
                     ),
                     "results": [],
                 }
@@ -1953,19 +2039,21 @@ def _cmd_library_search(args: argparse.Namespace) -> int:
         )
         return 1
 
-    embedder = build_embedder(client)
+    embedder = build_embedder()
     store = open_store()
     try:
-        results, cache_hit = vibe_search(
-            embedder, store, lib, args.query, k=args.k
-        )
+        corpus_size = store.row_count()
+        results, cache_hit = vibe_search(embedder, store, lib, args.query, k=args.k)
     finally:
         store.close()
+    corpus_size = int(corpus_size) if corpus_size is not None else len(results)
 
     _json.dump(
         {
             "query": args.query,
             "cache_hit": cache_hit,
+            "centered": corpus_size >= 2,
+            "corpus_size": corpus_size,
             "results": [r.to_dict() for r in results],
         },
         sys.stdout,
@@ -1980,39 +2068,33 @@ def _cmd_library_similar(args: argparse.Namespace) -> int:
     import json as _json
 
     from vibemix.library import (
-        LibraryEmbedder,
-        build_embedder,
         RekordboxLibrary,
+        build_embedder,
         open_store,
     )
     from vibemix.library.similar import similar_to
 
-    client, err = _library_genai_client()
-    if err is not None:
-        print(_json.dumps(err), file=sys.stderr)
-        return 1
-
     lib = RekordboxLibrary()
     if not lib.try_load_cache():
         print(
-            _json.dumps(
-                {"error": "No library cache.", "results": []}
-            ),
+            _json.dumps({"error": "No library cache.", "results": []}),
             file=sys.stderr,
         )
         return 1
 
-    embedder = build_embedder(client)
+    embedder = build_embedder()
     store = open_store()
     try:
-        results = similar_to(
-            embedder, store, lib, args.track_id, k=args.k
-        )
+        corpus_size = store.row_count()
+        results = similar_to(embedder, store, lib, args.track_id, k=args.k)
     finally:
         store.close()
+    corpus_size = int(corpus_size) if corpus_size is not None else len(results)
     _json.dump(
         {
             "track_id": args.track_id,
+            "centered": corpus_size >= 2,
+            "corpus_size": corpus_size,
             "results": [r.to_dict() for r in results],
         },
         sys.stdout,
@@ -2025,17 +2107,53 @@ def _cmd_library_similar(args: argparse.Namespace) -> int:
 def _cmd_library_curate(args: argparse.Namespace) -> int:
     """Viber Agent Phase 1 — theme → curated playlist (M3U/JSON).
 
-    Two reasoning backends, one grounded tool surface (LibraryToolset):
-    ``gemini`` (built-in function-calling) or ``codex`` (the user's flat-rate
-    ChatGPT sub via ``codex exec`` + the MCP server). Both can only emit tracks
-    that search returned — grounding is enforced at the tool boundary.
+    Product path: ``codex`` (the user's flat-rate ChatGPT sub via ``codex exec``
+    + the MCP server). It can only emit tracks that search returned —
+    grounding is enforced at the tool boundary.
     """
     import json as _json
 
     from vibemix.library import RekordboxLibrary
 
-    # The library cache is needed by both backends (Gemini agent reads it
-    # directly; Codex uses it for result-boundary grounding re-validation).
+    backend = getattr(args, "backend", "codex")
+    if backend != "codex":
+        print(
+            _json.dumps(
+                {
+                    "error": (
+                        "Unsupported Viber backend. Library/Viber uses local "
+                        "Codex; run `codex login` and retry with --backend codex."
+                    ),
+                    "playlist": None,
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 2
+    if getattr(args, "interactive", False):
+        print(
+            _json.dumps(
+                {
+                    "error": (
+                        "`library curate --interactive` is retired for the "
+                        "Codex path. Use `library chat` for a conversational "
+                        "Viber turn, or pass a theme to `library curate`."
+                    ),
+                    "playlist": None,
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 2
+    if not args.theme:
+        print(
+            _json.dumps({"error": "Give a theme, or use `library chat` to talk to Viber."}),
+            file=sys.stderr,
+        )
+        return 1
+
+    # The library cache is needed by Codex for result-boundary grounding
+    # re-validation.
     lib = RekordboxLibrary()
     if not lib.try_load_cache():
         print(
@@ -2052,66 +2170,7 @@ def _cmd_library_curate(args: argparse.Namespace) -> int:
         )
         return 1
 
-    if getattr(args, "backend", "gemini") == "codex":
-        return _cmd_library_curate_codex(args, lib)
-
-    from vibemix.library import ViberAgent, build_embedder, open_store
-
-    client, err = _library_genai_client()
-    if err is not None:
-        print(_json.dumps(err), file=sys.stderr)
-        return 1
-
-    interactive = getattr(args, "interactive", False)
-    if not interactive and not args.theme:
-        print(
-            _json.dumps(
-                {"error": "Give a theme, or use --interactive to be asked."}
-            ),
-            file=sys.stderr,
-        )
-        return 1
-
-    embedder = build_embedder(client)
-    store = open_store()
-    try:
-        agent = ViberAgent(client, embedder, store, lib)
-        if interactive:
-            # Conversational: the agent asks via ask_user → we read stdin. The
-            # questions go to stderr (stdout stays pure JSON for the bridge).
-            def _ask(question: str) -> str:
-                print(f"\nViber> {question}", file=sys.stderr)
-                try:
-                    return input("you> ").strip()
-                except (EOFError, KeyboardInterrupt):
-                    return ""
-
-            result = agent.curate_interactive(_ask, opening=args.theme)
-        else:
-            result = agent.curate(args.theme)
-        # The agent names the playlist via the tool call; --name is advisory
-        # and only surfaces in human output (the model picks the persisted name).
-    finally:
-        store.close()
-
-    out = result.to_dict()
-    if result.playlist is None:
-        print(_json.dumps(out, indent=2), file=sys.stderr)
-        print(
-            f"[viber] no playlist created (stop_reason={result.stop_reason})",
-            file=sys.stderr,
-        )
-        return 1
-
-    _json.dump(out, sys.stdout, indent=2)
-    sys.stdout.write("\n")
-    pl = result.playlist
-    print(
-        f"-> playlist '{pl.name}' ({len(pl.track_ids)} tracks) "
-        f"saved: {pl.m3u_path}",
-        file=sys.stderr,
-    )
-    return 0
+    return _cmd_library_curate_codex(args, lib)
 
 
 def _cmd_library_chat(args: argparse.Namespace) -> int:
@@ -2120,7 +2179,7 @@ def _cmd_library_chat(args: argparse.Namespace) -> int:
     Stateless per invocation: the caller threads prior turns via ``--history``
     so the Tauri bridge can drive a live conversation. Unlike curate/build-set
     this does NOT hard-fail on a missing library cache — chat can still answer
-    technique / web / YouTube questions; an empty library just means search
+    technique / web questions; an empty library just means search
     honestly returns nothing.
     """
     import json as _json
@@ -2139,42 +2198,34 @@ def _cmd_library_chat(args: argparse.Namespace) -> int:
         except (ValueError, TypeError):
             history = None  # malformed history degrades to a fresh turn
 
-    # CODEX is the agentic engine (default). It owns the conversational loop +
-    # MCP grounded tools; the library is read-only for result-boundary grounding.
-    if getattr(args, "backend", "codex") == "codex":
-        from vibemix.library.codex_curate import chat_with_codex
-
-        result = chat_with_codex(args.message, lib, history=history)
-        _json.dump(result.to_dict(), sys.stdout, indent=2)
-        sys.stdout.write("\n")
+    backend = getattr(args, "backend", "codex")
+    if backend != "codex":
         print(
-            f"-> viber chat [codex] ({len(result.tools_used)} tools, "
-            f"stop={result.stop_reason})",
+            _json.dumps(
+                {
+                    "reply": (
+                        "Unsupported Viber backend. Library/Viber uses local "
+                        "Codex; run `codex login` and retry with --backend codex."
+                    ),
+                    "stop_reason": "unsupported_backend",
+                    "tool_trace": [],
+                    "playlist": None,
+                    "export_path": None,
+                }
+            ),
             file=sys.stderr,
         )
-        return 0
+        return 2
 
-    # Gemini fallback (built-in fn-calling conversational loop).
-    from vibemix.library import ViberAgent, build_embedder, open_store
+    # CODEX is the agentic engine. It owns the conversational loop + MCP
+    # grounded tools; the library is read-only for result-boundary grounding.
+    from vibemix.library.codex_curate import chat_with_codex
 
-    client, err = _library_genai_client()
-    if err is not None:
-        print(_json.dumps(err), file=sys.stderr)
-        return 1
-
-    embedder = build_embedder(client)
-    store = open_store()
-    try:
-        agent = ViberAgent(client, embedder, store, lib)
-        result = agent.chat(args.message, history)
-    finally:
-        store.close()
-
+    result = chat_with_codex(args.message, lib, history=history)
     _json.dump(result.to_dict(), sys.stdout, indent=2)
     sys.stdout.write("\n")
     print(
-        f"-> viber chat ({len(result.tool_trace)} tool calls, "
-        f"stop={result.stop_reason})",
+        f"-> viber chat [codex] ({len(result.tools_used)} tools, stop={result.stop_reason})",
         file=sys.stderr,
     )
     return 0
@@ -2223,9 +2274,8 @@ def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
 
     Codex drives the discover → sequence → export tool surface on the MCP server;
     we pass the loaded library only for result-boundary grounding re-validation.
-    Emits the SAME JSON contract as the Gemini path's `to_dict` (playlist_name /
-    track_ids / rationale / export_path) so the Tauri `map_curate_result` bridge
-    reads both backends through one shape.
+    Emits the same JSON contract the Tauri `map_curate_result` bridge reads
+    (playlist_name / track_ids / rationale / export_path).
     """
     import json as _json
 
@@ -2236,10 +2286,12 @@ def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
         lib,
         curve=getattr(args, "curve", None),
         name=getattr(args, "name", None),
+        n_slots=getattr(args, "n_slots", None),
+        export=getattr(args, "export", None) == "rekordbox",
     )
     out = result.to_dict()
 
-    if result.stop_reason != "created":
+    if result.stop_reason not in ("created", "exported"):
         print(_json.dumps(out, indent=2), file=sys.stderr)
         hint = {
             "codex_not_installed": (
@@ -2265,20 +2317,14 @@ def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
 def _cmd_library_build_set(args: argparse.Namespace) -> int:
     """Vibe Mix set-prep co-host — brief → discovered + sequenced set.
 
-    Mirrors ``_cmd_library_curate``'s client/embedder/store/library setup, then
-    runs ``ViberAgent.build_set`` (the set-prep tool surface). Prints the chosen
-    sequence slot-by-slot + the agent's per-transition rationale + any export
-    path. Fail-actionable when the library cache is missing.
+    Mirrors ``_cmd_library_curate``'s library-cache setup, then runs the local
+    Codex/MCP set-prep surface. Prints the chosen sequence slot-by-slot + the
+    agent's per-transition rationale + any export path. Fail-actionable when
+    the library cache is missing.
     """
     import json as _json
 
-    from vibemix.library import (
-        LibraryEmbedder,
-        build_embedder,
-        RekordboxLibrary,
-        ViberAgent,
-        open_store,
-    )
+    from vibemix.library import RekordboxLibrary
 
     lib = RekordboxLibrary()
     if not lib.try_load_cache():
@@ -2296,74 +2342,28 @@ def _cmd_library_build_set(args: argparse.Namespace) -> int:
         )
         return 1
 
-    # Codex backend: Codex talks to the MCP server (which holds embedder/store);
-    # no local genai client needed. Mirrors `_cmd_library_curate_codex`.
-    if getattr(args, "backend", "gemini") == "codex":
-        return _cmd_library_build_set_codex(args, lib)
-
-    client, err = _library_genai_client()
-    if err is not None:
-        print(_json.dumps(err), file=sys.stderr)
-        return 1
-
-    # Curve / length / export are advisory hints folded into the brief — the
-    # agent owns the tool calls (the curve preset is its choice, grounded).
-    brief = args.brief
-    hints: list[str] = []
-    if getattr(args, "curve", None):
-        hints.append(f"prefer the '{args.curve}' energy curve")
-    if getattr(args, "n_slots", None):
-        hints.append(f"aim for about {args.n_slots} tracks")
-    if getattr(args, "export", None):
-        hints.append("export the chosen set to Rekordbox XML when done")
-    if getattr(args, "name", None):
-        hints.append(f"name the set '{args.name}'")
-    if hints:
-        brief = f"{brief} ({'; '.join(hints)})"
-
-    embedder = build_embedder(client)
-    store = open_store()
-    try:
-        agent = ViberAgent(client, embedder, store, lib)
-        result = agent.build_set(brief)
-    finally:
-        store.close()
-
-    out = result.to_dict()
-    if getattr(args, "json", False):
-        _json.dump(out, sys.stdout, indent=2)
-        sys.stdout.write("\n")
-        return 0
-
-    # Human-readable: the agent's rationale + the tracks it surfaced.
-    print(f"-> set brief: {args.brief}", file=sys.stderr)
-    if result.rationale:
-        print(result.rationale, file=sys.stderr)
-    if result.seen_track_ids:
+    backend = getattr(args, "backend", "codex")
+    if backend != "codex":
         print(
-            f"-> {len(result.seen_track_ids)} grounded tracks discovered",
+            _json.dumps(
+                {
+                    "error": (
+                        "Unsupported Viber backend. Library/Viber uses local "
+                        "Codex; run `codex login` and retry with --backend codex."
+                    ),
+                    "set": None,
+                }
+            ),
             file=sys.stderr,
         )
-    if result.playlist is not None:
-        print(
-            f"-> playlist '{result.playlist.name}' saved: "
-            f"{result.playlist.m3u_path}",
-            file=sys.stderr,
-        )
-    # BL-02: surface the exported Rekordbox XML path when the agent exported.
-    if result.export_path:
-        print(
-            f"-> set exported to Rekordbox XML: {result.export_path}",
-            file=sys.stderr,
-        )
-    _json.dump(out, sys.stdout, indent=2)
-    sys.stdout.write("\n")
-    return 0
+        return 2
+
+    # Codex talks to the MCP server (which holds embedder/store); no local
+    # genai client needed. Mirrors `_cmd_library_curate_codex`.
+    return _cmd_library_build_set_codex(args, lib)
 
 
-def _validate_export_tracks_against_library(
-    tracks: list, library
-) -> tuple[list, list[dict]]:
+def _validate_export_tracks_against_library(tracks: list, library) -> tuple[list, list[dict]]:
     """WR-03: re-validate each set item against the live library (grounding).
 
     A track resolves if its ``track_id`` is a known library id OR its
@@ -2437,8 +2437,7 @@ def _cmd_library_export_set(args: argparse.Namespace) -> int:
     if not isinstance(tracks, list) or not tracks:
         print(
             _json.dumps(
-                {"error": "set file must be a non-empty list of track dicts "
-                          "(or {tracks:[...]})."}
+                {"error": "set file must be a non-empty list of track dicts (or {tracks:[...]})."}
             ),
             file=sys.stderr,
         )
@@ -2451,8 +2450,7 @@ def _cmd_library_export_set(args: argparse.Namespace) -> int:
         tracks, ungrounded = _validate_export_tracks_against_library(tracks, lib)
         if ungrounded:
             print(
-                f"-> dropped {len(ungrounded)} ungrounded track(s) "
-                "(not in library)",
+                f"-> dropped {len(ungrounded)} ungrounded track(s) (not in library)",
                 file=sys.stderr,
             )
         if not tracks:
@@ -2477,7 +2475,7 @@ def _cmd_library_export_set(args: argparse.Namespace) -> int:
 
     try:
         result = export_rekordbox.export_set(tracks, name, args.out)
-    except Exception as e:  # noqa: BLE001 — surface the failure actionably
+    except Exception as e:
         print(
             _json.dumps({"error": f"export failed: {type(e).__name__}: {e}"}),
             file=sys.stderr,
@@ -2505,20 +2503,24 @@ def _cmd_library_export_set(args: argparse.Namespace) -> int:
 def _cmd_library_telegram(args: argparse.Namespace) -> int:
     """Run the Telegram mobile surface — curate playlists from your phone.
 
-    Wires the SAME Gemini Viber agent the CLI uses behind a long-poll bot. A
-    FRESH ViberAgent per message (the grounding seen-set is per-run). Blocking
-    until Ctrl-C.
+    Wires the same local Codex Viber backend behind a long-poll bot. A fresh
+    Codex run is spawned per message, then the result is re-validated before it
+    reaches chat. Blocking until Ctrl-C.
     """
     import json as _json
 
-    from vibemix.library import (
-        LibraryEmbedder,
-        build_embedder,
-        RekordboxLibrary,
-        ViberAgent,
-        open_store,
+    from vibemix.library import RekordboxLibrary
+    from vibemix.library.codex_curate import curate_with_codex
+    from vibemix.library.telegram_bridge import (
+        TelegramDependencyError,
+        build_bridge_from_env,
+        telegram_dependency_error,
     )
-    from vibemix.library.telegram_bridge import build_bridge_from_env
+
+    dep_err = telegram_dependency_error()
+    if dep_err is not None:
+        print(_json.dumps({"error": dep_err}), file=sys.stderr)
+        return 1
 
     lib = RekordboxLibrary()
     if not lib.try_load_cache():
@@ -2535,89 +2537,47 @@ def _cmd_library_telegram(args: argparse.Namespace) -> int:
         )
         return 1
 
-    client, err = _library_genai_client()
-    if err is not None:
-        print(_json.dumps(err), file=sys.stderr)
-        return 1
-
-    embedder = build_embedder(client)
-    store = open_store()
-
     def curate_fn(theme: str) -> dict:
-        # Fresh agent per message — the seen-set must be per-run (grounding).
-        agent = ViberAgent(client, embedder, store, lib)
-        result = agent.curate(theme)
-        if result.playlist is None:
-            return {"ok": False, "error": f"no playlist ({result.stop_reason})"}
+        result = curate_with_codex(theme, lib)
+        if result.playlist_name is None or not result.track_ids:
+            return {
+                "ok": False,
+                "error": result.error or f"no playlist ({result.stop_reason})",
+            }
         titles: list[str] = []
-        for tid in result.playlist.track_ids:
+        for tid in result.track_ids:
             e = lib.lookup_by_id(tid)
             if e is None:
                 continue  # grounding: only real tracks ever reach the chat
             titles.append(f"{e.artist} - {e.title}".strip(" -"))
-        return {"ok": True, "name": result.playlist.name, "titles": titles}
+        return {"ok": True, "name": result.playlist_name, "titles": titles}
 
     bridge, berr = build_bridge_from_env(curate_fn)
     if berr is not None:
         print(_json.dumps({"error": berr}), file=sys.stderr)
         print(f"[viber/telegram] {berr}", file=sys.stderr)
-        store.close()
         return 1
 
     print("-> Telegram bridge: long-poll started (Ctrl-C to stop)", file=sys.stderr)
     try:
         assert bridge is not None
         bridge.run()  # blocking until interrupted
-    finally:
-        store.close()
+    except TelegramDependencyError as e:
+        print(_json.dumps({"error": str(e)}), file=sys.stderr)
+        return 1
     return 0
 
 
 def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
-    """quick-260525-gz2 — embed a raw audio folder.
-
-    Client selection (direct-first so Kaan can run NOW with his .env key):
-        1. GEMINI_API_KEY set → DIRECT genai.Client(api_key=...) — the SAME
-           construction the live session's mode=direct path uses.
-        2. else VIBEMIX_PROXY_JWT set → proxy client (build_proxy_genai_client).
-        3. else → clear stderr error + exit 1.
-    """
+    """quick-260525-gz2 — embed a raw audio folder locally with CLAP ONNX."""
     import json as _json
-    import os as _os
     from pathlib import Path as _Path
 
     from vibemix.library import (
-        LibraryEmbedder,
         build_embedder,
         ingest_folder,
         open_store,
     )
-
-    # ── Client selection: direct key first, proxy JWT fallback ──
-    api_key = _os.environ.get("GEMINI_API_KEY")
-    proxy_jwt = _os.environ.get("VIBEMIX_PROXY_JWT")
-    proxy_url = _os.environ.get(
-        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
-    )
-
-    if api_key:
-        # Same direct-client construction as main()'s mode=direct path.
-        client = genai.Client(api_key=api_key)
-        print("-> embed-folder: client=direct (GEMINI_API_KEY)", file=sys.stderr)
-    elif proxy_jwt:
-        from vibemix.agent.proxy_client import build_proxy_genai_client
-
-        client = build_proxy_genai_client(proxy_jwt, proxy_url)
-        print("-> embed-folder: client=proxy (VIBEMIX_PROXY_JWT)", file=sys.stderr)
-    else:
-        print(
-            "[FATAL] embed-folder needs an API client: set GEMINI_API_KEY "
-            "(direct, recommended for local runs) in your .env/environment, "
-            "or VIBEMIX_PROXY_JWT (Bravoh proxy). Neither is set.",
-            file=sys.stderr,
-            flush=True,
-        )
-        return 1
 
     folder = _Path(args.path)
     if not folder.is_dir():
@@ -2629,9 +2589,10 @@ def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
         return 1
 
     strategy = getattr(args, "strategy", "mean_excerpt")
-    embedder = build_embedder(client, embed_strategy=strategy)
+    embedder = build_embedder(embed_strategy=strategy)
     store = open_store()
     as_json = bool(getattr(args, "json", False))
+    print("-> embed-folder: embedder=CLAP ONNX (local, keyless)", file=sys.stderr)
     if strategy != "mean_excerpt":
         print(f"-> embed-folder: strategy={strategy}", file=sys.stderr)
 
@@ -2675,13 +2636,14 @@ def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
 def _cmd_library_ingest(args: argparse.Namespace) -> int:
     """Phase 89 Plan 01 — detect → parse → CLAP-embed → store one DJ library.
 
-    KEYLESS + on-device: unlike ``embed-folder`` (Gemini, needs an API key),
-    ingest embeds via the staged ``ClapEngine`` — no genai client, no API cost,
-    audio never leaves the machine. Auto-detects the Rekordbox collection.xml at
-    its standard export location, or accepts an explicit ``path``.
+    KEYLESS + on-device: ingest embeds via ``ClapEngine`` — no genai client, no
+    API cost, audio never leaves the machine. Auto-detects the Rekordbox
+    collection.xml at its standard export location, or accepts an explicit
+    ``path``.
     """
     import json as _json
 
+    from vibemix.library.anlz_ingest import build_anlz_index
     from vibemix.library.clap_engine import ClapEngine
     from vibemix.library.ingest import ingest_source
     from vibemix.library.rekordbox import RekordboxLibrary
@@ -2703,10 +2665,32 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
         )
         return 1
 
-    print(f"-> library ingest: source=rekordbox xml={source.resolved_path}",
-          file=sys.stderr)
-    print("-> library ingest: embedder=ClapEngine (on-device, keyless)",
-          file=sys.stderr)
+    print(
+        f"-> library ingest: source=rekordbox xml={source.resolved_path}",
+        file=sys.stderr,
+    )
+    print("-> library ingest: embedder=ClapEngine (on-device, keyless)", file=sys.stderr)
+    try:
+        anlz_index = build_anlz_index()
+        anlz_count = sum(len(items) for items in anlz_index.by_basename.values())
+        if anlz_count:
+            print(
+                f"-> library ingest: ANLZ structure index={anlz_count} tracks",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "-> library ingest: ANLZ structure index empty (DJ/auto-cue fallback remains)",
+                file=sys.stderr,
+            )
+            anlz_index = None
+    except Exception as e:
+        print(
+            f"-> library ingest: ANLZ structure index unavailable ({e}); "
+            "DJ/auto-cue fallback remains",
+            file=sys.stderr,
+        )
+        anlz_index = None
 
     # The embedder exposes embed_audio_file(path) -> np.ndarray; ingest_source
     # reads its .backend tag for the content-hash cache namespace.
@@ -2725,6 +2709,7 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
             store,
             persist_library=True,
             progress=_progress,
+            anlz_index=anlz_index,
         )
     finally:
         store.close()
@@ -2748,10 +2733,11 @@ def _cmd_library_ingest(args: argparse.Namespace) -> int:
 
 
 def _cmd_library_budget(args: argparse.Namespace) -> int:
-    """Plan 28-08 — monthly Gemini Embedding cost projection + telemetry."""
+    """Legacy Gemini Embedding projection plus current runtime telemetry."""
     import json as _json
     from dataclasses import asdict as _asdict
 
+    from vibemix.library._cosine import EMBED_BACKEND
     from vibemix.library.budget import (
         get_telemetry,
         project_monthly_cost,
@@ -2759,11 +2745,14 @@ def _cmd_library_budget(args: argparse.Namespace) -> int:
 
     p = project_monthly_cost(dau=args.dau)
     tel = get_telemetry()
+    projection_kind = "legacy_gemini_embedding_what_if"
 
     if getattr(args, "json", False):
         _json.dump(
             {
                 "projection": _asdict(p),
+                "projection_kind": projection_kind,
+                "active_embedding_backend": EMBED_BACKEND,
                 "telemetry": tel.as_dict(),
                 "dau": args.dau,
             },
@@ -2773,7 +2762,10 @@ def _cmd_library_budget(args: argparse.Namespace) -> int:
         sys.stdout.write("\n")
         return 0
 
-    print(f"\nPhase 28 Cost Projection @ DAU={args.dau}\n")
+    print(f"\nLegacy Gemini Embedding Cost Projection @ DAU={args.dau}\n")
+    print(f"  Active library embedding backend: {EMBED_BACKEND} (local; telemetry below)")
+    print("  Projection kind: legacy Gemini Embedding what-if, not the CLAP default")
+    print()
     print("  Feature                         Monthly (EUR)")
     print(f"  One-time library indexing       {p.indexing_eur:>8.2f}")
     print(f"  Vibe-search NL queries          {p.vibe_search_eur:>8.2f}")
@@ -2795,6 +2787,42 @@ def _cmd_library_budget(args: argparse.Namespace) -> int:
     return 0
 
 
+def _library_agent_setup_status() -> dict[str, object]:
+    """Offline Viber backend setup status for app preflight UI.
+
+    This is intentionally cheap: no network, no `codex exec`, no Gemini client
+    construction. Runtime chat/curate/build still owns the authoritative run
+    result; this only lets the app show obvious setup gaps before the user hits
+    a failing Viber turn.
+    """
+    from vibemix.library.codex_curate import find_codex
+
+    if find_codex() is None:
+        return {
+            "agent_backend": "codex",
+            "agent_ready": False,
+            "agent_status": "codex_not_installed",
+            "agent_hint": (
+                "Install Codex (`npm i -g @openai/codex` or "
+                "`brew install codex`) and run `codex login`."
+            ),
+        }
+    codex_home = Path(os.environ.get("CODEX_HOME", "~/.codex")).expanduser()
+    if not (codex_home / "auth.json").exists():
+        return {
+            "agent_backend": "codex",
+            "agent_ready": False,
+            "agent_status": "codex_auth_required",
+            "agent_hint": "Run `codex login` to connect your ChatGPT plan.",
+        }
+    return {
+        "agent_backend": "codex",
+        "agent_ready": True,
+        "agent_status": "ready",
+        "agent_hint": "",
+    }
+
+
 def _cmd_library_stats(args: argparse.Namespace) -> int:
     """Offline library-store stats for the desktop Vibe Engine header.
 
@@ -2805,9 +2833,10 @@ def _cmd_library_stats(args: argparse.Namespace) -> int:
     this is that source.
 
     Emits ``{"indexed": <row_count>, "backend": "sqlite-vec"|"numpy",
-    "failed": 0}``. ``failed`` has no persisted source today, so it is
-    honestly ``0`` (not invented). Never crashes / never networks: if the
-    store cannot be opened, falls back to ``indexed:0, backend:"unknown"``.
+    "embedding_backend": "clap", "embedding_dim": 512, agent setup fields,
+    "failed": 0}``. ``failed`` has no persisted source today, so it is honestly
+    ``0`` (not invented). Never crashes / never networks: if the store cannot
+    be opened, falls back to ``indexed:0, backend:"unknown"``.
     """
     import json as _json
 
@@ -2829,7 +2858,22 @@ def _cmd_library_stats(args: argparse.Namespace) -> int:
     except Exception as e:  # never network, never crash — header must render
         print(f"[library stats] store unavailable: {e}", file=sys.stderr)
 
-    payload = {"indexed": indexed, "backend": backend, "failed": 0}
+    from vibemix.library._cosine import EMBED_BACKEND, EMBEDDING_DIM
+    from vibemix.library.clap_engine import onnx_model_status
+
+    model_status = onnx_model_status()
+
+    payload = {
+        "indexed": indexed,
+        "backend": backend,
+        "embedding_backend": EMBED_BACKEND,
+        "embedding_dim": EMBEDDING_DIM,
+        "clap_model_installed": bool(model_status["installed"]),
+        "clap_model_path": model_status["path"],
+        "clap_model_missing": model_status["missing"],
+        **_library_agent_setup_status(),
+        "failed": 0,
+    }
 
     if getattr(args, "json", False):
         _json.dump(payload, sys.stdout, indent=2)
@@ -2839,25 +2883,133 @@ def _cmd_library_stats(args: argparse.Namespace) -> int:
     print("\nLibrary stats")
     print(f"  indexed:  {indexed}")
     print(f"  backend:  {backend}")
+    print(f"  embedder: {EMBED_BACKEND} ({EMBEDDING_DIM}d)")
+    print(f"  agent:    {payload['agent_backend']} ({payload['agent_status']})")
+    print(
+        "  model:    "
+        + ("installed" if payload["clap_model_installed"] else "missing")
+        + f" ({payload['clap_model_path']})"
+    )
     print("  failed:   0")
     return 0
+
+
+def _cmd_library_models(args: argparse.Namespace) -> int:
+    """Offline local-model status for setup/install UX."""
+    import json as _json
+
+    install_result = None
+    if getattr(args, "install", None):
+        from vibemix.library.model_assets import install_models
+
+        progress = None
+        if bool(getattr(args, "progress", False)):
+
+            def progress(frame: dict[str, object]) -> None:
+                sys.stderr.write(
+                    "VIBEMIX_MODEL_PROGRESS " + _json.dumps(frame, separators=(",", ":")) + "\n"
+                )
+                sys.stderr.flush()
+
+        if progress is None:
+            install_result = install_models(
+                str(args.install), force=bool(getattr(args, "force", False))
+            )
+        else:
+            install_result = install_models(
+                str(args.install),
+                force=bool(getattr(args, "force", False)),
+                progress=progress,
+            )
+
+    from vibemix.library.clap_engine import onnx_model_status
+    from vibemix.library.cue_detr import model_status as cue_model_status
+    from vibemix.library.model_assets import cue_model_installable
+
+    clap = onnx_model_status()
+    cue = cue_model_status()
+    models = [
+        {
+            "id": "clap",
+            "label": "CLAP ONNX",
+            "role": "library embeddings/search/similarity",
+            "required": True,
+            "env": "VIBEMIX_CLAP_ONNX_DIR",
+            "installed": bool(clap["installed"]),
+            "installable": True,
+            "path": clap["path"],
+            "missing": clap["missing"],
+            "mismatched": clap.get("mismatched", []),
+        },
+        {
+            "id": "cue-detr",
+            "label": "CUE-DETR ONNX",
+            "role": "cue-anchored ingest and structural cue detection",
+            "required": False,
+            "env": "VIBEMIX_CUE_ONNX_PATH",
+            "installed": bool(cue["installed"]),
+            "installable": cue_model_installable(),
+            "path": cue["path"],
+            "missing": cue["missing"],
+            "mismatched": cue.get("mismatched", []),
+        },
+    ]
+    payload = {
+        "models": models,
+        "required_ready": all(bool(m["installed"]) for m in models if bool(m["required"])),
+        "all_ready": all(bool(m["installed"]) for m in models),
+    }
+    if install_result is not None:
+        payload["install"] = install_result
+    exit_code = 0 if install_result is None or bool(install_result["ok"]) else 1
+
+    if getattr(args, "json", False):
+        _json.dump(payload, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return exit_code
+
+    if install_result is not None:
+        print("\nModel install")
+        for result in install_result["results"]:
+            status = "ok" if not result["errors"] else "needs attention"
+            print(f"  {result['id']}: {status}")
+            for file_result in result["files"]:
+                print(
+                    f"    {file_result['status']}: "
+                    f"{file_result['rel_path']} ({file_result['size']} bytes)"
+                )
+            for error in result["errors"]:
+                print(f"    error: {error}")
+
+    print("\nLocal model assets")
+    for model in models:
+        status = "installed" if model["installed"] else "missing"
+        if model.get("mismatched"):
+            status = "needs repair"
+        requirement = "required" if model["required"] else "optional"
+        print(f"  {model['label']}: {status} ({requirement})")
+        print(f"    role:    {model['role']}")
+        print(f"    path:    {model['path']}")
+        if model["missing"]:
+            print(f"    missing: {', '.join(model['missing'])}")
+        if model.get("mismatched"):
+            print(f"    repair:  {', '.join(model['mismatched'])}")
+        print(f"    env:     {model['env']}")
+    return exit_code
 
 
 def cli_entry(argv: list[str] | None = None) -> None:
     """Synchronous CLI entry. Parses args (``--version`` short-circuits via
     argparse's ``action="version"``), then routes to one of three runtimes:
 
-    * ``--wizard``           → Phase 11 W4 ``run_wizard`` (calibration flow)
-    * ``--session``          → Phase 12 W2 ``run_session`` (sidecar-only;
-                                no cascade graph — used by 12-03/12-04
-                                glue tests + Tauri shell pre-cascade boot)
-    * (default, both unset)  → Phase 5 ``main()`` (full live runtime —
-                                cascade agent + audio I/O + ws_broadcast)
+    * ``--wizard``           → ``run_wizard`` (first-run calibration flow)
+    * ``--session``          → ``run_session`` (diagnostic/bootstrap IPC loop;
+                                no cascade graph)
+    * (default, both unset)  → ``main()`` (full live runtime — cascade agent +
+                                audio I/O + ws_broadcast)
 
     The Tauri shell currently spawns ``vibemix --wizard`` on first run
-    and ``vibemix`` (no flag — full runtime) thereafter. Phase 12-04
-    will flip the post-wizard spawn to ``vibemix --session`` once the
-    session loop owns the snapshot path the renderer drives off.
+    and ``vibemix`` (no flag — full runtime) thereafter.
     """
     _enable_line_buffering()
     # Phase 28 — `vibemix library <subcommand>` is dispatched BEFORE
@@ -2882,10 +3034,8 @@ def cli_entry(argv: list[str] | None = None) -> None:
     set_debug_log(bool(getattr(args, "debug_log", False)))
     try:
         if args.debrief is not None:
-            # Phase 25 Plan 25-03 — DEBRIEF architectural slot. Dispatched
-            # before --wizard / --session because it MUST NOT engage audio
-            # I/O or LiveKit (v2.0 contract: log + return only). v2.1 will
-            # wire the real session-replay loop here.
+            # Debrief sidecar. Dispatched before --wizard / --session because
+            # it MUST NOT engage audio I/O or LiveKit.
             _run_debrief_sidecar(session_dir=args.debrief)
             return
         if args.wizard:
@@ -2895,10 +3045,8 @@ def cli_entry(argv: list[str] | None = None) -> None:
 
             asyncio.run(run_wizard())
         elif args.session:
-            # Phase 12 W2 — sidecar-only session loop. The full cascade
-            # graph joins via 12-04; until then this runs the ipc.session.*
-            # + ipc.settings.* surface standalone so the renderer can be
-            # built + tested against a real Python WS bus.
+            # Sidecar-only session loop for diagnostic/bootstrap checks against
+            # a real Python WS bus.
             from vibemix.runtime.session_loop import run_session
 
             asyncio.run(run_session())

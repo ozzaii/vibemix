@@ -28,8 +28,8 @@ Hard invariants (objective + 63-PATTERNS.md):
       bit-identity). NEVER a native vec0 KNN / ``ORDER BY distance`` / ``MATCH``.
     * Raw-in/raw-out: a ``Record`` carries only the raw text signature +
       (session_id, ts, kind). No LLM-extracted "insight" — the store makes NO
-      generation-model call; its only model call is the embedding call via the
-      reused ``LibraryEmbedder`` (resolve("embedding") on FLEX, never a literal).
+      generation-model call; retrieval embeddings are provided by the injected
+      local CLAP embedder, never by this store.
     * No live-reaction-path import (coach loop, MusicState, ws_bus, agent,
       prompts) — this module is a pure storage spine.
     * ``memory.db`` is durable user data: ``app_data_dir() / "memory.db"`` —
@@ -46,14 +46,10 @@ from typing import Protocol
 
 import numpy as np
 
-# The single ranking chokepoint — IMPORTED VERBATIM, never forked (P55).
 from vibemix.library._cosine import EMBEDDING_DIM, cosine_topk
-
-# Embedding seam (the ONLY model call the store may make). Re-export so callers
-# embed via resolve("embedding")/FLEX without reaching into library internals
-# and without a hardcoded model literal. noqa: F401 — surfaced for downstream.
-from vibemix.library.embed import LibraryEmbedder  # noqa: F401
 from vibemix.library.index_numpy import NumpyStore
+
+# The single ranking chokepoint is imported verbatim, never forked (P55).
 
 logger = logging.getLogger(__name__)
 
@@ -213,9 +209,8 @@ class MemoryStore:
     """Storage-agnostic facade. Single chokepoint for top-K math (P55).
 
     Composes a vector backend (vec0 primary / numpy fallback) with a ``moments``
-    metadata table. The store's ONLY model call is the embedding call (via the
-    reused ``LibraryEmbedder``); it imports no live-reaction-path surface and
-    calls no generation model.
+    metadata table. The store imports no live-reaction-path surface and calls no
+    generation model.
     """
 
     def __init__(
@@ -300,8 +295,8 @@ class MemoryStore:
         NOT assume atomicity here. (Contrast ``delete_session``, which IS one
         transaction on the sqlite-vec path.)
 
-        The float32 + (768,) dimension-drift guard lives in the backend's
-        add_batch assert (and cosine_topk re-asserts at query time).
+        The float32 + active-dimension guard lives in the backend's add_batch
+        assert (and cosine_topk re-asserts at query time).
 
         Path-traversal gate (T-63-07): ``session_id`` is validated BEFORE any
         write — a crafted id (``../``, absolute, separator, NUL) raises
@@ -516,8 +511,8 @@ class MemoryStore:
 
 
 __all__ = [
+    "EMBEDDING_DIM",
     "MemoryStore",
     "Record",
     "open_memory_store",
-    "EMBEDDING_DIM",
 ]

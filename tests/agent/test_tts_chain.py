@@ -2,7 +2,8 @@
 """TTS chain — TTS-01..06 + PKG-02 + PYPROJECT-01.
 
 Pins the OpenRouter monkey-patch as a module-load invariant (TTS-01) and the
-factory's branching shape with/without OPENROUTER_API_KEY (TTS-02..06)."""
+factory's branching shape with native Gemini primary plus explicit OpenRouter
+standby opt-in (TTS-02..06)."""
 
 from __future__ import annotations
 
@@ -23,8 +24,31 @@ def test_tts_01_monkey_patch_active_at_module_load() -> None:
     assert "google/gemini-3.1-flash-tts-preview" in t.AUDIO_STREAM_MODELS
 
 
-def test_tts_02_with_openrouter_chain_has_3_entries(mocker) -> None:
-    """TTS-02: with OPENROUTER_API_KEY → FallbackAdapter has 3 entries."""
+def test_tts_02_with_openrouter_standby_has_3_entries(mocker) -> None:
+    """TTS-02: explicit OpenRouter standby → FallbackAdapter has 3 entries."""
+    mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
+    mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
+    mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
+
+    from vibemix.agent.tts_chain import build_tts_chain
+
+    build_tts_chain(
+        gemini_api_key="g",
+        openrouter_api_key="or",
+        openrouter_enabled=True,
+    )
+
+    kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
+    chain = kwargs["tts"]
+    assert len(chain) == 3
+    assert kwargs["max_retry_per_tts"] == 1
+    assert isinstance(chain[0], gemini_native_tts.TTS)
+    assert isinstance(chain[1], gemini_native_tts.TTS)
+    assert isinstance(chain[2], openai_plugin.TTS)
+
+
+def test_tts_02b_openrouter_key_alone_does_not_enter_chain(mocker) -> None:
+    """TTS-02b: OPENROUTER_API_KEY alone is not enough to opt into TTS."""
     mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
     mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
     mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
@@ -35,11 +59,8 @@ def test_tts_02_with_openrouter_chain_has_3_entries(mocker) -> None:
 
     kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
     chain = kwargs["tts"]
-    assert len(chain) == 3
-    assert kwargs["max_retry_per_tts"] == 1
-    assert isinstance(chain[0], openai_plugin.TTS)
-    assert isinstance(chain[1], gemini_native_tts.TTS)
-    assert isinstance(chain[2], gemini_native_tts.TTS)
+    assert len(chain) == 2
+    assert openai_plugin.TTS.__init__.call_count == 0
 
 
 def test_tts_03_without_openrouter_key_none_chain_has_2_entries(mocker) -> None:
@@ -85,7 +106,11 @@ def test_tts_05_openrouter_kwargs_match_v4(mocker) -> None:
 
     from vibemix.agent.tts_chain import build_tts_chain
 
-    build_tts_chain(gemini_api_key="g", openrouter_api_key="or")
+    build_tts_chain(
+        gemini_api_key="g",
+        openrouter_api_key="or",
+        openrouter_enabled=True,
+    )
 
     kw = openai_plugin.TTS.__init__.call_args.kwargs
     assert kw["model"] == "google/gemini-3.1-flash-tts-preview"
@@ -108,7 +133,11 @@ def test_tts_06_gemini_native_kwargs_match_v4(mocker) -> None:
 
     from vibemix.agent.tts_chain import build_tts_chain
 
-    build_tts_chain(gemini_api_key="g", openrouter_api_key="or")
+    build_tts_chain(
+        gemini_api_key="g",
+        openrouter_api_key="or",
+        openrouter_enabled=True,
+    )
 
     # Two gemini_native_tts.TTS constructor calls — primary then fallback
     calls = gemini_native_tts.TTS.__init__.call_args_list
@@ -175,15 +204,20 @@ def test_tts_mode_01_direct_default_preserves_phase4(mocker) -> None:
     assert openai_plugin.TTS.__init__.call_count == 0
 
 
-def test_tts_mode_02_direct_with_openrouter(mocker) -> None:
-    """TTS-MODE-02: direct mode with openrouter still gives 3 entries (Phase 4 verbatim)."""
+def test_tts_mode_02_direct_with_openrouter_standby(mocker) -> None:
+    """TTS-MODE-02: direct mode with explicit OpenRouter standby gives 3 entries."""
     mocker.patch.object(openai_plugin.TTS, "__init__", return_value=None)
     mocker.patch.object(gemini_native_tts.TTS, "__init__", return_value=None)
     mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
 
     from vibemix.agent.tts_chain import build_tts_chain
 
-    build_tts_chain(gemini_api_key="g", openrouter_api_key="or", mode="direct")
+    build_tts_chain(
+        gemini_api_key="g",
+        openrouter_api_key="or",
+        openrouter_enabled=True,
+        mode="direct",
+    )
 
     kwargs = agents_tts.FallbackAdapter.__init__.call_args.kwargs
     chain = kwargs["tts"]

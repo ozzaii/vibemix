@@ -86,7 +86,7 @@ def _log_suggestion_error(fut: Any) -> None:
     stderr without ever propagating into the reaction loop."""
     try:
         exc = fut.exception()
-    except Exception:  # noqa: BLE001 — cancelled future, etc.
+    except Exception:
         return
     if exc is not None:
         print(f"\n[coach suggestion err] {exc}", file=sys.stderr)
@@ -126,11 +126,7 @@ async def coach_loop(
     mic_active_frames = 0
     mic_silence_since = 0.0
 
-    wired = (
-        cancel_gate is not None
-        and ttft_meter is not None
-        and playback is not None
-    )
+    wired = cancel_gate is not None and ttft_meter is not None and playback is not None
     citation_wired = ipc_bus is not None and citation_telemetry is not None
 
     # SessionTracer hook — additive, side-effect-free, fully fail-soft. A None
@@ -141,7 +137,7 @@ async def coach_loop(
             return
         try:
             getattr(tracer, method)(ev_name, **detail)
-        except Exception:  # noqa: BLE001 — tracing is observation only
+        except Exception:
             pass
 
     while not stop_event.is_set():
@@ -224,9 +220,11 @@ async def coach_loop(
                 tracer.note_change(
                     "STATE", "audible_track", "state.audible_track", state.audible_track
                 )
-                tracer.note_change("STATE", "audible_deck", "state.audible_deck", state.audible_deck)
+                tracer.note_change(
+                    "STATE", "audible_deck", "state.audible_deck", state.audible_deck
+                )
                 tracer.note_change("STATE", "bpm", "state.bpm", round(float(state.bpm or 0.0), 1))
-            except Exception:  # noqa: BLE001 — tracing is observation only
+            except Exception:
                 pass
 
         if ev is not None:
@@ -241,41 +239,52 @@ async def coach_loop(
             )
 
         # PILL next-suggestion (additive, off-loop): the seed track changed, so
-        # the "what's next" must change. Recompute in an executor so the store
-        # read NEVER blocks the reaction path; fire-and-forget with an error
-        # callback. Independent of whether this event also fires an AI reaction.
-        if (
-            suggestion_service is not None
-            and ev is not None
-            and ev.type == "TRACK_CHANGE"
-        ):
+        # the "what's next" must change. Use the service scheduler when present
+        # so TRACK_CHANGE and the 30Hz bus share one in-flight guard; fallback to
+        # the legacy executor path for duck-typed test holders. Independent of
+        # whether this event also fires an AI reaction.
+        if suggestion_service is not None and ev is not None and ev.type == "TRACK_CHANGE":
             try:
-                _tr("suggestion", "recompute_dispatched", seed_track=state.audible_track)
-                fut = asyncio.get_running_loop().run_in_executor(
-                    None, suggestion_service.compute_from_state, state
-                )
+                if hasattr(suggestion_service, "maybe_schedule_compute_from_state"):
+                    scheduled = suggestion_service.maybe_schedule_compute_from_state(state)
+                    _tr(
+                        "suggestion",
+                        "recompute_scheduled" if scheduled else "recompute_held",
+                        seed_track=state.audible_track,
+                    )
+                    if tracer is not None:
+                        tracer.suggestion(
+                            "dispatch",
+                            chosen=state.audible_track,
+                            why="scheduled" if scheduled else "held",
+                        )
+                else:
+                    _tr("suggestion", "recompute_dispatched", seed_track=state.audible_track)
+                    fut = asyncio.get_running_loop().run_in_executor(
+                        None, suggestion_service.compute_from_state, state
+                    )
 
-                def _trace_suggestion_done(f: Any) -> None:
-                    _log_suggestion_error(f)
-                    if tracer is None:
-                        return
-                    try:
-                        if f.exception() is not None:
+                    def _trace_suggestion_done(f: Any) -> None:
+                        _log_suggestion_error(f)
+                        if tracer is None:
                             return
-                        result = f.result()
-                        if result is None:
-                            tracer.suggestion("result", chosen=None, why="no_candidate")
-                        else:
-                            tracer.suggestion(
-                                "result",
-                                chosen=result.get("track_id") or result.get("title"),
-                                detail=result,
-                            )
-                    except Exception:  # noqa: BLE001 — tracing is observation only
-                        pass
+                        try:
+                            if f.exception() is not None:
+                                return
+                            result = f.result()
+                            if result is None:
+                                tracer.suggestion("result", chosen=None, why="no_candidate")
+                            else:
+                                tracer.suggestion(
+                                    "result",
+                                    chosen=result.get("track_id") or result.get("title"),
+                                    detail=result,
+                                )
+                        except Exception:
+                            pass
 
-                fut.add_done_callback(_trace_suggestion_done)
-            except Exception as e:  # noqa: BLE001 — never wedge the loop
+                    fut.add_done_callback(_trace_suggestion_done)
+            except Exception as e:
                 print(f"\n[coach suggestion] {e}", file=sys.stderr)
 
         if ev is None:

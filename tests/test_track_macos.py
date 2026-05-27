@@ -8,6 +8,7 @@ conversion, and isinstance(TrackInfoBackend).
 
 from __future__ import annotations
 
+import json
 import subprocess
 
 import pytest
@@ -111,6 +112,32 @@ def test_track_macos_poll_returns_nowplaying_snapshot(mocker):
     assert snap.album is None
     assert snap.duration_sec is None
     assert snap.position_sec is None
+
+
+def test_track_macos_poll_carries_raw_elapsed_position(mocker):
+    raw = {
+        "kMRMediaRemoteNowPlayingInfoTitle": "Around the World",
+        "kMRMediaRemoteNowPlayingInfoElapsedTime": 64.5,
+        "kMRMediaRemoteNowPlayingInfoDuration": 420.0,
+        "kMRMediaRemoteNowPlayingInfoPlaybackRate": 1.0,
+    }
+    mocker.patch(
+        "vibemix.platform._track_macos.subprocess.check_output",
+        side_effect=[
+            b"Around the World\nDaft Punk\n",
+            json.dumps(raw).encode(),
+        ],
+    )
+
+    t = TrackMacOS()
+    snap = t.poll()
+
+    assert snap is not None
+    assert snap.position_sec == 64.5
+    assert snap.duration_sec == 420.0
+    info = t.track_info.snapshot()
+    assert info["position_sec"] == 64.5
+    assert info["duration_sec"] == 420.0
 
 
 def test_track_macos_poll_returns_none_when_unavailable(mocker):

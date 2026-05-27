@@ -59,6 +59,8 @@ from vibemix.audio.constants import (
     GENRE_BPM_BANDS,
     GENRE_CENTROID_HARD_TEK_MIN,
 )
+from vibemix.state.deck_poller import DECK_CITE_MIN_CONF
+from vibemix.state.emotion_router import derive_emotion
 from vibemix.state.evidence_registry import EvidenceRegistry
 from vibemix.state.genre import (
     EmaSmoother,
@@ -75,14 +77,11 @@ from vibemix.state.genre import (
     set_active_profile,
     validate_bpm,
 )
-from vibemix.state.deck_poller import DECK_CITE_MIN_CONF
 from vibemix.state.genre.genre_reconcile import reconcile_genre
-from vibemix.state.emotion_router import derive_emotion
 from vibemix.state.harmonics import to_camelot
 from vibemix.state.music_state import MusicState
 from vibemix.state.phase import classify_phase
 from vibemix.state.track_resolver import derive_audible_deck, derive_audible_track
-
 
 # BPM stabilization — estimate_bpm is bimodal on dense material: a strong
 # subdivision lock can land at ~200 while the true kick reads ~130 (measured on
@@ -186,9 +185,14 @@ def _compute_buildup_score(curve: list, window_s: float, hop_s: float = 1.0) -> 
     return score
 
 
-def _compose_trajectory(
-    phase_history: list, buildup_score: float, recent_moves: list
-) -> str:
+def _optional_float(raw: object) -> float | None:
+    try:
+        return float(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _compose_trajectory(phase_history: list, buildup_score: float, recent_moves: list) -> str:
     """PERCEIVE-02: compose ONE bounded multi-scale trajectory narrative from
     the already-bounded MusicState fields. PURE — no state write, no I/O; called
     from the single-writer ``_tick_once``.
@@ -488,11 +492,7 @@ def _tick_once(
         # profile. set_active_profile mutates a module singleton (not
         # MusicState), called from this one tick path only. The honesty fields
         # above are surfaced regardless of the flag.
-        if (
-            is_auto_enabled()
-            and committed_genre != "unknown"
-            and committed_genre != profile_name
-        ):
+        if is_auto_enabled() and committed_genre != "unknown" and committed_genre != profile_name:
             try:
                 set_active_profile(committed_genre)
             except ValueError:
@@ -602,6 +602,16 @@ def _tick_once(
                     _dispatch_genre_lookup(genre_source, tt)
         state.audible_track = tt
         state.audible_track_confidence = tc
+        position_s = _optional_float(tsnap.get("position_sec"))
+        duration_s = _optional_float(tsnap.get("duration_sec"))
+        if tt and tc >= 0.5 and position_s is not None:
+            state.audible_track_position_s = max(0.0, position_s)
+            state.audible_track_duration_s = duration_s if duration_s and duration_s > 0 else None
+            state.audible_track_position_confidence = tc
+        else:
+            state.audible_track_position_s = None
+            state.audible_track_duration_s = None
+            state.audible_track_position_confidence = 0.0
 
         # Phase 59-04 (DECK-04) — deck-state single-writer copy. The deck poller
         # is the THIRD external snapshot producer (after ControllerState /
@@ -611,9 +621,7 @@ def _tick_once(
         # the key:/track: registry writes can be change-only — mirrors the
         # mix:audible_deck prev_deck pattern above.
         if deck_source is not None:
-            prev_camelot = {
-                side: dt.camelot for side, dt in state.deck_state.decks.items()
-            }
+            prev_camelot = {side: dt.camelot for side, dt in state.deck_state.decks.items()}
             deck_snap = deck_source.snapshot()
             for dt in deck_snap.values():
                 # Normalize the raw Tonality tag → Camelot inside the lock — pure

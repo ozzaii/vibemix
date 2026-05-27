@@ -846,7 +846,7 @@ def test_18_02_registry_write_per_event_type(mocker):
     assert ev is not None and ev.type == "KAAN_SPOKE"
 
     # 2) MANUAL — also bypass; advance past global cooldown (22s)
-    t = _patch_time(mocker, 1023.0)
+    _patch_time(mocker, 1023.0)
     ev = d.detect(ms, kaan_just_spoke=False, manual=True)
     assert ev is not None and ev.type == "MANUAL"
 
@@ -930,6 +930,24 @@ def test_18_02_registry_kwarg_default_keeps_existing_tests_green(mocker):
     assert ev is not None and ev.type == "KAAN_SPOKE"
     # No registry attribute should be set, OR should be None
     assert getattr(d, "_registry", None) is None
+
+
+def test_attach_evidence_registry_wires_existing_detector(mocker):
+    """Live main() constructs EventDetector before EvidenceRegistry exists.
+
+    The post-construction attach must still make detector-fired event citations
+    land in the shared registry before coach_loop starts.
+    """
+    registry = EvidenceRegistry()
+    d = EventDetector()
+    d.attach_evidence_registry(registry)
+
+    ms = _state(audible=False, bpm=0.0)
+    _patch_time(mocker, 1000.0)
+    ev = d.detect(ms, kaan_just_spoke=True, manual=False)
+
+    assert ev is not None and ev.type == "KAAN_SPOKE"
+    assert "KAAN_SPOKE" in registry.snapshot()["ev"]
 
 
 def test_18_02_t_session_is_now_minus_set_start_at(mocker):

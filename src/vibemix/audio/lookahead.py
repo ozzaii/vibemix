@@ -161,7 +161,7 @@ class LookaheadProvider:
                             best = p
                             break
                 path = best or candidates[0]
-        except Exception:  # noqa: BLE001 — graceful degrade, never raise
+        except Exception:
             path = None
         with self._lock:
             self._title_to_path[title] = path
@@ -279,7 +279,7 @@ class LookaheadProvider:
         except subprocess.TimeoutExpired:
             meta["reason"] = "ffmpeg timeout"
             return (None, meta)
-        except Exception as e:  # noqa: BLE001 — graceful degrade per contract
+        except Exception as e:
             meta["reason"] = f"ffmpeg exc: {e}"
             print(f"[lookahead err] {e}", file=sys.stderr)
             return (None, meta)

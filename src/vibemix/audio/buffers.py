@@ -123,10 +123,10 @@ class AudioBuffer:
         Bulk-loads a recorded WAV file into the ring for the eval harness
         replay path. Accepts mono or stereo WAVs at 16kHz, 44.1kHz, or 48kHz;
         downmixes stereo→mono and resamples to ``self._sr`` (default 16kHz)
-        via scipy.signal.resample_poly (mirrors the live runtime resample path
-        in src/vibemix/audio/resample.py). Acquires the same internal lock as
-        ``push`` so a concurrent (test-only) snapshot reader sees a consistent
-        ring state — but does NOT register with any audio callback machinery.
+        via the local live-runtime resampler. Acquires the same internal lock
+        as ``push`` so a concurrent (test-only) snapshot reader sees a
+        consistent ring state — but does NOT register with any audio callback
+        machinery.
 
         EVAL-01 invariant: this method is called only from
         ``scripts/eval/replay_harness.py`` and tests/. ``__main__.py`` and the
@@ -160,18 +160,11 @@ class AudioBuffer:
             )
 
         if src_sr != self._sr:
-            # Resample via polyphase filter (same library + pattern as the live
-            # runtime resample path). Convert to float32 for the filter then
-            # back to int16 with clipping.
-            from scipy.signal import resample_poly  # noqa: PLC0415
+            # Convert to float32 for resampling, then back to int16 with clipping.
+            from vibemix.audio.resample import resample_audio
 
-            from math import gcd as _gcd  # noqa: PLC0415
-
-            g = _gcd(self._sr, src_sr)
-            up = self._sr // g
-            down = src_sr // g
             f32 = samples.astype(np.float32)
-            resampled = resample_poly(f32, up, down)
+            resampled = resample_audio(f32, source_sr=src_sr, target_sr=self._sr)
             samples = np.clip(resampled, -32768, 32767).astype(np.int16)
 
         # Bulk-write under the ring lock. If the file is larger than the ring,

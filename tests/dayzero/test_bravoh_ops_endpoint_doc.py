@@ -4,10 +4,10 @@ Asserts:
 1. Bravoh ops endpoint doc exists and covers required surfaces.
 2. KAAN-ACTION-LEGAL.md has all 6 Phase 36 entries.
 """
+
 from __future__ import annotations
 
 import pathlib
-
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 DOC = ROOT / "docs" / "bravoh-ops-endpoint.md"
@@ -19,8 +19,18 @@ def test_bravoh_ops_endpoint_doc_present():
     text = DOC.read_text()
     assert "updates/upload" in text
     assert "Bearer" in text
-    assert "updates/latest.json" in text
+    assert "updates/{target}/{arch}/{current_version}" in text
     assert "/vibemix/healthz" in text
+
+
+def test_bravoh_upload_contract_accepts_signed_manifest_json():
+    text = DOC.read_text()
+    assert "application/json" in text
+    assert "scripts/dist/sign_manifest.sh" in text
+    assert "must point at updater artifacts" in text
+    assert "darwin-aarch64" in text
+    assert "darwin-x86_64" in text
+    assert "windows-x86_64" in text
 
 
 def test_kaan_action_legal_has_phase_36_entries():

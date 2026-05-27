@@ -40,7 +40,6 @@ Threat model (Plan 43-09 §threat_model):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -170,7 +169,7 @@ def load_sequence() -> DemoState:
     return _state
 
 
-def step() -> Optional[DemoEvent]:
+def step() -> DemoEvent | None:
     """Return the current event and advance the cursor.
 
     Returns ``None`` when the sequence is exhausted (after 30 calls).

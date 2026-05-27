@@ -42,7 +42,7 @@ import os
 import sys
 import time
 from collections.abc import AsyncGenerator
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from google import genai
 from google.genai import types
@@ -52,9 +52,8 @@ from livekit.agents import tts as agents_tts
 
 from vibemix.agent._streaming_pipe import find_sentence_end, passes_head_gate
 from vibemix.agent.cache import GeminiContextCache
-from vibemix.agent.config import LLM_MODEL
+from vibemix.agent.config import LLM_MODEL, OPENROUTER_LLM_MODEL
 from vibemix.agent.proxy_client import (
-    ProxyUnavailable,
     classify_proxy_error,
     probe_proxy_health,
 )
@@ -405,12 +404,12 @@ class DJCoHostAgent(Agent):
         # guarantee for the existing tests/agent/test_dj_cohost.py suite.
         citation_linter: CitationLinter | None = None,
         stripped_rate_tracker: StrippedRateTracker | None = None,
-        playback: "PlaybackQueue | None" = None,
+        playback: PlaybackQueue | None = None,
         # Plan 24-02 — overlay-highlight publish path. Default None
         # preserves backward compat (no overlay events). When non-None,
         # llm_node publishes ipc.session.overlay-highlight envelopes for
         # every [screen:<element>] citation in an emit-action turn.
-        ipc_bus: "IpcBus | None" = None,
+        ipc_bus: IpcBus | None = None,
         # Plan 32-03 / PROFILE-04 — long-term DJ profile reference. P53
         # kwargs-only addition; None default keeps v2.0 4-kwarg construction
         # path byte-identical. P60: profile lives in GeminiContextCache
@@ -427,7 +426,7 @@ class DJCoHostAgent(Agent):
         # and (b) the ring snapshot has signal (RMS > presence floor).
         # Closes hallucination class "AI invents what Kaan said" by
         # putting Kaan's literal voice in front of Gemini.
-        mic_audio_buf: "AudioBuffer | None" = None,
+        mic_audio_buf: AudioBuffer | None = None,
         # Plan 40-03 / AUDIO-02 + AUDIO-04 — source-file lookahead provider.
         # None default preserves Phase 4/18/19/40-01 backward compat (the
         # 1-Part / 2-Part request shapes are byte-identical when lookahead
@@ -438,7 +437,7 @@ class DJCoHostAgent(Agent):
         # that Part with "NOT YET HEARD BY AUDIENCE" per locked CONTEXT
         # Q2 — closes the "AI claims to predict the future" hallucination
         # class that lookahead introduces.
-        lookahead: "LookaheadProvider | None" = None,
+        lookahead: LookaheadProvider | None = None,
         # ipc.session.snapshot transcript sink. Optional bounded deque the
         # live runtime (``ws_broadcast``) drains per snapshot to light up the
         # cohost transcript panel. None default keeps every other construction
@@ -446,7 +445,7 @@ class DJCoHostAgent(Agent):
         # to ``_ai_text_history.append``) which live in the cold post-stream
         # logging tail — NEVER in the audio/TTS hot path. Best-effort: any
         # append failure is swallowed so a sink hiccup can't touch a turn.
-        transcript_sink: "collections.deque | None" = None,
+        transcript_sink: collections.deque | None = None,
         # 2026-05-21 — OpenRouter LLM path. When ``or_client`` is non-None,
         # llm_node streams the brain through OpenRouter (OpenAI-compat,
         # ``or_model``) instead of the direct google.genai client — escapes
@@ -454,7 +453,7 @@ class DJCoHostAgent(Agent):
         # (verified: OR passes input_audio to Gemini). None default keeps the
         # direct-genai path byte-identical for every existing caller/test.
         or_client: Any = None,
-        or_model: str = "google/gemini-3.5-flash",
+        or_model: str = OPENROUTER_LLM_MODEL,
         # Phase 65 Plan 04 — Memory Retrieval Seam (RECALL-01/02/03/04). The
         # MemoryRecall enrichment service is the off-hot-path retrieval
         # seam: track-aware events pre-dispatch it via run_in_executor +
@@ -465,7 +464,7 @@ class DJCoHostAgent(Agent):
         # BYTE-IDENTICAL (the cold/feature-off path is the v5.0 baseline).
         # The live-relevance veto flip is KAAN-ACTION (Kaan-ear pass on the
         # real corpus); the seam ships wired + tested regardless.
-        recall: "MemoryRecall | None" = None,
+        recall: MemoryRecall | None = None,
         recall_enabled: bool = False,
         # Phase 77 Plan 04 — WIRE-01: the "what's playing" Grounding engine.
         # Built + armed at boot (``__main__.py``) but historically orphaned —
@@ -483,7 +482,7 @@ class DJCoHostAgent(Agent):
         # BYTE-IDENTICAL to the v8.0 baseline (``grounding is None`` IS the
         # gate; no separate enabled flag, since the live build already
         # conditions grounding creation on library presence).
-        grounding: "Grounding | None" = None,
+        grounding: Grounding | None = None,
         # Phase 80 Plan 02 — GROUND-01: secondary-ear framing flag. Default
         # False keeps the cold path BYTE-IDENTICAL to the v8.0 baseline (the
         # Part-1 audio attach is unconditional regardless; this flag gates ONLY
@@ -557,13 +556,13 @@ class DJCoHostAgent(Agent):
         # turn (the gate runs in the LLM hot-path).
         self._linter: CitationLinter | None = citation_linter
         self._stripped_tracker: StrippedRateTracker | None = stripped_rate_tracker
-        self._playback: "PlaybackQueue | None" = playback
+        self._playback: PlaybackQueue | None = playback
         self._linter_wired: bool = all(
             x is not None
             for x in (citation_linter, stripped_rate_tracker, playback)
         )
         # Plan 24-02 — overlay-highlight publish path. Wired iff non-None.
-        self._ipc_bus: "IpcBus | None" = ipc_bus
+        self._ipc_bus: IpcBus | None = ipc_bus
         # Plan 32-03 / PROFILE-04 — stored read-only reference. NEVER
         # accessed inside llm_node (P60 grep gate enforces this). The
         # Settings → Profile panel may read it for diagnostics without
@@ -575,21 +574,21 @@ class DJCoHostAgent(Agent):
         # Part 2 to ``contents``. The ring itself is fed by
         # ``__main__._mic_callback_factory`` on the sounddevice audio thread
         # (verbatim port of cohost_v4.py:2278-2296 with AI-talk zero-fill).
-        self._mic_audio_buf: "AudioBuffer | None" = mic_audio_buf
+        self._mic_audio_buf: AudioBuffer | None = mic_audio_buf
         # Plan 40-03 / AUDIO-02 + AUDIO-04 — lookahead provider reference.
         # Read-only consumer: llm_node calls ``snapshot_wav()`` per turn
         # and conditionally appends Part 3 to ``contents``. The provider
         # is per-session (instantiated in __main__.py next to
         # clean_audio_buf); the title→path cache lives for the whole DJ
         # session per RESEARCH Open Question 3 resolution.
-        self._lookahead: "LookaheadProvider | None" = lookahead
+        self._lookahead: LookaheadProvider | None = lookahead
         # Phase 65 Plan 04 — MemoryRecall service + recall_enabled flag.
         # The wired path runs iff BOTH the service is non-None AND the flag
         # is True; the flag is the Kaan-ear veto switch (default-OFF so the
         # engineering close ships wired but never live until Kaan flips it).
         # The recall_enabled flag is checked at the seam (set_next_event +
         # llm_node) — passing only the service is not enough.
-        self._recall: "MemoryRecall | None" = recall
+        self._recall: MemoryRecall | None = recall
         self._recall_enabled: bool = recall_enabled and recall is not None
         # Phase 77 Plan 04 — WIRE-01: the Grounding service reference + its
         # off-loop pre-dispatch task ref. ``grounding is not None`` is the
@@ -598,8 +597,8 @@ class DJCoHostAgent(Agent):
         # background task per track-aware event; llm_node leaves it alone and
         # pulls ``get_latest_citation()``. Default None → cold path
         # byte-identical (no dispatch, no injection, no clear).
-        self._grounding: "Grounding | None" = grounding
-        self._grounding_task: "asyncio.Task | None" = None
+        self._grounding: Grounding | None = grounding
+        self._grounding_task: asyncio.Task | None = None
         # Phase 80 Plan 02 — GROUND-01 secondary-ear framing gate. Default
         # False → parts_clause/contents byte-identical to v8.0.
         self._secondary_ear: bool = secondary_ear
@@ -636,11 +635,11 @@ class DJCoHostAgent(Agent):
         # survivors in `_recall._latest` (Plan 65-03 contract) or its
         # asyncio.wait_for(RECALL_DEADLINE_S) timed out and the timeout
         # handler called `_recall.clear()` to ensure nothing leaks.
-        self._recall_task: "asyncio.Task | None" = None
+        self._recall_task: asyncio.Task | None = None
         self._pending_event: Event | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         # ipc.session.snapshot transcript sink (see __init__ kwarg docstring).
-        self._transcript_sink: "collections.deque | None" = transcript_sink
+        self._transcript_sink: collections.deque | None = transcript_sink
 
         # ---- Phase 69 Plan 69-03 (OSS-02) — proxy fallback state ----------
         # In proxy mode, when the upstream Bravoh proxy returns 5xx / times
@@ -692,7 +691,7 @@ class DJCoHostAgent(Agent):
             system_instruction=prompt_body,
             thinking_config=types.ThinkingConfig(thinking_level="minimal"),
             temperature=1.0,
-            max_output_tokens=1024,  # 2026-05-20 — lifted from 220 for gemini-3.5-flash (thinking shares budget); Kaan: don't cap output
+            max_output_tokens=1024,  # 2026-05-20 — lifted from 220 for live-coach thinking budget; Kaan: don't cap output
         )
         # Plan 41-03 / LAT-08 — second gate, defense in depth. llm_factory
         # already runs validate_live_config; the agent re-runs it against
@@ -910,7 +909,7 @@ class DJCoHostAgent(Agent):
         stamp = f"{int(set_s // 60)}:{int(set_s % 60):02d}"
         self._ai_text_history.append(f"[{stamp}] {text}")
 
-    def attach_grounding(self, grounding: "Grounding | None") -> None:
+    def attach_grounding(self, grounding: Grounding | None) -> None:
         """Post-construction wiring for the WIRE-01 Grounding engine.
 
         Phase 77 Plan 04. ``main()`` builds the agent BEFORE the Grounding
@@ -1041,7 +1040,7 @@ class DJCoHostAgent(Agent):
                 # on_event will latch its own fresh citation; clearing here
                 # would torpedo the new dispatch. Mirrors the recall seam.
                 raise
-            except (TimeoutError, asyncio.TimeoutError):
+            except TimeoutError:
                 # Late grounding is worse than none — clear so the stale
                 # latch from a prior turn cannot bleed into this one.
                 grounding.clear()
@@ -1148,7 +1147,7 @@ class DJCoHostAgent(Agent):
                 # WITHOUT calling ``recall.clear()`` (which would torpedo
                 # the new dispatch's latch).
                 raise
-            except (TimeoutError, asyncio.TimeoutError):
+            except TimeoutError:
                 # Late memory is worse than no memory — clear() ensures the
                 # stale latch from a prior turn cannot bleed into this one.
                 # This DOES bump ``_inflight_gen`` (default) so the still-
@@ -1502,7 +1501,7 @@ class DJCoHostAgent(Agent):
             if self._lookahead is not None:
                 try:
                     lookahead_wav, lookahead_meta = self._lookahead.snapshot_wav()
-                except Exception as e:  # noqa: BLE001 — graceful degrade per T-40-03-02
+                except Exception as e:
                     print(f"[lookahead err] {e}", file=sys.stderr)
                     lookahead_wav = None
                     lookahead_meta = {"ok": False, "reason": f"exception: {e!r}"}
@@ -1600,7 +1599,7 @@ class DJCoHostAgent(Agent):
                         cached_content=cache_name,
                         thinking_config=types.ThinkingConfig(thinking_level="minimal"),
                         temperature=1.0,
-                        max_output_tokens=1024,  # 2026-05-20 — lifted from 220 for gemini-3.5-flash (thinking shares budget); Kaan: don't cap output
+                        max_output_tokens=1024,  # 2026-05-20 — lifted from 220 for live-coach thinking budget; Kaan: don't cap output
                     )
                     cache_state = "warm"
 
@@ -2185,7 +2184,7 @@ class DJCoHostAgent(Agent):
                             duration_ms=OVERLAY_DURATION_MS,
                         )
                         await self._ipc_bus.emit(msg.to_dict())
-                except Exception as e:  # noqa: BLE001 — best-effort telemetry
+                except Exception as e:
                     print(f"\n[overlay publish err] {e}", file=sys.stderr)
 
             # ---- Plan 44-03 / LAUNCH-02 — cohost-reaction broadcast ----
@@ -2217,7 +2216,7 @@ class DJCoHostAgent(Agent):
                         citation_strip=strip,
                     )
                     await self._ipc_bus.emit(reaction_msg.to_dict())
-                except Exception as e:  # noqa: BLE001 — best-effort telemetry
+                except Exception as e:
                     print(f"\n[cohost-reaction publish err] {e}", file=sys.stderr)
                 else:
                     # Phase 66 (COPILOT-02) — arm the recall-callback cooldown
@@ -2242,7 +2241,7 @@ class DJCoHostAgent(Agent):
                             for chip in strip
                         ):
                             self._last_recall_callback_at = time.time()
-                    except Exception as _e:  # noqa: BLE001
+                    except Exception as _e:
                         print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
             elif self._ipc_bus is None and citation_action in ("emit", "bypass"):
                 # Phase 66 (COPILOT-02) — bus-less arm path. When ``_ipc_bus`` is
@@ -2287,7 +2286,7 @@ class DJCoHostAgent(Agent):
                             for chip in strip
                         ):
                             self._last_recall_callback_at = time.time()
-                    except Exception as _e:  # noqa: BLE001
+                    except Exception as _e:
                         print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
 
             # ---- Per-invocation dump (always written, even on suppression) ----

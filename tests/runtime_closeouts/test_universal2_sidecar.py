@@ -5,9 +5,8 @@ Three classes of test:
 
 1. File-grep gates (always run on every CI runner): no `lipo -create` ever
    appears in release.yml; bundle ID `world.bravoh.vibemix` UNCHANGED in
-   tauri.conf.json5 (Pitfall P63 lock); externalBin/resources entry uses
-   the bare `vibemix-sidecar` / `vibemix-core` stem (Tauri appends the
-   triple at install time).
+   tauri.conf.json5 (Pitfall P63 lock); resources include both
+   arch-specific PyInstaller onedir bundles.
 
 2. Local-build artifact assertions (skip when no built sidecars present):
    both arch-specific files exist under tauri/src-tauri/binaries/; each is
@@ -84,6 +83,7 @@ def test_resources_includes_both_arch_bundles() -> None:
     text = TAURI_CONF.read_text(encoding="utf-8")
     assert "binaries/vibemix-core-aarch64-apple-darwin" in text
     assert "binaries/vibemix-core-x86_64-apple-darwin" in text
+    assert "binaries/vibemix-core-x86_64-pc-windows-msvc" in text
 
 
 def test_release_yml_matrix_builds_both_archs() -> None:
@@ -190,7 +190,7 @@ def test_each_sidecar_is_single_arch() -> None:
             # bundle. Capture the mismatch but only fail when the host
             # *should* have been able to produce a real x86_64 build
             # (i.e. ``host arch == expected arch``).
-            import platform as _plat  # noqa: PLC0415 — lazy guard
+            import platform as _plat
 
             host = "arm64" if _plat.machine() == "arm64" else "x86_64"
             if host == expected:

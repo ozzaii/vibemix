@@ -1,22 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
-"""vibemix.llm — Gemini SKU + ServiceTier routing seam (Plan 41-01).
+"""vibemix.llm — Gemini SKU + tier routing seam.
 
-Single source of truth: every Gemini model literal in `src/vibemix/`
-flows through :func:`vibemix.llm.model_router.resolve`. The CI grep
-gate fails any PR that re-introduces a hardcoded model literal in
-`src/vibemix/` outside the allowlisted ``_router_config.py``.
-
-See :mod:`vibemix.llm.model_router` for the API and
-:mod:`vibemix.llm._router_config` for the locked routing table.
+Importing this package is intentionally light; the Google SDK's ``ServiceTier``
+enum is imported only when a caller explicitly asks for it or resolves a full
+``(model, tier)`` pair.
 """
 
 from __future__ import annotations
 
-from vibemix.llm.model_router import (
-    ROUTER_PATHS,
-    RouterPathError,
-    ServiceTier,
-    resolve,
-)
+from typing import Any
 
-__all__ = ["ROUTER_PATHS", "RouterPathError", "ServiceTier", "resolve"]
+from vibemix.llm.model_router import ROUTER_PATHS, RouterPathError, resolve, resolve_model
+
+__all__ = ["ROUTER_PATHS", "RouterPathError", "resolve", "resolve_model"]
+
+
+def __getattr__(name: str) -> Any:
+    if name == "ServiceTier":
+        from google.genai.types import ServiceTier
+
+        return ServiceTier
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

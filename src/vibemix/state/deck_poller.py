@@ -90,7 +90,7 @@ class DeckPoller:
     def __init__(
         self,
         *,
-        library: "RekordboxLibrary | None" = None,
+        library: RekordboxLibrary | None = None,
         controller=None,
         track_info=None,
         vision_reader=None,

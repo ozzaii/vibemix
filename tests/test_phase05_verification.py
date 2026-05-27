@@ -9,7 +9,6 @@ blocks Phase 5 closeout.
 from __future__ import annotations
 
 import re
-import subprocess
 from pathlib import Path
 
 import jwt as pyjwt
@@ -121,8 +120,8 @@ def test_g5_poc_files_untouched():
     Post-Phase 5 the project explicitly accepts intentional POC edits
     (per CLAUDE.md "POC = reference, devour it" and the MEMORY entry
     confirming intuition-to-port). v3/v4 have been retired into
-    ``.planning/research/v3-shipped/`` and ``_test_*.py`` / ``mascot.html``
-    have legitimate post-Phase-5 edits.
+    ``.planning/archive/2026-05-27-stale-v2-v3-research/v3-shipped/`` and
+    ``_test_*.py`` / ``mascot.html`` have legitimate post-Phase-5 edits.
 
     The test stays as a documented historical gate, marked skipped so
     the long-baseline diff stops fighting modern commits.

@@ -57,6 +57,19 @@ def _track_mock(title: str = "") -> MagicMock:
     return m
 
 
+def _track_position_mock(title: str = "", position_s: float = 0.0) -> MagicMock:
+    m = MagicMock()
+    m.snapshot.return_value = {
+        "title": title,
+        "prev_title": "",
+        "title_changed_at": 0.0,
+        "position_sec": position_s,
+        "duration_sec": 300.0,
+        "playback_rate": 1.0,
+    }
+    return m
+
+
 # ---------- Import surface ----------
 
 
@@ -411,6 +424,28 @@ def test_tick_does_not_append_track_history_when_title_none():
         last_bpm_at=999.0,
     )
     assert state.track_history == []
+
+
+def test_tick_writes_audible_track_position_when_confident():
+    state = MusicState()
+    state.audible = True
+    buf = _audible_buf()
+    _tick_once(
+        state,
+        buf,
+        _ctrl_mock(),
+        _track_position_mock(title="X", position_s=64.5),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.0,
+    )
+
+    assert state.audible_track == "X"
+    assert state.audible_track_position_s == 64.5
+    assert state.audible_track_duration_s == 300.0
+    assert state.audible_track_position_confidence >= 0.8
 
 
 # ---------- Audible deck + track wiring ----------
@@ -987,7 +1022,15 @@ def test_18_02_per_tick_aud_writes_when_audible():
     assert state.audible is True
     snap = registry.snapshot()
     aud = snap.get("aud", {})
-    expected_keys = {"rms", "bpm", "onset_density", "sub_share", "low_share", "mid_share", "high_share"}
+    expected_keys = {
+        "rms",
+        "bpm",
+        "onset_density",
+        "sub_share",
+        "low_share",
+        "mid_share",
+        "high_share",
+    }
     assert set(aud.keys()) >= expected_keys, f"missing keys: {expected_keys - set(aud.keys())}"
     # Each key has exactly one observation from this single tick
     for k in expected_keys:
@@ -1216,7 +1259,9 @@ def test_18_02_registry_write_inside_state_lock_AST_check():
 
     def walk(node, inside_lock: bool):
         if isinstance(node, ast.Call) and call_targets_registry_write(node):
-            (registry_writes_inside_lock if inside_lock else registry_writes_outside_lock).append(node)
+            (registry_writes_inside_lock if inside_lock else registry_writes_outside_lock).append(
+                node
+            )
         if isinstance(node, ast.With) and is_state_lock_with(node):
             for child in node.body:
                 walk(child, inside_lock=True)
@@ -1274,6 +1319,7 @@ def test_18_02_state_refresh_loop_threads_registry_kwarg(mocker):
     and threads it through to _tick_once on every iteration.
     """
     import inspect
+
     sig = inspect.signature(state_refresh_loop)
     assert "evidence_registry" in sig.parameters
     # Default is None for backward compat
@@ -1299,13 +1345,16 @@ def test_18_02_state_refresh_loop_threads_registry_kwarg(mocker):
     mocker.patch("vibemix.state.refresh._tick_once", side_effect=spy_tick_once)
 
     original_sleep = asyncio.sleep
+
     async def short_sleep(delay):
         await original_sleep(0)
 
     mocker.patch("vibemix.state.refresh.asyncio.sleep", side_effect=short_sleep)
 
     asyncio.run(
-        state_refresh_loop(state, buf, _ctrl_mock(), _track_mock(), stop, evidence_registry=registry)
+        state_refresh_loop(
+            state, buf, _ctrl_mock(), _track_mock(), stop, evidence_registry=registry
+        )
     )
     assert captured_kwargs, "tick_once was never called"
     assert captured_kwargs[0].get("evidence_registry") is registry

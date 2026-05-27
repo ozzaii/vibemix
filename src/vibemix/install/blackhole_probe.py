@@ -61,7 +61,8 @@ the existing Phase 33 install-wizard module.
 from __future__ import annotations
 
 import time
-from typing import Any, Callable, TypedDict
+from collections.abc import Callable
+from typing import Any, TypedDict
 
 
 class BlackHoleProbeResult(TypedDict):

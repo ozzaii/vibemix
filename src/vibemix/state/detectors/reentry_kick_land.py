@@ -56,7 +56,7 @@ class ReentryKickLandDetector:
     ``kill_detector`` reference).
     """
 
-    def __init__(self, kill_detector: "BreakdownKickKillDetector") -> None:
+    def __init__(self, kill_detector: BreakdownKickKillDetector) -> None:
         # Dependency-injected pair — NO global state. Plan 05's GenreRouter
         # is responsible for wiring exactly one ReentryKickLandDetector per
         # active genre with the matching kill detector.
@@ -70,8 +70,8 @@ class ReentryKickLandDetector:
 
     def detect(
         self,
-        state: "MusicState",
-        audio_buf: "AudioBuffer | None",
+        state: MusicState,
+        audio_buf: AudioBuffer | None,
         now: float,
     ) -> Event | None:
         """Return an ``Event("REENTRY_KICK_LAND", ...)`` when the kick comes

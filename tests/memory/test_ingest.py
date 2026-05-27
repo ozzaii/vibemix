@@ -81,7 +81,7 @@ def _vec(seed: int) -> np.ndarray:
 
 
 class _FakeEmbedder:
-    """A stand-in for ``LibraryEmbedder`` exposing ONLY ``embed_query``.
+    """A stand-in product embedder exposing ONLY ``embed_query``.
 
     Counts calls so the idempotency / cache tests can assert 0 API cost. Returns
     a deterministic per-signature vector (so re-embedding the same signature is

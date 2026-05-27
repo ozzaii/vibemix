@@ -27,7 +27,6 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass
 
-
 # ---------------------------------------------------------------------------
 # Canonical outbound endpoint inventory.
 #
@@ -128,6 +127,6 @@ __all__ = [
     "OUTBOUND_ENDPOINTS",
     "OutboundEndpoint",
     "banner_lines",
-    "print_security_banner",
     "endpoint_urls",
+    "print_security_banner",
 ]

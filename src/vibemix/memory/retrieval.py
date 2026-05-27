@@ -12,8 +12,9 @@ Invariants (the milestone's anti-poisoning + off-path core):
 
     * No-live-path: imports NO live-reaction-path surface (no coach loop, no
       ``MusicState``, no ``ws_bus``, no agent, no prompts). It reads
-      ``MemoryStore.query_topk`` + ``LibraryEmbedder.embed_query`` only, writes
-      only its own ``_latest``, opens no socket, never writes ``MusicState``.
+      ``MemoryStore.query_topk`` + an injected product embedder's
+      ``embed_query`` only, writes only its own ``_latest``, opens no socket,
+      never writes ``MusicState``.
       Lives in ``memory/`` so the shipped no-live-path / no-extraction static
       gates auto-cover this file.
     * No-extraction: the ONLY model call is ``embedder.embed_query(query_text)``
@@ -22,19 +23,26 @@ Invariants (the milestone's anti-poisoning + off-path core):
       the current session is excluded from its own retrieval via
       ``query_topk(..., exclude_session=current_session_id)``.
     * Budget / off-path (RECALL-04): event-gated to track-aware events (NEVER
-      HEARTBEAT — the highest-frequency class), exactly one FLEX embed per
-      gated event, cosine-only (NO time-decay blend — that is a KAAN-ACTION
-      deferral, not v1), conservative top-K. The hard deadline
+      HEARTBEAT — the highest-frequency class), exactly one local CLAP query
+      embed per gated event, cosine-only (NO time-decay blend — that is a
+      KAAN-ACTION deferral, not v1), conservative top-K. The hard deadline
       (``RECALL_DEADLINE_S``) is enforced AGENT-side (Plan 65-04) via
       ``asyncio.wait_for``; defined here as the shared default.
 """
 
 from __future__ import annotations
 
+import logging
 import threading
+from typing import Protocol
 
-from vibemix.library.embed import LibraryEmbedder
 from vibemix.memory.store import MemoryStore, Record
+
+logger = logging.getLogger(__name__)
+
+
+class _RecallEmbedder(Protocol):  # pragma: no cover - structural typing only
+    def embed_query(self, query: str): ...
 
 # ---------------------------------------------------------------------------
 # Retrieval policy defaults (research §Retrieval Policy Defaults). Conservative
@@ -61,7 +69,7 @@ RECALL_EVENT_GATE: frozenset[str] = frozenset(
 )
 
 
-def build_recall_query(ev) -> str:  # noqa: ANN001 — duck-typed Event, no live import
+def build_recall_query(ev) -> str:
     """Build the query string for ``ev``, mirroring the stored signature prefix.
 
     Reuses the Phase-64 ``coach_line`` signature template head
@@ -115,7 +123,7 @@ class MemoryRecall:
     the one that reads ``get_latest`` / calls ``clear``.
     """
 
-    def __init__(self, embedder: LibraryEmbedder, store: MemoryStore) -> None:
+    def __init__(self, embedder: _RecallEmbedder, store: MemoryStore) -> None:
         self._embedder = embedder
         self._store = store
         self._lock = threading.Lock()
@@ -138,10 +146,10 @@ class MemoryRecall:
     ) -> list[Record]:
         """Run recall for an emitted event. Returns + latches the survivors.
 
-        Gate first (no embed on a non-track-aware event), then a SINGLE FLEX
-        query embed, then ``query_topk`` over the pre-embedded corpus with the
-        current session excluded, then the cosine-floor filter. Survivors are
-        latched under the lock for ``get_latest`` and returned.
+        Gate first (no embed on a non-track-aware event), then a single local
+        CLAP query embed, then ``query_topk`` over the pre-embedded corpus with
+        the current session excluded, then the cosine-floor filter. Survivors
+        are latched under the lock for ``get_latest`` and returned.
 
         Phase 65 review CR-04 — a per-dispatch generation token is captured
         BEFORE the (potentially slow) embed + ranking and re-checked before
@@ -153,7 +161,7 @@ class MemoryRecall:
         by the deadline wrapper, such as the synchronous unit-test path,
         still see the result).
         """
-        # Event gate — short-circuit BEFORE any embed (no API round-trip on a
+        # Event gate — short-circuit BEFORE any embed (no model call on a
         # HEARTBEAT / non-track-aware event).
         if event_type not in RECALL_EVENT_GATE:
             return []
@@ -165,14 +173,23 @@ class MemoryRecall:
             self._inflight_gen += 1
             my_gen = self._inflight_gen
 
-        # Exactly one FLEX query embed (no per-candidate re-embed, no retry).
+        # Exactly one local query embed (no per-candidate re-embed, no retry).
         qvec = self._embedder.embed_query(query_text)
 
         # Current session excluded BEFORE ranking (the live session can't
-        # "remember itself").
-        hits = self._store.query_topk(
-            qvec, RECALL_TOP_K, exclude_session=current_session_id
-        )
+        # "remember itself"). Stale pre-CLAP memory vectors or backend damage
+        # must never perturb a live turn; fail empty and clear the latch for
+        # this dispatch.
+        try:
+            hits = self._store.query_topk(
+                qvec, RECALL_TOP_K, exclude_session=current_session_id
+            )
+        except Exception as exc:
+            logger.warning("memory recall query failed: %s", exc)
+            with self._lock:
+                if my_gen == self._inflight_gen:
+                    self._latest = []
+            return []
 
         # Cosine floor — a weak callback is no callback (cosine-only, no decay).
         survivors = [r for r in hits if r.score >= RECALL_SIMILARITY_FLOOR]
@@ -222,10 +239,10 @@ class MemoryRecall:
 
 
 __all__ = [
-    "RECALL_SIMILARITY_FLOOR",
-    "RECALL_TOP_K",
     "RECALL_DEADLINE_S",
     "RECALL_EVENT_GATE",
+    "RECALL_SIMILARITY_FLOOR",
+    "RECALL_TOP_K",
     "MemoryRecall",
     "build_recall_query",
 ]

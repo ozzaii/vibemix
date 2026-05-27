@@ -14,7 +14,11 @@ execution required.
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import stat
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -71,6 +75,42 @@ def test_release_yml_apple_sign_step_guarded_by_signing_available(workflow_yaml)
     assert sign_step["if"] == "env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'"
 
 
+def test_release_yml_detects_complete_apple_secret_group(workflow_text: str):
+    """Full-release mode must not start with a partial Apple signing setup."""
+    for secret in (
+        "APPLE_DEVELOPER_ID",
+        "APPLE_DEVELOPER_ID_P12_BASE64",
+        "APPLE_DEVELOPER_ID_PASSWORD",
+        "APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD",
+        "APPLE_TEAM_ID",
+        "APPLE_API_KEY_ID",
+        "APPLE_API_KEY_ISSUER",
+        "APPLE_API_KEY_P8",
+    ):
+        assert f"secrets.{secret} != ''" in workflow_text
+    assert "HAS_APPLE:" not in workflow_text
+
+
+def test_sign_macos_materializes_ci_signing_secrets():
+    script = (REPO_ROOT / "scripts/dist/sign_macos.sh").read_text(encoding="utf-8")
+    assert "APPLE_DEVELOPER_ID_P12_BASE64" in script
+    assert "APPLE_DEVELOPER_ID_PASSWORD" in script
+    assert "APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD" in script
+    assert "APPLE_API_KEY_P8" in script
+    assert 'APPLE_API_KEY_PATH="$CI_TMP_DIR/AuthKey.p8"' in script
+    assert "security create-keychain" in script
+    assert "security import" in script
+    assert "security set-key-partition-list" in script
+    assert "Developer ID identity not imported into CI keychain" in script
+
+
+def test_macos_signing_repairs_sidecar_symlinks_before_codesign():
+    script = (REPO_ROOT / "scripts/dist/sign_macos.sh").read_text(encoding="utf-8")
+    repair = "repair_macos_app_sidecar_symlinks.py"
+    assert repair in script
+    assert script.index(repair) < script.index('stage 2 "pre-flight codesign nested binaries')
+
+
 def test_release_yml_skip_on_empty_apple_secret(workflow_yaml):
     """The Apple annotation step fires on the inverse condition."""
     build_macos = workflow_yaml["jobs"]["build-macos"]
@@ -84,6 +124,28 @@ def test_release_yml_skip_on_empty_apple_secret(workflow_yaml):
     # The step must reference KAAN-ACTION-LEGAL.md so operators can find the runbook.
     assert "KAAN-ACTION-LEGAL.md" in skip_step["run"]
     assert "DIST-09" in skip_step["run"]
+
+
+def test_release_yml_repairs_macos_sidecar_symlinks_before_signing(workflow_yaml):
+    build_macos = workflow_yaml["jobs"]["build-macos"]
+    steps = build_macos["steps"]
+    names = [step.get("name", "") for step in steps]
+    repair_index = names.index("PACKAGE — Repair macOS app sidecar symlinks")
+    verify_index = names.index("VERIFY — macOS app bundle sidecar ready")
+    sign_index = names.index("SIGN + PACKAGE — codesign / create-dmg / notarytool / stapler")
+    dmg_verify_index = names.index("VERIFY — macOS DMG drag-install sidecar ready")
+    updater_index = names.index("PACKAGE — Create Tauri macOS updater artifact (.app.tar.gz)")
+    updater_verify_index = names.index("VERIFY — macOS updater artifact extracts to ready app")
+    assert repair_index < verify_index < sign_index
+    assert sign_index < dmg_verify_index < updater_index
+    assert updater_index < updater_verify_index
+    assert "repair_macos_app_sidecar_symlinks.py" in steps[repair_index]["run"]
+    assert "check_macos_app_bundle_ready.py" in steps[verify_index]["run"]
+    assert "--smoke version" in steps[verify_index]["run"]
+    assert "check_macos_dmg_artifact_ready.py" in steps[dmg_verify_index]["run"]
+    assert "-name 'vibemix-*.dmg'" in steps[dmg_verify_index]["run"]
+    assert "check_macos_updater_artifact_ready.py" in steps[updater_verify_index]["run"]
+    assert "-name '*.app.tar.gz'" in steps[updater_verify_index]["run"]
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +197,129 @@ def test_release_yml_skip_on_empty_signpath_secret(workflow_yaml):
     assert skip_step["if"] == "env.SIGNING_AVAILABLE != 'true'"
     assert "KAAN-ACTION-LEGAL.md" in skip_step["run"]
     assert "DIST-11" in skip_step["run"]
+
+
+# ---------------------------------------------------------------------------
+# Updater manifest signing contract
+# ---------------------------------------------------------------------------
+
+def test_release_yml_manifest_signer_uses_tauri_updater_artifacts(workflow_text: str):
+    """latest.json must point at Tauri updater artifacts, not first-install media."""
+    assert "VIBEMIX_DMG_NAME: vibemix-${{ github.ref_name }}-${{ matrix.arch }}.dmg" in workflow_text
+    assert "scripts/dist/create_macos_updater_artifact.sh" in workflow_text
+    assert "cargo tauri build --bundles nsis --no-sign" in workflow_text
+    assert "tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/*.app.tar.gz" in workflow_text
+    assert "tauri/src-tauri/target/release/bundle/nsis/*setup*.exe" in workflow_text
+    assert "DMG=$(find release-artifacts/macos-artifacts-arm64 -type f -name 'vibemix-*.dmg'" in workflow_text
+    assert "WIN_INSTALLER=$(find release-artifacts/windows-artifacts -type f -name 'vibemix-installer.exe'" in workflow_text
+    assert "Verify Windows updater — DIST-17 require-signed gate" in workflow_text
+    assert "WIN_UPDATER=$(find release-artifacts/windows-artifacts -type f -name '*setup*.exe' ! -name 'vibemix-installer.exe'" in workflow_text
+    assert "MACOS_ARM64_UPDATER=$(find release-artifacts/macos-artifacts-arm64 -type f" in workflow_text
+    assert "MACOS_X86_64_UPDATER=$(find release-artifacts/macos-artifacts-x86_64 -type f" in workflow_text
+    assert "-name '*.app.tar.gz'" in workflow_text
+    assert "WIN_UPDATER=$(find release-artifacts/windows-artifacts -type f" in workflow_text
+    assert "-name '*setup*.exe'" in workflow_text
+    assert "-name '*.msi'" not in workflow_text
+    assert "! -name 'vibemix-installer.exe'" in workflow_text
+    assert "not the DMG" in workflow_text
+    assert "not the Inno vibemix-installer.exe" in workflow_text
+    assert "or MSI" not in workflow_text
+    assert '--macos-artifact "$MACOS_ARM64_UPDATER"' in workflow_text
+    assert '--macos-x86_64-artifact "$MACOS_X86_64_UPDATER"' in workflow_text
+    assert "--macos-x86_64-url" in workflow_text
+    assert '--windows-artifact "$WIN_UPDATER"' in workflow_text
+    assert "PUBLISH — Stage flat GitHub Release assets" in workflow_text
+    assert "release-artifacts/upload/*" in workflow_text
+    assert "release-artifacts/macos-artifacts-arm64/vibemix-*.dmg" not in workflow_text
+    assert "-maxdepth 1 -type f -name '*.app.tar.gz'" not in workflow_text
+
+
+def test_sign_manifest_script_rejects_first_install_artifacts():
+    script = (REPO_ROOT / "scripts/dist/sign_manifest.sh").read_text(encoding="utf-8")
+    assert "--macos-artifact" in script
+    assert "--macos-x86_64-artifact" in script
+    assert "--windows-artifact" in script
+    assert '"$artifact" 2>/dev/null' in script
+    assert '"$url" 2>/dev/null' not in script
+    assert ".app.tar.gz" in script
+    assert "must not be the Inno first-install EXE" in script
+    assert "Tauri MSI" not in script
+    assert "*setup*.exe" in script
+    assert "darwin-x86_64" in script
+    assert "TAURI_UPDATER_KEY_PASSWORD:?" not in script
+    assert "${TAURI_UPDATER_KEY_PASSWORD+x}" in script
+
+
+def test_sign_manifest_script_writes_all_shipped_platform_targets(tmp_path, monkeypatch):
+    script = REPO_ROOT / "scripts/dist/sign_manifest.sh"
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_npx = fake_bin / "npx"
+    fake_npx.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+artifact="${@: -1}"
+case "$artifact" in
+  *arm64.app.tar.gz) echo "sig-arm64" ;;
+  *x86_64.app.tar.gz) echo "sig-x86_64" ;;
+  *setup.exe) echo "sig-windows" ;;
+  *) echo "unexpected artifact: $artifact" >&2; exit 9 ;;
+esac
+""",
+        encoding="utf-8",
+    )
+    fake_npx.chmod(fake_npx.stat().st_mode | stat.S_IXUSR)
+
+    mac_arm64 = tmp_path / "vibemix-0.1.0-arm64.app.tar.gz"
+    mac_x86_64 = tmp_path / "vibemix-0.1.0-x86_64.app.tar.gz"
+    windows = tmp_path / "vibemix_0.1.0_x64-setup.exe"
+    for artifact in (mac_arm64, mac_x86_64, windows):
+        artifact.write_bytes(b"artifact")
+
+    output = tmp_path / "latest.json"
+    env = os.environ.copy()
+    env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+    env["TAURI_UPDATER_PRIVATE_KEY"] = "ZmFrZS1rZXk="
+    env["TAURI_UPDATER_KEY_PASSWORD"] = ""
+
+    subprocess.run(
+        [
+            str(script),
+            "--version",
+            "0.1.0",
+            "--macos-artifact",
+            str(mac_arm64),
+            "--macos-url",
+            "https://example.test/vibemix-0.1.0-arm64.app.tar.gz",
+            "--macos-x86_64-artifact",
+            str(mac_x86_64),
+            "--macos-x86_64-url",
+            "https://example.test/vibemix-0.1.0-x86_64.app.tar.gz",
+            "--windows-artifact",
+            str(windows),
+            "--windows-url",
+            "https://example.test/vibemix_0.1.0_x64-setup.exe",
+            "--notes",
+            "Release v0.1.0",
+            "--output",
+            str(output),
+        ],
+        check=True,
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    manifest = json.loads(output.read_text(encoding="utf-8"))
+    assert set(manifest["platforms"]) == {
+        "darwin-aarch64",
+        "darwin-x86_64",
+        "windows-x86_64",
+    }
+    assert manifest["platforms"]["darwin-aarch64"]["signature"] == "sig-arm64"
+    assert manifest["platforms"]["darwin-x86_64"]["signature"] == "sig-x86_64"
+    assert manifest["platforms"]["windows-x86_64"]["signature"] == "sig-windows"
 
 
 if __name__ == "__main__":  # pragma: no cover

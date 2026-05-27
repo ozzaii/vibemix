@@ -7,7 +7,7 @@ Two builders, no live API, no GEMINI_API_KEY:
   controllable scalar deltas, for the PERCEIVE-01/02 single-writer + render
   tests. The current state carries a ``prev_perceive`` dict mirroring the prior
   tick's scalars (the shape the refresh loop will write).
-- ``synthetic_corpus`` — N L2-normalized 1536-dim vectors sharing a common
+- ``synthetic_corpus`` — N L2-normalized ``EMBEDDING_DIM`` vectors sharing a common
   direction (the anisotropic shape from tests/library/test_centering.py), with
   folder-style genre labels, for the PERCEIVE-03 prototype tests.
 
@@ -25,7 +25,7 @@ from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
 def _anisotropic_corpus(n: int, seed: int = 0) -> np.ndarray:
     """N L2-normalized vectors sharing a strong common direction (high avg
     pairwise cosine) plus small per-vector noise — mimics real anisotropic
-    whole-track Gemini embeddings. Copied from tests/library/test_centering.py
+    whole-track embedding corpora. Copied from tests/library/test_centering.py
     so the PERCEIVE-03 prototype tests exercise the same centering separation."""
     rng = np.random.default_rng(seed)
     shared = l2_normalize(rng.standard_normal(EMBEDDING_DIM).astype(np.float32))
@@ -95,7 +95,7 @@ def perceive_state_pair():
 def synthetic_corpus():
     """Factory → (vectors, ids, label_of) for PERCEIVE-03 prototype tests.
 
-    ``vectors`` is an (N, 1536) float32 L2-normalized anisotropic corpus;
+    ``vectors`` is an (N, EMBEDDING_DIM) float32 L2-normalized anisotropic corpus;
     ``ids`` are ``t000``-style; ``label_of`` maps id → folder-style genre label
     cycling over a small label set (so each label gets ≥2 members → a real
     centered mean prototype).

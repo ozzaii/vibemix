@@ -22,7 +22,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Task 1 — synthetic-kick fixture helper
 # ---------------------------------------------------------------------------

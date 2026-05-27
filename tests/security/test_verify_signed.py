@@ -19,10 +19,43 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts/dist/verify_signed.py"
 WORKFLOW = REPO_ROOT / ".github/workflows/verify-signed.yml"
+
+
+def _write_unsigned_pe(path: Path) -> None:
+    data = bytearray(0x240)
+    data[0:2] = b"MZ"
+    data[0x3C:0x40] = (0x80).to_bytes(4, "little")
+    data[0x80:0x84] = b"PE\0\0"
+    # COFF header: x86_64, zero sections, optional-header size 240.
+    data[0x84:0x86] = (0x8664).to_bytes(2, "little")
+    data[0x94:0x96] = (240).to_bytes(2, "little")
+    optional = 0x98
+    data[optional : optional + 2] = (0x20B).to_bytes(2, "little")
+    data[optional + 108 : optional + 112] = (16).to_bytes(4, "little")
+    path.write_bytes(data)
+
+
+def _write_authenticode_pe(path: Path) -> None:
+    data = bytearray(0x340)
+    data[0:2] = b"MZ"
+    data[0x3C:0x40] = (0x80).to_bytes(4, "little")
+    data[0x80:0x84] = b"PE\0\0"
+    data[0x84:0x86] = (0x8664).to_bytes(2, "little")
+    data[0x94:0x96] = (240).to_bytes(2, "little")
+    optional = 0x98
+    data[optional : optional + 2] = (0x20B).to_bytes(2, "little")
+    data[optional + 108 : optional + 112] = (16).to_bytes(4, "little")
+    security_entry = optional + 112 + (4 * 8)
+    data[security_entry : security_entry + 4] = (0x300).to_bytes(4, "little")
+    data[security_entry + 4 : security_entry + 8] = (0x20).to_bytes(4, "little")
+    data[0x300:0x304] = (0x20).to_bytes(4, "little")
+    data[0x304:0x306] = (0x0200).to_bytes(2, "little")
+    data[0x306:0x308] = (0x0002).to_bytes(2, "little")
+    data[0x308:0x320] = b"signed-certificate-bytes"
+    path.write_bytes(data)
 
 
 @pytest.fixture(scope="module")
@@ -51,10 +84,14 @@ def test_checksum_mismatch_fails(mod, capsys, tmp_path):
     artifact = tmp_path / "bin.dmg"
     artifact.write_bytes(b"fake bytes")
     bad_sha = "0" * 64
-    rc = mod.main([
-        "--artifact", str(artifact),
-        "--expected-sha256", bad_sha,
-    ])
+    rc = mod.main(
+        [
+            "--artifact",
+            str(artifact),
+            "--expected-sha256",
+            bad_sha,
+        ]
+    )
     assert rc == 1
     err = capsys.readouterr().out
     assert "sha256 mismatch" in err
@@ -65,10 +102,14 @@ def test_checksum_match_passes(mod, capsys, tmp_path):
     payload = b"fake bytes"
     artifact.write_bytes(payload)
     good_sha = hashlib.sha256(payload).hexdigest()
-    rc = mod.main([
-        "--artifact", str(artifact),
-        "--expected-sha256", good_sha,
-    ])
+    rc = mod.main(
+        [
+            "--artifact",
+            str(artifact),
+            "--expected-sha256",
+            good_sha,
+        ]
+    )
     assert rc == 0
 
 
@@ -82,6 +123,7 @@ def test_workflow_has_p46_audit_step():
 def test_workflow_grep_pattern_catches_violation():
     """Round-trip: synthesize a violating line and verify the grep would match."""
     import re
+
     pattern = r"(curl|wget).*(POST|PUT).*(apple\.com|signpath\.io|notarytool)"
     bad = "curl -X POST https://signpath.io/sign"
     assert re.search(pattern, bad)
@@ -91,13 +133,9 @@ def test_workflow_grep_pattern_catches_violation():
 # Phase 38 / DIST-17 — release-publish gate
 # ---------------------------------------------------------------------------
 
+
 def test_require_signed_flag_present(mod):
     """--require-signed CLI flag must exist (Phase 38 DIST-17)."""
-    # Argparse exposes flag presence via help text.
-    import argparse
-    p = argparse.ArgumentParser()
-    # We re-run argparse exactly as main() builds it.
-    # Easier: invoke with --help and capture exit.
     try:
         mod.main(["--help"])
     except SystemExit:
@@ -109,10 +147,13 @@ def test_post_sign_verifier_blocks_publish_on_unsigned(mod, capsys, tmp_path):
     # Write bytes that do NOT match any Mach-O magic value.
     artifact = tmp_path / "vibemix-0.0.1-arm64.dmg"
     artifact.write_bytes(b"definitely not a mach-o header" + b"\x00" * 64)
-    rc = mod.main([
-        "--artifact", str(artifact),
-        "--require-signed",
-    ])
+    rc = mod.main(
+        [
+            "--artifact",
+            str(artifact),
+            "--require-signed",
+        ]
+    )
     assert rc == 1
     out = capsys.readouterr().out
     assert "::error::" in out
@@ -120,46 +161,91 @@ def test_post_sign_verifier_blocks_publish_on_unsigned(mod, capsys, tmp_path):
 
 
 def test_post_sign_verifier_passes_on_mach_o_magic(mod, capsys, tmp_path):
-    """A .dmg starting with a valid Mach-O magic word should pass --require-signed."""
-    artifact = tmp_path / "vibemix-0.0.1-arm64.dmg"
+    """A Mach-O-like darwin artifact should pass the offline fallback surface."""
+    artifact = tmp_path / "vibemix-0.0.1-darwin"
     # Mach-O 64-bit thin little-endian magic: cf fa ed fe
     artifact.write_bytes(b"\xcf\xfa\xed\xfe" + b"\x00" * 64)
-    rc = mod.main([
-        "--artifact", str(artifact),
-        "--require-signed",
-    ])
+    rc = mod.main(
+        [
+            "--artifact",
+            str(artifact),
+            "--require-signed",
+        ]
+    )
     assert rc == 0
 
 
-def test_post_sign_verifier_blocks_unsigned_msi(mod, capsys, tmp_path):
-    """An .msi without PE MZ header should fail --require-signed."""
-    artifact = tmp_path / "vibemix-installer.msi"
-    artifact.write_bytes(b"not a PE binary" + b"\x00" * 64)
-    rc = mod.main([
-        "--artifact", str(artifact),
-        "--require-signed",
-    ])
+def test_macos_dmg_verifier_uses_codesign_on_darwin(mod, monkeypatch, tmp_path):
+    """On macOS, DMG/PKG verification must use codesign, not Mach-O magic."""
+    artifact = tmp_path / "vibemix-0.0.1-arm64.dmg"
+    artifact.write_bytes(b"signed dmg bytes")
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return mod.subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(mod.sys, "platform", "darwin")
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+    result = mod.verify(artifact)
+
+    assert result.signed_mac is True
+    assert calls == [["codesign", "--verify", "--strict", "--verbose=2", str(artifact)]]
+
+
+def test_post_sign_verifier_blocks_unsigned_exe(mod, capsys, tmp_path):
+    """A PE without an Authenticode certificate table should fail."""
+    artifact = tmp_path / "vibemix-installer.exe"
+    _write_unsigned_pe(artifact)
+    rc = mod.main(
+        [
+            "--artifact",
+            str(artifact),
+            "--require-signed",
+        ]
+    )
     assert rc == 1
 
 
-def test_post_sign_verifier_passes_on_mz_header(mod, capsys, tmp_path):
-    """An .msi/.exe with MZ header should pass --require-signed."""
-    artifact = tmp_path / "vibemix-installer.msi"
-    artifact.write_bytes(b"MZ" + b"\x00" * 64)
-    rc = mod.main([
-        "--artifact", str(artifact),
-        "--require-signed",
-    ])
+def test_post_sign_verifier_passes_on_authenticode_certificate_table(mod, capsys, tmp_path):
+    """A PE with an Authenticode certificate table should pass."""
+    artifact = tmp_path / "vibemix-installer.exe"
+    _write_authenticode_pe(artifact)
+    rc = mod.main(
+        [
+            "--artifact",
+            str(artifact),
+            "--require-signed",
+        ]
+    )
     assert rc == 0
+
+
+def test_post_sign_verifier_blocks_mz_without_pe_signature(mod, capsys, tmp_path):
+    """A bare MZ header is not enough to count as Authenticode-signed."""
+    artifact = tmp_path / "vibemix-installer.exe"
+    artifact.write_bytes(b"MZ" + b"\x00" * 128)
+    rc = mod.main(
+        [
+            "--artifact",
+            str(artifact),
+            "--require-signed",
+        ]
+    )
+    assert rc == 1
 
 
 def test_require_signed_default_off_preserves_phase_34_surface(mod, tmp_path):
     """Without --require-signed flag, unsigned artifact still exits 0 (Phase 34 surface)."""
     artifact = tmp_path / "vibemix-0.0.1.dmg"
     artifact.write_bytes(b"unsigned bytes" + b"\x00" * 64)
-    rc = mod.main([
-        "--artifact", str(artifact),
-    ])
+    rc = mod.main(
+        [
+            "--artifact",
+            str(artifact),
+        ]
+    )
     assert rc == 0  # Phase 34 surface contract preserved
 
 
@@ -169,6 +255,9 @@ def test_release_yml_has_verify_signed_publish_gate():
     txt = release_yml.read_text(encoding="utf-8")
     assert "verify-signed-publish-gate:" in txt
     assert "--require-signed" in txt
+    assert "runs-on: macos-14" in txt
+    assert "Verify Windows updater — DIST-17 require-signed gate" in txt
+    assert "-name '*setup*.exe' ! -name 'vibemix-installer.exe'" in txt
     # release-publish must depend on the gate.
     assert "verify-signed-publish-gate" in txt
     # Sanity: the gate calls verify_signed.py.

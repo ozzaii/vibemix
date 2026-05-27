@@ -52,7 +52,7 @@ async def watch_parent(stop_event: asyncio.Event) -> None:
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=POLL_INTERVAL_S)
             return  # stop_event tripped elsewhere — clean exit path
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
         current_ppid = os.getppid()
         if current_ppid != initial_ppid:

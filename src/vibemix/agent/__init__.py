@@ -5,8 +5,9 @@ Phase 4 ships the DJCoHostAgent (multimodal llm_node override calling
 google.genai.aio.models.generate_content_stream with the last
 INVOKE_AUDIO_SECONDS of audio attached as a Part), the
 PlaybackQueueAudioOutput TTS sink, the SYSTEM_INSTRUCTION persona, the LLM
-factory, and the OpenRouter-primary TTS chain (with a load-bearing module-load
-monkey-patch that puts the OpenRouter Gemini TTS model on LiveKit's
+factory, and the Gemini-native TTS chain with optional OpenRouter standby
+(with a load-bearing module-load monkey-patch that puts the OpenRouter model on
+LiveKit's
 AudioChunkedStream path).
 
 Phase 5 adds:
@@ -19,7 +20,8 @@ Phase 5 adds:
   ``build_proxy_tts_chain(jwt, proxy_base_url)``.
 - ``build_llm(api_key, *, mode, proxy_base_url, jwt)`` extended with mode
   dispatch (direct = Phase 4 verbatim; proxy = http_options-pointed at proxy).
-- ``build_tts_chain(*, gemini_api_key, openrouter_api_key, mode, ...)`` same.
+- ``build_tts_chain(*, gemini_api_key, openrouter_api_key, openrouter_enabled,
+  mode, ...)`` same.
 """
 
 from __future__ import annotations
@@ -34,20 +36,7 @@ from vibemix.agent.config import (
     TTS_MODEL,
     VOICE,
 )
-from vibemix.agent.dj_cohost import DJCoHostAgent
-from vibemix.agent.install_uuid import get_or_create_install_uuid
-from vibemix.agent.jwt_cache import get_or_refresh_jwt
-from vibemix.agent.llm_factory import build_llm
 from vibemix.agent.persona import SYSTEM_INSTRUCTION
-from vibemix.agent.playback_sink import PlaybackQueueAudioOutput
-from vibemix.agent.proxy_client import (
-    ProxyUnavailable,
-    build_proxy_genai_client,
-    build_proxy_tts_chain,
-    classify_proxy_error,
-    probe_proxy_health,
-)
-from vibemix.agent.tts_chain import build_tts_chain
 
 __all__ = [
     "INPUT_DEVICE",
@@ -71,3 +60,30 @@ __all__ = [
     "get_or_refresh_jwt",
     "probe_proxy_health",
 ]
+
+_LAZY_EXPORTS = {
+    "DJCoHostAgent": ("vibemix.agent.dj_cohost", "DJCoHostAgent"),
+    "PlaybackQueueAudioOutput": ("vibemix.agent.playback_sink", "PlaybackQueueAudioOutput"),
+    "ProxyUnavailable": ("vibemix.agent.proxy_client", "ProxyUnavailable"),
+    "build_llm": ("vibemix.agent.llm_factory", "build_llm"),
+    "build_proxy_genai_client": ("vibemix.agent.proxy_client", "build_proxy_genai_client"),
+    "build_proxy_tts_chain": ("vibemix.agent.proxy_client", "build_proxy_tts_chain"),
+    "build_tts_chain": ("vibemix.agent.tts_chain", "build_tts_chain"),
+    "classify_proxy_error": ("vibemix.agent.proxy_client", "classify_proxy_error"),
+    "get_or_create_install_uuid": ("vibemix.agent.install_uuid", "get_or_create_install_uuid"),
+    "get_or_refresh_jwt": ("vibemix.agent.jwt_cache", "get_or_refresh_jwt"),
+    "probe_proxy_health": ("vibemix.agent.proxy_client", "probe_proxy_health"),
+}
+
+
+def __getattr__(name: str):
+    """Lazily expose cohost-only modules without taxing library/model CLIs."""
+    try:
+        module_name, attr = _LAZY_EXPORTS[name]
+    except KeyError as exc:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
+    from importlib import import_module
+
+    value = getattr(import_module(module_name), attr)
+    globals()[name] = value
+    return value

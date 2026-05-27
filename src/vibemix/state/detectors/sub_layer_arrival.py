@@ -56,8 +56,8 @@ class SubLayerArrivalDetector:
 
     def detect(
         self,
-        state: "MusicState",
-        audio_buf: "AudioBuffer | None",
+        state: MusicState,
+        audio_buf: AudioBuffer | None,
         now: float,
     ) -> Event | None:
         """Return an ``Event("SUB_LAYER_ARRIVAL", ...)`` when sub jumps under

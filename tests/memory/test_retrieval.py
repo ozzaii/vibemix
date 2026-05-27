@@ -46,7 +46,7 @@ module), NOT collection errors.
 Sibling fixture conventions mirror tests/memory/test_ingest.py: a
 ``MemoryStore(db_path=tmp_path / "memory.db", prefer_sqlite_vec=False)``, a
 call-counting ``_FakeEmbedder`` exposing ONLY ``embed_query`` (no generation
-surface), and synthetic 768-dim L2-normalized vectors. Cosine score == dot of
+surface), and synthetic active-dim L2-normalized vectors. Cosine score == dot of
 two L2-normalized vectors, so we craft a query vector and seed records whose
 dot with it is above / below the 0.7 floor on demand — no live API.
 
@@ -65,18 +65,13 @@ from pathlib import Path
 import numpy as np
 
 from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
-from vibemix.memory.store import MemoryStore
-
-# RED edge — does NOT exist until 65-03. Collection raises
-# ModuleNotFoundError: No module named 'vibemix.memory.retrieval'. That is the
-# pinned Wave-0 contract; 65-03 implements these identifiers verbatim.
-from vibemix.memory.retrieval import (  # noqa: E402
+from vibemix.memory.retrieval import (
     RECALL_EVENT_GATE,
     RECALL_SIMILARITY_FLOOR,
     RECALL_TOP_K,
     MemoryRecall,
 )
-
+from vibemix.memory.store import MemoryStore
 
 # ---------------------------------------------------------------------------
 # Synthetic vector helpers — cosine == dot of two L2-normalized vectors.
@@ -84,7 +79,7 @@ from vibemix.memory.retrieval import (  # noqa: E402
 
 
 def _unit(seed: int) -> np.ndarray:
-    """A single 768-dim L2-normalized float32 vector (deterministic)."""
+    """A single active-dim L2-normalized float32 vector (deterministic)."""
     rng = np.random.default_rng(seed)
     return l2_normalize(rng.standard_normal(EMBEDDING_DIM).astype(np.float32))
 
@@ -109,7 +104,7 @@ def _aligned(query: np.ndarray, target_cos: float, seed: int) -> np.ndarray:
 
 
 class _SpyEmbedder:
-    """Stand-in for ``LibraryEmbedder`` exposing ONLY ``embed_query``.
+    """Stand-in product embedder exposing ONLY ``embed_query``.
 
     Counts calls (so the event-gate test can assert ZERO embeds) and returns a
     fixed query vector so the seeded-record cosines are deterministic. NO
@@ -322,7 +317,7 @@ def test_clear_during_inflight_on_event_discards_stale_latch(tmp_path: Path) -> 
     # final token check fails and survivors are dropped.
     original_embed = embedder.embed_query
 
-    def racing_embed(text: str):  # noqa: ANN202 — test shim
+    def racing_embed(text: str) -> np.ndarray:
         vec = original_embed(text)
         recall.clear()  # bumps _inflight_gen between dispatch and write
         return vec
@@ -336,6 +331,29 @@ def test_clear_during_inflight_on_event_discards_stale_latch(tmp_path: Path) -> 
     assert recall.get_latest() == [], (
         "stale executor write must be discarded after intervening clear()"
     )
+
+
+def test_store_query_failure_latches_nothing() -> None:
+    """A stale/broken memory vector backend fails empty, never into the prompt.
+
+    This is the CLAP migration safety net: if a pre-CLAP memory store contains
+    incompatible vectors, recall should behave as "no useful past moment this
+    turn" instead of raising through the live reaction path.
+    """
+
+    class BrokenStore:
+        def query_topk(self, *args: object, **kwargs: object) -> list[object]:
+            raise AssertionError("stale vector dim mismatch")
+
+    query = _unit(6)
+    embedder = _SpyEmbedder(query)
+    recall = MemoryRecall(embedder, BrokenStore())  # type: ignore[arg-type]
+
+    survivors = recall.on_event(_TRACK_AWARE, "stale memory", _CURRENT_SESSION)
+
+    assert survivors == []
+    assert recall.get_latest() == []
+    assert embedder.calls == 1
 
 
 # ---------------------------------------------------------------------------

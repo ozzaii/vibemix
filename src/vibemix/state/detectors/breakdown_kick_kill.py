@@ -64,8 +64,8 @@ class BreakdownKickKillDetector:
 
     def detect(
         self,
-        state: "MusicState",
-        audio_buf: "AudioBuffer | None",
+        state: MusicState,
+        audio_buf: AudioBuffer | None,
         now: float,
     ) -> Event | None:
         """Return an ``Event("BREAKDOWN_KICK_KILL", ...)`` when the kick band

@@ -3,9 +3,9 @@
 
 Picks the active ``GenreProfile`` from the features ALREADY computed each tick —
 stabilized BPM + band shares (sub/low/mid/high) + crest factor — by scoring
-nearest-match across the profile library. Pure numpy on existing features: no
-CLAP/MERT/OpenL3, no new heavy deps, zero per-tick API cost (Critical
-Constraint 6 + [[feedback_no_clap_use_gemini_embedding]]).
+nearest-match across the profile library. Pure numpy on existing live-tick
+features: no heavy embedding models in the realtime DSP loop, no new heavy deps,
+zero per-tick API cost. Library-level CLAP embeddings live outside this detector.
 
 Anti-slop ([[project_anti_slop_grounded_gemini_thesis]]) is non-negotiable:
 

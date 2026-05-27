@@ -56,7 +56,8 @@ CI fallback: WebView2-only on Win runners + manual Mac walk (50a).
 
 ## Pin
 
-- `@playwright/test==1.50.x` per `.planning/research/STACK.md` § Bucket 4
-- `pixelmatch==7.1.0` per same
+- `@playwright/test==1.50.x` per the UI package lock; historical basis archived
+  at `.planning/archive/2026-05-27-stale-stack-research/STACK.md` § Bucket 4
+- `pixelmatch==7.1.0` per the same archived baseline
 - `maxDiffPixelRatio: 0.02` — REQ E2E-03 verbatim
 - `tauri-plugin-playwright==0.1.0` — accepted-maturity scaffold per PITFALLS § 8

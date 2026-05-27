@@ -7,8 +7,8 @@ pins the specific anti-slop substrings that paraphrasing would lose.
 
 (Pre-2026-05-19 these tests pinned byte-equality against
 ``cohost_v4.py``. v4 has been retired into
-``.planning/research/v3-shipped/`` — the persona's source of truth is
-now ``vibemix/agent/persona.py`` itself.)
+``.planning/archive/2026-05-27-stale-v2-v3-research/v3-shipped/``; the
+persona's source of truth is now ``vibemix/agent/persona.py`` itself.)
 """
 
 from __future__ import annotations

@@ -78,7 +78,7 @@ class PhraseBoundaryDetector:
     anything other than ``detect()``.
     """
 
-    def __init__(self, kill_detector: "BreakdownKickKillDetector | None" = None) -> None:
+    def __init__(self, kill_detector: BreakdownKickKillDetector | None = None) -> None:
         # Optional dep — None is valid (Plan 05's GenreRouter MAY pass None
         # for genres where kick-kill self-correction isn't relevant).
         self.kill_detector = kill_detector
@@ -100,8 +100,8 @@ class PhraseBoundaryDetector:
 
     def detect(
         self,
-        state: "MusicState",
-        audio_buf: "AudioBuffer | None",
+        state: MusicState,
+        audio_buf: AudioBuffer | None,
         now: float,
     ) -> Event | None:
         """Return an ``Event("PHRASE_BOUNDARY", ...)`` when a downbeat closes

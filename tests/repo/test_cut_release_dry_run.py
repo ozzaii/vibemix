@@ -24,7 +24,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CUT_RELEASE = REPO_ROOT / "scripts" / "launch" / "cut_release.sh"
 

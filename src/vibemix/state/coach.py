@@ -157,7 +157,7 @@ VOCABULARY_RECALL_FRAGMENT_TPL: str = (
 
 def recall_fragment_for_event(
     ev: Event,
-    recall_moments: "list[Record] | None",
+    recall_moments: list[Record] | None,
 ) -> str:
     """Phase 66 (COPILOT-01/02) — dispatch the right recall fragment
     template for the event type, or return ``""`` on cold/empty input.
@@ -258,7 +258,7 @@ class AICoach:
         state: MusicState,
         *,
         registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None = None,
-        recall_moments: "list[Record] | None" = None,
+        recall_moments: list[Record] | None = None,
     ) -> str:
         """Build the grounded-state evidence string for the AI prompt.
 
@@ -731,7 +731,7 @@ class AICoach:
         ev: Event,
         *,
         registry_snapshot: dict[str, dict[str, tuple[float, ...]]] | None = None,
-        recall_moments: "list[Record] | None" = None,
+        recall_moments: list[Record] | None = None,
         diet: bool = False,
     ) -> str:
         """Format the per-event prompt body.

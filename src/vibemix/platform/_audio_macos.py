@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Concrete ``AudioBackend`` impl for macOS.
 
-Owns all sounddevice / scipy imports — the Phase 1 platform firewall keeps these
+Owns all sounddevice / resampler imports — the Phase 1 platform firewall keeps these
 out of `vibemix.platform.audio` (the typing-only Protocol module). Wires the v4
 stream factories (cohost_v4.py:855-947 + 1895-1908) into a class that satisfies
 the Phase 1 Protocol firewall.
@@ -59,9 +59,9 @@ def assert_device_sample_rate(device_index: int, expected: int) -> None:
     # Best-effort auto-fix failed — fall back to opening Audio MIDI Setup
     # so the user lands one click from the right device.
     try:
-        import subprocess  # noqa: PLC0415
+        import subprocess
 
-        subprocess.Popen(  # noqa: S607
+        subprocess.Popen(
             ["open", "-a", "Audio MIDI Setup"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -343,9 +343,9 @@ class AudioMacOS:
         callback so it sees the source rate (it pulls source-rate bytes
         from PlaybackQueue) while the OS sees device-rate audio (we
         upsample by integer N via ``np.repeat`` — sample-and-hold, no
-        scipy needed, fine for monophonic voice).
+        general resampler needed, fine for monophonic voice).
         """
-        import numpy as np  # noqa: PLC0415
+        import numpy as np
 
         info = sd.query_devices(device_index)
         device_sr = int(info["default_samplerate"])
@@ -383,11 +383,11 @@ class AudioMacOS:
 
             wrapped = upsampling_wrapper
         else:
-            # Non-integer ratio (e.g. 44100/24000) — use scipy resample_poly
-            # so the user isn't forced to flip Audio MIDI Setup.
-            from math import gcd  # noqa: PLC0415
+            # Non-integer ratio (e.g. 44100/24000) — resample so the user
+            # isn't forced to flip Audio MIDI Setup.
+            from math import gcd
 
-            from scipy.signal import resample_poly  # noqa: PLC0415
+            from vibemix.audio.resample import resample_audio
 
             g = gcd(device_sr, sample_rate)
             up = device_sr // g
@@ -408,7 +408,9 @@ class AudioMacOS:
 
                 callback(_SrcView(), src_frames, time_info, status)
                 src_arr = np.frombuffer(src_bytes, dtype=np.int16).astype(np.float32)
-                out_f = resample_poly(src_arr, up, down)
+                out_f = resample_audio(
+                    src_arr, source_sr=sample_rate, target_sr=device_sr
+                )
                 out_i = np.clip(out_f, -32768, 32767).astype(np.int16)
                 # Pad or trim to exact frame count expected by sd.
                 if len(out_i) < frames:

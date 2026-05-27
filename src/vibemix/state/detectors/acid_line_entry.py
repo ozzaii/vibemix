@@ -77,8 +77,8 @@ class AcidLineEntryDetector:
 
     def detect(
         self,
-        state: "MusicState",
-        audio_buf: "AudioBuffer | None",
+        state: MusicState,
+        audio_buf: AudioBuffer | None,
         now: float,
     ) -> Event | None:
         """Return ``Event("ACID_LINE_ENTRY", ...)`` on combined sweep + Q rise."""

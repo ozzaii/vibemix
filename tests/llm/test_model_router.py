@@ -6,9 +6,12 @@ These tests pin the router contract:
 - ``resolve(path)`` returns a ``(model_id, ServiceTier | None)`` tuple per
   the locked router-paths table in 41-01-PLAN.md.
 - Live coach + live-coach TTS dispatch to ``ServiceTier.STANDARD`` (LAT-07).
-- Debrief / library / embedding dispatch to ``ServiceTier.FLEX``.
-- The OpenRouter TTS path returns the namespaced ``google/gemini-*`` id and
-  a ``None`` tier sentinel (it is not a Gemini-API call).
+- Debrief / library / legacy embedding dispatch to ``ServiceTier.FLEX``.
+- The ``embedding`` route remains only for the old Gemini cache/migration
+  helper; product library embeddings are local CLAP ONNX and do not use this
+  router path.
+- The OpenRouter paths return namespaced ``google/gemini-*`` ids and a
+  ``None`` tier sentinel (they are not Gemini-API calls).
 - Unknown paths raise ``RouterPathError`` and the message lists every valid
   path so the caller can self-diagnose.
 - ``ROUTER_PATHS`` is a frozen ``tuple`` (defensive against mutation).
@@ -22,7 +25,6 @@ import pytest
 from google.genai.types import ServiceTier
 
 from vibemix.llm.model_router import ROUTER_PATHS, RouterPathError, resolve
-
 
 # ---------------------------------------------------------------------------
 # GA path × tier assertions
@@ -41,7 +43,7 @@ from vibemix.llm.model_router import ROUTER_PATHS, RouterPathError, resolve
 def test_resolve_ga_paths(
     path: str, expected_model: str, expected_tier: ServiceTier
 ) -> None:
-    """Four canonical GA paths × tier dispatch (CONTEXT.md locked table)."""
+    """Canonical Gemini API paths x tier dispatch (legacy embedding included)."""
     model, tier = resolve(path)
     assert model == expected_model
     assert tier == expected_tier
@@ -58,6 +60,13 @@ def test_resolve_openrouter_tts_returns_namespaced_id_and_none_tier() -> None:
     """OpenRouter TTS is not a Gemini-API call — sentinel None tier."""
     model, tier = resolve("live_coach_tts_openrouter")
     assert model == "google/gemini-3.1-flash-tts-preview"
+    assert tier is None
+
+
+def test_resolve_openrouter_live_coach_returns_namespaced_id_and_none_tier() -> None:
+    """OpenRouter brain is not a Gemini-API call — sentinel None tier."""
+    model, tier = resolve("live_coach_openrouter")
+    assert model == "google/gemini-3.5-flash"
     assert tier is None
 
 
@@ -80,18 +89,19 @@ def test_router_path_error_is_keyerror_subclass() -> None:
 def test_router_paths_is_frozen_tuple() -> None:
     """ROUTER_PATHS is a tuple (not list) — defensive against mutation."""
     assert isinstance(ROUTER_PATHS, tuple)
-    # The router-paths table in 41-01-PLAN.md shipped 8 keys; the Viber agent
-    # (2026-05-25) added `library_agent` → 9.
+    # The Library/Viber agent is local Codex now, so no Gemini `library_agent`
+    # route remains. OpenRouter live-coach/TTS aliases are the only non-SDK
+    # routes.
     assert len(ROUTER_PATHS) == 9
     expected = {
         "live_coach",
+        "live_coach_openrouter",
         "live_coach_tts",
         "live_coach_tts_fallback",
         "live_coach_tts_openrouter",
         "debrief",
         "debrief_tts",
         "library_auto_tag",
-        "library_agent",
         "embedding",
     }
     assert set(ROUTER_PATHS) == expected

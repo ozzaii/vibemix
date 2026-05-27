@@ -22,9 +22,9 @@ def test_debrief_tts_model_matches_router() -> None:
     assert DEBRIEF_TTS_MODEL == resolve("debrief_tts")[0]
 
 
-def test_debrief_tldr_model_is_3_pro_preview() -> None:
-    """Smoke: the resolved id still equals the locked Wave-0-A1 id."""
-    assert DEBRIEF_TLDR_MODEL == "gemini-3-pro-preview"
+def test_debrief_tldr_model_is_3_5_flash() -> None:
+    """Smoke: the resolved id follows the current debrief router SKU."""
+    assert DEBRIEF_TLDR_MODEL == "gemini-3.5-flash"
 
 
 def test_debrief_tts_model_is_3_flash_tts_preview() -> None:

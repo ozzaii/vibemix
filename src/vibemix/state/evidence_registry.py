@@ -52,7 +52,8 @@ import collections
 import re
 import sys
 import threading
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover — type-only import
     from vibemix.library.rekordbox import RekordboxLibrary
@@ -214,6 +215,7 @@ class EvidenceRegistry:
         self._debounce_s: float = mutation_debounce_s
         self._min_interval_s: float = min_refresh_interval_s
         self._pending_refresh_handle: asyncio.TimerHandle | None = None
+        self._refresh_task: asyncio.Task[None] | None = None
         self._last_refresh_at: float | None = None
 
     # --- writes ---------------------------------------------------------- #
@@ -447,7 +449,7 @@ class EvidenceRegistry:
         def _fire() -> None:
             self._pending_refresh_handle = None
             self._last_refresh_at = loop.time()
-            asyncio.create_task(self._run_callback())
+            self._refresh_task = asyncio.create_task(self._run_callback())
 
         self._pending_refresh_handle = loop.call_later(delay, _fire)
 

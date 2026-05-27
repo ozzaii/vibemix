@@ -32,7 +32,6 @@ from dataclasses import dataclass, field
 
 import psutil
 
-
 # ---------------------------------------------------------------------------
 # Underrun classification — pure, observes the real PlaybackQueue.pull() bytes.
 # ---------------------------------------------------------------------------

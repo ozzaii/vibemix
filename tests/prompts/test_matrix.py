@@ -204,6 +204,40 @@ def test_prompt_01_default_dispatch_is_intermediate_hype() -> None:
     assert "[ev:" in out
 
 
+def test_hype_prompt_does_not_reference_removed_phase_field() -> None:
+    """The live prompt must not teach Gemini to trust a raw phase= field.
+
+    ``AICoach.evidence_line`` intentionally exposes phase_age/phase_history but
+    not ``phase=``. Mentioning the removed field re-primes old hallucinations.
+    """
+    out = build_system_instruction(
+        "intermediate",
+        "hype",
+        include_citation_grammar=False,
+        include_listening_fallback=False,
+        include_tag_dsl=False,
+    )
+
+    assert not re.search(r"\bphase=", out)
+    assert "phase_age" in out
+    assert "phase_history" in out
+
+
+def test_hype_prompt_keeps_latency_safe_variety_rule() -> None:
+    """The main hype prompt must not contradict its own latency guidance."""
+    out = build_system_instruction(
+        "intermediate",
+        "hype",
+        include_citation_grammar=False,
+        include_listening_fallback=False,
+        include_tag_dsl=False,
+    )
+
+    assert "Don't make every reaction past-tense" not in out
+    assert "present-tense claims" in out
+    assert "past-tense or timeless fragments" in out
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher correctness
 # ---------------------------------------------------------------------------
@@ -710,3 +744,18 @@ def test_prompt_61_coach_routes_calm_only_tts_tags(skill: str) -> None:
     assert "[whisper]" in body, f"coach({skill}) missing calm [whisper] tag"
     assert "[excited]" not in body, f"coach({skill}) leaked hype [excited] tag"
     assert "[fast]" not in body, f"coach({skill}) leaked hype [fast] tag"
+
+
+def test_prompt_62_psy_tripper_overlay_is_not_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("VIBEMIX_PROMPT_OVERLAY", raising=False)
+    body = build_system_instruction("intermediate", "hype")
+    assert "SADECE TÜRKÇE KONUŞ" not in body
+    assert "Respond in English." in body
+
+
+def test_prompt_63_psy_tripper_overlay_is_explicit_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VIBEMIX_PROMPT_OVERLAY", "psy_tripper_tr")
+    body = build_system_instruction("intermediate", "hype")
+    assert "SADECE TÜRKÇE KONUŞ" in body

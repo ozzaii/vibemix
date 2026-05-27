@@ -60,7 +60,7 @@ import shutil
 import wave
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from vibemix.ui_bus.messages import RecordingSummary
 
@@ -142,7 +142,7 @@ def _scandir_size_sum(d: Path) -> int:
     return total
 
 
-def _dir_name_to_iso(dir_name: str) -> Optional[str]:
+def _dir_name_to_iso(dir_name: str) -> str | None:
     """Parse ``YYYYMMDD-HHMMSS`` into an ISO-8601 local-time string.
 
     Returns None if the name doesn't match SESSION_DIR_RE.
@@ -201,7 +201,7 @@ def _count_jsonl_lines(jsonl_path: Path) -> int:
         return 0
 
 
-def _synthesize_legacy_summary(session_dir: Path) -> Optional[RecordingSummary]:
+def _synthesize_legacy_summary(session_dir: Path) -> RecordingSummary | None:
     """Build a RecordingSummary for a legacy (pre-Phase-15) directory.
 
     Falls back when session.json is absent OR malformed. Pitfall 9.
@@ -225,7 +225,7 @@ def _synthesize_legacy_summary(session_dir: Path) -> Optional[RecordingSummary]:
     )
 
 
-def _read_session_summary(session_dir: Path) -> Optional[RecordingSummary]:
+def _read_session_summary(session_dir: Path) -> RecordingSummary | None:
     """Build a RecordingSummary from session.json + a fresh scandir.
 
     Falls back to legacy synth on FileNotFoundError or JSONDecodeError
@@ -372,7 +372,7 @@ class RecordingsIndex:
     # delete
     # ------------------------------------------------------------------
 
-    def delete(self, session_dir_name: str) -> tuple[bool, Optional[str]]:
+    def delete(self, session_dir_name: str) -> tuple[bool, str | None]:
         """Delete ``recordings_root/<session_dir_name>`` if and only if the name
         is safe.
 
@@ -421,7 +421,7 @@ class RecordingsIndex:
 
     def read_events(
         self, session_dir_name: str
-    ) -> tuple[Optional[list[dict]], Optional[str]]:
+    ) -> tuple[list[dict] | None, str | None]:
         """Read ``<recordings_root>/<name>/events.jsonl`` and return parsed records.
 
         Discriminated return:
@@ -496,7 +496,7 @@ def run_retention_sweep(
     recordings_root: Path,
     retention_days: int,
     *,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> RetentionSweepResult:
     """Walk recordings_root and delete dirs older than retention_days.
 
@@ -582,8 +582,8 @@ def run_retention_sweep(
 
 
 __all__ = [
+    "SESSION_DIR_RE",
     "RecordingsIndex",
     "RetentionSweepResult",
-    "SESSION_DIR_RE",
     "run_retention_sweep",
 ]

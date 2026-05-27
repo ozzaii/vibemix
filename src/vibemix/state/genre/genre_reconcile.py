@@ -96,4 +96,4 @@ def reconcile_genre(
     return (dsp_label, dsp_conf)
 
 
-__all__ = ["reconcile_genre", "normalize_embedding_confidence"]
+__all__ = ["normalize_embedding_confidence", "reconcile_genre"]

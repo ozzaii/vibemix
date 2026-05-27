@@ -30,6 +30,10 @@ from typing import Literal
 import jsonschema
 
 from vibemix.ui_bus.schemas.citation import SessionCitationPayload
+from vibemix.ui_bus.schemas.cohost_reaction import (
+    CitationChipPayload,
+    SessionCohostReactionPayload,
+)
 from vibemix.ui_bus.schemas.debrief import (
     ChapterRegionPayload,
     DebriefChapterListPayload,
@@ -54,10 +58,6 @@ from vibemix.ui_bus.schemas.library import (
     LibrarySimilarResultPayload,
     LibraryStalenessActionPayload,
     LibraryStalenessNudgePayload,
-)
-from vibemix.ui_bus.schemas.cohost_reaction import (
-    CitationChipPayload,
-    SessionCohostReactionPayload,
 )
 from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
 from vibemix.ui_bus.schemas.profile import (
@@ -124,7 +124,7 @@ class StatusTickPayload:
     # ``midi`` is the count of connected MIDI inputs; null when the platform
     # backend is unavailable (e.g. mido import failed). minimum: 0 in schema.
     midi: int | None
-    screen: Literal["ok", "denied"]
+    screen: Literal["ok", "denied", "unavailable"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -434,7 +434,7 @@ class StatusTick:
         livekit: Literal["ok", "connecting", "down"],
         gemini: Literal["ok", "down"],
         midi: int | None,
-        screen: Literal["ok", "denied"],
+        screen: Literal["ok", "denied", "unavailable"],
     ) -> StatusTick:
         return cls(
             type="ipc.status.tick",

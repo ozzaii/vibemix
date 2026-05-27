@@ -137,6 +137,9 @@ class MusicState:
     # Track (cross-referenced with audible deck)
     audible_track: str | None = None
     audible_track_confidence: float = 0.0  # 0..1 — feeds into prompt as `(unsure)` flag
+    audible_track_position_s: float | None = None
+    audible_track_duration_s: float | None = None
+    audible_track_position_confidence: float = 0.0
     last_audible_track: str | None = None  # what was audible last refresh (for change detection)
 
     # Recent moves (within last 12s, deck-attributed)

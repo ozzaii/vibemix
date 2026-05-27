@@ -7,8 +7,7 @@ Two pillars of honest-green for the bench harness:
    ``usage_metadata`` namespace with ZERO network (no ``genai.Client``, no
    ``GEMINI_API_KEY``, no socket). ``_RaisingClient`` raises a fake 429 so
    Plan 02's per-cell fail-safe (Pitfall 2: a 429 must NOT abort the sweep)
-   can be driven offline. The call shape mirrors
-   ``/tmp/truthtest/run_test.py`` + ``library/agent.py:_gemini_call``:
+   can be driven offline. The call shape mirrors the Gemini SDK boundary:
    ``client.models.generate_content(model=, contents=, config=)`` where
    ``.models`` is the client itself.
 

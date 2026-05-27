@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """OpenRouter LLM path — OpenAI-compat streaming adapter for the live coach.
 
-2026-05-21 (Kaan): the brain (gemini-3.5-flash) was 503ing on the direct
-Gemini free tier. OpenRouter serves the same model with its own quota AND
+2026-05-21 (Kaan): the live-coach brain was 503ing on the direct Gemini
+free tier. OpenRouter serves the router-selected model with its own quota AND
 accepts inline audio (verified: ``scripts/_probe_or_audio.py`` → Gemini
 heard "Kick, lead, texture." through OpenRouter's ``input_audio`` parts).
 
@@ -13,16 +13,17 @@ google.genai stream chunks (``.text`` + ``.usage_metadata``) — so
 ``DJCoHostAgent.llm_node`` consumes either source through the SAME loop with
 no downstream change (speculative-head, citation lint, slop gate all intact).
 
-The 3.5-flash reasoning trap (probe finding): with a tiny token budget the
-model spent the whole budget on hidden reasoning and returned empty content.
+Probe finding: with a tiny token budget the live model spent the whole budget
+on hidden reasoning and returned empty content.
 Mitigated by (a) a generous ``max_tokens`` and (b) ``reasoning.effort=low``
 so Gemini keeps thinking minimal and leaves budget for the actual reply.
 """
 from __future__ import annotations
 
 import base64
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, AsyncIterator
+from typing import Any
 
 from openai import AsyncOpenAI
 

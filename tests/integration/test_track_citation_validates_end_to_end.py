@@ -13,9 +13,9 @@ the real classes (no shim mocks of the registry / linter).
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 
@@ -60,9 +60,8 @@ def test_drag_drop_xml_then_live_track_citation_validates(
     # 3. Grounding fires on TRACK_CHANGE with a stubbed embedder + store
     #    that returns t000 with cosine 0.85 (above CITATION_THRESHOLD).
     fake_embedder = MagicMock()
-    fake_embedder._client = MagicMock()
-    fake_embedder._client.models.embed_content.return_value = SimpleNamespace(
-        embeddings=[SimpleNamespace(values=[0.1] * EMBEDDING_DIM)]
+    fake_embedder.embed_audio_bytes.return_value = np.full(
+        (EMBEDDING_DIM,), 0.1, dtype=np.float32
     )
     fake_store = MagicMock()
     fake_store.search.return_value = [("t000", 0.85)]

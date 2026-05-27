@@ -8,6 +8,7 @@ from vibemix.agent.config import (
     INPUT_DEVICE,
     LLM_MODEL,
     MIC_DEVICE,
+    OPENROUTER_LLM_MODEL,
     OPENROUTER_TTS_MODEL,
     OUTPUT_DEVICE,
     TTS_FALLBACK_MODEL,
@@ -20,13 +21,15 @@ def test_config_01_constants_pinned() -> None:
     """CONFIG-01: agent constants are pinned to the current shipped values.
 
     Originally byte-identity to cohost_v4.py was the contract. v4 was
-    retired into ``.planning/research/v3-shipped/`` once its behavior had
-    been ported into this package, so the test now pins the
+    retired into
+    ``.planning/archive/2026-05-27-stale-v2-v3-research/v3-shipped/`` once its
+    behavior had been ported into this package, so the test now pins the
     package-side source of truth directly. Device defaults are settable
     per-machine via the calibration wizard; the strings here are the
     factory values.
     """
     assert LLM_MODEL == "gemini-3.5-flash"
+    assert OPENROUTER_LLM_MODEL == "google/gemini-3.5-flash"
     assert TTS_MODEL == "gemini-3.1-flash-tts-preview"
     assert TTS_FALLBACK_MODEL == "gemini-2.5-flash-preview-tts"
     assert OPENROUTER_TTS_MODEL == "google/gemini-3.1-flash-tts-preview"
@@ -143,6 +146,13 @@ def test_41_01_openrouter_tts_model_matches_router() -> None:
     import vibemix.agent.tts_chain  # noqa: F401 — module-load side effect
 
     assert OPENROUTER_TTS_MODEL in openai_tts_mod.AUDIO_STREAM_MODELS
+
+
+def test_openrouter_llm_model_matches_router() -> None:
+    """OPENROUTER_LLM_MODEL is router-derived (live_coach_openrouter path)."""
+    from vibemix.llm.model_router import resolve
+
+    assert OPENROUTER_LLM_MODEL == resolve("live_coach_openrouter")[0]
 
 
 def test_41_01_live_coach_service_tier_exposed() -> None:

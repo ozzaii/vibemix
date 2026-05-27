@@ -1,17 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 27-02 — cited-relevance pure-logic tests + cost-guard verification.
+"""Phase 27-02 — cited-relevance pure-logic tests.
 
-No API calls; tests for the API-backed path are deferred to a cassette-
-backed integration suite (KAAN-ACTION-LEGAL.md tracks cassette generation).
+No API calls; cited relevance is now a deterministic local token-cosine metric.
 """
 
 from __future__ import annotations
 
-import numpy as np
+import asyncio
 
+import numpy as np
 from scripts.eval.cited_relevance import (
     MIN_STRIPPED_WORDS,
     cosine,
+    relevance_score,
     strip_citations,
 )
 
@@ -95,3 +96,23 @@ def test_long_response_after_strip_passes_threshold() -> None:
     )
     stripped = strip_citations(long).strip()
     assert len(stripped.split()) >= MIN_STRIPPED_WORDS
+
+
+def test_relevance_score_uses_local_metric_without_client() -> None:
+    class ExplodingClient:
+        @property
+        def models(self):  # pragma: no cover - should never be touched
+            raise AssertionError("relevance_score must not call a cloud embed API")
+
+    response = (
+        "The mid kicks just dropped and the room energy is rising fast "
+        "[ev:DROP@1]."
+    )
+    evidence = "mid kicks dropped with rising room energy"
+    score = asyncio.run(relevance_score(response, evidence, ExplodingClient()))
+    assert 0.5 < score <= 1.0
+
+
+def test_relevance_score_short_response_returns_zero_without_client() -> None:
+    score = asyncio.run(relevance_score("Yeah [ev:DROP@1].", "drop energy", object()))
+    assert score == 0.0

@@ -57,8 +57,8 @@ class KickDensityShiftDetector:
 
     def detect(
         self,
-        state: "MusicState",
-        audio_buf: "AudioBuffer | None",
+        state: MusicState,
+        audio_buf: AudioBuffer | None,
         now: float,
     ) -> Event | None:
         """Return an ``Event("KICK_DENSITY_SHIFT", ...)`` on regime jumps,

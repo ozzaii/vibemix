@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""OpenRouter-primary TTS chain with module-load monkey-patch + factory.
+"""Gemini-native TTS chain with optional OpenRouter standby + factory.
 
 Verbatim port of cohost_v4.py:62-66 (monkey-patch) + cohost_v4.py:1991-2017
-(factory body). Phase 5 extends build_tts_chain with `mode` dispatch — direct
-mode preserves the Phase 4 byte-identical behavior; proxy mode routes to
+(factory body). Phase 5 extends build_tts_chain with `mode` dispatch. Direct
+mode uses Gemini native TTS first; proxy mode routes to
 `build_proxy_tts_chain` (single-entry chain via openai_plugin.TTS pointed at
 the proxy's /v1).
 
@@ -29,7 +29,7 @@ from livekit.plugins.openai import tts as _openai_tts_mod
 # load-order invariant (monkey-patch before any openai_plugin.TTS init) is
 # preserved — `vibemix.agent.config` is import-safe and triggers no plugin
 # instantiation.
-from vibemix.agent.config import (  # noqa: E402
+from vibemix.agent.config import (
     OPENROUTER_TTS_MODEL,
     TTS_FALLBACK_MODEL,
     TTS_MODEL,
@@ -41,25 +41,48 @@ from vibemix.agent.config import (  # noqa: E402
 # Source string is the router-derived OPENROUTER_TTS_MODEL — never inline.
 _openai_tts_mod.AUDIO_STREAM_MODELS.add(OPENROUTER_TTS_MODEL)
 
-from livekit.plugins.google.beta import gemini_tts as gemini_native_tts  # noqa: E402
+from vibemix.agent._livekit_google_slim import gemini_native_tts_class  # noqa: E402
 
 _TTS_INSTRUCTIONS = "Casual studio friend, brief, natural — no theatrics, no announcer voice."
 
 
 def _build_direct_chain(
-    gemini_api_key: str, openrouter_api_key: str | None
+    gemini_api_key: str,
+    openrouter_api_key: str | None,
+    *,
+    openrouter_enabled: bool = False,
 ) -> agents_tts.FallbackAdapter:
-    """Phase 4 verbatim — port of v4:1991-2017.
+    """Build the direct TTS chain.
 
     Returns a FallbackAdapter:
-        primary (OpenRouter)  -> secondary (Gemini native TTS_MODEL)
-                              -> tertiary (Gemini native TTS_FALLBACK_MODEL).
+        primary (Gemini native TTS_MODEL)
+          -> secondary (Gemini native TTS_FALLBACK_MODEL)
+          -> optional tertiary (OpenRouter standby).
 
-    When ``openrouter_api_key`` is None or empty, the OpenRouter entry is
-    omitted and the chain starts at the secondary.
+    OpenRouter is no longer enabled just because ``OPENROUTER_API_KEY`` is
+    present. A credit-exhausted OpenRouter account can otherwise block every
+    spoken turn before native Gemini TTS gets a chance to run. Keep it as an
+    explicit standby via ``openrouter_enabled``.
     """
     chain: list = []
-    if openrouter_api_key:
+    gemini_tts = gemini_native_tts_class()
+    chain.append(
+        gemini_tts(
+            model=TTS_MODEL,
+            voice_name=VOICE,
+            api_key=gemini_api_key,
+            instructions=_TTS_INSTRUCTIONS,
+        )
+    )
+    chain.append(
+        gemini_tts(
+            model=TTS_FALLBACK_MODEL,
+            voice_name=VOICE,
+            api_key=gemini_api_key,
+            instructions=_TTS_INSTRUCTIONS,
+        )
+    )
+    if openrouter_enabled and openrouter_api_key:
         chain.append(
             openai_plugin.TTS(
                 model=OPENROUTER_TTS_MODEL,
@@ -70,22 +93,6 @@ def _build_direct_chain(
                 instructions=_TTS_INSTRUCTIONS,
             )
         )
-    chain.append(
-        gemini_native_tts.TTS(
-            model=TTS_MODEL,
-            voice_name=VOICE,
-            api_key=gemini_api_key,
-            instructions=_TTS_INSTRUCTIONS,
-        )
-    )
-    chain.append(
-        gemini_native_tts.TTS(
-            model=TTS_FALLBACK_MODEL,
-            voice_name=VOICE,
-            api_key=gemini_api_key,
-            instructions=_TTS_INSTRUCTIONS,
-        )
-    )
     return agents_tts.FallbackAdapter(tts=chain, max_retry_per_tts=1)
 
 
@@ -93,13 +100,14 @@ def build_tts_chain(
     *,
     gemini_api_key: str | None = None,
     openrouter_api_key: str | None = None,
+    openrouter_enabled: bool = False,
     mode: Literal["direct", "proxy"] = "direct",
     proxy_base_url: str | None = None,
     jwt: str | None = None,
 ) -> agents_tts.FallbackAdapter:
     """Factory entry — dispatches on mode.
 
-    direct: requires gemini_api_key (openrouter_api_key optional).
+    direct: requires gemini_api_key (OpenRouter standby is explicit opt-in).
     proxy:  requires proxy_base_url AND jwt.
 
     Per CONTEXT decision (locked): missing required args raise ValueError
@@ -108,7 +116,11 @@ def build_tts_chain(
     if mode == "direct":
         if not gemini_api_key:
             raise ValueError("direct mode requires gemini_api_key")
-        return _build_direct_chain(gemini_api_key, openrouter_api_key)
+        return _build_direct_chain(
+            gemini_api_key,
+            openrouter_api_key,
+            openrouter_enabled=openrouter_enabled,
+        )
     if mode == "proxy":
         missing: list[str] = []
         if not proxy_base_url:

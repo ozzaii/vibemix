@@ -6,7 +6,7 @@ A pure storage layer over a per-install ``memory.db``: embedded session
 guarantees as ``vibemix.library`` (sqlite-vec primary, numpy fallback, ranking
 through the shared ``cosine_topk`` chokepoint). It imports nothing from the
 live reaction path and makes no generation-model call — the store's only model
-call is the embedding call (via the reused ``LibraryEmbedder``).
+call is the injected product embedder's local CLAP query embedding.
 
 Public surface:
     ``from vibemix.memory import MemoryStore, open_memory_store, Record``

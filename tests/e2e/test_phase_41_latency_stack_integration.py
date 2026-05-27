@@ -62,7 +62,6 @@ from vibemix.llm.thinking_gate import LiveCoachConfigError, validate_live_config
 from vibemix.runtime.llm_to_tts_delta_meter import LLMToTTSDeltaMeter
 from vibemix.state.evidence_registry import EvidenceRegistry
 
-
 # ---------------------------------------------------------------------------
 # Shared test fixtures
 # ---------------------------------------------------------------------------
@@ -91,7 +90,7 @@ def spy_recorder() -> _SpyRecorder:
 
 
 def test_router_resolves_all_paths() -> None:
-    """All 8 router paths resolve to the locked SKU + tier per CONTEXT.md.
+    """All router paths resolve to the locked SKU + tier per CONTEXT.md.
 
     Wave 1 + 2 plans depend on this seam — any path that fails to resolve
     or returns the wrong tier is a phase-level integration regression.
@@ -99,6 +98,7 @@ def test_router_resolves_all_paths() -> None:
     # Path × (model, tier) — CONTEXT.md table mirror.
     expected: dict[str, tuple[str, ServiceTier | None]] = {
         "live_coach": ("gemini-3.5-flash", ServiceTier.STANDARD),
+        "live_coach_openrouter": ("google/gemini-3.5-flash", None),
         "live_coach_tts": ("gemini-3.1-flash-tts-preview", ServiceTier.STANDARD),
         "live_coach_tts_fallback": (
             "gemini-2.5-flash-preview-tts",
@@ -108,13 +108,11 @@ def test_router_resolves_all_paths() -> None:
             "google/gemini-3.1-flash-tts-preview",
             None,
         ),
-        "debrief": ("gemini-3-pro-preview", ServiceTier.FLEX),
+        "debrief": ("gemini-3.5-flash", ServiceTier.FLEX),
         "debrief_tts": ("gemini-3-flash-tts-preview", ServiceTier.FLEX),
-        "library_auto_tag": ("gemini-3-flash-preview", ServiceTier.FLEX),
-        # Viber curator agent (2026-05-25) — same Flash SKU/FLEX tier as
-        # the other library-side paths; added to ROUTER_PATHS + _ROUTES when
-        # the agent shipped, this expected-table mirror trailed behind.
-        "library_agent": ("gemini-3-flash-preview", ServiceTier.FLEX),
+        "library_auto_tag": ("gemini-3.5-flash", ServiceTier.FLEX),
+        # Legacy Gemini cache/migration helper only. Product library embeddings
+        # use local CLAP ONNX/512 via embed_factory.
         "embedding": ("gemini-embedding-2", ServiceTier.FLEX),
     }
     # Sanity — ROUTER_PATHS and _ROUTES agree.
@@ -527,7 +525,7 @@ def test_embedding_probe_runs_at_boot_and_logs(
     # Simulate the GA-renamed candidate succeeding (first tuple entry).
     ga_renamed = GEMINI_EMBEDDING_MODEL_GA_CANDIDATES[0]
     client = _FakeEmbedClient(succeed_on=ga_renamed)
-    model_id, version = _probe_ga_model_id(client, recorder=spy_recorder)
+    model_id, _version = _probe_ga_model_id(client, recorder=spy_recorder)
 
     assert model_id == ga_renamed
     # Recorder captured exactly one embedding_model_probe event.
@@ -615,8 +613,9 @@ def test_lookahead_provider_imports_cleanly() -> None:
     Phase 41 changes. The Part-3 audio attach is exercised by Phase 40
     tests; this is a pure import-graph sanity check at the integration
     boundary (Pitfall A7 — `vibemix.llm` doesn't break agent.config)."""
-    from vibemix.audio.lookahead import LookaheadProvider  # noqa: F401
-    from vibemix.agent.config import LLM_MODEL  # noqa: F401
+    from vibemix.agent.config import LLM_MODEL
+    from vibemix.audio.lookahead import LookaheadProvider
 
     # No assertion needed beyond the import succeeding — that's the surface.
     assert LookaheadProvider is not None
+    assert LLM_MODEL

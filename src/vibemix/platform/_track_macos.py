@@ -21,6 +21,7 @@ Phase boundary:
 from __future__ import annotations
 
 import asyncio
+import json
 import shutil
 import subprocess
 import sys
@@ -43,6 +44,9 @@ class TrackInfo:
         self.title: str = ""
         self.prev_title: str = ""
         self.title_changed_at: float = 0.0
+        self.duration_sec: float | None = None
+        self.position_sec: float | None = None
+        self.playback_rate: float = 1.0
         self._cli = shutil.which("nowplaying-cli") or "/opt/homebrew/bin/nowplaying-cli"
 
     def poll_once(self) -> None:
@@ -67,11 +71,43 @@ class TrackInfo:
         title = out[0].strip() if len(out) > 0 else ""
         artist = out[1].strip() if len(out) > 1 else ""
         full = f"{artist} - {title}" if (artist and title) else title
+        raw = self._poll_raw()
+        position_sec = _float_or_none(
+            raw.get("kMRMediaRemoteNowPlayingInfoElapsedTime") if raw else None
+        )
+        duration_sec = _float_or_none(
+            raw.get("kMRMediaRemoteNowPlayingInfoDuration") if raw else None
+        )
+        playback_rate = _float_or_none(
+            raw.get("kMRMediaRemoteNowPlayingInfoPlaybackRate") if raw else None
+        )
         with self._lock:
             if full and full != self.title:
                 self.prev_title = self.title
                 self.title = full
                 self.title_changed_at = time.time()
+            if raw is not None:
+                self.position_sec = position_sec
+                self.duration_sec = duration_sec
+                self.playback_rate = playback_rate if playback_rate is not None else 1.0
+
+    def _poll_raw(self) -> dict | None:
+        try:
+            out = subprocess.check_output(
+                [self._cli, "get-raw"],
+                timeout=1.5,
+                stderr=subprocess.DEVNULL,
+            )
+            raw = json.loads(out)
+            return {k: v for k, v in raw.items() if "art" not in k.lower()}
+        except (
+            subprocess.TimeoutExpired,
+            subprocess.CalledProcessError,
+            FileNotFoundError,
+            OSError,
+            json.JSONDecodeError,
+        ):
+            return None
 
     def snapshot(self) -> dict:
         with self._lock:
@@ -79,6 +115,9 @@ class TrackInfo:
                 "title": self.title,
                 "prev_title": self.prev_title,
                 "title_changed_at": self.title_changed_at,
+                "duration_sec": self.duration_sec,
+                "position_sec": self.position_sec,
+                "playback_rate": self.playback_rate,
             }
 
 
@@ -121,8 +160,8 @@ class TrackMacOS:
             title=title,
             artist=None,
             album=None,
-            duration_sec=None,
-            position_sec=None,
+            duration_sec=snap.get("duration_sec"),
+            position_sec=snap.get("position_sec"),
         )
 
     async def run_poll_loop(self, stop_event: asyncio.Event) -> None:
@@ -134,3 +173,10 @@ class TrackMacOS:
             except Exception as e:
                 print(f"[track poll err] {e}", file=sys.stderr)
             await asyncio.sleep(1.0)
+
+
+def _float_or_none(raw: object) -> float | None:
+    try:
+        return float(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None

@@ -22,14 +22,14 @@ from vibemix.coach.prompt_fragments import FAIL_SOFT_EXAMPLES, IM_LISTENING_FRAG
 from vibemix.coach.stripped_rate import StrippedRateTracker
 
 __all__ = [
-    "CitationIpcShim",
-    "CitationLinter",
     "DEBRIEF_TOLERANCE_S",
     "FAIL_SOFT_EXAMPLES",
     "IM_LISTENING_FRAGMENT",
     "LIVE_TOLERANCE_S",
-    "LintResult",
     "STRIPPED_RATE_THRESHOLD",
     "STRIPPED_RATE_WINDOW_S",
+    "CitationIpcShim",
+    "CitationLinter",
+    "LintResult",
     "StrippedRateTracker",
 ]

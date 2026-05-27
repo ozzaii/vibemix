@@ -99,7 +99,7 @@ class EventDetector:
 
     def __init__(
         self,
-        audio_buf: "AudioBuffer | None" = None,
+        audio_buf: AudioBuffer | None = None,
         *,
         evidence_registry: EvidenceRegistry | None = None,
         harmonic_clash_enabled: bool = False,
@@ -151,6 +151,15 @@ class EventDetector:
         # even with a fully-resolved clashing deck pair. The kwarg shape mirrors
         # ``vision_enabled`` so a caller / test flips it without monkeypatching.
         self._harmonic_clash_enabled = bool(harmonic_clash_enabled)
+
+    def attach_evidence_registry(self, evidence_registry: EvidenceRegistry | None) -> None:
+        """Post-construction wiring for live runtime evidence registration.
+
+        ``main()`` builds the detector before the registry exists, then attaches
+        the shared registry before the coach loop starts. Passing ``None`` keeps
+        the historical no-registry path intact for tests and standalone callers.
+        """
+        self._registry = evidence_registry
 
     def _cooldown_ok(self, ev_type: str, now: float) -> bool:
         gap = MIN_EVENT_GAP_PER_TYPE.get(ev_type, EVENT_GLOBAL_MIN_GAP)

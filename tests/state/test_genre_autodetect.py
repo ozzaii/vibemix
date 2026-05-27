@@ -3,8 +3,8 @@
 
 Pins the central directive: a pure-numpy detector that picks the active profile
 from the features ALREADY computed each tick (stabilized BPM + band shares +
-crest factor), scoring nearest-match across ``list_profiles()`` — no CLAP/MERT,
-no new heavy deps.
+crest factor), scoring nearest-match across ``list_profiles()`` — no heavy
+embedding models in the realtime DSP loop, no new heavy deps.
 
 Anti-slop (non-negotiable, [[project_anti_slop_grounded_gemini_thesis]]):
 - confidence gate + ``unknown`` fallback — NEVER a false-confident guess;
@@ -23,7 +23,6 @@ import pytest
 from vibemix.state.genre import list_profiles, load_profile
 from vibemix.state.genre.genre_autodetect import (
     GENRE_CONFIDENCE_MIN,
-    GENRE_TIE_MARGIN,
     GenreHysteresis,
     apply_genre_hysteresis,
     is_auto_enabled,
@@ -230,11 +229,10 @@ def test_set_auto_enabled_toggles():
 
 
 def _drive_tick_with_forced_genre(monkeypatch, forced=("psytrance", 0.9)):
+    from tests.state.test_refresh import _audible_buf, _ctrl_mock, _track_mock
     from vibemix.state import MusicState
     from vibemix.state.genre import set_active_profile
     from vibemix.state.refresh import _tick_once
-
-    from tests.state.test_refresh import _audible_buf, _ctrl_mock, _track_mock
 
     # Pin the active profile to techno (the "wrong" profile for psy audio).
     set_active_profile("techno")

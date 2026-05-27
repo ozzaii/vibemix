@@ -170,6 +170,7 @@ class SessionLoop:
         levels: _LevelsHook | None = None,
         playback_queue: _PlaybackQueueHook | None = None,
         controller_state: _ControllerStateHook | None = None,
+        screen_available: bool | None = None,
         recordings_root: Path | None = None,
         active_recorder: object | None = None,
         evidence_registry: object | None = None,
@@ -185,6 +186,7 @@ class SessionLoop:
         self.levels = levels
         self.playback_queue = playback_queue
         self.controller_state = controller_state
+        self.screen_available = screen_available
         self.recordings_root = recordings_root
         # Phase 15 Plan 02 — `active_recorder` is the live VoiceRecorder
         # instance whose events.jsonl receives the per-sweep
@@ -821,43 +823,15 @@ class SessionLoop:
             return None
 
     def _build_ingest_embedder(self):
-        """Lazily construct a ``LibraryEmbedder`` for ingest — best-effort.
+        """Lazily construct the local CLAP embedder for ingest — best-effort.
 
-        The ingest path's only model call is ``embedder.embed_query(...)``.
-        Construction is wrapped so a missing API key / proxy JWT / network
-        never breaks session close or boot — on any failure we return None
-        and the caller skips the ingest enqueue (logged, swallowed).
-
-        Mirrors __main__'s embedder build: proxy mode when
-        ``VIBEMIX_LLM_MODE=proxy``, else a direct ``genai.Client`` from
-        ``GEMINI_API_KEY``. Function-local imports keep the live-path/genai
-        surface out of session_loop's module import graph.
+        Construction is wrapped so a missing CLAP model/dependency never breaks
+        session close or boot. On any failure we return None and the caller skips
+        the ingest enqueue (logged, swallowed).
         """
-        import os
+        from vibemix.library.embed_factory import build_embedder
 
-        from google import genai
-
-        from vibemix.library.embed import build_embedder
-
-        mode = os.environ.get("VIBEMIX_LLM_MODE", "direct").strip().lower()
-        if mode == "proxy":
-            from vibemix.agent.proxy_client import build_proxy_genai_client
-
-            jwt = os.environ.get("VIBEMIX_PROXY_JWT")
-            if not jwt:
-                log.info("[ingest] proxy mode but no VIBEMIX_PROXY_JWT — skip embed")
-                return None
-            proxy_url = os.environ.get(
-                "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
-            )
-            client = build_proxy_genai_client(jwt, proxy_url)
-        else:
-            api_key = os.environ.get("GEMINI_API_KEY")
-            if not api_key:
-                log.info("[ingest] no GEMINI_API_KEY — skip embed")
-                return None
-            client = genai.Client(api_key=api_key)
-        return build_embedder(client)
+        return build_embedder()
 
     async def _fire_ingest(self, trigger: str, *, session_dir: Path | None = None) -> None:
         """Enqueue a memory ingest off the hot path — best-effort, never-raise.
@@ -976,7 +950,7 @@ class SessionLoop:
         # Inline import to read the module attribute fresh on every iteration
         # — `from X import Y` would freeze a local at import time, defeating
         # monkeypatch.
-        from vibemix.runtime import session_loop as _self_mod  # noqa: PLC0415
+        from vibemix.runtime import session_loop as _self_mod
 
         while not self._stop.is_set():
             interval = float(_self_mod.RETENTION_SWEEP_INTERVAL_S)
@@ -984,7 +958,7 @@ class SessionLoop:
                 await asyncio.wait_for(self._stop.wait(), timeout=interval)
                 # _stop fired during the wait — exit immediately.
                 return
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass  # interval elapsed without stop — fire a sweep
             if self._stop.is_set():
                 return
@@ -1025,14 +999,26 @@ class SessionLoop:
                 )
             )
             return
-        # Best-effort probe — same fallback set the wizard's status_tick uses.
+        # In the standalone --session structural loop there is no live cascade
+        # yet, so keep the conservative boot defaults. In the real cohost path
+        # main() constructs this object as a handler bag with live refs already
+        # wired; a user-clicked recheck must mirror the periodic live status
+        # tick rather than repainting the app as "connecting / down".
+        live_attached = self._live_runtime_attached()
         tick = StatusTick.make(
-            livekit="connecting",
-            gemini="down",
+            livekit="ok" if live_attached else "connecting",
+            gemini="ok" if live_attached else "down",
             midi=self._probe_midi_count(),
             screen=self._probe_screen_status(),
         )
         await self.bus.emit(json.loads(tick.to_json()))
+
+    def _live_runtime_attached(self) -> bool:
+        """True when SessionLoop is acting as handlers for the full live app."""
+        return any(
+            ref is not None
+            for ref in (self.music_state, self.levels, self.playback_queue)
+        )
 
     # ------------------------------------------------------------------
     # Snapshot construction
@@ -1045,7 +1031,8 @@ class SessionLoop:
         zeroed meters + IDLE + grounded=false. The schema rejects an
         empty enum so we cannot use a "warming_up" status — IDLE is
         the closest neutral state and ``grounded=false`` flags the
-        renderer that the cohost surface is not yet wired.
+        renderer that the cohost surface is unavailable in this bootstrap
+        context.
         """
         # Meters — pull from Levels if injected; else zeros.
         if self.levels is not None:
@@ -1152,7 +1139,7 @@ class SessionLoop:
                     self._stop.wait(), timeout=max(0.0, SNAPSHOT_INTERVAL - dt)
                 )
                 return
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
 
     # ------------------------------------------------------------------
@@ -1204,8 +1191,14 @@ class SessionLoop:
 
     def _probe_midi_count(self) -> int | None:
         """Mirror of WizardLoop._probe_midi_count — best-effort mido import."""
+        if self.controller_state is not None:
+            try:
+                port_name = getattr(self.controller_state, "port_name", "")
+                return 1 if port_name else 0
+            except Exception:
+                return None
         try:
-            import mido  # noqa: PLC0415
+            import mido
 
             return len(mido.get_input_names())
         except Exception:
@@ -1213,8 +1206,10 @@ class SessionLoop:
 
     def _probe_screen_status(self) -> str:
         """Mirror of WizardLoop._probe_screen_status."""
+        if self.screen_available is False:
+            return "unavailable"
         try:
-            from vibemix.platform import permissions  # noqa: PLC0415
+            from vibemix.platform import permissions
 
             return (
                 "ok"
@@ -1222,7 +1217,7 @@ class SessionLoop:
                 else "denied"
             )
         except Exception:
-            return "denied"
+            return "unavailable"
 
     # ------------------------------------------------------------------
     # Inbound message validation — wraps bus dispatch with ipc.error fallback
@@ -1371,7 +1366,7 @@ async def run_session() -> int:
     bus = WizardBus()
     # Inline import — config_store.app_data_dir is a Phase 15-02 public
     # alias; keep the runtime/session_loop top-level imports unchanged.
-    from vibemix.runtime.config_store import app_data_dir  # noqa: PLC0415
+    from vibemix.runtime.config_store import app_data_dir
 
     recordings_root = app_data_dir() / "recordings"
     loop = SessionLoop(bus, recordings_root=recordings_root)
@@ -1389,4 +1384,4 @@ async def run_session() -> int:
     return 0
 
 
-__all__ = ["SessionLoop", "SNAPSHOT_HZ", "SNAPSHOT_INTERVAL", "run_session"]
+__all__ = ["SNAPSHOT_HZ", "SNAPSHOT_INTERVAL", "SessionLoop", "run_session"]

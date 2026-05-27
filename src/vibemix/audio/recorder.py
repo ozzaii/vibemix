@@ -478,7 +478,7 @@ class VoiceRecorder:
                         encoding="utf-8",
                     )
                     os.replace(tmp, final)
-            except Exception as e:  # noqa: BLE001 — best-effort
+            except Exception as e:
                 print(f"[evidence snapshot err] {e}")
         with self._lock:
             with contextlib.suppress(Exception):

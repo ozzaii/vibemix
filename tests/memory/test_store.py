@@ -38,7 +38,7 @@ from vibemix.memory.store import MemoryStore
 
 
 def _vec(seed: int) -> np.ndarray:
-    """A single 768-dim L2-normalized float32 vector (deterministic)."""
+    """A single active-dim L2-normalized float32 vector (deterministic)."""
     rng = np.random.default_rng(seed)
     return l2_normalize(rng.standard_normal(EMBEDDING_DIM).astype(np.float32))
 

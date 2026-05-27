@@ -12,8 +12,8 @@ land in Task 2 GREEN — see the Task 1 PLAN.md ``<behavior>`` block):
   2.  ``--help`` exits 0, prints flag reference including the 3 flags.
   3.  Unknown flag exits 2 with usage error to stderr.
   4.  Mock 200 + healthz fresh → exit 0 + OK stdout banner.
-  5.  Mock returns 404 for ``/vibemix/updates/latest.json`` → exit 1 + structured
-      ``BLOCKED_BY=bravoh-server: endpoint missing: /vibemix/updates/latest.json``.
+  5.  Mock returns 404 for ``/vibemix/updates/darwin/aarch64/0.0.0`` → exit 1
+      + structured ``BLOCKED_BY=bravoh-server: endpoint missing: ...``.
   6.  Mock 200 for healthz but ts is 30 min old → exit 4 + structured
       ``BLOCKED_BY=bravoh-server: healthz stale``.
   7.  Mock unreachable (closed port) → exit 3 + structured
@@ -38,19 +38,20 @@ import os
 import shutil
 import socket
 import subprocess
-import sys
-import textwrap
 import threading
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROBE = REPO_ROOT / "scripts" / "release" / "check_bravoh_server_ready.sh"
+UPDATE_PATHS = (
+    "/vibemix/updates/darwin/aarch64/0.0.0",
+    "/vibemix/updates/darwin/x86_64/0.0.0",
+    "/vibemix/updates/windows/x86_64/0.0.0",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -65,9 +66,9 @@ class _MockState:
         # Healthz behaviour.
         self.healthz_status = 200
         self.healthz_ts: str | None = _iso_now()
-        # Latest.json behaviour.
-        self.latest_status = 200
-        self.latest_body: dict | None = {"version": "3.0.0", "url": "https://x/y"}
+        # Runtime updater feed behaviour.
+        self.update_status: dict[str, int] = {path: 200 for path in UPDATE_PATHS}
+        self.update_body: dict | None = {"version": "3.0.0", "platforms": {}}
         # Upload (HEAD) behaviour.
         self.upload_status = 401  # auth-gated correctly
         # Request log for assertions.
@@ -75,11 +76,11 @@ class _MockState:
 
 
 def _iso_now() -> str:
-    return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _iso_offset(seconds: int) -> str:
-    return (datetime.now(tz=timezone.utc) - timedelta(seconds=seconds)).strftime(
+    return (datetime.now(tz=UTC) - timedelta(seconds=seconds)).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
 
@@ -87,7 +88,7 @@ def _iso_offset(seconds: int) -> str:
 def _make_handler(state: _MockState):
     class _Handler(BaseHTTPRequestHandler):
         # Silence default stderr access log spam.
-        def log_message(self, fmt, *args):  # noqa: D401, ANN001
+        def log_message(self, fmt, *args):
             return
 
         def _respond_json(self, code: int, body: dict | None) -> None:
@@ -101,7 +102,7 @@ def _make_handler(state: _MockState):
             if payload:
                 self.wfile.write(payload)
 
-        def do_GET(self):  # noqa: N802
+        def do_GET(self):
             state.requests.append(("GET", self.path))
             if self.path == "/vibemix/healthz":
                 if state.healthz_status != 200:
@@ -112,17 +113,18 @@ def _make_handler(state: _MockState):
                     200, {"status": "ok", "ts": state.healthz_ts}
                 )
                 return
-            if self.path == "/vibemix/updates/latest.json":
-                if state.latest_status != 200:
-                    self.send_response(state.latest_status)
+            if self.path in UPDATE_PATHS:
+                status = state.update_status.get(self.path, 404)
+                if status != 200:
+                    self.send_response(status)
                     self.end_headers()
                     return
-                self._respond_json(200, state.latest_body)
+                self._respond_json(200, state.update_body)
                 return
             self.send_response(404)
             self.end_headers()
 
-        def do_HEAD(self):  # noqa: N802
+        def do_HEAD(self):
             state.requests.append(("HEAD", self.path))
             if self.path == "/vibemix/updates/upload":
                 self.send_response(state.upload_status)
@@ -221,17 +223,18 @@ def test_4_all_endpoints_ok_exits_zero(mock_server):
         f"stdout={result.stdout!r}\nstderr={result.stderr!r}"
     )
     assert "OK" in result.stdout
-    assert "3/3" in result.stdout or "3 of 3" in result.stdout
-    # Confirm the mock saw all 3 endpoints hit.
+    assert "5/5" in result.stdout or "5 of 5" in result.stdout
+    # Confirm the mock saw all runtime contract paths.
     paths = {p for _, p in state.requests}
     assert "/vibemix/healthz" in paths
-    assert "/vibemix/updates/latest.json" in paths
+    for path in UPDATE_PATHS:
+        assert path in paths
     assert "/vibemix/updates/upload" in paths
 
 
 def test_5_missing_endpoint_exits_one_with_structured_blocker(mock_server):
     state, base = mock_server
-    state.latest_status = 404
+    state.update_status["/vibemix/updates/darwin/aarch64/0.0.0"] = 404
     state.healthz_ts = _iso_now()
     result = _run_probe("--endpoint-base", base)
     assert result.returncode == 1, (
@@ -240,7 +243,7 @@ def test_5_missing_endpoint_exits_one_with_structured_blocker(mock_server):
     )
     assert "BLOCKED_BY=bravoh-server" in result.stderr
     assert "endpoint missing" in result.stderr
-    assert "/vibemix/updates/latest.json" in result.stderr
+    assert "/vibemix/updates/darwin/aarch64/0.0.0" in result.stderr
 
 
 def test_6_stale_healthz_exits_four(mock_server):
@@ -294,7 +297,7 @@ def test_8_max_age_override_changes_stale_threshold(mock_server):
 
 def test_9_github_actions_annotation_on_failure(mock_server):
     state, base = mock_server
-    state.latest_status = 404
+    state.update_status["/vibemix/updates/darwin/aarch64/0.0.0"] = 404
     state.healthz_ts = _iso_now()
     result = _run_probe(
         "--endpoint-base", base,

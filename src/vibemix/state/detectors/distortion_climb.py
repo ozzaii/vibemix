@@ -87,8 +87,8 @@ class DistortionClimbDetector:
 
     def detect(
         self,
-        state: "MusicState",
-        audio_buf: "AudioBuffer | None",
+        state: MusicState,
+        audio_buf: AudioBuffer | None,
         now: float,
     ) -> Event | None:
         """Return ``Event("DISTORTION_CLIMB", ...)`` when all three gates pass.

@@ -9,28 +9,48 @@ proxy → direct (that would defeat Phase 5's entire security goal).
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from google.genai import types
-from livekit.plugins import google as google_plugin
-
+from vibemix.agent._livekit_google_slim import google_llm_class
 from vibemix.agent.config import LLM_MODEL
-from vibemix.llm.thinking_gate import validate_live_config
 
 
-def _build_direct(api_key: str) -> google_plugin.LLM:
+class _LazyGenAITypes:
+    def __getattr__(self, name: str) -> Any:
+        from google.genai import types as genai_types
+
+        return getattr(genai_types, name)
+
+
+types = _LazyGenAITypes()
+
+
+def validate_live_config(cfg: object) -> None:
+    """Lazy wrapper kept as the factory's test/spy seam."""
+    from vibemix.llm.thinking_gate import validate_live_config as _validate_live_config
+
+    _validate_live_config(cfg)  # type: ignore[arg-type]
+
+
+def _live_generation_config() -> Any:
+    gen_cfg = types.GenerateContentConfig(
+        temperature=1.0,
+        thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+        max_output_tokens=1024,  # 2026-05-20 — lifted from 220: thinking tokens share the budget, and Kaan wants reactions uncapped (system prompt still keeps lines short)
+    )
+    validate_live_config(gen_cfg)
+    return gen_cfg
+
+
+def _build_direct(api_key: str) -> Any:
     """Phase 4 verbatim — port of v4:1983-1989."""
     # Plan 41-03 / LAT-08 — validate the live-coach config before
     # constructing the LLM wrapper. Zero per-turn cost: this runs once
     # per agent boot. Any future config-mutation seam that bypasses this
     # factory still hits the second gate inside DJCoHostAgent.__init__.
-    gen_cfg = types.GenerateContentConfig(
-        temperature=1.0,
-        thinking_config=types.ThinkingConfig(thinking_level="minimal"),
-        max_output_tokens=1024,  # 2026-05-20 — lifted from 220: gemini-3.5-flash thinking tokens share the budget, and Kaan wants reactions uncapped (system prompt still keeps lines short)
-    )
-    validate_live_config(gen_cfg)
-    return google_plugin.LLM(
+    gen_cfg = _live_generation_config()
+    llm_cls = google_llm_class()
+    return llm_cls(
         model=LLM_MODEL,
         api_key=api_key,
         temperature=gen_cfg.temperature,
@@ -39,7 +59,7 @@ def _build_direct(api_key: str) -> google_plugin.LLM:
     )
 
 
-def _build_proxy(proxy_base_url: str, jwt: str) -> google_plugin.LLM:
+def _build_proxy(proxy_base_url: str, jwt: str) -> Any:
     """Phase 5 — build google_plugin.LLM with http_options pointed at the proxy.
 
     Decision (verified against .venv/lib/python3.12/site-packages/livekit/plugins/google/llm.py:117):
@@ -52,13 +72,9 @@ def _build_proxy(proxy_base_url: str, jwt: str) -> google_plugin.LLM:
     """
     # Plan 41-03 / LAT-08 — same gate as the direct path. Proxy mode must
     # not bypass the live-coach invariants.
-    gen_cfg = types.GenerateContentConfig(
-        temperature=1.0,
-        thinking_config=types.ThinkingConfig(thinking_level="minimal"),
-        max_output_tokens=1024,  # 2026-05-20 — lifted from 220: gemini-3.5-flash thinking tokens share the budget, and Kaan wants reactions uncapped (system prompt still keeps lines short)
-    )
-    validate_live_config(gen_cfg)
-    return google_plugin.LLM(
+    gen_cfg = _live_generation_config()
+    llm_cls = google_llm_class()
+    return llm_cls(
         model=LLM_MODEL,
         api_key="vibemix-proxy",
         http_options=types.HttpOptions(
@@ -78,7 +94,7 @@ def build_llm(
     mode: Literal["direct", "proxy"] = "direct",
     proxy_base_url: str | None = None,
     jwt: str | None = None,
-) -> google_plugin.LLM:
+) -> Any:
     """Factory entry — dispatches on mode.
 
     direct: requires api_key.

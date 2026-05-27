@@ -52,7 +52,9 @@ smoke-tests on a real Windows 11 machine before sign-off.
 
 from __future__ import annotations
 
-from typing import Literal
+import sys
+import threading
+from typing import ClassVar, Literal
 
 from vibemix.audio.errors import SampleRateMismatchError
 from vibemix.audio.recorder import VoiceRecorder
@@ -367,9 +369,6 @@ __all__ = [
 # (sys_platform marker on the dep + sys.platform guard here).
 # ---------------------------------------------------------------------------
 
-import sys
-import threading
-
 if sys.platform == "win32":
     try:
         # comtypes lookup-only — IMM* constants resolve lazily inside the
@@ -412,9 +411,8 @@ def _build_device_listener_class(restart_event: threading.Event):
     other 4 immediately return 0 (S_OK).
     """
     # Lazy imports — never reach this code path on macOS.
-    from comtypes import COMObject, GUID, IUnknown
-    from ctypes import HRESULT, c_uint32, c_wchar_p
-    from ctypes.wintypes import DWORD
+
+    from comtypes import GUID, COMObject, IUnknown
 
     class _IMMNotificationClient(IUnknown):
         _iid_ = GUID(_IID_IMMNotificationClient)
@@ -423,7 +421,7 @@ def _build_device_listener_class(restart_event: threading.Event):
         # (we receive callbacks, never call into the interface).
 
     class _DeviceChangeListener(COMObject):
-        _com_interfaces_ = [_IMMNotificationClient]
+        _com_interfaces_: ClassVar[list[type]] = [_IMMNotificationClient]
 
         def __init__(self) -> None:
             super().__init__()
@@ -485,7 +483,7 @@ class WindowsLoopbackAudio:
             return
 
         # Lazy COM init — happens once, on the calling thread.
-        from comtypes import CoCreateInstance, GUID
+        from comtypes import GUID, CoCreateInstance
         from comtypes.client import GetModule  # noqa: F401 — typelib trigger
 
         listener_cls = _build_device_listener_class(self._restart_event)
@@ -498,7 +496,6 @@ class WindowsLoopbackAudio:
             # CoCreateInstance + RegisterEndpointNotificationCallback —
             # signature pinned by IMMDeviceEnumerator vtable. comtypes builds
             # the bindings lazily on first use.
-            from ctypes import HRESULT
             from comtypes import IUnknown
 
             class _IMMDeviceEnumerator(IUnknown):
@@ -516,7 +513,7 @@ class WindowsLoopbackAudio:
             )
             if register is not None:
                 register(self._listener)
-        except Exception as e:  # noqa: BLE001 — degrade-to-no-op is intentional
+        except Exception as e:
             print(
                 f"[wasapi] device-change listener registration failed: {e} "
                 "— soft-restart on device change unavailable this session",
@@ -540,7 +537,7 @@ class WindowsLoopbackAudio:
                 self._restart_event.clear()
                 try:
                     self._on_restart()
-                except Exception as e:  # noqa: BLE001 — keep worker alive
+                except Exception as e:
                     print(
                         f"[wasapi restart err] {e}",
                         file=sys.stderr,
@@ -562,7 +559,7 @@ class WindowsLoopbackAudio:
                 )
                 if unregister is not None:
                     unregister(self._listener)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 print(f"[wasapi] unregister failed: {e}", file=sys.stderr)
         if self._restart_thread is not None:
             self._restart_thread.join(timeout=2.0)

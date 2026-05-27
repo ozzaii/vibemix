@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """BENCH-01 — fake-client sweep + per-cell fail-safe (REAL-GREEN, flipped in Plan 02).
 
-The runner takes the client by INJECTION (``library/agent.py:306`` idiom), so
-the offline ``_FakeClient`` / ``_RaisingClient`` fixtures make the whole sweep
-green with ZERO API calls (honest green). The Wave-0 ``xfail(strict=True)``
-scaffolds flipped to real passes when Plan 02 landed ``vibemix.bench.run`` /
-``vibemix.bench.matrix``.
+The runner takes the client by injection, so the offline ``_FakeClient`` /
+``_RaisingClient`` fixtures make the whole sweep green with ZERO API calls
+(honest green). The Wave-0 ``xfail(strict=True)`` scaffolds flipped to real
+passes when Plan 02 landed ``vibemix.bench.run`` / ``vibemix.bench.matrix``.
 
 The fail-safe (Pitfall 2): a per-cell error records ``result.error`` (non-None)
 and the sweep CONTINUES to the next cell — never aborts, never fabricates

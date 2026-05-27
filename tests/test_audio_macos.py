@@ -244,7 +244,7 @@ def test_open_voice_output_resamples_instead_of_raising(
     Aggregate devices (AI Capture stacking on top of BlackHole, AirPods at
     44.1k) refuse 24kHz Gemini TTS opens, so the backend now opens the
     stream at the device's native rate and wraps the source callback with
-    either an integer-ratio np.repeat upsample or a scipy resample_poly.
+    either an integer-ratio np.repeat upsample or the local resampler.
     The pre-open guard remains only for capture / passthrough / mic paths
     where the upstream pipeline assumes lock-step rates.
     """

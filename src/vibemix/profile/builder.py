@@ -39,7 +39,6 @@ from vibemix.profile.schema import (
     EVENT_TYPES_FOR_PREFS,
     GENRES,
     MIX_STYLE_TAGS,
-    TEMPO_BINS,
     ProfileError,
     validate_profile,
 )

@@ -56,6 +56,39 @@ def test_smoke_01_version_exits_zero_without_devices_or_keys():
     assert f"vibemix {__version__}" in result.stdout
 
 
+def test_smoke_01b_main_import_does_not_load_cohost_provider_plugins():
+    """Importing the CLI module must stay light for library/model commands."""
+    code = """
+import sys
+import vibemix.__main__  # noqa
+loaded = [
+    m for m in sys.modules
+    if m == "grpc" or m.startswith("google.cloud") or m.startswith("livekit.plugins")
+]
+if loaded:
+    raise SystemExit("\\n".join(loaded))
+print("ok")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert "ok" in result.stdout
+
+
+def test_smoke_01c_bench_cli_is_source_only_in_frozen_sidecar(mocker, capsys):
+    """The dev bench harness should fail clearly when omitted from frozen builds."""
+    import vibemix.__main__ as main_mod
+
+    mocker.patch.object(main_mod.sys, "frozen", True, create=True)
+
+    assert main_mod._run_bench_cli(["run"]) == 2
+    assert "source-only dev/eval command" in capsys.readouterr().err
+
+
 # ---------------------------------------------------------------------------
 # SMOKE-02 — missing GEMINI_API_KEY exits non-zero
 # ---------------------------------------------------------------------------
@@ -267,7 +300,13 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     Gemini surfaces and verifies the orchestration."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    # Importing vibemix.__main__ can load the developer .env before the patch
+    # above takes effect; re-assert the dummy keys after that import side effect.
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
 
     audio_mocks = _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
@@ -310,7 +349,10 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
 
     # (d) build_tts_chain called with both keys + mode=direct
     livekit_mocks["build_tts_chain"].assert_called_once_with(
-        gemini_api_key="dummy-key", openrouter_api_key="dummy-or", mode="direct"
+        gemini_api_key="dummy-key",
+        openrouter_api_key="dummy-or",
+        openrouter_enabled=False,
+        mode="direct",
     )
 
     # (e) DJCoHostAgent constructed with non-None kwargs
@@ -325,6 +367,9 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
         "tts_inst",
     ):
         assert agent_call.kwargs.get(kw) is not None, f"missing kwarg {kw}"
+    assert agent_call.kwargs.get("recall") is None
+    assert agent_call.kwargs.get("recall_enabled") is False
+    assert livekit_mocks["genai_client"].models.embed_content.call_count == 0
 
     # (f) AgentSession constructed with llm + tts
     as_call = livekit_mocks["AgentSession"].call_args
@@ -357,6 +402,8 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
     _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
@@ -381,7 +428,10 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
     asyncio.run(driver())
 
     livekit_mocks["build_tts_chain"].assert_called_once_with(
-        gemini_api_key="dummy-key", openrouter_api_key=None, mode="direct"
+        gemini_api_key="dummy-key",
+        openrouter_api_key=None,
+        openrouter_enabled=False,
+        mode="direct",
     )
 
 
@@ -741,8 +791,6 @@ def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> 
     drops cache=cache from DJCoHostAgent kwargs or removes the try/except
     around cache.create, this test catches it.
     """
-    from pathlib import Path
-
     src = Path("src/vibemix/__main__.py").read_text()
 
     # Cache construction

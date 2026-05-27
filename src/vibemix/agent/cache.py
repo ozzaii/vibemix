@@ -113,7 +113,7 @@ class GeminiContextCache:
 
     def __init__(
         self,
-        client: "genai.Client",
+        client: genai.Client,
         system_instruction_body: str,
         *,
         model: str = LLM_MODEL,

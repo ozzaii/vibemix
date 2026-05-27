@@ -61,7 +61,7 @@ def test_grounding_construction_is_try_guarded(main_source: str) -> None:
     # Find the Grounding-related block and assert it's inside a try.
     lines = main_source.splitlines()
     grounding_line = next(
-        (i for i, l in enumerate(lines) if "Grounding(" in l),
+        (i for i, line in enumerate(lines) if "Grounding(" in line),
         None,
     )
     assert grounding_line is not None
@@ -78,6 +78,11 @@ def test_grounding_disabled_without_library(main_source: str) -> None:
     assert "grounding = None" in main_source, (
         "grounding default state must be None"
     )
+
+
+def test_event_detector_attaches_shared_evidence_registry(main_source: str) -> None:
+    """Live event citations must use the same registry as deck/audio evidence."""
+    assert "event_detector.attach_evidence_registry(evidence_registry)" in main_source
 
 
 def test_main_module_parses(main_source: str) -> None:

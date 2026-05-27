@@ -21,7 +21,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PS1 = REPO_ROOT / "scripts/dist/sign_windows.ps1"
 
@@ -41,9 +40,10 @@ def test_sign_windows_ps1_has_param_block(ps1_text: str):
     assert "[CmdletBinding()]" in ps1_text
     assert re.search(r"\bparam\s*\(", ps1_text)
     # Required parameters per the Plan.
-    for name in ("MsiPath", "ApiToken", "OrganizationId", "ProjectSlug",
+    for name in ("InstallerPath", "ApiToken", "OrganizationId", "ProjectSlug",
                  "PolicySlug", "ArtifactConfigSlug", "OutputDir"):
         assert f"${name}" in ps1_text, f"Missing param: ${name}"
+    assert '[Alias("MsiPath")]' in ps1_text
 
 
 def test_sign_windows_ps1_no_forbidden_posts(ps1_text: str):

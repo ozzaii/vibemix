@@ -156,7 +156,7 @@ class SessionTracer:
                 self._lock = threading.Lock()
             self._f = open(session_dir / "trace.jsonl", "a", encoding="utf-8")
             self.enabled = True
-        except Exception as e:  # noqa: BLE001 — tracer must never raise on init
+        except Exception as e:
             print(f"[tracer init err] {e}", file=sys.stderr)
             self._f = None
             self.enabled = False
@@ -174,7 +174,7 @@ class SessionTracer:
             enabled = _env_truthy("VIBEMIX_TRACE", default=True)
             mirror = _env_truthy("VIBEMIX_TRACE_STDERR", default=False)
             return cls(recorder, enabled=enabled, mirror_stderr=mirror)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"[tracer attach err] {e}", file=sys.stderr)
             return cls(None, enabled=False)
 

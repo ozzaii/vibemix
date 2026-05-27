@@ -199,7 +199,7 @@ def render_review(
     if isinstance(scores, dict):
         pairs = [(r, scores[r]) for r in results]
     else:
-        pairs = list(zip(results, scores))
+        pairs = list(zip(results, scores, strict=True))
 
     cell_count = len(pairs)
     errored_count = sum(1 for r, _ in pairs if _error_of(r) is not None)

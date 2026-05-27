@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """run_study — the injected-client runner + per-cell fail-safe + recorder.
 
-The runner takes the genai client by INJECTION (``library/agent.py:306`` idiom),
-so the offline ``_FakeClient`` makes the whole sweep green with ZERO API
-(honest green). The real run swaps in a funded ``genai.Client`` via the
-``vibemix bench run`` CLI.
+The runner takes the genai client by injection, so the offline ``_FakeClient``
+makes the whole sweep green with ZERO API (honest green). The real run swaps in
+a funded ``genai.Client`` via the ``vibemix bench run`` CLI.
 
 THE 429 FAIL-SAFE (RESEARCH Pitfall 2, MANDATORY): each cell's
 ``generate_content`` is wrapped in ``try/except Exception`` → on error the cell
@@ -30,12 +29,12 @@ from vibemix.bench.assemble import build_cell_prompt
 from vibemix.bench.cell import BenchCell, BenchResult
 from vibemix.library.budget import ROUTE_PRICING, get_session_meter
 
-__all__ = ["run_study", "resolve_track_path", "results_to_json"]
+__all__ = ["resolve_track_path", "results_to_json", "run_study"]
 
-# WR-03: hard wall-clock per real generate_content call (mirrors
-# library/agent.py:GEMINI_CALL_TIMEOUT_S). A silent network/server hang short
-# of an HTTP error never blocks the whole sweep forever — the timeout raises,
-# the existing per-cell fail-safe parks the cell, and the sweep CONTINUES.
+# WR-03: hard wall-clock per real generate_content call. A silent
+# network/server hang short of an HTTP error never blocks the whole sweep
+# forever — the timeout raises, the existing per-cell fail-safe parks the cell,
+# and the sweep CONTINUES.
 _BENCH_CALL_TIMEOUT_S = 60.0
 
 
@@ -143,7 +142,7 @@ def run_study(
     meter = get_session_meter()
 
     for cell in cells:
-        system, contents, model, _tier = build_cell_prompt(
+        _system, contents, model, _tier = build_cell_prompt(
             cell, audio_seconds=audio_seconds
         )
         prompt_text = "".join(p for p in contents if isinstance(p, str))
@@ -213,7 +212,7 @@ def run_study(
                 cached=int(usage.get("cached_content_token_count") or 0),
                 output=int(usage.get("candidates_token_count") or 0),
             )
-        except Exception as e:  # noqa: BLE001 — the fail-safe MUST catch broadly
+        except Exception as e:
             results.append(
                 BenchResult(
                     cell=cell,

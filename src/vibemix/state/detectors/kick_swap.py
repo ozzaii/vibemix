@@ -60,8 +60,8 @@ class KickSwapDetector:
 
     def detect(
         self,
-        state: "MusicState",
-        audio_buf: "AudioBuffer | None",
+        state: MusicState,
+        audio_buf: AudioBuffer | None,
         now: float,
     ) -> Event | None:
         """Return an ``Event("KICK_SWAP", ...)`` when the kick-band centroid

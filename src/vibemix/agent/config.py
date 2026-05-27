@@ -19,25 +19,24 @@ compatibility — every existing import (``__main__.py``, ``agent/cache.py``,
 
 from __future__ import annotations
 
-from vibemix.llm.model_router import resolve
+from vibemix.llm.model_router import resolve, resolve_model
 
 # ---- LLM + TTS model identifiers (v4:97-99, router-derived per Plan 41-01) ----
-LLM_MODEL: str = resolve("live_coach")[0]
-TTS_MODEL: str = resolve("live_coach_tts")[0]
-TTS_FALLBACK_MODEL: str = resolve("live_coach_tts_fallback")[0]
+LLM_MODEL: str = resolve_model("live_coach")
+TTS_MODEL: str = resolve_model("live_coach_tts")
+TTS_FALLBACK_MODEL: str = resolve_model("live_coach_tts_fallback")
 
-# OpenRouter-routed Gemini TTS model id (v4:1995). NOT in v4 as a constant but
-# used inline at v4:1995 — promoted to a constant here so the monkey-patch
-# (tts_chain.py) and the factory body reference the same source string.
-OPENROUTER_TTS_MODEL: str = resolve("live_coach_tts_openrouter")[0]
+# OpenRouter-routed Gemini model ids. The TTS id was used inline at v4:1995;
+# both now ride the router so OpenRouter surfaces do not reintroduce literals
+# outside ``llm/_router_config.py``.
+OPENROUTER_LLM_MODEL: str = resolve_model("live_coach_openrouter")
+OPENROUTER_TTS_MODEL: str = resolve_model("live_coach_tts_openrouter")
 
 # ---- ServiceTier dispatch (Plan 41-01, LAT-07) ----
 # Exposed alongside LLM_MODEL so callers that need the tier (e.g. the
 # coach loop wiring up ``GenerateContentConfig(service_tier=...)``) don't
 # need to round-trip back through ``resolve()``. Other call sites that
 # want both values for a different path should import ``resolve`` directly.
-LIVE_COACH_SERVICE_TIER = resolve("live_coach")[1]
-
 # ---- Voice id (v4:104) ----
 VOICE: str = "Achird"
 
@@ -45,3 +44,9 @@ VOICE: str = "Achird"
 INPUT_DEVICE: str = "BlackHole 2ch"
 OUTPUT_DEVICE: str = "MacBook Pro Speakers"  # 2026-05-18 — Kaan's pick for tonight (was "AI Capture" aggregate, switched to laptop speakers).
 MIC_DEVICE: str = "MacBook Pro Microphone"
+
+
+def __getattr__(name: str):
+    if name == "LIVE_COACH_SERVICE_TIER":
+        return resolve("live_coach")[1]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
