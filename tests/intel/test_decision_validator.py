@@ -54,6 +54,29 @@ def _envelope(*, mode: str = "live", exact_timing: bool = True):
     )
 
 
+def _multi_candidate_envelope():
+    source = _section("t1#s000", "t1", "outro", "F")
+    destinations = (
+        _section("t2#s000", "t2", "intro", "A"),
+        _section("t3#s000", "t3", "intro", "A"),
+    )
+    slate = score_transition_slate(
+        TransitionScoringInput(
+            source=source,
+            destinations=destinations,
+            mode="live",
+            live_position=LivePosition(remaining_bars=16, playhead_confidence=0.95),
+        )
+    )
+    return compile_transition_context(
+        packet_id="ctx_001",
+        mode="live",
+        intent="live_next_pill",
+        current={},
+        candidates=slate,
+    )
+
+
 def _claim_id(envelope, claim_type: str) -> str:  # type: ignore[no-untyped-def]
     for claim in envelope.claim_summary:
         if claim["type"] == claim_type:
@@ -113,6 +136,64 @@ def test_validator_accepts_section_role_copy_when_claim_backed() -> None:
     )
 
     assert result.accepted
+
+
+def test_validator_rejects_claim_ids_from_unselected_candidate() -> None:
+    envelope = _multi_candidate_envelope()
+    other_cue_claim = next(
+        claim
+        for claim in envelope.claim_summary
+        if claim["type"] == "cue_slot" and claim["subject_id"] == "tr_002"
+    )
+
+    result = validate_agent_decision(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            candidate_id="tr_001",
+            cue_slot="A",
+            spoken_text="Use cue A.",
+            cited_claim_ids=(str(other_cue_claim["claim_id"]),),
+            confidence=0.9,
+        ),
+    )
+
+    assert not result.accepted
+    assert f"claim_subject_mismatch:{other_cue_claim['claim_id']}:cue_slot" in result.errors
+
+
+def test_validator_rejects_track_identity_from_unselected_target() -> None:
+    envelope = _multi_candidate_envelope()
+    other_track_claim = next(
+        claim
+        for claim in envelope.claim_summary
+        if claim["type"] == "track_identity" and claim["subject_id"] == "t3"
+    )
+    selected_cue_claim = next(
+        claim
+        for claim in envelope.claim_summary
+        if claim["type"] == "cue_slot" and claim["subject_id"] == "tr_001"
+    )
+
+    result = validate_agent_decision(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            candidate_id="tr_001",
+            cue_slot="A",
+            spoken_text="Next good entry: t3 cue A.",
+            cited_claim_ids=(
+                str(other_track_claim["claim_id"]),
+                str(selected_cue_claim["claim_id"]),
+            ),
+            confidence=0.9,
+        ),
+    )
+
+    assert not result.accepted
+    assert f"claim_subject_mismatch:{other_track_claim['claim_id']}:track_identity" in result.errors
 
 
 def test_validator_rejects_unknown_candidate_id() -> None:

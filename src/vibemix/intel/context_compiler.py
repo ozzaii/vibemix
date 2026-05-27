@@ -653,7 +653,11 @@ def _add_source_context_claims(
         if bool(current.get("source_loop_recent")):
             _add_source_loop_risk_claim(
                 ledger,
-                subject_id=_optional_str(current.get("active_track_id")) or "source",
+                subject_id=(
+                    _optional_str(current.get("track_id"))
+                    or _optional_str(current.get("active_track_id"))
+                    or "source"
+                ),
                 source_ref=f"current:{packet_id}",
                 confidence=_score_component(current, "playhead_confidence", 0.0),
             )

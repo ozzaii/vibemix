@@ -402,6 +402,8 @@ Acceptance evidence:
 - context is bounded and redacted;
 - validator rejects unknown candidates, sections, cue proposals, and timing
   overclaims;
+- validator rejects selected decisions that cite valid claim IDs from a different
+  candidate/target/section;
 - context packets now carry compact INTEL-21 `claim_ids` and `claim_summary`;
 - no raw vectors in packet;
 - no raw local paths in packet;
