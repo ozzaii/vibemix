@@ -72,11 +72,11 @@ still be kept as grounded context, but exact bar timing is withheld and the
 validated live decision suppresses rather than issuing a fresh `select`.
 
 When the opposite deck already carries a confidently resolved track ID, that is
-also live set context. If the prepared target track is already present in the
-bounded embedding shortlist and has grounded transition evidence, the pill
-promotes that candidate instead of telling the DJ to load a different visible
-option. This promotion never expands the candidate universe or invents a cue:
-the target-deck track must still be library-resolved and transition-scored.
+also live set context. If the prepared target track is present in the library
+and stored vector cache, the pill may extend the bounded slate with that deck
+fact and transition-score it. The candidate is promoted only when it has
+grounded transition evidence, so the pill can tell the DJ how to mix the track
+they actually loaded without inventing a cue or bypassing validation.
 
 ## Wire payload
 
@@ -276,9 +276,9 @@ match, the cited claims must support those facts.
 - Exact timing is emitted only when the playhead confidence policy allows it.
 - Live blend conditions suppress unsafe timing precision and validated select
   actions, while preserving grounded transition context where possible.
-- A track already loaded on the target deck may promote only an already-issued,
-  grounded transition candidate. It cannot create a new candidate or bypass
-  library/transition scoring.
+- A track already loaded on the target deck may extend the slate only when it is
+  library-resolved and present in the stored vector cache. It can become the
+  selected action only after deterministic transition scoring.
 - Semantic dimension mismatches become unknown evidence, not fabricated matches.
 - Auto-generated or low-confidence target cues remain usable context, but are
   marked with review risk and lower cue-operability confidence.

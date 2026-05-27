@@ -42,6 +42,7 @@ from vibemix.intel.feedback import FeedbackEvent, parse_feedback_event
 from vibemix.library.next_suggestion import (
     annotate_transition_selection,
     next_suggestion,
+    prepared_target_candidate_payload,
     promote_transition_alternative,
     ranked_transition_alternatives,
     seed_vector_for_track_id,
@@ -996,6 +997,39 @@ class SuggestionService:
                     refreshed_transitions[track_id] = _strip_transition_timing(
                         refreshed_transitions[track_id]
                     )
+            if seed.target_track_id and not any(
+                alternative.get("track_id") == seed.target_track_id for alternative in alternatives
+            ):
+                target_payload = prepared_target_candidate_payload(
+                    self._store,
+                    self._library,
+                    seed_vector=seed_vector,
+                    track_id=seed.target_track_id,
+                )
+                if target_payload is not None:
+                    target_alternative, target_vector = target_payload
+                    transition = transition_payload_for_candidate(
+                        self._store,
+                        self._library,
+                        seed_track_id=seed_track_id,
+                        seed_vector=seed_vector,
+                        candidate_track_id=seed.target_track_id,
+                        source_deck=seed.source_deck,
+                        target_deck=seed.target_deck,
+                        remaining_bars=timing.remaining_bars,
+                        playhead_confidence=timing.playhead_confidence,
+                        blend_active=timing.blend_active,
+                        source_position_s=timing.source_position_s,
+                        destination_vector=target_vector,
+                        taste_scores=self._taste_scores,
+                    )
+                    if (seed_track_id, seed.target_track_id) in timing_suppressed_pairs:
+                        transition = _strip_transition_timing(transition)
+                    if transition is not None:
+                        target_alternative["transition"] = transition
+                        alternatives = (*alternatives, target_alternative)
+                        refreshed_transitions[seed.target_track_id] = transition
+                        candidate_vectors_by_track_id[seed.target_track_id] = target_vector
             alternatives = ranked_transition_alternatives(
                 alternatives,
                 refreshed_transitions,

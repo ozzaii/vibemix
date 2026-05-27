@@ -223,6 +223,103 @@ def test_set_aware_transition_can_promote_lower_embedding_candidate(library):
     )
 
 
+def test_prepared_target_deck_track_can_extend_transition_slate(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    library.tracks["t1"] = _track("t1", key="9A", cues=())
+    library.tracks["t2"] = _track(
+        "t2",
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore(
+        [("t0", 0.99), ("t1", 0.91)],
+        ids=["t0", "t1", "t2"],
+        vectors=np.array(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+            ],
+            dtype=np.float32,
+        ),
+    )
+
+    s = next_suggestion(
+        store,
+        library,
+        seed_vector=np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32),
+        seed_track_id="t0",
+        played_ids=set(),
+        prepared_target_track_id="t2",
+    )
+
+    assert s is not None
+    assert s.track_id == "t2"
+    assert s.similarity == 1.0
+    assert s.why.startswith("loaded on target deck")
+    assert s.transition is not None
+    assert s.transition["to_track_id"] == "t2"
+    assert s.transition_alternatives[0]["track_id"] == "t2"
+    assert s.transition_alternatives[0]["selected"] is True
+
+
+def test_prepared_target_deck_track_must_have_stored_vector(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    library.tracks["t2"] = _track(
+        "t2",
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore([("t0", 0.99)], ids=["t0"], vectors=np.eye(1, 4, dtype=np.float32))
+
+    s = next_suggestion(
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
+        played_ids=set(),
+        prepared_target_track_id="t2",
+    )
+
+    assert s is None
+
+
+def test_prepared_target_deck_track_must_have_transition_evidence(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    library.tracks["t2"] = _track("t2", key="9A", cues=())
+    store = _FakeStore(
+        [("t0", 0.99)],
+        ids=["t0", "t2"],
+        vectors=np.array(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+            ],
+            dtype=np.float32,
+        ),
+    )
+
+    s = next_suggestion(
+        store,
+        library,
+        seed_vector=np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32),
+        seed_track_id="t0",
+        played_ids=set(),
+        prepared_target_track_id="t2",
+    )
+
+    assert s is None
+
+
 def test_taste_scores_thread_into_transition_components(library):
     library.tracks["t0"] = _track(
         "t0",

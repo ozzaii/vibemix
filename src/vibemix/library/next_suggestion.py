@@ -21,7 +21,9 @@ This is the grounded shortlist path for the Pill Advancer:
   distinct neighbour set rather than "everything ~0.92 similar".
 * **Set-aware selection stays bounded by the embedding shortlist.** The search
   still defines "near the current vibe"; grounded section/cue evidence can then
-  promote the best mix point inside that shortlist.
+  promote the best mix point inside that shortlist. A confidently loaded target
+  deck track may extend the slate only when it resolves through the library and
+  stored vector cache; live deck reality is context, not a license to invent.
 * **Harmonic / BPM refine is Phase 2** — a POST-filter on the embedding
   shortlist (embedding similarity stays the primary ranker). Candidates lacking
   key/BPM degrade gracefully (kept, never dropped for missing metadata). When
@@ -73,6 +75,7 @@ class _SuggestionOption:
     camelot: str | None
     bpm: float | None
     why: str
+    source: str = "search"
 
 
 def seed_vector_for_track_id(store: LibraryStore, track_id: str) -> np.ndarray | None:
@@ -159,17 +162,6 @@ def next_suggestion(
             ):
                 continue
 
-        # Build the "why" honestly from what we actually resolved.
-        bits = ["similar vibe"]
-        if cand_camelot is not None:
-            bits.append(cand_camelot)
-        if cand_bpm is not None:
-            bits.append(f"{cand_bpm:g}")
-        cue_hint = _cue_hint(entry)
-        if cue_hint is not None:
-            bits.append(cue_hint)
-        why = " · ".join(bits)
-
         options.append(
             _SuggestionOption(
                 track_id=tid,
@@ -177,14 +169,26 @@ def next_suggestion(
                 similarity=float(sim),
                 camelot=cand_camelot,
                 bpm=cand_bpm,
-                why=why,
+                why=_why_for_entry(entry, prefix="similar vibe"),
             )
         )
+
+    prepared_option = _prepared_target_option(
+        store,
+        library,
+        seed_vector=qvec,
+        prepared_target_track_id=prepared_target_track_id,
+        seed_track_id=seed_track_id,
+        played_ids=played_ids,
+        existing_track_ids={option.track_id for option in options},
+    )
+    if prepared_option is not None:
+        options.append(prepared_option)
 
     if not options:
         return None
 
-    chosen, transition, alternatives = _select_set_aware_option(
+    selected = _select_set_aware_option(
         store,
         library,
         options,
@@ -199,6 +203,9 @@ def next_suggestion(
         source_position_s=source_position_s,
         taste_scores=taste_scores,
     )
+    if selected is None:
+        return None
+    chosen, transition, alternatives = selected
 
     return NextSuggestion(
         track_id=chosen.track_id,
@@ -228,7 +235,7 @@ def _select_set_aware_option(
     blend_active: bool,
     source_position_s: float | None,
     taste_scores: dict[tuple[str, str], float] | None,
-) -> tuple[_SuggestionOption, dict | None, tuple[dict, ...]]:
+) -> tuple[_SuggestionOption, dict | None, tuple[dict, ...]] | None:
     """Pick the best grounded option, preferring proven mix-point evidence.
 
     The embedding shortlist still defines the candidate universe. Within that
@@ -237,7 +244,10 @@ def _select_set_aware_option(
     has grounded transition evidence, the original top embedding survivor wins.
     """
     if seed_track_id is None:
-        return options[0], None, ()
+        first_search_option = next(
+            (option for option in options if option.source != "target_deck"), None
+        )
+        return (first_search_option, None, ()) if first_search_option is not None else None
 
     destination_vectors = _vectors_for_track_ids(store, [option.track_id for option in options])
     ranked: list[tuple[tuple[float, float, float, float], _SuggestionOption, dict | None]] = []
@@ -260,6 +270,9 @@ def _select_set_aware_option(
         ranked.append((_selection_key(option, transition, order), option, transition))
 
     ranked.sort(key=lambda item: item[0], reverse=True)
+    ranked = [item for item in ranked if item[1].source != "target_deck" or item[2] is not None]
+    if not ranked:
+        return None
     ranked = _prefer_prepared_target_option(ranked, prepared_target_track_id)
     _, option, transition = ranked[0]
     alternatives = _ranked_alternatives(ranked)
@@ -274,6 +287,106 @@ def _select_set_aware_option(
 def vectors_for_track_ids(store: LibraryStore, track_ids: list[str]) -> dict[str, np.ndarray]:
     """Load cached whole-track vectors for a bounded set of ids."""
     return _vectors_for_track_ids(store, track_ids)
+
+
+def prepared_target_candidate_payload(
+    store: LibraryStore,
+    library: RekordboxLibrary,
+    *,
+    seed_vector: np.ndarray,
+    track_id: str | None,
+) -> tuple[dict, np.ndarray] | None:
+    """Return UI metadata + vector for a loaded target-deck candidate.
+
+    This is used by the live refresh path when the DJ loads a target deck after
+    the original shortlist was issued. It does not search the library; it only
+    admits a track that is already identified by live deck state and present in
+    both the Rekordbox library and stored vector cache.
+    """
+    result = _prepared_target_option_with_vector(
+        store,
+        library,
+        seed_vector=l2_normalize(np.asarray(seed_vector, dtype=np.float32)),
+        prepared_target_track_id=track_id,
+        seed_track_id=None,
+        played_ids=set(),
+        existing_track_ids=set(),
+    )
+    if result is None:
+        return None
+    option, vector = result
+    return (
+        {
+            "track_id": option.track_id,
+            "title": option.entry.title,
+            "artist": option.entry.artist,
+            "similarity": round(float(option.similarity), 4),
+            "why": option.why,
+            "camelot": option.camelot,
+            "bpm": option.bpm,
+        },
+        vector,
+    )
+
+
+def _prepared_target_option(
+    store: LibraryStore,
+    library: RekordboxLibrary,
+    *,
+    seed_vector: np.ndarray,
+    prepared_target_track_id: str | None,
+    seed_track_id: str | None,
+    played_ids: set[str],
+    existing_track_ids: set[str],
+) -> _SuggestionOption | None:
+    result = _prepared_target_option_with_vector(
+        store,
+        library,
+        seed_vector=seed_vector,
+        prepared_target_track_id=prepared_target_track_id,
+        seed_track_id=seed_track_id,
+        played_ids=played_ids,
+        existing_track_ids=existing_track_ids,
+    )
+    return result[0] if result is not None else None
+
+
+def _prepared_target_option_with_vector(
+    store: LibraryStore,
+    library: RekordboxLibrary,
+    *,
+    seed_vector: np.ndarray,
+    prepared_target_track_id: str | None,
+    seed_track_id: str | None,
+    played_ids: set[str],
+    existing_track_ids: set[str],
+) -> tuple[_SuggestionOption, np.ndarray] | None:
+    track_id = prepared_target_track_id.strip() if isinstance(prepared_target_track_id, str) else ""
+    if (
+        not track_id
+        or track_id == seed_track_id
+        or track_id in played_ids
+        or track_id in existing_track_ids
+    ):
+        return None
+    entry = library.lookup_by_id(track_id)
+    if entry is None:
+        return None
+    vector = seed_vector_for_track_id(store, track_id)
+    if vector is None:
+        return None
+    cand_camelot = harmonics.to_camelot(entry.key) if entry.key else None
+    cand_bpm = entry.bpm if (entry.bpm and entry.bpm > 0) else None
+    option = _SuggestionOption(
+        track_id=track_id,
+        entry=entry,
+        similarity=_cosine_similarity(seed_vector, vector),
+        camelot=cand_camelot,
+        bpm=cand_bpm,
+        why=_why_for_entry(entry, prefix="loaded on target deck"),
+        source="target_deck",
+    )
+    return option, vector
 
 
 def _vectors_for_track_ids(store: LibraryStore, track_ids: list[str]) -> dict[str, np.ndarray]:
@@ -494,6 +607,18 @@ def _float01(value: object, default: float) -> float:
     return max(0.0, min(1.0, raw))
 
 
+def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    src = np.asarray(a, dtype=np.float32)
+    dst = np.asarray(b, dtype=np.float32)
+    if src.shape != dst.shape:
+        return 0.0
+    src_norm = float(np.linalg.norm(src))
+    dst_norm = float(np.linalg.norm(dst))
+    if src_norm <= 1e-12 or dst_norm <= 1e-12:
+        return 0.0
+    return float(np.dot(src / src_norm, dst / dst_norm))
+
+
 def transition_payload_for_candidate(
     store: LibraryStore,
     library: RekordboxLibrary,
@@ -702,6 +827,20 @@ def _cue_hint(entry) -> str | None:
     return f"{label} @ {_format_mmss(float(getattr(cue, 'start_s', 0.0) or 0.0))}"
 
 
+def _why_for_entry(entry, *, prefix: str) -> str:
+    bits = [prefix]
+    camelot = harmonics.to_camelot(entry.key) if entry.key else None
+    bpm = entry.bpm if (entry.bpm and entry.bpm > 0) else None
+    if camelot is not None:
+        bits.append(camelot)
+    if bpm is not None:
+        bits.append(f"{bpm:g}")
+    cue_hint = _cue_hint(entry)
+    if cue_hint is not None:
+        bits.append(cue_hint)
+    return " · ".join(bits)
+
+
 def _cue_label_from_number(number: int) -> str:
     if 0 <= number <= 7:
         return f"hot {chr(ord('A') + number)}"
@@ -721,6 +860,7 @@ __all__ = [
     "NextSuggestion",
     "annotate_transition_selection",
     "next_suggestion",
+    "prepared_target_candidate_payload",
     "promote_transition_alternative",
     "ranked_transition_alternatives",
     "seed_vector_for_track_id",

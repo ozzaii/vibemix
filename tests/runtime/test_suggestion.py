@@ -704,7 +704,7 @@ def test_compute_from_state_prefers_grounded_track_loaded_on_target_deck():
 
     store = _FakeStore(
         ["s", "a", "b"],
-        [("s", 0.99), ("a", 0.92), ("b", 0.91)],
+        [("s", 0.99), ("a", 0.92)],
         section_vectors={
             "s#s000": np.array([1.0, 0.0], dtype=np.float32),
             "s#s001": np.array([0.0, 1.0], dtype=np.float32),
@@ -748,6 +748,7 @@ def test_compute_from_state_prefers_grounded_track_loaded_on_target_deck():
 
     assert out is not None
     assert out["track_id"] == "b"
+    assert out["why"].startswith("loaded on target deck")
     assert out["transition"]["to_track_id"] == "b"
     assert out["transition"]["target_deck"] == "B"
     assert out["transition_alternatives"][0]["track_id"] == "b"
@@ -764,7 +765,7 @@ def test_refresh_from_state_follows_grounded_track_loaded_on_target_deck_without
 
     store = _FakeStore(
         ["s", "a", "b"],
-        [("s", 0.99), ("a", 0.92), ("b", 0.91)],
+        [("s", 0.99), ("a", 0.92)],
         section_vectors={
             "s#s000": np.array([1.0, 0.0], dtype=np.float32),
             "s#s001": np.array([0.0, 1.0], dtype=np.float32),
@@ -803,6 +804,7 @@ def test_refresh_from_state_follows_grounded_track_loaded_on_target_deck_without
     first = svc.compute_from_state(state)
     assert first is not None
     assert first["track_id"] == "a"
+    assert [alt["track_id"] for alt in first["transition_alternatives"]] == ["a"]
 
     store.search_count = 0
     store._backend.load_count = 0
@@ -824,7 +826,7 @@ def test_refresh_from_state_follows_grounded_track_loaded_on_target_deck_without
     assert refreshed["transition_alternatives"][1]["track_id"] == "a"
     assert refreshed["decision"]["candidate_id"] == "tr_001"
     assert store.search_count == 0
-    assert store._backend.load_count == 0
+    assert store._backend.load_count == 1
 
 
 def test_keep_feedback_pins_visible_candidate_through_refresh():
