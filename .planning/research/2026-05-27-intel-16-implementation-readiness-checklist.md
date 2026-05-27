@@ -446,6 +446,8 @@ Acceptance evidence:
 - playlist/M3U/JSON creation language requires a `playlist_created` action claim;
 - stayed-quiet / suppressed-output explanations require a `decision_suppressed`
   or `blend_suppression` claim;
+- audience predictions and absolute "perfect/guaranteed" transition language are
+  rejected as unsupported musical facts;
 - missing claim evidence degrades live output;
 - claim ledger redacts local paths, vectors, and audio from evidence refs,
   subjects, values, and model-visible phrase payloads;

@@ -36,6 +36,15 @@ _SUPPRESSION_RE = re.compile(
     r"\b(?:stayed\s+quiet|kept\s+quiet|held\s+back|suppressed|stayed\s+silent)\b",
     re.I,
 )
+_UNSUPPORTED_MUSICAL_FACT_RE = re.compile(
+    r"\b(?:crowd|audience|dancefloor|floor)\s+"
+    r"(?:will|is\s+going\s+to|gonna)\s+"
+    r"(?:love|go\s+off|explode|respond|react)\b"
+    r"|\bguaranteed\b"
+    r"|\bperfect\s+(?:mix|transition|fit|key|cue|entry|match)\b"
+    r"|\bwill\s+(?:work|hit|land)\s+perfectly\b",
+    re.I,
+)
 
 _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "timing": frozenset({"bars_until_event", "current_position"}),
@@ -51,6 +60,7 @@ _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "taste": frozenset({"taste_preference", "taste_fit", "taste_uncertain"}),
     "risk": frozenset({"risk", "uncertainty"}),
     "suppression": frozenset({"decision_suppressed", "blend_suppression"}),
+    "unsupported_musical_fact": frozenset(),
 }
 
 
@@ -126,6 +136,7 @@ def _claim_families_implied_by_text(text: str) -> tuple[str, ...]:
         ("taste", _TASTE_RE),
         ("risk", _RISK_RE),
         ("suppression", _SUPPRESSION_RE),
+        ("unsupported_musical_fact", _UNSUPPORTED_MUSICAL_FACT_RE),
     )
     for family, pattern in checks:
         if pattern.search(text):

@@ -219,6 +219,41 @@ def test_suppressed_timing_phrase_accepts_blend_suppression_claim() -> None:
     assert result.accepted
 
 
+def test_crowd_prediction_is_rejected_as_unsupported_musical_fact() -> None:
+    envelope = _envelope(claim_summary=())
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="The crowd will love this.",
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_unsupported_musical_fact" in result.errors
+
+
+def test_perfect_transition_claim_is_rejected_as_unsupported_musical_fact() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "transition_fit"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="This is a perfect transition.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_unsupported_musical_fact" in result.errors
+
+
 def test_section_texture_copy_accepts_matching_claim_id() -> None:
     envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "semantic_match"),))
 
