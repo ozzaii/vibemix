@@ -161,21 +161,31 @@ function mountLearnWindow(root: HTMLElement): {
   // rAF drainer — paint at most one frame per repaint slot
   // (RESEARCH §Pitfall 6). On tab-resume floods, only the latest
   // pendingPositions reaches the SVG.
+  //
+  // WR-01 fix: actually consult `pendingControllerId` here so a same-tick
+  // controller swap (controller_detected{A} → midi_position{B} →
+  // controller_detected{B} arriving before the next rAF) can't paint A's
+  // positions onto B's SVG. Most `<g data-control-id>` keys overlap
+  // across SKUs (vol:A, eq_hi:A etc.) so the silent miscolor would go
+  // unnoticed in production but is wrong; the guard the comment promised
+  // is now actually wired.
   function drainFrame(): void {
-    if (pendingPositions !== null) {
+    if (
+      pendingPositions !== null &&
+      pendingControllerId !== null &&
+      stage.currentControllerId === pendingControllerId
+    ) {
       const positions = pendingPositions;
       const emitTs = pendingEmitTs;
-      pendingPositions = null;
-      pendingEmitTs = null;
-      // Skip if the stage isn't mounted yet (no controller detected, or
-      // mid-swap during a controller_detected race).
-      if (stage.currentControllerId !== null) {
-        stage.applyPositionFrame(positions);
-        if (emitTs !== null) {
-          status.pushLatency(performance.now() - emitTs);
-        }
+      stage.applyPositionFrame(positions);
+      if (emitTs !== null) {
+        status.pushLatency(performance.now() - emitTs);
       }
     }
+    // Always clear after a drain attempt — stale pending frames don't
+    // accumulate; the next midi_position event repopulates.
+    pendingPositions = null;
+    pendingEmitTs = null;
     requestAnimationFrame(drainFrame);
   }
   requestAnimationFrame(drainFrame);
