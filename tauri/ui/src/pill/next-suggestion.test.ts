@@ -22,6 +22,7 @@
 import { describe, test, expect } from "vitest";
 
 import {
+  nextDecisionText,
   nextSuggestionRenderKey,
   nextMetaText,
   nextTransitionText,
@@ -106,6 +107,93 @@ describe("nextTransitionText — cue + grounded timing", () => {
   });
 });
 
+describe("nextDecisionText — validator-checked live action", () => {
+  test("accepted emitted select decision becomes the primary action line", () => {
+    expect(
+      nextDecisionText(
+        {
+          emitted: true,
+          validation_status: "accepted",
+          action: "select",
+          candidate_id: "tr_001",
+          cue_slot: "A",
+          timing_text: "in 13 bars",
+          spoken_text: "Next good entry: t1 cue A at 1:04, outro into intro, in 13 bars.",
+        },
+        {
+          candidate_id: "tr_001",
+          target_deck: "B",
+          from_role: "outro",
+          to_role: "intro",
+          to_start_s: 64,
+          cue_slot: "A",
+          start_in_bars: 12,
+        },
+      ),
+    ).toBe("load B · cue A @ 1:04 · outro→intro · in 13 bars");
+  });
+
+  test("accepted decision can fall back to spoken text when no compact fields exist", () => {
+    expect(
+      nextDecisionText({
+        emitted: true,
+        validation_status: "accepted",
+        action: "select",
+        candidate_id: "tr_001",
+        spoken_text: "  Next good entry: cue A.  ",
+      }),
+    ).toBe("Next good entry: cue A.");
+  });
+
+  test("rejected or non-emitted decisions render nothing", () => {
+    expect(
+      nextDecisionText({
+        emitted: false,
+        validation_status: "accepted",
+        action: "select",
+        candidate_id: "tr_001",
+        cue_slot: "A",
+      }),
+    ).toBe("");
+    expect(
+      nextDecisionText({
+        emitted: true,
+        validation_status: "rejected",
+        action: "select",
+        candidate_id: "tr_001",
+        cue_slot: "A",
+      }),
+    ).toBe("");
+  });
+
+  test("accepted select without a candidate id is still not renderable", () => {
+    expect(
+      nextDecisionText({
+        emitted: true,
+        validation_status: "accepted",
+        action: "select",
+        cue_slot: "A",
+      }),
+    ).toBe("");
+  });
+
+  test("candidate mismatch does not render the stale decision", () => {
+    expect(
+      nextDecisionText(
+        {
+          emitted: true,
+          validation_status: "accepted",
+          action: "select",
+          candidate_id: "tr_old",
+          cue_slot: "A",
+          timing_text: "in 13 bars",
+        },
+        { candidate_id: "tr_001", cue_slot: "A", start_in_bars: 13 },
+      ),
+    ).toBe("");
+  });
+});
+
 describe("renderNextSuggestion — honest silence + verbatim render", () => {
   test("null → renders NOTHING (honest silence, never a fabricated track)", () => {
     expect(renderNextSuggestion(null)).toBeNull();
@@ -166,9 +254,82 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     );
   });
 
+  test("accepted decision owns the action line over the raw transition countdown", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: {
+          candidate_id: "tr_001",
+          target_deck: "B",
+          from_role: "outro",
+          to_role: "intro",
+          cue_slot: "A",
+          to_start_s: 64,
+          start_in_bars: 12,
+        },
+        decision: {
+          emitted: true,
+          validation_status: "accepted",
+          action: "select",
+          candidate_id: "tr_001",
+          cue_slot: "A",
+          timing_text: "in 13 bars",
+          spoken_text: "Next good entry: t1 cue A at 1:04, outro into intro, in 13 bars.",
+        },
+      }),
+    )!;
+    expect(card.querySelector(".vmx-next-card__transition")?.textContent).toBe(
+      "load B · cue A @ 1:04 · outro→intro · in 13 bars",
+    );
+  });
+
+  test("unsafe decision falls back to transition text", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: { candidate_id: "tr_001", target_deck: "B", cue_slot: "A", start_in_bars: 4 },
+        decision: {
+          emitted: true,
+          validation_status: "rejected",
+          action: "select",
+          candidate_id: "tr_001",
+          cue_slot: "A",
+          timing_text: "in 16 bars",
+        },
+      }),
+    )!;
+    expect(card.querySelector(".vmx-next-card__transition")?.textContent).toBe(
+      "load B · cue A · in 4 bars",
+    );
+  });
+
   test("render key changes when the live transition countdown changes", () => {
     const a = _sugg({ transition: { cue_slot: "A", start_in_bars: 13 } });
     const b = _sugg({ transition: { cue_slot: "A", start_in_bars: 12 } });
+    expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
+  });
+
+  test("render key changes when the validated decision timing changes", () => {
+    const a = _sugg({
+      transition: { candidate_id: "tr_001", cue_slot: "A", start_in_bars: 13 },
+      decision: {
+        emitted: true,
+        validation_status: "accepted",
+        action: "select",
+        candidate_id: "tr_001",
+        cue_slot: "A",
+        timing_text: "in 13 bars",
+      },
+    });
+    const b = _sugg({
+      transition: { candidate_id: "tr_001", cue_slot: "A", start_in_bars: 13 },
+      decision: {
+        emitted: true,
+        validation_status: "accepted",
+        action: "select",
+        candidate_id: "tr_001",
+        cue_slot: "A",
+        timing_text: "in 12 bars",
+      },
+    });
     expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
   });
 

@@ -234,11 +234,33 @@ export function nextTransitionText(
   return bits.join(" · ");
 }
 
+export function nextDecisionText(
+  d: NextSuggestionDecisionWire | null | undefined,
+  t?: NextSuggestionTransitionWire | null,
+): string {
+  if (!isRenderableDecision(d, t)) return "";
+  const cue = typeof d.cue_slot === "string" ? d.cue_slot.trim() : "";
+  const bits: string[] = [];
+  const targetDeck = deckLabel(t?.target_deck);
+  if (targetDeck) bits.push(`load ${targetDeck}`);
+  if (cue) {
+    const cueTime = formatCueTime(t?.to_start_s);
+    bits.push(cueTime ? `cue ${cue.toUpperCase()} @ ${cueTime}` : `cue ${cue.toUpperCase()}`);
+  }
+  const rolePair = rolePairLabel(t?.from_role, t?.to_role);
+  if (rolePair) bits.push(rolePair);
+  const timing = cleanDecisionText(d.timing_text);
+  if (timing) bits.push(timing);
+  if (bits.length > 0) return bits.join(" · ");
+  return cleanDecisionText(d.spoken_text);
+}
+
 export function nextSuggestionRenderKey(
   s: NextSuggestionWire | null | undefined,
 ): string {
   if (!s) return "";
   const t = s.transition;
+  const d = s.decision;
   return [
     s.track_id,
     s.title,
@@ -261,13 +283,38 @@ export function nextSuggestionRenderKey(
     t?.source_anchor_s ?? "",
     t?.cue_slot ?? "",
     t?.start_in_bars ?? "",
+    d?.emitted ?? "",
+    d?.validation_status ?? "",
+    d?.action ?? "",
+    d?.candidate_id ?? "",
+    d?.cue_slot ?? "",
+    d?.timing_text ?? "",
+    d?.spoken_text ?? "",
   ].join("|");
+}
+
+function isRenderableDecision(
+  d: NextSuggestionDecisionWire | null | undefined,
+  t?: NextSuggestionTransitionWire | null,
+): d is NextSuggestionDecisionWire {
+  if (!d || d.emitted !== true) return false;
+  if (d.validation_status !== "accepted") return false;
+  if (d.action !== "select") return false;
+  const decisionCandidate = cleanDecisionText(d.candidate_id);
+  const transitionCandidate = cleanDecisionText(t?.candidate_id);
+  if (!decisionCandidate) return false;
+  return !transitionCandidate || decisionCandidate === transitionCandidate;
 }
 
 function deckLabel(raw: string | null | undefined): string {
   if (typeof raw !== "string") return "";
   const deck = raw.trim().toUpperCase();
   return deck === "A" || deck === "B" ? deck : "";
+}
+
+function cleanDecisionText(raw: string | null | undefined): string {
+  if (typeof raw !== "string") return "";
+  return raw.trim().replace(/\s+/g, " ");
 }
 
 function formatCueTime(raw: number | null | undefined): string {
@@ -330,11 +377,11 @@ export function renderNextSuggestion(
   meta.textContent = nextMetaText(s);
   root.append(meta);
 
-  const transitionText = nextTransitionText(s.transition);
-  if (transitionText) {
+  const actionText = nextDecisionText(s.decision, s.transition) || nextTransitionText(s.transition);
+  if (actionText) {
     const transition = document.createElement("div");
     transition.className = "vmx-next-card__transition";
-    transition.textContent = transitionText;
+    transition.textContent = actionText;
     root.append(transition);
   }
 
