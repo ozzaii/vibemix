@@ -444,6 +444,8 @@ Acceptance evidence:
 - review-only cues cannot be called export-ready;
 - exported/saved language requires an action-success claim;
 - playlist/M3U/JSON creation language requires a `playlist_created` action claim;
+- completed export/playlist language requires success-valued action claims, not
+  failed/planned action rows;
 - stayed-quiet / suppressed-output explanations require a `decision_suppressed`
   or `blend_suppression` claim;
 - audience predictions and absolute "perfect/guaranteed" transition language are

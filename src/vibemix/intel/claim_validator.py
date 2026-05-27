@@ -62,6 +62,23 @@ _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "suppression": frozenset({"decision_suppressed", "blend_suppression"}),
     "unsupported_musical_fact": frozenset(),
 }
+_SUCCESS_CLAIM_VALUES = frozenset(
+    {
+        "ok",
+        "success",
+        "succeeded",
+        "done",
+        "complete",
+        "completed",
+        "true",
+        "written",
+        "file_written",
+        "created",
+        "playlist_created",
+        "exported",
+        "saved",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +129,7 @@ def validate_decision_claims(
         if not (_REQUIRED_TYPES[family] & cited_types):
             errors.append(f"missing_claim_id_for_{family}")
     _validate_cue_export_status_phrase(text, cited_rows, errors)
+    _validate_action_success_phrases(text, cited_rows, errors)
 
     return (
         ClaimValidationResult("rejected", tuple(errors))
@@ -157,6 +175,32 @@ def _validate_cue_export_status_phrase(
         if not any(str(row.get("value")) == expected_status for row in status_rows):
             claim_id = str(status_rows[0].get("claim_id") or "unknown")
             errors.append(f"cue_export_status_mismatch:{claim_id}:{expected_status}")
+
+
+def _validate_action_success_phrases(
+    text: str,
+    cited_rows: list[dict[str, Any]],
+    errors: list[str],
+) -> None:
+    for claim_type, pattern in (
+        ("export_result", _EXPORT_RE),
+        ("playlist_created", _PLAYLIST_ACTION_RE),
+    ):
+        if not pattern.search(text):
+            continue
+        rows = [row for row in cited_rows if row.get("type") == claim_type]
+        if not rows or any(_claim_value_is_success(row.get("value")) for row in rows):
+            continue
+        claim_id = str(rows[0].get("claim_id") or "unknown")
+        errors.append(f"action_claim_not_success:{claim_id}:{claim_type}")
+
+
+def _claim_value_is_success(value: Any) -> bool:
+    if value is True:
+        return True
+    if not isinstance(value, str):
+        return False
+    return value.strip().lower() in _SUCCESS_CLAIM_VALUES
 
 
 def _cue_export_statuses_implied_by_text(text: str) -> tuple[str, ...]:

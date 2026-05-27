@@ -289,6 +289,45 @@ def test_exported_phrase_requires_action_success_claim() -> None:
     assert "missing_claim_id_for_export" in result.errors
 
 
+def test_exported_phrase_rejects_failed_export_result_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(_claim("clm_ctx_001_000", "export_result", value="failed"),)
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="I exported the cue map.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "action_claim_not_success:clm_ctx_001_000:export_result" in result.errors
+
+
+def test_exported_phrase_accepts_successful_export_result_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(_claim("clm_ctx_001_000", "export_result", value="file_written"),)
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="I exported the cue map.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
 def test_created_playlist_phrase_requires_playlist_success_claim() -> None:
     envelope = _envelope(claim_summary=())
 
@@ -304,6 +343,46 @@ def test_created_playlist_phrase_requires_playlist_success_claim() -> None:
 
     assert not result.accepted
     assert "missing_claim_id_for_playlist" in result.errors
+
+
+def test_created_playlist_phrase_rejects_planned_playlist_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(_claim("clm_ctx_001_000", "playlist_created", value="planned"),)
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="I created the playlist.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "action_claim_not_success:clm_ctx_001_000:playlist_created" in result.errors
+
+
+def test_created_playlist_phrase_rejects_false_playlist_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(_claim("clm_ctx_001_000", "playlist_created", value=False),)
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="I created the playlist.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "action_claim_not_success:clm_ctx_001_000:playlist_created" in result.errors
 
 
 def test_created_playlist_phrase_accepts_playlist_success_claim() -> None:
