@@ -76,7 +76,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 
 | # | Phase | Goal | REQ-IDs | SC count |
 |---|-------|------|---------|----------|
-| 91 | Controller Renderer + MIDI Mirror | 1/7 | In Progress|  |
+| 91 | Controller Renderer + MIDI Mirror | 2/7 | In Progress|  |
 | 92 | Lesson Runtime + AI Highlight Contract | A "hello world" 1-step lesson runs end-to-end: AI says "press play deck A", highlight glows on the rendered control, user presses physical button → lesson advances | TONE-02, TONE-04, LESSON-01, LESSON-02, LESSON-03, LESSON-04, LESSON-05, LESSON-06, RENDER-04 (9) | 4 |
 | 93 | Exemplar Engine + `[exemplar:]` Evidence Source | DSP-band exemplar engine picks strongest-band track from user's library; falls back to packaged CC-BY bank when empty; plays through dedicated `ExemplarPlayer`; `[exemplar:<id>]` resolves via 4-site mirror | EXEMPLAR-01, EXEMPLAR-02, EXEMPLAR-03, EXEMPLAR-04, EXEMPLAR-05 (5) | 4 |
 | 94 | Course 1 — Anatomy (L1.01–L1.16) | Beginner opens Learn, sees verbatim 4-line opening dialog, walks through 16 hand-authored anatomy lessons culminating in EQ-as-Tutor demo using library exemplars | TONE-01, TONE-03, CURR-1.01..1.16 (18) | 5 |
@@ -101,7 +101,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 
 **Plans:** 7 plans
 - [x] 91-01-PLAN.md — IPC schema + Vite/HTML/capability scaffolding + Python envelope dataclasses (Wave 1)
-- [ ] 91-02-PLAN.md — Test scaffolding (5 Python + 14 TS test stubs covering every per-task verification row) (Wave 1)
+- [x] 91-02-PLAN.md — Test scaffolding (5 Python + 14 TS test stubs covering every per-task verification row) (Wave 1)
 - [ ] 91-03-PLAN.md — Python backend `learn/midi_mirror.py` + `ws_bus.py` + `__main__.py` wiring (Wave 2)
 - [ ] 91-04-PLAN.md — Rust shell `learn_window.rs` + `main.rs` registration (Wave 2)
 - [ ] 91-05-PLAN.md — Webview entry + FLX4 SVG + generic fallback + ARIA lookup + 5 components (Wave 3)

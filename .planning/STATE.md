@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v9.0
 milestone_name: Lesson One
 status: executing
-last_updated: "2026-05-27T20:47:12.944Z"
-last_activity: 2026-05-27 -- Plan 91-01 SHIPPED (IPC contract + Vite/Tauri scaffolding)
+last_updated: "2026-05-27T21:08:43.534Z"
+last_activity: 2026-05-27
 progress:
   total_phases: 14
   completed_phases: 0
   total_plans: 7
-  completed_plans: 1
+  completed_plans: 2
   percent: 14
 ---
 
@@ -18,9 +18,9 @@ progress:
 ## Current Position
 
 Phase: 91 (Controller Renderer + MIDI Mirror) — EXECUTING
-Plan: 2 of 7 (Plan 01 SHIPPED 2026-05-27, commits 905e1550 → de4808ce)
+Plan: 3 of 7 (Plans 01-02 SHIPPED; 91-01 commits 905e1550 → de4808ce on 2026-05-27; 91-02 commits da2aa70c → 10c4fcfc on 2026-05-27/28)
 Status: Ready to execute
-Last activity: 2026-05-27 — 91-01 SHIPPED: 2 ipc.learn.* envelopes + Vite/Tauri scaffolding; 6 tests fixed; 66 oneOf == 66 wrappers
+Last activity: 2026-05-28
 
 ## Milestone Reference
 
