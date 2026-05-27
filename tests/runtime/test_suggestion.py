@@ -143,6 +143,63 @@ def test_compute_unknown_seed_keeps_current():
     assert out == before and svc.current() == before
 
 
+def test_compute_emits_inferred_suggestion_shown_feedback():
+    store = _FakeStore(["s", "a"], [("s", 0.99), ("a", 0.9)])
+    events = []
+    svc = SuggestionService(
+        store,
+        _lib(["s", "a"]),
+        feedback_sink=events.append,
+        session_id="session test",
+    )
+
+    out = svc.compute("s")
+
+    assert out is not None
+    assert len(events) == 1
+    assert events[0].surface == "live_next_pill"
+    assert events[0].action == "suggestion_shown"
+    assert events[0].label is None
+    assert events[0].inferred is True
+    assert events[0].session_id == "session_test"
+    assert events[0].raw["seed_track_id"] == "s"
+    assert events[0].raw["selected_track_id"] == "a"
+
+
+def test_seed_change_emits_inferred_played_or_different_track_feedback():
+    state = MusicState()
+    state.audible_deck = "A"
+    events = []
+    store = _FakeStore(["s", "a", "b"], [("s", 0.99), ("a", 0.9), ("b", 0.8)])
+    svc = SuggestionService(store, _lib(["s", "a", "b"]), feedback_sink=events.append)
+    state.deck_state = DeckState(decks={"A": DeckTrack(track_id="s", confidence=1.0)})
+
+    first = svc.compute_from_state(state)
+    assert first is not None and first["track_id"] == "a"
+    state.deck_state = DeckState(decks={"A": DeckTrack(track_id="a", confidence=1.0)})
+
+    assert svc.refresh_from_state(state, now=10.0, min_interval_s=0.0) is None
+    assert events[-1].action == "suggestion_played_next"
+    assert events[-1].label == "played_next"
+    assert events[-1].inferred is True
+    assert events[-1].raw["selected_track_id"] == "a"
+    assert events[-1].raw["actual_next_track_id"] == "a"
+
+    events = []
+    svc = SuggestionService(store, _lib(["s", "a", "b"]), feedback_sink=events.append)
+    state.deck_state = DeckState(decks={"A": DeckTrack(track_id="s", confidence=1.0)})
+    first = svc.compute_from_state(state)
+    assert first is not None and first["track_id"] == "a"
+    state.deck_state = DeckState(decks={"A": DeckTrack(track_id="b", confidence=1.0)})
+
+    assert svc.refresh_from_state(state, now=10.0, min_interval_s=0.0) is None
+    assert events[-1].action == "suggestion_different_track"
+    assert events[-1].label == "different_track"
+    assert events[-1].inferred is True
+    assert events[-1].raw["selected_track_id"] == "a"
+    assert events[-1].raw["actual_next_track_id"] == "b"
+
+
 def test_resolve_seed_from_audible_deck():
     state = MusicState()
     state.audible_deck = "A"
@@ -601,19 +658,20 @@ def test_choose_alternative_pins_visible_backup_without_reranking():
     assert chosen["transition_alternatives"][1]["track_id"] == "a"
     assert chosen["decision"]["action"] == "select"
     assert chosen["decision"]["candidate_id"] == "tr_001"
-    assert len(events) == 1
-    assert events[0].surface == "live_next_pill"
-    assert events[0].label == "played_next"
-    assert events[0].session_id == "session_test"
-    assert events[0].candidate_id == backup["candidate_id"]
-    assert events[0].role_pair == (
+    assert len(events) == 2
+    assert events[0].action == "suggestion_shown"
+    assert events[1].surface == "live_next_pill"
+    assert events[1].label == "played_next"
+    assert events[1].session_id == "session_test"
+    assert events[1].candidate_id == backup["candidate_id"]
+    assert events[1].role_pair == (
         chosen["transition"]["from_role"],
         chosen["transition"]["to_role"],
     )
-    assert events[0].score == chosen["transition"]["score"]
-    assert events[0].raw["selected_track_id"] == "b"
-    assert events[0].raw["replaced_track_id"] == "a"
-    assert events[0].raw["promoted_candidate_id"] == "tr_001"
+    assert events[1].score == chosen["transition"]["score"]
+    assert events[1].raw["selected_track_id"] == "b"
+    assert events[1].raw["replaced_track_id"] == "a"
+    assert events[1].raw["promoted_candidate_id"] == "tr_001"
 
     refreshed = svc.refresh_from_state(state, now=10.0, min_interval_s=0.0)
 
@@ -626,7 +684,7 @@ def test_choose_alternative_pins_visible_backup_without_reranking():
 
     assert svc.choose_alternative(candidate_id="tr_missing", state=state) is None
     assert svc.current()["track_id"] == "b"
-    assert len(events) == 1
+    assert len(events) == 2
 
 
 def test_refresh_from_state_clears_stale_pick_when_seed_changes():

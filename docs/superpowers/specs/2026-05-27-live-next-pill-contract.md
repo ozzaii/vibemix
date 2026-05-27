@@ -175,6 +175,14 @@ The event is emitted only when a non-selected visible alternative is actually
 promoted. Clicking the already-selected row or a stale/missing candidate does not
 emit feedback.
 
+The runtime also records inferred feedback from the live deck outcome. When a
+new suggestion is issued, it emits `suggestion_shown` as a non-taste exposure
+event. When the active seed changes, the service compares the actual next track
+against the visible suggestion: matching the suggestion emits inferred
+`played_next`; loading a different track emits inferred `different_track`.
+Inferred labels are deliberately lower weight in the taste model and still need
+the multi-session evidence gates before they can affect ranking.
+
 In the live runtime the event is written to the current session's `events.jsonl`
 as `kind: "taste_feedback"` for local replay. Long-term taste storage appends the
 same structured row to `app_data_dir()/taste_feedback.jsonl` only when

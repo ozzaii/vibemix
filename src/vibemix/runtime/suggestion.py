@@ -356,22 +356,62 @@ class SuggestionService:
             "profile_consent": True,
         }
         if transition is not None:
-            row.update(
-                {
-                    "role_from": _str_or_none(transition.get("from_role")),
-                    "role_to": _str_or_none(transition.get("to_role")),
-                    "from_section_id": _str_or_none(transition.get("from_section_id")),
-                    "to_section_id": _str_or_none(transition.get("to_section_id")),
-                    "cue_slot": _str_or_none(transition.get("cue_slot")),
-                    "cue_source": _str_or_none(transition.get("cue_source")),
-                    "cue_confidence": _float_or(transition.get("cue_confidence"), None),
-                    "score": _float_or(transition.get("score"), None),
-                    "confidence": _float_or(transition.get("confidence"), None),
-                    "risk_flags": [str(flag) for flag in (transition.get("risk_flags") or ())],
-                    "source_selection": _str_or_none(transition.get("source_selection")),
-                    "timing_basis": _str_or_none(transition.get("timing_basis")),
-                }
-            )
+            row.update(_transition_feedback_fields(transition))
+        return parse_feedback_event(row)
+
+    def _feedback_event_for_seed_change(
+        self,
+        *,
+        previous: dict | None,
+        previous_seed_track_id: str | None,
+        new_seed_track_id: str | None,
+    ) -> FeedbackEvent | None:
+        if previous is None or not new_seed_track_id or new_seed_track_id == previous_seed_track_id:
+            return None
+        suggested_track_id = _str_or_none(previous.get("track_id"))
+        if suggested_track_id is None:
+            return None
+        label = "played_next" if new_seed_track_id == suggested_track_id else "different_track"
+        return self._feedback_event_for_suggestion(
+            action="suggestion_played_next"
+            if label == "played_next"
+            else "suggestion_different_track",
+            label=label,
+            suggestion=previous,
+            seed_track_id=previous_seed_track_id,
+            actual_next_track_id=new_seed_track_id,
+            inferred=True,
+        )
+
+    def _feedback_event_for_suggestion(
+        self,
+        *,
+        action: str,
+        label: str | None,
+        suggestion: dict | None,
+        seed_track_id: str | None,
+        actual_next_track_id: str | None = None,
+        inferred: bool,
+    ) -> FeedbackEvent | None:
+        if self._feedback_sink is None or suggestion is None:
+            return None
+        transition = _dict_or_none(suggestion.get("transition"))
+        row: dict[str, Any] = {
+            "event_id": f"live_next_{action}_{self._feedback_session_id}_{time.time_ns()}",
+            "session_id": self._feedback_session_id,
+            "surface": "live_next_pill",
+            "action": action,
+            "label": label,
+            "split": "calibration",
+            "candidate_id": _candidate_id_for_suggestion(suggestion),
+            "selected_track_id": _str_or_none(suggestion.get("track_id")),
+            "actual_next_track_id": _str_or_none(actual_next_track_id),
+            "seed_track_id": _str_or_none(seed_track_id),
+            "inferred": inferred,
+            "profile_consent": True,
+        }
+        if transition is not None:
+            row.update(_transition_feedback_fields(transition))
         return parse_feedback_event(row)
 
     def _emit_feedback(self, event: FeedbackEvent) -> None:
@@ -652,7 +692,16 @@ class SuggestionService:
             candidate_vector = candidate_vectors_by_track_id.get(candidate_track_id)
             if candidate_vector is None:
                 candidate_vector = seed_vector_for_track_id(self._store, candidate_track_id)
+        outcome_event: FeedbackEvent | None = None
         with self._lock:
+            previous = dict(self._current) if self._current is not None else None
+            previous_seed_track_id = self._seed_track_id
+            if previous is not None and previous_seed_track_id != seed_track_id:
+                outcome_event = self._feedback_event_for_seed_change(
+                    previous=previous,
+                    previous_seed_track_id=previous_seed_track_id,
+                    new_seed_track_id=seed_track_id,
+                )
             self._current = d
             self._seed_track_id = seed_track_id if d is not None else None
             self._seed_vector = vec.copy() if d is not None else None
@@ -669,6 +718,17 @@ class SuggestionService:
             self._pinned_candidate_track_id = None
             self._last_compute_seed_track_id = seed_track_id
             self._last_refresh_at = 0.0
+        if outcome_event is not None:
+            self._emit_feedback(outcome_event)
+        shown_event = self._feedback_event_for_suggestion(
+            action="suggestion_shown",
+            label=None,
+            suggestion=d,
+            seed_track_id=seed_track_id,
+            inferred=True,
+        )
+        if shown_event is not None:
+            self._emit_feedback(shown_event)
         return d
 
     def compute_for_seed(self, seed: ResolvedSeed, timing: LiveTimingHint) -> dict | None:
@@ -737,6 +797,11 @@ class SuggestionService:
         if seed is None:
             return current
         if seed.track_id != seed_track_id:
+            feedback_event = self._feedback_event_for_seed_change(
+                previous=current,
+                previous_seed_track_id=seed_track_id,
+                new_seed_track_id=seed.track_id,
+            )
             with self._lock:
                 if self._seed_track_id == seed_track_id:
                     self._current = None
@@ -747,6 +812,8 @@ class SuggestionService:
                     self._candidate_vectors_by_track_id = {}
                     self._pinned_candidate_track_id = None
                     self._last_compute_seed_track_id = None
+            if feedback_event is not None:
+                self._emit_feedback(feedback_event)
             return None
 
         candidate_track_id = current.get("track_id")
@@ -1017,6 +1084,37 @@ def _xfader_factor(side: str, xfader: int) -> float:
 
 def _dict_or_none(value: Any) -> dict | None:
     return dict(value) if isinstance(value, dict) else None
+
+
+def _candidate_id_for_suggestion(suggestion: dict) -> str | None:
+    transition = _dict_or_none(suggestion.get("transition"))
+    if transition is not None:
+        candidate_id = _str_or_none(transition.get("candidate_id"))
+        if candidate_id is not None:
+            return candidate_id
+    alternatives = _coerce_transition_alternatives(suggestion.get("transition_alternatives"))
+    if alternatives:
+        candidate_id = _str_or_none(alternatives[0].get("candidate_id"))
+        if candidate_id is not None:
+            return candidate_id
+    return None
+
+
+def _transition_feedback_fields(transition: dict) -> dict[str, Any]:
+    return {
+        "role_from": _str_or_none(transition.get("from_role")),
+        "role_to": _str_or_none(transition.get("to_role")),
+        "from_section_id": _str_or_none(transition.get("from_section_id")),
+        "to_section_id": _str_or_none(transition.get("to_section_id")),
+        "cue_slot": _str_or_none(transition.get("cue_slot")),
+        "cue_source": _str_or_none(transition.get("cue_source")),
+        "cue_confidence": _float_or(transition.get("cue_confidence"), None),
+        "score": _float_or(transition.get("score"), None),
+        "confidence": _float_or(transition.get("confidence"), None),
+        "risk_flags": [str(flag) for flag in (transition.get("risk_flags") or ())],
+        "source_selection": _str_or_none(transition.get("source_selection")),
+        "timing_basis": _str_or_none(transition.get("timing_basis")),
+    }
 
 
 def _str_or_none(value: Any) -> str | None:

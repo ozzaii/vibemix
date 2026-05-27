@@ -776,7 +776,7 @@ async def main() -> None:
     recorder.trace_sink = _recorder_trace_sink
 
     def _live_next_feedback_sink(event) -> None:
-        """Record live pill backup choices as local, consent-gated taste rows."""
+        """Record live pill feedback as local, consent-gated taste rows."""
         from vibemix.intel.feedback import append_feedback_event, feedback_event_to_row
         from vibemix.profile import load_consent as _load_profile_consent
 
