@@ -6,7 +6,12 @@ from pathlib import Path
 
 from scripts.eval.intel_gate import run_intel_gate
 from scripts.eval.intel_gold import DEFAULT_FIXTURE_DIR, report_gold_file
-from scripts.eval.intel_recalibration_note import build_recalibration_note, main
+from scripts.eval.intel_recalibration_note import (
+    APPEND_MARKER,
+    append_recalibration_note,
+    build_recalibration_note,
+    main,
+)
 from scripts.eval.intel_scorecard import score_fixture_dir
 from scripts.eval.intel_taste_scorecard import score_fixture_dir as score_taste_fixture_dir
 
@@ -127,3 +132,80 @@ def test_recalibration_note_cli_writes_markdown_and_json(tmp_path: Path, capsys)
     result = json.loads(capsys.readouterr().out)
     assert result["valid"] is True
     assert out.read_text(encoding="utf-8") == result["entry"]
+
+
+def test_append_recalibration_note_appends_after_marker(tmp_path: Path) -> None:
+    log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
+    log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report(),
+        evidence_tier="tier1_private_calibration",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+        run_id="intel_private_append",
+    )
+
+    appended = append_recalibration_note(log, result)
+
+    text = appended.read_text(encoding="utf-8")
+    assert APPEND_MARKER in text
+    assert text.index(APPEND_MARKER) < text.index("intel_private_append")
+
+
+def test_append_recalibration_note_refuses_invalid_result(tmp_path: Path) -> None:
+    log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
+    log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report(),
+        evidence_tier="tier2_private_holdout_canary",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+    )
+
+    try:
+        append_recalibration_note(log, result)
+    except ValueError as exc:
+        assert "invalid" in str(exc)
+    else:  # pragma: no cover - explicit assertion path for clarity
+        raise AssertionError("invalid recalibration note was appended")
+
+    assert "private_recalibration_required" not in log.read_text(encoding="utf-8")
+
+
+def test_cli_does_not_write_output_or_append_log_for_invalid_note(
+    tmp_path: Path,
+    capsys,  # type: ignore[no-untyped-def]
+) -> None:
+    scorecard = tmp_path / "scorecard.json"
+    gold = tmp_path / "gold_report.json"
+    out = tmp_path / "entry.md"
+    log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
+    scorecard.write_text(json.dumps(_scorecard()), encoding="utf-8")
+    gold.write_text(json.dumps(_gold_report()), encoding="utf-8")
+    log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
+
+    rc = main(
+        [
+            "--scorecard",
+            str(scorecard),
+            "--gold-report",
+            str(gold),
+            "--evidence-tier",
+            "tier2_private_holdout_canary",
+            "--timestamp",
+            "2026-05-27T12:00:00Z",
+            "--output",
+            str(out),
+            "--append-log",
+            str(log),
+            "--json",
+        ]
+    )
+
+    assert rc == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result["valid"] is False
+    assert not out.exists()
+    assert log.read_text(encoding="utf-8") == f"# Log\n\n{APPEND_MARKER}\n"

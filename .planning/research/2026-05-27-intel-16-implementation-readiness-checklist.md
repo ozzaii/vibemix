@@ -641,6 +641,8 @@ done: private-label release threshold recalibration note exists at
       INTEL threshold lock/public eval docs
 done: `scripts/eval/intel_recalibration_note.py` is the reproducible producer
       for the private-label note, including privacy and split-coverage gates
+done: `scripts/eval/intel_recalibration_note.py --append-log` appends only
+      valid entries to the public recalibration log and refuses invalid evidence
 ```
 
 The docs are not the milestone. The scorecard is.

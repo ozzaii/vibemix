@@ -76,7 +76,8 @@ INTEL thresholds is tracked in
 [`eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md`](INTEL-THRESHOLD-RECALIBRATION-LOG.md);
 the public log records only redacted split counts, aggregate metrics, hashes,
 privacy flags, and actions. `scripts/eval/intel_recalibration_note.py` renders
-that append-only entry from redacted private scorecard/gold/taste reports.
+that append-only entry from redacted private scorecard/gold/taste reports and
+can append it with `--append-log` only after validation passes.
 
 ## 2-Judge Architecture (high level)
 

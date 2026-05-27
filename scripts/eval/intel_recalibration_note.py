@@ -18,6 +18,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 DEFAULT_LOCK = ROOT / "eval" / "INTEL-THRESHOLD-LOCK.md"
+DEFAULT_LOG = ROOT / "eval" / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
+APPEND_MARKER = "<!-- Real redacted private-label entries append below. -->"
 
 EVIDENCE_TIERS = frozenset(
     {
@@ -323,6 +325,22 @@ def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def append_recalibration_note(log_path: Path | str, result: dict[str, Any]) -> Path:
+    """Append one valid rendered note to the public recalibration log."""
+    if result.get("valid") is not True:
+        raise ValueError("refusing to append invalid recalibration note")
+    entry = str(result.get("entry") or "").strip()
+    if not entry:
+        raise ValueError("refusing to append empty recalibration note")
+    path = Path(log_path)
+    text = path.read_text(encoding="utf-8")
+    if APPEND_MARKER not in text:
+        raise ValueError(f"append marker missing from {path}")
+    suffix = "" if text.endswith("\n") else "\n"
+    path.write_text(f"{text}{suffix}\n{entry}\n", encoding="utf-8")
+    return path
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scorecard", type=Path, required=True)
@@ -335,6 +353,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-id")
     parser.add_argument("--promote-release", action="store_true")
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--append-log", type=Path, help="Append the valid entry to the log")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -349,9 +368,12 @@ def main(argv: list[str] | None = None) -> int:
         run_id=args.run_id,
         promote_release=args.promote_release,
     )
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(result["entry"], encoding="utf-8")
+    if result["valid"]:
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(result["entry"], encoding="utf-8")
+        if args.append_log:
+            append_recalibration_note(args.append_log, result)
     if args.json:
         json.dump(result, sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write("\n")
