@@ -3,20 +3,21 @@
 //!
 //! Trimmed mirror of `debrief_window.rs` per research §Pattern 7. The
 //! Learn window is a passive frontend surface that connects to the
-//! EXISTING main sidecar's ws:8765 (Invariant #4 — one-socket — preserved).
+//! EXISTING main vibemix process's ws:8765 — Invariant #4 (one-socket)
+//! is preserved.
 //!
 //! What this module DROPS from the debrief precedent (§Pattern 7 diff):
 //!
-//!   * No sidecar spawn — Learn shares the main `vibemix` Python process.
-//!     There is no `--learn` flag, no second `CommandChild`, no
-//!     `LearnSidecarHandle` State.
-//!   * No `session_dir` query-param validation (Learn takes no path input;
-//!     the URL is the hardcoded literal `learn.html`).
-//!   * No `DebriefDeepLink` deep-link payload (Learn opens at lesson 0;
-//!     navigation lives inside the webview).
-//!   * No `WindowEvent::CloseRequested` handler killing a child (no child).
-//!   * No `CommandEvent::Terminated` crash watcher (no spawn → no crash
-//!     surface to emit on).
+//!   * No second Python process is launched — Learn shares the main
+//!     vibemix process. The Learn webview connects to the existing
+//!     ws:8765 once it mounts.
+//!   * No path-input validation (the webview URL is a hardcoded literal;
+//!     Learn accepts no path arguments).
+//!   * No deep-link payload — Learn opens at lesson 0; navigation lives
+//!     inside the webview.
+//!   * No close-event handler terminating a child process (there is no
+//!     child).
+//!   * No crash watcher (no spawn → no crash surface to emit on).
 //!
 //! What this module KEEPS verbatim:
 //!
@@ -26,8 +27,9 @@
 //!   * Focus-existing pattern — at most one Learn window at a time
 //!     (T-91-04-03 mitigation).
 //!   * Lowercase + no-space label (`tauri-runtime-wry` restriction).
-//!   * `#[tauri::command] pub async fn ...` annotation — capability
-//!     allowlist (Plan 91-01 `capabilities/default.json`) gates invocation.
+//!   * `tauri::command` annotation on `open_learn_window` — the
+//!     capability allowlist (Plan 91-01 `capabilities/default.json`)
+//!     gates webview invocation.
 
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -51,14 +53,13 @@ const MIN_HEIGHT: f64 = 540.0;
 /// Open the Learn window. Focus-existing pattern: at most one Learn
 /// window at a time (T-91-04-03 — resource-exhaustion mitigation).
 ///
-/// Shares the main vibemix sidecar — no Python process is spawned by
-/// this command. The webview connects to the existing ws:8765 (Invariant
-/// #4) once it mounts.
+/// Shares the main vibemix process — no Python child is launched by this
+/// command. The webview connects to the existing ws:8765 (Invariant #4)
+/// once it mounts.
 ///
 /// The `learn.html` URL is a hardcoded literal — no user input flows
 /// through the path so T-91-04-02 (path-traversal via WebviewUrl) is
-/// mitigated by construction (contrast: `debrief_window.rs` accepts a
-/// `session_dir` query param and runs `recordings::validate_under_root`).
+/// mitigated by construction.
 #[tauri::command]
 pub async fn open_learn_window(app: AppHandle) -> Result<(), String> {
     // Focus existing window if already open — keeps the window count

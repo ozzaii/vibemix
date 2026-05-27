@@ -22,6 +22,7 @@ mod debrief_window;
 mod debug_log;
 mod djay_ax;
 mod hotkey;
+mod learn_window;
 mod library_cmds;
 mod mascot_window;
 mod overlay;
@@ -107,6 +108,7 @@ fn main() {
             library_cmds::library_models,
             library_cmds::library_embed_folder,
             library_cmds::open_library_window,
+            learn_window::open_learn_window,
         ])
         .manage(SidecarHandle::default())
         .manage(DebriefSidecarHandle::default())
