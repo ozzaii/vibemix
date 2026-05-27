@@ -1374,54 +1374,68 @@ async def main() -> None:
     # cleaned up in the finally block alongside midi_stop.
     midi_watcher_stop = asyncio.Event()
     # Phase 91 (RENDER-01) — layer MidiMirror's controller_detected enqueue +
-    # bind_profile/unbind hooks on TOP of the existing single-state callback.
-    # Order matters per Plan 03 §behavior: on connect we bind THEN enqueue (so
-    # subsequent snapshot() calls in ws_broadcast see the bound profile); on
-    # disconnect we enqueue THEN unbind (so the envelope payload's profile id /
-    # display_name are still well-formed before clearing). The callback NEVER
-    # calls ws_broadcast's _send_all directly — that closure lives inside the
-    # 30 Hz tick and is not reachable from here. Queueing is the only correct
-    # emit path; the tick drains every iteration before pulling the snapshot.
-    from vibemix.platform._midi_common import (
-        ListenerHolder,
-        handle_port_change_single_state,
-    )
-
-    _midi_holder = ListenerHolder(
-        controller_state=midi_macos.controller_state,
-        listener_thread=None,
-        listener_stop=None,
-        mido_module=__import__("mido"),
-        bound_port=None,
-    )
+    # bind_profile/unbind hooks on the existing hot-plug watcher. The watcher's
+    # default single-state callback (handle_port_change_single_state) would also
+    # work, BUT it spawns a fresh listener thread that opens mido.open_input on
+    # the same port as the static start_listener_thread above — every MIDI
+    # message gets handled twice (CR-01 from Phase 91 review).
+    #
+    # The fix: do NOT call handle_port_change_single_state from here. The
+    # static listener at start_listener_thread() above already:
+    #   * Calls controller_state.mark_connected(port_name) on each successful
+    #     open (see _midi_common.midi_listener_thread:125).
+    #   * Retries silently on disconnect (2s sleep + re-enumerate) — so a
+    #     replug rebinds without intervention from this callback.
+    #
+    # What the static listener does NOT do: call mark_disconnected on unplug
+    # (it just retries forever). The single-state callback handled that —
+    # mark_disconnected clears the moves/events rings so a coach reaction
+    # post-unplug can't hallucinate a move from stale ring data (state.py:193
+    # docstring). So we still call mark_disconnected() here on the disconnect
+    # event, but we do NOT spawn a second listener thread. Net effect: one
+    # listener thread, ring-clear on unplug, MidiMirror bind/unbind layered
+    # on top.
+    #
+    # Order: on connect we bind THEN enqueue (so a subsequent snapshot() sees
+    # the bound profile); on disconnect we capture the last-bound profile,
+    # enqueue, mark_disconnected on the controller_state, THEN unbind on the
+    # mirror (so the envelope payload's profile id / display_name are still
+    # well-formed before clearing).
 
     def _on_midi_port_change(event: tuple) -> None:
-        # Step 1: preserve the existing single-state behavior (mark_connected
-        # / mark_disconnected + listener-thread restart) — read-only from
-        # MidiMirror's perspective.
-        handle_port_change_single_state(_midi_holder, event)
-        # Step 2: layer the MidiMirror lifecycle on top.
         kind = event[0]
         if kind == "connected":
             _, port_name, profile = event
-            # Bind FIRST so the first snapshot() after bind emits a full frame
-            # for the freshly-rendered SVG, then enqueue the detected envelope.
+            # The static listener above will (or already did) call
+            # controller_state.mark_connected(port_name) on its open. Bind
+            # the mirror's profile FIRST so the next ws_broadcast 30 Hz tick
+            # emits a fresh full position frame for the freshly-rendered SVG.
             midi_mirror.bind_profile(profile)
             midi_mirror.queue_controller_detected(
                 connected=True, profile=profile, port_name=port_name
             )
         elif kind == "disconnected":
             _, port_name = event
-            # Use the LAST bound profile from the holder so the envelope
-            # payload's controller_id / display_name are still well-formed;
-            # unbind only AFTER the enqueue.
-            _last_profile = getattr(midi_mirror, "_profile", None)
-            if _last_profile is not None:
+            # Use the public current_profile() accessor (WR-04 fix — no
+            # reach into MidiMirror's private _profile attribute) so the
+            # disconnect envelope's controller_id / display_name reflect the
+            # LAST bound profile.
+            last_profile = midi_mirror.current_profile()
+            if last_profile is not None:
                 midi_mirror.queue_controller_detected(
                     connected=False,
-                    profile=_last_profile,
+                    profile=last_profile,
                     port_name=port_name,
                 )
+            # Clear the moves/events rings on the live ControllerState so a
+            # post-unplug coach reaction can't hallucinate a move from stale
+            # ring data (state.py:193 — this is the load-bearing piece of the
+            # old single-state callback we preserve; the listener-restart
+            # piece is what we drop to avoid the doubled-thread bug).
+            try:
+                midi_macos.controller_state.mark_disconnected()
+            except Exception as e:  # pragma: no cover — defensive
+                print(f"[midi disconnect err] {e}", file=sys.stderr)
             midi_mirror.unbind()
 
     midi_watcher_task = midi_macos.start_port_watcher(

@@ -166,6 +166,21 @@ class MidiMirror:
         self._profile = None
         self._last_positions = {}
 
+    def current_profile(self) -> ControllerProfile | None:
+        """Return the currently-bound :class:`ControllerProfile`, or ``None``
+        when no controller is bound.
+
+        Public accessor for the port-watcher callback in ``__main__`` — it
+        needs to build the disconnect envelope from the last-bound profile
+        BEFORE :meth:`unbind` is called (otherwise the envelope payload's
+        ``controller_id`` / ``display_name`` would be ``None``). Exposed as a
+        method (not a property) so callers don't accidentally rely on
+        attribute-style access into MidiMirror's internals (WR-04 — the
+        previous wiring read ``midi_mirror._profile`` directly, which
+        couples ``__main__`` to a private name).
+        """
+        return self._profile
+
     # ------------------------------------------------------------------
     # Position snapshot path (called from ws_broadcast 30 Hz tick)
     # ------------------------------------------------------------------
