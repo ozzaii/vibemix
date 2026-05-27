@@ -135,20 +135,92 @@ async function loadControllerSvg(controllerId: string): Promise<string> {
 }
 
 /**
+ * Classify a `data-control-id` into knob / fader / button.
+ *
+ * The classification drives the render dispatch in :func:`applyPositionFrame`
+ * — knobs ROTATE around their `data-cx`/`data-cy` pivot, faders TRANSLATE
+ * along a linear axis (or, today, stay still and carry a `data-value`
+ * marker until per-fader geometry lands — see CR-02 note below), and
+ * buttons flip a `data-active` flag for the stylesheet to swap fill.
+ *
+ * The dispatch lives in the renderer (rather than as a `data-control-type`
+ * attribute on every SVG group) because the SVG-author surface is large
+ * (~66 fader groups across 10 controllers) and the control-id naming
+ * convention is already a stable contract pinned by the profile JSON
+ * parity gate (`test_svg_profile_parity.spec.ts`). The full set of
+ * known control-id prefixes is enumerated below; any new SKU that adds
+ * a control-id outside this set falls through to "knob" (the safe
+ * default — a missing `data-cx`/`data-cy` falls through to the button
+ * path further down).
+ *
+ * Phase 91 REVIEW CR-02 fix — before this, every group with
+ * `data-cx`/`data-cy` was rotated, so faders (which all carry `data-cx`/
+ * `data-cy` for the original rotation-pivot design) visibly rotated
+ * instead of translating; buttons (which also all carry `data-cx`/`data-cy`)
+ * rotated by a few degrees on press (value 0 → -135°, value 1 → -132.87°,
+ * a ~2° rotation per click). Both regressions failed the Kaan ear-pass
+ * bar before the milestone could ship.
+ */
+function classifyControl(controlId: string): "knob" | "fader" | "button" {
+  // Faders: linear position controls (vertical channel faders, the
+  // crossfader, and the per-deck tempo / pitch fader).
+  if (
+    controlId.startsWith("vol:") ||
+    controlId.startsWith("tempo:") ||
+    controlId === "xfader"
+  ) {
+    return "fader";
+  }
+  // Buttons: discrete on/off (transports, loop in/out, hot cues, jog touch,
+  // tap-tempo). `jog_touched` is the wire-shape spelling produced by
+  // ControllerState normalisation; `jog_touch` is what the SVG groups use
+  // — the lookup in applyPositionFrame already normalises the key before
+  // calling this classifier (so we only need the SVG-side spelling here).
+  if (
+    controlId.startsWith("play:") ||
+    controlId.startsWith("cue:") ||
+    controlId.startsWith("sync:") ||
+    controlId.startsWith("loop_in:") ||
+    controlId.startsWith("loop_out:") ||
+    controlId.startsWith("hotcue:") ||
+    controlId.startsWith("jog_touch:") ||
+    controlId === "tap_tempo"
+  ) {
+    return "button";
+  }
+  // Default: knob (eq_hi/mid/low:*, filter:*, filter_fx — all rotary).
+  return "knob";
+}
+
+/**
  * Apply a midi_position frame to the live SVG. Walks `positions`,
  * finds the matching `<g data-control-id>` group, and mutates a
- * `transform`/`data-active` attribute — never repaints the SVG.
+ * `transform`/`data-active`/`data-value` attribute — never repaints
+ * the SVG.
  *
- * - Knobs (presence of `data-cx`/`data-cy`): `transform="rotate(deg cx cy)"`
- *   where deg = (value/127)*270 - 135 (RESEARCH §Code Example 3).
- *   Maps the 7-bit MIDI range to the ±135° physical knob travel.
- * - Buttons (no `data-cx`): `data-active="0|1"` — CSS handles fill swap.
+ * Dispatch (see :func:`classifyControl` for the prefix→type map):
+ *
+ * - **Knob** (eq_*, filter:*, filter_fx): `transform="rotate(deg cx cy)"`
+ *   where deg = (value/127)*270 - 135 (RESEARCH §Code Example 3). Maps
+ *   the 7-bit MIDI range to the ±135° physical knob travel.
+ * - **Fader** (vol:*, tempo:*, xfader): `data-value="<n>"` is set on the
+ *   group. The rotation that the original implementation applied to
+ *   faders was visually wrong (the whole fader tilted instead of the
+ *   thumb translating); per CR-02 the rotation is suppressed entirely
+ *   until per-fader geometry (axis + travel + thumb classmark) lands
+ *   in a follow-up. Static-but-correct beats animated-but-wrong for
+ *   the milestone bar.
+ * - **Button** (play:*, cue:*, sync:*, loop_in/out:*, hotcue:*,
+ *   jog_touch:*, tap_tempo): `data-active="0|1"` — CSS handles the
+ *   fill swap. Previously buttons inherited the rotation path because
+ *   they also carry `data-cx`/`data-cy` (a ~2° rotation per click —
+ *   barely visible but wrong).
  *
  * The wire shape carries `jog_touched:A/B` (after ControllerState
- * normalisation in `state.py`) but the FLX4 SVG `data-control-id` is
+ * normalisation in `state.py`) but the SVG `data-control-id` is
  * `jog_touch:A/B` (matches the profile binding's `kind`). The lookup
  * tries the literal key first, then falls back to a `jog_touch`
- * substitution for the jog-touch family.
+ * substitution for the jog-touch family before classifying.
  */
 export function applyPositionFrame(
   stage: HTMLElement,
@@ -158,26 +230,39 @@ export function applyPositionFrame(
     if (typeof valueRaw !== "number") continue;
     const value = valueRaw;
     // Resolve key: try literal, then strip `_touched` -> `_touch` for jog.
+    let resolvedKey = rawKey;
     let group = stage.querySelector(
       `[data-control-id="${rawKey}"]`,
     ) as SVGGElement | null;
     if (!group && rawKey.startsWith("jog_touched:")) {
-      const alt = rawKey.replace("jog_touched:", "jog_touch:");
+      resolvedKey = rawKey.replace("jog_touched:", "jog_touch:");
       group = stage.querySelector(
-        `[data-control-id="${alt}"]`,
+        `[data-control-id="${resolvedKey}"]`,
       ) as SVGGElement | null;
     }
     if (!group) continue;
 
-    const cx = group.dataset.cx;
-    const cy = group.dataset.cy;
-    if (cx !== undefined && cy !== undefined) {
-      // Knob / fader-thumb-with-pivot — rotate.
-      const degrees = (value / 127) * 270 - 135;
-      group.setAttribute(
-        "transform",
-        `rotate(${degrees} ${Number(cx)} ${Number(cy)})`,
-      );
+    const controlType = classifyControl(resolvedKey);
+    if (controlType === "knob") {
+      const cx = group.dataset.cx;
+      const cy = group.dataset.cy;
+      if (cx !== undefined && cy !== undefined) {
+        // Knob — rotate around the pivot.
+        const degrees = (value / 127) * 270 - 135;
+        group.setAttribute(
+          "transform",
+          `rotate(${degrees} ${Number(cx)} ${Number(cy)})`,
+        );
+      }
+      // No pivot defined → silently skip (defensive — unknown rotary shape).
+    } else if (controlType === "fader") {
+      // CR-02: faders translate along an axis, not rotate. Per-fader
+      // geometry (axis + travel + thumb class) is not yet on the SVG
+      // surface (66 groups across 10 controllers); until that lands, mark
+      // the value on the group so CSS / a future renderer pass can wire
+      // the visual position. The blocker is the rotating fader — making
+      // it static is the immediate fix.
+      group.setAttribute("data-value", String(value));
     } else {
       // Button — data-active 0/1 (CSS picks up the swap).
       group.setAttribute("data-active", value > 0 ? "1" : "0");
