@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from vibemix.intel.agent_contract import AgentDecision
@@ -125,9 +127,46 @@ def test_live_pill_uses_deterministic_path_by_default() -> None:
         for claim in snapshot.envelope.claim_summary
         if claim["claim_id"] in result.final_decision.cited_claim_ids
     }
-    assert {"section_role", "section_boundary"}.issubset(claim_types)
+    assert {"track_identity", "section_role", "section_boundary"}.issubset(claim_types)
     assert set(result.final_decision.cited_claims) == claim_types
     assert result.trace.decision_source == "deterministic"
+
+
+def test_live_pill_suppresses_when_target_identity_claim_is_missing() -> None:
+    snapshot = _snapshot()
+    envelope = snapshot.envelope
+    identity_ids = {
+        str(claim["claim_id"])
+        for claim in envelope.claim_summary
+        if claim["type"] == "track_identity"
+    }
+    stripped = replace(
+        envelope,
+        claim_ids=tuple(
+            claim_id for claim_id in envelope.claim_ids if claim_id not in identity_ids
+        ),
+        claim_summary=tuple(
+            claim for claim in envelope.claim_summary if claim["claim_id"] not in identity_ids
+        ),
+        citation_scope={
+            **envelope.citation_scope,
+            "claim": tuple(
+                claim_id
+                for claim_id in envelope.citation_scope["claim"]
+                if claim_id not in identity_ids
+            ),
+        },
+    )
+
+    result = decide(
+        "live",
+        "live_next_pill",
+        RuntimeInputSnapshot("snap_missing_identity", stripped),
+    )
+
+    assert result.final_decision.action == "suppress"
+    assert not result.emitted
+    assert "target_identity_missing" in result.trace.suppressed_reasons
 
 
 def test_live_pill_suppresses_when_no_current_track() -> None:

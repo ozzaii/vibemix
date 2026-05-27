@@ -110,6 +110,7 @@ def test_compile_transition_context_bounds_and_redacts_live_packet() -> None:
     assert "vector" not in envelope.current
     assert envelope.constraints["raw_vectors_included"] is False
     assert envelope.constraints["strict_claim_validation"] is True
+    assert "/Users/ozai" not in json.dumps(envelope.current)
     assert envelope.citation_scope["candidate"] == tuple(
         candidate["candidate_id"] for candidate in envelope.candidates
     )
@@ -144,6 +145,7 @@ def test_compile_transition_context_exposes_score_components_without_vectors() -
     assert "vector" not in candidate
     assert envelope.allowed_actions == ("select", "hold", "suppress", "ask")
     assert {claim["type"] for claim in envelope.claim_summary} >= {
+        "track_identity",
         "transition_fit",
         "section_role",
         "section_boundary",
@@ -159,6 +161,74 @@ def test_compile_transition_context_exposes_score_components_without_vectors() -
         ("t1#s000", "outro"),
         ("t2#s000", "intro"),
     }
+    identity_claims = [
+        claim for claim in envelope.claim_summary if claim["type"] == "track_identity"
+    ]
+    assert {(claim["subject_id"], claim["value"]) for claim in identity_claims} >= {("t2", "t2")}
+
+
+def test_compile_suggestion_context_filters_candidates_with_private_identifiers() -> None:
+    suggestion = {
+        "transition": _suggestion_transition(
+            candidate_id="tr_001",
+            to_track_id="/Users/ozai/Music/private.wav",
+            to_section_id="/Users/ozai/Music/private.wav#s000",
+            semantic=0.92,
+        )
+    }
+
+    envelope = compile_suggestion_context(
+        packet_id="ctx_live_private_candidate",
+        current={"active_track_id": "t1"},
+        suggestion=suggestion,
+    )
+
+    assert envelope.candidates == ()
+    assert envelope.claim_summary == ()
+    assert "/Users/ozai" not in json.dumps(
+        {
+            "current": envelope.current,
+            "candidates": envelope.candidates,
+            "claims": envelope.claim_summary,
+            "citation_scope": envelope.citation_scope,
+        }
+    )
+
+
+def test_compile_suggestion_context_applies_cap_after_private_candidate_filter() -> None:
+    suggestion = {
+        "transition_alternatives": (
+            {
+                "track_id": "/Users/ozai/Music/private.wav",
+                "transition": _suggestion_transition(
+                    candidate_id="tr_001",
+                    to_track_id="/Users/ozai/Music/private.wav",
+                    to_section_id="/Users/ozai/Music/private.wav#s000",
+                    semantic=0.95,
+                ),
+            },
+            {
+                "track_id": "t2",
+                "transition": _suggestion_transition(
+                    candidate_id="tr_002",
+                    to_track_id="t2",
+                    to_section_id="t2#s000",
+                    semantic=0.92,
+                ),
+            },
+        )
+    }
+
+    envelope = compile_suggestion_context(
+        packet_id="ctx_live_safe_after_private",
+        current={"active_track_id": "t1"},
+        suggestion=suggestion,
+        max_candidates=1,
+    )
+
+    assert len(envelope.candidates) == 1
+    assert envelope.candidates[0]["to_track_id"] == "t2"
+    assert "/Users/ozai" not in json.dumps(envelope.candidates)
 
 
 def test_compile_transition_context_blocks_exact_timing_when_slate_has_none() -> None:

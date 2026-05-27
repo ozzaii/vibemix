@@ -21,6 +21,7 @@ from vibemix.intel.transition_scorer import (
 )
 
 DEFAULT_ALLOWED_CLAIMS: tuple[str, ...] = (
+    "track_identity",
     "transition_role",
     "transition_fit",
     "section_role",
@@ -63,7 +64,7 @@ def compile_transition_context(
 ) -> AgentContextEnvelope:
     """Return a redacted, bounded context envelope for transition decisions."""
     cap = max_candidates if max_candidates is not None else (5 if mode == "live" else 12)
-    bounded = tuple(candidates[: max(0, cap)])
+    bounded = _bounded_safe_candidates(candidates, cap)
     exact_timing_allowed = any(candidate.start_in_bars is not None for candidate in bounded)
     candidate_payloads = tuple(_candidate_payload(candidate) for candidate in bounded)
     current_payload = _redact_current(current)
@@ -311,7 +312,27 @@ def _redact_value(value: Any, *, forbidden_keys: set[str]) -> Any | None:
 
 
 def _looks_like_local_path(value: str) -> bool:
-    return value.startswith("/") or value.startswith("file://") or ":\\" in value
+    return _looks_like_private_text(value)
+
+
+def _looks_like_private_text(value: str) -> bool:
+    lowered = value.lower()
+    return (
+        value.startswith("/")
+        or lowered.startswith("file://")
+        or ":\\" in value
+        or "/users/" in lowered
+        or "/volumes/" in lowered
+        or "/home/" in lowered
+        or "/tmp/" in lowered
+        or "/private/" in lowered
+        or "/var/folders/" in lowered
+        or "\\users\\" in lowered
+        or lowered.startswith("vector:")
+        or lowered.startswith("audio:raw")
+        or "raw_audio" in lowered
+        or "raw vector" in lowered
+    )
 
 
 def _required_str(raw: Any) -> str | None:
@@ -367,6 +388,40 @@ def _str_tuple(raw: Any) -> tuple[str, ...]:
     return tuple(str(item) for item in raw if isinstance(item, str) and item)
 
 
+def _candidate_identifiers_safe(candidate: TransitionCandidate) -> bool:
+    return all(
+        _safe_public_identifier(value)
+        for value in (
+            candidate.candidate_id,
+            candidate.from_track_id,
+            candidate.to_track_id,
+            candidate.from_section_id,
+            candidate.to_section_id,
+        )
+    )
+
+
+def _bounded_safe_candidates(
+    candidates: tuple[TransitionCandidate, ...],
+    cap: int,
+) -> tuple[TransitionCandidate, ...]:
+    if cap <= 0:
+        return ()
+    bounded: list[TransitionCandidate] = []
+    for candidate in candidates:
+        if not _candidate_identifiers_safe(candidate):
+            continue
+        bounded.append(candidate)
+        if len(bounded) >= cap:
+            break
+    return tuple(bounded)
+
+
+def _safe_public_identifier(value: object) -> bool:
+    text = _optional_str(value)
+    return text is not None and not _looks_like_private_text(text)
+
+
 def _allowed_actions(mode: ContextMode) -> tuple[str, ...]:
     if mode == "live":
         return ("select", "hold", "suppress")
@@ -383,6 +438,12 @@ def _claim_ledger(
     _add_source_context_claims(ledger, packet_id, current)
     for candidate in candidates:
         candidate_ref = f"candidate:{candidate.candidate_id}"
+        _add_track_identity_claim(
+            ledger,
+            candidate_ref,
+            track_id=candidate.to_track_id,
+            confidence=1.0,
+        )
         ledger.add(
             "transition_fit",
             subject_id=candidate.candidate_id,
@@ -557,6 +618,29 @@ def _claim_ledger(
                 provenance_ref=f"packet:{packet_id}",
             )
     return ledger
+
+
+def _add_track_identity_claim(
+    ledger: MusicClaimLedger,
+    candidate_ref: str,
+    *,
+    track_id: str,
+    confidence: float,
+) -> None:
+    if not _safe_public_identifier(track_id):
+        return
+    ledger.add(
+        "track_identity",
+        subject_id=track_id,
+        value=track_id,
+        evidence_refs=(f"track:{track_id}", candidate_ref),
+        confidence=confidence,
+        scope="track",
+        allowed_phrases=(track_id,),
+        forbidden_phrases=("unknown track",),
+        reason_codes=(),
+        provenance_ref=f"track:{track_id}",
+    )
 
 
 def _add_source_context_claims(

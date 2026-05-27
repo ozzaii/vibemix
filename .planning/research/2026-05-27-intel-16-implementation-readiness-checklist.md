@@ -445,7 +445,9 @@ Acceptance evidence:
 - claim ledger redacts local paths, vectors, and audio from evidence refs,
   subjects, values, and model-visible phrase payloads;
 - `export-ready` / `review-only` language requires a `cue_export_status` claim
-  with the matching status value.
+  with the matching status value;
+- deterministic live copy cites a `track_identity` claim before naming the
+  target track, and missing target identity suppresses emission.
 
 Focused command:
 
@@ -486,6 +488,8 @@ Acceptance evidence:
 - validator failure never emits model-written copy;
 - live exact timing is blocked below floor or during blend;
 - unsupported musical claims degrade before emission;
+- deterministic live selection requires a public `track_identity` claim for the
+  selected target;
 - `DecisionSource` is recorded;
 - traces redact local paths, vectors, and audio;
 - old `next_suggestion` payload remains compatible until UI migration.

@@ -231,6 +231,10 @@ def _gate_envelope(envelope: AgentContextEnvelope) -> tuple[GateResult, ...]:
             )
         else:
             gates.append(GateResult("prepared_target", "pass", "matched_or_empty"))
+        if _candidate_target_has_identity(envelope, envelope.candidates[0]):
+            gates.append(GateResult("target_identity", "pass", "claim_available"))
+        else:
+            gates.append(GateResult("target_identity", "suppress", "target_identity_missing"))
     return tuple(gates)
 
 
@@ -249,6 +253,9 @@ def _deterministic_decision(
         return _suppress_decision()
 
     candidate = envelope.candidates[0]
+    track_short = _track_identity_for_candidate(envelope, candidate)
+    if track_short is None:
+        return _suppress_decision()
     cue_slot = candidate.get("recommended_cue_slot")
     if not cue_slot:
         if "hold" in envelope.allowed_actions:
@@ -267,7 +274,6 @@ def _deterministic_decision(
     cue_text = _cue_text(str(cue_slot), cue_start_label)
     role_pair = _role_pair_text(candidate.get("from_role"), candidate.get("to_role"))
     role_suffix = f", {role_pair}" if role_pair else ""
-    track_short = str(candidate.get("to_track_id") or "next track")
     loop_hold = _loop_hold_active(envelope, candidate)
     if timing_text:
         spoken = f"Next good entry: {track_short} {cue_text}{role_suffix}, {timing_text}."
@@ -306,6 +312,7 @@ def _claim_ids_for_candidate(
     include_risk: bool = False,
 ) -> tuple[str, ...]:
     candidate_id = str(candidate.get("candidate_id"))
+    target_track_id = _nonempty_str(candidate.get("to_track_id"))
     candidate_claims = {"transition_fit", "cue_slot"}
     if include_timing:
         candidate_claims.add("bars_until_event")
@@ -328,11 +335,29 @@ def _claim_ids_for_candidate(
         subject_id = row.get("subject_id")
         if subject_id == candidate_id and claim_type in candidate_claims:
             ids.append(str(row["claim_id"]))
+        elif (
+            claim_type == "track_identity"
+            and target_track_id is not None
+            and subject_id == target_track_id
+        ):
+            ids.append(str(row["claim_id"]))
         elif claim_type in section_claims and subject_id in section_ids:
             ids.append(str(row["claim_id"]))
         elif include_risk and _is_loop_hold_risk_claim(row):
             ids.append(str(row["claim_id"]))
     return tuple(ids)
+
+
+def _track_identity_for_candidate(envelope: AgentContextEnvelope, candidate: dict) -> str | None:
+    target_track_id = _nonempty_str(candidate.get("to_track_id"))
+    if target_track_id is None:
+        return None
+    for row in envelope.claim_summary:
+        if row.get("type") != "track_identity" or row.get("subject_id") != target_track_id:
+            continue
+        value = _nonempty_str(row.get("value"))
+        return value or target_track_id
+    return None
 
 
 def _loop_hold_active(envelope: AgentContextEnvelope, candidate: dict) -> bool:
@@ -371,6 +396,10 @@ def _prepared_target_mismatch(envelope: AgentContextEnvelope) -> str | None:
     if selected == prepared:
         return None
     return prepared
+
+
+def _candidate_target_has_identity(envelope: AgentContextEnvelope, candidate: dict) -> bool:
+    return _track_identity_for_candidate(envelope, candidate) is not None
 
 
 def _nonempty_str(value: object) -> str | None:
