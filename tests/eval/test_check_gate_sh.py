@@ -50,6 +50,16 @@ def _intel_threshold_lock_hash() -> str:
     return "sha256:" + hashlib.sha256(INTEL_LOCK_PATH.read_bytes()).hexdigest()
 
 
+def _intel_thresholds_hash() -> str:
+    from scripts.eval.intel_scorecard import load_intel_thresholds_from_lock
+
+    thresholds = load_intel_thresholds_from_lock(INTEL_LOCK_PATH)
+    blob = json.dumps(thresholds, sort_keys=True, separators=(",", ":"), default=str).encode(
+        "utf-8"
+    )
+    return "sha256:" + hashlib.sha256(blob).hexdigest()
+
+
 def _intel_fixture_manifest_hash() -> str:
     return "sha256:" + hashlib.sha256(INTEL_FIXTURE_MANIFEST.read_bytes()).hexdigest()
 
@@ -152,7 +162,7 @@ def _make_nightly_run(
                         ],
                         "provenance": {
                             "fixture_manifest_hash": _intel_fixture_manifest_hash(),
-                            "thresholds_hash": "sha256:" + ("b" * 64),
+                            "thresholds_hash": _intel_thresholds_hash(),
                             "threshold_lock_hash": _intel_threshold_lock_hash(),
                             "replay_tier": "tier0_fixture_replay",
                         },
@@ -556,6 +566,24 @@ def test_intel_gate_json_fixture_audit_manifest_hash_disagreement_fails(tmp_path
     assert result.returncode == 1
     assert "BLOCKED_BY=intel" in result.stderr
     assert "fixture_audit.manifest_hash mismatch" in result.stderr
+
+
+def test_intel_gate_json_stale_thresholds_hash_fails(tmp_path: Path):
+    """Release evidence must match the current parsed INTEL threshold values."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["scorecard"]["provenance"]["thresholds_hash"] = "sha256:" + ("a" * 64)
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "scorecard.provenance.thresholds_hash mismatch" in result.stderr
 
 
 def test_intel_gate_json_stale_threshold_lock_hash_fails(tmp_path: Path):

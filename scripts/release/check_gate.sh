@@ -23,6 +23,7 @@
 #        - fixture/threshold provenance hashes and replay tier are present
 #        - artifact fixture-manifest hash matches the current fixture corpus
 #        - fixture-audit manifest hash agrees with scorecard provenance
+#        - artifact thresholds hash matches current INTEL lock values
 #        - artifact threshold-lock hash matches the current INTEL lock
 #
 #   3. scripts/release/check_ear_test.sh exits 0 (≥2 ear-test sessions
@@ -145,6 +146,20 @@ from pathlib import Path
 print("sha256:" + hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
 PY
 )
+INTEL_THRESHOLDS_HASH=$(
+  "${PYTHON_BIN}" - "${INTEL_THRESHOLD_LOCK}" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+from scripts.eval.intel_scorecard import load_intel_thresholds_from_lock
+
+thresholds = load_intel_thresholds_from_lock(Path(sys.argv[1]))
+blob = json.dumps(thresholds, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+print("sha256:" + hashlib.sha256(blob).hexdigest())
+PY
+)
 INTEL_FIXTURE_MANIFEST_HASH=$(
   "${PYTHON_BIN}" - "${INTEL_FIXTURE_MANIFEST}" <<'PY'
 import hashlib
@@ -204,6 +219,7 @@ else
       else
         intel_status=$(jq -r \
           --arg expected_intel_lock_hash "${INTEL_THRESHOLD_LOCK_HASH}" \
+          --arg expected_intel_thresholds_hash "${INTEL_THRESHOLDS_HASH}" \
           --arg expected_fixture_manifest_hash "${INTEL_FIXTURE_MANIFEST_HASH}" '
           def nonempty_object(x): (x | type == "object" and length > 0);
           def nonempty_array(x): (x | type == "array" and length > 0);
@@ -245,6 +261,8 @@ else
             "fixture_audit.manifest_hash disagrees with scorecard provenance"
           elif (sha256_hash(.stages.scorecard.provenance.thresholds_hash // "") | not) then
             "scorecard.provenance.thresholds_hash missing"
+          elif .stages.scorecard.provenance.thresholds_hash != $expected_intel_thresholds_hash then
+            "scorecard.provenance.thresholds_hash mismatch"
           elif (sha256_hash(.stages.scorecard.provenance.threshold_lock_hash // "") | not) then
             "scorecard.provenance.threshold_lock_hash missing"
           elif .stages.scorecard.provenance.threshold_lock_hash != $expected_intel_lock_hash then
