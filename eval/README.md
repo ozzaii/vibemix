@@ -80,6 +80,12 @@ report hashes, threshold hashes, privacy flags, and actions.
 gold-label JSONL files: split names are validated as written, so typos such as a
 misspelled holdout split do not silently become calibration evidence, and the
 validate/report CLI exits non-zero when labels are invalid.
+ANLZ audit evidence is fail-closed at the structure floor:
+`scripts/eval/intel_anlz_audit.py` rejects malformed bundle identity,
+inconsistent parsed/tag state, missing phrase roles, and non-finite or
+out-of-range phrase confidence before ANLZ coverage or phrase-quality metrics
+are trusted. Real Rekordbox local paths may be read for audit, but emitted
+artifacts keep path evidence redacted or hashed.
 Taste-feedback evidence uses the same fail-closed posture:
 `scripts/eval/intel_taste_scorecard.py --feedback` rejects invalid split names,
 unknown labels, duplicate event IDs, malformed consent fields, and private

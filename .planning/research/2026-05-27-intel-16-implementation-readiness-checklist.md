@@ -159,6 +159,10 @@ Acceptance evidence:
 - `scripts/eval/intel_anlz_audit.py` emits redacted PSSI/PQTZ/PPTH coverage,
   parse error rate, path collision hashes, role distribution, and confidence
   buckets.
+- `scripts/eval/intel_anlz_audit.py` rejects malformed bundle identity,
+  inconsistent parsed/tag state, missing phrase roles, and non-finite or
+  out-of-range phrase confidence before coverage or phrase-quality metrics can
+  move thresholds; the CLI exits non-zero when ANLZ evidence is invalid.
 - `_cmd_library_ingest` builds/passes the ANLZ index once per run and falls back
   to DJ/auto cues when the index is empty or unavailable.
 
@@ -592,6 +596,9 @@ done: smart-cue baseline validation rejects duplicate track/proposal IDs,
 done: scripts/eval/intel_section_retrieval.py
 done: tests/eval/test_intel_section_retrieval.py
 done: tests/intel/fixtures/section_queries.jsonl
+done: ANLZ audit validation rejects malformed bundle identity, inconsistent
+      parsed/tag state, missing phrase roles, and non-finite or out-of-range
+      phrase confidence; the CLI exits non-zero when ANLZ evidence is invalid
 done: section retrieval validation rejects duplicate section/query IDs, missing
       or non-finite vectors, non-finite query thresholds, and private payload
       markers; the CLI exits non-zero when section/query evidence is invalid

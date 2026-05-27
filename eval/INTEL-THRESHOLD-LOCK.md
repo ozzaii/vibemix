@@ -77,6 +77,9 @@ of catching regressions.
 
 Release-grade thresholds still need private Kaan-reviewed evidence:
 
+- ANLZ structure audits, with bundle identity, parsed/tag consistency, phrase
+  roles, phrase-confidence finiteness/ranges, and redacted or hashed path
+  evidence checked before coverage and phrase-quality metrics are trusted;
 - smart-cue proposals and Rekordbox baseline snapshots, with track/proposal IDs,
   cue-slot uniqueness, cue-time/confidence finiteness, confidence ranges, and
   privacy checked before cue exact/near-rate metrics are trusted;

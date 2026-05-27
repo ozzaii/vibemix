@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,6 +54,7 @@ def audit_fixture_dir(fixture_dir: Path | str = DEFAULT_FIXTURE_DIR) -> dict[str
         ppth_path = _string_or_none(item.get("ppth_path"))
         pssi = item.get("pssi") if isinstance(item, dict) else None
         pqtz = item.get("pqtz") if isinstance(item, dict) else None
+        pqtz_beat_count = _positive_int(pqtz.get("beat_count")) if isinstance(pqtz, dict) else 0
         phrases = []
         if isinstance(pssi, dict):
             for phrase in pssi.get("phrases", []):
@@ -71,12 +73,12 @@ def audit_fixture_dir(fixture_dir: Path | str = DEFAULT_FIXTURE_DIR) -> dict[str
                 ppth_path=ppth_path,
                 has_ppth=bool(ppth_path),
                 has_pssi=isinstance(pssi, dict) and bool(pssi.get("phrases")),
-                has_pqtz=isinstance(pqtz, dict) and int(pqtz.get("beat_count") or 0) > 0,
+                has_pqtz=pqtz_beat_count > 0,
                 parsed=bool(ppth_path)
                 and isinstance(pssi, dict)
                 and bool(pssi.get("phrases"))
                 and isinstance(pqtz, dict)
-                and int(pqtz.get("beat_count") or 0) > 0,
+                and pqtz_beat_count > 0,
                 phrases=tuple(phrases),
             )
         )
@@ -98,6 +100,7 @@ def summarize_records(records: list[BundleRecord], *, source: str) -> dict[str, 
     parsed = sum(1 for record in records if record.parsed)
     parse_errors = sum(1 for record in records if record.parse_error)
     all_phrases = [phrase for record in records for phrase in record.phrases]
+    evidence_errors = _evidence_shape_errors(records)
 
     collision_groups: dict[str, int] = {}
     for record in records:
@@ -113,7 +116,7 @@ def summarize_records(records: list[BundleRecord], *, source: str) -> dict[str, 
     return {
         "schema": "intel_anlz_audit_v1",
         "source": source,
-        "valid": total > 0 and parsed > 0 and parse_errors == 0,
+        "valid": total > 0 and parsed > 0 and parse_errors == 0 and not evidence_errors,
         "privacy": {
             "local_paths_redacted": True,
             "collision_keys_hashed": True,
@@ -136,6 +139,7 @@ def summarize_records(records: list[BundleRecord], *, source: str) -> dict[str, 
             "collision_count": len(collision_hashes),
             "collision_key_hashes": collision_hashes,
         },
+        "evidence_errors": tuple(evidence_errors),
         "phrase_quality": {
             "roles": _count_by(all_phrases, "role"),
             "moods": _count_by(all_phrases, "mood"),
@@ -220,6 +224,42 @@ def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _evidence_shape_errors(records: list[BundleRecord]) -> tuple[str, ...]:
+    errors: list[str] = []
+    source_ids = [record.source_id for record in records if record.source_id]
+    errors.extend(_duplicate_values(source_ids, label="source"))
+    for record_index, record in enumerate(records):
+        source_id = record.source_id or f"<bundle_{record_index}>"
+        if not record.source_id:
+            errors.append(f"{source_id}:missing_source_id")
+        if record.parsed and record.parse_error:
+            errors.append(f"{source_id}:parsed_with_parse_error")
+        if record.parsed and not (record.has_ppth and record.has_pssi and record.has_pqtz):
+            errors.append(f"{source_id}:parsed_missing_required_tags")
+        for phrase_index, phrase in enumerate(record.phrases):
+            phrase_id = f"{source_id}:phrase_{phrase_index}"
+            if not phrase.role:
+                errors.append(f"{phrase_id}:missing_role")
+            confidence = phrase.confidence
+            if confidence is None:
+                continue
+            if not math.isfinite(confidence):
+                errors.append(f"{phrase_id}:nonfinite_confidence")
+            elif not 0.0 <= confidence <= 1.0:
+                errors.append(f"{phrase_id}:confidence_out_of_range")
+    return tuple(errors)
+
+
+def _duplicate_values(values: list[str], *, label: str) -> tuple[str, ...]:
+    seen: set[str] = set()
+    errors: list[str] = []
+    for value in values:
+        if value in seen:
+            errors.append(f"{value}:duplicate_{label}")
+        seen.add(value)
+    return tuple(errors)
+
+
 def _coverage(count: int, total: int) -> dict[str, float | int]:
     return {"count": count, "rate": _rate(count, total)}
 
@@ -232,7 +272,7 @@ def _confidence_buckets(phrases: list[PhraseRecord]) -> dict[str, int]:
     buckets = {"high": 0, "medium": 0, "low": 0, "below_anchor_floor": 0, "unknown": 0}
     for phrase in phrases:
         confidence = phrase.confidence
-        if confidence is None:
+        if confidence is None or not math.isfinite(confidence):
             buckets["unknown"] += 1
         elif confidence >= HIGH_CONFIDENCE_FLOOR:
             buckets["high"] += 1
@@ -269,6 +309,14 @@ def _float_or_none(value: Any) -> float | None:
     if isinstance(value, int | float):
         return float(value)
     return None
+
+
+def _positive_int(value: Any) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(parsed, 0)
 
 
 def _mood_name(mood: int) -> str:
@@ -321,7 +369,7 @@ def main(argv: list[str] | None = None) -> int:
             f"pssi={coverage['pssi']['rate']:.1%} pqtz={coverage['pqtz']['rate']:.1%} "
             f"collisions={result['path_collisions']['collision_count']}"
         )
-    return 0
+    return 0 if result.get("valid") is True else 1
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint

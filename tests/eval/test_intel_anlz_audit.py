@@ -14,6 +14,14 @@ from scripts.eval.intel_anlz_audit import (
 )
 
 
+def _copy_anlz_fixture(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    for name in ("MANIFEST.json", "anlz_bundles.json"):
+        (tmp_path / name).write_text(
+            (DEFAULT_FIXTURE_DIR / name).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+
 def test_intel_anlz_audit_passes_public_fixture_corpus() -> None:
     result = audit_fixture_dir(DEFAULT_FIXTURE_DIR)
 
@@ -25,6 +33,7 @@ def test_intel_anlz_audit_passes_public_fixture_corpus() -> None:
     assert result["coverage"]["pssi"]["rate"] == 1.0
     assert result["coverage"]["pqtz"]["rate"] == 0.75
     assert result["coverage"]["complete"]["rate"] == 0.75
+    assert result["evidence_errors"] == ()
     assert result["phrase_quality"]["roles"]["drop"] >= 1
     assert result["privacy"]["local_paths_redacted"] is True
 
@@ -80,6 +89,7 @@ def test_intel_anlz_audit_summarizes_collisions_and_confidence_buckets() -> None
     assert result["coverage"]["ppth"]["count"] == 2
     assert result["coverage"]["parse_error_rate"] == pytest.approx(1 / 3)
     assert result["path_collisions"]["collision_count"] == 1
+    assert result["evidence_errors"] == ()
     assert len(result["path_collisions"]["collision_key_hashes"][0]) == 12
     assert result["phrase_quality"]["roles"]["build"] == 2
     assert result["phrase_quality"]["confidence_buckets"] == {
@@ -91,6 +101,37 @@ def test_intel_anlz_audit_summarizes_collisions_and_confidence_buckets() -> None
     }
 
 
+def test_intel_anlz_audit_rejects_malformed_phrase_confidence() -> None:
+    records = [
+        BundleRecord(
+            source_id="a",
+            ppth_path="fixture://tracks/a.wav",
+            has_ppth=True,
+            has_pssi=True,
+            has_pqtz=True,
+            parsed=True,
+            phrases=(PhraseRecord(role="drop", confidence=float("nan"), mood="high"),),
+        ),
+        BundleRecord(
+            source_id="a",
+            ppth_path="fixture://tracks/b.wav",
+            has_ppth=True,
+            has_pssi=True,
+            has_pqtz=True,
+            parsed=True,
+            phrases=(PhraseRecord(role="build", confidence=1.2, mood="high"),),
+        ),
+    ]
+
+    result = summarize_records(records, source="unit")
+
+    assert result["valid"] is False
+    assert "a:duplicate_source" in result["evidence_errors"]
+    assert "a:phrase_0:nonfinite_confidence" in result["evidence_errors"]
+    assert "a:phrase_0:confidence_out_of_range" in result["evidence_errors"]
+    assert result["phrase_quality"]["confidence_buckets"]["unknown"] == 1
+
+
 def test_intel_anlz_audit_cli_json(capsys) -> None:
     code = main(["--fixture-dir", str(DEFAULT_FIXTURE_DIR), "--json"])
     captured = capsys.readouterr()
@@ -99,3 +140,24 @@ def test_intel_anlz_audit_cli_json(capsys) -> None:
     result = json.loads(captured.out)
     assert result["schema"] == "intel_anlz_audit_v1"
     assert result["valid"] is True
+
+
+def test_intel_anlz_audit_cli_returns_nonzero_for_invalid_evidence(
+    tmp_path,
+    capsys,  # type: ignore[no-untyped-def]
+) -> None:
+    _copy_anlz_fixture(tmp_path)
+    bundles_path = tmp_path / "anlz_bundles.json"
+    bundles = json.loads(bundles_path.read_text(encoding="utf-8"))
+    bundles[0]["pssi"]["phrases"][0]["confidence"] = 1.2
+    bundles_path.write_text(json.dumps(bundles), encoding="utf-8")
+
+    code = main(["--fixture-dir", str(tmp_path), "--json"])
+
+    assert code == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result["valid"] is False
+    assert any(
+        str(error).endswith(":phrase_0:confidence_out_of_range")
+        for error in result["evidence_errors"]
+    )
