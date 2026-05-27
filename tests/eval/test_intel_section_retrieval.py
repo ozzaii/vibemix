@@ -93,6 +93,160 @@ def test_section_retrieval_catches_missing_vectors(tmp_path: Path) -> None:
     assert result["errors"] == ("track-a#s000:missing_vector:vec8:missing",)
 
 
+def test_section_retrieval_catches_duplicate_section_ids(tmp_path: Path) -> None:
+    sections = tmp_path / "sections.json"
+    vectors = tmp_path / "vectors.json"
+    queries = tmp_path / "queries.jsonl"
+    sections.write_text(
+        json.dumps(
+            [
+                {
+                    "section_id": "track-a#s000",
+                    "role": "drop",
+                    "role_confidence": 0.9,
+                    "bar_count": 16,
+                    "source_detail": "pssi",
+                    "semantic_vector_ref": "vec8:a",
+                },
+                {
+                    "section_id": "track-a#s000",
+                    "role": "intro",
+                    "role_confidence": 0.9,
+                    "bar_count": 16,
+                    "source_detail": "pssi",
+                    "semantic_vector_ref": "vec8:b",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    vectors.write_text(json.dumps({"vec8:a": [1.0, 0.0], "vec8:b": [0.0, 1.0]}), encoding="utf-8")
+    queries.write_text(
+        json.dumps(
+            {
+                "query_id": "q_drop",
+                "target_role": "drop",
+                "vector": [1.0, 0.0],
+                "mixable_roles": ["drop"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = score_paths(
+        sections_path=sections,
+        vectors_path=vectors,
+        queries_path=queries,
+        mode="section",
+    )
+
+    assert result["valid"] is False
+    assert "track-a#s000:duplicate_section_id" in result["errors"]
+
+
+def test_section_retrieval_catches_bad_query_evidence(tmp_path: Path) -> None:
+    sections = tmp_path / "sections.json"
+    vectors = tmp_path / "vectors.json"
+    queries = tmp_path / "queries.jsonl"
+    sections.write_text(
+        json.dumps(
+            [
+                {
+                    "section_id": "track-a#s000",
+                    "role": "drop",
+                    "role_confidence": 0.9,
+                    "bar_count": 16,
+                    "source_detail": "pssi",
+                    "semantic_vector_ref": "vec8:a",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    vectors.write_text(json.dumps({"vec8:a": [1.0, 0.0]}), encoding="utf-8")
+    queries.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "query_id": "q_drop",
+                        "target_role": "drop",
+                        "vector": [1.0, 0.0],
+                        "mixable_roles": ["drop"],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "query_id": "q_drop",
+                        "target_role": "drop",
+                        "vector": [1.0, 0.0],
+                        "mixable_roles": ["drop"],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "query_id": "q_nan",
+                        "target_role": "drop",
+                        "vector": [float("nan"), 0.0],
+                        "mixable_roles": ["drop"],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "query_id": "q_inf",
+                        "target_role": "drop",
+                        "vector": [1.0, 0.0],
+                        "mixable_roles": ["drop"],
+                        "min_bar_count": "inf",
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = score_paths(
+        sections_path=sections,
+        vectors_path=vectors,
+        queries_path=queries,
+        mode="section",
+    )
+
+    assert result["valid"] is False
+    assert "q_drop:duplicate_query_id" in result["errors"]
+    assert "q_nan:missing_query_vector" in result["errors"]
+    assert "q_inf:nonfinite_min_bar_count" in result["errors"]
+
+
+def test_section_retrieval_catches_private_payload(tmp_path: Path) -> None:
+    sections = tmp_path / "sections.json"
+    vectors = tmp_path / "vectors.json"
+    sections.write_text(
+        json.dumps(
+            [
+                {
+                    "section_id": "track-a#s000",
+                    "role": "drop",
+                    "role_confidence": 0.9,
+                    "bar_count": 16,
+                    "source_detail": "pssi",
+                    "semantic_vector_ref": "vec8:a",
+                    "debug_path": "/Users/ozai/Music/private.wav",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    vectors.write_text(json.dumps({"vec8:a": [1.0, 0.0]}), encoding="utf-8")
+
+    result = score_paths(sections_path=sections, vectors_path=vectors, mode="section")
+
+    assert result["valid"] is False
+    assert any(str(error).startswith("private_payload_present:") for error in result["errors"])
+
+
 def test_section_retrieval_cli_json(capsys) -> None:  # type: ignore[no-untyped-def]
     assert main(["--fixture-dir", str(DEFAULT_FIXTURE_DIR), "--json"]) == 0
 
@@ -100,6 +254,64 @@ def test_section_retrieval_cli_json(capsys) -> None:  # type: ignore[no-untyped-
     assert out["schema"] == "intel_section_retrieval_compare_v1"
     assert out["valid"] is True
     assert out["metrics"]["section_minus_whole_track_role_hit_at_5"] >= 0.15
+
+
+def test_section_retrieval_cli_returns_nonzero_for_invalid_evidence(
+    tmp_path: Path,
+    capsys,  # type: ignore[no-untyped-def]
+) -> None:
+    sections = tmp_path / "sections.json"
+    vectors = tmp_path / "vectors.json"
+    queries = tmp_path / "queries.jsonl"
+    sections.write_text(
+        json.dumps(
+            [
+                {
+                    "section_id": "track-a#s000",
+                    "role": "drop",
+                    "role_confidence": 0.9,
+                    "bar_count": 16,
+                    "source_detail": "pssi",
+                    "semantic_vector_ref": "vec8:missing",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    vectors.write_text("{}", encoding="utf-8")
+    queries.write_text(
+        json.dumps(
+            {
+                "query_id": "q_drop",
+                "target_role": "drop",
+                "vector": [1.0, 0.0],
+                "mixable_roles": ["drop"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "--sections",
+                str(sections),
+                "--vectors",
+                str(vectors),
+                "--queries",
+                str(queries),
+                "--mode",
+                "section",
+                "--json",
+            ]
+        )
+        == 1
+    )
+
+    out = json.loads(capsys.readouterr().out)
+    assert out["valid"] is False
+    assert "track-a#s000:missing_vector:vec8:missing" in out["errors"]
 
 
 def test_section_retrieval_cli_requires_paths_together(capsys) -> None:  # type: ignore[no-untyped-def]

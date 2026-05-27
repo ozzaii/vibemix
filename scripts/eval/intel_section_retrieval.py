@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import math
+import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
@@ -26,6 +27,13 @@ DEFAULT_FIXTURE_DIR = ROOT / "tests" / "intel" / "fixtures"
 DEFAULT_MIN_ROLE_CONFIDENCE = 0.70
 DEFAULT_MIN_BAR_COUNT = 4.0
 LOW_CONFIDENCE_FLOOR = 0.55
+PRIVATE_PAYLOAD_PATTERNS = (
+    re.compile(r"/Users/[^\"'\s]+"),
+    re.compile(r"/Volumes/[^\"'\s]+"),
+    re.compile(r"[A-Za-z]:\\\\[^\"'\s]+"),
+    re.compile(r"file://[^\"'\s]+", re.I),
+    re.compile(r"\.(?:wav|aiff|aif|mp3|flac)\b", re.I),
+)
 
 Mode = Literal["section", "whole_track"]
 
@@ -260,13 +268,21 @@ def _section_candidates(
     sections: tuple[dict[str, Any], ...], vectors: dict[str, Any]
 ) -> tuple[tuple[Candidate, ...], tuple[str, ...]]:
     candidates: list[Candidate] = []
-    errors: list[str] = []
+    errors: list[str] = list(_private_payload_errors(sections))
+    seen_section_ids: set[str] = set()
     for section in sections:
         section_id = str(section.get("section_id") or "")
+        if not section_id:
+            errors.append("missing_section_id")
+            continue
+        if section_id in seen_section_ids:
+            errors.append(f"{section_id}:duplicate_section_id")
+            continue
+        seen_section_ids.add(section_id)
         vector_ref = str(section.get("semantic_vector_ref") or "")
         vector = _vector_for_ref(vectors, vector_ref)
         if vector is None:
-            errors.append(f"{section_id or '<missing_section_id>'}:missing_vector:{vector_ref}")
+            errors.append(f"{section_id}:missing_vector:{vector_ref}")
             continue
         candidates.append(
             Candidate(
@@ -327,9 +343,14 @@ def _load_queries(
 
     rows = _load_json_or_jsonl(queries_path)
     queries: list[RetrievalQuery] = []
-    errors: list[str] = []
+    errors: list[str] = list(_private_payload_errors(tuple(rows)))
+    seen_query_ids: set[str] = set()
     for index, row in enumerate(rows):
         query_id = str(row.get("query_id") or f"query_{index:03d}")
+        if query_id in seen_query_ids:
+            errors.append(f"{query_id}:duplicate_query_id")
+            continue
+        seen_query_ids.add(query_id)
         vector = _query_vector(row, role_prototypes, vectors)
         target_role = str(row.get("target_role") or row.get("role") or "")
         if not target_role:
@@ -338,6 +359,14 @@ def _load_queries(
         if vector is None:
             errors.append(f"{query_id}:missing_query_vector")
             continue
+        min_role_confidence = _float(row.get("min_role_confidence"), DEFAULT_MIN_ROLE_CONFIDENCE)
+        min_bar_count = _float(row.get("min_bar_count"), DEFAULT_MIN_BAR_COUNT)
+        if not math.isfinite(min_role_confidence):
+            errors.append(f"{query_id}:nonfinite_min_role_confidence")
+            continue
+        if not math.isfinite(min_bar_count):
+            errors.append(f"{query_id}:nonfinite_min_bar_count")
+            continue
         mixable_roles = tuple(str(role) for role in row.get("mixable_roles") or (target_role,))
         queries.append(
             RetrievalQuery(
@@ -345,10 +374,8 @@ def _load_queries(
                 target_role=target_role,
                 vector=vector,
                 mixable_roles=mixable_roles,
-                min_role_confidence=_float(
-                    row.get("min_role_confidence"), DEFAULT_MIN_ROLE_CONFIDENCE
-                ),
-                min_bar_count=_float(row.get("min_bar_count"), DEFAULT_MIN_BAR_COUNT),
+                min_role_confidence=min_role_confidence,
+                min_bar_count=min_bar_count,
             )
         )
     return tuple(queries), tuple(errors)
@@ -504,9 +531,21 @@ def _as_float_vector(value: Any) -> tuple[float, ...] | None:
     if not isinstance(value, list | tuple) or not value:
         return None
     try:
-        return tuple(float(item) for item in value)
+        vector = tuple(float(item) for item in value)
     except (TypeError, ValueError):
         return None
+    if any(not math.isfinite(item) for item in vector):
+        return None
+    return vector
+
+
+def _private_payload_errors(value: Any) -> tuple[str, ...]:
+    text = json.dumps(value, sort_keys=True, default=str)
+    return tuple(
+        f"private_payload_present:{pattern.pattern}"
+        for pattern in PRIVATE_PAYLOAD_PATTERNS
+        if pattern.search(text)
+    )
 
 
 def _public_ref(candidate_id: str) -> str:
@@ -593,7 +632,7 @@ def main(argv: list[str] | None = None) -> int:
             f"role@5={metrics['role_hit_at_5']} "
             f"mixable@5={metrics['mixable_window_hit_at_5']}"
         )
-    return 0
+    return 0 if result.get("valid") is True else 1
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint

@@ -584,6 +584,9 @@ done: aggregate fixture scorecard covers ANLZ audit, cue baseline comparison,
 done: scripts/eval/intel_section_retrieval.py
 done: tests/eval/test_intel_section_retrieval.py
 done: tests/intel/fixtures/section_queries.jsonl
+done: section retrieval validation rejects duplicate section/query IDs, missing
+      or non-finite vectors, non-finite query thresholds, and private payload
+      markers; the CLI exits non-zero when section/query evidence is invalid
 done: scripts/eval/intel_transition_scorecard.py
 done: tests/eval/test_intel_transition_scorecard.py
 done: transition scorecard validation rejects duplicate candidate IDs,

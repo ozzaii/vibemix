@@ -90,6 +90,11 @@ Transition-ranking evidence is also fail-closed:
 rejects unknown label candidates, duplicate candidate IDs, non-finite scores,
 and private payload markers before the ranking metrics can back threshold
 movement.
+Section-retrieval evidence follows the same rule:
+`scripts/eval/intel_section_retrieval.py --sections ... --vectors ...` rejects
+duplicate section/query IDs, missing or non-finite vectors, non-finite query
+threshold fields, and private payload markers before section-vs-whole-track
+retrieval deltas can move thresholds.
 `scripts/eval/intel_recalibration_note.py` renders that append-only entry from
 redacted private scorecard/gold/taste/gate reports, binds it to those aggregate
 reports by SHA-256, rejects malformed timestamp/run-id identity fields before
@@ -225,6 +230,7 @@ scope for v3.0:
 - [`eval/rubrics/`](rubrics/) — judge rubric bodies (`judge_pro.md`, `judge_flash.md`).
 - [`scripts/eval/replay_harness.py`](../scripts/eval/replay_harness.py) — deterministic replay CLI.
 - [`scripts/eval/intel_gold.py`](../scripts/eval/intel_gold.py) — validates and redacts private INTEL gold-label evidence.
+- [`scripts/eval/intel_section_retrieval.py`](../scripts/eval/intel_section_retrieval.py) — validates section-vs-whole-track retrieval evidence and privacy-safe deltas.
 - [`scripts/eval/intel_taste_scorecard.py`](../scripts/eval/intel_taste_scorecard.py) — validates privacy-safe taste feedback and deterministic profile projection metrics.
 - [`scripts/eval/intel_transition_scorecard.py`](../scripts/eval/intel_transition_scorecard.py) — validates transition-ranking candidate evidence and scored label metrics.
 - [`scripts/eval/intel_recalibration_note.py`](../scripts/eval/intel_recalibration_note.py) — renders redacted private-label INTEL recalibration log entries.
