@@ -71,7 +71,11 @@ provenance-validation stage disagree about their dataset, fixture, threshold,
 replay-tier, or lock hashes. The release-gate test suite also feeds
 `scripts/release/check_gate.sh` a real artifact produced by
 `scripts.eval.intel_gate.run_intel_gate()` so producer/consumer schema drift is
-caught before a release cut.
+caught before a release cut. Private-label recalibration for release-grade
+INTEL thresholds is tracked in
+[`eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md`](INTEL-THRESHOLD-RECALIBRATION-LOG.md);
+the public log records only redacted split counts, aggregate metrics, hashes,
+privacy flags, and actions.
 
 ## 2-Judge Architecture (high level)
 
@@ -174,6 +178,7 @@ scope for v3.0:
 - [`eval/THRESHOLD-LOCK.md`](THRESHOLD-LOCK.md) — locked numeric thresholds (signed).
 - [`eval/INTEL-THRESHOLD-LOCK.md`](INTEL-THRESHOLD-LOCK.md) — locked INTEL fixture thresholds.
 - [`eval/THRESHOLD-RECALIBRATION-LOG.md`](THRESHOLD-RECALIBRATION-LOG.md) — audit trail for threshold movement.
+- [`eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md`](INTEL-THRESHOLD-RECALIBRATION-LOG.md) — redacted private-label audit trail for INTEL threshold movement.
 - [`eval/EAR-TEST-PROTOCOL.md`](EAR-TEST-PROTOCOL.md) — full ear-test protocol document.
 - [`eval/corpus/MANIFEST.md`](corpus/MANIFEST.md) — real-corpus session manifest.
 - [`eval/corpus/LICENSES.md`](corpus/LICENSES.md) — corpus attribution + licenses.

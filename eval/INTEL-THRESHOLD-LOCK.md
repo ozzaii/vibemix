@@ -87,9 +87,12 @@ Changing any `intel_thresholds` value requires:
 1. Re-run the gate command above and record the before/after scorecard metrics.
 2. State whether the change is a fixture calibration, private-label calibration,
    or release-gate promotion.
-3. Keep zero-tolerance privacy and grounding counters at `0.00` unless the
+3. For private-label calibration or release-gate promotion, append a redacted
+   entry to `eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` with calibration,
+   holdout, and canary split counts plus the measured/locked/delta values.
+4. Keep zero-tolerance privacy and grounding counters at `0.00` unless the
    underlying contract changes in the corresponding INTEL spec.
-4. Update `.planning/research/2026-05-27-intel-03-data-eval-excellence-spec.md`
+5. Update `.planning/research/2026-05-27-intel-03-data-eval-excellence-spec.md`
    and `.planning/research/2026-05-27-intel-16-implementation-readiness-checklist.md`
    in the same PR.
 

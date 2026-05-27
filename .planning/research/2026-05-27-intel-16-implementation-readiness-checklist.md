@@ -536,6 +536,9 @@ done: scripts/eval/intel_gold.py
 done: tests/intel/test_gold_labels.py
 done: tests/intel/test_gold_sampling.py
 done: tests/eval/test_intel_gold_validation.py
+done: eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md defines the redacted
+      private-label calibration/holdout/canary note format for future threshold
+      movement
 pending: first private gold slice
 pending: release threshold lock fed by holdout/canary labels
 pending: durable taste-consent ingestion from labels
@@ -630,7 +633,9 @@ done: release-gate tests feed `scripts/release/check_gate.sh` a real
 done: `.github/workflows/eval.yml` DCO-signs nightly `.planning/eval-runs/`
       evidence commits with `git commit -s`, and workflow tests pin the
       `vibemix-eval-bot` identity + signoff flag
-pending: private-label release threshold recalibration note
+done: private-label release threshold recalibration note exists at
+      `eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` and is referenced by the
+      INTEL threshold lock/public eval docs
 ```
 
 The docs are not the milestone. The scorecard is.
