@@ -93,7 +93,13 @@ async function loadControllerSvg(controllerId: string): Promise<string> {
       )) as ControllerSvgModule;
       return m.HERCULES_INPULSE_500_SVG ?? "";
     }
-    // Plan 06 lands the remaining 5 — until then they fall through to
+    case "numark_party_mix_live": {
+      const m = (await import(
+        "../controllers/numark_party_mix_live.svg.js"
+      )) as ControllerSvgModule;
+      return m.NUMARK_PARTY_MIX_LIVE_SVG ?? "";
+    }
+    // Plan 06 lands the remaining 4 — until then they fall through to
     // the generic branch (so a user plugging an FLX10 still sees the
     // labeled-zone fallback, not a blank stage).
     default: {
