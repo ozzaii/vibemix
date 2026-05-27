@@ -25,13 +25,13 @@
 //                           Filter knobs per deck
 //
 // Every interactive control is wrapped in:
-//   <g data-control-id="<field>:<deck>" role="button"
+//   g data-control-id="<field>:<deck>" role="button"     (one <g> per control)
 //      aria-label="<from _aria-labels>" tabindex="0"
-//      data-cx="<center-x>" data-cy="<center-y>">
+//      data-cx="<center-x>" data-cy="<center-y>"
 //     <factual geometry>
 //     <g class="cue-color"></g>   ← P92 highlight slot (color channel)
 //     <g class="cue-shape"></g>   ← P92 highlight slot (shape channel)
-//   </g>
+//   /g
 //
 // Parity contract (RENDER-06): every `data-control-id` resolves to a
 // binding in `src/vibemix/midi/profiles/pioneer_ddj_flx4.json`, and
