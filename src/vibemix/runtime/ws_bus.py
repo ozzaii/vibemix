@@ -20,7 +20,7 @@ import sys
 import time
 from collections import deque
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import jsonschema as _jsonschema
 import websockets
@@ -28,6 +28,32 @@ import websockets
 from vibemix.audio import WS_HOST, WS_PORT, Levels
 from vibemix.state import MusicState
 from vibemix.ui_bus.validator import validate_message as _validate_outbound
+
+if TYPE_CHECKING:
+    # WR-06: hint-only import to avoid pulling vibemix.learn into the
+    # runtime import graph (the Learn island is optional — present in the
+    # full app but not in any reduced runtime). The Protocol below is the
+    # actual structural type used in the signature; this import is here
+    # purely so type-checkers can verify that the concrete `MidiMirror`
+    # satisfies the protocol.
+    from vibemix.learn.midi_mirror import MidiMirror  # noqa: F401
+
+
+class _MidiMirrorProtocol(Protocol):
+    """Structural type the ``ws_broadcast`` 30 Hz tick needs from a
+    midi_mirror.
+
+    WR-06 fix (REVIEW.md): the kwarg was previously typed ``Any | None``
+    so a stale caller passing the wrong object would only surface at
+    runtime via the existing try/except (``[learn drain err]`` /
+    ``[learn snapshot err]``) — and those messages don't indicate root
+    cause. A Protocol captures the call shape (drain + snapshot returning
+    well-defined types) without forcing a hard import of the
+    :mod:`vibemix.learn` package into this module.
+    """
+
+    def drain_pending_detected(self) -> list[dict]: ...  # noqa: E704
+    def snapshot(self) -> dict | None: ...  # noqa: E704
 
 # ---------------------------------------------------------------------------
 # ipc.session.snapshot — wired into the LIVE runtime (the real cohost).
@@ -345,7 +371,7 @@ async def ws_broadcast(
     tracer: Any | None = None,
     ipc_router: IpcRouterBus | None = None,
     screen_available: bool | None = None,
-    midi_mirror: Any | None = None,
+    midi_mirror: _MidiMirrorProtocol | None = None,
 ) -> None:
     """30Hz outbound mascot broadcast + inbound manual-trigger handler.
 
