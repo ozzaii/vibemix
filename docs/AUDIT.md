@@ -23,6 +23,7 @@
 
 | Package | Version | License | Rationale | Install-Impact | Notes |
 |---------|---------|---------|-----------|----------------|-------|
+| `av` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `bidict` | 0.23.1 | see uv.lock | pyrekordbox transitive (declared explicitly per --no-deps recipe). Pure-Python. | 🟢 Green |  |
 | `construct` | 2.10.70 | see uv.lock | pyrekordbox transitive — ANLZ binary parser. Pure-Python. | 🟢 Green |  |
 | `google-genai` | 2.0.1 | see uv.lock | Gemini Live co-host and Gemini TTS. Library embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex. Pure-Python; no native build. | 🟢 Green |  |

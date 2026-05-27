@@ -36,6 +36,8 @@ def _all_phase_dirs() -> list[Path]:
     Live: ``.planning/phases/<NN>-<slug>/``.
     Archived (current): ``.planning/milestones/<version>-phases/<NN>-<slug>/``.
     Archived (legacy v0.1.0): ``.planning/milestones/<version>/phases/<NN>-<slug>/``.
+    Archived (post-2026-05-27 sweep): ``.planning/archive/<bundle>/v2.1-phases/<NN>-<slug>/``
+        and ``.planning/archive/<bundle>/v2.1-phases/<NN>-<slug>/phases/<NN>-<slug>/``.
 
     A "phase dir" is identified by an ``NN-`` basename prefix so we
     don't sweep up milestone metadata files.
@@ -58,6 +60,14 @@ def _all_phase_dirs() -> list[Path]:
                 for child in nested.iterdir():
                     if child.is_dir() and _PHASE_DIR_RE.match(child.name):
                         dirs.append(child)
+    archive_root = REPO_ROOT / ".planning" / "archive"
+    if archive_root.exists():
+        for bundle in archive_root.iterdir():
+            if not bundle.is_dir():
+                continue
+            for sub in bundle.rglob("*"):
+                if sub.is_dir() and _PHASE_DIR_RE.match(sub.name):
+                    dirs.append(sub)
     return sorted(set(dirs), key=lambda p: p.name)
 
 
