@@ -1,92 +1,77 @@
 ---
 gsd_state_version: 1.0
-milestone: product-sweep
-milestone_name: Product Sweep / Package Readiness
-status: active
-last_updated: "2026-05-27T13:56:00+03:00"
-last_activity: "2026-05-27 - product sweep verified first-run CLAP setup, local Codex/Viber truth, and archived stale v7/v8.1/v8.2 phase detail"
+milestone: v9.0
+milestone_name: Lesson One
+status: planning
+last_updated: "2026-05-27T20:00:00+03:00"
+last_activity: "2026-05-27 - milestone v9.0 'Lesson One' started; 4 opus research agents in flight; rc1 product-sweep blockers parked"
 progress:
-  mode: sweep
-  product_truth: current
-  release_closed: false
+  mode: planning
+  research: in_flight
+  requirements: pending
+  roadmap: pending
+  phases_complete: 0
+  phases_total: tbd
 ---
 
-# vibemix - State
+# vibemix — State
 
 ## Current Position
 
-v8.2 "Set Builder" is code-shipped: energy, discovery, sequencing, Rekordbox export,
-Viber set-prep/build-set, and the Library UI surface are wired. The active work is no
-longer feature planning; it is product sweep, packaging rehearsal, stale-doc cleanup,
-and release-gate discharge.
+Phase: Not started (defining requirements via 4 parallel opus research agents)
+Plan: —
+Status: Research in flight — STACK / FEATURES / ARCHITECTURE / PITFALLS opus agents launched
+Last activity: 2026-05-27 — Milestone v9.0 "Lesson One" started under `gsd-autonomous fully`
 
-Phase 88 (UI) is now wired into the Vibe Engine Library surface.
-Next: packaged fresh-install/updater rehearsal, signed/notarized package proof,
-Windows install proof, and human signoff gates.
+## Milestone Reference
 
-Do not claim the release is friend-ready until signed/notarized macOS artifacts,
-Windows fresh-machine install proof, real Discord invite/link cleanup, and the remaining
-human signoff gates are complete.
+See: .planning/PROJECT.md § Current Milestone (updated 2026-05-27)
 
-## Current Product Truth
+**Goal:** Turn vibemix into the AI teaching module beginner DJs need. Three progressive courses (Anatomy / Transitions / Play Mode) driven by a real-time interactive vector visualization of the user's MIDI controller. Every lesson grounded — controls highlighted on the rendered controller, EQ bands demonstrated audibly via library-pulled exemplar tracks, Course-3 live coaching grounded on CueAnchor + phrase detection.
 
-- Library search, ingest, curation, and retrieval embeddings use local CLAP ONNX through
-  the current embedder factory. Full-precision fp32 ONNX is the default quality path;
-  fp16/q8 are optimization candidates only after parity checks.
-- Viber set-prep/chat/build-set uses local Codex for the current demo/test path. The
-  removed Gemini library agent is not a product fallback.
-- Gemini remains scoped to the separate live co-host/TTS brain where configuration
-  resolves it through the model router. Do not hardcode model names.
-- The live UI socket is `127.0.0.1:8765`; debrief uses `127.0.0.1:8766`.
-- Only state refresh writes `MusicState`. AI reactions must resolve through
-  `EvidenceRegistry`; live audio is authoritative.
-
-## Verified In This Sweep
-
-- `AGENTS.md` exists as the concise contributor guide and matches the current
-  `uv`, `npm --prefix`, and Cargo-manifest workflow.
-- Library/Viber Gemini agent code and YouTube ingest tooling were removed from the
-  product path; Codex chat smoke returned valid local JSON with no Gemini/proxy env.
-- The Library UI opens chat-first and the Tauri bridge routes `library chat` through the
-  Codex backend. Desktop and mobile Playwright screenshots completed without page or
-  console errors.
-- Fresh CLAP model setup was proven from source and from the frozen PyInstaller sidecar:
-  all six fp32 ONNX assets verified by size/SHA and produced finite 512d normalized text
-  and audio embeddings.
-- Local unsigned macOS DMG/updater packaging smoke passed. Pretag still reports release
-  blockers listed below.
-
-## Release Blockers
-
-- Phase 16 / Phase 17 human gates are not closed.
-- README Discord placeholder/link and real invite remain unresolved.
-- GitHub Actions signing/upload secrets are incomplete.
-- macOS signed/notarized DMG and signed updater rehearsal are not closed.
-- Windows fresh-machine install proof is not closed.
+**Phase numbering:** continues from P88 (P89/P90 = direct wire-ins) → milestone starts at **P91**.
 
 ## Active Sources
 
-- `.planning/research/CODEX-full-product-sweep-map.md` - live sweep evidence and
-  package/DSP verdict.
-- `.planning/ROADMAP.md` and `.planning/PROJECT.md` - current milestone/product view.
-- `.planning/phases/v8.2-STATUS.md` - compact v8.2 shipped status.
-- `docs/clap-engine.md` and `docs/codex-agent.md` - current local model/agent paths.
-- `CLAUDE.md` - repository operating constraints for agent sessions.
+- `.planning/PROJECT.md` § Current Milestone — vision + constraints + invariants
+- `.planning/research/{STACK,FEATURES,ARCHITECTURE,PITFALLS}.md` — IN FLIGHT
+- `.planning/research/SUMMARY.md` — TBD (synthesizer after 4 researchers complete)
+- `.planning/REQUIREMENTS.md` — TBD
+- `.planning/ROADMAP.md` — TBD
+- `.planning/handoffs/2026-05-27-session-end.md` — concurrent rc1 ship work (parked, Kaan ear-pass)
 
-## Archived This Sweep
+## Pre-Milestone Direction
 
-- Stale active notes: `.planning/archive/2026-05-27-stale-active-notes/`.
-- Historical v7/v8.0/v8.1 phase detail:
-  `.planning/archive/2026-05-27-v7-v8-1-phase-detail/`.
-- v8.2 detailed phase folders and Phase 89/90 stale in-flight notes:
-  `.planning/archive/2026-05-27-v8-2-active-phase-detail/`.
-- Pre-sweep state snapshot:
-  `.planning/archive/2026-05-27-state-snapshot/STATE-pre-product-sweep.md`.
+From Kaan's verbatim brief (2026-05-27):
+- **Iconic opening dialog (verbatim-locked):**
+  - user: "Hello vibemix, what are you?"
+  - vibemix: "I'm the best DJ app in the world."
+  - user: "If you are the best, then who the fuck am I?"
+  - vibemix: "Oh bestie, don't worry. You know why? Because I'm the beginner module of vibemix. Let's go."
+- **The teaching mechanic:** AI highlights a control on the rendered visualization of the user's MIDI controller → user touches the physical control → lesson advances. For EQ lessons, the AI plays a library track exemplifying that band so the user HEARS the change.
+- **Three courses:** (1) Anatomy of a Deck, (2) Transitions, (3) Play Mode (live coaching alongside actual DJing).
+- **Default-YES on every candidate feature** — fully-comprehensive curriculum.
+- **All-opus agents · maximum effort · best-of-the-best UI · impeccable skills.**
+- **Kaan will plug DJ set into computer for autonomous overnight testing** — full computer access for fuck-around-find-out.
 
-## Audit Trail
+## Concurrent Work (other sessions)
 
-- **Phase 16 ear-test memory override - RETIRED.** The v2.1 P85 autonomous-only
-  override is retired; see `.planning/decisions/P85-OVERRIDE-RETIRED.md`. The current
-  replacement is the hybrid hallucination gate plus human ear-test lane.
-- Historical pre-CLAP embedding docs are retained only in archived research and
-  phase-detail folders. Current library intelligence is local CLAP ONNX.
+3 Codex sessions active on `live-tuning-or-brain` — commit by named paths only, never `git add -A`. rc1 product-sweep open in this branch; v9.0 work additive (new `src/vibemix/learn/` subpackage, extends but does not modify existing engines).
+
+## Hard Rules (carried)
+
+- Privacy: all OZ/Hermes/LM-Studio off-limits paths (see CLAUDE.md) — Kaan's overnight autonomous run does NOT extend this permission. Per-turn permission still expires at turn end.
+- One-socket invariant: every `learn.*` IPC envelope rides `127.0.0.1:8765`.
+- Single-writer: `MusicState` write-locked to `state/refresh.py`. `LearnState` lives separately under `src/vibemix/learn/`.
+- Trust-the-audio: Course 3 grounded on CueAnchor + phrase detection; never invents upcoming structure.
+- Citation-grounding: AI tutor claims about exemplar tracks resolve via `EvidenceRegistry`.
+- Apache-clean: no AGPL/GPL deps (essentia excluded); stylized controller renders, not Pioneer faceplate art.
+- Honest green: every learn-engine module offline-unit-testable; live-app verification HARD per `feedback_verify_live_app_not_just_tests` (cargo tauri dev + ui.log).
+- AI-slop blocklist: every lesson copy runs through `scripts/launch/check_no_ai_slop.py`.
+
+## Carried-Forward KAAN-ACTION
+
+- rc1 ear-pass + signed-release A/B/C decision (`.planning/handoffs/2026-05-27-session-end.md`)
+- v8.2 UI-02 funded-key ear-pass (PROJECT.md)
+- v8.0 §GH-BILLING / §SHIP-V4 / §V7-LIVE
+- v9.0 KAAN-ACTION will accrue (controller-renderer aesthetic sign-off · 3-course full-run ear-pass · per-controller hardware verification on the 10 SKUs · "bestie" tone calibration)

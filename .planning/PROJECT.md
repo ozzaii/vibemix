@@ -10,6 +10,42 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
+## Current Milestone: v9.0 "Lesson One"
+
+**Status:** Started 2026-05-27. `gsd-autonomous fully` · all-opus agents · default-YES on every scope question. Research in flight (4 parallel opus agents covering Stack / Features / Architecture / Pitfalls — including web survey of the canonical beginner-DJ curriculum). Phase numbering continues from P88; P89/P90 were direct wire-ins → this milestone starts at **P91**.
+
+**Goal:** Turn vibemix into the **AI teaching module beginner DJs have been waiting for**. Open the app, pick **Learn**, and the AI walks you through three progressive courses with YOUR specific MIDI controller mirrored on screen as a real-time interactive vector visualization. The AI highlights physical controls ("here are the Mids"), explains what each one does, then proves it audibly by pulling a track from YOUR library where that band is most prominent — so as you turn the knob, you HEAR the band swell. The opening dialog is the iconic Kaan-vision (verbatim-locked):
+
+> user: "Hello vibemix, what are you?"
+> vibemix: "I'm the best DJ app in the world."
+> user: "If you are the best, then who the fuck am I?"
+> vibemix: "Oh bestie, don't worry. You know why? Because I'm the beginner module of vibemix. Let's go."
+
+**Three courses (fully comprehensive — default-YES on every candidate lesson):**
+1. **Anatomy of a Deck** — channel faders · crossfader · cue button + headphones cue · EQ Low / Mid / High (each demonstrated audibly via library exemplar) · hot cues · loop · jog · gain · trim · master/booth split · "don't touch the master fader" hygiene · phrase awareness primer.
+2. **Transitions** — phrase counting · cut · long blend / fade · EQ swap (kick swap) · echo & filter outs · loop-out · drop swap (advanced). Each performed live with AI count-in (`3 · 2 · 1 · slam`) on two tracks from the user's library matched by Camelot + BPM.
+3. **Play Mode (Live Coaching)** — existing co-host in **tutor lens** (v8.1 LENS-03), but PROACTIVE not reactive: announces upcoming structure ("breakdown in 16 beats — get ready to bring in track 2"), suggests moves, gives count-ins, grounded on CueAnchor + phrase detection (Invariant #3: never invents). End-of-session debrief tied to specific moves the user actually made.
+
+**The 10-controller real-time renderer is the biggest net-new UI lift.** All 10 already-mapped controllers (Pioneer DDJ-FLX4/6/10/400/1000/SX3 · XDJ-RX3 · Numark Party Mix Live · Hercules Inpulse 300/500) get a CDJ-Whisper-styled vector visualization, every knob/fader/button mirroring physical position via incoming MIDI within ≤50ms. AI highlights via a new typed contract (`{deck, control, intensity, annotation, expected_action}` over an extended `messages.schema.json` envelope — same `:8765` socket, one-socket invariant holds).
+
+**Constraints (locked, encoded in every phase):**
+- **Reuse-first.** No new AI provider (Gemini Flash for tutor dialog · local Codex offline · existing LiveKit pipe for play-mode). No new MIR libraries. No new ws ports (one-socket invariant). No new IPC envelope without `npm run codegen:ipc`. No new heavy deps (essentia AGPL excluded; librosa unnecessary). The CLAP + sequencer + audio/features + persona/lens + MIDI + Tauri shell + Three.js / Canvas 2D are all the primitives we need.
+- **All four cardinal invariants hold by ADDITIVE design.** Lesson state lives in a private `LearnState` (NOT in `MusicState` — single-writer invariant safe). Citation-grounding: any AI claim about an exemplar track resolves via existing `track:` / `library:` evidence sources (a new `exemplar:` source may be added à la P59 `key:` / P65 `recall:` if the researcher proposes it). Trust-the-audio: Course 3 reuses live coach grounding — never invents phrase boundaries. One-socket: every `learn.*` envelope rides `:8765`.
+- **Honest green** — every learn-engine module is offline-unit-testable (lesson state machine, exemplar finder, highlight serializer); the live-app verification gate (`cargo tauri dev` + `ui.log` `[vmx:click]/[vmx:ipc>]/[vmx:ipc<]/[vmx:error]`) is HARD per `feedback_verify_live_app_not_just_tests`. The bundled-sidecar path (rc1 work in flight) must NOT regress.
+- **Tone is the release gate.** "Real DJ friend in your ear, no AI slop" is doubly-load-bearing here. Every lesson copy run through `scripts/launch/check_no_ai_slop.py` blocklist. The iconic opening dialog verbatim-locked in a test fixture. The tutor persona reuses v8.1 LENS-03 ("teaching voice" lens variant — final shape per Architecture research).
+- **Hardware-aware onboarding.** First launch sniffs MIDI (`mido.get_input_names()` + product-string fingerprint), picks the correct profile of the 10, renders that controller. Manual override picks from the catalog if auto-detect misses.
+- **Accessibility.** Color-blind glyph cue alongside the amber highlight (CDJ-Whisper amber-on-charcoal needs a non-color anchor). No time-pressure on lesson advancement (motor-impaired-safe). Visual phrase markers for hearing-impaired use of Course 3. Keyboard-nav browse mode for users without hardware exploring the curriculum.
+- **Apache-clean copyright posture** — stylized vector representations of each controller, not Pioneer's faceplate art. Researcher to confirm the line (Mixxx ships per-controller skins; we match that posture).
+- **`gsd-autonomous fully`** — blockers (Kaan's ear-pass · physical hardware verification · controller-renderer aesthetic sign-off) ride forward to KAAN-ACTION; only the privacy hard rule + destructive risk pause.
+
+**Empirical grounding (in research):** the canon of beginner DJ pedagogy (DJ TechTools · /r/Beatmatch wiki · Crossfader.com · Digital DJ Tips · Pioneer DJ official tutorials · Mixed In Key blog) being surveyed by Features researcher for the WHAT and the ORDER of lessons. Architecture researcher mapping every new module against the 4 cardinal invariants. Pitfalls researcher cataloguing tone-cringe risk · pedagogical-order trap · controller variation matrix · audio-routing setup · exemplar-engine reliability · grounding failure modes.
+
+**Charter + research (consumed by next steps):** `.planning/research/STACK.md` · `FEATURES.md` · `ARCHITECTURE.md` · `PITFALLS.md` (in flight) → `SUMMARY.md` (synthesizer next) → `.planning/REQUIREMENTS.md` (v9.0 REQ-IDs) → `.planning/ROADMAP.md` (P91+ phases).
+
+**Open alongside:** v0.1.0-rc1 (rc1 ship — gated on Kaan's Phase-16 ear-pass + signed-release path A/B/C — see `.planning/handoffs/2026-05-27-session-end.md`).
+
+---
+
 ## Latest Shipped Milestone: v8.2 "Set Builder"
 
 **Status:** Shipped 2026-05-26; audit passed. Engine, agent, CLI, and GUI path
@@ -457,4 +493,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-27 — **v8.2 "Set Builder" SHIPPED** (audit PASSED) and product-sweep cleanup in progress. Current truth: local Codex owns Library/Viber set-prep/chat, local full-precision CLAP ONNX owns embeddings, v8.2 UI/build-set path is wired for demo, and public release remains blocked by signing/notarization, release secrets, Discord invite, human evidence gates, Windows fresh-machine proof, and the funded-key Build-a-Set ear-pass. Earlier: v8.1 "One Mind" 2026-05-26; v8.0 "Proof & Polish" 2026-05-25; v7.0 "Open House" 2026-05-24.*
+*Last updated: 2026-05-27 — **v9.0 "Lesson One" STARTED** under `gsd-autonomous fully` / all-opus / default-YES. Beginner DJ teaching module: iconic opening dialog ("Oh bestie don't worry, I'm the beginner module of vibemix…") · 3 progressive courses (Anatomy / Transitions / Play Mode) · real-time interactive vector visualization of the user's MIDI controller · library-driven EQ-band exemplars · tutor lens reused from v8.1 LENS-03 · Course-3 grounded on CueAnchor + phrase detection. 4 parallel opus research agents in flight (STACK/FEATURES/ARCHITECTURE/PITFALLS). Phases start at **P91** (P89/P90 were direct wire-ins). Open alongside: rc1 ship (Kaan ear-pass + signed-release decision A/B/C). Prior: v8.2 "Set Builder" SHIPPED 2026-05-26 (audit PASSED); v8.1 "One Mind" 2026-05-26; v8.0 "Proof & Polish" 2026-05-25; v7.0 "Open House" 2026-05-24.*
