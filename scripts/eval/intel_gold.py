@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,14 @@ from vibemix.intel.gold_validation import (
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FIXTURE_DIR = ROOT / "tests" / "intel" / "fixtures"
+PRIVATE_PAYLOAD_PATTERNS = (
+    re.compile(r"/Users/[^\"'\s]+"),
+    re.compile(r"/Volumes/[^\"'\s]+"),
+    re.compile(r"[A-Za-z]:\\\\[^\"'\s]+"),
+    re.compile(r"file://[^\"'\s]+", re.I),
+    re.compile(r"\.(?:wav|aiff|aif|mp3|flac)\b", re.I),
+    re.compile(r"\braw_(?:audio|vector)s?\b", re.I),
+)
 
 
 def validate_gold_file(
@@ -62,11 +72,15 @@ def sample_gold_items(
     threshold: float = 0.62,
 ) -> dict[str, Any]:
     candidates = _load_json(Path(candidates_path))
-    items = sample_transition_candidates(candidates, n=n, threshold=threshold)
+    errors = _sample_candidate_errors(candidates, n=n, threshold=threshold)
+    items = () if errors else sample_transition_candidates(candidates, n=n, threshold=threshold)
     return {
         "schema": "intel_gold_sample_v1",
+        "valid": bool(items) and not errors,
+        "privacy": {"local_paths_redacted": True},
         "kind": "transition",
         "n": len(items),
+        "errors": tuple(errors),
         "items": [
             {
                 "review_item_id": item.review_item_id,
@@ -136,6 +150,62 @@ def _load_json(path: Path, *, default: Any | None = None) -> Any:
     return json.loads(text)
 
 
+def _sample_candidate_errors(candidates: Any, *, n: int, threshold: float) -> tuple[str, ...]:
+    errors: list[str] = []
+    if n <= 0:
+        errors.append("sample_n_must_be_positive")
+    if _finite_float_or_none(threshold) is None:
+        errors.append("nonfinite_threshold")
+    if not isinstance(candidates, list) or not candidates:
+        errors.append("missing_candidates")
+        return tuple(errors)
+    errors.extend(_private_payload_errors(candidates))
+    seen: set[str] = set()
+    for index, candidate in enumerate(candidates):
+        if not isinstance(candidate, dict):
+            errors.append(f"candidate_{index}:invalid_candidate")
+            continue
+        candidate_id = str(candidate.get("candidate_id") or f"<candidate_{index}>")
+        if not candidate.get("candidate_id"):
+            errors.append(f"{candidate_id}:missing_candidate_id")
+        elif candidate_id in seen:
+            errors.append(f"{candidate_id}:duplicate_candidate_id")
+        seen.add(candidate_id)
+        for field in ("score", "confidence"):
+            value = candidate.get(field)
+            if value is not None and _finite_float_or_none(value) is None:
+                errors.append(f"{candidate_id}:nonfinite_{field}")
+        start_in_bars = candidate.get("start_in_bars")
+        if start_in_bars is not None and _finite_float_or_none(start_in_bars) is None:
+            errors.append(f"{candidate_id}:nonfinite_start_in_bars")
+        risk_flags = candidate.get("risk_flags")
+        if risk_flags is not None and not isinstance(risk_flags, list | tuple):
+            errors.append(f"{candidate_id}:invalid_risk_flags")
+        scores = candidate.get("scores")
+        if isinstance(scores, dict):
+            for score_name, score_value in scores.items():
+                if _finite_float_or_none(score_value) is None:
+                    errors.append(f"{candidate_id}:scores.{score_name}:nonfinite_score")
+    return tuple(errors)
+
+
+def _private_payload_errors(value: Any) -> tuple[str, ...]:
+    text = json.dumps(value, sort_keys=True, default=str)
+    return (
+        ("private_payload_present",)
+        if any(pattern.search(text) for pattern in PRIVATE_PAYLOAD_PATTERNS)
+        else ()
+    )
+
+
+def _finite_float_or_none(value: Any) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -182,6 +252,8 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(_summary(result))
     if result["schema"] in {"intel_gold_validation_v1", "intel_gold_report_v1"}:
+        return 0 if result.get("valid") is True else 1
+    if result["schema"] == "intel_gold_sample_v1":
         return 0 if result.get("valid") is True else 1
     return 0
 

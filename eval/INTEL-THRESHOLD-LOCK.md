@@ -88,6 +88,9 @@ Release-grade thresholds still need private Kaan-reviewed evidence:
   deltas are trusted;
 - transition pairs labeled `would_play`, `maybe`, and `no`, with candidate IDs,
   score finiteness, and privacy checked before metrics are trusted;
+- private gold review queues sampled from valid candidates only, with candidate
+  identity, score/confidence finiteness, score-component finiteness, risk-flag
+  shape, and privacy checked before review payloads are emitted;
 - live/debrief decisions replayed with timing confidence, with packet/decision
   identity, candidate identity, confidence finiteness, and privacy checked before
   fallback/timing metrics are trusted;

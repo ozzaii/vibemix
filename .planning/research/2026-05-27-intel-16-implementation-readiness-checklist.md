@@ -533,6 +533,8 @@ Acceptance evidence:
 - redacted reports hash track IDs and omit local paths;
 - labels cannot be used as action IDs;
 - validation catches unknown candidate/proposal IDs.
+- sampling rejects malformed/private candidate rows before emitting review
+  payloads.
 
 Current implementation:
 
@@ -548,6 +550,11 @@ done: gold-label parsing preserves invalid split names for validation instead
       of silently coercing them into calibration evidence
 done: `scripts/eval/intel_gold.py validate/report` exits non-zero when private
       gold-label evidence is invalid
+done: `scripts/eval/intel_gold.py sample` rejects duplicate/missing candidate
+      IDs, non-finite score/confidence fields, malformed risk flags,
+      non-finite score components, and private payload markers before emitting
+      review items; the CLI exits non-zero and withholds sample payloads when
+      candidate evidence is invalid
 done: eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md defines the redacted
       private-label calibration/holdout/canary note format for future threshold
       movement

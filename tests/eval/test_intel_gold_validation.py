@@ -70,12 +70,49 @@ def test_sample_gold_items_uses_transition_pairs_fixture() -> None:
     result = sample_gold_items(DEFAULT_FIXTURE_DIR / "transition_pairs.json", n=3)
 
     assert result["schema"] == "intel_gold_sample_v1"
+    assert result["valid"] is True
+    assert result["privacy"] == {"local_paths_redacted": True}
+    assert result["errors"] == ()
     assert result["kind"] == "transition"
     assert result["n"] == 3
     assert {item["sample_reason"] for item in result["items"]} >= {
         "top_scorer",
         "near_threshold",
     }
+
+
+def test_sample_gold_items_rejects_invalid_candidate_evidence(tmp_path: Path) -> None:
+    candidates = tmp_path / "candidates.json"
+    candidates.write_text(
+        json.dumps(
+            [
+                {
+                    "candidate_id": "tr_001",
+                    "score": "nan",
+                    "confidence": 0.8,
+                    "from_section_id": "a#outro",
+                    "to_section_id": "b#intro",
+                },
+                {
+                    "candidate_id": "tr_001",
+                    "score": 0.7,
+                    "confidence": 0.7,
+                    "debug_path": "/Users/ozai/Music/private.wav",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = sample_gold_items(candidates, n=3)
+
+    assert result["valid"] is False
+    assert result["n"] == 0
+    assert result["items"] == []
+    assert "tr_001:nonfinite_score" in result["errors"]
+    assert "tr_001:duplicate_candidate_id" in result["errors"]
+    assert "private_payload_present" in result["errors"]
+    assert "/Users/" not in json.dumps(result)
 
 
 def test_gold_cli_validate_json(capsys) -> None:  # type: ignore[no-untyped-def]
@@ -165,7 +202,27 @@ def test_gold_cli_sample_json(capsys) -> None:  # type: ignore[no-untyped-def]
 
     out = json.loads(capsys.readouterr().out)
     assert out["schema"] == "intel_gold_sample_v1"
+    assert out["valid"] is True
     assert out["n"] == 2
+
+
+def test_gold_cli_sample_returns_nonzero_for_invalid_candidates(
+    tmp_path: Path,
+    capsys,  # type: ignore[no-untyped-def]
+) -> None:
+    candidates = tmp_path / "candidates.json"
+    candidates.write_text(
+        json.dumps([{"candidate_id": "tr_001", "score": "inf"}]),
+        encoding="utf-8",
+    )
+
+    assert main(["sample", str(candidates), "--n", "2", "--json"]) == 1
+
+    out = json.loads(capsys.readouterr().out)
+    assert out["schema"] == "intel_gold_sample_v1"
+    assert out["valid"] is False
+    assert out["items"] == []
+    assert "tr_001:nonfinite_score" in out["errors"]
 
 
 def test_gold_cli_report_json(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]

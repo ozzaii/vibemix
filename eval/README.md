@@ -80,6 +80,10 @@ report hashes, threshold hashes, privacy flags, and actions.
 gold-label JSONL files: split names are validated as written, so typos such as a
 misspelled holdout split do not silently become calibration evidence, and the
 validate/report CLI exits non-zero when labels are invalid.
+`scripts/eval/intel_gold.py sample` also validates review-queue candidates before
+emitting payloads: duplicate/missing candidate IDs, non-finite score/confidence
+fields, malformed risk flags, non-finite score components, and private payload
+markers make the sampler exit non-zero and withhold sample items.
 ANLZ audit evidence is fail-closed at the structure floor:
 `scripts/eval/intel_anlz_audit.py` rejects malformed bundle identity,
 inconsistent parsed/tag state, missing phrase roles, and non-finite or
