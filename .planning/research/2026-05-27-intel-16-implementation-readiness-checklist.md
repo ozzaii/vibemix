@@ -608,6 +608,8 @@ done: `scripts/release/check_gate.sh` requires recent `intel_gate.json` artifact
       statuses, Tier 0 replay provenance, and provenance hashes
 done: `scripts/release/check_gate.sh` rejects stale INTEL artifacts whose
       threshold-lock hash does not match the current `eval/INTEL-THRESHOLD-LOCK.md`
+done: `scripts/release/check_gate.sh` rejects stale INTEL artifacts whose
+      fixture-manifest hash does not match the current `tests/intel/fixtures/MANIFEST.json`
 pending: private-label release threshold recalibration note
 ```
 

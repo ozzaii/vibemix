@@ -21,6 +21,7 @@
 #        - every gate reports PASS
 #        - every artifact_status entry is true
 #        - fixture/threshold provenance hashes and replay tier are present
+#        - artifact fixture-manifest hash matches the current fixture corpus
 #        - artifact threshold-lock hash matches the current INTEL lock
 #
 #   3. scripts/release/check_ear_test.sh exits 0 (≥2 ear-test sessions
@@ -36,6 +37,7 @@
 #   EVAL_RUNS_DIR          default: .planning/eval-runs
 #   THRESHOLD_LOCK         default: eval/THRESHOLD-LOCK.md
 #   INTEL_THRESHOLD_LOCK   default: eval/INTEL-THRESHOLD-LOCK.md
+#   INTEL_FIXTURE_MANIFEST default: tests/intel/fixtures/MANIFEST.json
 #   EAR_TEST_GATE          default: scripts/release/check_ear_test.sh
 #   MIN_CONSECUTIVE_GREEN  default: 7
 #
@@ -51,6 +53,7 @@ set -euo pipefail
 EVAL_RUNS_DIR="${EVAL_RUNS_DIR:-.planning/eval-runs}"
 THRESHOLD_LOCK="${THRESHOLD_LOCK:-eval/THRESHOLD-LOCK.md}"
 INTEL_THRESHOLD_LOCK="${INTEL_THRESHOLD_LOCK:-eval/INTEL-THRESHOLD-LOCK.md}"
+INTEL_FIXTURE_MANIFEST="${INTEL_FIXTURE_MANIFEST:-tests/intel/fixtures/MANIFEST.json}"
 EAR_TEST_GATE="${EAR_TEST_GATE:-scripts/release/check_ear_test.sh}"
 MIN_CONSECUTIVE_GREEN="${MIN_CONSECUTIVE_GREEN:-7}"
 
@@ -93,6 +96,10 @@ if [ ! -f "${INTEL_THRESHOLD_LOCK}" ]; then
   emit_err "INTEL-THRESHOLD-LOCK missing: ${INTEL_THRESHOLD_LOCK}"
   exit 1
 fi
+if [ ! -f "${INTEL_FIXTURE_MANIFEST}" ]; then
+  emit_err "INTEL fixture manifest missing: ${INTEL_FIXTURE_MANIFEST}"
+  exit 1
+fi
 
 # --- parse locked thresholds ----------------------------------------------
 # Single python invocation extracts the 4 metric thresholds, emits as
@@ -130,6 +137,15 @@ fi
 
 INTEL_THRESHOLD_LOCK_HASH=$(
   "${PYTHON_BIN}" - "${INTEL_THRESHOLD_LOCK}" <<'PY'
+import hashlib
+import sys
+from pathlib import Path
+
+print("sha256:" + hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+)
+INTEL_FIXTURE_MANIFEST_HASH=$(
+  "${PYTHON_BIN}" - "${INTEL_FIXTURE_MANIFEST}" <<'PY'
 import hashlib
 import sys
 from pathlib import Path
@@ -185,7 +201,9 @@ else
       if [ ! -f "${intel_report}" ]; then
         INTEL_FAIL_REASONS+=("${name}: intel_gate.json missing")
       else
-        intel_status=$(jq -r --arg expected_intel_lock_hash "${INTEL_THRESHOLD_LOCK_HASH}" '
+        intel_status=$(jq -r \
+          --arg expected_intel_lock_hash "${INTEL_THRESHOLD_LOCK_HASH}" \
+          --arg expected_fixture_manifest_hash "${INTEL_FIXTURE_MANIFEST_HASH}" '
           def nonempty_object(x): (x | type == "object" and length > 0);
           def nonempty_array(x): (x | type == "array" and length > 0);
           def sha256_hash(x): (x | type == "string" and startswith("sha256:"));
@@ -216,6 +234,8 @@ else
             "scorecard.provenance.replay_tier=\(.stages.scorecard.provenance.replay_tier // "missing")"
           elif (sha256_hash(.stages.scorecard.provenance.fixture_manifest_hash // "") | not) then
             "scorecard.provenance.fixture_manifest_hash missing"
+          elif .stages.scorecard.provenance.fixture_manifest_hash != $expected_fixture_manifest_hash then
+            "scorecard.provenance.fixture_manifest_hash mismatch"
           elif (sha256_hash(.stages.scorecard.provenance.thresholds_hash // "") | not) then
             "scorecard.provenance.thresholds_hash missing"
           elif (sha256_hash(.stages.scorecard.provenance.threshold_lock_hash // "") | not) then
