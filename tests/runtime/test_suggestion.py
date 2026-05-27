@@ -708,6 +708,74 @@ def test_choose_alternative_pins_visible_backup_without_reranking():
     assert len(events) == 2
 
 
+def test_not_now_feedback_promotes_next_backup_without_positive_label():
+    from dataclasses import replace
+
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(
+        ["s", "a", "b"],
+        [("s", 0.99), ("a", 0.92), ("b", 0.91)],
+        section_vectors={
+            "s#s000": np.array([1.0, 0.0], dtype=np.float32),
+            "s#s001": np.array([0.0, 1.0], dtype=np.float32),
+            "a#s000": np.array([0.0, 1.0], dtype=np.float32),
+            "b#s000": np.array([1.0, 0.0], dtype=np.float32),
+        },
+    )
+    lib = _lib(["s", "a", "b"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        bpm=120.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    lib.tracks["b"] = replace(
+        lib.tracks["b"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    events = []
+    svc = SuggestionService(store, lib, feedback_sink=events.append)
+    state = MusicState()
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=120.0)}
+    )
+
+    first = svc.compute_from_state(state)
+    assert first is not None
+    assert first["track_id"] == "a"
+    assert first["transition_alternatives"][1]["track_id"] == "b"
+
+    store.search_count = 0
+    store._backend.load_count = 0
+    event = svc.record_feedback("later", state=state)
+    current = svc.current()
+
+    assert event is not None
+    assert event.action == "suggestion_rejected"
+    assert event.label == "not_now"
+    assert current is not None
+    assert current["track_id"] == "b"
+    assert current["transition_alternatives"][0]["track_id"] == "b"
+    assert current["transition_alternatives"][0]["candidate_id"] == "tr_001"
+    assert current["transition_alternatives"][0]["selected"] is True
+    assert current["decision"]["candidate_id"] == "tr_001"
+    assert [row.action for row in events] == ["suggestion_shown", "suggestion_rejected"]
+    assert store.search_count == 0
+    assert store._backend.load_count == 0
+
+
 def test_refresh_from_state_clears_stale_pick_when_seed_changes():
     store = _FakeStore(["s", "a", "b"], [("s", 0.99), ("a", 0.9), ("b", 0.8)])
     svc = SuggestionService(store, _lib(["s", "a", "b"]))

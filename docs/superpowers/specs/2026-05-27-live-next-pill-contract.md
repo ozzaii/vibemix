@@ -191,6 +191,9 @@ The expanded pill exposes three tiny explicit feedback controls:
 
 `not_now` is a weak taste negative for the current transition context. Timing
 feedback is technical calibration only and must not become role-pair taste.
+When a backup is already visible, `later` also promotes the next grounded backup
+without emitting a positive `played_next` label or rerunning the full library
+search.
 
 In the live runtime the event is written to the current session's `events.jsonl`
 as `kind: "taste_feedback"` for local replay. Long-term taste storage appends the

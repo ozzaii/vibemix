@@ -61,7 +61,9 @@ CONTROLLER_XFADER_FACTOR_FLOOR = 0.20
 EXPLICIT_FEEDBACK_ACTIONS: dict[str, tuple[str, str]] = {
     "accept": ("suggestion_accepted", "accepted"),
     "keep": ("suggestion_accepted", "accepted"),
+    "later": ("suggestion_rejected", "not_now"),
     "not_now": ("suggestion_rejected", "not_now"),
+    "timing": ("timing_claim_wrong", "wrong_timing"),
     "wrong_timing": ("timing_claim_wrong", "wrong_timing"),
 }
 
@@ -340,6 +342,13 @@ class SuggestionService:
         with self._lock:
             suggestion = dict(self._current) if self._current is not None else None
             seed_track_id = self._seed_track_id
+            candidate_vectors_by_track_id = {
+                tid: vector.copy() for tid, vector in self._candidate_vectors_by_track_id.items()
+            }
+            fallback_candidate_track_id = self._candidate_track_id
+            fallback_candidate_vector = (
+                self._candidate_vector.copy() if self._candidate_vector is not None else None
+            )
         if suggestion is None:
             return None
         active_seed = resolve_seed_context(state) if state is not None else None
@@ -352,7 +361,57 @@ class SuggestionService:
         )
         if event is not None:
             self._emit_feedback(event)
+        if label == "not_now":
+            self._promote_next_backup_after_feedback(
+                suggestion,
+                candidate_vectors_by_track_id,
+                fallback_candidate_track_id=fallback_candidate_track_id,
+                fallback_candidate_vector=fallback_candidate_vector,
+                state=state,
+            )
         return event
+
+    def _promote_next_backup_after_feedback(
+        self,
+        suggestion: dict,
+        candidate_vectors_by_track_id: dict[str, Any],
+        *,
+        fallback_candidate_track_id: str | None,
+        fallback_candidate_vector: Any | None,
+        state: Any | None,
+    ) -> None:
+        alternatives = _coerce_transition_alternatives(suggestion.get("transition_alternatives"))
+        if len(alternatives) < 2:
+            return
+        backup = alternatives[1]
+        backup_track_id = _str_or_none(backup.get("track_id"))
+        backup_candidate_id = _str_or_none(backup.get("candidate_id"))
+        promoted = promote_transition_alternative(
+            alternatives,
+            candidate_id=backup_candidate_id,
+            track_id=backup_track_id,
+        )
+        if promoted == alternatives:
+            return
+
+        fallback_track = fallback_candidate_track_id or str(suggestion.get("track_id") or "")
+        selected_track_id, selected_vector = _apply_winning_alternative(
+            suggestion,
+            promoted,
+            candidate_vectors_by_track_id,
+            fallback_candidate_track_id=fallback_track,
+            fallback_candidate_vector=fallback_candidate_vector,
+        )
+        if state is not None:
+            suggestion["decision"] = self._safe_decision_payload_for_suggestion(state, suggestion)
+
+        with self._lock:
+            if self._current is None:
+                return
+            self._current = suggestion
+            self._candidate_track_id = selected_track_id
+            self._candidate_vector = selected_vector.copy() if selected_vector is not None else None
+            self._pinned_candidate_track_id = selected_track_id
 
     def _feedback_event_for_choice(
         self,
