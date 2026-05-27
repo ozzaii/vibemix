@@ -94,7 +94,8 @@ audio. Release promotion also requires a passing private scorecard and a valid
 `scripts/eval/intel_gate.py` artifact whose scorecard and provenance stages
 point at the same threshold-lock/threshold-values hashes. Use `--append-log
 eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` to append a valid entry directly;
-invalid evidence exits non-zero and is not written.
+invalid evidence or a candidate log that fails whole-log validation exits
+non-zero and is not written.
 
 Validate the public log with
 `scripts/eval/intel_recalibration_log_validate.py`. The validator treats

@@ -83,6 +83,17 @@ def validate_recalibration_log(
     """Validate schema, privacy, and hash bindings in the public log."""
     log_path = Path(path)
     text = log_path.read_text(encoding="utf-8")
+    return validate_recalibration_log_text(text, path=log_path, threshold_lock=threshold_lock)
+
+
+def validate_recalibration_log_text(
+    text: str,
+    *,
+    path: Path | str = DEFAULT_LOG,
+    threshold_lock: Path | str | None = DEFAULT_LOCK,
+) -> LogValidationReport:
+    """Validate schema, privacy, and hash bindings in public log text."""
+    log_path = Path(path)
     errors = _privacy_errors(text)
     lock_path = Path(threshold_lock) if threshold_lock is not None else None
     expected_lock_hash = _expected_lock_hash(lock_path, errors)

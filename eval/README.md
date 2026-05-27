@@ -79,9 +79,10 @@ report hashes, threshold hashes, privacy flags, and actions.
 `scripts/eval/intel_recalibration_note.py` renders that append-only entry from
 redacted private scorecard/gold/taste/gate reports, binds it to those aggregate
 reports by SHA-256, and can append it with `--append-log` only after validation
-passes; release promotion requires a passing scorecard plus a valid
-hash-bound `intel_gate.py` artifact with matching threshold-lock and
-threshold-values provenance. `scripts/eval/intel_recalibration_log_validate.py`
+passes for the candidate whole log; release promotion requires a passing
+scorecard plus a valid hash-bound `intel_gate.py` artifact with matching
+threshold-lock and threshold-values provenance.
+`scripts/eval/intel_recalibration_log_validate.py`
 validates the public log after entries are appended so malformed, hashless, or
 private-leaking entries are caught mechanically; it also rejects stale
 recalibration entries whose `lock:` digest no longer matches the current

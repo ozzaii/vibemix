@@ -461,7 +461,12 @@ def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def append_recalibration_note(log_path: Path | str, result: dict[str, Any]) -> Path:
+def append_recalibration_note(
+    log_path: Path | str,
+    result: dict[str, Any],
+    *,
+    threshold_lock: Path | str = DEFAULT_LOCK,
+) -> Path:
     """Append one valid rendered note to the public recalibration log."""
     if result.get("valid") is not True:
         raise ValueError("refusing to append invalid recalibration note")
@@ -473,7 +478,19 @@ def append_recalibration_note(log_path: Path | str, result: dict[str, Any]) -> P
     if APPEND_MARKER not in text:
         raise ValueError(f"append marker missing from {path}")
     suffix = "" if text.endswith("\n") else "\n"
-    path.write_text(f"{text}{suffix}\n{entry}\n", encoding="utf-8")
+    candidate = f"{text}{suffix}\n{entry}\n"
+
+    from scripts.eval.intel_recalibration_log_validate import validate_recalibration_log_text
+
+    report = validate_recalibration_log_text(
+        candidate,
+        path=path,
+        threshold_lock=threshold_lock,
+    )
+    if not report.valid:
+        errors = ",".join(report.errors)
+        raise ValueError(f"refusing to append invalid recalibration log: {errors}")
+    path.write_text(candidate, encoding="utf-8")
     return path
 
 
@@ -509,7 +526,7 @@ def main(argv: list[str] | None = None) -> int:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(result["entry"], encoding="utf-8")
         if args.append_log:
-            append_recalibration_note(args.append_log, result)
+            append_recalibration_note(args.append_log, result, threshold_lock=args.lock_path)
     if args.json:
         json.dump(result, sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write("\n")

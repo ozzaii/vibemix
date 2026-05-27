@@ -270,20 +270,54 @@ def test_recalibration_note_cli_writes_markdown_and_json(tmp_path: Path, capsys)
 def test_append_recalibration_note_appends_after_marker(tmp_path: Path) -> None:
     log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
     log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
-    result = build_recalibration_note(
-        scorecard=_scorecard(),
-        gold_report=_gold_report(),
-        evidence_tier="tier1_private_calibration",
-        lock_path=INTEL_LOCK_PATH,
-        timestamp="2026-05-27T12:00:00Z",
-        run_id="intel_private_append",
-    )
+    result = _tier1_note_result(timestamp="2026-05-27T12:00:00Z", run_id="intel_private_append")
 
     appended = append_recalibration_note(log, result)
 
     text = appended.read_text(encoding="utf-8")
     assert APPEND_MARKER in text
     assert text.index(APPEND_MARKER) < text.index("intel_private_append")
+
+
+def test_append_recalibration_note_refuses_duplicate_run_id(tmp_path: Path) -> None:
+    log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
+    log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
+    first = _tier1_note_result(timestamp="2026-05-27T12:00:00Z", run_id="intel_private_dup")
+    duplicate = _tier1_note_result(timestamp="2026-05-27T12:00:01Z", run_id="intel_private_dup")
+
+    append_recalibration_note(log, first)
+    before = log.read_text(encoding="utf-8")
+
+    try:
+        append_recalibration_note(log, duplicate)
+    except ValueError as exc:
+        assert "run_id.duplicate" in str(exc)
+    else:  # pragma: no cover - explicit assertion path for clarity
+        raise AssertionError("duplicate recalibration run id was appended")
+
+    assert log.read_text(encoding="utf-8") == before
+
+
+def test_append_recalibration_note_refuses_out_of_order_timestamp(tmp_path: Path) -> None:
+    log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
+    log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
+    later = _tier1_note_result(timestamp="2026-05-27T12:00:02Z", run_id="intel_private_later")
+    earlier = _tier1_note_result(
+        timestamp="2026-05-27T12:00:01Z",
+        run_id="intel_private_earlier",
+    )
+
+    append_recalibration_note(log, later)
+    before = log.read_text(encoding="utf-8")
+
+    try:
+        append_recalibration_note(log, earlier)
+    except ValueError as exc:
+        assert "timestamp.out_of_order" in str(exc)
+    else:  # pragma: no cover - explicit assertion path for clarity
+        raise AssertionError("out-of-order recalibration note was appended")
+
+    assert log.read_text(encoding="utf-8") == before
 
 
 def test_append_recalibration_note_refuses_invalid_result(tmp_path: Path) -> None:
@@ -346,3 +380,14 @@ def test_cli_does_not_write_output_or_append_log_for_invalid_note(
 
 def _report_hash_line(entry: str) -> str:
     return next(line for line in entry.splitlines() if line.startswith("- report_hashes: "))
+
+
+def _tier1_note_result(*, timestamp: str, run_id: str) -> dict:
+    return build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report(),
+        evidence_tier="tier1_private_calibration",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp=timestamp,
+        run_id=run_id,
+    )
