@@ -38,6 +38,17 @@ const WS_URL_8765 = "ws://127.0.0.1:8765";
 
 const RECONNECT_DELAY_MS = 1000;
 
+// The shared ws:8765 socket carries multiple envelope families: the
+// legacy 30 Hz mascot frame (a flat dict with no `type` field), the
+// ~15 Hz `ipc.session.snapshot`, the ~1 Hz `ipc.status.tick`, mascot
+// mood-change events, and finally the `ipc.learn.*` envelopes the Learn
+// webview cares about. CR-03 (REVIEW.md): pre-filter to `ipc.learn.*`
+// BEFORE the validator + the missing-type warning, otherwise the
+// learn-window devtools console takes ~30 console.warn() calls per
+// second from the mascot frame alone (~108k/hour) and real schema-drift
+// warnings get buried.
+const MESSAGE_TYPE_PREFIX = "ipc.learn.";
+
 type AjvValidator = ((data: unknown) => boolean) & {
   errors?: Array<{ instancePath?: string; message?: string }> | null;
 };
@@ -111,29 +122,32 @@ export class LearnWsClient extends EventTarget {
       console.warn("[learn:ws] parse failed; dropping frame", e);
       return;
     }
-    if (typeof envelope?.type !== "string") {
-      // eslint-disable-next-line no-console
-      console.warn("[learn:ws] envelope missing type; dropping");
+    // CR-03: filter to ipc.learn.* BEFORE the missing-type warning + the
+    // validator. ws:8765 is shared with the mascot bus (30 Hz flat dict,
+    // no `type` field) + ipc.session.snapshot (~15 Hz) + ipc.status.tick
+    // (~1 Hz) + mascot mood-change events; the learn webview is only
+    // concerned with ipc.learn.*. Without this early-drop, every mascot
+    // frame logged a missing-type warning to devtools (108k/hour) and
+    // every status/snapshot envelope did wasted validate + dispatch work.
+    // Silent drop — no warn — keeps real schema-drift warnings legible.
+    const t = envelope?.type;
+    if (typeof t !== "string" || !t.startsWith(MESSAGE_TYPE_PREFIX)) {
       return;
     }
-    // Pre-compiled ajv validator — CSP-safe (no unsafe-eval). The
-    // static default-import above guarantees synchronous availability;
-    // the `await` keyword on this method exists for parity with the
-    // earlier dynamic-import path. Future schema additions automatically
-    // flow through `npm run codegen:ipc`.
+    // Pre-compiled ajv validator — CSP-safe (no unsafe-eval). The static
+    // default-import above guarantees synchronous availability; future
+    // schema additions automatically flow through `npm run codegen:ipc`.
     const ok = validate(envelope);
     if (!ok) {
       // eslint-disable-next-line no-console
-      console.warn(
-        `[learn:ws] validate failed for ${envelope.type}; dropping`,
-      );
+      console.warn(`[learn:ws] validate failed for ${t}; dropping`);
       return;
     }
     // We dispatch on `window` so any component (controller-stage,
     // status-bar, etc.) can subscribe via `addEventListener` without
-    // needing a reference to this ws client.
-    window.dispatchEvent(
-      new CustomEvent(envelope.type, { detail: envelope.payload }),
-    );
+    // needing a reference to this ws client. `t` is the type-narrowed
+    // string from the prefix filter above; using it (not `envelope.type`)
+    // keeps the type system happy without re-asserting non-undefined.
+    window.dispatchEvent(new CustomEvent(t, { detail: envelope.payload }));
   }
 }
