@@ -76,6 +76,40 @@ def test_validate_rejects_null_core_report_hashes(tmp_path: Path) -> None:
     assert "entry[1].report_hashes.scorecard.required" in report.errors
 
 
+def test_validate_rejects_duplicate_key_value_tokens(tmp_path: Path) -> None:
+    entry = _append_to_field(
+        _valid_entry(),
+        "measured",
+        "section_role_hit_at_5_delta=0.99",
+    )
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].measured.duplicate:section_role_hit_at_5_delta" in report.errors
+
+
+def test_validate_rejects_unknown_key_value_tokens(tmp_path: Path) -> None:
+    entry = _append_to_field(_valid_entry(), "report_hashes", "unknown_report=sha256:" + ("c" * 64))
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].report_hashes.unknown:unknown_report" in report.errors
+
+
+def test_validate_rejects_malformed_key_value_tokens(tmp_path: Path) -> None:
+    entry = _append_to_field(_valid_entry(), "privacy", "free_form_notes_committed")
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].privacy.token" in report.errors
+
+
 def test_validate_rejects_missing_required_metric(tmp_path: Path) -> None:
     entry = _replace_field(
         _valid_entry(),
@@ -240,6 +274,13 @@ def _write_log(tmp_path: Path, entry: str) -> Path:
 def _replace_field(entry: str, field: str, value: str) -> str:
     return "\n".join(
         f"- {field}: {value}" if line.startswith(f"- {field}: ") else line
+        for line in entry.splitlines()
+    )
+
+
+def _append_to_field(entry: str, field: str, token: str) -> str:
+    return "\n".join(
+        f"{line} {token}" if line.startswith(f"- {field}: ") else line
         for line in entry.splitlines()
     )
 

@@ -36,6 +36,8 @@ NUMBER_RE = re.compile(r"^[+-]?\d+(?:\.\d+)?$")
 SIGNED_NUMBER_RE = re.compile(r"^[+-]\d+(?:\.\d+)?$")
 REPORT_HASH_KEYS = ("gold_report", "scorecard", "taste_scorecard", "gate")
 ALWAYS_REQUIRED_REPORT_HASHES = ("gold_report", "scorecard")
+SPLIT_KEYS = ("calibration", "holdout", "canary")
+LABEL_KIND_KEYS = ("section", "transition", "cue", "live_pill", "representation", "taste")
 REQUIRED_FIELDS = (
     "run_id",
     "lock",
@@ -152,20 +154,32 @@ def _validate_entry(entry: str, *, index: int, expected_lock_hash: str | None) -
     ):
         errors.append(f"entry[{index}].release_evidence_tier")
 
-    splits = _parse_key_values(fields.get("splits", ""))
-    for split in ("calibration", "holdout", "canary"):
+    splits = _parse_key_values(
+        fields.get("splits", ""),
+        field="splits",
+        index=index,
+        errors=errors,
+        expected_keys=SPLIT_KEYS,
+    )
+    for split in SPLIT_KEYS:
         if split not in splits or not splits[split].isdigit():
             errors.append(f"entry[{index}].splits.{split}")
     if (
         fields.get("evidence_tier") == "tier2_private_holdout_canary"
         or header_verdict == "release_promoted"
     ):
-        for split in ("calibration", "holdout", "canary"):
+        for split in SPLIT_KEYS:
             if int(splits.get(split, "0")) <= 0:
                 errors.append(f"entry[{index}].splits.{split}.empty")
 
-    label_kinds = _parse_key_values(fields.get("label_kinds", ""))
-    for kind in ("section", "transition", "cue", "live_pill", "representation", "taste"):
+    label_kinds = _parse_key_values(
+        fields.get("label_kinds", ""),
+        field="label_kinds",
+        index=index,
+        errors=errors,
+        expected_keys=LABEL_KIND_KEYS,
+    )
+    for kind in LABEL_KIND_KEYS:
         if kind not in label_kinds or not label_kinds[kind].isdigit():
             errors.append(f"entry[{index}].label_kinds.{kind}")
 
@@ -173,7 +187,13 @@ def _validate_entry(entry: str, *, index: int, expected_lock_hash: str | None) -
     metric_errors, metric_failures = _validate_metric_lines(fields, index=index)
     errors.extend(metric_errors)
 
-    privacy = _parse_key_values(fields.get("privacy", ""))
+    privacy = _parse_key_values(
+        fields.get("privacy", ""),
+        field="privacy",
+        index=index,
+        errors=errors,
+        expected_keys=tuple(EXPECTED_PRIVACY),
+    )
     for key, expected in EXPECTED_PRIVACY.items():
         if privacy.get(key) != expected:
             errors.append(f"entry[{index}].privacy.{key}")
@@ -203,9 +223,27 @@ def _validate_entry(entry: str, *, index: int, expected_lock_hash: str | None) -
 def _validate_metric_lines(fields: dict[str, str], *, index: int) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     failures: list[str] = []
-    measured = _parse_key_values(fields.get("measured", ""))
-    locked = _parse_key_values(fields.get("locked", ""))
-    delta = _parse_key_values(fields.get("delta", ""))
+    measured = _parse_key_values(
+        fields.get("measured", ""),
+        field="measured",
+        index=index,
+        errors=errors,
+        expected_keys=tuple(spec.metric for spec in KEY_METRICS),
+    )
+    locked = _parse_key_values(
+        fields.get("locked", ""),
+        field="locked",
+        index=index,
+        errors=errors,
+        expected_keys=tuple(spec.threshold for spec in KEY_METRICS),
+    )
+    delta = _parse_key_values(
+        fields.get("delta", ""),
+        field="delta",
+        index=index,
+        errors=errors,
+        expected_keys=tuple(spec.metric for spec in KEY_METRICS),
+    )
     for spec in KEY_METRICS:
         measured_value = _metric_value(
             measured,
@@ -285,8 +323,20 @@ def _lock_field_digest(value: str) -> str | None:
 
 def _validate_report_bindings(fields: dict[str, str], *, index: int, verdict: str) -> list[str]:
     errors: list[str] = []
-    reports = _parse_key_values(fields.get("reports", ""))
-    hashes = _parse_key_values(fields.get("report_hashes", ""))
+    reports = _parse_key_values(
+        fields.get("reports", ""),
+        field="reports",
+        index=index,
+        errors=errors,
+        expected_keys=REPORT_HASH_KEYS,
+    )
+    hashes = _parse_key_values(
+        fields.get("report_hashes", ""),
+        field="report_hashes",
+        index=index,
+        errors=errors,
+        expected_keys=REPORT_HASH_KEYS,
+    )
     for key in REPORT_HASH_KEYS:
         report = reports.get(key)
         digest = hashes.get(key)
@@ -311,12 +361,29 @@ def _validate_report_bindings(fields: dict[str, str], *, index: int, verdict: st
     return errors
 
 
-def _parse_key_values(value: str) -> dict[str, str]:
+def _parse_key_values(
+    value: str,
+    *,
+    field: str,
+    index: int,
+    errors: list[str],
+    expected_keys: tuple[str, ...],
+) -> dict[str, str]:
     out: dict[str, str] = {}
     for part in value.split():
         if "=" not in part:
+            errors.append(f"entry[{index}].{field}.token")
             continue
         key, raw = part.split("=", maxsplit=1)
+        if not key or raw == "":
+            errors.append(f"entry[{index}].{field}.token")
+            continue
+        if key not in expected_keys:
+            errors.append(f"entry[{index}].{field}.unknown:{key}")
+            continue
+        if key in out:
+            errors.append(f"entry[{index}].{field}.duplicate:{key}")
+            continue
         out[key] = raw
     return out
 
