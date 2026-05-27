@@ -105,7 +105,13 @@ async function loadControllerSvg(controllerId: string): Promise<string> {
       )) as ControllerSvgModule;
       return m.PIONEER_DDJ_FLX10_SVG ?? "";
     }
-    // Plan 06 lands the remaining 3 — until then they fall through to
+    case "pioneer_ddj_1000": {
+      const m = (await import(
+        "../controllers/pioneer_ddj_1000.svg.js"
+      )) as ControllerSvgModule;
+      return m.PIONEER_DDJ_1000_SVG ?? "";
+    }
+    // Plan 06 lands the remaining 2 — until then they fall through to
     // the generic branch (so a user plugging an XDJ-RX3 still sees the
     // labeled-zone fallback, not a blank stage).
     default: {
