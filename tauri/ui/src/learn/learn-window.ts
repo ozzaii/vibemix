@@ -169,7 +169,14 @@ function mountLearnWindow(root: HTMLElement): {
   // across SKUs (vol:A, eq_hi:A etc.) so the silent miscolor would go
   // unnoticed in production but is wrong; the guard the comment promised
   // is now actually wired.
+  //
+  // WR-03 fix: a `stopped` flag the drainer checks before re-scheduling
+  // so the unbounded rAF loop can be torn down on beforeunload. Without
+  // it, an HMR reload or a future test fixture that re-mounts on the
+  // same page would stack drainers indefinitely.
+  let drainerStopped = false;
   function drainFrame(): void {
+    if (drainerStopped) return;
     if (
       pendingPositions !== null &&
       pendingControllerId !== null &&
@@ -193,6 +200,33 @@ function mountLearnWindow(root: HTMLElement): {
   // Open ws + start streaming.
   const ws = new LearnWsClient();
   ws.connect();
+
+  // WR-03: tear down on beforeunload so a future HMR reload / test
+  // remount doesn't stack timers + rAF loops. Production impact today
+  // is zero (the page tears down naturally on close) but the cleanup
+  // is cheap and makes the lifecycle explicit. Wired only when running
+  // in a real window environment; jsdom tests skip the listener.
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    const teardown = () => {
+      drainerStopped = true;
+      try {
+        titlebar.dispose();
+      } catch {
+        /* swallow — best-effort cleanup */
+      }
+      try {
+        status.dispose();
+      } catch {
+        /* swallow */
+      }
+      try {
+        ws.close();
+      } catch {
+        /* swallow */
+      }
+    };
+    window.addEventListener("beforeunload", teardown, { once: true });
+  }
 
   return { ws, titlebar, stage, status };
 }
