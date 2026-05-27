@@ -147,9 +147,10 @@ contract, POC immutability, anti-slop blocklist all stay green either way.
 
 - `.planning/phases/49-win-mac-one-click-installer-chain/49-CONTEXT.md` —
   full phase context
-- `.planning/research/ARCHITECTURE.md § Feature 1` — architecture-level
-  design
-- `.planning/research/PITFALLS.md § 1` — installer pitfalls (silent install
-  regression, Apple Silicon Reduced Security)
+- `.planning/archive/2026-05-27-stale-v6-memory-research/ARCHITECTURE.md`
+  § Feature 1 — historical architecture-level design
+- `.planning/archive/2026-05-27-stale-v6-memory-research/PITFALLS.md` § 1 —
+  historical installer pitfalls (silent install regression, Apple Silicon
+  Reduced Security)
 - Memory anchors: `project_one_click_install_hard_req`,
   `project_v4_canonical_baseline`, `feedback_no_scope_creep_clean_utility`

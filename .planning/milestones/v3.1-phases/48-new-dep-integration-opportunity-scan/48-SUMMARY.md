@@ -20,7 +20,7 @@ A dated v3.1 opportunity-scan artifact + a 3-gate validator + 8 Yellow-defer car
 - `.planning/decisions/DEP-OPP-01-obs-browser-source.md` — ADR for the only Green-adopt outcome.
 - `docs/integrations/obs-browser-source.md` — OBS Studio setup guide using existing Tauri webview port 8765 + mascot bus.
 - README.md — Streaming integrations cross-link.
-- `.planning/research/v3-buckets/v3.x-*.md` — 8 Yellow-defer stubs (Mixxx OSC, controller map transpiler, pyrekordbox depth, Beat This!, Voicemeeter Banana, Numark/Hercules controllers, macOS 26+ verify, Win11 24H2 WASAPI).
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/v3.x-*.md` — 8 Yellow-defer stubs (Mixxx OSC, controller map transpiler, pyrekordbox depth, Beat This!, Voicemeeter Banana, Numark/Hercules controllers, macOS 26+ verify, Win11 24H2 WASAPI).
 - `tests/audit/test_opportunity_evaluations_schema.py` (6 tests)
 - `tests/audit/test_scan_opportunities.py` (8 tests)
 - `tests/audit/test_no_slop_opp.py` (5 tests)
@@ -30,7 +30,7 @@ A dated v3.1 opportunity-scan artifact + a 3-gate validator + 8 Yellow-defer car
 | Bucket | Count | Surface | Examples |
 |---|---|---|---|
 | Green-adopt | 1 | docs-only | OBS browser-source mascot path |
-| Yellow-defer | 8 | `.planning/research/v3-buckets/v3.x-*.md` | Mixxx OSC, Beat This!, pyrekordbox depth |
+| Yellow-defer | 8 | `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/v3.x-*.md` | Mixxx OSC, Beat This!, pyrekordbox depth |
 | Red-constraint | 9 | none | CLAP, MERT, OpenL3, OpenAI/Anthropic direct, Demucs, Spleeter, DAW APIs, Linux-only |
 | Red-risk | 6 | none | ProDJ Link, cdj-link-py, Dante Via, Loopback Audio, Soundflower, Auto-Rig Pro |
 
@@ -44,7 +44,7 @@ A dated v3.1 opportunity-scan artifact + a 3-gate validator + 8 Yellow-defer car
 4. **Sibling anti-slop checker** at `scripts/audit/check_no_slop_opp.py` instead of widening `scripts/launch/check_no_ai_slop.py`'s contract-pinned target paths. Phase 47-resume sibling-script pattern.
 5. **`scripts/audit/scan_opportunities.py` is validator-only**, not a content writer. Scan markdown stays human-curated from `.planning/research/STACK.md` § Bucket 3.
 6. **OBS adoption is docs-only.** Mascot bus port 8765 already serves; OBS browser-source plugs in without code.
-7. **Yellow-defer carry-forward** via stub files at `.planning/research/v3-buckets/v3.x-<slug>.md` — 8 stubs.
+7. **Yellow-defer carry-forward** via stub files at `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/v3.x-<slug>.md` — 8 stubs.
 8. **Auto-Red set explicit + verbatim memory quote per row** for CLAP / MERT / OpenL3 / OpenAI direct / Anthropic / Demucs / Spleeter / DAW APIs / Linux-only / ProDJ Link / cdj-link-py / Dante Via / Loopback Audio / Soundflower / Auto-Rig Pro.
 9. **Phase 49 hand-off contract:** Phase 49 installer companion reads `opportunity_evaluations` to confirm OBS docs-only path is NOT a fetchable driver. Companion driver pins (BlackHole + VB-CABLE) stay Phase 49 internal.
 10. **CI surface:** `dep-audit.yml` gained `opp-scan-validate` job alongside existing Phase 46 jobs.
@@ -60,7 +60,7 @@ A dated v3.1 opportunity-scan artifact + a 3-gate validator + 8 Yellow-defer car
 - 1 new ADR: `.planning/decisions/DEP-OPP-01-obs-browser-source.md`
 - 1 new integration doc: `docs/integrations/obs-browser-source.md`
 - 1 README cross-link (Streaming integrations section)
-- 8 Yellow-defer stubs in `.planning/research/v3-buckets/`
+- 8 Yellow-defer stubs in `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/`
 - 3 new test files in `tests/audit/`
 - 4 pre-existing v3-buckets/ research notes touched with surgical word swaps to clear the anti-slop sweep on the directory
 - 6 planning artifacts (CONTEXT.md, DISCUSSION-LOG.md, 6 PLAN.md files, VERIFICATION.md, SUMMARY.md)

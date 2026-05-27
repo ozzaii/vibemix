@@ -10,7 +10,7 @@
 
 **Critical correction:** neither `essentia` nor `librosa` is installed (CLAUDE.md's "essentia in stack"
 is WRONG — essentia is **AGPLv3 = poison** for Apache+Bravoh-commercial; do not add it, fix the doc).
-The DSP stack is hand-rolled numpy/scipy + ffmpeg decode. **Reuse existing primitives, add NO deps.**
+The DSP stack is hand-rolled numpy + ffmpeg/PyAV decode. **Reuse existing primitives, add NO deps.**
 
 Reusable primitives:
 - `library/cue_detect.py:134` `decode_to_mono(path, sr=16000)` — ffmpeg → mono float32 (the offline decode).

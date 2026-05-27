@@ -26,7 +26,7 @@
 - [x] **EXPORT-02**: Internal Camelot keys are converted deterministically to classical notation for Rekordbox's `Tonality` field (`harmonics.to_classical`, honest-null on unknown), and export is exposed through an `export_set` agent tool + a `vibemix library export-set` CLI command.
 
 ### AGENT — the set-prep co-host flow
-- [x] **AGENT-01**: A DJ can ask the co-host (CLI `vibemix library build-set "<brief>"`, Gemini agent) to build a full set from a natural-language brief; the agent discovers → sequences → and explains in 1-2 sentences why each critical transition works (key/BPM/energy/vibe), acting as a mentor rather than a black box, with every track grounded (never invented).
+- [x] **AGENT-01**: A DJ can ask the co-host (CLI `vibemix library build-set "<brief>"`, local Codex Viber agent) to build a full set from a natural-language brief; the agent discovers → sequences → and explains in 1-2 sentences why each critical transition works (key/BPM/energy/vibe), acting as a mentor rather than a black box, with every track grounded (never invented).
 - [x] **AGENT-02**: The set-prep flow reuses the existing bounded, no-hang agent harness (iteration cap, per-call + per-tool timeouts, handlers return errors never raise) and the shared persona/lens seam, so it can never wedge and its voice matches the co-host's.
 
 ### UI — "Build a Set" path
@@ -43,9 +43,9 @@
 - **Public catalog** (Beatport / Spotify / SoundCloud APIs), external discovery (Modes B/C), purchase deep-links, affiliate revenue — network catalog + monetization is the Bravoh commercial product, not the local OSS utility.
 - **Fingerprinting** (Chromaprint / AcoustID) — only needed to inherit public-catalog embeddings, which are out of scope.
 - **1001Tracklists / Mixcloud scraping** energy "moat" — scraping + proprietary-dataset IP is commercial Bravoh work.
-- **Non-Gemini LLM** (the spec names Claude Sonnet for reasoning) — vibemix is Gemini-only; reasoning is the existing Gemini agent.
+- **New shipped cloud LLM provider** (the spec names Claude Sonnet for reasoning) — vibemix keeps Gemini for live/TTS, while the current demo/test set-prep path is local Codex over the shared grounded tool core.
 - **Mem0 / managed memory frameworks** — rejected; recency uses the local store / played-ids.
-- **New heavy deps** (essentia = AGPL poison; librosa unnecessary; torch/Pinecone/pgvector) — pure-compute over the existing numpy/scipy + ffmpeg stack only.
+- **New heavy deps** (essentia = AGPL poison; librosa unnecessary; scipy/torch/Pinecone/pgvector) — pure-compute over the existing numpy + ffmpeg/PyAV stack only.
 
 ## Traceability
 > Each v8.2 REQ-ID maps to exactly one phase (100% coverage, no orphans, no duplicates). Phases continue from v8.1 (77–82) — start at 83, no reset.

@@ -38,7 +38,7 @@ Surface every v3.1 candidate dep / integration on a single dated discovery artif
 - `project_one_click_install_hard_req` — "Mac+Win, app opens → auto-downloads deps → configures audio → ready. Every dep choice rated green/yellow/red on install impact."
 
 **Yellow-defer destination:**
-- `.planning/research/v3-buckets/` — Yellow candidates carry forward here for v3.x re-eval (per OPP-05). Existing tenants establish the pattern.
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/` — Yellow candidates carry forward here for v3.x re-eval (per OPP-05). Existing tenants establish the pattern.
 </canonical_refs>
 
 <spec_lock>
@@ -47,7 +47,7 @@ Surface every v3.1 candidate dep / integration on a single dated discovery artif
 - OPP-02: 4-color rubric (Red-constraint / Red-risk / Yellow-defer / Green-adopt) applied to every candidate.
 - OPP-03: Exclusion set quoted verbatim from `feedback_no_clap_use_gemini_embedding` / `feedback_no_scope_creep_clean_utility` / `project_one_click_install_hard_req`; constraint-violators auto-Red.
 - OPP-04: ADR sidecar `.planning/decisions/DEP-OPP-<N>-<slug>.md` per Green adoption.
-- OPP-05: Zero (or near-zero) new runtime deps documented; Yellow → `.planning/research/v3-buckets/`.
+- OPP-05: Zero (or near-zero) new runtime deps documented; Yellow → `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/`.
 - OPP-06: OBS browser-source mascot path docs-only in README + `docs/integrations/obs-browser-source.md`.
 
 **Locked success criteria (from `.planning/ROADMAP.md` § Phase 48):**
@@ -156,9 +156,9 @@ NO mascot code changes. NO new IPC. NO new Tauri webview routes (the mascot rout
 
 **Rationale:** Per memory + OPP-06: "no new runtime code required (docs-only adoption)". The mascot bus port 8765 is the existing v3.0 surface — OBS browser-source plugs into it without any vibemix-side work.
 
-### Decision 7 — Yellow-defer carry-forward via stub files in `.planning/research/v3-buckets/`
+### Decision 7 — Yellow-defer carry-forward via stub files in `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/`
 
-[auto] Per OPP-05: Yellow candidates carry forward. Each Yellow-defer row gets a single stub markdown at `.planning/research/v3-buckets/v3.x-<slug>.md` with:
+[auto] Per OPP-05: Yellow candidates carry forward. Each Yellow-defer row gets a single stub markdown at `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/v3.x-<slug>.md` with:
 - Candidate name + category
 - Why deferred (link back to scan row)
 - Re-eval trigger (memory + roadmap conditions that would flip it Green)
@@ -174,7 +174,7 @@ Expected Yellow-defer set per STACK.md § Bucket 3 + memory `project_v2_open_can
 - `v3.x-macos-26-support.md` (next-major-OS verification, contingent on release timing)
 - `v3.x-win11-24h2-wasapi-verify.md`
 
-**Rationale:** Existing `.planning/research/v3-buckets/` is the established forward-carry surface; Yellow stubs are the audit-trail mechanism for the "carry forward into v3-buckets/" success criterion.
+**Rationale:** Existing `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/` is the established forward-carry surface; Yellow stubs are the audit-trail mechanism for the "carry forward into v3-buckets/" success criterion.
 
 ### Decision 8 — Auto-Red set (explicit candidate list with verbatim memory quote per row)
 
@@ -222,7 +222,7 @@ Already captured under Decision 4. Re-cited here for the CI surface: `dep-audit.
 - Create `docs/dep-opportunities/2026-05-scan.md` with candidate inventory verbatim from `.planning/research/STACK.md` § Bucket 3 + verbatim memory quotes per Decision 8.
 - Create `scripts/audit/scan_opportunities.py` (auto-Red validator + md↔yaml parity gate) + `scripts/audit/check_no_slop_opp.py` (anti-slop sibling) + extend `.github/workflows/dep-audit.yml` (or new `opp-audit.yml` — planner picks).
 - Create `.planning/decisions/DEP-OPP-01-obs-browser-source.md` + `docs/integrations/obs-browser-source.md` + README cross-link.
-- Create 8 Yellow-defer stubs under `.planning/research/v3-buckets/v3.x-<slug>.md` per Decision 7.
+- Create 8 Yellow-defer stubs under `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/v3.x-<slug>.md` per Decision 7.
 - Anti-slop check must pass on ALL generated prose: scan markdown, ADR, OBS docs, Yellow stubs, commit messages.
 
 **MUST NOT do:**
@@ -283,7 +283,7 @@ Already captured under Decision 4. Re-cited here for the CI surface: `dep-audit.
    - **48-02:** Scan markdown (`docs/dep-opportunities/2026-05-scan.md` with candidate inventory + 4-color rubric + verbatim memory quotes)
    - **48-03:** Auto-Red validator (`scripts/audit/scan_opportunities.py`) + anti-slop sibling (`scripts/audit/check_no_slop_opp.py`) + CI wiring
    - **48-04:** OBS browser-source Green adoption (ADR `.planning/decisions/DEP-OPP-01-obs-browser-source.md` + integration doc `docs/integrations/obs-browser-source.md` + README cross-link)
-   - **48-05:** Yellow-defer stubs (8 files under `.planning/research/v3-buckets/`)
+   - **48-05:** Yellow-defer stubs (8 files under `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/`)
    - **48-06:** Phase-level VERIFICATION.md + SUMMARY.md hand-off to Phase 49
 
 Every plan carries the Step-0 worktree-sync invariant + per-plan stall budget.

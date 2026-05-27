@@ -712,7 +712,7 @@ def probe_blackhole(emit_event: Callable[[str, dict], None] | None = None) -> Bl
 - Project memory `project_v4_canonical_baseline` — confirms cohost_v4 is canonical + carries the tuned cooldown numbers + "trust the audio" rule
 - Project memory `feedback_mic_audio_as_multimodal_part` — confirms mic-as-literal-Part validated in v4 chat tests
 - Project memory `project_v4_tr_lookahead` — confirms 3s-ahead file-based pipeline validated in v4_tr chat tests
-- `.planning/research/v3-buckets/B-gemini-capabilities.md:153,180,230` — research bucket validating both audio paths for v3 port
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/B-gemini-capabilities.md:153,180,230` — research bucket validating both audio paths for v3 port
 
 ### Tertiary (LOW confidence)
 - `keys.openpgp.org` upload flow assumed standard `gpg --send-keys --keyserver hpkps://keys.openpgp.org` — only minor risk of UI flow change [CITED: standard OpenPGP submission protocol; not checked live]

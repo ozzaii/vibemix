@@ -10,19 +10,23 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 
 The AI reacts to your set in a way that feels alive and grounded — never hallucinating, never breaking the flow, never sounding like generic AI slop. If reactions feel forced, late, fake, or scripted, the product fails. The bar is "real DJ friend in your ear", not "voice assistant doing music commentary".
 
-## Current Milestone: v8.2 "Set Builder"
+## Latest Shipped Milestone: v8.2 "Set Builder"
 
-**Goal:** Wire the Viber agent engine into a DJ **set-prep co-host** — turn the flat-playlist curator into a tool that *discovers a pool from the DJ's OWN crate → sequences it on an energy curve with harmonically-valid transitions → exports one-click to Rekordbox → and explains why each transition works.* This is the library-local (Mode A) half of Francesco's "Vibe Mix Discovery & Sequencing" spec, built inside vibemix's locked constraints (Gemini-only, sqlite-vec local, zero new deps, Apache-clean). The deep DJ value: *"give me a sequenced, harmonically-correct, energy-curved set from my own library, ready to load — and tell me why,"* the thing DJs spend hours on, grounded so it never invents a track.
+**Status:** Shipped 2026-05-26; audit passed. Engine, agent, CLI, and GUI path
+are wired. The remaining UI-02 funded-key ear-pass is KAAN-ACTION, not an
+engineering gap.
 
-**Target features (6 categories → phases 83+):**
+**Goal:** Wire the Viber agent engine into a DJ **set-prep co-host** — turn the flat-playlist curator into a tool that *discovers a pool from the DJ's OWN crate → sequences it on an energy curve with harmonically-valid transitions → exports one-click to Rekordbox → and explains why each transition works.* This is the library-local (Mode A) half of Francesco's "Vibe Mix Discovery & Sequencing" spec, built inside vibemix's locked constraints (local Codex as the Viber set-prep/chat brain, local CLAP ONNX embeddings, sqlite-vec local, Apache-clean). The deep DJ value: *"give me a sequenced, harmonically-correct, energy-curved set from my own library, ready to load — and tell me why,"* the thing DJs spend hours on, grounded so it never invents a track.
+
+**Shipped features (6 categories → phases 83-88):**
 - **ENERGY** — a v1 perceived-dancefloor-energy score (0-100) per track, reusing the existing hand-rolled DSP + a new spectral-flux term; genre-robust (a quiet hypnotic track ≠ low energy); cached; `get_track_energy` tool.
 - **DISCOVER** — intent centroid (multi-ref + α-blend text) → KNN over the local store → hard filters (BPM/Camelot/duration/recency/exclude) → MMR diversity → a candidate pool; `discover_pool` tool.
 - **SEQUENCE** — energy-curve presets (opener/peak/after-hours/festival/custom) + a transition graph (Camelot + BPM±6%, graceful degrade) + beam search → 3-5 ranked, genuinely-different ordered sets with honest fit labels; `sequence_set` tool.
 - **EXPORT** — one-click Rekordbox-importable XML (order + key/BPM/genre + memory & hot cues + beatgrid) via the verified pyrekordbox write path + `harmonics.to_classical`; `export_set` tool + CLI.
-- **AGENT** — the co-host set-prep flow (CLI `library build-set` + Gemini agent): brief → discover → sequence → explain each transition (mentor, not black-box), grounded (never an invented track).
+- **AGENT** — the co-host set-prep flow (CLI `library build-set` + Viber agent; local Codex): brief → discover → sequence → explain each transition (mentor, not black-box), grounded (never an invented track).
 - **UI** — a "Build a Set" path in the app (brief + curve picker → sequenced result + per-transition why + Export). Every control works LIVE (ui.log-verified), no dead buttons.
 
-**Constraints (locked):** Mode A library-local ONLY. **DEFER to Bravoh-commercial** (explicit out-of-scope): public catalog (Beatport/Spotify/SoundCloud) + affiliate + purchase links (Modes B/C), Chromaprint/AcoustID fingerprint, XGBoost energy regressor, 1001Tracklists scraping moat, Serato/Engine/Traktor export (Rekordbox first). Gemini-only AI provider; sqlite-vec local; **zero new deps**; Apache-clean (essentia = AGPL, excluded — and not actually installed); all four cardinal invariants hold by additive design; the grounding gate (seen-set + library re-validation) unchanged; honest green (offline-unit-testable, no API key). New modules are **dim-agnostic** (survive the staged 1536→512 CLAP embedding swap free). **Do not collide with concurrent sessions** cooking CLAP/CueAnchor/metadata (untracked) — disjoint new files; do not refresh `.planning/codebase/orphans.csv`.
+**Constraints (locked):** Mode A library-local ONLY. **DEFER to Bravoh-commercial** (explicit out-of-scope): public catalog (Beatport/Spotify/SoundCloud) + affiliate + purchase links (Modes B/C), Chromaprint/AcoustID fingerprint, XGBoost energy regressor, 1001Tracklists scraping moat, Serato/Engine/Traktor export (Rekordbox first). Live co-host brain remains separate and config-resolved; local Codex is the current Viber set-prep/chat path for demo/test; local CLAP ONNX owns library embeddings; sqlite-vec local; no extra Set-Builder deps beyond the approved CLAP/onnxruntime/tokenizers stack; Apache-clean (essentia = AGPL, excluded — and not actually installed); all four cardinal invariants hold by additive design; the grounding gate (seen-set + library re-validation) unchanged; honest green (offline-unit-testable, no API key). New modules are **dim-agnostic** over current 512D CLAP vectors or future D. Shared-tree discipline applies around CLAP/CueAnchor/metadata ownership; do not refresh `.planning/codebase/orphans.csv` unless that baseline is the explicit task.
 
 **Charter + research (read first):** `.planning/research/vibe-mix-agent-engine-synthesis.md` (scope + spec↔constraint reconciliation), `.planning/research/vibe-mix-engine-research.md` (energy formula, beam-search design, Rekordbox export — implementation-ready), `.planning/research/vibe-mix-ui-ipc-button-audit.md` (seams + dead-control inventory). Source spec: `VibeMix_Discovery_Sequencing_Spec_EN.pdf` (Francesco, v1.0).
 
@@ -30,7 +34,7 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 
 ## Prior State: v8.1 "One Mind" SHIPPED 2026-05-26 (audit PASSED) — no active milestone
 
-**v8.1 shipped code-complete** (6/6 phases 77–82, 18/18 requirements, audit PASSED, honest-green 4540/0, no API key). The disconnected islands are now ONE grounded product — *"an AI that hears music with you, and gets you."* Delivered: the live co-host grounds on what's actually playing (WIRE-01) + memory fills on the live path (WIRE-05) + env-key fix (WIRE-06); the EAR speaks in **change not snapshots** — deltas/calibrated-confidence + multi-scale trajectory + €0 mean-centered nearest-prototype genre (PERCEIVE); **three grounded lenses** hype/critique/tutor on one shared selection across both surfaces (LENS); Gemini hears the audio as a **secondary** ear, hallucination-guarded, model bench-swappable (GROUND); a **multi-dimensional bench instrument** + auto first-pass eval + a Kaan's-ear review surface (BENCH); and the **diamond closed** — curator + co-host share ONE genre mechanism + ONE consent-gated taste layer + ONE lens (CURATE). The code-review gate caught a real bug every phase (grounding stale-citation race · over-suppression · lens-dead-on-live-path · invariant-#3 inversion · bench cost/None-text/timeout · consent-gate bypass) — all fixed. **Remaining work is all KAAN-ACTION (produced-and-parked, never faked):** the BENCH-03 verdict (run `vibemix bench run`, read the review surface, pick the winning architecture × model — the milestone's central empirical decision), the live ear-passes per phase on the funded key, the TASTE_RUBRIC wording (Kaan's IP), and the deferred UI lens-picker. **Next:** `/gsd:new-milestone`, or discharge the KAAN-ACTION queue. Full audit: `.planning/milestones/v8.1-MILESTONE-AUDIT.md`; charter: `.planning/research/one-mind-charter.md`.
+**v8.1 shipped code-complete** (6/6 phases 77–82, 18/18 requirements, audit PASSED, honest-green 4540/0, no API key). The disconnected islands are now ONE grounded product — *"an AI that hears music with you, and gets you."* Delivered: the live co-host grounds on what's actually playing (WIRE-01) + memory fills on the live path (WIRE-05) + env-key fix (WIRE-06); the EAR speaks in **change not snapshots** — deltas/calibrated-confidence + multi-scale trajectory + €0 mean-centered nearest-prototype genre (PERCEIVE); **three grounded lenses** hype/critique/tutor on one shared selection across both surfaces (LENS); Gemini hears the audio as a **secondary** ear, hallucination-guarded, model bench-swappable (GROUND); a **multi-dimensional bench instrument** + auto first-pass eval + a Kaan's-ear review surface (BENCH); and the **diamond closed** — curator + co-host share ONE genre mechanism + ONE consent-gated taste layer + ONE lens (CURATE). The code-review gate caught a real bug every phase (grounding stale-citation race · over-suppression · lens-dead-on-live-path · invariant-#3 inversion · bench cost/None-text/timeout · consent-gate bypass) — all fixed. **Remaining work is all KAAN-ACTION (produced-and-parked, never faked):** the BENCH-03 verdict (run `vibemix bench run`, read the review surface, pick the winning architecture × model — the milestone's central empirical decision), the live ear-passes per phase on the funded key, the TASTE_RUBRIC wording (Kaan's IP), and the deferred UI lens-picker. **Next:** `/gsd:new-milestone`, or discharge the KAAN-ACTION queue. Full audit: `.planning/milestones/v8.1-MILESTONE-AUDIT.md`; charter: `.planning/archive/2026-05-27-stale-one-mind-research/one-mind-charter.md`.
 
 <details>
 <summary>v8.1 "One Mind" — original milestone goal (shipped)</summary>
@@ -45,7 +49,7 @@ The AI reacts to your set in a way that feels alive and grounded — never hallu
 - **BENCH** — multi-dimensional validation instrument (model × grounding × prompting × contexting × lens × taste); **Kaan's ear = final judge**.
 - **CURATE** — unify curator + co-host on the shared engine / taste / lens.
 
-**Constraints (locked):** ship-not-over-engineer (one connected, tested wire per phase) · Gemini-only AI provider · no new MIR libraries (GPL/AGPL/NC vs Apache-2.0 + Bravoh reuse) · no new ws ports · four cardinal invariants hold by additive design · honest green (unit-testable without API; live e2e on the funded key). **Charter + research:** `.planning/research/one-mind-charter.md` (+ connection-map · genre-from-embeddings · gemini-audio-truth-test · gsd-operational-playbook).
+**Constraints (locked):** ship-not-over-engineer (one connected, tested wire per phase) · Gemini-only AI provider · no new MIR libraries (GPL/AGPL/NC vs Apache-2.0 + Bravoh reuse) · no new ws ports · four cardinal invariants hold by additive design · honest green (unit-testable without API; live e2e on the funded key). **Charter + research:** `.planning/archive/2026-05-27-stale-one-mind-research/one-mind-charter.md` (+ connection-map · genre-from-embeddings · gemini-audio-truth-test · gsd-operational-playbook).
 
 **Empirical grounding:** 3 frontier models returned 3 different genres for one track (raw-audio bench floor) → Gemini's raw ear isn't reliable; ground it. Genre-from-embeddings hit **86.5%** nearest-prototype accuracy at **€0** (cached). An env-var ghost key shadowing `.env` was found + fixed.
 
@@ -155,7 +159,7 @@ Roadmap: `.planning/ROADMAP.md` (v4.0 section) · Audit: `.planning/v4.0-MILESTO
 
 - **Dependency audit + lockfile shipped (Phase 46)** — hermetic `uv.lock` regen in `python:3.12-slim-bookworm`; `cargo-deny` license allowlist with GPL ban; CycloneDX + SPDX SBOMs on release assets; `docs/AUDIT.md` 3-table surface with green/yellow/red install-impact ratings; freshness gate fails any PR with stale AUDIT.md; Dependabot wired for 4 ecosystems. 45 passing + 1 xfail (pinact mechanical rewrite deferred to CI).
 - **Mascot real-GLB-land scaffolded (Phase 47)** — retarget CLI extended from 5 to 28 slots across 5 families; MANIFEST.yaml provenance schema + MIXAMO-CLIP-SOURCES.md selection guidance; 23 placeholder GLB stubs at slot paths so dev loader doesn't 404; EVENT_LAYER_PRIORITY_MAP single-source-of-truth for 15 event classes × 4-layer state machine; 63 Python + 177 TypeScript tests pass. §VIS-04 Mixamo discharge pending.
-- **Opportunity scan locked steady state (Phase 48)** — `docs/dep-opportunities/2026-05-scan.md` rates 24 candidates (1G / 8Y / 9R-constraint / 6R-risk); ADR sidecar for the one green-adopt (OBS browser-source docs-only); 8 Yellow stubs in `.planning/research/v3-buckets/`; zero new runtime deps introduced; exclusion-set memories quoted verbatim.
+- **Opportunity scan locked steady state (Phase 48)** — `docs/dep-opportunities/2026-05-scan.md` rates 24 candidates (1G / 8Y / 9R-constraint / 6R-risk); ADR sidecar for the one green-adopt (OBS browser-source docs-only); 8 Yellow stubs in `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/`; zero new runtime deps introduced; exclusion-set memories quoted verbatim.
 - **Win + Mac one-click installer chain live (Phase 49)** — Inno Setup `[Run]` + `[Code]` license dialog for VB-CABLE silent install; `fetch_drivers.{sh,ps1}` + `driver_manifest.json` with SHA-256 verify; `companion-sign` workflow + verifier (SignPath cert pending Kaan discharge); `INSTALL_READY` event with 60s CI gate (median 41,000 ms across simulated SHIP-04 matrix); BlackHole 48 kHz post-install probe; WCAG-AA a11y on wizard; uninstall preserves user data unless opt-in clean. 68 passing + 1 platform-gated skip.
 - **End-to-end MacBook + OS-matrix harness shipped (Phase 50)** — `tests/e2e/macbook/` with privacy-fixture asserting zero off-limits writes; Playwright + pixelmatch at `maxDiffPixelRatio: 0.02` baselined on Phase 47 placeholders; audio-loopback VCR cassette pinned to v3.0 GATE-02 (zero live Gemini); Gate 6b wired into `cut_release.sh`; 50a Kaan-walk checklist + Nielsen 10 + screencast capture rig; 50b OS-matrix smoke composes Phase 49 `install_vm_matrix.sh`. 16 passing + 5 CI-tolerant skips.
 
@@ -189,7 +193,7 @@ Full archive: `.planning/milestones/v3.0-ROADMAP.md` · Requirements: `.planning
 **Highlights:**
 
 - **Autonomous hallucination-proxy gate (Phase 27)** — replay harness + 2-judge cross-check (Gemini 3 Pro + Flash) + corpus diversity + substance + cited-relevance filter. Substitutes for Kaan's Phase 16 ear-test for v2.1 only (override expires post-v2.1 per P85).
-- **Library intelligence v1 (Phase 28)** — Gemini Embedding 2 + sqlite-vec (Mac) / numpy (Win) with bit-identical top-K parity + vibe-search NL CLI + drag-drop UX + 30-day staleness nudge + €50/month CI cost gate.
+- **Library intelligence v1 (Phase 28, historical)** — Gemini Embedding 2 + sqlite-vec (Mac) / numpy (Win) with bit-identical top-K parity + vibe-search NL CLI + drag-drop UX + 30-day staleness nudge + €50/month CI cost gate. Superseded for product embeddings by Phase 90 local CLAP ONNX.
 - **Post-session debrief MVP UI (Phase 29)** — chaptered review + 60-90s voiced TL;DR + 3 drills + WaveSurfer.js clickable timeline + cited-critique strip. Second Tauri WebviewWindow docks into v2.0 sidecar slot via port 8766.
 - **4-layer mascot full additive state machine (Phase 31)** — Base + Emotion + Anticipation + Reaction with priority-stacked crossfades; v2.0 mascot tests port verbatim (P47); GLB bundle 21.67/25 MB.
 - **Long-term DJ profile (Phase 32)** — ~2KB allowlist-only JSON cache-side injected into `GeminiContextCache` (P60 preserved); `additionalProperties: false`; default-OFF consent; ≥ 2 citations per tendency.
@@ -232,7 +236,7 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 
 **Goal (v2.0):** Ship a public open-source AI DJ co-host that reacts in-bar, never hallucinates, with a viral demo arsenal earning 1000+ GitHub stars.
 
-**Absorbed:** Outstanding v0.1.0 work (Phases 15-20 — recording, UAT, sign, release, day-zero ops) folded into a single bulky milestone alongside the research-driven feature set from the v2-bucket research swarm (`.planning/research/v2-buckets/SYNTHESIS.md` + 11 supporting artifacts).
+**Absorbed:** Outstanding v0.1.0 work (Phases 15-20 — recording, UAT, sign, release, day-zero ops) folded into a single bulky milestone alongside the research-driven feature set from the v2-bucket research swarm (`.planning/archive/2026-05-27-stale-v2-v3-research/v2-buckets/SYNTHESIS.md` + 11 supporting artifacts).
 
 **Target features (12 buckets — shipped):**
 
@@ -251,15 +255,15 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 
 **v2.0 source-of-truth artifacts:**
 
-- `.planning/research/v2-buckets/SYNTHESIS.md` — integration layer + priority matrix
-- `.planning/research/v2-buckets/A-latency.md` + `A-followup-1-cancel-and-caching.md`
-- `.planning/research/v2-buckets/B-industry-integrations.md` + `B-followup-1-v11-integration-spec.md`
-- `.planning/research/v2-buckets/C-ui-overlay.md`
-- `.planning/research/v2-buckets/D-mascot-emotion.md`
-- `.planning/research/v2-buckets/E-debrief-pedagogy.md` + `E-followup-1-citation-linter.md`
-- `.planning/research/v2-buckets/F-library-intelligence.md`
-- `.planning/research/v2-buckets/G-genre-taxonomy.md` + `G-followup-1-hard-tek-dsp.md`
-- `.planning/research/v2-buckets/synthesis-viral-demo.md`
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v2-buckets/SYNTHESIS.md` — integration layer + priority matrix
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v2-buckets/A-latency.md` + `A-followup-1-cancel-and-caching.md`
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v2-buckets/B-industry-integrations.md` + `B-followup-1-v11-integration-spec.md`
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v2-buckets/C-ui-overlay.md`
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v2-buckets/D-mascot-emotion.md`
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v2-buckets/E-debrief-pedagogy.md` + `E-followup-1-citation-linter.md`
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v2-buckets/F-library-intelligence.md`
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v2-buckets/G-genre-taxonomy.md` + `G-followup-1-hard-tek-dsp.md`
+- `.planning/archive/2026-05-27-stale-v2-v3-research/v2-buckets/synthesis-viral-demo.md`
 
 </details>
 
@@ -292,7 +296,7 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 - ✓ `ModelRouter` config-driven seam + zero hardcoded model literals (CI grep gate) — v3.0 (Phase 41 / LAT-01)
 - ✓ Implicit caching default-on + 60min explicit cache TTL + EvidenceRegistry-mutation-driven refresh + cache_hit telemetry — v3.0 (Phase 41 / LAT-02 + LAT-03)
 - ✓ LLM→TTS streaming pipe-through with bracket-depth-aware sentence boundary + 3.1 Flash TTS 6-tag DSL — v3.0 (Phase 41 / LAT-04 + LAT-05)
-- ✓ Gemini Embedding 2 GA + MRL 768-dim + 4× smaller library index + bit-identical top-K parity — v3.0 (Phase 41 / LAT-06)
+- ✓ Gemini Embedding 2 GA + MRL 768-dim + 4× smaller library index + bit-identical top-K parity — v3.0 (Phase 41 / LAT-06, historical; superseded for product library embeddings by Phase 90 CLAP)
 - ✓ ServiceTier.FLEX routing for batch paths (debrief / library_auto_tag / embedding) + STANDARD pinned to live coach — v3.0 (Phase 41 / LAT-07)
 - ✓ `thinking_level=MINIMAL` enforced on live path + FLEX-on-live Pitfall 3 defense — v3.0 (Phase 41 / LAT-08)
 - ✓ Hybrid hallucination gate — autonomous proxy fast-lane (PR + 7 nightly canary) + Kaan-ear release-cut veto via `check_gate.sh` Gate 2b — v3.0 (Phase 42 / GATE-06)
@@ -322,7 +326,7 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 - ✓ `docs/AUDIT.md` 3-table surface (Python / Rust / JS) with green/yellow/red install-impact + freshness gate via git log commit-time + CycloneDX + SPDX SBOMs + pinact audit scaffold + 4 dep-health badges + Dependabot 4-ecosystem weekly cadence — v3.1 (Phase 46 / DEPS-04..07 + DEPS-09 + DEPS-10)
 - ✓ Retarget CLI extended 5 → 28 slots across 5 families + MANIFEST.yaml provenance schema + MIXAMO-CLIP-SOURCES.md + 23 placeholder GLB stubs + Phase 47 pools + EVENT_LAYER_PRIORITY_MAP (15 event classes × 4 layers) — v3.1 (Phase 47 / MASCOT-01..05)
 - ✓ Bundle gate Tier-2 per-family bands + draco retune target (~23.2 MB / 25 MB cap) + persona-smoke harness with WebM screencast + README hero PNG/WebM scaffold + mascot.html grep-gate (6-file allowlist) + mascot-audit.yml CI aggregation — v3.1 (Phase 47 / MASCOT-06..08)
-- ✓ `docs/dep-opportunities/2026-05-scan.md` rates 24 candidates under 4-color rubric (1G / 8Y / 9R-constraint / 6R-risk) + ADR sidecar for OBS browser-source docs-only + 8 Yellow stubs in `.planning/research/v3-buckets/` + zero new runtime deps + exclusion-set memories quoted verbatim — v3.1 (Phase 48 / OPP-01..06)
+- ✓ `docs/dep-opportunities/2026-05-scan.md` rates 24 candidates under 4-color rubric (1G / 8Y / 9R-constraint / 6R-risk) + ADR sidecar for OBS browser-source docs-only + 8 Yellow stubs in `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/` + zero new runtime deps + exclusion-set memories quoted verbatim — v3.1 (Phase 48 / OPP-01..06)
 - ✓ Inno Setup `[Run]` + `[Code]` license dialog for VB-CABLE silent install + `fetch_drivers.{sh,ps1}` + `driver_manifest.json` SHA-256 verify + `companion-sign.yml` workflow + verifier + `audio_config.py --configure-routing` Multi-Output Device (Mac) + WASAPI default (Win) + BlackHole 48 kHz post-install probe — v3.1 (Phase 49 / INSTALL-02 + INSTALL-04 + INSTALL-05 + INSTALL-09 + INSTALL-10)
 - ✓ `INSTALL_READY` event + 60s CI gate (median 41,000 ms / 60,000 ms budget across SHIP-04 simulated matrix) + forewarning copy passes anti-slop sibling-script + WCAG-AA a11y on wizard 3-step surface + uninstall preserves recordings/debriefs/ghost_calibration unless --clean opt-in — v3.1 (Phase 49 / INSTALL-01 + INSTALL-03 + INSTALL-06..08)
 - ✓ `tests/e2e/macbook/` harness foundation + Jinja2 report.html + privacy fixture asserting zero writes to `~/.hermes/` / `~/hermes-rig/logs/` / `~/.lmstudio/` + audio-loopback VCR cassette pinned to v3.0 GATE-02 (zero live Gemini) + Playwright + pixelmatch `maxDiffPixelRatio: 0.02` against Phase 47 placeholder baselines — v3.1 (Phase 50 / E2E-01 + E2E-03 + E2E-04 + E2E-09)
@@ -332,46 +336,15 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 
 <!-- v3.x candidate scope — strategic conversation is open per memory `project_v2_planning_active`; do NOT auto-create next milestone. Kaan drives. -->
 
-**Pending external clock — v3.0 + v3.1 RC publish (KAAN-ACTION-LEGAL §SHIP + §INSTALL + §VIS + §E2E)**
+**Current release blockers — public/friend-ready cut (2026-05-27)**
 
-- [ ] Apple Dev Agreement update signed by Francesco (SHIP-01 / P46 legal-capacity)
-- [ ] SignPath OSS Foundation approval received (SHIP-02 / P46 legal-capacity, ~1-week SLA)
-- [ ] DIST-19 signed-binary smoke + `verify_signed.py --require-signed` (SHIP-03)
-- [ ] INSTALL-VM-RUN fresh-VM matrix (macOS 12.3/14/15 + Win 10/11) + INSTALL-60S-CHECK (SHIP-04 + SHIP-05)
-- [ ] Bravoh server `/vibemix/updates/*` + `/vibemix/healthz` + `*/5 * * * *` cron (SHIP-06)
-- [ ] `gh release create v3.0.0-rc1 --draft` after `cut_release.sh` 6-gate green + tag-regex bump prerequisite (SHIP-07)
-- [ ] `launch_trigger.sh --live` 5-channel social publish on T-30 / T+0 / T+5 / T+24h cadence (SHIP-08)
-- [ ] Discord #announcements + `discord_provision.py --real` execution (SHIP-09)
-- [ ] Repo transfer to `bravoh/vibemix` (SHIP-10) — depends on LAUNCH-06 bravoh GH org standup
-- [ ] 24h monitoring rotation execution per `docs/launch-rotation.md` (SHIP-11)
-- [ ] Windows SmartScreen reputation propagation observation (SHIP-12 — passive, 1-2 wk post-signed release)
-- [ ] SHIP-V1-DECISION T+30 audit + Kaan 3-way sign-off (cut v1.0.0 / cycle RC2 / pause) (SHIP-13)
-
-**Pre-stage discharges (v3.0 carryover)**
-
-- [ ] AUDIO-05 PGP key for `security@bravoh.com` published to `keys.openpgp.org` (Kaan custody)
-- [ ] AUDIO-06 Tauri ed25519 updater key rotated to production value (Kaan custody + GH secret)
-- [ ] AUDIO-07 BlackHole probe fresh-Mac walk (fresh macOS user account)
-- [ ] LAT-09 Gemini 3.1 Flash Live music spike verdict (real 5-min DJ clip + offline listen)
-- [ ] GATE-01 ack-bank 20/40 (Gemini TTS quota reset, ~$0.10)
-- [ ] GATE-02 VCR cassettes populated via `VCR_RECORD_MODE=new_episodes`
-- [ ] GATE-03 6 × 30-min DJ session WAVs in git-LFS corpus (200 MB)
-- [ ] GATE-05 ear-test session execution (≥2 sessions ≥2 genres in 14d window)
-- [ ] LAUNCH-03 / LAUNCH-04 real DJ-software + controller logos (16 SVG placeholders → real assets)
-- [ ] LAUNCH-06 bravoh GH org standup (Bravoh Enterprise billing flag resolve)
-- [ ] LAUNCH-07 SHIP-TWEET Kaan + Francesco mutual sign-off
-- [ ] LAUNCH-08 Discord live execution (`discord_provision.py --real`)
-
-**Pre-stage discharges (v3.1 carryover)**
-
-- [ ] §INSTALL-COMPANION-SIGN — SignPath OSS Foundation cert grant for companion `.ps1` + `.py` Authenticode submission (v3.1 / Phase 49)
-- [ ] §INSTALL-VM-RUN — Real Tart VM execution on macOS 12.3 / 14 / 15 + Win 10 / 11 (depends on §INSTALL-COMPANION-SIGN) (v3.1 / Phase 49 + Phase 50)
-- [ ] §E2E-50A-WALK — Kaan walks `tests/e2e/macbook/50a_kaan_walk_checklist.md` on MacBook with real DJ-set audio; records `docs/e2e/2026-05-walk.webm` via `scripts/e2e/record_50a_walk.sh` (v3.1 / Phase 50)
-- [ ] §VIS-04 — 28 Mixamo retargets via Adobe-account walk + per-family `retarget_to_neon_rebel.py --really` (v3.0 carryover + v3.1 Phase 47; independent of SignPath path)
-- [ ] §VIS-05 — 5 pre-existing legacy_prep_* slot retargets (bundle with §VIS-04 discharge) (v3.1 / Phase 47)
-- [ ] §SHIP-CONTACT-VBAUDIO — Kaan emails VB-Audio for OEM/bundle redistribution permission (future Win installer optimization) (v3.1 / Phase 49)
-- [ ] DEPS-07 — `pinact` mechanical SHA rewrite of `.github/workflows/*.yml` (closes via `brew install pinact && bash scripts/audit/run_pinact.sh --apply` OR first CI run) (v3.1 / Phase 46)
-- [ ] DEPS-08 — `livekit-plugins-openai` cull blocked by direct imports at `src/vibemix/agent/tts_chain.py:25`; TTS proxy fallback chain refactor scheduled post-v3.1 (v3.1 / Phase 46)
+- [ ] Phase 16 signoff and Phase 17 grading CSV supplied or retired through the current release gate.
+- [ ] GitHub release/signing/upload secrets present and verified by `scripts/dist/pretag_check.sh`.
+- [ ] Real Discord invite configured; placeholder invite must not ship.
+- [ ] macOS release DMG signed with Apple Developer ID and notarized; signed updater archive exercised from a previous version.
+- [ ] Windows installer/updater produced by the release runner, Authenticode/SignPath signed, and smoke-tested on a fresh Windows machine.
+- [ ] Kaan/UI-02 funded-key ear-pass for Build-a-Set/chat flow completed before public claim or friend-ready handoff.
+- [ ] Real public-release execution still follows `docs/ship-runbook.md`, `docs/release-process.md`, and the `§SHIP-11` monitoring rotation.
 
 **v3.x candidate scope (confirmed per memory `project_v2_open_candidates` — Kaan drives commit to milestone)**
 
@@ -382,7 +355,7 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 - [ ] Post-session debrief depth — multi-session arc, weekly progress summary, energy-arc taxonomy lift
 - [ ] Library coach drill packs — "harmonic mixing pratiği için library'nde bu 5 track Am ↔ C sırayla mix'le"
 - [ ] Curriculum-mode lesson packs per user level (Beginner / Intermediate / Pro)
-- [ ] Multimodal "sounds like this" library search from live 30s phrase window (Gemini Embedding 2 multimodal RAG)
+- [ ] Multimodal "sounds like this" library search from live 30s phrase window (local CLAP audio/text retrieval; no Gemini Embedding path)
 - [ ] Phase 16 ear-test memory override choice (restored Kaan-ear-only gate OR permanent autonomous proxy adoption — Kaan drives at next-milestone scaffold)
 
 **v3.x backlog (deferred / opt-in)**
@@ -417,11 +390,11 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 
 **Why open-source now.** Bravoh (the AI Artist Operating System) has a 140k-view reel on the project's Instagram account and a Closed Beta running since March 1, 2026. The DJ co-host is a fast-shipping, narrowly-scoped, demo-able artefact that lives downstream of Bravoh's positioning ("we build cool AI for musicians, here's a free taste") — it is the marketing wedge that turns "interested" into "watching the Bravoh waitlist".
 
-**Current state (post-v3.1 close, 2026-05-18).** Distribution-ready engineering-complete. 5 milestones shipped (v0.1.0 / v2.0 / v2.1 / v3.0 / v3.1). 46 phases total. v3.1 added ~+57.5k LOC, 61 commits, 382 files changed since `v3.0` tag. 44/44 v3.1 REQ-IDs engineering-satisfied (100%); 7 carveouts deferred to KAAN-ACTION external surface per `gsd-autonomous fully` mode — all external-clock dependent (SignPath cert, Tart VM walk, Adobe Mixamo, Kaan-ear MacBook pass, VB-Audio OEM email, pinact binary). Installer chain ships one-click on Win + Mac with 41,000 ms median onboarding (60,000 ms budget); dep audit chain enforces hermetic lockfile + license allowlist + SBOMs + freshness gate; mascot scaffolded for full emotion coverage (28 slots × 4 layers, real GLB land pending Mixamo walk); e2e harness has audio-loopback VCR cassette + visual regression + privacy fixture + Gate 6b in `cut_release.sh`. Local `v3.0` tag created (NOT pushed); `v3.1` tag pending milestone-close commit. Awaiting external clock: Apple Dev Agreement (Francesco) + SignPath OSS Foundation (Kaan, ~1-week SLA) gates BOTH v3.0 SHIP-CUT and v3.1 companion-driver signing — v3.1 ride-along publishes after v3.0 lands.
+**Current state (product sweep, 2026-05-27).** v8.2 "Set Builder" is shipped and audit-passed: Library/Viber set-prep and chat run through local Codex; library search/ingest/curate embeddings run through local full-precision CLAP ONNX; the old Gemini Embedding/library agent path is retired from the product surface. A local arm64 frozen sidecar, unsigned macOS `.app`, DMG drag-install rehearsal, packaged first-run CLAP install, and unsigned updater extraction smoke have passed. The app is demo-ready on the verified local machine, but not yet public/friend-ready: `scripts/dist/pretag_check.sh` reports **4 pass / 4 fail / 0 warn**, with failures for Phase 16 signoff, Phase 17 grading CSV, GitHub release/signing/upload secrets, and the real Discord invite. Signed/notarized macOS release, signed updater rehearsal, Windows fresh-machine proof, and the funded-key Build-a-Set ear-pass remain open.
 
 **Existing user.** Kaan, primarily — the codebase started as his Friday-night experiment. The open-source release expands to "any DJ with a controller + a DJ software running on mac or windows" — beginner curiosity to pro feedback-loop.
 
-**Stack baseline.** Python 3.12+ (current `.venv` is 3.14), LiveKit Agents framework, `google-genai`, `sounddevice` (mac) / WASAPI bindings (Windows), `mido` + `python-rtmidi`, `numpy` + `scipy` for DSP, `mss` / Quartz / win32 for screen capture. Heavy reliance on Gemini 3 family (Flash for inference, 3.1 Flash TTS for voice, Embedding 2 for library/RAG). Tauri shell + Python sidecar + FastAPI proxy on `api.altidus.world`. SQLite-vec (Mac) / numpy (Win) for library index.
+**Stack baseline.** Python 3.12+ (current `.venv` is 3.14), LiveKit Agents framework, `google-genai`, `sounddevice` (mac) / WASAPI bindings (Windows), `mido` + `python-rtmidi`, `numpy` + PyAV/FFmpeg for DSP/decode, `mss` / Quartz / win32 for screen capture. Gemini 3 family remains the conversational/live/TTS brain; library search, similarity, and curator retrieval use local CLAP ONNX embeddings. Tauri shell + Python sidecar + FastAPI proxy on `api.altidus.world`. SQLite-vec (Mac) / numpy (Win) for library index.
 
 **Open user feedback themes.** None yet — v3.0 not publicly shipped (engineering-complete; awaits Apple Dev + SignPath approvals). Anti-slop ship-gate satisfied by Phase 16 ear-test (memory override RETIRED post-v2.1) → Phase 42 hybrid regime (autonomous proxy + Kaan ear-test). T+30 SHIP-V1-DECISION audit will be first real user-signal moment.
 
@@ -432,7 +405,7 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 - **Timeline**: No hard calendar target — ship-when-ready per `gsd-autonomous fully` mode. External Apple Developer Program Agreement + SignPath OSS approvals are the critical path; engineering parallelizes around the external clock.
 - **Quality bar**: "Real DJ friend in your ear, no AI slop" — Kaan will block release if reactions feel scripted, late, hallucinated, or generic.
 - **Budget**: 150-200 € launch marketing (IG ads, paid posts), ~50 €/month ongoing Gemini API for end-user requests. Reassess if usage scales.
-- **Tech stack**: Locked on LiveKit pipeline + Gemini 3 Flash + Gemini TTS streaming. No other LLM providers (Bravoh is Gemini-only).
+- **Tech stack**: Live co-host remains on the LiveKit pipeline + configured live/TTS brain. Library/Viber set-prep and chat use the local Codex CLI backend; library/search embeddings are local CLAP ONNX.
 - **Platforms**: macOS + Windows in v1. Linux explicitly excluded.
 - **Team**: Kaan (engineering + product), Francesco (cofounder — product/marketing/DJ network for outreach), Momo (Bravoh team). Bravoh main product takes priority — vibemix runs alongside.
 - **Open-source license**: TBD (likely MIT or Apache 2.0). Must allow Bravoh to use the same code internally if needed.
@@ -456,13 +429,13 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md` · Requirements: `.planning
 | **Critique → execute → critique → execute loop per phase** | Kaan's directive: every phase runs a quality loop, not a one-shot. plan-checker before execute, verifier after execute, ui-checker/ui-auditor between polish iterations, code-reviewer on output. | ✓ Good — Phase 43 visual lock proved the loop end-to-end (zero HIGH findings on Tier-1 surfaces) |
 | **Reactive mascot as v1 feature, dedicated polish phase** | The mascot isn't just brand decoration — it's the visual feedback loop that telegraphs back what the system saw. Inspired by OpenAI Pets, lives in-app, reacts to MIDI/audio in real time. | ✓ Good — VTuber-style 3D character "Neon Rebel"; 4-layer mascot full additive state machine in production (Phase 31 v2.1); §VIS-04 Mixamo retargets pending |
 | **One-click install is a HARD requirement** | Memory `project_one_click_install_hard_req` — Mac+Win, app opens → auto-downloads deps → configures audio → ready. Every dep choice rated green/yellow/red on install impact. | ✓ Good — Phase 33 v2.1 install hardening shipped (TCC wizard + BlackHole probe + onboarding stopwatch); INSTALL-VM-RUN real execution pending external clock |
-| **No scope creep — clean utility only** | Memory `feedback_no_scope_creep_clean_utility` — OUT: stem separation, CLAP, multi-provider AI, enterprise features. Optimize for "minimum useful surface" not feature parity. | ✓ Good — every v3.0 phase respected the constraint; no Demucs / no CLAP / no ProDJ Link / no DAW |
-| **Anti-slop thesis: grounded Gemini, not better prompting** (v3.0 lock) | Memory `project_anti_slop_grounded_gemini_thesis` — every feature evaluated by "what hallucination class does it close?". Grounding stack: audio + screen + MIDI + now-playing + Rekordbox priors + Gemini Embedding 2 + session memory + mic-as-Part-2 + lookahead-as-Part-3 + EvidenceRegistry citation strip in live UI. | ✓ Good — Phase 40 closed "AI invents what Kaan said" + "AI reacts after the moment passed" classes; Phase 44-03 surfaces citations on-screen |
+| **No scope creep — clean utility only** | Memory `feedback_no_scope_creep_clean_utility` — OUT remains stem separation, multi-provider AI, enterprise features, ProDJ Link, DAW surfaces. The old blanket CLAP ban is superseded only for local library embeddings by Phase 90 evidence. | ✓ Good — minimum useful surface preserved; CLAP is the local embedding spine, not a new product surface |
+| **Anti-slop thesis: grounded Gemini, not better prompting** (v3.0 lock) | Memory `project_anti_slop_grounded_gemini_thesis` — every feature evaluated by "what hallucination class does it close?". Grounding stack: audio + screen + MIDI + now-playing + Rekordbox priors + local CLAP embeddings + session memory + mic-as-Part-2 + lookahead-as-Part-3 + EvidenceRegistry citation strip in live UI. | ✓ Good — Phase 40 closed "AI invents what Kaan said" + "AI reacts after the moment passed" classes; Phase 90 replaced Gemini Embedding for library/search with local CLAP |
 | **Hybrid hallucination gate** (v3.0 lock) | Phase 27 autonomous proxy fast-lane (PR + 7 nightly canary) + Kaan-ear release-cut veto. P85 Phase 16 ear-test override formally retired. | ✓ Good — `check_gate.sh` Gate 2b wired in `cut_release.sh`; `.planning/decisions/P85-OVERRIDE-RETIRED.md` committed |
 | **POC files byte-identical to v2.0 tag** | `cohost*.py`, `mascot.html`, `cohost.streaming.py.bak` — trusted intuition preserved as reference. Phase 37-06 immutability gate enforces. | ✓ Good — preserved through v2.1 + v3.0 |
 | **Honest RC labeling** (v3.0 lock) | `v3.0.0-rc1` not premature `v1.0.0`; v1.0.0 decision deferred to Kaan post-2-week bake per SHIP-V1-DECISION audit at T+30. | ✓ Good — `audit_ship_v1_decision.py` (Plan 45-04) ships 3-way decision template |
 | **`gsd-autonomous fully` mode** | Memory `feedback_autonomous_no_grey_area_pause` — recommended grey-area answers + defer blockers (not pause) into Kaan-action-required surface. Continue with unblocked work. Only destructive risk + privacy rule still pause. Legal-capacity (P46) + customer-facing publish + real-hardware + real-asset = explicit autonomy carveouts. | ✓ Good — applied through v2.1 + v3.0; 22 v3.0 carveouts routed cleanly to KAAN-ACTION-LEGAL §SHIP-NN cookbook |
-| **No CLAP — Gemini Embedding 2 only** | Memory `feedback_no_clap_use_gemini_embedding` — vibemix is Gemini-only; CLAP/MERT/OpenL3 forbidden even when research recommends. | ✓ Good — Embedding 2 GA + MRL 768-dim shipped (LAT-06); 4× smaller library index |
+| **Embedding provider: CLAP ONNX local** | Supersedes the old no-CLAP rule after Phase 90 evidence. Gemini remains live/TTS, local Codex is the current Viber set-prep/chat path, and library/search/curator embeddings use local CLAP ONNX. | ✓ Good — full-precision CLAP default, Gemini Embedding removed from the normal library path; fp16/q8 only after parity |
 | **Visual direction: CDJ Whisper** | Memory `project_visual_direction_cdj_whisper` — Pioneer-grade hardware in library mode. 5 warm blacks, single amber accent (4 intensities), tactility via faint glow not faux-3D bevels, Geist + Fraunces typeface, readability + restraint. | ✓ Good — Phase 43 Tier-1 surfaces locked; hardware-LED-strip meter rebuild; 22-site `--glow-faint` hover-glow sweep; storyboard migrated to Saira + Geist |
 | **Bravoh waitlist toggle: subtle, opt-in, default-OFF** (v3.0 lock) | Funnel integrity over conversion lift — Kaan rejects pushy CTAs. No signed-out telemetry. UTM-tracked link. | ✓ Good — Plan 44-04 `ConfigStore.bravoh_waitlist_opt_in` + verbatim UTM URL grep-gate + token-driven faint-amber-glow active state |
 
@@ -484,4 +457,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-05-26 — **v8.1 "One Mind" SHIPPED** (audit PASSED) under `gsd-autonomous fully` mode. 6/6 phases (77–82), 18/18 REQ-IDs, 19 plans, honest-green 4540/0 (no API key). The disconnected islands → ONE grounded product: live co-host grounded + deeper ear (deltas/trajectory/€0 genre) + three shared lenses + Gemini-secondary-ear + the bench instrument + curator/co-host unified (one genre mechanism, one consent-gated taste, one lens). Code-review gate caught + fixed a real bug every phase. KAAN-ACTION parked (never faked): the BENCH-03 verdict (run the bench, pick the winning architecture × model — the milestone's central empirical decision), live ear-passes, the TASTE_RUBRIC wording, the deferred UI lens-picker. Earlier: v8.0 "Proof & Polish" 2026-05-25; v7.0 "Open House" 2026-05-24.*
+*Last updated: 2026-05-27 — **v8.2 "Set Builder" SHIPPED** (audit PASSED) and product-sweep cleanup in progress. Current truth: local Codex owns Library/Viber set-prep/chat, local full-precision CLAP ONNX owns embeddings, v8.2 UI/build-set path is wired for demo, and public release remains blocked by signing/notarization, release secrets, Discord invite, human evidence gates, Windows fresh-machine proof, and the funded-key Build-a-Set ear-pass. Earlier: v8.1 "One Mind" 2026-05-26; v8.0 "Proof & Polish" 2026-05-25; v7.0 "Open House" 2026-05-24.*

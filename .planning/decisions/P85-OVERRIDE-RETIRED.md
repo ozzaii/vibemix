@@ -22,7 +22,7 @@ through the v2.1 RC bake.
 
 The override's expiry was tracked via three distinct mechanisms:
 
-1. **Pitfall P85** — flagged the carveout in `.planning/research/PITFALLS.md`.
+1. **Pitfall P85** — flagged the carveout in historical research notes.
 2. **`tests/repo/test_phase_16_override_expiry.py`** (Phase 39-08) — load-bearing
    repo-level test asserting STATE.md still carried the override line + that
    `cut_release.sh` printed a `Phase 16 override cleanup reminder` on every RC

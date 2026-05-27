@@ -5,8 +5,12 @@
 > verify exact lines when editing (tree is changing under active sessions).
 
 ## Agent-engine entry points (where the set-prep flow plugs in)
-- **CLI** `vibemix library curate <theme>` → `_cmd_library_curate` (`__main__.py:1894`) → `ViberAgent.curate()` / `.curate_interactive()`. Subparsers built at `__main__.py:1539` (`sp_curate` :1606). **Add `build-set` + `export-set` subparsers here.**
-- **Tauri Library window** (`tauri/ui/src/library/` + `tauri/src-tauri/src/library_cmds.rs`): the GUI spawns `vibemix library …` as a subprocess and parses JSON stdout (does NOT instantiate ViberAgent in-proc). Curate GUI = one-shot. **Add a "Build a Set" mode here (curve picker → sequenced result → Export button).**
+- **CLI** `vibemix library curate <theme>` / `build-set` / `export-set` route through
+  `__main__.py` library subcommands and the grounded tool surface.
+- **Tauri Library window** (`tauri/ui/src/library/` + `tauri/src-tauri/src/library_cmds.rs`):
+  the GUI spawns `vibemix library ...` as a subprocess and parses JSON stdout
+  (does NOT instantiate a Viber agent in-proc). Current Library modes include
+  search, chat, curate, and Build a Set.
 - **Telegram** `vibemix library telegram` (`telegram_bridge.py`) — mobile curate. Tool surface inherited from `LibraryToolset`, so new tools land there for free.
 - **Live session pill** — `runtime/suggestion.SuggestionService` → `next_suggestion()`; the 1-step transition primitive the sequencer generalizes.
 
@@ -25,17 +29,22 @@ Inbound (handler in `runtime/session_loop.py`): `ipc.session.mute`, `ipc.setting
 The live-test pass must: launch real `cargo tauri dev`, click every control, watch `~/Library/Application Support/world.bravoh.vibemix/vibemix/logs/ui.log` (`[vmx:click]/[vmx:ipc>]/[vmx:ipc<]/[vmx:error]`), confirm each fires + gets a reply (no timeouts). Green vitest ≠ working app ([[feedback_verify_live_app_not_just_tests]]).
 
 ## Sequencing/discovery/export seams (verified signatures)
-- `store.LibraryStore`: `search(qv,k)→[(id,score)]`, `search_centered(qv,k)`, `_backend.load_all()→(ids:list[str], vecs:np.ndarray(N,D))`. **Dim-agnostic** (D=1536 Gemini now, 512 after the staged CLAP swap — sequencer/discovery survive the swap free).
+- `store.LibraryStore`: `search(qv,k)→[(id,score)]`, `search_centered(qv,k)`,
+  `_backend.load_all()→(ids:list[str], vecs:np.ndarray(N,D))`.
+  **Dim-agnostic** over the current 512D local CLAP store and future embedding
+  variants.
 - `state.harmonics`: `to_camelot(raw)->str|None` (never raises), `compatible(a,b)->bool` (False on None — both-known gate required), `is_clash`, `semitone_distance`. **Need to ADD `to_classical(camelot)->str|None`** (Camelot→classical for Rekordbox `Tonality`).
 - `rekordbox.TrackEntry`: `track_id,title,artist,album,bpm:float(0.0 if missing),key:str("" if missing),duration_s:float,cues:tuple[CuePoint],filepath:str`. `CuePoint`: `name,type:str,start_s,end_s|None,number(-1 memory / 1..8 hot)`.
 - `audio/features.py`: `snapshot_features→{rms,onsets_per_sec,sub_share,low/mid/high_share}`, `energy_curve`, `long_arc_curve`, `snapshot_wav`. `cue_detect.decode_to_mono(path,sr=16000)` = offline decode; `cue_detect.detect_cues(path,max_cues=8)`.
 - `_cosine`: `l2_normalize`, `cosine_topk`, `EMBEDDING_DIM`.
 
-## Other sessions' STAGED (untracked, do not collide)
-- `library/clap_engine.py` `ClapEngine` (on-device CLAP 512-d, staged-not-wired) — embedding swap.
-- `library/cue_types.py` `CueAnchor{label,start_s,end_s,confidence,source}` (intro/build/breakdown/drop/outro; dj/auto) — the cue producer↔consumer contract. **Sequencer structural-mixability + cue-anchored export will consume this once committed; v1 = placeholder True.**
-- metadata ingest research (Serato/Traktor/Rekordbox), modified `test_cue_detect.py`.
-- Orphan-inventory test fails on their staged `ClapEngine`/`CueAnchor` — **NOT mine, do not refresh the baseline** (their commit owns it).
+## Current Shared Surfaces
+- `library/clap_engine.py` / `embed_clap.py` — product local CLAP ONNX/512
+  embedding path.
+- `library/cue_types.py` — `CueAnchor{label,start_s,end_s,confidence,source}`
+  contract for cue producers and consumers.
+- Coordinate before broad rewrites to shared CLAP, cue, ingest, sequencer, or
+  export seams while parallel sessions are active.
 
 ## Tests
-Python: `tests/library/` (agent/toolset/store/search/similar/next_suggestion/rekordbox/cue_detect/centering…), `tests/runtime/` (session_loop/ws_bus/settings_apply/suggestion). New modules → new `tests/library/test_{energy,sequencer,discovery,export_rekordbox}.py`. Run: `PYTHONPATH=src python3 -m pytest tests/library/test_X.py -q`. UI vitest: `cd tauri/ui && npx vitest run <path>`.
+Python: `tests/library/` (agent/toolset/store/search/similar/next_suggestion/rekordbox/cue_detect/centering...), `tests/runtime/` (session_loop/ws_bus/settings_apply/suggestion). Run: `uv run pytest -q tests/library/test_X.py`. UI vitest: `npm --prefix tauri/ui test -- <path>`.

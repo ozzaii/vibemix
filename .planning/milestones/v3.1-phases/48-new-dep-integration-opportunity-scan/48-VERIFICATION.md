@@ -19,7 +19,7 @@ plans_completed: [48-01, 48-02, 48-03, 48-04, 48-05, 48-06]
 | OPP-02 | 48-01 + 48-02 | 4-color rubric in schema (`opportunity_entry.rating` enum) + every row carries a rating | green |
 | OPP-03 | 48-02 + 48-03 | Memory entries quoted verbatim in scan § 2; `scripts/audit/scan_opportunities.py` enforces auto-Red | green |
 | OPP-04 | 48-04 | `.planning/decisions/DEP-OPP-01-obs-browser-source.md` ADR; validator ADR-existence gate passes | green |
-| OPP-05 | 48-02 + 48-05 | Zero new runtime deps; 8 Yellow stubs at `.planning/research/v3-buckets/v3.x-*.md` | green |
+| OPP-05 | 48-02 + 48-05 | Zero new runtime deps; 8 Yellow stubs at `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/v3.x-*.md` | green |
 | OPP-06 | 48-04 | `docs/integrations/obs-browser-source.md` + README cross-link; zero new runtime code | green |
 
 ## Success criteria check (per ROADMAP § Phase 48)
@@ -32,7 +32,7 @@ plans_completed: [48-01, 48-02, 48-03, 48-04, 48-05, 48-06]
 
    Verified by: scan_opportunities.py ADR-existence gate exits 0.
 
-3. **Zero (or near-zero) new runtime deps.** Scan outcome documents: 1 green-adopt (docs-only) + 8 yellow-defer (stubs) + 9 red-constraint + 6 red-risk. Net runtime-dep delta = 0. Yellow stubs carry forward to `.planning/research/v3-buckets/`.
+3. **Zero (or near-zero) new runtime deps.** Scan outcome documents: 1 green-adopt (docs-only) + 8 yellow-defer (stubs) + 9 red-constraint + 6 red-risk. Net runtime-dep delta = 0. Yellow stubs carry forward to `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/`.
 
    Verified by: 8 stubs present + no new pip/cargo/npm declarations introduced in this phase.
 
@@ -46,8 +46,8 @@ plans_completed: [48-01, 48-02, 48-03, 48-04, 48-05, 48-06]
 
 ## Invariants check
 
-- **Anti-slop blocklist (15-token + `\bdeeply\s+\w+` regex)** — `scripts/audit/check_no_slop_opp.py` exits 0 against `docs/dep-opportunities/`, `docs/integrations/`, and `.planning/research/v3-buckets/`. The sibling-script pattern preserved the launch-copy script's contract pin to `scripts/dayzero/launch_copy/` (per CONTEXT Decision 4 + Phase 47-resume learning).
-- **ModelRouter seam** — `grep -rn "gemini-3\.\|gemini-2\." docs/dep-opportunities/ docs/integrations/ .planning/decisions/DEP-OPP-*.md .planning/research/v3-buckets/v3.x-*.md scripts/audit/scan_opportunities.py scripts/audit/check_no_slop_opp.py` returns no matches.
+- **Anti-slop blocklist (15-token + `\bdeeply\s+\w+` regex)** — `scripts/audit/check_no_slop_opp.py` exits 0 against `docs/dep-opportunities/`, `docs/integrations/`, and `.planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/`. The sibling-script pattern preserved the launch-copy script's contract pin to `scripts/dayzero/launch_copy/` (per CONTEXT Decision 4 + Phase 47-resume learning).
+- **ModelRouter seam** — `grep -rn "gemini-3\.\|gemini-2\." docs/dep-opportunities/ docs/integrations/ .planning/decisions/DEP-OPP-*.md .planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets/v3.x-*.md scripts/audit/scan_opportunities.py scripts/audit/check_no_slop_opp.py` returns no matches.
 - **POC immutability** — `git diff --stat HEAD~10 -- cohost.py cohost_v2.py cohost_lk.py mascot.html run.sh run_v2.sh run_lk.sh` is empty.
 - **`feedback_no_scope_creep_clean_utility` upheld** — auto-Red set covers stem separation (Demucs / Spleeter) / CLAP / multi-provider AI / DAW APIs; rows marked red-constraint with verbatim memory quote.
 - **No new IPC wrappers** — 38-wrapper IPC schema frozen; no Tauri command exports added in any Plan 48 plan.
@@ -63,7 +63,7 @@ plans_completed: [48-01, 48-02, 48-03, 48-04, 48-05, 48-06]
 | E2E scan validator | `uv run python scripts/audit/scan_opportunities.py` | 0 |
 | Anti-slop dep-opps | `uv run python scripts/audit/check_no_slop_opp.py` | 0 |
 | Anti-slop integrations | `uv run python scripts/audit/check_no_slop_opp.py --dir docs/integrations` | 0 |
-| Anti-slop v3-buckets | `uv run python scripts/audit/check_no_slop_opp.py --dir .planning/research/v3-buckets` | 0 |
+| Anti-slop v3-buckets | `uv run python scripts/audit/check_no_slop_opp.py --dir .planning/archive/2026-05-27-stale-v2-v3-research/v3-buckets` | 0 |
 
 Aggregate: 19/19 pytest cases passed + 4/4 script invocations green + 0 model-literal matches + POC diff empty.
 
