@@ -1,9 +1,9 @@
 # vibemix — Roadmap
 
 **Project:** vibemix — AI DJ Co-Host
+**Current work:** v9.0 "Lesson One" — IN PROGRESS (started 2026-05-27). Phases 91–98 turn vibemix into the AI teaching module beginner DJs have been waiting for (3 progressive courses · 10-controller real-time renderer · library-grounded exemplar engine · 36 hand-authored lessons · proactive Course 3 tutor lens). All-opus · `gsd-autonomous fully` · default-YES on every scope question.
 **Last shipped:** v8.2 "Set Builder" — 2026-05-26 (audit PASSED; engine + agent + CLI + GUI shipped, UI-02 funded-key ear-pass parked as KAAN-ACTION). Prior: v8.1 "One Mind" — 2026-05-26.
-**Current work:** presentation/fresh-install product sweep: local CLAP ONNX setup, local Codex Viber/library chat and set-prep, package rehearsals, and cleanup of stale planning surfaces. KAAN-ACTION queue rides forward (§GH-BILLING / §SHIP-V4 / §V7-LIVE + funded-key ear-passes).
-**Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on the external Apple Dev + SignPath signature clock (NOT archived) — **v7.0's OSS-04 discharges §SHIP-V4 for real; v4.0 closes alongside when the real cut fires**
+**Open alongside:** v4.0 "SHIP" — engineering-complete (8/8), publish gated on the external Apple Dev + SignPath signature clock (NOT archived) — **v7.0's OSS-04 discharges §SHIP-V4 for real; v4.0 closes alongside when the real cut fires**. Also: **v0.1.0-rc1 ship work** (bundle/launchd fixes in flight; KAAN-ACTION ear-pass + signed-release decision parked — see `.planning/handoffs/2026-05-27-session-end.md`).
 
 ---
 
@@ -21,6 +21,200 @@
 - ✅ **v8.0 Proof & Polish** — Phases 71–76 (shipped 2026-05-25, tech_debt accepted) — *this file, below* · audit `.planning/v8.0-MILESTONE-AUDIT.md`
 - ✅ **v8.1 One Mind** — Phases 77–82 (shipped 2026-05-26, audit PASSED; KAAN-ACTION human gates parked) — see `.planning/milestones/v8.1-ROADMAP.md` · audit `.planning/milestones/v8.1-MILESTONE-AUDIT.md` · charter `.planning/archive/2026-05-27-stale-one-mind-research/one-mind-charter.md`
 - ✅ **v8.2 Set Builder** — Phases 83–88 (shipped 2026-05-26, audit PASSED; UI-02 funded-key ear-pass parked) — *this file, below* · audit `.planning/v8.2-MILESTONE-AUDIT.md` · status `.planning/phases/v8.2-STATUS.md`
+- 🔵 **v9.0 Lesson One** — Phases 91–98 (in progress, started 2026-05-27) — *this file, below* · requirements `.planning/REQUIREMENTS.md` · research `.planning/research/{SUMMARY,STACK,FEATURES,ARCHITECTURE,PITFALLS}.md`
+
+---
+
+# v9.0 "Lesson One" — ▶ IN PROGRESS (started 2026-05-27)
+
+This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the **AI teaching module beginner DJs have been waiting for**. Three progressive courses (Anatomy of a Deck · Transitions · Play Mode) walk a stranger through DJing with **their specific MIDI controller mirrored on screen** as a real-time interactive vector visualization. The AI highlights physical controls, narrates in a hand-authored tutor voice, and proves each EQ band audibly by pulling a track from **their library** where that band is most prominent — so as they turn the knob, they HEAR the band swell.
+
+**Mode:** `gsd-autonomous fully` · all-opus · default-YES on every scope question. Phase numbering continues from P88 (P89/P90 = direct wire-ins) — v9.0 starts at **P91**, no reset.
+
+**Iconic opening dialog (verbatim-locked, byte-equality test in P94):**
+
+> user: "Hello vibemix, what are you?"
+> vibemix: "I'm the best DJ app in the world."
+> user: "If you are the best, then who the fuck am I?"
+> vibemix: "Oh bestie, don't worry. You know why? Because I'm the beginner module of vibemix. Let's go."
+
+**Anti-creep acid test (v9.0, locked):**
+
+> *"Does this phase deliver a working slice of the BEGINNER (level 1, all 10 mapped controllers, 36-lesson curriculum, library exemplar engine + packaged fallback, scripted curriculum with grounded AI interjections) module — WITHOUT adding a new AI provider, new ws port, new IPC envelope family beyond `learn.*`, new DSP library, new content beyond the 36 hand-authored lessons, or new community/multi-user feature surface? Does it NOT regress any of the 4 cardinal invariants or the rc1 bundle fix?"*
+
+**Hard constraints (locked, encoded in every phase):**
+
+- **Reuse-first.** No new AI provider (Gemini Flash via `model_router.resolve("standard")` for tutor dialog; local Codex offline tutor deferred to v9.x). No new MIR libraries (essentia AGPL excluded; librosa unnecessary; scipy/torch/Pinecone/pgvector out). **Exactly ONE new Python dep:** `python-statemachine ^3.1.2` (MIT, pure-Python, ~30 KB wheel — GREEN install impact). **ZERO new JS deps.** No new ws ports — `learn.*` envelopes ride existing `127.0.0.1:8765` ws_bus through `IpcRouterBus` (Invariant #4 holds). No new IPC envelope family beyond `learn.*` (12 envelopes); MANDATORY `cd tauri/ui && npm run codegen:ipc` after every `messages.schema.json` edit (the ajv validator is pre-compiled — per `feedback_schema_edit_needs_codegen_ipc`).
+- **All four cardinal invariants hold by ADDITIVE design.**
+  - **#1 single-writer** — Lesson state lives in a private `LearnState` dataclass under `src/vibemix/learn/`, NOT in `MusicState`. Sole writer = `LearnRuntime`. Static AST gate `tests/learn/test_runtime_invariants.py::test_musicstate_never_mutated_by_learn` pins it in P92.
+  - **#2 citation grounding** — ONE new evidence source: `[exemplar:<track_id>]` added atomically to 4 schema-mirror sites in a single commit (mirrors v6 `[recall:]` precedent: `state/evidence_registry.py:111` EVIDENCE_SOURCES · `:137` _SOURCE_ALT regex · `prompts/matrix.py` CITATION_GRAMMAR_BLOCK · `agent/dj_cohost.py` _build_citation_strip). Fabricated `[exemplar:bogus]` strips whole turn. Lands in P93.
+  - **#3 trust the audio** — Course 3 tutor narration prediction (count-ins) requires `[cue:<anchor_id>]` evidence (CONDITIONAL: default-YES per Kaan = add via identical 4-site mirror in P96); confidence gates `bpm_confidence < 0.8` OR `phrase_position_confidence < 0.7` downgrade to retrospective-only. `tests/learn/test_no_speculative_phrase.py` AST gate lands in P96 **BEFORE** any Gemini wiring.
+  - **#4 one socket** — every `learn.*` envelope rides `:8765`; `tests/learn/test_no_new_ws_port.py` static greps `learn/` for `websockets.serve` (zero allowed). Lands in P92.
+- **Tone is the release gate.** "Real DJ friend in your ear, no AI slop" is doubly-load-bearing. Verbatim opening dialog fixture-locked (byte-equality test in P94). All 36 lesson scripts are HAND-AUTHORED (committed JSON at `src/vibemix/learn/transcripts/`), NEVER LLM-generated on-the-fly (static gate `tests/learn/test_scripts_are_fixtures.py` in P92). New `scripts/launch/check_no_tutor_slop.py` blocklist catches ≥20 tutor-tic tokens ("Great question!" / "Today we'll be learning…" / "Awesome!" / etc.) — CI-gated; runs against all `learn/transcripts/**.json` AND runtime AI interjections. System instruction lock forbids the four learned moves (compliment / summarize / preview / upbeat hook) — pinned by `tests/learn/test_tutor_system_instruction_lock.py`. All in P94.
+- **Hardware-aware onboarding.** First launch sniffs MIDI (`mido.get_input_names()` + `midi/registry.find_mapping`); 10 supported controllers (Pioneer DDJ-FLX4/6/10/400/1000/SX3 · XDJ-RX3 · Numark Party Mix Live · Hercules Inpulse 300/300-MK2/500) + 1 generic fallback. Stylized CDJ-Whisper schematic SVGs (NO Pioneer logo, NO Pioneer orange, NO faceplate photo-lifts) — authored from official hardware-diagram PDFs, factual control geometry only. Mixxx-precedent nominative fair use posture. Disclaimer copy in app footer + repo README. **FLX4 = canonical ear-pass golden (Kaan's hardware); 9 non-FLX4 live-verify rides forward as `§LEARN-CONTROLLER-EAR` KAAN-ACTION.**
+- **Accessibility.** Dual-channel cue (color + shape) so color-blind users (deuteranopia / protanopia / tritanopia) can distinguish — not amber-only. Keyboard-nav for users without hardware. No time-pressure on lesson advancement (motor-impaired-safe). Visual phrase markers for hearing-impaired Course 3 use. Anti-speedrun min-dwell ≥45s + "I got it" override always available.
+- **Honest green.** Every `learn/` engine module offline-unit-testable (lesson state machine, exemplar finder, highlight serializer, MIDI matchers). The live-app verification gate (`cargo tauri dev` + `ui.log` `[vmx:click]/[vmx:ipc>]/[vmx:ipc<]/[vmx:error]`) is HARD per `feedback_verify_live_app_not_just_tests`. **The bundled-sidecar path (in-flight v0.1.0-rc1 fixes — `patch_livekit_agents_init.py` + `sidecar.rs` std::process + spec blocklist) MUST NOT regress; P98 runs `scripts/smoke/sidecar_bundle_smoke.sh` (or writes it).**
+- **Apache-clean copyright posture** — stylized vector schematics, not Pioneer faceplate art; nominative fair use only. KAAN-ACTION `§LEARN-LEGAL-DISCLAIMER` Francesco/lawyer sight-check before public ship.
+- **`gsd-autonomous fully`** — blockers (Kaan's ear-pass · physical hardware verification · controller-renderer aesthetic sign-off · legal sight-check · cue-decision) ride forward to KAAN-ACTION; only the privacy hard rule + destructive risk pause.
+
+**Charter + research (consumed):** `.planning/PROJECT.md` § Current Milestone · `.planning/research/SUMMARY.md` (14-axis synthesis from 4 opus researchers) · `.planning/research/{STACK,FEATURES,ARCHITECTURE,PITFALLS}.md` · `.planning/REQUIREMENTS.md` (72 v9.0 REQ-IDs).
+
+**EXPLICIT DEFER LIST (v9.x / Bravoh, NOT v9.0 — quoted from SUMMARY §12):** Intermediate / Pro courses → v9.x · Scratching lessons → v9.x or never · Effects deep-dive beyond filter → v9.x · Production / DAW / sample-making → Bravoh · Per-genre branches (wedding-DJ, techno-DJ, etc.) → v9.1+ (only after telemetry justifies) · Stem isolation / mashups / live remixing → never on device · Mobile app → never (CLAUDE.md platform constraint) · Linux → never · Web catalog → defer · 1001Tracklists scraping moat → Bravoh · Community-shared lessons / leaderboards / streaks / cohort mode → Bravoh · Cross-device progress sync → Bravoh · DAW surfaces / Push / Maschine integration → never · ProDJ Link as primary source → keep deferred · Hardware-free "Explore" mode for Course 1 → v9.1 · Photorealistic faceplate art → never (copyright + maintenance burden) · Localization beyond English → v9.1 · Lesson sharing / Mixcloud-style export → v9.x · Per-controller MIDI self-test auto-fix → v9.x.
+
+**Empirical grounding:** v9.0 lessons backed by canon (Phil Morse "Rock The Dancefloor" / Crossfader Complete DJ Course / Pioneer rekordbox Tutorial Mode / DJ TechTools phrasing 101 / Mixed In Key Camelot / Beatport "10 Lessons" / ClubReady DJ School / DJ.studio 16 transitions); AI-tutor tone canon = Khanmigo / Duolingo Max (both flagged for "scripted dialog" failure mode — mitigation = hand-authored scripts + slop blocklist v2 + per-course Kaan ear-pass).
+
+## Phases
+
+- [ ] **Phase 91: Controller Renderer + MIDI Mirror** — Plug controller → see knob move on canvas in <50ms (P95). Standalone-verifiable; NO lessons yet — Kaan ear-pass available the moment this lands.
+- [ ] **Phase 92: Lesson Runtime + AI Highlight Contract** — "Hello world" 1-step lesson; the 4 cardinal-invariant pins land here; 12 `ipc.learn.*` envelopes wired.
+- [ ] **Phase 93: Exemplar Engine + `[exemplar:]` Evidence Source** — DSP-band engine + 4-site schema mirror + `ExemplarPlayer` + packaged fallback. NO UI yet — just engine + CLI test.
+- [ ] **Phase 94: Course 1 — Anatomy (L1.01–L1.16)** — Beginner completes anatomy walkthrough. Verbatim opening dialog byte-equality test + tutor-slop blocklist v2 + tutor system instruction lock land here.
+- [ ] **Phase 95: Course 2 — Transitions (L2.01–L2.14)** — User learns 5 canonical transitions + harmonic mixing. Exemplar wiring throughout (depends P93 + P94).
+- [ ] **Phase 96: Course 3 — Play Mode (L3.01–L3.06) + tutor lens proactive integration** — User plays real set with proactive tutor mode active. `test_no_speculative_phrase` AST gate lands BEFORE Gemini wiring. `[cue:<anchor_id>]` evidence source added via 4-site mirror.
+- [ ] **Phase 97: Onboarding + Verbatim Tone Locks + Mode Picker** — Stranger opens app, picks Learn, sees "Oh bestie" opening, advances through L1.1 seamlessly. Mode picker on main window. Hercules MK2 detection. Disclaimer copy.
+- [ ] **Phase 98: Live Audit + Ear-Pass Hand-Off + rc1 Regression Smoke** — Kaan-walk recording: full 3-course run on real FLX4 → `.planning/milestones/v9.0-MILESTONE-AUDIT.md`. rc1 standalone sidecar smoke MUST PASS unregressed.
+
+| # | Phase | Goal | REQ-IDs | SC count |
+|---|-------|------|---------|----------|
+| 91 | Controller Renderer + MIDI Mirror | A DJ plugs a controller and sees a CDJ-Whisper-styled inline SVG of that exact controller within 2s, with every knob/fader/button mirroring physical position via MIDI within ≤50ms P95 | RENDER-01, RENDER-02, RENDER-03, RENDER-05, RENDER-06, RENDER-07 (6) | 4 |
+| 92 | Lesson Runtime + AI Highlight Contract | A "hello world" 1-step lesson runs end-to-end: AI says "press play deck A", highlight glows on the rendered control, user presses physical button → lesson advances | TONE-02, TONE-04, LESSON-01, LESSON-02, LESSON-03, LESSON-04, LESSON-05, LESSON-06, RENDER-04 (9) | 4 |
+| 93 | Exemplar Engine + `[exemplar:]` Evidence Source | DSP-band exemplar engine picks strongest-band track from user's library; falls back to packaged CC-BY bank when empty; plays through dedicated `ExemplarPlayer`; `[exemplar:<id>]` resolves via 4-site mirror | EXEMPLAR-01, EXEMPLAR-02, EXEMPLAR-03, EXEMPLAR-04, EXEMPLAR-05 (5) | 4 |
+| 94 | Course 1 — Anatomy (L1.01–L1.16) | Beginner opens Learn, sees verbatim 4-line opening dialog, walks through 16 hand-authored anatomy lessons culminating in EQ-as-Tutor demo using library exemplars | TONE-01, TONE-03, CURR-1.01..1.16 (18) | 5 |
+| 95 | Course 2 — Transitions (L2.01–L2.14) | User learns beatmatching (ear + sync) + 5 canonical transitions (long blend, EQ swap, kick swap, filter fade, echo-out, drop swap, loop) + harmonic mixing via Camelot wheel | CURR-2.01..2.14 (14) | 4 |
+| 96 | Course 3 — Play Mode (L3.01–L3.07) + tutor lens proactive integration | User plays real 30-min set with proactive tutor mode active; count-ins grounded on `[cue:]` evidence ONLY; recovery drills + DJ profile graduation | EXEMPLAR-06, CURR-3.01..3.07 (8) | 5 |
+| 97 | Onboarding + Verbatim Tone Locks + Mode Picker | Stranger opens app, picks Learn from mode picker, first-launch MIDI probe detects controller, sees verbatim opening, advances seamlessly; disclaimer copy ships | RENDER-08, ONBOARD-01..07 (8) | 4 |
+| 98 | Live Audit + Ear-Pass Hand-Off + rc1 Regression Smoke | Kaan-walk recording captures full 3-course run on real FLX4; v9.0-MILESTONE-AUDIT.md lands; rc1 sidecar smoke confirmed unregressed | AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04 (4) | 4 |
+
+**Dependency spine:** `P91 → P92 → P94 → P95 → P96 → P97 → P98`, with `P91 → P93` running in parallel and `P93` feeding cite-grounding for `P95` and `P96`.
+
+## Phase Details
+
+### Phase 91: Controller Renderer + MIDI Mirror
+**Goal:** A DJ plugs their MIDI controller and sees a CDJ-Whisper-styled inline SVG schematic of that exact controller on screen within 2 seconds of plug-in (10 supported + 1 generic fallback), with every physical control mirroring its current position via incoming MIDI within ≤50 ms P95 latency. **Standalone-verifiable artifact: NO lessons yet** — Kaan ear-pass available the moment this lands.
+**Depends on:** rc1 ship landed (parallelizable with P93). First v9.0 phase.
+**Requirements:** RENDER-01, RENDER-02, RENDER-03, RENDER-05, RENDER-06, RENDER-07
+**Success Criteria** (what must be TRUE):
+  1. A DJ with any of the 10 supported controllers plugged in opens the Learn surface (new `WebviewWindow` via `tauri/src-tauri/src/learn_window.rs`, mirror of `debrief_window.rs`, on the SAME ws:8765 — Invariant #4 holds) and sees the correct CDJ-Whisper-styled inline SVG schematic of that controller (11 files at `tauri/ui/src/learn/controllers/<id>.svg.ts`, Vite `?raw` import) within 2 seconds; auto-detect via `mido.get_input_names()` + `midi/registry.find_mapping(port_name)` (already substring-matches `port_name_hints` from the 10 bundled profiles). Generic fallback labeled-zone layout when fingerprint confidence is low. **RENDER-01.**
+  2. Every physical control (knob/fader/button/jog/cue pad) on the rendered SVG mirrors the controller's current MIDI position within ≤50 ms P95 latency — measured by `tauri/ui/tests/learn/highlight-latency.test.ts` in a synthetic harness; CI fails red on regression beyond 80 ms P95 (triggers `§LEARN-LATENCY-CONTINGENCY` Rust-direct `midir` amendment). CSS-variable swap for `--learn-highlight` is composited (60 fps guaranteed). **RENDER-02 + RENDER-04 painted-but-tested-in-P92.**
+  3. Every rendered control has a `<g data-control-id="<field>">` hit region with ARIA `role="button"` + `aria-label` (e.g. `aria-label="EQ-HI knob, deck A"`) + a dual-channel cue (color + shape) so deuteranopia/protanopia/tritanopia users can distinguish active vs inactive — verified by `tauri/ui/tests/learn/test_a11y_highlight_dual_cue.spec.ts`; keyboard-nav works for hardware-free curriculum browsing. **RENDER-03 + RENDER-05.**
+  4. Every SVG controller file passes a bi-directional CI parity gate (`tauri/ui/tests/learn/test_svg_profile_parity.spec.ts`): every `data-control-id` in the SVG resolves to a binding in `midi/profiles/<id>.json` AND every profile binding has a matching `<g>` group; stops schema drift across all 11 files. **RENDER-06 + RENDER-07.**
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 92: Lesson Runtime + AI Highlight Contract
+**Goal:** A "hello world" 1-step lesson runs end-to-end: AI says "press play on deck A", the highlight glows on the rendered play button, the user presses their physical play button, and the lesson advances. The 4 cardinal-invariant pins (single-writer #1 + one-socket #4 + tone fixture lock + IPC schema lock) all land here. 12 `ipc.learn.*` envelopes wired through `IpcRouterBus`.
+**Depends on:** Phase 91 (controller renderer + MIDI mirror).
+**Requirements:** TONE-02, TONE-04, LESSON-01, LESSON-02, LESSON-03, LESSON-04, LESSON-05, LESSON-06, RENDER-04
+**Success Criteria** (what must be TRUE):
+  1. The Learn runtime drives lesson state via a deterministic `python-statemachine ^3.1.2` (ONE new MIT pure-Python dep — GREEN install impact) state machine in `src/vibemix/learn/runtime.py`; each lesson is one state with declarative entry/exit/transition predicates; **integration test `tests/learn/test_runtime_invariants.py` confirms ZERO writes to `MusicState` from the `learn/` package (Invariant #1 binding, static AST gate)**. **LESSON-01.**
+  2. Twelve new IPC envelopes in the `ipc.learn.*` namespace (start_course / start_lesson / complete_lesson / lesson_loaded / highlight / midi_position / advance / ack / tutor_speak / exemplar_play / exemplar_stop / progress_state) ride existing `127.0.0.1:8765` ws_bus through `IpcRouterBus` — all `additionalProperties: false`; ajv validator regenerated via `cd tauri/ui && npm run codegen:ipc`; Python dataclass mirrors in `src/vibemix/ui_bus/learn_messages.py`; **`tests/learn/test_no_new_ws_port.py` static gate greps `learn/` for `websockets.serve` (zero allowed — Invariant #4 binding)**. Highlight paints in ≤16 ms of receiving `ipc.learn.highlight` (CSS-variable swap, no full SVG re-render) — pinned by `tauri/ui/tests/learn/highlight-paint.test.ts`. **LESSON-02 + RENDER-04.**
+  3. Lesson advancement requires the user to perform the expected MIDI action (CC drop ≥30% of range OR button press matching `expected_action.control` + `direction`); a 3-strike progressive hint surface guides the user; an "I got it" override skip is always available (motor-impaired-safe — no time-pressure); anti-speedrun min-dwell ≥45s prevents click-through gaming. Lesson progress persists between sessions in atomic JSON at `~/.cache/vibemix/learn-progress.json` (schema-versioned; corruption → nuke + emit fresh empty + one-line toast); reset CLI `vibemix learn reset` + "Reset Learn Progress" button in existing settings drawer. **LESSON-03 + LESSON-04.**
+  4. The tutor persona reuses `MOOD_PERSONAS["teacher"]` from `prompts/matrix.py:53-66` (v8.1 LENS-03 — NO new lens); the lesson runtime composes `build_tutor_system_instruction(course_id, lesson_id, controller_id)` = `COURSE_FRAMES[course_id]` + `controller_frame` + `CURRICULUM[lesson_id].system_instruction_addendum` (≤200 chars) + base tutor lens system instruction. All AI dialog flows through Gemini Flash via `vibemix.llm.model_router.resolve("standard")` (zero hardcoded model literals; CI grep-gated). **Tutor system instruction lock pinned by `tests/learn/test_tutor_system_instruction_lock.py` — forbids the four learned moves (NO complimenting · NO summarizing · NO previewing · NO upbeat hook closer)**. Static fixture gate `tests/learn/test_scripts_are_fixtures.py` confirms no live generative call writes a `tutor_speak` envelope's `text` field — all 36 scripts hand-authored JSON. **TONE-02 + TONE-04 + LESSON-05 + LESSON-06.**
+**Plans**: TBD
+
+### Phase 93: Exemplar Engine + `[exemplar:]` Evidence Source
+**Goal:** DSP-band exemplar engine picks the strongest-band track from the DJ's CLAP-embedded library for each EQ lesson (low/mid/high), with a compressed-kick guard (Pearson r > 0.8 → exclude) and an honest-null fallback to a packaged ~3–5 MB CC-BY exemplar bank when the library is empty. Audio plays through a dedicated `ExemplarPlayer` on a second `sd.OutputStream` to a user-picked headphone device. The `[exemplar:<track_id>]` evidence source lands atomically across 4 schema-mirror sites. **NO UI yet — just engine + CLI test.**
+**Depends on:** Phase 91 (parallelizable with Phase 92). Feeds cite-grounding to P95 + P96.
+**Requirements:** EXEMPLAR-01, EXEMPLAR-02, EXEMPLAR-03, EXEMPLAR-04, EXEMPLAR-05
+**Success Criteria** (what must be TRUE):
+  1. For each EQ band (low/mid/high) the system picks the strongest-band track from the DJ's CLAP-embedded library by computing band-share scalars (`sub_share` / `low_share` / `mid_share` / `high_share`) — primitives EXIST at `audio/features.py:27-90`; engine extracted at ingest time and persisted via a new sqlite-vec band-share column migration. **Engine = DSP-band ranker, NOT CLAP semantic cosine** (CLAP is semantic, not spectral; would mislabel "uplifting trance" as high-band when actually mid+sub). Includes compressed-kick guard: if Pearson r > 0.8 between mid-band energy and sub-band energy, exclude as kick-sideband false-positive — pinned by `tests/learn/test_exemplar_kick_guard.py`. `src/vibemix/learn/exemplar.py::ExemplarFinder` is pure-compute, dim-agnostic, offline-unit-testable on synthetic fixtures. **EXEMPLAR-01 + EXEMPLAR-02.**
+  2. When the user's library is empty or ≤3 tracks pass the band-share floor, the system falls back to a packaged ~3–5 MB CC-BY exemplar bank at `assets/learn/band_exemplars/{sub,low,mid,high}/*` (4 tracks, instrumental, no vocals, ≤60s each) — honest-null reasoning surfaced as *"Your library doesn't have a great example of this — listen to this one we packaged"*. Empty-library path verified by `tests/learn/test_exemplar_packaged_fallback.py`. **EXEMPLAR-03.**
+  3. Exemplar audio plays through a dedicated `src/vibemix/learn/audio_cue.py::ExemplarPlayer` on a SECOND `sd.OutputStream` to a user-picked headphone device — NOT reusing `audio.buffers.PlaybackQueue` (which is mic-gated at `audio/buffers.py:195` and would mute the user). Stereo float32 @ track sample rate via PyAV/FFmpeg decode. Default-safe playback gain: -12 dB (or -18 dB if master deck audio > -6 dBFS — defer until quiet). Headphone device picker added to existing wizard; persists as `learn.headphone_device_index` on existing `ipc.settings.set` envelope. **EXEMPLAR-04.**
+  4. AI claims about exemplar tracks resolve via a NEW `[exemplar:<track_id>]` evidence source — added atomically to the 4 schema-mirror sites in a single commit (mirrors v6 `[recall:]` precedent EXACTLY): `state/evidence_registry.py:111` (EVIDENCE_SOURCES frozenset) · `state/evidence_registry.py:137` (`_SOURCE_ALT` regex) · `prompts/matrix.py` (CITATION_GRAMMAR_BLOCK) · `agent/dj_cohost.py` (`_build_citation_strip`). Pinned by `tests/learn/test_exemplar_citation_schema_mirror.py` (4-site lock test) + `tests/learn/test_exemplar_grounding_e2e.py` (fabricated `[exemplar:bogus]` strips whole turn — **Invariant #2 binding**). **EXEMPLAR-05.**
+**Plans**: TBD
+
+### Phase 94: Course 1 — Anatomy (L1.01–L1.16)
+**Goal:** A beginner opens vibemix, picks Learn, sees the verbatim 4-line iconic opening dialog ("Oh bestie…"), and walks through 16 hand-authored anatomy lessons culminating in the EQ-as-Tutor marquee demo using library exemplars. **The tone byte-equality test on opening dialog + tutor-slop blocklist v2 + tutor system instruction lock all land here.**
+**Depends on:** Phase 92 (lesson runtime). Phase 93 needed for CURR-1.14 (EQ-as-Tutor demo); CURR-1.14 wires the exemplar engine.
+**Requirements:** TONE-01, TONE-03, CURR-1.01..1.16
+**Success Criteria** (what must be TRUE):
+  1. A beginner opens vibemix → picks Learn → sees the verbatim 4-line iconic opening dialog ("Hello vibemix, what are you?" / "I'm the best DJ app in the world." / "If you are the best, then who the fuck am I?" / "Oh bestie, don't worry. You know why? Because I'm the beginner module of vibemix. Let's go.") — **byte-equality test against `src/vibemix/learn/transcripts/course_1_anatomy/01_welcome.json` fixture, CI-red on any drift** (`tests/learn/test_tutor_prompts_byte_equality.py`). **TONE-01 + CURR-1.01.**
+  2. The user advances through 15 hand-authored anatomy lessons in canonical pedagogical order (Meet Your Controller · Channel Strip · Crossfader · Pitch Fader · Transport Buttons · Jog Wheel (nudge only) · Headphone Cueing · Master/Booth/Headphone Volumes + red-zone hygiene · Anatomy of a Song · Counting Bars · Spot Breakdown By Ear · Spot Breakdown By Eye (waveform) · Load Two Tracks); each lesson gates on actual MIDI events from the rendered controller. **CURR-1.02..1.13 + CURR-1.15.**
+  3. **The EQ-as-Tutor Demo (L1.14, marquee/moat lesson) lands working end-to-end:** for each EQ band (low/mid/high), the AI plays a track from the user's library where that band dominates (via P93's `ExemplarFinder`); the user turns the EQ knob on their physical controller; they HEAR the band swell live; the AI's claim is cited `[exemplar:<track_id>]` (Invariant #2). Honest-null fallback to packaged bank when library is empty. **CURR-1.14.**
+  4. Course 1 Recital (CURR-1.16) is a 5-prompt mixed gate (random subset of CURR-1.03..1.13 controls) — user must perform each correctly to unlock Course 2; replayable; honest grading. **CURR-1.16.**
+  5. **Tone discipline gates land:** (a) NEW `scripts/launch/check_no_tutor_slop.py` extends `check_no_ai_slop.py` to catch ≥20 tutor-tic tokens ("Great question!" / "Today we'll be learning…" / "Awesome!" / "You crushed it!" / "Let's dive in!" / "Don't worry, you'll get the hang of it" + 14 more); CI-gated against all `learn/transcripts/**.json` AND runtime AI interjections. (b) Tutor system instruction includes hard lock forbidding the four learned moves (NO complimenting · NO summarizing · NO previewing · NO upbeat hook) — pinned by `tests/learn/test_tutor_system_instruction_lock.py`. **TONE-03.**
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 95: Course 2 — Transitions (L2.01–L2.14)
+**Goal:** The user learns 5 canonical transitions in canonical pedagogical order, beatmatching (ear + sync side-by-side per modern consensus), harmonic mixing via Camelot wheel, and a Course 2 Recital gating into Course 3. Exemplar wiring (P93) cited throughout transition demos.
+**Depends on:** Phase 93 (exemplar engine + `[exemplar:]` evidence source) + Phase 94 (Course 1 must be passed before Course 2 unlocks).
+**Requirements:** CURR-2.01..2.14
+**Success Criteria** (what must be TRUE):
+  1. Beatmatching taught both ways (CURR-2.01 manual by-ear ±0.5% BPM gate, sync-OFF; CURR-2.02 sync side-by-side per modern consensus: DJ Shortee / Mixcloud / SpinStart / DJ Mentors — sync IS a tool, not gatekeeping). AI mutes sync and narrates "this one is faster/slower" tempo deviation as the user nudges. **CURR-2.01 + CURR-2.02.**
+  2. User performs all 5 canonical transitions on their controller in canonical order: Long Blend (CURR-2.03, 32-bar fade with crossfader, AI count-in at -8 bars) · EQ Swap (CURR-2.04) · Bassline/Kick Swap (CURR-2.05, kill outgoing low EQ + bring up incoming low EQ on beat-1 of next phrase) · Filter Fade (CURR-2.06) · Echo-Out (CURR-2.07, the bail-out for beginners with no beatmatching) · Drop Swap (CURR-2.08) · Loop Transition (CURR-2.09). Each performed live with AI count-in on two tracks from the user's library matched by Camelot + BPM ±6%. **CURR-2.03..2.09.**
+  3. Hot Cues & Memory Cues (CURR-2.10) — AI demonstrates entering on cue 2 (the breakdown); fallback for users without rekordbox-imported cues = "set your own cue in vibemix" UI. Camelot Wheel (CURR-2.11) — harmonic-key matching using existing `harmonics.py` Camelot table; AI walks user through finding compatible neighbors. Phrase Matching (CURR-2.12) — align deck B's phrase start with deck A's phrase start, AI counts in. Diagnosing a Train Wreck (CURR-2.13) — AI plays deliberately misaligned mix; user identifies the issue (off-phrase / off-key / off-BPM). **CURR-2.10..2.13.**
+  4. Course 2 Recital (CURR-2.14) — user performs a 5-track 10-minute mix using ≥3 different transition types; honest grading against the L2.x protocol; unlocks Course 3. **CURR-2.14.**
+**Plans**: TBD
+
+### Phase 96: Course 3 — Play Mode (L3.01–L3.06) + tutor lens proactive integration
+**Goal:** The user plays a real 30-minute set with proactive tutor mode active; the AI gives count-ins ("breakdown in 16 beats — get ready to bring in track 2") **only when grounded on `[cue:<anchor_id>]` evidence**, downgrading to retrospective-only narration ("that was a breakdown — see how the bass dropped out") when confidence thresholds fail. **`test_no_speculative_phrase.py` AST gate lands BEFORE any Gemini wiring.** Active-session guard: NEVER play tutor exemplar audio while user is mid-set.
+**Depends on:** Phase 95 (Course 2 must be passed). Reuses live coach (`agent/dj_cohost.py`) + CueAnchor + phrase detection UNCHANGED.
+**Requirements:** EXEMPLAR-06, CURR-3.01..3.07
+**Success Criteria** (what must be TRUE):
+  1. **`test_no_speculative_phrase.py` AST gate lands FIRST** — static gate (no `numpy.fft` / `scipy.signal` / phrase-guessing primitives in `learn/`). THEN `test_course3_uses_existing_coach.py` lands (every tutor-narration prompt built by `state/coach.py:AICoach.build_prompt`). THEN runtime gate at `state/coach.py::evidence_line`: if `bpm_confidence < 0.8` OR `phrase_position_confidence < 0.7` OR `MusicState.next_phrase_at is None`, disable count-in language → downgrade to retrospective narration. **ONLY THEN wire tutor narration to Gemini.** New `[cue:<anchor_id>]` evidence source added via identical 4-site mirror pattern à la EXEMPLAR-05 (default-YES per Kaan = add it). Invariant #3 binding. **CURR-3.07 + Invariant #3 pin.**
+  2. User plays a freely-chosen 5-minute mix (CURR-3.01) with proactive tutor lens active; AI suggests one grounded move per minute. Then a 15-minute set (CURR-3.02) using v8.2 Build-a-Set engine to prepare a sequenced pool; AI live-coaches each transition. Then Reading The Room (CURR-3.03) — AI walks user through reading energy curve mid-set + adjusting next-track choice. **CURR-3.01..3.03.**
+  3. First 30-Minute Set Capstone (CURR-3.04) — proactive co-pilot through full 30-min set; count-ins only when `[cue:<anchor_id>]` evidence present, otherwise retrospective only. Session recorded; debrief surface (port 8766) auto-opens with cited critique. **CURR-3.04.**
+  4. Recovery Drills (CURR-3.05) — AI synthetically introduces a train-wreck during user's set (drill 1: unexpected key clash; drill 2: misaligned phrase); user practices bail-out via echo-out / filter fade / cut; gate = recovery within 4 bars. DJ Profile Graduation (CURR-3.06) — user reviews their accumulated DJ-profile insights from v8.1 long-term profile + lesson completion summary in the v2.1 debrief surface. **CURR-3.05 + CURR-3.06.**
+  5. **Active-session guard pinned:** NEVER play tutor exemplar audio while `MusicState.audible_deck != none` AND `state.session_active` — Course 3 = verbal coaching only; exemplar playback restricted to "between sets" lessons. Pinned by `tests/learn/test_course3_no_exemplar_during_live.py`. **EXEMPLAR-06.**
+**Plans**: TBD
+
+### Phase 97: Onboarding + Verbatim Tone Locks + Mode Picker
+**Goal:** A stranger opens the app, picks Learn from a mode picker on the main window, first-launch MIDI probe detects their controller and announces it by name ("I see your DDJ-FLX4 — let's go"), they see the verbatim opening dialog and advance seamlessly through L1.1. Disclaimer copy ships. Hercules MK2 detection works. Headphone device picker in wizard. Lesson progress list UI.
+**Depends on:** Phases 94 + 95 + 96 (all three courses must exist for mode picker to navigate into them).
+**Requirements:** RENDER-08, ONBOARD-01..07
+**Success Criteria** (what must be TRUE):
+  1. A new user opens the app and sees a mode picker on the main window (Co-host / Learn / Build a Set / Debrief) — extending `tauri/ui/src/session/state.ts` with a `mode` enum; mode picker flips `data-active` IMMEDIATELY on click (CLAUDE.md optimistic-repaint rule), then settles on the round-trip `ipc.session.set_mode` ack. First-launch hardware probe sniffs MIDI via `mido.get_input_names()` + `midi/registry.find_mapping(port_name)`; if a known controller is detected, render its SVG and announce by name; if unknown, fall back to the generic SVG with manual picker. **ONBOARD-01 + ONBOARD-02.**
+  2. Hercules Inpulse 300 vs 300-MK2 (2023) detection — TWO profile files ship (`hercules_inpulse_300.json`, `hercules_inpulse_300_mk2.json`); first-run MIDI-signature probe picks by `iSerialNumber` (Pitfalls §P3 — DJUCED treats as different controllers with different MIDI maps). Live-verify on real MK2 rides forward as `§LEARN-MK2-DETECTION` KAAN-ACTION. Headphone device picker added to existing wizard — user selects which output device hosts tutor exemplar playback (default = system output; advanced = BlackHole + Multi-Output Device routing path documented at `docs/audio-routing.md` as `§LEARN-AUDIO-ROUTING-WIZARD-DISCHARGE` KAAN-ACTION). **ONBOARD-03 + ONBOARD-04.**
+  3. Lesson progress list UI in Learn window — each lesson shows a dot (empty/in-progress/completed); user can pick up where they left off OR replay any completed lesson; consumes `ipc.learn.progress_state`. Empty-state copy ("no controller? plug one in") + keyboard-nav for users browsing curriculum without hardware; hardware-free "Explore" mode for Course 1 anatomy DEFERRED to v9.1 per anti-creep acid test. **ONBOARD-05 + ONBOARD-06.**
+  4. **All 11 controller SVGs are stylized CDJ-Whisper schematics** — NO Pioneer logo, NO Pioneer orange brand color, NO faceplate photo-lifts; authored from official hardware-diagram PDFs (factual control geometry only). LEGAL disclaimer copy visible in app footer + repo README: *"Visual representation for instructional use. DDJ-FLX4, XDJ-RX3, etc. are trademarks of AlphaTheta / Pioneer DJ. Inpulse is a trademark of Hercules. Numark is a trademark of inMusic Brands. vibemix is not affiliated with or endorsed by these manufacturers."* Test `tests/learn/test_disclaimer_present.py` verifies disclaimer text exists in both surfaces. **RENDER-08 + ONBOARD-07.**
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 98: Live Audit + Ear-Pass Hand-Off + rc1 Regression Smoke
+**Goal:** Kaan-walk recording captures the full 3-course run on real FLX4 hardware end-to-end. v9.0-MILESTONE-AUDIT.md lands. Francesco/lawyer sight-check on rendered controllers + disclaimer copy + Mixxx-precedent nominative fair use posture. **rc1 standalone sidecar smoke MUST PASS unregressed.** Three KAAN-ACTION ear-pass sessions (one per course) parked. Mostly KAAN-ACTION discharge (~80%).
+**Depends on:** Phase 97 (onboarding must work for stranger walk-through).
+**Requirements:** AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04
+**Success Criteria** (what must be TRUE):
+  1. A Kaan-walk recording (screencast + audio) captures the full 3-course run on real FLX4 hardware end-to-end; saved to `docs/learn/2026-XX-kaan-walk.webm`; one session per course (Course 1 anatomy / Course 2 transitions / Course 3 live coaching) — 3 sessions, ≥90 minutes total. Surfaced as `§LEARN-EAR-COURSE-1/2/3` KAAN-ACTION (cannot be self-verified — Kaan's ear is the gate). **AUDIT-01.**
+  2. The v9.0 milestone audit doc `.planning/milestones/v9.0-MILESTONE-AUDIT.md` lands at P98 close — covers 72-REQ-ID satisfaction matrix · 4 cardinal-invariant pin re-runs on real session recordings · KAAN-ACTION queue · pitfall coverage (Pitfalls §P1–P17) · acid-test self-check per phase. **AUDIT-02.**
+  3. Francesco / lawyer sight-check on the rendered controllers + disclaimer copy + Mixxx-precedent nominative fair use posture — `§LEARN-LEGAL-DISCLAIMER` KAAN-ACTION; mandatory before public ship. **AUDIT-03.**
+  4. **rc1 standalone sidecar smoke MUST PASS unregressed** — the in-flight v0.1.0-rc1 bundle/launchd fixes (`patch_livekit_agents_init.py` + `sidecar.rs` std::process + spec blocklist) confirmed still working post-v9.0 via `scripts/smoke/sidecar_bundle_smoke.sh` (or equivalent — write if missing). v9.0 must not block rc1. Additionally: envelope namespace audit (mascot frame handler not broken by `learn.*` additions — `tauri/ui/tests/mascot/learn-envelope-doesnt-break-mascot.spec.ts`); standalone `vibemix-core --session` + `vibemix-core --wizard` launchd-spawn unregressed. **AUDIT-04.**
+**Plans**: TBD
+
+## Progress Table
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 91. Controller Renderer + MIDI Mirror | 0/? | Not started | - |
+| 92. Lesson Runtime + AI Highlight Contract | 0/? | Not started | - |
+| 93. Exemplar Engine + `[exemplar:]` Evidence Source | 0/? | Not started | - |
+| 94. Course 1 — Anatomy | 0/? | Not started | - |
+| 95. Course 2 — Transitions | 0/? | Not started | - |
+| 96. Course 3 — Play Mode + tutor lens proactive | 0/? | Not started | - |
+| 97. Onboarding + Tone Locks + Mode Picker | 0/? | Not started | - |
+| 98. Live Audit + Ear-Pass + rc1 Regression Smoke | 0/? | Not started | - |
+
+## KAAN-ACTION Queue (v9.0 — surfaced + parked, never faked)
+
+**BLOCKING (must resolve before v9.0 public ship):**
+- 🔴 `§LEARN-LEGAL-DISCLAIMER` — Francesco/lawyer sight-check on rendered controllers + disclaimer copy.
+- 🔴 `§LEARN-EAR-COURSE-1` — Kaan ear-pass on Course 1 (16 lessons) on real FLX4.
+- 🔴 `§LEARN-EAR-COURSE-2` — Kaan ear-pass on Course 2 (14 lessons) on real FLX4.
+- 🔴 `§LEARN-EAR-COURSE-3` — Kaan ear-pass on Course 3 (6 lessons) on real FLX4 mid-set.
+- 🔴 `§LEARN-CUE-DECISION` (P96) — Course 3 proactive count-ins (needs `[cue:]`) OR retrospective-only? Default-YES = count-ins. Kaan ratifies during P96 planning.
+
+**NON-BLOCKING (ride forward to KAAN-ACTION queue):**
+- 🟡 `§LEARN-CONTROLLER-EAR` — Live-verify on 9 non-FLX4 controllers (FLX4 = canonical golden; other 9 stay SVG-shipped + CI-parity-gated, ear-pass deferred per controller).
+- 🟡 `§LEARN-AUDIO-ROUTING-WIZARD-DISCHARGE` — BlackHole/Multi-Output Device wizard for master+cue split (`docs/audio-routing.md`).
+- 🟡 `§LEARN-CLAP-FIRST-RUN-UX` — CLAP ONNX model first-run download UX (existing library Models row at `tauri/ui/library.html:170-176` is the load-bearing path — DO NOT bypass from Learn mode).
+- 🟡 `§LEARN-OVERNIGHT-DISCIPLINE` — One-page overnight-run handoff doc (Pitfalls §P16).
+- 🟡 `§LEARN-LATENCY-CONTINGENCY` — If P91 measures >80 ms P95, Rust-direct MIDI→Tauri amendment via `midir` crate (skip Python sidecar for highlight-only events).
+- 🟡 `§LEARN-MK2-DETECTION` — Hercules Inpulse 300 vs 300-MK2 live-verify on real hardware.
+- 🟡 `§LEARN-FIRMWARE-VARIANTS` — DDJ-FLX4 v1.07 variant detection (Beat-FX behavior change under rekordbox).
+- 🟡 `§LEARN-OFFLINE-TONE-PATH` — Codex tutor parity deferred to v9.x.
+- 🟡 `§LEARN-LOCALIZATION-IT-TR` — en-only v9.0; v9.1 drops `tr.py`/`it.py`.
+- 🟡 `§LEARN-PEDAGOGY-INSTRUCTOR-REVIEW` — 36-lesson ordering past beginner-track DJ instructor (Francesco contact / Kaan).
 
 ---
 

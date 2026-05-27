@@ -200,3 +200,11 @@
 ---
 *Requirements defined: 2026-05-27*
 *Last updated: 2026-05-27 after initial definition (v9.0 "Lesson One" — based on 4 opus researcher synthesis at `.planning/research/SUMMARY.md`)*
+
+---
+
+## Note on REQ-ID Count (added 2026-05-27 by gsd-roadmapper)
+
+The `**Coverage**` block above text-says **71 total**, but the actual REQ-ID sum is **72** (4 TONE + 8 RENDER + 6 LESSON + 6 EXEMPLAR + 16 CURR-1 + 14 CURR-2 + 7 CURR-3 + 7 ONBOARD + 4 AUDIT = 72). Treating the **72** as authoritative for coverage purposes — the Traceability table maps all 72 with no orphans and no duplicates. The "71" in line 194 is a one-off transcription artifact; existing rows untouched.
+
+ROADMAP.md v9.0 section quotes **72 REQ-IDs** to match the actual sum.
