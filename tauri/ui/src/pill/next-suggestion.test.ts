@@ -453,6 +453,24 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     expect(card.querySelector(".vmx-next-card__alternatives")).toBeNull();
   });
 
+  test("feedback controls render only when a handler is provided", () => {
+    const feedback: string[] = [];
+    const card = renderNextSuggestion(_sugg(), {
+      onFeedback: (kind) => feedback.push(kind),
+    })!;
+    const buttons = Array.from(card.querySelectorAll(".vmx-next-card__feedback-btn"));
+
+    expect(buttons.map((button) => button.textContent)).toEqual(["keep", "later", "timing"]);
+    (buttons[1] as HTMLButtonElement).click();
+    expect(feedback).toEqual(["not_now"]);
+
+    const peek = renderNextSuggestion(_sugg(), {
+      showAlternatives: false,
+      onFeedback: (kind) => feedback.push(kind),
+    })!;
+    expect(peek.querySelector(".vmx-next-card__feedback")).toBeNull();
+  });
+
   test("backup alternative titles are text nodes, never injected markup", () => {
     const card = renderNextSuggestion(
       _sugg({

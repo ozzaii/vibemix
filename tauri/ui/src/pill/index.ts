@@ -21,7 +21,8 @@
  *
  * Frame content is rendered via textContent / contract-tested renderCitationStrip
  * — NEVER eval'd or innerHTML'd from wire data (T-62-11/T-62-12). The pill
- * only sends one live action: choosing a rendered backup transition.
+ * only sends grounded live actions: choosing a rendered backup transition and
+ * labeling the visible suggestion.
  */
 
 import { renderCitationStrip, type CitationChip } from "../session/components/citation-strip.js";
@@ -30,6 +31,7 @@ import {
   nextSuggestionRenderKey,
   renderNextSuggestion,
   type NextAlternativeView,
+  type NextSuggestionFeedbackKind,
   type NextSuggestionWire,
 } from "./next-suggestion.js";
 import {
@@ -427,6 +429,7 @@ function syncNextSuggestion(view: PillView): void {
     showAlternatives: true,
     maxAlternatives: 2,
     onAlternativeSelect: chooseNextSuggestionAlternative,
+    onFeedback: sendNextSuggestionFeedback,
   });
   if (card) {
     card.setAttribute("data-no-drag", "");
@@ -479,11 +482,30 @@ export function nextSuggestionChoiceMessage(alt: NextAlternativeView): Record<st
   };
 }
 
+export function nextSuggestionFeedbackMessage(
+  feedback: NextSuggestionFeedbackKind,
+): Record<string, unknown> {
+  return {
+    action: "next_suggestion.feedback",
+    feedback,
+  };
+}
+
 function chooseNextSuggestionAlternative(alt: NextAlternativeView): void {
   const message = nextSuggestionChoiceMessage(alt);
   vmxLog("[vmx:ipc>]", "choose next-suggestion backup", message);
   void invoke("forward_ipc_to_sidecar", { message }).catch((err: unknown) => {
     vmxLog("[vmx:error]", "next-suggestion backup choose failed", {
+      error: String(err),
+    });
+  });
+}
+
+function sendNextSuggestionFeedback(feedback: NextSuggestionFeedbackKind): void {
+  const message = nextSuggestionFeedbackMessage(feedback);
+  vmxLog("[vmx:ipc>]", "label next-suggestion", message);
+  void invoke("forward_ipc_to_sidecar", { message }).catch((err: unknown) => {
+    vmxLog("[vmx:error]", "next-suggestion feedback failed", {
       error: String(err),
     });
   });

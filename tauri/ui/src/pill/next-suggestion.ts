@@ -90,10 +90,13 @@ export interface NextSuggestionAlternativeWire {
   transition?: NextSuggestionTransitionWire | null;
 }
 
+export type NextSuggestionFeedbackKind = "accept" | "not_now" | "wrong_timing";
+
 export interface NextSuggestionRenderOptions {
   showAlternatives?: boolean;
   maxAlternatives?: number;
   onAlternativeSelect?: (alt: NextAlternativeView) => void;
+  onFeedback?: (kind: NextSuggestionFeedbackKind) => void;
 }
 
 /** The `next_suggestion` wire payload — mirrors
@@ -234,6 +237,38 @@ const CSS = `
     background: var(--glass-2);
   }
   button.vmx-next-card__alt-row:focus-visible {
+    outline: 1px solid var(--silk-40);
+    outline-offset: 2px;
+  }
+  .vmx-next-card__feedback {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-1);
+    margin-top: var(--sp-1);
+    padding-top: var(--sp-1);
+    border-top: 1px solid var(--glass-edge);
+  }
+  .vmx-next-card__feedback-btn {
+    min-width: 0;
+    height: 20px;
+    padding: 0 var(--sp-1);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm);
+    background: transparent;
+    color: var(--silk-40);
+    font-family: var(--type-mono);
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .vmx-next-card__feedback-btn:hover {
+    background: var(--glass-2);
+    color: var(--silk-65);
+  }
+  .vmx-next-card__feedback-btn:focus-visible {
     outline: 1px solid var(--silk-40);
     outline-offset: 2px;
   }
@@ -561,6 +596,28 @@ export function renderNextSuggestion(
       }
       root.append(group);
     }
+  }
+
+  if (options.showAlternatives !== false && options.onFeedback) {
+    const group = document.createElement("div");
+    group.className = "vmx-next-card__feedback";
+    group.setAttribute("aria-label", "suggestion feedback");
+    const controls: Array<[NextSuggestionFeedbackKind, string, string]> = [
+      ["accept", "keep", "mark suggestion accepted"],
+      ["not_now", "later", "mark suggestion not now"],
+      ["wrong_timing", "timing", "mark suggestion timing wrong"],
+    ];
+    for (const [kind, text, label] of controls) {
+      const button = document.createElement("button");
+      button.className = "vmx-next-card__feedback-btn";
+      button.type = "button";
+      button.textContent = text;
+      button.setAttribute("aria-label", label);
+      button.setAttribute("data-no-drag", "");
+      button.addEventListener("click", () => options.onFeedback?.(kind));
+      group.append(button);
+    }
+    root.append(group);
   }
 
   return root;

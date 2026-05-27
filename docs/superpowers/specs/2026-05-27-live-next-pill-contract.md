@@ -183,6 +183,15 @@ against the visible suggestion: matching the suggestion emits inferred
 Inferred labels are deliberately lower weight in the taste model and still need
 the multi-session evidence gates before they can affect ranking.
 
+The expanded pill exposes three tiny explicit feedback controls:
+
+- `keep` emits `suggestion_accepted` / `accepted`
+- `later` emits `suggestion_rejected` / `not_now`
+- `timing` emits `timing_claim_wrong` / `wrong_timing`
+
+`not_now` is a weak taste negative for the current transition context. Timing
+feedback is technical calibration only and must not become role-pair taste.
+
 In the live runtime the event is written to the current session's `events.jsonl`
 as `kind: "taste_feedback"` for local replay. Long-term taste storage appends the
 same structured row to `app_data_dir()/taste_feedback.jsonl` only when
@@ -271,6 +280,9 @@ The expanded pill renders up to two backup alternatives from
 `transition_alternatives`. The collapsed hover peek calls the same renderer with
 backups hidden. Clicking a backup promotes it through the existing websocket
 action path and the next frame reflects the pinned selected candidate.
+
+The expanded pill also renders compact `keep`, `later`, and `timing` controls
+for explicit feedback. These controls are omitted from the collapsed hover peek.
 
 ## Validation
 

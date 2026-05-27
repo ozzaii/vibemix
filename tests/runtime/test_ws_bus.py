@@ -194,6 +194,61 @@ def test_inbound_next_suggestion_choose_action_calls_holder(mocker):
     assert holder.calls == [{"candidate_id": "tr_002", "track_id": "b", "state": state}]
 
 
+def test_inbound_next_suggestion_feedback_action_calls_holder(mocker):
+    mock_server = _build_mock_server()
+    serve_mock = AsyncMock(return_value=mock_server)
+    mocker.patch("vibemix.runtime.ws_bus.websockets.serve", new=serve_mock)
+
+    fake_levels = MagicMock()
+    fake_levels.snapshot = MagicMock(return_value={"music": 0.0, "voice": 0.0, "mic": 0.0})
+    state = MusicState()
+    manual_trigger = asyncio.Event()
+    stop_event = asyncio.Event()
+    stop_event.set()
+
+    class Holder:
+        def __init__(self):
+            self.calls = []
+
+        def record_feedback(self, feedback, **kwargs):
+            self.calls.append({"feedback": feedback, **kwargs})
+            return object()
+
+    holder = Holder()
+
+    async def fast_sleep(_s):
+        await _REAL_SLEEP(0)
+
+    mocker.patch("vibemix.runtime.ws_bus.asyncio.sleep", side_effect=fast_sleep)
+
+    asyncio.run(
+        ws_broadcast(
+            fake_levels,
+            state,
+            manual_trigger,
+            stop_event,
+            suggestion_holder=holder,
+        )
+    )
+    handler = serve_mock.await_args.args[0]
+
+    class FakeWs:
+        def __aiter__(self):
+            async def gen():
+                yield json.dumps(
+                    {
+                        "action": "next_suggestion.feedback",
+                        "feedback": "wrong_timing",
+                    }
+                )
+
+            return gen()
+
+    asyncio.run(handler(FakeWs()))
+
+    assert holder.calls == [{"feedback": "wrong_timing", "state": state}]
+
+
 def test_ws_05_inbound_invalid_json_does_not_raise(mocker):
     """WS-05: malformed inbound message → handler does NOT raise,
     manual_trigger stays unset."""

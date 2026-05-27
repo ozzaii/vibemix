@@ -28,6 +28,7 @@ TASTE_LABEL_WEIGHTS: dict[str, float] = {
     "vibe_no": -0.70,
     "played_next": 0.65,
     "accepted": 1.00,
+    "not_now": -0.35,
     "rejected": -0.70,
     "ignored_timeout": -0.20,
     "different_track": -0.30,
@@ -94,13 +95,12 @@ def build_taste_model(events: tuple[FeedbackEvent, ...]) -> TasteModel:
         if positives < MIN_POSITIVE_PAIR_EVENTS and negatives < MIN_NEGATIVE_PAIR_EVENTS:
             continue
         net = sum(_taste_weight(row) or 0.0 for row in rows)
-        total_abs = sum(abs(_taste_weight(row) or 0.0) for row in rows)
-        if total_abs <= 0:
+        if not rows:
             continue
         weight = round(
             max(
                 -MAX_ABS_ROLE_PAIR_WEIGHT,
-                min(MAX_ABS_ROLE_PAIR_WEIGHT, net / total_abs * MAX_ABS_ROLE_PAIR_WEIGHT),
+                min(MAX_ABS_ROLE_PAIR_WEIGHT, net / len(rows) * MAX_ABS_ROLE_PAIR_WEIGHT),
             ),
             6,
         )

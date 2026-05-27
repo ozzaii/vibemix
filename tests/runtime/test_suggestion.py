@@ -200,6 +200,27 @@ def test_seed_change_emits_inferred_played_or_different_track_feedback():
     assert events[-1].raw["actual_next_track_id"] == "b"
 
 
+def test_record_feedback_emits_explicit_live_pill_labels():
+    store = _FakeStore(["s", "a"], [("s", 0.99), ("a", 0.9)])
+    events = []
+    svc = SuggestionService(store, _lib(["s", "a"]), feedback_sink=events.append)
+
+    assert svc.record_feedback("not_now") is None
+    out = svc.compute("s")
+    assert out is not None
+
+    event = svc.record_feedback("not-now")
+
+    assert event is not None
+    assert event.action == "suggestion_rejected"
+    assert event.label == "not_now"
+    assert event.inferred is False
+    assert event.raw["seed_track_id"] == "s"
+    assert event.raw["selected_track_id"] == "a"
+    assert svc.record_feedback("unknown") is None
+    assert [row.action for row in events] == ["suggestion_shown", "suggestion_rejected"]
+
+
 def test_resolve_seed_from_audible_deck():
     state = MusicState()
     state.audible_deck = "A"

@@ -58,6 +58,12 @@ FULL_COMPUTE_RETRY_S = 5.0
 FULL_COMPUTE_DISPATCH_GUARD_S = 0.25
 CONTROLLER_TARGET_VOLUME_FLOOR = 16
 CONTROLLER_XFADER_FACTOR_FLOOR = 0.20
+EXPLICIT_FEEDBACK_ACTIONS: dict[str, tuple[str, str]] = {
+    "accept": ("suggestion_accepted", "accepted"),
+    "keep": ("suggestion_accepted", "accepted"),
+    "not_now": ("suggestion_rejected", "not_now"),
+    "wrong_timing": ("timing_claim_wrong", "wrong_timing"),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -318,6 +324,35 @@ class SuggestionService:
         if feedback_event is not None:
             self._emit_feedback(feedback_event)
         return result
+
+    def record_feedback(
+        self,
+        feedback: str | None,
+        *,
+        state: Any | None = None,
+    ) -> FeedbackEvent | None:
+        """Record an explicit live-pill feedback control for the current pick."""
+        key = _feedback_key(feedback)
+        action_label = EXPLICIT_FEEDBACK_ACTIONS.get(key)
+        if action_label is None:
+            return None
+        action, label = action_label
+        with self._lock:
+            suggestion = dict(self._current) if self._current is not None else None
+            seed_track_id = self._seed_track_id
+        if suggestion is None:
+            return None
+        active_seed = resolve_seed_context(state) if state is not None else None
+        event = self._feedback_event_for_suggestion(
+            action=action,
+            label=label,
+            suggestion=suggestion,
+            seed_track_id=active_seed.track_id if active_seed is not None else seed_track_id,
+            inferred=False,
+        )
+        if event is not None:
+            self._emit_feedback(event)
+        return event
 
     def _feedback_event_for_choice(
         self,
@@ -1127,6 +1162,12 @@ def _str_or_none(value: Any) -> str | None:
 def _feedback_token(value: str) -> str:
     token = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in value)
     return token.strip("_") or "live_session"
+
+
+def _feedback_key(value: str | None) -> str:
+    if value is None:
+        return ""
+    return value.strip().lower().replace("-", "_").replace(" ", "_")
 
 
 def _target_deck(source_deck: str | None, audible_deck: Any) -> str | None:

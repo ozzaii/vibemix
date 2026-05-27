@@ -426,6 +426,23 @@ async def ws_broadcast(
                             track_id=data.get("track_id"),
                             ok=choice is not None,
                         )
+                elif data.get("action") == "next_suggestion.feedback":
+                    if suggestion_holder is not None and hasattr(
+                        suggestion_holder, "record_feedback"
+                    ):
+                        try:
+                            event = suggestion_holder.record_feedback(
+                                data.get("feedback"),
+                                state=state,
+                            )
+                        except Exception as e:
+                            print(f"[ws] suggestion feedback failed: {e}", file=sys.stderr)
+                            event = None
+                        _tr(
+                            "next_suggestion_feedback",
+                            feedback=data.get("feedback"),
+                            ok=event is not None,
+                        )
                 elif ipc_router is not None and isinstance(data.get("type"), str):
                     # Route ipc.settings.* / ipc.profile.* / ipc.recordings.*
                     # into SessionLoop's handlers (2026-05-25 GUI-control fix).

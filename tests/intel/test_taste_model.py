@@ -65,6 +65,14 @@ def test_repeated_negative_across_sessions_creates_constraint() -> None:
     assert model.negative_constraints
 
 
+def test_not_now_is_explicit_but_weak_negative_taste() -> None:
+    events = tuple(_event(f"evt_{i}", f"s{i % 3}", "not_now", ("drop", "intro")) for i in range(10))
+
+    model = build_taste_model(events)
+
+    assert 0.40 < model.taste_score_for(("drop", "intro")) < 0.50
+
+
 def test_technical_no_updates_risk_penalty_not_role_pair_taste() -> None:
     events = tuple(
         _event(

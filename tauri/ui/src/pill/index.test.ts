@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 import { initialPillState } from "./state-machine.js";
 import {
   nextSuggestionChoiceMessage,
+  nextSuggestionFeedbackMessage,
   reduceFrame,
   readDeckState,
   readNextSuggestion,
@@ -188,6 +189,15 @@ describe("nextSuggestionChoiceMessage — backup command payload", () => {
       action: "next_suggestion.choose",
       candidate_id: "tr_002",
       track_id: "t2",
+    });
+  });
+});
+
+describe("nextSuggestionFeedbackMessage — feedback command payload", () => {
+  it("builds the websocket action shape for explicit pill labels", () => {
+    expect(nextSuggestionFeedbackMessage("wrong_timing")).toEqual({
+      action: "next_suggestion.feedback",
+      feedback: "wrong_timing",
     });
   });
 });
