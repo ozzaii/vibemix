@@ -203,6 +203,59 @@ def test_exported_phrase_requires_action_success_claim() -> None:
     assert "missing_claim_id_for_export" in result.errors
 
 
+def test_created_playlist_phrase_requires_playlist_success_claim() -> None:
+    envelope = _envelope(claim_summary=())
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="I created the playlist.",
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_playlist" in result.errors
+
+
+def test_created_playlist_phrase_accepts_playlist_success_claim() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "playlist_created"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="I created the playlist.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
+def test_saved_playlist_phrase_requires_export_and_playlist_success_claims() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "playlist_created"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="I saved the playlist.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_export" in result.errors
+    assert "missing_claim_id_for_playlist" not in result.errors
+
+
 def test_export_ready_phrase_requires_cue_export_status_claim() -> None:
     envelope = _envelope(claim_summary=())
 

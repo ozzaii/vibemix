@@ -20,6 +20,12 @@ _SEMANTIC_RE = re.compile(r"\b(?:texture|timbre|sonic|sound(?:s|ed)?\s+close)\b"
 _ENERGY_RE = re.compile(r"\b(?:energy|intensity|energy\s+shape)\b", re.I)
 _PHRASE_RE = re.compile(r"\b(?:phrase|downbeat|bar\s+line|boundary)\b", re.I)
 _EXPORT_RE = re.compile(r"\b(?:exported|wrote|saved)\b", re.I)
+_PLAYLIST_ACTION_RE = re.compile(
+    r"\b(?:(?:created|made|built|generated|saved|wrote)\s+(?:the\s+)?"
+    r"(?:playlist|m3u|json|set)|(?:playlist|m3u|json)\s+"
+    r"(?:created|made|built|generated|saved|written))\b",
+    re.I,
+)
 _EXPORT_READY_RE = re.compile(
     r"\b(?:export[- ]ready|ready\s+to\s+export|safe\s+to\s+export)\b", re.I
 )
@@ -37,6 +43,7 @@ _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "energy": frozenset({"energy_shape"}),
     "phrase": frozenset({"phrase_fit"}),
     "export": frozenset({"export_result"}),
+    "playlist": frozenset({"playlist_created"}),
     "taste": frozenset({"taste_preference", "taste_fit", "taste_uncertain"}),
     "risk": frozenset({"risk", "uncertainty"}),
 }
@@ -110,6 +117,7 @@ def _claim_families_implied_by_text(text: str) -> tuple[str, ...]:
         ("energy", _ENERGY_RE),
         ("phrase", _PHRASE_RE),
         ("export", _EXPORT_RE),
+        ("playlist", _PLAYLIST_ACTION_RE),
         ("taste", _TASTE_RE),
         ("risk", _RISK_RE),
     )
