@@ -648,6 +648,8 @@ done: `scripts/eval/intel_recalibration_note.py --append-log` appends only
 done: `scripts/eval/intel_recalibration_note.py --append-log` validates the
       candidate whole log before writing, so duplicate run IDs and out-of-order
       timestamps cannot be appended
+done: `scripts/eval/intel_recalibration_note.py` writes `--output` only after
+      candidate append-log validation succeeds when both flags are supplied
 done: private-label recalibration notes carry canonical SHA-256 hashes for the
       exact redacted scorecard/gold/taste/gate reports used to render the entry
 done: `scripts/eval/intel_recalibration_log_validate.py` validates the public

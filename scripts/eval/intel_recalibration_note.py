@@ -528,11 +528,18 @@ def main(argv: list[str] | None = None) -> int:
         promote_release=args.promote_release,
     )
     if result["valid"]:
-        if args.output:
+        if args.append_log:
+            try:
+                append_recalibration_note(args.append_log, result, threshold_lock=args.lock_path)
+            except ValueError as exc:
+                result = {
+                    **result,
+                    "valid": False,
+                    "errors": (*tuple(result.get("errors", ())), f"append_log:{exc}"),
+                }
+        if result["valid"] and args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(result["entry"], encoding="utf-8")
-        if args.append_log:
-            append_recalibration_note(args.append_log, result, threshold_lock=args.lock_path)
     if args.json:
         json.dump(result, sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write("\n")

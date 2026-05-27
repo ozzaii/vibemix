@@ -393,6 +393,49 @@ def test_cli_does_not_write_output_or_append_log_for_invalid_note(
     assert log.read_text(encoding="utf-8") == f"# Log\n\n{APPEND_MARKER}\n"
 
 
+def test_cli_does_not_write_output_when_append_validation_fails(
+    tmp_path: Path,
+    capsys,  # type: ignore[no-untyped-def]
+) -> None:
+    scorecard = tmp_path / "scorecard.json"
+    gold = tmp_path / "gold_report.json"
+    out = tmp_path / "entry.md"
+    log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
+    scorecard.write_text(json.dumps(_scorecard()), encoding="utf-8")
+    gold.write_text(json.dumps(_gold_report()), encoding="utf-8")
+    log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
+    first = _tier1_note_result(timestamp="2026-05-27T12:00:00Z", run_id="intel_private_cli_dup")
+    append_recalibration_note(log, first)
+    before = log.read_text(encoding="utf-8")
+
+    rc = main(
+        [
+            "--scorecard",
+            str(scorecard),
+            "--gold-report",
+            str(gold),
+            "--evidence-tier",
+            "tier1_private_calibration",
+            "--timestamp",
+            "2026-05-27T12:00:01Z",
+            "--run-id",
+            "intel_private_cli_dup",
+            "--output",
+            str(out),
+            "--append-log",
+            str(log),
+            "--json",
+        ]
+    )
+
+    assert rc == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result["valid"] is False
+    assert any("run_id.duplicate" in error for error in result["errors"])
+    assert not out.exists()
+    assert log.read_text(encoding="utf-8") == before
+
+
 def test_cli_does_not_write_output_for_invalid_identity(
     tmp_path: Path,
     capsys,  # type: ignore[no-untyped-def]

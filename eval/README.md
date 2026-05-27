@@ -80,9 +80,10 @@ report hashes, threshold hashes, privacy flags, and actions.
 redacted private scorecard/gold/taste/gate reports, binds it to those aggregate
 reports by SHA-256, rejects malformed timestamp/run-id identity fields before
 writing output, and can append it with `--append-log` only after validation
-passes for the candidate whole log; release promotion requires a passing
-scorecard plus a valid hash-bound `intel_gate.py` artifact with matching
-threshold-lock and threshold-values provenance.
+passes for the candidate whole log. If `--output` and `--append-log` are used
+together, the output file is written only after append validation succeeds.
+Release promotion requires a passing scorecard plus a valid hash-bound `intel_gate.py` artifact
+with matching threshold-lock and threshold-values provenance.
 `scripts/eval/intel_recalibration_log_validate.py`
 validates the public log after entries are appended so malformed, hashless, or
 private-leaking entries are caught mechanically; it also rejects stale
