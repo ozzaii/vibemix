@@ -117,6 +117,37 @@ def exe_suffix_for_triple(triple: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _apply_livekit_agents_init_patch() -> None:
+    """Apply the livekit-agents __init__ split-import patch before pyinstaller.
+
+    Idempotent. See ``scripts/dist/patch_livekit_agents_init.py`` for the full
+    explanation — short version is that livekit-agents 1.x's single-statement
+    ``from . import cli, ..., voice`` triggers a circular ImportError in
+    PyInstaller-frozen bundles spawned in many real-world contexts (Tauri,
+    Finder/launchd, subprocess.Popen with pipes). Splitting cli into its own
+    statement first makes Python's submodule-binding order survive the frozen
+    importer's quirks. Regression-guarded by
+    ``tests/dist/test_livekit_agents_init_patch.py``.
+    """
+    patch_script = _PROJECT_ROOT / "scripts" / "dist" / "patch_livekit_agents_init.py"
+    if not patch_script.exists():
+        print(
+            f"[build_sidecar] WARNING: {patch_script} missing — skipping livekit "
+            "init patch (frozen bundle WILL crash on Tauri/launchd spawn)",
+            file=sys.stderr,
+        )
+        return
+    print(
+        "[build_sidecar] applying livekit/agents/__init__ split-import patch",
+        file=sys.stderr,
+    )
+    subprocess.run(
+        [sys.executable, str(patch_script)],
+        check=True,
+        cwd=_PROJECT_ROOT,
+    )
+
+
 def run_pyinstaller(
     spec: Path,
     *,
@@ -142,6 +173,8 @@ def run_pyinstaller(
     """
     if not spec.exists():
         raise FileNotFoundError(f"spec file not found: {spec}")
+
+    _apply_livekit_agents_init_patch()
 
     dist_dir = _PROJECT_ROOT / "dist"
     cmd = [
