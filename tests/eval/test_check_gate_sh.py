@@ -6,10 +6,12 @@ Invokes the bash gate via :mod:`subprocess` with ``EVAL_RUNS_DIR``,
 fixtures. Pins:
     - 7 consecutive nightly green + ear-test green => exit 0
     - any nightly metric below lock OR ear-test fail => exit 1
+    - missing/failing INTEL gate artifacts => exit 1
     - fewer than 7 nightly runs => exit 1
     - only the most-recent 7 are considered
     - jq missing => clear stderr
     - structured ``BLOCKED_BY=nightly|ear-test`` lines on failure
+      (plus ``BLOCKED_BY=intel`` for INTEL fixture-gate regressions)
 """
 
 from __future__ import annotations
@@ -23,7 +25,6 @@ import time
 from pathlib import Path
 
 import pytest
-
 
 SCRIPT_PATH = Path("scripts/release/check_gate.sh").resolve()
 
@@ -74,6 +75,7 @@ def _make_nightly_run(
     substance: float = 0.70,
     cited_cosine: float = 0.50,
     bypass: float = 0.10,
+    intel_gate_valid: bool = True,
     mtime: float | None = None,
 ) -> Path:
     """Create ``base/<name>/eval_report.json`` with the given metrics.
@@ -100,9 +102,58 @@ def _make_nightly_run(
     }
     out = run / "eval_report.json"
     out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    intel = run / "intel_gate.json"
+    intel.write_text(
+        json.dumps(
+            {
+                "schema": "intel_gate_v1",
+                "valid": intel_gate_valid,
+                "errors": [] if intel_gate_valid else ["fixture regression"],
+                "stages": {
+                    "fixture_audit": {"valid": intel_gate_valid},
+                    "scorecard": {
+                        "valid": intel_gate_valid,
+                        "passed": intel_gate_valid,
+                        "artifact_status": {
+                            "anlz": intel_gate_valid,
+                            "cue_baseline": intel_gate_valid,
+                            "section_retrieval": intel_gate_valid,
+                            "transition_scorecard": intel_gate_valid,
+                            "decision_replay": intel_gate_valid,
+                            "gold_labels": intel_gate_valid,
+                            "taste_scorecard": intel_gate_valid,
+                        },
+                        "metrics": {
+                            "anlz_complete_rate": 1.0,
+                            "section_role_hit_at_5_delta": 0.2,
+                            "transition_pairwise_accuracy": 1.0,
+                            "decision_exact_timing_floor_violation_rate": 0.0,
+                            "taste_accepted_suggestion_lift": 0.18,
+                        },
+                        "gates": [
+                            {
+                                "metric": "section_role_hit_at_5_delta",
+                                "status": "PASS" if intel_gate_valid else "FAIL",
+                            }
+                        ],
+                        "provenance": {
+                            "fixture_manifest_hash": "sha256:" + ("a" * 64),
+                            "thresholds_hash": "sha256:" + ("b" * 64),
+                            "threshold_lock_hash": "sha256:" + ("c" * 64),
+                            "replay_tier": "tier0_fixture_replay",
+                        },
+                    },
+                    "provenance": {"valid": intel_gate_valid},
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     if mtime is not None:
         os.utime(run, (mtime, mtime))
         os.utime(out, (mtime, mtime))
+        os.utime(intel, (mtime, mtime))
     return run
 
 
@@ -297,6 +348,148 @@ def test_missing_eval_report_json_fails(tmp_path: Path):
     assert "eval_report.json missing" in result.stderr
 
 
+def test_missing_intel_gate_json_fails(tmp_path: Path):
+    """7 dirs but one has no intel_gate.json -> exit 1, BLOCKED_BY=intel."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    (target / "intel_gate.json").unlink()
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "intel_gate.json missing" in result.stderr
+
+
+def test_failing_intel_gate_json_fails(tmp_path: Path):
+    """A recent intel_gate.json with valid=false blocks release."""
+    runs = tmp_path / "eval-runs"
+    runs.mkdir()
+    now = time.time()
+    for i in range(6):
+        _make_nightly_run(runs, f"run_{i:02d}", mtime=now - (i * 3600))
+    _make_nightly_run(
+        runs,
+        "run_intel_bad",
+        intel_gate_valid=False,
+        mtime=now - (6 * 3600),
+    )
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "run_intel_bad" in result.stderr
+    assert "valid=false" in result.stderr
+
+
+def test_skinny_intel_gate_json_fails(tmp_path: Path):
+    """valid=true is not enough; release gate requires reviewer evidence fields."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    (target / "intel_gate.json").write_text(
+        json.dumps(
+            {
+                "schema": "intel_gate_v1",
+                "valid": True,
+                "stages": {
+                    "fixture_audit": {"valid": True},
+                    "scorecard": {"valid": True, "passed": True},
+                    "provenance": {"valid": True},
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "scorecard.metrics missing" in result.stderr
+
+
+def test_intel_gate_json_with_non_pass_gate_fails(tmp_path: Path):
+    """A spoofed artifact cannot claim passed=true while hiding a failing gate."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["scorecard"]["gates"][0]["status"] = "FAIL"
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "scorecard.gates contain non-PASS" in result.stderr
+
+
+def test_intel_gate_json_with_false_artifact_status_fails(tmp_path: Path):
+    """A spoofed artifact cannot claim passed=true while an input artifact is false."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["scorecard"]["artifact_status"]["section_retrieval"] = False
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "scorecard.artifact_status contains false" in result.stderr
+
+
+def test_intel_gate_json_with_wrong_replay_tier_fails(tmp_path: Path):
+    """Release evidence must be the locked Tier 0 fixture replay artifact."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["scorecard"]["provenance"]["replay_tier"] = "manual_notes"
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "scorecard.provenance.replay_tier=manual_notes" in result.stderr
+
+
+def test_intel_gate_json_missing_provenance_hash_fails(tmp_path: Path):
+    """Release evidence must carry hashes that explain exactly what passed."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["scorecard"]["provenance"].pop("threshold_lock_hash")
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "scorecard.provenance.threshold_lock_hash missing" in result.stderr
+
+
 # ---------------------------------------------------------------------------
 # Accept paths
 # ---------------------------------------------------------------------------
@@ -340,8 +533,7 @@ def test_only_most_recent_7_considered(tmp_path: Path):
 
     result = _run(runs, tl, ear)
     assert result.returncode == 0, (
-        f"expected PASS; older bad runs should be ignored; "
-        f"stderr={result.stderr!r}"
+        f"expected PASS; older bad runs should be ignored; stderr={result.stderr!r}"
     )
 
 
@@ -354,19 +546,17 @@ def test_boundary_metric_equal_passes(tmp_path: Path):
         _make_nightly_run(
             runs,
             f"run_{i:02d}",
-            f1=0.80,            # ==
-            substance=0.65,     # ==
+            f1=0.80,  # ==
+            substance=0.65,  # ==
             cited_cosine=0.40,  # ==
-            bypass=0.15,        # ==
+            bypass=0.15,  # ==
             mtime=now - (i * 3600),
         )
     tl = _make_threshold_lock(tmp_path)
     ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
 
     result = _run(runs, tl, ear)
-    assert result.returncode == 0, (
-        f"boundary metrics should pass; stderr={result.stderr!r}"
-    )
+    assert result.returncode == 0, f"boundary metrics should pass; stderr={result.stderr!r}"
 
 
 # ---------------------------------------------------------------------------

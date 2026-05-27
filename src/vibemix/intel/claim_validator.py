@@ -16,6 +16,9 @@ _CUE_RE = re.compile(r"\b(?:hot\s+cue|cue\s+[A-H])\b", re.I)
 _HARMONIC_RE = re.compile(r"\b(?:key|harmonic|camelot|neighboring?\s+key)\b", re.I)
 _TEMPO_RE = re.compile(r"\b(?:bpm|tempo|pitch)\b", re.I)
 _STRUCTURE_RE = re.compile(r"\b(?:drop|breakdown|build|outro|intro)\b", re.I)
+_SEMANTIC_RE = re.compile(r"\b(?:texture|timbre|sonic|sound(?:s|ed)?\s+close)\b", re.I)
+_ENERGY_RE = re.compile(r"\b(?:energy|intensity|energy\s+shape)\b", re.I)
+_PHRASE_RE = re.compile(r"\b(?:phrase|downbeat|bar\s+line|boundary)\b", re.I)
 _EXPORT_RE = re.compile(r"\b(?:exported|wrote|saved)\b", re.I)
 _TASTE_RE = re.compile(r"\b(?:you usually|your preference|you like)\b", re.I)
 
@@ -25,6 +28,9 @@ _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "harmonic": frozenset({"harmonic_fit"}),
     "tempo": frozenset({"tempo_fit"}),
     "structure": frozenset({"section_role", "section_boundary"}),
+    "semantic": frozenset({"semantic_match"}),
+    "energy": frozenset({"energy_shape"}),
+    "phrase": frozenset({"phrase_fit"}),
     "export": frozenset({"export_result"}),
     "taste": frozenset({"taste_preference", "taste_fit", "taste_uncertain"}),
 }
@@ -93,6 +99,9 @@ def _claim_families_implied_by_text(text: str) -> tuple[str, ...]:
         ("harmonic", _HARMONIC_RE),
         ("tempo", _TEMPO_RE),
         ("structure", _STRUCTURE_RE),
+        ("semantic", _SEMANTIC_RE),
+        ("energy", _ENERGY_RE),
+        ("phrase", _PHRASE_RE),
         ("export", _EXPORT_RE),
         ("taste", _TASTE_RE),
     )

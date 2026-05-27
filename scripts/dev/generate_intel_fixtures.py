@@ -521,6 +521,16 @@ def build_claim_ledgers() -> list[dict[str, Any]]:
                     "allowed_phrases": ["in 16 bars"],
                     "forbidden_phrases": ["exactly now"],
                 },
+                {
+                    "claim_id": "clm_ctx_001_002",
+                    "claim_type": "cue_slot",
+                    "subject_id": "tr_001",
+                    "value": "A",
+                    "confidence": 0.84,
+                    "evidence_refs": ["candidate:tr_001"],
+                    "allowed_phrases": ["cue A", "hot cue A"],
+                    "forbidden_phrases": ["cue H"],
+                },
             ],
         },
         {
@@ -664,7 +674,8 @@ def build_jsonl_rows() -> dict[str, list[dict[str, Any]]]:
                 "candidate_id": "tr_001",
                 "cue_slot": "A",
                 "timing_text": "in 16 bars",
-                "cited_claims": ["clm_ctx_001_000", "clm_ctx_001_001"],
+                "spoken_text": "Use cue A in 16 bars.",
+                "cited_claims": ["clm_ctx_001_001", "clm_ctx_001_002"],
                 "confidence": 0.82,
             },
             {
@@ -737,6 +748,182 @@ def build_jsonl_rows() -> dict[str, list[dict[str, Any]]]:
             },
         ],
     }
+
+
+def build_section_queries() -> list[dict[str, Any]]:
+    return [
+        {
+            "query_id": "fixture_role_intro_mix_in",
+            "target_role": "intro",
+            "prototype_role": "intro",
+            "mixable_roles": ["intro"],
+            "min_role_confidence": 0.7,
+            "min_bar_count": 4,
+        },
+        {
+            "query_id": "fixture_role_groove_bed",
+            "target_role": "groove",
+            "prototype_role": "groove",
+            "mixable_roles": ["groove"],
+            "min_role_confidence": 0.7,
+            "min_bar_count": 8,
+        },
+        {
+            "query_id": "fixture_role_breakdown_reset",
+            "target_role": "breakdown",
+            "prototype_role": "breakdown",
+            "mixable_roles": ["breakdown"],
+            "min_role_confidence": 0.7,
+            "min_bar_count": 4,
+        },
+        {
+            "query_id": "fixture_role_drop_peak",
+            "target_role": "drop",
+            "prototype_role": "drop",
+            "mixable_roles": ["drop"],
+            "min_role_confidence": 0.7,
+            "min_bar_count": 8,
+        },
+        {
+            "query_id": "fixture_role_outro_mix_out",
+            "target_role": "outro",
+            "prototype_role": "outro",
+            "mixable_roles": ["outro"],
+            "min_role_confidence": 0.7,
+            "min_bar_count": 4,
+        },
+        {
+            "query_id": "fixture_role_build_lift",
+            "target_role": "build",
+            "prototype_role": "build",
+            "mixable_roles": ["build"],
+            "min_role_confidence": 0.7,
+            "min_bar_count": 4,
+        },
+    ]
+
+
+def build_taste_feedback_rows() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+
+    def add(
+        event_id: str,
+        session_id: str,
+        label: str,
+        role_from: str,
+        role_to: str,
+        *,
+        candidate_id: str,
+        split: str = "calibration",
+        action: str = "transition_labeled",
+        risk_flags: list[str] | None = None,
+        score: float = 0.70,
+    ) -> None:
+        rows.append(
+            {
+                "event_id": event_id,
+                "session_id": session_id,
+                "surface": "prep_chat",
+                "action": action,
+                "label": label,
+                "split": split,
+                "candidate_id": candidate_id,
+                "role_from": role_from,
+                "role_to": role_to,
+                "risk_flags": risk_flags or [],
+                "score": score,
+                "profile_consent": True,
+            }
+        )
+
+    for index in range(12):
+        add(
+            f"taste_pos_groove_{index:03d}",
+            f"s{index % 4 + 1}",
+            "would_play" if index % 3 else "played_next",
+            "outro",
+            "groove",
+            candidate_id="tr_001",
+            score=0.86,
+        )
+    for index in range(8):
+        add(
+            f"taste_pos_intro_{index:03d}",
+            f"s{index % 4 + 2}",
+            "would_play",
+            "outro",
+            "intro",
+            candidate_id="tr_002",
+            score=0.70,
+        )
+    for index in range(4):
+        add(
+            f"taste_maybe_lift_{index:03d}",
+            f"s{index % 3 + 1}",
+            "maybe",
+            "breakdown",
+            "drop",
+            candidate_id="tr_003",
+            score=0.76,
+        )
+    for index in range(4):
+        add(
+            f"taste_neg_vocal_{index:03d}",
+            f"s{index % 4 + 1}",
+            "vibe_no" if index % 2 else "no",
+            "hook",
+            "outro",
+            candidate_id="tr_004",
+            risk_flags=["vocal_clash", "unsafe_role_pair"],
+            score=0.18,
+        )
+    for index in range(3):
+        add(
+            f"taste_technical_{index:03d}",
+            f"s{index % 3 + 1}",
+            "technical_no",
+            "hook",
+            "outro",
+            candidate_id="tr_004",
+            risk_flags=["vocal_clash", "tempo_clash"],
+            score=0.18,
+        )
+    for index in range(10):
+        add(
+            f"taste_poison_{index:03d}",
+            "s_poison",
+            "no",
+            "drop",
+            "drop",
+            candidate_id="tr_poison",
+            split="poison",
+            risk_flags=["fatigue"],
+            score=0.74,
+        )
+    for index in range(4):
+        add(
+            f"taste_holdout_positive_{index:03d}",
+            f"s_holdout_{index % 2 + 1}",
+            "would_play",
+            "outro",
+            "groove" if index % 2 == 0 else "intro",
+            candidate_id="tr_001" if index % 2 == 0 else "tr_002",
+            split="holdout",
+            score=0.80,
+        )
+    for index in range(2):
+        add(
+            f"taste_holdout_technical_{index:03d}",
+            f"s_holdout_{index + 1}",
+            "technical_no",
+            "hook",
+            "outro",
+            candidate_id="tr_004",
+            split="holdout",
+            risk_flags=["vocal_clash", "tempo_clash"],
+            score=0.18,
+        )
+    return rows
 
 
 def write_json(path: Path, obj: Any) -> None:
@@ -860,6 +1047,8 @@ def main() -> None:
     write_json(FIXTURE_DIR / "claim_ledgers.json", build_claim_ledgers())
     for name, rows in build_jsonl_rows().items():
         write_jsonl(FIXTURE_DIR / name, rows)
+    write_jsonl(FIXTURE_DIR / "section_queries.jsonl", build_section_queries())
+    write_jsonl(FIXTURE_DIR / "taste_feedback.jsonl", build_taste_feedback_rows())
     write_privacy_bad_examples()
 
     files = [
@@ -881,6 +1070,8 @@ def main() -> None:
         "decision_traces.jsonl",
         "live_awareness_snapshots.jsonl",
         "gold_labels_redacted.jsonl",
+        "section_queries.jsonl",
+        "taste_feedback.jsonl",
     ]
     write_json(FIXTURE_DIR / "MANIFEST.json", build_manifest(files))
 

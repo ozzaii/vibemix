@@ -493,13 +493,14 @@ async def ws_broadcast(
             # Phase (PILL next-suggestion) — additive, read-only. The pill's
             # "what's next" card reads ``next_suggestion`` = the latest grounded
             # suggestion dict ({track_id, title, artist, similarity, why,
-            # camelot, bpm}) or ``null`` (honest silence — never a fabricated
-            # track). Full ranking is computed off-loop by the SuggestionService
-            # on TRACK_CHANGE; this serialize edge may ask the holder for a
-            # throttled timing-only refresh so "in N bars" follows the live
-            # playhead without reranking the library at 30Hz. Guarded so a
-            # holder fault can never break the wire; absent when no holder is
-            # wired (golden-equivalent for existing subscribers).
+            # camelot, bpm, transition, decision}) or ``null`` (honest silence
+            # — never a fabricated track). Full ranking is computed off-loop by
+            # the SuggestionService on TRACK_CHANGE; this serialize edge may ask
+            # the holder for a throttled live refresh so the shortlist winner,
+            # validator-checked decision, and "in N bars" follow the playhead
+            # without reranking the library at 30Hz. Guarded so a holder fault
+            # can never break the wire; absent when no holder is wired
+            # (golden-equivalent for existing subscribers).
             if suggestion_holder is not None:
                 try:
                     if hasattr(suggestion_holder, "current_for_state"):

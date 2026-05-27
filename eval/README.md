@@ -30,10 +30,12 @@ and a slow human one that runs before release cuts.
 | Fast (autonomous proxy) | 2-judge cross-check (Gemini 3 Pro + Gemini 3 Flash) against the real-corpus replay harness | Every PR + nightly canary | No — required for merge |
 | Slow (Kaan ear-test)    | Real DJ session ear-pass via debrief window toggle                                          | ≥ 2 sessions ≥ 2 genres in 14-day window | No — required for release cut |
 
-Both lanes must be green before `scripts/release/check_gate.sh` (Gate-2 of
-`scripts/launch/cut_release.sh`) exits 0. The fast lane catches drift
-mechanically; the slow lane catches the qualitative slop modes (felt
-scripted, felt late, felt generic) that no judge prompt currently catches.
+Both lanes, plus the INTEL fixture gate, must be green before
+`scripts/release/check_gate.sh` (Gate-2 of `scripts/launch/cut_release.sh`)
+exits 0. The fast lane catches drift mechanically; the slow lane catches the
+qualitative slop modes (felt scripted, felt late, felt generic) that no judge
+prompt currently catches. The INTEL fixture gate proves the section-aware
+musical-intelligence evidence spine still passes its locked public fixtures.
 
 ## Threshold Values
 
@@ -54,6 +56,12 @@ Audit trail for any movement in these values lives in
 [`eval/THRESHOLD-RECALIBRATION-LOG.md`](THRESHOLD-RECALIBRATION-LOG.md).
 Re-tuning without re-running both judges is forbidden per the lock file's
 self-described retuning protocol.
+
+The musical-intelligence fixture gate has its own lock at
+[`eval/INTEL-THRESHOLD-LOCK.md`](INTEL-THRESHOLD-LOCK.md). Nightly/PR eval runs
+write `.planning/eval-runs/<sha>/intel_gate.json` with metric, gate, artifact,
+and provenance-hash evidence; the release gate requires recent runs to report
+`"valid": true`.
 
 ## 2-Judge Architecture (high level)
 
@@ -152,12 +160,13 @@ scope for v3.0:
 ## Cross-references
 
 - [`eval/THRESHOLD-LOCK.md`](THRESHOLD-LOCK.md) — locked numeric thresholds (signed).
+- [`eval/INTEL-THRESHOLD-LOCK.md`](INTEL-THRESHOLD-LOCK.md) — locked INTEL fixture thresholds.
 - [`eval/THRESHOLD-RECALIBRATION-LOG.md`](THRESHOLD-RECALIBRATION-LOG.md) — audit trail for threshold movement.
 - [`eval/EAR-TEST-PROTOCOL.md`](EAR-TEST-PROTOCOL.md) — full ear-test protocol document.
 - [`eval/corpus/MANIFEST.md`](corpus/MANIFEST.md) — real-corpus session manifest.
 - [`eval/corpus/LICENSES.md`](corpus/LICENSES.md) — corpus attribution + licenses.
 - [`eval/rubrics/`](rubrics/) — judge rubric bodies (`judge_pro.md`, `judge_flash.md`).
 - [`scripts/eval/replay_harness.py`](../scripts/eval/replay_harness.py) — deterministic replay CLI.
-- [`scripts/release/check_gate.sh`](../scripts/release/check_gate.sh) — Gate-2 umbrella that combines both lanes.
+- [`scripts/release/check_gate.sh`](../scripts/release/check_gate.sh) — Gate-2 umbrella that combines the hybrid gate and INTEL fixture gate.
 - [`scripts/release/check_ear_test.sh`](../scripts/release/check_ear_test.sh) — slow-lane ear-test gate.
 - [`.planning/decisions/P85-OVERRIDE-RETIRED.md`](../.planning/decisions/P85-OVERRIDE-RETIRED.md) — v2.1→v3.0 override retirement.

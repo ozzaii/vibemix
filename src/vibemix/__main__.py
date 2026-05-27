@@ -1254,8 +1254,8 @@ async def main() -> None:
             # the pill suggests from the embedded library (Phase 1, embedding-
             # only; needs deck_library for track-id resolution). Full ranking is
             # recomputed on TRACK_CHANGE by coach_loop; ws_broadcast performs a
-            # throttled timing-only refresh so the pill countdown follows the
-            # live playhead without reranking at 30Hz.
+            # throttled live refresh so the shortlist winner + countdown follow
+            # the playhead without reranking at 30Hz.
             if deck_library is not None:
                 from vibemix.runtime.suggestion import SuggestionService
 

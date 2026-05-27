@@ -21,7 +21,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 README = REPO_ROOT / "eval" / "README.md"
 LOCK = REPO_ROOT / "eval" / "THRESHOLD-LOCK.md"
@@ -130,6 +129,14 @@ def test_readme_documents_reproducibility_invocation(readme_text: str):
     assert "--corpus" in readme_text, "missing --corpus CLI flag"
 
 
+def test_readme_documents_intel_fixture_gate(readme_text: str):
+    """The public gate doc must name the INTEL evidence lane and persisted artifact."""
+    assert "INTEL fixture gate" in readme_text
+    assert "INTEL-THRESHOLD-LOCK.md" in readme_text
+    assert "intel_gate.json" in readme_text
+    assert "provenance-hash" in readme_text or "provenance hash" in readme_text
+
+
 # ---------------------------------------------------------------------------
 # Cross-links
 # ---------------------------------------------------------------------------
@@ -151,7 +158,11 @@ def test_readme_cross_links_decision_log(readme_text: str):
 def test_readme_documents_anti_feature_carveouts(readme_text: str):
     """Anti-feature section must announce itself + name at least one carveout."""
     lowered = readme_text.lower()
-    has_anti = ("anti-feature" in lowered) or ("not building" in lowered) or ("NOT building" in readme_text)
+    has_anti = (
+        ("anti-feature" in lowered)
+        or ("not building" in lowered)
+        or ("NOT building" in readme_text)
+    )
     assert has_anti, "missing 'anti-feature' / 'NOT building' section signal"
     carveouts = ("cross-dj" in lowered) or ("single-dj" in lowered) or ("gamif" in lowered)
     assert carveouts, "missing at least one carveout (cross-DJ / single-DJ / gamification)"
@@ -180,7 +191,7 @@ def _first_meaningful_chunk(rubric_path: Path, *, n_chars: int = 40) -> str:
     # Strip YAML frontmatter if present (delimited by --- ... ---).
     fm_match = re.match(r"^---\s*\n.*?\n---\s*\n", text, re.DOTALL)
     if fm_match:
-        text = text[fm_match.end():]
+        text = text[fm_match.end() :]
     # Skip blank and HTML-comment-only lines; collect first meaningful chunk.
     lines = []
     for line in text.splitlines():
@@ -214,6 +225,4 @@ def test_readme_no_inline_rubric_or_prompt_bodies(readme_text: str):
             f"derived leak-sentinel too short ({len(token)} chars); "
             f"rubric file may be malformed: {token!r}"
         )
-        assert token not in readme_text, (
-            f"rubric body content leaked into public README: {token!r}"
-        )
+        assert token not in readme_text, f"rubric body content leaked into public README: {token!r}"

@@ -380,7 +380,7 @@ src/vibemix/intel/context_compiler.py
 src/vibemix/intel/decision_validator.py
 tests/intel/test_context_compiler.py
 tests/intel/test_decision_validator.py
-tests/eval/test_intel_agent_grounding.py
+tests/eval/test_intel_decision_runtime_replay.py
 ```
 
 Acceptance evidence:
@@ -481,7 +481,7 @@ done: tests/intel/test_decision_trace.py
 done: scripts/eval/intel_decision_runtime_replay.py
 done: tests/eval/test_intel_decision_runtime_replay.py
 pending: product UI/backend default wiring to consume RuntimeDecisionResult
-pending: real private replay report and threshold lock
+pending: real private replay report and release threshold lock
 ```
 
 Focused command:
@@ -526,6 +526,21 @@ Acceptance evidence:
 - labels cannot be used as action IDs;
 - validation catches unknown candidate/proposal IDs.
 
+Current implementation:
+
+```text
+done: src/vibemix/intel/gold_labels.py
+done: src/vibemix/intel/gold_sampling.py
+done: src/vibemix/intel/gold_validation.py
+done: scripts/eval/intel_gold.py
+done: tests/intel/test_gold_labels.py
+done: tests/intel/test_gold_sampling.py
+done: tests/eval/test_intel_gold_validation.py
+pending: first private gold slice
+pending: release threshold lock fed by holdout/canary labels
+pending: durable taste-consent ingestion from labels
+```
+
 Focused command:
 
 ```bash
@@ -546,6 +561,52 @@ Live timing never overclaims below confidence floors.
 Taste improves ranking without privacy leaks or scorer poisoning.
 Scorecard/threshold lock enforce the above.
 Provenance manifests can replay or explain the evidence above.
+```
+
+Current implementation:
+
+```text
+done: scripts/eval/intel_scorecard.py
+done: tests/eval/test_intel_scorecard.py
+done: aggregate fixture scorecard covers ANLZ audit, cue baseline comparison,
+      section retrieval delta, transition scorecard, decision replay, and
+      gold-label validation, plus taste privacy/poisoning gates
+done: scripts/eval/intel_section_retrieval.py
+done: tests/eval/test_intel_section_retrieval.py
+done: tests/intel/fixtures/section_queries.jsonl
+done: scripts/eval/intel_transition_scorecard.py
+done: tests/eval/test_intel_transition_scorecard.py
+done: fixture decision replay hydrates candidate/claim ledgers and passes
+      fallback/timing gates
+done: taste privacy/poisoning fixture gate
+done: src/vibemix/intel/feedback.py
+done: src/vibemix/intel/taste_model.py
+done: src/vibemix/intel/profile_projection.py
+done: scripts/eval/intel_taste_scorecard.py
+done: tests/intel/test_feedback.py
+done: tests/intel/test_taste_model.py
+done: tests/intel/test_profile_projection.py
+done: tests/eval/test_intel_taste_scorecard.py
+pending: transition scorecard over real private reviewed labels
+pending: durable taste storage and product feedback capture surfaces
+done: eval/INTEL-THRESHOLD-LOCK.md fixture thresholds and scorecard CLI wiring
+done: scorecard emits Tier 0 fixture replay provenance with manifest/threshold
+      hashes and safe replay command
+done: scripts/eval/intel_provenance_report.py validates scorecard provenance,
+      manifest/threshold hashes, replay command, and privacy flags
+done: scripts/eval/intel_gate.py runs fixture audit + locked scorecard +
+      provenance validation as one CI-ready command
+done: intel gate CLI supports `--output` for persisted JSON evidence artifacts
+done: persisted intel gate artifacts include scorecard metrics, gate statuses,
+      artifact statuses, and provenance hashes for release review
+done: `.github/workflows/eval.yml` runs the INTEL fixture gate and writes
+      `.planning/eval-runs/<sha>/intel_gate.json`
+done: workflow threshold-edit warning covers both `eval/THRESHOLD-LOCK.md` and
+      `eval/INTEL-THRESHOLD-LOCK.md`
+done: `scripts/release/check_gate.sh` requires recent `intel_gate.json` artifacts
+      to report `valid=true` and carry scorecard metrics, gates, artifact
+      statuses, Tier 0 replay provenance, and provenance hashes
+pending: private-label release threshold recalibration note
 ```
 
 The docs are not the milestone. The scorecard is.

@@ -3,7 +3,9 @@
 **Date:** 2026-05-27
 **Scope:** dependency graph, milestone cuts, acceptance gates, and ship order
 **Depends on:** INTEL-01 through INTEL-23
-**Code posture:** no product code changed in this research pass
+**Code posture:** roadmap plus implementation status. Several intelligence
+fixture/eval primitives now exist; product wiring and private threshold locking
+remain future cuts.
 
 ## Purpose
 
@@ -181,8 +183,10 @@ uv run pytest -q tests/library/test_toolset.py
 Product evidence:
 
 ```text
-section_role_hit@5 beats whole-track baseline by >=0.15 on labeled queries
-low_confidence_result_rate <= 0.20 for live-mode filters
+done fixture gate: section_role_hit@5 beats whole-track baseline by >=0.15
+done fixture gate: section_mixable_window_hit@5 beats whole-track baseline by >=0.10
+done fixture gate: section_low_confidence_result_rate <= 0.15
+pending private gate: recalibrate against Kaan-reviewed labeled queries
 ```
 
 Cutline:
@@ -258,7 +262,7 @@ Acceptance gates:
 
 ```text
 uv run pytest -q tests/library/test_setprep_tools.py tests/library/test_toolset.py tests/library/test_codex_curate.py
-uv run pytest -q tests/eval/test_intel_agent_grounding.py
+uv run pytest -q tests/intel/test_context_compiler.py tests/intel/test_decision_validator.py tests/eval/test_intel_decision_runtime_replay.py
 ```
 
 Product evidence:
@@ -387,10 +391,11 @@ uv run pytest -q tests/eval/test_intel_taste_scorecard.py
 Product evidence:
 
 ```text
-consent_off_long_term_write_rate = 0
-single_session_hard_negative_rate = 0
-technical_bad_candidate_rescued_by_taste = 0
-accepted_suggestion_lift >= 0.10 after 30 labeled events
+done fixture gate: consent_off_long_term_write_rate = 0
+done fixture gate: single_session_hard_negative_rate = 0
+done fixture gate: technical_bad_candidate_rescued_by_taste = 0
+done fixture gate: accepted_suggestion_lift = 0.18 after 31 calibration events
+pending private gate: Kaan-reviewed taste labels and product capture surfaces
 ```
 
 Cutline:
@@ -534,23 +539,40 @@ INTEL metrics should appear in one scorecard section:
 
 ```text
 ANLZ coverage
-section retrieval delta
+section retrieval delta (implemented in `scripts/eval/intel_section_retrieval.py`)
 transition pairwise/nDCG
 agent grounding failures
 unsupported musical claim rate
 decision runtime validator fallback rate
 live timing floor violations
-taste privacy/poisoning gates
 synthetic fixture privacy audit
+taste privacy/poisoning gates (implemented in `scripts/eval/intel_taste_scorecard.py`)
 ```
 
-Thresholds live in:
+Current first aggregate scorecard:
 
 ```text
-eval/THRESHOLD-LOCK.md
+scripts/eval/intel_scorecard.py
+tests/eval/test_intel_scorecard.py
+scripts/eval/intel_gate.py
+tests/eval/test_intel_gate.py
 ```
 
-Any threshold change needs a recalibration note.
+It currently gates ANLZ complete coverage, parse error rate, cue exact/near
+agreement, section retrieval deltas, transition accept@3/pairwise ranking,
+transition unknown-label count, decision validator fallback rate, exact-timing
+floor violations, gold-label validation errors, and taste privacy/poisoning
+counters. The public synthetic fixture scorecard is now fully green; private
+Kaan-reviewed labels still decide release-grade thresholds.
+
+Fixture-level INTEL thresholds live in:
+
+```text
+eval/INTEL-THRESHOLD-LOCK.md
+```
+
+`eval/THRESHOLD-LOCK.md` remains the signed legacy hallucination-gate lock. Any
+INTEL threshold change still needs a recalibration note.
 
 ## Completion definition for the intelligence milestone
 

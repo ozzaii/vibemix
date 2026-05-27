@@ -35,6 +35,23 @@
         ],
         "subject_id": "tr_001",
         "value": "16 bars"
+      },
+      {
+        "allowed_phrases": [
+          "cue A",
+          "hot cue A"
+        ],
+        "claim_id": "clm_ctx_001_002",
+        "claim_type": "cue_slot",
+        "confidence": 0.84,
+        "evidence_refs": [
+          "candidate:tr_001"
+        ],
+        "forbidden_phrases": [
+          "cue H"
+        ],
+        "subject_id": "tr_001",
+        "value": "A"
       }
     ],
     "packet_id": "ctx_001"

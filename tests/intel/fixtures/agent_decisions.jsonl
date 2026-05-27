@@ -1,2 +1,2 @@
-{"action": "select", "candidate_id": "tr_001", "cited_claims": ["clm_ctx_001_000", "clm_ctx_001_001"], "confidence": 0.82, "cue_slot": "A", "decision_id": "dec_001", "packet_id": "ctx_001", "timing_text": "in 16 bars"}
+{"action": "select", "candidate_id": "tr_001", "cited_claims": ["clm_ctx_001_001", "clm_ctx_001_002"], "confidence": 0.82, "cue_slot": "A", "decision_id": "dec_001", "packet_id": "ctx_001", "spoken_text": "Use cue A in 16 bars.", "timing_text": "in 16 bars"}
 {"action": "suppress", "candidate_id": null, "cited_claims": [], "confidence": 0.0, "cue_slot": null, "decision_id": "dec_002", "packet_id": "ctx_004", "timing_text": null}

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from vibemix.intel.context_compiler import compile_transition_context
+from vibemix.intel.context_compiler import compile_suggestion_context, compile_transition_context
 from vibemix.intel.transition_scorer import (
     LivePosition,
     SectionRecord,
@@ -27,6 +27,51 @@ def _section(section_id: str, track_id: str, role: str, cue_slot: str = "A") -> 
         cue_slot=cue_slot,
         cue_source="dj",
     )
+
+
+def _suggestion_transition(
+    *,
+    candidate_id: str,
+    to_track_id: str,
+    to_section_id: str,
+    semantic: float,
+) -> dict:
+    return {
+        "candidate_id": candidate_id,
+        "from_track_id": "t1",
+        "to_track_id": to_track_id,
+        "from_section_id": "t1#s001",
+        "to_section_id": to_section_id,
+        "from_role": "outro",
+        "to_role": "intro",
+        "from_start_s": 224.0,
+        "from_end_s": 300.0,
+        "to_start_s": 0.0,
+        "to_end_s": 80.0,
+        "from_bpm": 128.0,
+        "to_bpm": 128.0,
+        "from_camelot": "8A",
+        "to_camelot": "9A",
+        "cue_slot": "A",
+        "start_in_bars": 8,
+        "score": 0.84,
+        "confidence": 0.91,
+        "semantic_basis": "section_vector",
+        "scores": {
+            "semantic": semantic,
+            "harmonic": 0.88,
+            "bpm": 1.0,
+            "energy_shape": 0.82,
+            "role": 0.95,
+            "phrase_alignment": 1.0,
+            "cue_operability": 1.0,
+            "taste": 0.5,
+            "novelty": 0.7,
+            "risk_penalty": 0.0,
+        },
+        "risk_flags": [],
+        "reasons": ["section texture is close"],
+    }
 
 
 def test_compile_transition_context_bounds_and_redacts_live_packet() -> None:
@@ -85,15 +130,30 @@ def test_compile_transition_context_exposes_score_components_without_vectors() -
     candidate = envelope.candidates[0]
     assert candidate["candidate_id"] == "tr_001"
     assert candidate["recommended_cue_slot"] == "A"
+    assert candidate["from_role"] == "outro"
+    assert candidate["to_role"] == "intro"
+    assert candidate["from_start_s"] == 0.0
+    assert candidate["to_start_s"] == 0.0
+    assert candidate["from_camelot"] == "8A"
+    assert candidate["to_camelot"] == "8A"
     assert "semantic" in candidate["scores"]
     assert "vector" not in candidate
     assert envelope.allowed_actions == ("select", "hold", "suppress", "ask")
     assert {claim["type"] for claim in envelope.claim_summary} >= {
         "transition_fit",
         "section_role",
+        "section_boundary",
         "harmonic_fit",
         "tempo_fit",
+        "energy_shape",
+        "phrase_fit",
+        "cue_operability",
         "cue_slot",
+    }
+    role_claims = [claim for claim in envelope.claim_summary if claim["type"] == "section_role"]
+    assert {(claim["subject_id"], claim["value"]) for claim in role_claims} >= {
+        ("t1#s000", "outro"),
+        ("t2#s000", "intro"),
     }
 
 
@@ -115,3 +175,67 @@ def test_compile_transition_context_blocks_exact_timing_when_slate_has_none() ->
     assert envelope.constraints["exact_timing_allowed"] is False
     assert envelope.confidence_policy["exact_timing_allowed"] is False
     assert "bars_until_event" not in {claim["type"] for claim in envelope.claim_summary}
+
+
+def test_compile_suggestion_context_from_live_pill_shortlist() -> None:
+    suggestion = {
+        "track_id": "t2",
+        "title": "Candidate",
+        "artist": "Artist",
+        "similarity": 0.91,
+        "why": "similar vibe",
+        "camelot": "9A",
+        "bpm": 128.0,
+        "transition_alternatives": (
+            {
+                "candidate_id": "tr_001",
+                "track_id": "t2",
+                "selected": True,
+                "transition": _suggestion_transition(
+                    candidate_id="tr_001",
+                    to_track_id="t2",
+                    to_section_id="t2#s000",
+                    semantic=0.92,
+                ),
+            },
+            {
+                # Duplicate scorer-local ids are normalized by the compiler.
+                "candidate_id": "tr_001",
+                "track_id": "t3",
+                "selected": False,
+                "transition": _suggestion_transition(
+                    candidate_id="tr_001",
+                    to_track_id="t3",
+                    to_section_id="t3#s000",
+                    semantic=0.86,
+                ),
+            },
+        ),
+    }
+
+    envelope = compile_suggestion_context(
+        packet_id="ctx_live_001",
+        current={
+            "active_track_id": "t1",
+            "filepath": "/Users/ozai/private.wav",
+            "vector": [1.0, 0.0],
+        },
+        suggestion=suggestion,
+    )
+
+    assert envelope.mode == "live"
+    assert envelope.intent == "live_next_pill"
+    assert [candidate["candidate_id"] for candidate in envelope.candidates] == [
+        "tr_001",
+        "tr_002",
+    ]
+    assert [candidate["to_track_id"] for candidate in envelope.candidates] == ["t2", "t3"]
+    assert envelope.candidates[0]["scores"]["semantic"] == 0.92
+    assert "filepath" not in envelope.current
+    assert "vector" not in envelope.current
+    assert envelope.constraints["raw_vectors_included"] is False
+    assert envelope.constraints["raw_audio_included"] is False
+    assert envelope.constraints["strict_claim_validation"] is True
+    assert {"semantic_match", "cue_slot", "bars_until_event"} <= {
+        claim["type"] for claim in envelope.claim_summary
+    }

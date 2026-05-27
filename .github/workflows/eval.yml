@@ -55,6 +55,16 @@ jobs:
           ! grep -rEn "(POST|PUT|curl.*(-X|--request)).*?(apple|signpath|developer\.apple\.com|notarytool|app-store-connect|app\.signpath\.io)" .github/workflows/eval.yml scripts/eval/ 2>/dev/null || \
             ( echo "P46 VIOLATION: workflow / eval scripts attempt apple/signpath POST/PUT" && exit 1 )
 
+      - name: Run INTEL fixture gate
+        run: |
+          uv run python scripts/eval/intel_gate.py \
+            --fixture-dir tests/intel/fixtures \
+            --threshold-lock eval/INTEL-THRESHOLD-LOCK.md \
+            --output .planning/eval-runs/${{ github.sha }}/intel_gate.json \
+            --summary-markdown .planning/eval-runs/${{ github.sha }}/intel_gate.md \
+            --json
+          cat .planning/eval-runs/${{ github.sha }}/intel_gate.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run replay harness (PR mode — Flash only)
         if: github.event_name == 'pull_request'
         env:
@@ -136,6 +146,6 @@ jobs:
           git fetch origin ${{ github.base_ref }}
           # Detect any threshold edit in the PR (raised flag for human review;
           # not an automatic failure — legitimate threshold changes happen).
-          if git diff origin/${{ github.base_ref }}...HEAD -- eval/THRESHOLD-LOCK.md | grep -E "^[-+].*_min:|^[-+].*_max:" | grep -v "^---\|^+++"; then
-            echo "WARNING: threshold edit detected in PR — human reviewer must confirm both judges re-ran"
+          if git diff origin/${{ github.base_ref }}...HEAD -- eval/THRESHOLD-LOCK.md eval/INTEL-THRESHOLD-LOCK.md | grep -E "^[-+].*_min:|^[-+].*_max:" | grep -v "^---\|^+++"; then
+            echo "WARNING: threshold edit detected in PR — human reviewer must confirm eval/INTEL gates re-ran"
           fi

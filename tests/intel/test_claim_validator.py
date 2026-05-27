@@ -75,6 +75,74 @@ def test_tempo_phrase_rejected_without_bpm_claim() -> None:
     assert "missing_claim_id_for_tempo" in result.errors
 
 
+def test_texture_phrase_requires_semantic_claim() -> None:
+    envelope = _envelope(claim_summary=())
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="The section texture is close.",
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_semantic" in result.errors
+
+
+def test_energy_phrase_requires_energy_claim() -> None:
+    envelope = _envelope(claim_summary=())
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="The energy shape fits.",
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_energy" in result.errors
+
+
+def test_phrase_boundary_copy_requires_phrase_claim() -> None:
+    envelope = _envelope(claim_summary=())
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="The entry lands on a phrase boundary.",
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_phrase" in result.errors
+
+
+def test_section_texture_copy_accepts_matching_claim_id() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "semantic_match"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="The section texture is close.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
 def test_exported_phrase_requires_action_success_claim() -> None:
     envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "proposal_issued"),))
 

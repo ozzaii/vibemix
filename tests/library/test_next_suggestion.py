@@ -47,12 +47,13 @@ class _FakeBackend:
 class _FakeStore:
     """Returns a scripted ranked list from search_centered; load_all via backend."""
 
-    def __init__(self, ranked, ids=None, vectors=None):
+    def __init__(self, ranked, ids=None, vectors=None, section_vectors=None):
         self._ranked = ranked  # list[(track_id, sim)] in rank order
         self._backend = _FakeBackend(
             ids or [t for t, _ in ranked],
             vectors if vectors is not None else np.eye(len(ranked), 4, dtype=np.float32),
         )
+        self.section_vectors = section_vectors or {}
 
     def search_centered(self, qvec, k=10):
         return self._ranked[:k]
@@ -172,8 +173,110 @@ def test_suggestion_includes_set_aware_transition_when_cues_exist(library):
     assert s is not None
     assert s.transition is not None
     assert s.transition["cue_slot"] == "A"
+    assert s.transition["from_role"] == "outro"
+    assert s.transition["to_role"] == "intro"
+    assert s.transition["from_start_s"] == 224.0
+    assert s.transition["to_start_s"] == 0.0
+    assert s.transition["from_camelot"] == "8A"
+    assert s.transition["to_camelot"] == "9A"
     assert s.transition["start_in_bars"] is None  # no live playhead confidence yet
     assert "enter cue A" not in s.why  # the dedicated transition line owns actions
+
+
+def test_set_aware_transition_can_promote_lower_embedding_candidate(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    # Higher embedding similarity, but no trustworthy section/cue handle for a
+    # live transition.
+    library.tracks["t1"] = _track("t1", key="9A", cues=())
+    # Slightly lower embedding similarity, but a grounded cue/section pair.
+    library.tracks["t2"] = _track(
+        "t2",
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.91), ("t2", 0.86)])
+
+    s = next_suggestion(store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set())
+
+    assert s is not None
+    assert s.track_id == "t2"
+    assert s.similarity == 0.86
+    assert s.transition is not None
+    assert s.transition["to_track_id"] == "t2"
+    assert s.transition["selection_basis"] == "section_transition"
+    assert s.transition["selection_score"] > 0
+    assert s.transition["scores"]["semantic"] >= 0.0
+    assert s.transition_alternatives[0]["selected"] is True
+    assert s.transition_alternatives[0]["track_id"] == "t2"
+    assert s.transition_alternatives[0]["candidate_id"] == "tr_001"
+    assert s.transition_alternatives[0]["transition"]["candidate_id"] == "tr_001"
+    assert s.transition_alternatives[0]["transition"]["to_track_id"] == "t2"
+    assert len(s.transition_alternatives) <= 3
+    assert len({alt["candidate_id"] for alt in s.transition_alternatives}) == len(
+        s.transition_alternatives
+    )
+
+
+def test_section_vectors_can_promote_better_section_texture(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    library.tracks["t2"] = _track(
+        "t2",
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore(
+        [("t0", 0.99), ("t1", 0.91), ("t2", 0.86)],
+        section_vectors={
+            "t0#s000": np.array([1.0, 0.0], dtype=np.float32),
+            "t1#s000": np.array([0.0, 1.0], dtype=np.float32),
+            "t2#s000": np.array([1.0, 0.0], dtype=np.float32),
+        },
+    )
+
+    s = next_suggestion(store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set())
+
+    assert s is not None
+    assert s.track_id == "t2"
+    assert s.transition is not None
+    assert s.transition["semantic_basis"] == "section_vector"
+    assert "section texture is close" in s.transition["reasons"]
+
+
+def test_section_vector_dim_mismatch_reports_semantic_unknown(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore(
+        [("t0", 0.99), ("t1", 0.88)],
+        section_vectors={
+            "t0#s000": np.array([1.0, 0.0], dtype=np.float32),
+            "t1#s000": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+        },
+    )
+
+    s = next_suggestion(store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set())
+
+    assert s is not None
+    assert s.transition is not None
+    assert s.transition["semantic_basis"] == "semantic_unknown"
+    assert "semantic_dim_mismatch" in s.transition["risk_flags"]
 
 
 def test_suggestion_uses_explicit_live_bar_timing_when_locked(library):
@@ -208,6 +311,7 @@ def test_suggestion_uses_explicit_live_bar_timing_when_locked(library):
     assert s.transition["to_track_id"] == "t1"
     assert s.transition["start_in_bars"] == 1
     assert s.transition["timing_basis"] == "bar_lock"
+    assert s.transition["timing_anchor"] == "live_bar_countdown"
 
 
 def test_suggestion_uses_live_position_to_pick_source_section(library):
@@ -240,9 +344,59 @@ def test_suggestion_uses_live_position_to_pick_source_section(library):
     assert s is not None
     assert s.transition is not None
     assert s.transition["from_section_id"] == "t0#s001"
+    assert s.transition["from_role"] == "outro"
+    assert s.transition["to_role"] == "intro"
+    assert s.transition["from_start_s"] == 224.0
+    assert s.transition["from_end_s"] == 300.0
+    assert s.transition["to_start_s"] == 0.0
+    assert s.transition["to_end_s"] == 80.0
     assert s.transition["start_in_bars"] == 32
     assert s.transition["timing_basis"] == "section_playhead"
+    assert s.transition["timing_anchor"] == "source_section_end"
+    assert s.transition["source_anchor_s"] == 300.0
+    assert s.transition["source_selection"] == "current_section"
     assert s.transition["cue_slot"] == "A"
+
+
+def test_suggestion_forecasts_upcoming_mix_source_section(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        bpm=120.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.88)])
+
+    s = next_suggestion(
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
+        played_ids=set(),
+        source_position_s=216.0,
+        live_playhead_confidence=0.85,
+    )
+
+    assert s is not None
+    assert s.transition is not None
+    assert s.transition["from_section_id"] == "t0#s001"
+    assert s.transition["from_role"] == "outro"
+    assert s.transition["to_role"] == "intro"
+    assert s.transition["from_start_s"] == 224.0
+    assert s.transition["to_start_s"] == 0.0
+    assert s.transition["start_in_bars"] == 4
+    assert s.transition["timing_basis"] == "section_lookahead"
+    assert s.transition["timing_anchor"] == "source_section_start"
+    assert s.transition["source_anchor_s"] == 224.0
+    assert s.transition["source_selection"] == "upcoming_section"
 
 
 def test_low_confidence_live_position_does_not_anchor_source_section(library):

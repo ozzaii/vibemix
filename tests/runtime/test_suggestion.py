@@ -47,9 +47,10 @@ class _FakeBackend:
 
 
 class _FakeStore:
-    def __init__(self, ids, ranked):
+    def __init__(self, ids, ranked, section_vectors=None):
         self._backend = _FakeBackend(ids, np.eye(len(ids), 4, dtype=np.float32))
         self._ranked = ranked
+        self.section_vectors = section_vectors or {}
         self.search_count = 0
 
     def search_centered(self, qvec, k=10):
@@ -237,8 +238,60 @@ def test_compute_from_state_threads_live_bar_timing_into_transition():
     assert out["transition"]["from_track_id"] == "s"
     assert out["transition"]["to_track_id"] == "a"
     assert out["transition"]["from_section_id"] == "s#s000"
+    assert out["transition"]["from_role"] == "outro"
+    assert out["transition"]["to_role"] == "intro"
+    assert out["transition"]["from_start_s"] == 224.0
+    assert out["transition"]["to_start_s"] == 0.0
     assert out["transition"]["start_in_bars"] == 13
     assert out["transition"]["timing_basis"] == "section_playhead"
+    assert out["transition"]["timing_anchor"] == "source_section_end"
+
+    envelope = svc.context_for_state(state, packet_id="ctx_live_001")
+
+    assert envelope is not None
+    assert envelope.packet_id == "ctx_live_001"
+    assert envelope.current["active_track_id"] == "s"
+    assert envelope.candidates[0]["to_track_id"] == "a"
+    assert envelope.candidates[0]["recommended_cue_slot"] == "A"
+    assert {"cue_slot", "section_role", "bars_until_event"} <= {
+        claim["type"] for claim in envelope.claim_summary
+    }
+
+    decision = svc.decision_for_state(
+        state,
+        packet_id="ctx_live_001",
+        snapshot_id="snapshot_live_001",
+        decision_id="dec_live_001",
+        trace_id="trace_live_001",
+    )
+
+    assert decision is not None
+    assert decision.decision_id == "dec_live_001"
+    assert decision.emitted is True
+    assert decision.validation_result.accepted is True
+    assert decision.final_decision.candidate_id == "tr_001"
+    assert decision.final_decision.cue_slot == "A"
+    assert decision.final_decision.timing_text == "in 13 bars"
+    assert "cue A at 0:00" in decision.final_decision.spoken_text
+    assert {"cue_slot", "section_role", "section_boundary", "bars_until_event"} <= set(
+        decision.final_decision.cited_claims
+    )
+
+    payload = svc.decision_payload_for_state(
+        state,
+        packet_id="ctx_live_001",
+        snapshot_id="snapshot_live_001",
+        decision_id="dec_live_001",
+        trace_id="trace_live_001",
+    )
+
+    assert payload is not None
+    assert payload["action"] == "select"
+    assert payload["emitted"] is True
+    assert payload["validation_status"] == "accepted"
+    assert payload["candidate_id"] == "tr_001"
+    assert payload["cue_slot"] == "A"
+    assert payload["timing_text"] == "in 13 bars"
 
 
 def test_refresh_from_state_updates_transition_countdown_without_reranking():
@@ -269,6 +322,8 @@ def test_refresh_from_state_updates_transition_countdown_without_reranking():
     first = svc.compute_from_state(state)
     assert first is not None
     assert first["transition"]["start_in_bars"] == 13
+    assert first["transition"]["selection_basis"] == "section_transition"
+    assert first["transition"]["selection_score"] > 0
 
     # Prove the live refresh is timing-only: neither the ranked list nor a fresh
     # vector load is needed once the chosen next track is held.
@@ -282,6 +337,87 @@ def test_refresh_from_state_updates_transition_countdown_without_reranking():
     assert refreshed["track_id"] == "a"
     assert refreshed["transition"]["start_in_bars"] == 5
     assert refreshed["transition"]["timing_basis"] == "section_playhead"
+    assert refreshed["transition"]["selection_basis"] == "section_transition"
+    assert refreshed["transition"]["selection_score"] > 0
+    assert refreshed["decision"]["action"] == "select"
+    assert refreshed["decision"]["emitted"] is True
+    assert refreshed["decision"]["validation_status"] == "accepted"
+    assert refreshed["decision"]["candidate_id"] == "tr_001"
+    assert refreshed["decision"]["cue_slot"] == "A"
+    assert refreshed["decision"]["timing_text"] == "in 5 bars"
+    assert "cue A at 0:00" in refreshed["decision"]["spoken_text"]
+    assert store._backend.load_count == 0
+
+
+def test_refresh_from_state_can_reselect_inside_embedding_shortlist():
+    from dataclasses import replace
+
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(
+        ["s", "a", "b"],
+        [("s", 0.99), ("a", 0.92), ("b", 0.91)],
+        section_vectors={
+            "s#s000": np.array([1.0, 0.0], dtype=np.float32),
+            "s#s001": np.array([0.0, 1.0], dtype=np.float32),
+            "a#s000": np.array([0.0, 1.0], dtype=np.float32),
+            "b#s000": np.array([1.0, 0.0], dtype=np.float32),
+        },
+    )
+    lib = _lib(["s", "a", "b"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        bpm=120.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    lib.tracks["b"] = replace(
+        lib.tracks["b"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    svc = SuggestionService(store, lib)
+    state = MusicState()
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=120.0)}
+    )
+
+    first = svc.compute_from_state(state)
+    assert first is not None
+    assert first["track_id"] == "a"
+    assert first["transition"]["from_section_id"] == "s#s001"
+    assert first["transition_alternatives"][0]["track_id"] == "a"
+
+    store._backend.load_count = 0
+    state.audible_track_position_s = 32.0
+    state.audible_track_position_confidence = 0.85
+
+    refreshed = svc.refresh_from_state(state, now=10.0, min_interval_s=0.0)
+
+    assert refreshed is not None
+    assert refreshed["track_id"] == "b"
+    assert refreshed["transition"]["from_section_id"] == "s#s000"
+    assert refreshed["transition"]["to_track_id"] == "b"
+    assert refreshed["transition"]["candidate_id"] == "tr_001"
+    assert refreshed["transition_alternatives"][0]["track_id"] == "b"
+    assert refreshed["transition_alternatives"][0]["candidate_id"] == "tr_001"
+    assert refreshed["transition_alternatives"][0]["selected"] is True
+    assert refreshed["decision"]["action"] == "select"
+    assert refreshed["decision"]["candidate_id"] == "tr_001"
+    assert refreshed["decision"]["cue_slot"] == "A"
+    assert len({alt["candidate_id"] for alt in refreshed["transition_alternatives"]}) == len(
+        refreshed["transition_alternatives"]
+    )
     assert store._backend.load_count == 0
 
 

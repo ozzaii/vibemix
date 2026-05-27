@@ -53,6 +53,14 @@ from vibemix.library.cache_paths import CLAP_EMBED_CACHE_DB_PATH
 from vibemix.library.excerpt import anchors_for_track, cut_windows
 from vibemix.library.folder_ingest import IngestReport, _write_library_cache
 from vibemix.library.rekordbox import TrackEntry
+from vibemix.library.section_builder import sections_for_entry
+from vibemix.library.section_vectors import (
+    SECTION_VECTOR_CACHE_VERSION,
+    init_section_vector_schema,
+    open_default_section_vector_db,
+    put_section_vector,
+    section_vector_cached,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -441,6 +449,76 @@ def _embed_track_cue_anchored(
     return l2_normalize(mean)
 
 
+def _ensure_section_vectors_for_track(
+    track: TrackEntry,
+    local: Path,
+    embedder: _Embedder,
+    cache: sqlite3.Connection,
+    *,
+    track_cache_key: str,
+    backend_tag: str,
+    slicer: Callable[[str, float, float], bytes] | None = None,
+) -> int:
+    """Populate per-section CLAP vectors for transition scoring.
+
+    This is additive to the track vector: failures are logged and skipped so a
+    bad section window never invalidates a successfully ingested track.
+    """
+    from vibemix.library._cosine import l2_normalize
+
+    if slicer is None:
+        slicer = _default_slicer
+
+    written = 0
+    for section in sections_for_entry(track):
+        start_s = max(0.0, float(section.start_s))
+        end_s = float(section.end_s)
+        if track.duration_s and track.duration_s > 0:
+            end_s = min(end_s, float(track.duration_s))
+        end_s = min(max(end_s, start_s), start_s + 80.0)
+        length_s = end_s - start_s
+        if length_s < 1.0:
+            continue
+
+        source_hash = _section_source_hash(track_cache_key, section.section_id, start_s, end_s)
+        if section_vector_cached(cache, section.section_id, source_hash=source_hash):
+            continue
+
+        try:
+            clip = slicer(str(local), start_s, length_s)
+            vector = l2_normalize(np.asarray(embedder.embed_audio_bytes(clip, "audio/mpeg")))
+            put_section_vector(
+                cache,
+                section_id=section.section_id,
+                source_hash=source_hash,
+                vector=vector.astype(np.float32),
+                model_tag=backend_tag,
+                strategy_tag=SECTION_VECTOR_CACHE_VERSION,
+                start_s=start_s,
+                end_s=end_s,
+            )
+            written += 1
+        except Exception as e:
+            logger.warning(
+                "[ingest] section-vector embed failed for %s (%s); skipping section.",
+                section.section_id,
+                e,
+            )
+    return written
+
+
+def _section_source_hash(
+    track_cache_key: str, section_id: str, start_s: float, end_s: float
+) -> str:
+    h = hashlib.sha256()
+    h.update(track_cache_key.encode("utf-8"))
+    h.update(b"||")
+    h.update(section_id.encode("utf-8"))
+    h.update(b"||")
+    h.update(f"{start_s:.3f}:{end_s:.3f}".encode())
+    return h.hexdigest()
+
+
 # --------------------------------------------------------------------------- #
 # The orchestrator                                                             #
 # --------------------------------------------------------------------------- #
@@ -454,6 +532,7 @@ def ingest_source(
     persist_library: bool = True,
     progress: Callable[[str], None] | None = None,
     cache: sqlite3.Connection | None = None,
+    section_cache: sqlite3.Connection | None = None,
     anlz_index: object | None = None,
 ) -> IngestReport:
     """Detect → iter → CLAP embed → store one source, resumably + honestly.
@@ -482,6 +561,12 @@ def ingest_source(
         cache = _open_clap_cache()
     else:
         _init_clap_cache_schema(cache)
+    owns_section_cache = section_cache is None
+    if section_cache is None:
+        section_cache = open_default_section_vector_db(create=True)
+        assert section_cache is not None
+    else:
+        init_section_vector_schema(section_cache)
 
     backend_tag = str(getattr(embedder, "backend", "clap"))
 
@@ -524,6 +609,14 @@ def ingest_source(
                     _reconcile_store_dim(store, int(cached.shape[0]))
                     dim_reconciled = True
                 store.add_batch([(track.track_id, cached.astype(np.float32))])
+                _ensure_section_vectors_for_track(
+                    track,
+                    local,
+                    embedder,
+                    section_cache,
+                    track_cache_key=key,
+                    backend_tag=backend_tag,
+                )
                 handled[track.track_id] = track
                 report.skipped_cached += 1
                 _emit(progress, idx, "skip", label)
@@ -554,6 +647,14 @@ def ingest_source(
             # Honest store: only a real vector lands. Cache AFTER a clean embed.
             _cache_put(cache, key, vec)
             store.add_batch([(track.track_id, vec)])
+            _ensure_section_vectors_for_track(
+                track,
+                local,
+                embedder,
+                section_cache,
+                track_cache_key=key,
+                backend_tag=backend_tag,
+            )
             handled[track.track_id] = track
             report.embedded += 1
             _emit(progress, idx, "ok", label)
@@ -561,6 +662,11 @@ def ingest_source(
         if owns_cache:
             try:
                 cache.close()
+            except Exception:  # pragma: no cover - defensive
+                pass
+        if owns_section_cache and section_cache is not None:
+            try:
+                section_cache.close()
             except Exception:  # pragma: no cover - defensive
                 pass
 
@@ -595,5 +701,6 @@ __all__ = [
     "CLAP_EMBED_CACHE_DB_PATH",
     "INGEST_CUE_STRATEGY_VERSION",
     "INGEST_STRATEGY_VERSION",
+    "_ensure_section_vectors_for_track",
     "ingest_source",
 ]

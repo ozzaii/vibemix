@@ -16,7 +16,7 @@ Data flow:
     seed = deck_state.decks[audible_side] (track_id + camelot + bpm)
         → stored seed vector (cached, ~free) → next_suggestion(...)
         → service.current() holds the dict
-        → service.current_for_state(state) can refresh only cue/timing
+        → service.current_for_state(state) can reselect inside shortlist + refresh cue/timing
                                                              │
     ws_broadcast reads service.current_for_state() at the serialize edge
         → merges it onto the flat mascot frame as ``next_suggestion``
@@ -38,9 +38,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from vibemix.library.next_suggestion import (
+    annotate_transition_selection,
     next_suggestion,
+    ranked_transition_alternatives,
     seed_vector_for_track_id,
     transition_payload_for_candidate,
+    vectors_for_track_ids,
 )
 
 logger = logging.getLogger(__name__)
@@ -165,6 +168,7 @@ class SuggestionService:
         self._seed_vector: Any | None = None
         self._candidate_track_id: str | None = None
         self._candidate_vector: Any | None = None
+        self._candidate_vectors_by_track_id: dict[str, Any] = {}
         self._last_refresh_at = 0.0
         self._last_compute_seed_track_id: str | None = None
         self._compute_inflight = False
@@ -177,10 +181,11 @@ class SuggestionService:
             return self._current
 
     def current_for_state(self, state: Any) -> dict | None:
-        """Latest suggestion after a throttled timing-only live refresh.
+        """Latest suggestion after a throttled live shortlist refresh.
 
-        This keeps the chosen next track stable between TRACK_CHANGE recomputes
-        while letting the transition payload follow the live playhead. It is
+        This keeps the expensive embedding shortlist stable between TRACK_CHANGE
+        recomputes while letting the set-aware winner and timing follow the
+        live playhead. It is
         safe to call from the 30Hz broadcast edge: the expensive full library
         ranking is only scheduled when no current pick exists for the live seed,
         and this path refreshes timing at most every
@@ -188,6 +193,161 @@ class SuggestionService:
         """
         self.maybe_schedule_compute_from_state(state)
         return self.refresh_from_state(state)
+
+    def context_for_state(
+        self,
+        state: Any,
+        *,
+        packet_id: str = "ctx_live_next_pill",
+    ) -> Any | None:
+        """Compile the live pill shortlist into a model-safe context envelope."""
+        suggestion = self.current_for_state(state)
+        if suggestion is None:
+            return None
+        return self._context_for_suggestion(state, suggestion, packet_id=packet_id)
+
+    def _context_for_suggestion(
+        self,
+        state: Any,
+        suggestion: dict,
+        *,
+        packet_id: str,
+    ) -> Any | None:
+        seed = resolve_seed_context(state)
+        timing = resolve_live_timing(state)
+        current = {
+            "active_track_id": seed.track_id if seed is not None else None,
+            "source_deck": seed.source_deck if seed is not None else None,
+            "target_deck": seed.target_deck if seed is not None else None,
+            "blend_active": timing.blend_active,
+            "playhead_confidence": timing.playhead_confidence,
+            "source_position_s": timing.source_position_s,
+        }
+        from vibemix.intel.context_compiler import compile_suggestion_context
+
+        return compile_suggestion_context(
+            packet_id=packet_id,
+            current=current,
+            suggestion=suggestion,
+        )
+
+    def decision_for_state(
+        self,
+        state: Any,
+        *,
+        packet_id: str = "ctx_live_next_pill",
+        snapshot_id: str = "snapshot_live_next_pill",
+        decision_id: str = "dec_live_next_pill",
+        trace_id: str = "trace_live_next_pill",
+    ) -> Any | None:
+        """Return a validated deterministic/model-safe decision for the pill."""
+        suggestion = self.current_for_state(state)
+        if suggestion is None:
+            return None
+        return self._decision_for_suggestion(
+            state,
+            suggestion,
+            packet_id=packet_id,
+            snapshot_id=snapshot_id,
+            decision_id=decision_id,
+            trace_id=trace_id,
+        )
+
+    def _decision_for_suggestion(
+        self,
+        state: Any,
+        suggestion: dict,
+        *,
+        packet_id: str,
+        snapshot_id: str,
+        decision_id: str,
+        trace_id: str,
+    ) -> Any | None:
+        envelope = self._context_for_suggestion(state, suggestion, packet_id=packet_id)
+        if envelope is None:
+            return None
+        from vibemix.intel.decision_runtime import RuntimeInputSnapshot, decide
+
+        return decide(
+            "live",
+            "live_next_pill",
+            RuntimeInputSnapshot(snapshot_id, envelope),
+            decision_id=decision_id,
+            trace_id=trace_id,
+        )
+
+    def decision_payload_for_state(
+        self,
+        state: Any,
+        *,
+        packet_id: str = "ctx_live_next_pill",
+        snapshot_id: str = "snapshot_live_next_pill",
+        decision_id: str = "dec_live_next_pill",
+        trace_id: str = "trace_live_next_pill",
+    ) -> dict | None:
+        """Compact, JSON-safe validated decision payload for UI wires."""
+        suggestion = self.current_for_state(state)
+        if suggestion is None:
+            return None
+        return self._decision_payload_for_suggestion(
+            state,
+            suggestion,
+            packet_id=packet_id,
+            snapshot_id=snapshot_id,
+            decision_id=decision_id,
+            trace_id=trace_id,
+        )
+
+    def _decision_payload_for_suggestion(
+        self,
+        state: Any,
+        suggestion: dict,
+        *,
+        packet_id: str,
+        snapshot_id: str,
+        decision_id: str,
+        trace_id: str,
+    ) -> dict | None:
+        result = self._decision_for_suggestion(
+            state,
+            suggestion,
+            packet_id=packet_id,
+            snapshot_id=snapshot_id,
+            decision_id=decision_id,
+            trace_id=trace_id,
+        )
+        if result is None:
+            return None
+        decision = result.final_decision
+        return {
+            "decision_id": result.decision_id,
+            "decision_source": result.decision_source,
+            "emitted": result.emitted,
+            "validation_status": result.validation_result.status,
+            "validation_errors": list(result.validation_result.errors),
+            "action": decision.action,
+            "candidate_id": decision.candidate_id,
+            "cue_slot": decision.cue_slot,
+            "timing_text": decision.timing_text,
+            "spoken_text": decision.spoken_text,
+            "cited_claims": list(decision.cited_claims),
+            "cited_claim_ids": list(decision.cited_claim_ids),
+            "confidence": decision.confidence,
+        }
+
+    def _safe_decision_payload_for_suggestion(self, state: Any, suggestion: dict) -> dict | None:
+        try:
+            return self._decision_payload_for_suggestion(
+                state,
+                suggestion,
+                packet_id="ctx_live_next_pill",
+                snapshot_id="snapshot_live_next_pill",
+                decision_id="dec_live_next_pill",
+                trace_id="trace_live_next_pill",
+            )
+        except Exception as e:
+            logger.warning("[suggestion] decision payload failed: %s", e)
+            return None
 
     def maybe_schedule_compute_from_state(
         self,
@@ -285,11 +445,17 @@ class SuggestionService:
 
         d = sugg.to_dict() if sugg is not None else None
         candidate_track_id = d.get("track_id") if d is not None else None
-        candidate_vector = (
-            seed_vector_for_track_id(self._store, candidate_track_id)
-            if isinstance(candidate_track_id, str)
-            else None
+        candidate_track_ids = _transition_alternative_track_ids(d)
+        candidate_vectors_by_track_id = (
+            vectors_for_track_ids(self._store, list(candidate_track_ids))
+            if candidate_track_ids
+            else {}
         )
+        candidate_vector = None
+        if isinstance(candidate_track_id, str):
+            candidate_vector = candidate_vectors_by_track_id.get(candidate_track_id)
+            if candidate_vector is None:
+                candidate_vector = seed_vector_for_track_id(self._store, candidate_track_id)
         with self._lock:
             self._current = d
             self._seed_track_id = seed_track_id if d is not None else None
@@ -300,6 +466,10 @@ class SuggestionService:
             self._candidate_vector = (
                 candidate_vector.copy() if candidate_vector is not None else None
             )
+            self._candidate_vectors_by_track_id = {
+                track_id: vector.copy()
+                for track_id, vector in candidate_vectors_by_track_id.items()
+            }
             self._last_compute_seed_track_id = seed_track_id
             self._last_refresh_at = 0.0
         return d
@@ -357,6 +527,10 @@ class SuggestionService:
             candidate_vector = (
                 self._candidate_vector.copy() if self._candidate_vector is not None else None
             )
+            candidate_vectors_by_track_id = {
+                track_id: vector.copy()
+                for track_id, vector in self._candidate_vectors_by_track_id.items()
+            }
 
         if current is None or seed_track_id is None or seed_vector is None:
             return current
@@ -372,6 +546,7 @@ class SuggestionService:
                     self._seed_vector = None
                     self._candidate_track_id = None
                     self._candidate_vector = None
+                    self._candidate_vectors_by_track_id = {}
                     self._last_compute_seed_track_id = None
             return None
 
@@ -382,24 +557,66 @@ class SuggestionService:
             candidate_vector = None
 
         timing = resolve_live_timing(state)
-        transition = transition_payload_for_candidate(
-            self._store,
-            self._library,
-            seed_track_id=seed_track_id,
-            seed_vector=seed_vector,
-            candidate_track_id=candidate_track_id,
-            source_deck=seed.source_deck,
-            target_deck=seed.target_deck,
-            remaining_bars=timing.remaining_bars,
-            playhead_confidence=timing.playhead_confidence,
-            blend_active=timing.blend_active,
-            source_position_s=timing.source_position_s,
-            destination_vector=candidate_vector,
-        )
-        current["transition"] = transition
+        alternatives = _coerce_transition_alternatives(current.get("transition_alternatives"))
+        if alternatives:
+            refreshed_transitions: dict[str, dict | None] = {}
+            for alternative in alternatives:
+                track_id = alternative.get("track_id")
+                if not isinstance(track_id, str) or not track_id:
+                    continue
+                refreshed_transitions[track_id] = transition_payload_for_candidate(
+                    self._store,
+                    self._library,
+                    seed_track_id=seed_track_id,
+                    seed_vector=seed_vector,
+                    candidate_track_id=track_id,
+                    source_deck=seed.source_deck,
+                    target_deck=seed.target_deck,
+                    remaining_bars=timing.remaining_bars,
+                    playhead_confidence=timing.playhead_confidence,
+                    blend_active=timing.blend_active,
+                    source_position_s=timing.source_position_s,
+                    destination_vector=candidate_vectors_by_track_id.get(track_id),
+                )
+            alternatives = ranked_transition_alternatives(
+                alternatives,
+                refreshed_transitions,
+            )
+            candidate_track_id, candidate_vector = _apply_winning_alternative(
+                current,
+                alternatives,
+                candidate_vectors_by_track_id,
+                fallback_candidate_track_id=candidate_track_id,
+                fallback_candidate_vector=candidate_vector,
+            )
+        else:
+            transition = transition_payload_for_candidate(
+                self._store,
+                self._library,
+                seed_track_id=seed_track_id,
+                seed_vector=seed_vector,
+                candidate_track_id=candidate_track_id,
+                source_deck=seed.source_deck,
+                target_deck=seed.target_deck,
+                remaining_bars=timing.remaining_bars,
+                playhead_confidence=timing.playhead_confidence,
+                blend_active=timing.blend_active,
+                source_position_s=timing.source_position_s,
+                destination_vector=candidate_vector,
+            )
+            transition = annotate_transition_selection(
+                transition,
+                _float_or(current.get("similarity"), None),
+            )
+            current["transition"] = transition
+        current["decision"] = self._safe_decision_payload_for_suggestion(state, current)
         with self._lock:
             if self._seed_track_id == seed_track_id and self._current is not None:
                 self._current = current
+                self._candidate_track_id = candidate_track_id
+                self._candidate_vector = (
+                    candidate_vector.copy() if candidate_vector is not None else None
+                )
                 return self._current
             return self._current
 
@@ -417,6 +634,56 @@ class SuggestionService:
                 self._next_compute_allowed_at = time.monotonic() + FULL_COMPUTE_RETRY_S
             else:
                 self._next_compute_allowed_at = 0.0
+
+
+def _transition_alternative_track_ids(raw: dict | None) -> tuple[str, ...]:
+    if raw is None:
+        return ()
+    alternatives = _coerce_transition_alternatives(raw.get("transition_alternatives"))
+    ids = [
+        alternative.get("track_id")
+        for alternative in alternatives
+        if isinstance(alternative.get("track_id"), str) and alternative.get("track_id")
+    ]
+    track_id = raw.get("track_id")
+    if isinstance(track_id, str) and track_id:
+        ids.insert(0, track_id)
+    return tuple(dict.fromkeys(str(track_id) for track_id in ids))
+
+
+def _coerce_transition_alternatives(raw: Any) -> tuple[dict, ...]:
+    if not isinstance(raw, (list, tuple)):
+        return ()
+    return tuple(dict(item) for item in raw if isinstance(item, dict))
+
+
+def _apply_winning_alternative(
+    current: dict,
+    alternatives: tuple[dict, ...],
+    candidate_vectors_by_track_id: dict[str, Any],
+    *,
+    fallback_candidate_track_id: str,
+    fallback_candidate_vector: Any | None,
+) -> tuple[str, Any | None]:
+    if not alternatives:
+        return fallback_candidate_track_id, fallback_candidate_vector
+
+    winner = alternatives[0]
+    track_id = winner.get("track_id")
+    if not isinstance(track_id, str) or not track_id:
+        current["transition_alternatives"] = alternatives
+        return fallback_candidate_track_id, fallback_candidate_vector
+
+    for key in ("track_id", "title", "artist", "similarity", "why", "camelot", "bpm"):
+        if key in winner:
+            current[key] = winner[key]
+    current["transition"] = winner.get("transition")
+    current["transition_alternatives"] = alternatives
+
+    vector = candidate_vectors_by_track_id.get(track_id)
+    if vector is None and track_id == fallback_candidate_track_id:
+        vector = fallback_candidate_vector
+    return track_id, vector
 
 
 def _float_or(raw: Any, default: float | None) -> float | None:

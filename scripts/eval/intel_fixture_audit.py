@@ -38,6 +38,8 @@ REQUIRED_FILES = (
     "decision_traces.jsonl",
     "live_awareness_snapshots.jsonl",
     "gold_labels_redacted.jsonl",
+    "section_queries.jsonl",
+    "taste_feedback.jsonl",
 )
 
 JSON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".json"))

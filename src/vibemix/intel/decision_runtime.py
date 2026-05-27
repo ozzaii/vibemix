@@ -252,11 +252,22 @@ def _deterministic_decision(
     bars = candidate.get("start_in_bars")
     exact_timing_allowed = bool(envelope.constraints.get("exact_timing_allowed", False))
     timing_text = f"in {int(bars)} bars" if exact_timing_allowed and bars is not None else None
+    cue_start_label = _format_mmss(candidate.get("to_start_s"))
+    cue_text = _cue_text(str(cue_slot), cue_start_label)
+    role_pair = _role_pair_text(candidate.get("from_role"), candidate.get("to_role"))
+    role_suffix = f", {role_pair}" if role_pair else ""
     track_short = str(candidate.get("to_track_id") or "next track")
     if timing_text:
-        spoken = f"Next good entry: {track_short} cue {cue_slot} {timing_text}."
+        spoken = f"Next good entry: {track_short} {cue_text}{role_suffix}, {timing_text}."
     else:
-        spoken = f"Next good entry: {track_short} from cue {cue_slot}."
+        spoken = f"Next good entry: {track_short} from {cue_text}{role_suffix}."
+    cited_claim_ids = _claim_ids_for_candidate(
+        envelope,
+        candidate,
+        include_timing=timing_text is not None,
+        include_structure=role_pair is not None,
+        include_boundary=cue_start_label is not None,
+    )
     return AgentDecision(
         schema_version=SCHEMA_VERSION,
         action="select",
@@ -264,26 +275,91 @@ def _deterministic_decision(
         cue_slot=str(cue_slot),
         timing_text=timing_text,
         spoken_text=spoken,
-        cited_claims=("cue_operability",),
-        cited_claim_ids=_claim_ids_for_candidate(
-            envelope, candidate, include_timing=timing_text is not None
-        ),
+        cited_claims=_claim_types_for_ids(envelope, cited_claim_ids),
+        cited_claim_ids=cited_claim_ids,
         confidence=float(candidate.get("confidence") or 0.0),
     )
 
 
 def _claim_ids_for_candidate(
-    envelope: AgentContextEnvelope, candidate: dict, *, include_timing: bool
+    envelope: AgentContextEnvelope,
+    candidate: dict,
+    *,
+    include_timing: bool,
+    include_structure: bool,
+    include_boundary: bool,
 ) -> tuple[str, ...]:
     candidate_id = str(candidate.get("candidate_id"))
-    wanted = {"transition_fit", "cue_slot"}
+    candidate_claims = {"transition_fit", "cue_slot"}
     if include_timing:
-        wanted.add("bars_until_event")
+        candidate_claims.add("bars_until_event")
+    section_claims: set[str] = set()
+    if include_structure:
+        section_claims.add("section_role")
+    if include_boundary:
+        section_claims.add("section_boundary")
+    section_ids = {
+        section_id
+        for section_id in (
+            candidate.get("from_section_id"),
+            candidate.get("to_section_id"),
+        )
+        if isinstance(section_id, str) and section_id
+    }
     ids: list[str] = []
     for row in envelope.claim_summary:
-        if row.get("subject_id") == candidate_id and row.get("type") in wanted:
+        claim_type = row.get("type")
+        subject_id = row.get("subject_id")
+        if subject_id == candidate_id and claim_type in candidate_claims:
+            ids.append(str(row["claim_id"]))
+        elif claim_type in section_claims and subject_id in section_ids:
             ids.append(str(row["claim_id"]))
     return tuple(ids)
+
+
+def _claim_types_for_ids(
+    envelope: AgentContextEnvelope, claim_ids: tuple[str, ...]
+) -> tuple[str, ...]:
+    wanted = set(claim_ids)
+    types = [
+        str(row["type"])
+        for row in envelope.claim_summary
+        if row.get("claim_id") in wanted and row.get("type")
+    ]
+    return tuple(dict.fromkeys(types))
+
+
+def _cue_text(cue_slot: str, start_label: str | None) -> str:
+    cue = f"cue {cue_slot}"
+    return f"{cue} at {start_label}" if start_label is not None else cue
+
+
+def _role_pair_text(from_role: object, to_role: object) -> str | None:
+    source = _role_label(from_role)
+    destination = _role_label(to_role)
+    if source is None or destination is None:
+        return None
+    return f"{source} into {destination}"
+
+
+def _role_label(raw: object) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    role = raw.strip().lower()
+    if not role or role == "unknown":
+        return None
+    return role.replace("_", " ").replace("-", " ")
+
+
+def _format_mmss(raw: object) -> str | None:
+    try:
+        seconds = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not seconds >= 0:
+        return None
+    total = round(seconds)
+    return f"{total // 60}:{total % 60:02d}"
 
 
 def _safe_rejection_decision(envelope: AgentContextEnvelope) -> AgentDecision:

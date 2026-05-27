@@ -3,7 +3,9 @@
 **Date:** 2026-05-27
 **Scope:** personalization, feedback capture, taste adaptation, and privacy gates
 **Depends on:** `.planning/research/2026-05-27-intel-04-implementation-handoff.md`
-**Code posture:** no product code changed in this research pass
+**Code posture:** deterministic feedback/taste/profile primitives and the first
+synthetic taste scorecard now exist. Product UI capture and durable storage are
+still future cuts.
 
 ## Goal
 
@@ -458,6 +460,24 @@ accepted_suggestion_lift >= 0.10 after 30 labeled events
 technical_bad_candidate_rescued_by_taste = 0
 ```
 
+Implementation status (2026-05-27):
+
+- `src/vibemix/intel/feedback.py` defines structured feedback rows, JSONL
+  loading, consent-off persistence filtering, and privacy checks.
+- `src/vibemix/intel/taste_model.py` builds deterministic role-pair taste
+  weights only after enough events across multiple sessions; technical labels
+  calibrate risk penalties instead of becoming role-pair taste.
+- `src/vibemix/intel/profile_projection.py` emits a tiny consent-gated,
+  allowlisted prompt projection with no action IDs, section IDs, paths, vectors,
+  or track history.
+- `scripts/eval/intel_taste_scorecard.py` gates accepted suggestion lift,
+  consent-off persistence, single-session poisoning, profile projection privacy,
+  unknown preference claims, and technical-bad rescue.
+- Public fixture result: `accepted_suggestion_lift=0.18`,
+  `consent_off_long_term_write_rate=0`,
+  `single_session_hard_negative_rate=0`,
+  `technical_bad_candidate_rescued_by_taste=0`.
+
 ## Proposed files
 
 Add:
@@ -486,23 +506,24 @@ Prefer `vibemix/intel/` once INTEL becomes a real subsystem; it avoids bloating
 
 ### INTEL-05A: feedback schema only
 
-- Define `FeedbackEvent` dataclass.
-- Add local store with path traversal/session-id guard.
-- Add consent-off no-write behavior.
+- Done: define `FeedbackEvent` dataclass.
+- Deferred: durable local store with path traversal/session-id guard.
+- Done: add consent-off no-write behavior.
 - Tests only; no UI.
 
 ### INTEL-05B: deterministic TasteModel
 
-- Aggregate explicit labels.
-- Add decay and min-evidence gates.
-- Feed `taste_score` into transition scoring.
-- Tests for poisoning, cold-start, and no technical rescue.
+- Done: aggregate explicit labels.
+- Done: add min-evidence and multi-session gates.
+- Existing transition scorer already accepts `taste_scores`; product wiring
+  remains future work.
+- Done: tests for poisoning, cold-start, and no technical rescue.
 
 ### INTEL-05C: profile projection
 
-- Generate coarse tags from TasteModel.
-- Keep profile v1 unchanged unless product decides v2.
-- Tests for privacy: no track IDs, section IDs, paths, candidate IDs.
+- Done: generate coarse tags from TasteModel.
+- Done: keep profile v1 unchanged.
+- Done: tests for privacy: no track IDs, section IDs, paths, candidate IDs.
 
 ### INTEL-05D: feedback capture surfaces
 

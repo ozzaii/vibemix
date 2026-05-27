@@ -3,7 +3,15 @@
 **Date:** 2026-05-27
 **Scope:** evaluation, data quality, and acceptance gates for INTEL-01/02
 **Depends on:** `.planning/research/2026-05-27-intel-02-agentic-musical-context-spec.md`
-**Code posture:** no product code changed in this research pass
+**Code posture:** first eval utilities now exist for ANLZ audit, cue-baseline
+comparison, section retrieval, transition scoring, decision-runtime replay,
+INTEL-15 gold-label validation/sampling/reporting, and INTEL-05 taste/privacy
+gates. Fixture-level INTEL thresholds are locked in
+`eval/INTEL-THRESHOLD-LOCK.md`; private release threshold locking remains
+future work.
+`scripts/eval/intel_scorecard.py` now aggregates the first INTEL gates across
+ANLZ audit, cue-baseline comparison, section retrieval, transition scoring,
+decision-runtime replay, gold-label validation, and taste learning.
 
 ## Goal
 
@@ -25,6 +33,7 @@ lab. The current repo already has:
 - `scripts/eval/scorecard.py`
 - `scripts/eval/cited_relevance.py`
 - `eval/THRESHOLD-LOCK.md`
+- `eval/INTEL-THRESHOLD-LOCK.md`
 - `eval/corpus/MANIFEST.md`
 - genre/session fixture layout under `eval/corpus/sessions/`
 
@@ -107,6 +116,19 @@ low_confidence_result_rate <= 0.20 for live mode
 
 The exact values should be recalibrated after the first human-labeled review
 set, but the relative improvement over whole-track retrieval is non-negotiable.
+
+Implementation status (2026-05-27):
+
+- `scripts/eval/intel_section_retrieval.py` compares section candidates against
+  pooled whole-track candidates.
+- `tests/intel/fixtures/section_queries.jsonl` is the public synthetic query
+  fixture.
+- Fixture result: section `role_hit@5=1.0`, whole-track `role_hit@5=0.5`,
+  delta `0.5`; section `low_confidence_result_rate=0.033333`.
+- `scripts/eval/intel_scorecard.py` now gates
+  `section_role_hit_at_5_delta`,
+  `section_mixable_window_hit_at_5_delta`, and
+  `section_low_confidence_result_rate`.
 
 ### Claim 3: transition slate ranks playable moves above bad moves
 
@@ -208,6 +230,52 @@ accepted_live_suggestion_rate >= baseline_track_pill + 0.20
 
 The pill should be allowed to say nothing. Silence protects trust.
 
+### Claim 6: taste improves ranking without privacy leaks or scorer poisoning
+
+Evidence required:
+
+- structured feedback events with explicit consent posture;
+- deterministic taste aggregation from feedback, not LLM-written memories;
+- proof that consent-off feedback does not create long-term writes;
+- proof that one session cannot create durable hard negatives;
+- proof that taste cannot rescue technically bad transitions;
+- prompt-facing profile projection contains only allowlisted aggregate tags.
+
+Metrics:
+
+```text
+accepted_suggestion_lift
+consent_off_long_term_write_rate
+single_session_hard_negative_rate
+technical_bad_candidate_rescued_by_taste
+profile_projection_privacy_leak_count
+unknown_preference_claim_rate
+```
+
+Gate:
+
+```text
+accepted_suggestion_lift >= 0.10 on labeled or synthetic calibration events
+consent_off_long_term_write_rate = 0
+single_session_hard_negative_rate = 0
+technical_bad_candidate_rescued_by_taste = 0
+profile_projection_privacy_leak_count = 0
+unknown_preference_claim_rate = 0
+```
+
+Implementation status (2026-05-27):
+
+- `src/vibemix/intel/feedback.py` defines structured feedback events and
+  consent-aware persistence posture.
+- `src/vibemix/intel/taste_model.py` builds conservative deterministic taste
+  aggregates with minimum-evidence and single-session poisoning guards.
+- `src/vibemix/intel/profile_projection.py` emits an allowlisted prompt-facing
+  projection without track IDs, section IDs, local paths, or detailed history.
+- `scripts/eval/intel_taste_scorecard.py` gates the public synthetic taste
+  fixture.
+- Fixture result: accepted suggestion lift `0.18`; all privacy/poisoning
+  counters `0`.
+
 ## Eval assets
 
 ### Local private assets
@@ -295,6 +363,17 @@ Outputs:
 }
 ```
 
+Current implementation:
+
+```text
+scripts/eval/intel_transition_scorecard.py
+tests/eval/test_intel_transition_scorecard.py
+```
+
+It validates transition labels against issued candidates and reports
+`pairwise_accuracy`, `ndcg_at_5`, `accepted_transition_rate_at_3`,
+`risk_flag_precision`, `leakage_rate`, unknown label candidates, and NaN scores.
+
 Test coverage:
 
 - parser missing-file cases;
@@ -308,7 +387,7 @@ Inputs:
 
 ```text
 --queries eval/private/intel/section_queries.jsonl
---mode whole-track|section
+--mode compare|whole-track|section
 --k 10
 ```
 
@@ -327,6 +406,12 @@ Compare modes in scorecard:
 
 ```text
 section - whole_track deltas
+```
+
+Current fixture command:
+
+```bash
+uv run python scripts/eval/intel_section_retrieval.py --fixture-dir tests/intel/fixtures --json
 ```
 
 ### `scripts/eval/intel_transition_scorecard.py`
@@ -358,26 +443,28 @@ Hard failures:
 - played-track leakage;
 - NaN score.
 
-### `scripts/eval/intel_agent_grounding.py`
+### `scripts/eval/intel_decision_runtime_replay.py`
 
 Inputs:
 
 ```text
---packets tests/intel/fixtures/context_packets.json
---decisions <model-output-jsonl>
+--fixture-dir tests/intel/fixtures
+--contexts tests/intel/fixtures/context_packets.json
+--decisions tests/intel/fixtures/agent_decisions.jsonl
 ```
 
 Validates:
 
-- `PillDecision` schema;
+- `AgentDecision` / `PillDecision` schema;
 - `candidate_id` in packet slate;
 - timing text suppressed below confidence floor;
 - no unsupported cue/section claims;
 - no unsupported musical claims outside INTEL-21 claim ledger;
 - citations parse and resolve through available sources.
 
-This should reuse `scripts/eval/cited_relevance.py` for substance, but add
-music-specific claim extraction.
+The current replay hydrates redacted context packets from `transition_pairs.json`
+and `claim_ledgers.json`, then reports fallback, grounding, claim, and timing
+floor metrics.
 
 ### `scripts/eval/intel_live_replay.py`
 
@@ -478,21 +565,32 @@ agent failures will really be data coverage failures.
 Use the existing threshold-lock discipline:
 
 - initial gates live in the INTEL spec;
-- once implemented, mirror active thresholds into `eval/THRESHOLD-LOCK.md`;
+- fixture-level INTEL gates live in `eval/INTEL-THRESHOLD-LOCK.md`;
+- `eval/THRESHOLD-LOCK.md` remains the signed legacy hallucination-gate lock;
 - any threshold change needs a recalibration note;
 - never silently loosen a threshold to make a demo pass.
 
-Proposed threshold block:
+Locked synthetic-fixture threshold block:
 
 ```text
-INTEL_ANLZ_PARSE_ERROR_RATE_MAX=0.01
-INTEL_PSSI_COVERAGE_MIN=0.80
-INTEL_SECTION_ROLE_HIT_AT_5_DELTA_MIN=0.15
-INTEL_TRANSITION_PAIRWISE_ACC_MIN=0.75
-INTEL_TRANSITION_NDCG_AT_5_MIN=0.80
-INTEL_UNKNOWN_CANDIDATE_ID_RATE_MAX=0.0
-INTEL_TIMING_CLAIM_BELOW_FLOOR_RATE_MAX=0.0
-INTEL_WRONG_TIMING_RATE_MAX=0.05
+anlz_complete_rate_min=0.70
+anlz_parse_error_rate_max=0.00
+cue_exact_or_near_rate_min=0.40
+section_role_hit_at_5_delta_min=0.15
+section_mixable_window_hit_at_5_delta_min=0.10
+section_low_confidence_result_rate_max=0.15
+transition_accept_at_3_min=0.80
+transition_pairwise_accuracy_min=0.80
+transition_unknown_candidate_label_count_max=0.00
+decision_validator_fallback_rate_max=0.20
+decision_exact_timing_floor_violation_rate_max=0.00
+gold_validation_error_count_max=0.00
+taste_accepted_suggestion_lift_min=0.10
+taste_consent_off_long_term_write_rate_max=0.00
+taste_single_session_hard_negative_rate_max=0.00
+taste_technical_bad_candidate_rescued_count_max=0.00
+taste_profile_projection_privacy_leak_count_max=0.00
+taste_unknown_preference_claim_rate_max=0.00
 ```
 
 ## Build order
@@ -506,9 +604,9 @@ INTEL_WRONG_TIMING_RATE_MAX=0.05
 
 ### INTEL-03B: section retrieval bake-off
 
-- Build tiny query fixture.
-- Compare whole-track vs section retrieval.
-- Add scorecard output.
+- Done: build tiny query fixture.
+- Done: compare whole-track vs section retrieval.
+- Done: add scorecard output and aggregate gates.
 
 ### INTEL-03C: transition pair scorecard
 
@@ -538,6 +636,15 @@ outro -> outro
 - Use it to test structure/transition assumptions, not as a replacement for
   Kaan's ear on his own library.
 
+### INTEL-03F: taste/privacy gate
+
+- Done: add structured feedback event parsing and validation.
+- Done: add deterministic taste aggregation with minimum-evidence guards.
+- Done: add profile projection privacy checks.
+- Done: add `scripts/eval/intel_taste_scorecard.py`.
+- Done: aggregate taste gates into `scripts/eval/intel_scorecard.py`.
+- Pending: real private feedback labels and durable product capture surfaces.
+
 ## Non-goals
 
 - No committed private audio.
@@ -557,6 +664,7 @@ Transition slates rank playable moves above bad moves.
 The agent never chooses unknown candidates.
 The pill never makes exact timing claims below confidence floor.
 Kaan accepts materially more live/prep suggestions than the track-level baseline.
+Taste improves close-call ranking without privacy leaks or technical rescues.
 ```
 
 That is how we keep the app from becoming impressive theater. The product should

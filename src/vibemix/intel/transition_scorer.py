@@ -85,6 +85,7 @@ class TransitionScoringInput:
     destinations: tuple[SectionRecord, ...]
     source_vector: np.ndarray | None = None
     destination_vectors: dict[str, np.ndarray] | None = None
+    semantic_basis_by_section: dict[str, str] | None = None
     played_track_ids: frozenset[str] = frozenset()
     candidate_pool_track_ids: frozenset[str] | None = None
     genre_profile: str | None = None
@@ -117,10 +118,19 @@ class TransitionCandidate:
     to_track_id: str
     from_role: str
     to_role: str
+    from_start_s: float
+    from_end_s: float
+    to_start_s: float
+    to_end_s: float
+    from_bpm: float | None
+    to_bpm: float | None
+    from_camelot: str | None
+    to_camelot: str | None
     cue_slot: str | None
     start_in_bars: int | None
     score: float
     confidence: float
+    semantic_basis: str
     components: TransitionScoreComponents
     risk_flags: tuple[str, ...]
     reasons: tuple[str, ...]
@@ -347,10 +357,19 @@ def _score_one(
         to_track_id=destination.track_id,
         from_role=normalize_role(source.role),
         to_role=normalize_role(destination.role),
+        from_start_s=float(source.start_s),
+        from_end_s=float(source.end_s),
+        to_start_s=float(destination.start_s),
+        to_end_s=float(destination.end_s),
+        from_bpm=source.bpm,
+        to_bpm=destination.bpm,
+        from_camelot=source.camelot,
+        to_camelot=destination.camelot,
         cue_slot=cue_slot,
         start_in_bars=start_in_bars,
         score=score,
         confidence=confidence,
+        semantic_basis=_semantic_basis(scoring_input, destination, risk_flags),
         components=components,
         risk_flags=risk_flags,
         reasons=_reasons(source, destination, components, risk_flags),
@@ -394,8 +413,30 @@ def _semantic_score(
     dst_norm = float(np.linalg.norm(dst))
     if src_norm <= 1e-12 or dst_norm <= 1e-12:
         return 0.50, ("semantic_unknown",)
+    if src.shape != dst.shape:
+        return 0.50, ("semantic_unknown", "semantic_dim_mismatch")
     cosine = float(np.dot(src / src_norm, dst / dst_norm))
     return clamp01((cosine + 1.0) / 2.0), ()
+
+
+def _semantic_basis(
+    scoring_input: TransitionScoringInput,
+    destination: SectionRecord,
+    risk_flags: tuple[str, ...],
+) -> str:
+    if "semantic_unknown" in risk_flags:
+        return "semantic_unknown"
+    basis_by_section = scoring_input.semantic_basis_by_section or {}
+    source_basis = basis_by_section.get(scoring_input.source.section_id)
+    destination_basis = basis_by_section.get(destination.section_id)
+    bases = {source_basis or "vector", destination_basis or "vector"}
+    if bases == {"section_vector"}:
+        return "section_vector"
+    if "section_vector" in bases and "track_vector_fallback" in bases:
+        return "mixed_section_track"
+    if bases == {"track_vector_fallback"}:
+        return "track_vector_fallback"
+    return "vector"
 
 
 def _energy_shape_score(
@@ -577,6 +618,7 @@ def _reasons(
         "off_phrase": "entry is not phrase-clean",
         "no_cue_slot": "good section, but no exported cue slot yet",
         "semantic_unknown": "section texture is not embedded yet",
+        "semantic_dim_mismatch": "section texture vectors are not comparable yet",
         "timing_low_confidence": "timing is not locked, so exact bars are withheld",
     }
     ordered_risks = [risk_reasons[flag] for flag in risk_flags if flag in risk_reasons]
@@ -617,9 +659,7 @@ def _candidate_sort_key(candidate: TransitionCandidate) -> tuple[float, float, f
 
 
 def _cue_sort_seconds(candidate: TransitionCandidate) -> float:
-    # Start time is not part of the public candidate shape yet; the transition
-    # key keeps ties stable until the context/compiler shape carries it.
-    return 0.0
+    return candidate.to_start_s
 
 
 def _transition_key(

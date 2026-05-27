@@ -2,7 +2,8 @@
 
 **Date:** 2026-05-27
 **Lane:** intelligence / data / agentic engine / grounding / musical context
-**Status:** pre-roadmap research and build-prep; intentionally avoids codebase cleanup work
+**Status:** research map plus first fixture/eval implementation pass;
+intentionally avoids codebase cleanup work
 
 ## Spec ledger
 
@@ -76,6 +77,35 @@
   source-backed bet map for ANLZ, section embeddings, transition scoring,
   set-aware cueing, live awareness, model explanations, and differentiation
   against rekordbox Intelligent Cue Creation.
+
+## Current implementation snapshot
+
+This lane now has a green public synthetic evidence spine, separate from the
+other session's codebase-cleanup work:
+
+- ANLZ audit, smart-cue baseline comparison, section retrieval, transition
+  scoring, decision replay, gold-label validation, and taste/privacy scorecards
+  all have focused scripts/tests.
+- `scripts/eval/intel_scorecard.py` aggregates those gates against
+  `tests/intel/fixtures/` and can consume the fixture-level lock at
+  `eval/INTEL-THRESHOLD-LOCK.md`.
+- The aggregate scorecard now emits Tier 0 replay provenance: fixture manifest
+  hash, threshold lock hash, dataset card, thresholds hash, and a redacted replay
+  command.
+- `scripts/eval/intel_provenance_report.py validate` turns that provenance into
+  a CI-checkable contract.
+- `scripts/eval/intel_gate.py` composes fixture audit, locked scorecard, and
+  provenance validation into one green/red INTEL fixture gate.
+- The gate can write a persisted JSON artifact with `--output`, so CI can keep
+  the exact evidence bundle instead of relying on console output.
+- The existing eval workflow runs the INTEL fixture gate before the replay
+  harness and persists `.planning/eval-runs/<sha>/intel_gate.json`.
+- Decision replay hydrates redacted context packets from candidate and claim
+  ledgers, so spoken timing/cue claims can be validated instead of trusted.
+- Taste learning has deterministic feedback, taste model, and profile projection
+  primitives; current gates prove privacy/poisoning behavior on fixtures.
+- Remaining release-grade evidence is private and human-reviewed: Kaan-labeled
+  transition pairs, section queries, taste labels, and live/debrief feedback.
 
 ## Thesis
 
@@ -455,6 +485,11 @@ The right tool additions after ANLZ ingest:
   - 0 invented track ids;
   - 0 invented sections;
   - no timing claim when playhead confidence is below floor.
+- Taste:
+  - accepted suggestions improve over baseline;
+  - consent-off feedback creates no long-term taste writes;
+  - single sessions do not create durable hard negatives;
+  - taste never rescues a technically bad transition.
 
 ### Human gates
 

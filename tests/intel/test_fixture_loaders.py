@@ -62,4 +62,18 @@ def test_fixture_manifest_declares_generated_files() -> None:
     assert manifest["fixture_version"] == "intel_fixture_v1"
     assert manifest["dataset_card_id"] == "dataset_intel_synthetic_v1"
     assert "section_vectors_512d.npy" in files
+    assert "taste_feedback.jsonl" in files
     assert all(value.startswith("sha256:") for value in files.values())
+
+
+def test_fixture_taste_feedback_is_public_synthetic() -> None:
+    rows = [
+        json.loads(line)
+        for line in (FIXTURE_DIR / "taste_feedback.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    assert len(rows) >= 30
+    assert all(row["candidate_id"].startswith("tr_") for row in rows)
+    assert "/Users/" not in json.dumps(rows)
+    assert "raw_vector" not in json.dumps(rows)

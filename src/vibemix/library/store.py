@@ -45,6 +45,7 @@ class LibraryStore:
 
     def __init__(self, backend: _Backend) -> None:
         self._backend = backend
+        self._section_vector_cache = None
 
     @property
     def backend_name(self) -> str:
@@ -53,16 +54,12 @@ class LibraryStore:
     def add_batch(self, items: list[tuple[str, np.ndarray]]) -> None:
         self._backend.add_batch(items)
 
-    def search(
-        self, query_vector: np.ndarray, k: int = 10
-    ) -> list[tuple[str, float]]:
+    def search(self, query_vector: np.ndarray, k: int = 10) -> list[tuple[str, float]]:
         """Top-K cosine search. Always uses shared cosine_topk (P55)."""
         ids, vectors = self._backend.load_all()
         return cosine_topk(query_vector, vectors, ids, k)
 
-    def search_centered(
-        self, query_vector: np.ndarray, k: int = 10
-    ) -> list[tuple[str, float]]:
+    def search_centered(self, query_vector: np.ndarray, k: int = 10) -> list[tuple[str, float]]:
         """Mean-centered top-K cosine search (the anisotropy fix).
 
         Loads all vectors once, derives (or reuses) the corpus centroid keyed
@@ -80,9 +77,7 @@ class LibraryStore:
         )
 
         ids, vectors = self._backend.load_all()
-        centroid = load_or_compute_centroid(
-            vectors, self._backend.snapshot_hash()
-        )
+        centroid = load_or_compute_centroid(vectors, self._backend.snapshot_hash())
         if centroid is None:
             return cosine_topk(query_vector, vectors, ids, k)
         q_centered = center_and_renorm(query_vector, centroid)
@@ -122,7 +117,32 @@ class LibraryStore:
     def snapshot_hash(self) -> str:
         return self._backend.snapshot_hash()
 
+    def section_vector_for_id(self, section_id: str) -> np.ndarray | None:
+        """Optional per-section vector lookup for transition scoring."""
+        if self._section_vector_cache is False:
+            return None
+        try:
+            from vibemix.library.section_vectors import (
+                get_cached_section_vector,
+                open_default_section_vector_db,
+            )
+
+            if self._section_vector_cache is None:
+                self._section_vector_cache = open_default_section_vector_db(create=False)
+                if self._section_vector_cache is None:
+                    self._section_vector_cache = False
+                    return None
+            return get_cached_section_vector(self._section_vector_cache, section_id)
+        except Exception:
+            return None
+
     def close(self) -> None:
+        cache = self._section_vector_cache
+        if cache is not None and cache is not False:
+            try:
+                cache.close()
+            except Exception:
+                pass
         self._backend.close()
 
 

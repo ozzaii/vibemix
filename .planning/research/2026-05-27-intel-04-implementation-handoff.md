@@ -5,8 +5,10 @@
 **Code posture:** implementation has begun. ANLZ ingest, caller/product ingest
 orchestration, ANLZ audit, smart-cue policy/export, baseline comparison,
 context packets, transition scoring, musical claim validation, and the first
-agentic decision runtime are now present with focused tests. Product wiring and
-broader eval thresholding remain future cuts.
+agentic decision runtime are now present. Section retrieval, gold-label
+validation/sampling, feedback/taste/profile primitives, taste privacy gates,
+and the aggregate INTEL scorecard are also present with focused tests. Product
+wiring, durable taste storage, and broader eval thresholding remain future cuts.
 
 ## Purpose
 
@@ -515,37 +517,64 @@ If playhead confidence is weak, never emit exact bar timing.
 
 ### Files
 
-Add:
+Current implemented eval artifacts:
 
 ```text
 scripts/eval/intel_anlz_audit.py
+scripts/eval/intel_cue_baseline_compare.py
+scripts/eval/intel_decision_runtime_replay.py
+scripts/eval/intel_fixture_audit.py
 scripts/eval/intel_section_retrieval.py
 scripts/eval/intel_transition_scorecard.py
-scripts/eval/intel_agent_grounding.py
 scripts/eval/intel_gold.py
+scripts/eval/intel_taste_scorecard.py
+scripts/eval/intel_scorecard.py
+scripts/eval/intel_provenance_report.py
+scripts/eval/intel_gate.py
 tests/eval/test_intel_anlz_audit.py
+tests/eval/test_intel_cue_baseline_compare.py
+tests/eval/test_intel_decision_runtime_replay.py
+tests/eval/test_intel_fixture_audit.py
+tests/eval/test_intel_section_retrieval.py
 tests/eval/test_intel_transition_scorecard.py
-tests/eval/test_intel_agent_grounding.py
 tests/eval/test_intel_gold_validation.py
+tests/eval/test_intel_taste_scorecard.py
+tests/eval/test_intel_scorecard.py
+tests/eval/test_intel_provenance_report.py
+tests/eval/test_intel_gate.py
+tests/intel/fixtures/section_queries.jsonl
+tests/intel/fixtures/taste_feedback.jsonl
 ```
 
-Modify:
+Implemented fixture threshold-lock integration:
 
 ```text
-eval/THRESHOLD-LOCK.md
-scripts/eval/scorecard.py
+eval/INTEL-THRESHOLD-LOCK.md
+scripts/eval/intel_gate.py --threshold-lock eval/INTEL-THRESHOLD-LOCK.md
+scripts/eval/intel_scorecard.py --threshold-lock eval/INTEL-THRESHOLD-LOCK.md
 ```
 
 Minimum gates:
 
 ```text
-INTEL_ANLZ_PARSE_ERROR_RATE_MAX=0.01
-INTEL_PSSI_COVERAGE_MIN=0.80
-INTEL_SECTION_ROLE_HIT_AT_5_DELTA_MIN=0.15
-INTEL_TRANSITION_PAIRWISE_ACC_MIN=0.75
-INTEL_TRANSITION_NDCG_AT_5_MIN=0.80
-INTEL_UNKNOWN_CANDIDATE_ID_RATE_MAX=0.0
-INTEL_TIMING_CLAIM_BELOW_FLOOR_RATE_MAX=0.0
+anlz_complete_rate_min=0.70
+anlz_parse_error_rate_max=0.00
+cue_exact_or_near_rate_min=0.40
+section_role_hit_at_5_delta_min=0.15
+section_mixable_window_hit_at_5_delta_min=0.10
+section_low_confidence_result_rate_max=0.15
+transition_accept_at_3_min=0.80
+transition_pairwise_accuracy_min=0.80
+transition_unknown_candidate_label_count_max=0.00
+decision_validator_fallback_rate_max=0.20
+decision_exact_timing_floor_violation_rate_max=0.00
+gold_validation_error_count_max=0.00
+taste_accepted_suggestion_lift_min=0.10
+taste_consent_off_long_term_write_rate_max=0.00
+taste_single_session_hard_negative_rate_max=0.00
+taste_technical_bad_candidate_rescued_count_max=0.00
+taste_profile_projection_privacy_leak_count_max=0.00
+taste_unknown_preference_claim_rate_max=0.00
 ```
 
 Optional external benchmark:
@@ -574,9 +603,13 @@ Recommended sequence:
 13. Add smart cue export over issued proposals using slot-preserving export.
 14. Add gold-label schema validation and private review sampling.
 15. Add INTEL-22 fixture corpus and privacy audit if not already present.
-16. Check INTEL-23 before adding model swaps, live analyzers, or cue features
+16. Add structured feedback, deterministic taste aggregation, profile
+    projection, and taste/privacy scorecard gates.
+17. Check INTEL-23 before adding model swaps, live analyzers, or cue features
     outside the no-regret build order.
-17. Add eval gates to scorecard/threshold lock.
+18. Done for public fixtures: add eval gates to scorecard/INTEL threshold lock.
+    Remaining release cut: recalibrate against private labels and promote the
+    threshold policy deliberately.
 ```
 
 This order creates value after step 4 and keeps every later step testable.
@@ -596,7 +629,10 @@ This order creates value after step 4 and keeps every later step testable.
 | Decision runtime | `tests/intel/test_decision_runtime.py` + replay eval prove degrade/trace behavior |
 | Smart cue policy | `tests/library/test_smart_cues.py` proves A-H policy + slot export marks |
 | Smart cue baseline compare | `tests/eval/test_intel_cue_baseline_compare.py` proves XML diff + comparative lift |
-| Eval gates | scorecard reads INTEL metrics and threshold lock |
+| Gold labels | `tests/intel/test_gold_labels.py` + `tests/eval/test_intel_gold_validation.py` prove schema/redaction gates |
+| Taste learning | `tests/intel/test_feedback.py`, `tests/intel/test_taste_model.py`, `tests/intel/test_profile_projection.py`, and `tests/eval/test_intel_taste_scorecard.py` prove conservative learning/privacy gates |
+| Transition scorecard | `tests/eval/test_intel_transition_scorecard.py` proves playable-vs-bad ranking metrics |
+| Eval gates | `tests/eval/test_intel_scorecard.py` proves INTEL artifact aggregation + threshold gates |
 | Privacy | no committed local audio or private Rekordbox paths |
 
 ## Do not do

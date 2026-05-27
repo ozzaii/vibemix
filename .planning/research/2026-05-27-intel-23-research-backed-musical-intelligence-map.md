@@ -3,7 +3,8 @@
 **Date:** 2026-05-27
 **Lane:** intelligence excellence / musical context / agentic engine / data strategy
 **Depends on:** INTEL-01 through INTEL-22
-**Status:** source-backed strategy map; no product code touched
+**Status:** source-backed strategy map; companion INTEL docs now track the first
+fixture/eval implementation pass
 
 ## Purpose
 
@@ -301,6 +302,9 @@ Graduate criteria:
 
 - Section retrieval improves mixable-window hit@5 and transition nDCG without
   more grounding failures.
+- Public fixture gate implemented: section retrieval beats pooled whole-track
+  retrieval by `0.5` role-hit@5 delta and `0.5` mixable-window@5 delta; private
+  Kaan-reviewed query calibration remains the release-grade proof.
 
 ### Bet C: deterministic transition slate scorer
 
@@ -426,6 +430,7 @@ Each bet must map to a current INTEL gate:
 | Smart cueing | INTEL-18 policy tests | INTEL-19 baseline comparison |
 | Live awareness | INTEL-06 replay | INTEL-20 suppression traces |
 | Model explanations | INTEL-21 claim validation | INTEL-17 replay |
+| Taste learning | INTEL-05 taste scorecard | INTEL-15 private labels |
 | Synthetic testability | INTEL-22 privacy fixture audit | INTEL-16 PR evidence bundle |
 
 ## Product language discipline
@@ -469,6 +474,7 @@ PR 6 context compiler
 PR 7 claim ledger
 PR 8 decision runtime
 PR 9 labels/eval gates
+PR 10 taste feedback/profile gates
 ```
 
 Research tracks after the first build sequence:

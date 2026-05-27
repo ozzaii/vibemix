@@ -61,9 +61,10 @@ class _FakeBackend:
 
 
 class _FakeStore:
-    def __init__(self, ids, vectors, ranked):
+    def __init__(self, ids, vectors, ranked, section_vectors=None):
         self._backend = _FakeBackend(ids, vectors)
         self._ranked = ranked  # list[(track_id, sim)]
+        self.section_vectors = section_vectors or {}
 
     def search_centered(self, qvec, k=10):
         return self._ranked[:k]
@@ -304,9 +305,52 @@ def test_transition_slate_issues_grounded_candidates(toolset):
     candidate = out["candidates"][0]
     assert candidate["candidate_id"] == "tr_001"
     assert candidate["to_track_id"] == "t001"
+    assert candidate["from_role"] == "outro"
+    assert candidate["to_role"] == "intro"
+    assert candidate["from_start_s"] == 240.0
+    assert candidate["to_start_s"] == 0.0
+    assert candidate["from_camelot"] == "8A"
+    assert candidate["to_camelot"] == "9A"
     assert candidate["cue_slot"] == "A"
     assert candidate["start_in_bars"] == 16
+    assert candidate["semantic_basis"] == "track_vector_fallback"
     assert "tr_001" in toolset.issued_transition_candidates
+
+
+def test_transition_slate_uses_section_vectors_when_available(store, library):
+    store.section_vectors = {
+        "t000#s000": np.array([1.0, 0.0], dtype=np.float32),
+        "t001#s000": np.array([0.95, 0.05], dtype=np.float32),
+    }
+    toolset = LibraryToolset(embedder=None, store=store, library=library)
+    toolset.seen.update({"t000", "t001"})
+    toolset._library.tracks["t000"] = TrackEntry(
+        track_id="t000",
+        title="Outgoing",
+        artist="Artist",
+        album="A",
+        bpm=128.0,
+        key="8A",
+        duration_s=300.0,
+        cues=(CuePoint(name="OUT", type="cue", start_s=240.0, end_s=None, number=5),),
+        filepath="/tmp/t000.mp3",
+    )
+    toolset._library.tracks["t001"] = TrackEntry(
+        track_id="t001",
+        title="Incoming",
+        artist="Artist",
+        album="A",
+        bpm=128.0,
+        key="9A",
+        duration_s=300.0,
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+        filepath="/tmp/t001.mp3",
+    )
+
+    out = toolset.transition_slate({"source_track_id": "t000", "candidate_track_ids": ["t001"]})
+
+    assert out["candidates"][0]["semantic_basis"] == "section_vector"
+    assert out["candidates"][0]["components"]["semantic"] > 0.9
 
 
 def test_transition_slate_rejects_unseen_candidate(toolset):

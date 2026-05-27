@@ -4,7 +4,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.eval.intel_decision_runtime_replay import main, replay_paths
+from scripts.eval.intel_decision_runtime_replay import (
+    DEFAULT_FIXTURE_DIR,
+    main,
+    replay_fixture_dir,
+    replay_paths,
+)
 
 
 def _write_replay_fixture(tmp_path: Path) -> tuple[Path, Path]:
@@ -117,6 +122,16 @@ def test_replay_reports_validator_metrics(tmp_path: Path) -> None:
         "cue_slot_requires_selected_candidate": 1,
         "unknown_candidate_id": 1,
     }
+
+
+def test_fixture_replay_hydrates_candidate_and_claim_ledgers() -> None:
+    result = replay_fixture_dir(DEFAULT_FIXTURE_DIR)
+
+    assert result["valid"] is True
+    assert result["totals"]["accepted"] == 2
+    assert result["metrics"]["validator_fallback_rate"] == 0.0
+    assert result["metrics"]["exact_timing_floor_violation_rate"] == 0.0
+    assert result["error_counts"] == {}
 
 
 def test_replay_counts_timing_floor_violation(tmp_path: Path) -> None:

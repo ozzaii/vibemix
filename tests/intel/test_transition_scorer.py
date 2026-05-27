@@ -136,6 +136,16 @@ def test_scorer_ranks_grounded_cue_aware_transition() -> None:
     assert candidate.candidate_id == "tr_001"
     assert candidate.from_section_id == "t1#s000"
     assert candidate.to_section_id == "t2#s000"
+    assert candidate.from_role == "outro"
+    assert candidate.to_role == "intro"
+    assert candidate.from_start_s == 0.0
+    assert candidate.from_end_s == 64.0
+    assert candidate.to_start_s == 0.0
+    assert candidate.to_end_s == 64.0
+    assert candidate.from_bpm == 128.0
+    assert candidate.to_bpm == 128.0
+    assert candidate.from_camelot == "8A"
+    assert candidate.to_camelot == "9A"
     assert candidate.cue_slot == "A"
     assert candidate.score > 0.70
     assert "outro into intro is a strong role pair" in candidate.reasons
@@ -206,6 +216,26 @@ def test_missing_vector_does_not_crash_or_claim_texture() -> None:
 
     assert "semantic_unknown" in slate[0].risk_flags
     assert "section texture is close" not in slate[0].reasons
+
+
+def test_mismatched_semantic_vector_dims_degrade_to_unknown() -> None:
+    source = _section("t1#s000", "t1", "outro")
+    destination = _section("t2#s000", "t2", "intro")
+
+    slate = score_transition_slate(
+        TransitionScoringInput(
+            source=source,
+            destinations=(destination,),
+            source_vector=np.array([1.0, 0.0], dtype=np.float32),
+            destination_vectors={
+                destination.section_id: np.array([1.0, 0.0, 0.0], dtype=np.float32)
+            },
+        )
+    )
+
+    assert "semantic_unknown" in slate[0].risk_flags
+    assert "semantic_dim_mismatch" in slate[0].risk_flags
+    assert slate[0].semantic_basis == "semantic_unknown"
 
 
 def test_harmonic_clash_live_melodic_suppresses() -> None:

@@ -54,6 +54,7 @@ from vibemix.library.section_builder import (
     section_to_dict,
     sections_for_entry,
 )
+from vibemix.library.section_vectors import resolve_section_vector
 from vibemix.library.store import LibraryStore
 from vibemix.state import harmonics
 
@@ -243,15 +244,26 @@ class LibraryToolset:
                 score_transition_slate,
             )
 
+            source_vector_result = self._section_vector(source)
+            destination_vector_results = {
+                section.section_id: self._section_vector(section) for section in destinations
+            }
             slate = score_transition_slate(
                 TransitionScoringInput(
                     source=source,
                     destinations=tuple(destinations),
-                    source_vector=self._track_vector(source.track_id),
+                    source_vector=source_vector_result.vector,
                     destination_vectors={
-                        section.section_id: vector
-                        for section in destinations
-                        if (vector := self._track_vector(section.track_id)) is not None
+                        section_id: result.vector
+                        for section_id, result in destination_vector_results.items()
+                        if result.vector is not None
+                    },
+                    semantic_basis_by_section={
+                        source.section_id: source_vector_result.basis,
+                        **{
+                            section_id: result.basis
+                            for section_id, result in destination_vector_results.items()
+                        },
                     },
                     played_track_ids=frozenset(
                         t for t in args.get("played_track_ids", []) if isinstance(t, str)
@@ -1051,6 +1063,13 @@ class LibraryToolset:
             return seed_vector_for_track_id(self._store, track_id)
         except Exception:
             return None
+
+    def _section_vector(self, section: SectionRecord) -> Any:
+        return resolve_section_vector(
+            self._store,
+            section.section_id,
+            fallback_vector=self._track_vector(section.track_id),
+        )
 
 
 def _export_cues_and_grid(entry: Any) -> dict[str, Any]:

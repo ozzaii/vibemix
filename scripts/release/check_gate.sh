@@ -4,7 +4,7 @@
 # Plan 42-04 / Task 1 — hybrid hallucination release gate.
 #
 # Per CONTEXT D-GATE-06 — this is the SHIP-CUT gate-2 implementation.
-# It combines TWO inputs and passes iff BOTH are green:
+# It combines THREE inputs and passes iff ALL are green:
 #
 #   1. Last 7 nightly autonomous-proxy scorecards (.planning/eval-runs/)
 #      all report:
@@ -13,14 +13,23 @@
 #        - cited_cosine  >= cited_cosine_min  (THRESHOLD-LOCK.md)
 #        - bypass_rate   <= bypass_max        (THRESHOLD-LOCK.md)
 #
-#   2. scripts/release/check_ear_test.sh exits 0 (≥2 ear-test sessions
+#   2. Last 7 INTEL fixture gate artifacts (.planning/eval-runs/*/intel_gate.json)
+#      all report `.valid == true` and include rich scorecard evidence:
+#        - schema == intel_gate_v1
+#        - fixture audit, scorecard, and provenance stages green
+#        - non-empty metrics, gates, and artifact_status
+#        - every gate reports PASS
+#        - every artifact_status entry is true
+#        - fixture/threshold provenance hashes and replay tier are present
+#
+#   3. scripts/release/check_ear_test.sh exits 0 (≥2 ear-test sessions
 #      ≥2 genres within 14d, zero slop flags).
 #
-# Exits 0 only when BOTH gates pass; otherwise exits 1 with a structured
-# stderr message naming each tripped input as `BLOCKED_BY=nightly` and/or
-# `BLOCKED_BY=ear-test`. Under GitHub Actions (GITHUB_ACTIONS=true) the
-# failures also surface as ::error:: annotations (mirrors the
-# check_no_hardcoded_model.sh / check_ear_test.sh pattern).
+# Exits 0 only when ALL gates pass; otherwise exits 1 with a structured
+# stderr message naming each tripped input as `BLOCKED_BY=nightly`,
+# `BLOCKED_BY=intel`, and/or `BLOCKED_BY=ear-test`. Under GitHub Actions
+# (GITHUB_ACTIONS=true) the failures also surface as ::error:: annotations
+# (mirrors the check_no_hardcoded_model.sh / check_ear_test.sh pattern).
 #
 # Inputs (env, with defaults):
 #   EVAL_RUNS_DIR          default: .planning/eval-runs
@@ -31,7 +40,7 @@
 # Non-zero from the ear-test gate propagates verbatim; we do not re-parse
 # its internal failure reason.
 #
-# Threat-model note (T-42-04-01): scorecard JSON is untrusted (committed
+# Threat-model note (T-42-04-01): scorecard/gate JSON is untrusted (committed
 # by nightly canary CI). All field extraction goes through jq — never via
 # shell `eval` or `$(...)` substitution of report values.
 
@@ -114,6 +123,7 @@ fi
 
 # --- enumerate nightly runs -----------------------------------------------
 NIGHTLY_FAIL_REASONS=()
+INTEL_FAIL_REASONS=()
 
 if [ ! -d "${EVAL_RUNS_DIR}" ]; then
   BLOCKERS+=("BLOCKED_BY=nightly: eval-runs dir missing: ${EVAL_RUNS_DIR}")
@@ -152,6 +162,54 @@ else
       if [ ! -f "${report}" ]; then
         NIGHTLY_FAIL_REASONS+=("${name}: eval_report.json missing")
         continue
+      fi
+
+      intel_report="${run_path}/intel_gate.json"
+      if [ ! -f "${intel_report}" ]; then
+        INTEL_FAIL_REASONS+=("${name}: intel_gate.json missing")
+      else
+        intel_status=$(jq -r '
+          def nonempty_object(x): (x | type == "object" and length > 0);
+          def nonempty_array(x): (x | type == "array" and length > 0);
+          def sha256_hash(x): (x | type == "string" and startswith("sha256:"));
+
+          if .schema != "intel_gate_v1" then
+            "schema=\(.schema // "missing")"
+          elif .valid != true then
+            "valid=\(.valid // false)"
+          elif .stages.fixture_audit.valid != true then
+            "fixture_audit.valid=\(.stages.fixture_audit.valid // false)"
+          elif .stages.scorecard.valid != true then
+            "scorecard.valid=\(.stages.scorecard.valid // false)"
+          elif .stages.scorecard.passed != true then
+            "scorecard.passed=\(.stages.scorecard.passed // false)"
+          elif .stages.provenance.valid != true then
+            "provenance.valid=\(.stages.provenance.valid // false)"
+          elif (nonempty_object(.stages.scorecard.metrics // {}) | not) then
+            "scorecard.metrics missing"
+          elif (nonempty_array(.stages.scorecard.gates // []) | not) then
+            "scorecard.gates missing"
+          elif ([.stages.scorecard.gates[]? | select(.status != "PASS")] | length) > 0 then
+            "scorecard.gates contain non-PASS"
+          elif (nonempty_object(.stages.scorecard.artifact_status // {}) | not) then
+            "scorecard.artifact_status missing"
+          elif ([.stages.scorecard.artifact_status | to_entries[]? | select(.value != true)] | length) > 0 then
+            "scorecard.artifact_status contains false"
+          elif .stages.scorecard.provenance.replay_tier != "tier0_fixture_replay" then
+            "scorecard.provenance.replay_tier=\(.stages.scorecard.provenance.replay_tier // "missing")"
+          elif (sha256_hash(.stages.scorecard.provenance.fixture_manifest_hash // "") | not) then
+            "scorecard.provenance.fixture_manifest_hash missing"
+          elif (sha256_hash(.stages.scorecard.provenance.thresholds_hash // "") | not) then
+            "scorecard.provenance.thresholds_hash missing"
+          elif (sha256_hash(.stages.scorecard.provenance.threshold_lock_hash // "") | not) then
+            "scorecard.provenance.threshold_lock_hash missing"
+          else
+            "ok"
+          end
+        ' "${intel_report}" 2>/dev/null || echo "parse_error")
+        if [ "${intel_status}" != "ok" ]; then
+          INTEL_FAIL_REASONS+=("${name}: intel_gate.json ${intel_status}")
+        fi
       fi
 
       # Single jq invocation extracts the 4 aggregate metrics. The
@@ -201,6 +259,11 @@ else
         BLOCKERS+=("BLOCKED_BY=nightly: ${r}")
       done
     fi
+    if [ "${#INTEL_FAIL_REASONS[@]}" -gt 0 ]; then
+      for r in "${INTEL_FAIL_REASONS[@]}"; do
+        BLOCKERS+=("BLOCKED_BY=intel: ${r}")
+      done
+    fi
   fi
 fi
 
@@ -223,7 +286,7 @@ fi
 
 # --- verdict --------------------------------------------------------------
 if [ "${#BLOCKERS[@]}" -eq 0 ]; then
-  echo "PASS check_gate: ${MIN_CONSECUTIVE_GREEN}/${MIN_CONSECUTIVE_GREEN} nightly green + ear-test green"
+  echo "PASS check_gate: ${MIN_CONSECUTIVE_GREEN}/${MIN_CONSECUTIVE_GREEN} nightly green + INTEL green + ear-test green"
   exit 0
 fi
 

@@ -3,7 +3,11 @@
 **Date:** 2026-05-27
 **Lane:** data excellence / human eval / taste-safe learning
 **Depends on:** INTEL-03, INTEL-05, INTEL-11, INTEL-12, INTEL-14
-**Status:** canonical private-label schema and sampling protocol
+**Status:** first schema/sampling/validation/reporting slice implemented
+**Code posture:** pure eval/data modules implemented in
+`src/vibemix/intel/gold_labels.py`, `gold_sampling.py`, `gold_validation.py`,
+and `scripts/eval/intel_gold.py`. No model, audio, DB, or product runtime
+dependency added.
 
 ## Why this exists
 
@@ -731,9 +735,9 @@ example rows only after track/title redaction
 
 Do not publish notes unless manually reviewed.
 
-## Commands to implement later
+## Commands
 
-These are build targets, not work for this research pass:
+Research-target commands remain future `vibemix` CLI wiring:
 
 ```text
 uv run python -m vibemix eval intel-gold init \
@@ -765,6 +769,25 @@ Validation rules:
 - no local path pattern appears;
 - no unknown candidate/proposal IDs;
 - no action payload is reconstructed from label rows.
+
+Current implemented eval CLI:
+
+```text
+uv run python scripts/eval/intel_gold.py validate tests/intel/fixtures/gold_labels_redacted.jsonl --json
+uv run python scripts/eval/intel_gold.py report tests/intel/fixtures/gold_labels_redacted.jsonl --json
+uv run python scripts/eval/intel_gold.py sample tests/intel/fixtures/transition_pairs.json --n 5 --json
+```
+
+Current implementation:
+
+- parses canonical INTEL-15 rows and legacy redacted fixture rows;
+- normalizes legacy transition `accept/reject` labels to `would_play/no`;
+- validates split enums, label enums, duplicate label IDs, unsafe private
+  payloads, label-like action IDs, known candidate/proposal/packet/track/section
+  IDs, and holdout `supersedes` corrections;
+- samples transition review queues from top, near-threshold, high-risk,
+  low-confidence, and coverage buckets;
+- emits redacted reports with hashed IDs and no notes/local paths.
 
 ## Proposed implementation files
 

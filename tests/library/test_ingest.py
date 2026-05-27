@@ -129,6 +129,13 @@ class _DimAgnosticStore:
 def isolated_cache(tmp_path, monkeypatch):
     cache = tmp_path / "library.pkl"
     monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", cache)
+    from vibemix.library import section_vectors
+
+    monkeypatch.setattr(
+        section_vectors,
+        "SECTION_VECTOR_CACHE_DB_PATH",
+        tmp_path / "section_vectors.db",
+    )
     return cache
 
 
@@ -385,13 +392,23 @@ def test_dj_cued_track_uses_window_path_and_mean_pools(isolated_cache, tmp_path,
     assert report.failed == 0
     assert store.row_count() == 1
     # Window path used: bytes-embed called per window, whole-track NOT called.
-    assert len(embedder.byte_calls) == 2  # two cues -> two windows
+    assert len(embedder.byte_calls) == 4  # two track windows + two section windows
     assert embedder.calls == []  # whole-track fallback never hit
-    assert len(sliced) == 2
+    assert len(sliced) == 4
     # Stored vector is L2-normalized (mean-pool then normalize).
     stored = store._rows["10"]
     assert stored.shape == (CLAP_DIM,)
     assert abs(float(np.linalg.norm(stored)) - 1.0) < 1e-4
+    from vibemix.library.section_vectors import (
+        get_cached_section_vector,
+        open_default_section_vector_db,
+    )
+
+    section_cache = open_default_section_vector_db(create=False)
+    assert section_cache is not None
+    assert get_cached_section_vector(section_cache, "10#s000") is not None
+    assert get_cached_section_vector(section_cache, "10#s001") is not None
+    section_cache.close()
 
 
 def test_no_structure_track_falls_back_to_whole_track(isolated_cache, tmp_path, monkeypatch):
@@ -417,7 +434,9 @@ def test_no_structure_track_falls_back_to_whole_track(isolated_cache, tmp_path, 
 
     assert report.embedded == 1
     assert store.row_count() == 1
-    # Whole-track fallback: embed_audio_file called, no window bytes embeds.
+    # Whole-track vector fallback stays true. The default section-vector slicer
+    # may honestly skip these fake bytes; a dedicated stubbed-slicer test pins
+    # the section-cache path below.
     assert embedder.calls == [str(f.resolve())]
     assert embedder.byte_calls == []
 
@@ -534,8 +553,8 @@ def test_anlz_index_drives_windows_and_has_separate_cache(isolated_cache, tmp_pa
     assert with_anlz.embedded == 1
     assert with_anlz.skipped_cached == 0
     assert anlz_embedder.calls == []
-    assert len(anlz_embedder.byte_calls) == 2
-    assert sliced == [(0.0, 32.0), (32.0, 32.0)]
+    assert len(anlz_embedder.byte_calls) == 4
+    assert sliced[:2] == [(0.0, 32.0), (32.0, 32.0)]
 
     resumed_embedder = FakeClapEmbedder()
     resumed = ingest_source(
@@ -584,8 +603,8 @@ def test_ingest_keeps_dj_cues_ahead_of_anlz(isolated_cache, tmp_path, monkeypatc
 
     assert report.embedded == 1
     assert embedder.calls == []
-    assert len(embedder.byte_calls) == 1
-    assert sliced == [(10.0, 80.0)]
+    assert len(embedder.byte_calls) == 2
+    assert sliced[0] == (10.0, 80.0)
 
 
 def test_cue_strategy_version_namespaces_cache(isolated_cache, tmp_path):

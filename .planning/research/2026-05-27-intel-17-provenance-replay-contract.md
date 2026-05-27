@@ -510,6 +510,19 @@ Rules:
 - release claims use holdout/canary, not only calibration;
 - threshold changes require a new threshold lock version and recalibration note.
 
+Current fixture implementation (2026-05-27):
+
+- `scripts/eval/intel_scorecard.py` emits a public-safe `provenance` block.
+- The block includes `eval_run_id`, `dataset_card_id`, `fixture_version`,
+  fixture manifest hash, thresholds hash, threshold lock hash/path, replay tier,
+  and a copy-paste replay command.
+- Paths are project-relative when possible and never absolute local paths.
+- `scripts/eval/intel_provenance_report.py validate` checks the scorecard
+  provenance block, optional fixture manifest hash, optional threshold lock hash,
+  replay command shape, privacy flags, and local-path leakage.
+- This is Tier 0 fixture replay evidence, not the full private
+  `eval_runs.jsonl` manifest layer.
+
 ## Replay guarantees
 
 ### Tier 0: audit replay

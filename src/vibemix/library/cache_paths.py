@@ -15,6 +15,11 @@ EMBED_CACHE_DB_PATH = VIBEMIX_CACHE_DIR / "embeddings.db"
 # CLAP 512-d content-hash cache, distinct from legacy cloud embedding rows.
 CLAP_EMBED_CACHE_DB_PATH = VIBEMIX_CACHE_DIR / "clap_embeddings.db"
 
+# Per-section CLAP vectors produced from bounded structural windows. Kept
+# separate from whole-track vectors so live transition scoring can ask for
+# section texture without mixing row shapes or cache keys.
+SECTION_VECTOR_CACHE_DB_PATH = VIBEMIX_CACHE_DIR / "section_vectors.db"
+
 CLAP_ONNX_ENV = "VIBEMIX_CLAP_ONNX_DIR"
 DEFAULT_CLAP_ONNX_DIR = VIBEMIX_CACHE_DIR / "clap-onnx"
 
@@ -31,6 +36,7 @@ def cue_onnx_path() -> Path:
     """Resolved CUE-DETR ONNX path (env override, else vibemix cache)."""
     return Path(os.environ.get(CUE_ONNX_ENV) or DEFAULT_CUE_ONNX_PATH).expanduser()
 
+
 __all__ = [
     "CLAP_EMBED_CACHE_DB_PATH",
     "CLAP_ONNX_ENV",
@@ -38,6 +44,7 @@ __all__ = [
     "DEFAULT_CLAP_ONNX_DIR",
     "DEFAULT_CUE_ONNX_PATH",
     "EMBED_CACHE_DB_PATH",
+    "SECTION_VECTOR_CACHE_DB_PATH",
     "VIBEMIX_CACHE_DIR",
     "clap_onnx_dir",
     "cue_onnx_path",

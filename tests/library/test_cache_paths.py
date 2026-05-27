@@ -12,8 +12,11 @@ def test_cache_paths_use_vibemix_cache_suffixes() -> None:
     assert cache_paths.VIBEMIX_CACHE_DIR.name == "vibemix"
     assert cache_paths.EMBED_CACHE_DB_PATH == cache_paths.VIBEMIX_CACHE_DIR / "embeddings.db"
     assert (
-        cache_paths.CLAP_EMBED_CACHE_DB_PATH
-        == cache_paths.VIBEMIX_CACHE_DIR / "clap_embeddings.db"
+        cache_paths.CLAP_EMBED_CACHE_DB_PATH == cache_paths.VIBEMIX_CACHE_DIR / "clap_embeddings.db"
+    )
+    assert (
+        cache_paths.SECTION_VECTOR_CACHE_DB_PATH
+        == cache_paths.VIBEMIX_CACHE_DIR / "section_vectors.db"
     )
     assert cache_paths.DEFAULT_CLAP_ONNX_DIR == cache_paths.VIBEMIX_CACHE_DIR / "clap-onnx"
     assert (

@@ -566,7 +566,11 @@ Current implementation:
   validation status, selected IDs, payload hash, suppressed reasons, and redacts
   local paths/vectors/audio refs;
 - `scripts/eval/intel_decision_runtime_replay.py` replays saved context packets
-  and decisions into the validator and reports grounding/claim/timing metrics.
+  and decisions into the validator and reports grounding/claim/timing metrics;
+- the replay harness hydrates redacted fixture packets from
+  `transition_pairs.json` and `claim_ledgers.json` when context rows carry only
+  candidate IDs, so exact timing and spoken cue/timing copy are validated
+  against issued candidate/claim facts.
 
 ### A/B modes
 

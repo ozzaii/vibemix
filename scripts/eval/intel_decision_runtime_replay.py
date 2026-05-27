@@ -29,12 +29,21 @@ def replay_paths(
     *,
     contexts_path: Path | str,
     decisions_path: Path | str,
+    candidate_index_path: Path | str | None = None,
+    claim_ledgers_path: Path | str | None = None,
     source: str = "private:redacted",
 ) -> dict[str, Any]:
+    candidate_index = _candidate_index(candidate_index_path)
+    claim_summary_index = _claim_summary_index(claim_ledgers_path)
     contexts = {
         envelope.packet_id: envelope
         for envelope in (
-            _envelope_from_raw(row) for row in _load_json_or_jsonl(Path(contexts_path))
+            _envelope_from_raw(
+                row,
+                candidate_index=candidate_index,
+                claim_summary_index=claim_summary_index,
+            )
+            for row in _load_json_or_jsonl(Path(contexts_path))
         )
     }
     rows = _load_json_or_jsonl(Path(decisions_path))
@@ -119,23 +128,33 @@ def replay_fixture_dir(fixture_dir: Path | str = DEFAULT_FIXTURE_DIR) -> dict[st
     return replay_paths(
         contexts_path=base / "context_packets.json",
         decisions_path=base / "agent_decisions.jsonl",
+        candidate_index_path=base / "transition_pairs.json",
+        claim_ledgers_path=base / "claim_ledgers.json",
         source=f"fixture:{base.name}",
     )
 
 
-def _envelope_from_raw(row: dict[str, Any]) -> AgentContextEnvelope:
+def _envelope_from_raw(
+    row: dict[str, Any],
+    *,
+    candidate_index: dict[str, dict[str, Any]] | None = None,
+    claim_summary_index: dict[str, tuple[dict[str, Any], ...]] | None = None,
+) -> AgentContextEnvelope:
     candidate_rows = row.get("candidates")
     if not isinstance(candidate_rows, list):
         candidate_rows = [
-            {
-                "candidate_id": candidate_id,
-                "recommended_cue_slot": None,
-                "start_in_bars": None,
-            }
+            _candidate_payload_for_id(str(candidate_id), candidate_index or {})
             for candidate_id in row.get("candidate_ids", ())
         ]
+    packet_id = str(row["packet_id"])
     claim_summary = tuple(row.get("claim_summary") or ())
+    if not claim_summary and claim_summary_index is not None:
+        claim_summary = claim_summary_index.get(packet_id, ())
     claim_ids = tuple(row.get("claim_ids") or ())
+    if not claim_ids:
+        claim_ids = tuple(
+            str(claim["claim_id"]) for claim in claim_summary if claim.get("claim_id")
+        )
     if not claim_ids:
         claim_ids = tuple(
             claim_id
@@ -145,19 +164,25 @@ def _envelope_from_raw(row: dict[str, Any]) -> AgentContextEnvelope:
     allowed_claims = tuple(
         claim for claim in row.get("allowed_claims", ()) if not str(claim).startswith("clm_")
     )
+    constraints = dict(row.get("constraints") or {})
+    confidence_policy = dict(row.get("confidence_policy") or {})
+    if "exact_timing_allowed" not in constraints and "exact_timing_allowed" in confidence_policy:
+        constraints["exact_timing_allowed"] = bool(confidence_policy["exact_timing_allowed"])
+    if claim_summary and "strict_claim_validation" not in constraints:
+        constraints["strict_claim_validation"] = True
     return AgentContextEnvelope(
         schema_version=str(row.get("schema_version") or SCHEMA_VERSION),
-        packet_id=str(row["packet_id"]),
+        packet_id=packet_id,
         mode=row.get("mode", "prep"),
         intent=row.get("intent", "chat"),
         current=dict(row.get("current") or {}),
         candidates=tuple(dict(candidate) for candidate in candidate_rows),
-        constraints=dict(row.get("constraints") or {}),
+        constraints=constraints,
         allowed_actions=tuple(row.get("allowed_actions") or ()),
         allowed_claims=allowed_claims,
         forbidden_claims=tuple(row.get("forbidden_claims") or ()),
         citation_scope={k: tuple(v) for k, v in dict(row.get("citation_scope") or {}).items()},
-        confidence_policy=dict(row.get("confidence_policy") or {}),
+        confidence_policy=confidence_policy,
         claim_ids=claim_ids,
         claim_summary=claim_summary,
     )
@@ -194,6 +219,66 @@ def _load_json_or_jsonl(path: Path) -> list[dict[str, Any]]:
         return [json.loads(line) for line in text.splitlines() if line.strip()]
     raw = json.loads(text)
     return raw if isinstance(raw, list) else [raw]
+
+
+def _candidate_index(path: Path | str | None) -> dict[str, dict[str, Any]]:
+    if path is None:
+        return {}
+    index: dict[str, dict[str, Any]] = {}
+    for row in _load_json_or_jsonl(Path(path)):
+        candidate_id = str(row.get("candidate_id") or "")
+        if candidate_id:
+            index[candidate_id] = {
+                "candidate_id": candidate_id,
+                "from_section_id": row.get("from_section_id"),
+                "to_section_id": row.get("to_section_id"),
+                "recommended_cue_slot": row.get("cue_slot"),
+                "start_in_bars": row.get("start_in_bars"),
+                "score": row.get("score"),
+                "confidence": row.get("confidence"),
+                "risk_flags": tuple(row.get("risk_flags") or ()),
+            }
+    return index
+
+
+def _candidate_payload_for_id(
+    candidate_id: str, candidate_index: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    return candidate_index.get(
+        candidate_id,
+        {
+            "candidate_id": candidate_id,
+            "recommended_cue_slot": None,
+            "start_in_bars": None,
+        },
+    )
+
+
+def _claim_summary_index(path: Path | str | None) -> dict[str, tuple[dict[str, Any], ...]]:
+    if path is None:
+        return {}
+    index: dict[str, tuple[dict[str, Any], ...]] = {}
+    for ledger in _load_json_or_jsonl(Path(path)):
+        packet_id = str(ledger.get("packet_id") or "")
+        claims = []
+        for claim in ledger.get("claims") or ():
+            claims.append(
+                {
+                    "claim_id": claim.get("claim_id"),
+                    "type": _claim_type(str(claim.get("claim_type") or claim.get("type") or "")),
+                    "subject_id": claim.get("subject_id"),
+                    "value": claim.get("value"),
+                    "status": claim.get("status", "allowed"),
+                    "forbidden_phrases": tuple(claim.get("forbidden_phrases") or ()),
+                }
+            )
+        if packet_id:
+            index[packet_id] = tuple(claims)
+    return index
+
+
+def _claim_type(value: str) -> str:
+    return {"timing": "bars_until_event"}.get(value, value)
 
 
 def _count_errors(results: list[dict[str, Any]]) -> dict[str, int]:

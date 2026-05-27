@@ -16,6 +16,8 @@ from vibemix.intel.transition_scorer import SectionRecord
 from vibemix.library.rekordbox import CuePoint, TrackEntry
 from vibemix.state import harmonics
 
+SOURCE_LOOKAHEAD_BARS = 16
+
 
 def sections_for_entry(entry: TrackEntry) -> tuple[SectionRecord, ...]:
     """Build v1 grounded sections from Rekordbox cues or a fallback map."""
@@ -93,11 +95,62 @@ def section_at_position(
     return sections[0]
 
 
+def next_section_after_position(
+    sections: tuple[SectionRecord, ...], position_s: float | None
+) -> SectionRecord | None:
+    """Return the first section that starts after a live playhead position."""
+    if position_s is None:
+        return None
+    position = max(0.0, float(position_s))
+    for section in sections:
+        if section.start_s > position:
+            return section
+    return None
+
+
+def transition_source_for_position(
+    sections: tuple[SectionRecord, ...],
+    position_s: float | None,
+    *,
+    lookahead_bars: int = SOURCE_LOOKAHEAD_BARS,
+) -> tuple[SectionRecord, int | None, str | None]:
+    """Resolve the source section/timing for a live transition.
+
+    When a stronger mix-out section is about to start, score against that
+    upcoming section and return bars until its start. Otherwise score against
+    the current section and return bars until its end.
+    """
+    if position_s is None:
+        return best_source_section(sections), None, None
+
+    current = section_at_position(sections, position_s)
+    next_section = next_section_after_position(sections, position_s)
+    bars_to_next = bars_until_section_start(next_section, position_s)
+    if (
+        next_section is not None
+        and bars_to_next is not None
+        and bars_to_next <= lookahead_bars
+        and _source_role_priority(next_section.role) > _source_role_priority(current.role)
+    ):
+        return next_section, bars_to_next, "section_lookahead"
+
+    return current, bars_until_section_end(current, position_s), "section_playhead"
+
+
 def bars_until_section_end(section: SectionRecord, position_s: float | None) -> int | None:
     """Return whole bars until this source section ends, when BPM is known."""
     if position_s is None or section.bpm is None or section.bpm <= 0:
         return None
     seconds = max(0.0, section.end_s - max(0.0, float(position_s)))
+    bars = seconds * section.bpm / 60.0 / 4.0
+    return max(0, math.ceil(bars))
+
+
+def bars_until_section_start(section: SectionRecord | None, position_s: float | None) -> int | None:
+    """Return whole bars until a future section starts, when BPM is known."""
+    if section is None or position_s is None or section.bpm is None or section.bpm <= 0:
+        return None
+    seconds = max(0.0, float(section.start_s) - max(0.0, float(position_s)))
     bars = seconds * section.bpm / 60.0 / 4.0
     return max(0, math.ceil(bars))
 
@@ -224,11 +277,29 @@ def _bar_count(start_s: float, end_s: float, bpm: float | None) -> float | None:
     return max(0.0, (end_s - start_s) * bpm / 60.0 / 4.0)
 
 
+def _source_role_priority(role: str | None) -> int:
+    role = (role or "").strip().lower()
+    priority = {
+        "unknown": 0,
+        "intro": 1,
+        "breakdown": 2,
+        "build": 3,
+        "drop": 4,
+        "groove": 5,
+        "outro": 6,
+    }
+    return priority.get(role, 0)
+
+
 __all__ = [
+    "SOURCE_LOOKAHEAD_BARS",
     "bars_until_section_end",
+    "bars_until_section_start",
     "best_source_section",
     "destination_sections",
+    "next_section_after_position",
     "section_at_position",
     "section_to_dict",
     "sections_for_entry",
+    "transition_source_for_position",
 ]

@@ -1,0 +1,6 @@
+{"min_bar_count":4,"min_role_confidence":0.7,"mixable_roles":["intro"],"prototype_role":"intro","query_id":"fixture_role_intro_mix_in","target_role":"intro"}
+{"min_bar_count":8,"min_role_confidence":0.7,"mixable_roles":["groove"],"prototype_role":"groove","query_id":"fixture_role_groove_bed","target_role":"groove"}
+{"min_bar_count":4,"min_role_confidence":0.7,"mixable_roles":["breakdown"],"prototype_role":"breakdown","query_id":"fixture_role_breakdown_reset","target_role":"breakdown"}
+{"min_bar_count":8,"min_role_confidence":0.7,"mixable_roles":["drop"],"prototype_role":"drop","query_id":"fixture_role_drop_peak","target_role":"drop"}
+{"min_bar_count":4,"min_role_confidence":0.7,"mixable_roles":["outro"],"prototype_role":"outro","query_id":"fixture_role_outro_mix_out","target_role":"outro"}
+{"min_bar_count":4,"min_role_confidence":0.7,"mixable_roles":["build"],"prototype_role":"build","query_id":"fixture_role_build_lift","target_role":"build"}

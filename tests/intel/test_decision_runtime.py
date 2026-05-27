@@ -97,13 +97,23 @@ def test_live_pill_uses_deterministic_path_by_default() -> None:
         )
     )
 
-    result = decide("live", "live_next_pill", _snapshot(), model_backend=model)
+    snapshot = _snapshot()
+    result = decide("live", "live_next_pill", snapshot, model_backend=model)
 
     assert model.called is False
     assert result.decision_source == "deterministic"
     assert result.emitted
     assert result.final_decision.candidate_id == "tr_001"
     assert result.final_decision.timing_text == "in 16 bars"
+    assert "cue A at 0:00" in result.final_decision.spoken_text
+    assert "outro into intro" in result.final_decision.spoken_text
+    claim_types = {
+        claim["type"]
+        for claim in snapshot.envelope.claim_summary
+        if claim["claim_id"] in result.final_decision.cited_claim_ids
+    }
+    assert {"section_role", "section_boundary"}.issubset(claim_types)
+    assert set(result.final_decision.cited_claims) == claim_types
     assert result.trace.decision_source == "deterministic"
 
 

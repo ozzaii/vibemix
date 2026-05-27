@@ -61,6 +61,15 @@ def _claim_id(envelope, claim_type: str) -> str:  # type: ignore[no-untyped-def]
     raise AssertionError(f"missing claim type {claim_type}")
 
 
+def _claim_ids(envelope, claim_type: str) -> tuple[str, ...]:  # type: ignore[no-untyped-def]
+    ids = tuple(
+        str(claim["claim_id"]) for claim in envelope.claim_summary if claim["type"] == claim_type
+    )
+    if not ids:
+        raise AssertionError(f"missing claim type {claim_type}")
+    return ids
+
+
 def test_validator_accepts_issued_select_decision() -> None:
     envelope = _envelope()
     result = validate_agent_decision(
@@ -77,6 +86,27 @@ def test_validator_accepts_issued_select_decision() -> None:
                 _claim_id(envelope, "transition_fit"),
                 _claim_id(envelope, "cue_slot"),
                 _claim_id(envelope, "bars_until_event"),
+            ),
+            confidence=0.9,
+        ),
+    )
+
+    assert result.accepted
+
+
+def test_validator_accepts_section_role_copy_when_claim_backed() -> None:
+    envelope = _envelope()
+    result = validate_agent_decision(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="select",
+            candidate_id="tr_001",
+            cue_slot="A",
+            spoken_text="Next good entry: cue A, outro into intro.",
+            cited_claim_ids=(
+                _claim_id(envelope, "cue_slot"),
+                *_claim_ids(envelope, "section_role"),
             ),
             confidence=0.9,
         ),
