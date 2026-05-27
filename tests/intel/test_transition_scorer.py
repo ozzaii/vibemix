@@ -95,6 +95,13 @@ def test_bpm_score_tempo_jump_low_and_flagged() -> None:
     assert flags == ("tempo_jump",)
 
 
+def test_bpm_score_nonfinite_degrades_to_unknown() -> None:
+    score, flags = bpm_score(float("nan"), 128.0)
+
+    assert score == pytest.approx(0.55)
+    assert flags == ("bpm_unknown",)
+
+
 def test_cue_operability_dj_cue_highest() -> None:
     score, flags = cue_operability_score(
         _section("t2#s000", "t2", "intro", cue_slot="A", cue_source="dj")
@@ -254,6 +261,48 @@ def test_mismatched_semantic_vector_dims_degrade_to_unknown() -> None:
     assert slate[0].semantic_basis == "semantic_unknown"
 
 
+def test_nonfinite_semantic_vector_degrades_to_unknown() -> None:
+    source = _section("t1#s000", "t1", "outro")
+    destination = _section("t2#s000", "t2", "intro")
+
+    slate = score_transition_slate(
+        TransitionScoringInput(
+            source=source,
+            destinations=(destination,),
+            source_vector=np.array([1.0, float("nan")], dtype=np.float32),
+            destination_vectors={destination.section_id: np.array([1.0, 0.0], dtype=np.float32)},
+        )
+    )
+
+    assert len(slate) == 1
+    assert "semantic_unknown" in slate[0].risk_flags
+    assert slate[0].semantic_basis == "semantic_unknown"
+
+
+def test_nonfinite_energy_degrades_to_unknown_not_perfect_match() -> None:
+    source = _section("t1#s000", "t1", "outro", energy_mean=float("nan"))
+    destination = _section("t2#s000", "t2", "intro", energy_mean=54.0)
+
+    slate = score_transition_slate(
+        TransitionScoringInput(source=source, destinations=(destination,))
+    )
+
+    assert len(slate) == 1
+    assert slate[0].components.energy_shape == pytest.approx(0.50)
+    assert "energy_unknown" in slate[0].risk_flags
+
+
+def test_nonfinite_timing_sections_are_filtered() -> None:
+    source = _section("t1#s000", "t1", "outro")
+    bad_destination = _section("t2#s000", "t2", "intro", start_s=float("nan"))
+
+    slate = score_transition_slate(
+        TransitionScoringInput(source=source, destinations=(bad_destination,))
+    )
+
+    assert slate == ()
+
+
 def test_harmonic_clash_live_melodic_suppresses() -> None:
     source = _section("t1#s000", "t1", "drop", camelot="8A")
     destination = _section("t2#s000", "t2", "drop", camelot="3A")
@@ -347,6 +396,26 @@ def test_high_playhead_confidence_allows_start_in_bars() -> None:
 
     assert len(slate) == 1
     assert slate[0].start_in_bars == 16
+
+
+def test_nonfinite_live_timing_withholds_exact_bars() -> None:
+    source = _section("t1#s000", "t1", "outro")
+    destination = _section("t2#s000", "t2", "intro")
+
+    slate = score_transition_slate(
+        TransitionScoringInput(
+            source=source,
+            destinations=(destination,),
+            mode="live",
+            live_position=LivePosition(
+                remaining_bars=float("nan"),  # type: ignore[arg-type]
+                playhead_confidence=0.95,
+            ),
+        )
+    )
+
+    assert len(slate) == 1
+    assert slate[0].start_in_bars is None
 
 
 def test_live_caps_one_candidate_per_destination_track() -> None:

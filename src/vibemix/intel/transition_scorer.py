@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from dataclasses import dataclass, replace
 from typing import Literal
 
@@ -209,9 +210,11 @@ def harmonic_score(src: str | None, dst: str | None) -> tuple[float, tuple[str, 
 
 def bpm_score(src: float | None, dst: float | None) -> tuple[float, tuple[str, ...]]:
     """Grade tempo compatibility from deterministic BPM metadata."""
-    if src is None or dst is None or src <= 0 or dst <= 0:
+    src_bpm = _finite_positive_or_none(src)
+    dst_bpm = _finite_positive_or_none(dst)
+    if src_bpm is None or dst_bpm is None:
         return 0.55, ("bpm_unknown",)
-    delta = abs(dst - src) / src
+    delta = abs(dst_bpm - src_bpm) / src_bpm
     if delta <= 0.015:
         return 1.0, ()
     if delta <= 0.03:
@@ -238,15 +241,20 @@ def phrase_alignment_score(
             flags.append("blend_active")
         if live_position.source_loop_recent:
             flags.append("source_loop_recent")
-        if live_position.playhead_confidence < EXACT_TIMING_CONFIDENCE_FLOOR:
+        playhead_confidence = _finite_or_none(live_position.playhead_confidence)
+        if playhead_confidence is None or playhead_confidence < EXACT_TIMING_CONFIDENCE_FLOOR:
             flags.append("timing_low_confidence")
-    if section.bar_count is not None and section.bar_count < 4:
+    bar_count = _finite_or_none(section.bar_count)
+    if section.bar_count is not None and bar_count is None:
+        flags.append("phrase_unknown")
+    elif bar_count is not None and bar_count < 4:
         flags.append("phrase_short")
-    if section.start_beat is None:
+    start_beat = _finite_or_none(section.start_beat)
+    if start_beat is None:
         flags.append("phrase_unknown")
         return 0.50, tuple(flags)
 
-    beat = max(0, int(section.start_beat))
+    beat = max(0, int(start_beat))
     if beat % 128 == 0:
         return 1.0, tuple(flags)
     if beat % 64 == 0:
@@ -404,6 +412,10 @@ def _hard_filtered(scoring_input: TransitionScoringInput, destination: SectionRe
     source = scoring_input.source
     if destination.section_id == source.section_id:
         return True
+    source_duration = _section_duration(source)
+    destination_duration = _section_duration(destination)
+    if source_duration is None or destination_duration is None:
+        return True
     if scoring_input.mode == "live" and destination.track_id == source.track_id:
         return True
     if destination.track_id in scoring_input.played_track_ids:
@@ -420,10 +432,16 @@ def _hard_filtered(scoring_input: TransitionScoringInput, destination: SectionRe
         if scoring_input.mode == "live"
         else PREP_SECTION_CONFIDENCE_FLOOR
     )
-    if source.confidence < floor or destination.confidence < floor:
+    source_confidence = _finite_or_none(source.confidence)
+    destination_confidence = _finite_or_none(destination.confidence)
+    if (
+        source_confidence is None
+        or destination_confidence is None
+        or source_confidence < floor
+        or destination_confidence < floor
+    ):
         return True
-    duration = destination.end_s - destination.start_s
-    return duration > 0 and duration < MIN_USABLE_SECTION_SECONDS
+    return destination_duration < MIN_USABLE_SECTION_SECONDS
 
 
 def _semantic_score(
@@ -433,13 +451,22 @@ def _semantic_score(
         return 0.50, ("semantic_unknown",)
     src = np.asarray(source_vector, dtype=np.float32)
     dst = np.asarray(destination_vector, dtype=np.float32)
-    src_norm = float(np.linalg.norm(src))
-    dst_norm = float(np.linalg.norm(dst))
-    if src_norm <= 1e-12 or dst_norm <= 1e-12:
-        return 0.50, ("semantic_unknown",)
     if src.shape != dst.shape:
         return 0.50, ("semantic_unknown", "semantic_dim_mismatch")
+    if not np.all(np.isfinite(src)) or not np.all(np.isfinite(dst)):
+        return 0.50, ("semantic_unknown",)
+    src_norm = float(np.linalg.norm(src))
+    dst_norm = float(np.linalg.norm(dst))
+    if (
+        not math.isfinite(src_norm)
+        or not math.isfinite(dst_norm)
+        or src_norm <= 1e-12
+        or dst_norm <= 1e-12
+    ):
+        return 0.50, ("semantic_unknown",)
     cosine = float(np.dot(src / src_norm, dst / dst_norm))
+    if not math.isfinite(cosine):
+        return 0.50, ("semantic_unknown",)
     return clamp01((cosine + 1.0) / 2.0), ()
 
 
@@ -468,7 +495,11 @@ def _energy_shape_score(
 ) -> tuple[float, tuple[str, ...]]:
     if source.energy_mean is None or destination.energy_mean is None:
         return 0.50, ("energy_unknown",)
-    energy_delta = destination.energy_mean - source.energy_mean
+    source_energy = _finite_or_none(source.energy_mean)
+    destination_energy = _finite_or_none(destination.energy_mean)
+    if source_energy is None or destination_energy is None:
+        return 0.50, ("energy_unknown",)
+    energy_delta = destination_energy - source_energy
     desired = _desired_energy_delta(source.role, destination.role)
     score = 1.0 - clamp01(abs(energy_delta - desired) / 60.0)
     flags: list[str] = []
@@ -499,7 +530,8 @@ def _taste_score(scoring_input: TransitionScoringInput, destination: SectionReco
     if not scoring_input.taste_scores:
         return 0.50
     key = (normalize_role(scoring_input.source.role), normalize_role(destination.role))
-    return clamp01(scoring_input.taste_scores.get(key, 0.50))
+    value = _finite_or_none(scoring_input.taste_scores.get(key, 0.50))
+    return clamp01(value if value is not None else 0.50)
 
 
 def _novelty_score(scoring_input: TransitionScoringInput, destination: SectionRecord) -> float:
@@ -567,10 +599,8 @@ def _transition_confidence(
 def _metadata_confidence(source: SectionRecord, destination: SectionRecord) -> float:
     key_known = source.camelot is not None and destination.camelot is not None
     bpm_known = (
-        source.bpm is not None
-        and source.bpm > 0
-        and destination.bpm is not None
-        and destination.bpm > 0
+        _finite_positive_or_none(source.bpm) is not None
+        and _finite_positive_or_none(destination.bpm) is not None
     )
     if key_known and bpm_known:
         return 1.0
@@ -583,13 +613,19 @@ def _start_in_bars(scoring_input: TransitionScoringInput, phrase_score: float) -
     live = scoring_input.live_position
     if scoring_input.mode != "live" or live is None:
         return None
-    if live.playhead_confidence < EXACT_TIMING_CONFIDENCE_FLOOR or live.blend_active:
+    playhead_confidence = _finite_or_none(live.playhead_confidence)
+    if (
+        playhead_confidence is None
+        or playhead_confidence < EXACT_TIMING_CONFIDENCE_FLOOR
+        or live.blend_active
+    ):
         return None
     if live.source_loop_recent:
         return None
-    if phrase_score < 0.62 or live.remaining_bars is None:
+    remaining_bars = _finite_or_none(live.remaining_bars)
+    if phrase_score < 0.62 or remaining_bars is None:
         return None
-    return max(0, int(live.remaining_bars))
+    return max(0, int(remaining_bars))
 
 
 def _severe_live_suppressor(
@@ -721,9 +757,34 @@ def _normalized_cue_source(section: SectionRecord) -> str | None:
 
 
 def _clamped_cue_confidence(confidence: float | None) -> float | None:
-    if confidence is None:
+    parsed = _finite_or_none(confidence)
+    if parsed is None:
         return None
-    return clamp01(confidence)
+    return clamp01(parsed)
+
+
+def _section_duration(section: SectionRecord) -> float | None:
+    start_s = _finite_or_none(section.start_s)
+    end_s = _finite_or_none(section.end_s)
+    if start_s is None or end_s is None:
+        return None
+    duration = end_s - start_s
+    return duration if duration > 0 else None
+
+
+def _finite_or_none(value: float | int | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
+def _finite_positive_or_none(value: float | int | None) -> float | None:
+    parsed = _finite_or_none(value)
+    return parsed if parsed is not None and parsed > 0 else None
 
 
 def _camelot_parts(raw: str | None) -> tuple[int, str] | None:

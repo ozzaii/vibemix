@@ -311,6 +311,10 @@ Acceptance evidence:
 - harmonic/BPM risks only fire when facts are known enough;
 - risk flags are structured;
 - no NaN/inf scores;
+- non-finite BPM, energy, vector, cue-confidence, and live-timing facts degrade
+  to unknown/withheld evidence rather than fabricated musical claims;
+- non-finite or non-positive section timing is hard-filtered before candidate
+  emission;
 - tie-breaks are deterministic;
 - taste defaults to neutral;
 - scorer is pure and import-light.
