@@ -117,9 +117,14 @@ async function loadControllerSvg(controllerId: string): Promise<string> {
       )) as ControllerSvgModule;
       return m.PIONEER_DDJ_SX3_SVG ?? "";
     }
-    // Plan 06 lands the remaining 1 — until then it falls through to
-    // the generic branch (so a user plugging an XDJ-RX3 still sees the
-    // labeled-zone fallback, not a blank stage).
+    case "pioneer_xdj_rx3": {
+      const m = (await import(
+        "../controllers/pioneer_xdj_rx3.svg.js"
+      )) as ControllerSvgModule;
+      return m.PIONEER_XDJ_RX3_SVG ?? "";
+    }
+    // All 10 specific controllers landed (Plan 06 closed). Unknown ids
+    // still fall through to the generic labeled-zone fallback below.
     default: {
       const generic = (await import(
         "../controllers/_generic.svg.js"
