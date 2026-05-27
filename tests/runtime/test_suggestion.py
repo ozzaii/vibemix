@@ -345,6 +345,19 @@ def test_resolve_live_timing_prefers_grounded_track_position():
     assert timing.source_position_s == 276.0
 
 
+def test_resolve_live_timing_marks_recent_source_loop():
+    state = MusicState()
+    state.audible_deck = "A"
+    state.audible_track_position_s = 276.0
+    state.audible_track_position_confidence = 0.85
+    state.recent_moves = [(0.3, "A_loop_out_hit"), (0.2, "B_loop_out_hit")]
+
+    timing = resolve_live_timing(state)
+
+    assert timing.source_loop_recent is True
+    assert timing.source_position_s == 276.0
+
+
 def test_controller_mix_context_marks_open_target_deck_as_blend() -> None:
     state = MusicState()
     state.audible_deck = "A"
@@ -529,6 +542,54 @@ def test_controller_blend_keeps_transition_but_suppresses_select_decision():
         "status": "suppress",
         "reason": "blend_active",
     } in payload["gate_results"]
+
+
+def test_recent_source_loop_keeps_cue_but_withholds_exact_timing():
+    from dataclasses import replace
+
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(["s", "a"], [("s", 0.99), ("a", 0.9)])
+    lib = _lib(["s", "a"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    svc = SuggestionService(store, lib)
+    state = MusicState()
+    state.audible_deck = "A"
+    state.audible_track_position_s = 276.0
+    state.audible_track_position_confidence = 0.85
+    state.recent_moves = [(0.3, "A_loop_out_hit")]
+    state.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=124.0)}
+    )
+
+    out = svc.compute_from_state(state)
+    envelope = svc.context_for_state(state, packet_id="ctx_live_loop")
+    payload = svc.decision_payload_for_state(
+        state,
+        packet_id="ctx_live_loop",
+        snapshot_id="snapshot_live_loop",
+        decision_id="dec_live_loop",
+        trace_id="trace_live_loop",
+    )
+
+    assert out is not None
+    assert out["transition"]["cue_slot"] == "A"
+    assert out["transition"]["start_in_bars"] is None
+    assert out["transition"]["timing_basis"] is None
+    assert "source_loop_recent" in out["transition"]["risk_flags"]
+    assert envelope is not None
+    assert envelope.current["source_loop_recent"] is True
+    assert payload is not None
+    assert payload["action"] == "select"
+    assert payload["timing_text"] is None
 
 
 def test_refresh_from_state_updates_transition_countdown_without_reranking():

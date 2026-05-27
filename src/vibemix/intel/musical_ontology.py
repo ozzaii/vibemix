@@ -118,6 +118,7 @@ RISK_PENALTIES: dict[str, float] = {
     "short_entry_window": 0.15,
     "fallback_entry": 0.14,
     "blend_active": 0.12,
+    "source_loop_recent": 0.10,
     "energy_cliff": 0.12,
     "tempo_push": 0.10,
     "semantic_unknown": 0.08,

@@ -88,6 +88,7 @@ class LivePosition:
     remaining_bars: int | None = None
     playhead_confidence: float = 0.0
     blend_active: bool = False
+    source_loop_recent: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,6 +236,8 @@ def phrase_alignment_score(
     if mode == "live" and live_position is not None:
         if live_position.blend_active:
             flags.append("blend_active")
+        if live_position.source_loop_recent:
+            flags.append("source_loop_recent")
         if live_position.playhead_confidence < EXACT_TIMING_CONFIDENCE_FLOOR:
             flags.append("timing_low_confidence")
     if section.bar_count is not None and section.bar_count < 4:
@@ -582,6 +585,8 @@ def _start_in_bars(scoring_input: TransitionScoringInput, phrase_score: float) -
         return None
     if live.playhead_confidence < EXACT_TIMING_CONFIDENCE_FLOOR or live.blend_active:
         return None
+    if live.source_loop_recent:
+        return None
     if phrase_score < 0.62 or live.remaining_bars is None:
         return None
     return max(0, int(live.remaining_bars))
@@ -641,6 +646,7 @@ def _reasons(
         "semantic_unknown": "section texture is not embedded yet",
         "semantic_dim_mismatch": "section texture vectors are not comparable yet",
         "timing_low_confidence": "timing is not locked, so exact bars are withheld",
+        "source_loop_recent": "source deck was looped recently, so exact bars are withheld",
         "auto_cue_review": "auto-generated cue needs review before trusting it",
         "cue_needs_review": "cue confidence is below the review threshold",
         "low_cue_confidence": "cue confidence is low",

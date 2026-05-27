@@ -60,6 +60,7 @@ FULL_COMPUTE_DISPATCH_GUARD_S = 0.25
 CONTROLLER_TARGET_VOLUME_FLOOR = 16
 CONTROLLER_XFADER_FACTOR_FLOOR = 0.20
 TARGET_DECK_TRACK_CONFIDENCE_FLOOR = 0.50
+SOURCE_LOOP_RECENCY_S = 8.0
 EXPLICIT_FEEDBACK_ACTIONS: dict[str, tuple[str, str]] = {
     "accept": ("suggestion_accepted", "accepted"),
     "keep": ("suggestion_accepted", "accepted"),
@@ -78,6 +79,7 @@ class LiveTimingHint:
     playhead_confidence: float
     blend_active: bool = False
     source_position_s: float | None = None
+    source_loop_recent: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,27 +158,35 @@ def resolve_live_timing(state: Any) -> LiveTimingHint:
         getattr(state, "audible_deck", None) == "mix"
         or resolve_controller_mix_context(state).get("controller_blend_active")
     )
+    source_deck = _deck_label(getattr(state, "audible_deck", None))
+    source_loop_recent = _source_loop_recent(state, source_deck=source_deck)
     source_position_s = _float_or(getattr(state, "audible_track_position_s", None), None)
     position_confidence = _clamp01(
         _float_or(getattr(state, "audible_track_position_confidence", 0.0), 0.0) or 0.0
     )
     if source_position_s is not None and position_confidence >= 0.5:
-        return LiveTimingHint(None, position_confidence, blend_active, source_position_s)
+        return LiveTimingHint(
+            None,
+            position_confidence,
+            blend_active,
+            source_position_s,
+            source_loop_recent,
+        )
 
     confidence = _float_or(getattr(state, "bpm_confidence", 0.0), 0.0)
     confidence = _clamp01(confidence)
     if confidence < BAR_LOCK_CONFIDENCE_FLOOR:
-        return LiveTimingHint(None, confidence, blend_active)
+        return LiveTimingHint(None, confidence, blend_active, None, source_loop_recent)
 
     phase = _float_or(getattr(state, "beat_phase", None), None)
     if phase is None:
         phase = _float_or(getattr(state, "downbeat_phase", 0.0), None)
     if phase is None or not 0.0 <= phase < 1.0:
-        return LiveTimingHint(None, 0.0, blend_active)
+        return LiveTimingHint(None, 0.0, blend_active, None, source_loop_recent)
 
     distance_to_bar_boundary = min(phase, 1.0 - phase)
     remaining_bars = 0 if distance_to_bar_boundary <= BAR_BOUNDARY_TOLERANCE else 1
-    return LiveTimingHint(remaining_bars, confidence, blend_active)
+    return LiveTimingHint(remaining_bars, confidence, blend_active, None, source_loop_recent)
 
 
 def resolve_controller_mix_context(
@@ -590,6 +600,7 @@ class SuggestionService:
             "target_deck": seed.target_deck if seed is not None else None,
             "prepared_target_track_id": seed.target_track_id if seed is not None else None,
             "blend_active": timing.blend_active,
+            "source_loop_recent": timing.source_loop_recent,
             "playhead_confidence": timing.playhead_confidence,
             "source_position_s": timing.source_position_s,
             "controller": controller,
@@ -784,6 +795,7 @@ class SuggestionService:
         live_remaining_bars: int | None = None,
         live_playhead_confidence: float = 0.0,
         blend_active: bool = False,
+        source_loop_recent: bool = False,
         source_position_s: float | None = None,
     ) -> dict | None:
         """Recompute from a seed track_id. Marks the seed played, returns +
@@ -815,6 +827,7 @@ class SuggestionService:
                 live_remaining_bars=live_remaining_bars,
                 live_playhead_confidence=live_playhead_confidence,
                 blend_active=blend_active,
+                source_loop_recent=source_loop_recent,
                 source_position_s=source_position_s,
                 taste_scores=self._taste_scores,
             )
@@ -890,6 +903,7 @@ class SuggestionService:
             live_remaining_bars=timing.remaining_bars,
             live_playhead_confidence=timing.playhead_confidence,
             blend_active=timing.blend_active,
+            source_loop_recent=timing.source_loop_recent,
             source_position_s=timing.source_position_s,
         )
 
@@ -910,6 +924,7 @@ class SuggestionService:
             live_remaining_bars=timing.remaining_bars,
             live_playhead_confidence=timing.playhead_confidence,
             blend_active=timing.blend_active,
+            source_loop_recent=timing.source_loop_recent,
             source_position_s=timing.source_position_s,
         )
 
@@ -994,6 +1009,7 @@ class SuggestionService:
                     remaining_bars=timing.remaining_bars,
                     playhead_confidence=timing.playhead_confidence,
                     blend_active=timing.blend_active,
+                    source_loop_recent=timing.source_loop_recent,
                     source_position_s=timing.source_position_s,
                     destination_vector=candidate_vectors_by_track_id.get(track_id),
                     taste_scores=self._taste_scores,
@@ -1024,6 +1040,7 @@ class SuggestionService:
                         remaining_bars=timing.remaining_bars,
                         playhead_confidence=timing.playhead_confidence,
                         blend_active=timing.blend_active,
+                        source_loop_recent=timing.source_loop_recent,
                         source_position_s=timing.source_position_s,
                         destination_vector=target_vector,
                         taste_scores=self._taste_scores,
@@ -1071,6 +1088,7 @@ class SuggestionService:
                 remaining_bars=timing.remaining_bars,
                 playhead_confidence=timing.playhead_confidence,
                 blend_active=timing.blend_active,
+                source_loop_recent=timing.source_loop_recent,
                 source_position_s=timing.source_position_s,
                 destination_vector=candidate_vector,
                 taste_scores=self._taste_scores,
@@ -1276,6 +1294,20 @@ def _deck_label(deck: Any) -> str | None:
         return None
     deck = deck.strip().upper()
     return deck if deck in {"A", "B"} else None
+
+
+def _source_loop_recent(state: Any, *, source_deck: str | None) -> bool:
+    if source_deck not in {"A", "B"}:
+        return False
+    prefix = f"{source_deck}_loop_"
+    for raw in getattr(state, "recent_moves", ()) or ():
+        if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+            continue
+        age = _float_or(raw[0], None)
+        label = str(raw[1])
+        if age is not None and age <= SOURCE_LOOP_RECENCY_S and label.startswith(prefix):
+            return True
+    return False
 
 
 def _int_0_127(raw: Any, default: int) -> int:

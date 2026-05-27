@@ -24,6 +24,7 @@ pretend it has perfect ears:
 
 - live deck and playhead state
 - controller mix posture, including deck volume, xfader, EQ-low, and filter state
+- recent source-deck loop posture from grounded MIDI moves
 - track-level CLAP similarity
 - section-level vectors where available
 - section roles and phrase boundaries
@@ -226,11 +227,12 @@ semantic, and confidence gates intact.
 
 ### Controller posture
 
-The live context also includes `prepared_target_track_id` plus a bounded
-`controller` object derived from `MusicState.deck_a`, `MusicState.deck_b`, and
-`MusicState.xfader`:
+The live context also includes `prepared_target_track_id`,
+`source_loop_recent`, plus a bounded `controller` object derived from
+`MusicState.deck_a`, `MusicState.deck_b`, and `MusicState.xfader`:
 
 - `prepared_target_track_id`
+- `source_loop_recent`
 - `connected`
 - `xfader`
 - source/target deck summaries
@@ -244,6 +246,10 @@ already opened the target deck or prepared a low-cut/filter blend. In that
 state, transition candidates remain available for UI context, but
 `start_in_bars` is removed and the validated decision is suppressed so the pill
 does not bark a stale "load this now" instruction mid-blend.
+Recent loop commands on the audible source deck also remove exact bar timing,
+because the natural section countdown is no longer trustworthy while the DJ is
+holding a loop. Unlike active blending, this keeps the validated cue action
+available; it only withholds the bar countdown and adds review risk.
 
 ### `decision`
 
@@ -286,6 +292,8 @@ model to infer why the pill did not emit.
 - Exact timing is emitted only when the playhead confidence policy allows it.
 - Live blend conditions suppress unsafe timing precision and validated select
   actions, while preserving grounded transition context where possible.
+- Recent source-deck loop posture suppresses exact bar countdowns while keeping
+  grounded cue/track guidance available.
 - A track already loaded on the target deck may extend the slate only when it is
   library-resolved and present in the stored vector cache. It can become the
   selected action only after deterministic transition scoring.

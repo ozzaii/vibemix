@@ -112,6 +112,7 @@ def next_suggestion(
     live_remaining_bars: int | None = None,
     live_playhead_confidence: float = 0.0,
     blend_active: bool = False,
+    source_loop_recent: bool = False,
     source_position_s: float | None = None,
     taste_scores: dict[tuple[str, str], float] | None = None,
 ) -> NextSuggestion | None:
@@ -200,6 +201,7 @@ def next_suggestion(
         live_remaining_bars=live_remaining_bars,
         live_playhead_confidence=live_playhead_confidence,
         blend_active=blend_active,
+        source_loop_recent=source_loop_recent,
         source_position_s=source_position_s,
         taste_scores=taste_scores,
     )
@@ -233,6 +235,7 @@ def _select_set_aware_option(
     live_remaining_bars: int | None,
     live_playhead_confidence: float,
     blend_active: bool,
+    source_loop_recent: bool,
     source_position_s: float | None,
     taste_scores: dict[tuple[str, str], float] | None,
 ) -> tuple[_SuggestionOption, dict | None, tuple[dict, ...]] | None:
@@ -263,6 +266,7 @@ def _select_set_aware_option(
             remaining_bars=live_remaining_bars,
             playhead_confidence=live_playhead_confidence,
             blend_active=blend_active,
+            source_loop_recent=source_loop_recent,
             source_position_s=source_position_s,
             destination_vector=destination_vectors.get(option.track_id),
             taste_scores=taste_scores,
@@ -631,7 +635,8 @@ def transition_payload_for_candidate(
     remaining_bars: int | None,
     playhead_confidence: float,
     blend_active: bool,
-    source_position_s: float | None,
+    source_loop_recent: bool = False,
+    source_position_s: float | None = None,
     destination_vector: np.ndarray | None = None,
     taste_scores: dict[tuple[str, str], float] | None = None,
 ) -> dict | None:
@@ -724,6 +729,7 @@ def transition_payload_for_candidate(
                     remaining_bars=remaining_bars,
                     playhead_confidence=playhead_confidence,
                     blend_active=blend_active,
+                    source_loop_recent=source_loop_recent,
                 ),
                 mode="live",
                 taste_scores=taste_scores,

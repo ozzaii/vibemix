@@ -516,6 +516,43 @@ def test_suggestion_uses_live_position_to_pick_source_section(library):
     assert s.transition["cue_slot"] == "A"
 
 
+def test_suggestion_withholds_exact_timing_after_recent_source_loop(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        bpm=120.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.88)])
+
+    s = next_suggestion(
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
+        played_ids=set(),
+        source_position_s=236.0,
+        live_playhead_confidence=0.85,
+        source_loop_recent=True,
+    )
+
+    assert s is not None
+    assert s.transition is not None
+    assert s.transition["from_section_id"] == "t0#s001"
+    assert s.transition["cue_slot"] == "A"
+    assert s.transition["start_in_bars"] is None
+    assert s.transition["timing_basis"] is None
+    assert "source_loop_recent" in s.transition["risk_flags"]
+
+
 def test_suggestion_forecasts_upcoming_mix_source_section(library):
     library.tracks["t0"] = _track(
         "t0",
