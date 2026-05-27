@@ -345,6 +345,7 @@ async def ws_broadcast(
     tracer: Any | None = None,
     ipc_router: IpcRouterBus | None = None,
     screen_available: bool | None = None,
+    midi_mirror: Any | None = None,
 ) -> None:
     """30Hz outbound mascot broadcast + inbound manual-trigger handler.
 
@@ -571,6 +572,48 @@ async def ws_broadcast(
                     dead.append(c)
             for c in dead:
                 clients.discard(c)
+
+            # Phase 91 (RENDER-01 + RENDER-02) — Learn surface emit.
+            # Drain THEN snapshot, in that strict order: a fresh plug-in's
+            # ipc.learn.controller_detected envelope MUST hit the wire BEFORE
+            # any ipc.learn.midi_position envelope from the same controller, so
+            # the webview sees "controller appeared" before it sees position
+            # data for that controller. Both envelopes ride the SAME _send_all
+            # closure (Invariant #4 preserved — no second WS listener); the
+            # port_watcher callback in __main__ ENQUEUES via
+            # midi_mirror.queue_controller_detected and never calls _send_all
+            # directly (that closure is not reachable from outside this
+            # coroutine). Each step is guarded by its own try/except so a
+            # learn-side fault NEVER touches the mascot path above or the
+            # snapshot path below.
+            if midi_mirror is not None:
+                # 1) Drain controller_detected queue and emit each pending
+                # envelope. The drain itself is cheap (locked O(N) copy+clear;
+                # N is normally 0 — plug-in events are user-driven, ≤1/s).
+                try:
+                    pending = midi_mirror.drain_pending_detected()
+                except Exception as e:
+                    print(f"[learn drain err] {e}", file=sys.stderr)
+                    pending = []
+                for envelope in pending:
+                    try:
+                        await _send_all(envelope)
+                    except Exception as e:
+                        print(f"[learn detected emit err] {e}", file=sys.stderr)
+                # 2) Pull position snapshot. midi_mirror.snapshot() returns
+                # None when no profile is bound or when no tracked control's
+                # integer LSB has changed since the last call (delta
+                # suppression — RESEARCH §Pattern 2).
+                try:
+                    pos_frame = midi_mirror.snapshot()
+                except Exception as e:
+                    print(f"[learn snapshot err] {e}", file=sys.stderr)
+                    pos_frame = None
+                if pos_frame is not None:
+                    try:
+                        await _send_all(pos_frame)
+                    except Exception as e:
+                        print(f"[learn pos emit err] {e}", file=sys.stderr)
 
             # Additive ipc.session.snapshot @ ~15Hz (every Nth tick). Built +
             # validated + sent in its OWN try/except so a bad snapshot frame

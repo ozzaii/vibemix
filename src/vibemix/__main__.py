@@ -847,6 +847,17 @@ async def main() -> None:
     # single-state hot-plug rebuild path (which mutates this object in place)
     # keeps the hook. Fail-soft inside ControllerState._record_move.
     midi_macos.controller_state.on_move = lambda label, ts: tracer.midi("move", label=label)
+    # Phase 91 (RENDER-01 + RENDER-02) — the Learn surface mirror. Reads
+    # (read-only) the same ControllerState midi_macos owns; the 30 Hz
+    # ws_broadcast tick drains its detected queue + pulls a delta-coalesced
+    # position snapshot per iteration. Sole writer of ipc.learn.midi_position
+    # envelopes (Invariant #1); no second WS listener (Invariant #4); no
+    # second mido listener — subscribes to the existing daemon thread via
+    # ControllerState.deck_snapshot() reads.
+    from vibemix.learn.midi_mirror import MidiMirror
+
+    midi_mirror = MidiMirror(controller_state=midi_macos.controller_state)
+    print("-> midi_mirror wired", file=sys.stderr)
     track_macos = TrackMacOS()
     state = MusicState()
     # 2026-05-21 — seed mood from VIBEMIX_MOOD at boot. MusicState.mood defaults
@@ -1362,7 +1373,60 @@ async def main() -> None:
     # (no rebuild, no consumer change). Runs on its own asyncio.Event stop signal;
     # cleaned up in the finally block alongside midi_stop.
     midi_watcher_stop = asyncio.Event()
-    midi_watcher_task = midi_macos.start_port_watcher(midi_watcher_stop)
+    # Phase 91 (RENDER-01) — layer MidiMirror's controller_detected enqueue +
+    # bind_profile/unbind hooks on TOP of the existing single-state callback.
+    # Order matters per Plan 03 §behavior: on connect we bind THEN enqueue (so
+    # subsequent snapshot() calls in ws_broadcast see the bound profile); on
+    # disconnect we enqueue THEN unbind (so the envelope payload's profile id /
+    # display_name are still well-formed before clearing). The callback NEVER
+    # calls ws_broadcast's _send_all directly — that closure lives inside the
+    # 30 Hz tick and is not reachable from here. Queueing is the only correct
+    # emit path; the tick drains every iteration before pulling the snapshot.
+    from vibemix.platform._midi_common import (
+        ListenerHolder,
+        handle_port_change_single_state,
+    )
+
+    _midi_holder = ListenerHolder(
+        controller_state=midi_macos.controller_state,
+        listener_thread=None,
+        listener_stop=None,
+        mido_module=__import__("mido"),
+        bound_port=None,
+    )
+
+    def _on_midi_port_change(event: tuple) -> None:
+        # Step 1: preserve the existing single-state behavior (mark_connected
+        # / mark_disconnected + listener-thread restart) — read-only from
+        # MidiMirror's perspective.
+        handle_port_change_single_state(_midi_holder, event)
+        # Step 2: layer the MidiMirror lifecycle on top.
+        kind = event[0]
+        if kind == "connected":
+            _, port_name, profile = event
+            # Bind FIRST so the first snapshot() after bind emits a full frame
+            # for the freshly-rendered SVG, then enqueue the detected envelope.
+            midi_mirror.bind_profile(profile)
+            midi_mirror.queue_controller_detected(
+                connected=True, profile=profile, port_name=port_name
+            )
+        elif kind == "disconnected":
+            _, port_name = event
+            # Use the LAST bound profile from the holder so the envelope
+            # payload's controller_id / display_name are still well-formed;
+            # unbind only AFTER the enqueue.
+            _last_profile = getattr(midi_mirror, "_profile", None)
+            if _last_profile is not None:
+                midi_mirror.queue_controller_detected(
+                    connected=False,
+                    profile=_last_profile,
+                    port_name=port_name,
+                )
+            midi_mirror.unbind()
+
+    midi_watcher_task = midi_macos.start_port_watcher(
+        midi_watcher_stop, on_change=_on_midi_port_change
+    )
 
     # 2026-05-25 — wire the GUI session-control IPC handlers onto the live
     # ws_broadcast socket. Until now the Tauri renderer's ipc.settings.* /
@@ -1456,6 +1520,7 @@ async def main() -> None:
             tracer=tracer,
             ipc_router=ipc_router,
             screen_available=screen_macos.is_available(),
+            midi_mirror=midi_mirror,
         )
     )
     diag_task = asyncio.create_task(diag_loop(levels, state, stop_event, tracer=tracer))
