@@ -73,6 +73,29 @@ describe("nextTransitionText — cue + grounded timing", () => {
     ).toBe("load B · cue A · in 13 bars");
   });
 
+  test("cue start time renders when the transition carries section timing", () => {
+    expect(
+      nextTransitionText({
+        target_deck: "B",
+        cue_slot: "A",
+        to_start_s: 64,
+        start_in_bars: 13,
+      }),
+    ).toBe("load B · cue A @ 1:04 · in 13 bars");
+  });
+
+  test("grounded section roles render as a compact pair", () => {
+    expect(
+      nextTransitionText({
+        target_deck: "B",
+        cue_slot: "A",
+        from_role: "outro",
+        to_role: "intro",
+        start_in_bars: 4,
+      }),
+    ).toBe("load B · cue A · outro→intro · in 4 bars");
+  });
+
   test("cue without timing still renders the actionable cue", () => {
     expect(nextTransitionText({ cue_slot: "F", start_in_bars: null })).toBe("cue F");
   });
@@ -130,6 +153,8 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
           to_track_id: "t1",
           from_section_id: "t0#s001",
           to_section_id: "t1#s000",
+          from_role: "outro",
+          to_role: "intro",
           cue_slot: "A",
           start_in_bars: 13,
           timing_basis: "section_playhead",
@@ -137,7 +162,7 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
       }),
     )!;
     expect(card.querySelector(".vmx-next-card__transition")?.textContent).toBe(
-      "load B · cue A · in 13 bars",
+      "load B · cue A · outro→intro · in 13 bars",
     );
   });
 

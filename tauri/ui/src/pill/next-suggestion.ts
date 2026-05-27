@@ -32,13 +32,46 @@ export interface NextSuggestionTransitionWire {
   to_track_id?: string;
   from_section_id?: string;
   to_section_id?: string;
+  from_role?: string | null;
+  to_role?: string | null;
+  from_start_s?: number | null;
+  from_end_s?: number | null;
+  to_start_s?: number | null;
+  to_end_s?: number | null;
+  from_bpm?: number | null;
+  to_bpm?: number | null;
+  from_camelot?: string | null;
+  to_camelot?: string | null;
   cue_slot?: string | null;
   start_in_bars?: number | null;
   score?: number | null;
   confidence?: number | null;
+  semantic_basis?: string | null;
+  source_selection?: string | null;
+  selection_score?: number | null;
+  selection_basis?: string | null;
+  scores?: Record<string, number | null>;
   timing_basis?: string | null;
+  timing_anchor?: string | null;
+  source_anchor_s?: number | null;
   risk_flags?: string[];
   reasons?: string[];
+}
+
+export interface NextSuggestionDecisionWire {
+  decision_id?: string;
+  decision_source?: string;
+  emitted?: boolean;
+  validation_status?: string;
+  validation_errors?: string[];
+  action?: "select" | "hold" | "suppress" | "ask" | string;
+  candidate_id?: string | null;
+  cue_slot?: string | null;
+  timing_text?: string | null;
+  spoken_text?: string;
+  cited_claims?: string[];
+  cited_claim_ids?: string[];
+  confidence?: number | null;
 }
 
 /** The `next_suggestion` wire payload — mirrors
@@ -53,6 +86,20 @@ export interface NextSuggestionWire {
   camelot: string | null;
   bpm: number | null;
   transition?: NextSuggestionTransitionWire | null;
+  decision?: NextSuggestionDecisionWire | null;
+  transition_alternatives?: Array<{
+    candidate_id?: string;
+    rank?: number;
+    selected?: boolean;
+    track_id?: string;
+    title?: string;
+    artist?: string;
+    similarity?: number;
+    why?: string;
+    camelot?: string | null;
+    bpm?: number | null;
+    transition?: NextSuggestionTransitionWire | null;
+  }>;
 }
 
 const CSS = `
@@ -173,7 +220,12 @@ export function nextTransitionText(
   const cue = typeof t.cue_slot === "string" ? t.cue_slot.trim() : "";
   const bits: string[] = [];
   if (targetDeck) bits.push(`load ${targetDeck}`);
-  if (cue) bits.push(`cue ${cue.toUpperCase()}`);
+  if (cue) {
+    const cueTime = formatCueTime(t.to_start_s);
+    bits.push(cueTime ? `cue ${cue.toUpperCase()} @ ${cueTime}` : `cue ${cue.toUpperCase()}`);
+  }
+  const rolePair = rolePairLabel(t.from_role, t.to_role);
+  if (rolePair) bits.push(rolePair);
   if (typeof t.start_in_bars === "number" && Number.isFinite(t.start_in_bars)) {
     const bars = Math.max(0, Math.round(t.start_in_bars));
     if (bars === 0) bits.push("now");
@@ -199,6 +251,14 @@ export function nextSuggestionRenderKey(
     t?.to_track_id ?? "",
     t?.from_section_id ?? "",
     t?.to_section_id ?? "",
+    t?.from_role ?? "",
+    t?.to_role ?? "",
+    t?.from_start_s ?? "",
+    t?.from_end_s ?? "",
+    t?.to_start_s ?? "",
+    t?.to_end_s ?? "",
+    t?.timing_anchor ?? "",
+    t?.source_anchor_s ?? "",
     t?.cue_slot ?? "",
     t?.start_in_bars ?? "",
   ].join("|");
@@ -208,6 +268,30 @@ function deckLabel(raw: string | null | undefined): string {
   if (typeof raw !== "string") return "";
   const deck = raw.trim().toUpperCase();
   return deck === "A" || deck === "B" ? deck : "";
+}
+
+function formatCueTime(raw: number | null | undefined): string {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return "";
+  const total = Math.max(0, Math.round(raw));
+  const minutes = Math.floor(total / 60);
+  const seconds = String(total % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function rolePairLabel(
+  fromRole: string | null | undefined,
+  toRole: string | null | undefined,
+): string {
+  const from = normalizeRoleLabel(fromRole);
+  const to = normalizeRoleLabel(toRole);
+  return from && to ? `${from}→${to}` : "";
+}
+
+function normalizeRoleLabel(raw: string | null | undefined): string {
+  if (typeof raw !== "string") return "";
+  const role = raw.trim().toLowerCase();
+  if (!role || role === "unknown") return "";
+  return role.replace(/[_-]+/g, " ");
 }
 
 /**
