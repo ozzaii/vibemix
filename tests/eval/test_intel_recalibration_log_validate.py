@@ -49,6 +49,36 @@ def test_validate_rejects_entry_without_report_hashes(tmp_path: Path) -> None:
     assert "entry[1].report_hashes.gold_report" in report.errors
 
 
+def test_validate_rejects_null_core_report_hashes(tmp_path: Path) -> None:
+    entry = _replace_key_value(_valid_entry(), "- reports:", "scorecard", "null")
+    entry = _replace_key_value(entry, "- report_hashes:", "scorecard", "null")
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].reports.scorecard.required" in report.errors
+    assert "entry[1].report_hashes.scorecard.required" in report.errors
+
+
+def test_validate_release_promotion_requires_gate_report_hash(tmp_path: Path) -> None:
+    entry = _valid_entry().replace(
+        "### 2026-05-27T12:00:00Z - verdict=private_in_tolerance",
+        "### 2026-05-27T12:00:00Z - verdict=release_promoted",
+    )
+    entry = _replace_field(entry, "evidence_tier", "tier2_private_holdout_canary")
+    entry = _replace_field(entry, "splits", "calibration=1 holdout=1 canary=1")
+    entry = _replace_field(entry, "verdict", "release_promoted")
+    entry = _replace_field(entry, "action", "PROMOTE_LOCK_WITH_PR")
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].reports.gate.required" in report.errors
+    assert "entry[1].report_hashes.gate.required" in report.errors
+
+
 def test_validate_rejects_private_payload_marker(tmp_path: Path) -> None:
     entry = _valid_entry().replace(
         "run_id: intel_private_test",
@@ -92,3 +122,21 @@ def _write_log(tmp_path: Path, entry: str) -> Path:
     log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
     log.write_text(f"# Log\n\n{APPEND_MARKER}\n\n{entry.strip()}\n", encoding="utf-8")
     return log
+
+
+def _replace_field(entry: str, field: str, value: str) -> str:
+    return "\n".join(
+        f"- {field}: {value}" if line.startswith(f"- {field}: ") else line
+        for line in entry.splitlines()
+    )
+
+
+def _replace_key_value(entry: str, line_prefix: str, key: str, value: str) -> str:
+    lines: list[str] = []
+    for line in entry.splitlines():
+        if line.startswith(line_prefix):
+            line = " ".join(
+                f"{key}={value}" if part.startswith(f"{key}=") else part for part in line.split()
+            )
+        lines.append(line)
+    return "\n".join(lines)

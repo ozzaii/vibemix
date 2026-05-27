@@ -29,6 +29,7 @@ ENTRY_RE = re.compile(
 )
 SHA_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 REPORT_HASH_KEYS = ("gold_report", "scorecard", "taste_scorecard", "gate")
+ALWAYS_REQUIRED_REPORT_HASHES = ("gold_report", "scorecard")
 REQUIRED_FIELDS = (
     "run_id",
     "lock",
@@ -136,7 +137,7 @@ def _validate_entry(entry: str, *, index: int) -> list[str]:
         if kind not in label_kinds or not label_kinds[kind].isdigit():
             errors.append(f"entry[{index}].label_kinds.{kind}")
 
-    errors.extend(_validate_report_bindings(fields, index=index))
+    errors.extend(_validate_report_bindings(fields, index=index, verdict=header_verdict))
 
     privacy = _parse_key_values(fields.get("privacy", ""))
     for key, expected in EXPECTED_PRIVACY.items():
@@ -173,7 +174,7 @@ def _lock_field_valid(value: str) -> bool:
     return bool(digest and SHA_RE.match(digest))
 
 
-def _validate_report_bindings(fields: dict[str, str], *, index: int) -> list[str]:
+def _validate_report_bindings(fields: dict[str, str], *, index: int, verdict: str) -> list[str]:
     errors: list[str] = []
     reports = _parse_key_values(fields.get("reports", ""))
     hashes = _parse_key_values(fields.get("report_hashes", ""))
@@ -190,6 +191,14 @@ def _validate_report_bindings(fields: dict[str, str], *, index: int) -> list[str
             errors.append(f"entry[{index}].report_binding.{key}")
         if report == "private:redacted" and (digest is None or digest == "null"):
             errors.append(f"entry[{index}].report_binding.{key}")
+    required_hashes = list(ALWAYS_REQUIRED_REPORT_HASHES)
+    if verdict == "release_promoted":
+        required_hashes.append("gate")
+    for key in required_hashes:
+        if reports.get(key) != "private:redacted":
+            errors.append(f"entry[{index}].reports.{key}.required")
+        if SHA_RE.match(hashes.get(key, "")) is None:
+            errors.append(f"entry[{index}].report_hashes.{key}.required")
     return errors
 
 
