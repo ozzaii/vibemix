@@ -260,6 +260,7 @@ Focused backend and UI checks used for this slice:
 
 ```bash
 uv run pytest -q tests/intel/test_feedback.py tests/intel/test_taste_model.py tests/intel/test_transition_scorer.py tests/library/test_next_suggestion.py tests/runtime/test_suggestion.py tests/runtime/test_ws_bus.py tests/intel/test_context_compiler.py tests/intel/test_decision_runtime.py tests/intel/test_decision_validator.py
+uv run pytest -q tests/runtime/test_suggestion.py::test_live_next_replay_fixture_reselects_source_section_without_rerank
 npm --prefix tauri/ui test -- next-suggestion
 npm --prefix tauri/ui test -- pill/index
 ```
@@ -274,11 +275,15 @@ npm --prefix tauri/ui run build
 The Vite build may emit existing chunk-size or dynamic-import warnings; those
 warnings are not specific to the live next-pill contract.
 
+Replay-shaped coverage for cached shortlist live refresh lives in
+`tests/runtime/fixtures/live_next_pill_source_section_replay.json` and
+`tests/runtime/test_suggestion.py::test_live_next_replay_fixture_reselects_source_section_without_rerank`.
+It drives two `MusicState` frames from the same embedded shortlist and proves the
+winner can change when the source playhead moves without a full library rerank
+or fresh vector load.
+
 ## Remaining gaps
 
-- Add real-session replay coverage for live deck changes that cause the source
-  section to move while the embedding shortlist remains cached, beyond the
-  synthetic wire-level regression.
 - Add richer target-cue operability checks once more CUE-DETR or Rekordbox cue
   data is available.
 - Keep improving taste thresholds and live refresh behavior so the system learns

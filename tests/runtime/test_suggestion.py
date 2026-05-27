@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import numpy as np
@@ -30,6 +31,7 @@ from vibemix.state import MusicState
 from vibemix.state.deck_state import DeckState, DeckTrack
 
 _REAL_SLEEP = asyncio.sleep
+REPLAY_FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 
 # --------------------------------------------------------------------------- #
@@ -78,6 +80,41 @@ def _lib(ids):
         for t in ids
     }
     return lib
+
+
+def _cue_from_row(row):
+    from vibemix.library.rekordbox import CuePoint
+
+    return CuePoint(
+        name=str(row.get("name") or ""),
+        type=str(row.get("type") or "cue"),
+        start_s=float(row.get("start_s") or 0.0),
+        end_s=None,
+        number=int(row.get("number", -1)),
+    )
+
+
+def _apply_replay_frame(state: MusicState, frame: dict) -> None:
+    state.audible = bool(frame.get("audible", False))
+    state.audible_deck = str(frame.get("audible_deck") or "none")
+    state.audible_track_position_s = frame.get("audible_track_position_s")
+    state.audible_track_position_confidence = float(
+        frame.get("audible_track_position_confidence") or 0.0
+    )
+    deck_rows = frame.get("deck_state") if isinstance(frame.get("deck_state"), dict) else {}
+    state.deck_state = DeckState(
+        decks={
+            side: DeckTrack(
+                title=row.get("title"),
+                track_id=row.get("track_id"),
+                camelot=row.get("camelot"),
+                bpm=float(row.get("bpm") or 0.0),
+                confidence=float(row.get("confidence", 1.0)),
+            )
+            for side, row in deck_rows.items()
+            if isinstance(row, dict)
+        }
+    )
 
 
 def test_compute_returns_grounded_suggestion():
@@ -830,6 +867,64 @@ def test_payload_uses_live_suggestion_refresh_hook(mocker):
 
     assert holder.seen_state is state
     assert payload["next_suggestion"] == sugg
+
+
+def test_live_next_replay_fixture_reselects_source_section_without_rerank(mocker):
+    from dataclasses import replace
+
+    fixture = json.loads(
+        (REPLAY_FIXTURE_DIR / "live_next_pill_source_section_replay.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    store_rows = fixture["store"]
+    store = _FakeStore(
+        store_rows["ids"],
+        [tuple(row) for row in store_rows["ranked"]],
+        section_vectors={
+            section_id: np.array(vector, dtype=np.float32)
+            for section_id, vector in store_rows["section_vectors"].items()
+        },
+    )
+    lib = _lib(store_rows["ids"])
+    for track_id, row in fixture["library"].items():
+        lib.tracks[track_id] = replace(
+            lib.tracks[track_id],
+            bpm=float(row["bpm"]),
+            key=row["key"],
+            cues=tuple(_cue_from_row(cue) for cue in row.get("cues", ())),
+        )
+
+    svc = SuggestionService(store, lib)
+    state = MusicState()
+
+    _apply_replay_frame(state, fixture["frames"][0])
+    first = svc.compute_from_state(state)
+    assert first is not None
+    first_expect = fixture["frames"][0]["expect"]
+    assert first["track_id"] == first_expect["track_id"]
+    assert first["transition"]["from_section_id"] == first_expect["from_section_id"]
+    assert first["transition"]["to_track_id"] == first_expect["to_track_id"]
+    assert first["transition"]["candidate_id"] == first_expect["candidate_id"]
+
+    store.search_count = 0
+    store._backend.load_count = 0
+    _apply_replay_frame(state, fixture["frames"][1])
+
+    payload = _capture_payload(state, mocker, suggestion_holder=svc)
+
+    suggestion = payload["next_suggestion"]
+    second_expect = fixture["frames"][1]["expect"]
+    assert suggestion["track_id"] == second_expect["track_id"]
+    assert suggestion["transition"]["from_section_id"] == second_expect["from_section_id"]
+    assert suggestion["transition"]["to_track_id"] == second_expect["to_track_id"]
+    assert suggestion["transition"]["candidate_id"] == second_expect["candidate_id"]
+    assert suggestion["transition_alternatives"][0]["selected"] is True
+    assert suggestion["transition_alternatives"][1]["track_id"] == first_expect["track_id"]
+    assert suggestion["decision"]["action"] == "select"
+    assert suggestion["decision"]["validation_status"] == "accepted"
+    assert store.search_count == 0
+    assert store._backend.load_count == 0
 
 
 def test_payload_live_refresh_reselects_cached_alternative_when_source_section_moves(mocker):

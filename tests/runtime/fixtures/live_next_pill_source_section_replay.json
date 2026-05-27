@@ -1,0 +1,70 @@
+{
+  "schema": "live_next_pill_replay_v1",
+  "description": "Replay-shaped live frames: a cached embedding shortlist must reselect when the source playhead moves from the best outro section to the current intro section.",
+  "store": {
+    "ids": ["s", "a", "b"],
+    "ranked": [["s", 0.99], ["a", 0.92], ["b", 0.91]],
+    "section_vectors": {
+      "s#s000": [1.0, 0.0],
+      "s#s001": [0.0, 1.0],
+      "a#s000": [0.0, 1.0],
+      "b#s000": [1.0, 0.0]
+    }
+  },
+  "library": {
+    "s": {
+      "bpm": 120.0,
+      "key": "8A",
+      "cues": [
+        {"name": "IN", "type": "cue", "start_s": 0.0, "number": 0},
+        {"name": "OUT", "type": "cue", "start_s": 224.0, "number": 5}
+      ]
+    },
+    "a": {
+      "bpm": 120.0,
+      "key": "9A",
+      "cues": [
+        {"name": "IN", "type": "cue", "start_s": 0.0, "number": 0}
+      ]
+    },
+    "b": {
+      "bpm": 120.0,
+      "key": "9A",
+      "cues": [
+        {"name": "IN", "type": "cue", "start_s": 0.0, "number": 0}
+      ]
+    }
+  },
+  "frames": [
+    {
+      "t": 0.0,
+      "audible": true,
+      "audible_deck": "A",
+      "deck_state": {
+        "A": {"title": "Source", "track_id": "s", "camelot": "8A", "bpm": 120.0}
+      },
+      "expect": {
+        "track_id": "a",
+        "from_section_id": "s#s001",
+        "to_track_id": "a",
+        "candidate_id": "tr_001"
+      }
+    },
+    {
+      "t": 4.0,
+      "audible": true,
+      "audible_deck": "A",
+      "audible_track_position_s": 32.0,
+      "audible_track_position_confidence": 0.85,
+      "deck_state": {
+        "A": {"title": "Source", "track_id": "s", "camelot": "8A", "bpm": 120.0}
+      },
+      "expect": {
+        "track_id": "b",
+        "from_section_id": "s#s000",
+        "to_track_id": "b",
+        "candidate_id": "tr_001"
+      }
+    }
+  ]
+}
