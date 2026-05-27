@@ -1251,27 +1251,19 @@ cd tauri/ui && npm run codegen:ipc  # regenerates messages.ts + validator.genera
 
 **If this table is empty:** Not applicable; 7 assumptions tagged for ratification.
 
-## Open Questions
+## Open Questions (RESOLVED 2026-05-27)
 
 1. **Should P91 wire a `VIBEMIX_LATENCY_LOG=1` env to dump rolling latency samples to `events.jsonl`?**
-   - What we know: the status-bar `P95: NN ms` readout is user-visible; events.jsonl would be Kaan-debug-visible.
-   - What's unclear: whether Kaan wants this in P91 or P92.
-   - Recommendation: ADD in P91 — trivial cost, hugely valuable during ear-pass.
+   - **RESOLVED: YES — wire in P91.** Trivial cost (single `os.environ.get("VIBEMIX_LATENCY_LOG")` branch in `MidiMirror`), hugely valuable during ear-pass. Planner discretion on exact event shape.
 
-2. **Should the 11 controller SVG files all ship together in P91, or only the FLX4 in P91 with generic-fallback for the rest, and the other 9 in P98?**
-   - What we know: SUMMARY §13 lists "3-4 plans, 10% KAAN-ACTION%" for P91 — aligned with all-11-in-P91 if SVGs are authored in parallel.
-   - What's unclear: bandwidth tradeoff. 11 SVGs is ~80-120 hours of vector authoring per Pitfalls P4. P91 ship rate becomes a hard question.
-   - Recommendation: Plan author should consider an explicit "SVG-only sub-phase" — P91a (FLX4 + generic; renderer live; Kaan ear-pass possible) → P91b (other 9 SVGs after Kaan-FLX4-pass). Either way, all 11 land BEFORE P98.
+2. **Should the 11 controller SVG files all ship together in P91, or only FLX4 + generic in P91 with the other 9 in P98?**
+   - **RESOLVED: ALL 11 SVGs in P91 per Kaan's "fully-comprehensive / default-YES" directive (SUMMARY §2 LOCKED).** FLX4 is the canonical ear-pass golden (Plan 07); the other 9 controllers' SVGs ship but their live ear-passes ride forward as §LEARN-CONTROLLER-EAR KAAN-ACTION queue items into P98. Plan 06 schedules the 9 non-FLX4 SVGs as a single re-entrant batch — the parity gate goes green per-SVG, so the work is incrementally committable.
 
 3. **Does the Learn window need a Tauri capability allowlist entry?**
-   - What we know: existing `debrief_window` is in `tauri/src-tauri/capabilities/default.json`'s allowlist; `open_learn_window` likely needs the same treatment.
-   - What's unclear: whether the planner needs to explicitly call this out.
-   - Recommendation: Yes — add `learn_window:default` or equivalent to the capability allowlist in a discrete plan step.
+   - **RESOLVED: YES, but the entry goes into the `windows` scope array (NOT a permission identifier).** The existing pattern (verified by reading `tauri/src-tauri/capabilities/default.json` description text + the `"windows": ["main", "mascot", "overlay-*", "debrief", "pill", "library"]` array) is: Tauri 2.x auto-allows webview→app-command invocation for any command registered in `invoke_handler`, so `open_learn_window` does NOT need a permission identifier. What it DOES need is the window label `"learn"` appended to the top-level `windows` scope array (mirroring how `"debrief"`, `"pill"`, `"library"` were added in prior phases). Attempting to add an `"open_learn_window"` or `"learn_window:default"` permission identifier would FAIL the Tauri build with "permission identifier not found" — the description text on line 4 explicitly warns about this. **This supersedes the original recommendation in this section, which was technically wrong.**
 
 4. **What's the test fixture format for the SVG↔profile parity gate?**
-   - What we know: Per Pattern 6, jsdom parses the SVG, querySelectorAll extracts data-control-ids, JSON profile imports give expected fields.
-   - What's unclear: whether profiles ship JSON-direct or via the existing `vibemix.midi.profile::load_profile` Python module (which TS can't call).
-   - Recommendation: TS tests read the JSON directly from `src/vibemix/midi/profiles/<id>.json` via `fs.readFileSync` (jsdom Node context); no need to round-trip through Python.
+   - **RESOLVED: TS tests read the JSON directly from `src/vibemix/midi/profiles/<id>.json` via `fs.readFileSync` (vitest+jsdom Node context).** No Python round-trip; no shared fixture file. Vitest is already configured with `environment: 'jsdom'`.
 
 ## Environment Availability
 
