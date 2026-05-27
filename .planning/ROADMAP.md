@@ -98,7 +98,15 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
   2. Every physical control (knob/fader/button/jog/cue pad) on the rendered SVG mirrors the controller's current MIDI position within ≤50 ms P95 latency — measured by `tauri/ui/tests/learn/highlight-latency.test.ts` in a synthetic harness; CI fails red on regression beyond 80 ms P95 (triggers `§LEARN-LATENCY-CONTINGENCY` Rust-direct `midir` amendment). CSS-variable swap for `--learn-highlight` is composited (60 fps guaranteed). **RENDER-02 + RENDER-04 painted-but-tested-in-P92.**
   3. Every rendered control has a `<g data-control-id="<field>">` hit region with ARIA `role="button"` + `aria-label` (e.g. `aria-label="EQ-HI knob, deck A"`) + a dual-channel cue (color + shape) so deuteranopia/protanopia/tritanopia users can distinguish active vs inactive — verified by `tauri/ui/tests/learn/test_a11y_highlight_dual_cue.spec.ts`; keyboard-nav works for hardware-free curriculum browsing. **RENDER-03 + RENDER-05.**
   4. Every SVG controller file passes a bi-directional CI parity gate (`tauri/ui/tests/learn/test_svg_profile_parity.spec.ts`): every `data-control-id` in the SVG resolves to a binding in `midi/profiles/<id>.json` AND every profile binding has a matching `<g>` group; stops schema drift across all 11 files. **RENDER-06 + RENDER-07.**
-**Plans**: TBD
+
+**Plans:** 7 plans
+- [ ] 91-01-PLAN.md — IPC schema + Vite/HTML/capability scaffolding + Python envelope dataclasses (Wave 1)
+- [ ] 91-02-PLAN.md — Test scaffolding (5 Python + 14 TS test stubs covering every per-task verification row) (Wave 1)
+- [ ] 91-03-PLAN.md — Python backend `learn/midi_mirror.py` + `ws_bus.py` + `__main__.py` wiring (Wave 2)
+- [ ] 91-04-PLAN.md — Rust shell `learn_window.rs` + `main.rs` registration (Wave 2)
+- [ ] 91-05-PLAN.md — Webview entry + FLX4 SVG + generic fallback + ARIA lookup + 5 components (Wave 3)
+- [ ] 91-06-PLAN.md — 9 remaining controller SVGs + extended `_aria-labels.ts` + `controller-stage.ts` allowlist (Wave 4)
+- [ ] 91-07-PLAN.md — Kaan FLX4 ear-pass checkpoint (live verification per `feedback_verify_live_app_not_just_tests`) (Wave 5)
 **UI hint**: yes
 
 ### Phase 92: Lesson Runtime + AI Highlight Contract
@@ -186,7 +194,7 @@ This is the live v9.0 plan — eight phases (P91–P98) turning vibemix into the
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 91. Controller Renderer + MIDI Mirror | 0/? | Not started | - |
+| 91. Controller Renderer + MIDI Mirror | 0/7 | Not started | - |
 | 92. Lesson Runtime + AI Highlight Contract | 0/? | Not started | - |
 | 93. Exemplar Engine + `[exemplar:]` Evidence Source | 0/? | Not started | - |
 | 94. Course 1 — Anatomy | 0/? | Not started | - |
