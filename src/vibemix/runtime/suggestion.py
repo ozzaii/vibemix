@@ -58,6 +58,7 @@ FULL_COMPUTE_RETRY_S = 5.0
 FULL_COMPUTE_DISPATCH_GUARD_S = 0.25
 CONTROLLER_TARGET_VOLUME_FLOOR = 16
 CONTROLLER_XFADER_FACTOR_FLOOR = 0.20
+TARGET_DECK_TRACK_CONFIDENCE_FLOOR = 0.50
 EXPLICIT_FEEDBACK_ACTIONS: dict[str, tuple[str, str]] = {
     "accept": ("suggestion_accepted", "accepted"),
     "keep": ("suggestion_accepted", "accepted"),
@@ -87,6 +88,7 @@ class ResolvedSeed:
     bpm: float | None
     source_deck: str | None = None
     target_deck: str | None = None
+    target_track_id: str | None = None
 
 
 def resolve_seed_context(state: Any) -> ResolvedSeed | None:
@@ -118,12 +120,18 @@ def resolve_seed_context(state: Any) -> ResolvedSeed | None:
     camelot = getattr(dt, "camelot", None)
     bpm = getattr(dt, "bpm", None)
     bpm = bpm if (bpm and bpm > 0.0) else None
+    target_deck = _target_deck(source_deck, side)
     return ResolvedSeed(
         track_id=track_id,
         camelot=camelot,
         bpm=bpm,
         source_deck=source_deck,
-        target_deck=_target_deck(source_deck, side),
+        target_deck=target_deck,
+        target_track_id=_prepared_target_track_id(
+            decks,
+            target_deck=target_deck,
+            source_track_id=track_id,
+        ),
     )
 
 
@@ -579,6 +587,7 @@ class SuggestionService:
             "active_track_id": seed.track_id if seed is not None else None,
             "source_deck": seed.source_deck if seed is not None else None,
             "target_deck": seed.target_deck if seed is not None else None,
+            "prepared_target_track_id": seed.target_track_id if seed is not None else None,
             "blend_active": timing.blend_active,
             "playhead_confidence": timing.playhead_confidence,
             "source_position_s": timing.source_position_s,
@@ -765,6 +774,7 @@ class SuggestionService:
         seed_bpm: float | None = None,
         source_deck: str | None = None,
         target_deck: str | None = None,
+        prepared_target_track_id: str | None = None,
         live_remaining_bars: int | None = None,
         live_playhead_confidence: float = 0.0,
         blend_active: bool = False,
@@ -794,6 +804,7 @@ class SuggestionService:
                 seed_bpm=seed_bpm,
                 source_deck=source_deck,
                 target_deck=target_deck,
+                prepared_target_track_id=prepared_target_track_id,
                 k=self._k,
                 live_remaining_bars=live_remaining_bars,
                 live_playhead_confidence=live_playhead_confidence,
@@ -869,6 +880,7 @@ class SuggestionService:
             seed_bpm=seed.bpm,
             source_deck=seed.source_deck,
             target_deck=seed.target_deck,
+            prepared_target_track_id=seed.target_track_id,
             live_remaining_bars=timing.remaining_bars,
             live_playhead_confidence=timing.playhead_confidence,
             blend_active=timing.blend_active,
@@ -888,6 +900,7 @@ class SuggestionService:
             seed_bpm=seed.bpm,
             source_deck=seed.source_deck,
             target_deck=seed.target_deck,
+            prepared_target_track_id=seed.target_track_id,
             live_remaining_bars=timing.remaining_bars,
             live_playhead_confidence=timing.playhead_confidence,
             blend_active=timing.blend_active,
@@ -991,6 +1004,14 @@ class SuggestionService:
                 alternatives = promote_transition_alternative(
                     alternatives,
                     track_id=pinned_candidate_track_id,
+                )
+            elif seed.target_track_id and _alternative_has_transition(
+                alternatives,
+                track_id=seed.target_track_id,
+            ):
+                alternatives = promote_transition_alternative(
+                    alternatives,
+                    track_id=seed.target_track_id,
                 )
             candidate_track_id, candidate_vector = _apply_winning_alternative(
                 current,
@@ -1107,6 +1128,13 @@ def _alternative_already_selected(
     return bool(
         (wanted_candidate_id and first.get("candidate_id") == wanted_candidate_id)
         or (wanted_track_id and first.get("track_id") == wanted_track_id)
+    )
+
+
+def _alternative_has_transition(alternatives: tuple[dict, ...], *, track_id: str) -> bool:
+    return any(
+        alternative.get("track_id") == track_id and isinstance(alternative.get("transition"), dict)
+        for alternative in alternatives
     )
 
 
@@ -1311,6 +1339,26 @@ def _target_deck(source_deck: str | None, audible_deck: Any) -> str | None:
     if audible_deck != source_deck:
         return None
     return "B" if source_deck == "A" else "A"
+
+
+def _prepared_target_track_id(
+    decks: Any,
+    *,
+    target_deck: str | None,
+    source_track_id: str,
+) -> str | None:
+    if target_deck not in {"A", "B"} or not isinstance(decks, dict):
+        return None
+    target = decks.get(target_deck)
+    if target is None:
+        return None
+    track_id = _str_or_none(getattr(target, "track_id", None))
+    if track_id is None or track_id == source_track_id:
+        return None
+    confidence = _float_or(getattr(target, "confidence", 0.0), 0.0) or 0.0
+    if _clamp01(confidence) < TARGET_DECK_TRACK_CONFIDENCE_FLOOR:
+        return None
+    return track_id
 
 
 __all__ = [

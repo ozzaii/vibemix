@@ -71,6 +71,13 @@ runtime treats the booth as actively blending: the set-aware transition can
 still be kept as grounded context, but exact bar timing is withheld and the
 validated live decision suppresses rather than issuing a fresh `select`.
 
+When the opposite deck already carries a confidently resolved track ID, that is
+also live set context. If the prepared target track is already present in the
+bounded embedding shortlist and has grounded transition evidence, the pill
+promotes that candidate instead of telling the DJ to load a different visible
+option. This promotion never expands the candidate universe or invents a cue:
+the target-deck track must still be library-resolved and transition-scored.
+
 ## Wire payload
 
 The pill payload is attached as `next_suggestion`.
@@ -214,9 +221,11 @@ semantic, and confidence gates intact.
 
 ### Controller posture
 
-The live context also includes a bounded `controller` object derived from
-`MusicState.deck_a`, `MusicState.deck_b`, and `MusicState.xfader`:
+The live context also includes `prepared_target_track_id` plus a bounded
+`controller` object derived from `MusicState.deck_a`, `MusicState.deck_b`, and
+`MusicState.xfader`:
 
+- `prepared_target_track_id`
 - `connected`
 - `xfader`
 - source/target deck summaries
@@ -267,6 +276,9 @@ match, the cited claims must support those facts.
 - Exact timing is emitted only when the playhead confidence policy allows it.
 - Live blend conditions suppress unsafe timing precision and validated select
   actions, while preserving grounded transition context where possible.
+- A track already loaded on the target deck may promote only an already-issued,
+  grounded transition candidate. It cannot create a new candidate or bypass
+  library/transition scoring.
 - Semantic dimension mismatches become unknown evidence, not fabricated matches.
 - Auto-generated or low-confidence target cues remain usable context, but are
   marked with review risk and lower cue-operability confidence.

@@ -103,6 +103,7 @@ def next_suggestion(
     seed_bpm: float | None = None,
     source_deck: str | None = None,
     target_deck: str | None = None,
+    prepared_target_track_id: str | None = None,
     k: int = 5,
     bpm_window: float = 15.0,
     live_remaining_bars: int | None = None,
@@ -191,6 +192,7 @@ def next_suggestion(
         seed_vector=qvec,
         source_deck=source_deck,
         target_deck=target_deck,
+        prepared_target_track_id=prepared_target_track_id,
         live_remaining_bars=live_remaining_bars,
         live_playhead_confidence=live_playhead_confidence,
         blend_active=blend_active,
@@ -220,6 +222,7 @@ def _select_set_aware_option(
     seed_vector: np.ndarray,
     source_deck: str | None,
     target_deck: str | None,
+    prepared_target_track_id: str | None,
     live_remaining_bars: int | None,
     live_playhead_confidence: float,
     blend_active: bool,
@@ -257,6 +260,7 @@ def _select_set_aware_option(
         ranked.append((_selection_key(option, transition, order), option, transition))
 
     ranked.sort(key=lambda item: item[0], reverse=True)
+    ranked = _prefer_prepared_target_option(ranked, prepared_target_track_id)
     _, option, transition = ranked[0]
     alternatives = _ranked_alternatives(ranked)
     selected = (
@@ -427,6 +431,26 @@ def _ranked_alternatives_from_payloads(
         option["transition"] = transition
         out.append(option)
     return tuple(out)
+
+
+def _prefer_prepared_target_option(
+    ranked: list[tuple[tuple[float, float, float, float], _SuggestionOption, dict | None]],
+    prepared_target_track_id: str | None,
+) -> list[tuple[tuple[float, float, float, float], _SuggestionOption, dict | None]]:
+    """Promote the track already loaded on the target deck when it is grounded.
+
+    The live deck fact is strong context, but it should not invent a mix point:
+    the track must already be in the bounded shortlist and have transition
+    evidence before it can become the selected pill action.
+    """
+    prepared = prepared_target_track_id.strip() if isinstance(prepared_target_track_id, str) else ""
+    if not prepared:
+        return ranked
+    for index, item in enumerate(ranked):
+        _, option, transition = item
+        if option.track_id == prepared and transition is not None:
+            return [item, *ranked[:index], *ranked[index + 1 :]]
+    return ranked
 
 
 def _alternative_selection_key(

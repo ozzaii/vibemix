@@ -245,6 +245,41 @@ def test_resolve_seed_context_names_source_and_target_decks():
     assert seed.target_deck == "B"
 
 
+def test_resolve_seed_context_carries_confident_target_deck_track():
+    state = MusicState()
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={
+            "A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=128.0),
+            "B": DeckTrack(title="Prepared", track_id="b", confidence=0.92),
+        }
+    )
+
+    seed = resolve_seed_context(state)
+
+    assert seed is not None
+    assert seed.track_id == "s"
+    assert seed.target_deck == "B"
+    assert seed.target_track_id == "b"
+
+
+def test_resolve_seed_context_ignores_weak_target_deck_track():
+    state = MusicState()
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={
+            "A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=128.0),
+            "B": DeckTrack(title="Maybe Prepared", track_id="b", confidence=0.2),
+        }
+    )
+
+    seed = resolve_seed_context(state)
+
+    assert seed is not None
+    assert seed.target_deck == "B"
+    assert seed.target_track_id is None
+
+
 def test_resolve_seed_context_withholds_target_when_audible_side_is_uncertain():
     state = MusicState()
     state.audible_deck = "mix"
@@ -659,6 +694,136 @@ def test_refresh_from_state_can_reselect_inside_embedding_shortlist():
     assert len({alt["candidate_id"] for alt in refreshed["transition_alternatives"]}) == len(
         refreshed["transition_alternatives"]
     )
+    assert store._backend.load_count == 0
+
+
+def test_compute_from_state_prefers_grounded_track_loaded_on_target_deck():
+    from dataclasses import replace
+
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(
+        ["s", "a", "b"],
+        [("s", 0.99), ("a", 0.92), ("b", 0.91)],
+        section_vectors={
+            "s#s000": np.array([1.0, 0.0], dtype=np.float32),
+            "s#s001": np.array([0.0, 1.0], dtype=np.float32),
+            "a#s000": np.array([0.0, 1.0], dtype=np.float32),
+            "b#s000": np.array([1.0, 0.0], dtype=np.float32),
+        },
+    )
+    lib = _lib(["s", "a", "b"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        bpm=120.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    lib.tracks["b"] = replace(
+        lib.tracks["b"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    svc = SuggestionService(store, lib)
+    state = MusicState()
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={
+            "A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=120.0),
+            "B": DeckTrack(title="Prepared", track_id="b", camelot="9A", bpm=120.0, confidence=1.0),
+        }
+    )
+
+    out = svc.compute_from_state(state)
+    envelope = svc.context_for_state(state, packet_id="ctx_live_prepared")
+
+    assert out is not None
+    assert out["track_id"] == "b"
+    assert out["transition"]["to_track_id"] == "b"
+    assert out["transition"]["target_deck"] == "B"
+    assert out["transition_alternatives"][0]["track_id"] == "b"
+    assert out["transition_alternatives"][0]["selected"] is True
+    assert out["transition_alternatives"][1]["track_id"] == "a"
+    assert envelope is not None
+    assert envelope.current["prepared_target_track_id"] == "b"
+
+
+def test_refresh_from_state_follows_grounded_track_loaded_on_target_deck_without_reranking():
+    from dataclasses import replace
+
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(
+        ["s", "a", "b"],
+        [("s", 0.99), ("a", 0.92), ("b", 0.91)],
+        section_vectors={
+            "s#s000": np.array([1.0, 0.0], dtype=np.float32),
+            "s#s001": np.array([0.0, 1.0], dtype=np.float32),
+            "a#s000": np.array([0.0, 1.0], dtype=np.float32),
+            "b#s000": np.array([1.0, 0.0], dtype=np.float32),
+        },
+    )
+    lib = _lib(["s", "a", "b"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        bpm=120.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    lib.tracks["b"] = replace(
+        lib.tracks["b"],
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    svc = SuggestionService(store, lib)
+    state = MusicState()
+    state.audible_deck = "A"
+    state.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=120.0)}
+    )
+
+    first = svc.compute_from_state(state)
+    assert first is not None
+    assert first["track_id"] == "a"
+
+    store.search_count = 0
+    store._backend.load_count = 0
+    state.deck_state = DeckState(
+        decks={
+            "A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=120.0),
+            "B": DeckTrack(title="Prepared", track_id="b", camelot="9A", bpm=120.0, confidence=1.0),
+        }
+    )
+
+    refreshed = svc.refresh_from_state(state, now=10.0, min_interval_s=0.0)
+
+    assert refreshed is not None
+    assert refreshed["track_id"] == "b"
+    assert refreshed["transition"]["to_track_id"] == "b"
+    assert refreshed["transition_alternatives"][0]["track_id"] == "b"
+    assert refreshed["transition_alternatives"][0]["candidate_id"] == "tr_001"
+    assert refreshed["transition_alternatives"][0]["selected"] is True
+    assert refreshed["transition_alternatives"][1]["track_id"] == "a"
+    assert refreshed["decision"]["candidate_id"] == "tr_001"
+    assert store.search_count == 0
     assert store._backend.load_count == 0
 
 
