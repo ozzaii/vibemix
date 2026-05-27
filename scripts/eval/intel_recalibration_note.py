@@ -583,8 +583,14 @@ def main(argv: list[str] | None = None) -> int:
                     "errors": (*tuple(result.get("errors", ())), f"append_log:{exc}"),
                 }
         if result["valid"] and args.output:
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(result["entry"], encoding="utf-8")
+            try:
+                _atomic_write_text(args.output, result["entry"])
+            except OSError as exc:
+                result = {
+                    **result,
+                    "valid": False,
+                    "errors": (*tuple(result.get("errors", ())), f"output:{exc}"),
+                }
     if args.json:
         json.dump(result, sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write("\n")

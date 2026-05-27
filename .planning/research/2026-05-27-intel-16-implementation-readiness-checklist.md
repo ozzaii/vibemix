@@ -658,6 +658,8 @@ done: `scripts/eval/intel_recalibration_note.py --append-log` persists public
       on failed final writes
 done: `scripts/eval/intel_recalibration_note.py` writes `--output` only after
       candidate append-log validation succeeds when both flags are supplied
+done: `scripts/eval/intel_recalibration_note.py --output` writes rendered
+      recalibration entries with the same temp-file + atomic-replace helper
 done: private-label recalibration notes carry canonical SHA-256 hashes for the
       exact redacted scorecard/gold/taste/gate reports used to render the entry
 done: `scripts/eval/intel_recalibration_log_validate.py` validates the public
