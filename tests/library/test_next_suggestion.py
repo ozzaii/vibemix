@@ -221,6 +221,34 @@ def test_set_aware_transition_can_promote_lower_embedding_candidate(library):
     )
 
 
+def test_taste_scores_thread_into_transition_components(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.91)])
+
+    s = next_suggestion(
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
+        played_ids=set(),
+        taste_scores={("outro", "intro"): 0.73},
+    )
+
+    assert s is not None
+    assert s.transition is not None
+    assert s.transition["from_role"] == "outro"
+    assert s.transition["to_role"] == "intro"
+    assert s.transition["scores"]["taste"] == 0.73
+
+
 def test_promote_transition_alternative_reassigns_rank_local_candidate_ids():
     alternatives = (
         {

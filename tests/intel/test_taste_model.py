@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
-from vibemix.intel.feedback import parse_feedback_event
-from vibemix.intel.taste_model import build_taste_model
+from vibemix.intel.feedback import append_feedback_event, parse_feedback_event
+from vibemix.intel.taste_model import build_taste_model, load_taste_model
 
 
 def _event(
@@ -81,3 +81,19 @@ def test_technical_no_updates_risk_penalty_not_role_pair_taste() -> None:
 
     assert model.role_pair_weights == {}
     assert model.risk_flag_penalties["vocal_clash"] < 0.0
+
+
+def test_load_taste_model_reads_consent_gated_feedback_jsonl(tmp_path) -> None:
+    path = tmp_path / "taste_feedback.jsonl"
+    events = tuple(
+        _event(f"evt_{i}", f"s{i % 3}", "played_next", ("outro", "intro")) for i in range(10)
+    )
+    for event in events:
+        append_feedback_event(path, event, profile_consent=True)
+
+    consented = load_taste_model(path, profile_consent=True)
+    withheld = load_taste_model(path, profile_consent=False)
+
+    assert consented.taste_score_for(("outro", "intro")) > 0.50
+    assert withheld.taste_event_count == 0
+    assert withheld.taste_score_for(("outro", "intro")) == 0.50

@@ -805,6 +805,31 @@ async def main() -> None:
         except Exception as e:
             print(f"-> pill feedback: taste append skipped ({e})", file=sys.stderr)
 
+    def _load_live_taste_scores() -> dict[tuple[str, str], float] | None:
+        """Load consent-gated taste feedback for live transition scoring."""
+        from vibemix.intel.taste_model import load_taste_model
+        from vibemix.profile import load_consent as _load_profile_consent
+
+        try:
+            consent = bool(_load_profile_consent())
+        except Exception as e:
+            print(f"-> pill taste: consent read skipped ({e})", file=sys.stderr)
+            return None
+        if not consent:
+            return None
+        try:
+            model = load_taste_model(
+                app_data_dir() / "taste_feedback.jsonl",
+                profile_consent=consent,
+            )
+        except Exception as e:
+            print(f"-> pill taste: disabled ({e})", file=sys.stderr)
+            return None
+        scores = model.taste_scores()
+        if scores:
+            print(f"-> pill taste: loaded {len(scores)} role-pair score(s)")
+        return scores or None
+
     registry = BufferRegistry(
         audio=audio_buf,
         clean_audio=clean_audio_buf,
@@ -1294,6 +1319,7 @@ async def main() -> None:
                     deck_library,
                     feedback_sink=_live_next_feedback_sink,
                     session_id=recorder.session_dir.name,
+                    taste_scores=_load_live_taste_scores(),
                 )
                 print("-> pill next-suggestion: armed")
         except Exception as e:

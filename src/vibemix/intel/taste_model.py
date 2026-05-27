@@ -4,8 +4,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
-from vibemix.intel.feedback import FeedbackEvent
+from vibemix.intel.feedback import (
+    FeedbackEvent,
+    feedback_privacy_errors,
+    load_feedback_events,
+    persistable_events,
+)
 from vibemix.intel.musical_ontology import clamp01, normalize_role
 
 TASTE_MODEL_VERSION = "taste_model_v1"
@@ -123,6 +129,22 @@ def build_taste_model(events: tuple[FeedbackEvent, ...]) -> TasteModel:
     )
 
 
+def load_taste_model(path: Path | str, *, profile_consent: bool) -> TasteModel:
+    """Load consent-gated local feedback rows into a deterministic taste model."""
+    if not profile_consent:
+        return build_taste_model(())
+
+    p = Path(path)
+    if not p.exists():
+        return build_taste_model(())
+
+    events = persistable_events(load_feedback_events(p), profile_consent=profile_consent)
+    errors = feedback_privacy_errors(events)
+    if errors:
+        raise ValueError(";".join(errors))
+    return build_taste_model(events)
+
+
 def _risk_penalties(events: tuple[FeedbackEvent, ...]) -> dict[str, float]:
     by_flag: dict[str, set[str]] = {}
     for event in events:
@@ -162,4 +184,5 @@ __all__ = [
     "TasteConstraint",
     "TasteModel",
     "build_taste_model",
+    "load_taste_model",
 ]

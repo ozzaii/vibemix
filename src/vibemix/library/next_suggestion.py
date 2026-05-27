@@ -109,6 +109,7 @@ def next_suggestion(
     live_playhead_confidence: float = 0.0,
     blend_active: bool = False,
     source_position_s: float | None = None,
+    taste_scores: dict[tuple[str, str], float] | None = None,
 ) -> NextSuggestion | None:
     """Rank the library by similarity to ``seed_vector`` → one next suggestion.
 
@@ -194,6 +195,7 @@ def next_suggestion(
         live_playhead_confidence=live_playhead_confidence,
         blend_active=blend_active,
         source_position_s=source_position_s,
+        taste_scores=taste_scores,
     )
 
     return NextSuggestion(
@@ -222,6 +224,7 @@ def _select_set_aware_option(
     live_playhead_confidence: float,
     blend_active: bool,
     source_position_s: float | None,
+    taste_scores: dict[tuple[str, str], float] | None,
 ) -> tuple[_SuggestionOption, dict | None, tuple[dict, ...]]:
     """Pick the best grounded option, preferring proven mix-point evidence.
 
@@ -249,6 +252,7 @@ def _select_set_aware_option(
             blend_active=blend_active,
             source_position_s=source_position_s,
             destination_vector=destination_vectors.get(option.track_id),
+            taste_scores=taste_scores,
         )
         ranked.append((_selection_key(option, transition, order), option, transition))
 
@@ -480,6 +484,7 @@ def transition_payload_for_candidate(
     blend_active: bool,
     source_position_s: float | None,
     destination_vector: np.ndarray | None = None,
+    taste_scores: dict[tuple[str, str], float] | None = None,
 ) -> dict | None:
     """Return a set-aware cue recommendation for the chosen candidate.
 
@@ -572,6 +577,7 @@ def transition_payload_for_candidate(
                     blend_active=blend_active,
                 ),
                 mode="live",
+                taste_scores=taste_scores,
             ),
             max_candidates=1,
         )

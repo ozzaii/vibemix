@@ -168,12 +168,14 @@ class SuggestionService:
         k: int = 5,
         feedback_sink: Callable[[FeedbackEvent], None] | None = None,
         session_id: str | None = None,
+        taste_scores: dict[tuple[str, str], float] | None = None,
     ) -> None:
         self._store = store
         self._library = library
         self._k = k
         self._feedback_sink = feedback_sink
         self._feedback_session_id = _feedback_token(session_id or "live_session")
+        self._taste_scores = dict(taste_scores or {})
         self._lock = threading.Lock()
         self._played: set[str] = set()
         self._current: dict | None = None
@@ -589,6 +591,7 @@ class SuggestionService:
                 live_playhead_confidence=live_playhead_confidence,
                 blend_active=blend_active,
                 source_position_s=source_position_s,
+                taste_scores=self._taste_scores,
             )
         except Exception as e:
             logger.warning("[suggestion] compute failed: %s", e)
@@ -731,6 +734,7 @@ class SuggestionService:
                     blend_active=timing.blend_active,
                     source_position_s=timing.source_position_s,
                     destination_vector=candidate_vectors_by_track_id.get(track_id),
+                    taste_scores=self._taste_scores,
                 )
             alternatives = ranked_transition_alternatives(
                 alternatives,
@@ -762,6 +766,7 @@ class SuggestionService:
                 blend_active=timing.blend_active,
                 source_position_s=timing.source_position_s,
                 destination_vector=candidate_vector,
+                taste_scores=self._taste_scores,
             )
             transition = annotate_transition_selection(
                 transition,

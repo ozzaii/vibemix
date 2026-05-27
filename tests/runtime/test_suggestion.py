@@ -217,7 +217,7 @@ def test_compute_from_state_threads_live_bar_timing_into_transition():
         key="9A",
         cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
     )
-    svc = SuggestionService(store, lib)
+    svc = SuggestionService(store, lib, taste_scores={("outro", "intro"): 0.73})
     state = MusicState()
     state.audible_deck = "A"
     state.bpm_confidence = 0.95
@@ -240,6 +240,7 @@ def test_compute_from_state_threads_live_bar_timing_into_transition():
     assert out["transition"]["from_section_id"] == "s#s000"
     assert out["transition"]["from_role"] == "outro"
     assert out["transition"]["to_role"] == "intro"
+    assert out["transition"]["scores"]["taste"] == 0.73
     assert out["transition"]["from_start_s"] == 224.0
     assert out["transition"]["to_start_s"] == 0.0
     assert out["transition"]["start_in_bars"] == 13

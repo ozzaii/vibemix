@@ -166,6 +166,13 @@ same structured row to `app_data_dir()/taste_feedback.jsonl` only when
 `profile_consent` is currently true. The row must not include raw audio, local
 paths, vectors, or prompt prose.
 
+On boot, the live suggestion service loads the same consent-gated
+`taste_feedback.jsonl` through the deterministic taste model and passes its
+role-pair scores into the transition scorer. Taste is therefore a bounded score
+component, not a hard override: it can nudge technically close transitions
+toward the DJ's accepted role pairs while leaving harmonic, tempo, phrase, cue,
+semantic, and confidence gates intact.
+
 ### `decision`
 
 `decision` is the validator-checked action packet produced after the claim ledger
@@ -225,7 +232,7 @@ action path and the next frame reflects the pinned selected candidate.
 Focused backend and UI checks used for this slice:
 
 ```bash
-uv run pytest -q tests/intel/test_feedback.py tests/library/test_next_suggestion.py tests/runtime/test_suggestion.py tests/runtime/test_ws_bus.py tests/intel/test_context_compiler.py tests/intel/test_decision_runtime.py tests/intel/test_decision_validator.py
+uv run pytest -q tests/intel/test_feedback.py tests/intel/test_taste_model.py tests/library/test_next_suggestion.py tests/runtime/test_suggestion.py tests/runtime/test_ws_bus.py tests/intel/test_context_compiler.py tests/intel/test_decision_runtime.py tests/intel/test_decision_validator.py
 npm --prefix tauri/ui test -- next-suggestion
 npm --prefix tauri/ui test -- pill/index
 ```
@@ -247,7 +254,6 @@ warnings are not specific to the live next-pill contract.
   synthetic wire-level regression.
 - Add richer target-cue operability checks once more CUE-DETR or Rekordbox cue
   data is available.
-- Feed the consent-gated `taste_feedback.jsonl` rows back into the live
-  transition scorer at boot instead of leaving them as stored evidence only.
-- Keep improving taste thresholds so the system learns which technically valid
-  transitions the DJ actually accepts.
+- Keep improving taste thresholds and live refresh behavior so the system learns
+  which technically valid transitions the DJ actually accepts without
+  overfitting one session.
