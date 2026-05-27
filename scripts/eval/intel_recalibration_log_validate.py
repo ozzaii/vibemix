@@ -98,8 +98,19 @@ def validate_recalibration_log(
 
     real_tail = text.split(APPEND_MARKER, maxsplit=1)[1].strip()
     entries = _parse_entries(real_tail)
+    seen_run_ids: set[str] = set()
+    previous_timestamp: str | None = None
     for index, entry in enumerate(entries, start=1):
         errors.extend(_validate_entry(entry, index=index, expected_lock_hash=expected_lock_hash))
+        timestamp, run_id = _entry_sequence_metadata(entry)
+        if timestamp is not None:
+            if previous_timestamp is not None and timestamp < previous_timestamp:
+                errors.append(f"entry[{index}].timestamp.out_of_order")
+            previous_timestamp = timestamp
+        if run_id:
+            if run_id in seen_run_ids:
+                errors.append(f"entry[{index}].run_id.duplicate")
+            seen_run_ids.add(run_id)
     return _report(
         path=log_path,
         entries=len(entries),
@@ -218,6 +229,21 @@ def _validate_entry(entry: str, *, index: int, expected_lock_hash: str | None) -
     if header_verdict == "private_recalibration_required" and not metric_failures:
         errors.append(f"entry[{index}].verdict.no_metric_failures")
     return errors
+
+
+def _entry_sequence_metadata(entry: str) -> tuple[str | None, str | None]:
+    lines = [line.rstrip() for line in entry.splitlines() if line.strip()]
+    if not lines:
+        return None, None
+    header = ENTRY_RE.match(lines[0])
+    timestamp = header.group("timestamp") if header is not None else None
+    fields: dict[str, str] = {}
+    for line in lines[1:]:
+        if not line.startswith("- ") or ": " not in line:
+            continue
+        key, value = line[2:].split(": ", maxsplit=1)
+        fields.setdefault(key, value)
+    return timestamp, fields.get("run_id")
 
 
 def _validate_metric_lines(fields: dict[str, str], *, index: int) -> tuple[list[str], list[str]]:

@@ -653,6 +653,9 @@ done: `scripts/eval/intel_recalibration_log_validate.py` rejects stale public
 done: `scripts/eval/intel_recalibration_log_validate.py` rejects duplicate,
       unknown, and malformed key-value tokens in machine-audited public
       recalibration entries
+done: `scripts/eval/intel_recalibration_log_validate.py` rejects duplicate
+      private recalibration `run_id` values and entries whose timestamps move
+      backwards in the append-only public audit trail
 done: `.github/workflows/eval.yml` runs the recalibration-log validator before
       generating INTEL fixture-gate artifacts, catching audit-log drift on PRs
       and nightly canaries

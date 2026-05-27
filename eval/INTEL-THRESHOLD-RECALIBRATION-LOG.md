@@ -43,6 +43,8 @@ rejects verdict/action pairs that disagree with those numbers. It also rejects
 evidence, and rejects entries whose `lock:` digest does not match the current
 `eval/INTEL-THRESHOLD-LOCK.md` file. Key-value lines are strict: duplicate keys,
 unknown keys, and malformed tokens are invalid rather than silently ignored.
+Across real entries, `run_id` values must be unique and timestamps must not move
+backwards.
 
 ```text
 ### YYYY-MM-DDTHH:MM:SSZ - verdict={private_in_tolerance|private_recalibration_required|release_promoted}
@@ -98,7 +100,8 @@ Validate the public log with
 `scripts/eval/intel_recalibration_log_validate.py`. The validator treats
 everything after the append marker as machine-audited evidence and checks entry
 schema, current-lock hash binding, report-hash bindings, release/split
-consistency, strict key-value parsing, and public-redaction markers.
+consistency, strict key-value parsing, append-order coherence, and
+public-redaction markers.
 
 ## Audit Trail
 

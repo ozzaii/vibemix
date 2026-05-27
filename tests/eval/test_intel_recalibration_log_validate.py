@@ -110,6 +110,36 @@ def test_validate_rejects_malformed_key_value_tokens(tmp_path: Path) -> None:
     assert "entry[1].privacy.token" in report.errors
 
 
+def test_validate_rejects_duplicate_run_ids(tmp_path: Path) -> None:
+    entries = "\n\n".join(
+        [
+            _valid_entry(timestamp="2026-05-27T12:00:00Z", run_id="intel_private_dup"),
+            _valid_entry(timestamp="2026-05-27T12:00:01Z", run_id="intel_private_dup"),
+        ]
+    )
+    log = _write_log(tmp_path, entries)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[2].run_id.duplicate" in report.errors
+
+
+def test_validate_rejects_out_of_order_timestamps(tmp_path: Path) -> None:
+    entries = "\n\n".join(
+        [
+            _valid_entry(timestamp="2026-05-27T12:00:02Z", run_id="intel_private_later"),
+            _valid_entry(timestamp="2026-05-27T12:00:01Z", run_id="intel_private_earlier"),
+        ]
+    )
+    log = _write_log(tmp_path, entries)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[2].timestamp.out_of_order" in report.errors
+
+
 def test_validate_rejects_missing_required_metric(tmp_path: Path) -> None:
     entry = _replace_field(
         _valid_entry(),
@@ -249,7 +279,11 @@ def test_recalibration_log_validator_cli_json(tmp_path: Path, capsys) -> None:  
     assert payload["entry_count"] == 1
 
 
-def _valid_entry() -> str:
+def _valid_entry(
+    *,
+    timestamp: str = "2026-05-27T12:00:00Z",
+    run_id: str = "intel_private_test",
+) -> str:
     result = build_recalibration_note(
         scorecard=score_fixture_dir(DEFAULT_FIXTURE_DIR, threshold_lock_path=INTEL_LOCK_PATH),
         gold_report=report_gold_file(
@@ -258,8 +292,8 @@ def _valid_entry() -> str:
         taste_scorecard=score_taste_fixture_dir(DEFAULT_FIXTURE_DIR),
         evidence_tier="tier1_private_calibration",
         lock_path=INTEL_LOCK_PATH,
-        timestamp="2026-05-27T12:00:00Z",
-        run_id="intel_private_test",
+        timestamp=timestamp,
+        run_id=run_id,
     )
     assert result["valid"] is True
     return result["entry"]
