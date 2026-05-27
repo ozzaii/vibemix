@@ -27,6 +27,8 @@
 #        - provenance stage hashes/replay tier match current evidence too
 #        - artifact thresholds hash matches current INTEL lock values
 #        - artifact threshold-lock hash matches the current INTEL lock
+#      The public INTEL recalibration log must also validate so private-label
+#      threshold-movement evidence stays redacted, hash-bound, and append-safe.
 #
 #   3. scripts/release/check_ear_test.sh exits 0 (≥2 ear-test sessions
 #      ≥2 genres within 14d, zero slop flags).
@@ -42,6 +44,7 @@
 #   THRESHOLD_LOCK         default: eval/THRESHOLD-LOCK.md
 #   INTEL_THRESHOLD_LOCK   default: eval/INTEL-THRESHOLD-LOCK.md
 #   INTEL_FIXTURE_MANIFEST default: tests/intel/fixtures/MANIFEST.json
+#   INTEL_RECALIBRATION_LOG default: eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md
 #   EAR_TEST_GATE          default: scripts/release/check_ear_test.sh
 #   MIN_CONSECUTIVE_GREEN  default: 7
 #
@@ -58,6 +61,7 @@ EVAL_RUNS_DIR="${EVAL_RUNS_DIR:-.planning/eval-runs}"
 THRESHOLD_LOCK="${THRESHOLD_LOCK:-eval/THRESHOLD-LOCK.md}"
 INTEL_THRESHOLD_LOCK="${INTEL_THRESHOLD_LOCK:-eval/INTEL-THRESHOLD-LOCK.md}"
 INTEL_FIXTURE_MANIFEST="${INTEL_FIXTURE_MANIFEST:-tests/intel/fixtures/MANIFEST.json}"
+INTEL_RECALIBRATION_LOG="${INTEL_RECALIBRATION_LOG:-eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md}"
 EAR_TEST_GATE="${EAR_TEST_GATE:-scripts/release/check_ear_test.sh}"
 MIN_CONSECUTIVE_GREEN="${MIN_CONSECUTIVE_GREEN:-7}"
 
@@ -191,6 +195,21 @@ fi
 # --- enumerate nightly runs -----------------------------------------------
 NIGHTLY_FAIL_REASONS=()
 INTEL_FAIL_REASONS=()
+
+if [ ! -f "${INTEL_RECALIBRATION_LOG}" ]; then
+  INTEL_FAIL_REASONS+=("INTEL recalibration log missing: ${INTEL_RECALIBRATION_LOG}")
+else
+  recalibration_status=$(
+    "${PYTHON_BIN}" scripts/eval/intel_recalibration_log_validate.py \
+      "${INTEL_RECALIBRATION_LOG}" \
+      --json 2>&1 || true
+  )
+  recalibration_valid=$(echo "${recalibration_status}" | jq -r '.valid // false' 2>/dev/null || echo "false")
+  if [ "${recalibration_valid}" != "true" ]; then
+    recalibration_errors=$(echo "${recalibration_status}" | jq -r '(.errors // ["parse_error"]) | join(",")' 2>/dev/null || echo "parse_error")
+    INTEL_FAIL_REASONS+=("INTEL recalibration log invalid: ${recalibration_errors}")
+  fi
+fi
 
 if [ ! -d "${EVAL_RUNS_DIR}" ]; then
   BLOCKERS+=("BLOCKED_BY=nightly: eval-runs dir missing: ${EVAL_RUNS_DIR}")
@@ -365,12 +384,13 @@ else
         BLOCKERS+=("BLOCKED_BY=nightly: ${r}")
       done
     fi
-    if [ "${#INTEL_FAIL_REASONS[@]}" -gt 0 ]; then
-      for r in "${INTEL_FAIL_REASONS[@]}"; do
-        BLOCKERS+=("BLOCKED_BY=intel: ${r}")
-      done
-    fi
   fi
+fi
+
+if [ "${#INTEL_FAIL_REASONS[@]}" -gt 0 ]; then
+  for r in "${INTEL_FAIL_REASONS[@]}"; do
+    BLOCKERS+=("BLOCKED_BY=intel: ${r}")
+  done
 fi
 
 # --- ear-test gate --------------------------------------------------------

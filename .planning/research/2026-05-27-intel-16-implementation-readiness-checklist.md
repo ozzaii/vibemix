@@ -647,6 +647,8 @@ done: private-label recalibration notes carry canonical SHA-256 hashes for the
       exact redacted scorecard/gold/taste/gate reports used to render the entry
 done: `scripts/eval/intel_recalibration_log_validate.py` validates the public
       INTEL recalibration log schema, report-hash bindings, and privacy markers
+done: `scripts/release/check_gate.sh` blocks release when the public INTEL
+      recalibration log is missing, malformed, hashless, or privacy-leaking
 done: release-promotion notes require a valid `intel_gate.py` artifact whose
       scorecard/provenance lock hashes match the promoted INTEL threshold lock
 done: release-promotion notes reject failed scorecards and gate/scorecard

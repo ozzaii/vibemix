@@ -27,6 +27,7 @@ from pathlib import Path
 
 import pytest
 from scripts.eval.intel_gate import run_intel_gate
+from scripts.eval.intel_recalibration_note import APPEND_MARKER
 
 SCRIPT_PATH = Path("scripts/release/check_gate.sh").resolve()
 INTEL_LOCK_PATH = Path("eval/INTEL-THRESHOLD-LOCK.md").resolve()
@@ -749,6 +750,71 @@ def test_missing_intel_fixture_manifest_fails_before_artifact_scan(tmp_path: Pat
 
     assert result.returncode == 1
     assert "INTEL fixture manifest missing" in result.stderr
+
+
+def test_missing_intel_recalibration_log_fails_release_gate(tmp_path: Path):
+    """The release gate must validate the public private-evidence audit log."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(
+        runs,
+        tl,
+        ear,
+        extra_env={"INTEL_RECALIBRATION_LOG": str(tmp_path / "missing-intel-log.md")},
+    )
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "INTEL recalibration log missing" in result.stderr
+
+
+def test_invalid_intel_recalibration_log_fails_release_gate(tmp_path: Path):
+    """Malformed private-label audit entries block release even when nightly is green."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+    bad_log = tmp_path / "bad-intel-log.md"
+    bad_log.write_text(
+        "\n".join(
+            [
+                "# Log",
+                "",
+                APPEND_MARKER,
+                "",
+                "### 2026-05-27T12:00:00Z - verdict=private_in_tolerance",
+                "- run_id: intel_private_bad",
+                "- lock: eval/INTEL-THRESHOLD-LOCK.md (sha256:" + ("a" * 64) + ")",
+                "- evidence_tier: tier1_private_calibration",
+                "- splits: calibration=1 holdout=0 canary=0",
+                "- label_kinds: section=1 transition=1 cue=0 live_pill=0 representation=0 taste=0",
+                "- reports: gold_report=private:redacted scorecard=private:redacted taste_scorecard=null gate=null",
+                "- measured: section_role_hit_at_5_delta=0.20 transition_accept_at_3=1.00 decision_exact_timing_floor_violation_rate=0.00 taste_accepted_suggestion_lift=0.18",
+                "- locked:   section_role_hit_at_5_delta_min=0.15 transition_accept_at_3_min=0.80 decision_exact_timing_floor_violation_rate_max=0.00 taste_accepted_suggestion_lift_min=0.10",
+                "- delta:    section_role_hit_at_5_delta=+0.05 transition_accept_at_3=+0.20 decision_exact_timing_floor_violation_rate=+0.00 taste_accepted_suggestion_lift=+0.08",
+                "- privacy: local_paths_redacted=true ids_hashed=true raw_audio_committed=false raw_vectors_committed=false free_form_notes_committed=false",
+                "- verdict: private_in_tolerance",
+                "- action: none",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run(
+        runs,
+        tl,
+        ear,
+        extra_env={"INTEL_RECALIBRATION_LOG": str(bad_log)},
+    )
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "INTEL recalibration log invalid" in result.stderr
+    assert "missing:report_hashes" in result.stderr
 
 
 # ---------------------------------------------------------------------------
