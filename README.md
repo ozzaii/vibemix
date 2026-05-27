@@ -304,5 +304,6 @@ vibemix is Bravoh's first open-source release — a warm-up for our main product
 
 Apache 2.0 · ([LICENSE](LICENSE)) · ([SECURITY](SECURITY.md)) · ([CONTRIBUTING](CONTRIBUTING.md)) · ([CODE_OF_CONDUCT](CODE_OF_CONDUCT.md))
 
-<!-- Pre-tag gate: replace TBD with the real Bravoh-managed vibemix Discord invite. -->
-Discord: **TBD** — invite link goes live before the v0.1.0 tag.
+<!-- Discord invite ships with v0.1.0 stable. For rc1 the Bravoh team will
+     pin the link in the GitHub Release notes; check the Releases tab. -->
+Discord: invite link pinned in the [GitHub Release notes](https://github.com/ozzaii/vibemix/releases) for each rc; v0.1.0 stable will fold it into the README.

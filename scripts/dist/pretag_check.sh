@@ -50,17 +50,27 @@ fi
 echo
 
 # --- 2. Phase 17 grading sheet has 4+ rows --------------------------------
+# RC-tag mode (VIBEMIX_PRETAG_RC=1) softens this gate to warn-level: 4-rater
+# reaction-reel grading is a stable-release signal, not an rc gate. An rc tag
+# IS the "test in the wild" cut; gather rater feedback against the rc binary
+# itself, then enforce the gate before promoting to v0.1.0 stable.
 echo "[2/8] Phase 17 reaction-reel grading has ≥4 raters"
 G17="benchmarks/reaction_reel/grading-sheet.csv"
 if [[ -f "$G17" ]]; then
   rows=$(($(wc -l < "$G17") - 1))  # minus header
   if (( rows >= 4 )); then
     ok "$G17 has $rows rater rows"
+  elif [[ "${VIBEMIX_PRETAG_RC:-0}" == "1" ]]; then
+    warn "$G17 has only $rows rater rows (need ≥4 for stable; deferred for rc tag)"
   else
     no "$G17 has only $rows rater rows (need ≥4)"
   fi
 else
-  no "$G17 missing — Phase 17 grading not run yet"
+  if [[ "${VIBEMIX_PRETAG_RC:-0}" == "1" ]]; then
+    warn "$G17 missing — Phase 17 grading deferred for rc tag (required before v0.1.0 stable)"
+  else
+    no "$G17 missing — Phase 17 grading not run yet"
+  fi
 fi
 echo
 
@@ -116,6 +126,11 @@ fi
 echo
 
 # --- 6. Required GitHub secrets configured -------------------------------
+# Mac-only mode (set VIBEMIX_PRETAG_MAC_ONLY=1) skips the SignPath gates so
+# the macOS-only rc tag can ship while the SignPath OSS-program approval is
+# still in flight. The Windows build job in release.yml already no-ops when
+# SignPath secrets are absent — this just suppresses the pretag fail line so
+# the macOS rc isn't held hostage by Windows signing infra.
 echo "[6/8] Required GitHub secrets configured"
 REQUIRED=(
   APPLE_DEVELOPER_ID
@@ -126,15 +141,19 @@ REQUIRED=(
   APPLE_API_KEY_ID
   APPLE_API_KEY_ISSUER
   APPLE_API_KEY_P8
-  SIGNPATH_API_TOKEN
-  SIGNPATH_ORGANIZATION_ID
-  SIGNPATH_PROJECT_SLUG
-  SIGNPATH_SIGNING_POLICY_SLUG
-  SIGNPATH_SIGNTOOL_CMD
   TAURI_UPDATER_PRIVATE_KEY
   TAURI_UPDATER_KEY_PASSWORD
   BRAVOH_MANIFEST_UPLOAD_TOKEN
 )
+if [[ "${VIBEMIX_PRETAG_MAC_ONLY:-0}" != "1" ]]; then
+  REQUIRED+=(
+    SIGNPATH_API_TOKEN
+    SIGNPATH_ORGANIZATION_ID
+    SIGNPATH_PROJECT_SLUG
+    SIGNPATH_SIGNING_POLICY_SLUG
+    SIGNPATH_SIGNTOOL_CMD
+  )
+fi
 if command -v gh >/dev/null 2>&1; then
   if gh auth status >/dev/null 2>&1; then
     secrets_list=$(gh secret list --json name -q '.[].name' 2>/dev/null || true)
