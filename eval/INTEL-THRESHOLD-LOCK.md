@@ -80,7 +80,8 @@ Release-grade thresholds still need private Kaan-reviewed evidence:
 - section queries against real hardtechno/hard-tek library moments;
 - transition pairs labeled `would_play`, `maybe`, and `no`;
 - live/debrief decisions replayed with timing confidence;
-- taste labels captured from actual accepted/rejected suggestions.
+- taste labels captured from actual accepted/rejected suggestions, with invalid
+  taste split/label/consent fields rejected before profile projection.
 
 ## Retuning Protocol
 

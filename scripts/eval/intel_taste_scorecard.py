@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
 
 from vibemix.intel.feedback import (  # noqa: E402
     FeedbackEvent,
-    feedback_privacy_errors,
+    feedback_validation_errors,
     load_feedback_events,
     persistable_events,
 )
@@ -41,14 +41,16 @@ def score_path(path: Path | str, *, source: str = "private:redacted") -> dict[st
 
 
 def score_taste_feedback(events: tuple[FeedbackEvent, ...], *, source: str) -> dict[str, Any]:
-    calibration = tuple(event for event in events if event.split == "calibration")
-    holdout = tuple(event for event in events if event.split == "holdout")
-    poison = tuple(event for event in events if event.split == "poison")
+    event_errors = feedback_validation_errors(events)
+    scored_events = () if event_errors else events
+    calibration = tuple(event for event in scored_events if event.split == "calibration")
+    holdout = tuple(event for event in scored_events if event.split == "holdout")
+    poison = tuple(event for event in scored_events if event.split == "poison")
     model = build_taste_model(calibration)
     poison_model = build_taste_model(poison)
     profile = project_profile(model, consent=True)
-    privacy_errors = (
-        *feedback_privacy_errors(events),
+    validation_errors = (
+        *event_errors,
         *profile_projection_privacy_errors(profile),
     )
     metrics = {
@@ -69,7 +71,7 @@ def score_taste_feedback(events: tuple[FeedbackEvent, ...], *, source: str) -> d
     return {
         "schema": "intel_taste_scorecard_v1",
         "source": source,
-        "valid": bool(events) and not privacy_errors,
+        "valid": bool(events) and not validation_errors,
         "privacy": {"local_paths_redacted": True, "profile_ids_redacted": True},
         "counts": {
             "events": len(events),
@@ -84,7 +86,7 @@ def score_taste_feedback(events: tuple[FeedbackEvent, ...], *, source: str) -> d
             "transition_style_tags": tuple(profile.get("transition_style_tags") or ()),
             "suggestion_cadence": profile.get("suggestion_cadence"),
         },
-        "errors": tuple(privacy_errors),
+        "errors": tuple(validation_errors),
     }
 
 
@@ -162,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
             f"lift={metrics['accepted_suggestion_lift']} "
             f"poison={metrics['single_session_hard_negative_rate']}"
         )
-    return 0
+    return 0 if result.get("valid") is True else 1
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint

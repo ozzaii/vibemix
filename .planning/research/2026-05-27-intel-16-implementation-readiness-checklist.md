@@ -597,6 +597,9 @@ done: tests/intel/test_feedback.py
 done: tests/intel/test_taste_model.py
 done: tests/intel/test_profile_projection.py
 done: tests/eval/test_intel_taste_scorecard.py
+done: taste feedback validation rejects invalid split names, unknown labels,
+      duplicate event IDs, malformed `profile_consent`, and private payloads
+      before rows affect deterministic profile projection or release scorecards
 pending: transition scorecard over real private reviewed labels
 pending: durable taste storage and product feedback capture surfaces
 done: eval/INTEL-THRESHOLD-LOCK.md fixture thresholds and scorecard CLI wiring

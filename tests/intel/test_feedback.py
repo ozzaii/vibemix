@@ -5,13 +5,16 @@ import json
 from pathlib import Path
 
 from vibemix.intel.feedback import (
+    ALLOWED_FEEDBACK_LABELS,
     append_feedback_event,
     feedback_event_to_row,
     feedback_privacy_errors,
+    feedback_validation_errors,
     load_feedback_events,
     parse_feedback_event,
     persistable_events,
 )
+from vibemix.intel.taste_model import TASTE_LABEL_WEIGHTS, TECHNICAL_LABELS
 
 
 def test_parse_feedback_event_preserves_structured_fields() -> None:
@@ -60,6 +63,67 @@ def test_feedback_privacy_catches_paths_and_vectors() -> None:
     )
 
     assert feedback_privacy_errors((event,)) == ("evt_001:private_payload_present",)
+
+
+def test_feedback_validation_rejects_bad_split_and_label() -> None:
+    event = parse_feedback_event(
+        {
+            "event_id": "evt_bad",
+            "session_id": "s1",
+            "surface": "prep_chat",
+            "action": "transition_labeled",
+            "split": "holdot",
+            "label": "would_playy",
+        }
+    )
+
+    assert feedback_validation_errors((event,)) == (
+        "evt_bad:invalid_split:holdot",
+        "evt_bad:unknown_label:would_playy",
+    )
+
+
+def test_feedback_label_allowlist_matches_taste_model_labels() -> None:
+    assert ALLOWED_FEEDBACK_LABELS == frozenset(TASTE_LABEL_WEIGHTS) | TECHNICAL_LABELS
+
+
+def test_feedback_validation_rejects_duplicate_event_ids() -> None:
+    first = parse_feedback_event(
+        {
+            "event_id": "evt_dup",
+            "session_id": "s1",
+            "surface": "prep_chat",
+            "action": "transition_labeled",
+            "label": "would_play",
+        }
+    )
+    second = parse_feedback_event(
+        {
+            "event_id": "evt_dup",
+            "session_id": "s2",
+            "surface": "prep_chat",
+            "action": "transition_labeled",
+            "label": "no",
+        }
+    )
+
+    assert feedback_validation_errors((first, second)) == ("evt_dup:duplicate_event_id",)
+
+
+def test_feedback_validation_requires_boolean_profile_consent() -> None:
+    event = parse_feedback_event(
+        {
+            "event_id": "evt_consent",
+            "session_id": "s1",
+            "surface": "prep_chat",
+            "action": "transition_labeled",
+            "label": "would_play",
+            "profile_consent": "false",
+        }
+    )
+
+    assert event.profile_consent is False
+    assert feedback_validation_errors((event,)) == ("evt_consent:profile_consent_must_be_bool",)
 
 
 def test_load_feedback_events_jsonl(tmp_path: Path) -> None:

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from vibemix.intel.feedback import (
     FeedbackEvent,
-    feedback_privacy_errors,
+    feedback_validation_errors,
     load_feedback_events,
     persistable_events,
 )
@@ -139,7 +139,7 @@ def load_taste_model(path: Path | str, *, profile_consent: bool) -> TasteModel:
         return build_taste_model(())
 
     events = persistable_events(load_feedback_events(p), profile_consent=profile_consent)
-    errors = feedback_privacy_errors(events)
+    errors = feedback_validation_errors(events)
     if errors:
         raise ValueError(";".join(errors))
     return build_taste_model(events)

@@ -17,6 +17,26 @@ PRIVATE_PAYLOAD_PATTERNS = (
     re.compile(r"[A-Za-z]:\\\\[^\"'\s]+"),
     re.compile(r"file://[^\"'\s]+", re.I),
 )
+ALLOWED_FEEDBACK_SPLITS: frozenset[str] = frozenset({"calibration", "holdout", "poison"})
+ALLOWED_FEEDBACK_LABELS: frozenset[str] = frozenset(
+    {
+        "would_play",
+        "maybe",
+        "no",
+        "vibe_no",
+        "played_next",
+        "accepted",
+        "not_now",
+        "rejected",
+        "ignored_timeout",
+        "different_track",
+        "cue_kept",
+        "cue_edited",
+        "technical_no",
+        "timing_no",
+        "wrong_timing",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +83,7 @@ def parse_feedback_event(row: dict[str, Any]) -> FeedbackEvent:
         risk_flags=tuple(str(flag) for flag in row.get("risk_flags") or ()),
         score=_float_or_none(row.get("score")),
         inferred=bool(row.get("inferred", False)),
-        profile_consent=bool(row.get("profile_consent", True)),
+        profile_consent=_bool_or_default(row.get("profile_consent"), default=True),
         raw=dict(row),
     )
 
@@ -127,7 +147,7 @@ def append_feedback_event(
         return False
 
     row = feedback_event_to_row(event, profile_consent=True)
-    errors = feedback_privacy_errors((parse_feedback_event(row),))
+    errors = feedback_validation_errors((parse_feedback_event(row),))
     if errors:
         raise ValueError(";".join(errors))
 
@@ -171,6 +191,29 @@ def feedback_privacy_errors(events: tuple[FeedbackEvent, ...]) -> tuple[str, ...
     return tuple(errors)
 
 
+def feedback_validation_errors(events: tuple[FeedbackEvent, ...]) -> tuple[str, ...]:
+    """Validate structured taste feedback before it can become evidence."""
+    errors = list(feedback_privacy_errors(events))
+    seen_event_ids: set[str] = set()
+    for event in events:
+        prefix = f"{event.event_id or '<missing>'}:"
+        if event.event_id:
+            if event.event_id in seen_event_ids:
+                errors.append(prefix + "duplicate_event_id")
+            seen_event_ids.add(event.event_id)
+        if not event.surface:
+            errors.append(prefix + "missing_surface")
+        if not event.action:
+            errors.append(prefix + "missing_action")
+        if event.split not in ALLOWED_FEEDBACK_SPLITS:
+            errors.append(prefix + f"invalid_split:{event.split}")
+        if event.label is not None and event.label not in ALLOWED_FEEDBACK_LABELS:
+            errors.append(prefix + f"unknown_label:{event.label}")
+        if "profile_consent" in event.raw and not isinstance(event.raw["profile_consent"], bool):
+            errors.append(prefix + "profile_consent_must_be_bool")
+    return tuple(errors)
+
+
 def _contains_private_payload(value: Any) -> bool:
     if isinstance(value, dict):
         return any(
@@ -207,11 +250,28 @@ def _float_or_none(value: Any) -> float | None:
         return None
 
 
+def _bool_or_default(value: Any, *, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"false", "0", "no"}:
+            return False
+        if lowered in {"true", "1", "yes"}:
+            return True
+    return bool(value)
+
+
 __all__ = [
+    "ALLOWED_FEEDBACK_LABELS",
+    "ALLOWED_FEEDBACK_SPLITS",
     "FeedbackEvent",
     "append_feedback_event",
     "feedback_event_to_row",
     "feedback_privacy_errors",
+    "feedback_validation_errors",
     "load_feedback_events",
     "parse_feedback_event",
     "persistable_events",
