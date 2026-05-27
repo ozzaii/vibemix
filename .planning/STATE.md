@@ -2,26 +2,25 @@
 gsd_state_version: 1.0
 milestone: v9.0
 milestone_name: Lesson One
-status: in_progress
-last_updated: "2026-05-27T22:00:00+03:00"
-last_activity: "2026-05-27 - v9.0 ROADMAP locked; 8 phases (P91-P98) covering 72 REQ-IDs; ready for /gsd:plan-phase 91"
+status: executing
+last_updated: "2026-05-27T20:47:12.944Z"
+last_activity: 2026-05-27 -- Plan 91-01 SHIPPED (IPC contract + Vite/Tauri scaffolding)
 progress:
-  mode: in_progress
-  research: done
-  requirements: done
-  roadmap: done
-  phases_complete: 0
-  phases_total: 8
+  total_phases: 14
+  completed_phases: 0
+  total_plans: 7
+  completed_plans: 1
+  percent: 14
 ---
 
 # vibemix — State
 
 ## Current Position
 
-Phase: **Phase 91 — Controller Renderer + MIDI Mirror (next)**
-Plan: — (awaiting `/gsd:plan-phase 91`)
-Status: v9.0 ROADMAP locked; 4 opus researchers complete; 72 REQ-IDs mapped 100% across 8 phases (P91–P98)
-Last activity: 2026-05-27 — ROADMAP.md v9.0 section added (`gsd-roadmapper`); coverage verified; KAAN-ACTION queue parked; ready for first phase plan
+Phase: 91 (Controller Renderer + MIDI Mirror) — EXECUTING
+Plan: 2 of 7 (Plan 01 SHIPPED 2026-05-27, commits 905e1550 → de4808ce)
+Status: Ready to execute
+Last activity: 2026-05-27 — 91-01 SHIPPED: 2 ipc.learn.* envelopes + Vite/Tauri scaffolding; 6 tests fixed; 66 oneOf == 66 wrappers
 
 ## Milestone Reference
 
@@ -64,6 +63,7 @@ P91 (Controller Renderer + MIDI Mirror) ──┬──► P92 (Lesson Runtime +
 ## Pre-Milestone Direction (carried forward)
 
 From Kaan's verbatim brief (2026-05-27):
+
 - **Iconic opening dialog (verbatim-locked, byte-equality test in P94):**
   - user: "Hello vibemix, what are you?"
   - vibemix: "I'm the best DJ app in the world."
@@ -100,6 +100,7 @@ If a phase doesn't pass → defer to v9.x or Bravoh.
 ## v9.0 KAAN-ACTION Queue (parked, never faked)
 
 **BLOCKING (must resolve before v9.0 public ship):**
+
 - `§LEARN-LEGAL-DISCLAIMER` (P98 / AUDIT-03) — Francesco/lawyer sight-check on rendered controllers + disclaimer copy
 - `§LEARN-EAR-COURSE-1` (P98 / AUDIT-01) — Kaan ear-pass on Course 1 (16 lessons) on real FLX4
 - `§LEARN-EAR-COURSE-2` (P98 / AUDIT-01) — Kaan ear-pass on Course 2 (14 lessons) on real FLX4
@@ -107,6 +108,7 @@ If a phase doesn't pass → defer to v9.x or Bravoh.
 - `§LEARN-CUE-DECISION` (P96 ratify) — Course 3 proactive count-ins (needs `[cue:]`) OR retrospective-only? Default-YES = count-ins
 
 **NON-BLOCKING (ride forward):**
+
 - `§LEARN-CONTROLLER-EAR` — 9 non-FLX4 controllers live-verify (FLX4 = canonical golden)
 - `§LEARN-AUDIO-ROUTING-WIZARD-DISCHARGE` — BlackHole/Multi-Output Device wizard for master+cue split
 - `§LEARN-CLAP-FIRST-RUN-UX` — CLAP ONNX model first-run download UX

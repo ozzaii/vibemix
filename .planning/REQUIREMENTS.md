@@ -17,13 +17,13 @@
 
 ### RENDER — controller visualization + MIDI position mirror
 
-- [ ] **RENDER-01**: A DJ plugs their MIDI controller and sees a CDJ-Whisper-styled inline SVG schematic of that exact controller on screen within 2 seconds of plug-in — 10 supported (DDJ-FLX4 / FLX6 / FLX10 / 400 / 1000 / SX3 · XDJ-RX3 · Numark Party Mix Live · Hercules Inpulse 300 / 300-MK2 / 500) + 1 generic fallback (labeled-zone layout when fingerprint is low-confidence). Auto-detect via `mido.get_input_names()` + `midi/registry.find_mapping`.
-- [ ] **RENDER-02**: Every physical control (knob/fader/button/jog/cue pad) on the rendered SVG mirrors the controller's current position via incoming MIDI within ≤50 ms P95 latency, measured by `tauri/ui/tests/learn/highlight-latency.test.ts`. CI fails red on regression beyond 80 ms P95 (triggers `§LEARN-LATENCY-CONTINGENCY` Rust-direct amendment).
+- [x] **RENDER-01**: A DJ plugs their MIDI controller and sees a CDJ-Whisper-styled inline SVG schematic of that exact controller on screen within 2 seconds of plug-in — 10 supported (DDJ-FLX4 / FLX6 / FLX10 / 400 / 1000 / SX3 · XDJ-RX3 · Numark Party Mix Live · Hercules Inpulse 300 / 300-MK2 / 500) + 1 generic fallback (labeled-zone layout when fingerprint is low-confidence). Auto-detect via `mido.get_input_names()` + `midi/registry.find_mapping`.
+- [x] **RENDER-02**: Every physical control (knob/fader/button/jog/cue pad) on the rendered SVG mirrors the controller's current position via incoming MIDI within ≤50 ms P95 latency, measured by `tauri/ui/tests/learn/highlight-latency.test.ts`. CI fails red on regression beyond 80 ms P95 (triggers `§LEARN-LATENCY-CONTINGENCY` Rust-direct amendment).
 - [ ] **RENDER-03**: Every rendered control has a `<g data-control-id="<field>">` hit region with ARIA `role="button"` + `aria-label` for accessibility (e.g. `aria-label="EQ-HI knob, deck A"`); keyboard navigation works for users browsing the curriculum without hardware.
 - [ ] **RENDER-04**: An AI highlight glow paints on a rendered control within 16 ms of receiving the `ipc.learn.highlight` envelope, composited via CSS-variable swap (no full SVG re-render); pinned by `tauri/ui/tests/learn/highlight-paint.test.ts`.
 - [ ] **RENDER-05**: Highlights use a dual-channel cue (color + shape) so color-blind users (deuteranopia / protanopia / tritanopia) can distinguish active vs inactive — not amber-only; verified by `tauri/ui/tests/learn/test_a11y_highlight_dual_cue.spec.ts` colour-difference assertion.
 - [ ] **RENDER-06**: Every SVG controller file passes a bi-directional CI parity gate against its MIDI profile JSON (`tauri/ui/tests/learn/test_svg_profile_parity.spec.ts`): every `data-control-id` in the SVG resolves to a binding in `midi/profiles/<id>.json` AND every profile binding has a matching `<g>` group in the SVG. Stops schema drift across all 11 files.
-- [ ] **RENDER-07**: The Learn surface runs in a SEPARATE `WebviewWindow` (mirror of `tauri/src-tauri/src/debrief_window.rs` → new `tauri/src-tauri/src/learn_window.rs`); the user can `Cmd+Tab` between Learn and the deck; both share the SAME ws:8765 socket (one-socket invariant).
+- [x] **RENDER-07**: The Learn surface runs in a SEPARATE `WebviewWindow` (mirror of `tauri/src-tauri/src/debrief_window.rs` → new `tauri/src-tauri/src/learn_window.rs`); the user can `Cmd+Tab` between Learn and the deck; both share the SAME ws:8765 socket (one-socket invariant).
 - [ ] **RENDER-08**: All 11 controller SVGs are stylized CDJ-Whisper schematics — NO Pioneer logo, NO Pioneer orange brand color, NO faceplate photo-lifts; authored from official hardware-diagram PDFs (factual control geometry only). Disclaimer copy ships in app footer + repo README. Test `tests/learn/test_disclaimer_present.py` verifies disclaimer text exists in both surfaces.
 
 ### LESSON — runtime + IPC + progress persistence
@@ -155,13 +155,13 @@
 | TONE-02 | Phase 92 — Lesson Runtime (no-LLM-write static gate) | Pending |
 | TONE-03 | Phase 94 — Course 1 Anatomy (tutor-slop blocklist) | Pending |
 | TONE-04 | Phase 92 — Lesson Runtime (system instruction lock) | Pending |
-| RENDER-01 | Phase 91 — Controller Renderer + MIDI Mirror | Pending |
-| RENDER-02 | Phase 91 — Controller Renderer + MIDI Mirror | Pending |
+| RENDER-01 | Phase 91 — Controller Renderer + MIDI Mirror | Complete |
+| RENDER-02 | Phase 91 — Controller Renderer + MIDI Mirror | Complete |
 | RENDER-03 | Phase 91 — Controller Renderer + MIDI Mirror | Pending |
 | RENDER-04 | Phase 92 — Lesson Runtime + Highlight Contract | Pending |
 | RENDER-05 | Phase 91 — Controller Renderer + MIDI Mirror | Pending |
 | RENDER-06 | Phase 91 — Controller Renderer + MIDI Mirror | Pending |
-| RENDER-07 | Phase 91 — Controller Renderer + MIDI Mirror | Pending |
+| RENDER-07 | Phase 91 — Controller Renderer + MIDI Mirror | Complete |
 | RENDER-08 | Phase 97 — Onboarding + Tone Locks + Mode Picker (disclaimer copy) | Pending |
 | LESSON-01 | Phase 92 — Lesson Runtime + Highlight Contract | Pending |
 | LESSON-02 | Phase 92 — Lesson Runtime + Highlight Contract | Pending |
