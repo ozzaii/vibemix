@@ -53,3 +53,15 @@ def test_eval_workflow_threshold_guard_covers_intel_lock() -> None:
     assert "eval/THRESHOLD-LOCK.md" in run_body
     assert "eval/INTEL-THRESHOLD-LOCK.md" in run_body
     assert "eval/INTEL gates re-ran" in run_body
+
+
+def test_eval_workflow_dco_signs_nightly_evidence_commits() -> None:
+    steps = _steps()
+    target = next(
+        step for step in steps if step.get("name") == "Commit eval-run artifact (nightly only)"
+    )
+    run_body = target.get("run", "")
+
+    assert 'git config user.name "vibemix-eval-bot"' in run_body
+    assert 'git config user.email "noreply@vibemix.dev"' in run_body
+    assert "git commit -s -m" in run_body

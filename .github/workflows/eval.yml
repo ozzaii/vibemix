@@ -131,7 +131,7 @@ jobs:
           git config user.name "vibemix-eval-bot"
           git config user.email "noreply@vibemix.dev"
           git add .planning/eval-runs/
-          git commit -m "eval: nightly canary $(date +%Y-%m-%d)" || true
+          git commit -s -m "eval: nightly canary $(date +%Y-%m-%d)" || true
           git push || true
 
       - name: AIza scrub on cassettes (Plan 02 + Pitfall LATENCY-15 cross-check)

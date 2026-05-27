@@ -627,6 +627,9 @@ done: `scripts/release/check_gate.sh` validates provenance-stage replay tier,
 done: release-gate tests feed `scripts/release/check_gate.sh` a real
       `scripts.eval.intel_gate.run_intel_gate()` artifact, pinning producer /
       consumer compatibility instead of only handcrafted JSON fixtures
+done: `.github/workflows/eval.yml` DCO-signs nightly `.planning/eval-runs/`
+      evidence commits with `git commit -s`, and workflow tests pin the
+      `vibemix-eval-bot` identity + signoff flag
 pending: private-label release threshold recalibration note
 ```
 
