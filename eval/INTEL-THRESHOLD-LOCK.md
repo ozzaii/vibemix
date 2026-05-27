@@ -91,7 +91,9 @@ Changing any `intel_thresholds` value requires:
    entry to `eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` with calibration,
    holdout, and canary split counts plus the measured/locked/delta values. Use
    `scripts/eval/intel_recalibration_note.py` to render that entry from
-   redacted reports.
+   redacted reports. The redacted gold-label report and scorecard hashes are
+   mandatory; release-gate promotion also requires a non-null gate artifact
+   hash.
 4. Keep zero-tolerance privacy and grounding counters at `0.00` unless the
    underlying contract changes in the corresponding INTEL spec.
 5. Update `.planning/research/2026-05-27-intel-03-data-eval-excellence-spec.md`

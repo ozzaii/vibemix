@@ -22,6 +22,8 @@ def test_intel_recalibration_log_documents_private_split_contract() -> None:
     assert "calibration=N holdout=N canary=N" in text
     assert "label_kinds: section=N transition=N cue=N live_pill=N representation=N taste=N" in text
     assert "report_hashes: gold_report=sha256:<hash> scorecard=sha256:<hash>" in text
+    assert "private gold-label report and private scorecard" in text
+    assert "non-null `gate=sha256:<hash>`" in text
     assert "intel_recalibration_log_validate.py" in text
     assert "local_paths_redacted=true" in text
     assert "ids_hashed=true" in text
@@ -37,6 +39,10 @@ def test_intel_threshold_lock_requires_recalibration_log_for_private_labels() ->
     assert "INTEL-THRESHOLD-RECALIBRATION-LOG.md" in text
     assert "private-label calibration" in text
     assert "release-gate promotion" in text
+    assert "gold-label report" in text
+    assert "scorecard hashes" in text
+    assert "mandatory" in text
+    assert "gate artifact" in text
     for split in ("calibration", "holdout", "canary"):
         assert split in text
 
@@ -47,6 +53,7 @@ def test_eval_readme_cross_links_intel_recalibration_log() -> None:
     assert "INTEL-THRESHOLD-RECALIBRATION-LOG.md" in text
     assert "Private-label recalibration" in text
     assert "redacted split counts" in text
+    assert "hash-bound `intel_gate.py` artifact" in text
     assert "intel_recalibration_log_validate.py" in text
 
 

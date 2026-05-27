@@ -33,7 +33,10 @@ raw vectors, unhashed IDs, deck/session identifiers, and free-form review notes.
 ## Entry Schema
 
 Every real entry must follow this shape. Use `null` only when a field genuinely
-does not exist yet; do not omit the field.
+does not exist yet; do not omit the field. Real entries must always bind the
+private gold-label report and private scorecard to non-null SHA-256 hashes.
+`release_promoted` entries must also bind the gate artifact to a non-null
+SHA-256 hash.
 
 ```text
 ### YYYY-MM-DDTHH:MM:SSZ - verdict={private_in_tolerance|private_recalibration_required|release_promoted}
@@ -60,7 +63,8 @@ does not exist yet; do not omit the field.
    `calibration`, `holdout`, and `canary`.
 3. `release_promoted` requires `tier2_private_holdout_canary` evidence and a
    fresh `scripts/eval/intel_gate.py` artifact generated after the threshold
-   change.
+   change. The gate artifact must appear as `gate=private:redacted` with a
+   non-null `gate=sha256:<hash>` entry in `report_hashes`.
 4. Zero-tolerance privacy and grounding counters stay at `0.00` unless the
    underlying INTEL contract is deliberately changed in the same PR.
 5. Lowering thresholds to make a demo pass is forbidden. A lower value needs

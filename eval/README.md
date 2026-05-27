@@ -80,11 +80,11 @@ report hashes, threshold hashes, privacy flags, and actions.
 redacted private scorecard/gold/taste/gate reports, binds it to those aggregate
 reports by SHA-256, and can append it with `--append-log` only after validation
 passes; release promotion requires a passing scorecard plus a valid
-`intel_gate.py` artifact with matching threshold-lock and threshold-values
-provenance. `scripts/eval/intel_recalibration_log_validate.py` validates the
-public log after entries are appended so malformed, hashless, or private-leaking
-entries are caught mechanically. `scripts/release/check_gate.sh` runs that
-validator as part of the INTEL release gate.
+hash-bound `intel_gate.py` artifact with matching threshold-lock and
+threshold-values provenance. `scripts/eval/intel_recalibration_log_validate.py`
+validates the public log after entries are appended so malformed, hashless, or
+private-leaking entries are caught mechanically. `scripts/release/check_gate.sh`
+runs that validator as part of the INTEL release gate.
 
 ## 2-Judge Architecture (high level)
 
