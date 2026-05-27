@@ -61,6 +61,53 @@ def test_validate_rejects_null_core_report_hashes(tmp_path: Path) -> None:
     assert "entry[1].report_hashes.scorecard.required" in report.errors
 
 
+def test_validate_rejects_missing_required_metric(tmp_path: Path) -> None:
+    entry = _replace_field(
+        _valid_entry(),
+        "measured",
+        "section_role_hit_at_5_delta=0.20 transition_accept_at_3=1.00 "
+        "decision_exact_timing_floor_violation_rate=0.00",
+    )
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].measured.taste_accepted_suggestion_lift" in report.errors
+
+
+def test_validate_rejects_delta_mismatch(tmp_path: Path) -> None:
+    entry = _replace_field(
+        _valid_entry(),
+        "delta",
+        "section_role_hit_at_5_delta=+9.99 transition_accept_at_3=+0.20 "
+        "decision_exact_timing_floor_violation_rate=+0.00 "
+        "taste_accepted_suggestion_lift=+0.08",
+    )
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].delta.section_role_hit_at_5_delta.mismatch" in report.errors
+
+
+def test_validate_rejects_unsigned_delta(tmp_path: Path) -> None:
+    entry = _replace_field(
+        _valid_entry(),
+        "delta",
+        "section_role_hit_at_5_delta=0.05 transition_accept_at_3=+0.20 "
+        "decision_exact_timing_floor_violation_rate=+0.00 "
+        "taste_accepted_suggestion_lift=+0.08",
+    )
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].delta.section_role_hit_at_5_delta.numeric" in report.errors
+
+
 def test_validate_release_promotion_requires_gate_report_hash(tmp_path: Path) -> None:
     entry = _valid_entry().replace(
         "### 2026-05-27T12:00:00Z - verdict=private_in_tolerance",

@@ -19,6 +19,7 @@ from scripts.eval.intel_recalibration_note import (  # noqa: E402
     APPEND_MARKER,
     EVIDENCE_TIERS,
     FORBIDDEN_PRIVATE_PATTERNS,
+    KEY_METRICS,
 )
 
 DEFAULT_LOG = ROOT / "eval" / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
@@ -28,6 +29,8 @@ ENTRY_RE = re.compile(
     r"- verdict=(?P<verdict>[a-z_]+)$"
 )
 SHA_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+NUMBER_RE = re.compile(r"^[+-]?\d+(?:\.\d+)?$")
+SIGNED_NUMBER_RE = re.compile(r"^[+-]\d+(?:\.\d+)?$")
 REPORT_HASH_KEYS = ("gold_report", "scorecard", "taste_scorecard", "gate")
 ALWAYS_REQUIRED_REPORT_HASHES = ("gold_report", "scorecard")
 REQUIRED_FIELDS = (
@@ -138,6 +141,7 @@ def _validate_entry(entry: str, *, index: int) -> list[str]:
             errors.append(f"entry[{index}].label_kinds.{kind}")
 
     errors.extend(_validate_report_bindings(fields, index=index, verdict=header_verdict))
+    errors.extend(_validate_metric_lines(fields, index=index))
 
     privacy = _parse_key_values(fields.get("privacy", ""))
     for key, expected in EXPECTED_PRIVACY.items():
@@ -153,6 +157,62 @@ def _validate_entry(entry: str, *, index: int) -> list[str]:
     if header_verdict != "release_promoted" and fields.get("action") == "PROMOTE_LOCK_WITH_PR":
         errors.append(f"entry[{index}].action_without_release")
     return errors
+
+
+def _validate_metric_lines(fields: dict[str, str], *, index: int) -> list[str]:
+    errors: list[str] = []
+    measured = _parse_key_values(fields.get("measured", ""))
+    locked = _parse_key_values(fields.get("locked", ""))
+    delta = _parse_key_values(fields.get("delta", ""))
+    for spec in KEY_METRICS:
+        measured_value = _metric_value(
+            measured,
+            spec.metric,
+            field="measured",
+            index=index,
+            errors=errors,
+        )
+        locked_value = _metric_value(
+            locked,
+            spec.threshold,
+            field="locked",
+            index=index,
+            errors=errors,
+        )
+        delta_value = _metric_value(
+            delta,
+            spec.metric,
+            field="delta",
+            index=index,
+            errors=errors,
+            require_sign=True,
+        )
+        if measured_value is None or locked_value is None or delta_value is None:
+            continue
+        expected_delta = measured_value - locked_value
+        if abs(delta_value - expected_delta) > 0.011:
+            errors.append(f"entry[{index}].delta.{spec.metric}.mismatch")
+    return errors
+
+
+def _metric_value(
+    values: dict[str, str],
+    key: str,
+    *,
+    field: str,
+    index: int,
+    errors: list[str],
+    require_sign: bool = False,
+) -> float | None:
+    raw = values.get(key)
+    if raw is None:
+        errors.append(f"entry[{index}].{field}.{key}")
+        return None
+    pattern = SIGNED_NUMBER_RE if require_sign else NUMBER_RE
+    if pattern.match(raw) is None:
+        errors.append(f"entry[{index}].{field}.{key}.numeric")
+        return None
+    return float(raw)
 
 
 def _entry_fields(lines: list[str], *, index: int, errors: list[str]) -> dict[str, str]:
