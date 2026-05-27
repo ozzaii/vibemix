@@ -113,17 +113,23 @@ def transition_source_for_position(
     position_s: float | None,
     *,
     lookahead_bars: int = SOURCE_LOOKAHEAD_BARS,
+    allow_lookahead: bool = True,
 ) -> tuple[SectionRecord, int | None, str | None]:
     """Resolve the source section/timing for a live transition.
 
     When a stronger mix-out section is about to start, score against that
     upcoming section and return bars until its start. Otherwise score against
-    the current section and return bars until its end.
+    the current section and return bars until its end. Callers can disable
+    lookahead when controller posture suggests the DJ is holding the source
+    section, for example after a recent loop action.
     """
     if position_s is None:
         return best_source_section(sections), None, None
 
     current = section_at_position(sections, position_s)
+    if not allow_lookahead:
+        return current, bars_until_section_end(current, position_s), "section_playhead"
+
     next_section = next_section_after_position(sections, position_s)
     bars_to_next = bars_until_section_start(next_section, position_s)
     if (

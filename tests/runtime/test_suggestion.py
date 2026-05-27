@@ -592,6 +592,47 @@ def test_recent_source_loop_keeps_cue_but_withholds_exact_timing():
     assert payload["timing_text"] is None
 
 
+def test_recent_source_loop_anchors_current_section_before_upcoming_outro():
+    from dataclasses import replace
+
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(["s", "a"], [("s", 0.99), ("a", 0.9)])
+    lib = _lib(["s", "a"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        cues=(
+            CuePoint(name="GROOVE", type="cue", start_s=0.0, end_s=None, number=1),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    svc = SuggestionService(store, lib)
+    state = MusicState()
+    state.audible_deck = "A"
+    state.audible_track_position_s = 216.0
+    state.audible_track_position_confidence = 0.85
+    state.recent_moves = [(0.3, "A_loop_out_hit")]
+    state.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=124.0)}
+    )
+
+    out = svc.compute_from_state(state)
+
+    assert out is not None
+    assert out["transition"]["from_section_id"] == "s#s000"
+    assert out["transition"]["from_role"] == "groove"
+    assert out["transition"]["source_selection"] == "loop_hold_section"
+    assert out["transition"]["start_in_bars"] is None
+    assert out["transition"]["timing_basis"] is None
+    assert out["transition"]["cue_slot"] == "A"
+    assert "source_loop_recent" in out["transition"]["risk_flags"]
+
+
 def test_refresh_from_state_updates_transition_countdown_without_reranking():
     from dataclasses import replace
 

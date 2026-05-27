@@ -679,12 +679,14 @@ def transition_payload_for_candidate(
             source, section_remaining_bars, section_timing_basis = transition_source_for_position(
                 source_sections,
                 grounded_source_position_s,
+                allow_lookahead=not source_loop_recent,
             )
-            source_selection = (
-                "upcoming_section"
-                if section_timing_basis == "section_lookahead"
-                else "current_section"
-            )
+            if source_loop_recent:
+                source_selection = "loop_hold_section"
+            elif section_timing_basis == "section_lookahead":
+                source_selection = "upcoming_section"
+            else:
+                source_selection = "current_section"
             if section_remaining_bars is not None:
                 remaining_bars = section_remaining_bars
         else:

@@ -140,6 +140,13 @@ Important fields:
 The system must not silently claim section-level semantic certainty when it only
 has track-level or unknown evidence.
 
+`source_selection` describes why the source section was chosen:
+
+- `default_section`: no grounded live playhead was available
+- `current_section`: the live playhead anchored the currently playing section
+- `upcoming_section`: a stronger mix-out section starts within the lookahead
+- `loop_hold_section`: a recent source-deck loop anchored the current section
+
 Cue provenance must be explicit too. `cue_source` distinguishes DJ-authored
 Rekordbox cues from ANLZ-derived structure, auto-generated cues, fallback
 entries, or unknown cue handles. `cue_confidence` is nullable and clamped by the
@@ -249,7 +256,8 @@ does not bark a stale "load this now" instruction mid-blend.
 Recent loop commands on the audible source deck also remove exact bar timing,
 because the natural section countdown is no longer trustworthy while the DJ is
 holding a loop. Unlike active blending, this keeps the validated cue action
-available; it only withholds the bar countdown and adds review risk.
+available; it anchors the source side to the current held section, withholds
+the bar countdown, and adds review risk.
 
 ### `decision`
 

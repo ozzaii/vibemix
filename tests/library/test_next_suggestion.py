@@ -594,6 +594,49 @@ def test_suggestion_forecasts_upcoming_mix_source_section(library):
     assert s.transition["source_selection"] == "upcoming_section"
 
 
+def test_recent_source_loop_anchors_current_section_instead_of_upcoming_mix_out(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        bpm=120.0,
+        cues=(
+            CuePoint(name="GROOVE", type="cue", start_s=0.0, end_s=None, number=1),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.88)])
+
+    s = next_suggestion(
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
+        played_ids=set(),
+        source_position_s=216.0,
+        live_playhead_confidence=0.85,
+        source_loop_recent=True,
+    )
+
+    assert s is not None
+    assert s.transition is not None
+    assert s.transition["from_section_id"] == "t0#s000"
+    assert s.transition["from_role"] == "groove"
+    assert s.transition["to_role"] == "intro"
+    assert s.transition["from_start_s"] == 0.0
+    assert s.transition["from_end_s"] == 224.0
+    assert s.transition["source_selection"] == "loop_hold_section"
+    assert s.transition["start_in_bars"] is None
+    assert s.transition["timing_basis"] is None
+    assert s.transition["timing_anchor"] is None
+    assert s.transition["source_anchor_s"] is None
+    assert "source_loop_recent" in s.transition["risk_flags"]
+
+
 def test_low_confidence_live_position_does_not_anchor_source_section(library):
     library.tracks["t0"] = _track(
         "t0",
