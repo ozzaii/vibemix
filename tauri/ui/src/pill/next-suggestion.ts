@@ -336,6 +336,9 @@ export function nextTransitionText(
     const bars = Math.max(0, Math.round(t.start_in_bars));
     if (bars === 0) bits.push("now");
     else bits.push(`in ${bars} ${bars === 1 ? "bar" : "bars"}`);
+  } else {
+    const posture = timingPostureText(t);
+    if (posture) bits.push(posture);
   }
   return bits.join(" · ");
 }
@@ -357,8 +360,24 @@ export function nextDecisionText(
   if (rolePair) bits.push(rolePair);
   const timing = cleanDecisionText(d.timing_text);
   if (timing) bits.push(timing);
+  else {
+    const posture = timingPostureText(t);
+    if (posture) bits.push(posture);
+  }
   if (bits.length > 0) return bits.join(" · ");
   return cleanDecisionText(d.spoken_text);
+}
+
+function timingPostureText(t: NextSuggestionTransitionWire | null | undefined): string {
+  if (!t) return "";
+  const sourceSelection = cleanDecisionText(t.source_selection).toLowerCase();
+  const riskFlags = Array.isArray(t.risk_flags)
+    ? t.risk_flags.map((flag) => cleanDecisionText(flag).toLowerCase())
+    : [];
+  if (sourceSelection === "loop_hold_section" || riskFlags.includes("source_loop_recent")) {
+    return "loop held";
+  }
+  return "";
 }
 
 export interface NextAlternativeView {
@@ -427,8 +446,10 @@ export function nextSuggestionRenderKey(
     t?.to_end_s ?? "",
     t?.timing_anchor ?? "",
     t?.source_anchor_s ?? "",
+    t?.source_selection ?? "",
     t?.cue_slot ?? "",
     t?.start_in_bars ?? "",
+    ...(t?.risk_flags ?? []),
     d?.emitted ?? "",
     d?.validation_status ?? "",
     d?.action ?? "",

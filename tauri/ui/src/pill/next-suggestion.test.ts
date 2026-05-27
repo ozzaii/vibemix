@@ -102,6 +102,20 @@ describe("nextTransitionText — cue + grounded timing", () => {
     expect(nextTransitionText({ cue_slot: "F", start_in_bars: null })).toBe("cue F");
   });
 
+  test("recent source loop explains why exact timing is withheld", () => {
+    expect(
+      nextTransitionText({
+        target_deck: "B",
+        cue_slot: "A",
+        from_role: "groove",
+        to_role: "intro",
+        start_in_bars: null,
+        source_selection: "loop_hold_section",
+        risk_flags: ["source_loop_recent"],
+      }),
+    ).toBe("load B · cue A · groove→intro · loop held");
+  });
+
   test("no grounded transition evidence → empty string", () => {
     expect(nextTransitionText(null)).toBe("");
     expect(nextTransitionText({})).toBe("");
@@ -192,6 +206,30 @@ describe("nextDecisionText — validator-checked live action", () => {
         { candidate_id: "tr_001", cue_slot: "A", start_in_bars: 13 },
       ),
     ).toBe("");
+  });
+
+  test("accepted no-timing decision keeps the loop-held posture visible", () => {
+    expect(
+      nextDecisionText(
+        {
+          emitted: true,
+          validation_status: "accepted",
+          action: "select",
+          candidate_id: "tr_001",
+          cue_slot: "A",
+          timing_text: null,
+        },
+        {
+          candidate_id: "tr_001",
+          target_deck: "B",
+          from_role: "groove",
+          to_role: "intro",
+          cue_slot: "A",
+          source_selection: "loop_hold_section",
+          risk_flags: ["source_loop_recent"],
+        },
+      ),
+    ).toBe("load B · cue A · groove→intro · loop held");
   });
 });
 
