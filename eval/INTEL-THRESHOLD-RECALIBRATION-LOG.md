@@ -48,7 +48,7 @@ backwards.
 
 ```text
 ### YYYY-MM-DDTHH:MM:SSZ - verdict={private_in_tolerance|private_recalibration_required|release_promoted}
-- run_id: intel_private_<date>_<short-hash>
+- run_id: intel_private_<YYYYMMDD>_<10-lowercase-hex>
 - lock: eval/INTEL-THRESHOLD-LOCK.md (sha256:<lock-hash>)
 - evidence_tier: tier1_private_calibration|tier2_private_holdout_canary
 - splits: calibration=N holdout=N canary=N
@@ -87,11 +87,11 @@ Use `scripts/eval/intel_recalibration_note.py` to render the redacted markdown
 entry from private scorecard/gold/taste/gate reports. The script validates report
 schemas, privacy flags, forbidden private payload markers, holdout/canary split
 coverage for release promotion, timestamp/run-id shape, and the key
-measured-vs-locked INTEL metrics before emitting an entry. Each entry also
-carries canonical SHA-256 hashes of
-the redacted private aggregate reports, so the public note is bound to exact
-evidence artifacts without exposing paths, track names, labels, vectors, or
-audio. Release promotion also requires a passing private scorecard and a valid
+measured-vs-locked INTEL metrics before emitting an entry. The `run_id` date
+must match the entry timestamp date. Each entry also carries canonical SHA-256
+hashes of the redacted private aggregate reports, so the public note is bound
+to exact evidence artifacts without exposing paths, track names, labels,
+vectors, or audio. Release promotion also requires a passing private scorecard and a valid
 `scripts/eval/intel_gate.py` artifact whose scorecard and provenance stages
 point at the same threshold-lock/threshold-values hashes. Use `--append-log
 eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` to append a valid entry directly;
@@ -102,9 +102,9 @@ the output file is written only after append validation succeeds.
 Validate the public log with
 `scripts/eval/intel_recalibration_log_validate.py`. The validator treats
 everything after the append marker as machine-audited evidence and checks entry
-schema, current-lock hash binding, report-hash bindings, release/split
-consistency, strict key-value parsing, append-order coherence, and
-public-redaction markers.
+schema, canonical run-id shape/date binding, current-lock hash binding,
+report-hash bindings, release/split consistency, strict key-value parsing,
+append-order coherence, and public-redaction markers.
 
 ## Audit Trail
 

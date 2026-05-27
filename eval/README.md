@@ -79,14 +79,16 @@ report hashes, threshold hashes, privacy flags, and actions.
 `scripts/eval/intel_recalibration_note.py` renders that append-only entry from
 redacted private scorecard/gold/taste/gate reports, binds it to those aggregate
 reports by SHA-256, rejects malformed timestamp/run-id identity fields before
-writing output, and can append it with `--append-log` only after validation
-passes for the candidate whole log. If `--output` and `--append-log` are used
-together, the output file is written only after append validation succeeds.
-Release promotion requires a passing scorecard plus a valid hash-bound `intel_gate.py` artifact
-with matching threshold-lock and threshold-values provenance.
+writing output, requires `run_id` dates to match entry timestamp dates, and can
+append it with `--append-log` only after validation passes for the candidate
+whole log. If `--output` and `--append-log` are used together, the output file
+is written only after append validation succeeds. Release promotion requires a
+passing scorecard plus a valid hash-bound `intel_gate.py` artifact with
+matching threshold-lock and threshold-values provenance.
 `scripts/eval/intel_recalibration_log_validate.py`
 validates the public log after entries are appended so malformed, hashless, or
-private-leaking entries are caught mechanically; it also rejects stale
+private-leaking entries are caught mechanically; it also rejects malformed
+canonical run ids, run-id/timestamp date mismatches, stale
 recalibration entries whose `lock:` digest no longer matches the current
 `eval/INTEL-THRESHOLD-LOCK.md`, plus duplicate or unknown key-value tokens that
 would make evidence lines ambiguous. It also enforces sequence-level audit

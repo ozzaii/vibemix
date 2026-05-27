@@ -38,6 +38,7 @@ FORBIDDEN_PRIVATE_PATTERNS = (
 )
 TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 RUN_ID_PREFIX = "intel_private_"
+RUN_ID_RE = re.compile(rf"^{RUN_ID_PREFIX}(?P<date>\d{{8}})_[0-9a-f]{{10}}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,8 +137,7 @@ def build_recalibration_note(
     run_id = run_id or _default_run_id(timestamp, evidence_tier, scorecard, gold_report)
     if TIMESTAMP_RE.match(timestamp) is None:
         errors.append("timestamp")
-    if not run_id.startswith(RUN_ID_PREFIX):
-        errors.append("run_id")
+    errors.extend(_run_id_errors(run_id, timestamp))
     label_kinds = _label_kind_counts(gold_report, taste_scorecard)
     entry = _render_entry(
         timestamp=timestamp,
@@ -446,6 +446,16 @@ def _default_run_id(
     short = hashlib.sha256(blob).hexdigest()[:10]
     date = timestamp[:10].replace("-", "")
     return f"intel_private_{date}_{short}"
+
+
+def _run_id_errors(run_id: str, timestamp: str) -> tuple[str, ...]:
+    match = RUN_ID_RE.match(run_id)
+    if match is None:
+        return ("run_id",)
+    timestamp_date = timestamp[:10].replace("-", "")
+    if TIMESTAMP_RE.match(timestamp) is not None and match.group("date") != timestamp_date:
+        return ("run_id.timestamp_date",)
+    return ()
 
 
 def _file_sha256(path: Path) -> str:

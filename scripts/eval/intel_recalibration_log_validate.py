@@ -22,6 +22,7 @@ from scripts.eval.intel_recalibration_note import (  # noqa: E402
     EVIDENCE_TIERS,
     FORBIDDEN_PRIVATE_PATTERNS,
     KEY_METRICS,
+    RUN_ID_RE,
 )
 
 DEFAULT_LOG = ROOT / "eval" / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
@@ -151,8 +152,10 @@ def _validate_entry(entry: str, *, index: int, expected_lock_hash: str | None) -
     if header is None:
         errors.append(f"entry[{index}].header")
         header_verdict = ""
+        header_timestamp = ""
     else:
         header_verdict = header.group("verdict")
+        header_timestamp = header.group("timestamp")
         if header_verdict not in ALLOWED_VERDICTS:
             errors.append(f"entry[{index}].header.verdict")
 
@@ -161,7 +164,7 @@ def _validate_entry(entry: str, *, index: int, expected_lock_hash: str | None) -
         if field not in fields:
             errors.append(f"entry[{index}].missing:{field}")
 
-    if not str(fields.get("run_id", "")).startswith("intel_private_"):
+    if not _run_id_valid(str(fields.get("run_id", "")), header_timestamp):
         errors.append(f"entry[{index}].run_id")
     lock_digest = _lock_field_digest(fields.get("lock", ""))
     if lock_digest is None:
@@ -356,6 +359,13 @@ def _lock_field_digest(value: str) -> str | None:
         else ""
     )
     return digest if digest and SHA_RE.match(digest) is not None else None
+
+
+def _run_id_valid(value: str, timestamp: str) -> bool:
+    match = RUN_ID_RE.match(value)
+    if match is None:
+        return False
+    return match.group("date") == timestamp[:10].replace("-", "")
 
 
 def _validate_report_bindings(fields: dict[str, str], *, index: int, verdict: str) -> list[str]:

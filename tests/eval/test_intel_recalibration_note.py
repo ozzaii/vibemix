@@ -40,7 +40,7 @@ def test_build_recalibration_note_renders_redacted_tier1_entry() -> None:
         evidence_tier="tier1_private_calibration",
         lock_path=INTEL_LOCK_PATH,
         timestamp="2026-05-27T12:00:00Z",
-        run_id="intel_private_test",
+        run_id="intel_private_20260527_aaaaaaaaaa",
     )
 
     assert result["valid"] is True
@@ -97,6 +97,20 @@ def test_recalibration_note_rejects_invalid_timestamp_and_run_id() -> None:
     assert result["valid"] is False
     assert "timestamp" in result["errors"]
     assert "run_id" in result["errors"]
+
+
+def test_recalibration_note_rejects_run_id_date_mismatch() -> None:
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report(),
+        evidence_tier="tier1_private_calibration",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+        run_id="intel_private_20260528_aaaaaaaaaa",
+    )
+
+    assert result["valid"] is False
+    assert "run_id.timestamp_date" in result["errors"]
 
 
 def test_tier2_release_evidence_requires_holdout_and_canary_splits() -> None:
@@ -269,7 +283,7 @@ def test_recalibration_note_cli_writes_markdown_and_json(tmp_path: Path, capsys)
             "--timestamp",
             "2026-05-27T12:00:00Z",
             "--run-id",
-            "intel_private_cli",
+            "intel_private_20260527_bbbbbbbbbb",
             "--output",
             str(out),
             "--json",
@@ -285,20 +299,26 @@ def test_recalibration_note_cli_writes_markdown_and_json(tmp_path: Path, capsys)
 def test_append_recalibration_note_appends_after_marker(tmp_path: Path) -> None:
     log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
     log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
-    result = _tier1_note_result(timestamp="2026-05-27T12:00:00Z", run_id="intel_private_append")
+    result = _tier1_note_result(
+        timestamp="2026-05-27T12:00:00Z", run_id="intel_private_20260527_cccccccccc"
+    )
 
     appended = append_recalibration_note(log, result)
 
     text = appended.read_text(encoding="utf-8")
     assert APPEND_MARKER in text
-    assert text.index(APPEND_MARKER) < text.index("intel_private_append")
+    assert text.index(APPEND_MARKER) < text.index("intel_private_20260527_cccccccccc")
 
 
 def test_append_recalibration_note_refuses_duplicate_run_id(tmp_path: Path) -> None:
     log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
     log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
-    first = _tier1_note_result(timestamp="2026-05-27T12:00:00Z", run_id="intel_private_dup")
-    duplicate = _tier1_note_result(timestamp="2026-05-27T12:00:01Z", run_id="intel_private_dup")
+    first = _tier1_note_result(
+        timestamp="2026-05-27T12:00:00Z", run_id="intel_private_20260527_dddddddddd"
+    )
+    duplicate = _tier1_note_result(
+        timestamp="2026-05-27T12:00:01Z", run_id="intel_private_20260527_dddddddddd"
+    )
 
     append_recalibration_note(log, first)
     before = log.read_text(encoding="utf-8")
@@ -316,10 +336,12 @@ def test_append_recalibration_note_refuses_duplicate_run_id(tmp_path: Path) -> N
 def test_append_recalibration_note_refuses_out_of_order_timestamp(tmp_path: Path) -> None:
     log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
     log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
-    later = _tier1_note_result(timestamp="2026-05-27T12:00:02Z", run_id="intel_private_later")
+    later = _tier1_note_result(
+        timestamp="2026-05-27T12:00:02Z", run_id="intel_private_20260527_eeeeeeeeee"
+    )
     earlier = _tier1_note_result(
         timestamp="2026-05-27T12:00:01Z",
-        run_id="intel_private_earlier",
+        run_id="intel_private_20260527_ffffffffff",
     )
 
     append_recalibration_note(log, later)
@@ -404,7 +426,9 @@ def test_cli_does_not_write_output_when_append_validation_fails(
     scorecard.write_text(json.dumps(_scorecard()), encoding="utf-8")
     gold.write_text(json.dumps(_gold_report()), encoding="utf-8")
     log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
-    first = _tier1_note_result(timestamp="2026-05-27T12:00:00Z", run_id="intel_private_cli_dup")
+    first = _tier1_note_result(
+        timestamp="2026-05-27T12:00:00Z", run_id="intel_private_20260527_1111111111"
+    )
     append_recalibration_note(log, first)
     before = log.read_text(encoding="utf-8")
 
@@ -419,7 +443,7 @@ def test_cli_does_not_write_output_when_append_validation_fails(
             "--timestamp",
             "2026-05-27T12:00:01Z",
             "--run-id",
-            "intel_private_cli_dup",
+            "intel_private_20260527_1111111111",
             "--output",
             str(out),
             "--append-log",

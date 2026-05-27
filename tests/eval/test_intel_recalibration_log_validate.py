@@ -113,8 +113,12 @@ def test_validate_rejects_malformed_key_value_tokens(tmp_path: Path) -> None:
 def test_validate_rejects_duplicate_run_ids(tmp_path: Path) -> None:
     entries = "\n\n".join(
         [
-            _valid_entry(timestamp="2026-05-27T12:00:00Z", run_id="intel_private_dup"),
-            _valid_entry(timestamp="2026-05-27T12:00:01Z", run_id="intel_private_dup"),
+            _valid_entry(
+                timestamp="2026-05-27T12:00:00Z", run_id="intel_private_20260527_dddddddddd"
+            ),
+            _valid_entry(
+                timestamp="2026-05-27T12:00:01Z", run_id="intel_private_20260527_dddddddddd"
+            ),
         ]
     )
     log = _write_log(tmp_path, entries)
@@ -128,8 +132,12 @@ def test_validate_rejects_duplicate_run_ids(tmp_path: Path) -> None:
 def test_validate_rejects_out_of_order_timestamps(tmp_path: Path) -> None:
     entries = "\n\n".join(
         [
-            _valid_entry(timestamp="2026-05-27T12:00:02Z", run_id="intel_private_later"),
-            _valid_entry(timestamp="2026-05-27T12:00:01Z", run_id="intel_private_earlier"),
+            _valid_entry(
+                timestamp="2026-05-27T12:00:02Z", run_id="intel_private_20260527_eeeeeeeeee"
+            ),
+            _valid_entry(
+                timestamp="2026-05-27T12:00:01Z", run_id="intel_private_20260527_ffffffffff"
+            ),
         ]
     )
     log = _write_log(tmp_path, entries)
@@ -138,6 +146,20 @@ def test_validate_rejects_out_of_order_timestamps(tmp_path: Path) -> None:
 
     assert report.valid is False
     assert "entry[2].timestamp.out_of_order" in report.errors
+
+
+def test_validate_rejects_run_id_date_mismatch(tmp_path: Path) -> None:
+    entry = _replace_field(
+        _valid_entry(),
+        "run_id",
+        "intel_private_20260528_aaaaaaaaaa",
+    )
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].run_id" in report.errors
 
 
 def test_validate_rejects_missing_required_metric(tmp_path: Path) -> None:
@@ -258,8 +280,8 @@ def test_validate_release_promotion_requires_tier2_evidence(tmp_path: Path) -> N
 
 def test_validate_rejects_private_payload_marker(tmp_path: Path) -> None:
     entry = _valid_entry().replace(
-        "run_id: intel_private_test",
-        "run_id: intel_private_test /Users/ozai/Music/private.wav",
+        "run_id: intel_private_20260527_aaaaaaaaaa",
+        "run_id: intel_private_20260527_aaaaaaaaaa /Users/ozai/Music/private.wav",
     )
     log = _write_log(tmp_path, entry)
 
@@ -282,7 +304,7 @@ def test_recalibration_log_validator_cli_json(tmp_path: Path, capsys) -> None:  
 def _valid_entry(
     *,
     timestamp: str = "2026-05-27T12:00:00Z",
-    run_id: str = "intel_private_test",
+    run_id: str = "intel_private_20260527_aaaaaaaaaa",
 ) -> str:
     result = build_recalibration_note(
         scorecard=score_fixture_dir(DEFAULT_FIXTURE_DIR, threshold_lock_path=INTEL_LOCK_PATH),
