@@ -29,6 +29,26 @@ Critical ordering invariants preserved from v4:
 
 from __future__ import annotations
 
+# ─────────────────────────────────────────────────────────────────────────────
+# PyInstaller-only eager import — rc1 ship-blocker fix #2 (2026-05-27).
+# Frozen bundles spawned with closed stdin (Tauri's `app.shell().command()`,
+# Finder/launchd-launched .app, CI smoke jobs that pipe stdio) hit a circular
+# ImportError on first `from livekit.agents import Agent`:
+#
+#   ImportError: cannot import name 'cli' from partially initialized module
+#   'livekit.agents'  (livekit/agents/voice/agent_session.py:26)
+#
+# Dev Python (`uv run python -m vibemix`) is unaffected regardless of stdin
+# state — the bug is PyInstaller's hidden-import boot order interacting with
+# livekit-agents 1.x's intra-package import graph (voice.agent_session does
+# `from .. import cli, inference, llm, ...` which expects the parent's
+# __init__.py:23 `from . import cli, ..., voice` to have bound cli first).
+# Eager-importing the parent package here forces the full chain to complete
+# inside a controlled scope BEFORE dj_cohost's later transitive import races
+# the bootloader. Companion fix: tests/dist/test_spec_blocklist_keeps_livekit_cli.py
+# (un-blocked the cli submodule from `_runtime_submodule` part-name filter).
+import livekit.agents  # noqa: F401 — load-bearing eager import, do not remove
+
 import argparse
 import asyncio
 import os
