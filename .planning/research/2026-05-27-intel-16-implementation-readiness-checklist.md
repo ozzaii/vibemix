@@ -442,7 +442,10 @@ Acceptance evidence:
 - review-only cues cannot be called export-ready;
 - exported/saved language requires an action-success claim;
 - missing claim evidence degrades live output;
-- claim ledger redacts local paths, vectors, and audio.
+- claim ledger redacts local paths, vectors, and audio from evidence refs,
+  subjects, values, and model-visible phrase payloads;
+- `export-ready` / `review-only` language requires a `cue_export_status` claim
+  with the matching status value.
 
 Focused command:
 

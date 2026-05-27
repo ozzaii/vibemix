@@ -9,6 +9,7 @@ audio facts.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -117,23 +118,34 @@ class MusicClaimLedger:
         """Append one packet-scoped claim and return it."""
         evidence_tuple = tuple(evidence_refs)
         clean_evidence = tuple(ref for ref in evidence_tuple if _is_safe_evidence_ref(ref))
-        status = claim_status or claim_status_for_confidence(confidence)
+        clean_confidence, confidence_safe = _clean_confidence(confidence)
+        status = claim_status or claim_status_for_confidence(clean_confidence)
         reasons = tuple(reason_codes)
         if len(clean_evidence) != len(evidence_tuple):
             reasons = (*reasons, "redacted_unsafe_evidence_ref")
             status = "rejected"
+        if not confidence_safe:
+            reasons = (*reasons, "nonfinite_claim_confidence")
+            status = "rejected"
+        clean_subject, subject_safe = _clean_public_subject(subject_id)
+        clean_value, value_safe = _clean_public_value(value)
+        clean_allowed, allowed_safe = _clean_phrases(allowed_phrases)
+        clean_forbidden, forbidden_safe = _clean_phrases(forbidden_phrases)
+        if not (subject_safe and value_safe and allowed_safe and forbidden_safe):
+            reasons = (*reasons, "redacted_unsafe_public_payload")
+            status = "rejected"
         claim = MusicClaim(
             claim_id=self._next_claim_id(),
             claim_type=claim_type,
-            subject_id=subject_id,
-            value=value,
+            subject_id=clean_subject,
+            value=clean_value,
             unit=unit,
             scope=scope,
             evidence_refs=clean_evidence,
-            confidence=round(max(0.0, min(1.0, float(confidence))), 6),
+            confidence=round(max(0.0, min(1.0, clean_confidence)), 6),
             claim_status=status,
-            allowed_phrases=tuple(allowed_phrases),
-            forbidden_phrases=tuple(forbidden_phrases),
+            allowed_phrases=clean_allowed,
+            forbidden_phrases=clean_forbidden,
             reason_codes=reasons,
             provenance_ref=provenance_ref or f"packet:{self.packet_id}",
         )
@@ -173,15 +185,83 @@ def claim_status_for_confidence(confidence: float) -> ClaimStatus:
     return "rejected"
 
 
+def _clean_confidence(confidence: float) -> tuple[float, bool]:
+    try:
+        value = float(confidence)
+    except (TypeError, ValueError):
+        return 0.0, False
+    if not math.isfinite(value):
+        return 0.0, False
+    return value, True
+
+
+def _clean_public_subject(subject_id: str) -> tuple[str, bool]:
+    text = str(subject_id).strip()
+    if not text or _is_unsafe_public_text(text):
+        return "redacted", False
+    return text, True
+
+
+def _clean_public_value(value: ClaimValue) -> tuple[ClaimValue, bool]:
+    if value is None or isinstance(value, bool):
+        return value, True
+    if isinstance(value, str):
+        text = value.strip()
+        if _is_unsafe_public_text(text):
+            return None, False
+        return text, True
+    if isinstance(value, int | float):
+        numeric = float(value)
+        if not math.isfinite(numeric):
+            return None, False
+        return value, True
+    return None, False
+
+
+def _clean_phrases(phrases: Sequence[str]) -> tuple[tuple[str, ...], bool]:
+    clean: list[str] = []
+    safe = True
+    phrase_iter = (phrases,) if isinstance(phrases, str) else phrases
+    for phrase in phrase_iter:
+        if not isinstance(phrase, str):
+            safe = False
+            continue
+        text = phrase.strip()
+        if not text:
+            continue
+        if _is_unsafe_public_text(text):
+            safe = False
+            continue
+        clean.append(text)
+    return tuple(clean), safe
+
+
 def _is_safe_evidence_ref(ref: str) -> bool:
     if not isinstance(ref, str) or not ref:
         return False
-    lowered = ref.lower()
-    if ref.startswith("/") or lowered.startswith("file://") or ":\\" in ref:
-        return False
-    if lowered.startswith("vector:") or lowered.startswith("audio:raw"):
+    if _is_unsafe_public_text(ref):
         return False
     return ":" in ref
+
+
+def _is_unsafe_public_text(text: str) -> bool:
+    lowered = text.lower()
+    return (
+        text.startswith("/")
+        or lowered.startswith("file://")
+        or ":\\" in text
+        or "/users/" in lowered
+        or "/volumes/" in lowered
+        or "/home/" in lowered
+        or "/tmp/" in lowered
+        or "/private/" in lowered
+        or "/var/folders/" in lowered
+        or "\\users\\" in lowered
+        or lowered.startswith("vector:")
+        or lowered.startswith("audio:raw")
+        or "raw_audio" in lowered
+        or "raw vector" in lowered
+    )
 
 
 __all__ = [

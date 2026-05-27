@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
+import json
+
 from vibemix.intel.claims import MusicClaimLedger, claim_status_for_confidence
 
 
@@ -70,3 +72,27 @@ def test_claim_ledger_redacts_paths_and_vectors_from_public_trace() -> None:
     assert "/Users/ozai" not in trace_text
     assert "vector:raw_001" not in trace_text
     assert "candidate:tr_004" in trace_text
+
+
+def test_claim_ledger_redacts_unsafe_public_payloads_and_nonfinite_confidence() -> None:
+    ledger = MusicClaimLedger("ctx_005")
+    claim = ledger.add(
+        "track_identity",
+        subject_id="/Users/ozai/Music/private.wav",
+        value="file:///Users/ozai/Music/private.wav",
+        evidence_refs=("track:t1",),
+        confidence=float("nan"),
+        scope="track",
+        allowed_phrases=("play /Users/ozai/Music/private.wav",),
+        forbidden_phrases=("vector:raw_001",),
+    )
+
+    assert claim.claim_status == "rejected"
+    assert claim.confidence == 0.0
+    assert "nonfinite_claim_confidence" in claim.reason_codes
+    assert "redacted_unsafe_public_payload" in claim.reason_codes
+    assert ledger.claim_summary() == ()
+    trace_text = json.dumps(ledger.trace(), allow_nan=False)
+    assert "/Users/ozai" not in trace_text
+    assert "file://" not in trace_text
+    assert "vector:raw_001" not in trace_text

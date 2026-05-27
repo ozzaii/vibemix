@@ -20,6 +20,10 @@ _SEMANTIC_RE = re.compile(r"\b(?:texture|timbre|sonic|sound(?:s|ed)?\s+close)\b"
 _ENERGY_RE = re.compile(r"\b(?:energy|intensity|energy\s+shape)\b", re.I)
 _PHRASE_RE = re.compile(r"\b(?:phrase|downbeat|bar\s+line|boundary)\b", re.I)
 _EXPORT_RE = re.compile(r"\b(?:exported|wrote|saved)\b", re.I)
+_EXPORT_READY_RE = re.compile(
+    r"\b(?:export[- ]ready|ready\s+to\s+export|safe\s+to\s+export)\b", re.I
+)
+_REVIEW_ONLY_RE = re.compile(r"\b(?:review[- ]only|needs\s+review|for\s+review)\b", re.I)
 _TASTE_RE = re.compile(r"\b(?:you usually|your preference|you like)\b", re.I)
 _RISK_RE = re.compile(r"\b(?:loop\s+held|source\s+loop|risk)\b", re.I)
 
@@ -85,6 +89,7 @@ def validate_decision_claims(
     for family in _claim_families_implied_by_text(text):
         if not (_REQUIRED_TYPES[family] & cited_types):
             errors.append(f"missing_claim_id_for_{family}")
+    _validate_cue_export_status_phrase(text, cited_rows, errors)
 
     return (
         ClaimValidationResult("rejected", tuple(errors))
@@ -112,6 +117,30 @@ def _claim_families_implied_by_text(text: str) -> tuple[str, ...]:
         if pattern.search(text):
             families.append(family)
     return tuple(families)
+
+
+def _validate_cue_export_status_phrase(
+    text: str,
+    cited_rows: list[dict[str, Any]],
+    errors: list[str],
+) -> None:
+    for expected_status in _cue_export_statuses_implied_by_text(text):
+        status_rows = [row for row in cited_rows if row.get("type") == "cue_export_status"]
+        if not status_rows:
+            errors.append("missing_claim_id_for_cue_export_status")
+            continue
+        if not any(str(row.get("value")) == expected_status for row in status_rows):
+            claim_id = str(status_rows[0].get("claim_id") or "unknown")
+            errors.append(f"cue_export_status_mismatch:{claim_id}:{expected_status}")
+
+
+def _cue_export_statuses_implied_by_text(text: str) -> tuple[str, ...]:
+    statuses: list[str] = []
+    if _EXPORT_READY_RE.search(text):
+        statuses.append("export_ready")
+    if _REVIEW_ONLY_RE.search(text):
+        statuses.append("review")
+    return tuple(dict.fromkeys(statuses))
 
 
 __all__ = [

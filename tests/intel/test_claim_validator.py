@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
+from typing import Any
+
 from vibemix.intel.agent_contract import AgentContextEnvelope, AgentDecision
 from vibemix.intel.claim_validator import validate_decision_claims
 
@@ -24,12 +26,18 @@ def _envelope(*, claim_summary: tuple[dict, ...]) -> AgentContextEnvelope:  # ty
     )
 
 
-def _claim(claim_id: str, claim_type: str, *, forbidden=()) -> dict:  # type: ignore[no-untyped-def]
+def _claim(
+    claim_id: str,
+    claim_type: str,
+    *,
+    value: Any = "ok",
+    forbidden: tuple[str, ...] = (),
+) -> dict[str, Any]:
     return {
         "claim_id": claim_id,
         "type": claim_type,
         "subject_id": "tr_001",
-        "value": "ok",
+        "value": value,
         "unit": None,
         "scope": "transition",
         "confidence": 0.9,
@@ -193,6 +201,81 @@ def test_exported_phrase_requires_action_success_claim() -> None:
 
     assert not result.accepted
     assert "missing_claim_id_for_export" in result.errors
+
+
+def test_export_ready_phrase_requires_cue_export_status_claim() -> None:
+    envelope = _envelope(claim_summary=())
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="This map is export-ready.",
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_cue_export_status" in result.errors
+
+
+def test_review_only_cue_cannot_be_called_export_ready() -> None:
+    envelope = _envelope(
+        claim_summary=(_claim("clm_ctx_001_000", "cue_export_status", value="review"),)
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="This map is export-ready.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "cue_export_status_mismatch:clm_ctx_001_000:export_ready" in result.errors
+
+
+def test_export_ready_copy_accepts_matching_status_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(_claim("clm_ctx_001_000", "cue_export_status", value="export_ready"),)
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="This map is export-ready.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
+def test_review_only_copy_accepts_matching_status_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(_claim("clm_ctx_001_000", "cue_export_status", value="review"),)
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="This map is review-only.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
 
 
 def test_forbidden_phrase_rejected_even_when_claim_is_cited() -> None:
