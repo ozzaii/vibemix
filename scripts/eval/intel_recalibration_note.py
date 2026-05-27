@@ -576,7 +576,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.append_log:
             try:
                 append_recalibration_note(args.append_log, result, threshold_lock=args.lock_path)
-            except ValueError as exc:
+            except (OSError, ValueError) as exc:
                 result = {
                     **result,
                     "valid": False,

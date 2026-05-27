@@ -85,9 +85,11 @@ after validation passes for the candidate whole log. If `--output` and
 `--append-log` are used together, the output file is written only after append
 validation succeeds. The public-log append is persisted via temp file plus
 atomic replace, so failed final writes leave the previous log intact; the
-optional `--output` artifact uses the same atomic writer. Release promotion
-requires a passing scorecard plus a valid hash-bound `intel_gate.py` artifact
-with matching threshold-lock and threshold-values provenance.
+CLI reports append write failures as structured non-zero JSON and withholds the
+optional `--output` artifact. The optional `--output` artifact uses the same
+atomic writer. Release promotion requires a passing scorecard plus a valid
+hash-bound `intel_gate.py` artifact with matching threshold-lock and
+threshold-values provenance.
 `scripts/eval/intel_recalibration_log_validate.py`
 validates the public log after entries are appended so malformed, hashless, or
 private-leaking entries are caught mechanically; it also rejects malformed

@@ -421,6 +421,57 @@ def test_append_recalibration_note_atomic_replace_failure_keeps_existing_log(
     assert not list(tmp_path.glob(".INTEL-THRESHOLD-RECALIBRATION-LOG.md.*.tmp"))
 
 
+def test_cli_reports_append_write_failure_without_output(
+    tmp_path: Path,
+    monkeypatch,  # type: ignore[no-untyped-def]
+    capsys,  # type: ignore[no-untyped-def]
+) -> None:
+    scorecard = tmp_path / "scorecard.json"
+    gold = tmp_path / "gold_report.json"
+    out = tmp_path / "entry.md"
+    log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
+    scorecard.write_text(json.dumps(_scorecard()), encoding="utf-8")
+    gold.write_text(json.dumps(_gold_report()), encoding="utf-8")
+    log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
+    before = log.read_text(encoding="utf-8")
+
+    def fail_replace(src: Path | str, dst: Path | str) -> None:
+        raise OSError(f"simulated append replace failure for {src} -> {dst}")
+
+    monkeypatch.setattr(note_module.os, "replace", fail_replace)
+
+    rc = main(
+        [
+            "--scorecard",
+            str(scorecard),
+            "--gold-report",
+            str(gold),
+            "--evidence-tier",
+            "tier1_private_calibration",
+            "--timestamp",
+            "2026-05-27T12:00:00Z",
+            "--run-id",
+            "intel_private_20260527_4444444444",
+            "--output",
+            str(out),
+            "--append-log",
+            str(log),
+            "--json",
+        ]
+    )
+
+    assert rc == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result["valid"] is False
+    assert any(
+        "append_log:" in error and "simulated append replace failure" in error
+        for error in result["errors"]
+    )
+    assert log.read_text(encoding="utf-8") == before
+    assert not out.exists()
+    assert not list(tmp_path.glob(".INTEL-THRESHOLD-RECALIBRATION-LOG.md.*.tmp"))
+
+
 def test_cli_does_not_write_output_or_append_log_for_invalid_note(
     tmp_path: Path,
     capsys,  # type: ignore[no-untyped-def]

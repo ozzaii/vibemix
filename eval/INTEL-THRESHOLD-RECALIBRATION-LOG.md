@@ -100,8 +100,9 @@ invalid evidence or a candidate log that fails whole-log validation exits
 non-zero and is not written. When `--output` and `--append-log` are combined,
 the output file is written only after append validation succeeds. The log update
 itself is persisted with a temp file and atomic replace, so a failed final
-replace leaves the existing public log intact. The optional `--output` artifact
-uses the same atomic writer.
+replace leaves the existing public log intact; the CLI reports that append
+write failure as structured non-zero JSON and withholds the optional `--output`
+artifact. The optional `--output` artifact uses the same atomic writer.
 
 Validate the public log with
 `scripts/eval/intel_recalibration_log_validate.py`. The validator treats

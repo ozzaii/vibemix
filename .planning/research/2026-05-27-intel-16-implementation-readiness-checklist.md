@@ -656,6 +656,9 @@ done: `scripts/eval/intel_recalibration_note.py --append-log` validates the
 done: `scripts/eval/intel_recalibration_note.py --append-log` persists public
       log updates with temp-file + atomic replace, preserving the previous log
       on failed final writes
+done: `scripts/eval/intel_recalibration_note.py --append-log` reports append
+      write failures as structured non-zero CLI output and withholds the
+      optional rendered entry artifact
 done: `scripts/eval/intel_recalibration_note.py` writes `--output` only after
       candidate append-log validation succeeds when both flags are supplied
 done: `scripts/eval/intel_recalibration_note.py --output` writes rendered
