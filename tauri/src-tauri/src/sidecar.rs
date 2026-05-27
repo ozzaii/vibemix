@@ -16,7 +16,9 @@
 //! a separate task channel that Wave 4 will add). The capability allowlist
 //! locks at Wave 2 so we never surface "not allowed by ACL" later.
 
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
+use std::process::{Command as StdCommand, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -75,11 +77,57 @@ fn sidecar_triple() -> &'static str {
     "x86_64-pc-windows-msvc"
 }
 
+/// Process-handle shape for the currently-spawned sidecar.
+///
+/// The dev-source path keeps using ``tauri_plugin_shell`` (no bug there —
+/// the `uv run python -m vibemix` invocation has its own Python interpreter
+/// that handles imports normally). The Bundled path drops to
+/// ``std::process::Command`` because tauri-plugin-shell 2.3's spawn
+/// implementation poisons the PyInstaller-frozen bundle's import bootstrap
+/// in a way we haven't isolated (plain ``std::process::Command::new(bin).spawn()``
+/// works under identical env/cwd/stdio — proven 2026-05-27). Production
+/// ``launchd`` spawn is std::process-equivalent so this same fix unblocks
+/// the signed .app boot too. See ``scripts/dist/patch_livekit_agents_init.py``
+/// for the build-side patch that fixes the import order otherwise.
+pub enum SidecarChild {
+    /// Dev-source ``uv run`` spawn (tauri-plugin-shell — works fine here).
+    Plugin(CommandChild),
+    /// Bundled PyInstaller spawn (raw std::process — tauri-plugin-shell bug
+    /// avoidance). Stores the PID so ``restart_sidecar`` can SIGTERM it
+    /// without needing exclusive access to the ``Child`` (which the
+    /// watchdog loop is .wait()-ing on in a blocking thread).
+    Std { pid: u32 },
+}
+
+impl SidecarChild {
+    /// Best-effort kill — consumes self; returns Ok(()) even on
+    /// already-dead children. ``tauri_plugin_shell::CommandChild::kill``
+    /// takes ``self`` so the consume signature is necessary; the Std arm
+    /// is symmetric for shape.
+    fn kill(self) -> std::io::Result<()> {
+        match self {
+            SidecarChild::Plugin(c) => c
+                .kill()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
+            SidecarChild::Std { pid } => {
+                // SAFETY: libc::kill is the POSIX kill syscall; SIGTERM (15)
+                // requests graceful exit (Python's signal handlers run).
+                // Returns -1 + errno on failure; we ignore (already-dead is
+                // not an error in our supervision flow).
+                unsafe {
+                    libc::kill(pid as libc::pid_t, libc::SIGTERM);
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
 /// Shared handle to the most-recently-spawned sidecar child. `restart_sidecar`
 /// reads this to kill the current process; the watchdog loop refreshes it on
 /// every spawn. Wave 4 may extend this struct with a wake-up channel.
 pub struct SidecarHandle {
-    pub child: Arc<Mutex<Option<CommandChild>>>,
+    pub child: Arc<Mutex<Option<SidecarChild>>>,
 }
 
 impl Default for SidecarHandle {
@@ -150,10 +198,10 @@ pub async fn spawn_sidecar_with_watchdog(
             )
         };
 
-        let cmd = match invocation {
+        let exit_code: i32 = match invocation {
             SidecarInvocation::Bundled(bin) => {
-                // Release path. Two correctness fixes for the "co-host never
-                // speaks" release blocker (RELEASE-AUTH):
+                // RELEASE-AUTH correctness fixes preserved verbatim from the
+                // previous implementation:
                 //
                 // 1. CWD — a Finder/Dock-launched .app runs with cwd "/", so
                 //    the bundled binary's load_dotenv() never finds a .env.
@@ -164,28 +212,112 @@ pub async fn spawn_sidecar_with_watchdog(
                 //    app_data_dir()/.env — the supported per-user key drop.)
                 //
                 // 2. Runtime auth/mode — forward VIBEMIX_LLM_MODE plus
-                //    GEMINI_API_KEY / OPENROUTER_API_KEY from the Tauri
-                //    parent env to the child WHEN PRESENT.
-                //    SECURITY (CLAUDE.md): no key is embedded here — we only
-                //    relay a key that already exists in the environment (e.g.
-                //    `GEMINI_API_KEY=… open vibemix.app`, or a launchd plist).
-                //    The real distribution answer is the Bravoh proxy
-                //    (VIBEMIX_LLM_MODE=proxy), which needs no key at all.
-                let mut c = app.shell().command(&bin);
+                //    GEMINI_API_KEY / OPENROUTER_API_KEY from the Tauri parent
+                //    env to the child WHEN PRESENT. SECURITY (CLAUDE.md): no
+                //    key is embedded here — we only relay a key that already
+                //    exists in the environment.
+                //
+                // 3. (NEW 2026-05-27) SPAWN VIA std::process::Command, NOT
+                //    tauri_plugin_shell::Command — the latter's spawn
+                //    implementation poisons the PyInstaller-frozen bundle's
+                //    import bootstrap somehow (verified: plain
+                //    `std::process::Command::new(bin).spawn()` works under
+                //    identical env/cwd/stdio + closed stdin + every Tauri
+                //    env var set; tauri-plugin-shell's spawn of the SAME
+                //    binary crashes at first `from livekit.agents import
+                //    Agent` with the circular `cli` ImportError). Production
+                //    launchd spawn is std::process-equivalent so this also
+                //    unblocks the signed .app. The DevSource arm below
+                //    keeps tauri-plugin-shell because the dev `uv run python
+                //    -m vibemix` invocation has its own Python interpreter
+                //    that handles imports normally — no bundle involved.
+                let mut cmd = StdCommand::new(&bin);
                 if let Some(parent) = bin.parent() {
-                    c = c.current_dir(parent);
+                    cmd.current_dir(parent);
                 }
                 for key in FORWARDED_ENV_KEYS {
                     if let Ok(val) = std::env::var(key) {
                         if !val.is_empty() {
-                            c = c.env(key, val);
+                            cmd.env(key, val);
                         }
                     }
                 }
                 if wizard_mode {
-                    c = c.args(["--wizard"]);
+                    cmd.arg("--wizard");
                 }
-                c
+                // macOS fork-safety workaround. The Tauri shell process has
+                // CoreFoundation initialized (Cocoa/AppKit linkage). When it
+                // spawns a child via fork() on macOS, Apple's CF marks the
+                // child as "fork-after-CF-init unsafe" and any CF call
+                // (which the PyInstaller bootloader makes during bundle
+                // bootstrap) trips Apple's abort/SIGABRT path —
+                // manifesting in our bundle as the chained livekit.agents
+                // circular ImportError because the import machinery
+                // half-runs then dies. Setting this env var on the child
+                // disables the abort and lets CF behave normally
+                // post-fork. Documented Apple workaround for this class of
+                // issue. See `man dispatch_workloop` / Apple TN2486.
+                cmd.env("OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES");
+                cmd.stdin(Stdio::null())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped());
+
+                let mut child = match cmd.spawn() {
+                    Ok(c) => c,
+                    Err(e) => return Err(format!("sidecar spawn failed: {e}")),
+                };
+                let child_pid = child.id();
+
+                // Publish PID-only handle for restart_sidecar to SIGTERM.
+                if let Some(state) = app.try_state::<SidecarHandle>() {
+                    if let Ok(mut guard) = state.child.lock() {
+                        *guard = Some(SidecarChild::Std { pid: child_pid });
+                    }
+                }
+                app.emit("sidecar-state", serde_json::json!({ "state": "running" }))
+                    .ok();
+
+                // Drain stdout + stderr into the rotating log on dedicated
+                // OS threads. std::process::Child::wait() consumes the
+                // handle, so the stdio takes happen BEFORE the wait future.
+                let stdout = child
+                    .stdout
+                    .take()
+                    .expect("Stdio::piped configured above");
+                let stderr = child
+                    .stderr
+                    .take()
+                    .expect("Stdio::piped configured above");
+                let log_stdout = log.clone();
+                std::thread::spawn(move || {
+                    let reader = BufReader::new(stdout);
+                    for line in reader.lines().map_while(Result::ok) {
+                        if let Ok(mut g) = log_stdout.lock() {
+                            let _ = writeln!(g, "{line}");
+                        }
+                    }
+                });
+                let log_stderr = log.clone();
+                std::thread::spawn(move || {
+                    let reader = BufReader::new(stderr);
+                    for line in reader.lines().map_while(Result::ok) {
+                        if let Ok(mut g) = log_stderr.lock() {
+                            let _ = writeln!(g, "{line}");
+                        }
+                    }
+                });
+
+                // Move the blocking wait off the tokio worker via
+                // spawn_blocking so other async tasks keep ticking.
+                let wait_handle = tokio::task::spawn_blocking(move || child.wait());
+                match wait_handle.await {
+                    Ok(Ok(status)) => status.code().unwrap_or(-1),
+                    Ok(Err(e)) => {
+                        app.emit("sidecar-error", e.to_string()).ok();
+                        -1
+                    }
+                    Err(_) => -1,
+                }
             }
             SidecarInvocation::DevSource { program, args, cwd } => {
                 // Dev path — run repo source so `cargo tauri dev` reflects
@@ -195,6 +327,12 @@ pub async fn spawn_sidecar_with_watchdog(
                 // OPENROUTER_API_KEY if they happen to be in the dev shell's
                 // env, so mode/auth exported in the terminal wins even if the
                 // repo .env is absent (no key embedded — env relay only).
+                //
+                // Still uses tauri_plugin_shell — works fine here because
+                // `uv run python -m vibemix` boots its own Python
+                // interpreter; no PyInstaller-frozen bundle involved, so the
+                // tauri-plugin-shell spawn-poisoning bug that breaks the
+                // Bundled arm doesn't apply.
                 let mut c = app.shell().command(&program).args(&args).current_dir(&cwd);
                 for key in FORWARDED_ENV_KEYS {
                     if let Ok(val) = std::env::var(key) {
@@ -203,50 +341,45 @@ pub async fn spawn_sidecar_with_watchdog(
                         }
                     }
                 }
-                c
-            }
-        };
 
-        let (mut rx, child) = cmd
-            .spawn()
-            .map_err(|e| format!("sidecar spawn failed: {e}"))?;
+                let (mut rx, child) = match c.spawn() {
+                    Ok(pair) => pair,
+                    Err(e) => return Err(format!("sidecar spawn failed: {e}")),
+                };
 
-        // Publish the child handle for restart_sidecar to kill it.
-        if let Some(state) = app.try_state::<SidecarHandle>() {
-            if let Ok(mut guard) = state.child.lock() {
-                *guard = Some(child);
-            }
-        }
+                if let Some(state) = app.try_state::<SidecarHandle>() {
+                    if let Ok(mut guard) = state.child.lock() {
+                        *guard = Some(SidecarChild::Plugin(child));
+                    }
+                }
+                app.emit("sidecar-state", serde_json::json!({ "state": "running" }))
+                    .ok();
 
-        app.emit("sidecar-state", serde_json::json!({ "state": "running" }))
-            .ok();
-
-        let log_clone = log.clone();
-        let app_clone = app.clone();
-
-        // Drain the child's stdout/stderr until it terminates.
-        let exit_code: i32 = tokio::spawn(async move {
-            use std::io::Write as _;
-            while let Some(event) = rx.recv().await {
-                match event {
-                    CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
-                        if let Ok(mut g) = log_clone.lock() {
-                            let _ = g.write_all(&b);
+                let log_clone = log.clone();
+                let app_clone = app.clone();
+                tokio::spawn(async move {
+                    while let Some(event) = rx.recv().await {
+                        match event {
+                            CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
+                                if let Ok(mut g) = log_clone.lock() {
+                                    let _ = g.write_all(&b);
+                                }
+                            }
+                            CommandEvent::Error(e) => {
+                                app_clone.emit("sidecar-error", e).ok();
+                            }
+                            CommandEvent::Terminated(payload) => {
+                                return payload.code.unwrap_or(-1);
+                            }
+                            _ => {}
                         }
                     }
-                    CommandEvent::Error(e) => {
-                        app_clone.emit("sidecar-error", e).ok();
-                    }
-                    CommandEvent::Terminated(payload) => {
-                        return payload.code.unwrap_or(-1);
-                    }
-                    _ => {}
-                }
+                    -1
+                })
+                .await
+                .unwrap_or(-1)
             }
-            -1
-        })
-        .await
-        .unwrap_or(-1);
+        };
 
         // Clear the published child handle — the process is gone.
         if let Some(state) = app.try_state::<SidecarHandle>() {

@@ -4585,6 +4585,7 @@ dependencies = [
  "dirs-next",
  "file-rotate",
  "futures-util",
+ "libc",
  "serde",
  "serde_json",
  "tauri",
