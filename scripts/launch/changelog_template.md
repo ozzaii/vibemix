@@ -11,9 +11,9 @@
 ## Highlights
 
 - **Real DJ friend in your ear, no AI slop.** Reactions are tied to real events via a Gemini-grounded evidence registry. The model has to cite what just happened (BPM jump, layer arrival, track change, MIDI move) before it speaks.
-- **Mac + Windows.** One-click install via signed `.dmg` (Apple-notarized) + `.msi` (SignPath OSS-foundation signed).
+- **Mac + Windows.** One-click install via signed `.dmg` (Apple-notarized) + `.exe` (SignPath OSS-foundation signed).
 - **Hype-man or coach.** Two modes × three skill levels (Beginner / Intermediate / Pro). Coach is past-tense — it won't talk while you're working.
-- **Library intelligence.** Drag-drop import; Gemini-Embedding-2 powered vibe search + "what's playing" grounding from YOUR library. 30-day staleness nudge keeps it fresh.
+- **Library intelligence.** Drag-drop import; local CLAP ONNX vibe search + "what's playing" grounding from YOUR library. 30-day staleness nudge keeps it fresh.
 - **Post-session debrief.** Chaptered review with 60–90s voiced TL;DR + 3 personalized drills + clickable timeline + cited critique.
 - **4-layer mascot.** Base + Emotion + Anticipation + Reaction additive state machine. Sub-budget GLB animations within 25 MB.
 - **Free, Apache 2.0.** Bravoh-managed Gemini proxy means no API keys in the binary (solves the "API key in distributed binary" problem).
@@ -60,7 +60,7 @@ Full Kaan/Francesco-action list: [`KAAN-ACTION-LEGAL.md`](KAAN-ACTION-LEGAL.md) 
 | OS | Download |
 |----|----------|
 | macOS (Apple Silicon) | `vibemix.dmg` (Apple Developer ID + notarized) |
-| Windows 11 | `vibemix-installer.msi` (SignPath Foundation OSS) |
+| Windows 11 | `vibemix-installer.exe` (SignPath Foundation OSS) |
 
 After install, the calibration wizard runs once: TCC permissions (mic + screen recording + accessibility), BlackHole 2ch auto-detect (macOS), MIDI controller pairing.
 
@@ -74,7 +74,7 @@ codesign -dvv ~/Downloads/vibemix.app
 spctl -a -v ~/Downloads/vibemix.app
 
 # Windows (PowerShell)
-Get-AuthenticodeSignature .\vibemix-installer.msi
+Get-AuthenticodeSignature .\vibemix-installer.exe
 ```
 
 ---

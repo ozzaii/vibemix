@@ -2,8 +2,8 @@
 """3-track calibration: surface distinct anchors across a vibe-filtered pool.
 
 The prep flow's calibration step. Given the embedding pool returned by the
-cheap vibe-search pass (each track = a Gemini Embedding 2 vector), pick a small
-set of candidates the DJ chooses between to pin their exact intent.
+cheap vibe-search pass (each track = one embedding vector), pick a small set of
+candidates the DJ chooses between to pin their exact intent.
 
 Algorithm — centroid-anchored farthest-first traversal (deterministic):
 

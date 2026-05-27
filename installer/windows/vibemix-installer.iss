@@ -1,9 +1,10 @@
 ; ============================================================================
-; vibemix-installer.iss — Inno Setup 6 script for the Windows MSI installer.
+; vibemix-installer.iss — Inno Setup 6 script for the Windows EXE installer.
 ;
-; Consumes the PyInstaller --onedir payload at `dist\vibemix\` (produced by
-; vibemix-core.windows.spec — Phase 18 wave 0) and produces a signed MSI named
-; `vibemix-installer.msi` for distribution via GitHub Releases.
+; Consumes the Windows app payload staged by release.yml/local build scripts and
+; produces a signed installer named `vibemix-installer.exe` for distribution via
+; GitHub Releases. CI/local scripts pass /DSourceDir=...; the default points at
+; the canonical unsigned staging directory for manual dry runs.
 ;
 ; Per-machine install (`{commonpf}\vibemix`), Start Menu shortcut, optional
 ; Desktop shortcut, VC++ 2015-2022 redistributable runtime presence check,
@@ -13,12 +14,11 @@
 ; GitHub Action (`signpath/github-action-submit-signing-request`) — see
 ; `docs/signing-windows.md` for the full pipeline. The `SignTool=signpath`
 ; directive below is the hook point for the CI signing step; local builds
-; produce an unsigned MSI which `signtool verify /pa` will reject (expected).
+; produce an unsigned EXE which `signtool verify /pa` will reject (expected).
 ;
 ; Inno Setup is the v1 distribution choice (per signpath-application.md §7);
 ; switching to WiX is a v2 candidate if cleaner MSI semantics become a
-; blocker — the OutputBaseFilename keeps the `.msi` extension so consumers
-; (download buttons, brew/scoop manifests) need not change.
+; blocker.
 ; ============================================================================
 
 #define MyAppName             "vibemix"
@@ -35,6 +35,12 @@
 #define MyAppVersion          GetFileVersion("version.txt") + ""
 #if MyAppVersion == ""
   #define MyAppVersion        FileRead(FileOpen("version.txt"))
+#endif
+#ifndef SourceDir
+  #define SourceDir           "..\..\dist\windows-app"
+#endif
+#ifndef InstallerOutputDir
+  #define InstallerOutputDir  "output"
 #endif
 
 [Setup]
@@ -56,26 +62,20 @@ VersionInfoDescription={#MyAppName} setup
 DefaultDirName={commonpf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-; UAC elevation prompt is required for `{commonpf}` writes. `PrivilegesRequired`
-; matches Windows MSI installer expectations.
+; UAC elevation prompt is required for `{commonpf}` writes.
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-; Output MSI bundle. `OutputBaseFilename` is `.msi`-suffixed even though Inno
-; Setup nominally emits `.exe` because:
-;   1. DIST-03 acceptance criterion names the deliverable `vibemix-installer.msi`.
-;   2. The CI signing job downloads the SignPath-signed artifact, renames the
-;      Inno Setup `.exe` to `.msi`, and re-signs the rename. The `.msi`
-;      extension survives `signtool verify /v vibemix-installer.msi` — Inno
-;      Setup wraps a real MSI database, not a freestanding NSIS-style stub.
-;   3. End-user download buttons reference `*.msi` for SmartScreen scoring.
-OutputDir=output
+; Inno Setup emits `output\vibemix-installer.exe`. Do not rename it to `.msi`;
+; Windows would route that extension to msiexec instead of running the Inno
+; installer.
+OutputDir={#InstallerOutputDir}
 OutputBaseFilename=vibemix-installer
 ; The signed-uninstaller-dir directive tells SignPath where to deposit the
 ; signed `unins000.exe` after the inner uninstaller is generated. Keeps the
 ; uninstaller trusted, not just the outer installer.
-SignedUninstallerDir=output\signed-uninstaller
+SignedUninstallerDir={#InstallerOutputDir}\signed-uninstaller
 SetupIconFile=assets\vibemix.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName} {#MyAppVersion}
@@ -104,10 +104,11 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-; Consume PyInstaller --onedir output. The spec ships the entire `dist\vibemix\`
-; folder tree (Python interpreter + site-packages + plugins + assets). Inno
-; Setup recurses into subdirs and preserves the directory layout under {app}.
-Source: "..\..\dist\vibemix\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Consume the staged Windows app payload. Inno Setup recurses into subdirs and
+; preserves the directory layout under {app}. `SourceDir` is a macro so CI can
+; point the installer at the SignPath-returned payload instead of the legacy
+; local default.
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Ship the LICENSE inside the install dir so it's visible without launching
 ; the app (Apache 2.0 §4(d) — "give recipients a copy of this License").
 Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
@@ -153,7 +154,7 @@ Filename: "powershell.exe"; \
 ; Sweep the per-user config dir on uninstall. {userappdata} expands to the
 ; uninstalling user's `%APPDATA%\vibemix`; if vibemix was used by multiple
 ; users on the same box, each user's config lingers until their own
-; uninstall pass (matches Windows MSI per-user-data convention).
+; uninstall pass (matches Windows per-user-data convention).
 Type: filesandordirs; Name: "{userappdata}\vibemix"
 
 [Code]

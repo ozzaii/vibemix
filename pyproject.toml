@@ -34,7 +34,9 @@ dependencies = [
     "livekit-plugins-openai>=1.5.8",
     "livekit>=1.1.7",
     "numpy>=2.4.4",
-    "scipy>=1.17.1",
+    # Direct runtime dependency: local CLAP/CUE decode and debrief MP3 encode
+    # import PyAV directly. Do not rely on LiveKit Agents to pull it transitively.
+    "av>=17.0.1",
     "sounddevice>=0.5.5",
     "mido>=1.3.3",
     "python-rtmidi>=1.5.8",
@@ -123,31 +125,35 @@ dependencies = [
     # install bar. Only the OPTIONAL playlist-curation agent needs it; the live
     # co-host never imports it.
     "mcp>=1.2.0",
-    # Viber Agent — Telegram mobile surface (OPTIONAL). Long-poll bot (no public
-    # URL; runs alongside the desktop app), chat_id allow-list = the v1 auth, so
-    # the user can curate playlists from their phone. Pure-Python; lazily
-    # imported only by the `telegram` subcommand — the co-host never imports it.
-    "python-telegram-bot>=21",
 ]
 
 [project.optional-dependencies]
-# Phase 90 — on-device CLAP embedding backend (VIBEMIX_EMBED_BACKEND=clap).
-# OPTIONAL: only installed when opting into the local 512-dim CLAP path
-# (Xenova/larger_clap_music_and_speech ONNX). Keeps the default install lean
-# (Gemini-embedding path needs none of these). onnxruntime is the cross-platform
-# inference runtime (~13-18MB wheel, NO torch); transformers supplies the
-# RoBERTa tokenizer + the torch-FREE `audio_utils` mel primitives
-# (mel_filter_bank/spectrogram — byte-identical to ClapFeatureExtractor, which
-# we deliberately do NOT use because that class top-level-imports torch); librosa
-# loads + resamples audio. All three are lazy-imported (clap_engine.ClapEngine /
-# embed_clap.ClapEmbedder) so `import vibemix.library.*` stays safe without them.
+# Phase 90+ — local AI extras. The app/installer path should install
+# `ai-local`; narrow extras let CI/import-only jobs avoid heavy deps.
+#
+# Shared deps:
+# - onnxruntime: cross-platform ONNX inference (~13-18MB wheel, no torch).
+# - tokenizers: CLAP Roberta tokenizer without the full Transformers package.
+# Audio decode/DSP for CLAP/CUE uses PyAV/FFmpeg plus narrow numpy helpers,
+# avoiding scipy and librosa's numba/llvmlite/scikit-learn dependency family.
+#
+# All are lazy-imported so `import vibemix.library.*` stays safe without them.
 # Verified torch-free: genre parity holds (techno 10/10, psy 10/10) with torch
-# absent. Follow-up: the lighter `tokenizers` lib could drop transformers — see
-# docs/clap-engine.md.
+# absent. CUE-DETR preprocessing is local numpy code, so Transformers is not in
+# the one-click local model dependency set.
 clap = [
     "onnxruntime>=1.20",
-    "transformers>=4.40",
-    "librosa>=0.10",
+    "tokenizers>=0.22",
+]
+cue = [
+    "onnxruntime>=1.20",
+]
+ai-local = [
+    "onnxruntime>=1.20",
+    "tokenizers>=0.22",
+]
+telegram = [
+    "python-telegram-bot>=21",
 ]
 
 [project.urls]
@@ -211,7 +217,15 @@ src = ["src"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "B", "I", "UP", "RUF"]
-ignore = ["E501"]
+ignore = [
+    "E501",
+    # Project docs/prompts intentionally use Turkish text, sigma notation, and
+    # DJ math glyphs in comments/docstrings. Keep ruff focused on executable
+    # risk rather than rewriting copy.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "cohost*.py" = ["E", "F", "B", "I", "UP", "RUF"]
@@ -219,6 +233,7 @@ ignore = ["E501"]
 # rule removed to keep the config truthful to repo state.
 "test_voice.py" = ["E", "F", "B", "I", "UP", "RUF"]
 "generate_bat.py" = ["E", "F", "B", "I", "UP", "RUF"]
+"src/vibemix/ui_bus/__init__.py" = ["RUF022"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -227,7 +242,7 @@ docstring-code-format = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers -m 'not network'"
 markers = [
     "macos_audio: requires BlackHole 2ch present (opt-in smoke test, Plan 05)",
     "windows_only: requires sys.platform == 'win32' — live tests for the Windows port (Phase 7 Wave 3+, executed in Phase 20 CI matrix)",
@@ -237,5 +252,6 @@ markers = [
     "cli: subprocess CLI integration tests (slower than unit tests; run via `pytest -m cli` for full coverage)",
     "e2e: end-to-end debrief lifecycle tests (Phase 29 Plan 08; opt-in via `pytest -m e2e`)",
     "network: live-network smoke tests (e.g. LAUNCH-06 GitHub org poller); opt-in via `pytest -m network`",
+    "real_model_status: bypass patched model-status fixtures to exercise local asset validation directly",
     "flaky: quarantined non-deterministic test; carries a # issue: https://... link enforced by tests/repo/test_no_silent_flakes.py",
 ]

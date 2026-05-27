@@ -89,5 +89,5 @@ HARDTEK-CORPUS-001 closes.
 Once tracks land, the same WAVs feed `scripts/eval/replay_harness.py` for
 per-detector-per-genre F1 scoring (Phase 27 EVAL-03 matrix). The hard_tek
 genre slice must clear F1 ≥ 0.80 per detector before v1 release. The
-2-judge cross-check rubric (Gemini-only — no Anthropic in product per
-project memory) lives in `eval/rubrics/`.
+2-judge cross-check rubric (Gemini judges; no Anthropic judge provider)
+lives in `eval/rubrics/`.

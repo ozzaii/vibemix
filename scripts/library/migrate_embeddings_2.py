@@ -1,18 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Plan 41-05 LAT-06 — Embedding 2 cache audit + migration script.
+"""Legacy Gemini Embedding 2 cache audit script.
 
-Power-user tool. The DEFAULT migration UX is lazy-on-first-launch: the
-LibraryEmbedder GA-rename probe (Plan 41-05 Task 1) naturally bumps
-``EXCERPT_STRATEGY_VERSION`` when it lands on ``gemini-embedding-002``,
-and the next read of any track triggers a re-embed via the existing
-content-hash cache miss path. Users do NOT need to run this script.
+Power-user compatibility tool. The current product embedding path is local
+CLAP ONNX via ``embed_factory.build_embedder()``; normal library search,
+similarity, curation, and ingest do not use this Gemini cache. This module only
+helps inspect or invalidate historical ``~/.cache/vibemix/embeddings.db`` rows
+left by the retired Gemini embedder.
 
 This module exists for two cases:
-    1. Power-users who want to pre-warm the cache before a session
-       (saves the lazy-re-embed first-call latency).
-    2. Engineers who want to verify cache state — confirm which model
-       id the production probe lands on, count cached entries, surface
-       drift before it ships.
+    1. Power-users who want to audit or clear old Gemini cache rows before
+       rebuilding their library with CLAP.
+    2. Engineers who want to verify legacy cache/probe behavior without
+       touching the product CLAP path.
 
 Modes:
     --audit-only (default)
@@ -20,12 +19,12 @@ Modes:
         cache contents + cache-key version. No mutation.
 
     --dry-run
-        Audit + report what ``--re-embed-all`` would do (track count,
-        estimated cost, estimated time). No mutation.
+        Audit + report what invalidating the old cache would affect. No
+        mutation.
 
     --re-embed-all
-        Actually invoke the lazy re-embed path on every cached track.
-        Useful before a known offline session window.
+        Delete legacy Gemini cache rows. It does not call Gemini and it does
+        not prewarm CLAP; the next product import/search uses the CLAP path.
 
 Run:
     python -m scripts.library.migrate_embeddings_2 --help
@@ -37,6 +36,7 @@ Run:
 from __future__ import annotations
 
 import argparse
+import os
 import sqlite3
 import sys
 from dataclasses import dataclass
@@ -74,7 +74,7 @@ class CacheAudit:
 
 @dataclass(frozen=True, slots=True)
 class CostEstimate:
-    """What --re-embed-all would cost."""
+    """Legacy Gemini re-embed what-if estimate."""
 
     track_count: int
     est_cost_usd: float
@@ -103,7 +103,7 @@ def _count_cache_entries(cache_path: Path) -> int:
 
 
 def audit_cache(
-    client: "genai.Client | None" = None,
+    client: genai.Client | None = None,
     cache_path: Path | None = None,
 ) -> CacheAudit:
     """Run the GA probe + count cached entries; no mutation.
@@ -150,7 +150,7 @@ def estimate_reembed_cost(
     usd_to_eur: float = USD_TO_EUR_DEFAULT,
     embed_seconds_per_track: float = 1.5,
 ) -> CostEstimate:
-    """Rough cost + time estimate for a full re-embed.
+    """Rough legacy Gemini cost + time estimate for a historical full re-embed.
 
     Assumptions documented in CostProjection / Phase 28-08:
         - ~150 tokens/track avg × Flex pricing ≈ $0.00375/track.
@@ -174,8 +174,8 @@ def _render_audit(audit: CacheAudit, *, stream=None) -> None:
     # Resolve sys.stdout lazily so capsys redirection in tests works.
     if stream is None:
         stream = sys.stdout
-    print("Embedding 2 cache audit", file=stream)
-    print("=======================", file=stream)
+    print("Legacy Gemini Embedding cache audit", file=stream)
+    print("===================================", file=stream)
     print(f"  Cache path:      {audit.cache_path}", file=stream)
     print(f"  Cache exists:    {audit.cache_exists}", file=stream)
     print(f"  Entry count:     {audit.entry_count}", file=stream)
@@ -197,8 +197,8 @@ def _render_cost(est: CostEstimate, *, stream=None) -> None:
     # Resolve sys.stdout lazily so capsys redirection in tests works.
     if stream is None:
         stream = sys.stdout
-    print("Re-embed-all cost estimate", file=stream)
-    print("==========================", file=stream)
+    print("Legacy re-embed cost estimate", file=stream)
+    print("=============================", file=stream)
     print(f"  Tracks to re-embed:  {est.track_count}", file=stream)
     print(f"  Estimated cost:      ${est.est_cost_usd:.2f} USD "
           f"(€{est.est_cost_eur:.2f})", file=stream)
@@ -219,15 +219,12 @@ def reembed_all(
     embedder: object,
     cache_path: Path | None = None,
 ) -> int:
-    """Iterate the cache table + drop every row so the next read re-embeds.
+    """Drop legacy Gemini cache rows.
 
-    Note: we deliberately do NOT eagerly call ``embedder.embed_track()``
-    for each track here — that would require iterating the Rekordbox
-    library, and the cache rows don't hold enough info to reconstruct
-    the TrackEntry. The simplest "force re-embed" primitive is to
-    invalidate the cache; the next ``LibraryImporter.import_all()`` or
-    runtime ``embed_track()`` call naturally re-fills it with the new
-    model id.
+    Note: we deliberately do NOT call ``embedder.embed_track()`` here. The
+    product path is CLAP, and old cache rows do not hold enough information to
+    reconstruct a ``TrackEntry``. This helper only clears the legacy Gemini
+    cache; normal imports/searches refill through the CLAP embedder.
 
     Returns: number of rows deleted.
     """
@@ -253,12 +250,10 @@ def reembed_all(
 
 
 HELP_EPILOG = """\
-Migration UX note:
-    The default vibemix UX is LAZY ON FIRST LAUNCH. After the
-    LibraryEmbedder GA-rename probe ships (Plan 41-05), the next time
-    a user reads any track, the cache key miss triggers a transparent
-    re-embed. You only need this script if you want to pre-warm or
-    audit the cache explicitly.
+Product UX note:
+    Current vibemix library embeddings are local CLAP ONNX/512. This script is
+    not part of the product re-embed path; it only audits or clears historical
+    Gemini Embedding cache rows.
 
 Examples:
     python -m scripts.library.migrate_embeddings_2 --audit-only
@@ -271,8 +266,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="migrate_embeddings_2",
         description=(
-            "Plan 41-05 LAT-06 — Embedding 2 cache audit + migration. "
-            "Default UX is lazy on first launch; this is a power-user tool."
+            "Legacy Gemini Embedding cache audit. Product library embeddings "
+            "now use local CLAP ONNX/512."
         ),
         epilog=HELP_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -286,20 +281,20 @@ def _build_parser() -> argparse.ArgumentParser:
     mode.add_argument(
         "--dry-run",
         action="store_true",
-        help="Audit + show what --re-embed-all would do. No mutation.",
+        help="Audit + show what clearing the old cache would affect. No mutation.",
     )
     mode.add_argument(
         "--re-embed-all",
         action="store_true",
         help=(
-            "Invalidate every cached embedding so subsequent imports "
-            "re-fill with the current probe-derived model id."
+            "Invalidate legacy Gemini cache rows. Product imports/searches "
+            "refill via CLAP, not Gemini."
         ),
     )
     return parser
 
 
-def _build_client_or_none() -> "genai.Client | None":
+def _build_client_or_none() -> genai.Client | None:
     """Build a proxy-wired client if env is configured; else None.
 
     Tests + power-users without a configured proxy run audit-only mode
@@ -307,7 +302,6 @@ def _build_client_or_none() -> "genai.Client | None":
     """
     try:
         from vibemix.agent.proxy_client import build_proxy_genai_client
-        import os
 
         proxy_jwt = os.environ.get("VIBEMIX_PROXY_JWT")
         proxy_url = os.environ.get("VIBEMIX_PROXY_URL")
@@ -330,9 +324,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.re_embed_all:
         deleted = reembed_all(embedder=None)
         print(
-            f"Invalidated {deleted} cache rows. Next import/read will "
-            f"re-embed with model "
-            f"{audit.probe_model_id or '<not probed>'}.",
+            f"Invalidated {deleted} legacy Gemini cache rows. Product "
+            "imports/searches now refill via CLAP, not Gemini.",
         )
         return 0
 
@@ -341,15 +334,14 @@ def main(argv: list[str] | None = None) -> int:
         _render_cost(est)
         print(
             "(dry-run — no mutation performed. Run with --re-embed-all "
-            "to invalidate and trigger re-embed.)",
+            "to clear legacy Gemini cache rows.)",
         )
         return 0
 
     # Default --audit-only — already rendered above.
     print(
-        "Migration UX: lazy on first launch. The next track read will "
-        "trigger a re-embed automatically if the probe lands on a new "
-        "model id.",
+        "Product UX: current library embeddings are local CLAP ONNX/512. "
+        "This tool only audits the legacy Gemini cache.",
     )
     return 0
 

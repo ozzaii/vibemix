@@ -18,7 +18,7 @@
 python:
   google-genai:
     rating: green
-    rationale: "Gemini-only AI surface (CLAUDE.md hard rule). Pure-Python; no native build."
+    rationale: "Gemini Live co-host and Gemini TTS. Library embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex. Pure-Python; no native build."
   httpx:
     rating: green
     rationale: "HTTP client used by google-genai + livekit-agents transitives."
@@ -37,12 +37,12 @@ python:
   livekit:
     rating: yellow
     rationale: "WebRTC client; transitively pulls av + aiortc. Prebuilt wheels for Mac+Win64."
+  mcp:
+    rating: green
+    rationale: "Codex MCP bridge for the local Viber tool surface. Pure-Python; optional at runtime outside Codex-backed chat/curate/build-set."
   numpy:
     rating: yellow
     rationale: "Audio math (RMS / FFT / BPM autocorr). Prebuilt wheels Mac arm64+x86_64 + Win64."
-  scipy:
-    rating: yellow
-    rationale: "scipy.signal.resample_poly for 48kHz to 16kHz. Prebuilt wheels all platforms."
   sounddevice:
     rating: yellow
     rationale: "CoreAudio (Mac) + WASAPI (Win) bridge. Pure-Python over CFFI; system PortAudio resolved by the installer."
@@ -88,6 +88,9 @@ python:
   python-dotenv:
     rating: green
     rationale: "load_dotenv() for GEMINI_API_KEY ingest. Pure-Python."
+  python-telegram-bot:
+    rating: green
+    rationale: "Optional Telegram long-poll bridge for Viber mobile curation. Pure-Python extra; not installed in the default app path."
   pyobjc-core:
     rating: yellow
     rationale: "PyObjC bridge for macOS APIs. macOS-only (sys_platform guard). Prebuilt wheels."
@@ -203,6 +206,9 @@ js:
   json-schema-to-typescript:
     rating: green
     rationale: "IPC schema to TS codegen. Build-time only."
+  '@playwright/test':
+    rating: green
+    rationale: "Playwright test-runner wrapper. Dev/test only; not shipped with the desktop app."
   '@gltf-transform/cli':
     rating: green
     rationale: "GLB optimization CLI for mascot bundle. Build-time only."
@@ -212,6 +218,12 @@ js:
   '@types/three':
     rating: green
     rationale: "TS type declarations for three. Dev only."
+  pixelmatch:
+    rating: green
+    rationale: "Pure-JS visual diff helper for UI tests. Dev/test only."
+  playwright:
+    rating: yellow
+    rationale: "Browser automation for visual/e2e tests. Dev/test only; downloads managed browser binaries outside the shipped app."
   gltf-pipeline:
     rating: green
     rationale: "GLB compression pipeline. Build-time only."
@@ -271,11 +283,11 @@ opportunity_evaluations:
     category: "python-dep"
     rating: "red-constraint"
     install_impact: "red"
-    rationale: "Violates Gemini-only constraint. Gemini Embedding 2 covers multimodal audio embedding (~180s cap) per memory project_gemini_embedding_2."
+    rationale: "Historical v3.1 row: CLAP was rejected under the then-current Gemini-only embedding rule. Superseded on 2026-05-26 for library/search/curate, which now use local CLAP ONNX/512."
     integration_surface: "none"
     rejected_constraints:
       - memory: "feedback_no_clap_use_gemini_embedding"
-        quote: "vibemix is Gemini-only; never propose CLAP/LAION-CLAP/MERT/OpenL3 even when research recommends it."
+        quote: "SUPERSEDED 2026-05-26: old Gemini-only embedding rule; CLAP is now approved for library embeddings."
     adr_sidecar: ""
   - id: "DEP-OPP-03"
     date: "2026-05-18"
@@ -283,11 +295,11 @@ opportunity_evaluations:
     category: "python-dep"
     rating: "red-constraint"
     install_impact: "red"
-    rationale: "Same as DEP-OPP-02. Gemini Embedding 2 single-space coverage substitutes."
+    rationale: "MERT remains unadopted; the CLAP-specific rejection in the original DEP-OPP-02 rationale is superseded."
     integration_surface: "none"
     rejected_constraints:
-      - memory: "feedback_no_clap_use_gemini_embedding"
-        quote: "vibemix is Gemini-only; never propose CLAP/LAION-CLAP/MERT/OpenL3 even when research recommends it."
+      - memory: "project_one_click_install_hard_req"
+        quote: "Every dep choice rated green/yellow/red on install impact."
     adr_sidecar: ""
   - id: "DEP-OPP-04"
     date: "2026-05-18"
@@ -295,11 +307,11 @@ opportunity_evaluations:
     category: "python-dep"
     rating: "red-constraint"
     install_impact: "red"
-    rationale: "Same as DEP-OPP-02. Gemini Embedding 2 covers the use case."
+    rationale: "OpenL3 remains unadopted; the CLAP-specific rejection in the original DEP-OPP-02 rationale is superseded."
     integration_surface: "none"
     rejected_constraints:
-      - memory: "feedback_no_clap_use_gemini_embedding"
-        quote: "vibemix is Gemini-only; never propose CLAP/LAION-CLAP/MERT/OpenL3 even when research recommends it."
+      - memory: "project_one_click_install_hard_req"
+        quote: "Every dep choice rated green/yellow/red on install impact."
     adr_sidecar: ""
   - id: "DEP-OPP-05"
     date: "2026-05-18"
@@ -319,7 +331,7 @@ opportunity_evaluations:
     category: "python-dep"
     rating: "red-constraint"
     install_impact: "n/a"
-    rationale: "Same as DEP-OPP-05. vibemix is Gemini-only product surface."
+    rationale: "Same as DEP-OPP-05. New direct hosted AI providers are out; live reactions use Bravoh's Gemini path, while library embeddings are local CLAP ONNX."
     integration_surface: "none"
     rejected_constraints:
       - memory: "feedback_no_scope_creep_clean_utility"

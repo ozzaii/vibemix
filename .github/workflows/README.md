@@ -5,7 +5,7 @@ one consumes. Bookmark this file when adding a new secret — secrets live in
 **Settings → Secrets and variables → Actions → New repository secret**, and
 this README is the canonical inventory.
 
-> Phase 18 Plan 18-05 ships `release.yml` and its 14-secret inventory.
+> Phase 18 Plan 18-05 ships `release.yml` and its 16-secret inventory.
 > Other workflows (CI, lint, test) are out of scope for Phase 18 — they
 > arrive in Phase 20 (CI matrix expansion).
 
@@ -13,7 +13,7 @@ this README is the canonical inventory.
 
 | File          | Trigger                                          | Purpose                                                                | Owner             |
 | ------------- | ------------------------------------------------ | ---------------------------------------------------------------------- | ----------------- |
-| `release.yml` | `v*` tag push + `workflow_dispatch` (rehearsal)  | Build, sign, notarize, MSI, verify, and publish the release end-to-end | Phase 18 Plan 18-05 |
+| `release.yml` | `v*` tag push + `workflow_dispatch` (rehearsal)  | Build, sign, notarize, package, verify, and publish the release end-to-end | Phase 18 Plan 18-05 |
 
 ## Secrets required by `release.yml`
 
@@ -31,24 +31,25 @@ this README is the canonical inventory.
 | `SIGNPATH_ORGANIZATION_ID`               | Windows SignPath signing      | SignPath dashboard → Organization URL slug                                                              |
 | `SIGNPATH_PROJECT_SLUG`                  | Windows SignPath signing      | SignPath dashboard → Project URL slug (typically `vibemix`)                                             |
 | `SIGNPATH_SIGNING_POLICY_SLUG`           | Windows SignPath signing      | SignPath dashboard → Project → Signing Policy slug (typically `release-signing`)                        |
+| `SIGNPATH_SIGNTOOL_CMD`                  | Windows Authenticode signing  | SignPath-provided SignTool command containing the `$f` artifact placeholder                             |
 | `TAURI_UPDATER_PRIVATE_KEY`              | Manifest signing              | base64 of `~/.tauri/vibemix_updater.key` — see `tauri/src-tauri/keys/README.md` for generation steps    |
-| `TAURI_UPDATER_KEY_PASSWORD`             | Manifest signing              | Passphrase chosen during `npx @tauri-apps/cli signer generate`                                          |
+| `TAURI_UPDATER_KEY_PASSWORD`             | Manifest signing              | Passphrase chosen during `npx @tauri-apps/cli signer generate`; may be empty, but the secret must exist |
 | `BRAVOH_MANIFEST_UPLOAD_TOKEN`           | Manifest POST to api.altidus  | Issued by Bravoh ops once `/vibemix/updates/upload` endpoint ships on `api.altidus.world`               |
 
-Total: **14 secrets** + the workflow-default `GITHUB_TOKEN` (auto-provided
+Total: **16 secrets** + the workflow-default `GITHUB_TOKEN` (auto-provided
 by GitHub Actions; never user-configured).
 
 All secrets reach the workflow as `${{ secrets.XXX }}` interpolation; zero
 values are inlined into the YAML or any committed file. The
-`detect-signing-mode` pre-flight job inspects three "canary" secrets
-(`APPLE_DEVELOPER_ID_P12_BASE64`, `SIGNPATH_API_TOKEN`,
-`TAURI_UPDATER_PRIVATE_KEY`) to decide between full-release and
-mock-signing mode without reading the values themselves.
+`detect-signing-mode` pre-flight job inspects signing-secret presence to
+decide between full-release and mock-signing mode without reading the values
+themselves. `TAURI_UPDATER_KEY_PASSWORD` is passed to signer steps but is not
+used as a non-empty canary because an empty updater passphrase is valid.
 
 ## Mock-signing fallback
 
-When the three canary secrets are ALL present, `release.yml` runs in **full
-release mode**:
+When the required signing secret groups are present, `release.yml` runs in
+**full release mode**:
 
 ```
 detect-signing-mode → placeholder-pubkey-gate → build-macos (BUILD/SIGN/PACKAGE/VERIFY)
@@ -56,9 +57,10 @@ detect-signing-mode → placeholder-pubkey-gate → build-macos (BUILD/SIGN/PACK
                                               → release-publish
 ```
 
-If ANY canary is absent (PR builds, fork PRs, dry-runs against a fresh
-repo), the workflow runs in **mock mode**: BUILD + VERIFY only on each OS;
-no signing, no MSI, no publishing. The verify step (Plan 18-01
+If any required signing secret group is incomplete (PR builds, fork PRs,
+dry-runs against a fresh repo), the workflow runs in **mock mode**: BUILD +
+VERIFY only on each OS; no signing, no packaging, no publishing. The verify
+step (Plan 18-01
 `scripts/dist/verify_binary.py`) STILL runs on the unsigned bundle — leak
 detection is the load-bearing invariant and never goes offline.
 
@@ -102,7 +104,7 @@ The repo enforces three layers of secret-egress defence:
 2. **Pre-commit hook** (Phase 11 W1 `scripts.build_sidecar.assert_no_aiza_leak`)
    scans the build tree before sign + ship.
 3. **`release.yml` verify stage** (Plan 18-01 `verify_binary.py`) scans the
-   SIGNED bundle post-codesign / post-MSI and fails the workflow on any
+   SIGNED bundle post-codesign / post-package and fails the workflow on any
    `AIza`/`AKIA`/`ya29.`/`sk-` pattern hit. Defence in depth: even if a
    developer accidentally bypasses the pre-commit hook, the release gate
    would still catch a leaked key before it ships.

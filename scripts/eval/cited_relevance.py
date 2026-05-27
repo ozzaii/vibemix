@@ -1,13 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 27 Plan 02 — cited-relevance cosine filter (EVAL-05) + substance metric (EVAL-04).
+"""Phase 27 Plan 02 — cited-relevance filter (EVAL-05) + substance metric (EVAL-04).
 
 Two Pitfall mitigations:
 
 - **P45 (cited-but-irrelevant):** ``relevance_score`` strips citation tags
-  from the response, embeds the bare prose, and cosines against the
-  evidence payload via Gemini Embedding 2 (768-dim MRL). Pitfall P45
-  early-exits with 0.0 when the stripped response is < 8 words (no API
-  call made — cost guard).
+  from the response, then computes a deterministic local token-cosine against
+  the evidence payload. Pitfall P45 early-exits with 0.0 when the stripped
+  response is < 8 words.
 - **P44 (lenient F1):** ``useful_response_ratio`` and
   ``per_event_class_substance`` measure WHAT FRACTION of events got a
   substantive response (per-event substance >= 0.5 OR Flash pass),
@@ -20,20 +19,46 @@ Public surface (pure-logic):
     - useful_response_ratio(verdicts) -> float
     - per_event_class_substance(verdicts, event_classes) -> dict[str, float]
 
-API-backed (gated by genai.Client + cassettes in tests):
-    - relevance_score(response_text, evidence_payload, client) -> float
+Async compatibility surface:
+    - relevance_score(response_text, evidence_payload, client=None) -> float
 """
 
 from __future__ import annotations
 
 import re
+from collections import Counter
 from typing import Any
 
 import numpy as np
 
 _CITATION_RE = re.compile(r"\[(?:ev|track|mix|emote):[^\]]*\]")
-EMBED_MODEL = "gemini-embedding-2-preview"
-EMBED_OUTPUT_DIMENSIONS = 768  # MRL truncation; 4x bandwidth saving over default 3072
+_TOKEN_RE = re.compile(r"[a-z0-9]+(?:'[a-z0-9]+)?")
+_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "but",
+        "by",
+        "for",
+        "from",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "or",
+        "that",
+        "the",
+        "this",
+        "to",
+        "with",
+    }
+)
 
 # Pitfall P45 floor: responses with fewer words than this (after citation
 # strip) cannot anchor — return 0.0 without invoking the API (cost guard).
@@ -60,40 +85,51 @@ def cosine(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.dot(a, b) / (na * nb))
 
 
+def _token_counts(text: str) -> Counter[str]:
+    return Counter(
+        tok
+        for tok in _TOKEN_RE.findall(text.lower())
+        if len(tok) > 1 and tok not in _STOPWORDS
+    )
+
+
+def _token_cosine(a_text: str, b_text: str) -> float:
+    """Sparse cosine over local token-count vectors."""
+    a = _token_counts(a_text)
+    b = _token_counts(b_text)
+    if not a or not b:
+        return 0.0
+    dot = sum(float(count) * float(b.get(tok, 0)) for tok, count in a.items())
+    if dot == 0.0:
+        return 0.0
+    na = sum(float(count) ** 2 for count in a.values()) ** 0.5
+    nb = sum(float(count) ** 2 for count in b.values()) ** 0.5
+    if na == 0.0 or nb == 0.0:
+        return 0.0
+    return dot / (na * nb)
+
+
 async def relevance_score(
     response_text: str,
     evidence_payload: str,
-    client: Any,
+    client: Any | None = None,
 ) -> float:
     """Return cosine similarity between stripped response and evidence payload.
 
-    Returns 0.0 (without invoking the embedding API — cost guard) when:
+    Returns 0.0 when:
       - stripped response is < 8 words (Pitfall P45 min-8-words floor), OR
       - evidence_payload is empty.
 
-    Otherwise embeds both via Gemini Embedding 2 (SEMANTIC_SIMILARITY task
-    type, 768-dim MRL truncation) and returns the cosine.
+    Otherwise returns a deterministic local token-cosine score in [0, 1].
+    ``client`` is accepted only for old call-site compatibility and is not used.
     """
+    _ = client
     stripped = strip_citations(response_text).strip()
     if len(stripped.split()) < MIN_STRIPPED_WORDS:
         return 0.0
     if not evidence_payload.strip():
         return 0.0
-
-    from google.genai import types
-
-    cfg = types.EmbedContentConfig(
-        task_type="SEMANTIC_SIMILARITY",
-        output_dimensionality=EMBED_OUTPUT_DIMENSIONS,
-    )
-    emb = client.models.embed_content(
-        model=EMBED_MODEL,
-        contents=[stripped, evidence_payload],
-        config=cfg,
-    )
-    a = np.array(emb.embeddings[0].values, dtype=np.float32)
-    b = np.array(emb.embeddings[1].values, dtype=np.float32)
-    return cosine(a, b)
+    return _token_cosine(stripped, evidence_payload)
 
 
 def useful_response_ratio(verdicts: list[dict[str, Any]]) -> float:

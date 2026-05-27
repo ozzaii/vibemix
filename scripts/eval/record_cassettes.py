@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Phase 42 Plan 01 / GATE-02 — one-time VCR cassette population helper.
 
-The Phase 27 eval test suite (tests/eval/test_judge_pro_rubric.py,
-test_judge_flash_rubric.py, test_cited_relevance.py, test_substance_metric.py)
-depends on recorded VCR cassettes under ``tests/eval/cassettes/`` to let CI
-replay Gemini API responses at $0 cost on every PR. Phase 27 shipped the
-scaffolding; cassette population is a one-time Kaan-discharge step that needs
-a real ``GEMINI_API_KEY`` and burns ~$1-2 of API budget across the suite.
+The Gemini-backed Phase 27 judge tests depend on recorded VCR cassettes under
+``tests/eval/cassettes/`` to let CI replay API responses at $0 cost on every
+PR. Cited relevance and substance metrics are deterministic local tests and do
+not need cassettes. Phase 27 shipped the scaffolding; cassette population is a
+one-time Kaan-discharge step that needs a real ``GEMINI_API_KEY`` and burns
+~$1-2 of API budget across the judge suite.
 
 This helper:
 

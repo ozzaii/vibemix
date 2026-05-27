@@ -84,7 +84,6 @@ from typing import Any
 from unittest.mock import patch
 
 import numpy as np
-from scipy.signal import resample_poly
 
 from vibemix.audio.buffers import AudioBuffer
 from vibemix.audio.constants import (
@@ -97,7 +96,12 @@ from vibemix.audio.constants import (
     PHRASE_BOUNDARY_BAR_TOLERANCE,
     SUB_JUMP_THRESHOLD,
 )
-from vibemix.state import EventDetector, GenreRouter, MusicState  # noqa: F401  (GenreRouter is reexported public surface)
+from vibemix.audio.resample import resample_audio
+from vibemix.state import (  # noqa: F401  (GenreRouter is reexported public surface)
+    EventDetector,
+    GenreRouter,
+    MusicState,
+)
 from vibemix.state.refresh import _tick_once
 
 logger = logging.getLogger(__name__)
@@ -140,7 +144,7 @@ class _ControllerStateStub:
     def deck_snapshot(self) -> dict:
         return {"A": {}, "B": {}, "xfader": 64, "connected": False}
 
-    def moves_since(self, t: float) -> list[tuple[float, str]]:  # noqa: ARG002
+    def moves_since(self, t: float) -> list[tuple[float, str]]:
         return []
 
 
@@ -161,7 +165,7 @@ def _read_wav_to_int16_16k(path: Path) -> np.ndarray:
 
     - Decodes via stdlib ``wave`` (no soundfile dep — see CLAUDE.md tech-stack).
     - Mixes stereo → mono by averaging channels.
-    - Resamples to 16kHz via ``scipy.signal.resample_poly`` (project dep).
+    - Resamples to 16kHz via the local numpy resampler (no scipy dep).
     """
     with wave.open(str(path), "rb") as wf:
         sr = wf.getframerate()
@@ -186,13 +190,11 @@ def _read_wav_to_int16_16k(path: Path) -> np.ndarray:
         samples = samples.reshape(-1, n_channels).mean(axis=1)
 
     if sr != INPUT_SR_TARGET:
-        # resample_poly with up=target / gcd, down=src / gcd.
-        from math import gcd
-
-        g = gcd(sr, INPUT_SR_TARGET)
-        up = INPUT_SR_TARGET // g
-        down = sr // g
-        samples = resample_poly(samples, up=up, down=down).astype(np.float32)
+        samples = resample_audio(
+            samples,
+            source_sr=sr,
+            target_sr=INPUT_SR_TARGET,
+        ).astype(np.float32, copy=False)
 
     # Convert back to int16 for AudioBuffer.push (which expects int16).
     return (np.clip(samples, -1.0, 1.0) * 32767.0).astype(np.int16)
@@ -386,7 +388,7 @@ def _default_csv_path() -> Path:
     ``tuning_runs/`` is gitignored — see scripts/README.md for rationale
     (per Plan 17-06 threat register T-17-06-04 mitigation).
     """
-    ts = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ts = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
     return Path("tuning_runs") / f"{ts}.csv"
 
 

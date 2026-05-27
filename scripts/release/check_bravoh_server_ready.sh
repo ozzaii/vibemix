@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# scripts/release/check_bravoh_server_ready.sh — SHIP-06 / OPS-14 3-endpoint
+# scripts/release/check_bravoh_server_ready.sh — SHIP-06 / OPS-14 runtime
 # Bravoh server health probe. Cut-gate cousin of scripts/dayzero/healthz_check.sh
 # (which is a monitoring watchdog; this is a release-blocking probe).
 #
@@ -9,11 +9,13 @@
 # backend, exits 0 iff ALL three are responsive AND healthz heartbeat is fresh.
 # Plan 45-03 wires this as Gate 5b in scripts/launch/cut_release.sh.
 #
-# Endpoints (default base: https://api.altidus.world, override with
+# Probes (default base: https://api.altidus.world, override with
 # --endpoint-base):
-#   1. GET  /vibemix/healthz             — must be 200 + JSON {"status":"ok","ts":"<ISO-8601>"}; ts ≤ 10 min old.
-#   2. GET  /vibemix/updates/latest.json — must be 200 + JSON {"version": "<semver>", ...}.
-#   3. HEAD /vibemix/updates/upload      — must be in {200, 401, 405} (endpoint mounted + auth-gated correctly).
+#   1. GET  /vibemix/healthz — must be 200 + JSON {"status":"ok","ts":"<ISO-8601>"}; ts ≤ 10 min old.
+#   2. GET  /vibemix/updates/darwin/aarch64/0.0.0 — must be 200 or 204.
+#   3. GET  /vibemix/updates/darwin/x86_64/0.0.0 — must be 200 or 204.
+#   4. GET  /vibemix/updates/windows/x86_64/0.0.0 — must be 200 or 204.
+#   5. HEAD /vibemix/updates/upload — must be in {200, 401, 405}.
 #
 # Usage:
 #   bash scripts/release/check_bravoh_server_ready.sh
@@ -23,7 +25,7 @@
 #   bash scripts/release/check_bravoh_server_ready.sh --help
 #
 # Exit codes:
-#   0  all 3 endpoints OK + healthz fresh
+#   0  all probes OK + healthz fresh
 #   1  at least one endpoint missing (404)
 #   2  CLI usage error (bad flag, missing curl)
 #   3  network failure (DNS / TCP / TLS) on any endpoint
@@ -54,7 +56,7 @@ Options:
   -h, --help                    Print this message
 
 Exit codes:
-  0  all 3 endpoints OK + healthz fresh
+    0  all probes OK + healthz fresh
   1  at least one endpoint missing (404)
   2  CLI usage error
   3  network failure
@@ -119,7 +121,7 @@ emit_blocker() {
 
 emit_ok() {
     if [[ "${QUIET}" -eq 0 ]]; then
-        echo "[bravoh-server] OK — 3/3 endpoints + healthz fresh"
+        echo "[bravoh-server] OK — 5/5 probes + healthz fresh"
     fi
 }
 
@@ -169,7 +171,11 @@ TMPDIR_PROBE="$(mktemp -d)"
 trap 'rm -rf "${TMPDIR_PROBE}"' EXIT
 
 HEALTHZ_URL="${ENDPOINT_BASE}/vibemix/healthz"
-LATEST_URL="${ENDPOINT_BASE}/vibemix/updates/latest.json"
+UPDATE_PATHS=(
+    "/vibemix/updates/darwin/aarch64/0.0.0"
+    "/vibemix/updates/darwin/x86_64/0.0.0"
+    "/vibemix/updates/windows/x86_64/0.0.0"
+)
 UPLOAD_URL="${ENDPOINT_BASE}/vibemix/updates/upload"
 
 # --- 1. GET /vibemix/healthz ----------------------------------------------
@@ -207,23 +213,25 @@ if (( AGE > HEALTHZ_MAX_AGE_S )); then
     exit 4
 fi
 
-# --- 2. GET /vibemix/updates/latest.json ----------------------------------
-LATEST_BODY="${TMPDIR_PROBE}/latest.body"
-LATEST_CODE=$(curl -sS -o "${LATEST_BODY}" -w "%{http_code}" --max-time 10 \
-    "${LATEST_URL}" 2>/dev/null) || LATEST_CODE="000"
+# --- 2. GET runtime updater feed paths ------------------------------------
+for update_path in "${UPDATE_PATHS[@]}"; do
+    UPDATE_BODY="${TMPDIR_PROBE}/$(echo "${update_path}" | tr '/_' '__').body"
+    UPDATE_CODE=$(curl -sS -o "${UPDATE_BODY}" -w "%{http_code}" --max-time 10 \
+        "${ENDPOINT_BASE}${update_path}" 2>/dev/null) || UPDATE_CODE="000"
 
-if [[ "${LATEST_CODE}" = "000" ]]; then
-    emit_blocker "network failure: ${LATEST_URL} unreachable"
-    exit 3
-fi
-if [[ "${LATEST_CODE}" = "404" ]]; then
-    emit_blocker "endpoint missing: /vibemix/updates/latest.json"
-    exit 1
-fi
-if [[ "${LATEST_CODE}" != "200" ]]; then
-    emit_blocker "network failure: /vibemix/updates/latest.json returned HTTP ${LATEST_CODE}"
-    exit 3
-fi
+    if [[ "${UPDATE_CODE}" = "000" ]]; then
+        emit_blocker "network failure: ${ENDPOINT_BASE}${update_path} unreachable"
+        exit 3
+    fi
+    if [[ "${UPDATE_CODE}" = "404" ]]; then
+        emit_blocker "endpoint missing: ${update_path}"
+        exit 1
+    fi
+    if [[ "${UPDATE_CODE}" != "200" && "${UPDATE_CODE}" != "204" ]]; then
+        emit_blocker "network failure: ${update_path} returned HTTP ${UPDATE_CODE}"
+        exit 3
+    fi
+done
 
 # --- 3. HEAD /vibemix/updates/upload --------------------------------------
 UPLOAD_CODE=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 -I \

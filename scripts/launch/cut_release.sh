@@ -18,7 +18,7 @@
 #   4.  `.planning/v4.0-MILESTONE-AUDIT.md` exists + frontmatter verdict WIRED.
 #   5.  `pytest tests/repo/test_g5_poc_files_untouched.py` — POC variants retired,
 #       stay gone (Phase 37 / AUDIT-06; inverted 2026-05-20).
-#   5b. `check_bravoh_server_ready.sh` — 3-endpoint Bravoh server probe
+#   5b. `check_bravoh_server_ready.sh` — runtime updater + healthz Bravoh probe
 #       (Plan 45-03 / SHIP-06 / OPS-14).
 #   6.  `pytest tests/security/test_bundle_id_locked.py` (Phase 33 / P63).
 #
@@ -99,13 +99,21 @@ if [[ "${DRY_RUN}" -eq 1 ]]; then
 fi
 DIST_DIR="${REPO_ROOT}/dist"
 if [[ ! -d "${DIST_DIR}" ]]; then
-  fail "dist/ directory missing — build artifacts before cutting"
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    info "DRY-RUN: dist/ missing; artifact presence is a real-cut precondition"
+  else
+    fail "dist/ directory missing — build artifacts before cutting"
+  fi
 else
   shopt -s nullglob
   ARTIFACTS=( "${DIST_DIR}"/*.dmg "${DIST_DIR}"/*.pkg "${DIST_DIR}"/*.msi "${DIST_DIR}"/*.exe )
   shopt -u nullglob
   if [[ ${#ARTIFACTS[@]} -eq 0 ]]; then
-    fail "no .dmg/.pkg/.msi/.exe artifacts in dist/ — sign + drop them before cutting"
+    if [[ "${DRY_RUN}" -eq 1 ]]; then
+      info "DRY-RUN: no dist artifacts present; artifact presence is a real-cut precondition"
+    else
+      fail "no .dmg/.pkg/.msi/.exe artifacts in dist/ — sign + drop them before cutting"
+    fi
   else
     for art in "${ARTIFACTS[@]}"; do
       REQUIRE_SIGNED="--require-signed"
@@ -191,9 +199,9 @@ echo
 # Not a Kaan-input gate, but external server state. Under --dry-run a down
 # server is logged as a server-readiness PRECONDITION and PASS-for-dry-run
 # (the gate is NOT weakened — a real cut still FAILS when the server is down).
-echo "[Gate 5b] check_bravoh_server_ready.sh — 3-endpoint probe + healthz freshness (Plan 45-03)"
+echo "[Gate 5b] check_bravoh_server_ready.sh — runtime updater probe + healthz freshness (Plan 45-03)"
 if bash "${REPO_ROOT}/scripts/release/check_bravoh_server_ready.sh" --quiet >/dev/null 2>&1; then
-  pass "check_bravoh_server_ready.sh — 3/3 endpoints OK + healthz fresh"
+  pass "check_bravoh_server_ready.sh — 5/5 probes OK + healthz fresh"
 elif [[ "${DRY_RUN}" -eq 1 ]]; then
   info "DRY-RUN: Gate 5b server-dependent; Bravoh server-readiness is a real-cut PRECONDITION — PASS-for-dry-run"
 else

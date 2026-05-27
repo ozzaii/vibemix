@@ -51,12 +51,12 @@ zero-click by auto-configuring Rekordbox's XML bridge path:
 So: "set up once, 1-click forever." Zero-click is only achievable via direct master.db writes
 (Slice 0 verdict: unsafe) or on more-open software (Serato/Mixxx/Engine) — both deferred.
 
-## Slice 3 dep decision — RESOLVED: numpy/scipy only (no new dep)
+## Slice 3 dep decision — historical spike note
 
-The cue-detection DSP was built on **numpy + scipy** (both already deps) — spectral-flux
-onset, autocorrelation tempo/beat-grid, RMS energy curve. No librosa (heavy: numba/llvmlite),
-no aubio, no CLAP. Install stays green; Gemini-only-AI constraint untouched (deterministic DSP
-is not an "AI provider"). The librosa-vs-aubio-vs-Rust-sidecar question is moot for v1.
+This spike's cue-detection DSP was built on **numpy + scipy** (both already deps) —
+spectral-flux onset, autocorrelation tempo/beat-grid, RMS energy curve. Current product cue
+detection has moved to `src/vibemix/library/cue_engine.py`, which tries CUE-DETR ONNX first and
+falls back to the heuristic path.
 
 Real-track behaviour (the honest finding): on Demo Track 1 it kept INTRO + BREAKDOWN@115s and
 **gated the DROP@119.8s at conf 0.83** (just under the 0.85 bar); on Demo Track 2 it gated all

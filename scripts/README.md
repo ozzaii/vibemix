@@ -75,7 +75,7 @@ versioned alongside the threshold change it justifies.
 
 - WAV via stdlib `wave`: int16, int32, uint8 mono / stereo at any sample
   rate. Stereo is mixed to mono; non-16kHz is resampled via
-  `scipy.signal.resample_poly`.
+  `vibemix.audio.resample.resample_audio`.
 - Other formats (mp3, flac, m4a) are NOT supported — convert to WAV first.
 
 ---

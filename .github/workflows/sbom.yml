@@ -1,7 +1,7 @@
 # Phase 34 / SEC-04 — SBOM generation + release attachment.
 #
 # syft v1.14.0 — SPDX 2.3 format. Attaches sbom.spdx.json to the GitHub
-# Release as an artifact alongside DMG/MSI/manifest.
+# Release as an artifact alongside DMG/EXE/manifest.
 
 name: SBOM
 

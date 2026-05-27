@@ -1,29 +1,31 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 28 Plan 04 Wave 0 — Bravoh proxy embedContent probe.
+"""Legacy Bravoh proxy embedContent probe.
 
-Verifies the Bravoh proxy at https://api.altidus.world routes the
-``models:embedContent`` endpoint. Failure surfaces as exit code 1 with
-a structured JSON diagnostic on stdout — under ``gsd-autonomous fully``,
-the orchestrator routes that to KAAN-ACTION-PROXY.md.
+Product library embeddings are local CLAP ONNX and no longer require this
+Gemini embedding route. By default this script emits a structured
+``status="skipped"`` report and exits 0. Pass ``--legacy-live-probe`` only when
+maintaining the legacy migration/fallback probe path.
 
 Usage:
     python scripts/probe_proxy_embed.py
-    VIBEMIX_PROXY_BASE_URL=http://test python scripts/probe_proxy_embed.py
-    VIBEMIX_PROXY_JWT=<token> python scripts/probe_proxy_embed.py
+    python scripts/probe_proxy_embed.py --legacy-live-probe
+    VIBEMIX_PROXY_BASE_URL=http://test python scripts/probe_proxy_embed.py --legacy-live-probe
+    VIBEMIX_PROXY_JWT=<token> python scripts/probe_proxy_embed.py --legacy-live-probe
 
-The script does NOT require a real JWT to detect endpoint availability —
+The live probe does NOT require a real JWT to detect endpoint availability:
 a 401/403 response confirms the route exists; only 404/connection errors
-indicate the endpoint is missing.
+indicate the legacy endpoint is missing.
 
 Exit codes:
-    0 — endpoint accessible (any response other than 404 / connection error)
-    1 — endpoint missing (404 or connection refused / DNS failure)
+    0 — skipped by default, or legacy endpoint accessible in live-probe mode
+    1 — legacy endpoint missing in live-probe mode
     2 — invocation error (bad env, missing httpx, etc.)
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -37,7 +39,32 @@ def _emit(report: dict[str, Any], exit_code: int) -> None:
     sys.exit(exit_code)
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Legacy Bravoh proxy embedContent probe. Product embeddings are "
+            "local CLAP; pass --legacy-live-probe to check the retired route."
+        )
+    )
+    parser.add_argument(
+        "--legacy-live-probe",
+        action="store_true",
+        help="actually call the legacy Gemini embedding proxy route",
+    )
+    args = parser.parse_args(argv)
+    if not args.legacy_live_probe:
+        _emit(
+            {
+                "status": "skipped",
+                "reason": (
+                    "Product library embeddings use local CLAP ONNX; "
+                    "the Gemini embedContent proxy route is no longer required."
+                ),
+                "legacy_probe": "rerun with --legacy-live-probe if needed",
+            },
+            0,
+        )
+
     base = os.environ.get("VIBEMIX_PROXY_BASE_URL", DEFAULT_PROXY).rstrip("/")
     jwt = os.environ.get("VIBEMIX_PROXY_JWT", "probe-no-real-jwt-needed")
     url = f"{base}/v1beta/models/gemini-embedding-2:embedContent"
@@ -94,9 +121,9 @@ def main() -> None:
                 "url": url,
                 "body_preview": r.text[:512],
                 "remediation": (
-                    "Bravoh proxy does NOT route models:embedContent. "
-                    "Either patch the proxy to forward this endpoint to "
-                    "Gemini, or fall back to MOCK_PROXY_FOR_DEV=1 in tests."
+                    "The legacy embedding proxy route is unavailable. "
+                    "This is not a product blocker unless you are running "
+                    "legacy migration/probe tests that still need it."
                 ),
             },
             1,

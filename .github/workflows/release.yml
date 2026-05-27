@@ -13,19 +13,20 @@
 #
 # Per-OS stages (5):
 #   1. BUILD    — `scripts/build_sidecar.py --spec vibemix-core.<os>.spec`
-#                 then `cargo tauri build` against the Tauri wrapper.
+#                 then `cargo tauri build` against the Tauri wrapper
+#                 (Windows also stages `dist/windows-app` for Inno/SignPath).
 #   2. SIGN     — macOS: `scripts/dist/sign_macos.sh` (Plan 18-02 chain:
 #                 codesign + create-dmg + notarytool + stapler)
 #                 Windows: `signpath/github-action-submit-signing-request@v1.2`
 #                 (Plan 18-03 SignPath OSS flow).
 #   3. PACKAGE  — macOS: DMG produced by sign_macos.sh stage 4.
 #                 Windows: `iscc installer/windows/vibemix-installer.iss`
-#                 (Plan 18-03 Inno Setup 6 → vibemix-installer.msi).
+#                 (Inno Setup 6 → vibemix-installer.exe).
 #   4. VERIFY   — `python -m scripts.dist.verify_binary <bundle>` (Plan 18-01
 #                 AIza-pattern leak gate). ALWAYS runs, even in mock-signing
 #                 fallback — protects against leaked keys reaching unsigned
 #                 PR artifacts.
-#   5. PUBLISH  — `softprops/action-gh-release@v2` uploads DMG/MSI/manifest
+#   5. PUBLISH  — `softprops/action-gh-release@v2` uploads DMG/EXE/manifest
 #                 to GitHub Releases (draft mode); curl POSTs signed
 #                 `latest.json` to api.altidus.world (Plan 18-04 contract).
 #
@@ -37,14 +38,13 @@
 #                placeholder-pubkey-gate against `tauri/src-tauri/tauri.conf.json5`)
 #
 # Mock-signing fallback (T-18-18 mitigation, see threat model):
-#   When ANY of APPLE_DEVELOPER_ID_P12_BASE64 / SIGNPATH_API_TOKEN /
-#   TAURI_UPDATER_PRIVATE_KEY are absent (fork PRs, dry-runs, or before
-#   Kaan configures the secrets), the workflow runs BUILD → VERIFY only.
+#   When any required signing secret group is incomplete (fork PRs, dry-runs,
+#   or before Kaan configures the secrets), the workflow runs BUILD → VERIFY only.
 #   Sign + package + publish stages are skipped. The verify stage still
 #   runs on the UNSIGNED bundle so leak detection never goes offline.
 #
 # Secret discipline:
-#   - All 14 secrets referenced as `${{ secrets.XXX }}`; ZERO values inline.
+#   - All 16 secrets referenced as `${{ secrets.XXX }}`; ZERO values inline.
 #   - `set +x` applied before every block that exports a secret env var.
 #   - GitHub Actions auto-masks the values it reads from `secrets` context.
 #   - Inventory + provenance in `.github/workflows/README.md`.
@@ -125,12 +125,36 @@ jobs:
           # NOTE: secrets accessed here ONLY to test for presence; values are
           # never echoed or persisted. GitHub masks them in any incidental
           # log emission. `set +x` is applied before the conditional read.
-          HAS_APPLE: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 != '' }}
-          HAS_SIGNPATH: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+          HAS_APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID != '' }}
+          HAS_APPLE_DEVELOPER_ID_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 != '' }}
+          HAS_APPLE_DEVELOPER_ID_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_PASSWORD != '' }}
+          HAS_APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD != '' }}
+          HAS_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID != '' }}
+          HAS_APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID != '' }}
+          HAS_APPLE_API_KEY_ISSUER: ${{ secrets.APPLE_API_KEY_ISSUER != '' }}
+          HAS_APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 != '' }}
+          HAS_SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+          HAS_SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID != '' }}
+          HAS_SIGNPATH_PROJECT_SLUG: ${{ secrets.SIGNPATH_PROJECT_SLUG != '' }}
+          HAS_SIGNPATH_SIGNING_POLICY_SLUG: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG != '' }}
+          HAS_SIGNPATH_SIGNTOOL_CMD: ${{ secrets.SIGNPATH_SIGNTOOL_CMD != '' }}
           HAS_TAURI_KEY: ${{ secrets.TAURI_UPDATER_PRIVATE_KEY != '' }}
         run: |
           set +x   # defensive — never echo secret-presence boolean composition
-          if [[ "$HAS_APPLE" == "true" && "$HAS_SIGNPATH" == "true" && "$HAS_TAURI_KEY" == "true" ]]; then
+          if [[ "$HAS_APPLE_DEVELOPER_ID" == "true" \
+             && "$HAS_APPLE_DEVELOPER_ID_P12_BASE64" == "true" \
+             && "$HAS_APPLE_DEVELOPER_ID_PASSWORD" == "true" \
+             && "$HAS_APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD" == "true" \
+             && "$HAS_APPLE_TEAM_ID" == "true" \
+             && "$HAS_APPLE_API_KEY_ID" == "true" \
+             && "$HAS_APPLE_API_KEY_ISSUER" == "true" \
+             && "$HAS_APPLE_API_KEY_P8" == "true" \
+             && "$HAS_SIGNPATH_API_TOKEN" == "true" \
+             && "$HAS_SIGNPATH_ORGANIZATION_ID" == "true" \
+             && "$HAS_SIGNPATH_PROJECT_SLUG" == "true" \
+             && "$HAS_SIGNPATH_SIGNING_POLICY_SLUG" == "true" \
+             && "$HAS_SIGNPATH_SIGNTOOL_CMD" == "true" \
+             && "$HAS_TAURI_KEY" == "true" ]]; then
             echo "signing_available=true" >> "$GITHUB_OUTPUT"
             echo "Signing secrets present — full release mode."
           else
@@ -318,6 +342,18 @@ jobs:
           cd src-tauri
           cargo tauri build --target ${{ matrix.rust_target }}
 
+      - name: PACKAGE — Repair macOS app sidecar symlinks
+        run: |
+          python3 scripts/dist/repair_macos_app_sidecar_symlinks.py \
+            tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app
+
+      - name: VERIFY — macOS app bundle sidecar ready
+        run: |
+          python3 scripts/dist/check_macos_app_bundle_ready.py \
+            tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app \
+            --triple ${{ matrix.target_triple }} \
+            --smoke version
+
       # ---- Stage 2 + 3 — SIGN + PACKAGE (DMG + notarize + staple) ----------
       # Phase 38 DIST-15 — Apple notarytool wiring annotation step.
       # When SIGNING_AVAILABLE != 'true' (Apple Dev secrets absent) the actual
@@ -343,11 +379,46 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_KEY_ISSUER: ${{ secrets.APPLE_API_KEY_ISSUER }}
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          VIBEMIX_DMG_NAME: vibemix-${{ github.ref_name }}-${{ matrix.arch }}.dmg
           CI: "true"
         run: |
           set +x   # secret env vars in scope — never echo
           chmod +x scripts/dist/sign_macos.sh
           ./scripts/dist/sign_macos.sh tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app
+
+      - name: VERIFY — macOS DMG drag-install sidecar ready
+        if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
+        run: |
+          DMG=$(find dist -type f -name 'vibemix-*.dmg' | sort | head -1)
+          test -n "$DMG" || (echo "missing macOS first-install DMG" && exit 1)
+          python3 scripts/dist/check_macos_dmg_artifact_ready.py \
+            "$DMG" \
+            --triple ${{ matrix.target_triple }} \
+            --smoke version
+
+      - name: PACKAGE — Create Tauri macOS updater artifact (.app.tar.gz)
+        if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
+        env:
+          TAURI_UPDATER_PRIVATE_KEY: ${{ secrets.TAURI_UPDATER_PRIVATE_KEY }}
+          TAURI_UPDATER_KEY_PASSWORD: ${{ secrets.TAURI_UPDATER_KEY_PASSWORD }}
+        run: |
+          set +x
+          chmod +x scripts/dist/create_macos_updater_artifact.sh
+          ./scripts/dist/create_macos_updater_artifact.sh \
+            --arch ${{ matrix.arch }} \
+            --output-dir tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos \
+            tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app
+
+      - name: VERIFY — macOS updater artifact extracts to ready app
+        if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
+        run: |
+          UPDATER=$(find tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos \
+            -type f -name '*.app.tar.gz' | sort | head -1)
+          test -n "$UPDATER" || (echo "missing macOS updater .app.tar.gz" && exit 1)
+          python3 scripts/dist/check_macos_updater_artifact_ready.py \
+            "$UPDATER" \
+            --triple ${{ matrix.target_triple }} \
+            --smoke version
 
       # ---- Stage 4 — VERIFY (ALWAYS runs, even in mock-signing) ------------
       - name: VERIFY — AIza scan + key-pattern grep (post-sign or unsigned)
@@ -380,6 +451,8 @@ jobs:
           name: macos-artifacts-${{ matrix.arch }}
           path: |
             dist/vibemix-*.dmg
+            tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/*.app.tar.gz
+            tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/*.app.tar.gz.sig
             tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app
             tauri/src-tauri/binaries/vibemix-core-${{ matrix.target_triple }}/
             dist/verify-report-macos.json
@@ -437,7 +510,27 @@ jobs:
           npm ci
           npm run build
           cd src-tauri
-          cargo tauri build
+          cargo tauri build --no-bundle
+
+      - name: BUILD — Tauri updater NSIS bundle
+        working-directory: tauri
+        shell: pwsh
+        run: |
+          cd src-tauri
+          cargo tauri build --bundles nsis --no-sign
+
+      - name: BUILD — Stage Windows app payload
+        shell: pwsh
+        run: |
+          pwsh scripts/win/stage_app_payload.ps1 -OutputDir dist/windows-app
+
+      - name: VERIFY — Windows app payload sidecar ready
+        shell: pwsh
+        run: |
+          uv run python scripts/dist/check_windows_app_payload_ready.py `
+            dist/windows-app `
+            --triple x86_64-pc-windows-msvc `
+            --smoke version
 
       - name: BUILD — Upload unsigned binaries for SignPath request
         if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
@@ -445,9 +538,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: vibemix-binaries-unsigned
-          path: |
-            dist/vibemix/vibemix.exe
-            dist/vibemix/_internal/**
+          path: dist/windows-app/**
           retention-days: 1
 
       # ---- Stage 2 — SIGN (SignPath OSS flow per Plan 18-03) ---------------
@@ -463,7 +554,8 @@ jobs:
           Write-Host "::warning::SignPath approval pending — see KAAN-ACTION-LEGAL.md DIST-11 (Kaan-action). signpath/github-action-submit-signing-request step skipped."
           Write-Host "  expected secrets (Kaan creates after SignPath approves):"
           Write-Host "    SIGNPATH_API_TOKEN, SIGNPATH_ORGANIZATION_ID,"
-          Write-Host "    SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG"
+          Write-Host "    SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG,"
+          Write-Host "    SIGNPATH_SIGNTOOL_CMD"
 
       - name: SIGN — Submit signing request to SignPath
         if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
@@ -478,8 +570,8 @@ jobs:
           wait-for-completion: true
           output-artifact-directory: dist/signed-binaries/
 
-      # ---- Stage 3 — PACKAGE (Inno Setup compile → vibemix-installer.msi) --
-      - name: PACKAGE — Compile vibemix-installer.msi via ISCC
+      # ---- Stage 3 — PACKAGE (Inno Setup compile → vibemix-installer.exe) --
+      - name: PACKAGE — Compile vibemix-installer.exe via ISCC
         if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
         shell: pwsh
         env:
@@ -494,22 +586,54 @@ jobs:
           }
           # version.txt is consumed by GetFileVersion() in the .iss header.
           Set-Content -Path installer/windows/version.txt -Value $version
+          $signTool = "${env:SIGNPATH_SIGNTOOL_CMD}"
+          if ([string]::IsNullOrWhiteSpace($signTool)) {
+            throw "SIGNPATH_SIGNTOOL_CMD secret missing; cannot register Inno SignTool=signpath."
+          }
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\iscc.exe"
           if (-not (Test-Path $iscc)) { $iscc = "$env:ProgramFiles\Inno Setup 6\iscc.exe" }
           & "$iscc" `
+              "/Ssignpath=$signTool" `
               "/DAppVersion=$version" `
               "/DSourceDir=..\..\dist\signed-binaries" `
-              "/DOutputDir=..\..\output" `
+              "/DInstallerOutputDir=..\..\output" `
               "installer\windows\vibemix-installer.iss"
+
+      - name: SIGN — Authenticode-sign Tauri NSIS updater installer
+        if: env.SIGNING_AVAILABLE == 'true' && env.DRY_RUN != 'true'
+        shell: pwsh
+        env:
+          SIGNPATH_SIGNTOOL_CMD: ${{ secrets.SIGNPATH_SIGNTOOL_CMD }}
+        run: |
+          $signTool = "${env:SIGNPATH_SIGNTOOL_CMD}"
+          if ([string]::IsNullOrWhiteSpace($signTool)) {
+            throw "SIGNPATH_SIGNTOOL_CMD secret missing; cannot sign the Tauri updater installer."
+          }
+          if (-not $signTool.Contains('$f')) {
+            throw "SIGNPATH_SIGNTOOL_CMD must contain the `$f placeholder for the artifact path."
+          }
+          $updaters = Get-ChildItem -Path "tauri\src-tauri\target\release\bundle\nsis" -Filter "*setup*.exe" -File -ErrorAction SilentlyContinue
+          if (-not $updaters) {
+            throw "No Tauri NSIS updater installer found under tauri\src-tauri\target\release\bundle\nsis."
+          }
+          foreach ($artifact in $updaters) {
+            Write-Host "[release] signing Windows updater artifact: $($artifact.FullName)"
+            $quoted = '"' + $artifact.FullName + '"'
+            $expanded = $signTool.Replace('$f', $quoted)
+            & cmd.exe /S /C $expanded
+            if ($LASTEXITCODE -ne 0) {
+              throw "SignPath SignTool command failed for $($artifact.FullName) with exit code $LASTEXITCODE."
+            }
+          }
 
       # ---- Stage 4 — VERIFY (ALWAYS runs, even in mock-signing) ------------
       - name: VERIFY — AIza scan + key-pattern grep (post-sign or unsigned)
         shell: pwsh
         run: |
-          if ($env:SIGNING_AVAILABLE -eq "true" -and $env:DRY_RUN -ne "true" -and (Test-Path "output/vibemix-installer.msi")) {
-            $target = "output/vibemix-installer.msi"
+          if ($env:SIGNING_AVAILABLE -eq "true" -and $env:DRY_RUN -ne "true" -and (Test-Path "output/vibemix-installer.exe")) {
+            $target = "output/vibemix-installer.exe"
           } else {
-            $target = "dist/vibemix/vibemix.exe"
+            $target = "dist/windows-app"
           }
           Write-Host "Verifying: $target"
           New-Item -ItemType Directory -Force -Path dist | Out-Null
@@ -521,8 +645,10 @@ jobs:
         with:
           name: windows-artifacts
           path: |
-            output/vibemix-installer.msi
-            dist/vibemix/vibemix.exe
+            output/vibemix-installer.exe
+            tauri/src-tauri/target/release/bundle/nsis/*setup*.exe
+            tauri/src-tauri/target/release/bundle/nsis/*setup*.exe.sig
+            dist/windows-app/**
             dist/verify-report-windows.json
           if-no-files-found: warn
           retention-days: 7
@@ -532,13 +658,13 @@ jobs:
   # ---------------------------------------------------------------------------
   # Activates the Phase 34 verify_signed.py surface as a HARD gate before
   # release-publish runs. Fails the build if any signed artifact lacks the
-  # platform-specific signing surface (Mach-O LC_CODE_SIGNATURE for .dmg/.pkg,
-  # PE MZ header for .msi/.exe). Tag-gated AND signing-mode-gated so forks +
-  # mock-mode never reach it.
+  # platform-specific signing surface (macOS codesign for .dmg/.pkg,
+  # PE Authenticode certificate table for .exe). Tag-gated AND
+  # signing-mode-gated so forks + mock-mode never reach it.
 
   verify-signed-publish-gate:
     name: Verify signed artifacts (publish gate)
-    runs-on: ubuntu-latest
+    runs-on: macos-14
     needs: [detect-signing-mode, build-macos, build-windows]
     if: startsWith(github.ref, 'refs/tags/v') && needs.detect-signing-mode.outputs.signing_available == 'true'
     steps:
@@ -556,7 +682,7 @@ jobs:
       - name: Verify macOS DMG (arm64) — DIST-17 require-signed gate
         run: |
           set -euo pipefail
-          DMG=$(ls release-artifacts/macos-artifacts-arm64/vibemix-*.dmg 2>/dev/null | head -1)
+          DMG=$(find release-artifacts/macos-artifacts-arm64 -type f -name 'vibemix-*.dmg' | sort | head -1)
           if [[ -z "$DMG" ]]; then
             echo "::error::No arm64 DMG found in release-artifacts/"
             exit 1
@@ -566,22 +692,32 @@ jobs:
       - name: Verify macOS DMG (x86_64) — DIST-17 require-signed gate
         run: |
           set -euo pipefail
-          DMG=$(ls release-artifacts/macos-artifacts-x86_64/vibemix-*.dmg 2>/dev/null | head -1)
+          DMG=$(find release-artifacts/macos-artifacts-x86_64 -type f -name 'vibemix-*.dmg' | sort | head -1)
           if [[ -z "$DMG" ]]; then
             echo "::error::No x86_64 DMG found in release-artifacts/"
             exit 1
           fi
           python scripts/dist/verify_signed.py --artifact "$DMG" --require-signed
 
-      - name: Verify Windows MSI — DIST-17 require-signed gate
+      - name: Verify Windows installer — DIST-17 require-signed gate
         run: |
           set -euo pipefail
-          MSI=release-artifacts/windows-artifacts/vibemix-installer.msi
-          if [[ ! -f "$MSI" ]]; then
-            echo "::error::Windows MSI missing at $MSI"
+          WIN_INSTALLER=$(find release-artifacts/windows-artifacts -type f -name 'vibemix-installer.exe' | sort | head -1)
+          if [[ -z "$WIN_INSTALLER" || ! -f "$WIN_INSTALLER" ]]; then
+            echo "::error::Windows installer missing in release-artifacts/windows-artifacts"
             exit 1
           fi
-          python scripts/dist/verify_signed.py --artifact "$MSI" --require-signed
+          python scripts/dist/verify_signed.py --artifact "$WIN_INSTALLER" --require-signed
+
+      - name: Verify Windows updater — DIST-17 require-signed gate
+        run: |
+          set -euo pipefail
+          WIN_UPDATER=$(find release-artifacts/windows-artifacts -type f -name '*setup*.exe' ! -name 'vibemix-installer.exe' | sort | head -1)
+          if [[ -z "$WIN_UPDATER" || ! -f "$WIN_UPDATER" ]]; then
+            echo "::error::Windows updater missing in release-artifacts/windows-artifacts"
+            exit 1
+          fi
+          python scripts/dist/verify_signed.py --artifact "$WIN_UPDATER" --require-signed
 
   # ---------------------------------------------------------------------------
   # Wave 2 — Publish to GitHub Releases + sign + POST updater manifest.
@@ -615,18 +751,96 @@ jobs:
           set +x   # private key value must NEVER hit logs
           chmod +x scripts/dist/sign_manifest.sh
           VERSION="${GITHUB_REF#refs/tags/v}"
-          # Plan 27-06 / REC-09: per-arch artifacts live under
-          # release-artifacts/macos-artifacts-arm64/ + macos-artifacts-x86_64/.
-          # Manifest URL points at the arm64 DMG (current default for the
-          # majority of macOS users); v2.2 may add per-arch updater entries.
-          MACOS_DMG=$(ls release-artifacts/macos-artifacts-arm64/vibemix-*.dmg 2>/dev/null | head -1)
-          MACOS_BASENAME=$(basename "$MACOS_DMG")
+          # Tauri updater artifacts are distinct from the public first-install
+          # artifacts. Do not point latest.json at the DMG or Inno installer.
+          MACOS_ARM64_UPDATER=$(find release-artifacts/macos-artifacts-arm64 -type f -name '*.app.tar.gz' | sort | head -1)
+          MACOS_X86_64_UPDATER=$(find release-artifacts/macos-artifacts-x86_64 -type f -name '*.app.tar.gz' | sort | head -1)
+          WIN_UPDATER=$(find release-artifacts/windows-artifacts -type f -name '*setup*.exe' ! -name 'vibemix-installer.exe' | sort | head -1)
+          if [[ -z "$MACOS_ARM64_UPDATER" || ! -f "$MACOS_ARM64_UPDATER" ]]; then
+            echo "::error::No macOS arm64 updater artifact found. Tauri updater needs *.app.tar.gz, not the DMG. Enable bundle.createUpdaterArtifacts or create the signed app archive before release-publish."
+            exit 1
+          fi
+          if [[ -z "$MACOS_X86_64_UPDATER" || ! -f "$MACOS_X86_64_UPDATER" ]]; then
+            echo "::error::No macOS x86_64 updater artifact found. Tauri updater needs *.app.tar.gz, not the DMG. Intel macOS installs require darwin-x86_64 in latest.json."
+            exit 1
+          fi
+          if [[ -z "$WIN_UPDATER" || ! -f "$WIN_UPDATER" ]]; then
+            echo "::error::No Windows updater artifact found. Tauri updater needs a Tauri NSIS *setup*.exe, not the Inno vibemix-installer.exe."
+            exit 1
+          fi
+          MACOS_ARM64_BASENAME=$(basename "$MACOS_ARM64_UPDATER")
+          MACOS_X86_64_BASENAME=$(basename "$MACOS_X86_64_UPDATER")
+          WIN_BASENAME=$(basename "$WIN_UPDATER")
           ./scripts/dist/sign_manifest.sh \
               --version "$VERSION" \
-              --macos-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${MACOS_BASENAME}" \
-              --windows-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/vibemix-installer.msi" \
+              --macos-artifact "$MACOS_ARM64_UPDATER" \
+              --macos-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${MACOS_ARM64_BASENAME}" \
+              --macos-x86_64-artifact "$MACOS_X86_64_UPDATER" \
+              --macos-x86_64-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${MACOS_X86_64_BASENAME}" \
+              --windows-artifact "$WIN_UPDATER" \
+              --windows-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${WIN_BASENAME}" \
               --notes "Release ${{ github.ref_name }}" \
               --output release-artifacts/latest.json
+
+      - name: PUBLISH — Stage flat GitHub Release assets
+        run: |
+          set -euo pipefail
+          UPLOAD_DIR=release-artifacts/upload
+          rm -rf "$UPLOAD_DIR"
+          mkdir -p "$UPLOAD_DIR"
+
+          copy_first() {
+            local label="$1"
+            local dest="$2"
+            local root="$3"
+            shift 3
+            local src
+            src=$(find "$root" -type f "$@" | sort | head -1)
+            if [[ -z "$src" || ! -f "$src" ]]; then
+              echo "::error::Missing release asset: $label"
+              exit 1
+            fi
+            cp "$src" "$UPLOAD_DIR/$dest"
+            echo "staged $label -> $UPLOAD_DIR/$dest"
+          }
+
+          copy_all_by_basename() {
+            local label="$1"
+            local root="$2"
+            shift 2
+            local found=0
+            while IFS= read -r -d '' src; do
+              found=1
+              cp "$src" "$UPLOAD_DIR/$(basename "$src")"
+              echo "staged $label -> $UPLOAD_DIR/$(basename "$src")"
+            done < <(find "$root" -type f "$@" -print0 | sort -z)
+            if [[ "$found" -eq 0 ]]; then
+              echo "::error::Missing release asset: $label"
+              exit 1
+            fi
+          }
+
+          copy_first "macOS arm64 DMG" "vibemix-${{ github.ref_name }}-arm64.dmg" \
+            release-artifacts/macos-artifacts-arm64 -name 'vibemix-*.dmg'
+          copy_first "macOS x86_64 DMG" "vibemix-${{ github.ref_name }}-x86_64.dmg" \
+            release-artifacts/macos-artifacts-x86_64 -name 'vibemix-*.dmg'
+          copy_first "Windows first-install EXE" "vibemix-installer.exe" \
+            release-artifacts/windows-artifacts -name 'vibemix-installer.exe'
+          copy_all_by_basename "macOS arm64 updater archive" \
+            release-artifacts/macos-artifacts-arm64 -name '*.app.tar.gz'
+          copy_all_by_basename "macOS x86_64 updater archive" \
+            release-artifacts/macos-artifacts-x86_64 -name '*.app.tar.gz'
+          copy_all_by_basename "Windows updater installer" \
+            release-artifacts/windows-artifacts -name '*setup*.exe' ! -name 'vibemix-installer.exe'
+
+          copy_first "macOS arm64 verify report" "verify-report-macos-arm64.json" \
+            release-artifacts/macos-artifacts-arm64 -name 'verify-report-macos.json'
+          copy_first "macOS x86_64 verify report" "verify-report-macos-x86_64.json" \
+            release-artifacts/macos-artifacts-x86_64 -name 'verify-report-macos.json'
+          copy_first "Windows verify report" "verify-report-windows.json" \
+            release-artifacts/windows-artifacts -name 'verify-report-windows.json'
+          cp release-artifacts/latest.json "$UPLOAD_DIR/latest.json"
+          ls -la "$UPLOAD_DIR"
 
       - name: PUBLISH — POST signed manifest to api.altidus.world
         env:
@@ -658,13 +872,7 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: |
-            release-artifacts/macos-artifacts-arm64/vibemix-*.dmg
-            release-artifacts/macos-artifacts-x86_64/vibemix-*.dmg
-            release-artifacts/windows-artifacts/vibemix-installer.msi
-            release-artifacts/latest.json
-            release-artifacts/macos-artifacts-arm64/verify-report-macos.json
-            release-artifacts/macos-artifacts-x86_64/verify-report-macos.json
-            release-artifacts/windows-artifacts/verify-report-windows.json
+            release-artifacts/upload/*
           # v1 draft → Kaan reviews + clicks Publish manually. v2 can flip
           # to false once fresh-machine rehearsal is wired in Phase 20.
           draft: true
@@ -678,16 +886,17 @@ jobs:
 
             ### Verification
 
-            `verify-report-macos.json` + `verify-report-windows.json` confirm
-            zero `AIza`/`AKIA`/`ya29.`/`sk-` key patterns + zero 39-char
-            Google-key shapes detected in the signed bundles
-            (Plan 18-01 leak-detection gate).
+            `verify-report-macos-arm64.json`,
+            `verify-report-macos-x86_64.json`, and
+            `verify-report-windows.json` confirm zero
+            `AIza`/`AKIA`/`ya29.`/`sk-` key patterns + zero 39-char Google-key
+            shapes detected in the signed bundles (Plan 18-01 leak-detection gate).
 
             ### Install
 
             - **macOS:** download the `.dmg`, open, drag `vibemix.app` to
               `/Applications`.
-            - **Windows:** download `vibemix-installer.msi`, double-click,
+            - **Windows:** download `vibemix-installer.exe`, double-click,
               follow the installer.
 
             Update prompts honour the `update_check_on_launch` setting in
