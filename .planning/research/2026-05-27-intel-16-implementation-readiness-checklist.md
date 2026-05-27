@@ -202,6 +202,10 @@ done: tests/library/test_smart_cues.py
 done: proposal_to_export_marks() produces slot-preserving export_set cue marks
 done: grounded tool surface for issuing/exporting proposals
 done: INTEL-19 baseline comparison harness first slice
+done: cue baseline comparison validation rejects duplicate track/proposal IDs,
+      duplicate cue slots, unknown cue-track references, non-finite cue
+      time/confidence fields, out-of-range confidence values, and private
+      payload markers before exact/near-rate metrics can move thresholds
 ```
 
 Acceptance evidence:
@@ -581,6 +585,10 @@ done: tests/eval/test_intel_scorecard.py
 done: aggregate fixture scorecard covers ANLZ audit, cue baseline comparison,
       section retrieval delta, transition scorecard, decision replay, and
       gold-label validation, plus taste privacy/poisoning gates
+done: smart-cue baseline validation rejects duplicate track/proposal IDs,
+      duplicate cue slots, unknown cue-track references, non-finite cue
+      time/confidence fields, out-of-range confidence values, and private
+      payload markers; the CLI exits non-zero when cue evidence is invalid
 done: scripts/eval/intel_section_retrieval.py
 done: tests/eval/test_intel_section_retrieval.py
 done: tests/intel/fixtures/section_queries.jsonl

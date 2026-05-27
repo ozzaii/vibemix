@@ -77,6 +77,9 @@ of catching regressions.
 
 Release-grade thresholds still need private Kaan-reviewed evidence:
 
+- smart-cue proposals and Rekordbox baseline snapshots, with track/proposal IDs,
+  cue-slot uniqueness, cue-time/confidence finiteness, confidence ranges, and
+  privacy checked before cue exact/near-rate metrics are trusted;
 - section queries against real hardtechno/hard-tek library moments, with
   section/query IDs, vector finiteness, and privacy checked before retrieval
   deltas are trusted;

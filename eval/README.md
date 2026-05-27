@@ -90,6 +90,11 @@ Transition-ranking evidence is also fail-closed:
 rejects unknown label candidates, duplicate candidate IDs, non-finite scores,
 and private payload markers before the ranking metrics can back threshold
 movement.
+Smart-cue baseline evidence is fail-closed too:
+`scripts/eval/intel_cue_baseline_compare.py` rejects duplicate track/proposal
+IDs, duplicate cue slots, unknown cue-track references, non-finite cue
+time/confidence fields, out-of-range confidence values, and private payload
+markers before cue exact/near-rate metrics are trusted.
 Section-retrieval evidence follows the same rule:
 `scripts/eval/intel_section_retrieval.py --sections ... --vectors ...` rejects
 duplicate section/query IDs, missing or non-finite vectors, non-finite query

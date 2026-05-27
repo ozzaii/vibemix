@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import re
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
@@ -24,6 +26,15 @@ CueBaseline = Literal["rekordbox_auto", "dj", "naive_anlz", "vibemix", "fallback
 CueType = Literal["hot_cue", "memory_cue", "loop", "load", "unknown"]
 DiffKind = Literal["added", "changed", "removed", "unchanged"]
 DistanceBand = Literal["exact", "near", "phrase_near", "different", "missing"]
+SMART_CUE_SLOTS = frozenset("ABCDEFGH")
+PRIVATE_PAYLOAD_PATTERNS = (
+    re.compile(r"/Users/[^\"'\s<>]+"),
+    re.compile(r"/Volumes/[^\"'\s<>]+"),
+    re.compile(r"[A-Za-z]:\\\\[^\"'\s<>]+"),
+    re.compile(r"file://[^\"'\s<>]+", re.I),
+    re.compile(r"\braw_(?:audio|vector)s?\b", re.I),
+)
+AUDIO_PATH_PATTERN = re.compile(r"\.(?:wav|aiff|aif|mp3|flac)\b", re.I)
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,7 +92,9 @@ def compare_paths(
     source: str = "private",
 ) -> dict[str, Any]:
     """Compare one before/after baseline pair with one vibemix proposal export."""
-    tracks = _load_tracks(Path(tracks_json))
+    track_rows = _load_json_list(Path(tracks_json))
+    tracks = _tracks_index(track_rows)
+    proposal_rows = _load_json_list(Path(proposals_json))
     before = parse_rekordbox_cues(
         before_xml,
         baseline="dj",
@@ -96,13 +109,23 @@ def compare_paths(
     baseline_cues = tuple(
         diff.after for diff in diffs if diff.kind in {"added", "changed"} and diff.after
     )
-    vibemix_cues = load_vibemix_proposals(proposals_json)
+    vibemix_cues = _vibemix_cues_from_rows(proposal_rows)
+    evidence_errors = _evidence_shape_errors(
+        before_xml=Path(before_xml),
+        after_xml=Path(after_xml),
+        track_rows=track_rows,
+        proposal_rows=proposal_rows,
+        tracks=tracks,
+        before_cues=before,
+        after_cues=after,
+    )
     return build_scorecard(
         baseline_cues=baseline_cues,
         vibemix_cues=vibemix_cues,
         tracks=tracks,
         diffs=diffs,
         source=source,
+        evidence_errors=evidence_errors,
     )
 
 
@@ -164,8 +187,10 @@ def diff_cue_snapshots(
 
 def load_vibemix_proposals(path: Path | str) -> tuple[BaselineCue, ...]:
     """Load committed fixture proposals or exported SmartCueProposal JSON."""
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    proposals = raw if isinstance(raw, list) else [raw]
+    return _vibemix_cues_from_rows(_load_json_list(Path(path)))
+
+
+def _vibemix_cues_from_rows(proposals: list[dict[str, Any]]) -> tuple[BaselineCue, ...]:
     cues: list[BaselineCue] = []
     for proposal in proposals:
         if not isinstance(proposal, dict):
@@ -210,6 +235,7 @@ def build_scorecard(
     tracks: dict[str, dict[str, Any]],
     diffs: tuple[CueDiff, ...] = (),
     source: str,
+    evidence_errors: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     comparisons = compare_cue_sets(
         vibemix_cues=vibemix_cues,
@@ -240,7 +266,7 @@ def build_scorecard(
     return {
         "schema": "intel_cue_baseline_compare_v1",
         "source": source,
-        "valid": bool(comparisons) and bool(vibemix_cues),
+        "valid": bool(comparisons) and bool(vibemix_cues) and not evidence_errors,
         "privacy": {"local_paths_redacted": True},
         "totals": {
             "tracks": len(per_track),
@@ -253,6 +279,7 @@ def build_scorecard(
         "outcomes": _count_values(item.outcome for item in comparisons),
         "distance_bands": _count_values(item.distance_band for item in comparisons),
         "comparative_lift": _comparative_lift(comparisons),
+        "evidence_errors": tuple(evidence_errors),
         "per_slot": _per_slot(comparisons),
         "per_track": per_track,
     }
@@ -326,11 +353,202 @@ def _cue_to_public_dict(cue: BaselineCue | None) -> dict[str, Any] | None:
     }
 
 
-def _load_tracks(path: Path) -> dict[str, dict[str, Any]]:
-    rows = json.loads(path.read_text(encoding="utf-8"))
-    return {
-        str(row["track_id"]): row for row in rows if isinstance(row, dict) and "track_id" in row
-    }
+def _load_json_list(path: Path) -> list[dict[str, Any]]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    rows = raw if isinstance(raw, list) else [raw]
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def _tracks_index(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {str(row["track_id"]): row for row in rows if "track_id" in row}
+
+
+def _evidence_shape_errors(
+    *,
+    before_xml: Path,
+    after_xml: Path,
+    track_rows: list[dict[str, Any]],
+    proposal_rows: list[dict[str, Any]],
+    tracks: dict[str, dict[str, Any]],
+    before_cues: tuple[BaselineCue, ...],
+    after_cues: tuple[BaselineCue, ...],
+) -> tuple[str, ...]:
+    errors: list[str] = []
+    errors.extend(_private_payload_errors(track_rows, "tracks"))
+    errors.extend(_private_payload_errors(proposal_rows, "proposals"))
+    errors.extend(_xml_private_payload_errors(before_xml, "before_xml"))
+    errors.extend(_xml_private_payload_errors(after_xml, "after_xml"))
+    errors.extend(_duplicate_field_errors(track_rows, key="track_id", label="track"))
+    errors.extend(_duplicate_field_errors(proposal_rows, key="proposal_id", label="proposal"))
+    errors.extend(_track_row_errors(track_rows))
+    errors.extend(_proposal_row_errors(proposal_rows, tracks=tracks))
+    errors.extend(_xml_mark_errors(before_xml, label="before_xml", tracks=tracks))
+    errors.extend(_xml_mark_errors(after_xml, label="after_xml", tracks=tracks))
+    errors.extend(_duplicate_cue_key_errors(before_cues, label="before_xml"))
+    errors.extend(_duplicate_cue_key_errors(after_cues, label="after_xml"))
+    return tuple(errors)
+
+
+def _track_row_errors(rows: list[dict[str, Any]]) -> tuple[str, ...]:
+    errors: list[str] = []
+    for index, row in enumerate(rows):
+        track_id = str(row.get("track_id") or f"<track_{index}>")
+        if not row.get("track_id"):
+            errors.append(f"{track_id}:missing_track_id")
+        bpm = row.get("bpm")
+        if bpm is not None and not _is_finite_number(bpm):
+            errors.append(f"{track_id}:nonfinite_bpm")
+        duration = row.get("duration_s")
+        if duration is not None:
+            parsed = _finite_number_or_none(duration)
+            if parsed is None:
+                errors.append(f"{track_id}:nonfinite_duration")
+            elif parsed <= 0:
+                errors.append(f"{track_id}:nonpositive_duration")
+    return tuple(errors)
+
+
+def _proposal_row_errors(
+    rows: list[dict[str, Any]], *, tracks: dict[str, dict[str, Any]]
+) -> tuple[str, ...]:
+    errors: list[str] = []
+    for index, row in enumerate(rows):
+        proposal_id = str(row.get("proposal_id") or f"<proposal_{index}>")
+        track_id = str(row.get("track_id") or "")
+        if not track_id:
+            errors.append(f"{proposal_id}:missing_track_id")
+        elif track_id not in tracks:
+            errors.append(f"{proposal_id}:{track_id}:unknown_track_id")
+        cue_rows = row.get("cues")
+        if cue_rows is None:
+            cue_rows = row.get("anchors")
+        if not isinstance(cue_rows, list):
+            errors.append(f"{proposal_id}:missing_cues")
+            continue
+        slots: list[str] = []
+        duration = _finite_number_or_none(tracks.get(track_id, {}).get("duration_s"))
+        for cue_index, cue in enumerate(cue_rows):
+            if not isinstance(cue, dict):
+                errors.append(f"{proposal_id}:cue_{cue_index}:invalid_cue")
+                continue
+            cue_label = str(cue.get("slot") or f"cue_{cue_index}")
+            slot = cue.get("slot")
+            if not isinstance(slot, str) or slot[:1].upper() not in SMART_CUE_SLOTS:
+                errors.append(f"{proposal_id}:{cue_label}:invalid_slot")
+            else:
+                slots.append(slot[:1].upper())
+            start_s = _finite_number_or_none(cue.get("start_s"))
+            if start_s is None:
+                errors.append(f"{proposal_id}:{cue_label}:nonfinite_start_s")
+            elif duration is not None and start_s > duration:
+                errors.append(f"{proposal_id}:{cue_label}:start_after_duration")
+            end_s = cue.get("end_s")
+            parsed_end = _finite_number_or_none(end_s) if end_s is not None else None
+            if end_s is not None and parsed_end is None:
+                errors.append(f"{proposal_id}:{cue_label}:nonfinite_end_s")
+            elif parsed_end is not None and start_s is not None and parsed_end < start_s:
+                errors.append(f"{proposal_id}:{cue_label}:end_before_start")
+            confidence = cue.get("confidence")
+            parsed_confidence = (
+                _finite_number_or_none(confidence) if confidence is not None else None
+            )
+            if confidence is not None and parsed_confidence is None:
+                errors.append(f"{proposal_id}:{cue_label}:nonfinite_confidence")
+            elif parsed_confidence is not None and not 0.0 <= parsed_confidence <= 1.0:
+                errors.append(f"{proposal_id}:{cue_label}:confidence_out_of_range")
+        errors.extend(f"{proposal_id}:{error}" for error in _duplicate_values(slots, label="slot"))
+    return tuple(errors)
+
+
+def _xml_mark_errors(
+    path: Path, *, label: str, tracks: dict[str, dict[str, Any]]
+) -> tuple[str, ...]:
+    errors: list[str] = []
+    root = ET.parse(str(path)).getroot()
+    for track_index, track in enumerate(root.findall(".//TRACK")):
+        track_id = str(track.attrib.get("TrackID") or "")
+        track_label = track_id or f"<track_{track_index}>"
+        if not track_id:
+            errors.append(f"{label}:{track_label}:missing_track_id")
+        elif track_id not in tracks:
+            errors.append(f"{label}:{track_id}:unknown_track_id")
+        duration = _finite_number_or_none(tracks.get(track_id, {}).get("duration_s"))
+        for mark_index, mark in enumerate(track.findall("POSITION_MARK")):
+            mark_label = str(mark.attrib.get("Name") or f"mark_{mark_index}")
+            mark_id = f"{label}:{track_label}:{mark_label}"
+            start_s = _finite_number_or_none(mark.attrib.get("Start"))
+            if start_s is None:
+                errors.append(f"{mark_id}:nonfinite_start")
+            elif duration is not None and start_s > duration:
+                errors.append(f"{mark_id}:start_after_duration")
+            end_s = mark.attrib.get("End")
+            parsed_end = _finite_number_or_none(end_s) if end_s is not None else None
+            if end_s is not None and parsed_end is None:
+                errors.append(f"{mark_id}:nonfinite_end")
+            elif parsed_end is not None and start_s is not None and parsed_end < start_s:
+                errors.append(f"{mark_id}:end_before_start")
+    return tuple(errors)
+
+
+def _duplicate_field_errors(rows: list[dict[str, Any]], *, key: str, label: str) -> tuple[str, ...]:
+    values = [str(row.get(key) or "") for row in rows if row.get(key)]
+    return _duplicate_values(values, label=label)
+
+
+def _duplicate_values(values: list[str], *, label: str) -> tuple[str, ...]:
+    seen: set[str] = set()
+    errors: list[str] = []
+    for value in values:
+        if value in seen:
+            errors.append(f"{value}:duplicate_{label}")
+        seen.add(value)
+    return tuple(errors)
+
+
+def _duplicate_cue_key_errors(cues: tuple[BaselineCue, ...], *, label: str) -> tuple[str, ...]:
+    keys = [":".join((cue.track_id, cue.slot or "memory", cue.type)) for cue in cues]
+    return tuple(f"{label}:{error}" for error in _duplicate_values(keys, label="cue"))
+
+
+def _private_payload_errors(value: Any, label: str) -> tuple[str, ...]:
+    errors: list[str] = []
+    for text in _iter_strings(value):
+        if text.startswith("fixture://"):
+            continue
+        if any(pattern.search(text) for pattern in PRIVATE_PAYLOAD_PATTERNS):
+            errors.append(f"{label}:private_payload_present")
+            break
+        if AUDIO_PATH_PATTERN.search(text) and ("/" in text or "\\" in text):
+            errors.append(f"{label}:private_audio_path_present")
+            break
+    return tuple(errors)
+
+
+def _xml_private_payload_errors(path: Path, label: str) -> tuple[str, ...]:
+    root = ET.parse(str(path)).getroot()
+    return _private_payload_errors(root.attrib | _xml_attributes(root), label)
+
+
+def _xml_attributes(root: ET.Element) -> dict[str, str]:
+    attrs: dict[str, str] = {}
+    for index, item in enumerate(root.iter()):
+        for key, value in item.attrib.items():
+            attrs[f"{index}:{key}"] = value
+    return attrs
+
+
+def _iter_strings(value: Any) -> tuple[str, ...]:
+    strings: list[str] = []
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, dict):
+        for key, item in value.items():
+            strings.extend(_iter_strings(str(key)))
+            strings.extend(_iter_strings(item))
+    elif isinstance(value, list | tuple):
+        for item in value:
+            strings.extend(_iter_strings(item))
+    return tuple(strings)
 
 
 def _index_by_track_slot(cues: tuple[BaselineCue, ...]) -> dict[tuple[str, str], BaselineCue]:
@@ -434,18 +652,32 @@ def _count_values(values: Any) -> dict[str, int]:
 
 def _float_attr(raw: Any, *, default: float) -> float:
     try:
-        return float(raw)
+        value = float(raw)
     except (TypeError, ValueError):
         return default
+    return value if math.isfinite(value) else default
 
 
 def _optional_float_attr(raw: Any) -> float | None:
     if raw is None:
         return None
     try:
-        return float(raw)
+        value = float(raw)
     except (TypeError, ValueError):
         return None
+    return value if math.isfinite(value) else None
+
+
+def _finite_number_or_none(raw: Any) -> float | None:
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def _is_finite_number(raw: Any) -> bool:
+    return _finite_number_or_none(raw) is not None
 
 
 def _int_or_none(raw: Any) -> int | None:
@@ -488,7 +720,7 @@ def main(argv: list[str] | None = None) -> int:
             f"tracks={totals['tracks']} baseline={totals['baseline_cues']} "
             f"vibemix={totals['vibemix_cues']} outcomes={result['outcomes']}"
         )
-    return 0
+    return 0 if result.get("valid") is True else 1
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint

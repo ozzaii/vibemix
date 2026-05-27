@@ -7,11 +7,36 @@ from pathlib import Path
 from scripts.eval.intel_cue_baseline_compare import (
     DEFAULT_FIXTURE_DIR,
     compare_fixture_dir,
+    compare_paths,
     diff_cue_snapshots,
     load_vibemix_proposals,
     main,
     parse_rekordbox_cues,
 )
+
+
+def _copy_cue_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
+    before = tmp_path / "before.xml"
+    after = tmp_path / "after.xml"
+    proposals = tmp_path / "smart_cue_proposals.json"
+    tracks = tmp_path / "tracks.json"
+    before.write_text(
+        (DEFAULT_FIXTURE_DIR / "cue_baseline_before.xml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    after.write_text(
+        (DEFAULT_FIXTURE_DIR / "cue_baseline_after.xml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    proposals.write_text(
+        (DEFAULT_FIXTURE_DIR / "smart_cue_proposals.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    tracks.write_text(
+        (DEFAULT_FIXTURE_DIR / "tracks.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    return before, after, proposals, tracks
 
 
 def test_parse_rekordbox_xml_normalizes_hot_slots() -> None:
@@ -104,6 +129,7 @@ def test_compare_fixture_dir_emits_redacted_scorecard() -> None:
     assert result["schema"] == "intel_cue_baseline_compare_v1"
     assert result["valid"] is True
     assert result["privacy"] == {"local_paths_redacted": True}
+    assert result["evidence_errors"] == ()
     assert result["totals"] == {
         "tracks": 2,
         "baseline_cues": 3,
@@ -124,12 +150,94 @@ def test_compare_fixture_dir_emits_redacted_scorecard() -> None:
     assert "fixture://tracks" not in json.dumps(result)
 
 
+def test_compare_rejects_duplicate_slots_and_nonfinite_confidence(tmp_path: Path) -> None:
+    before, after, proposals, tracks = _copy_cue_fixture(tmp_path)
+    proposal_rows = json.loads(proposals.read_text(encoding="utf-8"))
+    proposal_rows[0]["anchors"].append(dict(proposal_rows[0]["anchors"][0]))
+    proposal_rows[0]["anchors"][1]["confidence"] = "inf"
+    proposals.write_text(json.dumps(proposal_rows), encoding="utf-8")
+
+    result = compare_paths(
+        before_xml=before,
+        after_xml=after,
+        proposals_json=proposals,
+        tracks_json=tracks,
+    )
+
+    assert result["valid"] is False
+    assert "cueprop_fx-hard-001_v1:A:duplicate_slot" in result["evidence_errors"]
+    assert "cueprop_fx-hard-001_v1:C:nonfinite_confidence" in result["evidence_errors"]
+
+
+def test_compare_rejects_private_payload_markers(tmp_path: Path) -> None:
+    before, after, proposals, tracks = _copy_cue_fixture(tmp_path)
+    track_rows = json.loads(tracks.read_text(encoding="utf-8"))
+    track_rows[0]["location"] = "/Users/ozai/Music/private.wav"
+    tracks.write_text(json.dumps(track_rows), encoding="utf-8")
+
+    result = compare_paths(
+        before_xml=before,
+        after_xml=after,
+        proposals_json=proposals,
+        tracks_json=tracks,
+    )
+
+    assert result["valid"] is False
+    assert "tracks:private_payload_present" in result["evidence_errors"]
+
+
+def test_compare_rejects_malformed_xml_mark_start(tmp_path: Path) -> None:
+    before, after, proposals, tracks = _copy_cue_fixture(tmp_path)
+    after.write_text(
+        after.read_text(encoding="utf-8").replace('Start="0.000"', 'Start="nan"', 1),
+        encoding="utf-8",
+    )
+
+    result = compare_paths(
+        before_xml=before,
+        after_xml=after,
+        proposals_json=proposals,
+        tracks_json=tracks,
+    )
+
+    assert result["valid"] is False
+    assert "after_xml:fx-hard-001:A:nonfinite_start" in result["evidence_errors"]
+
+
 def test_cli_json_uses_fixture_dir(capsys) -> None:  # type: ignore[no-untyped-def]
     assert main(["--fixture-dir", str(DEFAULT_FIXTURE_DIR), "--json"]) == 0
 
     out = json.loads(capsys.readouterr().out)
     assert out["schema"] == "intel_cue_baseline_compare_v1"
     assert out["totals"]["snapshot_added"] == 3
+
+
+def test_cli_returns_nonzero_for_invalid_evidence(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]
+    before, after, proposals, tracks = _copy_cue_fixture(tmp_path)
+    proposal_rows = json.loads(proposals.read_text(encoding="utf-8"))
+    proposal_rows[0]["anchors"][0]["start_s"] = "nan"
+    proposals.write_text(json.dumps(proposal_rows), encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "--before",
+                str(before),
+                "--after",
+                str(after),
+                "--proposals",
+                str(proposals),
+                "--tracks",
+                str(tracks),
+                "--json",
+            ]
+        )
+        == 1
+    )
+
+    out = json.loads(capsys.readouterr().out)
+    assert out["valid"] is False
+    assert "cueprop_fx-hard-001_v1:A:nonfinite_start_s" in out["evidence_errors"]
 
 
 def test_cli_requires_explicit_paths_together(capsys) -> None:  # type: ignore[no-untyped-def]
