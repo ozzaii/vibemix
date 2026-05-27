@@ -603,6 +603,7 @@ class SuggestionService:
             "source_loop_recent": timing.source_loop_recent,
             "playhead_confidence": timing.playhead_confidence,
             "source_position_s": timing.source_position_s,
+            "source_context": self._source_context(seed, timing),
             "controller": controller,
         }
         from vibemix.intel.context_compiler import compile_suggestion_context
@@ -612,6 +613,51 @@ class SuggestionService:
             current=current,
             suggestion=suggestion,
         )
+
+    def _source_context(
+        self,
+        seed: ResolvedSeed | None,
+        timing: LiveTimingHint,
+    ) -> dict[str, Any] | None:
+        """Return model-safe current/next source-section context for live mode."""
+        if seed is None or timing.source_position_s is None:
+            return None
+        source_entry = self._library.lookup_by_id(seed.track_id)
+        if source_entry is None:
+            return None
+        try:
+            from vibemix.library.section_builder import (
+                bars_until_section_end,
+                bars_until_section_start,
+                next_section_after_position,
+                section_at_position,
+                sections_for_entry,
+            )
+
+            sections = sections_for_entry(source_entry)
+            current_section = section_at_position(sections, timing.source_position_s)
+            next_section = next_section_after_position(sections, timing.source_position_s)
+            return {
+                "track_id": seed.track_id,
+                "position_s": timing.source_position_s,
+                "playhead_confidence": timing.playhead_confidence,
+                "source_loop_recent": timing.source_loop_recent,
+                "lookahead_allowed": not timing.source_loop_recent,
+                "section_clock": "loop_hold" if timing.source_loop_recent else "playhead",
+                "current_section": _section_context_payload(current_section),
+                "next_section": _section_context_payload(next_section),
+                "bars_to_current_section_end": bars_until_section_end(
+                    current_section,
+                    timing.source_position_s,
+                ),
+                "bars_to_next_section_start": bars_until_section_start(
+                    next_section,
+                    timing.source_position_s,
+                ),
+            }
+        except Exception as e:
+            logger.debug("[suggestion] source context unavailable: %s", e)
+            return None
 
     def decision_for_state(
         self,
@@ -1251,6 +1297,29 @@ def _strip_transition_timing(transition: dict | None) -> dict | None:
         risk_flags.append("timing_feedback_suppressed")
     out["risk_flags"] = risk_flags
     return out
+
+
+def _section_context_payload(section: Any | None) -> dict[str, Any] | None:
+    if section is None:
+        return None
+    return {
+        "section_id": section.section_id,
+        "track_id": section.track_id,
+        "role": section.role,
+        "source": section.source,
+        "source_detail": section.source_detail,
+        "confidence": section.confidence,
+        "start_s": section.start_s,
+        "end_s": section.end_s,
+        "start_beat": section.start_beat,
+        "end_beat": section.end_beat,
+        "bar_count": section.bar_count,
+        "bpm": section.bpm,
+        "camelot": section.camelot,
+        "cue_slot": section.cue_slot,
+        "cue_source": section.cue_source,
+        "cue_confidence": section.cue_confidence,
+    }
 
 
 def _float_or(raw: Any, default: float | None) -> float | None:

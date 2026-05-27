@@ -82,6 +82,15 @@ If a loaded target-deck track exists but the selected candidate is a different
 track, the validated live decision suppresses instead of emitting a fresh
 `select` instruction that contradicts the DJ's prepared deck.
 
+The live context envelope also carries a `source_context` object that anchors
+the audio playhead to the grounded section map. It includes the current source
+section, the next source section when known, bars to the current section end,
+bars to the next section start, playhead confidence, and whether source
+lookahead is allowed. This gives the decision layer both facts at once: the
+section the DJ is actually in and the section the engine may be preparing for.
+When a recent loop action is present, `source_context.section_clock` becomes
+`loop_hold` and `lookahead_allowed` is false.
+
 ## Wire payload
 
 The pill payload is attached as `next_suggestion`.
@@ -235,11 +244,13 @@ semantic, and confidence gates intact.
 ### Controller posture
 
 The live context also includes `prepared_target_track_id`,
-`source_loop_recent`, plus a bounded `controller` object derived from
+`source_loop_recent`, a bounded `source_context` object derived from the live
+playhead plus library sections, and a bounded `controller` object derived from
 `MusicState.deck_a`, `MusicState.deck_b`, and `MusicState.xfader`:
 
 - `prepared_target_track_id`
 - `source_loop_recent`
+- `source_context`
 - `connected`
 - `xfader`
 - source/target deck summaries
