@@ -206,8 +206,31 @@ The Tauri shell is up at handoff time (`cargo run --no-default-features` from `t
 |---|---|---|
 | `b01fe4ee` | Handoff doc (the prior one this followup answers) | docs |
 | `6114bd0d` | Drop "Mac + Windows" overclaim across 11 customer-facing files + anchor + test fixtures | 50/49 |
-| `3d2900ce` | Spec blocklist fix + regression test (the ship blocker) | 83/2 |
+| `3d2900ce` | Spec blocklist fix + regression test (the FIRST shipper) | 83/2 |
+| `8dd2f098` | Eager-import attempt in `__main__` (reverted, was misleading) | 86/0 |
+| `249010c0` | This followup handoff (initial draft) | docs |
+| `99c951a7` | PyInstaller runtime hook + regression test (revert of `8dd2f098`) | 103/88 |
+| `d58c722f` | Patch livekit-agents init + purge stale pyc + build_sidecar integration + regression test | 282/0 |
+| `938c822a` | sidecar.rs Bundled-arm rewrite (std::process + libc kill) + `SidecarChild` enum + Cargo.toml libc dep | 197/55 |
 
 ---
 
-**End of followup handoff.** If you pick this up: re-read §"The bug we found this session" first — it's the load-bearing finding. Then trace the Tauri shell + sidecar status. Then check whether Kaan's ear-pass has landed in `16-VERIFICATION.md`. If yes, tag.
+## Late-session reality check (added after 938c822a)
+
+After committing all four bug fixes, this session built a minimal launchd-spawn simulator (a `.app` wrapper around `tauri/src-tauri/target/debug/vibemix` with the bundled sidecar in `Contents/Resources/`) and `open`-launched it to dry-run what a signed CI DMG would do on a user's machine.
+
+**Result:** MIXED. First clean launch ran the bundle PAST imports (printed privacy posture + techno profile + recorder armed, exited with [FATAL] GEMINI_API_KEY missing per the exit-4 sentinel). Second launch with `GEMINI_API_KEY` env relayed via `open --env` CRASHED with the same chained `livekit.agents` circular ImportError that the patch was supposed to fix.
+
+This suggests the bug is FLAKY in the launchd-spawn path — the patch helps but isn't 100% deterministic. Working theories: PyInstaller frozen importer's submodule-binding order is non-deterministic under high-load init contexts; OR a subtle interaction with how launchd-launched processes inherit signal masks / process group attributes that affects Python's import machinery.
+
+**Honest ship-recommendation update:** v0.1.0-rc1 SHOULD NOT BE TAGGED today without one of:
+
+1. **Vendor `livekit-agents`** into `vendor/livekit_agents/` with the split-import baked in at source-level (not patched at build time, which is what's flaky). Drop `scripts/dist/patch_livekit_agents_init.py` in favor of a stable vendored copy. Add the vendor dir to spec `pathex=` ahead of `.venv/lib/...`. ~30-60 min work. Then re-run the launchd-spawn simulator until the boot is deterministic across N launches.
+2. **Tag and ship the broken rc1 deliberately as the "test in the wild"** rc — Phase 17 grading is literally gathered against the rc binary. Document the known crash in the GitHub Release notes; rc1 readers see "macOS bundle may crash on first launch — use `VIBEMIX_DEV_SIDECAR=1` dev fallback" as a known-issue line. v0.1.0 stable closes the bundle bug as a hard gate.
+3. **Replace `livekit-agents` 1.x with the slimmer plain `google-genai` Live API client** for our `RealtimeModel` use case. Bigger refactor; closes the bug at its root by removing the source. Probably the right v0.1.x architectural play.
+
+**The dev-source path (`VIBEMIX_DEV_SIDECAR=1 cargo run --no-default-features` from `tauri/src-tauri/`) is healthy and gives a faithful Phase-16 ear-pass surface** — every user-facing reaction goes through the same prompt + grounding + TTS stack as the bundle would, just running on the dev Python interpreter that handles imports normally. Ear-pass results from the dev-source surface ARE meaningful and DO bind the codebase's quality gate.
+
+---
+
+**End of followup handoff.** If you pick this up: re-read §"The bug we found this session" + §"Late-session reality check" first. Then trace the Tauri shell + sidecar status. Then decide path 1/2/3 above with Kaan. If tagging anyway, run the post-tag launchd smoke-test on the signed DMG within 10 min of CI completing and prepare to delete the tag if it crashes.
