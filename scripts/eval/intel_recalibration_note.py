@@ -77,6 +77,7 @@ def build_recalibration_note(
     errors: list[str] = []
     if evidence_tier not in EVIDENCE_TIERS:
         errors.append(f"unknown_evidence_tier:{evidence_tier}")
+    lock_hash = _file_sha256(Path(lock_path))
 
     reports = {
         "scorecard": scorecard,
@@ -85,7 +86,16 @@ def build_recalibration_note(
         "gate": gate_report or {},
     }
     errors.extend(_privacy_errors(reports))
-    errors.extend(_report_contract_errors(scorecard, gold_report, taste_scorecard, gate_report))
+    errors.extend(
+        _report_contract_errors(
+            scorecard,
+            gold_report,
+            taste_scorecard,
+            gate_report,
+            expected_lock_hash=lock_hash,
+            require_gate=promote_release,
+        )
+    )
 
     splits = _split_counts(gold_report)
     if evidence_tier == "tier2_private_holdout_canary" or promote_release:
@@ -115,7 +125,6 @@ def build_recalibration_note(
         else "none"
     )
     timestamp = timestamp or _now_iso()
-    lock_hash = _file_sha256(Path(lock_path))
     run_id = run_id or _default_run_id(timestamp, evidence_tier, scorecard, gold_report)
     label_kinds = _label_kind_counts(gold_report, taste_scorecard)
     entry = _render_entry(
@@ -228,6 +237,9 @@ def _report_contract_errors(
     gold_report: dict[str, Any],
     taste_scorecard: dict[str, Any] | None,
     gate_report: dict[str, Any] | None,
+    *,
+    expected_lock_hash: str,
+    require_gate: bool = False,
 ) -> tuple[str, ...]:
     errors: list[str] = []
     if scorecard.get("schema") != "intel_scorecard_v1":
@@ -246,8 +258,41 @@ def _report_contract_errors(
             errors.append("taste_scorecard.schema")
         if taste_scorecard.get("privacy", {}).get("local_paths_redacted") is not True:
             errors.append("taste_scorecard.privacy.local_paths_redacted")
-    if gate_report is not None and gate_report.get("schema") != "intel_gate_v1":
-        errors.append("gate.schema")
+    if require_gate and gate_report is None:
+        errors.append("release_promotion_requires_gate_report")
+    if gate_report is not None:
+        if gate_report.get("schema") != "intel_gate_v1":
+            errors.append("gate.schema")
+        if require_gate:
+            errors.extend(_gate_promotion_errors(gate_report, expected_lock_hash))
+    return tuple(errors)
+
+
+def _gate_promotion_errors(gate_report: dict[str, Any], expected_lock_hash: str) -> tuple[str, ...]:
+    stages = gate_report.get("stages") if isinstance(gate_report.get("stages"), dict) else {}
+    scorecard = stages.get("scorecard") if isinstance(stages.get("scorecard"), dict) else {}
+    scorecard_provenance = (
+        scorecard.get("provenance") if isinstance(scorecard.get("provenance"), dict) else {}
+    )
+    provenance = stages.get("provenance") if isinstance(stages.get("provenance"), dict) else {}
+    provenance_lock = (
+        provenance.get("threshold_lock")
+        if isinstance(provenance.get("threshold_lock"), dict)
+        else {}
+    )
+    errors: list[str] = []
+    if gate_report.get("valid") is not True:
+        errors.append("gate.valid")
+    if scorecard.get("valid") is not True:
+        errors.append("gate.scorecard.valid")
+    if scorecard.get("passed") is not True:
+        errors.append("gate.scorecard.passed")
+    if provenance.get("valid") is not True:
+        errors.append("gate.provenance.valid")
+    if scorecard_provenance.get("threshold_lock_hash") != expected_lock_hash:
+        errors.append("gate.scorecard.threshold_lock_hash")
+    if provenance_lock.get("hash") != expected_lock_hash:
+        errors.append("gate.provenance.threshold_lock.hash")
     return tuple(errors)
 
 

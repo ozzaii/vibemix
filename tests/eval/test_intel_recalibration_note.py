@@ -87,6 +87,56 @@ def test_release_promotion_requires_tier2_and_all_splits() -> None:
     assert "calibration=7 holdout=5 canary=3" in result["entry"]
 
 
+def test_release_promotion_requires_gate_report() -> None:
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report_with_all_splits(),
+        evidence_tier="tier2_private_holdout_canary",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+        promote_release=True,
+    )
+
+    assert result["valid"] is False
+    assert "release_promotion_requires_gate_report" in result["errors"]
+
+
+def test_release_promotion_rejects_stale_gate_lock_hash() -> None:
+    gate = run_intel_gate(fixture_dir=DEFAULT_FIXTURE_DIR, threshold_lock=INTEL_LOCK_PATH)
+    gate["stages"]["scorecard"]["provenance"]["threshold_lock_hash"] = "sha256:" + ("0" * 64)
+
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report_with_all_splits(),
+        gate_report=gate,
+        evidence_tier="tier2_private_holdout_canary",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+        promote_release=True,
+    )
+
+    assert result["valid"] is False
+    assert "gate.scorecard.threshold_lock_hash" in result["errors"]
+
+
+def test_release_promotion_rejects_invalid_gate_report() -> None:
+    gate = run_intel_gate(fixture_dir=DEFAULT_FIXTURE_DIR, threshold_lock=INTEL_LOCK_PATH)
+    gate["valid"] = False
+
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report_with_all_splits(),
+        gate_report=gate,
+        evidence_tier="tier2_private_holdout_canary",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+        promote_release=True,
+    )
+
+    assert result["valid"] is False
+    assert "gate.valid" in result["errors"]
+
+
 def test_private_payload_in_reports_blocks_note() -> None:
     gold = _gold_report()
     gold["examples"].append({"note": "/Users/ozai/Music/private.wav"})
