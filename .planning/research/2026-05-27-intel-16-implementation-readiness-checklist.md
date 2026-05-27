@@ -653,6 +653,9 @@ done: `scripts/eval/intel_recalibration_note.py --append-log` appends only
 done: `scripts/eval/intel_recalibration_note.py --append-log` validates the
       candidate whole log before writing, so duplicate run IDs and out-of-order
       timestamps cannot be appended
+done: `scripts/eval/intel_recalibration_note.py --append-log` persists public
+      log updates with temp-file + atomic replace, preserving the previous log
+      on failed final writes
 done: `scripts/eval/intel_recalibration_note.py` writes `--output` only after
       candidate append-log validation succeeds when both flags are supplied
 done: private-label recalibration notes carry canonical SHA-256 hashes for the

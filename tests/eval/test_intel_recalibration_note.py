@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from scripts.eval import intel_recalibration_note as note_module
 from scripts.eval.intel_gate import run_intel_gate
 from scripts.eval.intel_gold import DEFAULT_FIXTURE_DIR, report_gold_file
 from scripts.eval.intel_recalibration_note import (
@@ -390,6 +391,34 @@ def test_append_recalibration_note_refuses_invalid_result(tmp_path: Path) -> Non
         raise AssertionError("invalid recalibration note was appended")
 
     assert "private_recalibration_required" not in log.read_text(encoding="utf-8")
+
+
+def test_append_recalibration_note_atomic_replace_failure_keeps_existing_log(
+    tmp_path: Path,
+    monkeypatch,  # type: ignore[no-untyped-def]
+) -> None:
+    log = tmp_path / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
+    log.write_text(f"# Log\n\n{APPEND_MARKER}\n", encoding="utf-8")
+    result = _tier1_note_result(
+        timestamp="2026-05-27T12:00:00Z",
+        run_id="intel_private_20260527_2222222222",
+    )
+    before = log.read_text(encoding="utf-8")
+
+    def fail_replace(src: Path | str, dst: Path | str) -> None:
+        raise OSError(f"simulated replace failure for {src} -> {dst}")
+
+    monkeypatch.setattr(note_module.os, "replace", fail_replace)
+
+    try:
+        append_recalibration_note(log, result)
+    except OSError as exc:
+        assert "simulated replace failure" in str(exc)
+    else:  # pragma: no cover - explicit assertion path for clarity
+        raise AssertionError("atomic replace failure was swallowed")
+
+    assert log.read_text(encoding="utf-8") == before
+    assert not list(tmp_path.glob(".INTEL-THRESHOLD-RECALIBRATION-LOG.md.*.tmp"))
 
 
 def test_cli_does_not_write_output_or_append_log_for_invalid_note(
