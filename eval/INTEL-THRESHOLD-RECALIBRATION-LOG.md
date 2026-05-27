@@ -74,9 +74,9 @@ Use `scripts/eval/intel_recalibration_note.py` to render the redacted markdown
 entry from private scorecard/gold/taste reports. The script validates report
 schemas, privacy flags, forbidden private payload markers, holdout/canary split
 coverage for release promotion, and the key measured-vs-locked INTEL metrics
-before emitting an entry. Release promotion also requires a valid
-`scripts/eval/intel_gate.py` artifact whose scorecard and provenance stages
-point at the same threshold-lock hash. Use
+before emitting an entry. Release promotion also requires a passing private
+scorecard and a valid `scripts/eval/intel_gate.py` artifact whose scorecard and
+provenance stages point at the same threshold-lock/threshold-values hashes. Use
 `--append-log eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` to append a valid entry
 directly; invalid evidence exits non-zero and is not written.
 

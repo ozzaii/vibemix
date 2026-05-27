@@ -645,6 +645,8 @@ done: `scripts/eval/intel_recalibration_note.py --append-log` appends only
       valid entries to the public recalibration log and refuses invalid evidence
 done: release-promotion notes require a valid `intel_gate.py` artifact whose
       scorecard/provenance lock hashes match the promoted INTEL threshold lock
+done: release-promotion notes reject failed scorecards and gate/scorecard
+      threshold-hash disagreement before the lock can be promoted
 ```
 
 The docs are not the milestone. The scorecard is.

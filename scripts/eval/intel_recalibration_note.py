@@ -258,21 +258,55 @@ def _report_contract_errors(
             errors.append("taste_scorecard.schema")
         if taste_scorecard.get("privacy", {}).get("local_paths_redacted") is not True:
             errors.append("taste_scorecard.privacy.local_paths_redacted")
+    if require_gate:
+        errors.extend(_scorecard_promotion_errors(scorecard, expected_lock_hash))
     if require_gate and gate_report is None:
         errors.append("release_promotion_requires_gate_report")
     if gate_report is not None:
         if gate_report.get("schema") != "intel_gate_v1":
             errors.append("gate.schema")
         if require_gate:
-            errors.extend(_gate_promotion_errors(gate_report, expected_lock_hash))
+            errors.extend(_gate_promotion_errors(gate_report, expected_lock_hash, scorecard))
     return tuple(errors)
 
 
-def _gate_promotion_errors(gate_report: dict[str, Any], expected_lock_hash: str) -> tuple[str, ...]:
+def _scorecard_promotion_errors(
+    scorecard: dict[str, Any], expected_lock_hash: str
+) -> tuple[str, ...]:
+    provenance = (
+        scorecard.get("provenance") if isinstance(scorecard.get("provenance"), dict) else {}
+    )
+    threshold_lock = (
+        provenance.get("threshold_lock")
+        if isinstance(provenance.get("threshold_lock"), dict)
+        else {}
+    )
+    errors: list[str] = []
+    if scorecard.get("valid") is not True:
+        errors.append("scorecard.valid")
+    if scorecard.get("passed") is not True:
+        errors.append("scorecard.passed")
+    if threshold_lock.get("hash") != expected_lock_hash:
+        errors.append("scorecard.provenance.threshold_lock.hash")
+    if not provenance.get("thresholds_hash"):
+        errors.append("scorecard.provenance.thresholds_hash")
+    return tuple(errors)
+
+
+def _gate_promotion_errors(
+    gate_report: dict[str, Any],
+    expected_lock_hash: str,
+    scorecard_report: dict[str, Any],
+) -> tuple[str, ...]:
     stages = gate_report.get("stages") if isinstance(gate_report.get("stages"), dict) else {}
     scorecard = stages.get("scorecard") if isinstance(stages.get("scorecard"), dict) else {}
     scorecard_provenance = (
         scorecard.get("provenance") if isinstance(scorecard.get("provenance"), dict) else {}
+    )
+    report_provenance = (
+        scorecard_report.get("provenance")
+        if isinstance(scorecard_report.get("provenance"), dict)
+        else {}
     )
     provenance = stages.get("provenance") if isinstance(stages.get("provenance"), dict) else {}
     provenance_lock = (
@@ -293,6 +327,14 @@ def _gate_promotion_errors(gate_report: dict[str, Any], expected_lock_hash: str)
         errors.append("gate.scorecard.threshold_lock_hash")
     if provenance_lock.get("hash") != expected_lock_hash:
         errors.append("gate.provenance.threshold_lock.hash")
+    if report_provenance.get("thresholds_hash") and scorecard_provenance.get(
+        "thresholds_hash"
+    ) != report_provenance.get("thresholds_hash"):
+        errors.append("gate.scorecard.thresholds_hash_mismatch")
+    if report_provenance.get("thresholds_hash") and provenance.get(
+        "thresholds_hash"
+    ) != report_provenance.get("thresholds_hash"):
+        errors.append("gate.provenance.thresholds_hash_mismatch")
     return tuple(errors)
 
 

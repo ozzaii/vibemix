@@ -78,8 +78,8 @@ the public log records only redacted split counts, aggregate metrics, hashes,
 privacy flags, and actions. `scripts/eval/intel_recalibration_note.py` renders
 that append-only entry from redacted private scorecard/gold/taste reports and
 can append it with `--append-log` only after validation passes; release
-promotion requires a valid `intel_gate.py` artifact with matching threshold-lock
-provenance.
+promotion requires a passing scorecard plus a valid `intel_gate.py` artifact
+with matching threshold-lock and threshold-values provenance.
 
 ## 2-Judge Architecture (high level)
 

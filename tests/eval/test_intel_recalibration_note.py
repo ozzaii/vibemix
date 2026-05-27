@@ -119,6 +119,60 @@ def test_release_promotion_rejects_stale_gate_lock_hash() -> None:
     assert "gate.scorecard.threshold_lock_hash" in result["errors"]
 
 
+def test_release_promotion_rejects_failed_scorecard_report() -> None:
+    scorecard = _scorecard()
+    scorecard["passed"] = False
+
+    result = build_recalibration_note(
+        scorecard=scorecard,
+        gold_report=_gold_report_with_all_splits(),
+        gate_report=run_intel_gate(fixture_dir=DEFAULT_FIXTURE_DIR, threshold_lock=INTEL_LOCK_PATH),
+        evidence_tier="tier2_private_holdout_canary",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+        promote_release=True,
+    )
+
+    assert result["valid"] is False
+    assert "scorecard.passed" in result["errors"]
+
+
+def test_release_promotion_rejects_scorecard_lock_hash_mismatch() -> None:
+    scorecard = _scorecard()
+    scorecard["provenance"]["threshold_lock"]["hash"] = "sha256:" + ("1" * 64)
+
+    result = build_recalibration_note(
+        scorecard=scorecard,
+        gold_report=_gold_report_with_all_splits(),
+        gate_report=run_intel_gate(fixture_dir=DEFAULT_FIXTURE_DIR, threshold_lock=INTEL_LOCK_PATH),
+        evidence_tier="tier2_private_holdout_canary",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+        promote_release=True,
+    )
+
+    assert result["valid"] is False
+    assert "scorecard.provenance.threshold_lock.hash" in result["errors"]
+
+
+def test_release_promotion_rejects_gate_scorecard_threshold_hash_mismatch() -> None:
+    gate = run_intel_gate(fixture_dir=DEFAULT_FIXTURE_DIR, threshold_lock=INTEL_LOCK_PATH)
+    gate["stages"]["scorecard"]["provenance"]["thresholds_hash"] = "sha256:" + ("2" * 64)
+
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report_with_all_splits(),
+        gate_report=gate,
+        evidence_tier="tier2_private_holdout_canary",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+        promote_release=True,
+    )
+
+    assert result["valid"] is False
+    assert "gate.scorecard.thresholds_hash_mismatch" in result["errors"]
+
+
 def test_release_promotion_rejects_invalid_gate_report() -> None:
     gate = run_intel_gate(fixture_dir=DEFAULT_FIXTURE_DIR, threshold_lock=INTEL_LOCK_PATH)
     gate["valid"] = False
