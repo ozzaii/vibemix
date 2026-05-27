@@ -36,6 +36,8 @@ FORBIDDEN_PRIVATE_PATTERNS = (
     re.compile(r"\braw_(?:audio|vector)s?\b", re.I),
     re.compile(r"\b(?:track_title|deck_id|session_id|free_form)\b", re.I),
 )
+TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+RUN_ID_PREFIX = "intel_private_"
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +134,10 @@ def build_recalibration_note(
     )
     timestamp = timestamp or _now_iso()
     run_id = run_id or _default_run_id(timestamp, evidence_tier, scorecard, gold_report)
+    if TIMESTAMP_RE.match(timestamp) is None:
+        errors.append("timestamp")
+    if not run_id.startswith(RUN_ID_PREFIX):
+        errors.append("run_id")
     label_kinds = _label_kind_counts(gold_report, taste_scorecard)
     entry = _render_entry(
         timestamp=timestamp,

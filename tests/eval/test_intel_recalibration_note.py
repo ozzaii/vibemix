@@ -84,6 +84,21 @@ def test_recalibration_note_report_hashes_bind_private_reports() -> None:
     )
 
 
+def test_recalibration_note_rejects_invalid_timestamp_and_run_id() -> None:
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report(),
+        evidence_tier="tier1_private_calibration",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27 12:00:00",
+        run_id="private_test",
+    )
+
+    assert result["valid"] is False
+    assert "timestamp" in result["errors"]
+    assert "run_id" in result["errors"]
+
+
 def test_tier2_release_evidence_requires_holdout_and_canary_splits() -> None:
     result = build_recalibration_note(
         scorecard=_scorecard(),
@@ -376,6 +391,42 @@ def test_cli_does_not_write_output_or_append_log_for_invalid_note(
     assert result["valid"] is False
     assert not out.exists()
     assert log.read_text(encoding="utf-8") == f"# Log\n\n{APPEND_MARKER}\n"
+
+
+def test_cli_does_not_write_output_for_invalid_identity(
+    tmp_path: Path,
+    capsys,  # type: ignore[no-untyped-def]
+) -> None:
+    scorecard = tmp_path / "scorecard.json"
+    gold = tmp_path / "gold_report.json"
+    out = tmp_path / "entry.md"
+    scorecard.write_text(json.dumps(_scorecard()), encoding="utf-8")
+    gold.write_text(json.dumps(_gold_report()), encoding="utf-8")
+
+    rc = main(
+        [
+            "--scorecard",
+            str(scorecard),
+            "--gold-report",
+            str(gold),
+            "--evidence-tier",
+            "tier1_private_calibration",
+            "--timestamp",
+            "2026-05-27 12:00:00",
+            "--run-id",
+            "private_cli",
+            "--output",
+            str(out),
+            "--json",
+        ]
+    )
+
+    assert rc == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result["valid"] is False
+    assert "timestamp" in result["errors"]
+    assert "run_id" in result["errors"]
+    assert not out.exists()
 
 
 def _report_hash_line(entry: str) -> str:
