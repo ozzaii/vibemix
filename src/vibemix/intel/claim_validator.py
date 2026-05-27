@@ -14,6 +14,13 @@ ClaimValidationStatus = Literal["accepted", "rejected"]
 _TIMESTAMP_TOLERANCE_S = 0.51
 
 _TIMING_RE = re.compile(r"\b(?:in|after)\s+\d+\s+(?:bar|bars|beat|beats|second|seconds)\b", re.I)
+_NOW_TIMING_RE = re.compile(
+    r"\b(?:press|hit|trigger|fire|drop|start|play|bring|cut|enter|go|launch|take|use|cue)"
+    r"\b[^\n.!?]{0,80}\b(?:right\s+now|now)\b"
+    r"|\b(?:right\s+now|now)\b[^\n.!?]{0,40}"
+    r"\b(?:press|hit|trigger|fire|drop|start|play|bring|cut|enter|go|launch|take|use|cue)\b",
+    re.I,
+)
 _CLOCK_TIMESTAMP_RE = re.compile(
     r"\b(?:at|around|near|from)\s+(?P<minute>\d{1,3}):(?P<second>[0-5]\d)\b", re.I
 )
@@ -59,6 +66,7 @@ _UNSUPPORTED_MUSICAL_FACT_RE = re.compile(
 
 _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "timing": frozenset({"bars_until_event", "current_position"}),
+    "now_timing": frozenset({"current_position"}),
     "timestamp": frozenset({"section_boundary", "current_position"}),
     "cue": frozenset({"cue_slot", "cue_role", "cue_export_status", "cue_operability"}),
     "harmonic": frozenset({"harmonic_fit"}),
@@ -155,6 +163,7 @@ def _claim_families_implied_by_text(text: str) -> tuple[str, ...]:
     families: list[str] = []
     checks = (
         ("timing", _TIMING_RE),
+        ("now_timing", _NOW_TIMING_RE),
         ("timestamp", _TIMESTAMP_RE),
         ("cue", _CUE_RE),
         ("harmonic", _HARMONIC_RE),

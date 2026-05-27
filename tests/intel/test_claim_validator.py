@@ -66,6 +66,62 @@ def test_exact_timing_phrase_rejected_without_timing_claim() -> None:
     assert "missing_claim_id_for_timing" in result.errors
 
 
+def test_now_cue_call_requires_current_position_claim() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "cue_slot"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="Hit cue A now.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_now_timing" in result.errors
+
+
+def test_now_cue_call_accepts_current_position_claim() -> None:
+    envelope = _envelope(
+        claim_summary=(
+            _claim("clm_ctx_001_000", "cue_slot"),
+            _claim("clm_ctx_001_001", "current_position", value=48.0),
+        )
+    )
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="Hit cue A now.",
+            cited_claim_ids=("clm_ctx_001_000", "clm_ctx_001_001"),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
+def test_timing_refusal_right_now_does_not_require_current_position_claim() -> None:
+    envelope = _envelope(claim_summary=())
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="I cannot call exact timing right now.",
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
 def test_tempo_phrase_rejected_without_bpm_claim() -> None:
     envelope = _envelope(claim_summary=())
 

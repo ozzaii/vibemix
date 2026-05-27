@@ -448,6 +448,8 @@ Acceptance evidence:
   failed/planned action rows;
 - cue/playhead timestamp copy (`at 1:23`, `at 32 seconds`) requires a matching
   `section_boundary` or `current_position` claim value;
+- "now" action calls (`hit cue A now`, `drop it now`) require a
+  `current_position` claim;
 - stayed-quiet / suppressed-output explanations require a `decision_suppressed`
   or `blend_suppression` claim;
 - audience predictions and absolute "perfect/guaranteed" transition language are
