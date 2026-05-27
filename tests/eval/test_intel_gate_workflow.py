@@ -31,12 +31,25 @@ def test_eval_workflow_runs_intel_fixture_gate() -> None:
     )
 
 
+def test_eval_workflow_validates_intel_recalibration_log() -> None:
+    steps = _steps()
+    matches = [step for step in steps if step.get("name") == "Validate INTEL recalibration log"]
+    assert len(matches) == 1
+
+    run_body = matches[0].get("run", "")
+    assert "scripts/eval/intel_recalibration_log_validate.py" in run_body
+    assert "eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md" in run_body
+    assert "--json" in run_body
+
+
 def test_eval_workflow_runs_intel_gate_before_replay_harness() -> None:
     names = [step.get("name", "") for step in _steps()]
+    recalibration_idx = names.index("Validate INTEL recalibration log")
     intel_idx = names.index("Run INTEL fixture gate")
     pr_replay_idx = names.index("Run replay harness (PR mode — Flash only)")
     nightly_replay_idx = names.index("Run replay harness (nightly canary — Pro + Flash)")
 
+    assert recalibration_idx < intel_idx
     assert intel_idx < pr_replay_idx
     assert intel_idx < nightly_replay_idx
 

@@ -55,6 +55,12 @@ jobs:
           ! grep -rEn "(POST|PUT|curl.*(-X|--request)).*?(apple|signpath|developer\.apple\.com|notarytool|app-store-connect|app\.signpath\.io)" .github/workflows/eval.yml scripts/eval/ 2>/dev/null || \
             ( echo "P46 VIOLATION: workflow / eval scripts attempt apple/signpath POST/PUT" && exit 1 )
 
+      - name: Validate INTEL recalibration log
+        run: |
+          uv run python scripts/eval/intel_recalibration_log_validate.py \
+            eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md \
+            --json
+
       - name: Run INTEL fixture gate
         run: |
           uv run python scripts/eval/intel_gate.py \
