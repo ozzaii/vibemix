@@ -24,6 +24,8 @@ def test_intel_recalibration_log_documents_private_split_contract() -> None:
     assert "report_hashes: gold_report=sha256:<hash> scorecard=sha256:<hash>" in text
     assert "private gold-label report and private scorecard" in text
     assert "non-null `gate=sha256:<hash>`" in text
+    assert "recomputes pass/fail" in text
+    assert "verdict/action pairs" in text
     assert "intel_recalibration_log_validate.py" in text
     assert "local_paths_redacted=true" in text
     assert "ids_hashed=true" in text

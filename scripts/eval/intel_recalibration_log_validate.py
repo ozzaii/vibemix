@@ -141,7 +141,8 @@ def _validate_entry(entry: str, *, index: int) -> list[str]:
             errors.append(f"entry[{index}].label_kinds.{kind}")
 
     errors.extend(_validate_report_bindings(fields, index=index, verdict=header_verdict))
-    errors.extend(_validate_metric_lines(fields, index=index))
+    metric_errors, metric_failures = _validate_metric_lines(fields, index=index)
+    errors.extend(metric_errors)
 
     privacy = _parse_key_values(fields.get("privacy", ""))
     for key, expected in EXPECTED_PRIVACY.items():
@@ -154,13 +155,25 @@ def _validate_entry(entry: str, *, index: int) -> list[str]:
         errors.append(f"entry[{index}].action")
     if header_verdict == "release_promoted" and fields.get("action") != "PROMOTE_LOCK_WITH_PR":
         errors.append(f"entry[{index}].release_action")
+    if (
+        header_verdict == "private_recalibration_required"
+        and fields.get("action") != "RECALIBRATION_REQUIRED"
+    ):
+        errors.append(f"entry[{index}].recalibration_action")
+    if header_verdict == "private_in_tolerance" and fields.get("action") != "none":
+        errors.append(f"entry[{index}].tolerance_action")
     if header_verdict != "release_promoted" and fields.get("action") == "PROMOTE_LOCK_WITH_PR":
         errors.append(f"entry[{index}].action_without_release")
+    if metric_failures and header_verdict != "private_recalibration_required":
+        errors.append(f"entry[{index}].verdict.metric_failures:{','.join(metric_failures)}")
+    if header_verdict == "private_recalibration_required" and not metric_failures:
+        errors.append(f"entry[{index}].verdict.no_metric_failures")
     return errors
 
 
-def _validate_metric_lines(fields: dict[str, str], *, index: int) -> list[str]:
+def _validate_metric_lines(fields: dict[str, str], *, index: int) -> tuple[list[str], list[str]]:
     errors: list[str] = []
+    failures: list[str] = []
     measured = _parse_key_values(fields.get("measured", ""))
     locked = _parse_key_values(fields.get("locked", ""))
     delta = _parse_key_values(fields.get("delta", ""))
@@ -192,7 +205,11 @@ def _validate_metric_lines(fields: dict[str, str], *, index: int) -> list[str]:
         expected_delta = measured_value - locked_value
         if abs(delta_value - expected_delta) > 0.011:
             errors.append(f"entry[{index}].delta.{spec.metric}.mismatch")
-    return errors
+        if spec.direction == "min" and measured_value < locked_value:
+            failures.append(spec.metric)
+        if spec.direction == "max" and measured_value > locked_value:
+            failures.append(spec.metric)
+    return errors, failures
 
 
 def _metric_value(

@@ -108,6 +108,39 @@ def test_validate_rejects_unsigned_delta(tmp_path: Path) -> None:
     assert "entry[1].delta.section_role_hit_at_5_delta.numeric" in report.errors
 
 
+def test_validate_rejects_in_tolerance_verdict_with_failed_metric(tmp_path: Path) -> None:
+    entry = _replace_field(
+        _valid_entry(),
+        "measured",
+        "section_role_hit_at_5_delta=0.10 transition_accept_at_3=1.00 "
+        "decision_exact_timing_floor_violation_rate=0.00 "
+        "taste_accepted_suggestion_lift=0.18",
+    )
+    entry = _replace_field(
+        entry,
+        "delta",
+        "section_role_hit_at_5_delta=-0.05 transition_accept_at_3=+0.20 "
+        "decision_exact_timing_floor_violation_rate=+0.00 "
+        "taste_accepted_suggestion_lift=+0.08",
+    )
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].verdict.metric_failures:section_role_hit_at_5_delta" in report.errors
+
+
+def test_validate_rejects_action_that_disagrees_with_verdict(tmp_path: Path) -> None:
+    entry = _replace_field(_valid_entry(), "action", "RECALIBRATION_REQUIRED")
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].tolerance_action" in report.errors
+
+
 def test_validate_release_promotion_requires_gate_report_hash(tmp_path: Path) -> None:
     entry = _valid_entry().replace(
         "### 2026-05-27T12:00:00Z - verdict=private_in_tolerance",

@@ -37,6 +37,8 @@ does not exist yet; do not omit the field. Real entries must always bind the
 private gold-label report and private scorecard to non-null SHA-256 hashes.
 `release_promoted` entries must also bind the gate artifact to a non-null
 SHA-256 hash.
+The validator recomputes pass/fail from the measured/locked metric lines and
+rejects verdict/action pairs that disagree with those numbers.
 
 ```text
 ### YYYY-MM-DDTHH:MM:SSZ - verdict={private_in_tolerance|private_recalibration_required|release_promoted}
