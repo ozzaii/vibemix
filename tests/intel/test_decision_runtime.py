@@ -57,13 +57,22 @@ def _snapshot(
     blend: bool = False,
     include_candidates: bool = True,
     prepared_target_track_id: str | None = None,
+    source_loop_recent: bool = False,
 ) -> RuntimeInputSnapshot:
     source = _section("t1#s000", "t1", "outro", "F")
     destination = _section("t2#s000", "t2", "intro", "A")
     live_position = (
-        LivePosition(remaining_bars=16, playhead_confidence=0.95)
+        LivePosition(
+            remaining_bars=16,
+            playhead_confidence=0.95,
+            source_loop_recent=source_loop_recent,
+        )
         if exact_timing
-        else LivePosition(remaining_bars=16, playhead_confidence=0.55)
+        else LivePosition(
+            remaining_bars=16,
+            playhead_confidence=0.55,
+            source_loop_recent=source_loop_recent,
+        )
     )
     slate = score_transition_slate(
         TransitionScoringInput(
@@ -81,6 +90,8 @@ def _snapshot(
             "track_id": "t1" if current_track else None,
             "blend_suppressed": blend,
             "prepared_target_track_id": prepared_target_track_id,
+            "source_loop_recent": source_loop_recent,
+            "playhead_confidence": live_position.playhead_confidence,
         },
         candidates=slate,
     )
@@ -142,6 +153,16 @@ def test_live_pill_drops_timing_when_playhead_is_weak() -> None:
     assert result.final_decision.timing_text is None
     assert "cue A" in result.final_decision.spoken_text
     assert "bars" not in result.final_decision.spoken_text
+
+
+def test_live_pill_names_loop_hold_when_timing_is_withheld_by_source_loop() -> None:
+    result = decide("live", "live_next_pill", _snapshot(source_loop_recent=True))
+
+    assert result.final_decision.action == "select"
+    assert result.validation_result.accepted is True
+    assert result.final_decision.timing_text is None
+    assert "loop held" in result.final_decision.spoken_text
+    assert "risk" in result.final_decision.cited_claims
 
 
 def test_live_pill_suppresses_when_prepared_target_deck_disagrees() -> None:

@@ -126,6 +126,40 @@ def test_phrase_boundary_copy_requires_phrase_claim() -> None:
     assert "missing_claim_id_for_phrase" in result.errors
 
 
+def test_loop_held_copy_requires_risk_claim() -> None:
+    envelope = _envelope(claim_summary=())
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="Loop held.",
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_risk" in result.errors
+
+
+def test_loop_held_copy_accepts_matching_risk_claim_id() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "risk"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="Loop held.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
 def test_section_texture_copy_accepts_matching_claim_id() -> None:
     envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "semantic_match"),))
 

@@ -268,8 +268,11 @@ def _deterministic_decision(
     role_pair = _role_pair_text(candidate.get("from_role"), candidate.get("to_role"))
     role_suffix = f", {role_pair}" if role_pair else ""
     track_short = str(candidate.get("to_track_id") or "next track")
+    loop_hold = _loop_hold_active(envelope, candidate)
     if timing_text:
         spoken = f"Next good entry: {track_short} {cue_text}{role_suffix}, {timing_text}."
+    elif loop_hold:
+        spoken = f"Next good entry: {track_short} from {cue_text}{role_suffix}, loop held."
     else:
         spoken = f"Next good entry: {track_short} from {cue_text}{role_suffix}."
     cited_claim_ids = _claim_ids_for_candidate(
@@ -278,6 +281,7 @@ def _deterministic_decision(
         include_timing=timing_text is not None,
         include_structure=role_pair is not None,
         include_boundary=cue_start_label is not None,
+        include_risk=loop_hold,
     )
     return AgentDecision(
         schema_version=SCHEMA_VERSION,
@@ -299,6 +303,7 @@ def _claim_ids_for_candidate(
     include_timing: bool,
     include_structure: bool,
     include_boundary: bool,
+    include_risk: bool = False,
 ) -> tuple[str, ...]:
     candidate_id = str(candidate.get("candidate_id"))
     candidate_claims = {"transition_fit", "cue_slot"}
@@ -325,7 +330,35 @@ def _claim_ids_for_candidate(
             ids.append(str(row["claim_id"]))
         elif claim_type in section_claims and subject_id in section_ids:
             ids.append(str(row["claim_id"]))
+        elif include_risk and _is_loop_hold_risk_claim(row):
+            ids.append(str(row["claim_id"]))
     return tuple(ids)
+
+
+def _loop_hold_active(envelope: AgentContextEnvelope, candidate: dict) -> bool:
+    if "source_loop_recent" in _string_tuple(candidate.get("risk_flags")):
+        return True
+    source_context = envelope.current.get("source_context")
+    if isinstance(source_context, dict):
+        if source_context.get("source_loop_recent") is True:
+            return True
+        if _nonempty_str(source_context.get("section_clock")) == "loop_hold":
+            return True
+    return any(_is_loop_hold_risk_claim(row) for row in envelope.claim_summary)
+
+
+def _is_loop_hold_risk_claim(row: dict) -> bool:
+    if row.get("type") != "risk":
+        return False
+    value = _nonempty_str(row.get("value"))
+    reasons = _string_tuple(row.get("reason_codes"))
+    return value == "source_loop_recent" or "source_loop_recent" in reasons
+
+
+def _string_tuple(value: object) -> tuple[str, ...]:
+    if not isinstance(value, (list, tuple)):
+        return ()
+    return tuple(item for item in value if isinstance(item, str) and item)
 
 
 def _prepared_target_mismatch(envelope: AgentContextEnvelope) -> str | None:

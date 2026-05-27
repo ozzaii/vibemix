@@ -590,6 +590,8 @@ def test_recent_source_loop_keeps_cue_but_withholds_exact_timing():
     assert payload is not None
     assert payload["action"] == "select"
     assert payload["timing_text"] is None
+    assert "loop held" in payload["spoken_text"]
+    assert "risk" in payload["cited_claims"]
 
 
 def test_live_context_carries_current_and_next_source_sections():

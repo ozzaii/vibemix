@@ -527,6 +527,13 @@ def _add_source_context_claims(
 ) -> None:
     source_context = current.get("source_context")
     if not isinstance(source_context, dict):
+        if bool(current.get("source_loop_recent")):
+            _add_source_loop_risk_claim(
+                ledger,
+                subject_id=_optional_str(current.get("active_track_id")) or "source",
+                source_ref=f"current:{packet_id}",
+                confidence=_score_component(current, "playhead_confidence", 0.0),
+            )
         return
     source_ref = f"source_context:{packet_id}"
     playhead_confidence = _score_component(source_context, "playhead_confidence", 0.0)
@@ -597,18 +604,33 @@ def _add_source_context_claims(
             )
 
     if bool(source_context.get("source_loop_recent")):
-        ledger.add(
-            "risk",
+        _add_source_loop_risk_claim(
+            ledger,
             subject_id=track_id,
-            value="source_loop_recent",
-            evidence_refs=(source_ref,),
-            confidence=max(playhead_confidence, 0.78),
-            scope="live_timing",
-            allowed_phrases=("loop held", "source loop held"),
-            forbidden_phrases=("natural countdown is exact",),
-            reason_codes=("source_loop_recent",),
-            provenance_ref=source_ref,
+            source_ref=source_ref,
+            confidence=playhead_confidence,
         )
+
+
+def _add_source_loop_risk_claim(
+    ledger: MusicClaimLedger,
+    *,
+    subject_id: str,
+    source_ref: str,
+    confidence: float,
+) -> None:
+    ledger.add(
+        "risk",
+        subject_id=subject_id,
+        value="source_loop_recent",
+        evidence_refs=(source_ref,),
+        confidence=max(confidence, 0.78),
+        scope="live_timing",
+        allowed_phrases=("loop held", "source loop held"),
+        forbidden_phrases=("natural countdown is exact",),
+        reason_codes=("source_loop_recent",),
+        provenance_ref=source_ref,
+    )
 
 
 def _source_section_payload(raw: Any) -> dict[str, Any] | None:

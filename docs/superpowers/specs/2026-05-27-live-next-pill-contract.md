@@ -97,6 +97,10 @@ issues `current_position`, `section_role`, `section_boundary`, and eligible
 deck was looped recently, it issues a `risk` claim instead of source-section bar
 countdown claims, so model-written copy can say "loop held" without claiming the
 natural countdown is exact.
+The claim validator treats "loop held" language as risk language: a decision
+must cite an issued `risk` or `uncertainty` claim before that phrase can be
+emitted. The deterministic live-pill path cites the loop risk claim when it
+uses that wording.
 
 ## Wire payload
 

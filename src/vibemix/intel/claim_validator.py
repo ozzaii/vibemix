@@ -21,6 +21,7 @@ _ENERGY_RE = re.compile(r"\b(?:energy|intensity|energy\s+shape)\b", re.I)
 _PHRASE_RE = re.compile(r"\b(?:phrase|downbeat|bar\s+line|boundary)\b", re.I)
 _EXPORT_RE = re.compile(r"\b(?:exported|wrote|saved)\b", re.I)
 _TASTE_RE = re.compile(r"\b(?:you usually|your preference|you like)\b", re.I)
+_RISK_RE = re.compile(r"\b(?:loop\s+held|source\s+loop|risk)\b", re.I)
 
 _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "timing": frozenset({"bars_until_event", "current_position"}),
@@ -33,6 +34,7 @@ _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "phrase": frozenset({"phrase_fit"}),
     "export": frozenset({"export_result"}),
     "taste": frozenset({"taste_preference", "taste_fit", "taste_uncertain"}),
+    "risk": frozenset({"risk", "uncertainty"}),
 }
 
 
@@ -104,6 +106,7 @@ def _claim_families_implied_by_text(text: str) -> tuple[str, ...]:
         ("phrase", _PHRASE_RE),
         ("export", _EXPORT_RE),
         ("taste", _TASTE_RE),
+        ("risk", _RISK_RE),
     )
     for family, pattern in checks:
         if pattern.search(text):
