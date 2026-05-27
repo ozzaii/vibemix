@@ -168,6 +168,57 @@ def test_loop_held_copy_accepts_matching_risk_claim_id() -> None:
     assert result.accepted
 
 
+def test_stayed_quiet_phrase_requires_suppression_claim() -> None:
+    envelope = _envelope(claim_summary=())
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="I stayed quiet because playhead confidence was low.",
+            confidence=0.8,
+        ),
+    )
+
+    assert not result.accepted
+    assert "missing_claim_id_for_suppression" in result.errors
+
+
+def test_stayed_quiet_phrase_accepts_decision_suppression_claim() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "decision_suppressed"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="I stayed quiet because playhead confidence was low.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
+def test_suppressed_timing_phrase_accepts_blend_suppression_claim() -> None:
+    envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "blend_suppression"),))
+
+    result = validate_decision_claims(
+        envelope,
+        AgentDecision(
+            schema_version="intel_context_v1",
+            action="hold",
+            spoken_text="I suppressed exact timing during the blend.",
+            cited_claim_ids=("clm_ctx_001_000",),
+            confidence=0.8,
+        ),
+    )
+
+    assert result.accepted
+
+
 def test_section_texture_copy_accepts_matching_claim_id() -> None:
     envelope = _envelope(claim_summary=(_claim("clm_ctx_001_000", "semantic_match"),))
 

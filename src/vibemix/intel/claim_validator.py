@@ -32,6 +32,10 @@ _EXPORT_READY_RE = re.compile(
 _REVIEW_ONLY_RE = re.compile(r"\b(?:review[- ]only|needs\s+review|for\s+review)\b", re.I)
 _TASTE_RE = re.compile(r"\b(?:you usually|your preference|you like)\b", re.I)
 _RISK_RE = re.compile(r"\b(?:loop\s+held|source\s+loop|risk)\b", re.I)
+_SUPPRESSION_RE = re.compile(
+    r"\b(?:stayed\s+quiet|kept\s+quiet|held\s+back|suppressed|stayed\s+silent)\b",
+    re.I,
+)
 
 _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "timing": frozenset({"bars_until_event", "current_position"}),
@@ -46,6 +50,7 @@ _REQUIRED_TYPES: dict[str, frozenset[str]] = {
     "playlist": frozenset({"playlist_created"}),
     "taste": frozenset({"taste_preference", "taste_fit", "taste_uncertain"}),
     "risk": frozenset({"risk", "uncertainty"}),
+    "suppression": frozenset({"decision_suppressed", "blend_suppression"}),
 }
 
 
@@ -120,6 +125,7 @@ def _claim_families_implied_by_text(text: str) -> tuple[str, ...]:
         ("playlist", _PLAYLIST_ACTION_RE),
         ("taste", _TASTE_RE),
         ("risk", _RISK_RE),
+        ("suppression", _SUPPRESSION_RE),
     )
     for family, pattern in checks:
         if pattern.search(text):

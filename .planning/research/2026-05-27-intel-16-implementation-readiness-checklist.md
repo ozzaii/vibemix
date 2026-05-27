@@ -444,6 +444,8 @@ Acceptance evidence:
 - review-only cues cannot be called export-ready;
 - exported/saved language requires an action-success claim;
 - playlist/M3U/JSON creation language requires a `playlist_created` action claim;
+- stayed-quiet / suppressed-output explanations require a `decision_suppressed`
+  or `blend_suppression` claim;
 - missing claim evidence degrades live output;
 - claim ledger redacts local paths, vectors, and audio from evidence refs,
   subjects, values, and model-visible phrase payloads;
