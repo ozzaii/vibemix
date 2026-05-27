@@ -462,6 +462,10 @@ def test_compute_from_state_threads_live_bar_timing_into_transition():
     assert payload["candidate_id"] == "tr_001"
     assert payload["cue_slot"] == "A"
     assert payload["timing_text"] == "in 13 bars"
+    assert payload["suppressed_reasons"] == []
+    assert {"current_track", "candidate_slate"} <= {
+        gate["name"] for gate in payload["gate_results"]
+    }
 
 
 def test_controller_blend_keeps_transition_but_suppresses_select_decision():
@@ -519,6 +523,12 @@ def test_controller_blend_keeps_transition_but_suppresses_select_decision():
     assert payload is not None
     assert payload["action"] == "suppress"
     assert payload["emitted"] is False
+    assert payload["suppressed_reasons"] == ["blend_active"]
+    assert {
+        "name": "blend",
+        "status": "suppress",
+        "reason": "blend_active",
+    } in payload["gate_results"]
 
 
 def test_refresh_from_state_updates_transition_countdown_without_reranking():
@@ -807,6 +817,12 @@ def test_decision_suppresses_when_loaded_target_deck_track_is_not_selected():
     assert payload is not None
     assert payload["action"] == "suppress"
     assert payload["emitted"] is False
+    assert payload["suppressed_reasons"] == ["prepared_target_mismatch:b"]
+    assert {
+        "name": "prepared_target",
+        "status": "suppress",
+        "reason": "prepared_target_mismatch:b",
+    } in payload["gate_results"]
 
 
 def test_refresh_from_state_follows_grounded_track_loaded_on_target_deck_without_reranking():

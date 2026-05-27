@@ -696,6 +696,11 @@ class SuggestionService:
             "emitted": result.emitted,
             "validation_status": result.validation_result.status,
             "validation_errors": list(result.validation_result.errors),
+            "suppressed_reasons": list(result.trace.suppressed_reasons),
+            "gate_results": [
+                {"name": gate.name, "status": gate.status, "reason": gate.reason}
+                for gate in result.trace.gate_results
+            ],
             "action": decision.action,
             "candidate_id": decision.candidate_id,
             "cue_slot": decision.cue_slot,

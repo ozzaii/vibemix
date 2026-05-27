@@ -255,6 +255,8 @@ Important fields:
 - `emitted`
 - `validation_status`
 - `validation_errors`
+- `suppressed_reasons`
+- `gate_results`
 - `action`: usually `select`, `hold`, or `suppress`
 - `candidate_id`
 - `cue_slot`
@@ -267,6 +269,9 @@ Important fields:
 The decision runtime should cite claims for musical claims it makes. For
 example, if the spoken text mentions cue, timing, section roles, or a semantic
 match, the cited claims must support those facts.
+Suppressed decisions carry compact gate reasons so the UI can distinguish
+honest silence, active blending, and prepared-deck conflict without asking a
+model to infer why the pill did not emit.
 
 ## Grounding rules
 
