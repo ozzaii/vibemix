@@ -64,8 +64,9 @@ and provenance-hash evidence; the release gate requires recent runs to report
 `"valid": true` and to match the current INTEL fixture-manifest and
 threshold-lock hashes, including the parsed INTEL threshold values. It also
 rejects artifacts where the fixture-audit stage and scorecard provenance
-disagree about the fixture manifest; the INTEL gate marks such artifacts invalid
-at generation time too.
+disagree about the fixture manifest. The INTEL gate also marks artifacts invalid
+at generation time when scorecard provenance and the provenance-validation stage
+disagree about their dataset, fixture, threshold, replay-tier, or lock hashes.
 
 ## 2-Judge Architecture (high level)
 

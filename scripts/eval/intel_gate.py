@@ -76,10 +76,6 @@ def run_intel_gate(
                 "replay_tier": scorecard_provenance.get("replay_tier"),
             },
         }
-        consistency_errors = _cross_stage_consistency_errors(fixture_result, scorecard_result)
-        if consistency_errors:
-            errors.extend(consistency_errors)
-            scorecard_result["errors"] = [*scorecard_result["errors"], *consistency_errors]
     except Exception as exc:
         errors.append(f"scorecard: {type(exc).__name__}: {exc}")
         scorecard_result = {
@@ -109,6 +105,19 @@ def run_intel_gate(
         }
         if not provenance.valid:
             errors.extend(f"provenance: {error}" for error in provenance.errors)
+
+    consistency_errors = _cross_stage_consistency_errors(
+        fixture_result,
+        scorecard_result,
+        provenance_result,
+    )
+    if consistency_errors:
+        errors.extend(consistency_errors)
+        scorecard_result["errors"] = [*scorecard_result.get("errors", []), *consistency_errors]
+        provenance_result["errors"] = [
+            *provenance_result.get("errors", []),
+            *consistency_errors,
+        ]
 
     return {
         "schema": "intel_gate_v1",
@@ -144,22 +153,62 @@ def _scorecard_errors(scorecard: dict[str, Any]) -> list[str]:
 
 
 def _cross_stage_consistency_errors(
-    fixture_result: dict[str, Any], scorecard_result: dict[str, Any]
+    fixture_result: dict[str, Any],
+    scorecard_result: dict[str, Any],
+    provenance_result: dict[str, Any],
 ) -> list[str]:
-    fixture_manifest_hash = fixture_result.get("manifest_hash")
-    scorecard_manifest_hash = (
-        (scorecard_result.get("provenance") or {}).get("fixture_manifest_hash")
+    scorecard_provenance = (
+        scorecard_result.get("provenance")
         if isinstance(scorecard_result.get("provenance"), dict)
-        else None
+        else {}
     )
-    if not fixture_manifest_hash or not scorecard_manifest_hash:
-        return ["provenance_consistency: fixture manifest hash missing"]
-    if fixture_manifest_hash != scorecard_manifest_hash:
-        return [
-            "provenance_consistency: fixture_audit.manifest_hash "
-            "!= scorecard.provenance.fixture_manifest_hash"
-        ]
-    return []
+    errors = []
+    _require_equal(
+        errors,
+        "fixture_audit.manifest_hash",
+        fixture_result.get("manifest_hash"),
+        "scorecard.provenance.fixture_manifest_hash",
+        scorecard_provenance.get("fixture_manifest_hash"),
+    )
+    for key in (
+        "dataset_card_id",
+        "fixture_version",
+        "fixture_manifest_hash",
+        "thresholds_hash",
+        "replay_tier",
+    ):
+        _require_equal(
+            errors,
+            f"scorecard.provenance.{key}",
+            scorecard_provenance.get(key),
+            f"provenance.{key}",
+            provenance_result.get(key),
+        )
+    _require_equal(
+        errors,
+        "scorecard.provenance.threshold_lock_hash",
+        scorecard_provenance.get("threshold_lock_hash"),
+        "provenance.threshold_lock.hash",
+        (
+            provenance_result.get("threshold_lock", {}).get("hash")
+            if isinstance(provenance_result.get("threshold_lock"), dict)
+            else None
+        ),
+    )
+    return errors
+
+
+def _require_equal(
+    errors: list[str],
+    left_label: str,
+    left: Any,
+    right_label: str,
+    right: Any,
+) -> None:
+    if not left or not right:
+        errors.append(f"provenance_consistency: {left_label} or {right_label} missing")
+    elif left != right:
+        errors.append(f"provenance_consistency: {left_label} != {right_label}")
 
 
 def render_markdown_summary(result: dict[str, Any]) -> str:

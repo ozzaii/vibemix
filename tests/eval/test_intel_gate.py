@@ -46,6 +46,14 @@ def test_run_intel_gate_passes_public_fixture_corpus() -> None:
         result["stages"]["fixture_audit"]["manifest_hash"]
         == result["stages"]["scorecard"]["provenance"]["fixture_manifest_hash"]
     )
+    assert (
+        result["stages"]["scorecard"]["provenance"]["thresholds_hash"]
+        == result["stages"]["provenance"]["thresholds_hash"]
+    )
+    assert (
+        result["stages"]["scorecard"]["provenance"]["threshold_lock_hash"]
+        == result["stages"]["provenance"]["threshold_lock"]["hash"]
+    )
     assert result["stages"]["scorecard"]["provenance"]["threshold_lock_hash"].startswith("sha256:")
 
 
@@ -82,6 +90,40 @@ def test_run_intel_gate_fails_on_cross_stage_manifest_hash_mismatch(monkeypatch)
     assert any("provenance_consistency" in error for error in result["errors"])
     assert any(
         "provenance_consistency" in error for error in result["stages"]["scorecard"]["errors"]
+    )
+    assert any(
+        "provenance_consistency" in error for error in result["stages"]["provenance"]["errors"]
+    )
+
+
+def test_run_intel_gate_fails_on_scorecard_vs_provenance_threshold_hash_mismatch(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
+    from scripts.eval import intel_provenance_report
+
+    real_validate = intel_provenance_report.validate_scorecard_provenance
+
+    def mismatched_provenance(*args: Any, **kwargs: Any):  # type: ignore[no-untyped-def]
+        report = real_validate(*args, **kwargs)
+        summary = dict(report.summary)
+        summary["thresholds_hash"] = "sha256:" + ("1" * 64)
+        return type(report)(valid=report.valid, errors=report.errors, summary=summary)
+
+    monkeypatch.setattr(
+        intel_provenance_report,
+        "validate_scorecard_provenance",
+        mismatched_provenance,
+    )
+
+    result = run_intel_gate(
+        fixture_dir=DEFAULT_FIXTURE_DIR,
+        threshold_lock=DEFAULT_THRESHOLD_LOCK,
+    )
+
+    assert result["valid"] is False
+    assert any(
+        "scorecard.provenance.thresholds_hash != provenance.thresholds_hash" in error
+        for error in result["errors"]
     )
 
 
