@@ -1,9 +1,10 @@
-"""Offline `library stats --json` CLI — indexed/backend/failed for the desktop header.
+"""Offline `library stats --json` CLI for the desktop header.
 
 The handler must read ONLY the local store row count (no Gemini / genai /
-httpx), emit valid JSON even when the store is empty/unavailable, and report
-``indexed: N`` for an N-row store. These tests isolate ALL on-disk caches to
-a tmp dir per CLAUDE.md (never touch the real ~/.cache/vibemix/library.db or
+httpx), emit valid JSON even when the store is empty/unavailable, report
+``indexed: N`` for an N-row store, and surface the active embedding
+backend/dimension for the UI header. These tests isolate ALL on-disk caches to a
+tmp dir per CLAUDE.md (never touch the real ~/.cache/vibemix/library.db or
 library.pkl).
 """
 
@@ -18,9 +19,11 @@ import numpy as np
 import pytest
 
 import vibemix.__main__ as m
-from vibemix.library._cosine import EMBEDDING_DIM
+from vibemix.library._cosine import EMBED_BACKEND, EMBEDDING_DIM
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.library.store import LibraryStore
+
+_TEST_CLAP_MODEL_PATH = "/tmp/vibemix-test-clap-onnx"
 
 
 @pytest.fixture(autouse=True)
@@ -29,6 +32,27 @@ def _isolate_caches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         RekordboxLibrary, "CACHE_PATH", tmp_path / "library.pkl", raising=False
     )
+    import vibemix.library.clap_engine as clap_engine
+
+    monkeypatch.setattr(
+        clap_engine,
+        "onnx_model_status",
+        lambda: {
+            "installed": True,
+            "path": _TEST_CLAP_MODEL_PATH,
+            "missing": [],
+        },
+    )
+    import vibemix.library.codex_curate as codex_curate
+
+    codex_home = tmp_path / "codex"
+    codex_home.mkdir()
+    (codex_home / "auth.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    monkeypatch.delenv("VIBEMIX_LIBRARY_AGENT_BACKEND", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("VIBEMIX_PROXY_JWT", raising=False)
+    monkeypatch.setattr(codex_curate, "find_codex", lambda codex_path=None: "/usr/bin/codex")
 
 
 def _seed_sqlite_store(db_path: Path, n: int) -> None:
@@ -50,6 +74,23 @@ def _run_handler(monkeypatch: pytest.MonkeyPatch) -> dict:
     rc = m._cmd_library_stats(argparse.Namespace(json=True))
     assert rc == 0
     return json.loads(buf.getvalue())
+
+
+def _expected_payload(indexed: int, backend: str) -> dict:
+    return {
+        "indexed": indexed,
+        "backend": backend,
+        "embedding_backend": EMBED_BACKEND,
+        "embedding_dim": EMBEDDING_DIM,
+        "clap_model_installed": True,
+        "clap_model_path": _TEST_CLAP_MODEL_PATH,
+        "clap_model_missing": [],
+        "agent_backend": "codex",
+        "agent_ready": True,
+        "agent_status": "ready",
+        "agent_hint": "",
+        "failed": 0,
+    }
 
 
 def test_seeded_store_reports_indexed_count(
@@ -74,7 +115,7 @@ def test_seeded_store_reports_indexed_count(
     )
 
     payload = _run_handler(monkeypatch)
-    assert payload == {"indexed": 5, "backend": "sqlite-vec", "failed": 0}
+    assert payload == _expected_payload(5, "sqlite-vec")
 
 
 def test_empty_store_reports_zero(
@@ -91,6 +132,8 @@ def test_empty_store_reports_zero(
     payload = _run_handler(monkeypatch)
     assert payload["indexed"] == 0
     assert payload["backend"] == "sqlite-vec"
+    assert payload["embedding_backend"] == EMBED_BACKEND
+    assert payload["embedding_dim"] == EMBEDDING_DIM
     assert payload["failed"] == 0
 
 
@@ -104,7 +147,7 @@ def test_store_unavailable_emits_valid_json_no_crash(
 
     payload = _run_handler(monkeypatch)
     # Never crashes, never networks — header must still render.
-    assert payload == {"indexed": 0, "backend": "unknown", "failed": 0}
+    assert payload == _expected_payload(0, "unknown")
 
 
 def test_json_shape_keys_exact(
@@ -120,10 +163,71 @@ def test_json_shape_keys_exact(
     )
 
     payload = _run_handler(monkeypatch)
-    assert set(payload.keys()) == {"indexed", "backend", "failed"}
+    assert set(payload.keys()) == {
+        "indexed",
+        "backend",
+        "embedding_backend",
+        "embedding_dim",
+        "clap_model_installed",
+        "clap_model_path",
+        "clap_model_missing",
+        "agent_backend",
+        "agent_ready",
+        "agent_status",
+        "agent_hint",
+        "failed",
+    }
     assert isinstance(payload["indexed"], int)
+    assert isinstance(payload["embedding_backend"], str)
+    assert isinstance(payload["embedding_dim"], int)
+    assert isinstance(payload["clap_model_installed"], bool)
+    assert isinstance(payload["clap_model_path"], str)
+    assert isinstance(payload["clap_model_missing"], list)
+    assert isinstance(payload["agent_backend"], str)
+    assert isinstance(payload["agent_ready"], bool)
+    assert isinstance(payload["agent_status"], str)
+    assert isinstance(payload["agent_hint"], str)
     assert isinstance(payload["failed"], int)
     assert payload["failed"] == 0
+
+
+def test_agent_status_reports_codex_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import vibemix.library.codex_curate as codex_curate
+    from vibemix.library.index_sqlite_vec import SqliteVecStore
+
+    db_path = tmp_path / "library.db"
+    monkeypatch.setattr(
+        "vibemix.library.store.open_store",
+        lambda *a, **k: LibraryStore(SqliteVecStore(db_path=db_path)),
+    )
+    monkeypatch.setattr(codex_curate, "find_codex", lambda codex_path=None: None)
+
+    payload = _run_handler(monkeypatch)
+    assert payload["agent_backend"] == "codex"
+    assert payload["agent_ready"] is False
+    assert payload["agent_status"] == "codex_not_installed"
+    assert "codex login" in payload["agent_hint"]
+
+
+def test_agent_status_ignores_stale_gemini_backend_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from vibemix.library.index_sqlite_vec import SqliteVecStore
+
+    db_path = tmp_path / "library.db"
+    monkeypatch.setenv("VIBEMIX_LIBRARY_AGENT_BACKEND", "gemini")
+    monkeypatch.setattr(
+        "vibemix.library.store.open_store",
+        lambda *a, **k: LibraryStore(SqliteVecStore(db_path=db_path)),
+    )
+
+    payload = _run_handler(monkeypatch)
+    assert payload["agent_backend"] == "codex"
+    assert payload["agent_ready"] is True
+    assert payload["agent_status"] == "ready"
+    assert payload["agent_hint"] == ""
 
 
 def test_subcommand_routes_through_cli(
@@ -143,4 +247,4 @@ def test_subcommand_routes_through_cli(
     assert rc == 0
     out = capsys.readouterr().out
     payload = json.loads(out)
-    assert payload == {"indexed": 3, "backend": "sqlite-vec", "failed": 0}
+    assert payload == _expected_payload(3, "sqlite-vec")

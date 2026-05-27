@@ -21,7 +21,7 @@ so no test can clobber the real ``~/.cache/vibemix/`` (library.pkl /
 genre_prototypes.npy). The ``_route_caches_to_tmp`` autouse fixture does this for
 every test in the file; a real-cache mtime spot-check pins the mitigation.
 
-Honest green: synthetic 1536-dim corpus, no live API, no GEMINI_API_KEY.
+Honest green: synthetic EMBEDDING_DIM corpus, no live API, no GEMINI_API_KEY.
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ def _route_caches_to_tmp(tmp_path: Path, monkeypatch):
     # The new prototype sidecar path (lands in Plan 03 as a module global mirroring
     # CENTROID_PATH). raising=False so this is a no-op until the module exists.
     try:
-        import vibemix.library.genre_prototypes as gp_mod  # noqa: F401
+        import vibemix.library.genre_prototypes as gp_mod
 
         monkeypatch.setattr(
             gp_mod, "PROTOTYPES_PATH", tmp_path / "genre_prototypes.npy", raising=False
@@ -131,8 +131,8 @@ def test_unknown_excluded_from_prototypes():
 def test_all_unknown_corpus_yields_empty_table():
     """WR-04 — an all-"unknown" corpus yields an empty prototype table, so
     classify abstains ("unknown", 0.0) rather than building a junk prototype."""
-    from vibemix.library.genre_prototypes import build_prototypes, classify
     from vibemix.library.centering import compute_centroid
+    from vibemix.library.genre_prototypes import build_prototypes, classify
 
     vectors = _anisotropic_corpus(n=8)
     ids = [f"t{i:03d}" for i in range(8)]
@@ -172,7 +172,7 @@ def test_correct_genre_not_margin_suppressed_by_unknown():
     # test isolates the "unknown does not compete" property, not the cosine
     # geometry of the synthetic corpus).
     own = label_of[ids[0]]
-    label, conf = classify(vectors[0], protos, labels, centroid, floor=0.0, margin=0.0)
+    label, _conf = classify(vectors[0], protos, labels, centroid, floor=0.0, margin=0.0)
     assert label == own
     assert label != "unknown"
 
@@ -202,7 +202,7 @@ def test_classify_floor_and_margin():
     assert 0.0 <= conf <= 1.0
 
     # An impossibly high floor → forces abstain regardless of nearest match.
-    label_floor, conf_floor = classify(
+    label_floor, _conf_floor = classify(
         vectors[0], protos, labels, centroid, floor=0.999, margin=0.0
     )
     assert label_floor == "unknown"
@@ -257,7 +257,6 @@ def test_classify_playing_unknown_track_abstains_no_api(monkeypatch):
     """``classify_playing`` on a track NOT in the library returns
     ``("unknown", 0.0)`` WITHOUT any live embed (RESEARCH A1, €0)."""
     import vibemix.library.genre_prototypes as gp
-
     from vibemix.library.genre_prototypes import GenrePrototypeLookup
 
     vectors, ids, label_of = _labeled_corpus(n=12)

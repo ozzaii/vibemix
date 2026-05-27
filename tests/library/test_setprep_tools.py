@@ -18,14 +18,20 @@ fake store + in-memory library; energy is monkeypatched.
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
+
 import numpy as np
 import pytest
 
 from vibemix.library import energy as energy_mod
 from vibemix.library import toolset as tool_mod
-from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
+from vibemix.library.rekordbox import (
+    CuePoint,
+    RekordboxLibrary,
+    TempoNode,
+    TrackEntry,
+)
 from vibemix.library.toolset import LibraryToolset
-
 
 # --------------------------------------------------------------------------- #
 # Fixtures — mirror test_discovery.py / test_next_suggestion.py fakes.
@@ -68,10 +74,7 @@ def library() -> RekordboxLibrary:
     lib = RekordboxLibrary()
     # Spread keys so harmonic gates pass, distinct enough to sequence.
     keys = ["8A", "9A", "8B", "7A", "8A"]
-    lib.tracks = {
-        f"t{i:03d}": _track(f"t{i:03d}", bpm=124.0 + i, key=keys[i])
-        for i in range(5)
-    }
+    lib.tracks = {f"t{i:03d}": _track(f"t{i:03d}", bpm=124.0 + i, key=keys[i]) for i in range(5)}
     return lib
 
 
@@ -159,9 +162,7 @@ def test_energy_cache_corrupt_degrades_to_recompute(monkeypatch, tmp_path):
     cache_path.write_text("{ this is not json")
     monkeypatch.setattr(e, "ENERGY_CACHE_PATH", cache_path)
     monkeypatch.setattr(e, "_content_signature", lambda p: "SIG::2::2")
-    monkeypatch.setattr(
-        e, "score_energy", lambda *a, **k: e.EnergyScore(score=33.0, breakdown={})
-    )
+    monkeypatch.setattr(e, "score_energy", lambda *a, **k: e.EnergyScore(score=33.0, breakdown={}))
     out = e.score_energy_cached("/tmp/y.mp3")
     assert out is not None and out.score == 33.0
 
@@ -194,9 +195,7 @@ def test_discover_pool_error_when_no_inputs(toolset):
 
 def test_sequence_set_rejects_unseen_ids(toolset):
     # Nothing discovered yet → every id is "invented".
-    out = toolset.sequence_set(
-        {"track_ids": ["t000", "t001"], "curve": "peak_time"}
-    )
+    out = toolset.sequence_set({"track_ids": ["t000", "t001"], "curve": "peak_time"})
     assert "error" in out
     assert "invented" in out["error"]
 
@@ -205,9 +204,7 @@ def test_sequence_set_orders_seen_pool(toolset):
     toolset.discover_pool({"ref_track_ids": ["t000"], "k": 10})
     seen_ids = sorted(toolset.seen)
     assert len(seen_ids) >= 2
-    out = toolset.sequence_set(
-        {"track_ids": seen_ids, "curve": "peak_time"}
-    )
+    out = toolset.sequence_set({"track_ids": seen_ids, "curve": "peak_time"})
     assert "candidates" in out
     assert out["candidates"]
     first = out["candidates"][0]
@@ -220,10 +217,153 @@ def test_sequence_set_orders_seen_pool(toolset):
 
 def test_sequence_set_unknown_curve_is_actionable(toolset):
     toolset.discover_pool({"ref_track_ids": ["t000"], "k": 10})
-    out = toolset.sequence_set(
-        {"track_ids": sorted(toolset.seen), "curve": "no_such_curve"}
-    )
+    out = toolset.sequence_set({"track_ids": sorted(toolset.seen), "curve": "no_such_curve"})
     assert "error" in out
+
+
+# --------------------------------------------------------------------------- #
+# section-aware transition slate — issues grounded section/candidate/context ids
+# --------------------------------------------------------------------------- #
+
+
+def test_get_track_sections_rejects_unseen_track(toolset):
+    out = toolset.get_track_sections({"track_id": "t000"})
+
+    assert "error" in out
+    assert "invented" in out["error"]
+
+
+def test_get_track_sections_issues_cue_derived_sections(toolset):
+    toolset.seen.add("t000")
+    toolset._library.tracks["t000"] = TrackEntry(
+        track_id="t000",
+        title="Section Track",
+        artist="Artist",
+        album="A",
+        bpm=128.0,
+        key="8A",
+        duration_s=300.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="DROP", type="cue", start_s=64.0, end_s=None, number=3),
+            CuePoint(name="OUT", type="cue", start_s=240.0, end_s=None, number=5),
+        ),
+        filepath="/tmp/t000.mp3",
+    )
+
+    out = toolset.get_track_sections({"track_id": "t000"})
+
+    assert [section["section_id"] for section in out["sections"]] == [
+        "t000#s000",
+        "t000#s001",
+        "t000#s002",
+    ]
+    assert out["sections"][0]["role"] == "intro"
+    assert out["sections"][1]["role"] == "drop"
+    assert out["sections"][2]["role"] == "outro"
+    assert set(toolset.seen_sections) >= {"t000#s000", "t000#s001", "t000#s002"}
+
+
+def test_transition_slate_issues_grounded_candidates(toolset):
+    toolset.seen.update({"t000", "t001"})
+    toolset._library.tracks["t000"] = TrackEntry(
+        track_id="t000",
+        title="Outgoing",
+        artist="Artist",
+        album="A",
+        bpm=128.0,
+        key="8A",
+        duration_s=300.0,
+        cues=(CuePoint(name="OUT", type="cue", start_s=240.0, end_s=None, number=5),),
+        filepath="/tmp/t000.mp3",
+    )
+    toolset._library.tracks["t001"] = TrackEntry(
+        track_id="t001",
+        title="Incoming",
+        artist="Artist",
+        album="A",
+        bpm=128.0,
+        key="9A",
+        duration_s=300.0,
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+        filepath="/tmp/t001.mp3",
+    )
+
+    out = toolset.transition_slate(
+        {
+            "source_track_id": "t000",
+            "candidate_track_ids": ["t001"],
+            "mode": "live",
+            "remaining_bars": 16,
+            "playhead_confidence": 0.95,
+        }
+    )
+
+    assert out["source_section_id"] == "t000#s000"
+    assert len(out["candidates"]) == 1
+    candidate = out["candidates"][0]
+    assert candidate["candidate_id"] == "tr_001"
+    assert candidate["to_track_id"] == "t001"
+    assert candidate["cue_slot"] == "A"
+    assert candidate["start_in_bars"] == 16
+    assert "tr_001" in toolset.issued_transition_candidates
+
+
+def test_transition_slate_rejects_unseen_candidate(toolset):
+    toolset.seen.add("t000")
+    out = toolset.transition_slate({"source_track_id": "t000", "candidate_track_ids": ["GHOST"]})
+
+    assert "error" in out
+    assert "invented" in out["error"]
+
+
+def test_compile_musical_context_uses_issued_candidates_and_redacts(toolset):
+    toolset.seen.update({"t000", "t001"})
+    toolset._library.tracks["t000"] = TrackEntry(
+        track_id="t000",
+        title="Outgoing",
+        artist="Artist",
+        album="A",
+        bpm=128.0,
+        key="8A",
+        duration_s=300.0,
+        cues=(CuePoint(name="OUT", type="cue", start_s=240.0, end_s=None, number=5),),
+        filepath="/tmp/t000.mp3",
+    )
+    toolset._library.tracks["t001"] = TrackEntry(
+        track_id="t001",
+        title="Incoming",
+        artist="Artist",
+        album="A",
+        bpm=128.0,
+        key="9A",
+        duration_s=300.0,
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+        filepath="/tmp/t001.mp3",
+    )
+    slate = toolset.transition_slate({"source_track_id": "t000", "candidate_track_ids": ["t001"]})
+    candidate_id = slate["candidates"][0]["candidate_id"]
+
+    out = toolset.compile_musical_context(
+        {
+            "candidate_ids": [candidate_id],
+            "mode": "prep",
+            "current": {"active_track_id": "t000", "filepath": "/tmp/private.mp3"},
+        }
+    )
+
+    packet = out["packet"]
+    assert packet["packet_id"] == "ctx_001"
+    assert packet["candidates"][0]["candidate_id"] == candidate_id
+    assert "filepath" not in packet["current"]
+    assert "ctx_001" in toolset.issued_context_packets
+
+
+def test_compile_musical_context_rejects_unknown_candidate(toolset):
+    out = toolset.compile_musical_context({"candidate_ids": ["tr_404"]})
+
+    assert "error" in out
+    assert "not issued" in out["error"]
 
 
 # --------------------------------------------------------------------------- #
@@ -232,9 +372,7 @@ def test_sequence_set_unknown_curve_is_actionable(toolset):
 
 
 def test_export_set_rejects_unseen_ids(toolset):
-    out = toolset.export_set(
-        {"name": "Set", "track_ids": ["t001"]}
-    )
+    out = toolset.export_set({"name": "Set", "track_ids": ["t001"]})
     assert "error" in out
     assert "invented" in out["error"]
 
@@ -243,13 +381,43 @@ def test_export_set_writes_grounded_xml(toolset, tmp_path):
     toolset.discover_pool({"ref_track_ids": ["t000"], "k": 10})
     seen_ids = sorted(toolset.seen)[:2]
     out_xml = tmp_path / "set.xml"
-    out = toolset.export_set(
-        {"name": "Test Set", "track_ids": seen_ids, "out_path": str(out_xml)}
-    )
+    out = toolset.export_set({"name": "Test Set", "track_ids": seen_ids, "out_path": str(out_xml)})
     assert out.get("exported") is True
     assert out["path"] == str(out_xml)
     assert out_xml.exists()
     assert out["written"] >= 1
+
+
+def test_export_set_forwards_rekordbox_cues_and_beatgrid(toolset, tmp_path):
+    toolset.discover_pool({"ref_track_ids": ["t000"], "k": 10})
+    toolset.seen.add("t000")
+    toolset._library.tracks["t000"] = TrackEntry(
+        track_id="t000",
+        title="Cued Track",
+        artist="Artist",
+        album="A",
+        bpm=128.0,
+        key="8A",
+        duration_s=300.0,
+        cues=(
+            CuePoint(name="DROP", type="cue", start_s=64.0, end_s=None, number=0),
+            CuePoint(name="LOOP", type="loop", start_s=96.0, end_s=104.0, number=1),
+        ),
+        filepath="/tmp/t000.mp3",
+        beatgrid=(TempoNode(inizio_s=0.012, bpm=128.0, metro="4/4", battito=1),),
+    )
+
+    out_xml = tmp_path / "cued.xml"
+    out = toolset.export_set({"name": "Cued", "track_ids": ["t000"], "out_path": str(out_xml)})
+
+    assert out.get("exported") is True
+    track = ET.parse(out_xml).getroot().find("COLLECTION/TRACK")
+    assert track is not None
+    assert track.find("TEMPO") is not None
+    marks = {m.attrib["Name"]: m for m in track.findall("POSITION_MARK")}
+    assert set(marks) == {"DROP", "LOOP"}
+    assert marks["DROP"].attrib["Num"] == "0"
+    assert marks["LOOP"].attrib["Type"] == "4"
 
 
 def test_export_set_records_exported_on_toolset(toolset, tmp_path):
@@ -261,9 +429,7 @@ def test_export_set_records_exported_on_toolset(toolset, tmp_path):
     toolset.discover_pool({"ref_track_ids": ["t000"], "k": 10})
     seen_ids = sorted(toolset.seen)[:2]
     out_xml = tmp_path / "recorded.xml"
-    out = toolset.export_set(
-        {"name": "Recorded", "track_ids": seen_ids, "out_path": str(out_xml)}
-    )
+    out = toolset.export_set({"name": "Recorded", "track_ids": seen_ids, "out_path": str(out_xml)})
     assert out.get("exported") is True
     assert isinstance(toolset.exported, ExportResult)
     assert str(toolset.exported.path) == str(out_xml)
@@ -298,6 +464,9 @@ def test_export_set_revalidates_against_library(toolset, tmp_path):
 
 def test_dispatch_registers_setprep_tools(toolset):
     assert "error" in toolset.dispatch("get_track_energy", {"track_id": "NOPE"})
+    assert "error" in toolset.dispatch("get_track_sections", {"track_id": "NOPE"})
+    assert "error" in toolset.dispatch("transition_slate", {})
+    assert "error" in toolset.dispatch("compile_musical_context", {})
     assert "error" in toolset.dispatch("discover_pool", {})
     assert "error" in toolset.dispatch("sequence_set", {"track_ids": [], "curve": "x"})
     assert "error" in toolset.dispatch("export_set", {"name": "", "track_ids": []})

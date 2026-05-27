@@ -22,10 +22,10 @@ from pathlib import Path
 
 import numpy as np
 
-from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize, store_suffix
+from vibemix.library._cosine import EMBEDDING_DIM, store_suffix
 
-# Backend-namespaced (see _cosine.store_suffix) so clap (512) and gemini (1536)
-# stores never collide. gemini → bare "library_vectors.npy" (unchanged).
+# Backend-namespaced (see _cosine.store_suffix) so the CLAP 512-d vectors never
+# collide with historical Gemini 1536-d files.
 VECTORS_PATH = Path.home() / ".cache" / "vibemix" / f"library{store_suffix()}_vectors.npy"
 IDS_PATH = Path.home() / ".cache" / "vibemix" / f"library{store_suffix()}_ids.json"
 
@@ -91,7 +91,7 @@ class NumpyStore:
         os.replace(tmp_ids, self._ids_path)
 
     def add_batch(self, items: list[tuple[str, np.ndarray]]) -> None:
-        """Add or replace (track_id, vector) rows. Vectors must be float32 (768,)."""
+        """Add or replace (track_id, vector) rows at the active embedding dim."""
         if not items:
             return
         for tid, vec in items:
@@ -145,6 +145,10 @@ class NumpyStore:
         """sha256(json.dumps(sorted(ids))) — stable across reloads."""
         payload = json.dumps(sorted(self._ids))
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def row_count(self) -> int:
+        """Number of stored vectors."""
+        return len(self._ids)
 
     def close(self) -> None:
         # numpy backend has no file handles to close — _save is sync.

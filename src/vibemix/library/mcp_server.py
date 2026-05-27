@@ -3,13 +3,15 @@
 
 This is the Codex backend of the Viber agent (the Hermes pattern, native CLI):
 the native ``codex exec`` runtime is the bounded reasoning harness; this STDIO
-MCP server exposes the SAME three grounded tools the Gemini ``ViberAgent`` uses
-(``search_vibe`` / ``get_track_features`` / ``create_playlist``), backed by the
-shared :class:`~vibemix.library.toolset.LibraryToolset`. Codex plans the
-curation and calls these tools; the seen-set grounding gate (Cardinal Invariant
-#2) and ``create_playlist``'s library re-validation are enforced here at the
-tool boundary — NOT in the prompt — so the model can never smuggle in an
-invented track regardless of what it reasons.
+MCP server exposes the grounded tool core, backed by the shared
+:class:`~vibemix.library.toolset.LibraryToolset`. The core discovery/write
+tools are ``search_vibe`` / ``discover_pool`` / ``create_playlist`` /
+``export_set``; additional tools add energy, sequencing, web, quote,
+knowledge, and cue-export capabilities. Codex plans the curation and calls
+these tools; the seen-set grounding gate (Cardinal Invariant #2) and the
+write/export re-validation are enforced here at the tool boundary — NOT in the
+prompt — so the model can never smuggle in an invented track regardless of what
+it reasons.
 
 Lifecycle: Codex spawns ONE instance of this server (as a STDIO subprocess) per
 ``codex exec`` run, so the module-level ``LibraryToolset`` (and its per-run
@@ -21,55 +23,27 @@ Run standalone (what Codex's config points at):
 
     python -m vibemix.library.mcp_server
 
-Requires ``GEMINI_API_KEY`` (direct, local default) or ``VIBEMIX_PROXY_JWT``
-(Bravoh proxy) in the environment / ``.env`` — same client the CLI uses.
+Library search/build-set is local and keyless through CLAP ONNX. The shipped
+Codex/Viber MCP surface does not resolve a Gemini client or expose Gemini-backed
+media tools.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import sys
 from typing import Any
 
 # WIRE-04 (Phase 77 Plan 02) — voice inherited via the codex_curate seam
 # (verified — no own prompt). This server carries NO system prompt / persona of
-# its own: it only exposes the 3 grounded tools over STDIO, and grounding lives
-# at the tool boundary (LibraryToolset seen-set gate), not in a prompt. The
+# its own: it only exposes grounded tools over STDIO, and grounding lives at
+# the tool boundary (LibraryToolset seen-set gate), not in a prompt. The
 # curator voice reaches Codex through ``library.codex_curate._SYSTEM_PROMPT``,
 # which now sources its persona from ``prompts.matrix.build_curator_instruction``
 # — so this backend is provably NOT persona-blind (CURATE acid test), with no
 # change needed here.
 
 logger = logging.getLogger(__name__)
-
-
-def _resolve_genai_client() -> Any:
-    """Direct GEMINI_API_KEY first (local default), else Bravoh proxy JWT.
-
-    Mirrors ``__main__._library_genai_client``. Fail-loud to stderr + exit if
-    neither is set — Codex will surface the MCP-server startup failure.
-    """
-    from google import genai
-
-    api_key = os.environ.get("GEMINI_API_KEY")
-    proxy_jwt = os.environ.get("VIBEMIX_PROXY_JWT")
-    proxy_url = os.environ.get(
-        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
-    )
-    if api_key:
-        return genai.Client(api_key=api_key)
-    if proxy_jwt:
-        from vibemix.agent.proxy_client import build_proxy_genai_client
-
-        return build_proxy_genai_client(proxy_jwt, proxy_url)
-    print(
-        "[viber-mcp] no API client: set GEMINI_API_KEY (direct) or "
-        "VIBEMIX_PROXY_JWT (Bravoh proxy) in your .env/environment.",
-        file=sys.stderr,
-        flush=True,
-    )
-    raise SystemExit(2)
 
 
 def build_toolset() -> Any:
@@ -84,15 +58,15 @@ def build_toolset() -> Any:
         from dotenv import load_dotenv
 
         load_dotenv()
-    except Exception:  # noqa: BLE001 — dotenv optional; env may already be set
+    except Exception:
+        # dotenv is optional; env may already be set.
         pass
 
-    from vibemix.library.embed import build_embedder
+    from vibemix.library.embed_factory import build_embedder
     from vibemix.library.rekordbox import RekordboxLibrary
     from vibemix.library.store import open_store
     from vibemix.library.toolset import LibraryToolset
 
-    client = _resolve_genai_client()
     library = RekordboxLibrary()
     if not library.try_load_cache():
         print(
@@ -102,20 +76,18 @@ def build_toolset() -> Any:
             file=sys.stderr,
             flush=True,
         )
-    embedder = build_embedder(client)
+    embedder = build_embedder()
     store = open_store()
-    # Pass the raw client too — the capability tools (ingest_youtube) reason
-    # directly through it, not via the embedder.
-    return LibraryToolset(embedder, store, library, client=client)
+    return LibraryToolset(embedder, store, library)
 
 
 def build_server(toolset: Any) -> Any:
-    """Wrap ``toolset`` in a FastMCP STDIO server exposing the 3 tools.
+    """Wrap ``toolset`` in a FastMCP STDIO server exposing Viber tools.
 
-    Each tool delegates to the shared toolset, so the grounding gate is
-    identical to the Gemini path. Tools return plain dicts (FastMCP serializes
-    them); errors come back as ``{"error": ...}`` rather than raising — the
-    no-hang contract.
+    Each tool delegates to the shared toolset, so the grounding gate stays
+    single-sourced. Tools return plain dicts
+    (FastMCP serializes them); errors come back as ``{"error": ...}`` rather
+    than raising — the no-hang contract.
     """
     from mcp.server.fastmcp import FastMCP
 
@@ -134,6 +106,96 @@ def build_server(toolset: Any) -> Any:
         Honest null when the library lacks a field. Use to reason about
         ordering — never to invent values."""
         return toolset.get_track_features({"track_id": track_id})
+
+    @mcp.tool()
+    def get_track_sections(track_id: str) -> dict[str, Any]:
+        """Issue grounded section records for a discovered track. track_id must
+        come from search_vibe/discover_pool this run. Returns section_ids the
+        agent may later use in transition_slate."""
+        return toolset.get_track_sections({"track_id": track_id})
+
+    @mcp.tool()
+    def transition_slate(
+        candidate_track_ids: list[str],
+        source_section_id: str | None = None,
+        source_track_id: str | None = None,
+        mode: str = "prep",
+        max_candidates: int | None = None,
+        genre_profile: str | None = None,
+        remaining_bars: int | None = None,
+        playhead_confidence: float | None = None,
+        blend_active: bool = False,
+        played_track_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Rank grounded section-to-section mix points. The source section or
+        source track and every candidate_track_id must already be grounded by
+        prior tools. Emits tr_* candidate ids with cue slots, score components,
+        risk flags, and timing only when confidence allows it."""
+        return toolset.transition_slate(
+            {
+                "source_section_id": source_section_id,
+                "source_track_id": source_track_id,
+                "candidate_track_ids": candidate_track_ids,
+                "mode": mode,
+                "max_candidates": max_candidates,
+                "genre_profile": genre_profile,
+                "remaining_bars": remaining_bars,
+                "playhead_confidence": playhead_confidence,
+                "blend_active": blend_active,
+                "played_track_ids": played_track_ids,
+            }
+        )
+
+    @mcp.tool()
+    def compile_musical_context(
+        candidate_ids: list[str],
+        mode: str = "prep",
+        intent: str | None = None,
+        current: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Compile already-issued transition candidates into a bounded,
+        redacted context packet. The agent may choose/explain only inside this
+        packet; invented tr_* ids are rejected."""
+        return toolset.compile_musical_context(
+            {
+                "candidate_ids": candidate_ids,
+                "mode": mode,
+                "intent": intent,
+                "current": current,
+            }
+        )
+
+    @mcp.tool()
+    def smart_hot_cues(
+        track_ids: list[str] | None = None,
+        track_id: str | None = None,
+        genre: str | None = None,
+    ) -> dict[str, Any]:
+        """Generate reviewable smart hot-cue proposals for discovered tracks.
+        Emits proposal/cue ids; the agent may select ids but never raw cue
+        payloads. Every track_id must come from search_vibe/discover_pool."""
+        return toolset.smart_hot_cues(
+            {"track_ids": track_ids, "track_id": track_id, "genre": genre}
+        )
+
+    @mcp.tool()
+    def export_smart_cues(
+        proposal_id: str,
+        selected_cue_ids: list[str] | None = None,
+        out_path: str | None = None,
+        include_review: bool = False,
+    ) -> dict[str, Any]:
+        """Export selected cue ids from an issued smart-cue proposal.
+        Preserves A-H slot numbers and rejects raw cue payloads or arbitrary
+        track paths. The proposal must have been issued by smart_hot_cues."""
+        return toolset.export_smart_cues(
+            {
+                "proposal_id": proposal_id,
+                "selected_cue_ids": selected_cue_ids,
+                "out_path": out_path,
+                "include_review": include_review,
+            }
+        )
 
     @mcp.tool()
     def create_playlist(name: str, track_ids: list[str]) -> dict[str, Any]:
@@ -186,22 +248,16 @@ def build_server(toolset: Any) -> Any:
         (opener / peak_time / after_hours / festival). Returns 3-5 ranked
         candidates with energy_fit / avg_coherence / relaxed_transitions. Every
         track_id must come from a prior search_vibe/discover_pool result."""
-        return toolset.sequence_set(
-            {"track_ids": track_ids, "curve": curve, "n_slots": n_slots}
-        )
+        return toolset.sequence_set({"track_ids": track_ids, "curve": curve, "n_slots": n_slots})
 
     @mcp.tool()
-    def export_set(
-        name: str, track_ids: list[str], out_path: str | None = None
-    ) -> dict[str, Any]:
+    def export_set(name: str, track_ids: list[str], out_path: str | None = None) -> dict[str, Any]:
         """Export the chosen ordered set to a Rekordbox-importable XML (order +
         key + BPM + cues). Every track_id must have come from a prior discovery
         result. Call once when the DJ accepts a set."""
-        return toolset.export_set(
-            {"name": name, "track_ids": track_ids, "out_path": out_path}
-        )
+        return toolset.export_set({"name": name, "track_ids": track_ids, "out_path": out_path})
 
-    # -- DJ-knowledge / media capability tools (grounding identical above) -- #
+    # -- DJ-knowledge / source capability tools (grounding identical above) -- #
 
     @mcp.tool()
     def web_search(query: str, k: int = 5) -> dict[str, Any]:
@@ -217,13 +273,6 @@ def build_server(toolset: Any) -> Any:
         Returns {url, title, text}. http(s) only. Read sources you cite —
         never invent page contents."""
         return toolset.fetch_url({"url": url})
-
-    @mcp.tool()
-    def ingest_youtube(url: str, prompt: str | None = None) -> dict[str, Any]:
-        """Listen to a YouTube track/mix via Gemini (no download, deep-link).
-        Returns genre/energy/mood/structure. Timestamps are HINTS only —
-        resolve precise cut points locally, never from the summary."""
-        return toolset.ingest_youtube({"url": url, "prompt": prompt})
 
     @mcp.tool()
     def quote_moment(

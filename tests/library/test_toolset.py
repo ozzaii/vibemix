@@ -1,25 +1,107 @@
 # SPDX-License-Identifier: Apache-2.0
-"""LibraryToolset — the shared grounded tool core. These tests pin the
-grounding gate (Cardinal Invariant #2) directly on the toolset, independent
-of which backend (Gemini agent / Codex MCP server) drives it.
+"""LibraryToolset — the shared grounded Codex/Viber tool core.
+
+These tests pin the grounding gate (Cardinal Invariant #2) directly on the
+toolset, independent of the Codex MCP process that drives it.
 
 No network: vibe_search is monkeypatched, the library is in-memory.
 """
 
 from __future__ import annotations
 
-from types import SimpleNamespace
+import json
+import subprocess
+import sys
+from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
+from vibemix.intel.transition_scorer import SectionRecord
 from vibemix.library import toolset as tool_mod
 from vibemix.library.create_playlist import create_playlist
-from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
+from vibemix.library.rekordbox import CuePoint, RekordboxLibrary, TrackEntry
 from vibemix.library.toolset import LibraryToolset
 
 
-def _make_track(tid: str, bpm: float = 124.0, key: str = "8A") -> TrackEntry:
+def test_local_toolset_import_does_not_load_gemini_sdk() -> None:
+    """Codex/MCP local tools must not wake the legacy Gemini embedder SDK."""
+    code = """
+import json
+import sys
+
+import vibemix.library.embed
+import vibemix.library.mcp_server
+import vibemix.library.toolset
+
+mods = sorted(
+    m for m in sys.modules
+    if m == "google.genai" or m.startswith("google.genai.")
+)
+print(json.dumps(mods))
+raise SystemExit(1 if mods else 0)
+"""
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert json.loads(proc.stdout) == []
+
+
+def test_mcp_product_surface_does_not_expose_gemini_youtube_tool(monkeypatch) -> None:
+    """The shipped Codex/Viber MCP tool list is local-first and keyless."""
+    from vibemix.library import mcp_server
+
+    registered: list[str] = []
+
+    class FakeFastMCP:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        def tool(self):
+            def register(fn):
+                registered.append(fn.__name__)
+                return fn
+
+            return register
+
+    fastmcp_mod = ModuleType("mcp.server.fastmcp")
+    fastmcp_mod.FastMCP = FakeFastMCP
+    monkeypatch.setitem(sys.modules, "mcp", ModuleType("mcp"))
+    monkeypatch.setitem(sys.modules, "mcp.server", ModuleType("mcp.server"))
+    monkeypatch.setitem(sys.modules, "mcp.server.fastmcp", fastmcp_mod)
+
+    mcp_server.build_server(SimpleNamespace())
+
+    assert "search_vibe" in registered
+    assert "discover_pool" in registered
+    assert "get_track_sections" in registered
+    assert "transition_slate" in registered
+    assert "compile_musical_context" in registered
+    assert "smart_hot_cues" in registered
+    assert "export_smart_cues" in registered
+    assert "ingest_youtube" not in registered
+
+
+def test_shared_toolset_does_not_dispatch_gemini_youtube_tool(toolset) -> None:
+    out = toolset.dispatch(
+        "ingest_youtube",
+        {"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    )
+
+    assert out == {"error": "unknown tool 'ingest_youtube'"}
+
+
+def _make_track(
+    tid: str,
+    bpm: float = 124.0,
+    key: str = "8A",
+    *,
+    cues: tuple[CuePoint, ...] = (),
+) -> TrackEntry:
     return TrackEntry(
         track_id=tid,
         title=f"Title {tid}",
@@ -28,9 +110,39 @@ def _make_track(tid: str, bpm: float = 124.0, key: str = "8A") -> TrackEntry:
         bpm=bpm,
         key=key,
         duration_s=300.0,
-        cues=(),
+        cues=cues,
         filepath=f"/tmp/{tid}.mp3",
     )
+
+
+def _section(section_id: str, role: str, start_s: float, end_s: float) -> SectionRecord:
+    return SectionRecord(
+        section_id=section_id,
+        track_id="t000",
+        role=role,
+        source="anlz",
+        source_detail="pssi",
+        confidence=0.9,
+        start_s=start_s,
+        end_s=end_s,
+        start_beat=round(start_s * 2),
+        end_beat=round(end_s * 2),
+        bar_count=(end_s - start_s) * 124.0 / 60.0 / 4.0,
+        bpm=124.0,
+        camelot="8A",
+    )
+
+
+def _issue_smart_cue_proposal(toolset, monkeypatch):
+    sections = (
+        _section("t000#s000", "intro", 0.0, 32.0),
+        _section("t000#s001", "drop", 64.0, 128.0),
+        _section("t000#s002", "outro", 192.0, 240.0),
+    )
+    monkeypatch.setattr(tool_mod, "sections_for_entry", lambda entry: sections)
+    toolset.seen.add("t000")
+    out = toolset.smart_hot_cues({"track_id": "t000"})
+    return out["proposals"][0]
 
 
 @pytest.fixture
@@ -49,9 +161,7 @@ def _stub_search(monkeypatch, ids):
     def fake(emb, st, lib, query, k=15):
         return (
             [
-                SimpleNamespace(
-                    track_id=t, title=f"T{t}", artist="A", bpm=124.0, confidence=0.9
-                )
+                SimpleNamespace(track_id=t, title=f"T{t}", artist="A", bpm=124.0, confidence=0.9)
                 for t in ids
             ],
             False,
@@ -90,10 +200,9 @@ def test_create_persists_grounded_playlist(toolset, monkeypatch, tmp_path):
         lambda lib, name, ids: create_playlist(lib, name, ids, out_dir=tmp_path),
     )
     toolset.search_vibe({"query": "x", "k": 3})
-    out = toolset.create_playlist(
-        {"name": "Warm-Up", "track_ids": ["t000", "t001", "t002"]}
-    )
+    out = toolset.create_playlist({"name": "Warm-Up", "track_ids": ["t000", "t001", "t002"]})
     assert out["created"] is True
+    assert out["track_ids"] == ["t000", "t001", "t002"]
     assert out["track_count"] == 3
     assert toolset.created is not None
 
@@ -113,6 +222,103 @@ def test_dispatch_errors_never_raise(toolset):
     assert "error" in toolset.dispatch("get_track_features", {"track_id": "NOPE"})
     assert "error" in toolset.dispatch("create_playlist", {"name": "x", "track_ids": []})
     assert "error" in toolset.dispatch("does_not_exist", {})
+
+
+def test_smart_hot_cues_rejects_unseen_track(toolset):
+    out = toolset.smart_hot_cues({"track_id": "t000"})
+
+    assert "error" in out
+    assert "invented" in out["error"]
+    assert toolset.issued_cue_proposals == {}
+
+
+def test_smart_hot_cues_records_issued_proposal(toolset, monkeypatch):
+    proposal = _issue_smart_cue_proposal(toolset, monkeypatch)
+
+    proposal_id = proposal["proposal_id"]
+    assert proposal_id in toolset.issued_cue_proposals
+    assert {cue["slot"] for cue in proposal["cues"]} >= {"A", "D", "F"}
+    assert all(cue["cue_id"].startswith(proposal_id + ":") for cue in proposal["cues"])
+
+
+def test_export_smart_cues_rejects_unissued_proposal(toolset):
+    out = toolset.export_smart_cues({"proposal_id": "cueprop_missing"})
+
+    assert "error" in out
+    assert "not issued" in out["error"]
+
+
+def test_export_smart_cues_rejects_raw_model_payload(toolset, monkeypatch):
+    proposal = _issue_smart_cue_proposal(toolset, monkeypatch)
+
+    out = toolset.export_smart_cues(
+        {
+            "proposal_id": proposal["proposal_id"],
+            "track_path": "/tmp/smuggled.wav",
+            "cues": [{"label": "drop", "start_s": 1.0}],
+        }
+    )
+
+    assert "error" in out
+    assert "rejects raw cue payloads" in out["error"]
+
+
+def test_export_smart_cues_rejects_cue_id_outside_proposal(toolset, monkeypatch):
+    proposal = _issue_smart_cue_proposal(toolset, monkeypatch)
+
+    out = toolset.export_smart_cues(
+        {
+            "proposal_id": proposal["proposal_id"],
+            "selected_cue_ids": [proposal["proposal_id"] + ":Z"],
+        }
+    )
+
+    assert "error" in out
+    assert "not issued in this proposal" in out["error"]
+
+
+def test_export_smart_cues_revalidates_track_at_write_time(toolset, monkeypatch):
+    proposal = _issue_smart_cue_proposal(toolset, monkeypatch)
+    del toolset._library.tracks["t000"]
+
+    out = toolset.export_smart_cues({"proposal_id": proposal["proposal_id"]})
+
+    assert "error" in out
+    assert "track missing" in out["error"]
+
+
+def test_export_smart_cues_preserves_slot_nums(toolset, monkeypatch, tmp_path):
+    from vibemix.library.export_rekordbox import ExportResult
+
+    proposal = _issue_smart_cue_proposal(toolset, monkeypatch)
+    proposal_id = proposal["proposal_id"]
+    selected = [f"{proposal_id}:A", f"{proposal_id}:D", f"{proposal_id}:F"]
+    captured: dict[str, object] = {}
+
+    def fake_export_set(items, name, out_path, library=None):
+        captured["items"] = items
+        captured["name"] = name
+        captured["out_path"] = out_path
+        captured["library"] = library
+        return ExportResult(path=tmp_path / "smart-cues.xml", written=1, referenced=1)
+
+    from vibemix.library import export_rekordbox
+
+    monkeypatch.setattr(export_rekordbox, "export_set", fake_export_set)
+
+    out = toolset.export_smart_cues(
+        {
+            "proposal_id": proposal_id,
+            "selected_cue_ids": selected,
+            "out_path": str(tmp_path / "smart-cues.xml"),
+        }
+    )
+
+    assert out["exported"] is True
+    assert out["cue_ids"] == selected
+    cues = captured["items"][0]["cues"]  # type: ignore[index]
+    assert {cue["num"] for cue in cues} == {0, 3, 5}
+    assert {cue["name"] for cue in cues} == {"VM A IN", "VM D DROP", "VM F OUT"}
 
 
 # ---------------------------------------------------------------------------

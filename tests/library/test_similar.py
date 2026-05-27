@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 
+import argparse
+import io
+import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 
+import vibemix.__main__ as main_mod
 from vibemix.library._cosine import EMBEDDING_DIM
 from vibemix.library.rekordbox import TrackEntry
 from vibemix.library.similar import SimilarResult, similar_to
@@ -151,3 +155,48 @@ def test_no_background_caller_imports_similar() -> None:
                     f"{f.name} imports vibemix.library.similar — anti-feature "
                     f"guard violation. similar_to is USER-ASKED only."
                 )
+
+
+def test_library_similar_cli_emits_centering_metadata(monkeypatch) -> None:
+    """The desktop bridge reads these fields for the shared results header."""
+    import vibemix.library as lib_pkg
+    import vibemix.library.similar as similar_mod
+
+    class FakeLibrary:
+        def __init__(self) -> None:
+            self.tracks = {"t000": _make_track("t000")}
+
+        def try_load_cache(self) -> bool:
+            return True
+
+    class FakeStore:
+        def row_count(self) -> int:
+            return 24
+
+        def close(self) -> None:
+            return None
+
+    result = SimilarResult(
+        track_id="t001",
+        similarity=0.77,
+        title="Title t001",
+        artist="Artist t001",
+        bpm=138.0,
+    )
+    monkeypatch.setattr(lib_pkg, "RekordboxLibrary", FakeLibrary)
+    monkeypatch.setattr(lib_pkg, "build_embedder", lambda: object())
+    monkeypatch.setattr(lib_pkg, "open_store", lambda: FakeStore())
+    monkeypatch.setattr(
+        similar_mod,
+        "similar_to",
+        lambda embedder, store, library, track_id, k: [result],
+    )
+
+    buf = io.StringIO()
+    monkeypatch.setattr(main_mod.sys, "stdout", buf)
+    rc = main_mod._cmd_library_similar(argparse.Namespace(track_id="t000", k=3))
+
+    assert rc == 0
+    payload = json.loads(buf.getvalue())
+    assert payload["centered"] is True
+    assert payload["corpus_size"] == 24

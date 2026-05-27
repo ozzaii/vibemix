@@ -18,20 +18,25 @@ Two functions:
         authoritative; a ``load`` / ``fadein`` / ``fadeout`` mark is NOT a
         structural anchor (it is dropped — T-89-08, "trust the audio").
 
-        AUTO FALLBACK: a track with NO usable DJ cue delegates to
-        :func:`vibemix.library.cue_detect.detect_cues` (``source="auto"``,
-        lazy-imported). When that engine also finds no structure it returns
-        ``[]`` HONESTLY — the ingest caller then whole-track falls back, so a
-        track is never left anchor-less AND never gets a faked anchor (T-89-09).
+        ANLZ SECOND: if the caller supplies an ANLZ index, a unique Rekordbox
+        ANLZ match yields ``source="anlz"`` anchors from PSSI/PQTZ structure.
+
+        AUTO FALLBACK: a track with NO usable DJ cue and NO usable ANLZ match
+        delegates to :func:`vibemix.library.cue_engine.detect_cues_auto`
+        (``source="auto"``, lazy-imported). That tries CUE-DETR ONNX first and
+        falls back to the dep-free heuristic. When neither engine finds
+        structure it returns ``[]`` HONESTLY — the ingest caller then
+        whole-track falls back, so a track is never left anchor-less AND never
+        gets a faked anchor (T-89-09).
 
     cut_windows(anchors, duration_s) -> list[(start_s, end_s)]
         Geometry: clamp each anchor span to ``[0, duration_s]``, keep only spans
         1.0..80s; degenerate/zero spans dropped.
 
 Import posture: stdlib + ``cue_types`` (frozen dataclass) + ``rekordbox`` types
-only at module top. ``cue_detect`` (which lazy-imports its DSP) is imported
-*inside* the fallback branch — so importing :mod:`excerpt` pulls NO heavy dep
-(no torch, no ffmpeg, no numpy needed here).
+only at module top. ``cue_engine`` is imported *inside* the fallback branch, so
+importing :mod:`excerpt` pulls NO heavy dep (no torch, no ffmpeg, no numpy needed
+here).
 """
 
 from __future__ import annotations
@@ -42,10 +47,10 @@ from vibemix.library.cue_types import CueAnchor, CueLabel
 from vibemix.library.rekordbox import CuePoint, TrackEntry
 
 __all__ = [
-    "anchors_for_track",
-    "cut_windows",
     "CUE_WINDOW_SECONDS",
     "MAX_CUES_PER_TRACK",
+    "anchors_for_track",
+    "cut_windows",
 ]
 
 # Mirror embed.py's cue-anchored constants locally so excerpt.py stays
@@ -66,31 +71,32 @@ _DJ_CONFIDENCE: float = 0.9
 def anchors_for_track(
     track: TrackEntry,
     *,
+    anlz_index: object | None = None,
     max_cues: int = MAX_CUES_PER_TRACK,
     window_s: float = CUE_WINDOW_SECONDS,
 ) -> list[CueAnchor]:
-    """Map a track's structural DJ cues to anchors; fall back to detect_cues.
+    """Map a track's structural DJ cues to anchors; fall back to detect_cues_auto.
 
     Args:
         track: a parsed :class:`TrackEntry` (its ``cues`` + ``duration_s`` +
             ``filepath`` drive the mapping).
-        max_cues: cap on how many DJ anchors to emit (also the detect_cues cap).
+        anlz_index: optional :class:`vibemix.library.anlz_ingest.AnlzIndex`.
+            When supplied, ANLZ structure is tried after DJ cues and before the
+            auto-cue engine.
+        max_cues: cap on how many DJ anchors to emit (also the auto-cue cap).
         window_s: the mixable-window length cap (≤80s by contract).
 
     Returns:
         A list of :class:`CueAnchor`. ``source="dj"`` when the track carries
-        usable structural cues; otherwise ``source="auto"`` from
-        ``detect_cues`` — or ``[]`` honestly when neither path finds structure.
+        usable structural cues; otherwise ``source="anlz"`` from Rekordbox
+        offline structure when available; otherwise ``source="auto"`` from
+        ``detect_cues_auto`` — or ``[]`` honestly when no path finds structure.
     """
     duration_s = float(track.duration_s) if track.duration_s else 0.0
 
     # DJ-FIRST: keep only structural cue/loop marks (load/fade dropped),
     # sorted by position, capped at max_cues.
-    structural = [
-        c
-        for c in track.cues
-        if c.type in _STRUCTURAL_CUE_TYPES
-    ]
+    structural = [c for c in track.cues if c.type in _STRUCTURAL_CUE_TYPES]
     structural.sort(key=lambda c: float(c.start_s))
     structural = structural[: max(0, int(max_cues))]
 
@@ -120,12 +126,32 @@ def anchors_for_track(
         if anchors:
             return anchors
 
-    # AUTO FALLBACK: no usable DJ cue → the offline structure engine. Lazy
-    # import keeps excerpt.py's top level heavy-dep-free (cue_detect drags in
-    # its DSP only when actually called).
-    from vibemix.library.cue_detect import detect_cues
+    # ANLZ SECOND: no usable DJ cue -> caller-supplied Rekordbox offline
+    # structure. Lazy import keeps excerpt.py top-level heavy-dep-free.
+    if anlz_index is not None:
+        try:
+            from vibemix.library.anlz_ingest import anchors_from_anlz, match_track_to_anlz
 
-    return list(detect_cues(Path(track.filepath), max_cues=max_cues))
+            meta = match_track_to_anlz(track, anlz_index)
+            if meta is not None:
+                anchors = anchors_from_anlz(
+                    track,
+                    meta,
+                    max_cues=max_cues,
+                    window_s=window_s,
+                )
+                if anchors:
+                    return anchors
+        except Exception:
+            # A stale/corrupt caller-supplied index must not block the existing
+            # auto fallback. Parser/audit code reports quality separately.
+            pass
+
+    # AUTO FALLBACK: no usable DJ/ANLZ cue -> the offline structure engine. Lazy
+    # import keeps excerpt.py's top level heavy-dep-free.
+    from vibemix.library.cue_engine import detect_cues_auto
+
+    return list(detect_cues_auto(Path(track.filepath), max_cues=max_cues))
 
 
 def _label_for_cue(cue: CuePoint) -> CueLabel:
@@ -142,9 +168,7 @@ def _label_for_cue(cue: CuePoint) -> CueLabel:
     return "drop"
 
 
-def cut_windows(
-    anchors: list[CueAnchor], duration_s: float
-) -> list[tuple[float, float]]:
+def cut_windows(anchors: list[CueAnchor], duration_s: float) -> list[tuple[float, float]]:
     """Turn anchors into clamped ``(start_s, end_s)`` audio windows.
 
     Each window is clamped to ``[0, duration_s]`` and kept only when its span is

@@ -243,18 +243,36 @@ class RekordboxLibrary:
         Side effect on hit: overwrites ``self.tracks`` + ``self.xml_path``.
         On miss: ``self`` is unchanged.
         """
-        cache_path = self.CACHE_PATH
+        cache_paths = (
+            self.CACHE_PATH,
+            self.CACHE_PATH.with_suffix(self.CACHE_PATH.suffix + ".v1bak"),
+        )
+        for cache_path in cache_paths:
+            hit = self._try_load_cache_path(cache_path)
+            if hit is None:
+                continue
+            self.tracks, self.xml_path = hit
+            return True
+        return False
+
+    def _try_load_cache_path(self, cache_path: Path) -> tuple[dict[str, TrackEntry], str] | None:
+        """Load one cache candidate.
+
+        The primary cache stays strict for Rekordbox XML files. Folder-ingest
+        caches are last-known snapshots, so a changed folder mtime must not make
+        the live pill lose its library on startup.
+        """
         if not cache_path.exists():
-            return False
+            return None
         try:
             with open(cache_path, "rb") as fh:
-                blob: _CacheBlob = pickle.load(fh)  # noqa: S301 — owned user data
-        except (pickle.PickleError, OSError, EOFError, AttributeError):
-            return False
+                blob: _CacheBlob = pickle.load(fh)
+        except (pickle.PickleError, OSError, EOFError, AttributeError, ModuleNotFoundError):
+            return None
         if not isinstance(blob, _CacheBlob):
-            return False
-        if blob.version != self.SCHEMA_VERSION:
-            return False
+            return None
+        if blob.version not in (1, self.SCHEMA_VERSION):
+            return None
         # Mtime check: if the XML file on disk is NEWER than the cache,
         # the cache is stale — fall through.
         try:
@@ -264,14 +282,12 @@ class RekordboxLibrary:
             # state), but for v2.0 we treat a missing source as a cache
             # miss so the wizard's "re-import" flow stays the source of
             # truth. Phase 25 Wave 3 may relax this.
-            return False
-        if current_mtime > blob.xml_mtime + 1.0:
+            return None
+        if current_mtime > blob.xml_mtime + 1.0 and not os.path.isdir(blob.xml_path):
             # 1.0s slack — file-system mtime resolution can drift slightly
             # under network mounts and APFS clones.
-            return False
-        self.tracks = dict(blob.tracks)
-        self.xml_path = blob.xml_path
-        return True
+            return None
+        return _coerce_cache_tracks(blob.tracks), blob.xml_path
 
     # ------------------------------------------------------------------ #
     # Reads                                                               #
@@ -322,6 +338,37 @@ class RekordboxLibrary:
 # ---------------------------------------------------------------------- #
 # Track → TrackEntry conversion                                           #
 # ---------------------------------------------------------------------- #
+
+
+def _coerce_cache_tracks(tracks: dict[str, Any]) -> dict[str, TrackEntry]:
+    """Normalize cache TrackEntry rows across schema bumps.
+
+    v1 folder-ingest caches predate the enriched TrackEntry fields. Pickle can
+    load those rows into the current class with missing slots, so rebuild every
+    row through the current constructor and fill new fields with honest empties.
+    """
+    out: dict[str, TrackEntry] = {}
+    for key, entry in tracks.items():
+        track_id = str(getattr(entry, "track_id", key) or key)
+        out[track_id] = TrackEntry(
+            track_id=track_id,
+            title=str(getattr(entry, "title", "") or ""),
+            artist=str(getattr(entry, "artist", "") or ""),
+            album=str(getattr(entry, "album", "") or ""),
+            bpm=_coerce_float(getattr(entry, "bpm", 0.0), default=0.0),
+            key=str(getattr(entry, "key", "") or ""),
+            duration_s=_coerce_float(getattr(entry, "duration_s", 0.0), default=0.0),
+            cues=tuple(getattr(entry, "cues", ()) or ()),
+            filepath=str(getattr(entry, "filepath", "") or ""),
+            genre=str(getattr(entry, "genre", "") or ""),
+            label=str(getattr(entry, "label", "") or ""),
+            rating=_coerce_int(getattr(entry, "rating", 0), default=0),
+            play_count=_coerce_int(getattr(entry, "play_count", 0), default=0),
+            comments=str(getattr(entry, "comments", "") or ""),
+            camelot=getattr(entry, "camelot", None),
+            beatgrid=tuple(getattr(entry, "beatgrid", ()) or ()),
+        )
+    return out
 
 
 def _track_to_entry(track: Any) -> TrackEntry:

@@ -24,8 +24,9 @@ CI — where ``torch`` / ``laion_clap`` are absent — must never pull a heavy d
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from vibemix.library.rekordbox import TrackEntry
 

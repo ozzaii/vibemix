@@ -1,20 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
 """ClapEngine — local, on-device CLAP audio/text embedder (512-dim).
 
-STAGED, NOT WIRED. This module exists so the future embedding-swap phase has a
-tested, import-safe seam to plug into; it does NOT yet replace the live Gemini
-embedding path (that is the 14-file wiring phase — see ``docs/clap-engine.md``).
+WIRED product path. ``ClapEmbedder`` uses this engine on the ``onnx`` backend;
+the legacy cloud embedder is no longer selected for library embeddings.
 
 # What it is
 ============
 
 A deterministic, on-device embedder built on the LAION-CLAP ``HTSAT-tiny``
-music checkpoint. It maps both audio and text into ONE 512-dim space (the same
-cross-modal property Gemini Embedding 2 has), so the library vibe-search /
-curator / next-suggestion layer can run with ZERO API cost and audio that never
-leaves the device. CLAP is an on-device *embedding* model, NOT a second LLM
-provider — the Gemini-only provider rule for the conversational co-host brain
-is unaffected.
+music checkpoint. It maps both audio and text into ONE 512-dim space, so the
+library vibe-search / curator / next-suggestion layer can run with ZERO API
+cost and audio that never leaves the device. CLAP is an on-device *embedding*
+model, NOT a second LLM provider; it does not change the selected
+conversational/co-host brain.
 
 # The proven pipeline (ported byte-for-byte from bravoh-gpu-worker/clap_mix_only.py)
 =================================================================================
@@ -35,8 +33,9 @@ file yields a bit-identical vector (proven: re-embed cos = 1.000000, max|Δ| = 0
 # Lazy-import contract (the load-bearing acceptance)
 ==================================================
 
-The heavy deps — ``torch`` / ``torchaudio`` / ``laion_clap`` (torch backend) and
-``onnxruntime`` (the future ship backend) — are NEVER imported at module top
+The heavy deps — ``torch`` / ``torchaudio`` / ``laion_clap`` (torch backend)
+and ``onnxruntime`` / ``tokenizers`` / ``av`` (the ONNX ship backend) —
+are NEVER imported at module top
 level. They are imported INSIDE ``_ensure_model`` / ``_load_and_chunk`` only.
 This mirrors ``library/telegram_bridge.py``'s convention for
 ``python-telegram-bot``: ``import vibemix.library.clap_engine`` succeeds in CI
@@ -46,15 +45,14 @@ module top level pulls only numpy + stdlib + ``__future__``.
 # Backends
 =========
 
-* ``torch`` (default) — the LAION-CLAP reference path above. Requires
+* ``onnx`` (default) — cross-platform ship path using Xenova/larger_clap_music_and_speech
+  via onnxruntime + local Slaney log-mel. ``ClapEmbedder`` uses
+  this backend for the product CLAP path.
+* ``torch`` — the LAION-CLAP reference path above. Requires
   ``torch`` + ``torchaudio`` + ``laion_clap`` to be installed at call time.
-* ``onnx`` — the eventual cross-platform ship path (onnxruntime, ~13-18MB wheel
-  vs torch's ~88-123MB tree). It is a ``NotImplementedError`` STUB until the
-  parity gate in ``docs/clap-engine.md`` passes — it MUST NOT silently return a
-  wrong-distribution vector.
 
 Select via the ``backend=`` arg or the ``VIBEMIX_CLAP_BACKEND`` env var
-(default ``"torch"``).
+(default ``"onnx"``).
 """
 
 from __future__ import annotations
@@ -64,6 +62,12 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+
+from vibemix.library.cache_paths import (
+    CLAP_ONNX_ENV,
+    DEFAULT_CLAP_ONNX_DIR,
+    clap_onnx_dir,
+)
 
 # --------------------------------------------------------------------------- #
 # Proven pipeline constants — ported VERBATIM from clap_mix_only.py.           #
@@ -75,7 +79,7 @@ CHUNK_BATCH = 128  # chunks per CLAP forward pass
 CLAP_DIM = 512  # output embedding dimensionality
 
 _ENV_BACKEND = "VIBEMIX_CLAP_BACKEND"
-_DEFAULT_BACKEND = "torch"
+_DEFAULT_BACKEND = "onnx"
 _VALID_BACKENDS = ("torch", "onnx")
 
 # ---- onnx backend (Xenova/larger_clap_music_and_speech, non-fusion) ----------
@@ -84,24 +88,25 @@ _VALID_BACKENDS = ("torch", "onnx")
 #   onnx/text_model.onnx   (ClapTextModelWithProjection, input "input_ids" ONLY)
 #   preprocessor_config.json + tokenizer files (for ClapFeatureExtractor / Roberta)
 # Override the dir with VIBEMIX_CLAP_ONNX_DIR; default is the vibemix cache.
-_ENV_ONNX_DIR = "VIBEMIX_CLAP_ONNX_DIR"
-_DEFAULT_ONNX_DIR = Path.home() / ".cache" / "vibemix" / "clap-onnx"
+_ENV_ONNX_DIR = CLAP_ONNX_ENV
+_DEFAULT_ONNX_DIR = DEFAULT_CLAP_ONNX_DIR
 _ONNX_AUDIO_REL = "onnx/audio_model.onnx"
 _ONNX_TEXT_REL = "onnx/text_model.onnx"
+_ONNX_REQUIRED_RELS = (
+    _ONNX_AUDIO_REL,
+    _ONNX_TEXT_REL,
+    "preprocessor_config.json",
+    "tokenizer.json",
+    "vocab.json",
+    "merges.txt",
+)
 # Non-fusion Xenova mel is 10s @ 48k; one 10s segment per ONNX forward (batch=1
 # model). Non-overlapping slices match the validated parity run (techno+psy 100%).
 _ONNX_TEXT_MAXLEN = 77  # CLAP text is trained/used at length 77
-# Log-mel frontend (Xenova ClapFeatureExtractor config). Computed via
-# transformers.audio_utils (mel_filter_bank/spectrogram/window_function) — the
-# EXACT numpy primitives ClapFeatureExtractor uses internally, but torch-FREE
-# (the whole point of the swap: transformers' ClapFeatureExtractor class does a
-# top-level `import torch`; audio_utils does not). A hand-rolled librosa mel was
-# tried first and DEGRADED genre separation (techno 6/10 vs 10/10) — librosa's
-# default Slaney filterbank + windowing don't match HF byte-for-byte. The fix is
-# to replicate CLAP's `_np_extract_fbank_features` exactly: for a 10s rand_trunc
-# segment CLAP uses `mel_filters_slaney` (norm="slaney", mel_scale="slaney"),
-# Hann window, frame 1024 / hop 480, power 2.0, log_mel="dB". Shape fed to the
-# audio ONNX: (1, 1, n_frames=1001, _ONNX_N_MELS=64).
+# Log-mel frontend (Xenova ClapFeatureExtractor config). Computed via local
+# numpy primitives: Slaney filterbank, Hann window, frame 1024 / hop 480,
+# power 2.0, log_mel="dB". Shape fed to the audio ONNX:
+# (1, 1, n_frames=1001, _ONNX_N_MELS=64).
 _ONNX_N_FFT = 1024
 _ONNX_HOP = 480
 _ONNX_N_MELS = 64
@@ -121,6 +126,33 @@ _MIME_TO_SUFFIX = {
     "audio/mpeg": ".mp3",
     "audio/mp3": ".mp3",
 }
+
+
+def onnx_model_status() -> dict[str, object]:
+    """Return lightweight CLAP ONNX asset status without importing heavy deps."""
+    root = clap_onnx_dir()
+    missing = [rel for rel in _ONNX_REQUIRED_RELS if not (root / rel).is_file()]
+    mismatched: list[str] = []
+    try:
+        from vibemix.library.model_assets import clap_model_files
+
+        specs = {spec.rel_path: spec for spec in clap_model_files()}
+        for rel in _ONNX_REQUIRED_RELS:
+            path = root / rel
+            spec = specs.get(rel)
+            if spec is not None and path.is_file() and path.stat().st_size != spec.size:
+                mismatched.append(rel)
+    except Exception:
+        # Status must stay best-effort and import-safe; install_clap_model()
+        # performs the authoritative SHA-256 verification when the user repairs
+        # the cache.
+        mismatched = []
+    return {
+        "installed": not missing and not mismatched,
+        "path": str(root),
+        "missing": missing,
+        "mismatched": mismatched,
+    }
 
 
 def _l2(vec: np.ndarray) -> np.ndarray:
@@ -158,7 +190,7 @@ class ClapEngine:
     # Model loading (lazy, heavy imports live HERE — never at top level)  #
     # ------------------------------------------------------------------ #
     def _ensure_model(self):
-        """Load + cache the CLAP model once. Raises for the onnx stub backend."""
+        """Load + cache the CLAP model once for either backend."""
         if self._model is not None:
             return self._model
 
@@ -267,8 +299,8 @@ class ClapEngine:
         return mean_emb.astype(np.float32)
 
     # ------------------------------------------------------------------ #
-    # ONNX backend (Xenova non-fusion; onnxruntime + HF mel/tokenizer)     #
-    # Heavy imports (onnxruntime/transformers/librosa) live HERE only.     #
+    # ONNX backend (Xenova non-fusion; onnxruntime + local mel/tokenizer)  #
+    # Heavy imports (onnxruntime/tokenizers/av) live HERE only.            #
     # ------------------------------------------------------------------ #
     def _ensure_onnx_model(self):
         """Load + cache the Xenova ONNX sessions + feature extractor + tokenizer.
@@ -279,9 +311,9 @@ class ClapEngine:
         error (NOT a wrong vector) when the model files are absent.
         """
         import onnxruntime as ort  # lazy — ship dep
-        from transformers import RobertaTokenizer  # lazy (tokenizer is torch-free)
+        from tokenizers import Tokenizer  # lazy — ship dep
 
-        mdir = Path(os.environ.get(_ENV_ONNX_DIR) or _DEFAULT_ONNX_DIR)
+        mdir = clap_onnx_dir()
         audio_path = mdir / _ONNX_AUDIO_REL
         text_path = mdir / _ONNX_TEXT_REL
         if not audio_path.exists() or not text_path.exists():
@@ -292,12 +324,10 @@ class ClapEngine:
                 f"or set {_ENV_ONNX_DIR}."
             )
 
-        tok = RobertaTokenizer.from_pretrained(str(mdir))
-        # CLAP's Slaney mel filterbank (norm="slaney", mel_scale="slaney") — the
-        # filter `_np_extract_fbank_features` uses for a 10s rand_trunc segment.
-        # Built via transformers.audio_utils (torch-free) so it is byte-identical
-        # to ClapFeatureExtractor without the class's top-level `import torch`.
-        from transformers.audio_utils import mel_filter_bank  # lazy, torch-free
+        tok = Tokenizer.from_file(str(mdir / "tokenizer.json"))
+        tok.enable_truncation(max_length=_ONNX_TEXT_MAXLEN)
+        from vibemix.library.audio_features import mel_filter_bank
+
         mel_slaney = mel_filter_bank(
             num_frequency_bins=_ONNX_NB_FREQ_BINS,
             num_mel_filters=_ONNX_N_MELS,
@@ -305,7 +335,6 @@ class ClapEngine:
             max_frequency=_ONNX_FMAX,
             sampling_rate=CLAP_SR,
             norm="slaney",
-            mel_scale="slaney",
         )
         providers = ["CPUExecutionProvider"]
         audio_sess = ort.InferenceSession(str(audio_path), providers=providers)
@@ -326,12 +355,9 @@ class ClapEngine:
     def _onnx_logmel(seg: np.ndarray, mel_filters: np.ndarray) -> np.ndarray:
         """Log-mel for one 10s segment → (1, 1, n_frames=1001, N_MELS=64).
 
-        Torch-free (the reason the ONNX path exists). Replicates CLAP's
-        ``_np_extract_fbank_features`` EXACTLY via transformers.audio_utils:
-        Hann window, frame 1024 / hop 480, power 2.0, the Slaney mel filterbank,
-        log_mel="dB". A hand-rolled librosa mel was tried and degraded genre
-        separation (techno 6/10) — these primitives are HF byte-for-byte."""
-        from transformers.audio_utils import spectrogram, window_function  # lazy
+        Torch-free (the reason the ONNX path exists): Hann window, frame
+        1024 / hop 480, power 2.0, Slaney mel filterbank, log_mel="dB"."""
+        from vibemix.library.audio_features import spectrogram, window_function
 
         log_mel = spectrogram(
             np.asarray(seg, dtype=np.float64),
@@ -348,10 +374,10 @@ class ClapEngine:
     def _onnx_embed_audio_file(self, path: str) -> np.ndarray:
         """ONNX audio embed: non-overlapping 10s segs → HF mel → audio ONNX →
         mean-pool → L2 → (512,). Matches the validated parity pipeline."""
-        import librosa  # lazy
+        from vibemix.library.audio_decode import load_audio_mono
 
         m = self._ensure_onnx_model()
-        y, _ = librosa.load(path, sr=CLAP_SR, mono=True)
+        y = load_audio_mono(path, target_sr=CLAP_SR)
         if len(y) == 0:
             raise ValueError(f"ClapEngine: empty audio from {path!r}")
         if len(y) < CHUNK_SAMPLES:  # repeat-pad short clips to one 10s window
@@ -374,12 +400,12 @@ class ClapEngine:
         """ONNX text embed: ONE query, UNPADDED (the text ONNX has no
         attention_mask → padding tokens collapse the output) → (512,) L2."""
         m = self._ensure_onnx_model()
-        enc = m["tok"](
-            text, truncation=True, max_length=_ONNX_TEXT_MAXLEN, return_tensors="np"
-        )
-        feed = {"input_ids": enc["input_ids"].astype(np.int64)}
+        enc = m["tok"].encode(text)
+        feed = {"input_ids": np.asarray(enc.ids, dtype=np.int64)[np.newaxis, :]}
         if "attention_mask" in m["text_inputs"]:
-            feed["attention_mask"] = enc["attention_mask"].astype(np.int64)
+            feed["attention_mask"] = np.asarray(enc.attention_mask, dtype=np.int64)[
+                np.newaxis, :
+            ]
         out = m["text"].run(None, feed)[0][0]
         return _l2(np.asarray(out)).astype(np.float32)
 

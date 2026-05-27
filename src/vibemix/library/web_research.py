@@ -99,7 +99,7 @@ def web_search(query: str, k: int = 5, *, client: Any | None = None) -> dict[str
             _SEARCH_URL,
             json={"api_key": api_key, "query": query, "max_results": k},
         )
-    except Exception as e:  # noqa: BLE001 — handler must not raise
+    except Exception as e:
         logger.warning("[web_research] web_search request failed: %s", e)
         return {"error": f"web_search failed: {type(e).__name__}"}
     finally:
@@ -107,7 +107,7 @@ def web_search(query: str, k: int = 5, *, client: Any | None = None) -> dict[str
         if own_client and client is not None:
             try:
                 client.close()
-            except Exception:  # noqa: BLE001 — best-effort cleanup
+            except Exception:
                 pass
 
     status = getattr(resp, "status_code", None)
@@ -115,7 +115,7 @@ def web_search(query: str, k: int = 5, *, client: Any | None = None) -> dict[str
         return {"error": f"web_search failed: HTTP {status}"}
     try:
         payload = resp.json()
-    except Exception as e:  # noqa: BLE001 — bad/empty body
+    except Exception as e:
         logger.warning("[web_research] web_search bad JSON: %s", e)
         return {"error": f"web_search failed: {type(e).__name__}"}
     if not isinstance(payload, dict):
@@ -171,14 +171,14 @@ def fetch_url(url: str, *, client: Any | None = None) -> dict[str, Any]:
             _EXTRACT_URL,
             json={"api_key": api_key, "urls": [url]},
         )
-    except Exception as e:  # noqa: BLE001 — handler must not raise
+    except Exception as e:
         logger.warning("[web_research] fetch_url request failed: %s", e)
         return {"error": f"fetch_url failed: {type(e).__name__}"}
     finally:
         if own_client and client is not None:
             try:
                 client.close()
-            except Exception:  # noqa: BLE001 — best-effort cleanup
+            except Exception:
                 pass
 
     status = getattr(resp, "status_code", None)
@@ -186,7 +186,7 @@ def fetch_url(url: str, *, client: Any | None = None) -> dict[str, Any]:
         return {"error": f"fetch_url failed: HTTP {status}"}
     try:
         payload = resp.json()
-    except Exception as e:  # noqa: BLE001 — bad/empty body
+    except Exception as e:
         logger.warning("[web_research] fetch_url bad JSON: %s", e)
         return {"error": f"fetch_url failed: {type(e).__name__}"}
     if not isinstance(payload, dict):

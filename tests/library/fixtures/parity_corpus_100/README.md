@@ -1,4 +1,4 @@
-# Parity corpus — 100 tracks × 768-dim
+# Parity corpus — 100 tracks × active EMBEDDING_DIM
 
 Used by `tests/library/test_embeddings_parity.py` (Plan 41-05 Task 2) to
 pin the determinism contract of `vibemix.library._cosine.cosine_topk`.
@@ -9,7 +9,7 @@ pin the determinism contract of `vibemix.library._cosine.cosine_topk`.
 python tests/library/fixtures/parity_corpus_100/_generate.py
 ```
 
-Output: `vectors.npz` (100 × 768 float32, each row L2-normalized) and
+Output: `vectors.npz` (100 × EMBEDDING_DIM float32, each row L2-normalized) and
 `track_ids.json` (100 ids of the form `parity-NNN`).
 
 ## Determinism contract

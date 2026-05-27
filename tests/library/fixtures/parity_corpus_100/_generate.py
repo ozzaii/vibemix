@@ -2,9 +2,9 @@
 """Regenerate the Plan 41-05 parity corpus fixture.
 
 100 deterministic synthetic ``(track_id, EMBEDDING_DIM-dim float32
-L2-normalized vector)`` rows (1536-dim as of quick-260525-gz2). Seed
-locked at 42 — any contributor can regenerate the fixture byte-identically
-by running this script. Dim is single-sourced from
+L2-normalized vector)`` rows. Seed locked at 42 — any contributor can
+regenerate the fixture byte-identically by running this script. Dim is
+single-sourced from
 ``vibemix.library._cosine.EMBEDDING_DIM`` so a future dim bump re-shapes the
 corpus automatically.
 

@@ -1,14 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
-"""LibraryEmbedder — Gemini Embedding 2 client for Phase 28 library work.
+"""Legacy Gemini Embedding 2 client kept for migration and fallback tests.
 
 # Proxy-only contract
 ==================
 
-This module NEVER reads any AIza-style env var directly. All Gemini API
-traffic flows through the Bravoh proxy via ``build_proxy_genai_client``.
-Callers (``__main__.py`` boot path + drag-drop importer) build the proxy
-client once and pass it in. The privacy + cost-control invariants from
-LIBRARY-04 + LIBRARY-10 hold because this module cannot bypass the proxy.
+This module is not the product embedding path. Normal library search,
+similarity, and curation embeddings use local CLAP ONNX/512 via
+``ClapEmbedder``. The legacy Gemini client remains for migrations, compatibility
+tests, explicit fallback probes, and historical cache handling.
+
+When this legacy path is used, it NEVER reads any AIza-style env var directly.
+All Gemini API traffic flows through the Bravoh proxy via
+``build_proxy_genai_client``. Callers build the proxy client once and pass it in.
+The privacy + cost-control invariants from LIBRARY-04 + LIBRARY-10 hold because
+this module cannot bypass the proxy.
 
 # Strategy
 ========
@@ -27,10 +32,8 @@ LIBRARY-04 + LIBRARY-10 hold because this module cannot bypass the proxy.
    ``(file_bytes || model_id || strategy_version)`` and persisted to
    ``~/.cache/vibemix/embeddings.db`` so re-imports do 0 API calls.
 5. Output dimensionality is single-sourced from
-   ``_cosine.EMBEDDING_DIM`` (1536 as of quick-260525-gz2;
-   MRL-truncated from Gemini Embedding 2's native 3072). Sub-3072 MRL
-   prefixes are NOT auto-normalized by Google, so every embed is passed
-   through ``l2_normalize`` before return (see embed_track / embed_query).
+   ``_cosine.EMBEDDING_DIM``. This legacy Gemini embedder is no longer selected
+   by the product factory; normal library embeddings are CLAP/512.
 
 # Critical corrections (Phase 28 RESEARCH Open Qs)
 ===============================================
@@ -54,16 +57,36 @@ import sqlite3
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
-from google import genai
-from google.genai import types
 
 from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
+from vibemix.library.cache_paths import EMBED_CACHE_DB_PATH
+from vibemix.library.embed_cache import (
+    init_cache_schema as _init_cache_schema,
+)
+from vibemix.library.embed_cache import (
+    open_default_cache_db as _open_default_cache_db,
+)
+from vibemix.library.embed_config import (
+    CUE_ANCHORED_STRATEGY_VERSION,
+    CUE_WINDOW_SECONDS,
+    DEFAULT_EMBED_STRATEGY,
+    EMBED_STRATEGIES,
+    MAX_CUES_PER_TRACK,
+)
+from vibemix.library.embed_factory import build_embedder
 from vibemix.library.rekordbox import TrackEntry
-from vibemix.llm.model_router import resolve
+from vibemix.llm._router_config import (
+    EMBEDDING_GA_CANDIDATES as GEMINI_EMBEDDING_MODEL_GA_CANDIDATES,
+)
+from vibemix.llm.model_router import resolve_model
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from google import genai
 
 
 # ─── Locked constants ──────────────────────────────────────────────────────────
@@ -74,50 +97,15 @@ logger = logging.getLogger(__name__)
 # MUST be coordinated with EXCERPT_STRATEGY_VERSION (Plan 41-05 owns that).
 # Plan 41-05: GEMINI_EMBEDDING_MODEL_GA_CANDIDATES below is the probe-time
 # override; this constant is the router-resolved default for non-probe paths.
-GEMINI_EMBEDDING_MODEL = resolve("embedding")[0]
+GEMINI_EMBEDDING_MODEL = resolve_model("embedding")
 
 # Plan 41-05 LAT-06 — GA-rename auto-bump probe candidates.
 # Sourced from `_router_config.EMBEDDING_GA_CANDIDATES` (the only allowlisted
 # location for raw Gemini model literals). Re-exported here for backward
 # compatibility with downstream consumers that import from `library.embed`.
-from vibemix.llm._router_config import EMBEDDING_GA_CANDIDATES as GEMINI_EMBEDDING_MODEL_GA_CANDIDATES
 
 # Bump to invalidate ALL cached embeddings. Format: vN-<strategy-name>.
 EXCERPT_STRATEGY_VERSION = "v1-3excerpt-mean"
-
-# ── Embed strategies ──────────────────────────────────────────────────────────
-#
-# "mean_excerpt"  — DEFAULT. The historical intro/mid/outro 3-excerpt path
-#                   (60s each, mean of the embeddings). Strategy version =
-#                   EXCERPT_STRATEGY_VERSION above.
-# "cue_anchored"  — OPT-IN (Path 2). Offline auto-cue detection
-#                   (``library.cue_detect.detect_cues``) finds the mixable
-#                   structural points (intro mix-in / breakdown / drop /
-#                   phrase boundaries); we embed a <=80s window anchored at
-#                   each cue and MEAN the cue-region vectors (single-vector
-#                   contract preserved). A future multi-vector mode can store
-#                   the per-cue vectors instead of meaning them — see the
-#                   `# MULTI-VECTOR SEAM` comment in `_embed_audio_cue_anchored`.
-#
-# Each strategy carries its OWN cache-key namespace so a cached mean_excerpt
-# vector is NEVER confused with a cue_anchored one (the strategy string is
-# hashed into the content-hash key alongside the model id).
-EMBED_STRATEGIES = ("mean_excerpt", "cue_anchored")
-DEFAULT_EMBED_STRATEGY = "mean_excerpt"
-
-# Cache-key namespace for the cue-anchored strategy. Distinct from
-# EXCERPT_STRATEGY_VERSION so the two strategies never collide in embed_cache.
-CUE_ANCHORED_STRATEGY_VERSION = "v1-cueanchored-mean"
-
-# Window length (seconds) embedded around each detected cue. Must stay <= the
-# emb-2 single-call audio cap (AUDIO_SINGLE_CALL_MAX_SECONDS = 80) so each
-# cue-region embed is a single fast call. The window is anchored AT the cue
-# (cue is the start) so the embedding represents what plays FROM the mix point.
-CUE_WINDOW_SECONDS = 80
-
-# Max cues to detect + embed per track in the cue-anchored path. Keeps the
-# per-track API-call count bounded (<= MAX_CUES_PER_TRACK audio embeds).
-MAX_CUES_PER_TRACK = 4
 
 # Plan 41-05 — version bump that runs the moment the GA-rename probe
 # resolves to the GA-renamed candidate (first entry of EMBEDDING_GA_CANDIDATES
@@ -145,27 +133,24 @@ EXCERPT_DURATION = 60
 # ffmpeg subprocess timeout per excerpt — guard against malformed audio.
 FFMPEG_TIMEOUT_SECONDS = 30
 
-# Cache database. NOT library.db (Plan 02 owns that for vec0). NOT
-# library.pkl (Phase 25 Rekordbox parsed cache).
-EMBED_CACHE_DB_PATH = Path.home() / ".cache" / "vibemix" / "embeddings.db"
-
 # Re-export so downstream plans don't have to import from _cosine directly.
 __all__ = [
-    "LibraryEmbedder",
-    "GEMINI_EMBEDDING_MODEL",
-    "GEMINI_EMBEDDING_MODEL_GA_CANDIDATES",
-    "EXCERPT_STRATEGY_VERSION",
-    "EXCERPT_STRATEGY_VERSION_GA_RENAME",
-    "EMBED_STRATEGIES",
-    "DEFAULT_EMBED_STRATEGY",
-    "CUE_ANCHORED_STRATEGY_VERSION",
-    "CUE_WINDOW_SECONDS",
-    "MAX_CUES_PER_TRACK",
-    "EMBEDDING_DIM",
     "AUDIO_CAP_SECONDS",
     "AUDIO_SINGLE_CALL_MAX_SECONDS",
+    "CUE_ANCHORED_STRATEGY_VERSION",
+    "CUE_WINDOW_SECONDS",
+    "DEFAULT_EMBED_STRATEGY",
+    "EMBEDDING_DIM",
     "EMBED_CACHE_DB_PATH",
+    "EMBED_STRATEGIES",
+    "EXCERPT_STRATEGY_VERSION",
+    "EXCERPT_STRATEGY_VERSION_GA_RENAME",
+    "GEMINI_EMBEDDING_MODEL",
+    "GEMINI_EMBEDDING_MODEL_GA_CANDIDATES",
+    "MAX_CUES_PER_TRACK",
+    "LibraryEmbedder",
     "_probe_ga_model_id",
+    "build_embedder",
 ]
 
 
@@ -189,29 +174,11 @@ def _require_ffmpeg() -> str:
     return ff
 
 
-# ─── Cache helpers ─────────────────────────────────────────────────────────────
+def _genai_types():
+    """Import Gemini SDK types only when the legacy embedder makes a call."""
+    from google.genai import types
 
-
-def _open_default_cache_db() -> sqlite3.Connection:
-    """Open the default ~/.cache/vibemix/embeddings.db with schema init."""
-    EMBED_CACHE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(EMBED_CACHE_DB_PATH))
-    _init_cache_schema(conn)
-    return conn
-
-
-def _init_cache_schema(conn: sqlite3.Connection) -> None:
-    """Idempotent: create embed_cache table if absent."""
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS embed_cache (
-            key TEXT PRIMARY KEY,
-            vector BLOB NOT NULL,
-            ts REAL NOT NULL
-        )
-        """
-    )
-    conn.commit()
+    return types
 
 
 # ─── GA-rename probe ──────────────────────────────────────────────────────────
@@ -246,6 +213,7 @@ def _probe_ga_model_id(
     started = _time.perf_counter()
     canary = "vibemix probe"
     candidates_tried: list[str] = []
+    types = _genai_types()
 
     for candidate in GEMINI_EMBEDDING_MODEL_GA_CANDIDATES:
         candidates_tried.append(candidate)
@@ -309,7 +277,7 @@ def _probe_ga_model_id(
 
 
 class LibraryEmbedder:
-    """Single entry point for embedding tracks + queries via Gemini Embedding 2.
+    """Legacy Gemini entry point for migration/fallback embedding tests.
 
     Construction:
         ``LibraryEmbedder(client, cache_db=None)`` where ``client`` is a
@@ -506,8 +474,9 @@ class LibraryEmbedder:
         """Cue-anchored audio embed path (Path 2, opt-in).
 
         Pipeline:
-            1. Offline auto-cue detection (``cue_detect.detect_cues``) — pure
-               DSP, NO network. Finds the mixable structural points.
+            1. Offline auto-cue detection (``cue_engine.detect_cues_auto``) —
+               local DSP/ONNX with heuristic fallback, NO network. Finds the
+               mixable structural points.
             2. For each cue, ffmpeg-slice a <=CUE_WINDOW_SECONDS (80s) window
                anchored AT the cue (cue = window start), embed it as a single
                audio Part, collect the vectors.
@@ -527,10 +496,10 @@ class LibraryEmbedder:
         and leave the per-cue vectors + their CuePoint metadata as the natural
         extension point.
         """
-        from vibemix.library.cue_detect import detect_cues
+        from vibemix.library.cue_engine import detect_cues_auto
 
         try:
-            cues = detect_cues(audio_path, max_cues=MAX_CUES_PER_TRACK)
+            cues = detect_cues_auto(audio_path, max_cues=MAX_CUES_PER_TRACK)
         except Exception as e:
             logger.warning(
                 "cue detection failed for %s (%s); falling back to "
@@ -552,7 +521,7 @@ class LibraryEmbedder:
         for cue in usable:
             start = max(0.0, float(cue.start_s))
             # Use the phrase-aligned mixable window the engine sized into the
-            # anchor (end_s − start_s, already ≤80s) instead of a hardcoded
+            # anchor (end_s - start_s, already <=80s) instead of a hardcoded
             # CUE_WINDOW_SECONDS — the engine knows how long the mix region is.
             # Clamp so we never request audio past the end-of-track (ffmpeg -t
             # past EOF just yields a short clip, which embeds fine, but clamping
@@ -649,7 +618,7 @@ class LibraryEmbedder:
         msg = str(err).lower()
         if "too long" in msg:
             return True
-        if "audio cap" in msg or "duration" in msg and "180" in msg:
+        if "audio cap" in msg or ("duration" in msg and "180" in msg):
             return True
         # google.genai.errors.APIError carries .code on some versions.
         code = getattr(err, "code", None) or getattr(err, "status_code", None)
@@ -731,6 +700,7 @@ class LibraryEmbedder:
         Uses ``self._model`` (probe-derived runtime id) instead of the
         module constant so a GA rename auto-routes without code change.
         """
+        types = _genai_types()
         result = self._client.models.embed_content(
             model=self._model,
             contents=[types.Part.from_bytes(data=clip, mime_type=mime_type)],
@@ -752,6 +722,7 @@ class LibraryEmbedder:
 
         Uses ``self._model`` (probe-derived runtime id).
         """
+        types = _genai_types()
         result = self._client.models.embed_content(
             model=self._model,
             contents=text,
@@ -830,11 +801,11 @@ class LibraryEmbedder:
         blob = row[0]
         vec = np.frombuffer(blob, dtype=np.float32).copy()
         # Dim guard: the content-hash key does not encode EMBEDDING_DIM, so a
-        # cache row written at a different dim (e.g. a 768→1536 bump without
+        # cache row written at a different dim (e.g. a 768→512 bump without
         # clearing embed_cache) would otherwise be returned and crash the
         # fail-loud dim asserts downstream. Treat a wrong-dim row as a clean
         # MISS → lazy re-embed at the current dim. Correct-dim rows still hit,
-        # so an in-progress 1536 run stays fully resumable for free.
+        # so an in-progress run stays fully resumable for free.
         if vec.shape[0] != EMBEDDING_DIM:
             return None
         return vec
@@ -849,28 +820,3 @@ class LibraryEmbedder:
             (key, vector.tobytes(), _time.time()),
         )
         self._cache.commit()
-
-
-# ─── Phase 90: backend-aware embedder factory ──────────────────────────────────
-def build_embedder(
-    client: "genai.Client | None" = None,
-    cache_db: sqlite3.Connection | None = None,
-    **kwargs: object,
-):
-    """Return the embedder for the active backend (``VIBEMIX_EMBED_BACKEND``).
-
-    ``clap``  → :class:`vibemix.library.embed_clap.ClapEmbedder` (local Xenova
-    ONNX, 512-dim; ``client`` is unused; ``embed_strategy``/probe kwargs ignored).
-    anything else (default ``gemini``) → :class:`LibraryEmbedder` (cloud, 1536-dim).
-
-    This is the SINGLE construction seam — call sites pass the genai ``client``
-    unconditionally; it is simply unused on the clap path. Pairs with the
-    ``_cosine.EMBED_BACKEND`` dim seam so dim + class flip together off one env var.
-    """
-    from vibemix.library._cosine import EMBED_BACKEND
-
-    if EMBED_BACKEND == "clap":
-        from vibemix.library.embed_clap import ClapEmbedder
-
-        return ClapEmbedder(cache_db=cache_db)
-    return LibraryEmbedder(client, cache_db=cache_db, **kwargs)

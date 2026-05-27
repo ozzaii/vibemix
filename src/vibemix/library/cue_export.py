@@ -182,7 +182,7 @@ def export_cues(
 
         # Real RekordboxXml.save takes path=...; the fake records the call.
         xml.save(path=out_path)
-    except Exception as e:  # noqa: BLE001 — tool contract: return, never raise
+    except Exception as e:
         logger.warning("[cue_export] export_cues failed: %s", e)
         return {"error": f"export_cues failed: {type(e).__name__}"}
 

@@ -21,8 +21,8 @@ Lazy-import contract: top level pulls only stdlib + the numpy-free
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
 
@@ -120,8 +120,7 @@ class RekordboxSource:
         if not (lib.try_load_cache() and lib.xml_path == self.resolved_path):
             lib.load_xml(self.resolved_path)
 
-        for entry in lib.tracks.values():
-            yield entry
+        yield from lib.tracks.values()
 
 
 __all__ = ["RekordboxSource"]

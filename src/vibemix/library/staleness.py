@@ -17,8 +17,8 @@ import logging
 import os
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -169,15 +169,15 @@ def apply_snooze_action(
 
 
 __all__ = [
-    "STALE_AGE_SECONDS",
-    "SNOOZE_DURATION_SECONDS",
-    "STATE_KEY",
     "DEFAULT_LIBRARY_PKL",
     "DEFAULT_STATE_FILE_PATH",
+    "SNOOZE_DURATION_SECONDS",
+    "STALE_AGE_SECONDS",
+    "STATE_KEY",
+    "apply_snooze_action",
+    "emit_nudge_if_stale",
+    "is_snoozed",
     "is_stale",
     "load_snooze_state",
     "save_snooze_state",
-    "is_snoozed",
-    "emit_nudge_if_stale",
-    "apply_snooze_action",
 ]

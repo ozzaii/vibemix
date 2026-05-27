@@ -144,7 +144,7 @@ def open_store(prefer_sqlite_vec: bool = True) -> LibraryStore:
 
             backend: _Backend = SqliteVecStore()
             print(
-                f"-> library store: backend=SqliteVecStore reason=ok",
+                "-> library store: backend=SqliteVecStore reason=ok",
                 file=sys.stderr,
                 flush=True,
             )
@@ -163,7 +163,7 @@ def open_store(prefer_sqlite_vec: bool = True) -> LibraryStore:
 
     backend = NumpyStore()
     print(
-        f"-> library store: backend=NumpyStore reason=preferred",
+        "-> library store: backend=NumpyStore reason=preferred",
         file=sys.stderr,
         flush=True,
     )
@@ -171,8 +171,8 @@ def open_store(prefer_sqlite_vec: bool = True) -> LibraryStore:
 
 
 __all__ = [
+    "EMBEDDING_DIM",
     "LibraryStore",
     "open_store",
     "snapshot_hash",
-    "EMBEDDING_DIM",
 ]

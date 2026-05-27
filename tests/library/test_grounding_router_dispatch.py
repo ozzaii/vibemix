@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Plan 41-01 / Task 2 — library/grounding.py routes via ModelRouter.
+"""Plan 41-01 / Task 2 — legacy Gemini model literals stay out of grounding.py.
 
-The grounding pipeline used to inline ``model="gemini-embedding-2"`` at
-the ``embed_content`` call site. Post-migration the literal is replaced
-with the router-derived constant from ``library.embed``. This test
-locks the contract that no model literal remains in ``grounding.py``.
+The old Gemini grounding pipeline used to inline ``model="gemini-embedding-2"``
+at the ``embed_content`` call site. Product grounding/search now routes through
+local CLAP ONNX, but this regression test still locks the contract that no raw
+Gemini model literal returns to ``grounding.py``.
 """
 
 from __future__ import annotations
@@ -64,6 +64,5 @@ def test_library_grounding_uses_router_derived_constant() -> None:
 
 
 def test_grounding_embedding_constant_matches_router() -> None:
-    """Sanity: the constant the grounding module consumes resolves
-    correctly via the router."""
+    """Legacy Gemini embedding constant still resolves through the router."""
     assert GEMINI_EMBEDDING_MODEL == resolve("embedding")[0]

@@ -24,8 +24,8 @@ import sqlite_vec
 
 from vibemix.library._cosine import EMBEDDING_DIM, store_suffix
 
-# Backend-namespaced so a clap (512) store never clobbers the gemini (1536)
-# library.db — see _cosine.store_suffix. gemini → "library.db" (unchanged).
+# Backend-namespaced so the CLAP 512-d store never clobbers a historical
+# Gemini 1536-d library.db — see _cosine.store_suffix.
 DB_PATH = Path.home() / ".cache" / "vibemix" / f"library{store_suffix()}.db"
 
 
@@ -123,7 +123,7 @@ class SqliteVecStore:
         dim-mismatch guard to catch a STALE-but-EMPTY 768-dim table (the
         ``IF NOT EXISTS`` clause does not recreate an existing table at the
         new EMBEDDING_DIM, so an empty table still carries the old schema
-        and rejects a 1536-d insert). Returns None if the DDL can't be read.
+        and rejects a 512-d insert). Returns None if the DDL can't be read.
         """
         import re
 
@@ -146,7 +146,7 @@ class SqliteVecStore:
         """Drop + recreate the vec0 table at the current EMBEDDING_DIM.
 
         Used by folder_ingest's dim-mismatch guard to wipe a STALE-BUT-EMPTY
-        768-dim table (0 rows = no real data) so a 1536-d ingest can proceed
+        768-dim table (0 rows = no real data) so a 512-d ingest can proceed
         without manual file deletion. NEVER call this on a populated table —
         the guard only invokes it when row_count() == 0.
         """

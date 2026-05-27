@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 """Corpus mean-centering for the library query path (search + similar).
 
-THE quality fix (quick-260525, validated experimentally): raw whole-track
-Gemini embeddings are strongly anisotropic — average pairwise cosine ≈ 0.81,
-so *everything* looks ~0.92 similar to everything else and the ranking has no
-discriminative power. Subtracting the corpus centroid (the mean of all stored
-vectors) and re-L2-normalizing collapses the average pairwise cosine to ≈ 0,
-restoring real separation: exact-dup detection hits cosine 1.000 and each seed
-gets a distinct neighbour set.
+THE quality fix (quick-260525, validated experimentally): dense music
+embeddings can be strongly anisotropic, so too many unrelated tracks sit in the
+same cosine cone and the ranking loses discriminative power. Subtracting the
+corpus centroid (the mean of all stored vectors) and re-L2-normalizing collapses
+the average pairwise cosine toward 0, restoring real separation: exact-dup
+detection hits cosine 1.000 and each seed gets a distinct neighbour set. This
+started as the old Gemini-embedding rescue path and now stays active for the
+local CLAP store under a dimension-namespaced cache.
 
 This is a QUERY-SIDE transform only. We never touch the persisted vectors —
 embed-time behaviour is byte-identical. Both the query/seed vector AND every
@@ -45,8 +46,8 @@ logger = logging.getLogger(__name__)
 # Sibling of ~/.cache/vibemix/library.db (the sqlite-vec store) and
 # library_vectors.npy (the numpy store). One centroid serves whichever
 # backend open_store() selected — they store the same vectors. Backend-
-# namespaced (see _cosine.store_suffix): the clap (512) centroid must not
-# overwrite the gemini (1536) centroid or the dim guard would thrash.
+# namespaced (see _cosine.store_suffix): the CLAP (512) centroid must not
+# overwrite a historical Gemini (1536) centroid or the dim guard would thrash.
 CENTROID_PATH = (
     Path.home() / ".cache" / "vibemix" / f"library{store_suffix()}_centroid.npy"
 )
@@ -148,9 +149,9 @@ def load_or_compute_centroid(
 
 
 __all__ = [
-    "CENTROID_PATH",
     "CENTROID_META_PATH",
-    "compute_centroid",
+    "CENTROID_PATH",
     "center_and_renorm",
+    "compute_centroid",
     "load_or_compute_centroid",
 ]

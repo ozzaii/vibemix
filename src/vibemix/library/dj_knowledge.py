@@ -32,8 +32,8 @@ Embedder contract (the injected ``embedder``)
 ``retrieve_dj_knowledge`` accepts ANY of:
   * a plain ``callable(text: str) -> np.ndarray``  (simplest), OR
   * an object exposing ``.embed_text(text) -> np.ndarray``, OR
-  * an object exposing ``.embed_query(text) -> np.ndarray``  (the live
-    ``LibraryEmbedder`` shape — so the existing Gemini text embedder drops in).
+  * an object exposing ``.embed_query(text) -> np.ndarray``  (the product
+    library embedder shape).
 The first match wins. The returned vector is L2-normalized here before cosine,
 so the embedder need not normalize. Vectors stored via ``add()`` are likewise
 L2-normalized on the way in, so ``search`` is a plain dot product.
@@ -205,7 +205,7 @@ class KnowledgeStore:
             )
             np.save(npy_path, matrix)
             return {"saved": len(self._chunks), "jsonl": str(jsonl_path)}
-        except Exception as e:  # noqa: BLE001 — persistence never raises to caller
+        except Exception as e:
             return {"error": f"save failed: {type(e).__name__}"}
 
     @classmethod
@@ -238,7 +238,7 @@ class KnowledgeStore:
             if matrix.ndim == 2 and matrix.shape[0] == len(rows) and len(rows) > 0:
                 store._chunks = rows
                 store._matrix = matrix
-        except Exception:  # noqa: BLE001 — corrupt files → empty store, never raise
+        except Exception:
             return cls()
         return store
 
@@ -272,12 +272,12 @@ def retrieve_dj_knowledge(
     k = max(1, min(10, int(k)))
     try:
         qvec = _embed_with(embedder, query)
-    except Exception as e:  # noqa: BLE001 — embedder failures degrade, never raise
+    except Exception as e:
         return {"error": f"retrieve_dj_knowledge embed failed: {type(e).__name__}"}
 
     try:
         hits = store.search(qvec, k=k, topic=topic, skill_level=skill_level)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return {"error": f"retrieve_dj_knowledge search failed: {type(e).__name__}"}
 
     results = [
@@ -329,10 +329,10 @@ def chunk_text(text: str, *, max_chars: int = 800) -> list[str]:
 
 
 __all__ = [
-    "VALID_SKILL_LEVELS",
     "DEFAULT_KNOWLEDGE_DIR",
+    "VALID_SKILL_LEVELS",
     "KnowledgeChunk",
     "KnowledgeStore",
-    "retrieve_dj_knowledge",
     "chunk_text",
+    "retrieve_dj_knowledge",
 ]

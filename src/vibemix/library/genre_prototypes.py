@@ -382,12 +382,12 @@ class GenrePrototypeLookup:
 
 
 __all__ = [
+    "PROTOTYPES_META_PATH",
+    "PROTOTYPES_PATH",
+    "PROTO_FLOOR",
+    "PROTO_MARGIN",
+    "GenrePrototypeLookup",
     "build_prototypes",
     "classify",
     "load_or_build_prototypes",
-    "GenrePrototypeLookup",
-    "PROTO_FLOOR",
-    "PROTO_MARGIN",
-    "PROTOTYPES_PATH",
-    "PROTOTYPES_META_PATH",
 ]

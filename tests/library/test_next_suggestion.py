@@ -14,13 +14,25 @@ from vibemix.library.next_suggestion import (
     next_suggestion,
     seed_vector_for_track_id,
 )
-from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
+from vibemix.library.rekordbox import CuePoint, RekordboxLibrary, TrackEntry
 
 
-def _track(tid: str, bpm: float = 124.0, key: str = "8A") -> TrackEntry:
+def _track(
+    tid: str,
+    bpm: float = 124.0,
+    key: str = "8A",
+    cues: tuple[CuePoint, ...] = (),
+) -> TrackEntry:
     return TrackEntry(
-        track_id=tid, title=f"Title {tid}", artist=f"Artist {tid}", album="A",
-        bpm=bpm, key=key, duration_s=300.0, cues=(), filepath=f"/tmp/{tid}.mp3",
+        track_id=tid,
+        title=f"Title {tid}",
+        artist=f"Artist {tid}",
+        album="A",
+        bpm=bpm,
+        key=key,
+        duration_s=300.0,
+        cues=cues,
+        filepath=f"/tmp/{tid}.mp3",
     )
 
 
@@ -58,9 +70,7 @@ SEED = np.ones(4, dtype=np.float32)
 
 def test_returns_top_grounded_neighbour(library):
     store = _FakeStore([("t0", 0.99), ("t1", 0.88), ("t2", 0.77)])
-    s = next_suggestion(
-        store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set()
-    )
+    s = next_suggestion(store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set())
     assert isinstance(s, NextSuggestion)
     assert s.track_id == "t1"  # t0 is the seed → skipped
     assert s.similarity == 0.88
@@ -70,7 +80,10 @@ def test_returns_top_grounded_neighbour(library):
 def test_excludes_played(library):
     store = _FakeStore([("t0", 0.99), ("t1", 0.88), ("t2", 0.77)])
     s = next_suggestion(
-        store, library, seed_vector=SEED, seed_track_id="t0",
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
         played_ids={"t1"},
     )
     assert s is not None and s.track_id == "t2"
@@ -79,17 +92,13 @@ def test_excludes_played(library):
 def test_skips_ids_absent_from_library(library):
     # GHOST is in the store ranking but not the library → ungrounded, skipped.
     store = _FakeStore([("t0", 0.99), ("GHOST", 0.95), ("t3", 0.80)])
-    s = next_suggestion(
-        store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set()
-    )
+    s = next_suggestion(store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set())
     assert s is not None and s.track_id == "t3"
 
 
 def test_none_when_nothing_qualifies(library):
     store = _FakeStore([("t0", 0.99)])  # only the seed
-    s = next_suggestion(
-        store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set()
-    )
+    s = next_suggestion(store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set())
     assert s is None
 
 
@@ -98,17 +107,179 @@ def test_honest_null_when_no_metadata():
     lib.tracks = {
         "t0": _track("t0"),
         "f1": TrackEntry(
-            track_id="f1", title="Folder Track", artist="", album="",
-            bpm=0.0, key="", duration_s=0.0, cues=(), filepath="/tmp/f1.mp3",
+            track_id="f1",
+            title="Folder Track",
+            artist="",
+            album="",
+            bpm=0.0,
+            key="",
+            duration_s=0.0,
+            cues=(),
+            filepath="/tmp/f1.mp3",
         ),
     }
     store = _FakeStore([("t0", 0.99), ("f1", 0.90)])
-    s = next_suggestion(
-        store, lib, seed_vector=SEED, seed_track_id="t0", played_ids=set()
-    )
+    s = next_suggestion(store, lib, seed_vector=SEED, seed_track_id="t0", played_ids=set())
     assert s is not None and s.track_id == "f1"
     assert s.why == "similar vibe"  # no key/bpm → honest, no fabricated values
     assert s.camelot is None and s.bpm is None
+
+
+def test_why_includes_first_structural_cue_hint(library):
+    library.tracks["t1"] = _track(
+        "t1",
+        cues=(
+            CuePoint(name="DROP", type="cue", start_s=64.0, end_s=None, number=0),
+            CuePoint(name="BREAK", type="cue", start_s=128.0, end_s=None, number=1),
+        ),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.88)])
+    s = next_suggestion(store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set())
+
+    assert s is not None
+    assert s.why == "similar vibe · 8A · 124 · cue drop @ 1:04"
+
+
+def test_why_ignores_non_structural_cues(library):
+    library.tracks["t1"] = _track(
+        "t1",
+        cues=(
+            CuePoint(name="LOAD", type="load", start_s=0.0, end_s=None, number=-1),
+            CuePoint(name="FADE", type="fadein", start_s=2.0, end_s=None, number=-1),
+        ),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.88)])
+    s = next_suggestion(store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set())
+
+    assert s is not None
+    assert s.why == "similar vibe · 8A · 124"
+
+
+def test_suggestion_includes_set_aware_transition_when_cues_exist(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.88)])
+
+    s = next_suggestion(store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set())
+
+    assert s is not None
+    assert s.transition is not None
+    assert s.transition["cue_slot"] == "A"
+    assert s.transition["start_in_bars"] is None  # no live playhead confidence yet
+    assert "enter cue A" not in s.why  # the dedicated transition line owns actions
+
+
+def test_suggestion_uses_explicit_live_bar_timing_when_locked(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.88)])
+
+    s = next_suggestion(
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
+        played_ids=set(),
+        source_deck="A",
+        target_deck="B",
+        live_remaining_bars=1,
+        live_playhead_confidence=0.95,
+    )
+
+    assert s is not None
+    assert s.transition is not None
+    assert s.transition["source_deck"] == "A"
+    assert s.transition["target_deck"] == "B"
+    assert s.transition["from_track_id"] == "t0"
+    assert s.transition["to_track_id"] == "t1"
+    assert s.transition["start_in_bars"] == 1
+    assert s.transition["timing_basis"] == "bar_lock"
+
+
+def test_suggestion_uses_live_position_to_pick_source_section(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        bpm=120.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.88)])
+
+    s = next_suggestion(
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
+        played_ids=set(),
+        source_position_s=236.0,
+        live_playhead_confidence=0.85,
+    )
+
+    assert s is not None
+    assert s.transition is not None
+    assert s.transition["from_section_id"] == "t0#s001"
+    assert s.transition["start_in_bars"] == 32
+    assert s.transition["timing_basis"] == "section_playhead"
+    assert s.transition["cue_slot"] == "A"
+
+
+def test_low_confidence_live_position_does_not_anchor_source_section(library):
+    library.tracks["t0"] = _track(
+        "t0",
+        bpm=120.0,
+        cues=(
+            CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),
+            CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),
+        ),
+    )
+    library.tracks["t1"] = _track(
+        "t1",
+        bpm=120.0,
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    store = _FakeStore([("t0", 0.99), ("t1", 0.88)])
+
+    s = next_suggestion(
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
+        played_ids=set(),
+        source_position_s=32.0,
+        live_playhead_confidence=0.25,
+    )
+
+    assert s is not None
+    assert s.transition is not None
+    # Low-confidence position is not trusted as "current section"; fall back to
+    # the best mix-out section and withhold exact timing.
+    assert s.transition["from_section_id"] == "t0#s001"
+    assert s.transition["start_in_bars"] is None
+    assert s.transition["timing_basis"] is None
+    assert "timing_low_confidence" in s.transition["risk_flags"]
 
 
 def test_phase2_harmonic_filter_drops_incompatible(library):
@@ -118,8 +289,14 @@ def test_phase2_harmonic_filter_drops_incompatible(library):
     library.tracks["t2"] = _track("t2", bpm=126.0, key="8A")  # compatible
     store = _FakeStore([("t0", 0.99), ("t1", 0.92), ("t2", 0.80)])
     s = next_suggestion(
-        store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set(),
-        seed_camelot="8A", seed_bpm=124.0, bpm_window=15.0,
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
+        played_ids=set(),
+        seed_camelot="8A",
+        seed_bpm=124.0,
+        bpm_window=15.0,
     )
     assert s is not None and s.track_id == "t2"  # t1 dropped on BPM
     assert s.camelot == "8A" and s.bpm == 126.0
@@ -128,13 +305,25 @@ def test_phase2_harmonic_filter_drops_incompatible(library):
 def test_phase2_keeps_candidate_missing_metadata(library):
     # A candidate with no key/bpm must NOT be dropped by the refine filter.
     library.tracks["t1"] = TrackEntry(
-        track_id="t1", title="No Meta", artist="X", album="",
-        bpm=0.0, key="", duration_s=0.0, cues=(), filepath="/tmp/t1.mp3",
+        track_id="t1",
+        title="No Meta",
+        artist="X",
+        album="",
+        bpm=0.0,
+        key="",
+        duration_s=0.0,
+        cues=(),
+        filepath="/tmp/t1.mp3",
     )
     store = _FakeStore([("t0", 0.99), ("t1", 0.92)])
     s = next_suggestion(
-        store, library, seed_vector=SEED, seed_track_id="t0", played_ids=set(),
-        seed_camelot="8A", seed_bpm=124.0,
+        store,
+        library,
+        seed_vector=SEED,
+        seed_track_id="t0",
+        played_ids=set(),
+        seed_camelot="8A",
+        seed_bpm=124.0,
     )
     assert s is not None and s.track_id == "t1"  # kept despite missing meta
     assert s.why == "similar vibe"

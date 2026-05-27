@@ -1,16 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """Shared curator seams — the ONE implementation of the lens + taste reads.
 
-IN-01 / WR-01: both Viber backends (``agent.py`` = gemini, ``codex_curate.py``
-= codex) need the SAME ``_shared_lens()`` (persona) and ``_taste_hint()``
-(profile bias) reads. Before this module the two implementations were
-byte-identical copies — so a fix to one (notably the WR-01 consent gate) could
-silently skip the other and orphan a backend (the CURATE acid test). Sourcing
-both seams here makes the persona/consent contract single-sourced: a change
-lands in both backends from one place and cannot diverge.
+IN-01 / WR-01: the product Codex backend needs the SAME ``_shared_lens()``
+(persona) and ``_taste_hint()`` (profile bias) reads as the live co-host's
+configuration layer. Keeping the reads here makes the persona/consent contract
+single-sourced.
 
 Both seams lazy-import their cross-package readers INSIDE the function body
-(Pattern 1) so importing this module — or either backend — does NOT pull
+(Pattern 1) so importing this module — or the Codex backend — does NOT pull
 ``vibemix.runtime`` / ``vibemix.profile`` into ``sys.modules`` at import time.
 That keeps the memory-storage spine's no-live-path import boundary intact
 (tests/memory/test_no_live_path_import.py). Each read is guarded with a bare
@@ -27,7 +24,7 @@ def shared_lens() -> str:
     Per-surface default-when-unset: the curator cold path is byte-identical to
     the ``build_curator_instruction("tutor")`` it shipped with. When the user
     sets a lens once (via the settings bus ``_apply_lens``), that SAME value
-    drives both curator backends AND the live co-host. Lazy-imported so the seam
+    drives Viber curation AND the live co-host. Lazy-imported so the seam
     keeps the import-time no-live-path boundary clean (matrix-seam pattern).
 
     WR-03: the read is guarded (mirrors the co-host ``_resolve_prompt_cell``
@@ -46,7 +43,7 @@ def shared_lens() -> str:
 
 def taste_hint() -> str:
     """SEAM #2 (CURATE-02): compact, privacy-safe taste hint biasing curation
-    'for this DJ', shared verbatim by BOTH curator backends.
+    'for this DJ', shared by the Codex Viber curator.
 
     WR-01 — the profile read is GATED ON CONSENT, mirroring the canonical
     project pattern in ``runtime/session_loop.py`` (``load_profile() if

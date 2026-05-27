@@ -20,7 +20,7 @@ Each of the 7 features is mapped to [0,1] through a FIXED perceptual window
 run-to-run and stops one loud track from re-scaling the whole library. The
 weights + windows live in ``vibemix.audio.constants`` (one-line-edit ethos).
 
-Zero new dependencies. DSP is hand-rolled numpy/scipy. We REUSE the existing
+Zero new dependencies. DSP is hand-rolled numpy. We REUSE the existing
 primitives — ``cue_detect.decode_to_mono`` (ffmpeg offline decode),
 ``state.genre.crest_factor.crest_factor`` (peak/RMS), and
 ``state.detectors._dsp.sub_share`` (20-100Hz energy fraction) — rather than

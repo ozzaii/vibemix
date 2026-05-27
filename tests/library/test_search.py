@@ -3,15 +3,17 @@
 
 from __future__ import annotations
 
+import argparse
+import io
 import json
 import sqlite3
-import time
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 
+import vibemix.__main__ as main_mod
 from vibemix.library._cosine import EMBEDDING_DIM
 from vibemix.library.rekordbox import TrackEntry
 from vibemix.library.search import (
@@ -221,3 +223,48 @@ def test_skips_unknown_track_ids(
     ids = [r.track_id for r in results]
     assert "t-unknown" not in ids
     assert ids == ["t000", "t001"]
+
+
+def test_library_search_cli_emits_centering_metadata(monkeypatch) -> None:
+    """The desktop bridge reads these fields to avoid labeling CLAP as raw."""
+    import vibemix.library as lib_pkg
+
+    class FakeLibrary:
+        def __init__(self) -> None:
+            self.tracks = {"t000": _make_track("t000")}
+
+        def try_load_cache(self) -> bool:
+            return True
+
+    class FakeStore:
+        def row_count(self) -> int:
+            return 24
+
+        def close(self) -> None:
+            return None
+
+    result = VibeSearchResult(
+        track_id="t000",
+        title="Title t000",
+        artist="Artist t000",
+        bpm=138.0,
+        confidence=0.9,
+        snippet="Title t000 - Artist t000 @ 138 BPM",
+    )
+    monkeypatch.setattr(lib_pkg, "RekordboxLibrary", FakeLibrary)
+    monkeypatch.setattr(lib_pkg, "build_embedder", lambda: object())
+    monkeypatch.setattr(lib_pkg, "open_store", lambda: FakeStore())
+    monkeypatch.setattr(
+        lib_pkg,
+        "vibe_search",
+        lambda embedder, store, library, query, k: ([result], False),
+    )
+
+    buf = io.StringIO()
+    monkeypatch.setattr(main_mod.sys, "stdout", buf)
+    rc = main_mod._cmd_library_search(argparse.Namespace(query="techno", k=3))
+
+    assert rc == 0
+    payload = json.loads(buf.getvalue())
+    assert payload["centered"] is True
+    assert payload["corpus_size"] == 24

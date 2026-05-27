@@ -7,8 +7,8 @@ Drag-drop UX flow:
     3. Sidecar runs ``import_library_async(xml_path, ...)``:
        a. Load XML via Phase 25 RekordboxLibrary.load_xml (writes
           ~/.cache/vibemix/library.pkl).
-       b. For each track, batch-embed via LibraryEmbedder. Cache hits
-          are silent; misses do the API call.
+       b. For each track, batch-embed via the product embedder. Cache hits
+          are silent; misses run the selected backend.
        c. Emit ``ipc.library.import_progress`` after every track so the
           UI can update the progress bar.
        d. On cancel: stop at next batch boundary, emit final progress
@@ -24,10 +24,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
-from vibemix.library.embed import LibraryEmbedder
+from vibemix.library.embed_types import CachedTrackEmbedder
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.library.store import LibraryStore
 
@@ -44,7 +44,7 @@ class LibraryImporter:
 
     def __init__(
         self,
-        embedder: LibraryEmbedder,
+        embedder: CachedTrackEmbedder,
         store: LibraryStore,
         on_progress: Callable[[dict], None] | None = None,
         batch_size: int = 10,
@@ -162,7 +162,7 @@ class LibraryImporter:
 
 async def import_library_async(
     xml_path: Path,
-    embedder: LibraryEmbedder,
+    embedder: CachedTrackEmbedder,
     store: LibraryStore,
     on_progress: Callable[[dict], None] | None = None,
     evidence_registry: object | None = None,

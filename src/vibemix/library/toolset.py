@@ -2,15 +2,14 @@
 """LibraryToolset — the grounded tool core shared by every Viber backend.
 
 This is the single implementation of the playlist-curation tool surface and,
-critically, of the **grounding gate** (Cardinal Invariant #2). Both backends
-reuse it verbatim so the anti-hallucination contract can never drift between
-them:
+critically, of the **grounding gate** (Cardinal Invariant #2). The product
+Codex backend uses it as the one tool spine, so the anti-hallucination contract
+lives at the tool boundary instead of in a prompt:
 
-* ``ViberAgent`` (``agent.py``) — the Gemini function-calling harness.
 * ``mcp_server.py`` — the FastMCP STDIO server that exposes these same tools
   to Codex (``provider: openai-codex``, the Hermes pattern, native CLI).
 
-The three tools:
+The base playlist tools:
 
 * ``search_vibe`` — the ONLY discovery path. Every id it returns is recorded
   in a per-run ``seen`` set.
@@ -33,7 +32,9 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from dataclasses import asdict
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from vibemix.library.create_playlist import PlaylistResult, create_playlist
 
@@ -41,10 +42,18 @@ if TYPE_CHECKING:
     # Type-only reference (no runtime import — the engine is lazy-imported in the
     # export_set handler). Makes ``ExportResult`` a genuinely-referenced name in
     # src so the orphan-inventory gate stops flagging it as defined-but-unused.
+    from vibemix.intel.agent_contract import AgentContextEnvelope
+    from vibemix.intel.transition_scorer import SectionRecord, TransitionCandidate
     from vibemix.library.export_rekordbox import ExportResult
-from vibemix.library.embed import LibraryEmbedder
+    from vibemix.library.smart_cues import SmartCueProposal
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.library.search import vibe_search
+from vibemix.library.section_builder import (
+    best_source_section,
+    destination_sections,
+    section_to_dict,
+    sections_for_entry,
+)
 from vibemix.library.store import LibraryStore
 from vibemix.state import harmonics
 
@@ -55,8 +64,12 @@ logger = logging.getLogger(__name__)
 TOOL_CALL_TIMEOUT_S = 30.0
 
 
+class _EmbeddingProvider(Protocol):
+    def embed_query(self, query: str) -> Any: ...
+
+
 class LibraryToolset:
-    """The grounded tool core: handlers + per-run seen-set + dispatch.
+    """The grounded Codex/Viber tool core: handlers + per-run seen-set + dispatch.
 
     One instance == one curation run. The ``seen`` set is the grounding
     spine; it MUST live for the whole run (across every tool call) and MUST
@@ -66,24 +79,24 @@ class LibraryToolset:
 
     def __init__(
         self,
-        embedder: LibraryEmbedder,
+        embedder: _EmbeddingProvider,
         store: LibraryStore,
         library: RekordboxLibrary,
-        *,
-        client: Any | None = None,
     ) -> None:
         self._embedder = embedder
         self._store = store
         self._library = library
-        # The Gemini client (DI, same one the embedder wraps) — needed by the
-        # capability tools that reason directly (ingest_youtube). Optional: the
-        # tools degrade to an honest error when it is absent.
-        self._client = client
         # Lazily-loaded DJ-knowledge RAG store (retrieve_dj_knowledge). Built on
         # first use from disk; honest empty-results when no KB is present.
         self._knowledge_store: Any | None = None
         # The grounding spine: ids any search_vibe returned THIS run.
         self.seen: set[str] = set()
+        # INTEL grounding holders. Track ids are discovered first, then section
+        # and transition/context aliases are issued from deterministic code.
+        self.seen_sections: dict[str, SectionRecord] = {}
+        self.issued_transition_candidates: dict[str, TransitionCandidate] = {}
+        self.issued_cue_proposals: dict[str, SmartCueProposal] = {}
+        self.issued_context_packets: dict[str, AgentContextEnvelope] = {}
         self.created: PlaylistResult | None = None
         # BL-02: the successful set-prep export (mirrors ``created``). Set by the
         # export_set handler; the agent loop reads it to break with a terminal
@@ -112,7 +125,7 @@ class LibraryToolset:
             results, _cache_hit = vibe_search(
                 self._embedder, self._store, self._library, query, k=k
             )
-        except Exception as e:  # noqa: BLE001 — handler must not raise
+        except Exception as e:
             logger.warning("[viber] search_vibe failed: %s", e)
             return {"error": f"search_vibe failed: {type(e).__name__}"}
         for r in results:
@@ -153,6 +166,211 @@ class LibraryToolset:
             "genre": self._resolve_genre(track_id),
         }
 
+    def get_track_sections(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Issue grounded section records for one already-discovered track.
+
+        v1 derives sections from Rekordbox cues when available, with a
+        conservative fallback intro/outro map when the library has no cues. The
+        full section store can replace the producer later without changing the
+        holder or candidate contracts.
+        """
+        track_id = args.get("track_id")
+        if not isinstance(track_id, str) or not track_id:
+            return {"error": "get_track_sections: 'track_id' must be a string"}
+        if track_id not in self.seen:
+            return {
+                "error": (
+                    "rejected: track_id was never returned by search_vibe/"
+                    f"discover_pool this run (invented): {track_id!r}"
+                )
+            }
+        entry = self._library.lookup_by_id(track_id)
+        if entry is None:
+            return {"error": f"unknown track_id {track_id!r}"}
+        sections = sections_for_entry(entry)
+        for section in sections:
+            self.seen_sections[section.section_id] = section
+        return {
+            "track_id": track_id,
+            "sections": [section_to_dict(section) for section in sections],
+        }
+
+    def transition_slate(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Issue deterministic section-to-section transition candidates.
+
+        The model supplies only grounded ids and high-level mode hints. The
+        scorer resolves BPM/key/cue/phrase facts from issued sections and stored
+        vectors; every emitted candidate is recorded in
+        ``issued_transition_candidates`` before the model may reference it.
+        """
+        source_section_id = args.get("source_section_id")
+        source_track_id = args.get("source_track_id")
+        candidate_track_ids = args.get("candidate_track_ids")
+        if not isinstance(candidate_track_ids, list) or not candidate_track_ids:
+            return {"error": "transition_slate: 'candidate_track_ids' must be a non-empty list"}
+        invented = [t for t in candidate_track_ids if not (isinstance(t, str) and t in self.seen)]
+        if invented:
+            return {
+                "error": (
+                    "rejected: these candidate_track_ids were never returned by "
+                    f"search_vibe/discover_pool this run (invented): {invented}"
+                )
+            }
+
+        source = self._resolve_source_section(source_section_id, source_track_id)
+        if isinstance(source, dict):
+            return source
+
+        destinations = self._resolve_destination_sections(candidate_track_ids)
+        if not destinations:
+            return {"error": "transition_slate: no destination sections resolved"}
+
+        mode = _mode_arg(args.get("mode"))
+        max_candidates = _int_arg(args.get("max_candidates"), default=(5 if mode == "live" else 12))
+        max_candidates = max(1, min(12, max_candidates))
+        live_position = None
+        if mode == "live":
+            from vibemix.intel.transition_scorer import LivePosition
+
+            live_position = LivePosition(
+                remaining_bars=_optional_int_arg(args.get("remaining_bars")),
+                playhead_confidence=_float_arg(args.get("playhead_confidence"), default=0.0),
+                blend_active=bool(args.get("blend_active", False)),
+            )
+        try:
+            from vibemix.intel.transition_scorer import (
+                TransitionScoringInput,
+                score_transition_slate,
+            )
+
+            slate = score_transition_slate(
+                TransitionScoringInput(
+                    source=source,
+                    destinations=tuple(destinations),
+                    source_vector=self._track_vector(source.track_id),
+                    destination_vectors={
+                        section.section_id: vector
+                        for section in destinations
+                        if (vector := self._track_vector(section.track_id)) is not None
+                    },
+                    played_track_ids=frozenset(
+                        t for t in args.get("played_track_ids", []) if isinstance(t, str)
+                    )
+                    if isinstance(args.get("played_track_ids"), list)
+                    else frozenset(),
+                    candidate_pool_track_ids=frozenset(candidate_track_ids),
+                    genre_profile=args.get("genre_profile")
+                    if isinstance(args.get("genre_profile"), str)
+                    else None,
+                    live_position=live_position,
+                    mode=mode,
+                ),
+                max_candidates=max_candidates,
+            )
+        except Exception as e:
+            logger.warning("[viber] transition_slate failed: %s", e)
+            return {"error": f"transition_slate failed: {type(e).__name__}"}
+
+        for candidate in slate:
+            self.issued_transition_candidates[candidate.candidate_id] = candidate
+        return {
+            "source_section_id": source.section_id,
+            "candidates": [_transition_candidate_to_dict(candidate) for candidate in slate],
+        }
+
+    def compile_musical_context(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Issue a bounded context packet over already-issued transition ids."""
+        candidate_ids = args.get("candidate_ids")
+        if not isinstance(candidate_ids, list) or not candidate_ids:
+            return {"error": "compile_musical_context: 'candidate_ids' must be a non-empty list"}
+        candidates = []
+        unknown = []
+        for cid in candidate_ids:
+            if not isinstance(cid, str) or cid not in self.issued_transition_candidates:
+                unknown.append(cid)
+            else:
+                candidates.append(self.issued_transition_candidates[cid])
+        if unknown:
+            return {
+                "error": (
+                    "rejected: these candidate_ids were not issued by transition_slate "
+                    f"this run: {unknown}"
+                )
+            }
+        mode = _mode_arg(args.get("mode"))
+        intent = args.get("intent")
+        if not isinstance(intent, str) or not intent:
+            intent = "live_next_pill" if mode == "live" else "transition_slate"
+        current = args.get("current")
+        current = current if isinstance(current, dict) else {}
+        packet_id = f"ctx_{len(self.issued_context_packets) + 1:03d}"
+        try:
+            from vibemix.intel.context_compiler import compile_transition_context
+
+            envelope = compile_transition_context(
+                packet_id=packet_id,
+                mode=mode,
+                intent=intent,  # type: ignore[arg-type]
+                current=current,
+                candidates=tuple(candidates),
+            )
+        except Exception as e:
+            logger.warning("[viber] compile_musical_context failed: %s", e)
+            return {"error": f"compile_musical_context failed: {type(e).__name__}"}
+        self.issued_context_packets[packet_id] = envelope
+        return {"packet": asdict(envelope)}
+
+    def smart_hot_cues(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Issue reviewable smart hot-cue proposals for seen tracks.
+
+        The model supplies only grounded track ids and optional genre/policy
+        hints. Cue positions are generated by deterministic code from library
+        sections/cues; every proposal is stored before the model may reference
+        its proposal/cue ids.
+        """
+        track_ids_arg = args.get("track_ids")
+        if isinstance(track_ids_arg, list):
+            track_ids = [track_id for track_id in track_ids_arg if isinstance(track_id, str)]
+        else:
+            track_id = args.get("track_id")
+            track_ids = [track_id] if isinstance(track_id, str) and track_id else []
+        if not track_ids:
+            return {"error": "smart_hot_cues: provide 'track_id' or non-empty 'track_ids'"}
+        invented = [track_id for track_id in track_ids if track_id not in self.seen]
+        if invented:
+            return {
+                "error": (
+                    "rejected: these track_ids were never returned by "
+                    f"search_vibe/discover_pool this run (invented): {invented}"
+                )
+            }
+
+        genre_hint = args.get("genre")
+        genre_hint = genre_hint if isinstance(genre_hint, str) and genre_hint.strip() else None
+        proposals = []
+        try:
+            from vibemix.library.smart_cues import propose_smart_cues
+
+            for track_id in track_ids:
+                entry = self._library.lookup_by_id(track_id)
+                if entry is None:
+                    return {"error": f"unknown track_id {track_id!r}"}
+                sections = sections_for_entry(entry)
+                for section in sections:
+                    self.seen_sections[section.section_id] = section
+                proposal = propose_smart_cues(
+                    entry,
+                    sections,
+                    genre=genre_hint or self._resolve_genre(track_id) or entry.genre,
+                )
+                self.issued_cue_proposals[proposal.proposal_id] = proposal
+                proposals.append(proposal)
+        except Exception as e:
+            logger.warning("[viber] smart_hot_cues failed: %s", e)
+            return {"error": f"smart_hot_cues failed: {type(e).__name__}"}
+
+        return {"proposals": [_smart_cue_proposal_to_dict(proposal) for proposal in proposals]}
+
     def _resolve_genre(self, track_id: str) -> str | None:
         """Resolve genre via the SHARED genre_prototypes mechanism (CURATE-01).
 
@@ -185,7 +403,7 @@ class LibraryToolset:
                 self._genre_lookup = GenrePrototypeLookup(self._store)
             label, _conf = self._genre_lookup.classify_playing(track_id)
             return label if label and label != "unknown" else None
-        except Exception:  # noqa: BLE001 — feature lookup must not raise
+        except Exception:
             return None
 
     def create_playlist(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -198,9 +416,7 @@ class LibraryToolset:
         # GROUNDING gate #1: every id must be in this run's seen-set. An id the
         # model produced without a prior search_vibe is a hallucination —
         # reject the whole call so it cannot smuggle one in.
-        invented = [
-            t for t in track_ids if not (isinstance(t, str) and t in self.seen)
-        ]
+        invented = [t for t in track_ids if not (isinstance(t, str) and t in self.seen)]
         if invented:
             return {
                 "error": (
@@ -211,13 +427,14 @@ class LibraryToolset:
             }
         try:
             result = create_playlist(self._library, name, track_ids)
-        except Exception as e:  # noqa: BLE001 — handler must not raise
+        except Exception as e:
             logger.warning("[viber] create_playlist failed: %s", e)
             return {"error": f"create_playlist failed: {type(e).__name__}"}
         self.created = result
         return {
             "created": True,
             "name": result.name,
+            "track_ids": result.track_ids,
             "track_count": len(result.track_ids),
             "m3u_path": str(result.m3u_path),
             "json_path": str(result.json_path),
@@ -278,7 +495,7 @@ class LibraryToolset:
             from vibemix.library.energy import score_energy_cached
 
             score = score_energy_cached(str(filepath))
-        except Exception as e:  # noqa: BLE001 — handler must not raise
+        except Exception as e:
             logger.warning("[viber] get_track_energy failed: %s", e)
             return {"track_id": track_id, "energy": None}
         if score is None:
@@ -300,15 +517,13 @@ class LibraryToolset:
         """
         try:
             from vibemix.library import discovery
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return {"error": f"discover_pool unavailable: {type(e).__name__}"}
 
         query = args.get("query")
         text_query = query if isinstance(query, str) and query.strip() else None
         refs = args.get("ref_track_ids")
-        ref_track_ids = (
-            [t for t in refs if isinstance(t, str)] if isinstance(refs, list) else None
-        )
+        ref_track_ids = [t for t in refs if isinstance(t, str)] if isinstance(refs, list) else None
 
         def _opt_int(key: str) -> int | None:
             v = args.get(key)
@@ -327,9 +542,7 @@ class LibraryToolset:
         k = _opt_int("k") or 50
         k = max(1, min(200, k))
         excl = args.get("exclude_ids")
-        exclude_ids = (
-            {t for t in excl if isinstance(t, str)} if isinstance(excl, list) else None
-        )
+        exclude_ids = {t for t in excl if isinstance(t, str)} if isinstance(excl, list) else None
         try:
             pool = discovery.discover_pool(
                 self._store,
@@ -344,7 +557,7 @@ class LibraryToolset:
                 max_duration_s=_opt_float("max_duration_s"),
                 exclude_ids=exclude_ids,
             )
-        except Exception as e:  # noqa: BLE001 — handler must not raise
+        except Exception as e:
             logger.warning("[viber] discover_pool failed: %s", e)
             return {"error": f"discover_pool failed: {type(e).__name__}"}
         for item in pool:
@@ -378,9 +591,7 @@ class LibraryToolset:
         curve = args.get("curve")
         if not isinstance(curve, str) or not curve.strip():
             return {"error": "sequence_set: 'curve' must be a preset name"}
-        invented = [
-            t for t in track_ids if not (isinstance(t, str) and t in self.seen)
-        ]
+        invented = [t for t in track_ids if not (isinstance(t, str) and t in self.seen)]
         if invented:
             return {
                 "error": (
@@ -406,16 +617,14 @@ class LibraryToolset:
                 energy = None
                 if entry is not None:
                     bpm = entry.bpm if (entry.bpm and entry.bpm > 0) else None
-                    camelot = (
-                        harmonics.to_camelot(entry.key) if entry.key else None
-                    )
+                    camelot = harmonics.to_camelot(entry.key) if entry.key else None
                     duration_s = float(entry.duration_s or 0.0)
                     fp = getattr(entry, "filepath", None)
                     if fp:
                         try:
                             score = score_energy_cached(str(fp))
                             energy = score.score if score is not None else None
-                        except Exception:  # noqa: BLE001 — best-effort energy
+                        except Exception:
                             energy = None
                 pool.append(
                     sequencer.PoolTrack(
@@ -427,6 +636,7 @@ class LibraryToolset:
                         camelot=camelot,
                         energy=energy,
                         duration_s=duration_s,
+                        cues=(tuple(getattr(entry, "cues", ()) or ()) if entry is not None else ()),
                     )
                 )
             if not pool:
@@ -436,12 +646,10 @@ class LibraryToolset:
                 n_slots = int(n_slots) if n_slots is not None else len(pool)
             except (TypeError, ValueError):
                 n_slots = len(pool)
-            candidates = sequencer.sequence_set(
-                pool, curve=curve, n_slots=n_slots
-            )
+            candidates = sequencer.sequence_set(pool, curve=curve, n_slots=n_slots)
         except KeyError as e:  # unknown curve preset → actionable error
             return {"error": f"sequence_set: unknown curve preset {e}"}
-        except Exception as e:  # noqa: BLE001 — handler must not raise
+        except Exception as e:
             logger.warning("[viber] sequence_set failed: %s", e)
             return {"error": f"sequence_set failed: {type(e).__name__}"}
         return {
@@ -469,9 +677,7 @@ class LibraryToolset:
             return {"error": "export_set: 'track_ids' must be a non-empty list"}
         if not isinstance(name, str) or not name.strip():
             return {"error": "export_set: 'name' must be a non-empty string"}
-        invented = [
-            t for t in track_ids if not (isinstance(t, str) and t in self.seen)
-        ]
+        invented = [t for t in track_ids if not (isinstance(t, str) and t in self.seen)]
         if invented:
             return {
                 "error": (
@@ -498,6 +704,7 @@ class LibraryToolset:
                         "bpm": entry.bpm if (entry.bpm and entry.bpm > 0) else None,
                         "camelot": camelot,
                         "duration_s": entry.duration_s or None,
+                        **_export_cues_and_grid(entry),
                     }
                 )
             if not items:
@@ -506,17 +713,17 @@ class LibraryToolset:
             if not (isinstance(out_path, str) and out_path.strip()):
                 from pathlib import Path as _Path
 
-                slug = "".join(
-                    ch if ch.isalnum() or ch in "-_" else "-"
-                    for ch in name.strip().lower()
-                ).strip("-") or "set"
-                out_path = str(
-                    _Path.home() / ".cache" / "vibemix" / "sets" / f"{slug}.xml"
+                slug = (
+                    "".join(
+                        ch if ch.isalnum() or ch in "-_" else "-" for ch in name.strip().lower()
+                    ).strip("-")
+                    or "set"
                 )
+                out_path = str(_Path.home() / ".cache" / "vibemix" / "sets" / f"{slug}.xml")
             result: ExportResult = export_rekordbox.export_set(
                 items, name, out_path, library=self._library
             )
-        except Exception as e:  # noqa: BLE001 — handler must not raise
+        except Exception as e:
             logger.warning("[viber] export_set failed: %s", e)
             return {"error": f"export_set failed: {type(e).__name__}"}
         # BL-02: record the export so the agent loop can break with a terminal
@@ -531,28 +738,126 @@ class LibraryToolset:
             "dropped": result.dropped,
         }
 
-    # -- DJ-knowledge / media capability tools (grounded; lazy modules) ----- #
+    def export_smart_cues(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Export selected cue ids from an issued SmartCueProposal.
 
-    def ingest_youtube(self, args: dict[str, Any]) -> dict[str, Any]:
-        """Summarize a YouTube track/mix via Gemini native video (no download).
-
-        Deep-link posture: nothing is downloaded; Gemini ingests the URL.
-        Returns a coarse genre/energy/mood/structure summary. Reported
-        timestamps are HINTS only (see ``note``) — never precise cut points.
-        Needs the toolset's Gemini client; honest error when it is absent.
+        This is the agent-safe smart-cue write path: it rejects raw cue payloads
+        and arbitrary track paths, revalidates the proposal/track, and preserves
+        A-H slot numbers through `export_set`.
         """
-        url = args.get("url")
-        if not isinstance(url, str) or not url.strip():
-            return {"error": "ingest_youtube: 'url' must be a non-empty string"}
-        prompt = args.get("prompt")
-        prompt = prompt if isinstance(prompt, str) and prompt.strip() else None
-        try:
-            from vibemix.library.youtube_ingest import ingest_youtube
+        if "cues" in args or "track_path" in args:
+            return {
+                "error": (
+                    "export_smart_cues rejects raw cue payloads; call "
+                    "smart_hot_cues first and pass issued proposal/cue ids"
+                )
+            }
+        proposal_id = args.get("proposal_id")
+        if not isinstance(proposal_id, str) or not proposal_id:
+            return {"error": "export_smart_cues: 'proposal_id' must be a string"}
+        proposal = self.issued_cue_proposals.get(proposal_id)
+        if proposal is None:
+            return {
+                "error": (
+                    "rejected: proposal_id was not issued by smart_hot_cues "
+                    f"this run: {proposal_id!r}"
+                )
+            }
+        entry = self._library.lookup_by_id(proposal.track_id)
+        if entry is None:
+            return {"error": f"export_smart_cues: proposal track missing {proposal.track_id!r}"}
+        if proposal.track_id not in self.seen:
+            return {
+                "error": (
+                    "rejected: proposal track_id is no longer grounded in this run: "
+                    f"{proposal.track_id!r}"
+                )
+            }
 
-            return ingest_youtube(url, prompt, client=self._client)
-        except Exception as e:  # noqa: BLE001 — handler must not raise
-            logger.warning("[viber] ingest_youtube failed: %s", e)
-            return {"error": f"ingest_youtube failed: {type(e).__name__}"}
+        selected = args.get("selected_cue_ids")
+        if selected is None:
+            selected_ids: set[str] | None = None
+        elif isinstance(selected, list) and selected:
+            selected_ids = {cue_id for cue_id in selected if isinstance(cue_id, str)}
+            if len(selected_ids) != len(selected):
+                return {"error": "export_smart_cues: selected_cue_ids must all be strings"}
+        else:
+            return {"error": "export_smart_cues: selected_cue_ids must be a non-empty list or null"}
+
+        proposal_cue_ids = {cue.cue_id for cue in proposal.cues}
+        if selected_ids is not None:
+            unknown = sorted(selected_ids - proposal_cue_ids)
+            if unknown:
+                return {
+                    "error": (
+                        f"rejected: selected cue ids were not issued in this proposal: {unknown}"
+                    )
+                }
+
+        include_review = bool(args.get("include_review", selected_ids is not None))
+        include_preserved = bool(args.get("include_preserved", False))
+        try:
+            from vibemix.library import export_rekordbox
+            from vibemix.library.smart_cues import proposal_to_export_marks
+
+            marks = proposal_to_export_marks(
+                proposal,
+                include_review=include_review,
+                include_preserved=include_preserved,
+            )
+            if selected_ids is not None:
+                marks = [mark for mark in marks if mark.get("cue_id") in selected_ids]
+            if not marks:
+                return {"error": "export_smart_cues: no exportable cues selected"}
+
+            out_path = args.get("out_path")
+            if not (isinstance(out_path, str) and out_path.strip()):
+                from pathlib import Path as _Path
+
+                out_path = str(
+                    _Path.home()
+                    / ".cache"
+                    / "vibemix"
+                    / "cues"
+                    / f"{proposal.track_id}-smart-cues.xml"
+                )
+
+            camelot = harmonics.to_camelot(entry.key) if entry.key else None
+            result: ExportResult = export_rekordbox.export_set(
+                [
+                    {
+                        "track_id": entry.track_id,
+                        "filepath": entry.filepath,
+                        "title": entry.title,
+                        "artist": entry.artist,
+                        "bpm": entry.bpm if (entry.bpm and entry.bpm > 0) else None,
+                        "camelot": camelot,
+                        "duration_s": entry.duration_s or None,
+                        "genre": entry.genre or None,
+                        "cues": marks,
+                    }
+                ],
+                name=f"{entry.title or entry.track_id} Smart Cues",
+                out_path=out_path,
+                library=self._library,
+            )
+        except Exception as e:
+            logger.warning("[viber] export_smart_cues failed: %s", e)
+            return {"error": f"export_smart_cues failed: {type(e).__name__}"}
+
+        self.exported = result
+        return {
+            "exported": True,
+            "proposal_id": proposal.proposal_id,
+            "track_id": proposal.track_id,
+            "path": str(result.path),
+            "cue_count": len(marks),
+            "cue_ids": [str(mark.get("cue_id")) for mark in marks],
+            "written": result.written,
+            "dropped": result.dropped,
+        }
+
+    # -- DJ-knowledge / source capability tools (grounded; lazy modules) ---- #
 
     def quote_moment(self, args: dict[str, Any]) -> dict[str, Any]:
         """Point at a specific [start,end] moment inside a grounded track.
@@ -577,8 +882,13 @@ class LibraryToolset:
         from vibemix.library.quote_moment import resolve_quote
 
         return resolve_quote(
-            self._library, track_id, start_s, end_s,
-            label=label, caption=caption, seen=self.seen,
+            self._library,
+            track_id,
+            start_s,
+            end_s,
+            label=label,
+            caption=caption,
+            seen=self.seen,
         )
 
     def retrieve_dj_knowledge(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -588,6 +898,8 @@ class LibraryToolset:
         from vibemix.library.dj_knowledge import (
             DEFAULT_KNOWLEDGE_DIR,
             KnowledgeStore,
+        )
+        from vibemix.library.dj_knowledge import (
             retrieve_dj_knowledge as _retrieve,
         )
 
@@ -595,9 +907,7 @@ class LibraryToolset:
         if not isinstance(query, str) or not query.strip():
             return {"error": "retrieve_dj_knowledge: 'query' must be a non-empty string"}
         if self._knowledge_store is None:
-            self._knowledge_store = KnowledgeStore.load(
-                DEFAULT_KNOWLEDGE_DIR / "dj_knowledge"
-            )
+            self._knowledge_store = KnowledgeStore.load(DEFAULT_KNOWLEDGE_DIR / "dj_knowledge")
         k = args.get("k", 4)
         return _retrieve(
             self._knowledge_store,
@@ -641,8 +951,7 @@ class LibraryToolset:
                 from pathlib import Path as _Path
 
                 out_path = str(
-                    _Path.home() / ".cache" / "vibemix" / "cues"
-                    / (_Path(track_path).stem + ".xml")
+                    _Path.home() / ".cache" / "vibemix" / "cues" / (_Path(track_path).stem + ".xml")
                 )
             return cue_export.export_cues(
                 track_path,
@@ -652,7 +961,7 @@ class LibraryToolset:
                 artist=args.get("artist"),
                 bpm=args.get("bpm"),
             )
-        except Exception as e:  # noqa: BLE001 — handler must not raise
+        except Exception as e:
             logger.warning("[viber] export_cues failed: %s", e)
             return {"error": f"export_cues failed: {type(e).__name__}"}
 
@@ -662,14 +971,18 @@ class LibraryToolset:
         handlers: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
             "search_vibe": self.search_vibe,
             "get_track_features": self.get_track_features,
+            "get_track_sections": self.get_track_sections,
+            "transition_slate": self.transition_slate,
+            "compile_musical_context": self.compile_musical_context,
+            "smart_hot_cues": self.smart_hot_cues,
             "create_playlist": self.create_playlist,
             "get_track_energy": self.get_track_energy,
             "discover_pool": self.discover_pool,
             "sequence_set": self.sequence_set,
             "export_set": self.export_set,
+            "export_smart_cues": self.export_smart_cues,
             "web_search": self.web_search,
             "fetch_url": self.fetch_url,
-            "ingest_youtube": self.ingest_youtube,
             "quote_moment": self.quote_moment,
             "retrieve_dj_knowledge": self.retrieve_dj_knowledge,
             "export_cues": self.export_cues,
@@ -684,8 +997,129 @@ class LibraryToolset:
                 return fut.result(timeout=TOOL_CALL_TIMEOUT_S)
             except concurrent.futures.TimeoutError:
                 return {"error": f"tool {name!r} timed out"}
-            except Exception as e:  # noqa: BLE001 — defensive; handlers return errors
+            except Exception as e:
                 return {"error": f"tool {name!r} crashed: {type(e).__name__}"}
+
+    def _resolve_source_section(
+        self, source_section_id: Any, source_track_id: Any
+    ) -> SectionRecord | dict[str, str]:
+        if isinstance(source_section_id, str) and source_section_id:
+            section = self.seen_sections.get(source_section_id)
+            if section is None:
+                return {
+                    "error": (
+                        "transition_slate: source_section_id was not issued by "
+                        f"get_track_sections this run: {source_section_id!r}"
+                    )
+                }
+            return section
+        if not isinstance(source_track_id, str) or not source_track_id:
+            return {"error": ("transition_slate: provide 'source_section_id' or 'source_track_id'")}
+        if source_track_id not in self.seen:
+            return {
+                "error": (
+                    "rejected: source_track_id was never returned by search_vibe/"
+                    f"discover_pool this run (invented): {source_track_id!r}"
+                )
+            }
+        entry = self._library.lookup_by_id(source_track_id)
+        if entry is None:
+            return {"error": f"unknown source_track_id {source_track_id!r}"}
+        sections = sections_for_entry(entry)
+        for section in sections:
+            self.seen_sections[section.section_id] = section
+        return best_source_section(sections)
+
+    def _resolve_destination_sections(self, track_ids: list[Any]) -> list[SectionRecord]:
+        out: list[SectionRecord] = []
+        for track_id in track_ids:
+            if not isinstance(track_id, str):
+                continue
+            entry = self._library.lookup_by_id(track_id)
+            if entry is None:
+                continue
+            sections = sections_for_entry(entry)
+            for section in sections:
+                self.seen_sections[section.section_id] = section
+            out.extend(destination_sections(sections))
+        return out
+
+    def _track_vector(self, track_id: str) -> Any | None:
+        try:
+            from vibemix.library.next_suggestion import seed_vector_for_track_id
+
+            return seed_vector_for_track_id(self._store, track_id)
+        except Exception:
+            return None
+
+
+def _export_cues_and_grid(entry: Any) -> dict[str, Any]:
+    """Return optional Rekordbox cue + beatgrid payload for export_set."""
+    out: dict[str, Any] = {}
+
+    cues = []
+    for cue in getattr(entry, "cues", ()) or ():
+        payload: dict[str, Any] = {
+            "name": getattr(cue, "name", "") or "",
+            "type": getattr(cue, "type", "cue") or "cue",
+            "start_s": getattr(cue, "start_s", 0.0),
+            "num": getattr(cue, "number", -1),
+        }
+        end_s = getattr(cue, "end_s", None)
+        if end_s is not None:
+            payload["end_s"] = end_s
+        cues.append(payload)
+    if cues:
+        out["cues"] = cues
+
+    beatgrid = getattr(entry, "beatgrid", ()) or ()
+    first_tempo = beatgrid[0] if beatgrid else None
+    if first_tempo is not None:
+        out["beatgrid"] = {
+            "inizio": getattr(first_tempo, "inizio_s", 0.0),
+            "bpm": getattr(first_tempo, "bpm", None),
+            "metro": getattr(first_tempo, "metro", "") or "4/4",
+            "battito": getattr(first_tempo, "battito", 1),
+        }
+    elif getattr(entry, "bpm", 0.0) and entry.bpm > 0:
+        out["beatgrid"] = {"bpm": entry.bpm}
+
+    return out
+
+
+def _transition_candidate_to_dict(candidate: TransitionCandidate) -> dict[str, Any]:
+    return asdict(candidate)
+
+
+def _smart_cue_proposal_to_dict(proposal: SmartCueProposal) -> dict[str, Any]:
+    return asdict(proposal)
+
+
+def _mode_arg(raw: Any) -> Literal["prep", "live"]:
+    return "live" if raw == "live" else "prep"
+
+
+def _int_arg(raw: Any, *, default: int) -> int:
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _optional_int_arg(raw: Any) -> int | None:
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _float_arg(raw: Any, *, default: float) -> float:
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
 
 
 __all__ = ["TOOL_CALL_TIMEOUT_S", "LibraryToolset"]

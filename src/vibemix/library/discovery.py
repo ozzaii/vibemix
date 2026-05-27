@@ -25,8 +25,9 @@ Grounding (Cardinal Invariant #2 / #3): every surviving id must resolve in BOTH
 the store and the live library; store/library skew ids are silently dropped, so
 the pool can never surface an invented track.
 
-Dim-agnostic: vectors flow through as-is (D may be 1536 Gemini or 512 CLAP);
-nothing here hardcodes a dimension. Similarities use a dot product on
+Dim-agnostic: vectors flow through as-is (current product D is 512 CLAP; future
+stores may choose another D). Historical Gemini stores remain backend-namespaced
+and are not the active product path. Similarities use a dot product on
 L2-normalized vectors (== cosine).
 """
 
@@ -121,7 +122,7 @@ def intent_centroid(
     w = w / w_sum
 
     centroid = np.zeros_like(refs[0], dtype=np.float32)
-    for vec, wt in zip(refs, w):
+    for vec, wt in zip(refs, w, strict=True):
         centroid = centroid + wt * vec
     centroid = _l2(centroid)
 
@@ -412,8 +413,8 @@ def discover_pool(
 
 __all__ = [
     "PoolItem",
-    "intent_centroid",
-    "hard_filter",
-    "mmr_rerank",
     "discover_pool",
+    "hard_filter",
+    "intent_centroid",
+    "mmr_rerank",
 ]

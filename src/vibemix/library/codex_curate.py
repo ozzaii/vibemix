@@ -3,9 +3,10 @@
 
 The Hermes pattern, native CLI: Codex (``provider: openai-codex``, the owner's
 flat-rate ChatGPT subscription) is the bounded reasoning harness; vibemix's
-:mod:`vibemix.library.mcp_server` exposes the 3 grounded tools over STDIO.
-Codex's own harness owns the agentic loop, per-tool timeouts, and sandboxing
-(see ``.planning/research/viber-direction-2026-05-25/codex-agent-design.md`` §5).
+:mod:`vibemix.library.mcp_server` exposes the grounded Viber tool surface over
+STDIO. Codex's own harness owns the agentic loop, per-tool timeouts, and
+sandboxing. Historical pre-implementation research is archived under
+``.planning/archive/2026-05-27-stale-viber-direction-research/``.
 
 This wrapper is deliberately thin — spawn + outer timeout + parse + degrade.
 It owns ONLY the guards Codex's harness does not:
@@ -30,6 +31,7 @@ inject a fake runner, so they exercise every branch without Codex installed.
 
 from __future__ import annotations
 
+import glob
 import json
 import logging
 import os
@@ -38,9 +40,10 @@ import subprocess
 import sys
 import tempfile
 import threading
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from vibemix.library.rekordbox import RekordboxLibrary
 
@@ -49,9 +52,10 @@ logger = logging.getLogger(__name__)
 # Outer wall-clock guard. Codex bounds tool calls (tool_timeout_sec) and its
 # own loop; this is the belt-and-braces kill for a wedged process.
 DEFAULT_TIMEOUT_S = 120.0
-# Set-prep (build_set_with_codex) is multi-step — discover → energy → sequence →
-# export — so it needs a longer outer wall-clock than one-shot curate.
-BUILD_SET_TIMEOUT_S = 300.0
+# Set-prep is multi-step, but it is still an interactive app action. Keep the
+# wall-clock short enough that the Library UI can degrade during a demo instead
+# of looking wedged for several minutes.
+BUILD_SET_TIMEOUT_S = 90.0
 # MCP tool/startup timeouts handed to Codex via -c overrides (its harness owns
 # enforcement; we only set the values).
 _MCP_STARTUP_TIMEOUT_S = 15
@@ -61,9 +65,40 @@ _MCP_TOOL_TIMEOUT_S = 30
 # genuine runtime error — used to surface the actionable `codex login` hint.
 _AUTH_HINTS = ("login", "log in", "auth", "sign in", "not authenticated", "401")
 
+# Finder/Dock-launched macOS apps usually do not inherit the user's shell PATH,
+# so Homebrew/npm-installed Codex can be invisible to shutil.which("codex").
+# Search the common install locations before declaring the local brain missing.
+_CODEX_BIN_ENV_KEYS = ("VIBEMIX_CODEX_BIN", "CODEX_BIN")
+_NODE_BIN_ENV_KEYS = ("VIBEMIX_NODE_BIN", "NODE_BIN")
+_CODEX_UNIX_CANDIDATES = (
+    "/opt/homebrew/bin/codex",
+    "/usr/local/bin/codex",
+    "/opt/local/bin/codex",
+    "~/.local/bin/codex",
+    "~/.npm-global/bin/codex",
+    "~/.bun/bin/codex",
+    "~/.volta/bin/codex",
+    "~/Library/pnpm/codex",
+)
+_NODE_UNIX_CANDIDATES = (
+    "/opt/homebrew/bin/node",
+    "/usr/local/bin/node",
+    "/opt/local/bin/node",
+    "~/.volta/bin/node",
+    "~/.local/bin/node",
+)
+_NODE_GLOB_CANDIDATES = (
+    "~/.nvm/versions/node/*/bin/node",
+    "~/.fnm/node-versions/*/installation/bin/node",
+    "/opt/homebrew/Cellar/node/*/bin/node",
+    "/opt/homebrew/Cellar/node@*/*/bin/node",
+    "/usr/local/Cellar/node/*/bin/node",
+    "/usr/local/Cellar/node@*/*/bin/node",
+)
+
 # WIRE-04 (Phase 77 Plan 02): persona opener sourced from the shared matrix
-# seam (build_curator_instruction) — the same voice the gemini backend and the
-# live co-host speak. The "Use ONLY the provided tools" bridge is codex-specific
+# seam (build_curator_instruction) — the same voice family the live co-host uses.
+# The "Use ONLY the provided tools" bridge is codex-specific
 # (MCP tool surface) and the RULES below — including codex's distinct rule #3
 # (return final JSON, no create_playlist) — are PRESERVED VERBATIM.
 #
@@ -91,7 +126,7 @@ _SYSTEM_PROMPT_CACHE: str | None = None
 _SYSTEM_PROMPT_LENS: str | None = None
 # WR-04: guard the check-then-set so a concurrent lens-change rebuild can't
 # interleave the (_CACHE, _LENS) writes and serve the wrong voice. Mirrors the
-# gemini agent seam; uncontended on the steady-state cache hit.
+# legacy agent seam; uncontended on the steady-state cache hit.
 _CACHE_LOCK = threading.Lock()
 
 
@@ -99,9 +134,9 @@ def _shared_lens() -> str:
     """Read the ONE shared lens (LENS-02) — delegates to the shared seam.
 
     IN-01: the codex backend reads the lens through the SAME
-    ``library._curator_seams.shared_lens`` the gemini backend uses, so the two
-    can never diverge. Lazy-imported to keep the import-time no-live-path
-    boundary clean.
+    ``library._curator_seams.shared_lens`` so Viber set-prep/chat and the
+    live co-host read the same lens selection. Lazy-imported to keep the
+    import-time no-live-path boundary clean.
     """
     from vibemix.library._curator_seams import shared_lens
 
@@ -112,10 +147,9 @@ def _taste_hint() -> str:
     """SEAM #2 (CURATE-02) taste hint — delegates to the shared seam.
 
     IN-01 + WR-01: the codex backend calls the SAME consent-gated
-    ``library._curator_seams.taste_hint`` as the gemini backend, so the consent
-    contract is single-sourced and the codex twin can never be orphaned (the
-    CURATE acid test). Returns ``""`` when consent is OFF or the profile is
-    absent → byte-identical cold path even with a stale ``profile.json``.
+    ``library._curator_seams.taste_hint`` so the consent contract is
+    single-sourced. Returns ``""`` when consent is OFF or the profile is absent
+    → byte-identical cold path even with a stale ``profile.json``.
     """
     from vibemix.library._curator_seams import taste_hint
 
@@ -145,6 +179,7 @@ def __getattr__(name: str) -> Any:
     if name == "_SYSTEM_PROMPT":
         return _system_prompt()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 # JSON Schema enforced on Codex's final message (--output-schema). OpenAI strict
 # structured outputs require `additionalProperties: false` AND every property in
@@ -193,10 +228,77 @@ class CodexCurateResult:
 
 
 def find_codex(codex_path: str | None = None) -> str | None:
-    """Locate the ``codex`` binary, honoring an explicit override."""
+    """Locate the ``codex`` binary, honoring explicit and app-friendly paths.
+
+    ``shutil.which("codex")`` is enough in a terminal, but not in a packaged
+    macOS app launched from Finder. The desktop bridge also forwards
+    ``VIBEMIX_CODEX_BIN`` so users can pin a binary path without changing shell
+    startup files.
+    """
+    candidates: list[str] = []
     if codex_path:
-        return codex_path if Path(codex_path).exists() else None
-    return shutil.which("codex")
+        candidates.append(codex_path)
+    else:
+        for key in _CODEX_BIN_ENV_KEYS:
+            raw = os.environ.get(key)
+            if raw:
+                candidates.append(raw)
+        found = shutil.which("codex")
+        if found:
+            candidates.append(found)
+        candidates.extend(_CODEX_UNIX_CANDIDATES)
+        home = Path.home()
+        candidates.extend(str(p) for p in home.glob(".nvm/versions/node/*/bin/codex"))
+
+    for raw in candidates:
+        path = Path(raw).expanduser()
+        if path.is_file():
+            return str(path)
+    return None
+
+
+def build_subprocess_env(codex_path: str) -> dict[str, str]:
+    """Build an app-friendly env for ``codex exec``.
+
+    Homebrew/npm Codex is often a ``#!/usr/bin/env node`` script. Finder-launched
+    apps can find ``codex`` through ``VIBEMIX_CODEX_BIN`` or the common-path scan
+    above while still missing ``node`` from PATH. Prepending discovered Node bin
+    dirs keeps the local brain usable without requiring users to hand-edit shell
+    startup files that the desktop app will not read anyway.
+    """
+    env = os.environ.copy()
+    path_dirs: list[str] = []
+
+    def add_dir(raw: str | Path | None) -> None:
+        if raw is None:
+            return
+        p = Path(raw).expanduser()
+        if p.is_file():
+            p = p.parent
+        if not p.exists():
+            return
+        s = str(p)
+        if s not in path_dirs:
+            path_dirs.append(s)
+
+    add_dir(Path(codex_path).expanduser().parent)
+    for key in _NODE_BIN_ENV_KEYS:
+        raw = env.get(key)
+        if raw:
+            add_dir(raw)
+    found_node = shutil.which("node")
+    if found_node:
+        add_dir(found_node)
+    for raw in _NODE_UNIX_CANDIDATES:
+        add_dir(raw)
+    for pattern in _NODE_GLOB_CANDIDATES:
+        for p in sorted(glob.glob(str(Path(pattern).expanduser()))):
+            add_dir(p)
+
+    old_path = env.get("PATH", "")
+    prefix = os.pathsep.join(path_dirs)
+    env["PATH"] = prefix + (os.pathsep + old_path if prefix and old_path else old_path)
+    return env
 
 
 def build_prompt(theme: str) -> str:
@@ -247,7 +349,7 @@ def build_argv(
         "-o",
         out_path,
         "-c",
-        f'{server}.command={json.dumps(mcp_command)}',
+        f"{server}.command={json.dumps(mcp_command)}",
         "-c",
         f"{server}.args={json.dumps(mcp_args)}",
         "-c",
@@ -260,9 +362,7 @@ def build_argv(
     ]
 
 
-def _validate_against_library(
-    track_ids: list[str], library: RekordboxLibrary
-) -> list[str]:
+def _validate_against_library(track_ids: list[str], library: RekordboxLibrary) -> list[str]:
     """Keep only ids that resolve in the live library (order-preserving).
 
     The grounding guard at the result boundary — the model's list is never
@@ -336,9 +436,8 @@ def curate_with_codex(
                 "Codex's MCP tool calls are auto-cancelled in non-interactive "
                 "mode (upstream bug openai/codex#16685). Running them needs "
                 "`--dangerously-bypass-approvals-and-sandbox`, which also grants "
-                "codex shell access. To use the Codex backend anyway, set "
-                "VIBEMIX_CODEX_ALLOW_SHELL=1. Otherwise use the default Gemini "
-                "backend (no bypass needed): `library curate \"<theme>\"`."
+                "codex shell access. Set VIBEMIX_CODEX_ALLOW_SHELL=1 for the "
+                "current local Codex path."
             ),
         )
 
@@ -369,6 +468,7 @@ def curate_with_codex(
                 capture_output=True,
                 text=True,
                 timeout=timeout_s,
+                env=build_subprocess_env(codex),
                 # `codex exec` reads extra instructions from stdin when it's
                 # piped/inherited; a non-TTY child stdin makes it block/err with
                 # "Reading additional input from stdin...". DEVNULL = the prompt
@@ -389,7 +489,7 @@ def curate_with_codex(
                 error=f"Codex did not finish within {timeout_s:.0f}s.",
             )
 
-        stderr = (proc.stderr or "")
+        stderr = proc.stderr or ""
         if proc.returncode != 0:
             low = stderr.lower()
             if any(h in low for h in _AUTH_HINTS):
@@ -466,7 +566,7 @@ def curate_with_codex(
         m3u_path = str(res.m3u_path)
         json_path = str(res.json_path)
         validated = res.track_ids  # the persisted, de-duped, validated order
-    except Exception as e:  # noqa: BLE001 — never raise; report what we have
+    except Exception as e:
         logger.warning("[codex] persist failed: %s", e)
 
     return CodexCurateResult(
@@ -493,22 +593,33 @@ _BUILD_SET_RULES = (
     "You are preparing a DJ SET (an ordered, mixable sequence), not just a "
     "playlist. Use ONLY the provided tools.\n"
     "WORKFLOW (in order):\n"
-    "1. discover_pool — find a grounded candidate pool for the brief (optionally "
-    "bounded by bpm/duration). This is the ONLY way to introduce track_ids.\n"
+    "1. discover_pool — find a grounded candidate pool for the brief (normally "
+    "k=15 unless the user asked for a long set; optionally bounded by "
+    "bpm/duration). This is the ONLY way to introduce track_ids.\n"
     "2. get_track_energy — inspect candidates' perceived energy as needed.\n"
     "3. sequence_set — order the chosen track_ids on the requested energy curve. "
     "Pass ONLY track_ids returned by discover_pool this run.\n"
-    "4. export_set — write the final ordered set to a Rekordbox XML. Capture the "
-    "returned `path`.\n"
+    "4. For set-aware mix points, use get_track_sections on the ordered tracks, "
+    "then transition_slate for adjacent moves you need to explain. The tr_* "
+    "candidate ids come from the tool; never invent them.\n"
+    "5. For smart hot-cue prep, call smart_hot_cues on grounded track_ids; if "
+    "the DJ asks to write cues, call export_smart_cues with issued proposal/cue "
+    "ids. Never pass raw cue payloads.\n"
+    "6. If export is requested, export_set — write the final ordered set to a "
+    "Rekordbox XML and capture the returned `path`. If export is not requested, "
+    "skip export_set and return export_path as an empty string.\n"
     "RULES (non-negotiable):\n"
     "1. NEVER invent a track_id, title, artist, BPM, or key. Every track_id MUST "
     "have come from a discover_pool result in THIS run.\n"
     "2. Keys/BPM/energy come from the tools (deterministic) — never compute or "
     "guess them.\n"
-    "3. Return the final JSON object {name, track_ids, export_path, rationale}: "
+    "3. Cue/section/timing claims must come from get_track_sections / "
+    "transition_slate / compile_musical_context / smart_hot_cues; never invent "
+    "a cue slot, proposal id, cue id, or exact bar count.\n"
+    "4. Return the final JSON object {name, track_ids, export_path, rationale}: "
     "the ORDERED track_ids in play order, the export_set `path` as export_path "
     "(empty string if you did not export), and a short rationale for the arc.\n"
-    "4. Keep it tight and mixable — a focused, well-sequenced set beats a padded "
+    "5. Keep it tight and mixable — a focused, well-sequenced set beats a padded "
     "one."
 )
 
@@ -529,18 +640,26 @@ _BUILD_SET_SCHEMA: dict[str, Any] = {
 
 
 def build_set_prompt(
-    brief: str, *, curve: str | None = None, name: str | None = None
+    brief: str,
+    *,
+    curve: str | None = None,
+    name: str | None = None,
+    n_slots: int | None = None,
+    export: bool = True,
 ) -> str:
     """Compose the set-prep prompt: shared persona/lens + set-prep rules + brief.
 
     Curve / name are folded in as grounded hints; the agent still owns the tool
-    calls (mirrors the Gemini `_cmd_library_build_set` hint-folding).
+    calls (mirrors the legacy `_cmd_library_build_set` hint-folding).
     """
     hints: list[str] = []
     if curve:
         hints.append(f"prefer the '{curve}' energy curve")
     if name:
         hints.append(f"name the set '{name}'")
+    if n_slots:
+        hints.append(f"target exactly {n_slots} slots")
+    hints.append("export requested" if export else "do not export; return export_path as empty")
     brief_line = brief.strip()
     if hints:
         brief_line = f"{brief_line} ({'; '.join(hints)})"
@@ -556,6 +675,8 @@ def build_set_with_codex(
     *,
     curve: str | None = None,
     name: str | None = None,
+    n_slots: int | None = None,
+    export: bool = True,
     timeout_s: float = BUILD_SET_TIMEOUT_S,
     codex_path: str | None = None,
     mcp_command: str | None = None,
@@ -616,7 +737,13 @@ def build_set_with_codex(
             mcp_args=args,
             schema_path=schema_path,
             out_path=out_path,
-            prompt=build_set_prompt(brief, curve=curve, name=name),
+            prompt=build_set_prompt(
+                brief,
+                curve=curve,
+                name=name,
+                n_slots=n_slots,
+                export=export,
+            ),
             bypass_sandbox=allow_shell,
         )
 
@@ -626,6 +753,7 @@ def build_set_with_codex(
                 capture_output=True,
                 text=True,
                 timeout=timeout_s,
+                env=build_subprocess_env(codex),
                 stdin=subprocess.DEVNULL,
             )
         except FileNotFoundError:
@@ -714,12 +842,12 @@ def build_set_with_codex(
         m3u_path = str(res.m3u_path)
         json_path = str(res.json_path)
         validated = res.track_ids
-    except Exception as e:  # noqa: BLE001 — never raise; report what we have
+    except Exception as e:
         logger.warning("[codex] set persist failed: %s", e)
 
     return CodexCurateResult(
         theme=brief,
-        stop_reason="created",
+        stop_reason="exported" if export_path is not None else "created",
         playlist_name=playlist_name,
         track_ids=validated,
         m3u_path=m3u_path,
@@ -734,9 +862,9 @@ def build_set_with_codex(
 # Same MCP grounded-tool surface + same guards as curate; free-text reply.     #
 # --------------------------------------------------------------------------- #
 
-# Chat is multi-turn + may chain several tools (search → quote → web → reply),
-# so it gets the longer outer wall-clock like set-prep.
-CHAT_TIMEOUT_S = 300.0
+# Chat is an interactive UI turn. It may chain tools, but a stalled Codex loop
+# must degrade quickly enough that the Library window does not look frozen.
+CHAT_TIMEOUT_S = 90.0
 
 # Structured final message for a chat turn. Like _OUTPUT_SCHEMA: every property
 # is `required` + additionalProperties:false (structured-output constraint).
@@ -745,9 +873,42 @@ _CHAT_SCHEMA: dict[str, Any] = {
     "properties": {
         "reply": {"type": "string"},
         "tools_used": {"type": "array", "items": {"type": "string"}},
+        "tool_trace": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "arg": {"type": "string"},
+                    "ok": {"type": "boolean"},
+                },
+                "required": ["name", "arg", "ok"],
+                "additionalProperties": False,
+            },
+        },
         "track_ids": {"type": "array", "items": {"type": "string"}},
+        "playlist": {
+            "type": ["object", "null"],
+            "properties": {
+                "name": {"type": "string"},
+                "track_ids": {"type": "array", "items": {"type": "string"}},
+                "m3u_path": {"type": "string"},
+                "json_path": {"type": "string"},
+                "dropped_ids": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["name", "track_ids", "m3u_path", "json_path", "dropped_ids"],
+            "additionalProperties": False,
+        },
+        "export_path": {"type": ["string", "null"]},
     },
-    "required": ["reply", "tools_used", "track_ids"],
+    "required": [
+        "reply",
+        "tools_used",
+        "tool_trace",
+        "track_ids",
+        "playlist",
+        "export_path",
+    ],
     "additionalProperties": False,
 }
 
@@ -760,15 +921,26 @@ _CHAT_RULES_BLOCK = (
     "run. Never invent a track, title, artist, BPM, or key.\n"
     "2. Keys / BPM / energy come from the tools (get_track_features / "
     "get_track_energy), never your memory.\n"
-    "3. Ground a web / technique / YouTube claim with the matching tool "
-    "(web_search / retrieve_dj_knowledge / ingest_youtube) — let the source "
+    "3. For mix-point or cue-entry advice, use get_track_sections, "
+    "transition_slate, compile_musical_context, and smart_hot_cues. Only mention "
+    "cue slots, proposal ids, cue ids, candidate ids, or exact timing that "
+    "those tools issued. If writing smart cues, use export_smart_cues with "
+    "issued ids, never raw cue payloads.\n"
+    "4. Ground a web or technique claim with the matching tool "
+    "(web_search / retrieve_dj_knowledge) — let the source "
     "show.\n"
-    "4. You do NOT have to call a tool every turn; if they're just chatting, "
+    "5. You do NOT have to call a tool every turn; if they're just chatting, "
     "chat back.\n"
-    "5. When done, return the final JSON {reply, tools_used, track_ids}: reply "
-    "is your spoken answer to the DJ; tools_used lists the tool names you "
-    "called this turn; track_ids is any library track you referenced (in "
-    "order, empty if none)."
+    "6. When done, return the final JSON {reply, tools_used, tool_trace, "
+    "track_ids, playlist, export_path}: reply is your spoken answer to the DJ; "
+    "tools_used lists the tool names you called this turn. tool_trace lists the "
+    "same calls as {name, arg, ok}, where arg is the shortest useful argument "
+    "or intent the DJ should see and ok is false only if the tool failed. "
+    "track_ids is any library track you referenced (in order, empty if none). "
+    "If you call create_playlist, "
+    "copy its returned {name, track_ids, m3u_path, json_path, dropped_ids} into "
+    "playlist; otherwise playlist=null. If you call export_set, copy its "
+    "returned path into export_path; otherwise export_path=null."
 )
 
 
@@ -776,12 +948,7 @@ def _chat_system_prompt() -> str:
     """Codex chat system prompt — shared curator voice + chat rules + taste."""
     from vibemix.prompts.matrix import build_curator_instruction
 
-    return (
-        build_curator_instruction(_shared_lens())
-        + "\n"
-        + _CHAT_RULES_BLOCK
-        + _taste_hint()
-    )
+    return build_curator_instruction(_shared_lens()) + "\n" + _CHAT_RULES_BLOCK + _taste_hint()
 
 
 def chat_prompt(message: str, history: list[dict[str, Any]] | None = None) -> str:
@@ -793,7 +960,7 @@ def chat_prompt(message: str, history: list[dict[str, Any]] | None = None) -> st
         text = str(turn.get("text") or "").strip()
         if not text:
             continue
-        speaker = "You" if turn.get("role") == "viber" else "DJ"
+        speaker = "Viber" if turn.get("role") == "viber" else "DJ"
         convo += f"{speaker}: {text}\n"
     convo += f"DJ: {message.strip()}"
     return (
@@ -802,13 +969,74 @@ def chat_prompt(message: str, history: list[dict[str, Any]] | None = None) -> st
     )
 
 
+def _dedupe_ordered(items: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+def _normalize_chat_playlist(raw: Any, library: RekordboxLibrary) -> dict[str, Any] | None:
+    """Validate a Codex-reported chat playlist artifact before surfacing it.
+
+    The actual write happens inside the MCP process via ``create_playlist``.
+    The final JSON merely echoes that tool result, so the wrapper re-checks the
+    saved files and track ids at the process boundary. A missing file means no
+    visible playlist card; the chat can still show its text and receipts.
+    """
+    if not isinstance(raw, dict):
+        return None
+    name = str(raw.get("name") or "").strip()
+    raw_ids = [t for t in (raw.get("track_ids") or []) if isinstance(t, str)]
+    track_ids = _validate_against_library(raw_ids, library)
+    m3u_path = str(raw.get("m3u_path") or "").strip()
+    json_path = str(raw.get("json_path") or "").strip()
+    if not name or not track_ids or not m3u_path or not json_path:
+        return None
+    if not Path(m3u_path).exists() or not Path(json_path).exists():
+        return None
+    dropped_ids = [t for t in (raw.get("dropped_ids") or []) if isinstance(t, str)]
+    return {
+        "name": name,
+        "track_ids": track_ids,
+        "m3u_path": m3u_path,
+        "json_path": json_path,
+        "dropped_ids": dropped_ids,
+    }
+
+
+def _normalize_chat_tool_trace(raw_trace: Any, tools_used: list[str]) -> list[dict[str, Any]]:
+    """Return UI-ready tool rows, falling back to legacy name-only receipts."""
+    rows: list[dict[str, Any]] = []
+    if isinstance(raw_trace, list):
+        for item in raw_trace:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            if not name:
+                continue
+            arg = str(item.get("arg") or "").strip()
+            ok = item.get("ok")
+            rows.append({"name": name, "arg": arg, "ok": ok if isinstance(ok, bool) else True})
+    if rows:
+        return rows
+    return [{"name": n, "arg": "", "ok": True} for n in tools_used]
+
+
 @dataclass(slots=True)
 class CodexChatResult:
-    """Outcome of one Codex chat turn (normalized to the Gemini ChatResult shape)."""
+    """Outcome of one Codex chat turn (normalized to the shared ChatResult shape)."""
 
     reply: str = ""
     tools_used: list[str] = field(default_factory=list)
+    tool_trace: list[dict[str, Any]] = field(default_factory=list)
     track_ids: list[str] = field(default_factory=list)
+    playlist: dict[str, Any] | None = None
+    export_path: str | None = None
     stop_reason: str = "model_done"
     error: str | None = None
 
@@ -818,15 +1046,15 @@ class CodexChatResult:
         # seen_track_ids. An error degrades into a spoken reply so the chat UI
         # always shows something honest.
         reply = self.reply or (self.error or "")
+        tool_trace = self.tool_trace or _normalize_chat_tool_trace(None, self.tools_used)
+        iterations = 0 if self.error else max(1, len(tool_trace))
         return {
             "reply": reply,
-            "tool_trace": [
-                {"name": n, "arg": "", "ok": True} for n in self.tools_used
-            ],
-            "playlist": None,
-            "export_path": None,
+            "tool_trace": tool_trace,
+            "playlist": self.playlist,
+            "export_path": self.export_path,
             "seen_track_ids": self.track_ids,
-            "iterations": 0,
+            "iterations": iterations,
             "stop_reason": self.stop_reason,
         }
 
@@ -902,6 +1130,7 @@ def chat_with_codex(
                 capture_output=True,
                 text=True,
                 timeout=timeout_s,
+                env=build_subprocess_env(codex),
                 stdin=subprocess.DEVNULL,
             )
         except FileNotFoundError:
@@ -933,9 +1162,7 @@ def chat_with_codex(
         except OSError:
             raw = ""
         if not raw:
-            return CodexChatResult(
-                stop_reason="empty_output", error="Codex produced no output."
-            )
+            return CodexChatResult(stop_reason="empty_output", error="Codex produced no output.")
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError:
@@ -949,18 +1176,34 @@ def chat_with_codex(
 
     reply = str(payload.get("reply", "")).strip()
     tools_used = [t for t in (payload.get("tools_used") or []) if isinstance(t, str)]
+    tool_trace = _normalize_chat_tool_trace(payload.get("tool_trace"), tools_used)
+    if not tools_used:
+        tools_used = [str(row["name"]) for row in tool_trace]
     raw_ids = [t for t in (payload.get("track_ids") or []) if isinstance(t, str)]
+    playlist = _normalize_chat_playlist(payload.get("playlist"), library)
+    if playlist is not None:
+        raw_ids.extend(playlist["track_ids"])
     # Grounding at the result boundary: keep only ids that resolve in the library.
-    track_ids = _validate_against_library(raw_ids, library)
+    track_ids = _validate_against_library(_dedupe_ordered(raw_ids), library)
+
+    export_path = None
+    raw_export_path = payload.get("export_path")
+    if isinstance(raw_export_path, str) and raw_export_path.strip():
+        candidate = raw_export_path.strip()
+        if Path(candidate).exists():
+            export_path = candidate
+
     if not reply and not tools_used:
-        return CodexChatResult(
-            stop_reason="empty_output", error="Codex returned an empty reply."
-        )
+        return CodexChatResult(stop_reason="empty_output", error="Codex returned an empty reply.")
+    stop_reason = "exported" if export_path else "created" if playlist else "model_done"
     return CodexChatResult(
         reply=reply,
         tools_used=tools_used,
+        tool_trace=tool_trace,
         track_ids=track_ids,
-        stop_reason="model_done",
+        playlist=playlist,
+        export_path=export_path,
+        stop_reason=stop_reason,
     )
 
 
@@ -974,6 +1217,7 @@ __all__ = [
     "build_prompt",
     "build_set_prompt",
     "build_set_with_codex",
+    "build_subprocess_env",
     "chat_prompt",
     "chat_with_codex",
     "curate_with_codex",

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""create_playlist — the Viber agent's single validated write.
+"""create_playlist — the Viber tool surface's single validated write.
 
 Phase 1's only persistence path. Exports a NEUTRAL playlist (M3U + JSON) to
 ``~/.cache/vibemix/playlists/`` — deliberately NOT a Rekordbox-XML write-back
@@ -8,9 +8,9 @@ Phase 1's only persistence path. Exports a NEUTRAL playlist (M3U + JSON) to
 Grounding (Cardinal Invariant #2 applied to the agent): EVERY ``track_id`` is
 re-validated against the live library via ``RekordboxLibrary.lookup_by_id``.
 Unknown ids are dropped and reported in ``dropped_ids`` — a playlist can never
-reference a track the library does not contain. The agent-side seen-set gate
-(``agent.ViberAgent._tool_create_playlist``) is the first line; this re-check
-against the authoritative library is the second.
+reference a track the library does not contain. The toolset-side seen-set gate
+is the first line; this re-check against the authoritative library is the
+second.
 """
 
 from __future__ import annotations
@@ -103,7 +103,7 @@ def create_playlist(
     for tid in validated:
         entry = library.lookup_by_id(tid)
         assert entry is not None  # validated above
-        secs = int(round(entry.duration_s)) if entry.duration_s else -1
+        secs = round(entry.duration_s) if entry.duration_s else -1
         m3u_lines.append(f"#EXTINF:{secs},{entry.artist} - {entry.title}")
         m3u_lines.append(entry.filepath or "")
         payload_tracks.append(

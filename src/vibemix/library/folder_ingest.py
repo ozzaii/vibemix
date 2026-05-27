@@ -2,10 +2,10 @@
 """folder_ingest — raw-folder audio ingest for the vibemix library.
 
 quick-260525-gz2. Kaan's DJ library is a raw folder tree of audio files
-(mp3 / m4a / wav / flac / aac), NOT a Rekordbox ``collection.xml``. This
-module walks such a folder, derives a minimal :class:`TrackEntry` per file
-(filename stem as title, ffprobe duration), embeds each via
-:class:`LibraryEmbedder`, persists the 1536-d vectors to the active
+    (mp3 / m4a / wav / flac / aac), NOT a Rekordbox ``collection.xml``. This
+    module walks such a folder, derives a minimal :class:`TrackEntry` per file
+    (filename stem as title, ffprobe duration), embeds each via the active
+    product embedder, persists the 512-d CLAP vectors to the active
 :class:`LibraryStore`, and writes a ``library.pkl`` cache compatible with
 ``RekordboxLibrary.try_load_cache()`` so the existing ``search`` / ``similar``
 CLIs can resolve filenames for folder-ingested tracks.
@@ -14,8 +14,8 @@ Data flow::
 
     scan_folder(root)            # walk → sorted [Path, ...] of supported files
       └─ probe_duration_s(path)  # ffprobe → float | None (None == skip honestly)
-          └─ folder_to_track_entry(path, dur) → TrackEntry (namespaced id)
-              └─ embedder.embed_track(entry) → 1536-d L2-normalized vec
+              └─ folder_to_track_entry(path, dur) → TrackEntry (namespaced id)
+                  └─ embedder.embed_track(entry) → 512-d L2-normalized vec
                   └─ store.add_batch([(id, vec)])
     # after loop: write RekordboxLibrary CACHE_PATH pickle (titles)
 
@@ -43,9 +43,10 @@ import pickle
 import shutil
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Protocol
 
 import numpy as np
 
@@ -205,7 +206,7 @@ def _assert_store_dim_compatible(store: _Store) -> None:
          (``vector_dim()`` — sqlite-vec reads the FLOAT[N] schema), compare
          it to EMBEDDING_DIM. This catches a STALE-BUT-EMPTY 768 vec0 table
          that the row-data cosine path below would miss (the table's
-         ``CREATE ... IF NOT EXISTS`` keeps the old dim, so a 1536-d insert
+         ``CREATE ... IF NOT EXISTS`` keeps the old dim, so a 512-d insert
          fails deep in the extension with a cryptic error).
       2. Probe with a zero query of the current dim. An empty store no-ops
          (cosine_topk returns [] for N==0). A stale-dim store with rows
@@ -311,7 +312,7 @@ def ingest_folder(
         progress: optional callback receiving a per-track human line.
         probe: duration probe (injectable for tests).
         embed_strategy: informational label for the report (Path 2). The
-            actual strategy is decided at ``LibraryEmbedder`` construction; if
+            actual strategy is decided at product embedder construction; if
             ``None`` we read it off the embedder's ``_embed_strategy`` attribute
             when present, else default "mean_excerpt". This NEVER changes
             embedding behavior — it's a report annotation so the caller can
@@ -405,8 +406,8 @@ def _emit_progress(
 __all__ = [
     "SUPPORTED_SUFFIXES",
     "IngestReport",
-    "scan_folder",
-    "probe_duration_s",
     "folder_to_track_entry",
     "ingest_folder",
+    "probe_duration_s",
+    "scan_folder",
 ]

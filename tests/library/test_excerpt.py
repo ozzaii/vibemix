@@ -3,24 +3,30 @@
 
 The cue-anchored mapping layer: a TrackEntry's DJ-placed CuePoints become
 ``source="dj"`` CueAnchors (positions authoritative, labels best-effort); an
-un-cued track falls back to ``detect_cues`` (``source="auto"``); a track with no
-structure at all yields ``[]`` honestly (the ingest caller then whole-track
-falls back — never a faked anchor).
+un-cued track falls back to ``detect_cues_auto`` (``source="auto"``); a track
+with no structure at all yields ``[]`` honestly (the ingest caller then
+whole-track falls back — never a faked anchor).
 
 Honest-green posture (CLAUDE.md hard gate):
-    * NO real DSP, NO ffmpeg, NO audio file, NO torch. ``detect_cues`` is
+    * NO real DSP, NO ffmpeg, NO audio file, NO torch. ``detect_cues_auto`` is
       monkeypatched. Pure mapping over synthetic TrackEntry/CuePoint objects.
 """
 
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import pytest
 
+from vibemix.library.anlz_ingest import (
+    AnlzBeatGrid,
+    AnlzIndex,
+    AnlzPhrase,
+    AnlzTrackMeta,
+)
 from vibemix.library.cue_types import CueAnchor
 from vibemix.library.rekordbox import CuePoint, TrackEntry
-
 
 # --------------------------------------------------------------------------- #
 # Synthetic builders                                                           #
@@ -50,6 +56,31 @@ def _track(cues: tuple[CuePoint, ...], *, duration_s: float = 300.0) -> TrackEnt
         cues=cues,
         filepath="/tmp/track1.mp3",
     )
+
+
+def _anlz_index_for_track() -> AnlzIndex:
+    phrase = AnlzPhrase(
+        index=0,
+        mood=1,
+        kind=1,
+        raw_label="Intro 1",
+        cue_label="intro",
+        start_beat=1,
+        end_beat=65,
+        start_s=0.0,
+        end_s=32.0,
+        confidence=0.84,
+        flags={},
+    )
+    meta = AnlzTrackMeta(
+        ext_path=Path("/fixture/ANLZ0000.EXT"),
+        dat_path=Path("/fixture/ANLZ0000.DAT"),
+        ppth_path="/tmp/track1.mp3",
+        basename_key="track1.mp3",
+        beatgrid=AnlzBeatGrid(times_s=(0.0,), bpms=(128.0,), beat_in_bar=(1,)),
+        phrases=(phrase,),
+    )
+    return AnlzIndex(by_basename={"track1.mp3": (meta,)})
 
 
 # --------------------------------------------------------------------------- #
@@ -141,9 +172,7 @@ def test_loop_cues_are_usable():
 def test_max_cues_cap():
     from vibemix.library.excerpt import anchors_for_track
 
-    cues = tuple(
-        _cue(type="cue", start_s=float(i * 10), number=i) for i in range(8)
-    )
+    cues = tuple(_cue(type="cue", start_s=float(i * 10), number=i) for i in range(8))
     track = _track(cues)
     anchors = anchors_for_track(track, max_cues=4)
     assert len(anchors) == 4
@@ -155,12 +184,10 @@ def test_max_cues_cap():
 
 
 def test_load_fade_marks_are_not_anchors_falls_through_to_auto(monkeypatch):
-    import vibemix.library.cue_detect as cue_detect
+    import vibemix.library.cue_engine as cue_engine
 
-    sentinel = [
-        CueAnchor(label="drop", start_s=64.0, end_s=120.0, confidence=0.5, source="auto")
-    ]
-    monkeypatch.setattr(cue_detect, "detect_cues", lambda *a, **k: list(sentinel))
+    sentinel = [CueAnchor(label="drop", start_s=64.0, end_s=120.0, confidence=0.5, source="auto")]
+    monkeypatch.setattr(cue_engine, "detect_cues_auto", lambda *a, **k: list(sentinel))
 
     from vibemix.library.excerpt import anchors_for_track
 
@@ -178,12 +205,79 @@ def test_load_fade_marks_are_not_anchors_falls_through_to_auto(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
+# anchors_for_track — ANLZ second                                              #
+# --------------------------------------------------------------------------- #
+
+
+def test_dj_cues_win_over_anlz_index():
+    from vibemix.library.excerpt import anchors_for_track
+
+    track = _track((_cue(type="cue", start_s=8.0, number=0),))
+    anchors = anchors_for_track(track, anlz_index=_anlz_index_for_track())
+
+    assert len(anchors) == 1
+    assert anchors[0].source == "dj"
+    assert anchors[0].start_s == 8.0
+
+
+def test_no_cues_uses_anlz_before_auto(monkeypatch):
+    import vibemix.library.cue_engine as cue_engine
+
+    monkeypatch.setattr(
+        cue_engine,
+        "detect_cues_auto",
+        lambda *a, **k: pytest.fail("auto fallback should not run when ANLZ matches"),
+    )
+
+    from vibemix.library.excerpt import anchors_for_track
+
+    anchors = anchors_for_track(_track(()), anlz_index=_anlz_index_for_track())
+
+    assert len(anchors) == 1
+    assert anchors[0].source == "anlz"
+    assert anchors[0].label == "intro"
+    assert anchors[0].start_s == 0.0
+
+
+def test_no_anlz_match_delegates_to_detect_cues_auto(monkeypatch):
+    import vibemix.library.cue_engine as cue_engine
+
+    sentinel = [CueAnchor(label="drop", start_s=80.0, end_s=140.0, confidence=0.6, source="auto")]
+    monkeypatch.setattr(cue_engine, "detect_cues_auto", lambda *a, **k: list(sentinel))
+
+    from vibemix.library.excerpt import anchors_for_track
+
+    anchors = anchors_for_track(_track(()), anlz_index=AnlzIndex(by_basename={}))
+
+    assert anchors == sentinel
+
+
+def test_anlz_error_delegates_to_detect_cues_auto(monkeypatch):
+    import vibemix.library.anlz_ingest as anlz_ingest
+    import vibemix.library.cue_engine as cue_engine
+
+    sentinel = [CueAnchor(label="drop", start_s=80.0, end_s=140.0, confidence=0.6, source="auto")]
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("stale synthetic index")
+
+    monkeypatch.setattr(anlz_ingest, "match_track_to_anlz", _raise)
+    monkeypatch.setattr(cue_engine, "detect_cues_auto", lambda *a, **k: list(sentinel))
+
+    from vibemix.library.excerpt import anchors_for_track
+
+    anchors = anchors_for_track(_track(()), anlz_index=_anlz_index_for_track())
+
+    assert anchors == sentinel
+
+
+# --------------------------------------------------------------------------- #
 # anchors_for_track — auto fallback                                            #
 # --------------------------------------------------------------------------- #
 
 
-def test_no_cues_delegates_to_detect_cues(monkeypatch):
-    import vibemix.library.cue_detect as cue_detect
+def test_no_cues_delegates_to_detect_cues_auto(monkeypatch):
+    import vibemix.library.cue_engine as cue_engine
 
     sentinel = [
         CueAnchor(label="intro", start_s=0.0, end_s=40.0, confidence=0.7, source="auto"),
@@ -196,7 +290,7 @@ def test_no_cues_delegates_to_detect_cues(monkeypatch):
         captured["max_cues"] = max_cues
         return list(sentinel)
 
-    monkeypatch.setattr(cue_detect, "detect_cues", _fake_detect)
+    monkeypatch.setattr(cue_engine, "detect_cues_auto", _fake_detect)
 
     from vibemix.library.excerpt import anchors_for_track
 
@@ -207,9 +301,9 @@ def test_no_cues_delegates_to_detect_cues(monkeypatch):
 
 
 def test_empty_detect_cues_returns_empty_honest(monkeypatch):
-    import vibemix.library.cue_detect as cue_detect
+    import vibemix.library.cue_engine as cue_engine
 
-    monkeypatch.setattr(cue_detect, "detect_cues", lambda *a, **k: [])
+    monkeypatch.setattr(cue_engine, "detect_cues_auto", lambda *a, **k: [])
 
     from vibemix.library.excerpt import anchors_for_track
 
@@ -228,8 +322,12 @@ def test_cut_windows_clamps_and_drops_degenerate():
 
     anchors = [
         CueAnchor(label="intro", start_s=-5.0, end_s=40.0, confidence=0.9, source="dj"),
-        CueAnchor(label="drop", start_s=80.0, end_s=80.0, confidence=0.9, source="dj"),  # degenerate
-        CueAnchor(label="drop", start_s=100.0, end_s=400.0, confidence=0.9, source="dj"),  # clamp to dur + 80s
+        CueAnchor(
+            label="drop", start_s=80.0, end_s=80.0, confidence=0.9, source="dj"
+        ),  # degenerate
+        CueAnchor(
+            label="drop", start_s=100.0, end_s=400.0, confidence=0.9, source="dj"
+        ),  # clamp to dur + 80s
     ]
     windows = cut_windows(anchors, duration_s=300.0)
     # degenerate dropped

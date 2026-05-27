@@ -11,6 +11,8 @@ transition, never a fabricated track).
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
@@ -43,6 +45,7 @@ def _pt(
     energy: float | None = 50.0,
     vec: np.ndarray | None = None,
     duration_s: float = 300.0,
+    cues: tuple[object, ...] = (),
 ) -> PoolTrack:
     return PoolTrack(
         track_id=tid,
@@ -53,7 +56,12 @@ def _pt(
         camelot=camelot,
         energy=energy,
         duration_s=duration_s,
+        cues=cues,
     )
+
+
+def _cue(start_s: float, name: str = "", cue_type: str = "cue") -> SimpleNamespace:
+    return SimpleNamespace(start_s=start_s, name=name, type=cue_type)
 
 
 # ===========================================================================
@@ -102,7 +110,7 @@ def test_peak_time_sustains_high():
 def test_transition_both_known_incompatible_rejected():
     a = _pt("a", camelot="8A", bpm=124.0)
     b = _pt("b", camelot="2A", bpm=124.0)  # 8A vs 2A = far hour -> clash/neither
-    relaxed, valid = seq._transition_valid(a, b)
+    _relaxed, valid = seq._transition_valid(a, b)
     assert valid is False
 
 
@@ -140,6 +148,43 @@ def test_transition_bpm_over_tol_rejected():
     b = _pt("b", camelot="8A", bpm=124.0 * 1.07)  # +7% > 6%
     _, valid = seq._transition_valid(a, b, bpm_tol=0.06)
     assert valid is False
+
+
+def test_structural_cues_tag_weak_transition_without_rejecting():
+    # Both tracks have cue metadata, but A has no late/outgoing anchor and B has
+    # no early/incoming anchor. The sequencer keeps the set possible while
+    # surfacing the structural weakness as a relaxed transition.
+    a = _pt("a", seed=1, energy=25.0, cues=(_cue(8.0, "intro"),))
+    b = _pt("b", seed=2, energy=75.0, cues=(_cue(240.0, "outro"),))
+
+    cands = sequence_set([a, b], curve="opener", n_slots=2, weights={"beta": 0.0})
+
+    assert cands
+    assert cands[0].track_ids == ["a", "b"]
+    assert cands[0].relaxed_transitions == [
+        ("a", "b", "cue structure weak (no mix-out cue, no mix-in cue)")
+    ]
+
+
+def test_structural_cues_clean_when_mix_out_and_mix_in_exist():
+    a = _pt(
+        "a",
+        seed=1,
+        energy=25.0,
+        cues=(_cue(12.0, "intro"), _cue(230.0, "outro")),
+    )
+    b = _pt(
+        "b",
+        seed=2,
+        energy=75.0,
+        cues=(_cue(8.0, "intro"), _cue(220.0, "outro")),
+    )
+
+    cands = sequence_set([a, b], curve="opener", n_slots=2, weights={"beta": 0.0})
+
+    assert cands
+    assert cands[0].track_ids == ["a", "b"]
+    assert cands[0].relaxed_transitions == []
 
 
 # ===========================================================================
@@ -275,7 +320,7 @@ def test_sparse_graph_relaxation_tags_or_honest_short_set():
     # Every consecutive pair is either strictly valid OR recorded as relaxed.
     by_id = {p.track_id: p for p in pool}
     relaxed_pairs = {tuple(t[:2]) for t in best.relaxed_transitions}
-    for x, y in zip(best.track_ids, best.track_ids[1:]):
+    for x, y in zip(best.track_ids, best.track_ids[1:], strict=False):
         a, b = by_id[x], by_id[y]
         _, strict_ok = seq._transition_valid(a, b)
         if not strict_ok:

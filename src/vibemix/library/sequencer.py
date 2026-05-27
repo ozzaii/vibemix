@@ -45,7 +45,9 @@ M=50, N=20.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 
@@ -91,6 +93,13 @@ _NEAR_DUP_COS = 0.995
 # this fraction of tracks (=> each candidate is >= 30% distinct at 0.7).
 _JACCARD_MAX = 0.7
 
+# Cue-aware transition hints. Missing cues remain "unknown" and therefore pass;
+# when cue metadata exists, weak structure is tagged as a relaxed edge instead
+# of silently looking like a clean mix.
+_MIX_IN_FRAC = 0.35
+_MIX_OUT_FRAC = 0.55
+_MIX_CUE_FLOOR_S = 64.0
+
 
 @dataclass(frozen=True, slots=True)
 class PoolTrack:
@@ -109,6 +118,7 @@ class PoolTrack:
     camelot: str | None
     energy: float | None  # 0..100, or None -> BPM-proxy / 0-contribution
     duration_s: float = 0.0
+    cues: Sequence[Any] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,8 +186,9 @@ def _transition_valid(
     ``next_suggestion`` uses). BPM: reject only when BOTH are known and
     ``|b.bpm - a.bpm| > bpm_tol * a.bpm``. Missing metadata => PASS.
 
-    Structural mixability is a placeholder ``True`` until CueAnchor data is
-    wired (a future phase).
+    Structural mixability is handled by ``_structural_relax_reason`` in the
+    beam edge-admission path: cue metadata never hard-rejects a track, but weak
+    mix-in/out anchors are penalized and surfaced as relaxed transitions.
 
     ``relaxed`` is informational here (always False) — the ladder in the beam
     sets the relaxed flag based on which rung admitted the edge; this predicate
@@ -398,11 +409,11 @@ def sequence_set(
                 new_relaxed = beam.relaxed
                 if reason is not None:
                     step += _RELAX_PENALTY
-                    new_relaxed = beam.relaxed + ((last, j, reason),)
+                    new_relaxed = (*beam.relaxed, (last, j, reason))
                 next_beams.append(
                     _Beam(
                         used=beam.used | {j},
-                        order=beam.order + (j,),
+                        order=(*beam.order, j),
                         cost=step,
                         relaxed=new_relaxed,
                     )
@@ -422,9 +433,9 @@ def sequence_set(
                     next_beams.append(
                         _Beam(
                             used=beam.used | {j},
-                            order=beam.order + (j,),
+                            order=(*beam.order, j),
                             cost=step,
-                            relaxed=beam.relaxed + ((last, j, reason),),
+                            relaxed=(*beam.relaxed, (last, j, reason)),
                         )
                     )
 
@@ -478,6 +489,9 @@ def _edge_admit(
     """
     _, ok = _transition_valid(a, b, bpm_tol=rung)
     if ok:
+        reason = _structural_relax_reason(a, b)
+        if reason is not None:
+            return True, reason
         return False, None
     return None, None
 
@@ -524,6 +538,81 @@ def _relaxed_neighbors(
 def _jaccard(a: frozenset[int], b: frozenset[int]) -> float:
     union = a | b
     return len(a & b) / len(union) if union else 0.0
+
+
+def _cue_start_s(cue: Any) -> float | None:
+    raw = getattr(cue, "start_s", getattr(cue, "position_s", None))
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value >= 0.0 else None
+
+
+def _cue_label(cue: Any) -> str:
+    return str(
+        getattr(cue, "label", None) or getattr(cue, "name", None) or ""
+    ).strip().lower()
+
+
+def _cue_type(cue: Any) -> str:
+    return str(getattr(cue, "type", "cue") or "cue").strip().lower()
+
+
+def _usable_cues(track: PoolTrack) -> list[Any]:
+    return [
+        cue
+        for cue in (track.cues or ())
+        if _cue_start_s(cue) is not None and _cue_type(cue) in {"cue", "loop", ""}
+    ]
+
+
+def _has_mix_in_anchor(track: PoolTrack, cues: list[Any]) -> bool:
+    if not cues:
+        return False
+    boundary = max(_MIX_CUE_FLOOR_S, float(track.duration_s or 0.0) * _MIX_IN_FRAC)
+    labels = ("intro", "in", "start")
+    return any(
+        (_cue_start_s(cue) or 0.0) <= boundary
+        or any(token in _cue_label(cue) for token in labels)
+        for cue in cues
+    )
+
+
+def _has_mix_out_anchor(track: PoolTrack, cues: list[Any]) -> bool:
+    if not cues:
+        return False
+    duration = float(track.duration_s or 0.0)
+    boundary = duration * _MIX_OUT_FRAC if duration > 0.0 else _MIX_CUE_FLOOR_S
+    labels = ("outro", "out", "breakdown", "break")
+    return any(
+        (_cue_start_s(cue) or 0.0) >= boundary
+        or any(token in _cue_label(cue) for token in labels)
+        for cue in cues
+    )
+
+
+def _structural_relax_reason(a: PoolTrack, b: PoolTrack) -> str | None:
+    """Tag weak cue structure when cue metadata exists for either side.
+
+    No cues means unknown, not bad. If a track does carry cues, the sequencer
+    expects a plausible outgoing anchor on ``a`` and incoming anchor on ``b``.
+    Weakness stays a penalty/tag, never a hard rejection, so set prep remains
+    robust on sparse libraries.
+    """
+    a_cues = _usable_cues(a)
+    b_cues = _usable_cues(b)
+    if not a_cues and not b_cues:
+        return None
+
+    missing: list[str] = []
+    if a_cues and not _has_mix_out_anchor(a, a_cues):
+        missing.append("no mix-out cue")
+    if b_cues and not _has_mix_in_anchor(b, b_cues):
+        missing.append("no mix-in cue")
+    if not missing:
+        return None
+    return f"cue structure weak ({', '.join(missing)})"
 
 
 def _to_candidate(

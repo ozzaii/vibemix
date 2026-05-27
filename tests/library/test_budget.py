@@ -8,7 +8,6 @@ RESEARCH §Common Pitfalls P56. Failing it BLOCKS phase merge.
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 
@@ -16,11 +15,11 @@ import pytest
 
 from vibemix.library.budget import (
     BUDGET_CEILING_EUR,
-    BudgetTelemetry,
     COST_PER_AUDIO_EMBED_USD,
     DEFAULT_GROUNDING_EVENTS_PER_SESSION,
     PRICING,
     USD_TO_EUR,
+    BudgetTelemetry,
     get_telemetry,
     project_monthly_cost,
 )
@@ -171,6 +170,8 @@ def test_cli_library_budget_returns_projection() -> None:
     proj = data["projection"]
     assert {"total_eur", "indexing_eur", "ceiling_eur", "under_budget"} <= proj.keys()
     assert isinstance(proj["total_eur"], (int, float))
+    assert data["projection_kind"] == "legacy_gemini_embedding_what_if"
+    assert data["active_embedding_backend"] == "clap"
     assert data["dau"] == 1000
     assert "telemetry" in data
 
@@ -185,6 +186,7 @@ def test_cli_library_budget_human_readable() -> None:
         timeout=15,
     )
     assert proc.returncode == 0
-    assert "Cost Projection" in proc.stdout
+    assert "Legacy Gemini Embedding Cost Projection" in proc.stdout
+    assert "active library embedding backend: clap" in proc.stdout.lower()
     assert "Total" in proc.stdout
     assert "Under budget" in proc.stdout

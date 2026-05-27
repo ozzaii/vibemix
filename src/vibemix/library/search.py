@@ -21,7 +21,8 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from vibemix.library.embed import EMBED_CACHE_DB_PATH, LibraryEmbedder
+from vibemix.library.cache_paths import EMBED_CACHE_DB_PATH
+from vibemix.library.embed_types import QueryEmbedder
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.library.store import LibraryStore
 
@@ -75,14 +76,14 @@ class VibeSearchResult:
 
 def _format_snippet(title: str, artist: str, bpm: float | None) -> str:
     if bpm is not None and bpm > 0:
-        s = f"{title} — {artist} @ {int(round(bpm))} BPM"
+        s = f"{title} — {artist} @ {round(bpm)} BPM"
     else:
         s = f"{title} — {artist}"
     return s[:80]
 
 
 def vibe_search(
-    embedder: LibraryEmbedder,
+    embedder: QueryEmbedder,
     store: LibraryStore,
     library: RekordboxLibrary,
     query: str,
@@ -105,7 +106,7 @@ def vibe_search(
 
     snapshot = store.snapshot_hash()
     cache_key = hashlib.sha256(
-        f"{query}|{snapshot}|{RANKING_VERSION}".encode("utf-8")
+        f"{query}|{snapshot}|{RANKING_VERSION}".encode()
     ).hexdigest()
     own_conn = cache_db is None
     conn = cache_db if cache_db is not None else _open_query_cache()
@@ -128,8 +129,8 @@ def vibe_search(
 
         qvec = embedder.embed_query(query)
         # Mean-centered ranking (the anisotropy fix) is the DEFAULT — it is
-        # strictly more discriminative on anisotropic Gemini embeddings. The
-        # store transparently falls back to raw cosine for N < 2 (no centroid).
+        # strictly more discriminative for CLAP and the historical Gemini
+        # vectors. The store falls back to raw cosine for N < 2 (no centroid).
         topk = store.search_centered(qvec, k=k)
 
         # Build track_id → TrackEntry lookup once per call.
@@ -174,8 +175,8 @@ def vibe_search(
 
 
 __all__ = [
-    "QUERY_CACHE_TTL",
     "QUERY_CACHE_TABLE",
+    "QUERY_CACHE_TTL",
     "VibeSearchResult",
     "vibe_search",
 ]

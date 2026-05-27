@@ -28,10 +28,8 @@ import time
 import uuid
 from dataclasses import dataclass
 
-import numpy as np
-
-from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
-from vibemix.library.embed import LibraryEmbedder
+from vibemix.library._cosine import EMBEDDING_DIM
+from vibemix.library.embed_types import AudioBytesEmbedder
 from vibemix.library.store import LibraryStore
 
 logger = logging.getLogger(__name__)
@@ -80,7 +78,7 @@ def _decide(cosine: float) -> str:
 
 
 def identify_playing(
-    embedder: LibraryEmbedder,
+    embedder: AudioBytesEmbedder,
     store: LibraryStore,
     audio_bytes: bytes | None,
     *,
@@ -116,10 +114,9 @@ def identify_playing(
 
     try:
         # Phase 90: route through the embedder's public ``embed_audio_bytes``
-        # seam — backend-agnostic. The Gemini ``LibraryEmbedder`` runs its
-        # single-call audio path (short ≤30s buffer, under the 180s cap + telemetry
-        # inside); a ``ClapEmbedder`` runs the local CLAP audio encoder. NO more
-        # reaching into ``embedder._client`` (CLAP has none).
+        # surface. The product ``ClapEmbedder`` runs the local CLAP audio
+        # encoder; the legacy Gemini embedder still satisfies the same method
+        # in migration tests. NO more reaching into ``embedder._client``.
         qvec = embedder.embed_audio_bytes(audio_bytes, mime_type)
         assert qvec.shape == (EMBEDDING_DIM,), (
             f"grounding: embed returned {qvec.shape}, expected ({EMBEDDING_DIM},)"
@@ -165,7 +162,7 @@ class Grounding:
 
     def __init__(
         self,
-        embedder: LibraryEmbedder,
+        embedder: AudioBytesEmbedder,
         store: LibraryStore,
     ) -> None:
         self._embedder = embedder
@@ -254,8 +251,8 @@ class Grounding:
 
 __all__ = [
     "CITATION_THRESHOLD",
-    "UNCERTAIN_THRESHOLD",
     "TRACK_AWARE_EVENTS",
+    "UNCERTAIN_THRESHOLD",
     "Citation",
     "Grounding",
     "identify_playing",

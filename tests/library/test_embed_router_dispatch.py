@@ -1,12 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Plan 41-01 / Task 2 — library/embed.py routes via ModelRouter.
+"""Plan 41-01 / Task 2 — legacy library/embed.py routes via ModelRouter.
 
 The CRITICAL test here is :func:`test_library_embed_cache_key_unchanged`:
-the SHA256 cache-key invariant for LibraryEmbedder must stay byte-identical
-across the migration. If the resolved ``GEMINI_EMBEDDING_MODEL`` ever drifts
-from ``"gemini-embedding-2"``, every existing user's
-``~/.cache/vibemix/embeddings.db`` would silently invalidate. Plan 41-05
-owns the version bump if a GA model-ID rename surfaces.
+the SHA256 cache-key invariant for the old Gemini embedder must stay
+byte-identical for migration/cache audits. Product library embeddings use local
+CLAP ONNX via ``embed_factory`` and do not select this path.
 """
 
 from __future__ import annotations
@@ -21,7 +19,7 @@ from vibemix.llm.model_router import resolve
 
 
 def test_library_embed_model_matches_router() -> None:
-    """GEMINI_EMBEDDING_MODEL is router-derived (embedding path)."""
+    """Legacy GEMINI_EMBEDDING_MODEL is router-derived (embedding path)."""
     assert GEMINI_EMBEDDING_MODEL == resolve("embedding")[0]
 
 
@@ -36,8 +34,7 @@ def test_library_embed_cache_key_unchanged() -> None:
     LibraryEmbedder keys its on-disk cache by
     ``SHA256(file_bytes || model_id || strategy_version)``. The migration
     from inline literal → router-derived constant MUST NOT shift this hash,
-    or every cached embedding silently invalidates and the user re-pays
-    €27/month worth of API calls.
+    or old cached embeddings silently invalidate during a migration audit.
 
     The golden hash below was computed on the pre-migration tree
     (model_id == "gemini-embedding-2", strategy_version == "v1-3excerpt-mean").

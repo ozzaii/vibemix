@@ -21,7 +21,7 @@ from dataclasses import asdict, dataclass
 import numpy as np
 
 from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
-from vibemix.library.embed import LibraryEmbedder
+from vibemix.library.embed_types import TrackEmbedder
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.library.store import LibraryStore
 
@@ -43,7 +43,7 @@ class SimilarResult:
 
 
 def similar_to(
-    embedder: LibraryEmbedder,
+    embedder: TrackEmbedder,
     store: LibraryStore,
     library: RekordboxLibrary,
     seed_track_id: str,

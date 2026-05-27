@@ -1,18 +1,20 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Phase 28 Plan 08 — Gemini Embedding 2 cost projection + runtime telemetry.
+"""Embedding cost projection + runtime telemetry.
 
-The Pitfall P56 hard gate: ``test_monthly_projection_under_50_eur`` asserts
-the projected monthly cost stays ≤ €50 at 1000 DAU. Failure blocks merge.
+The production library embedding path is local CLAP ONNX, so normal
+search/curate/indexing spend is zero API cost. This module is retained for
+legacy Gemini-embedding projections, fallback what-if checks, and the shared
+session token/cost meter used by live Gemini surfaces.
 
 Two surfaces:
-    1. ``project_monthly_cost(dau)`` — design-time calculation. CLI exposed
-       via ``vibemix library budget``.
-    2. ``BudgetTelemetry`` (singleton) — runtime counters. Embedder + search
-       + grounding paths increment as they spend. Warning logged at 90% of
-       ceiling. The Plan 09 ``LibraryConfidence.cost_warning`` boolean
+    1. ``project_monthly_cost(dau)`` — legacy design-time calculation. CLI
+       exposed via ``vibemix library budget``.
+    2. ``BudgetTelemetry`` (singleton) — runtime counters for legacy embedding
+       tests and current live Gemini token/cost meters. Warning logged at 90%
+       of ceiling. The Plan 09 ``LibraryConfidence.cost_warning`` boolean
        surfaces the warning to the renderer.
 
-Pricing constants (Assumption A9 — Google pricing as of 2026-Q2):
+Legacy Gemini pricing constants (Assumption A9 — Google pricing as of 2026-Q2):
     text:  $0.20 per 1M tokens
     audio: $6.50 per 1M tokens
 """
@@ -22,7 +24,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +98,7 @@ def project_monthly_cost(
     indexing_amort_months: int = DEFAULT_INDEXING_AMORT_MONTHS,
     session_retrieval_per_session: int = DEFAULT_SESSION_RETRIEVAL_PER_SESSION,
 ) -> CostProjection:
-    """Project monthly Gemini Embedding spend for ``dau`` daily-active users."""
+    """Project legacy monthly Gemini Embedding spend for ``dau`` users."""
     # 1. One-time library indexing — amortised over N months.
     # Indexing uses the 3-excerpt path → 3 audio embeds per track. The
     # one-time cost per user is amortised over indexing_amort_months;
@@ -423,15 +425,15 @@ def get_telemetry() -> BudgetTelemetry:
 
 __all__ = [
     "BUDGET_CEILING_EUR",
-    "BudgetTelemetry",
     "COST_PER_AUDIO_EMBED_USD",
     "COST_PER_TEXT_QUERY_USD",
-    "CostProjection",
     "DEFAULT_GROUNDING_EVENTS_PER_SESSION",
     "PRICING",
     "ROUTE_PRICING",
-    "SessionMeter",
     "USD_TO_EUR",
+    "BudgetTelemetry",
+    "CostProjection",
+    "SessionMeter",
     "get_session_meter",
     "get_telemetry",
     "project_monthly_cost",

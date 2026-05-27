@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Telegram bridge — the Viber agent's mobile surface.
+"""Telegram bridge — optional mobile transport for Viber curation.
 
 Lets the user curate a playlist from their phone: send a theme ("90 min warm-up,
-hypnotic, 122-126") to the bot, get back the grounded playlist. It runs the SAME
-curation agent (Gemini or Codex) the CLI uses — Telegram is just a transport.
+hypnotic, 122-126") to the bot, get back the grounded playlist. It calls the
+same normalized curation function as the CLI, so Telegram stays only a
+transport.
 
 v1 auth = a **chat_id allow-list** (``VIBEMIX_TELEGRAM_ALLOWED_CHATS``): only
 those chats are answered, everything else gets a flat "not authorized" and is
@@ -36,7 +37,8 @@ import asyncio
 import logging
 import os
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +46,8 @@ logger = logging.getLogger(__name__)
 # belt-and-braces so one request can never park the poll loop).
 CURATE_TIMEOUT_S = 90.0
 
-# A curate_fn returns this normalized shape (the CLI adapts ViberAgent /
-# CodexCurateResult to it), so format_reply stays backend-agnostic:
+# A curate_fn returns this normalized shape (the CLI adapts current Codex and
+# historical harness results to it), so format_reply stays backend-agnostic:
 #   {"ok": bool, "name": str | None, "titles": list[str], "error": str | None}
 CurateFn = Callable[[str], dict[str, Any]]
 
@@ -55,6 +57,16 @@ _ENV_ALLOWED = "VIBEMIX_TELEGRAM_ALLOWED_CHATS"
 # Matches POSIX home/abs paths and Windows paths so we never leak local FS layout
 # into a chat message.
 _PATH_RE = re.compile(r"(/[\w.\-]+){2,}|[A-Za-z]:\\[^\s]+|~/[\w./\-]+")
+
+_TELEGRAM_EXTRA_HINT = (
+    "Telegram mobile surface requires the optional `python-telegram-bot` "
+    "dependency. Run `uv run --extra telegram python -m vibemix library "
+    "telegram`, or install the `vibemix[telegram]` extra."
+)
+
+
+class TelegramDependencyError(RuntimeError):
+    """Raised when the optional Telegram transport dependency is absent."""
 
 
 # --------------------------------------------------------------------------- #
@@ -158,10 +170,10 @@ class TelegramBridge:
                 loop.run_in_executor(None, self._curate_fn, text),
                 timeout=self._timeout_s,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await msg.reply_text("⚠️ that took too long — try a narrower theme.")
             return
-        except Exception as e:  # noqa: BLE001 — never wedge the loop
+        except Exception as e:
             logger.warning("[telegram] curate failed: %s", e)
             await msg.reply_text("⚠️ something went wrong building that set.")
             return
@@ -169,11 +181,7 @@ class TelegramBridge:
 
     def run(self) -> None:
         """Start the long-poll loop (blocking). Lazily imports telegram."""
-        from telegram.ext import (  # lazy — only when actually running
-            ApplicationBuilder,
-            MessageHandler,
-            filters,
-        )
+        ApplicationBuilder, MessageHandler, filters = _load_telegram_ext()
 
         app = ApplicationBuilder().token(self._token).build()
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle))
@@ -181,6 +189,28 @@ class TelegramBridge:
             "[telegram] long-poll started (allow-list: %d chats)", len(self._allowed)
         )
         app.run_polling(drop_pending_updates=True)
+
+
+def _load_telegram_ext() -> tuple[Any, Any, Any]:
+    try:
+        from telegram.ext import (  # lazy — only when actually running
+            ApplicationBuilder,
+            MessageHandler,
+            filters,
+        )
+    except ModuleNotFoundError as e:
+        if e.name == "telegram":
+            raise TelegramDependencyError(_TELEGRAM_EXTRA_HINT) from e
+        raise
+    return ApplicationBuilder, MessageHandler, filters
+
+
+def telegram_dependency_error() -> str | None:
+    try:
+        _load_telegram_ext()
+    except TelegramDependencyError as e:
+        return str(e)
+    return None
 
 
 def build_bridge_from_env(curate_fn: CurateFn) -> tuple[TelegramBridge | None, str | None]:
@@ -205,9 +235,11 @@ def build_bridge_from_env(curate_fn: CurateFn) -> tuple[TelegramBridge | None, s
 __all__ = [
     "CURATE_TIMEOUT_S",
     "TelegramBridge",
+    "TelegramDependencyError",
     "build_bridge_from_env",
     "format_reply",
     "is_authorized",
     "parse_allowed_chats",
     "strip_leaks",
+    "telegram_dependency_error",
 ]

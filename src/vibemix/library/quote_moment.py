@@ -38,8 +38,9 @@ wedging the agent's loop.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from vibemix.library.cue_types import CueAnchor
@@ -161,7 +162,7 @@ def resolve_quote(
     # Gate #2: the track must exist in the live library.
     try:
         entry = library.lookup_by_id(track_id)
-    except Exception as e:  # noqa: BLE001 — resolver must not raise
+    except Exception as e:
         return {
             "available": False,
             "error": f"library lookup failed: {type(e).__name__}",
@@ -233,7 +234,7 @@ def resolve_quote(
         if filepath:
             try:
                 clip_path = clip_writer(str(filepath), start_s, end_s)
-            except Exception as e:  # noqa: BLE001 — writer failure is non-fatal
+            except Exception as e:
                 out["clip_error"] = f"clip_writer failed: {type(e).__name__}"
             else:
                 if clip_path:

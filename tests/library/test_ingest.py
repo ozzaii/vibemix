@@ -10,7 +10,8 @@ Honest-green posture (the hard CLAUDE.md gate):
     * ``FakeClapEmbedder.embed_audio_file`` returns a deterministic (512,)
       float32 L2-normalized vector seeded off the path — never torch.
     * The store is an in-memory ``_DimAgnosticStore`` (no sqlite file, accepts
-      CLAP's 512-dim vectors without flipping the global EMBEDDING_DIM=1536).
+      CLAP's 512-dim vectors without depending on the active global
+      ``EMBEDDING_DIM``).
     * ``RekordboxLibrary.CACHE_PATH`` is monkeypatched so the real library.pkl
       is never written.
 """
@@ -78,11 +79,11 @@ class FakeClapEmbedder:
 class _DimAgnosticStore:
     """In-memory store that accepts any vector dim (no sqlite file).
 
-    The real NumpyStore hard-asserts EMBEDDING_DIM=1536; CLAP returns 512.
-    Per the plan's dim posture we do NOT flip the global dim — so the test
-    store is dim-agnostic, exercising the ingest loop with the real CLAP
-    shape. Exposes vector_dim()/row_count()/recreate_table() so the ingest
-    dim-reconciliation branch can introspect it.
+    Real stores hard-assert the active ``EMBEDDING_DIM``. This fake stays
+    dim-agnostic so ingest tests exercise CLAP-shaped vectors without coupling
+    the fixture to the current global dimension. Exposes
+    vector_dim()/row_count()/recreate_table() so the ingest dim-reconciliation
+    branch can introspect it.
     """
 
     def __init__(self) -> None:
@@ -136,14 +137,14 @@ def _stub_detect_cues(monkeypatch):
     """Default: the auto-cue engine finds no structure (honest-green, no ffmpeg).
 
     The Plan-01 e2e/resumability/failure tracks carry no DJ cues, so
-    ``anchors_for_track`` would otherwise shell ``detect_cues`` → real ffmpeg on
-    fake bytes. Stubbing it to ``[]`` keeps the suite offline + ffmpeg-free and
-    drives the whole-track fallback path the Plan-01 tests assert. Tests that
-    need a specific auto result override this with their own monkeypatch.
+    ``anchors_for_track`` would otherwise run ``detect_cues_auto`` on fake bytes.
+    Stubbing it to ``[]`` keeps the suite offline + ffmpeg-free and drives the
+    whole-track fallback path the Plan-01 tests assert. Tests that need a
+    specific auto result override this with their own monkeypatch.
     """
-    import vibemix.library.cue_detect as cue_detect
+    import vibemix.library.cue_engine as cue_engine
 
-    monkeypatch.setattr(cue_detect, "detect_cues", lambda *a, **k: [])
+    monkeypatch.setattr(cue_engine, "detect_cues_auto", lambda *a, **k: [])
 
 
 def _make_collection_xml(tmp_path: Path, n: int = 5) -> Path:
@@ -169,9 +170,7 @@ def _make_collection_xml(tmp_path: Path, n: int = 5) -> Path:
         "<?xml version='1.0' encoding='utf-8'?>\n"
         '<DJ_PLAYLISTS Version="1.0.0">\n'
         '  <PRODUCT Name="vibemix" Version="1.0.0" Company="vibemix-test" />\n'
-        f'  <COLLECTION Entries="{n}">\n'
-        + "\n".join(tracks_xml)
-        + "\n  </COLLECTION>\n"
+        f'  <COLLECTION Entries="{n}">\n' + "\n".join(tracks_xml) + "\n  </COLLECTION>\n"
         '  <PLAYLISTS>\n    <NODE Name="ROOT" Type="0" Count="0" />\n  </PLAYLISTS>\n'
         "</DJ_PLAYLISTS>\n"
     )
@@ -315,6 +314,41 @@ def _dj_cue(start_s, number, *, type="cue"):
     return CuePoint(name="", type=type, start_s=start_s, end_s=None, number=number)
 
 
+def _anlz_index_for_track(track, *, ppth_path: str | None = None):
+    from vibemix.library.anlz_ingest import (
+        AnlzBeatGrid,
+        AnlzIndex,
+        AnlzTrackMeta,
+        phrases_from_pssi_entries,
+    )
+
+    bpm = 120.0
+    grid = AnlzBeatGrid(
+        times_s=tuple(i * 60.0 / bpm for i in range(160)),
+        bpms=tuple(bpm for _ in range(160)),
+        beat_in_bar=tuple((i % 4) + 1 for i in range(160)),
+    )
+    phrases = phrases_from_pssi_entries(
+        mood=1,
+        end_beat=129,
+        entries=[
+            {"beat": 1, "kind": 1},
+            {"beat": 65, "kind": 5},
+        ],
+        beatgrid=grid,
+    )
+    path = ppth_path or str(track.filepath)
+    meta = AnlzTrackMeta(
+        ext_path=Path("/fixture/ANLZ0000.EXT"),
+        dat_path=Path("/fixture/ANLZ0000.DAT"),
+        ppth_path=path,
+        basename_key=Path(path).name.lower(),
+        beatgrid=grid,
+        phrases=phrases,
+    )
+    return AnlzIndex(by_basename={meta.basename_key: (meta,)})
+
+
 def test_dj_cued_track_uses_window_path_and_mean_pools(isolated_cache, tmp_path, monkeypatch):
     """A track WITH dj cues embeds via embed_audio_bytes (window path), NOT whole-track."""
     from vibemix.library import ingest as ingest_mod
@@ -361,13 +395,12 @@ def test_dj_cued_track_uses_window_path_and_mean_pools(isolated_cache, tmp_path,
 
 
 def test_no_structure_track_falls_back_to_whole_track(isolated_cache, tmp_path, monkeypatch):
-    """A track with no cues + empty detect_cues uses embed_audio_file (whole-track)."""
-    from vibemix.library import ingest as ingest_mod
+    """A track with no cues + empty detect_cues_auto uses embed_audio_file."""
+    import vibemix.library.cue_engine as cue_engine
     from vibemix.library.ingest import ingest_source
-    import vibemix.library.cue_detect as cue_detect
 
     # No structure anywhere.
-    monkeypatch.setattr(cue_detect, "detect_cues", lambda *a, **k: [])
+    monkeypatch.setattr(cue_engine, "detect_cues_auto", lambda *a, **k: [])
 
     f = tmp_path / "plain.mp3"
     f.write_bytes(b"PLAIN-AUDIO" * 8)
@@ -439,9 +472,7 @@ def test_all_windows_failed_falls_back_to_whole_track(isolated_cache, tmp_path, 
         duration_s=300.0,
     )
 
-    monkeypatch.setattr(
-        ingest_mod, "_default_slicer", lambda *a, **k: b"POISON-WINDOW"
-    )
+    monkeypatch.setattr(ingest_mod, "_default_slicer", lambda *a, **k: b"POISON-WINDOW")
 
     embedder = FakeClapEmbedder(bytes_raise_on=b"POISON")
     store = _DimAgnosticStore()
@@ -460,6 +491,103 @@ def test_all_windows_failed_falls_back_to_whole_track(isolated_cache, tmp_path, 
     assert abs(float(np.linalg.norm(stored)) - 1.0) < 1e-4
 
 
+def test_anlz_index_drives_windows_and_has_separate_cache(isolated_cache, tmp_path, monkeypatch):
+    """A later ANLZ match must not reuse an earlier no-structure whole-track vector."""
+    from vibemix.library import ingest as ingest_mod
+    from vibemix.library.ingest import ingest_source
+
+    f = tmp_path / "anlz.mp3"
+    f.write_bytes(b"ANLZ-AUDIO" * 8)
+    track = _track_entry("50", str(f.resolve()), cues=(), duration_s=180.0)
+    cache = _open_cache(tmp_path)
+
+    no_anlz_embedder = FakeClapEmbedder()
+    no_anlz = ingest_source(
+        _SyntheticSource([track]),
+        embedder=no_anlz_embedder,
+        store=_DimAgnosticStore(),
+        cache=cache,
+    )
+    assert no_anlz.embedded == 1
+    assert no_anlz.skipped_cached == 0
+    assert no_anlz_embedder.calls == [str(f.resolve())]
+    assert no_anlz_embedder.byte_calls == []
+
+    sliced: list[tuple[float, float]] = []
+
+    def _fake_slicer(path, start_s, length_s):
+        sliced.append((start_s, length_s))
+        return f"ANLZ-WIN-{start_s:.0f}-{length_s:.0f}".encode()
+
+    monkeypatch.setattr(ingest_mod, "_default_slicer", _fake_slicer)
+
+    anlz_index = _anlz_index_for_track(track)
+    anlz_embedder = FakeClapEmbedder()
+    with_anlz = ingest_source(
+        _SyntheticSource([track]),
+        embedder=anlz_embedder,
+        store=_DimAgnosticStore(),
+        cache=cache,
+        anlz_index=anlz_index,
+    )
+
+    assert with_anlz.embedded == 1
+    assert with_anlz.skipped_cached == 0
+    assert anlz_embedder.calls == []
+    assert len(anlz_embedder.byte_calls) == 2
+    assert sliced == [(0.0, 32.0), (32.0, 32.0)]
+
+    resumed_embedder = FakeClapEmbedder()
+    resumed = ingest_source(
+        _SyntheticSource([track]),
+        embedder=resumed_embedder,
+        store=_DimAgnosticStore(),
+        cache=cache,
+        anlz_index=anlz_index,
+    )
+    assert resumed.skipped_cached == 1
+    assert resumed.embedded == 0
+    assert resumed_embedder.calls == []
+    assert resumed_embedder.byte_calls == []
+
+
+def test_ingest_keeps_dj_cues_ahead_of_anlz(isolated_cache, tmp_path, monkeypatch):
+    """Even with an ANLZ index, human DJ cues remain the highest-trust source."""
+    from vibemix.library import ingest as ingest_mod
+    from vibemix.library.ingest import ingest_source
+
+    f = tmp_path / "dj-wins.mp3"
+    f.write_bytes(b"DJ-WINS" * 8)
+    track = _track_entry(
+        "60",
+        str(f.resolve()),
+        cues=(_dj_cue(10.0, 0),),
+        duration_s=180.0,
+    )
+
+    sliced: list[tuple[float, float]] = []
+
+    def _fake_slicer(path, start_s, length_s):
+        sliced.append((start_s, length_s))
+        return f"DJ-WIN-{start_s:.0f}-{length_s:.0f}".encode()
+
+    monkeypatch.setattr(ingest_mod, "_default_slicer", _fake_slicer)
+
+    embedder = FakeClapEmbedder()
+    report = ingest_source(
+        _SyntheticSource([track]),
+        embedder=embedder,
+        store=_DimAgnosticStore(),
+        cache=_open_cache(tmp_path),
+        anlz_index=_anlz_index_for_track(track),
+    )
+
+    assert report.embedded == 1
+    assert embedder.calls == []
+    assert len(embedder.byte_calls) == 1
+    assert sliced == [(10.0, 80.0)]
+
+
 def test_cue_strategy_version_namespaces_cache(isolated_cache, tmp_path):
     """The cue-anchored cache key must not collide with the whole-track key."""
     from vibemix.library.ingest import (
@@ -469,3 +597,4 @@ def test_cue_strategy_version_namespaces_cache(isolated_cache, tmp_path):
 
     assert INGEST_CUE_STRATEGY_VERSION != INGEST_STRATEGY_VERSION
     assert "cueanchored" in INGEST_CUE_STRATEGY_VERSION
+    assert "anlz" in INGEST_CUE_STRATEGY_VERSION

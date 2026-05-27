@@ -28,63 +28,24 @@ Determinism rules locked here:
 
 from __future__ import annotations
 
-import os
-
 import numpy as np
 
-# Locked at 1536 per quick-260525-gz2 (real-folder embed bring-up).
-# Gemini Embedding 2 supports MRL truncation to 768/1536/3072; we ship 1536.
-# IMPORTANT: sub-3072 MRL prefixes are NOT auto-L2-normalized by Google, so
-# every embed MUST be passed through l2_normalize before store/search (the
-# embed.py + grounding.py paths already do). Bumping this constant requires a
-# cache invalidation (EXCERPT_STRATEGY_VERSION) only if cached vectors change
-# dim — the on-disk vec0/numpy index recreates at the new dim automatically,
-# and a stale-dim index is caught fail-loud by folder_ingest's dim guard.
-#
-# Plan 41-05 rollback note (LAT-06):
-#     If production telemetry surfaces top-K parity drift between the
-#     truncated dim and full-precision 3072 — e.g. citation quality
-#     regresses or "what's playing" grounding hallucinates more than the
-#     baseline — the documented rollback path is:
-#         1. Bump EMBEDDING_DIM 1536 → 3072 (the full native dim).
-#         2. Bump embed.EXCERPT_STRATEGY_VERSION (so cache invalidates).
-#         3. Re-run tests/library/test_embeddings_parity.py with the
-#            new dim — recall threshold of >=9/10 positions identical
-#            for >=8/10 queries must still pass.
-#         4. Run scripts/library/migrate_embeddings_2.py --re-embed-all
-#            against affected user libraries (or rely on lazy first-launch
-#            re-embed once the version bump ships).
-#     Storage impact: 3072 = +100% per row vs 1536.
-#
-# Phase 90 (CLAP swap): the embedding backend is selected by the
-# ``VIBEMIX_EMBED_BACKEND`` env var (gemini | clap) — the SINGLE seam that flips
-# both the embedder class (embed.build_embedder) AND this dim. Gemini Embedding 2
-# = 1536; the local CLAP (Xenova ONNX) path = 512. Default stays ``gemini`` so
-# the cold path + the whole existing test suite are byte-identical. A backend
-# change diverges every content-hash cache key (model tag differs) + recreates
-# the vec0/numpy index at the new dim; the _cache_get wrong-dim guard turns any
-# stale-dim row into a clean miss → lazy re-embed.
-EMBED_BACKEND = os.environ.get("VIBEMIX_EMBED_BACKEND", "gemini").strip().lower()
-EMBEDDING_DIM = 512 if EMBED_BACKEND == "clap" else 1536
+# Product embedding path: local CLAP ONNX, 512-dim. The old Gemini Embedding
+# path remains as legacy code for migration/tests, but the public factory no
+# longer selects it and this math seam no longer follows VIBEMIX_EMBED_BACKEND.
+EMBED_BACKEND = "clap"
+EMBEDDING_DIM = 512
 
 
 def store_suffix() -> str:
     """On-disk store-file suffix that namespaces the persisted vectors by
-    embedding backend — so flipping ``VIBEMIX_EMBED_BACKEND`` never clobbers
-    another backend's store.
+    embedding backend.
 
-    This matters because the vec0 table is dim-typed and the store's
-    dim-mismatch handler DROPs + recreates the table: switching to clap (512)
-    against an existing 1536-dim gemini ``library.db`` would otherwise WIPE the
-    gemini library. With a suffix the clap store lives in its own file
-    (``library-clap.db`` / ``library-clap_vectors.npy`` / …) and the gemini
-    store is left intact, so switching back finds it unchanged.
-
-    Returns ``""`` for gemini (the historical bare filenames — fully backward
-    compatible: the existing suite + on-disk libraries are untouched) and
-    ``"-<backend>"`` otherwise (e.g. ``"-clap"``).
+    CLAP always uses suffixed files (``library-clap.db`` /
+    ``library-clap_vectors.npy`` / ...). That avoids dropping a historical
+    1536-dim Gemini ``library.db`` while the user re-embeds locally at 512 dims.
     """
-    return "" if EMBED_BACKEND == "gemini" else f"-{EMBED_BACKEND}"
+    return f"-{EMBED_BACKEND}"
 
 
 def l2_normalize(vec: np.ndarray) -> np.ndarray:

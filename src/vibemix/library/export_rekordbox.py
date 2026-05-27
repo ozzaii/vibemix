@@ -200,7 +200,7 @@ def _add_track(xml: Any, item: Mapping[str, Any], filepath: Any) -> Any:
     duration_s = item.get("duration_s")
     if duration_s is not None:
         try:
-            kwargs["TotalTime"] = int(round(float(duration_s)))
+            kwargs["TotalTime"] = round(float(duration_s))
         except (TypeError, ValueError):
             pass
 

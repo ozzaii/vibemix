@@ -17,7 +17,7 @@ from vibemix.library.store import LibraryStore, open_store
 
 def _sqlite_vec_available() -> bool:
     try:
-        import sqlite_vec  # noqa: F401
+        import sqlite_vec
 
         db = sqlite3.connect(":memory:")
         db.enable_load_extension(True)
@@ -52,6 +52,7 @@ def test_numpy_round_trip(tmp_path: Path) -> None:
         vectors_path=tmp_path / "v.npy", ids_path=tmp_path / "i.json"
     )
     ids, loaded = s2.load_all()
+    assert s2.row_count() == 100
     assert ids == [f"t{i:04d}" for i in range(100)]
     assert loaded.shape == (100, EMBEDDING_DIM)
     assert loaded.dtype == np.float32

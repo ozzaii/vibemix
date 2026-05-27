@@ -11,20 +11,21 @@ including the no-hang timeout + error degrade.
 from __future__ import annotations
 
 import asyncio
+import tomllib
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-import pytest
-
 from vibemix.library.telegram_bridge import (
     TelegramBridge,
+    TelegramDependencyError,
     build_bridge_from_env,
     format_reply,
     is_authorized,
     parse_allowed_chats,
     strip_leaks,
+    telegram_dependency_error,
 )
-
 
 # -- pure logic ------------------------------------------------------------- #
 
@@ -89,6 +90,25 @@ def test_build_bridge_ok(monkeypatch):
     monkeypatch.setenv("VIBEMIX_TELEGRAM_ALLOWED_CHATS", "7,8")
     bridge, err = build_bridge_from_env(lambda t: {"ok": True})
     assert err is None and bridge is not None
+
+
+def test_telegram_transport_dependency_is_optional() -> None:
+    data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    deps = data["project"]["dependencies"]
+    extras = data["project"]["optional-dependencies"]
+
+    assert not any("python-telegram-bot" in dep for dep in deps)
+    assert extras["telegram"] == ["python-telegram-bot>=21"]
+
+
+def test_telegram_dependency_error_is_actionable(monkeypatch):
+    import vibemix.library.telegram_bridge as bridge_mod
+
+    def missing():
+        raise TelegramDependencyError("install the telegram extra")
+
+    monkeypatch.setattr(bridge_mod, "_load_telegram_ext", missing)
+    assert telegram_dependency_error() == "install the telegram extra"
 
 
 # -- handler routing (mock update; no telegram needed) ---------------------- #

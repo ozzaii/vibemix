@@ -3,34 +3,36 @@
 
 One vertical: ``detect → iter_tracks → CLAP embed → store``, resumable + honest.
 A :class:`~vibemix.library.sources.base.LibrarySource` yields parsed tracks; each
-track's local audio file is embedded ON-DEVICE via the staged ``ClapEngine``
-(512-dim, keyless — no genai client, no API cost), and the vector is persisted
-to the active :class:`LibraryStore`. After the run a ``library.pkl`` is written
-so ``library search`` / ``similar`` resolve ingested titles.
+track's local audio file is embedded ON-DEVICE via the product ``ClapEmbedder`` /
+``ClapEngine(backend="onnx")`` seam (512-dim, keyless — no genai client, no API
+cost), and the vector is persisted to the active :class:`LibraryStore`. After
+the run a ``library.pkl`` is written so ``library search`` / ``similar`` resolve
+ingested titles.
 
 Posture (mirrors :mod:`vibemix.library.folder_ingest`, the proven loop shape):
 
     * CUE-ANCHORED (Plan 03) — instead of embedding the whole file, each track
-      is embedded over its cue-anchored ≤80s mixable windows (DJ cues first, the
-      offline ``detect_cues`` auto engine as fallback), mean-pooled to one
-      vector. A track with no structure at all degrades to a whole-track embed —
-      never anchor-less, never a faked vector.
+      is embedded over its cue-anchored ≤80s mixable windows (DJ cues first,
+      caller-injected Rekordbox ANLZ structure second, the offline
+      ``detect_cues_auto`` engine as fallback), mean-pooled to one vector. A
+      track with no structure at all degrades to a whole-track embed — never
+      anchor-less, never a faked vector.
     * RESUMABLE — a content-hash cache hit re-stores the cached vector cheaply
       (counted ``skipped_cached``); a re-run does ~0 embeds. The cache key is
       ``sha256(file-bytes) || clap-backend-tag || INGEST_CUE_STRATEGY_VERSION``
       in a DISTINCT ``~/.cache/vibemix/clap_embeddings.db`` (namespaced away from
-      embed.py's Gemini-keyed embeddings.db AND from the whole-track strategy).
+      legacy Gemini cache rows AND from the whole-track strategy).
     * HONEST partial failure — a missing/unreadable file or an embed raise is
       LOGGED + counted ``failed`` and the loop CONTINUES. A failed file NEVER
       produces a faked vector (Invariant #3 — trust the audio).
-    * DIM posture (CONTEXT-locked) — store whatever clap_engine returns (512).
-      We do NOT flip the global EMBEDDING_DIM. On an empty store pinned at a
-      different dim → ``recreate_table`` (clean wipe). On a NON-empty store at a
-      mismatched dim → fail-loud RuntimeError naming the CLAP-wiring session as
-      the owner of the dim reconciliation; we never silently mix dims.
+    * DIM posture — store whatever ClapEmbedder returns (512), matching the
+      global ``EMBEDDING_DIM``. On an empty store pinned at a different dim →
+      ``recreate_table`` (clean wipe). On a NON-empty store at a mismatched dim
+      → fail-loud RuntimeError; we never silently mix dims.
 
-CLAP's heavy deps (torch/laion_clap) stay lazy — this module imports only
-numpy + stdlib + the numpy-free source/store seams at top level.
+CLAP's ONNX deps stay lazy through ``ClapEngine``; the optional torch/laion_clap
+reference backend also remains lazy. This module imports only numpy + stdlib +
+the source/store seams at top level.
 """
 
 from __future__ import annotations
@@ -41,11 +43,13 @@ import sqlite3
 import subprocess
 import tempfile
 import urllib.parse
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Callable, Iterable, Protocol
+from typing import Protocol
 
 import numpy as np
 
+from vibemix.library.cache_paths import CLAP_EMBED_CACHE_DB_PATH
 from vibemix.library.excerpt import anchors_for_track, cut_windows
 from vibemix.library.folder_ingest import IngestReport, _write_library_cache
 from vibemix.library.rekordbox import TrackEntry
@@ -59,16 +63,13 @@ INGEST_STRATEGY_VERSION = "v1-clap-wholetrack"
 # Plan 03 — the cue-anchored strategy tag. A cue-anchored mean-pooled vector for
 # a file must NEVER collide with that file's whole-track vector in the
 # content-hash cache, so this distinct version is folded into the cache key
-# (T-89-10). "cueanchored" in the tag is asserted by the test.
-INGEST_CUE_STRATEGY_VERSION = "v1-clap-cueanchored"
+# (T-89-10). v2 is ANLZ-aware: when a caller supplies a matching ANLZ meta we
+# also fold a private-path-safe ANLZ fingerprint into that track's cache key.
+# "cueanchored" in the tag is asserted by the test.
+INGEST_CUE_STRATEGY_VERSION = "v2-clap-cueanchored-anlz"
 
 # ffmpeg window-slice budget (mirrors embed.py's FFMPEG_TIMEOUT_SECONDS posture).
 _FFMPEG_TIMEOUT_SECONDS = 60.0
-
-# The CLAP content-hash cache. DISTINCT from embed.py's Gemini-keyed
-# ~/.cache/vibemix/embeddings.db — a CLAP 512-d vector must never collide with a
-# Gemini 1536-d row keyed by the same file.
-CLAP_EMBED_CACHE_DB_PATH = Path.home() / ".cache" / "vibemix" / "clap_embeddings.db"
 
 # Read the file in chunks so a multi-hundred-MB lossless file never loads whole.
 _HASH_CHUNK_BYTES = 64 * 1024
@@ -173,7 +174,12 @@ def _init_clap_cache_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def _content_hash_key(path: Path, backend_tag: str) -> str:
+def _content_hash_key(
+    path: Path,
+    backend_tag: str,
+    *,
+    strategy_tag: str = INGEST_CUE_STRATEGY_VERSION,
+) -> str:
     """sha256(file-bytes) || backend || strategy → the cache key.
 
     Streams the file in 64KB chunks so a huge lossless file never loads whole.
@@ -187,14 +193,76 @@ def _content_hash_key(path: Path, backend_tag: str) -> str:
     h.update(b"||")
     # Cue-anchored strategy tag — namespaces the key so a cue-anchored vector
     # never collides with Plan 01's whole-track vector for the same file (T-89-10).
-    h.update(INGEST_CUE_STRATEGY_VERSION.encode("utf-8"))
+    h.update(strategy_tag.encode("utf-8"))
     return h.hexdigest()
 
 
+def _match_anlz_for_cache(track: TrackEntry, anlz_index: object | None) -> object | None:
+    """Best-effort ANLZ match used only to namespace the embed cache.
+
+    `excerpt.py` performs the authoritative cue-source priority again during
+    embedding. This preflight is deliberately light: no ANLZ index means the old
+    non-ANLZ key; a unique match means a separate ANLZ-keyed vector so a previous
+    whole-track/auto fallback can never mask newly available Rekordbox structure.
+    """
+    if anlz_index is None:
+        return None
+    try:
+        from vibemix.library.anlz_ingest import match_track_to_anlz
+
+        return match_track_to_anlz(track, anlz_index)
+    except Exception as e:
+        logger.warning(
+            "[ingest] ANLZ cache match failed for %s (%s); using non-ANLZ cache key.",
+            track.track_id,
+            e,
+        )
+        return None
+
+
+def _cue_strategy_tag_for_anlz(meta: object | None) -> str:
+    if meta is None:
+        return INGEST_CUE_STRATEGY_VERSION
+    return f"{INGEST_CUE_STRATEGY_VERSION}:meta:{_anlz_meta_fingerprint(meta)}"
+
+
+def _anlz_meta_fingerprint(meta: object) -> str:
+    """Hash ANLZ structure into the cache key without storing local paths."""
+    h = hashlib.sha256()
+    for attr in ("ext_path", "dat_path", "ppth_path", "basename_key"):
+        value = str(getattr(meta, attr, ""))
+        h.update(value.encode("utf-8", "surrogatepass"))
+        h.update(b"\0")
+        if attr.endswith("_path"):
+            h.update(_path_stat_token(value).encode("utf-8"))
+            h.update(b"\0")
+
+    for phrase in tuple(getattr(meta, "phrases", ())):
+        fields = (
+            getattr(phrase, "mood", ""),
+            getattr(phrase, "kind", ""),
+            getattr(phrase, "cue_label", ""),
+            getattr(phrase, "start_beat", ""),
+            getattr(phrase, "end_beat", ""),
+            getattr(phrase, "start_s", ""),
+            getattr(phrase, "end_s", ""),
+            getattr(phrase, "confidence", ""),
+        )
+        h.update("|".join(str(field) for field in fields).encode("utf-8"))
+        h.update(b"\0")
+    return h.hexdigest()[:16]
+
+
+def _path_stat_token(path: str) -> str:
+    try:
+        stat = Path(path).stat()
+    except OSError:
+        return ""
+    return f"{stat.st_mtime_ns}:{stat.st_size}"
+
+
 def _cache_get(conn: sqlite3.Connection, key: str) -> np.ndarray | None:
-    row = conn.execute(
-        "SELECT vector, dim FROM clap_embed_cache WHERE key = ?", (key,)
-    ).fetchone()
+    row = conn.execute("SELECT vector, dim FROM clap_embed_cache WHERE key = ?", (key,)).fetchone()
     if row is None:
         return None
     blob, dim = row
@@ -208,8 +276,7 @@ def _cache_put(conn: sqlite3.Connection, key: str, vec: np.ndarray) -> None:
     import time as _time
 
     conn.execute(
-        "INSERT OR REPLACE INTO clap_embed_cache (key, vector, dim, ts) "
-        "VALUES (?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO clap_embed_cache (key, vector, dim, ts) VALUES (?, ?, ?, ?)",
         (key, vec.astype(np.float32).tobytes(), int(vec.shape[0]), _time.time()),
     )
     conn.commit()
@@ -253,9 +320,7 @@ def _reconcile_store_dim(store: _Store, embedded_dim: int) -> None:
     raise RuntimeError(
         f"Library store holds {count} vectors at dim {stored_dim}, but CLAP "
         f"ingest produces dim {embedded_dim}. Refusing to mix dims silently. "
-        f"Reconciling the embedding dimensionality (e.g. flipping EMBEDDING_DIM "
-        f"1536 → {embedded_dim}) is the CLAP-wiring session's responsibility — "
-        f"that session must migrate or wipe the store before CLAP ingest runs."
+        f"Migrate or wipe the stale store before CLAP ingest runs."
     )
 
 
@@ -297,9 +362,7 @@ def _default_slicer(path: str, start_s: float, length_s: float) -> bytes:
             "128k",
             str(tmp_path),
         ]
-        subprocess.run(
-            cmd, check=True, timeout=_FFMPEG_TIMEOUT_SECONDS, capture_output=True
-        )
+        subprocess.run(cmd, check=True, timeout=_FFMPEG_TIMEOUT_SECONDS, capture_output=True)
         return tmp_path.read_bytes()
     finally:
         try:
@@ -313,13 +376,14 @@ def _embed_track_cue_anchored(
     local: Path,
     embedder: _Embedder,
     *,
+    anlz_index: object | None = None,
     slicer: Callable[[str, float, float], bytes] | None = None,
 ) -> np.ndarray:
     """Embed a track over its cue-anchored ≤80s windows, mean-pooled.
 
     Pipeline (mirrors :meth:`embed.LibraryEmbedder._embed_audio_cue_anchored`):
-        1. ``anchors_for_track`` — dj-first, auto fallback (``[]`` honestly when
-           no structure).
+        1. ``anchors_for_track`` — DJ-first, caller-injected ANLZ second, auto
+           fallback (``[]`` honestly when no structure).
         2. ``cut_windows`` — clamp each anchor to a 1..80s window.
         3. Per window: ``slicer`` → ``embedder.embed_audio_bytes`` (per-window
            try/except → skip; one bad window must not abort — T-89-11).
@@ -337,16 +401,15 @@ def _embed_track_cue_anchored(
     if slicer is None:
         slicer = _default_slicer
 
-    # anchors_for_track may shell out to detect_cues (the auto fallback decodes
-    # audio via ffmpeg). A detection failure must degrade to the whole-track
+    # anchors_for_track may run detect_cues_auto (CUE-DETR ONNX if installed,
+    # heuristic fallback otherwise). A detection failure must degrade to whole-track
     # embed, NOT abort the track (T-89-09: never anchor-less). Mirror embed.py's
     # _embed_audio_cue_anchored fallback posture.
     try:
-        anchors = anchors_for_track(track)
-    except Exception as e:  # noqa: BLE001 — degrade, don't abort
+        anchors = anchors_for_track(track, anlz_index=anlz_index)
+    except Exception as e:
         logger.warning(
-            "[ingest] cue anchoring failed for %s (%s); falling back to "
-            "whole-track embed.",
+            "[ingest] cue anchoring failed for %s (%s); falling back to whole-track embed.",
             local,
             e,
         )
@@ -359,10 +422,9 @@ def _embed_track_cue_anchored(
         try:
             clip = slicer(str(local), start_s, length_s)
             vec = embedder.embed_audio_bytes(clip, "audio/mpeg")
-        except Exception as e:  # noqa: BLE001 — one bad window must not abort
+        except Exception as e:
             logger.warning(
-                "[ingest] cue-window embed failed at %.1fs for %s (%s); "
-                "skipping this window.",
+                "[ingest] cue-window embed failed at %.1fs for %s (%s); skipping this window.",
                 start_s,
                 local,
                 e,
@@ -392,6 +454,7 @@ def ingest_source(
     persist_library: bool = True,
     progress: Callable[[str], None] | None = None,
     cache: sqlite3.Connection | None = None,
+    anlz_index: object | None = None,
 ) -> IngestReport:
     """Detect → iter → CLAP embed → store one source, resumably + honestly.
 
@@ -407,6 +470,9 @@ def ingest_source(
         cache: an injectable content-hash cache connection. Defaults to a NEW
             ``~/.cache/vibemix/clap_embeddings.db`` (distinct from the Gemini
             cache). Caller owns the lifecycle when they pass one in.
+        anlz_index: optional caller-built ``AnlzIndex``. When supplied, ingest
+            uses Rekordbox ANLZ phrases after DJ cues and before auto-cues, and
+            matched ANLZ metadata is folded into the per-track cache key.
 
     Returns:
         :class:`~vibemix.library.folder_ingest.IngestReport` (same shape).
@@ -442,7 +508,9 @@ def ingest_source(
 
             # Resumable: content-hash cache probe.
             try:
-                key = _content_hash_key(local, backend_tag)
+                anlz_meta = _match_anlz_for_cache(track, anlz_index)
+                strategy_tag = _cue_strategy_tag_for_anlz(anlz_meta)
+                key = _content_hash_key(local, backend_tag, strategy_tag=strategy_tag)
             except OSError as e:
                 logger.error("[ingest err] %s: cannot read file (%s)", local, e)
                 report.failed += 1
@@ -465,8 +533,13 @@ def ingest_source(
             # whole-track fallback baked into the helper. Broad-except so one bad
             # file never aborts the run.
             try:
-                vec = _embed_track_cue_anchored(track, local, embedder)
-            except Exception as e:  # noqa: BLE001 — one bad file must not abort
+                vec = _embed_track_cue_anchored(
+                    track,
+                    local,
+                    embedder,
+                    anlz_index=anlz_index,
+                )
+            except Exception as e:
                 logger.error("[ingest err] %s: %s", local, e)
                 report.failed += 1
                 report.failures.append((str(local), str(e)))
@@ -519,8 +592,8 @@ def _emit(
 
 
 __all__ = [
-    "INGEST_STRATEGY_VERSION",
-    "INGEST_CUE_STRATEGY_VERSION",
     "CLAP_EMBED_CACHE_DB_PATH",
+    "INGEST_CUE_STRATEGY_VERSION",
+    "INGEST_STRATEGY_VERSION",
     "ingest_source",
 ]

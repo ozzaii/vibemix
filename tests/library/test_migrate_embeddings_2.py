@@ -1,15 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Plan 41-05 Task 3 — Tests for scripts/library/migrate_embeddings_2.py.
+"""Tests for scripts/library/migrate_embeddings_2.py.
 
-The migration script is the power-user surface for the Embedding 2
-LAT-06 audit + re-embed flow. Default UX is lazy on first launch (Task 1
-ships the probe that handles it); this script only matters for users
-who want to verify or pre-warm explicitly.
+The script is now a legacy Gemini Embedding cache audit/cleanup helper. Current
+product library embeddings use local CLAP ONNX, so these tests keep the old
+cache tool honest without implying it is the normal re-embed path.
 
 Tests:
     - test_audit_only_no_mutation
     - test_dry_run_reports_count
-    - test_help_text_documents_lazy_default
+    - test_help_text_documents_clap_default
     - test_re_embed_all_invalidates_cache
     - test_main_runs_default_mode
     - test_estimate_reembed_cost_math
@@ -19,15 +18,12 @@ All Gemini probe calls are mocked. Cache lives in a tmp path.
 
 from __future__ import annotations
 
-import io
 import sqlite3
-import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-
 from scripts.library.migrate_embeddings_2 import (
     CacheAudit,
     CostEstimate,
@@ -37,8 +33,8 @@ from scripts.library.migrate_embeddings_2 import (
     main,
     reembed_all,
 )
-from vibemix.library._cosine import EMBEDDING_DIM
 
+from vibemix.library._cosine import EMBEDDING_DIM
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -159,7 +155,7 @@ def test_estimate_zero_tracks() -> None:
 
 
 def test_re_embed_all_invalidates_cache(tmp_cache: Path) -> None:
-    """reembed_all wipes every row so next read forces a re-embed."""
+    """reembed_all wipes every legacy Gemini cache row."""
     deleted = reembed_all(embedder=None, cache_path=tmp_cache)
 
     assert deleted == 3
@@ -207,9 +203,9 @@ def test_main_default_mode_renders_audit(
     out = capsys.readouterr().out
 
     assert rc == 0
-    assert "Embedding 2 cache audit" in out
+    assert "Legacy Gemini Embedding cache audit" in out
     assert "Entry count:     3" in out
-    assert "lazy on first launch" in out.lower()
+    assert "local CLAP ONNX/512" in out
 
 
 def test_main_dry_run_includes_cost_estimate(
@@ -226,13 +222,12 @@ def test_main_dry_run_includes_cost_estimate(
     out = capsys.readouterr().out
 
     assert rc == 0
-    assert "Re-embed-all cost estimate" in out
+    assert "Legacy re-embed cost estimate" in out
     assert "Tracks to re-embed:  3" in out
     # Cost line mentions USD + EUR.
     assert "USD" in out and "€" in out
     assert "dry-run" in out
-    # The dry-run mode MUST mention the lazy default in the audit chunk.
-    assert "lazy on first launch" not in out  # only printed in default mode
+    assert "local CLAP ONNX/512" not in out  # only printed in default mode
 
 
 def test_main_re_embed_all_invalidates(
@@ -249,7 +244,8 @@ def test_main_re_embed_all_invalidates(
     out = capsys.readouterr().out
 
     assert rc == 0
-    assert "Invalidated 3 cache rows" in out
+    assert "Invalidated 3 legacy Gemini cache rows" in out
+    assert "CLAP, not Gemini" in out
     # Confirm cache actually emptied.
     conn = sqlite3.connect(str(tmp_cache))
     try:
@@ -261,16 +257,16 @@ def test_main_re_embed_all_invalidates(
     assert count == 0
 
 
-def test_help_text_documents_lazy_default(
+def test_help_text_documents_clap_default(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """--help output mentions the lazy-on-first-launch default UX."""
+    """--help output makes the current CLAP product path explicit."""
     parser = _build_parser()
     # Capture full --help by formatting the parser directly.
     help_text = parser.format_help()
 
-    assert "lazy on first launch" in help_text.lower()
-    assert "power-user" in help_text.lower()
+    assert "local CLAP ONNX/512" in help_text
+    assert "historical" in help_text.lower()
     # Three mutually exclusive modes documented.
     assert "--audit-only" in help_text
     assert "--dry-run" in help_text
@@ -285,7 +281,7 @@ def test_help_via_main_argparse_exits_clean(
         main(argv=["--help"])
     assert excinfo.value.code == 0
     out = capsys.readouterr().out
-    assert "lazy on first launch" in out.lower()
+    assert "local CLAP ONNX/512" in out
 
 
 def test_mutually_exclusive_modes() -> None:
