@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DJ_PLAYLISTS Version="1.0.0">
+  <COLLECTION Entries="1">
+    <TRACK TrackID="fx-hard-001" Name="Fixture Hard Signal One" Artist="Fixture Lab" Location="fixture://tracks/fx-hard-001.wav">
+      <POSITION_MARK Name="A" Type="0" Start="0.000" Num="0" Red="0" Green="128" Blue="255" />
+      <POSITION_MARK Name="D" Type="0" Start="42.667" Num="3" Red="255" Green="64" Blue="64" />
+      <POSITION_MARK Name="F" Type="0" Start="74.667" Num="5" Red="255" Green="180" Blue="64" />
+    </TRACK>
+  </COLLECTION>
+</DJ_PLAYLISTS>

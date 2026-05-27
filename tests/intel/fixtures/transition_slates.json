@@ -1,0 +1,34 @@
+[
+  {
+    "candidate_ids": [
+      "tr_001",
+      "tr_005"
+    ],
+    "current_section_id": "fx-hard-001#s004",
+    "exact_timing_allowed": true,
+    "mode": "live_pill",
+    "slate_id": "slate_001",
+    "top_candidate_id": "tr_001"
+  },
+  {
+    "candidate_ids": [
+      "tr_002",
+      "tr_004"
+    ],
+    "current_section_id": "fx-tech-003#s003",
+    "exact_timing_allowed": false,
+    "mode": "prep_plan",
+    "slate_id": "slate_002",
+    "top_candidate_id": "tr_002"
+  },
+  {
+    "candidate_ids": [
+      "tr_004"
+    ],
+    "current_section_id": "fx-pop-006#s002",
+    "exact_timing_allowed": false,
+    "mode": "live_pill",
+    "slate_id": "slate_003",
+    "top_candidate_id": null
+  }
+]

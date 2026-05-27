@@ -1,0 +1,26 @@
+{
+  "dataset_card_id": "dataset_intel_synthetic_v1",
+  "files": {
+    "README.md": "sha256:a7ccae0bb2e3f360203a6bcc97ddaeeccd19a311c9d0f1e164be6fd1ea536947",
+    "agent_decisions.jsonl": "sha256:8a0fee6c98e7551889caf68139ac1b3c86f00c3e65c164b9d9ae5f5d8ec4fb44",
+    "anlz_bundles.json": "sha256:82252ed58a0077272dd74f03cc9bf9f3d0866f47a32d2fa527098116512cf9c6",
+    "claim_ledgers.json": "sha256:988cef6bd8a8e8032a3417e27a08ff25283d201b5361950b981ddc61e08e2a36",
+    "context_packets.json": "sha256:dbf034f191a8280793468d27d73e12b8bf3c92d6d45193cae0e5b3d6872bd22c",
+    "cue_baseline_after.xml": "sha256:8f252dc466456fb2972d167bc0eb03f1aa31bc80d4a4572274ab600717747d98",
+    "cue_baseline_before.xml": "sha256:14260b2af8276deec147905176e5111f7fdf1261d23f35b7e2b7f59575227ff3",
+    "dataset_card.json": "sha256:def909129b0e76d14a38f09b8afef48e420edaac229116380c779c2751085b7d",
+    "decision_traces.jsonl": "sha256:cc5ce29a5f242dc6b68bf46c662dd9c73de414c43fe64c854be7fed3c33ac082",
+    "gold_labels_redacted.jsonl": "sha256:a91ece06b79c54d332f152322599c95ad2d200e111ebf72a9e3b45f69e27c812",
+    "live_awareness_snapshots.jsonl": "sha256:b147d6d79a41055b6766c2981d22e646310d00ac989e3a528fa9bc87157cd4c2",
+    "section_vectors_512d.npy": "sha256:8b63a5c3df1a240b87085b9fa42e61c59d90cf08dac7f7e6495fd1c17fbb638e",
+    "section_vectors_8d.json": "sha256:772fc246c3698f622e06e037d6cf4dd153cfc0bb235140432da57537baff1baa",
+    "sections.json": "sha256:e654082fac861e87844aea0ef197ae6f6b9fadd8c1c24cb839418fbf18bede02",
+    "smart_cue_proposals.json": "sha256:4f67212fe0b8d711a6c7aa575e5a4b738536d842a069a5841aec03b774a4a02c",
+    "tracks.json": "sha256:f468dc73d93cca2b1b67e9b97d3ba798508d6da749e76b31e562b2451bb1e339",
+    "transition_pairs.json": "sha256:b24c637ef9f6ebd19113f308459ee36020f6a932610c94961d34acc2e64b0e41",
+    "transition_slates.json": "sha256:30fbfa809daf086336582eca16fa64259d2d12df3b2065f56bd48c24978b8052"
+  },
+  "fixture_version": "intel_fixture_v1",
+  "generated_by": "scripts/dev/generate_intel_fixtures.py",
+  "seed": "vibemix-intel-fixtures-v1"
+}

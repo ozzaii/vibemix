@@ -1,0 +1,181 @@
+[
+  {
+    "allowed_actions": [
+      "select",
+      "hold",
+      "suppress"
+    ],
+    "allowed_claims": [
+      "clm_ctx_001_000",
+      "clm_ctx_001_001"
+    ],
+    "candidate_ids": [
+      "tr_001",
+      "tr_005"
+    ],
+    "confidence_policy": {
+      "exact_timing_allowed": true,
+      "min_select_confidence": 0.7
+    },
+    "current": {
+      "blend_suppressed": false,
+      "playhead_confidence": 0.83,
+      "role": "outro",
+      "section_id": "fx-hard-001#s004",
+      "track_id": "fx-hard-001"
+    },
+    "intent": "live_next_pill",
+    "mode": "live",
+    "packet_id": "ctx_001",
+    "schema_version": "intel_context_v1"
+  },
+  {
+    "allowed_actions": [
+      "select",
+      "hold",
+      "ask"
+    ],
+    "allowed_claims": [],
+    "candidate_ids": [
+      "tr_002",
+      "tr_004"
+    ],
+    "confidence_policy": {
+      "exact_timing_allowed": false,
+      "min_select_confidence": 0.55
+    },
+    "current": {
+      "role": "outro",
+      "section_id": "fx-tech-003#s003",
+      "track_id": "fx-tech-003"
+    },
+    "intent": "transition_slate",
+    "mode": "prep",
+    "packet_id": "ctx_002",
+    "schema_version": "intel_context_v1"
+  },
+  {
+    "allowed_actions": [
+      "hold",
+      "suppress"
+    ],
+    "allowed_claims": [
+      "clm_ctx_003_000"
+    ],
+    "candidate_ids": [
+      "tr_002"
+    ],
+    "confidence_policy": {
+      "exact_timing_allowed": false,
+      "min_select_confidence": 0.7
+    },
+    "current": {
+      "blend_suppressed": false,
+      "playhead_confidence": 0.42,
+      "role": "outro",
+      "section_id": "fx-tech-003#s003",
+      "track_id": "fx-tech-003"
+    },
+    "intent": "live_next_pill",
+    "mode": "live",
+    "packet_id": "ctx_003",
+    "schema_version": "intel_context_v1"
+  },
+  {
+    "allowed_actions": [
+      "suppress"
+    ],
+    "allowed_claims": [],
+    "candidate_ids": [
+      "tr_004"
+    ],
+    "confidence_policy": {
+      "exact_timing_allowed": false,
+      "min_select_confidence": 0.7
+    },
+    "current": {
+      "blend_suppressed": true,
+      "playhead_confidence": 0.75,
+      "role": "hook",
+      "section_id": "fx-pop-006#s002",
+      "track_id": "fx-pop-006"
+    },
+    "intent": "live_next_pill",
+    "mode": "live",
+    "packet_id": "ctx_004",
+    "schema_version": "intel_context_v1"
+  },
+  {
+    "allowed_actions": [
+      "select",
+      "hold",
+      "ask"
+    ],
+    "allowed_claims": [],
+    "candidate_ids": [],
+    "confidence_policy": {
+      "exact_timing_allowed": false,
+      "min_select_confidence": 0.55
+    },
+    "cue_proposal_ids": [
+      "cueprop_fx-hard-001_v1"
+    ],
+    "current": {
+      "taste_consent": false,
+      "track_id": "fx-hard-001"
+    },
+    "intent": "smart_hot_cues",
+    "mode": "prep",
+    "packet_id": "ctx_005",
+    "schema_version": "intel_context_v1"
+  },
+  {
+    "allowed_actions": [
+      "hold",
+      "suppress"
+    ],
+    "allowed_claims": [],
+    "candidate_ids": [
+      "tr_005"
+    ],
+    "confidence_policy": {
+      "exact_timing_allowed": false,
+      "min_select_confidence": 0.55
+    },
+    "current": {
+      "role": "unknown",
+      "section_id": "fx-amb-007#s000",
+      "track_id": "fx-amb-007"
+    },
+    "intent": "transition_slate",
+    "mode": "prep",
+    "packet_id": "ctx_006",
+    "schema_version": "intel_context_v1"
+  },
+  {
+    "allowed_actions": [
+      "select",
+      "hold",
+      "ask"
+    ],
+    "allowed_claims": [
+      "clm_ctx_001_000"
+    ],
+    "candidate_ids": [
+      "tr_001"
+    ],
+    "confidence_policy": {
+      "exact_timing_allowed": false,
+      "min_select_confidence": 0.55
+    },
+    "current": {
+      "role": "outro",
+      "section_id": "fx-hard-001#s004",
+      "track_id": "fx-hard-001"
+    },
+    "intent": "explain_transition",
+    "mode": "prep",
+    "packet_id": "ctx_007",
+    "schema_version": "intel_context_v1"
+  }
+]

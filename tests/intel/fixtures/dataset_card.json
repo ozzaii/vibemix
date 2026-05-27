@@ -1,0 +1,17 @@
+{
+  "created_for": "vibemix INTEL PR-0 fixture/readiness gates",
+  "dataset_card_id": "dataset_intel_synthetic_v1",
+  "fixture_version": "intel_fixture_v1",
+  "not_recommended_uses": [
+    "claiming musical quality",
+    "calibrating taste",
+    "benchmarking CLAP quality"
+  ],
+  "privacy_class": "public_synthetic",
+  "recommended_uses": [
+    "schema tests",
+    "grounding tests",
+    "privacy redaction tests",
+    "deterministic scorer fixtures"
+  ]
+}

@@ -1,0 +1,69 @@
+[
+  {
+    "anchors": [
+      {
+        "confidence": 0.93,
+        "label": "mix-in",
+        "section_id": "fx-hard-001#s000",
+        "slot": "A",
+        "start_s": 0.0
+      },
+      {
+        "confidence": 0.8,
+        "label": "breakdown",
+        "section_id": "fx-hard-001#s002",
+        "slot": "C",
+        "start_s": 32.0
+      },
+      {
+        "confidence": 0.91,
+        "label": "drop",
+        "section_id": "fx-hard-001#s003",
+        "slot": "D",
+        "start_s": 42.667
+      },
+      {
+        "confidence": 0.89,
+        "label": "mix-out",
+        "section_id": "fx-hard-001#s004",
+        "slot": "F",
+        "start_s": 74.667
+      }
+    ],
+    "policy_version": "smart_cue_policy_v1",
+    "proposal_id": "cueprop_fx-hard-001_v1",
+    "status": "review",
+    "summary": "Fixture hardtechno cues prioritize mix-in, breakdown, drop, and mix-out.",
+    "track_id": "fx-hard-001"
+  },
+  {
+    "anchors": [
+      {
+        "confidence": 0.76,
+        "label": "mix-in",
+        "section_id": "fx-pop-006#s000",
+        "slot": "A",
+        "start_s": 0.0
+      },
+      {
+        "confidence": 0.86,
+        "label": "hook",
+        "section_id": "fx-pop-006#s002",
+        "slot": "D",
+        "start_s": 31.475
+      },
+      {
+        "confidence": 0.74,
+        "label": "mix-out",
+        "section_id": "fx-pop-006#s004",
+        "slot": "F",
+        "start_s": 70.82
+      }
+    ],
+    "policy_version": "smart_cue_policy_v1",
+    "proposal_id": "cueprop_fx-pop-006_v1",
+    "status": "review_only",
+    "summary": "Fixture pop cues include vocal/hook risk flags.",
+    "track_id": "fx-pop-006"
+  }
+]

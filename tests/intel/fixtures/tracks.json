@@ -1,0 +1,90 @@
+[
+  {
+    "analysis_source": "synthetic_anlz",
+    "artist": "Fixture Lab",
+    "bpm": 180.0,
+    "camelot": "8A",
+    "duration_s": 288.0,
+    "genre": "hardtechno",
+    "location": "fixture://tracks/fx-hard-001.wav",
+    "title": "Fixture Hard Signal One",
+    "track_id": "fx-hard-001"
+  },
+  {
+    "analysis_source": "synthetic_anlz",
+    "artist": "Fixture Lab",
+    "bpm": 180.0,
+    "camelot": "9A",
+    "duration_s": 260.0,
+    "genre": "hardtechno",
+    "location": "fixture://tracks/fx-hard-002.wav",
+    "title": "Fixture Hard Signal Two",
+    "track_id": "fx-hard-002"
+  },
+  {
+    "analysis_source": "synthetic_anlz",
+    "artist": "Fixture Lab",
+    "bpm": 136.0,
+    "camelot": "8A",
+    "duration_s": 372.0,
+    "genre": "techno",
+    "location": "fixture://tracks/fx-tech-003.wav",
+    "title": "Fixture Tool Groove",
+    "track_id": "fx-tech-003"
+  },
+  {
+    "analysis_source": "synthetic_anlz",
+    "artist": "Fixture Lab",
+    "bpm": 126.0,
+    "camelot": "8B",
+    "duration_s": 334.0,
+    "genre": "house",
+    "location": "fixture://tracks/fx-house-004.wav",
+    "title": "Fixture Warm House Window",
+    "track_id": "fx-house-004"
+  },
+  {
+    "analysis_source": "synthetic_anlz",
+    "artist": "Fixture Lab",
+    "bpm": 174.0,
+    "camelot": "4A",
+    "duration_s": 302.0,
+    "genre": "drum_and_bass",
+    "location": "fixture://tracks/fx-dnb-005.wav",
+    "title": "Fixture Double Drop Grid",
+    "track_id": "fx-dnb-005"
+  },
+  {
+    "analysis_source": "synthetic_anlz",
+    "artist": "Fixture Lab",
+    "bpm": 122.0,
+    "camelot": "5B",
+    "duration_s": 214.0,
+    "genre": "pop",
+    "location": "fixture://tracks/fx-pop-006.wav",
+    "title": "Fixture Vocal Hook Risk",
+    "track_id": "fx-pop-006"
+  },
+  {
+    "analysis_source": "synthetic_fallback",
+    "artist": "Fixture Lab",
+    "bpm": null,
+    "camelot": null,
+    "duration_s": 420.0,
+    "genre": "ambient",
+    "location": "fixture://tracks/fx-amb-007.wav",
+    "title": "Fixture Ambient Drift",
+    "track_id": "fx-amb-007"
+  },
+  {
+    "analysis_source": "synthetic_edge_case",
+    "artist": "Fixture Lab",
+    "bpm": null,
+    "camelot": null,
+    "duration_s": 64.0,
+    "genre": "unknown",
+    "location": "fixture://tracks/fx-bad-008.wav",
+    "title": "Fixture Malformed Edge",
+    "track_id": "fx-bad-008"
+  }
+]

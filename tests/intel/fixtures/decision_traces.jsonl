@@ -1,0 +1,2 @@
+{"context_run_id": "ctxrun_fixture_001", "decision_id": "dec_001", "decision_source": "deterministic", "latency_ms": 18, "packet_id": "ctx_001", "trace_id": "trace_001", "validator_result": "ok"}
+{"context_run_id": "ctxrun_fixture_004", "decision_id": "dec_002", "decision_source": "degraded", "latency_ms": 9, "packet_id": "ctx_004", "trace_id": "trace_002", "validator_result": "suppressed_blend"}

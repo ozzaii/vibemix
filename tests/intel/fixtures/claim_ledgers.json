@@ -1,0 +1,64 @@
+[
+  {
+    "claims": [
+      {
+        "allowed_phrases": [
+          "compatible entry",
+          "works as a next entry"
+        ],
+        "claim_id": "clm_ctx_001_000",
+        "claim_type": "transition_fit",
+        "confidence": 0.82,
+        "evidence_refs": [
+          "candidate:tr_001"
+        ],
+        "forbidden_phrases": [
+          "perfect",
+          "guaranteed"
+        ],
+        "subject_id": "tr_001",
+        "value": "compatible"
+      },
+      {
+        "allowed_phrases": [
+          "in 16 bars"
+        ],
+        "claim_id": "clm_ctx_001_001",
+        "claim_type": "timing",
+        "confidence": 0.81,
+        "evidence_refs": [
+          "packet:ctx_001",
+          "candidate:tr_001"
+        ],
+        "forbidden_phrases": [
+          "exactly now"
+        ],
+        "subject_id": "tr_001",
+        "value": "16 bars"
+      }
+    ],
+    "packet_id": "ctx_001"
+  },
+  {
+    "claims": [
+      {
+        "allowed_phrases": [
+          "timing is not locked"
+        ],
+        "claim_id": "clm_ctx_003_000",
+        "claim_type": "timing",
+        "confidence": 0.4,
+        "evidence_refs": [
+          "packet:ctx_003"
+        ],
+        "forbidden_phrases": [
+          "in 16 bars",
+          "exactly"
+        ],
+        "subject_id": "tr_002",
+        "value": null
+      }
+    ],
+    "packet_id": "ctx_003"
+  }
+]

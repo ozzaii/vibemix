@@ -1,0 +1,124 @@
+[
+  {
+    "candidate_id": "tr_001",
+    "confidence": 0.82,
+    "cue_slot": "A",
+    "from_section_id": "fx-hard-001#s004",
+    "reason": "outro density matches hardtechno groove entry with neighbor key",
+    "risk_flags": [],
+    "score": 0.86,
+    "scores": {
+      "bpm": 1.0,
+      "cue_operability": 0.84,
+      "energy_shape": 0.77,
+      "harmonic": 0.88,
+      "novelty": 0.42,
+      "phrase_alignment": 1.0,
+      "role": 0.94,
+      "semantic": 0.91,
+      "taste": 0.6
+    },
+    "start_in_bars": 16,
+    "to_section_id": "fx-hard-002#s000"
+  },
+  {
+    "candidate_id": "tr_002",
+    "confidence": 0.7,
+    "cue_slot": "A",
+    "from_section_id": "fx-tech-003#s003",
+    "reason": "tool outro can bridge to house intro but needs tempo handling",
+    "risk_flags": [
+      "tempo_bridge"
+    ],
+    "score": 0.7,
+    "scores": {
+      "bpm": 0.64,
+      "cue_operability": 0.8,
+      "energy_shape": 0.66,
+      "harmonic": 0.92,
+      "novelty": 0.58,
+      "phrase_alignment": 1.0,
+      "role": 0.88,
+      "semantic": 0.72,
+      "taste": 0.5
+    },
+    "start_in_bars": 32,
+    "to_section_id": "fx-house-004#s000"
+  },
+  {
+    "candidate_id": "tr_003",
+    "confidence": 0.86,
+    "cue_slot": "C",
+    "from_section_id": "fx-dnb-005#s001",
+    "reason": "build to drop exact-timing demo for dense double-drop behavior",
+    "risk_flags": [
+      "same_track_demo"
+    ],
+    "score": 0.83,
+    "scores": {
+      "bpm": 1.0,
+      "cue_operability": 0.88,
+      "energy_shape": 0.94,
+      "harmonic": 1.0,
+      "novelty": 0.25,
+      "phrase_alignment": 1.0,
+      "role": 0.9,
+      "semantic": 0.82,
+      "taste": 0.55
+    },
+    "start_in_bars": 8,
+    "to_section_id": "fx-dnb-005#s002"
+  },
+  {
+    "candidate_id": "tr_004",
+    "confidence": 0.3,
+    "cue_slot": "F",
+    "from_section_id": "fx-pop-006#s002",
+    "reason": "hook over outro is a negative fixture that should rank low",
+    "risk_flags": [
+      "vocal_clash",
+      "unsafe_role_pair",
+      "tempo_clash"
+    ],
+    "score": 0.18,
+    "scores": {
+      "bpm": 0.32,
+      "cue_operability": 0.34,
+      "energy_shape": 0.36,
+      "harmonic": 0.4,
+      "novelty": 0.7,
+      "phrase_alignment": 0.5,
+      "role": 0.2,
+      "semantic": 0.45,
+      "taste": 0.2
+    },
+    "start_in_bars": null,
+    "to_section_id": "fx-house-004#s003"
+  },
+  {
+    "candidate_id": "tr_005",
+    "confidence": 0.2,
+    "cue_slot": null,
+    "from_section_id": "fx-hard-001#s004",
+    "reason": "ambient fallback should suppress live transition claims",
+    "risk_flags": [
+      "missing_bpm",
+      "unknown_role",
+      "suppress_live"
+    ],
+    "score": 0.08,
+    "scores": {
+      "bpm": 0.0,
+      "cue_operability": 0.0,
+      "energy_shape": 0.12,
+      "harmonic": 0.0,
+      "novelty": 0.9,
+      "phrase_alignment": 0.0,
+      "role": 0.1,
+      "semantic": 0.2,
+      "taste": 0.1
+    },
+    "start_in_bars": null,
+    "to_section_id": "fx-amb-007#s000"
+  }
+]

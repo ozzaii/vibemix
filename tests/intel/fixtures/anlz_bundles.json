@@ -1,0 +1,320 @@
+[
+  {
+    "anlz_paths": {
+      "DAT": "fixture://rekordbox/fx-hard-001/ANLZ0000.DAT",
+      "EXT": "fixture://rekordbox/fx-hard-001/ANLZ0000.EXT"
+    },
+    "ppth_path": "fixture://tracks/fx-hard-001.wav",
+    "pqtz": {
+      "beat_count": 288,
+      "bpm": 180.0,
+      "downbeat_every": 4
+    },
+    "pssi": {
+      "mood": "high",
+      "phrases": [
+        {
+          "beat": 0,
+          "confidence": 0.93,
+          "role": "intro",
+          "section_id": "fx-hard-001#s000"
+        },
+        {
+          "beat": 32,
+          "confidence": 0.84,
+          "role": "groove",
+          "section_id": "fx-hard-001#s001"
+        },
+        {
+          "beat": 96,
+          "confidence": 0.8,
+          "role": "breakdown",
+          "section_id": "fx-hard-001#s002"
+        },
+        {
+          "beat": 128,
+          "confidence": 0.91,
+          "role": "drop",
+          "section_id": "fx-hard-001#s003"
+        },
+        {
+          "beat": 224,
+          "confidence": 0.89,
+          "role": "outro",
+          "section_id": "fx-hard-001#s004"
+        }
+      ]
+    },
+    "track_id": "fx-hard-001"
+  },
+  {
+    "anlz_paths": {
+      "DAT": "fixture://rekordbox/fx-hard-002/ANLZ0000.DAT",
+      "EXT": "fixture://rekordbox/fx-hard-002/ANLZ0000.EXT"
+    },
+    "ppth_path": "fixture://tracks/fx-hard-002.wav",
+    "pqtz": {
+      "beat_count": 260,
+      "bpm": 180.0,
+      "downbeat_every": 4
+    },
+    "pssi": {
+      "mood": "high",
+      "phrases": [
+        {
+          "beat": 0,
+          "confidence": 0.78,
+          "role": "groove",
+          "section_id": "fx-hard-002#s000"
+        },
+        {
+          "beat": 64,
+          "confidence": 0.9,
+          "role": "drop",
+          "section_id": "fx-hard-002#s001"
+        },
+        {
+          "beat": 176,
+          "confidence": 0.82,
+          "role": "outro",
+          "section_id": "fx-hard-002#s002"
+        }
+      ]
+    },
+    "track_id": "fx-hard-002"
+  },
+  {
+    "anlz_paths": {
+      "DAT": "fixture://rekordbox/fx-tech-003/ANLZ0000.DAT",
+      "EXT": "fixture://rekordbox/fx-tech-003/ANLZ0000.EXT"
+    },
+    "ppth_path": "fixture://tracks/fx-tech-003.wav",
+    "pqtz": {
+      "beat_count": 372,
+      "bpm": 136.0,
+      "downbeat_every": 4
+    },
+    "pssi": {
+      "mood": "high",
+      "phrases": [
+        {
+          "beat": 0,
+          "confidence": 0.88,
+          "role": "intro",
+          "section_id": "fx-tech-003#s000"
+        },
+        {
+          "beat": 64,
+          "confidence": 0.86,
+          "role": "groove",
+          "section_id": "fx-tech-003#s001"
+        },
+        {
+          "beat": 224,
+          "confidence": 0.74,
+          "role": "breakdown",
+          "section_id": "fx-tech-003#s002"
+        },
+        {
+          "beat": 256,
+          "confidence": 0.87,
+          "role": "outro",
+          "section_id": "fx-tech-003#s003"
+        }
+      ]
+    },
+    "track_id": "fx-tech-003"
+  },
+  {
+    "anlz_paths": {
+      "DAT": "fixture://rekordbox/fx-house-004/ANLZ0000.DAT",
+      "EXT": "fixture://rekordbox/fx-house-004/ANLZ0000.EXT"
+    },
+    "ppth_path": "fixture://tracks/fx-house-004.wav",
+    "pqtz": {
+      "beat_count": 334,
+      "bpm": 126.0,
+      "downbeat_every": 4
+    },
+    "pssi": {
+      "mood": "high",
+      "phrases": [
+        {
+          "beat": 0,
+          "confidence": 0.92,
+          "role": "intro",
+          "section_id": "fx-house-004#s000"
+        },
+        {
+          "beat": 64,
+          "confidence": 0.78,
+          "role": "build",
+          "section_id": "fx-house-004#s001"
+        },
+        {
+          "beat": 128,
+          "confidence": 0.83,
+          "role": "drop",
+          "section_id": "fx-house-004#s002"
+        },
+        {
+          "beat": 256,
+          "confidence": 0.85,
+          "role": "outro",
+          "section_id": "fx-house-004#s003"
+        }
+      ]
+    },
+    "track_id": "fx-house-004"
+  },
+  {
+    "anlz_paths": {
+      "DAT": "fixture://rekordbox/fx-dnb-005/ANLZ0000.DAT",
+      "EXT": "fixture://rekordbox/fx-dnb-005/ANLZ0000.EXT"
+    },
+    "ppth_path": "fixture://tracks/fx-dnb-005.wav",
+    "pqtz": {
+      "beat_count": 302,
+      "bpm": 174.0,
+      "downbeat_every": 4
+    },
+    "pssi": {
+      "mood": "high",
+      "phrases": [
+        {
+          "beat": 0,
+          "confidence": 0.82,
+          "role": "intro",
+          "section_id": "fx-dnb-005#s000"
+        },
+        {
+          "beat": 32,
+          "confidence": 0.84,
+          "role": "build",
+          "section_id": "fx-dnb-005#s001"
+        },
+        {
+          "beat": 64,
+          "confidence": 0.93,
+          "role": "drop",
+          "section_id": "fx-dnb-005#s002"
+        },
+        {
+          "beat": 160,
+          "confidence": 0.8,
+          "role": "breakdown",
+          "section_id": "fx-dnb-005#s003"
+        },
+        {
+          "beat": 192,
+          "confidence": 0.88,
+          "role": "drop",
+          "section_id": "fx-dnb-005#s004"
+        },
+        {
+          "beat": 272,
+          "confidence": 0.76,
+          "role": "outro",
+          "section_id": "fx-dnb-005#s005"
+        }
+      ]
+    },
+    "track_id": "fx-dnb-005"
+  },
+  {
+    "anlz_paths": {
+      "DAT": "fixture://rekordbox/fx-pop-006/ANLZ0000.DAT",
+      "EXT": "fixture://rekordbox/fx-pop-006/ANLZ0000.EXT"
+    },
+    "ppth_path": "fixture://tracks/fx-pop-006.wav",
+    "pqtz": {
+      "beat_count": 214,
+      "bpm": 122.0,
+      "downbeat_every": 4
+    },
+    "pssi": {
+      "mood": "mid",
+      "phrases": [
+        {
+          "beat": 0,
+          "confidence": 0.76,
+          "role": "intro",
+          "section_id": "fx-pop-006#s000"
+        },
+        {
+          "beat": 16,
+          "confidence": 0.7,
+          "role": "verse",
+          "section_id": "fx-pop-006#s001"
+        },
+        {
+          "beat": 64,
+          "confidence": 0.86,
+          "role": "hook",
+          "section_id": "fx-pop-006#s002"
+        },
+        {
+          "beat": 112,
+          "confidence": 0.65,
+          "role": "bridge",
+          "section_id": "fx-pop-006#s003"
+        },
+        {
+          "beat": 144,
+          "confidence": 0.74,
+          "role": "outro",
+          "section_id": "fx-pop-006#s004"
+        }
+      ]
+    },
+    "track_id": "fx-pop-006"
+  },
+  {
+    "anlz_paths": {
+      "DAT": "fixture://rekordbox/fx-amb-007/ANLZ0000.DAT",
+      "EXT": "fixture://rekordbox/fx-amb-007/ANLZ0000.EXT"
+    },
+    "ppth_path": "fixture://tracks/fx-amb-007.wav",
+    "pqtz": {
+      "beat_count": 0,
+      "bpm": null,
+      "downbeat_every": null
+    },
+    "pssi": {
+      "mood": "mid",
+      "phrases": [
+        {
+          "beat": null,
+          "confidence": 0.4,
+          "role": "unknown",
+          "section_id": "fx-amb-007#s000"
+        }
+      ]
+    },
+    "track_id": "fx-amb-007"
+  },
+  {
+    "anlz_paths": {
+      "DAT": "fixture://rekordbox/fx-bad-008/ANLZ0000.DAT",
+      "EXT": "fixture://rekordbox/fx-bad-008/ANLZ0000.EXT"
+    },
+    "ppth_path": "fixture://tracks/fx-bad-008.wav",
+    "pqtz": {
+      "beat_count": 0,
+      "bpm": null,
+      "downbeat_every": null
+    },
+    "pssi": {
+      "mood": "mid",
+      "phrases": [
+        {
+          "beat": null,
+          "confidence": 0.2,
+          "role": "unknown",
+          "section_id": "fx-bad-008#s000"
+        }
+      ]
+    },
+    "track_id": "fx-bad-008"
+  }
+]
