@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Learn — vibemix</title>
+    <!--
+      Phase 91 — Learn module entrypoint (RENDER-01..07).
+
+      Seventh Vite multi-page entry. Opened on demand by
+      tauri/src-tauri/src/learn_window.rs::open_learn_window (Plan 04).
+      Mirrors the structural precedent of debrief.html (Phase 29 Plan
+      29-05): font preload + tokens.css import + a single root <div>
+      mounted by the entrypoint script.
+
+      Window label "learn" lives in the top-level windows scope array
+      in tauri/src-tauri/capabilities/default.json so the spawned
+      WebviewWindow inherits the default-capabilities surface (mirrors
+      debrief/pill/library precedent — Tauri 2.x auto-allows
+      open_learn_window app-command invocation without a separate
+      permission identifier per RESEARCH §Open Questions Q3 RESOLVED).
+
+      The Learn webview opens its own ws client at 127.0.0.1:8765
+      (the existing ws_bus port — one-socket invariant #4 preserved).
+      It consumes ipc.learn.controller_detected (single-fire per
+      MIDI port-bind) + ipc.learn.midi_position (30 Hz delta-suppressed
+      controller position snapshot). The entrypoint script
+      /src/learn/learn-window.ts is wired up in Plan 05 (P91 ships
+      only the IPC contract + shell scaffolding; rendering lives in
+      a later wave).
+    -->
+    <link rel="stylesheet" href="/src/tokens.css" />
+  </head>
+  <body>
+    <div id="learn-root"></div>
+    <script type="module" src="/src/learn/learn-window.ts"></script>
+  </body>
+</html>

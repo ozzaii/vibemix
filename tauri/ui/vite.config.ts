@@ -109,6 +109,16 @@ export default defineConfig({
         // Phase 62 — floating liquid-glass pill overlay window. Opened at
         // startup by pill_window.rs when primary_surface resolves to "pill".
         pill: resolve(projectRoot, "pill.html"),
+        // Phase 91 — 7th webview entry for the Learn window. Opens via
+        // tauri/src-tauri/src/learn_window.rs::open_learn_window (Plan
+        // 04). Renders the rendered controller schematic + 30 Hz MIDI
+        // position mirror; consumes ipc.learn.controller_detected +
+        // ipc.learn.midi_position over the existing ws:8765 socket
+        // (one-socket invariant #4 preserved). Window label "learn"
+        // is appended to capabilities/default.json windows scope so the
+        // spawned WebviewWindow inherits the default-capabilities surface
+        // (mirrors debrief/pill/library precedent).
+        learn: resolve(projectRoot, "learn.html"),
       },
     },
   },
