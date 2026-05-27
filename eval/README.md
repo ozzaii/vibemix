@@ -74,12 +74,14 @@ replay-tier, or lock hashes. The release-gate test suite also feeds
 caught before a release cut. Private-label recalibration for release-grade
 INTEL thresholds is tracked in
 [`eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md`](INTEL-THRESHOLD-RECALIBRATION-LOG.md);
-the public log records only redacted split counts, aggregate metrics, hashes,
-privacy flags, and actions. `scripts/eval/intel_recalibration_note.py` renders
-that append-only entry from redacted private scorecard/gold/taste reports and
-can append it with `--append-log` only after validation passes; release
-promotion requires a passing scorecard plus a valid `intel_gate.py` artifact
-with matching threshold-lock and threshold-values provenance.
+the public log records only redacted split counts, aggregate metrics, canonical
+report hashes, threshold hashes, privacy flags, and actions.
+`scripts/eval/intel_recalibration_note.py` renders that append-only entry from
+redacted private scorecard/gold/taste/gate reports, binds it to those aggregate
+reports by SHA-256, and can append it with `--append-log` only after validation
+passes; release promotion requires a passing scorecard plus a valid
+`intel_gate.py` artifact with matching threshold-lock and threshold-values
+provenance.
 
 ## 2-Judge Architecture (high level)
 

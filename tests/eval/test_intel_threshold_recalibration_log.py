@@ -21,6 +21,7 @@ def test_intel_recalibration_log_documents_private_split_contract() -> None:
     assert "tier2_private_holdout_canary" in text
     assert "calibration=N holdout=N canary=N" in text
     assert "label_kinds: section=N transition=N cue=N live_pill=N representation=N taste=N" in text
+    assert "report_hashes: gold_report=sha256:<hash> scorecard=sha256:<hash>" in text
     assert "local_paths_redacted=true" in text
     assert "ids_hashed=true" in text
     assert "raw_audio_committed=false" in text

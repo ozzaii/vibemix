@@ -107,6 +107,12 @@ def build_recalibration_note(
     metric_failures = _metric_failures(metrics)
     if metric_failures:
         errors.extend(f"metric_failed:{name}" for name in metric_failures)
+    report_hashes = _report_hashes(
+        scorecard=scorecard,
+        gold_report=gold_report,
+        taste_scorecard=taste_scorecard,
+        gate_report=gate_report,
+    )
 
     if promote_release:
         if evidence_tier != "tier2_private_holdout_canary":
@@ -136,6 +142,7 @@ def build_recalibration_note(
         splits=splits,
         label_kinds=label_kinds,
         metrics=metrics,
+        report_hashes=report_hashes,
         action=action,
     )
     return {
@@ -144,6 +151,7 @@ def build_recalibration_note(
         "errors": tuple(errors),
         "verdict": verdict,
         "action": action,
+        "report_hashes": report_hashes,
         "entry": entry,
     }
 
@@ -158,6 +166,7 @@ def _render_entry(
     splits: dict[str, int],
     label_kinds: dict[str, int],
     metrics: dict[str, dict[str, float]],
+    report_hashes: dict[str, str],
     action: str,
 ) -> str:
     return "\n".join(
@@ -178,9 +187,11 @@ def _render_entry(
             f"representation={label_kinds.get('representation', 0)} "
             f"taste={label_kinds.get('taste', 0)}",
             "- reports: "
-            "gold_report=private:redacted "
-            "scorecard=private:redacted "
-            "gate=private:redacted",
+            f"gold_report={_report_label(report_hashes['gold_report'])} "
+            f"scorecard={_report_label(report_hashes['scorecard'])} "
+            f"taste_scorecard={_report_label(report_hashes['taste_scorecard'])} "
+            f"gate={_report_label(report_hashes['gate'])}",
+            "- report_hashes: " + _format_report_hashes(report_hashes),
             "- measured: " + _format_metric_line(metrics, "measured"),
             "- locked:   " + _format_metric_line(metrics, "locked"),
             "- delta:    " + _format_metric_line(metrics, "delta"),
@@ -194,6 +205,14 @@ def _render_entry(
     )
 
 
+def _format_report_hashes(report_hashes: dict[str, str]) -> str:
+    return " ".join(f"{name}={report_hashes[name]}" for name in _REPORT_HASH_ORDER)
+
+
+def _report_label(report_hash: str) -> str:
+    return "null" if report_hash == "null" else "private:redacted"
+
+
 def _format_metric_line(metrics: dict[str, dict[str, float]], field: str) -> str:
     parts: list[str] = []
     for spec in KEY_METRICS:
@@ -201,6 +220,36 @@ def _format_metric_line(metrics: dict[str, dict[str, float]], field: str) -> str
         value = metrics[spec.metric][field]
         parts.append(f"{key}={value:+.2f}" if field == "delta" else f"{key}={value:.2f}")
     return " ".join(parts)
+
+
+_REPORT_HASH_ORDER = ("gold_report", "scorecard", "taste_scorecard", "gate")
+
+
+def _report_hashes(
+    *,
+    scorecard: dict[str, Any],
+    gold_report: dict[str, Any],
+    taste_scorecard: dict[str, Any] | None,
+    gate_report: dict[str, Any] | None,
+) -> dict[str, str]:
+    return {
+        "gold_report": _json_sha256(gold_report),
+        "scorecard": _json_sha256(scorecard),
+        "taste_scorecard": _json_sha256(taste_scorecard),
+        "gate": _json_sha256(gate_report),
+    }
+
+
+def _json_sha256(payload: dict[str, Any] | None) -> str:
+    if payload is None:
+        return "null"
+    blob = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(blob).hexdigest()
 
 
 def _metric_snapshot(scorecard: dict[str, Any]) -> dict[str, dict[str, float]]:

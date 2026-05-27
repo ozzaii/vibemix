@@ -42,7 +42,8 @@ does not exist yet; do not omit the field.
 - evidence_tier: tier1_private_calibration|tier2_private_holdout_canary
 - splits: calibration=N holdout=N canary=N
 - label_kinds: section=N transition=N cue=N live_pill=N representation=N taste=N
-- reports: gold_report=<redacted-report-path> scorecard=<redacted-report-path> gate=<redacted-report-path>
+- reports: gold_report=<redacted-report-path> scorecard=<redacted-report-path> taste_scorecard=<redacted-report-path|null> gate=<redacted-report-path|null>
+- report_hashes: gold_report=sha256:<hash> scorecard=sha256:<hash> taste_scorecard=sha256:<hash>|null gate=sha256:<hash>|null
 - measured: section_role_hit_at_5_delta=X.XX transition_accept_at_3=X.XX decision_exact_timing_floor_violation_rate=X.XX taste_accepted_suggestion_lift=X.XX
 - locked:   section_role_hit_at_5_delta_min=X.XX transition_accept_at_3_min=X.XX decision_exact_timing_floor_violation_rate_max=X.XX taste_accepted_suggestion_lift_min=X.XX
 - delta:    section_role_hit_at_5_delta=+/-X.XX transition_accept_at_3=+/-X.XX decision_exact_timing_floor_violation_rate=+/-X.XX taste_accepted_suggestion_lift=+/-X.XX
@@ -71,14 +72,17 @@ does not exist yet; do not omit the field.
 ## Producer
 
 Use `scripts/eval/intel_recalibration_note.py` to render the redacted markdown
-entry from private scorecard/gold/taste reports. The script validates report
+entry from private scorecard/gold/taste/gate reports. The script validates report
 schemas, privacy flags, forbidden private payload markers, holdout/canary split
 coverage for release promotion, and the key measured-vs-locked INTEL metrics
-before emitting an entry. Release promotion also requires a passing private
-scorecard and a valid `scripts/eval/intel_gate.py` artifact whose scorecard and
-provenance stages point at the same threshold-lock/threshold-values hashes. Use
-`--append-log eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` to append a valid entry
-directly; invalid evidence exits non-zero and is not written.
+before emitting an entry. Each entry also carries canonical SHA-256 hashes of
+the redacted private aggregate reports, so the public note is bound to exact
+evidence artifacts without exposing paths, track names, labels, vectors, or
+audio. Release promotion also requires a passing private scorecard and a valid
+`scripts/eval/intel_gate.py` artifact whose scorecard and provenance stages
+point at the same threshold-lock/threshold-values hashes. Use `--append-log
+eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` to append a valid entry directly;
+invalid evidence exits non-zero and is not written.
 
 ## Audit Trail
 
@@ -88,7 +92,8 @@ directly; invalid evidence exits non-zero and is not written.
 - evidence_tier: tier1_private_calibration
 - splits: calibration=0 holdout=0 canary=0
 - label_kinds: section=0 transition=0 cue=0 live_pill=0 representation=0 taste=0
-- reports: gold_report=null scorecard=null gate=null
+- reports: gold_report=null scorecard=null taste_scorecard=null gate=null
+- report_hashes: gold_report=null scorecard=null taste_scorecard=null gate=null
 - measured: section_role_hit_at_5_delta=0.00 transition_accept_at_3=0.00 decision_exact_timing_floor_violation_rate=0.00 taste_accepted_suggestion_lift=0.00
 - locked:   section_role_hit_at_5_delta_min=0.15 transition_accept_at_3_min=0.80 decision_exact_timing_floor_violation_rate_max=0.00 taste_accepted_suggestion_lift_min=0.10
 - delta:    section_role_hit_at_5_delta=+0.00 transition_accept_at_3=+0.00 decision_exact_timing_floor_violation_rate=+0.00 taste_accepted_suggestion_lift=+0.00

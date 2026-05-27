@@ -50,9 +50,38 @@ def test_build_recalibration_note_renders_redacted_tier1_entry() -> None:
     assert "### 2026-05-27T12:00:00Z - verdict=private_in_tolerance" in entry
     assert "- evidence_tier: tier1_private_calibration" in entry
     assert "gold_report=private:redacted" in entry
+    hash_line = _report_hash_line(entry)
+    assert "gold_report=sha256:" in hash_line
+    assert "scorecard=sha256:" in hash_line
+    assert "taste_scorecard=sha256:" in hash_line
+    assert "gate=null" in hash_line
     assert "section_role_hit_at_5_delta=" in entry
     assert "/Users/" not in entry
     assert "file://" not in entry
+
+
+def test_recalibration_note_report_hashes_bind_private_reports() -> None:
+    scorecard = _scorecard()
+    changed_scorecard = _scorecard()
+    changed_scorecard["hash_regression_marker"] = "changed"
+    common = {
+        "gold_report": _gold_report(),
+        "taste_scorecard": score_taste_fixture_dir(DEFAULT_FIXTURE_DIR),
+        "evidence_tier": "tier1_private_calibration",
+        "lock_path": INTEL_LOCK_PATH,
+        "timestamp": "2026-05-27T12:00:00Z",
+    }
+
+    baseline = build_recalibration_note(scorecard=scorecard, **common)
+    changed = build_recalibration_note(scorecard=changed_scorecard, **common)
+
+    assert baseline["valid"] is True
+    assert changed["valid"] is True
+    assert baseline["report_hashes"]["gold_report"] == changed["report_hashes"]["gold_report"]
+    assert baseline["report_hashes"]["scorecard"] != changed["report_hashes"]["scorecard"]
+    assert f"scorecard={baseline['report_hashes']['scorecard']}" in _report_hash_line(
+        baseline["entry"]
+    )
 
 
 def test_tier2_release_evidence_requires_holdout_and_canary_splits() -> None:
@@ -313,3 +342,7 @@ def test_cli_does_not_write_output_or_append_log_for_invalid_note(
     assert result["valid"] is False
     assert not out.exists()
     assert log.read_text(encoding="utf-8") == f"# Log\n\n{APPEND_MARKER}\n"
+
+
+def _report_hash_line(entry: str) -> str:
+    return next(line for line in entry.splitlines() if line.startswith("- report_hashes: "))

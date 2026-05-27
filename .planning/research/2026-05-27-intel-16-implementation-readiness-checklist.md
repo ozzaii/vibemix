@@ -643,6 +643,8 @@ done: `scripts/eval/intel_recalibration_note.py` is the reproducible producer
       for the private-label note, including privacy and split-coverage gates
 done: `scripts/eval/intel_recalibration_note.py --append-log` appends only
       valid entries to the public recalibration log and refuses invalid evidence
+done: private-label recalibration notes carry canonical SHA-256 hashes for the
+      exact redacted scorecard/gold/taste/gate reports used to render the entry
 done: release-promotion notes require a valid `intel_gate.py` artifact whose
       scorecard/provenance lock hashes match the promoted INTEL threshold lock
 done: release-promotion notes reject failed scorecards and gate/scorecard
