@@ -606,6 +606,8 @@ done: workflow threshold-edit warning covers both `eval/THRESHOLD-LOCK.md` and
 done: `scripts/release/check_gate.sh` requires recent `intel_gate.json` artifacts
       to report `valid=true` and carry scorecard metrics, gates, artifact
       statuses, Tier 0 replay provenance, and provenance hashes
+done: `scripts/release/check_gate.sh` rejects stale INTEL artifacts whose
+      threshold-lock hash does not match the current `eval/INTEL-THRESHOLD-LOCK.md`
 pending: private-label release threshold recalibration note
 ```
 

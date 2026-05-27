@@ -21,6 +21,7 @@
 #        - every gate reports PASS
 #        - every artifact_status entry is true
 #        - fixture/threshold provenance hashes and replay tier are present
+#        - artifact threshold-lock hash matches the current INTEL lock
 #
 #   3. scripts/release/check_ear_test.sh exits 0 (≥2 ear-test sessions
 #      ≥2 genres within 14d, zero slop flags).
@@ -34,6 +35,7 @@
 # Inputs (env, with defaults):
 #   EVAL_RUNS_DIR          default: .planning/eval-runs
 #   THRESHOLD_LOCK         default: eval/THRESHOLD-LOCK.md
+#   INTEL_THRESHOLD_LOCK   default: eval/INTEL-THRESHOLD-LOCK.md
 #   EAR_TEST_GATE          default: scripts/release/check_ear_test.sh
 #   MIN_CONSECUTIVE_GREEN  default: 7
 #
@@ -48,6 +50,7 @@ set -euo pipefail
 
 EVAL_RUNS_DIR="${EVAL_RUNS_DIR:-.planning/eval-runs}"
 THRESHOLD_LOCK="${THRESHOLD_LOCK:-eval/THRESHOLD-LOCK.md}"
+INTEL_THRESHOLD_LOCK="${INTEL_THRESHOLD_LOCK:-eval/INTEL-THRESHOLD-LOCK.md}"
 EAR_TEST_GATE="${EAR_TEST_GATE:-scripts/release/check_ear_test.sh}"
 MIN_CONSECUTIVE_GREEN="${MIN_CONSECUTIVE_GREEN:-7}"
 
@@ -86,6 +89,10 @@ if [ ! -f "${THRESHOLD_LOCK}" ]; then
   emit_err "THRESHOLD-LOCK missing: ${THRESHOLD_LOCK}"
   exit 1
 fi
+if [ ! -f "${INTEL_THRESHOLD_LOCK}" ]; then
+  emit_err "INTEL-THRESHOLD-LOCK missing: ${INTEL_THRESHOLD_LOCK}"
+  exit 1
+fi
 
 # --- parse locked thresholds ----------------------------------------------
 # Single python invocation extracts the 4 metric thresholds, emits as
@@ -120,6 +127,16 @@ if [ -z "${F1_MIN}" ] || [ -z "${SUB_MIN}" ] || [ -z "${CIT_MIN}" ] || [ -z "${B
   emit_err "threshold-lock parse returned empty values (line=${TL_LINE!r})"
   exit 1
 fi
+
+INTEL_THRESHOLD_LOCK_HASH=$(
+  "${PYTHON_BIN}" - "${INTEL_THRESHOLD_LOCK}" <<'PY'
+import hashlib
+import sys
+from pathlib import Path
+
+print("sha256:" + hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+)
 
 # --- enumerate nightly runs -----------------------------------------------
 NIGHTLY_FAIL_REASONS=()
@@ -168,7 +185,7 @@ else
       if [ ! -f "${intel_report}" ]; then
         INTEL_FAIL_REASONS+=("${name}: intel_gate.json missing")
       else
-        intel_status=$(jq -r '
+        intel_status=$(jq -r --arg expected_intel_lock_hash "${INTEL_THRESHOLD_LOCK_HASH}" '
           def nonempty_object(x): (x | type == "object" and length > 0);
           def nonempty_array(x): (x | type == "array" and length > 0);
           def sha256_hash(x): (x | type == "string" and startswith("sha256:"));
@@ -203,6 +220,8 @@ else
             "scorecard.provenance.thresholds_hash missing"
           elif (sha256_hash(.stages.scorecard.provenance.threshold_lock_hash // "") | not) then
             "scorecard.provenance.threshold_lock_hash missing"
+          elif .stages.scorecard.provenance.threshold_lock_hash != $expected_intel_lock_hash then
+            "scorecard.provenance.threshold_lock_hash mismatch"
           else
             "ok"
           end

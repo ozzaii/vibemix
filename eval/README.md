@@ -61,7 +61,7 @@ The musical-intelligence fixture gate has its own lock at
 [`eval/INTEL-THRESHOLD-LOCK.md`](INTEL-THRESHOLD-LOCK.md). Nightly/PR eval runs
 write `.planning/eval-runs/<sha>/intel_gate.json` with metric, gate, artifact,
 and provenance-hash evidence; the release gate requires recent runs to report
-`"valid": true`.
+`"valid": true` and to match the current INTEL threshold-lock hash.
 
 ## 2-Judge Architecture (high level)
 

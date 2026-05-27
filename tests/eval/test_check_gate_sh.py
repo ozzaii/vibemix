@@ -16,6 +16,7 @@ fixtures. Pins:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -27,6 +28,7 @@ from pathlib import Path
 import pytest
 
 SCRIPT_PATH = Path("scripts/release/check_gate.sh").resolve()
+INTEL_LOCK_PATH = Path("eval/INTEL-THRESHOLD-LOCK.md").resolve()
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +43,10 @@ CANONICAL_THRESHOLDS = {
     "bypass_max": 0.15,
     "per_genre_f1_min": 0.70,
 }
+
+
+def _intel_threshold_lock_hash() -> str:
+    return "sha256:" + hashlib.sha256(INTEL_LOCK_PATH.read_bytes()).hexdigest()
 
 
 def _make_threshold_lock(tmp_path: Path, **overrides: float) -> Path:
@@ -139,7 +145,7 @@ def _make_nightly_run(
                         "provenance": {
                             "fixture_manifest_hash": "sha256:" + ("a" * 64),
                             "thresholds_hash": "sha256:" + ("b" * 64),
-                            "threshold_lock_hash": "sha256:" + ("c" * 64),
+                            "threshold_lock_hash": _intel_threshold_lock_hash(),
                             "replay_tier": "tier0_fixture_replay",
                         },
                     },
@@ -488,6 +494,42 @@ def test_intel_gate_json_missing_provenance_hash_fails(tmp_path: Path):
     assert result.returncode == 1
     assert "BLOCKED_BY=intel" in result.stderr
     assert "scorecard.provenance.threshold_lock_hash missing" in result.stderr
+
+
+def test_intel_gate_json_stale_threshold_lock_hash_fails(tmp_path: Path):
+    """Release evidence must match the current eval/INTEL-THRESHOLD-LOCK.md."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    target = next(runs.iterdir())
+    payload = json.loads((target / "intel_gate.json").read_text(encoding="utf-8"))
+    payload["stages"]["scorecard"]["provenance"]["threshold_lock_hash"] = "sha256:" + ("d" * 64)
+    (target / "intel_gate.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 1
+    assert "BLOCKED_BY=intel" in result.stderr
+    assert "scorecard.provenance.threshold_lock_hash mismatch" in result.stderr
+
+
+def test_missing_intel_threshold_lock_fails_before_artifact_scan(tmp_path: Path):
+    """The release gate must have the INTEL lock it compares artifacts against."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(
+        runs,
+        tl,
+        ear,
+        extra_env={"INTEL_THRESHOLD_LOCK": str(tmp_path / "missing-intel-lock.md")},
+    )
+
+    assert result.returncode == 1
+    assert "INTEL-THRESHOLD-LOCK missing" in result.stderr
 
 
 # ---------------------------------------------------------------------------
