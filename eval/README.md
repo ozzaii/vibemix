@@ -83,8 +83,10 @@ passes; release promotion requires a passing scorecard plus a valid
 hash-bound `intel_gate.py` artifact with matching threshold-lock and
 threshold-values provenance. `scripts/eval/intel_recalibration_log_validate.py`
 validates the public log after entries are appended so malformed, hashless, or
-private-leaking entries are caught mechanically. `scripts/release/check_gate.sh`
-runs that validator as part of the INTEL release gate.
+private-leaking entries are caught mechanically; it also rejects stale
+recalibration entries whose `lock:` digest no longer matches the current
+`eval/INTEL-THRESHOLD-LOCK.md`. `scripts/release/check_gate.sh` runs that
+validator as part of the INTEL release gate.
 
 ## 2-Judge Architecture (high level)
 
@@ -194,7 +196,7 @@ scope for v3.0:
 - [`eval/rubrics/`](rubrics/) — judge rubric bodies (`judge_pro.md`, `judge_flash.md`).
 - [`scripts/eval/replay_harness.py`](../scripts/eval/replay_harness.py) — deterministic replay CLI.
 - [`scripts/eval/intel_recalibration_note.py`](../scripts/eval/intel_recalibration_note.py) — renders redacted private-label INTEL recalibration log entries.
-- [`scripts/eval/intel_recalibration_log_validate.py`](../scripts/eval/intel_recalibration_log_validate.py) — validates the public INTEL recalibration log schema and report-hash bindings.
+- [`scripts/eval/intel_recalibration_log_validate.py`](../scripts/eval/intel_recalibration_log_validate.py) — validates the public INTEL recalibration log schema, current-lock hash binding, and report-hash bindings.
 - [`scripts/release/check_gate.sh`](../scripts/release/check_gate.sh) — Gate-2 umbrella that combines the hybrid gate and INTEL fixture gate.
 - [`scripts/release/check_ear_test.sh`](../scripts/release/check_ear_test.sh) — slow-lane ear-test gate.
 - [`.planning/decisions/P85-OVERRIDE-RETIRED.md`](../.planning/decisions/P85-OVERRIDE-RETIRED.md) — v2.1→v3.0 override retirement.

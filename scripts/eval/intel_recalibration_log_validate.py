@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -17,12 +18,14 @@ if str(ROOT) not in sys.path:
 
 from scripts.eval.intel_recalibration_note import (  # noqa: E402
     APPEND_MARKER,
+    DEFAULT_LOCK,
     EVIDENCE_TIERS,
     FORBIDDEN_PRIVATE_PATTERNS,
     KEY_METRICS,
 )
 
 DEFAULT_LOG = ROOT / "eval" / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
+LOCK_FIELD_PREFIX = "eval/INTEL-THRESHOLD-LOCK.md ("
 
 ENTRY_RE = re.compile(
     r"^### (?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) "
@@ -70,20 +73,38 @@ class LogValidationReport:
     summary: dict[str, Any]
 
 
-def validate_recalibration_log(path: Path | str = DEFAULT_LOG) -> LogValidationReport:
-    """Validate schema, privacy, and report-hash bindings in the public log."""
+def validate_recalibration_log(
+    path: Path | str = DEFAULT_LOG,
+    *,
+    threshold_lock: Path | str | None = DEFAULT_LOCK,
+) -> LogValidationReport:
+    """Validate schema, privacy, and hash bindings in the public log."""
     log_path = Path(path)
     text = log_path.read_text(encoding="utf-8")
     errors = _privacy_errors(text)
+    lock_path = Path(threshold_lock) if threshold_lock is not None else None
+    expected_lock_hash = _expected_lock_hash(lock_path, errors)
     if APPEND_MARKER not in text:
         errors.append("append_marker_missing")
-        return _report(path=log_path, entries=0, errors=errors)
+        return _report(
+            path=log_path,
+            entries=0,
+            errors=errors,
+            threshold_lock=lock_path,
+            threshold_lock_hash=expected_lock_hash,
+        )
 
     real_tail = text.split(APPEND_MARKER, maxsplit=1)[1].strip()
     entries = _parse_entries(real_tail)
     for index, entry in enumerate(entries, start=1):
-        errors.extend(_validate_entry(entry, index=index))
-    return _report(path=log_path, entries=len(entries), errors=errors)
+        errors.extend(_validate_entry(entry, index=index, expected_lock_hash=expected_lock_hash))
+    return _report(
+        path=log_path,
+        entries=len(entries),
+        errors=errors,
+        threshold_lock=lock_path,
+        threshold_lock_hash=expected_lock_hash,
+    )
 
 
 def _parse_entries(text: str) -> list[str]:
@@ -96,7 +117,7 @@ def _parse_entries(text: str) -> list[str]:
     ]
 
 
-def _validate_entry(entry: str, *, index: int) -> list[str]:
+def _validate_entry(entry: str, *, index: int, expected_lock_hash: str | None) -> list[str]:
     lines = [line.rstrip() for line in entry.splitlines() if line.strip()]
     errors: list[str] = []
     if not lines:
@@ -118,8 +139,11 @@ def _validate_entry(entry: str, *, index: int) -> list[str]:
 
     if not str(fields.get("run_id", "")).startswith("intel_private_"):
         errors.append(f"entry[{index}].run_id")
-    if not _lock_field_valid(fields.get("lock", "")):
+    lock_digest = _lock_field_digest(fields.get("lock", ""))
+    if lock_digest is None:
         errors.append(f"entry[{index}].lock")
+    elif expected_lock_hash is not None and lock_digest != expected_lock_hash:
+        errors.append(f"entry[{index}].lock.hash_mismatch")
     if fields.get("evidence_tier") not in EVIDENCE_TIERS:
         errors.append(f"entry[{index}].evidence_tier")
     if (
@@ -250,10 +274,13 @@ def _entry_fields(lines: list[str], *, index: int, errors: list[str]) -> dict[st
     return fields
 
 
-def _lock_field_valid(value: str) -> bool:
-    prefix = "eval/INTEL-THRESHOLD-LOCK.md ("
-    digest = value[len(prefix) : -1] if value.startswith(prefix) and value.endswith(")") else ""
-    return bool(digest and SHA_RE.match(digest))
+def _lock_field_digest(value: str) -> str | None:
+    digest = (
+        value[len(LOCK_FIELD_PREFIX) : -1]
+        if value.startswith(LOCK_FIELD_PREFIX) and value.endswith(")")
+        else ""
+    )
+    return digest if digest and SHA_RE.match(digest) is not None else None
 
 
 def _validate_report_bindings(fields: dict[str, str], *, index: int, verdict: str) -> list[str]:
@@ -302,7 +329,24 @@ def _privacy_errors(text: str) -> list[str]:
     ]
 
 
-def _report(path: Path, entries: int, errors: list[str]) -> LogValidationReport:
+def _expected_lock_hash(lock_path: Path | None, errors: list[str]) -> str | None:
+    if lock_path is None:
+        return None
+    try:
+        return "sha256:" + hashlib.sha256(lock_path.read_bytes()).hexdigest()
+    except OSError:
+        errors.append(f"threshold_lock_unreadable:{_safe_path_label(lock_path)}")
+        return None
+
+
+def _report(
+    path: Path,
+    entries: int,
+    errors: list[str],
+    *,
+    threshold_lock: Path | None,
+    threshold_lock_hash: str | None,
+) -> LogValidationReport:
     return LogValidationReport(
         valid=not errors,
         errors=tuple(errors),
@@ -310,6 +354,8 @@ def _report(path: Path, entries: int, errors: list[str]) -> LogValidationReport:
             "schema": "intel_recalibration_log_validation_v1",
             "path": _safe_path_label(path),
             "entry_count": entries,
+            "threshold_lock": _safe_path_label(threshold_lock) if threshold_lock else None,
+            "threshold_lock_hash": threshold_lock_hash,
         },
     )
 
@@ -324,10 +370,11 @@ def _safe_path_label(path: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", nargs="?", type=Path, default=DEFAULT_LOG)
+    parser.add_argument("--threshold-lock", type=Path, default=DEFAULT_LOCK)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
-    report = validate_recalibration_log(args.log)
+    report = validate_recalibration_log(args.log, threshold_lock=args.threshold_lock)
     payload = {
         **report.summary,
         "valid": report.valid,

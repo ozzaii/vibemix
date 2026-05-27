@@ -34,6 +34,21 @@ def test_validate_generated_recalibration_entry(tmp_path: Path) -> None:
     assert report.valid is True
     assert report.errors == ()
     assert report.summary["entry_count"] == 1
+    assert report.summary["threshold_lock"] == "eval/INTEL-THRESHOLD-LOCK.md"
+
+
+def test_validate_rejects_stale_threshold_lock_hash(tmp_path: Path) -> None:
+    entry = _replace_field(
+        _valid_entry(),
+        "lock",
+        "eval/INTEL-THRESHOLD-LOCK.md (sha256:" + ("b" * 64) + ")",
+    )
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].lock.hash_mismatch" in report.errors
 
 
 def test_validate_rejects_entry_without_report_hashes(tmp_path: Path) -> None:
