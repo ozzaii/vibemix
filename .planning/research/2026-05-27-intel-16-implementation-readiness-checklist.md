@@ -594,6 +594,10 @@ done: transition scorecard validation rejects duplicate candidate IDs,
       the CLI exits non-zero when candidate/label evidence is invalid
 done: fixture decision replay hydrates candidate/claim ledgers and passes
       fallback/timing gates
+done: decision runtime replay validation rejects duplicate packet/decision IDs,
+      duplicate candidate IDs inside packets, non-finite confidence, and
+      private payload markers; the CLI exits non-zero only when replay evidence
+      is malformed, while validator rejections remain metrics
 done: taste privacy/poisoning fixture gate
 done: src/vibemix/intel/feedback.py
 done: src/vibemix/intel/taste_model.py

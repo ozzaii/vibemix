@@ -122,6 +122,63 @@ def test_replay_reports_validator_metrics(tmp_path: Path) -> None:
         "cue_slot_requires_selected_candidate": 1,
         "unknown_candidate_id": 1,
     }
+    assert result["evidence_errors"] == ()
+
+
+def test_replay_rejects_duplicate_packet_and_decision_ids(tmp_path: Path) -> None:
+    contexts, decisions = _write_replay_fixture(tmp_path)
+    raw_contexts = json.loads(contexts.read_text(encoding="utf-8"))
+    raw_contexts.append(raw_contexts[0])
+    contexts.write_text(json.dumps(raw_contexts), encoding="utf-8")
+    decision_lines = decisions.read_text(encoding="utf-8").splitlines()
+    decision_lines.append(decision_lines[0])
+    decisions.write_text("\n".join(decision_lines) + "\n", encoding="utf-8")
+
+    result = replay_paths(contexts_path=contexts, decisions_path=decisions)
+
+    assert result["valid"] is False
+    assert "ctx_001:duplicate_packet" in result["evidence_errors"]
+    assert "dec_001:duplicate_decision" in result["evidence_errors"]
+
+
+def test_replay_rejects_duplicate_context_candidate_ids(tmp_path: Path) -> None:
+    contexts, decisions = _write_replay_fixture(tmp_path)
+    raw_contexts = json.loads(contexts.read_text(encoding="utf-8"))
+    raw_contexts[0].pop("candidates")
+    raw_contexts[0]["candidate_ids"] = ["tr_001", "tr_001"]
+    contexts.write_text(json.dumps(raw_contexts), encoding="utf-8")
+
+    result = replay_paths(contexts_path=contexts, decisions_path=decisions)
+
+    assert result["valid"] is False
+    assert "ctx_001:tr_001:duplicate_candidate_id" in result["evidence_errors"]
+
+
+def test_replay_rejects_malformed_decision_confidence(tmp_path: Path) -> None:
+    contexts, decisions = _write_replay_fixture(tmp_path)
+    rows = [json.loads(line) for line in decisions.read_text(encoding="utf-8").splitlines()]
+    rows[0]["confidence"] = "inf"
+    decisions.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+    result = replay_paths(contexts_path=contexts, decisions_path=decisions)
+
+    assert result["valid"] is False
+    assert "dec_001:nonfinite_confidence" in result["evidence_errors"]
+
+
+def test_replay_rejects_private_payload_markers(tmp_path: Path) -> None:
+    contexts, decisions = _write_replay_fixture(tmp_path)
+    raw_contexts = json.loads(contexts.read_text(encoding="utf-8"))
+    raw_contexts[0]["current"]["debug_path"] = "/Users/ozai/Music/private.wav"
+    contexts.write_text(json.dumps(raw_contexts), encoding="utf-8")
+
+    result = replay_paths(contexts_path=contexts, decisions_path=decisions)
+
+    assert result["valid"] is False
+    assert any(
+        str(error).startswith("contexts:private_payload_present:")
+        for error in result["evidence_errors"]
+    )
 
 
 def test_fixture_replay_hydrates_candidate_and_claim_ledgers() -> None:
@@ -154,6 +211,22 @@ def test_replay_cli_json(tmp_path: Path, capsys) -> None:  # type: ignore[no-unt
     out = json.loads(capsys.readouterr().out)
     assert out["schema"] == "intel_decision_runtime_replay_v1"
     assert out["totals"]["decisions"] == 2
+
+
+def test_replay_cli_returns_nonzero_for_invalid_evidence(
+    tmp_path: Path,
+    capsys,  # type: ignore[no-untyped-def]
+) -> None:
+    contexts, decisions = _write_replay_fixture(tmp_path)
+    rows = [json.loads(line) for line in decisions.read_text(encoding="utf-8").splitlines()]
+    rows[0]["confidence"] = "nan"
+    decisions.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+    assert main(["--contexts", str(contexts), "--decisions", str(decisions), "--json"]) == 1
+
+    out = json.loads(capsys.readouterr().out)
+    assert out["valid"] is False
+    assert "dec_001:nonfinite_confidence" in out["evidence_errors"]
 
 
 def test_replay_cli_requires_contexts_and_decisions_together(capsys) -> None:  # type: ignore[no-untyped-def]

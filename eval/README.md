@@ -95,6 +95,12 @@ Section-retrieval evidence follows the same rule:
 duplicate section/query IDs, missing or non-finite vectors, non-finite query
 threshold fields, and private payload markers before section-vs-whole-track
 retrieval deltas can move thresholds.
+Decision-runtime replay treats malformed evidence separately from model/runtime
+rejections: `scripts/eval/intel_decision_runtime_replay.py` rejects duplicate
+packet/decision IDs, duplicate candidate IDs inside a packet, non-finite
+confidence values, and private payload markers before fallback or exact-timing
+metrics are trusted. Validator rejections still count as metrics when replay
+evidence itself is well-formed.
 `scripts/eval/intel_recalibration_note.py` renders that append-only entry from
 redacted private scorecard/gold/taste/gate reports, binds it to those aggregate
 reports by SHA-256, rejects malformed timestamp/run-id identity fields before

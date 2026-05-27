@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -23,6 +25,14 @@ from vibemix.intel.decision_validator import validate_agent_decision
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FIXTURE_DIR = ROOT / "tests" / "intel" / "fixtures"
+PRIVATE_PAYLOAD_PATTERNS = (
+    re.compile(r"/Users/[^\"'\s]+"),
+    re.compile(r"/Volumes/[^\"'\s]+"),
+    re.compile(r"[A-Za-z]:\\\\[^\"'\s]+"),
+    re.compile(r"file://[^\"'\s]+", re.I),
+    re.compile(r"\.(?:wav|aiff|aif|mp3|flac)\b", re.I),
+    re.compile(r"\braw_(?:audio|vector)s?\b", re.I),
+)
 
 
 def replay_paths(
@@ -35,6 +45,14 @@ def replay_paths(
 ) -> dict[str, Any]:
     candidate_index = _candidate_index(candidate_index_path)
     claim_summary_index = _claim_summary_index(claim_ledgers_path)
+    context_rows = _load_json_or_jsonl(Path(contexts_path))
+    rows = _load_json_or_jsonl(Path(decisions_path))
+    evidence_errors = _evidence_shape_errors(
+        context_rows=context_rows,
+        decision_rows=rows,
+        candidate_index=candidate_index,
+        claim_summary_index=claim_summary_index,
+    )
     contexts = {
         envelope.packet_id: envelope
         for envelope in (
@@ -43,10 +61,9 @@ def replay_paths(
                 candidate_index=candidate_index,
                 claim_summary_index=claim_summary_index,
             )
-            for row in _load_json_or_jsonl(Path(contexts_path))
+            for row in context_rows
         )
     }
-    rows = _load_json_or_jsonl(Path(decisions_path))
     results: list[dict[str, Any]] = []
     for row in rows:
         packet_id = str(row.get("packet_id") or "")
@@ -94,7 +111,7 @@ def replay_paths(
     return {
         "schema": "intel_decision_runtime_replay_v1",
         "source": source,
-        "valid": total > 0,
+        "valid": total > 0 and not evidence_errors,
         "privacy": {"local_paths_redacted": True},
         "totals": {
             "contexts": len(contexts),
@@ -119,6 +136,7 @@ def replay_paths(
             "action_grounding_violation_rate": _rate(unknown_candidate, total),
         },
         "error_counts": _count_errors(results),
+        "evidence_errors": tuple(evidence_errors),
         "results": results,
     }
 
@@ -207,7 +225,69 @@ def _decision_from_raw(row: dict[str, Any]) -> AgentDecision:
         spoken_text=str(row.get("spoken_text") or ""),
         cited_claims=cited_claims,
         cited_claim_ids=cited_claim_ids,
-        confidence=float(row.get("confidence") or 0.0),
+        confidence=_finite_float(row.get("confidence"), default=0.0),
+    )
+
+
+def _evidence_shape_errors(
+    *,
+    context_rows: list[dict[str, Any]],
+    decision_rows: list[dict[str, Any]],
+    candidate_index: dict[str, dict[str, Any]],
+    claim_summary_index: dict[str, tuple[dict[str, Any], ...]],
+) -> tuple[str, ...]:
+    errors: list[str] = []
+    errors.extend(_private_payload_errors(context_rows, "contexts"))
+    errors.extend(_private_payload_errors(decision_rows, "decisions"))
+    errors.extend(_private_payload_errors(tuple(candidate_index.values()), "candidate_index"))
+    errors.extend(_private_payload_errors(claim_summary_index, "claim_ledgers"))
+    errors.extend(_duplicate_field_errors(context_rows, key="packet_id", label="packet"))
+    errors.extend(_duplicate_field_errors(decision_rows, key="decision_id", label="decision"))
+    for index, row in enumerate(context_rows):
+        packet_id = str(row.get("packet_id") or f"<context_{index}>")
+        if not row.get("packet_id"):
+            errors.append(f"{packet_id}:missing_packet_id")
+        candidate_ids = [
+            str(candidate.get("candidate_id") or "")
+            for candidate in row.get("candidates") or ()
+            if isinstance(candidate, dict)
+        ]
+        candidate_ids.extend(str(candidate_id) for candidate_id in row.get("candidate_ids") or ())
+        errors.extend(
+            f"{packet_id}:{error}"
+            for error in _duplicate_values(candidate_ids, label="candidate_id")
+        )
+    for index, row in enumerate(decision_rows):
+        decision_id = str(row.get("decision_id") or f"<decision_{index}>")
+        if not row.get("decision_id"):
+            errors.append(f"{decision_id}:missing_decision_id")
+        confidence = _finite_float(row.get("confidence"), default=0.0)
+        if not math.isfinite(confidence):
+            errors.append(f"{decision_id}:nonfinite_confidence")
+    return tuple(errors)
+
+
+def _duplicate_field_errors(rows: list[dict[str, Any]], *, key: str, label: str) -> tuple[str, ...]:
+    values = [str(row.get(key) or "") for row in rows if row.get(key)]
+    return _duplicate_values(values, label=label)
+
+
+def _duplicate_values(values: list[str], *, label: str) -> tuple[str, ...]:
+    seen: set[str] = set()
+    errors: list[str] = []
+    for value in values:
+        if value in seen:
+            errors.append(f"{value}:duplicate_{label}")
+        seen.add(value)
+    return tuple(errors)
+
+
+def _private_payload_errors(value: Any, label: str) -> tuple[str, ...]:
+    text = json.dumps(value, sort_keys=True, default=str)
+    return tuple(
+        f"{label}:private_payload_present:{pattern.pattern}"
+        for pattern in PRIVATE_PAYLOAD_PATTERNS
+        if pattern.search(text)
     )
 
 
@@ -219,6 +299,14 @@ def _load_json_or_jsonl(path: Path) -> list[dict[str, Any]]:
         return [json.loads(line) for line in text.splitlines() if line.strip()]
     raw = json.loads(text)
     return raw if isinstance(raw, list) else [raw]
+
+
+def _finite_float(value: Any, *, default: float) -> float:
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return default
+    return result if math.isfinite(result) else math.nan
 
 
 def _candidate_index(path: Path | str | None) -> dict[str, dict[str, Any]]:
@@ -320,7 +408,7 @@ def main(argv: list[str] | None = None) -> int:
             f"contexts={result['totals']['contexts']} decisions={result['totals']['decisions']} "
             f"accepted={result['totals']['accepted']} rejected={result['totals']['rejected']}"
         )
-    return 0
+    return 0 if result.get("valid") is True else 1
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint

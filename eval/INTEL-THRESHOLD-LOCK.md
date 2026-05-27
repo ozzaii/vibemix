@@ -82,7 +82,9 @@ Release-grade thresholds still need private Kaan-reviewed evidence:
   deltas are trusted;
 - transition pairs labeled `would_play`, `maybe`, and `no`, with candidate IDs,
   score finiteness, and privacy checked before metrics are trusted;
-- live/debrief decisions replayed with timing confidence;
+- live/debrief decisions replayed with timing confidence, with packet/decision
+  identity, candidate identity, confidence finiteness, and privacy checked before
+  fallback/timing metrics are trusted;
 - taste labels captured from actual accepted/rejected suggestions, with invalid
   taste split/label/consent fields rejected before profile projection.
 
