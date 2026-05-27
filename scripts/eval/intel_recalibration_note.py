@@ -1,0 +1,366 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Render a redacted INTEL threshold recalibration-log entry."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+DEFAULT_LOCK = ROOT / "eval" / "INTEL-THRESHOLD-LOCK.md"
+
+EVIDENCE_TIERS = frozenset(
+    {
+        "tier1_private_calibration",
+        "tier2_private_holdout_canary",
+    }
+)
+FORBIDDEN_PRIVATE_PATTERNS = (
+    re.compile(r"/Users/"),
+    re.compile(r"/Volumes/"),
+    re.compile(r"\b[A-Za-z]:\\\\"),
+    re.compile(r"file://", re.I),
+    re.compile(r"\.(?:wav|aiff|aif|mp3|flac)\b", re.I),
+    re.compile(r"\braw_(?:audio|vector)s?\b", re.I),
+    re.compile(r"\b(?:track_title|deck_id|session_id|free_form)\b", re.I),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class MetricSpec:
+    metric: str
+    threshold: str
+    direction: str
+
+
+KEY_METRICS: tuple[MetricSpec, ...] = (
+    MetricSpec("section_role_hit_at_5_delta", "section_role_hit_at_5_delta_min", "min"),
+    MetricSpec("transition_accept_at_3", "transition_accept_at_3_min", "min"),
+    MetricSpec(
+        "decision_exact_timing_floor_violation_rate",
+        "decision_exact_timing_floor_violation_rate_max",
+        "max",
+    ),
+    MetricSpec(
+        "taste_accepted_suggestion_lift",
+        "taste_accepted_suggestion_lift_min",
+        "min",
+    ),
+)
+
+
+def build_recalibration_note(
+    *,
+    scorecard: dict[str, Any],
+    gold_report: dict[str, Any],
+    lock_path: Path | str = DEFAULT_LOCK,
+    evidence_tier: str,
+    taste_scorecard: dict[str, Any] | None = None,
+    gate_report: dict[str, Any] | None = None,
+    timestamp: str | None = None,
+    run_id: str | None = None,
+    promote_release: bool = False,
+) -> dict[str, Any]:
+    """Build a public, redacted recalibration-log entry from private reports."""
+    errors: list[str] = []
+    if evidence_tier not in EVIDENCE_TIERS:
+        errors.append(f"unknown_evidence_tier:{evidence_tier}")
+
+    reports = {
+        "scorecard": scorecard,
+        "gold_report": gold_report,
+        "taste_scorecard": taste_scorecard or {},
+        "gate": gate_report or {},
+    }
+    errors.extend(_privacy_errors(reports))
+    errors.extend(_report_contract_errors(scorecard, gold_report, taste_scorecard, gate_report))
+
+    splits = _split_counts(gold_report)
+    if evidence_tier == "tier2_private_holdout_canary" or promote_release:
+        for split in ("calibration", "holdout", "canary"):
+            if splits.get(split, 0) <= 0:
+                errors.append(f"missing_private_split:{split}")
+
+    metrics = _metric_snapshot(scorecard)
+    metric_failures = _metric_failures(metrics)
+    if metric_failures:
+        errors.extend(f"metric_failed:{name}" for name in metric_failures)
+
+    if promote_release:
+        if evidence_tier != "tier2_private_holdout_canary":
+            errors.append("release_promotion_requires_tier2_private_holdout_canary")
+        verdict = "release_promoted" if not errors else "private_recalibration_required"
+    elif metric_failures:
+        verdict = "private_recalibration_required"
+    else:
+        verdict = "private_in_tolerance"
+
+    action = (
+        "PROMOTE_LOCK_WITH_PR"
+        if verdict == "release_promoted"
+        else "RECALIBRATION_REQUIRED"
+        if verdict == "private_recalibration_required"
+        else "none"
+    )
+    timestamp = timestamp or _now_iso()
+    lock_hash = _file_sha256(Path(lock_path))
+    run_id = run_id or _default_run_id(timestamp, evidence_tier, scorecard, gold_report)
+    label_kinds = _label_kind_counts(gold_report, taste_scorecard)
+    entry = _render_entry(
+        timestamp=timestamp,
+        verdict=verdict,
+        run_id=run_id,
+        lock_hash=lock_hash,
+        evidence_tier=evidence_tier,
+        splits=splits,
+        label_kinds=label_kinds,
+        metrics=metrics,
+        action=action,
+    )
+    return {
+        "schema": "intel_recalibration_note_v1",
+        "valid": not errors,
+        "errors": tuple(errors),
+        "verdict": verdict,
+        "action": action,
+        "entry": entry,
+    }
+
+
+def _render_entry(
+    *,
+    timestamp: str,
+    verdict: str,
+    run_id: str,
+    lock_hash: str,
+    evidence_tier: str,
+    splits: dict[str, int],
+    label_kinds: dict[str, int],
+    metrics: dict[str, dict[str, float]],
+    action: str,
+) -> str:
+    return "\n".join(
+        [
+            f"### {timestamp} - verdict={verdict}",
+            f"- run_id: {run_id}",
+            f"- lock: eval/INTEL-THRESHOLD-LOCK.md ({lock_hash})",
+            f"- evidence_tier: {evidence_tier}",
+            "- splits: "
+            f"calibration={splits.get('calibration', 0)} "
+            f"holdout={splits.get('holdout', 0)} "
+            f"canary={splits.get('canary', 0)}",
+            "- label_kinds: "
+            f"section={label_kinds.get('section', 0)} "
+            f"transition={label_kinds.get('transition', 0)} "
+            f"cue={label_kinds.get('cue', 0)} "
+            f"live_pill={label_kinds.get('live_pill', 0)} "
+            f"representation={label_kinds.get('representation', 0)} "
+            f"taste={label_kinds.get('taste', 0)}",
+            "- reports: "
+            "gold_report=private:redacted "
+            "scorecard=private:redacted "
+            "gate=private:redacted",
+            "- measured: " + _format_metric_line(metrics, "measured"),
+            "- locked:   " + _format_metric_line(metrics, "locked"),
+            "- delta:    " + _format_metric_line(metrics, "delta"),
+            "- privacy: "
+            "local_paths_redacted=true ids_hashed=true raw_audio_committed=false "
+            "raw_vectors_committed=false free_form_notes_committed=false",
+            f"- verdict: {verdict}",
+            f"- action: {action}",
+            "",
+        ]
+    )
+
+
+def _format_metric_line(metrics: dict[str, dict[str, float]], field: str) -> str:
+    parts: list[str] = []
+    for spec in KEY_METRICS:
+        key = spec.metric if field != "locked" else spec.threshold
+        value = metrics[spec.metric][field]
+        parts.append(f"{key}={value:+.2f}" if field == "delta" else f"{key}={value:.2f}")
+    return " ".join(parts)
+
+
+def _metric_snapshot(scorecard: dict[str, Any]) -> dict[str, dict[str, float]]:
+    metrics = scorecard.get("metrics") if isinstance(scorecard.get("metrics"), dict) else {}
+    thresholds = (
+        scorecard.get("thresholds") if isinstance(scorecard.get("thresholds"), dict) else {}
+    )
+    out: dict[str, dict[str, float]] = {}
+    for spec in KEY_METRICS:
+        measured = _float(metrics.get(spec.metric))
+        locked = _float(thresholds.get(spec.threshold))
+        out[spec.metric] = {
+            "measured": measured,
+            "locked": locked,
+            "delta": measured - locked,
+        }
+    return out
+
+
+def _metric_failures(metrics: dict[str, dict[str, float]]) -> tuple[str, ...]:
+    failures: list[str] = []
+    for spec in KEY_METRICS:
+        measured = metrics[spec.metric]["measured"]
+        locked = metrics[spec.metric]["locked"]
+        if spec.direction == "min" and measured < locked:
+            failures.append(spec.metric)
+        if spec.direction == "max" and measured > locked:
+            failures.append(spec.metric)
+    return tuple(failures)
+
+
+def _report_contract_errors(
+    scorecard: dict[str, Any],
+    gold_report: dict[str, Any],
+    taste_scorecard: dict[str, Any] | None,
+    gate_report: dict[str, Any] | None,
+) -> tuple[str, ...]:
+    errors: list[str] = []
+    if scorecard.get("schema") != "intel_scorecard_v1":
+        errors.append("scorecard.schema")
+    if scorecard.get("privacy", {}).get("local_paths_redacted") is not True:
+        errors.append("scorecard.privacy.local_paths_redacted")
+    if gold_report.get("schema") != "intel_gold_report_v1":
+        errors.append("gold_report.schema")
+    privacy = gold_report.get("privacy", {})
+    if privacy.get("local_paths_redacted") is not True:
+        errors.append("gold_report.privacy.local_paths_redacted")
+    if privacy.get("ids_hashed") is not True:
+        errors.append("gold_report.privacy.ids_hashed")
+    if taste_scorecard is not None:
+        if taste_scorecard.get("schema") != "intel_taste_scorecard_v1":
+            errors.append("taste_scorecard.schema")
+        if taste_scorecard.get("privacy", {}).get("local_paths_redacted") is not True:
+            errors.append("taste_scorecard.privacy.local_paths_redacted")
+    if gate_report is not None and gate_report.get("schema") != "intel_gate_v1":
+        errors.append("gate.schema")
+    return tuple(errors)
+
+
+def _privacy_errors(reports: dict[str, Any]) -> tuple[str, ...]:
+    text = json.dumps(reports, sort_keys=True, default=str)
+    return tuple(
+        f"private_payload_present:{pattern.pattern}"
+        for pattern in FORBIDDEN_PRIVATE_PATTERNS
+        if pattern.search(text)
+    )
+
+
+def _split_counts(gold_report: dict[str, Any]) -> dict[str, int]:
+    counts = gold_report.get("counts") if isinstance(gold_report.get("counts"), dict) else {}
+    splits = counts.get("splits") if isinstance(counts.get("splits"), dict) else {}
+    return {split: int(_float(splits.get(split))) for split in ("calibration", "holdout", "canary")}
+
+
+def _label_kind_counts(
+    gold_report: dict[str, Any],
+    taste_scorecard: dict[str, Any] | None,
+) -> dict[str, int]:
+    counts = gold_report.get("counts") if isinstance(gold_report.get("counts"), dict) else {}
+    kinds = counts.get("kinds") if isinstance(counts.get("kinds"), dict) else {}
+    out = {
+        kind: int(_float(kinds.get(kind)))
+        for kind in ("section", "transition", "cue", "live_pill", "representation")
+    }
+    taste_counts = (
+        taste_scorecard.get("counts")
+        if taste_scorecard is not None and isinstance(taste_scorecard.get("counts"), dict)
+        else {}
+    )
+    out["taste"] = int(_float(taste_counts.get("events")))
+    return out
+
+
+def _default_run_id(
+    timestamp: str,
+    evidence_tier: str,
+    scorecard: dict[str, Any],
+    gold_report: dict[str, Any],
+) -> str:
+    blob = json.dumps(
+        {
+            "timestamp": timestamp,
+            "evidence_tier": evidence_tier,
+            "scorecard_metrics": scorecard.get("metrics"),
+            "gold_counts": gold_report.get("counts"),
+        },
+        sort_keys=True,
+        default=str,
+    ).encode("utf-8")
+    short = hashlib.sha256(blob).hexdigest()[:10]
+    date = timestamp[:10].replace("-", "")
+    return f"intel_private_{date}_{short}"
+
+
+def _file_sha256(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _now_iso() -> str:
+    return datetime.now(tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--scorecard", type=Path, required=True)
+    parser.add_argument("--gold-report", type=Path, required=True)
+    parser.add_argument("--taste-scorecard", type=Path)
+    parser.add_argument("--gate", type=Path)
+    parser.add_argument("--lock-path", type=Path, default=DEFAULT_LOCK)
+    parser.add_argument("--evidence-tier", choices=sorted(EVIDENCE_TIERS), required=True)
+    parser.add_argument("--timestamp")
+    parser.add_argument("--run-id")
+    parser.add_argument("--promote-release", action="store_true")
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+
+    result = build_recalibration_note(
+        scorecard=_load_json(args.scorecard),
+        gold_report=_load_json(args.gold_report),
+        taste_scorecard=_load_json(args.taste_scorecard) if args.taste_scorecard else None,
+        gate_report=_load_json(args.gate) if args.gate else None,
+        lock_path=args.lock_path,
+        evidence_tier=args.evidence_tier,
+        timestamp=args.timestamp,
+        run_id=args.run_id,
+        promote_release=args.promote_release,
+    )
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(result["entry"], encoding="utf-8")
+    if args.json:
+        json.dump(result, sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+    else:
+        sys.stdout.write(result["entry"])
+        if result["errors"]:
+            sys.stderr.write("\n".join(str(error) for error in result["errors"]) + "\n")
+    return 0 if result["valid"] else 1
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
+    raise SystemExit(main())

@@ -75,7 +75,8 @@ caught before a release cut. Private-label recalibration for release-grade
 INTEL thresholds is tracked in
 [`eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md`](INTEL-THRESHOLD-RECALIBRATION-LOG.md);
 the public log records only redacted split counts, aggregate metrics, hashes,
-privacy flags, and actions.
+privacy flags, and actions. `scripts/eval/intel_recalibration_note.py` renders
+that append-only entry from redacted private scorecard/gold/taste reports.
 
 ## 2-Judge Architecture (high level)
 
@@ -184,6 +185,7 @@ scope for v3.0:
 - [`eval/corpus/LICENSES.md`](corpus/LICENSES.md) — corpus attribution + licenses.
 - [`eval/rubrics/`](rubrics/) — judge rubric bodies (`judge_pro.md`, `judge_flash.md`).
 - [`scripts/eval/replay_harness.py`](../scripts/eval/replay_harness.py) — deterministic replay CLI.
+- [`scripts/eval/intel_recalibration_note.py`](../scripts/eval/intel_recalibration_note.py) — renders redacted private-label INTEL recalibration log entries.
 - [`scripts/release/check_gate.sh`](../scripts/release/check_gate.sh) — Gate-2 umbrella that combines the hybrid gate and INTEL fixture gate.
 - [`scripts/release/check_ear_test.sh`](../scripts/release/check_ear_test.sh) — slow-lane ear-test gate.
 - [`.planning/decisions/P85-OVERRIDE-RETIRED.md`](../.planning/decisions/P85-OVERRIDE-RETIRED.md) — v2.1→v3.0 override retirement.

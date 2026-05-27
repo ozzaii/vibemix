@@ -1,0 +1,129 @@
+# SPDX-License-Identifier: Apache-2.0
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from scripts.eval.intel_gate import run_intel_gate
+from scripts.eval.intel_gold import DEFAULT_FIXTURE_DIR, report_gold_file
+from scripts.eval.intel_recalibration_note import build_recalibration_note, main
+from scripts.eval.intel_scorecard import score_fixture_dir
+from scripts.eval.intel_taste_scorecard import score_fixture_dir as score_taste_fixture_dir
+
+INTEL_LOCK_PATH = Path("eval/INTEL-THRESHOLD-LOCK.md").resolve()
+
+
+def _scorecard() -> dict:
+    return score_fixture_dir(DEFAULT_FIXTURE_DIR, threshold_lock_path=INTEL_LOCK_PATH)
+
+
+def _gold_report() -> dict:
+    return report_gold_file(DEFAULT_FIXTURE_DIR / "gold_labels_redacted.jsonl", salt="test")
+
+
+def _gold_report_with_all_splits() -> dict:
+    report = _gold_report()
+    report["counts"]["splits"] = {"calibration": 7, "holdout": 5, "canary": 3}
+    return report
+
+
+def test_build_recalibration_note_renders_redacted_tier1_entry() -> None:
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report(),
+        taste_scorecard=score_taste_fixture_dir(DEFAULT_FIXTURE_DIR),
+        evidence_tier="tier1_private_calibration",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+        run_id="intel_private_test",
+    )
+
+    assert result["valid"] is True
+    assert result["verdict"] == "private_in_tolerance"
+    assert result["action"] == "none"
+    entry = result["entry"]
+    assert "### 2026-05-27T12:00:00Z - verdict=private_in_tolerance" in entry
+    assert "- evidence_tier: tier1_private_calibration" in entry
+    assert "gold_report=private:redacted" in entry
+    assert "section_role_hit_at_5_delta=" in entry
+    assert "/Users/" not in entry
+    assert "file://" not in entry
+
+
+def test_tier2_release_evidence_requires_holdout_and_canary_splits() -> None:
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report(),
+        evidence_tier="tier2_private_holdout_canary",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+    )
+
+    assert result["valid"] is False
+    assert "missing_private_split:holdout" in result["errors"]
+    assert "missing_private_split:canary" in result["errors"]
+
+
+def test_release_promotion_requires_tier2_and_all_splits() -> None:
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report_with_all_splits(),
+        taste_scorecard=score_taste_fixture_dir(DEFAULT_FIXTURE_DIR),
+        gate_report=run_intel_gate(fixture_dir=DEFAULT_FIXTURE_DIR, threshold_lock=INTEL_LOCK_PATH),
+        evidence_tier="tier2_private_holdout_canary",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+        promote_release=True,
+    )
+
+    assert result["valid"] is True
+    assert result["verdict"] == "release_promoted"
+    assert result["action"] == "PROMOTE_LOCK_WITH_PR"
+    assert "calibration=7 holdout=5 canary=3" in result["entry"]
+
+
+def test_private_payload_in_reports_blocks_note() -> None:
+    gold = _gold_report()
+    gold["examples"].append({"note": "/Users/ozai/Music/private.wav"})
+
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=gold,
+        evidence_tier="tier1_private_calibration",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-05-27T12:00:00Z",
+    )
+
+    assert result["valid"] is False
+    assert any(str(error).startswith("private_payload_present:") for error in result["errors"])
+
+
+def test_recalibration_note_cli_writes_markdown_and_json(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]
+    scorecard = tmp_path / "scorecard.json"
+    gold = tmp_path / "gold_report.json"
+    out = tmp_path / "entry.md"
+    scorecard.write_text(json.dumps(_scorecard()), encoding="utf-8")
+    gold.write_text(json.dumps(_gold_report()), encoding="utf-8")
+
+    rc = main(
+        [
+            "--scorecard",
+            str(scorecard),
+            "--gold-report",
+            str(gold),
+            "--evidence-tier",
+            "tier1_private_calibration",
+            "--timestamp",
+            "2026-05-27T12:00:00Z",
+            "--run-id",
+            "intel_private_cli",
+            "--output",
+            str(out),
+            "--json",
+        ]
+    )
+
+    assert rc == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["valid"] is True
+    assert out.read_text(encoding="utf-8") == result["entry"]

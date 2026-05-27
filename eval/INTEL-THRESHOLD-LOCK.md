@@ -89,7 +89,9 @@ Changing any `intel_thresholds` value requires:
    or release-gate promotion.
 3. For private-label calibration or release-gate promotion, append a redacted
    entry to `eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` with calibration,
-   holdout, and canary split counts plus the measured/locked/delta values.
+   holdout, and canary split counts plus the measured/locked/delta values. Use
+   `scripts/eval/intel_recalibration_note.py` to render that entry from
+   redacted reports.
 4. Keep zero-tolerance privacy and grounding counters at `0.00` unless the
    underlying contract changes in the corresponding INTEL spec.
 5. Update `.planning/research/2026-05-27-intel-03-data-eval-excellence-spec.md`

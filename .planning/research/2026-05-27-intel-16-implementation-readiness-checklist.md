@@ -539,6 +539,9 @@ done: tests/eval/test_intel_gold_validation.py
 done: eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md defines the redacted
       private-label calibration/holdout/canary note format for future threshold
       movement
+done: scripts/eval/intel_recalibration_note.py renders that note from redacted
+      private scorecard/gold/taste reports and blocks release promotion without
+      holdout/canary coverage
 pending: first private gold slice
 pending: release threshold lock fed by holdout/canary labels
 pending: durable taste-consent ingestion from labels
@@ -636,6 +639,8 @@ done: `.github/workflows/eval.yml` DCO-signs nightly `.planning/eval-runs/`
 done: private-label release threshold recalibration note exists at
       `eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` and is referenced by the
       INTEL threshold lock/public eval docs
+done: `scripts/eval/intel_recalibration_note.py` is the reproducible producer
+      for the private-label note, including privacy and split-coverage gates
 ```
 
 The docs are not the milestone. The scorecard is.

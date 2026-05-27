@@ -68,6 +68,14 @@ does not exist yet; do not omit the field.
 6. This log is append-only. Corrections supersede earlier entries by adding a
    new entry; do not edit old real entries.
 
+## Producer
+
+Use `scripts/eval/intel_recalibration_note.py` to render the redacted markdown
+entry from private scorecard/gold/taste reports. The script validates report
+schemas, privacy flags, forbidden private payload markers, holdout/canary split
+coverage for release promotion, and the key measured-vs-locked INTEL metrics
+before emitting an entry.
+
 ## Audit Trail
 
 ### 1970-01-01T00:00:00Z - verdict=schema_example
