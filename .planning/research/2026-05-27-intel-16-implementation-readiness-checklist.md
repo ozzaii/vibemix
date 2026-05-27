@@ -624,6 +624,9 @@ done: `scripts/release/check_gate.sh` rejects INTEL artifacts whose dataset card
 done: `scripts/release/check_gate.sh` validates provenance-stage replay tier,
       fixture manifest hash, thresholds hash, and threshold-lock hash against
       the current release evidence, not only the scorecard provenance copy
+done: release-gate tests feed `scripts/release/check_gate.sh` a real
+      `scripts.eval.intel_gate.run_intel_gate()` artifact, pinning producer /
+      consumer compatibility instead of only handcrafted JSON fixtures
 pending: private-label release threshold recalibration note
 ```
 

@@ -68,7 +68,10 @@ provenance-validation stage. It also rejects artifacts where the fixture-audit
 stage and scorecard provenance disagree about the fixture manifest. The INTEL gate
 marks artifacts invalid at generation time when scorecard provenance and the
 provenance-validation stage disagree about their dataset, fixture, threshold,
-replay-tier, or lock hashes.
+replay-tier, or lock hashes. The release-gate test suite also feeds
+`scripts/release/check_gate.sh` a real artifact produced by
+`scripts.eval.intel_gate.run_intel_gate()` so producer/consumer schema drift is
+caught before a release cut.
 
 ## 2-Judge Architecture (high level)
 

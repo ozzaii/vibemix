@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 
 import pytest
+from scripts.eval.intel_gate import run_intel_gate
 
 SCRIPT_PATH = Path("scripts/release/check_gate.sh").resolve()
 INTEL_LOCK_PATH = Path("eval/INTEL-THRESHOLD-LOCK.md").resolve()
@@ -753,6 +754,32 @@ def test_missing_intel_fixture_manifest_fails_before_artifact_scan(tmp_path: Pat
 # ---------------------------------------------------------------------------
 # Accept paths
 # ---------------------------------------------------------------------------
+
+
+def test_release_gate_accepts_real_intel_gate_artifact(tmp_path: Path):
+    """Pin producer/consumer compatibility for the real INTEL gate artifact."""
+    runs = tmp_path / "eval-runs"
+    _seven_green_runs(runs)
+    newest = max(runs.iterdir(), key=lambda path: path.stat().st_mtime)
+    real_intel_gate = run_intel_gate(
+        fixture_dir=INTEL_FIXTURE_MANIFEST.parent,
+        threshold_lock=INTEL_LOCK_PATH,
+    )
+    assert real_intel_gate["valid"] is True
+    (newest / "intel_gate.json").write_text(
+        json.dumps(real_intel_gate, indent=2),
+        encoding="utf-8",
+    )
+    tl = _make_threshold_lock(tmp_path)
+    ear = _make_stub_gate(tmp_path / "ear_test_pass.sh", pass_=True)
+
+    result = _run(runs, tl, ear)
+
+    assert result.returncode == 0, (
+        f"real intel_gate.py artifact should pass release gate; "
+        f"stdout={result.stdout!r}; stderr={result.stderr!r}"
+    )
+    assert "PASS check_gate" in result.stdout
 
 
 def test_seven_nightly_green_plus_ear_test_green_passes(tmp_path: Path):
