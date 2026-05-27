@@ -99,8 +99,14 @@ async function loadControllerSvg(controllerId: string): Promise<string> {
       )) as ControllerSvgModule;
       return m.NUMARK_PARTY_MIX_LIVE_SVG ?? "";
     }
-    // Plan 06 lands the remaining 4 — until then they fall through to
-    // the generic branch (so a user plugging an FLX10 still sees the
+    case "pioneer_ddj_flx10": {
+      const m = (await import(
+        "../controllers/pioneer_ddj_flx10.svg.js"
+      )) as ControllerSvgModule;
+      return m.PIONEER_DDJ_FLX10_SVG ?? "";
+    }
+    // Plan 06 lands the remaining 3 — until then they fall through to
+    // the generic branch (so a user plugging an XDJ-RX3 still sees the
     // labeled-zone fallback, not a blank stage).
     default: {
       const generic = (await import(
