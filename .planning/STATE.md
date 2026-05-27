@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v9.0
 milestone_name: Lesson One
 status: executing
-last_updated: "2026-05-27T22:02:29.923Z"
+last_updated: "2026-05-27T22:30:55.537Z"
 last_activity: 2026-05-27
 progress:
   total_phases: 14
   completed_phases: 0
   total_plans: 7
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -18,9 +18,9 @@ progress:
 ## Current Position
 
 Phase: 91 (Controller Renderer + MIDI Mirror) — EXECUTING
-Plan: 6 of 7 (Plans 01-05 SHIPPED; 91-01 commits 905e1550 → de4808ce on 2026-05-27; 91-02 commits da2aa70c → 10c4fcfc on 2026-05-27/28; 91-03 commits 63d5c7f2 → e572a8a7 on 2026-05-28 — MidiMirror class + ws_broadcast drain-then-snapshot wiring + __main__ port_watcher layering; 91-04 commits 4136f72f → 508ef572 on 2026-05-27 — Rust learn_window.rs trimmed-mirror + main.rs wire-in; 91-05 commits bfa01b80 → 71d218cd on 2026-05-28 — Learn webview frontend: FLX4 SVG + generic fallback + ARIA lookup + ws-client + 5 components + styles; latency P95 0.66ms in jsdom — §LEARN-LATENCY-CONTINGENCY remains parked, no trigger). The user-facing artifact LIGHTS UP — Kaan can now plug in a DDJ-FLX4 and see the schematic mirror.
+Plan: 7 of 7 (Plans 01-06 SHIPPED; 91-01 commits 905e1550 → de4808ce on 2026-05-27; 91-02 commits da2aa70c → 10c4fcfc on 2026-05-27/28; 91-03 commits 63d5c7f2 → e572a8a7 on 2026-05-28 — MidiMirror class + ws_broadcast drain-then-snapshot wiring + __main__ port_watcher layering; 91-04 commits 4136f72f → 508ef572 on 2026-05-27 — Rust learn_window.rs trimmed-mirror + main.rs wire-in; 91-05 commits bfa01b80 → 71d218cd on 2026-05-28 — Learn webview frontend: FLX4 SVG + generic fallback + ARIA lookup + ws-client + 5 components + styles; latency P95 0.66ms in jsdom; 91-06 commits 89f378a1 → e85fae9d on 2026-05-28 — 9 controller SVGs (FLX6, FLX10, 400, 1000, SX3, XDJ-RX3, Numark Party Mix Live, Inpulse 300, Inpulse 500), 9 atomic per-SVG commits, 11/11 parity-rows GREEN, lazy chunks max 2.54 KB gz (8x headroom over 20 KB budget), §LEARN-LATENCY-CONTINGENCY remains parked, no trigger). The user-facing artifact LIGHTS UP — Kaan can now plug in ANY of the 10 supported controllers and see the schematic mirror.
 Status: Ready to execute
-Last activity: 2026-05-28
+Last activity: 2026-05-27
 
 ## Milestone Reference
 
