@@ -136,6 +136,10 @@ These IDs are intentionally local to the current payload. The context compiler
 normalizes scorer-local duplicates into the current ranked IDs so the decision
 runtime can cite the same candidate the UI sees.
 
+The expanded pill renders non-selected alternatives as compact backup rows. The
+collapsed hover peek hides backups so the glance stays focused on the selected
+action.
+
 ### `decision`
 
 `decision` is the validator-checked action packet produced after the claim ledger
@@ -180,10 +184,14 @@ match, the cited claims must support those facts.
 The TypeScript pill wire type understands the expanded `transition`,
 `transition_alternatives`, and `decision` payloads.
 
-The visible compact line still renders from `transition`, with cue time and
-section-role pair support. The validator-checked `decision` is available on the
-wire for future UI and model consumers, but it is not yet the primary visual
-rendering source.
+The visible compact line prefers a validator-checked emitted `decision` when it
+is an accepted `select` for the same candidate. Rejected, non-emitted,
+missing-candidate, stale-candidate, held, or suppressed decisions fall back to
+the grounded `transition` text.
+
+The expanded pill renders up to two backup alternatives from
+`transition_alternatives`. The collapsed hover peek calls the same renderer with
+backups hidden.
 
 ## Validation
 
@@ -192,6 +200,7 @@ Focused backend and UI checks used for this slice:
 ```bash
 uv run pytest -q tests/runtime/test_suggestion.py tests/intel/test_context_compiler.py tests/intel/test_decision_runtime.py tests/intel/test_decision_validator.py tests/library/test_next_suggestion.py
 npm --prefix tauri/ui test -- next-suggestion
+npm --prefix tauri/ui test -- pill/index
 ```
 
 Broader intelligence/eval checks used before documenting:
@@ -206,13 +215,11 @@ warnings are not specific to the live next-pill contract.
 
 ## Remaining gaps
 
-- Make the UI render from `decision` where appropriate, while preserving the
-  compact transition fallback.
 - Add real-session replay coverage for live deck changes that cause the source
   section to move while the embedding shortlist remains cached.
 - Add richer target-cue operability checks once more CUE-DETR or Rekordbox cue
   data is available.
-- Expose the alternatives in a DJ-friendly pill expansion so the DJ can choose
-  "not that one, give me the second-best cue" without a full rerank.
+- Add a DJ command path to actively choose a rendered backup alternative without
+  forcing a full rerank.
 - Keep improving taste learning and threshold gates so the system learns which
   technically valid transitions the DJ actually accepts.

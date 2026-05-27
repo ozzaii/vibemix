@@ -422,7 +422,7 @@ function syncNextSuggestion(view: PillView): void {
   if (key === view.lastNextKey) return;
   view.lastNextKey = key;
   mount.replaceChildren();
-  const card = renderNextSuggestion(s);
+  const card = renderNextSuggestion(s, { showAlternatives: true, maxAlternatives: 2 });
   if (card) {
     card.setAttribute("data-no-drag", "");
     mount.append(card);
@@ -431,8 +431,8 @@ function syncNextSuggestion(view: PillView): void {
 
 /**
  * Populate the collapsed-hover #pill-peek mount with the next-track suggestion
- * card (Phase-1b). REUSES renderNextSuggestion — the SAME card the expand panel
- * shows (one source of truth, no duplicated markup). Rebuilds only when the
+ * card (Phase-1b). REUSES renderNextSuggestion with backups hidden so the hover
+ * glance stays compact. Rebuilds only when the
  * rendered suggestion changes, including live transition timing, while the rAF
  * loop calls render() every frame. HONEST SILENCE: a null/undefined suggestion
  * clears the mount and renders nothing (renderNextSuggestion returns null) — the pill never
@@ -448,7 +448,7 @@ function syncPeekCard(view: PillView): void {
   if (key === view.lastPeekKey) return;
   view.lastPeekKey = key;
   mount.replaceChildren();
-  const card = renderNextSuggestion(s);
+  const card = renderNextSuggestion(s, { showAlternatives: false });
   if (card) {
     card.setAttribute("data-no-drag", "");
     mount.append(card);

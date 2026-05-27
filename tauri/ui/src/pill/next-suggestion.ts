@@ -74,6 +74,25 @@ export interface NextSuggestionDecisionWire {
   confidence?: number | null;
 }
 
+export interface NextSuggestionAlternativeWire {
+  candidate_id?: string;
+  rank?: number;
+  selected?: boolean;
+  track_id?: string;
+  title?: string;
+  artist?: string;
+  similarity?: number;
+  why?: string;
+  camelot?: string | null;
+  bpm?: number | null;
+  transition?: NextSuggestionTransitionWire | null;
+}
+
+export interface NextSuggestionRenderOptions {
+  showAlternatives?: boolean;
+  maxAlternatives?: number;
+}
+
 /** The `next_suggestion` wire payload — mirrors
  *  `vibemix.library.next_suggestion.NextSuggestion.to_dict()`.
  *  `camelot`/`bpm` are `null` for folder-only libraries (honest-null). */
@@ -87,19 +106,7 @@ export interface NextSuggestionWire {
   bpm: number | null;
   transition?: NextSuggestionTransitionWire | null;
   decision?: NextSuggestionDecisionWire | null;
-  transition_alternatives?: Array<{
-    candidate_id?: string;
-    rank?: number;
-    selected?: boolean;
-    track_id?: string;
-    title?: string;
-    artist?: string;
-    similarity?: number;
-    why?: string;
-    camelot?: string | null;
-    bpm?: number | null;
-    transition?: NextSuggestionTransitionWire | null;
-  }>;
+  transition_alternatives?: NextSuggestionAlternativeWire[];
 }
 
 const CSS = `
@@ -187,6 +194,50 @@ const CSS = `
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .vmx-next-card__alternatives {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin-top: var(--sp-1);
+    padding-top: var(--sp-1);
+    border-top: 1px solid var(--glass-edge);
+  }
+  .vmx-next-card__alt-label {
+    font-family: var(--type-mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--silk-40);
+  }
+  .vmx-next-card__alt-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .vmx-next-card__alt-title,
+  .vmx-next-card__alt-meta {
+    font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .vmx-next-card__alt-title {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    color: var(--silk-65);
+  }
+  .vmx-next-card__alt-meta {
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    color: var(--silk-40);
+    text-transform: lowercase;
+  }
 `;
 
 registerStyle("vmx-next-card", CSS);
@@ -255,6 +306,42 @@ export function nextDecisionText(
   return cleanDecisionText(d.spoken_text);
 }
 
+export interface NextAlternativeView {
+  key: string;
+  title: string;
+  meta: string;
+}
+
+export function nextAlternativeViews(
+  s: NextSuggestionWire | null | undefined,
+  limit = 2,
+): NextAlternativeView[] {
+  if (!s || limit <= 0) return [];
+  const selectedCandidate = cleanDecisionText(s.decision?.candidate_id)
+    || cleanDecisionText(s.transition?.candidate_id);
+  const selectedTrack = cleanDecisionText(s.track_id);
+  const rows: NextAlternativeView[] = [];
+  for (const alt of s.transition_alternatives ?? []) {
+    if (rows.length >= limit) break;
+    if (!alt || alt.selected === true) continue;
+    const candidateId = cleanDecisionText(alt.candidate_id);
+    const trackId = cleanDecisionText(alt.track_id);
+    if (candidateId && candidateId === selectedCandidate) continue;
+    if (trackId && trackId === selectedTrack) continue;
+    const title = cleanDecisionText(alt.title);
+    if (!candidateId || !title) continue;
+    const rank = typeof alt.rank === "number" && Number.isFinite(alt.rank)
+      ? Math.max(1, Math.round(alt.rank))
+      : rows.length + 2;
+    rows.push({
+      key: candidateId,
+      title: `${String(rank).padStart(2, "0")} · ${title}`,
+      meta: nextAlternativeMeta(alt),
+    });
+  }
+  return rows;
+}
+
 export function nextSuggestionRenderKey(
   s: NextSuggestionWire | null | undefined,
 ): string {
@@ -290,6 +377,20 @@ export function nextSuggestionRenderKey(
     d?.cue_slot ?? "",
     d?.timing_text ?? "",
     d?.spoken_text ?? "",
+    ...(s.transition_alternatives ?? []).flatMap((alt) => [
+      alt?.candidate_id ?? "",
+      alt?.rank ?? "",
+      alt?.selected ?? "",
+      alt?.track_id ?? "",
+      alt?.title ?? "",
+      alt?.camelot ?? "",
+      alt?.bpm ?? "",
+      alt?.transition?.candidate_id ?? "",
+      alt?.transition?.target_deck ?? "",
+      alt?.transition?.to_start_s ?? "",
+      alt?.transition?.cue_slot ?? "",
+      alt?.transition?.start_in_bars ?? "",
+    ]),
   ].join("|");
 }
 
@@ -315,6 +416,19 @@ function deckLabel(raw: string | null | undefined): string {
 function cleanDecisionText(raw: string | null | undefined): string {
   if (typeof raw !== "string") return "";
   return raw.trim().replace(/\s+/g, " ");
+}
+
+function nextAlternativeMeta(alt: NextSuggestionAlternativeWire): string {
+  const bits: string[] = [];
+  const transitionText = nextTransitionText(alt.transition);
+  if (transitionText) bits.push(transitionText.replace(/^load [AB] · /, ""));
+  const camelot = cleanDecisionText(alt.camelot).toLowerCase();
+  if (camelot) bits.push(camelot);
+  if (typeof alt.bpm === "number" && Number.isFinite(alt.bpm)) {
+    bits.push(String(Math.round(alt.bpm)));
+  }
+  if (bits.length > 0) return bits.join(" · ");
+  return cleanDecisionText(alt.why);
 }
 
 function formatCueTime(raw: number | null | undefined): string {
@@ -352,6 +466,7 @@ function normalizeRoleLabel(raw: string | null | undefined): string {
  */
 export function renderNextSuggestion(
   s: NextSuggestionWire | null | undefined,
+  options: NextSuggestionRenderOptions = {},
 ): HTMLDivElement | null {
   if (!s || !s.track_id || !s.title) return null; // honest silence
 
@@ -383,6 +498,38 @@ export function renderNextSuggestion(
     transition.className = "vmx-next-card__transition";
     transition.textContent = actionText;
     root.append(transition);
+  }
+
+  if (options.showAlternatives !== false) {
+    const alternatives = nextAlternativeViews(s, options.maxAlternatives ?? 2);
+    if (alternatives.length > 0) {
+      const group = document.createElement("div");
+      group.className = "vmx-next-card__alternatives";
+      group.setAttribute("aria-label", "backup transition options");
+
+      const altLabel = document.createElement("div");
+      altLabel.className = "vmx-next-card__alt-label";
+      altLabel.textContent = "backup";
+      group.append(altLabel);
+
+      for (const alt of alternatives) {
+        const row = document.createElement("div");
+        row.className = "vmx-next-card__alt-row";
+        row.dataset.candidateId = alt.key;
+
+        const title = document.createElement("div");
+        title.className = "vmx-next-card__alt-title";
+        title.textContent = alt.title;
+
+        const meta = document.createElement("div");
+        meta.className = "vmx-next-card__alt-meta";
+        meta.textContent = alt.meta;
+
+        row.append(title, meta);
+        group.append(row);
+      }
+      root.append(group);
+    }
   }
 
   return root;

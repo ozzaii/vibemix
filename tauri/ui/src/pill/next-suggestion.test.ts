@@ -23,6 +23,7 @@ import { describe, test, expect } from "vitest";
 
 import {
   nextDecisionText,
+  nextAlternativeViews,
   nextSuggestionRenderKey,
   nextMetaText,
   nextTransitionText,
@@ -194,6 +195,69 @@ describe("nextDecisionText — validator-checked live action", () => {
   });
 });
 
+describe("nextAlternativeViews — grounded backup choices", () => {
+  test("filters the selected candidate and returns bounded backup rows", () => {
+    expect(
+      nextAlternativeViews(
+        _sugg({
+          transition: { candidate_id: "tr_001" },
+          transition_alternatives: [
+            {
+              candidate_id: "tr_001",
+              rank: 1,
+              selected: true,
+              track_id: "t1",
+              title: "Strobe",
+            },
+            {
+              candidate_id: "tr_002",
+              rank: 2,
+              track_id: "t2",
+              title: "Backup Heat",
+              camelot: "9A",
+              bpm: 127.4,
+              transition: {
+                candidate_id: "tr_002",
+                target_deck: "B",
+                cue_slot: "B",
+                to_start_s: 64,
+                start_in_bars: 8,
+              },
+            },
+            {
+              candidate_id: "tr_003",
+              rank: 3,
+              track_id: "t3",
+              title: "Third Door",
+              transition: { candidate_id: "tr_003", cue_slot: "C" },
+            },
+          ],
+        }),
+        1,
+      ),
+    ).toEqual([
+      {
+        key: "tr_002",
+        title: "02 · Backup Heat",
+        meta: "cue B @ 1:04 · in 8 bars · 9a · 127",
+      },
+    ]);
+  });
+
+  test("requires a candidate id and title before showing a backup", () => {
+    expect(
+      nextAlternativeViews(
+        _sugg({
+          transition_alternatives: [
+            { rank: 2, track_id: "t2", title: "No Candidate" },
+            { candidate_id: "tr_003", rank: 3, track_id: "t3", title: "" },
+          ],
+        }),
+      ),
+    ).toEqual([]);
+  });
+});
+
 describe("renderNextSuggestion — honest silence + verbatim render", () => {
   test("null → renders NOTHING (honest silence, never a fabricated track)", () => {
     expect(renderNextSuggestion(null)).toBeNull();
@@ -301,6 +365,79 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     );
   });
 
+  test("backup alternatives render under the primary action", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition: { candidate_id: "tr_001", cue_slot: "A", start_in_bars: 4 },
+        transition_alternatives: [
+          {
+            candidate_id: "tr_001",
+            rank: 1,
+            selected: true,
+            track_id: "t1",
+            title: "Strobe",
+          },
+          {
+            candidate_id: "tr_002",
+            rank: 2,
+            track_id: "t2",
+            title: "Backup Heat",
+            camelot: "9A",
+            bpm: 127,
+            transition: { candidate_id: "tr_002", cue_slot: "B", start_in_bars: 8 },
+          },
+        ],
+      }),
+    )!;
+    expect(card.querySelector(".vmx-next-card__alternatives")?.getAttribute("aria-label")).toBe(
+      "backup transition options",
+    );
+    expect(card.querySelector(".vmx-next-card__alt-label")?.textContent).toBe("backup");
+    expect(card.querySelector(".vmx-next-card__alt-title")?.textContent).toBe(
+      "02 · Backup Heat",
+    );
+    expect(card.querySelector(".vmx-next-card__alt-meta")?.textContent).toBe(
+      "cue B · in 8 bars · 9a · 127",
+    );
+  });
+
+  test("backup alternatives can be hidden for the collapsed hover peek", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition_alternatives: [
+          {
+            candidate_id: "tr_002",
+            rank: 2,
+            track_id: "t2",
+            title: "Backup Heat",
+            transition: { candidate_id: "tr_002", cue_slot: "B" },
+          },
+        ],
+      }),
+      { showAlternatives: false },
+    )!;
+    expect(card.querySelector(".vmx-next-card__alternatives")).toBeNull();
+  });
+
+  test("backup alternative titles are text nodes, never injected markup", () => {
+    const card = renderNextSuggestion(
+      _sugg({
+        transition_alternatives: [
+          {
+            candidate_id: "tr_002",
+            rank: 2,
+            track_id: "t2",
+            title: "<img src=x onerror=alert(1)>",
+            transition: { candidate_id: "tr_002", cue_slot: "B" },
+          },
+        ],
+      }),
+    )!;
+    const title = card.querySelector(".vmx-next-card__alt-title")!;
+    expect(title.textContent).toBe("02 · <img src=x onerror=alert(1)>");
+    expect(title.querySelector("img")).toBeNull();
+  });
+
   test("render key changes when the live transition countdown changes", () => {
     const a = _sugg({ transition: { cue_slot: "A", start_in_bars: 13 } });
     const b = _sugg({ transition: { cue_slot: "A", start_in_bars: 12 } });
@@ -329,6 +466,32 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
         cue_slot: "A",
         timing_text: "in 12 bars",
       },
+    });
+    expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
+  });
+
+  test("render key changes when a backup transition changes", () => {
+    const a = _sugg({
+      transition_alternatives: [
+        {
+          candidate_id: "tr_002",
+          rank: 2,
+          track_id: "t2",
+          title: "Backup Heat",
+          transition: { candidate_id: "tr_002", cue_slot: "B", start_in_bars: 8 },
+        },
+      ],
+    });
+    const b = _sugg({
+      transition_alternatives: [
+        {
+          candidate_id: "tr_002",
+          rank: 2,
+          track_id: "t2",
+          title: "Backup Heat",
+          transition: { candidate_id: "tr_002", cue_slot: "C", start_in_bars: 8 },
+        },
+      ],
     });
     expect(nextSuggestionRenderKey(a)).not.toBe(nextSuggestionRenderKey(b));
   });
