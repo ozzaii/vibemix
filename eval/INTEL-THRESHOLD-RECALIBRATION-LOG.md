@@ -84,6 +84,12 @@ point at the same threshold-lock/threshold-values hashes. Use `--append-log
 eval/INTEL-THRESHOLD-RECALIBRATION-LOG.md` to append a valid entry directly;
 invalid evidence exits non-zero and is not written.
 
+Validate the public log with
+`scripts/eval/intel_recalibration_log_validate.py`. The validator treats
+everything after the append marker as machine-audited evidence and checks entry
+schema, report-hash bindings, release/split consistency, and public-redaction
+markers.
+
 ## Audit Trail
 
 ### 1970-01-01T00:00:00Z - verdict=schema_example
