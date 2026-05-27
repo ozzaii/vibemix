@@ -23,6 +23,7 @@ from scripts.eval.intel_recalibration_note import (  # noqa: E402
     FORBIDDEN_PRIVATE_PATTERNS,
     KEY_METRICS,
     RUN_ID_RE,
+    timestamp_valid,
 )
 
 DEFAULT_LOG = ROOT / "eval" / "INTEL-THRESHOLD-RECALIBRATION-LOG.md"
@@ -156,6 +157,8 @@ def _validate_entry(entry: str, *, index: int, expected_lock_hash: str | None) -
     else:
         header_verdict = header.group("verdict")
         header_timestamp = header.group("timestamp")
+        if not timestamp_valid(header_timestamp):
+            errors.append(f"entry[{index}].header.timestamp")
         if header_verdict not in ALLOWED_VERDICTS:
             errors.append(f"entry[{index}].header.verdict")
 

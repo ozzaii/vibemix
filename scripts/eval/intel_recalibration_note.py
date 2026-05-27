@@ -135,7 +135,7 @@ def build_recalibration_note(
     )
     timestamp = timestamp or _now_iso()
     run_id = run_id or _default_run_id(timestamp, evidence_tier, scorecard, gold_report)
-    if TIMESTAMP_RE.match(timestamp) is None:
+    if not timestamp_valid(timestamp):
         errors.append("timestamp")
     errors.extend(_run_id_errors(run_id, timestamp))
     label_kinds = _label_kind_counts(gold_report, taste_scorecard)
@@ -453,9 +453,19 @@ def _run_id_errors(run_id: str, timestamp: str) -> tuple[str, ...]:
     if match is None:
         return ("run_id",)
     timestamp_date = timestamp[:10].replace("-", "")
-    if TIMESTAMP_RE.match(timestamp) is not None and match.group("date") != timestamp_date:
+    if timestamp_valid(timestamp) and match.group("date") != timestamp_date:
         return ("run_id.timestamp_date",)
     return ()
+
+
+def timestamp_valid(value: str) -> bool:
+    if TIMESTAMP_RE.match(value) is None:
+        return False
+    try:
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return False
+    return True
 
 
 def _file_sha256(path: Path) -> str:

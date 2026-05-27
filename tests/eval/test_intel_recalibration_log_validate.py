@@ -162,6 +162,23 @@ def test_validate_rejects_run_id_date_mismatch(tmp_path: Path) -> None:
     assert "entry[1].run_id" in report.errors
 
 
+def test_validate_rejects_impossible_header_timestamp(tmp_path: Path) -> None:
+    entry = _valid_entry(
+        timestamp="2026-02-28T12:00:00Z",
+        run_id="intel_private_20260228_aaaaaaaaaa",
+    ).replace(
+        "### 2026-02-28T12:00:00Z - verdict=private_in_tolerance",
+        "### 2026-02-31T12:00:00Z - verdict=private_in_tolerance",
+    )
+    entry = _replace_field(entry, "run_id", "intel_private_20260231_aaaaaaaaaa")
+    log = _write_log(tmp_path, entry)
+
+    report = validate_recalibration_log(log)
+
+    assert report.valid is False
+    assert "entry[1].header.timestamp" in report.errors
+
+
 def test_validate_rejects_missing_required_metric(tmp_path: Path) -> None:
     entry = _replace_field(
         _valid_entry(),

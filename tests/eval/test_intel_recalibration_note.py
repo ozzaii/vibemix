@@ -99,6 +99,20 @@ def test_recalibration_note_rejects_invalid_timestamp_and_run_id() -> None:
     assert "run_id" in result["errors"]
 
 
+def test_recalibration_note_rejects_impossible_timestamp() -> None:
+    result = build_recalibration_note(
+        scorecard=_scorecard(),
+        gold_report=_gold_report(),
+        evidence_tier="tier1_private_calibration",
+        lock_path=INTEL_LOCK_PATH,
+        timestamp="2026-02-31T12:00:00Z",
+        run_id="intel_private_20260231_aaaaaaaaaa",
+    )
+
+    assert result["valid"] is False
+    assert "timestamp" in result["errors"]
+
+
 def test_recalibration_note_rejects_run_id_date_mismatch() -> None:
     result = build_recalibration_note(
         scorecard=_scorecard(),

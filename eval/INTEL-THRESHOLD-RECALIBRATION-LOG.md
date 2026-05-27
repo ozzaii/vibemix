@@ -43,8 +43,8 @@ rejects verdict/action pairs that disagree with those numbers. It also rejects
 evidence, and rejects entries whose `lock:` digest does not match the current
 `eval/INTEL-THRESHOLD-LOCK.md` file. Key-value lines are strict: duplicate keys,
 unknown keys, and malformed tokens are invalid rather than silently ignored.
-Across real entries, `run_id` values must be unique and timestamps must not move
-backwards.
+Timestamps must be real UTC instants. Across real entries, `run_id` values must
+be unique and timestamps must not move backwards.
 
 ```text
 ### YYYY-MM-DDTHH:MM:SSZ - verdict={private_in_tolerance|private_recalibration_required|release_promoted}
@@ -87,8 +87,9 @@ Use `scripts/eval/intel_recalibration_note.py` to render the redacted markdown
 entry from private scorecard/gold/taste/gate reports. The script validates report
 schemas, privacy flags, forbidden private payload markers, holdout/canary split
 coverage for release promotion, timestamp/run-id shape, and the key
-measured-vs-locked INTEL metrics before emitting an entry. The `run_id` date
-must match the entry timestamp date. Each entry also carries canonical SHA-256
+measured-vs-locked INTEL metrics before emitting an entry. Timestamps must be
+real UTC instants, and the `run_id` date must match the entry timestamp date.
+Each entry also carries canonical SHA-256
 hashes of the redacted private aggregate reports, so the public note is bound
 to exact evidence artifacts without exposing paths, track names, labels,
 vectors, or audio. Release promotion also requires a passing private scorecard and a valid
@@ -102,9 +103,9 @@ the output file is written only after append validation succeeds.
 Validate the public log with
 `scripts/eval/intel_recalibration_log_validate.py`. The validator treats
 everything after the append marker as machine-audited evidence and checks entry
-schema, canonical run-id shape/date binding, current-lock hash binding,
-report-hash bindings, release/split consistency, strict key-value parsing,
-append-order coherence, and public-redaction markers.
+schema, real UTC timestamp validity, canonical run-id shape/date binding,
+current-lock hash binding, report-hash bindings, release/split consistency,
+strict key-value parsing, append-order coherence, and public-redaction markers.
 
 ## Audit Trail
 

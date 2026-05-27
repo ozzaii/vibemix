@@ -643,6 +643,8 @@ done: `scripts/eval/intel_recalibration_note.py` is the reproducible producer
       for the private-label note, including privacy and split-coverage gates
 done: `scripts/eval/intel_recalibration_note.py` rejects malformed
       timestamp/run-id identity fields before writing output or appending logs
+done: recalibration producer and validator reject impossible timestamp values,
+      not only strings that fail the UTC timestamp regex
 done: recalibration producer and validator require canonical
       `intel_private_<YYYYMMDD>_<10-hex>` run IDs whose dates match the entry
       timestamp
