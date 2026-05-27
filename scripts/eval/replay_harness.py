@@ -339,12 +339,14 @@ def _emit_cache_hit_rate_report(events: list[dict[str, Any]]) -> None:
     )
 
 
-# Regex for `resolve("path")` or `resolve('path')` call sites under
-# `src/vibemix/`. We intentionally do NOT track `model_router.resolve` import
-# sites — only call sites — so re-exports and re-imports don't inflate the
-# count. The path argument is captured for the per-path breakdown.
+# Regex for `resolve("path")`, `resolve('path')`, `resolve_model("path")`, or
+# `resolve_model('path')` call sites under `src/vibemix/`. Both surfaces route
+# through `vibemix.llm.model_router` and are equally valid gates against
+# hardcoded model literals; `resolve_model` is the SDK-free helper used where
+# only the model id is needed. We intentionally do NOT track import sites —
+# only call sites — so re-exports and re-imports don't inflate the count.
 _RESOLVE_CALL_RE: re.Pattern[str] = re.compile(
-    r"""resolve\(\s*['"]([a-z_][a-z0-9_]*)['"]"""
+    r"""\bresolve(?:_model)?\(\s*['"]([a-z_][a-z0-9_]*)['"]"""
 )
 
 
