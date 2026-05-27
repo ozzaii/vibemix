@@ -586,6 +586,9 @@ done: tests/eval/test_intel_section_retrieval.py
 done: tests/intel/fixtures/section_queries.jsonl
 done: scripts/eval/intel_transition_scorecard.py
 done: tests/eval/test_intel_transition_scorecard.py
+done: transition scorecard validation rejects duplicate candidate IDs,
+      non-finite scores, unknown label candidates, and private payload markers;
+      the CLI exits non-zero when candidate/label evidence is invalid
 done: fixture decision replay hydrates candidate/claim ledgers and passes
       fallback/timing gates
 done: taste privacy/poisoning fixture gate

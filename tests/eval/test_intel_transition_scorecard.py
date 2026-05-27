@@ -65,8 +65,73 @@ def test_transition_scorecard_catches_nan_scores() -> None:
     result = score_transition_labels(candidates=candidates, labels=labels, source="unit")
 
     assert result["valid"] is False
-    assert "tr_001:nan_score" in result["errors"]
-    assert result["metrics"]["nan_score_count"] == 1.0
+    assert "tr_001:nonfinite_score" in result["errors"]
+    assert result["metrics"]["nonfinite_score_count"] == 1.0
+
+
+def test_transition_scorecard_catches_infinite_scores() -> None:
+    candidates = ({"candidate_id": "tr_001", "score": "inf", "risk_flags": []},)
+    labels = (
+        parse_gold_label(
+            {
+                "label_id": "lbl_001",
+                "candidate_id": "tr_001",
+                "label": "would_play",
+            }
+        ),
+    )
+
+    result = score_transition_labels(candidates=candidates, labels=labels, source="unit")
+
+    assert result["valid"] is False
+    assert "tr_001:nonfinite_score" in result["errors"]
+    assert result["metrics"]["nonfinite_score_count"] == 1.0
+
+
+def test_transition_scorecard_catches_duplicate_candidate_ids() -> None:
+    candidates = (
+        {"candidate_id": "tr_001", "score": 0.9, "risk_flags": []},
+        {"candidate_id": "tr_001", "score": 0.2, "risk_flags": []},
+    )
+    labels = (
+        parse_gold_label(
+            {
+                "label_id": "lbl_001",
+                "candidate_id": "tr_001",
+                "label": "would_play",
+            }
+        ),
+    )
+
+    result = score_transition_labels(candidates=candidates, labels=labels, source="unit")
+
+    assert result["valid"] is False
+    assert "tr_001:duplicate_candidate_id" in result["errors"]
+
+
+def test_transition_scorecard_catches_private_payload() -> None:
+    candidates = (
+        {
+            "candidate_id": "tr_001",
+            "score": 0.9,
+            "risk_flags": [],
+            "debug_path": "/Users/ozai/Music/private.wav",
+        },
+    )
+    labels = (
+        parse_gold_label(
+            {
+                "label_id": "lbl_001",
+                "candidate_id": "tr_001",
+                "label": "would_play",
+            }
+        ),
+    )
+
+    result = score_transition_labels(candidates=candidates, labels=labels, source="unit")
+
+    assert result["valid"] is False
+    assert any(str(error).startswith("private_payload_present:") for error in result["errors"])
 
 
 def test_transition_scorecard_private_paths() -> None:
@@ -85,6 +150,28 @@ def test_transition_scorecard_cli_json(capsys) -> None:  # type: ignore[no-untyp
     out = json.loads(capsys.readouterr().out)
     assert out["schema"] == "intel_transition_scorecard_v1"
     assert out["metrics"]["accepted_transition_rate_at_3"] == 1.0
+
+
+def test_transition_scorecard_cli_returns_nonzero_for_invalid_evidence(
+    tmp_path: Path,
+    capsys,  # type: ignore[no-untyped-def]
+) -> None:
+    candidates = tmp_path / "pairs.json"
+    labels = tmp_path / "labels.jsonl"
+    candidates.write_text(
+        json.dumps([{"candidate_id": "tr_001", "score": "inf", "risk_flags": []}]),
+        encoding="utf-8",
+    )
+    labels.write_text(
+        json.dumps({"label_id": "lbl_001", "candidate_id": "tr_001", "label": "would_play"}) + "\n",
+        encoding="utf-8",
+    )
+
+    assert main(["--candidates", str(candidates), "--labels", str(labels), "--json"]) == 1
+
+    out = json.loads(capsys.readouterr().out)
+    assert out["valid"] is False
+    assert "tr_001:nonfinite_score" in out["errors"]
 
 
 def test_transition_scorecard_cli_requires_paths_together(capsys) -> None:  # type: ignore[no-untyped-def]

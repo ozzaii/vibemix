@@ -85,6 +85,11 @@ Taste-feedback evidence uses the same fail-closed posture:
 unknown labels, duplicate event IDs, malformed consent fields, and private
 payload markers before those rows can influence profile projection or release
 scorecards.
+Transition-ranking evidence is also fail-closed:
+`scripts/eval/intel_transition_scorecard.py --candidates ... --labels ...`
+rejects unknown label candidates, duplicate candidate IDs, non-finite scores,
+and private payload markers before the ranking metrics can back threshold
+movement.
 `scripts/eval/intel_recalibration_note.py` renders that append-only entry from
 redacted private scorecard/gold/taste/gate reports, binds it to those aggregate
 reports by SHA-256, rejects malformed timestamp/run-id identity fields before
@@ -221,6 +226,7 @@ scope for v3.0:
 - [`scripts/eval/replay_harness.py`](../scripts/eval/replay_harness.py) — deterministic replay CLI.
 - [`scripts/eval/intel_gold.py`](../scripts/eval/intel_gold.py) — validates and redacts private INTEL gold-label evidence.
 - [`scripts/eval/intel_taste_scorecard.py`](../scripts/eval/intel_taste_scorecard.py) — validates privacy-safe taste feedback and deterministic profile projection metrics.
+- [`scripts/eval/intel_transition_scorecard.py`](../scripts/eval/intel_transition_scorecard.py) — validates transition-ranking candidate evidence and scored label metrics.
 - [`scripts/eval/intel_recalibration_note.py`](../scripts/eval/intel_recalibration_note.py) — renders redacted private-label INTEL recalibration log entries.
 - [`scripts/eval/intel_recalibration_log_validate.py`](../scripts/eval/intel_recalibration_log_validate.py) — validates the public INTEL recalibration log schema, current-lock hash binding, strict key-value tokens, append-order coherence, and report-hash bindings.
 - [`scripts/release/check_gate.sh`](../scripts/release/check_gate.sh) — Gate-2 umbrella that combines the hybrid gate and INTEL fixture gate.

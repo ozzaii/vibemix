@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,13 @@ if str(ROOT) not in sys.path:
 
 DEFAULT_FIXTURE_DIR = ROOT / "tests" / "intel" / "fixtures"
 RELEVANCE: dict[str, int] = {"would_play": 2, "maybe": 1, "no": 0}
+PRIVATE_PAYLOAD_PATTERNS = (
+    re.compile(r"/Users/[^\"'\s]+"),
+    re.compile(r"/Volumes/[^\"'\s]+"),
+    re.compile(r"[A-Za-z]:\\\\[^\"'\s]+"),
+    re.compile(r"file://[^\"'\s]+", re.I),
+    re.compile(r"\.(?:wav|aiff|aif|mp3|flac)\b", re.I),
+)
 
 
 def score_fixture_dir(fixture_dir: Path | str = DEFAULT_FIXTURE_DIR) -> dict[str, Any]:
@@ -47,15 +55,19 @@ def score_transition_labels(
     source: str,
 ) -> dict[str, Any]:
     errors: list[str] = []
+    errors.extend(_private_payload_errors(candidates, labels))
     candidate_map: dict[str, dict[str, Any]] = {}
     for row in candidates:
         candidate_id = str(row.get("candidate_id") or "")
         if not candidate_id:
             errors.append("candidate_missing_id")
             continue
+        if candidate_id in candidate_map:
+            errors.append(f"{candidate_id}:duplicate_candidate_id")
+            continue
         score = _float(row.get("score"), math.nan)
-        if math.isnan(score):
-            errors.append(f"{candidate_id}:nan_score")
+        if not math.isfinite(score):
+            errors.append(f"{candidate_id}:nonfinite_score")
         candidate_map[candidate_id] = row
 
     transition_labels = tuple(label for label in labels if label.kind == "transition")
@@ -108,7 +120,9 @@ def score_transition_labels(
         "unknown_candidate_label_count": float(
             sum(1 for error in errors if "unknown_candidate_id" in error)
         ),
-        "nan_score_count": float(sum(1 for error in errors if error.endswith(":nan_score"))),
+        "nonfinite_score_count": float(
+            sum(1 for error in errors if error.endswith(":nonfinite_score"))
+        ),
     }
     return {
         "schema": "intel_transition_scorecard_v1",
@@ -188,6 +202,21 @@ def _section_track(section_id: Any) -> str | None:
     return section_id.split("#s", 1)[0]
 
 
+def _private_payload_errors(
+    candidates: tuple[dict[str, Any], ...], labels: tuple[Any, ...]
+) -> list[str]:
+    text = json.dumps(
+        {"candidates": candidates, "labels": [getattr(label, "raw", {}) for label in labels]},
+        sort_keys=True,
+        default=str,
+    )
+    return [
+        f"private_payload_present:{pattern.pattern}"
+        for pattern in PRIVATE_PAYLOAD_PATTERNS
+        if pattern.search(text)
+    ]
+
+
 def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -228,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
             f"accept@3={metrics['accepted_transition_rate_at_3']} "
             f"ndcg@5={metrics['ndcg_at_5']}"
         )
-    return 0
+    return 0 if result.get("valid") is True else 1
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint

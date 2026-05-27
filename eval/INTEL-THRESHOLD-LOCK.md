@@ -78,7 +78,8 @@ of catching regressions.
 Release-grade thresholds still need private Kaan-reviewed evidence:
 
 - section queries against real hardtechno/hard-tek library moments;
-- transition pairs labeled `would_play`, `maybe`, and `no`;
+- transition pairs labeled `would_play`, `maybe`, and `no`, with candidate IDs,
+  score finiteness, and privacy checked before metrics are trusted;
 - live/debrief decisions replayed with timing confidence;
 - taste labels captured from actual accepted/rejected suggestions, with invalid
   taste split/label/consent fields rejected before profile projection.
