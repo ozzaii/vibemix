@@ -67,7 +67,9 @@ export type VibemixIPCMessages =
   | ProfileRegenerate
   | ProfileRegenerateResult
   | ProfileDelete
-  | ProfileDeleteAck;
+  | ProfileDeleteAck
+  | LearnControllerDetected
+  | LearnMidiPosition;
 
 export interface IpcBoot {
   type: "ipc.boot";
@@ -741,5 +743,25 @@ export interface ProfileDeleteAck {
   payload: {
     ok: boolean;
     error: string | null;
+  };
+}
+export interface LearnControllerDetected {
+  type: "ipc.learn.controller_detected";
+  ts: string;
+  payload: {
+    connected: boolean;
+    controller_id: string;
+    display_name: string;
+    port_name: string;
+  };
+}
+export interface LearnMidiPosition {
+  type: "ipc.learn.midi_position";
+  ts: string;
+  payload: {
+    controller_id: string;
+    positions: {
+      [k: string]: number;
+    };
   };
 }

@@ -195,6 +195,12 @@
     },
     {
       "$ref": "#/definitions/ProfileDeleteAck"
+    },
+    {
+      "$ref": "#/definitions/LearnControllerDetected"
+    },
+    {
+      "$ref": "#/definitions/LearnMidiPosition"
     }
   ],
   "definitions": {
@@ -2892,6 +2898,49 @@
           "properties": {
             "ok": {"type": "boolean"},
             "error": {"type": ["string", "null"], "maxLength": 200}
+          }
+        }
+      }
+    },
+    "LearnControllerDetected": {
+      "$comment": "Sidecar → shell. Single fire per MIDI port-bind / unbind event. Phase 91 RENDER-01 / RENDER-07.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.controller_detected"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["connected", "controller_id", "display_name", "port_name"],
+          "properties": {
+            "connected": {"type": "boolean"},
+            "controller_id": {"type": "string", "minLength": 1},
+            "display_name": {"type": "string", "minLength": 1},
+            "port_name": {"type": "string"}
+          }
+        }
+      }
+    },
+    "LearnMidiPosition": {
+      "$comment": "Sidecar → shell. 30 Hz delta-suppressed controller position snapshot. Phase 91 RENDER-02. Keys in 'positions' follow '<field>:<deck>' (deck-bound) or bare '<field>' (master-section) convention; values 0..127 for CC controls, 0/1 for booleans.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": {"const": "ipc.learn.midi_position"},
+        "ts": {"type": "string", "format": "date-time"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["controller_id", "positions"],
+          "properties": {
+            "controller_id": {"type": "string", "minLength": 1},
+            "positions": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0, "maximum": 127}
+            }
           }
         }
       }
