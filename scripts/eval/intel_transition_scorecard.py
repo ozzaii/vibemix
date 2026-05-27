@@ -54,6 +54,8 @@ def score_transition_labels(
     labels: tuple[Any, ...],
     source: str,
 ) -> dict[str, Any]:
+    from vibemix.intel.gold_validation import GoldKnownIds, validate_gold_labels
+
     errors: list[str] = []
     errors.extend(_private_payload_errors(candidates, labels))
     candidate_map: dict[str, dict[str, Any]] = {}
@@ -70,7 +72,17 @@ def score_transition_labels(
             errors.append(f"{candidate_id}:nonfinite_score")
         candidate_map[candidate_id] = row
 
+    label_validation = validate_gold_labels(
+        labels,
+        known_ids=GoldKnownIds(candidate_ids=frozenset(candidate_map)),
+        require_all_splits=False,
+    )
+    errors.extend(
+        error for error in label_validation.errors if ":unknown_candidate_id:" not in error
+    )
+
     transition_labels = tuple(label for label in labels if label.kind == "transition")
+    errors.extend(_duplicate_transition_label_candidate_errors(transition_labels))
     labeled_rows: list[tuple[Any, dict[str, Any], int]] = []
     for label in transition_labels:
         if not label.candidate_id:
@@ -139,6 +151,7 @@ def score_transition_labels(
         },
         "metrics": metrics,
         "errors": tuple(errors),
+        "warnings": tuple(label_validation.warnings),
         "ranked_labeled": tuple(
             {
                 "candidate_id": label.candidate_id,
@@ -200,6 +213,22 @@ def _section_track(section_id: Any) -> str | None:
     if not isinstance(section_id, str) or "#s" not in section_id:
         return None
     return section_id.split("#s", 1)[0]
+
+
+def _duplicate_transition_label_candidate_errors(labels: tuple[Any, ...]) -> tuple[str, ...]:
+    seen: dict[str, str] = {}
+    errors: list[str] = []
+    for label in labels:
+        candidate_id = getattr(label, "candidate_id", None)
+        if not candidate_id:
+            continue
+        label_id = str(getattr(label, "label_id", "") or "<missing_label_id>")
+        previous = seen.get(candidate_id)
+        if previous is not None:
+            errors.append(f"{label_id}:duplicate_transition_label_candidate:{candidate_id}")
+        else:
+            seen[candidate_id] = label_id
+    return tuple(errors)
 
 
 def _private_payload_errors(

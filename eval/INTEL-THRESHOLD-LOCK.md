@@ -87,7 +87,8 @@ Release-grade thresholds still need private Kaan-reviewed evidence:
   section/query IDs, vector finiteness, and privacy checked before retrieval
   deltas are trusted;
 - transition pairs labeled `would_play`, `maybe`, and `no`, with candidate IDs,
-  score finiteness, and privacy checked before metrics are trusted;
+  score finiteness, label identity, split validity, one transition label per
+  candidate, and privacy checked before metrics are trusted;
 - private gold review queues sampled from valid candidates only, with candidate
   identity, score/confidence finiteness, score-component finiteness, risk-flag
   shape, and privacy checked before review payloads are emitted;

@@ -109,6 +109,46 @@ def test_transition_scorecard_catches_duplicate_candidate_ids() -> None:
     assert "tr_001:duplicate_candidate_id" in result["errors"]
 
 
+def test_transition_scorecard_catches_bad_label_contract() -> None:
+    candidates = (
+        {"candidate_id": "tr_001", "score": 0.9, "risk_flags": []},
+        {"candidate_id": "tr_002", "score": 0.7, "risk_flags": []},
+    )
+    labels = (
+        parse_gold_label(
+            {
+                "label_id": "lbl_dup",
+                "split": "calibration",
+                "candidate_id": "tr_001",
+                "label": "would_play",
+            }
+        ),
+        parse_gold_label(
+            {
+                "label_id": "lbl_dup",
+                "split": "holdot",
+                "candidate_id": "tr_002",
+                "label": "maybe",
+            }
+        ),
+        parse_gold_label(
+            {
+                "label_id": "lbl_other",
+                "split": "calibration",
+                "candidate_id": "tr_001",
+                "label": "no",
+            }
+        ),
+    )
+
+    result = score_transition_labels(candidates=candidates, labels=labels, source="unit")
+
+    assert result["valid"] is False
+    assert "lbl_dup:duplicate_label_id" in result["errors"]
+    assert "lbl_dup:invalid_split:holdot" in result["errors"]
+    assert "lbl_other:duplicate_transition_label_candidate:tr_001" in result["errors"]
+
+
 def test_transition_scorecard_catches_private_payload() -> None:
     candidates = (
         {

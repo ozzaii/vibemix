@@ -612,8 +612,10 @@ done: section retrieval validation rejects duplicate section/query IDs, missing
 done: scripts/eval/intel_transition_scorecard.py
 done: tests/eval/test_intel_transition_scorecard.py
 done: transition scorecard validation rejects duplicate candidate IDs,
-      non-finite scores, unknown label candidates, and private payload markers;
-      the CLI exits non-zero when candidate/label evidence is invalid
+      non-finite scores, unknown label candidates, duplicate label IDs, invalid
+      label split names, duplicate transition labels for one candidate, and
+      private payload markers; the CLI exits non-zero when candidate/label
+      evidence is invalid
 done: fixture decision replay hydrates candidate/claim ledgers and passes
       fallback/timing gates
 done: decision runtime replay validation rejects duplicate packet/decision IDs,

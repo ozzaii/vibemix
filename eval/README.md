@@ -98,8 +98,9 @@ scorecards.
 Transition-ranking evidence is also fail-closed:
 `scripts/eval/intel_transition_scorecard.py --candidates ... --labels ...`
 rejects unknown label candidates, duplicate candidate IDs, non-finite scores,
-and private payload markers before the ranking metrics can back threshold
-movement.
+duplicate label IDs, invalid label split names, duplicate transition labels for
+one candidate, and private payload markers before the ranking metrics can back
+threshold movement.
 Smart-cue baseline evidence is fail-closed too:
 `scripts/eval/intel_cue_baseline_compare.py` rejects duplicate track/proposal
 IDs, duplicate cue slots, unknown cue-track references, non-finite cue
