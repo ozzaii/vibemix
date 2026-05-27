@@ -25,7 +25,7 @@
 |---------|---------|---------|-----------|----------------|-------|
 | `bidict` | 0.23.1 | see uv.lock | pyrekordbox transitive (declared explicitly per --no-deps recipe). Pure-Python. | 🟢 Green |  |
 | `construct` | 2.10.70 | see uv.lock | pyrekordbox transitive — ANLZ binary parser. Pure-Python. | 🟢 Green |  |
-| `google-genai` | 2.0.1 | see uv.lock | Gemini-only AI surface (CLAUDE.md hard rule). Pure-Python; no native build. | 🟢 Green |  |
+| `google-genai` | 2.0.1 | see uv.lock | Gemini Live co-host and Gemini TTS. Library embeddings/search use local CLAP ONNX, and Library/Viber uses local Codex. Pure-Python; no native build. | 🟢 Green |  |
 | `httpx` | 0.28.1 | see uv.lock | HTTP client used by google-genai + livekit-agents transitives. | 🟢 Green |  |
 | `jsonschema` | 4.26.0 | see uv.lock | JSON-schema validation (IPC schema gate, dep_ratings_schema). Pure-Python. | 🟢 Green |  |
 | `keyring` | 25.7.0 | see uv.lock | Native macOS Keychain / Windows Credential Locker integration via pure-Python ctypes; no compile step. | 🟡 Yellow |  |
@@ -33,7 +33,7 @@
 | `livekit-agents` | 1.5.8 | see uv.lock | Gemini Live API wrapper (cohost_v2/lk variants). Pure-Python. | 🟢 Green |  |
 | `livekit-plugins-google` | 1.5.8 | see uv.lock | LiveKit Gemini adapter — the seam through which all Gemini Live audio flows. | 🟢 Green |  |
 | `livekit-plugins-openai` | 1.5.8 | see uv.lock | [CULL-BLOCKED] Used by src/vibemix/agent/tts_chain.py for the proxy TTS fallback chain. Cannot remove without rewiring the TTS chain — out of scope for Phase 46. | 🟡 Yellow |  |
-| `mcp` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
+| `mcp` | 1.27.1 | see uv.lock | Codex MCP bridge for the local Viber tool surface. Pure-Python; optional at runtime outside Codex-backed chat/curate/build-set. | 🟢 Green |  |
 | `mido` | 1.3.3 | see uv.lock | MIDI message parsing (DDJ-FLX4 controller decode). Pure-Python. | 🟢 Green |  |
 | `mss` | 10.2.0 | see uv.lock | Win32 screen capture (CoreGraphics on Mac uses ScreenCaptureKit). Pure-Python. | 🟢 Green |  |
 | `numpy` | 2.4.4 | see uv.lock | Audio math (RMS / FFT / BPM autocorr). Prebuilt wheels Mac arm64+x86_64 + Win64. | 🟡 Yellow |  |
@@ -50,9 +50,7 @@
 | `python-dateutil` | 2.9.0.post0 | see uv.lock | pyrekordbox transitive — date parsing. Pure-Python. | 🟢 Green |  |
 | `python-dotenv` | 1.2.2 | see uv.lock | load_dotenv() for GEMINI_API_KEY ingest. Pure-Python. | 🟢 Green |  |
 | `python-rtmidi` | 1.5.8 | see uv.lock | Low-level MIDI I/O (mido backend). Prebuilt wheels Mac+Win64. | 🟡 Yellow |  |
-| `python-telegram-bot` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
 | `pywin32` | 311 | see uv.lock | Win32 API bindings (Win-only). Prebuilt wheels. | 🟡 Yellow |  |
-| `scipy` | 1.17.1 | see uv.lock | scipy.signal.resample_poly for 48kHz to 16kHz. Prebuilt wheels all platforms. | 🟡 Yellow |  |
 | `sounddevice` | 0.5.5 | see uv.lock | CoreAudio (Mac) + WASAPI (Win) bridge. Pure-Python over CFFI; system PortAudio resolved by the installer. | 🟡 Yellow |  |
 | `SQLAlchemy` | 2.0.49 | see uv.lock | pyrekordbox transitive — required for db6 import chain even when SQLCipher dormant. Prebuilt wheels all platforms. | 🟡 Yellow |  |
 | `sqlite-vec` | 0.1.9 | see uv.lock | Vector ANN extension for sqlite — Phase 28 library intelligence. Prebuilt loadable extension. | 🟡 Yellow |  |
@@ -89,7 +87,7 @@
 |---------|---------|---------|-----------|----------------|-------|
 | `@gltf-transform/cli` | see package-lock.json | see package-lock.json | GLB optimization CLI for mascot bundle. Build-time only. | 🟢 Green |  |
 | `@gltf-transform/core` | see package-lock.json | see package-lock.json | GLB transform library. | 🟢 Green |  |
-| `@playwright/test` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
+| `@playwright/test` | see package-lock.json | see package-lock.json | Playwright test-runner wrapper. Dev/test only; not shipped with the desktop app. | 🟢 Green |  |
 | `@tauri-apps/api` | see package-lock.json | see package-lock.json | Tauri JS bridge — pure-TS bindings to Rust IPC. | 🟢 Green |  |
 | `@tauri-apps/plugin-shell` | see package-lock.json | see package-lock.json | Shell-out plugin (open-link). Pure-TS bindings. | 🟢 Green |  |
 | `@tauri-apps/plugin-store` | see package-lock.json | see package-lock.json | Tauri persistent KV store. Pure-TS bindings. | 🟢 Green |  |
@@ -99,8 +97,8 @@
 | `gltf-pipeline` | see package-lock.json | see package-lock.json | GLB compression pipeline. Build-time only. | 🟢 Green |  |
 | `jsdom` | see package-lock.json | see package-lock.json | DOM emulator for vitest. Dev only. | 🟢 Green |  |
 | `json-schema-to-typescript` | see package-lock.json | see package-lock.json | IPC schema to TS codegen. Build-time only. | 🟢 Green |  |
-| `pixelmatch` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
-| `playwright` | ? | ? | [NO RATING — add to dep_ratings.yaml] | 🟡 Yellow | MISSING |
+| `pixelmatch` | see package-lock.json | see package-lock.json | Pure-JS visual diff helper for UI tests. Dev/test only. | 🟢 Green |  |
+| `playwright` | see package-lock.json | see package-lock.json | Browser automation for visual/e2e tests. Dev/test only; downloads managed browser binaries outside the shipped app. | 🟡 Yellow |  |
 | `three` | see package-lock.json | see package-lock.json | WebGL 3D library — mascot rig render path. Pure-JS, zero native deps. | 🟢 Green |  |
 | `typescript` | see package-lock.json | see package-lock.json | Build-time only — does not ship in the binary. | 🟢 Green |  |
 | `vite` | see package-lock.json | see package-lock.json | Build tool. Build-time only. | 🟢 Green |  |

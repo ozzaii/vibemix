@@ -1,91 +1,74 @@
-# DJ-Library Ingest — design spec
+# DJ-Library Ingest — Current Product Spec
 
-> **Status: design, approved 2026-05-26.** Build routes through GSD (per CLAUDE.md).
-> The CLAP embedder + curator wiring is a SEPARATE session's lane — this spec does
-> NOT touch `clap_engine.py`, `docs/clap-engine.md`, or the Viber/curator code.
+**Date:** 2026-05-26
+**Status:** current Rekordbox MVP source truth after Phase 89.
 
-## User story
+DJ-library ingest turns a user's local DJ library export into local CLAP vectors
+for search, similarity, set building, and Viber tools. The product path is
+`uv run python -m vibemix library ingest`.
 
-"I install vibemix, tap once, it finds my DJ library, and a few minutes later my
-tracks are ready — embedded and searchable — with no folder-picking and no manual
-analysis."
+## Current Scope
 
-## Scope
+Shipped MVP:
 
-**In (v1):**
-- Auto-detect the user's DJ library (Rekordbox first; Serato + Traktor next).
-- Parse clean, human-curated metadata: musical key, BPM, beatgrid, hot/memory cues,
-  genre, rating, comments.
-- Cut **cue-anchored ≤80s excerpts** per track (anchored on the DJ's real cues;
-  fall back to the auto-cue engine's `CueAnchor`s when a track is un-cued).
-- Embed each track **on-device** via the staged `clap_engine` (512-dim) — no upload,
-  no server RPC. Store in the existing sqlite-vec library store.
-- A **real file watcher**: watch the library index files, diff on change, re-embed
-  new/changed tracks.
+- Source: Rekordbox `collection.xml` only.
+- Metadata: title, artist, album, BPM, key, Camelot, genre, label, rating,
+  play count, comments, cues/loops/fades/load marks, and TEMPO beatgrid nodes.
+- Embeddings: local CLAP ONNX, 512 dimensions, keyless.
+- Excerpts: cue-anchored <=80s windows. DJ cues are preferred; uncued tracks
+  fall back to `cue_engine.detect_cues_auto()` and then to whole-track embedding
+  if no usable cue window exists.
+- Storage: active local library store plus `library.pkl` for title resolution.
+- Cache: CLAP-namespaced content-hash cache in
+  `~/.cache/vibemix/clap_embeddings.db`, separated from legacy Gemini rows and
+  from whole-track embedding strategy rows.
 
-**Out (deferred):**
-- djay Pro (closed DB), public-catalog/Beatport discovery, server-side embedding
-  (on-device won — the upload problem the old plan worried about is moot).
+Deferred:
 
-## Architecture (new, disjoint modules)
+- Serato and Traktor sources.
+- Real file watcher / delta queue.
+- djay Pro closed database support.
+- Public catalog discovery and server-side embedding.
 
-```
-library/
-  sources/
-    base.py        # LibrarySource protocol: detect() -> bool; iter_tracks() -> Iterable[TrackEntry]
-    rekordbox.py   # EXTEND existing library/rekordbox.py: add beatgrid/genre/rating/cue-type reads
-    serato.py      # NEW — serato-tools (GEOB markers) + mutagen TKEY for key
-    traktor.py     # NEW — collection.nml (stdlib xml.etree); CUE_V2 START is in SECONDS, filter TYPE="4" grid
-  excerpt.py       # NEW — TrackEntry + cues -> list of ≤80s mixable audio excerpts
-  ingest.py        # NEW — orchestrator: detect source -> iter tracks -> excerpt -> clap_engine embed -> store
-  watcher.py       # NEW — watchdog Observer on index files -> diff -> enqueue changed tracks
-```
-
-## The CueAnchor seam (shared — already shipped)
-
-Excerpt anchoring consumes `library/cue_types.py::CueAnchor` (from the shipped
-auto-cue engine). DJ-library sources emit `source="dj"` anchors from the parsed
-cues; un-cued tracks fall back to `detect_cues()` (`source="auto"`). `excerpt.py`
-is the single consumer that turns anchors into audio windows. **Do not modify
-`cue_types.py` or `cue_detect.py`** — they are the cue-engine session's artifacts.
-
-## Data flow
+## Current Pipeline
 
 ```
-one-tap → detect installed DJ app (path probe)
-        → LibrarySource.iter_tracks()  (clean metadata, key→Camelot via deterministic table)
-        → per track: CueAnchors (dj | auto) → excerpt.py cuts ≤80s windows
-        → clap_engine.embed_audio_file/bytes → 512-dim L2 vector
-        → store in library.db (sqlite-vec) + content-hash cache
-        → watcher: index file changes → diff → re-embed delta
+Rekordbox collection.xml
+  -> RekordboxLibrary.load_xml()
+  -> TrackEntry rows with typed metadata and cues
+  -> ingest_source()
+  -> anchors_for_track()         # DJ cue first, auto-cue fallback
+  -> cut_windows()               # <=80s mixable windows
+  -> ClapEmbedder / ClapEngine   # local 512D vector
+  -> sqlite-vec or NumPy store
+  -> library.pkl title cache
 ```
 
-## Reliability / honesty rules
+## Honesty And Safety Rules
 
-- **Coverage, not correctness, is the risk:** un-analyzed tracks have no key/grid/cue
-  → XML/tag-first, DSP-fallback per track. Never silently leave a track anchor-less.
-- **Rekordbox watcher is semi-live:** `collection.xml` is a manual export; watch the
-  export file + nudge the user to re-export. Serato/Traktor are live.
-- **Trust the audio (Invariant #3):** never fabricate metadata; missing fields stay
-  missing, surfaced honestly.
+- Missing or unreadable audio files are logged and counted as failures; no fake
+  vector is stored.
+- A cue failure degrades to whole-track embedding; a bad cue window is skipped.
+- Existing non-empty stores with the wrong vector dimension fail loudly instead
+  of mixing incompatible vectors.
+- Rekordbox SQLCipher database paths remain out of scope. The product reads the
+  exported XML path only.
 
-## Cross-session collision boundaries
+## Verification Surface
 
-- **Owned by other sessions — DO NOT TOUCH:** `clap_engine.py`, `docs/clap-engine.md`
-  (CLAP ship session); `discovery.py`, `energy.py`, `sequencer.py`,
-  `export_rekordbox.py` (Set-Builder session); `cue_types.py`, `cue_detect.py`
-  (cue-engine session).
-- **Shared read-only seams:** `clap_engine` (embed call), `cue_types.CueAnchor`,
-  `TrackEntry`.
-- Check `git status` + existing files before creating anything.
+Focused checks:
 
-## Open dependency
+```bash
+uv run pytest -q tests/library/test_ingest.py tests/library/test_excerpt.py
+uv run pytest -q tests/library/test_stats_cli.py tests/library/test_models_cli.py
+```
 
-- **Store dim (1536→512):** the CLAP session owns the `EMBEDDING_DIM` flip + cache
-  rebuild. Ingest stores whatever `clap_engine` returns; the dim change lands when
-  the CLAP wiring phase ships. Coordinate — do not flip the dim from this lane.
+Setup/status checks:
 
-## Build path
+```bash
+uv run python -m vibemix library models --json
+uv run python -m vibemix library ingest --help
+```
 
-Routes through GSD (`/gsd-plan-phase` or `/gsd-mvp-phase`) — this doc is the WHAT;
-GSD produces the HOW (PLAN.md, atomic commits). No code is written by this spec.
+The active implementation map is
+`.planning/research/CODEX-full-product-sweep-map.md`.

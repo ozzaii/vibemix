@@ -19,7 +19,7 @@ NOT widen the parent's pinned target paths.
 | intuitive | clear | "intuitive" claims user feeling without evidence |
 | powerful | fast / specific | "powerful" hides "we don't know what makes this good" |
 | delightful | good / useful | "delightful" is theatre |
-| AI-powered | Gemini-grounded | vibemix is Gemini-only; specificity is anti-slop |
+| AI-powered | evidence-grounded | Specific evidence beats provider branding; live uses Gemini, library embeddings are local CLAP ONNX. |
 | smart | responsive / observant | "smart" hides "we trained nothing on your data" |
 | next-generation | (rewrite) | Forbidden; never excuses absence of detail |
 | deeply (anything) | (rewrite) | Regex `\bdeeply\s+\w+` is hard-banned |

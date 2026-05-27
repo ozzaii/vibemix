@@ -1,13 +1,13 @@
 # Windows Code Signing — vibemix
 
 > Operational runbook for the SignPath Foundation OSS signing pipeline that
-> produces `vibemix-installer.msi`. Paired with `installer/windows/README.md`
+> produces `vibemix-installer.exe`. Paired with `installer/windows/README.md`
 > (build script reference) and `.planning/signpath-application.md` (the
 > day-1 application record).
 
 ## Prerequisites
 
-Before this runbook can produce a signed `vibemix-installer.msi`:
+Before this runbook can produce a signed `vibemix-installer.exe`:
 
 - [ ] **SignPath Foundation OSS approval** for the `vibemix` project — applied
       on day 1 of Phase 1 per the 3-week buffer in `.planning/signpath-application.md`.
@@ -15,14 +15,25 @@ Before this runbook can produce a signed `vibemix-installer.msi`:
       the SignPath organization slug and a project token.
 - [ ] **GitHub Actions secrets** set on the `ozzaii/vibemix` repo:
       - `SIGNPATH_API_TOKEN` — issued by SignPath after approval.
-      - `SIGNPATH_ORG_ID` — SignPath organization UUID.
+      - `SIGNPATH_ORGANIZATION_ID` — SignPath organization UUID.
       - `SIGNPATH_PROJECT_SLUG` — defaults to `vibemix`.
       - `SIGNPATH_SIGNING_POLICY_SLUG` — defaults to `release-signing`.
+      - `SIGNPATH_SIGNTOOL_CMD` — the Inno Setup `/Ssignpath=...` command
+        registered at package time.
 - [ ] **Inno Setup 6** installed on the build runner (CI: `windows-latest`
       ships a recent ISCC via `choco install innosetup`; local Kaan box:
       install once via `winget install JRSoftware.InnoSetup`).
-- [ ] **PyInstaller payload** built and present at `dist\vibemix\` — produced
-      by `pyinstaller vibemix-core.windows.spec` (Phase 18 wave 0).
+- [ ] **Sidecar payload** built by
+      `uv run python scripts/build_sidecar.py --spec vibemix-core.windows.spec`.
+      The helper runs PyInstaller with `--extra ai-local` and installs the
+      onedir sidecar into Tauri's `binaries\vibemix-core-<triple>\` resource
+      layout.
+- [ ] **Windows app payload** staged after `cargo tauri build --no-bundle` by
+      `pwsh scripts\win\stage_app_payload.ps1 -OutputDir dist\windows-app`.
+      The staged directory contains `vibemix.exe` plus the sidecar
+      `binaries\...` tree that `resource_dir()` resolves at runtime.
+      Verify it with `uv run python scripts/dist/check_windows_app_payload_ready.py
+      dist/windows-app --triple x86_64-pc-windows-msvc --smoke version`.
 - [ ] **`version.txt` populated** with the release tag — CI writes this from
       `${{ github.ref_name }}`; manual release backups must hand-edit
       `installer/windows/version.txt` before invoking ISCC.
@@ -38,39 +49,49 @@ GitHub tag push
    ▼
 release.yml (windows-latest)
    │
-   ├─ python -m PyInstaller vibemix-core.windows.spec
-   │      → dist\vibemix\ (interpreter + site-packages + assets)
+   ├─ uv run python scripts/build_sidecar.py --spec vibemix-core.windows.spec
+   │      → tauri\src-tauri\binaries\vibemix-core-<triple>\
+   │
+   ├─ cargo tauri build --no-bundle
+   │      → tauri\src-tauri\target\release\vibemix.exe
+   │
+   ├─ cargo tauri build --bundles nsis --no-sign
+   │      → tauri\src-tauri\target\release\bundle\nsis\*setup*.exe
+   │
+   ├─ pwsh scripts\win\stage_app_payload.ps1 -OutputDir dist\windows-app
+   │      → dist\windows-app\vibemix.exe + binaries\vibemix-core-<triple>\
+   │
+   ├─ python scripts/dist/check_windows_app_payload_ready.py dist/windows-app --smoke version
+   │      → confirms the staged app exe, sidecar exe, and _internal tree
    │
    ├─ Write version.txt from ${{ github.ref_name }}
    │
    ├─ ISCC installer\windows\vibemix-installer.iss
+   │      /DSourceDir=..\..\dist\signed-binaries
+   │      /DInstallerOutputDir=..\..\output
    │      /Ssignpath="signtool sign /n 'SignPath Foundation' /tr <ts> /fd SHA256 /td SHA256 $f"
-   │      → installer\windows\output\vibemix-installer.exe
+   │      → output\vibemix-installer.exe
    │
-   ├─ Rename → vibemix-installer.msi
+   ├─ SIGNPATH_SIGNTOOL_CMD over the Tauri NSIS updater installer
+   │      → Authenticode-signed *setup*.exe updater payload
    │
-   ├─ signpath/github-action-submit-signing-request@v1
-   │      with: api-token, organization-id, project-slug, signing-policy-slug,
-   │            artifact-configuration-slug=msi-installer,
-   │            github-artifact-id, parameters: {Version: ${{ github.ref_name }}}
-   │      → downloads OV-signed vibemix-installer.msi
-   │
-   ├─ signtool verify /v /pa vibemix-installer.msi
+   ├─ signtool verify /v /pa vibemix-installer.exe
    │      → must pass before release upload
    │
-   └─ gh release upload ${{ github.ref_name }} vibemix-installer.msi
+   └─ gh release upload ${{ github.ref_name }} vibemix-installer.exe
 ```
 
-The `signpath/github-action-submit-signing-request` Action handles:
-- Uploading the unsigned MSI to SignPath.
-- Polling SignPath until the signing job completes.
-- Downloading the OV-signed artifact back into the workflow workspace.
-- Attaching a signed timestamp via DigiCert so the binary stays trusted
-  past cert expiry.
+The workflow uses SignPath in two places: the GitHub Action signs the staged
+app payload before packaging, then Inno Setup registers `SIGNPATH_SIGNTOOL_CMD`
+through `/Ssignpath=...` so the final installer and generated uninstaller are
+signed during compile. DigiCert timestamping keeps the binary trusted past cert
+expiry.
 
-The inner uninstaller (`unins000.exe` baked into the MSI) is signed in
-the same pass — the `SignedUninstaller=yes` + `SignedUninstallerDir=output\signed-uninstaller`
-directives in `vibemix-installer.iss` direct SignPath at the second artifact.
+The Tauri auto-updater artifact is built separately as
+`tauri\src-tauri\target\release\bundle\nsis\*setup*.exe`. Release CI signs that
+NSIS updater installer with the same `SIGNPATH_SIGNTOOL_CMD` before the Tauri
+manifest signer adds the updater signature in `latest.json`. Authenticode gives
+Windows reputation; the Tauri signature gives update-integrity verification.
 
 ## Local Re-Sign
 
@@ -94,6 +115,7 @@ $cert = New-SelfSignedCertificate `
 # 2. Build the installer with the self-signed cert.
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
     /Ssignpath="signtool sign /sha1 $($cert.Thumbprint) /tr http://timestamp.digicert.com /fd SHA256 /td SHA256 `$f" `
+    /DSourceDir=..\..\dist\windows-app `
     installer\windows\vibemix-installer.iss
 
 # 3. Verify — note: /pa will fail because the self-signed cert is not chain-trusted,
@@ -146,6 +168,9 @@ for the OSS launch. SignPath Foundation OV is the right tradeoff for v1.
 
 The signing job didn't complete. Re-check:
 - `SIGNPATH_API_TOKEN` secret is present and unrevoked.
+- `SIGNPATH_SIGNTOOL_CMD` is present; release mode is intentionally disabled
+  unless this secret exists because `vibemix-installer.iss` uses
+  `SignTool=signpath`.
 - `vibemix-installer.iss` has `SignTool=signpath` (no typos in the slug).
 - The `signpath` SignTool config was passed to `ISCC.exe` via the `/Ssignpath=...`
   command-line flag at compile time.
@@ -179,12 +204,13 @@ The signature exists but isn't trusted. Causes:
 This is a separate gate from SmartScreen at download time — it fires when
 the binary itself runs. Same warm-up + reputation mechanic; same mitigations.
 
-### MSI install fails with error 1603
+### Installer fails during setup
 
-Generic Windows Installer failure. Check the verbose log:
+Generic setup failure. Re-run the installer from an elevated PowerShell window
+so the Inno log is written beside the installer:
 
 ```powershell
-msiexec /i vibemix-installer.msi /l*v install.log
+.\vibemix-installer.exe /LOG=install.log
 ```
 
 Common causes captured by `install.log`:
@@ -199,7 +225,7 @@ Common causes captured by `install.log`:
 ### `gh release upload` fails after signing
 
 Verify the artifact name matches the release-notes download link. The
-artifact is `vibemix-installer.msi` (lowercase, hyphenated, single dot).
+artifact is `vibemix-installer.exe` (lowercase, hyphenated, single dot).
 Phase 19 README download buttons reference this exact name.
 
 ## References

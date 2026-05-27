@@ -114,7 +114,7 @@ no I/O — the caller writes the file; same inputs → byte-identical output). I
 
 Autonomous **produces and ranks**; it never judges. Three items are parked as
 **KAAN-ACTION** — never automated, never faked (cross-ref
-[`81-VALIDATION.md` → Manual-Only Verifications](../.planning/phases/81-bench-the-validation-instrument/81-VALIDATION.md)):
+[`81-VALIDATION.md` → Manual-Only Verifications](../.planning/archive/2026-05-27-v7-v8-1-phase-detail/phases/81-bench-the-validation-instrument/81-VALIDATION.md)):
 
 1. **KAAN-ACTION — the real run.** Run `uv run python -m vibemix bench run
    --study A` (and `--study B`, `--study no-audio`) on the funded key to produce

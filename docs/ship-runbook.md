@@ -14,15 +14,15 @@
 
 ---
 
-## Status snapshot (as of 2026-05-13)
+## Status snapshot (checked 2026-05-27)
 
 | # | Item                                              | Owner       | Blocker class | Done? |
 |---|---------------------------------------------------|-------------|---------------|-------|
 | A | Phase 16 ear-test signoff                         | Kaan        | DJ session    | ☐    |
 | B | Phase 17 reaction-reel grading (4 raters)         | Kaan + crew | Coord         | ☐    |
-| C | Apple app-specific password generation            | Francesco   | Account       | ☐    |
+| C | Apple App Store Connect API key                   | Francesco   | Account       | ☐    |
 | D | Tauri updater keypair generation                  | Kaan        | One command   | ☐    |
-| E | Configure 11 GitHub secrets                       | Kaan        | Account       | ☐    |
+| E | Configure GitHub release secrets                  | Kaan        | Account       | ☐    |
 | F | bravoh/vibemix GitHub org/repo created            | Kaan        | Account       | ☐    |
 | G | Discord server + invite link                      | Kaan        | Account       | ☐    |
 | H | SignPath OSS Foundation cert approval             | Kaan        | 3-week SLA    | ☐    |
@@ -31,6 +31,19 @@
 | K | Fresh-machine install rehearsal both platforms    | Kaan        | Physical mach | ☐    |
 
 Once all 11 are ☑, run `scripts/dist/pretag_check.sh` → it should exit 0.
+
+Latest automated check:
+
+```text
+scripts/dist/pretag_check.sh
+RESULT: 4 pass / 4 fail / 0 warn
+```
+
+Passing today: updater pubkey is real, the bundled sidecar tree is ready, and
+the local Apple Developer ID certificate is present; README no longer has a
+pre-tag TODO marker. Still blocking: Phase 16 ear-test signoff, Phase 17 grading
+CSV, complete GitHub Actions signing/upload secrets, and a real Discord invite
+link.
 
 ---
 
@@ -78,19 +91,15 @@ across <genres>. Both hype-man and coach modes.
 4. Run `python -m benchmarks.reaction_reel.analyze` — get average + flag any 1-2 ratings.
 5. ≥4.0 average + zero 1-2 ratings → pass.
 
-## C — Apple app-specific password
+## C — Apple App Store Connect API key
 
 **Findings from the BRAVOH server audit (2026-05-13):**
 - Apple Developer ID Application cert: `Francesco Fasanella (UK7DYFK6F8)`
 - Cert installed in your local Mac Keychain ✓
-- `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_TEAM_ID` already exported
-  in zsh from BRAVOH desktop setup
-- **Only missing: `APPLE_APP_PASSWORD`** — Francesco generates one at
-  appleid.apple.com → Sign-In and Security → App-Specific Passwords →
-  label it "vibemix notarytool"
-
-Once Francesco hands it over, paste into the GitHub secret
-`APPLE_APP_PASSWORD` (step E).
+- `APPLE_DEVELOPER_ID`, `APPLE_TEAM_ID`, and the `.p12` export are the
+  signing inputs.
+- Notarization uses App Store Connect API key secrets:
+  `APPLE_API_KEY_ID`, `APPLE_API_KEY_ISSUER`, and `APPLE_API_KEY_P8`.
 
 **Server-side App Store Connect API key** (`AuthKey_G26449M849.p8`,
 Key ID `G26449M849`, on altidus at `/var/www/bravoh-backend/keys/`) is
@@ -121,22 +130,27 @@ Then:
 
 Full procedure: `tauri/src-tauri/keys/README.md`.
 
-## E — Configure 11 GitHub secrets
+## E — Configure GitHub release secrets
 
 In the `bravoh/vibemix` repo settings → Secrets and variables → Actions:
 
 | Secret name                              | Source                                                                  |
 |------------------------------------------|-------------------------------------------------------------------------|
+| `APPLE_DEVELOPER_ID`                     | Full Developer ID Application identity from `security find-identity`    |
 | `APPLE_DEVELOPER_ID_P12_BASE64`          | Export cert from Keychain → base64 the .p12                             |
-| `APPLE_DEVELOPER_ID_P12_PASSWORD`        | The password you used during .p12 export                                |
-| `APPLE_ID`                               | Francesco's Apple ID email (already in `$APPLE_ID` env var locally)     |
-| `APPLE_APP_PASSWORD`                     | From step C                                                             |
+| `APPLE_DEVELOPER_ID_PASSWORD`            | The password you used during .p12 export                                |
+| `APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD`   | Random password for the CI temporary keychain                           |
 | `APPLE_TEAM_ID`                          | `UK7DYFK6F8`                                                            |
+| `APPLE_API_KEY_ID`                       | App Store Connect API key ID from step C                                |
+| `APPLE_API_KEY_ISSUER`                   | App Store Connect issuer UUID from step C                               |
+| `APPLE_API_KEY_P8`                       | base64 of the App Store Connect `.p8` key                               |
 | `SIGNPATH_API_TOKEN`                     | From SignPath dashboard after step H approval                           |
 | `SIGNPATH_ORGANIZATION_ID`               | From SignPath dashboard                                                 |
 | `SIGNPATH_PROJECT_SLUG`                  | `vibemix` (or whatever you named the project in SignPath)               |
+| `SIGNPATH_SIGNING_POLICY_SLUG`           | SignPath signing policy slug                                            |
+| `SIGNPATH_SIGNTOOL_CMD`                  | Inno Setup `/Ssignpath=...` command                                     |
 | `TAURI_UPDATER_PRIVATE_KEY`              | base64 of `~/.tauri/vibemix_updater.key` from step D                    |
-| `TAURI_UPDATER_PRIVATE_KEY_PASSWORD`     | Whatever password you set during keypair generation (can be empty)      |
+| `TAURI_UPDATER_KEY_PASSWORD`             | Whatever password you set during keypair generation (can be empty)      |
 | `BRAVOH_MANIFEST_UPLOAD_TOKEN`           | Bearer token for `api.altidus.world/vibemix/updates/upload` — ask Musa  |
 
 Full reference: `.github/workflows/README.md`.
@@ -165,7 +179,7 @@ Full reference: `.github/workflows/README.md`.
 2. Generate an invite link with no expiry, unlimited uses, for #vibemix-launch.
 3. Edit `README.md`: replace `Discord: **TBD**` with
    `Discord: <https://discord.gg/YOUR_CODE>`.
-4. Remove the `<!-- TODO(kaan, pre-tag-v0.1.0) -->` marker on the line above.
+4. Re-run `scripts/dist/pretag_check.sh`; the Discord invite gate should pass.
 
 ## H — SignPath OSS Foundation cert
 

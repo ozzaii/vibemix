@@ -2,7 +2,14 @@
 
 ## Why this file exists
 
-Per Pitfall 6 (`.planning/research/PITFALLS.md` lines 148–172), the SignPath OSS Foundation approval cycle is ~1 week — they manually verify open-source identity before granting free code-signing for Windows binaries. Day-1 of Phase 21, file (or re-verify) the application before any other Phase 21 work proceeds; otherwise the SignPath SLA becomes the critical-path bottleneck on the v2.0 ship gate. This file is the checklist Kaan works from to file the application without re-reading PITFALLS.md or hunting through old `.planning/research/` notes.
+Per historical Pitfall 6
+(`.planning/archive/2026-05-27-stale-v6-memory-research/PITFALLS.md`), the
+SignPath OSS Foundation approval cycle is ~1 week — they manually verify
+open-source identity before granting free code-signing for Windows binaries.
+Day-1 of Phase 21, file (or re-verify) the application before any other Phase
+21 work proceeds; otherwise the SignPath SLA becomes the critical-path
+bottleneck on the v2.0 ship gate. This file is the checklist Kaan works from to
+file the application without hunting through old `.planning/research/` notes.
 
 ## Pre-application checklist
 
@@ -37,6 +44,7 @@ Per Pitfall 6 mitigation, secondary signing path is a Kaan-purchased EV cert (~$
 
 ## Cross-references
 
-- `.planning/research/PITFALLS.md` P6 (SignPath OSS ~1-week SLA, lines 148–172)
+- `.planning/archive/2026-05-27-stale-v6-memory-research/PITFALLS.md` P6
+  (SignPath OSS ~1-week SLA)
 - `.planning/phases/21-sign-notarize-github-release-matrix/21-DEFERRED.md` Blocker B
 - `.github/workflows/release.yml` — `build-windows` job stage 2 (`SIGN — Submit signing request to SignPath`) + `secret-name-audit` Wave 0 gate

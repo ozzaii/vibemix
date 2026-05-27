@@ -38,7 +38,7 @@ vibemix is a real DJ friend in your ear. It reacts to the actual audio coming ou
 
 Built by DJs. The reactions are tuned against real sessions on rekordbox, Serato, Traktor, and djay Pro — not against a benchmark. Cuts that land late, hallucinated track names, and small-talk filler all fail the grading bar before any release ships.
 
-Your audio doesn't leave your machine without you knowing. vibemix is open source under Apache 2.0, runs on Mac + Windows, and the only network calls go to Bravoh's Gemini proxy at `api.altidus.world` — analyzed in flight, never stored. Recordings stay local under `recordings/<session>/` with a 7-day default retention you can change in Settings. Read the FAQ for the long version.
+Your audio doesn't leave your machine without you knowing. vibemix is open source under Apache 2.0 and runs on Mac + Windows. Live co-host calls go to Bravoh's Gemini proxy at `api.altidus.world` — analyzed in flight, never stored. Library embeddings/search run locally with CLAP; the optional Viber library agent can use your local Codex login. Recordings stay local under `recordings/<session>/` with a 7-day default retention you can change in Settings.
 
 <p align="center">
   <img alt="release" src="https://img.shields.io/github/v/release/bravoh-ai/vibemix?style=flat-square&color=ff8a3d" />
@@ -60,7 +60,7 @@ Your audio doesn't leave your machine without you knowing. vibemix is open sourc
 
 **A real DJ friend in your ear — no AI slop.** vibemix listens to your master output, watches your DJ software's screen, ingests your controller, and talks back into your headphones in a way that's grounded in what you actually just did. Not generic "AI assistant" commentary. Not hallucinated track names. Not late reactions to events that already passed. Built by [Bravoh](https://altidus.world) and released open-source as the warm-up for our main launch.
 
-> **Audio privacy in one line:** your audio is streamed to Bravoh's Gemini proxy for analysis. Recordings stay on your machine. See [FAQ](#faq) for the long version.
+> **Audio privacy in one line:** live audio is streamed to Bravoh's Gemini proxy for analysis; library embeddings stay local. Recordings stay on your machine. See [FAQ](#faq) for the long version.
 
 > **Found a vulnerability?** Please email **security@bravoh.com** (PGP key in repo root). Full disclosure policy in [SECURITY.md](SECURITY.md). Do not open a public issue.
 
@@ -94,12 +94,16 @@ Don't see your app? vibemix listens to the audio coming out of your machine — 
 | OS | Download |
 |----|----------|
 | macOS (Apple Silicon) | [vibemix.dmg](https://github.com/bravoh-ai/vibemix/releases/latest) |
-| Windows 11 | [vibemix-installer.msi](https://github.com/bravoh-ai/vibemix/releases/latest) |
+| Windows 11 | [vibemix-installer.exe](https://github.com/bravoh-ai/vibemix/releases/latest) |
 
-<!-- TBD(launch): Install URLs go live with the first signed release (Phase 21 deliverable). Verify the `bravoh-ai/vibemix` org/repo slug matches the final GitHub home before public launch. -->
-<!-- TODO: drop install GIFs (clone-to-running in <60s) into docs/assets/install/ -->
+<!-- Launch note: install URLs go live with the first signed release. Verify the
+     `bravoh-ai/vibemix` org/repo slug matches the final GitHub home before
+     public launch. Install GIFs land in docs/assets/install/ with the first
+     signed release cut. -->
 
-Builds are signed (Apple Developer ID on macOS, SignPath OSS cert on Windows) and notarized. Auto-update is on by default; opt out in Settings.
+The v0.1.0 release gate requires Apple Developer ID signing + notarization on
+macOS and SignPath signing on Windows before these downloads are published.
+Auto-update is on by default for release builds; opt out in Settings.
 
 ---
 
@@ -115,7 +119,7 @@ vibemix has 3 skill levels × 2 modes. Pick one before each set.
 
 Each cell speaks a different vocabulary on purpose. Beginner is encouragement-heavy; Pro assumes you know the language. Coach mode is always past-tense — vibemix won't talk while you're working.
 
-### What's shipped in v2.1
+### Current shipped surface
 
 <!-- AUTO-GEN: feature-matrix START — auto-populated by scripts/launch/sync_feature_matrix.py -->
 
@@ -213,7 +217,7 @@ Two ways to add it:
   <img src="docs/assets/architecture.svg" alt="vibemix architecture diagram" width="100%" />
 </p>
 
-vibemix runs entirely on your machine. The only network calls go to Bravoh's proxy at `api.altidus.world`, which forwards to Google Gemini. Your audio + screen frames + MIDI events are streamed through; nothing is stored on Bravoh's end. The reaction comes back as a Gemini-TTS-streamed voice into your headphones.
+vibemix runs on your machine. The live co-host streams audio + screen frames + MIDI events through Bravoh's proxy at `api.altidus.world`, which forwards to Google Gemini; nothing is stored on Bravoh's end. The reaction comes back as a Gemini-TTS-streamed voice into your headphones. Library embeddings/search are local CLAP ONNX, and the optional Viber library chat/build path can use your local Codex CLI account.
 
 ---
 
@@ -231,7 +235,7 @@ An AI co-host for live DJ sets. It listens to your master output, watches your D
 
 ### 2. Is my audio sent to the cloud?
 
-Yes. Audio chunks are streamed to Bravoh's proxy at `api.altidus.world`, which forwards to Google Gemini for analysis. **No raw audio is stored on Bravoh's servers.** Your recordings (in `recordings/<session>/`) stay on your machine. Default retention is 7 days, configurable in Settings.
+For the live co-host, yes. Audio chunks are streamed to Bravoh's proxy at `api.altidus.world`, which forwards to Google Gemini for analysis. **No raw audio is stored on Bravoh's servers.** Library file embeddings and cue analysis run locally; Codex-backed Viber library chat/build uses your local Codex CLI account when enabled. Your recordings (in `recordings/<session>/`) stay on your machine. Default retention is 7 days, configurable in Settings.
 
 ### 3. Is this free?
 
@@ -243,7 +247,7 @@ Three reasons: djay Pro is Mac/Win only and that's our primary integration targe
 
 ### 5. Why Gemini and not GPT / Claude / Llama?
 
-Bravoh's main product is Gemini-only. vibemix shares the brain. The proxy could route elsewhere in principle, but it isn't designed to — you'd be running a different product.
+The live co-host uses Bravoh's Gemini path for grounded reactions and TTS. Library search and set prep are separate: embeddings run locally with CLAP ONNX, and Viber uses the local Codex CLI backend.
 
 ### 6. Is the AI actually listening to my music?
 
@@ -294,5 +298,5 @@ vibemix is Bravoh's first open-source release — a warm-up for our main product
 
 Apache 2.0 · ([LICENSE](LICENSE)) · ([SECURITY](SECURITY.md)) · ([CONTRIBUTING](CONTRIBUTING.md)) · ([CODE_OF_CONDUCT](CODE_OF_CONDUCT.md))
 
-<!-- TODO(kaan, pre-tag-v0.1.0): replace TBD with the real Bravoh-managed vibemix Discord invite. -->
+<!-- Pre-tag gate: replace TBD with the real Bravoh-managed vibemix Discord invite. -->
 Discord: **TBD** — invite link goes live before the v0.1.0 tag.

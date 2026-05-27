@@ -56,8 +56,8 @@ log every abuse event and have a hard kill-switch.
 extracted and shareable, it would let a third party piggyback on our
 Gemini quota indefinitely.
 
-**Threat actor:** Anyone with a copy of `vibemix.dmg` / `vibemix.msi` +
-`strings` + an hour. Especially: AI-tooling forums where extracted
+**Threat actor:** Anyone with a copy of `vibemix.dmg` /
+`vibemix-installer.exe` + `strings` + an hour. Especially: AI-tooling forums where extracted
 keys get traded.
 
 **Critical decision:** **There is NO raw `AIza` key in the distributed
@@ -127,7 +127,7 @@ eliminate it.
 ## Surface 4 — Supply-chain compromise
 
 **Asset:** The build pipeline that produces the signed Mac DMG and
-Windows MSI. Compromise here = arbitrary code execution on every
+Windows installer EXE. Compromise here = arbitrary code execution on every
 user's machine.
 
 **Threat actor:** Compromised dep (typo-squat, malicious update),
@@ -158,7 +158,8 @@ Apple/SignPath chain.
 
 **Residual risk:** **MEDIUM.** Build-time compromise of Tauri or Vite
 toolchain is the bug class hardest to mitigate without reproducible
-builds (deferred to v2.2 per `.planning/research/SUMMARY.md`).
+builds (deferred to v2.2 per the historical
+`.planning/archive/2026-05-27-stale-v6-memory-research/SUMMARY.md`).
 
 ---
 

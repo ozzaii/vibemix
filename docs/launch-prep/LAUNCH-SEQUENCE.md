@@ -169,8 +169,9 @@ calendar references); Phase 39 deferred-item Substack draft slot
   3. **The 3-Part Gemini grounding stack.** Audio + screen + MIDI fed
      to Gemini Live as three separate Parts — the LLM sees the actual
      evidence it is reacting to, never invents what it didn't hear.
-  4. **What we cut.** No CLAP, no ProDJ Link, no stem separation, no
-     multi-provider AI. Utility-only scope (link the
+  4. **What we cut.** No ProDJ Link, no stem separation, no public-catalog
+     sprawl, no provider maze. CLAP is now the local library/search embedding
+     engine; Gemini remains the live co-host brain. Utility-only scope (link the
      `feedback_no_scope_creep_clean_utility` discipline).
   5. **The 30-day star delta.** Cite the actual number — set the bar
      visible per `project_github_star_goal` (500-1000+).

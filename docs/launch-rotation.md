@@ -1,9 +1,11 @@
-# vibemix v2.1 Launch — 24h Monitoring Rotation
+# vibemix Launch — 24h Monitoring Rotation
 
 **Phase 39 / SHIP-07 / P79**
-**Supersedes:** `docs/day-zero-rota.md` (Phase 36 — 72h shift skeleton) for the v2.1 launch day specifically.
+**Supersedes:** `docs/day-zero-rota.md` (Phase 36 — 72h shift skeleton) for the original v2.1 launch-day plan.
 
-This document is the hourly hot-desk plan for the first 24 hours after the v2.1 RC binaries are public. Every hour is assigned to one of: **Kaan**, **Francesco**, **Bravoh-team** (Momo / Francis / on-call rotation).
+The first section preserves the historical v2.1 hourly rotation table. Current
+public-release execution uses the `§SHIP-11` section below: four 6-hour shifts,
+Kaan solo, with the current triage tree and monitoring-source list.
 
 ## Owners
 
@@ -135,7 +137,7 @@ Signal arrives → categorize:
 │   ├── Coordinate with Musa (Bravoh proxy on-call) to autoscale or raise rate limits
 │   └── If unable to resolve in 15 min → post Discord `[notice] vibemix proxy queue active`
 │
-└── Bravoh server down (healthz 5xx, /vibemix/updates/latest.json 5xx)
+└── Bravoh server down (healthz 5xx, /vibemix/updates/<target>/<arch>/<version> 5xx)
     ├── Run `bash scripts/release/check_bravoh_server_ready.sh` for structured BLOCKED_BY line
     ├── Escalate to Bravoh team (Slack #bravoh-vibemix)
     ├── Post Discord `[notice] vibemix updater check intermittent — investigating`

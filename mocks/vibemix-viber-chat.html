@@ -5,7 +5,7 @@
   Direction: "The Deck Speaks — in conversation."
   A Codex-style chat where you talk to Viber, the grounded DJ co-host/curator.
   Viber reasons out loud the way a real DJ friend would — and every capability
-  it just gained (web search, YouTube listening, quote-a-moment, DJ-knowledge,
+  it just gained (web search, source reading, quote-a-moment, DJ-knowledge,
   curate/build) is made VISIBLE as it works, then settles into hardware cards.
 
   Aesthetic (frontend-enforcement): retro-futurist DJ hardware, 20/80.
@@ -171,12 +171,12 @@ body::before{
 .quote .play{display:inline-flex;align-items:center;gap:7px;margin-top:10px;font-family:var(--type-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);cursor:pointer}
 .quote .play .tri{width:0;height:0;border-left:9px solid var(--amber);border-top:6px solid transparent;border-bottom:6px solid transparent;filter:drop-shadow(var(--glow-faint))}
 
-/* youtube "listened" line */
-.yt{display:flex;align-items:center;gap:11px;padding:11px 14px}
-.yt .ic{font-family:var(--type-mono);font-size:11px;color:var(--amber);border:1px solid var(--amber-22);border-radius:var(--rad-sm);padding:3px 6px;letter-spacing:.08em}
-.yt .meta{flex:1;min-width:0}
-.yt .meta .t{font-size:13px;color:var(--silk);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.yt .meta .u{font-family:var(--type-mono);font-size:11px;color:var(--silk-40)}
+/* fetched-source line */
+.source{display:flex;align-items:center;gap:11px;padding:11px 14px}
+.source .ic{font-family:var(--type-mono);font-size:11px;color:var(--amber);border:1px solid var(--amber-22);border-radius:var(--rad-sm);padding:3px 6px;letter-spacing:.08em}
+.source .meta{flex:1;min-width:0}
+.source .meta .t{font-size:13px;color:var(--silk);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.source .meta .u{font-family:var(--type-mono);font-size:11px;color:var(--silk-40)}
 
 /* ── receipt chips — the citation ignites under a grounded claim ── */
 .receipts{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
@@ -258,7 +258,7 @@ body::before{
       <button data-q="what's the breakdown you'd mix out of in my track Helix?">quote a moment</button>
       <button data-q="how do I avoid two basslines clashing on a transition?">ask a technique</button>
       <button data-q="what is charlotte de witte playing lately?">search the web</button>
-      <button data-q="listen to this and tell me the vibe https://youtu.be/dQw4w9WgXcQ">drop a youtube link</button>
+      <button data-q="read this source and pull the DJ-relevant bits https://ra.co/features">read a source</button>
     </div>
     <div class="inputwrap">
       <span class="prompt">›</span>
@@ -390,16 +390,17 @@ async function flowWeb(t){
   receipts(t.body, ['mixmag.net','residentadvisor.net','1001tracklists.com']);
 }
 
-async function flowYoutube(t){
-  await tool(t.tools,'◆','ingest_youtube','youtu.be/dQw4w9WgXcQ', 1450);
-  await say(t.body, `Listened. It's <span class="mark">upbeat 80s dance-pop</span> — bright synth hook, ~113 BPM, joyful and a little tongue-in-cheek. Structurally a clean verse/chorus, not really a peak-time techno tool — but the intro's drum-machine groove could warm up an early set.`);
+async function flowSource(t){
+  await tool(t.tools,'◆','web_search','resident advisor feature', 520);
+  await tool(t.tools,'◆','fetch_url','ra.co/features', 680);
+  await say(t.body, `Read it. The DJ-relevant bit is <span class="mark">context, not track facts</span>: use the source for scene language and references, then I’ll map that back onto tracks I can actually find in your library.`);
   card(t.body, `
-    <div class="cap"><span class="dot"></span> listened · youtube</div>
-    <div class="yt">
-      <span class="ic">▶ YT</span>
-      <div class="meta"><div class="t">Never Gonna Give You Up</div><div class="u">youtu.be/dQw4w9WgXcQ · ~113 BPM · dance-pop</div></div>
+    <div class="cap"><span class="dot"></span> read · source</div>
+    <div class="source">
+      <span class="ic">SRC</span>
+      <div class="meta"><div class="t">Resident Advisor feature</div><div class="u">ra.co/features · fetched text · cite before claiming</div></div>
     </div>`);
-  receipts(t.body, ['gemini · native video','timestamps are hints']);
+  receipts(t.body, ['web_search','fetch_url','claims need sources']);
 }
 
 async function flowDefault(t, text){
@@ -410,7 +411,7 @@ async function flowDefault(t, text){
 
 function route(text){
   const s = text.toLowerCase();
-  if (/youtu\.?be|youtube|listen/.test(s)) return flowYoutube;
+  if (/source|read|fetch|url/.test(s)) return flowSource;
   if (/set|build|peak|warehouse|arc|sequence/.test(s)) return flowSet;
   if (/quote|breakdown|moment|mix out|mix-out/.test(s)) return flowQuote;
   if (/eq|clash|bass|technique|how do i|phras/.test(s)) return flowTechnique;

@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>vibemix · pill hover-reveal (design contract)</title>
+<!-- Mock-only remote fonts. The shipped app vendors Saira + JBM locally (DESIGN.md);
+     a throwaway design mock may link them so the type reads true. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* ── Tokens (subset, copied verbatim from tauri/ui/src/tokens.css) ───────── */
+  :root {
+    --void:        #000000;
+    --void-1:      #020205;
+    --void-2:      #05070b;
+    --glass-3:     rgba(2, 3, 6, 0.88);
+    --glass-edge:  rgba(255, 255, 255, 0.065);
+    --glass-edge-up: rgba(255, 255, 255, 0.110);
+    --glass-top:   rgba(255, 255, 255, 0.055);
+
+    --silk:    #d6cfc7;
+    --silk-65: rgba(214, 207, 199, 0.65);
+    --silk-40: rgba(214, 207, 199, 0.40);
+    --silk-22: rgba(214, 207, 199, 0.22);
+    --silk-12: rgba(214, 207, 199, 0.12);
+
+    --amber:      #ff8a3d;
+    --amber-22:   rgba(255, 138, 61, 0.22);
+    --amber-40:   rgba(255, 138, 61, 0.40);
+    --amber-65:   rgba(255, 138, 61, 0.65);
+
+    /* Liquid-glass material (tokens.css §lg-*) */
+    --lg-spec-hi:   rgba(255, 251, 244, 0.12);
+    --lg-spec-mid:  rgba(255, 251, 244, 0.06);
+    --lg-spec-lo:   rgba(255, 251, 244, 0.025);
+    --lg-rim-light: rgba(255, 251, 244, 0.16);
+    --lg-rim-void:  rgba(2, 3, 8, 0.55);
+    --lg-depth:     0 2px 8px rgba(2, 3, 8, 0.5), 0 12px 32px rgba(2, 3, 8, 0.42);
+    --lg-lens-blur: blur(18px) saturate(135%);
+    --lg-surface-shadow:
+      inset 0 1px 0 var(--lg-rim-light),
+      inset 0 6px 12px -8px var(--lg-spec-hi),
+      inset 0 -1px 0 var(--lg-rim-void),
+      var(--lg-depth);
+
+    --type-display: 'Saira', system-ui, sans-serif;
+    --type-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+    --rad-sm: 2px; --rad-md: 6px; --rad-lg: 10px;
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px;
+
+    /* Premium reveal motion — ease-out-expo (no bounce, never elastic) */
+    --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --reveal:    320ms;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Faux desktop so the liquid-glass lensing actually reads ─────────────── */
+  body {
+    min-height: 100vh;
+    font-family: var(--type-display);
+    color: var(--silk);
+    /* A "DJ software at night" backdrop: deep void + a couple of restrained
+       rave washes so the glass has colour to bend. NEVER on chrome — body only. */
+    background:
+      radial-gradient(120% 80% at 18% 12%, rgba(192, 56, 224, 0.10), transparent 60%),
+      radial-gradient(100% 70% at 82% 88%, rgba(72, 152, 255, 0.09), transparent 55%),
+      radial-gradient(90% 60% at 60% 50%, rgba(255, 92, 188, 0.05), transparent 60%),
+      var(--void);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-5);
+    padding: 64px 24px 96px;
+  }
+  /* a faint fake "waveform timeline" in the backdrop, to sell the floating read */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      90deg, transparent 0 38px, rgba(214,207,199,0.018) 38px 39px);
+    pointer-events: none;
+  }
+
+  header { text-align: center; max-width: 560px; z-index: 1; }
+  header .kicker {
+    font-family: var(--type-mono); font-size: 11px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--amber-65); margin-bottom: var(--sp-2);
+  }
+  header h1 {
+    font-weight: 600; font-size: 20px; letter-spacing: 0.02em; color: var(--silk);
+  }
+  header p {
+    margin-top: var(--sp-3); font-size: 13px; line-height: 1.5; color: var(--silk-65);
+  }
+
+  /* ── Controls (mock-only) ────────────────────────────────────────────────── */
+  .controls {
+    display: flex; gap: var(--sp-2); flex-wrap: wrap; justify-content: center; z-index: 1;
+  }
+  .controls button {
+    font-family: var(--type-mono); font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--silk-65);
+    background: var(--glass-3); border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-sm); padding: 8px 14px; cursor: pointer;
+    transition: color 150ms, border-color 150ms;
+  }
+  .controls button:hover { color: var(--silk); border-color: var(--glass-edge-up); }
+  .controls button[aria-pressed="true"] {
+    color: var(--amber); border-color: var(--amber-40);
+  }
+
+  /* ── The booth: where the pill floats ────────────────────────────────────── */
+  .booth {
+    flex: 1; display: flex; align-items: flex-start; justify-content: center;
+    width: 100%; padding-top: 40px; z-index: 1;
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     THE PILL — one continuous liquid-glass body that morphs open on hover.
+     Window analogue: a fixed-tall transparent host (280 wide); the lozenge is
+     the only thing visible at rest, the drawer unfolds below it.
+     ════════════════════════════════════════════════════════════════════════ */
+  .pill {
+    position: relative;
+    width: 280px;
+    background: var(--glass-3);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--rad-lg);
+    box-shadow: var(--lg-surface-shadow);
+    backdrop-filter: var(--lg-lens-blur);
+    -webkit-backdrop-filter: var(--lg-lens-blur);
+    color: var(--silk);
+    overflow: hidden;
+    /* THE MORPH: grid rows tween from "lozenge + 0fr" to "lozenge + 1fr".
+       grid-template-rows is GPU-friendly to animate and never reflows siblings. */
+    display: grid;
+    grid-template-rows: 44px 0fr;
+    transition: grid-template-rows var(--reveal) var(--ease-expo);
+  }
+
+  /* Specular crown — one overhead stage light raking the top of the lozenge.
+     Paint-only pseudo (no 2nd blur). Pinned to the crown so it reads as light
+     on the glass, never a film over the drawer content. */
+  .pill::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 56px;
+    border-radius: var(--rad-lg) var(--rad-lg) 0 0;
+    background: linear-gradient(105deg,
+      var(--lg-spec-mid) 0%, var(--lg-spec-lo) 28%, transparent 60%);
+    mix-blend-mode: screen;
+    pointer-events: none; z-index: 2;
+  }
+
+  /* ── Lozenge (always-visible row 1) ──────────────────────────────────────── */
+  .pill__loz {
+    position: relative; z-index: 1;
+    height: 44px;
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding: 0 var(--sp-3);
+  }
+  .pill__dot {
+    flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--silk-40);
+    transition: background 200ms;
+  }
+  .pill[data-state="listening"] .pill__dot,
+  .pill[data-state="speaking"]  .pill__dot { background: var(--amber); }
+  .pill[data-state="listening"] .pill__dot { animation: blink 1.4s ease-in-out infinite; }
+  .pill[data-state="speaking"]  .pill__dot { animation: blink 0.9s ease-in-out infinite; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .pill__label {
+    flex: 0 0 auto; font-family: var(--type-display);
+    font-size: 9px; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--silk-65); line-height: 1;
+  }
+
+  /* waveform — quiet at idle, alive while speaking */
+  .pill__wave { flex: 1 1 auto; display: flex; align-items: center; justify-content: flex-end;
+    gap: 2px; height: 16px; min-width: 0; }
+  .pill__wave i { width: 2px; height: 3px; border-radius: 1px; background: var(--silk-40);
+    transition: height 120ms ease-out, background 200ms; }
+  .pill[data-state="speaking"] .pill__wave i { background: var(--silk-65); animation: vu 0.7s ease-in-out infinite; }
+  .pill__wave i:nth-child(2){animation-delay:.08s} .pill__wave i:nth-child(3){animation-delay:.16s}
+  .pill__wave i:nth-child(4){animation-delay:.24s} .pill__wave i:nth-child(5){animation-delay:.12s}
+  .pill__wave i:nth-child(6){animation-delay:.20s} .pill__wave i:nth-child(7){animation-delay:.04s}
+  @keyframes vu { 0%,100%{height:3px} 50%{height:13px} }
+
+  /* ── The pull-notch: a tactile "more below" hint, mirroring the drag grab-bar.
+        SILK, never amber (One-Amber rule: the only amber at rest is the state
+        dot). Shown ONLY when a grounded suggestion exists (honest sign-of-life,
+        tied to real data) and it dissolves the instant the drawer opens. ────── */
+  .pill__notch {
+    position: absolute; left: 50%; bottom: 0; transform: translate(-50%, 50%);
+    width: 22px; height: 2px; border-radius: 1px; background: var(--silk-22);
+    z-index: 3; opacity: 0; transition: opacity 200ms var(--ease-expo);
+    pointer-events: none;
+  }
+  .pill[data-has-next="true"] .pill__notch { opacity: 1; }
+  /* breathing only when there's something to pull for — a 1-px sign of life */
+  .pill[data-has-next="true"]:not([data-open="true"]) .pill__notch {
+    animation: notch 2.6s ease-in-out infinite;
+  }
+  @keyframes notch { 0%,100% { opacity: .35; width: 18px; } 50% { opacity: .9; width: 24px; } }
+  .pill[data-open="true"] .pill__notch { opacity: 0; animation: none; }
+
+  /* ── The drawer (row 2 — unfolds on open) ────────────────────────────────── */
+  .pill__drawer { overflow: hidden; min-height: 0; }
+  /* open only when hovering AND a suggestion exists (honest silence otherwise) */
+  .pill[data-open="true"] { grid-template-rows: 44px 1fr; }
+
+  .pill__drawerInner {
+    padding: 0 var(--sp-3) var(--sp-3);
+    /* the fold seam: a hairline where the lozenge meets the drawer, so the eye
+       reads one piece of glass creasing open, not a second box appearing */
+    border-top: 1px solid var(--glass-edge);
+    margin-top: 2px;
+  }
+
+  /* ── The next-track card — content settles a beat AFTER the container morphs.
+        That stagger is the tell of an expensive interface. ──────────────────── */
+  .next {
+    padding-top: var(--sp-3);
+    opacity: 0; transform: translateY(6px);
+    transition: opacity 240ms var(--ease-expo) 60ms, transform 320ms var(--ease-expo) 60ms;
+  }
+  .pill[data-open="true"] .next { opacity: 1; transform: translateY(0); }
+
+  .next__label {
+    display: inline-flex; align-items: center; gap: var(--sp-1);
+    font-family: var(--type-mono); font-size: 9px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--silk-40); margin-bottom: var(--sp-2);
+  }
+  .next__glyph { color: var(--amber); }          /* THE one amber in the drawer */
+  .next__title {
+    font-family: var(--type-mono); font-size: 12px; line-height: 1.25; color: var(--silk);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .next__meta {
+    margin-top: var(--sp-1);
+    font-family: var(--type-mono); font-variant-numeric: tabular-nums;
+    font-size: 10px; letter-spacing: 0.04em; line-height: 1.3; color: var(--silk-65);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* the key + bpm read as live-readout chips, tabular and quiet */
+  .next__meta b { color: var(--silk); font-weight: 500; }
+
+  /* reduced-motion: the drawer still opens, it just snaps; no pulse/stagger */
+  @media (prefers-reduced-motion: reduce) {
+    .pill, .next, .pill__notch { transition: none; }
+    .pill__dot, .pill__wave i, .pill[data-has-next="true"] .pill__notch { animation: none; }
+  }
+
+  .footnote {
+    z-index: 1; font-family: var(--type-mono); font-size: 10px; color: var(--silk-40);
+    letter-spacing: 0.06em; text-align: center; max-width: 520px; line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="kicker">vibemix · pill</div>
+    <h1>What&rsquo;s next, on hover</h1>
+    <p>The lozenge sits at rest. When a grounded pick is ready, a 1&#8209;pixel notch breathes at its lower edge. Hover, and the glass creases open into one continuous drawer: the next track, its key, its tempo, why.</p>
+  </header>
+
+  <div class="controls">
+    <button id="t-next" aria-pressed="true">suggestion ready</button>
+    <button id="t-state" aria-pressed="false">speaking</button>
+    <button id="t-open" aria-pressed="false">force open</button>
+  </div>
+
+  <div class="booth">
+    <div class="pill" id="pill" data-state="listening" data-has-next="true" data-open="false">
+      <!-- row 1: the lozenge, always visible -->
+      <div class="pill__loz">
+        <span class="pill__dot"></span>
+        <span class="pill__label" id="label">LISTENING</span>
+        <span class="pill__wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      </div>
+      <span class="pill__notch"></span>
+
+      <!-- row 2: the drawer, unfolds on open -->
+      <div class="pill__drawer">
+        <div class="pill__drawerInner">
+          <div class="next">
+            <div class="next__label"><span class="next__glyph">&uarr;</span> next</div>
+            <div class="next__title">Midnight Pulse</div>
+            <div class="next__meta">Rune &middot; similar vibe &middot; <b>8A</b> &middot; <b>128</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footnote">
+    grid&#8209;rows morph &middot; ease&#8209;out&#8209;expo 320ms &middot; one glass body, one specular crown<br/>
+    honest silence: no suggestion &rarr; no notch, no drawer (hover does nothing)
+  </p>
+
+<script>
+  const pill = document.getElementById('pill');
+  const label = document.getElementById('label');
+  const tNext = document.getElementById('t-next');
+  const tState = document.getElementById('t-state');
+  const tOpen = document.getElementById('t-open');
+
+  // hover-intent: open while pointer is over the pill AND a suggestion exists.
+  // (The real app additionally toggles the host window's click-through here so
+  //  the transparent void below the lozenge never steals the DJ's clicks.)
+  let over = false, forced = false;
+  function sync() {
+    const hasNext = pill.dataset.hasNext === 'true';
+    pill.dataset.open = (hasNext && (over || forced)) ? 'true' : 'false';
+  }
+  pill.addEventListener('pointerenter', () => { over = true; sync(); });
+  pill.addEventListener('pointerleave', () => { over = false; sync(); });
+
+  tNext.addEventListener('click', () => {
+    const on = tNext.getAttribute('aria-pressed') === 'true';
+    tNext.setAttribute('aria-pressed', String(!on));
+    pill.dataset.hasNext = String(!on);
+    sync();
+  });
+  tState.addEventListener('click', () => {
+    const speaking = tState.getAttribute('aria-pressed') !== 'true';
+    tState.setAttribute('aria-pressed', String(speaking));
+    pill.dataset.state = speaking ? 'speaking' : 'listening';
+    label.textContent = speaking ? 'SPEAKING' : 'LISTENING';
+  });
+  tOpen.addEventListener('click', () => {
+    forced = tOpen.getAttribute('aria-pressed') !== 'true';
+    tOpen.setAttribute('aria-pressed', String(forced));
+    sync();
+  });
+</script>
+</body>
+</html>

@@ -7,11 +7,10 @@ distributed outside the Microsoft Store, and it does **not** mean
 vibemix is unsafe — Defender simply hasn't seen the binary enough
 times to trust it yet.
 
-Phase 38 of the project ships a SignPath-signed installer. Once that
-chain is live and Defender has seen enough downloads of the signed
-binary (Microsoft calls this "reputation"), this prompt goes away on
-its own. Until then, the steps below walk you through one-click
-allow.
+The release process ships a SignPath-signed Inno installer named
+`vibemix-installer.exe`. Once Defender has seen enough downloads of the signed
+binary (Microsoft calls this "reputation"), this prompt usually goes away on
+its own. Until then, the steps below walk you through one-click allow.
 
 ## What the prompt looks like
 
@@ -28,15 +27,14 @@ appears after you click **More info**.
 1. When the SmartScreen dialog appears, click **More info** (top of the
    dialog, easy to miss).
 2. The dialog expands and shows two lines:
-   - **App:** `vibemix-setup.msi` (or `vibemix-setup.exe`)
-   - **Publisher:** `Bravoh AG` once SignPath is wired; before Phase 38
-     completes, this line may read **"Unknown publisher"** — that is
-     expected.
+   - **App:** `vibemix-installer.exe`
+   - **Publisher:** `Bravoh AG` for release builds. Unsigned local rehearsal
+     builds may read **"Unknown publisher"**; public releases should not.
 3. Click **Run anyway**. The installer proceeds normally.
 
 If you do not see the **More info** link, your organisation may have
 configured a stricter SmartScreen policy. In that case, ask your IT
-admin to allow `vibemix-setup` for your account — vibemix does not run
+admin to allow `vibemix-installer.exe` for your account — vibemix does not run
 elevated and does not modify system audio drivers (BlackHole is a
 separate optional install).
 
@@ -62,12 +60,12 @@ dialog and you can pick **More info → Run anyway** the second time.
 
 ## Related
 
-- Phase 38 SignPath wiring (DIST-16): the long-term fix.
+- Windows signing runbook: `docs/signing-windows.md`.
 - macOS Gatekeeper guidance: see `docs/signing-macos.md` for the
   equivalent Mac flow.
 
 ## Honesty note
 
 This document does not promise a warning-free install on Windows. The
-real fix is reputation building up after Phase 38 ships, which takes
-time and is outside our direct control.
+real fix is reputation building up for the signed `vibemix-installer.exe`,
+which takes time and is outside our direct control.

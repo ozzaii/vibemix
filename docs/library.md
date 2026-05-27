@@ -2,8 +2,8 @@
 
 vibemix can embed a folder of your audio files into a local vector index, then
 let you search it by *vibe* ("dark rolling techno") or by *similarity to a seed
-track*. Everything is stored locally; only the audio sent for embedding leaves
-your machine (to Gemini, via your own key).
+track*. Everything is stored locally; audio embedding runs on-device with CLAP
+ONNX, so your tracks do not leave the machine for library indexing.
 
 This is an **opt-in, isolated** subsystem. It never runs during a live session
 and never touches the reaction loop — it's a CLI you invoke when you want to
@@ -12,35 +12,67 @@ build or query your library.
 ## What it does
 
 ```
-your folder of tracks ──▶ embed-folder ──▶ ~/.cache/vibemix/library.db   (1536-d vectors, sqlite-vec)
+your folder of tracks ──▶ embed-folder ──▶ ~/.cache/vibemix/library-clap.db   (512-d vectors, sqlite-vec)
                                        └─▶ ~/.cache/vibemix/library.pkl  (titles for search/similar)
 
             search "<vibe>"  ─┐
             similar <id>     ─┴──▶ top-K nearest tracks (filename + score)
 ```
 
-- **Model:** Gemini Embedding 2 (`gemini-embedding-2`) — natively multimodal,
-  embeds audio directly (no transcription, no text-tagging step).
-- **Dimensions:** 1536 (a Matryoshka cut-point of the model's native 3072),
-  L2-normalized before storage.
-- **Long tracks:** the model takes short audio windows, so tracks are sampled
-  as three 60s excerpts (intro / mid / outro) and averaged into one vector.
-  Tracks ≤ 80s are embedded in a single call.
+- **Model:** CLAP ONNX (`Xenova/larger_clap_music_and_speech`) — local
+  audio/text embeddings in one shared space.
+- **Dimensions:** 512, L2-normalized before storage.
+- **Long tracks:** audio is chunked into deterministic 10s windows and
+  mean-pooled into one track vector.
 - **Backend:** `sqlite-vec` on macOS / Windows-x64, with a NumPy fallback
   (bit-identical top-K).
 
 ## Prerequisites
 
-1. **An API key.** Either:
-   - `GEMINI_API_KEY` in your `.env` (direct — the same key the live co-host
-     uses), or
-   - `VIBEMIX_PROXY_JWT` (+ optional `VIBEMIX_PROXY_BASE_URL`) for the Bravoh
-     proxy path.
-   `embed-folder` prefers the direct key when `GEMINI_API_KEY` is set.
-2. **ffmpeg / ffprobe** on your `PATH` (already required by vibemix — used to
+Install local AI runtime dependencies when setting up a full app/dev
+environment:
+
+```bash
+uv sync --extra ai-local
+```
+
+Use `--extra clap` for embedding-only CI/dev jobs, or `--extra cue` for
+cue-engine-only checks.
+
+1. **CLAP ONNX model files** under `~/.cache/vibemix/clap-onnx/` or
+   `VIBEMIX_CLAP_ONNX_DIR`.
+2. Optional for cue-anchored ingest: **CUE-DETR ONNX** at
+   `~/.cache/vibemix/cue-detr-onnx/cuedetr.fp32.onnx` or
+   `VIBEMIX_CUE_ONNX_PATH`. If missing, cue detection falls back to the local
+   heuristic.
+3. **ffmpeg / ffprobe** on your `PATH` (already required by vibemix — used to
    read track duration and slice excerpts).
 
-See [`byo-key.md`](./byo-key.md) for getting a key.
+Check local model status before indexing:
+
+```bash
+uv run python -m vibemix library models --json
+```
+
+This is an offline setup probe. It reports install state, cache paths, missing
+files, and env overrides for both CLAP and CUE-DETR.
+
+Install or verify the supported downloadable assets:
+
+```bash
+uv run python -m vibemix library models --install required --json
+```
+
+`--install required` is the app's first-run path: it downloads the required
+CLAP files from the `Xenova/larger_clap_music_and_speech` Hugging Face model
+repo into the vibemix cache and verifies size + SHA-256. Existing verified
+files are skipped. `--install clap` performs the same CLAP-only install.
+`--install cue` reports/verifies the CUE-DETR target and exits non-zero until
+the ONNX file is present. It can download CUE-DETR only when a release/ops
+build provides a hosted fp32 ONNX artifact through all three env pins:
+`VIBEMIX_CUE_ONNX_URL`, `VIBEMIX_CUE_ONNX_SHA256`, and
+`VIBEMIX_CUE_ONNX_SIZE`. `--install all` remains strict and requires both
+targets to be ready. Without those pins, CUE remains an honest manual target.
 
 ## Build your library
 
@@ -53,28 +85,26 @@ It walks the folder recursively, embeds every supported file
 cost estimate:
 
 ```
--> embed-folder: client=direct (GEMINI_API_KEY)
+-> embed-folder: embedder=CLAP ONNX (local, keyless)
 -> library store: backend=SqliteVecStore reason=ok
-[1/128] ok   10_10.mp3                    ~€0.0017
-[2/128] ok   2AT x Nixss - Nonstop.mp3    ~€0.0033
-[3/128] err  corrupt_file.mp3             ~€0.0033   (logged, skipped)
+[1/128] ok   10_10.mp3                    ~€0.0000
+[2/128] ok   2AT x Nixss - Nonstop.mp3    ~€0.0000
+[3/128] err  corrupt_file.mp3             ~€0.0000   (logged, skipped)
 ...
 ```
 
 It is:
 
 - **Resumable** — already-embedded files are content-hash cached, so re-running
-  the same folder costs ~€0 and just tops up what's missing. Safe to Ctrl-C and
-  resume (handy on a slow connection).
+  the same folder just tops up what's missing. Safe to Ctrl-C and resume.
 - **Fault-tolerant** — a corrupt / unprobeable / over-long file is logged and
   skipped; it never aborts the run and never stores a faked embedding.
-- **Cost-aware** — the running `~€` estimate lets you abort if a huge folder
-  spikes. Embedding is cheap (≈ €0.002 / track), but it scales with library
-  size.
+- **Keyless** — the running `~€` estimate stays at zero for local CLAP
+  embeddings.
 
 **Tip:** start with one representative subfolder (a single genre, or a folder
 with cross-genre variety) before committing a multi-thousand-track library —
-you validate quality, cost, and upload speed first.
+you validate quality and local model speed first.
 
 `--json` emits the final report (and per-track `track_id`s) as JSON instead of
 the human progress stream.
@@ -106,9 +136,22 @@ absolute file path), distinct from Rekordbox-imported ids.
   internal contrast (ambient intro → peak drop). For transition-style matching
   (outro-of-A → intro-of-B) a per-section / multi-vector strategy is more
   faithful — that's an open design axis, not yet a shipped knob.
-- **Cost** is per input token and independent of the 1536 output dimension.
-- **Privacy:** vectors and the index stay on your machine. Audio excerpts are
-  uploaded to Gemini for embedding under your key; nothing else is sent.
+- **Cost:** local CLAP embeddings do not use the Gemini embedding API.
+- **Privacy:** vectors, index, and audio stay on your machine for embedding.
+- **Setup:** `library models --json` is the installer/app seam for showing
+  whether local model assets are ready before a user starts indexing.
+  `library models --install required --json` installs the pinned
+  full-precision CLAP ONNX snapshot and repairs mismatched required caches.
+  Add `--progress` to keep stdout as final JSON while emitting
+  `VIBEMIX_MODEL_PROGRESS {...}` frames on stderr for the desktop setup row.
+  `library models --install cue --json` verifies CUE and can install it from a
+  hosted artifact only when URL, byte size, and SHA-256 are configured.
+- **Agent preflight:** `library stats --json` also reports the local Codex
+  Viber backend plus `agent_ready`, `agent_status`, and `agent_hint`. This is an
+  offline check for obvious Codex setup gaps; the actual chat/build run still
+  returns the authoritative result.
+- **Dependencies:** the full app/installer path should include the
+  `ai-local` extra; narrower `clap` and `cue` extras exist for focused jobs.
 - Changing `EMBEDDING_DIM` invalidates an existing index — delete
-  `~/.cache/vibemix/library.db` and re-embed (an empty stale-dim table is
+  `~/.cache/vibemix/library-clap.db` and re-embed (an empty stale-dim table is
   auto-recreated; a populated one fails loud to protect your data).

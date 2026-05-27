@@ -77,26 +77,38 @@ Server logic:
 
 - Look up the latest signed manifest for `(target, arch)`.
 - If `latest.version <= current_version`: respond `204 No Content`.
-- Else respond `200 OK` with the signed manifest JSON:
+- Else respond `200 OK` with the signed static manifest JSON:
   ```json
   {
     "version": "0.1.4",
-    "url": "https://github.com/<owner>/vibemix/releases/download/v0.1.4/vibemix-0.1.4-aarch64-apple-darwin.dmg",
-    "signature": "<minisign-signature-base64-of-the-dmg>",
     "notes": "Fixes mic gating regression. Improves Windows DDJ-FLX4 hot-plug.",
-    "pub_date": "2026-06-15T18:00:00Z"
+    "pub_date": "2026-06-15T18:00:00Z",
+    "platforms": {
+      "darwin-aarch64": {
+        "url": "https://github.com/<owner>/vibemix/releases/download/v0.1.4/vibemix-0.1.4-arm64.app.tar.gz",
+        "signature": "<signature-of-darwin-aarch64-updater-artifact>"
+      },
+      "darwin-x86_64": {
+        "url": "https://github.com/<owner>/vibemix/releases/download/v0.1.4/vibemix-0.1.4-x86_64.app.tar.gz",
+        "signature": "<signature-of-darwin-x86_64-updater-artifact>"
+      },
+      "windows-x86_64": {
+        "url": "https://github.com/<owner>/vibemix/releases/download/v0.1.4/vibemix_0.1.4_x64-setup.exe",
+        "signature": "<signature-of-windows-x86_64-updater-artifact>"
+      }
+    }
   }
   ```
 
-`signature` is the minisign signature of the binary at `url`, signed
-with the private half of the keypair documented in
-`tauri/src-tauri/keys/README.md`. Tauri verifies the signature against
-the `pubkey` baked into the running app (committed to
-`tauri.conf.json5` at build time). Mismatched / forged signatures are
-rejected silently; the running app keeps its version. The TLS layer
-protects manifest delivery in transit, but the signature is the
-real trust anchor — even a compromised manifest server cannot push
-malicious updates without the private key.
+Each platform `signature` is the minisign signature of that platform's
+updater artifact at `url`, signed with the private half of the keypair
+documented in `tauri/src-tauri/keys/README.md`. Tauri selects
+`darwin-aarch64`, `darwin-x86_64`, or `windows-x86_64` based on the
+running build, verifies the signature against the `pubkey` baked into the
+app, and rejects mismatched / forged signatures silently. The TLS layer
+protects manifest delivery in transit, but the signature is the real trust
+anchor — even a compromised manifest server cannot push malicious updates
+without the private key.
 
 ## Key Setup
 
@@ -109,6 +121,8 @@ procedure. Summary:
    `TAURI_UPDATER_PLACEHOLDER` sentinel.
 3. Store the matching private-key base64 + passphrase as GitHub repo
    secrets `TAURI_UPDATER_PRIVATE_KEY` + `TAURI_UPDATER_KEY_PASSWORD`.
+   The password may be empty, but keep the secret/env var present so the
+   signing scripts pass `--password ""` intentionally.
 
 Plan 18-05's `.github/workflows/release.yml` refuses to build any
 tagged release while the placeholder string `TAURI_UPDATER_PLACEHOLDER`
@@ -120,16 +134,24 @@ steps silently when the placeholder is present (mock-signing dry-run).
 The `.github/workflows/release.yml` workflow does the following on `v*`
 tag push:
 
-1. Build + sign + notarize + DMG / MSI (Plans 18-01 through 18-03).
-2. Upload the signed DMG / MSI to the GitHub Release at the matching
-   tag.
-3. Sign the manifest with `npx @tauri-apps/cli signer sign` (using
+1. Build + sign + notarize first-install artifacts (macOS DMG and Windows
+   Inno `vibemix-installer.exe`) for public downloads.
+2. Build updater artifacts that match Tauri's updater contract:
+   macOS `.app.tar.gz`, and Windows Tauri NSIS `*setup*.exe`. These are
+   distinct from the DMG/Inno installer. The Windows updater EXE is
+   Authenticode-signed through SignPath and checked by the release publish gate
+   before manifest signing.
+3. Sign the local updater artifact bytes with
+   `npx @tauri-apps/cli signer sign` (using
    `TAURI_UPDATER_PRIVATE_KEY` + `TAURI_UPDATER_KEY_PASSWORD` from
-   GitHub secrets).
-4. `curl POST` the signed manifest to a Bravoh-proxy endpoint on
-   `api.altidus.world` (TODO: endpoint not yet implemented on the
-   proxy side — out of scope for Phase 18; Bravoh ops adds the
-   endpoint in a separate hand-off).
+   GitHub secrets), while writing the future GitHub Release URLs into
+   `latest.json`.
+4. Attach the first-install artifacts, updater artifacts, and
+   `latest.json` to the draft GitHub Release at the matching tag.
+5. `curl POST` the signed manifest to a Bravoh-proxy endpoint on
+   `api.altidus.world`. Bravoh-side deployment is tracked outside this repo;
+   until it is live, the release workflow keeps the signed manifest attached
+   to the GitHub Release as the fallback source.
 
 Until the Bravoh proxy endpoint ships, the updater will receive HTTP
 `404 Not Found` and silently keep the running version. This is OK for
@@ -171,10 +193,9 @@ Ed25519-based. The public key is 32 bytes; the manifest signature is
 
 SmartScreen + Gatekeeper reputation builds across the first ~few
 thousand installs of a new cert (see `docs/signing-windows.md` for the
-SmartScreen warm-up note). The updater does NOT need separate reputation
-— Tauri verifies the manifest signature locally before download, then
-re-checks the installer's OS-level signature (codesign / SignPath) on
-install. Two independent verification layers.
+SmartScreen warm-up note). The updater manifest signature proves the
+downloaded bytes match what CI published; it does not replace OS-level
+signing for Windows installers or macOS app bundles.
 
 ## Troubleshooting
 

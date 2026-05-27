@@ -1,42 +1,45 @@
 # CLAP engine — local on-device audio/text embedding
 
-> **Status: WIRED (Phase 90, 2026-05-26) — OPT-IN via `VIBEMIX_EMBED_BACKEND=clap`.**
-> The `onnx` backend is live in `clap_engine.py`, `ClapEmbedder` is a drop-in for
-> `LibraryEmbedder`, the `build_embedder` factory + `_cosine.EMBED_BACKEND` seam
-> flip dim (512) + class together off ONE env var, and all 8 construction sites
+> **Status: PRODUCT DEFAULT (2026-05-26) — local CLAP ONNX embeddings.**
+> The `onnx` backend is live in `clap_engine.py`, `ClapEmbedder` implements the
+> product embedder protocol, the `embed_factory.build_embedder` factory always
+> selects CLAP, and `_cosine.EMBEDDING_DIM` is fixed at 512. All construction sites
 > (curate/search/similar/build-set/telegram/embed-folder CLI + co-host grounding
-> + session_loop + mcp_server) + `grounding.py` route through it. **Default stays
-> `gemini` (1536-dim) — the cold path + the whole existing suite are
-> byte-identical.** To use CLAP: `pip install -e ".[clap]"`, put the
+> + session_loop + mcp_server) + `grounding.py` route through it. For the full
+> local model runtime use `pip install -e ".[ai-local]"`; for embedding-only
+> work use `pip install -e ".[clap]"`. Put the
 > `Xenova/larger_clap_music_and_speech` ONNX snapshot under
-> `~/.cache/vibemix/clap-onnx/` (or set `VIBEMIX_CLAP_ONNX_DIR`), then run with
-> `VIBEMIX_EMBED_BACKEND=clap`. **Remaining KAAN-ACTION:** the one-time model
-> download/cache UX + the live re-embed of a real library + the funded-key curate
+> `~/.cache/vibemix/clap-onnx/` (or set `VIBEMIX_CLAP_ONNX_DIR`). `vibemix
+> library models --json` reports CLAP/CUE-DETR cache readiness for setup UX, and
+> `vibemix library models --install required --json` downloads/verifies the
+> required CLAP full-precision ONNX snapshot with size + SHA-256 checks.
+> fp16/q8 are treated as future installer variants only after the real-library
+> parity gate proves they do not regress retrieval quality. **Remaining
+> KAAN-ACTION:** host/download
+> UX for CUE-DETR, the live re-embed of a real library, and the funded-key curate
 > ear-pass (the parity gate already passed on the engine — see below).
 >
 > ## How it's wired (Phase 90)
 >
-> - **Seam:** `_cosine.EMBED_BACKEND` (env `VIBEMIX_EMBED_BACKEND`, default
->   `gemini`) sets `EMBEDDING_DIM` = 512 (clap) | 1536 (gemini). `embed.build_embedder()`
->   reads the same flag and returns `ClapEmbedder` | `LibraryEmbedder`. One switch,
->   dim + class move together.
+> - **Seam:** `_cosine.EMBED_BACKEND == "clap"` and
+>   `EMBEDDING_DIM == 512`; `embed_factory.build_embedder()` returns `ClapEmbedder`.
+>   Historical Gemini embedding code remains only for legacy tests/migrations.
 > - **`ClapEmbedder`** (`library/embed_clap.py`): wraps `ClapEngine(backend="onnx")`,
 >   exposes `embed_track` / `embed_query` / `embed_audio_bytes` / `has_cached_embedding`
->   1:1 with `LibraryEmbedder`; own clap-tagged content-hash cache in the shared
->   `embeddings.db` (never collides with the 1536-dim Gemini rows).
+>   through the product embedder protocols; owns clap-tagged content-hash cache in the shared
+>   `embeddings.db` (never collides with historical Gemini rows).
 > - **`grounding.py`** routes the "what's playing" embed through the public
->   `embedder.embed_audio_bytes` seam — no more `embedder._client` reach-in (CLAP
->   has no `_client`); `LibraryEmbedder.embed_audio_bytes` added to match.
-> - **Mel frontend is torch-FREE.** transformers 5.9's `ClapFeatureExtractor`
->   class top-level-imports torch, which would defeat the whole "drop torch"
->   rationale. Instead the ONNX audio path replicates CLAP's
->   `_np_extract_fbank_features` exactly via `transformers.audio_utils`
->   (`mel_filter_bank` + `spectrogram` + `window_function`) — the same numpy
->   primitives ClapFeatureExtractor uses internally, but importable without torch.
+>   `embedder.embed_audio_bytes` seam — no more `embedder._client` reach-in
+>   (CLAP has no `_client`). The legacy migration embedder keeps a matching
+>   shim for explicit legacy tests only.
+> - **Mel frontend is torch-FREE and Transformers-free.** The ONNX audio path
+>   uses local numpy helpers (`mel_filter_bank` + `spectrogram` +
+>   `window_function`) pinned against the CLAP feature-extractor math, without
+>   importing the full Transformers package.
 >   For a 10s `rand_trunc` segment CLAP uses the **Slaney** filterbank
 >   (`norm="slaney"`, `mel_scale="slaney"`), Hann window, frame 1024 / hop 480,
 >   power 2.0, `log_mel="dB"`. A first hand-rolled librosa mel (htk/norm=None)
->   degraded separation (techno 6/10) — the Slaney/audio_utils path is the fix.
+>   degraded separation (techno 6/10) — the pinned Slaney numpy path is the fix.
 > - **Gate PASSED, torch absent** (`ClapEngine(backend="onnx")`, real shipped
 >   module, 40 tracks 20+20, isolated cache): dim 512, determinism cos=1.000000,
 >   "hard techno"→{hardtechno:10/10}, "psy trance"→{psymind:10/10} — matches the
@@ -47,15 +50,14 @@
 
 A deterministic, **on-device** embedder built on the LAION-CLAP `HTSAT-tiny`
 music checkpoint. It maps both audio and text into ONE **512-dim** space — the
-same cross-modal property Gemini Embedding 2 has ("dark rolling techno" lands
-near the audio of dark rolling techno). It is meant to replace the Gemini
-embedding call for the **library vibe-search / curator / next-suggestion layer
-ONLY**.
+cross-modal property that lets "dark rolling techno" land near dark rolling
+techno audio. It replaces cloud embedding calls for the **library vibe-search /
+curator / next-suggestion layer ONLY** and is now the selected library embedding
+path.
 
-CLAP is an on-device **embedding** model, not a second LLM provider — the
-**Gemini-only provider rule stays intact** for the conversational co-host brain.
-The co-host keeps talking through Gemini; only the silent similarity/genre math
-underneath moves on-device.
+CLAP is an on-device **embedding** model, not a second LLM provider. It does not
+change whichever conversational brain is selected for the live co-host or Viber
+agent.
 
 ### The pipeline
 
@@ -110,7 +112,9 @@ The torch backend proves the quality; the **ship** backend is **ONNX Runtime**:
   win on both macOS and Windows).
 - **Mel frontend in pure numpy:** the mel-spectrogram frontend is computable in
   pure numpy (`np.fft.rfft`), so **no torchaudio** is needed at inference time.
-- **Model footprint:** ~**160 MB int8** / ~**311 MB fp16** — a one-time download.
+- **Model footprint:** ~**783 MB fp32** for the current default audio+text ONNX
+  models. fp16/q8 remain future installer variants, not the product default,
+  until they pass the same real-library retrieval parity gate.
 - **Export precedent:** the pre-exported `Xenova/clap-htsat-unfused` proves the
   HTSAT audio encoder + RoBERTa text encoder export to ONNX cleanly.
 
@@ -118,9 +122,9 @@ The torch backend proves the quality; the **ship** backend is **ONNX Runtime**:
 
 A server-side embedder would have to **upload the user's 9–15 GB library**
 upstream — recurring, slow on home connections, and it puts the audio on our
-infra. The on-device model is a **one-time ~160–310 MB download**, then every
-embed is local and free. On-device is roughly **40–100× cheaper** in bytes moved
-and honors **"audio never leaves the device"**.
+infra. The on-device model is a **one-time ~783 MB fp32 download** by default,
+then every embed is local and free. On-device is still far cheaper in bytes
+moved and honors **"audio never leaves the device"**.
 
 ## The parity gate (the single risk)
 
@@ -136,7 +140,7 @@ still "work" but rank differently, and nobody would see an error.
 **Before the ONNX backend is trusted, this gate must pass:**
 
 1. Export `larger_clap_music` → ONNX (a custom `OnnxConfig` — CLAP is **not** in
-   the `optimum` registry yet; pin `transformers`).
+   the `optimum` registry yet; pin the exporter toolchain).
 2. Build a numpy mel matched to the **shipped** encoder (Slaney vs HTK, fft
    size, hop, mel bins — all must match the exported graph).
 3. Embed **50 tracks** through **both** the torch reference and the ONNX path.
@@ -149,36 +153,18 @@ on-device + ONNX, just exported from the trusted weights instead of swapping to
 
 **This gate PASSED (Phase 90, 2026-05-26)** — the resolved ship path used the
 pre-exported `Xenova/larger_clap_music_and_speech` ONNX (not a custom export) +
-the torch-free `audio_utils` Slaney mel (see the banner). The real shipped
+the torch-free local Slaney mel (see the banner). The real shipped
 `onnx` backend reproduces the proven genre separation (techno 10/10, psy 10/10)
 with `torch` absent. The `torch` backend (laion_clap) remains as the reference
 the ONNX path was validated against.
 
-## Future wiring change-map
+## Current wiring map
 
-The swap is a **later phase** — summarized here, **not implemented** by the
-staging work:
-
-- **Dim flip:** `EMBEDDING_DIM` **1536 → 512** in
-  `src/vibemix/library/_cosine.py:56` — the single source of truth; the change
-  cascades to every shape assertion (`cosine_topk` and friends) automatically.
-- **`ClapEmbedder` wrapper:** a new class wrapping `ClapEngine` with the **same
-  public interface as `LibraryEmbedder`** (so call sites swap 1:1).
-- **Hardest coupling — `grounding.py:120-126`:** it calls
-  `embedder._client.models.embed_content(...)` **directly**. CLAP has no
-  `_client`, so this call must be re-routed through `embed_audio_bytes` (the
-  bytes path exists on `ClapEngine` precisely for this seam).
-- **Cache rebuild:**
-  - `library.db` — recreate at `FLOAT[512]` (the vec0 store is dim-typed).
-  - `embeddings.db` — **auto-invalidates** (the `model_id` is part of the
-    content-hash key, so a model change is a cache miss, not stale data).
-  - `library_centroid.npy` — **auto-recomputes** on a dim mismatch.
-  - `library.pkl` — safe (titles only, no vectors).
-- **Backend dispatch:** a `VIBEMIX_EMBED_BACKEND=clap|gemini` seam in `embed.py`
-  so the two embedders can coexist behind one switch.
-- **Tests asserting 1536** to update: `test_embed.py:325`, the embedding
-  fixtures, and `conftest`.
-
-None of the above is done yet. The engine is **staged + documented** so the
-wiring phase has a tested, import-safe seam to plug into — without dragging
-torch/onnx into the live co-host bundle before the parity gate is green.
+- `src/vibemix/library/_cosine.py` fixes `EMBED_BACKEND="clap"` and
+  `EMBEDDING_DIM=512`.
+- `src/vibemix/library/embed_factory.py::build_embedder()` returns `ClapEmbedder`;
+  `src/vibemix/library/embed.py::LibraryEmbedder` is legacy-only.
+- `grounding.py` uses the public `embed_audio_bytes` seam, so no path reaches
+  into a Gemini client for audio embeddings.
+- CLAP stores use the `-clap` suffix (`library-clap.db`,
+  `library-clap_centroid.npy`) to avoid wiping old Gemini stores.

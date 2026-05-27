@@ -68,10 +68,67 @@ cargo tauri dev   # no VIBEMIX_DEV_SIDECAR -> runs the freshly-built bundle
 ```
 
 `scripts/build_sidecar.py` is the canonical rebuild route: it runs PyInstaller
-(`dist/vibemix-core/` onedir) and installs it into
+through `uv run --extra ai-local` so the frozen sidecar includes the local
+CLAP/CUE runtime deps. It writes `dist/vibemix-core/` and installs it into
 `tauri/src-tauri/binaries/vibemix-core-<triple>/`. It is the slow path (full
 PyInstaller build) — which is exactly why source-spawn exists for day-to-day
 iteration.
+
+For packaging, direct `cargo tauri build` now runs
+`scripts/dist/prepare_tauri_build.py` through Tauri's `beforeBuildCommand`.
+That command builds `tauri/ui/dist`, checks the exact
+`binaries/vibemix-core-<triple>/vibemix-core-<triple>` resource path, rebuilds
+the sidecar if the tree is missing/placeholder-only, and fails before Tauri can
+emit a dead app. Set `VIBEMIX_FORCE_SIDECAR=1` when the package must include
+current Python changes even though an older sidecar bundle already exists. To
+inspect the gate without building:
+
+```bash
+uv run python scripts/dist/prepare_tauri_build.py --skip-frontend --check-only
+```
+
+For a local macOS `.app` rehearsal, repair the emitted bundle before running or
+archiving it. Tauri can flatten PyInstaller's duplicate dylib symlinks while
+copying resources; the release workflow and `sign_macos.sh` run the same repair
+before codesign seals the app:
+
+```bash
+cd tauri/src-tauri
+cargo tauri build --bundles app --no-sign --ci
+cd ../..
+python3 scripts/dist/repair_macos_app_sidecar_symlinks.py \
+  tauri/src-tauri/target/release/bundle/macos/vibemix.app
+python3 scripts/dist/check_macos_app_bundle_ready.py \
+  tauri/src-tauri/target/release/bundle/macos/vibemix.app \
+  --triple aarch64-apple-darwin --smoke version
+./scripts/dist/create_macos_updater_artifact.sh \
+  --arch arm64 \
+  --output-dir tauri/src-tauri/target/release/bundle/macos \
+  tauri/src-tauri/target/release/bundle/macos/vibemix.app
+python3 scripts/dist/check_macos_updater_artifact_ready.py \
+  tauri/src-tauri/target/release/bundle/macos/vibemix-0.0.1-arm64.app.tar.gz \
+  --triple aarch64-apple-darwin --smoke version
+```
+
+For the unsigned local DMG rehearsal, prefer the wrapper below instead of
+calling `cargo tauri build --bundles dmg --no-sign` directly. The direct Tauri
+DMG path can package the app before the PyInstaller sidecar links are repaired.
+The wrapper also forces a fresh sidecar rebuild so stale frozen Python cannot
+slip into a "successful" local package:
+
+```bash
+bash scripts/dist/build_macos_local_dmg.sh
+```
+
+On Windows, check the staged app payload before SignPath/Inno consumes it:
+
+```powershell
+pwsh scripts\win\stage_app_payload.ps1 -OutputDir dist\windows-app
+uv run python scripts/dist/check_windows_app_payload_ready.py `
+  dist/windows-app `
+  --triple x86_64-pc-windows-msvc `
+  --smoke version
+```
 
 ## Rule of thumb
 

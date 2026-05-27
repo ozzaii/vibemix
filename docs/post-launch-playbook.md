@@ -15,8 +15,10 @@
 
 - [ ] Both jobs are green; no red X
 - [ ] GitHub Release `v0.1.0` exists in **draft** mode
-- [ ] DMG attached: `vibemix-0.1.0-mac.dmg`
-- [ ] MSI attached: `vibemix-0.1.0-windows-installer.msi`
+- [ ] DMGs attached: `vibemix-v0.1.0-arm64.dmg` and `vibemix-v0.1.0-x86_64.dmg`
+- [ ] Windows installer attached: `vibemix-installer.exe`
+- [ ] Updater artifacts attached: macOS `.app.tar.gz`, Windows Tauri
+      NSIS `*setup*.exe`; Windows updater installer is Authenticode-signed
 - [ ] `latest.json` attached
 - [ ] `verify_binary.py` report attached + shows zero `AIza` matches
 

@@ -1,11 +1,13 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Bring Your Own Gemini API Key
 
-vibemix's default mode (`direct`) already runs against your own Gemini key
-when `GEMINI_API_KEY` is set in the environment. This doc walks the BYO path
-end-to-end on macOS / Windows / Linux: where to get a key, where to put it,
-how to verify the client builds, and how to switch back to the Bravoh proxy
-if you change your mind.
+vibemix's live co-host mode (`direct`) runs against your own Gemini key when
+`GEMINI_API_KEY` is set in the environment. This is only for the live Gemini
+brain/TTS path; library embeddings/search use local CLAP ONNX, and Library/Viber
+uses local Codex, so they do not need this key. This doc walks the BYO path
+end-to-end on macOS / Windows: where to get a key, where to put it, how to
+verify the client builds, and how to switch back to the Bravoh proxy if you
+change your mind.
 
 ## Why BYO
 
@@ -55,7 +57,6 @@ PowerShell profile) so the values survive a reboot.
 | Platform | Where to put it | Lines to add |
 | -------- | --------------- | ------------ |
 | **macOS** | `~/.zshrc` (or `~/.zprofile`) | `export VIBEMIX_LLM_MODE=direct`<br>`export GEMINI_API_KEY=AIza...your-key...` |
-| **Linux** | `~/.bashrc` (or `~/.profile` for non-bash shells) | `export VIBEMIX_LLM_MODE=direct`<br>`export GEMINI_API_KEY=AIza...your-key...` |
 | **Windows (PowerShell, current session)** | Run in a terminal | `$env:VIBEMIX_LLM_MODE = 'direct'`<br>`$env:GEMINI_API_KEY = 'AIza...your-key...'` |
 | **Windows (PowerShell, persistent)** | Run once, then reopen the shell | `[Environment]::SetEnvironmentVariable('VIBEMIX_LLM_MODE', 'direct', 'User')`<br>`[Environment]::SetEnvironmentVariable('GEMINI_API_KEY', 'AIza...your-key...', 'User')` |
 

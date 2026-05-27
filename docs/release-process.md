@@ -29,7 +29,7 @@
    private half into `TAURI_UPDATER_PRIVATE_KEY`, paste the public half's
    base64 into `tauri/src-tauri/tauri.conf.json5` → `plugins.updater.pubkey`.
 
-4. **All 14 GitHub secrets configured.**
+4. **All 16 GitHub secrets configured.**
    See `.github/workflows/README.md` for the canonical inventory + source
    for each value.
 
@@ -47,6 +47,15 @@
    to the GitHub Release for fallback consumption.
 
 ## Cutting a release
+
+0. **Run the hard pre-tag gate.**
+   ```bash
+   scripts/dist/pretag_check.sh
+   ```
+
+   Do not tag unless this exits 0. It checks the human ear-test/grading gates,
+   Discord invite, updater key, sidecar bundle, local Developer ID identity,
+   and required GitHub release secrets.
 
 1. **Bump version** in two locked locations:
    - `tauri/src-tauri/tauri.conf.json5` — top-level `"version"` field.
@@ -71,16 +80,34 @@
    `release.yml`. Expected duration: **~15–25 min** end-to-end. The
    macOS notarize step is the slowest single stage (`xcrun notarytool
    submit --wait` typically takes 5–10 min depending on Apple's queue).
+   Tauri's `beforeBuildCommand` also runs `scripts/dist/prepare_tauri_build.py`;
+   in CI it should find the sidecar produced by the explicit
+   `scripts/build_sidecar.py` step and recheck it before packaging. After the
+   macOS `.app` is emitted, CI repairs PyInstaller sidecar dylib symlinks and
+   runs `scripts/dist/check_macos_app_bundle_ready.py` before
+   codesign/notarization. After the signed DMG is created, CI mounts it,
+   drag-copies the app to a clean rehearsal directory, and verifies the copied
+   sidecar with `scripts/dist/check_macos_dmg_artifact_ready.py`. After creating
+   the updater `.app.tar.gz`, CI extracts it with
+   `scripts/dist/check_macos_updater_artifact_ready.py` and verifies the
+   app-side sidecar still smokes from the extracted payload. The publish gate
+   runs on macOS so `scripts/dist/verify_signed.py` can use `codesign --verify`
+   for DMGs while still checking Windows updater/installer PE certificate
+   tables offline.
 
 5. **Review the draft release.** On success a DRAFT release exists at
    <https://github.com/{repo}/releases>. Open it and confirm:
    - `verify-report-macos.json` reports `"status": "clean"` (zero key-
      pattern hits — Plan 18-01 invariant).
    - `verify-report-windows.json` reports `"status": "clean"`.
-   - DMG size ~250 MB; MSI size ~280 MB. ±10% off the prior release is a
+   - DMG size ~250 MB; Windows installer EXE size ~280 MB. ±10% off the prior release is a
      yellow flag worth investigating.
-   - `latest.json` exists and has signatures for both `darwin-aarch64`
-     and `windows-x86_64`.
+   - Updater artifacts are attached separately from first-install downloads:
+     macOS `.app.tar.gz` and Windows Tauri NSIS `*setup*.exe`. The
+     Windows updater installer should be Authenticode-signed before
+     `latest.json` is generated.
+   - `latest.json` exists and has signatures for `darwin-aarch64`,
+     `darwin-x86_64`, and `windows-x86_64`.
 
 6. **Edit release notes.** The workflow seeds a minimal body. Replace
    with the user-facing changelog (features, fixes, known issues).
@@ -146,46 +173,85 @@ the current main with the secret-store in its expected state.
 
 ## Homebrew + Scoop publish — split rationale
 
-vibemix's v7.0 OSS-05 ships the Homebrew Formula + Scoop manifest scaffolds in `packaging/homebrew/Formula/vibemix.rb` + `packaging/scoop/vibemix.json`, validated by `.github/workflows/packaging-audit.yml` (`brew audit --new` on macos-14 + `scoop checkver -d` on windows-latest). The scaffolds use deterministic 64-zero SHA placeholders that pass the syntax-only audit; `scripts/launch/sync_packaging.sh` replaces them with real signed-artifact SHAs at real-cut time after OSS-04 fires.
+The Homebrew Formula and Scoop manifest scaffolds live in
+`packaging/homebrew/Formula/vibemix.rb` and `packaging/scoop/vibemix.json`.
+`.github/workflows/packaging-audit.yml` validates their syntax with
+`brew audit --new` on `macos-14` and `scoop checkver -d` on `windows-latest`.
+The scaffolds intentionally use deterministic placeholder SHAs; real SHAs are
+filled only after the signed release artifacts exist.
 
-The actual publish — pushing the synced manifests to `bravoh-ai/homebrew-tap` + `bravoh-ai/scoop-bucket` so users can run `brew install bravoh-ai/tap/vibemix` and `scoop install bravoh-ai/bucket/vibemix` — is **deferred to a future milestone** and is NOT in v7.0 scope. The tap/bucket push is a user-visible install upgrade (1-command install vs DMG download) that earns its own milestone gated on the v0.1.0 (non-RC) tag; the existing v0.1.0-rc1 audit + RC publish (OSS-04) lands first.
+The actual publish to `bravoh-ai/homebrew-tap` and
+`bravoh-ai/scoop-bucket` is deferred until after the first signed, notarized,
+fresh-machine-verified public release. This is a user-visible install upgrade
+over DMG/EXE downloads and should not be mixed into the first-install release
+gate.
 
 Sequence at execution time:
-1. v7.0 OSS-04 fires: `cut_release.sh v0.1.0-rc1` ships signed DMG + EXE + SBOM + NOTICE as `v0.1.0-rc1` GitHub release assets.
-2. Run `bash scripts/launch/sync_packaging.sh dist/vibemix-v0.1.0-rc1-macos.dmg dist/vibemix-v0.1.0-rc1-windows-x64.exe` to fill the placeholder SHAs.
-3. Commit the synced manifests to `bravoh-ai/homebrew-tap` + `bravoh-ai/scoop-bucket` (future milestone — not v7.0).
 
-This split keeps the v7.0 surface clean: scaffolds + CI gate + helper script land now; the user-visible install upgrade ships as its own deliverable.
+1. Ship the signed/notarized macOS DMG and signed Windows Inno EXE from the
+   GitHub Release flow.
+2. Run `scripts/launch/sync_packaging.sh` against those exact artifacts to fill
+   the placeholder SHAs.
+3. Commit the synced manifests to the Homebrew tap and Scoop bucket in a
+   separate install-channel milestone.
+
+This split keeps the first release focused on the one-click installer path.
 
 ## Autonomous-mode release path
 
-Under `gsd-autonomous fully` (the autonomous overnight-run mode used for v7.0 milestone execution), the engineering side of OSS-04 — the actual v0.1.0-rc1 public release publish — ships green via Plan 69-05 WITHOUT blocking on the external signature clock (Apple Dev Agreement signed by Francesco + SignPath OSS Foundation cert granted to Kaan, ~1-week SLA).
+This section is now a historical pre-stage contract, not permission to publish.
+Automation may prepare release artifacts, run `cut_release.sh --dry-run`, and
+print the manual `gh release create ...` command, but the public release remains
+blocked until signing, notarization, Windows signing, updater artifacts, and
+fresh-machine install rehearsal pass.
 
-The contract is:
+Current contract:
 
-1. The pre-flight script `scripts/launch/cut_release.sh --dry-run v0.1.0-rc1` is re-verified GREEN on every v7.0 milestone close (Plan 69-05 / Wave 4). If a Phase 67/68 source change drifts a pre-flight gate, Plan 69-05 fixes it inline or routes the drift to `KAAN-ACTION-LEGAL.md §SHIP-V4` as a Wave 4 follow-on item.
-2. The exact pre-staged real-cut invocation + post-pre-flight `gh release create` command live in `KAAN-ACTION-LEGAL.md §SHIP-V4` "v7.0 OSS-04 autonomous-mode route" sub-section. Kaan runs the cut when the signatures land.
-3. cut_release.sh NEVER invokes `gh release create` itself — the hand-on-trigger is Kaan, regression-pinned by `tests/repo/test_cut_release_no_autonomous_publish.py`.
-4. v4.0 "SHIP" milestone (engineering-complete since 2026-05-21) closes alongside OSS-04 when the real cut fires — `MILESTONES.md` v4.0 entry flips to SHIPPED with the public release URL.
+1. `scripts/launch/cut_release.sh --dry-run <tag>` must pass immediately before
+   any real cut.
+2. `cut_release.sh` must never invoke `gh release create` itself; the
+   hand-on-trigger remains manual and is regression-pinned by
+   `tests/repo/test_cut_release_no_autonomous_publish.py`.
+3. The operator may run the printed `gh release create ...` command only after
+   the signed/notarized DMG, signed Windows installer, updater artifacts, and
+   install rehearsal evidence are present.
+4. If any gate drifts, fix the gate or record the external blocker. Do not
+   downgrade the release definition to match a partial artifact set.
 
-Under non-autonomous mode (e.g. an interactive Kaan-driven session where Kaan wants to walk through `cut_release.sh v0.1.0-rc1` in real time), the contract is unchanged — the pre-flight script + the `gh release create` invocation + the hard-guard split between engineering-pre-flight and Kaan-trigger is the same.
+Interactive release sessions follow the same split: automation prepares and
+verifies; a human publishes only after the gates prove the release is
+friend-installable.
 
 The test surface pinning the deferral contract is `tests/repo/test_ship_v4_section_exists.py` (Plan 69-05 / Wave 4 anti-rot gate). See `KAAN-ACTION-LEGAL.md §SHIP-V4` for the full SHIP runbook + sign-off block.
 
 ## Release-day checklist
 
+- [ ] `scripts/dist/pretag_check.sh` exits 0.
 - [ ] `tauri.conf.json5` pubkey is NOT the placeholder.
 - [ ] `tauri/src-tauri/Cargo.toml` version matches `tauri.conf.json5`.
 - [ ] CHANGELOG entry exists for the new version (or release notes
       drafted for inline use).
-- [ ] All 14 GitHub Actions secrets present + valid.
+- [ ] All 16 GitHub Actions secrets present + valid.
 - [ ] Last main-branch CI run is green.
+- [ ] `uv run python scripts/dist/prepare_tauri_build.py --skip-frontend --check-only`
+      passes on the release machine, or CI has already built the sidecar in the
+      current matrix job.
+- [ ] Local unsigned macOS first-install rehearsal uses
+      `bash scripts/dist/build_macos_local_dmg.sh`; direct
+      `cargo tauri build --bundles dmg --no-sign` can package the app before
+      sidecar symlink repair.
+- [ ] Windows payload verifier passed on `dist/windows-app` before SignPath/Inno.
 - [ ] Tag follows `v*` pattern (e.g., `v0.1.0`).
 - [ ] On tag push, `release.yml` runs all 5 jobs green.
 - [ ] `verify-report-macos.json` is `"status": "clean"`.
 - [ ] `verify-report-windows.json` is `"status": "clean"`.
-- [ ] DMG + MSI sizes within ±10% of the last release (sanity gate).
-- [ ] `latest.json` has both `darwin-aarch64` + `windows-x86_64`
+- [ ] DMG + Windows installer EXE sizes within ±10% of the last release (sanity gate).
+- [ ] Updater artifacts attached: macOS `.app.tar.gz` and Windows Tauri
+      NSIS `*setup*.exe`. The Windows updater installer is
+      Authenticode-signed through `SIGNPATH_SIGNTOOL_CMD` and covered by the
+      publish-gate signed-artifact verifier. Do not point `latest.json` at the
+      DMG or Inno `vibemix-installer.exe`.
+- [ ] `latest.json` has `darwin-aarch64`, `darwin-x86_64`, and `windows-x86_64`
       signatures present and non-empty.
 - [ ] Manifest POST to `api.altidus.world` returned 200/202/204
       (or expected 404 with `::warning::` if endpoint not yet shipped).

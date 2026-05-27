@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>vibemix · notch-anchored pill (macOS)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --void: #000000; --void-1: #020205;
+    --glass-3: rgba(2, 3, 6, 0.88);
+    --glass-edge: rgba(255,255,255,0.065); --glass-edge-up: rgba(255,255,255,0.110);
+    --silk: #d6cfc7; --silk-65: rgba(214,207,199,0.65); --silk-40: rgba(214,207,199,0.40);
+    --silk-22: rgba(214,207,199,0.22); --silk-12: rgba(214,207,199,0.12);
+    --amber: #ff8a3d; --amber-40: rgba(255,138,61,0.40); --amber-65: rgba(255,138,61,0.65);
+    --lg-spec-hi: rgba(255,251,244,0.12); --lg-spec-mid: rgba(255,251,244,0.06);
+    --lg-spec-lo: rgba(255,251,244,0.025); --lg-rim-light: rgba(255,251,244,0.16);
+    --lg-rim-void: rgba(2,3,8,0.55);
+    --lg-depth: 0 2px 8px rgba(2,3,8,0.5), 0 16px 40px rgba(2,3,8,0.55);
+    --lg-lens-blur: blur(18px) saturate(135%);
+    --lg-surface-shadow:
+      inset 0 1px 0 var(--lg-rim-light),
+      inset 0 6px 12px -8px var(--lg-spec-hi),
+      inset 0 -1px 0 var(--lg-rim-void),
+      var(--lg-depth);
+    --type-display: 'Saira', system-ui, sans-serif;
+    --type-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --rad-sm: 2px; --rad-md: 6px; --rad-lg: 10px;
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px;
+    --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --reveal: 360ms;
+
+    /* notch geometry — approx 14"/16" MBP notch (~190pt wide, menubar-tall) */
+    --notch-w: 192px;
+    --notch-h: 34px;
+    --island-w: 332px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Faux macOS desktop so the black notch + glass island read true ──────── */
+  html, body { height: 100%; }
+  body {
+    font-family: var(--type-display); color: var(--silk); overflow: hidden;
+    /* a moody "night studio" wallpaper — gives the glass colour to lens */
+    background:
+      radial-gradient(140% 100% at 20% 0%, #1a1326 0%, transparent 55%),
+      radial-gradient(120% 90% at 85% 30%, #102036 0%, transparent 50%),
+      radial-gradient(100% 80% at 55% 100%, #2a1020 0%, transparent 55%),
+      #060409;
+  }
+
+  /* the menubar the notch sits in */
+  .menubar {
+    position: fixed; top: 0; left: 0; right: 0; height: 28px; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; background: rgba(0,0,0,0.34);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    font-size: 12.5px; color: rgba(255,255,255,0.82);
+    font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif;
+  }
+  .menubar .left { display: flex; gap: 18px; align-items: center; }
+  .menubar .left .brand { font-weight: 600; }
+  .menubar .right { display: flex; gap: 16px; align-items: center;
+    font-variant-numeric: tabular-nums; color: rgba(255,255,255,0.7); }
+
+  /* faux app windows behind, so you feel the notch floating over real content */
+  .desk { position: fixed; inset: 28px 0 0 0; z-index: 1; }
+  .win {
+    position: absolute; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(10,12,18,0.55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+  }
+  .win.rekordbox { left: 6%; top: 80px; width: 52%; height: 60%; }
+  .win.browser  { right: 6%; top: 140px; width: 34%; height: 46%; }
+  .win h4 { font-family: var(--type-mono); font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--silk-40); padding: 12px 14px; }
+  .win .rows { padding: 0 14px; display: flex; flex-direction: column; gap: 9px; }
+  .win .rows i { display: block; height: 8px; border-radius: 2px;
+    background: linear-gradient(90deg, rgba(214,207,199,0.10), rgba(214,207,199,0.03)); }
+  .win .rows i:nth-child(odd){ width: 86%; } .win .rows i:nth-child(3n){ width: 64%; }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     THE NOTCH PILL — at rest it IS the notch (pure black, flush to the top
+     bezel, rounded bottom corners). When a pick is ready a 1px silk hairline
+     breathes at its lower lip. Hover, and the notch morphs into a liquid-glass
+     island that drops down with the next track. (TheBoringNotch pattern, but
+     the surface is our CDJ-Whisper glass and the payload is the grounded pick.)
+     ════════════════════════════════════════════════════════════════════════ */
+  .notch {
+    position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 10;
+    width: var(--notch-w);
+    background: #000;                       /* = the physical notch at rest */
+    border-radius: 0 0 var(--rad-lg) var(--rad-lg);
+    box-shadow: 0 0 0 transparent;
+    overflow: hidden;
+    /* morph: width + background + radius + shadow, all one ease-out-expo beat */
+    transition:
+      width var(--reveal) var(--ease-expo),
+      background var(--reveal) var(--ease-expo),
+      border-radius var(--reveal) var(--ease-expo),
+      box-shadow var(--reveal) var(--ease-expo);
+  }
+  /* the always-present bar: the part that occupies the notch slot (header) */
+  .notch__bar {
+    height: var(--notch-h);
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding: 0 var(--sp-3);
+    position: relative; z-index: 1;
+  }
+  /* at rest the bar shows NOTHING (it's the black notch). Its contents fade in
+     only as the island opens, so the resting notch is indistinguishable from
+     the hardware. */
+  .notch__bar > * { opacity: 0; transition: opacity 200ms var(--ease-expo); }
+  .notch[data-open="true"] .notch__bar > * { opacity: 1; }
+
+  .dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--silk-40); }
+  .notch[data-state="listening"] .dot, .notch[data-state="speaking"] .dot { background: var(--amber); }
+  .notch[data-state="listening"] .dot { animation: blink 1.4s ease-in-out infinite; }
+  .notch[data-state="speaking"]  .dot { animation: blink 0.9s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .label { font-family: var(--type-display); font-size: 9px; font-weight: 500;
+    letter-spacing: .22em; text-transform: uppercase; color: var(--silk-65); }
+  .wave { flex: 1 1 auto; display: flex; align-items: center; justify-content: flex-end;
+    gap: 2px; height: 14px; }
+  .wave i { width: 2px; height: 3px; border-radius: 1px; background: var(--silk-40); }
+  .notch[data-state="speaking"] .wave i { background: var(--silk-65); animation: vu .7s ease-in-out infinite; }
+  .wave i:nth-child(2){animation-delay:.08s} .wave i:nth-child(3){animation-delay:.16s}
+  .wave i:nth-child(4){animation-delay:.24s} .wave i:nth-child(5){animation-delay:.12s}
+  .wave i:nth-child(6){animation-delay:.20s}
+  @keyframes vu { 0%,100%{height:3px} 50%{height:12px} }
+
+  /* the resting sign-of-life: a 1px silk lip on the notch bottom edge, only when
+     a pick is ready. Dissolves the instant the island opens. SILK, not amber. */
+  .notch__lip {
+    position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+    width: 26px; height: 2px; border-radius: 1px; background: var(--silk-22);
+    z-index: 3; opacity: 0; pointer-events: none;
+    transition: opacity 220ms var(--ease-expo);
+  }
+  .notch[data-has-next="true"]:not([data-open="true"]) .notch__lip {
+    opacity: 1; animation: lip 2.6s ease-in-out infinite;
+  }
+  @keyframes lip { 0%,100%{opacity:.3;width:20px} 50%{opacity:.85;width:30px} }
+
+  /* OPEN: notch → liquid-glass island */
+  .notch[data-open="true"] {
+    width: var(--island-w);
+    background: var(--glass-3);
+    border-radius: 0 0 16px 16px;          /* attached to the top bezel, drops down */
+    box-shadow: var(--lg-surface-shadow);
+    -webkit-backdrop-filter: var(--lg-lens-blur); backdrop-filter: var(--lg-lens-blur);
+  }
+  /* specular crown on the open island only */
+  .notch[data-open="true"]::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 46px;
+    background: linear-gradient(105deg, var(--lg-spec-mid) 0%, var(--lg-spec-lo) 30%, transparent 62%);
+    mix-blend-mode: screen; pointer-events: none; z-index: 2;
+  }
+
+  /* the next-track drawer — grid-rows morph, content staggered after the shell */
+  .drawer { overflow: hidden; min-height: 0;
+    display: grid; grid-template-rows: 0fr;
+    transition: grid-template-rows var(--reveal) var(--ease-expo); }
+  .notch[data-open="true"] .drawer { grid-template-rows: 1fr; }
+  .drawer__in { overflow: hidden; }
+  .next {
+    padding: var(--sp-1) var(--sp-3) var(--sp-3);
+    border-top: 1px solid var(--glass-edge);
+    opacity: 0; transform: translateY(6px);
+    transition: opacity 240ms var(--ease-expo) 90ms, transform 360ms var(--ease-expo) 90ms;
+  }
+  .notch[data-open="true"] .next { opacity: 1; transform: translateY(0); }
+  .next__label { display: inline-flex; align-items: center; gap: var(--sp-1);
+    font-family: var(--type-mono); font-size: 9px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--silk-40); margin: var(--sp-2) 0; }
+  .next__glyph { color: var(--amber); }       /* the one amber */
+  .next__title { font-family: var(--type-mono); font-size: 12.5px; line-height: 1.25;
+    color: var(--silk); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .next__meta { margin-top: var(--sp-1); font-family: var(--type-mono);
+    font-variant-numeric: tabular-nums; font-size: 10px; letter-spacing: .04em;
+    color: var(--silk-65); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .next__meta b { color: var(--silk); font-weight: 500; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .notch, .drawer, .next, .notch__lip, .notch__bar > * { transition: none; }
+    .dot, .wave i, .notch__lip { animation: none; }
+  }
+
+  /* mock controls */
+  .controls { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; z-index: 20; }
+  .controls button { font-family: var(--type-mono); font-size: 10px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--silk-65); background: var(--glass-3);
+    border: 1px solid var(--glass-edge); border-radius: var(--rad-sm); padding: 8px 13px; cursor: pointer; }
+  .controls button[aria-pressed="true"] { color: var(--amber); border-color: var(--amber-40); }
+  .hint { position: fixed; bottom: 56px; left: 0; right: 0; text-align: center; z-index: 20;
+    font-family: var(--type-mono); font-size: 10px; letter-spacing: .08em; color: var(--silk-40); }
+</style>
+</head>
+<body>
+  <div class="menubar">
+    <div class="left"><span>&#63743;</span><span class="brand">vibemix</span><span>File</span><span>Session</span><span>View</span></div>
+    <div class="right"><span>&#9201;</span><span>&#128268;</span><span>Mon 26 May  02:14</span></div>
+  </div>
+
+  <div class="desk">
+    <div class="win rekordbox"><h4>rekordbox &mdash; performance</h4>
+      <div class="rows"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="win browser"><h4>collection</h4>
+      <div class="rows"><i></i><i></i><i></i><i></i><i></i></div></div>
+  </div>
+
+  <!-- the notch pill -->
+  <div class="notch" id="notch" data-state="listening" data-has-next="true" data-open="false">
+    <div class="notch__bar">
+      <span class="dot"></span>
+      <span class="label" id="label">LISTENING</span>
+      <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    </div>
+    <span class="notch__lip"></span>
+    <div class="drawer"><div class="drawer__in">
+      <div class="next">
+        <div class="next__label"><span class="next__glyph">&uarr;</span> next</div>
+        <div class="next__title">Midnight Pulse</div>
+        <div class="next__meta">Rune &middot; similar vibe &middot; <b>8A</b> &middot; <b>128</b></div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="hint">hover the notch &mdash; it&rsquo;s the resting pill</div>
+  <div class="controls">
+    <button id="t-next" aria-pressed="true">suggestion ready</button>
+    <button id="t-state" aria-pressed="false">speaking</button>
+    <button id="t-open" aria-pressed="false">force open</button>
+  </div>
+
+<script>
+  const notch = document.getElementById('notch');
+  const label = document.getElementById('label');
+  let over = false, forced = false;
+  const sync = () => {
+    const hasNext = notch.dataset.hasNext === 'true';
+    notch.dataset.open = (hasNext && (over || forced)) ? 'true' : 'false';
+  };
+  notch.addEventListener('pointerenter', () => { over = true; sync(); });
+  notch.addEventListener('pointerleave', () => { over = false; sync(); });
+
+  document.getElementById('t-next').addEventListener('click', (e) => {
+    const on = e.target.getAttribute('aria-pressed') === 'true';
+    e.target.setAttribute('aria-pressed', String(!on));
+    notch.dataset.hasNext = String(!on); sync();
+  });
+  document.getElementById('t-state').addEventListener('click', (e) => {
+    const sp = e.target.getAttribute('aria-pressed') !== 'true';
+    e.target.setAttribute('aria-pressed', String(sp));
+    notch.dataset.state = sp ? 'speaking' : 'listening';
+    label.textContent = sp ? 'SPEAKING' : 'LISTENING';
+  });
+  document.getElementById('t-open').addEventListener('click', (e) => {
+    forced = e.target.getAttribute('aria-pressed') !== 'true';
+    e.target.setAttribute('aria-pressed', String(forced)); sync();
+  });
+</script>
+</body>
+</html>

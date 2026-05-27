@@ -22,7 +22,7 @@ If you forget, fix it with: `git commit --amend -s --no-edit` (single commit) or
 
 ## Scope: vibemix vs Bravoh
 
-vibemix is Apache-2.0. The Bravoh-side Gemini proxy at `api.altidus.world` is closed-source by design — the Bravoh proxy is closed-source by design — it is the commercial wedge that funds Bravoh's main product. Contributions to vibemix should target the client-side code in this repo (`src/vibemix/`, `tauri/`, `scripts/`, `tests/`, `docs/`). Proxy bugs, quota issues, or rate-limit reports are not in scope here; route them via `SECURITY.md` for security-sensitive matters or open a GitHub issue describing the symptom and they will be triaged onto the Bravoh ops side by the maintainers. If you would rather bypass the Bravoh proxy entirely, see `docs/byo-key.md` for the Bring-Your-Own-Key path.
+vibemix is Apache-2.0. The Bravoh-side Gemini proxy at `api.altidus.world` is closed-source by design; it is the commercial wedge that funds Bravoh's main product. Contributions to vibemix should target the client-side code in this repo (`src/vibemix/`, `tauri/`, `scripts/`, `tests/`, `docs/`). Proxy bugs, quota issues, or rate-limit reports are not in scope here; route them via `SECURITY.md` for security-sensitive matters or open a GitHub issue describing the symptom and they will be triaged onto the Bravoh ops side by the maintainers. If you would rather bypass the Bravoh proxy entirely, see `docs/byo-key.md` for the Bring-Your-Own-Key path.
 
 ---
 
@@ -36,9 +36,11 @@ vibemix is Apache-2.0. The Bravoh-side Gemini proxy at `api.altidus.world` is cl
 2. Make the change. Keep PRs focused — one fix per PR.
 3. Add or update tests where appropriate.
 4. Run the local gates:
-   - `source .venv/bin/activate && PYTHONPATH=src python3 -m pytest -q`
-   - `cd tauri/ui && npx vitest run` (if you touched frontend)
-   - `cargo check` (if you touched Rust)
+   - `uv run pytest -q`
+   - `uv run ruff check src tests`
+   - `npm --prefix tauri/ui test` (if you touched frontend)
+   - `npm --prefix tauri/ui run build` (for frontend app changes)
+   - `cargo check --manifest-path tauri/src-tauri/Cargo.toml` (if you touched Rust)
 5. Sign off (`git commit -s`) and open a PR. Link the issue you're fixing.
 
 ### 2. New controller mapping
@@ -49,8 +51,7 @@ Adding support for a controller we haven't curated? You'll add one JSON profile 
 2. Capture the controller's MIDI shape with our sniff tool. Plug the controller in, then run:
 
    ```bash
-   source .venv/bin/activate
-   python3 scripts/sniff_controller.py --device "Your Controller Name"
+   uv run python scripts/sniff_controller.py --device "Your Controller Name"
    ```
 
    The tool listens for ~30s while you exercise every knob, fader, button, and jog wheel. It writes a JSON skeleton to stdout — the shape that goes into the profile file.
@@ -73,7 +74,7 @@ Prompts are where vibemix's personality lives. New templates need human review t
 
 ## Coding style
 
-- Python: ruff + black defaults (no formatter config currently — match existing files).
+- Python: Ruff lint + Ruff format from `pyproject.toml` (100-character lines, double quotes, import sorting).
 - TypeScript: project uses vanilla TS with vitest. Match `tauri/ui/src/` patterns.
 - Rust: `cargo fmt` before commit.
 - Tests are required for behavior changes. Documentation-only changes don't need tests.
@@ -84,7 +85,8 @@ Prompts are where vibemix's personality lives. New templates need human review t
 ## What we don't accept
 
 - Telemetry, analytics, or any code that exfiltrates user data.
-- New AI providers — vibemix is Gemini-only (Bravoh decision).
+- New hosted AI providers or ungrounded model paths. Live reactions use
+  Bravoh's Gemini path; library embeddings are local CLAP ONNX.
 - Linux ports — out of v1 scope.
 - Stem separation / track ripping / DRM-circumvention features.
 

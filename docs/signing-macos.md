@@ -115,7 +115,7 @@ Stages 1-3 + 7-8 only. For:
 2. `com.apple.security.device.microphone` — Kaan's mic when opted in.
 3. `com.apple.security.network.client` — Phase 5 proxy + Tauri updater + Gemini calls.
 4. `com.apple.security.cs.allow-jit` — Python interpreter on macOS 14+ rejects launch without this.
-5. `com.apple.security.cs.allow-unsigned-executable-memory` — PyInstaller + numpy/scipy native C extensions.
+5. `com.apple.security.cs.allow-unsigned-executable-memory` — PyInstaller + numpy/native audio extensions.
 
 **The sandbox key is deliberately NOT present.** BlackHole virtual-audio + global hotkeys break inside the sandbox; the trade is "no Mac App Store, ship via signed DMG via GitHub Releases".
 
@@ -140,9 +140,12 @@ The lock is enforced at:
 
 `sign_macos.sh` detects CI by checking `$CI == "true"`. In CI mode:
 
-- The keychain identity check (Stage 1) is **skipped** — CI imports the certificate inline from `$APPLE_DEVELOPER_ID_P12_BASE64` + `$APPLE_DEVELOPER_ID_PASSWORD` into a temporary keychain (handled by `.github/workflows/release.yml`, Plan 18-05).
-- The ASC API key is base64-decoded from `$APPLE_API_KEY_P8` into a temp `.p8` file before invocation.
-- The temp keychain is cleaned up on workflow exit (job-level `if: always()`).
+- `sign_macos.sh` materializes CI signing inputs itself: it imports
+  `$APPLE_DEVELOPER_ID_P12_BASE64` into a temporary keychain, unlocks that
+  keychain with `$APPLE_DEVELOPER_ID_KEYCHAIN_PASSWORD`, and base64-decodes
+  `$APPLE_API_KEY_P8` into a temp `.p8` file.
+- The script verifies the imported Developer ID identity before signing and
+  cleans up the temp keychain on exit.
 - Notarytool retries are the same (3 attempts, exponential backoff).
 
 In Local mode (your Mac):

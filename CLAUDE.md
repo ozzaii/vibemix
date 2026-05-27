@@ -18,7 +18,7 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 - **Timeline**: No hard calendar target — ship-when-ready per `gsd-autonomous fully` mode. External Apple + SignPath approvals are the critical path; engineering parallelizes around the external clock.
 - **Quality bar**: "Real DJ friend in your ear, no AI slop" — Kaan will block release if reactions feel scripted, late, hallucinated, or generic.
 - **Budget**: 150-200 € launch marketing (IG ads, paid posts), ~50 €/month ongoing Gemini API for end-user requests. Reassess if usage scales.
-- **Tech stack**: Locked on LiveKit pipeline + Gemini 3 Flash + Gemini TTS streaming. No other LLM providers (Bravoh is Gemini-only).
+- **Tech stack**: Live co-host is locked on LiveKit pipeline + Gemini Flash + Gemini TTS streaming (exact model versions resolved via `model_router`, never inlined). Library/Viber set-prep is pinned to local Codex for testing via MCP; do not route it through Gemini.
 - **Platforms**: macOS + Windows in v1. Linux explicitly excluded.
 - **Team**: Kaan (engineering + product), Francesco (cofounder — product/marketing/DJ network for outreach), Momo (Bravoh team). Bravoh main product takes priority — vibemix runs alongside.
 - **Open-source license**: Apache 2.0 (in `LICENSE`; `__main__.py` carries the SPDX header). Permits Bravoh internal reuse.
@@ -38,9 +38,10 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 - Packaged with **hatchling**; **`uv`** is the runner + lockfile tool (`uv.lock`).
 
 ### Core dependencies (pins in `pyproject.toml`)
-- `google-genai` — the **sole** AI provider (Gemini Flash multimodal + TTS + embeddings). No other LLM/embedding provider, ever (Bravoh is Gemini-only).
+- `google-genai` — live co-host brain/TTS. It is **not** the Library/Viber reasoning or embedding path; library/search/curate embeddings use local CLAP ONNX and Viber set-prep runs through local Codex.
+- Codex CLI — current local Viber reasoning backend for chat/curate/build-set during testing, reached through `codex exec` + `library/mcp_server.py`.
 - `livekit` + `livekit-agents` + `livekit-plugins-google` + `livekit-plugins-openai` — LiveKit pipeline (Gemini Live `RealtimeModel` path; the openai plugin is the TTS-fallback seam, not a second AI provider).
-- `numpy` + `scipy` — all audio DSP (RMS, FFT bands, onset, BPM, 48k→16k resample).
+- `numpy` + PyAV/FFmpeg — audio DSP, local model decode, and 48k→16k resample.
 - `sounddevice` — CoreAudio (macOS) / WASAPI (Windows) I/O.
 - `mido` + `python-rtmidi` — MIDI controller decode.
 - `httpx`, `keyring` — HTTP + OS keychain (BYO-key path).
@@ -48,7 +49,7 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 - System (not pip): macOS — BlackHole 2ch, `nowplaying-cli` (Homebrew), `pyobjc-*` (Quartz window crop). Windows — WASAPI loopback (`docs/windows-setup.md`).
 
 ### Configuration
-- `.env` at repo root: `GEMINI_API_KEY` (required) + `OPENROUTER_API_KEY` (TTS fallback chain). Loaded via `python-dotenv`.
+- `.env` at repo root: `GEMINI_API_KEY` is required for the live Gemini co-host only; library embeddings and Viber/Codex set-prep are local/keyless. `OPENROUTER_API_KEY` is only for the opt-in TTS standby chain. Loaded via `python-dotenv`.
 - **Model selection is config-driven through `vibemix.llm.model_router` — zero hardcoded model literals in code (CI grep-gated).** Never inline a model name; resolve via `model_router.resolve(...)`.
 <!-- GSD:stack-end -->
 
@@ -61,7 +62,9 @@ Bravoh's first open-source release. Built as a polished, narrow-scope utility th
 - **DI over globals:** state objects are allocated in `main()` and passed explicitly. The only module-level singletons are feature flags.
 - **Shutdown:** every long-running coroutine takes `stop_event: asyncio.Event` as a cooperative stop signal.
 - **Comments:** explain *why* (especially DSP constants/thresholds), not *what*. Module docstrings describe data flow.
-- **Logging:** startup lines `-> ...`; errors bracket-tagged to stderr (e.g. `[coach err]`); AI transcript `AI> `; structured per-session events to `events.jsonl`.
+- **Logging:** startup lines `-> ...`; errors bracket-tagged to stderr (e.g. `[coach err]`); AI reactions broadcast to the UI over the ws bus (`transcript_delta`), not stderr; structured per-session events to `events.jsonl`.
+- **Frontend settings controls must repaint OPTIMISTICALLY.** `tauri/ui/src/session/state.ts::setSessionState` has no pub/sub and the settings drawer never re-renders on the `ipc.settings.state` echo — a rocker/pill that waits for the round-trip looks dead ("no buttons work"). Flip `data-active` locally in the click handler (mirror `picker.ts::selectOption`); the ~3ms round-trip stays authoritative and self-corrects.
+- **Shell numerics (this Mac is Turkish-locale):** prefix `awk`/`printf`/`bc` output that feeds `ffmpeg -ss`/numeric tools with `LC_ALL=C` — otherwise the locale emits comma decimals (`117,37`) ffmpeg can't parse and clip renders fail silently.
 <!-- GSD:conventions-end -->
 
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->
@@ -76,17 +79,18 @@ Single packaged app under `src/vibemix/`. Entry point: `python -m vibemix` → `
 - `agent/` — LiveKit `RealtimeModel` session + the Gemini reaction path (`dj_cohost.py`).
 - `llm/` — `model_router.py` (config-driven model resolution, no hardcoded literals) + `thinking_gate.py`.
 - `coach/`, `prompts/`, `profile/` — persona/prompt templates per user level; long-term DJ profile.
-- `library/` — Gemini-embedding (1536-dim) + sqlite-vec vibe search (macOS sqlite-vec / Windows numpy, bit-identical top-K parity); also home to `next_suggestion.py` (the pill's mean-centered "what's next" engine, grounded by Invariant #2) and the Viber curator core (`toolset.py`/`agent.py`/`codex_curate.py`/`mcp_server.py`/`telegram_bridge.py`). **State on disk** under `~/.cache/vibemix/`: `library.db` (sqlite-vec vectors), `embeddings.db` (content-hash embed cache), `library.pkl` (track-title cache), `library_centroid.npy` (cached query centroid, auto-recomputed on store change). **Gotcha:** library/rekordbox tests MUST monkeypatch `RekordboxLibrary.CACHE_PATH` to a tmp dir, or they overwrite the real `library.pkl`.
-- **CLAP embedding engine** (the chosen similarity/library/curate engine replacing Gemini-embedding; the co-host *brain* stays Gemini-only): staged at `library/clap_engine.py` + `docs/clap-engine.md` — laion_clap **630k-fusion** (`model_id=3`, HTSAT-tiny, 512-dim, deterministic 10s-chunk mean-pool). **Run real CLAP locally with ZERO download** via the worker venv: `/Users/ozai/projects/bravoh-gpu-worker/venv/bin/python` already has `laion_clap` + the checkpoints, and `bravoh-gpu-worker/clap_mix_only.py` holds the proven `load_and_chunk`/`embed_chunks`. **Gotchas:** the HF `transformers.ClapModel` port is broken for text→audio (use the `laion_clap` pip API only); CLAP is anisotropic so mean-centering is mandatory; text→audio is reliable for coarse genre, not fine vibe.
+- `library/` — local CLAP ONNX 512-dim embeddings + sqlite-vec vibe search (macOS sqlite-vec / Windows numpy, bit-identical top-K parity); also home to `next_suggestion.py` (the pill's mean-centered "what's next" engine, grounded by Invariant #2) and the Viber curator core (`toolset.py`/`codex_curate.py`/`mcp_server.py`/`telegram_bridge.py`). **State on disk** under `~/.cache/vibemix/`: `library-clap.db` (sqlite-vec vectors), `embeddings.db` / CLAP-tagged cache rows, `library.pkl` (track-title cache), `library-clap_centroid.npy` (cached query centroid, auto-recomputed on store change). Historical Gemini `library.db` may exist; do not clobber it during CLAP re-embed. **Gotcha:** library/rekordbox tests MUST monkeypatch `RekordboxLibrary.CACHE_PATH` to a tmp dir, or they overwrite the real `library.pkl`.
+- **CLAP embedding engine** (the product similarity/library/curate engine): wired in `library/clap_engine.py` + `docs/clap-engine.md`; default backend is `onnx` (ship model `Xenova/larger_clap_music_and_speech`) with a torch reference backend kept for validation only. 512-dim, deterministic 10s-chunk mean-pool. `_cosine.EMBED_BACKEND` is fixed to `clap`; `build_embedder()` returns `ClapEmbedder`; `VIBEMIX_EMBED_BACKEND` is no longer the product selector. Inference target is **local per-user** (optional model download), not server-side. The full app/installer path should install the optional `[ai-local]` extra; focused jobs can use `[clap]` or `[cue]`. The shipped local path is torch-free, Transformers-free, and librosa-free: `clap`/`ai-local` install `onnxruntime` + `tokenizers`, while `cue` installs `onnxruntime`; audio decode/DSP uses PyAV/FFmpeg plus narrow numpy helpers. **Gotchas:** the HF `transformers.ClapModel` port is broken for text→audio; use the shipped Xenova ONNX path for product, CLAP is anisotropic so mean-centering is mandatory, and text→audio is reliable for coarse genre, not fine vibe.
 - `memory/` — local `memory.db` copilot store (sqlite-vec); gated behind `VIBEMIX_RECALL_ENABLED` (default off).
 - `debrief/` — post-session review UI (second Tauri window, port 8766).
-- `events/`, `midi/` (10-controller `profiles/` — the single-source catalog), `install/`, `ui_bus/`, `runtime/` (`ws_bus`, `wizard`, `session_loop`, `soak`, `ttft`, recordings index, `suggestion.py` = the pill's `SuggestionService`).
+- `events/`, `midi/` (10-controller `profiles/` — the single-source catalog), `install/`, `ui_bus/`, `runtime/` (`ws_bus`, `wizard`, `session_loop`, `soak`, `ttft`, recordings index, `suggestion.py` = the pill's `SuggestionService`); `bench/` (Phase-81 dev/eval harness — multi-dimensional model bench, NOT a runtime feature).
 
 ### Cardinal invariants (test-enforced — do not break)
 1. **Single-writer** — only the state-refresh loop writes `MusicState`; everything else reads.
 2. **Citation grounding** — every citation a reaction emits must resolve in `EvidenceRegistry`; un-cited reactions strip to the ack-bank fallback. This is the anti-slop release gate.
 3. **Trust the audio** — live audio evidence is authoritative; the AI reacts to real detected events, never invents them.
 4. **One socket** — the mascot/wizard bus binds `127.0.0.1:8765` only (never two listeners at once); debrief uses `8766`.
+5. **Idle ≠ fault** — `SessionLayout`'s grounding-failure timer runs ONLY while the co-host is ACTIVE. At idle, `grounded=false` is expected (no music to ground to) — counting it falsely flips the deck to "AI service unreachable" with a blank hero (the recurring empty-screen bug). Test-guarded in `tauri/ui/tests/session/grounding-failure.spec.ts`.
 
 ### Threading & generation model
 sounddevice callbacks (OS audio thread) → lock-protected buffers → asyncio event loop (AI calls, ws, state loops) ← MIDI daemon thread. A single in-flight Gemini generation is enforced by an `in_flight` flag with a stale-age force-clear. Errors are caught per-loop and logged to stderr + `events.jsonl`; a loop failure never wedges the `in_flight` gate.
@@ -124,7 +128,7 @@ Do not make direct repo edits outside a GSD workflow unless the user explicitly 
 
 ## Commands
 
-The repo is now a packaged project: `pyproject.toml` (hatchling) + `uv.lock` at root, Python `>=3.12,<3.13` (the `.venv/` is 3.12.x — **not** 3.14, despite stale notes elsewhere in this file). `uv` is the runner. Source lives in `src/vibemix/`; the Tauri desktop shell is under `tauri/`.
+The repo is a packaged project: `pyproject.toml` (hatchling) + `uv.lock` at root, Python `>=3.12,<3.13` (the `.venv/` is 3.12.x). `uv` is the runner. Source lives in `src/vibemix/`; the Tauri desktop shell is under `tauri/`.
 
 **Run the co-host (dev):**
 
@@ -139,7 +143,17 @@ source .venv/bin/activate && PYTHONPATH=src python3 -m pytest -q
 # or, without activating:  uv run pytest -q
 ```
 
-Opt-in markers (default run skips them): `-m macos_audio`, `-m windows_only`, `-m integration`, `-m slow`, `-m e2e`, `-m cli`, `-m network`. See `[tool.pytest.ini_options]` in `pyproject.toml`.
+Opt-in markers (default run skips them): `-m macos_audio`, `-m windows_only`, `-m integration`, `-m slow`, `-m e2e`, `-m cli`, `-m network`, `-m parity`, `-m flaky`. See `[tool.pytest.ini_options]` in `pyproject.toml` for the authoritative set.
+
+**Tauri UI (frontend) — the authoritative gate after any `tauri/ui/` change:**
+
+```bash
+cd tauri/ui && npm run build && npm test     # build = `tsc --noEmit && vite build`; test = vitest run (~886 tests)
+npm run codegen:ipc                          # REQUIRED after editing src/ipc/messages.schema.json — the ajv
+                                             # validator is PRE-COMPILED (validator.generated.mjs); stale = new fields rejected
+```
+
+The bundled Python sidecar in `cargo tauri dev` is FROZEN (lags edited `src/`) → false negatives. Verify backend wiring by running `main()` on current source, not the bundled binary.
 
 **Library / vibe-search CLI** (the embedding workflow — see `docs/library.md`):
 
@@ -147,24 +161,29 @@ Opt-in markers (default run skips them): `-m macos_audio`, `-m windows_only`, `-
 uv run python -m vibemix library embed-folder "<dir>" [--strategy mean_excerpt|cue_anchored]  # walk+embed a folder, no Rekordbox XML needed
 uv run python -m vibemix library search "<text vibe>" [-k N]      # text→tracks (cross-modal)
 uv run python -m vibemix library similar "<track_id|file path>"   # track→similar
-uv run python -m vibemix library curate "<theme>" [--interactive] [--backend gemini|codex]  # Viber agent → grounded M3U/JSON playlist; --interactive = agent asks→builds (docs/codex-agent.md)
-uv run python -m vibemix library telegram                         # Viber mobile surface — long-poll bot, curate from your phone
+VIBEMIX_CODEX_ALLOW_SHELL=1 uv run python -m vibemix library curate "<theme>" [--interactive] [--backend codex]  # Viber agent → grounded M3U/JSON playlist; local Codex is the product path
+VIBEMIX_CODEX_ALLOW_SHELL=1 uv run python -m vibemix library build-set "<brief>" [--curve peak_time|...] [--export rekordbox] [--backend codex]  # discover→sequence on an energy curve→explain why; optional Rekordbox export
+uv run python -m vibemix library export-set "<set>" --export rekordbox        # export a built set to Rekordbox XML
+uv run --extra telegram python -m vibemix library telegram         # optional Viber mobile surface — long-poll bot, curate from your phone
 uv run python -m vibemix library budget --json                    # offline cost telemetry
 ```
 
-The Telegram bridge (`library/telegram_bridge.py`, lazy-imports `python-telegram-bot`) needs `VIBEMIX_TELEGRAM_TOKEN` (BotFather) + `VIBEMIX_TELEGRAM_ALLOWED_CHATS` (numeric chat-id allow-list = the v1 auth, fail-closed). Pure logic (allow-list/leak-strip/reply-format) is dep-free + unit-tested; outbound messages are path-scrubbed (privacy); each request runs the Gemini agent under a wall-clock timeout (no-hang).
+The Telegram bridge (`library/telegram_bridge.py`, optional `telegram` extra, lazy-imports `python-telegram-bot`) needs `VIBEMIX_TELEGRAM_TOKEN` (BotFather) + `VIBEMIX_TELEGRAM_ALLOWED_CHATS` (numeric chat-id allow-list = the v1 auth, fail-closed). Pure logic (allow-list/leak-strip/reply-format) is dep-free + unit-tested; outbound messages are path-scrubbed (privacy); each request runs the local Codex Viber path under a wall-clock timeout (no-hang).
 
-The Viber agent (`library/toolset.py` = shared grounded tool core) has two backends: `gemini` (built-in fn-calling, default) and `codex` (BYO ChatGPT-sub via `codex exec` + `library/mcp_server.py` MCP STDIO server — needs `codex login`). Grounding (seen-set + library re-validation) is identical across both. Codex is NOT bundled; `--backend codex` fails actionably when absent.
+The Viber agent (`library/toolset.py` = shared grounded tool core) uses `codex` as the product backend: BYO ChatGPT-sub via `codex exec` + `library/mcp_server.py` MCP STDIO server, with `codex login` + `VIBEMIX_CODEX_ALLOW_SHELL=1`. Do not reintroduce a Gemini Viber fallback. Codex is not bundled; when absent it fails actionably. Finder-launched app paths can miss shell PATH, so `codex_curate.py` searches common Codex/Node dirs and honors `VIBEMIX_CODEX_BIN` / `VIBEMIX_NODE_BIN`.
 
-Embeds need `GEMINI_API_KEY` (client picks direct key first, else proxy JWT). embed-folder is resumable: a content-hash cache skips already-embedded files for free, and per-file errors are logged + skipped, never fatal. Ranking is mean-centered by default (anisotropy fix) — query-side only, persisted vectors untouched.
+Embeds need the CLAP ONNX model under `~/.cache/vibemix/clap-onnx/` or `VIBEMIX_CLAP_ONNX_DIR`; they do **not** need `GEMINI_API_KEY`. embed-folder is resumable: a content-hash cache skips already-embedded files for free, and per-file errors are logged + skipped, never fatal. Ranking is mean-centered by default (anisotropy fix) — query-side only, persisted vectors untouched.
 
-**Required environment:** `.env` at repo root with `GEMINI_API_KEY=...` (and `OPENROUTER_API_KEY=...` for the TTS fallback chain). Read via `python-dotenv`.
+**Runtime environment:** live co-host direct mode needs `GEMINI_API_KEY` in the
+repo-root `.env`; `OPENROUTER_API_KEY` is only for the opt-in TTS standby chain.
+Library search, ingest, chat, curate, and build-set use local CLAP/Codex paths
+and do not require a Gemini key.
 
 **macOS prerequisites:** BlackHole 2ch (`brew install blackhole-2ch`), `nowplaying-cli` (`brew install nowplaying-cli`), a DJ app routed through BlackHole as the audio source, Pioneer DDJ-FLX4 over USB (optional, graceful fallback). Windows uses WASAPI loopback — see `docs/windows-setup.md`.
 
 ## Planning Home
 
-`.planning/` is the GSD source of truth — `ROADMAP.md`, `REQUIREMENTS.md`, `PROJECT.md`, `STATE.md`, plus `codebase/*.md` (codebase maps) and `research/*.md` (pre-roadmap research). The codebase maps in `.planning/codebase/` feed the GSD-managed sections of this file. `MILESTONES.md` tracks shipped milestones (v0.1.0 → v8.0 "Proof & Polish" shipped 2026-05-25; phases run continuously, currently 76+).
+`.planning/` is the GSD source of truth — `ROADMAP.md`, `REQUIREMENTS.md`, `PROJECT.md`, `STATE.md`, plus `codebase/*.md` (codebase maps) and `research/*.md` (pre-roadmap research). The codebase maps in `.planning/codebase/` feed the GSD-managed sections of this file. `MILESTONES.md` tracks shipped milestones (v0.1.0 → v8.1 "One Mind" → v8.2 "Set Builder", both shipped 2026-05-26; phases run continuously, currently ~90).
 
 When a phase is active, its planning artifacts live under `.planning/phases/<NN>-<slug>/` (CONTEXT.md, RESEARCH.md, PLAN.md, etc.). Read those before touching code on that phase.
 
@@ -172,10 +191,10 @@ When a phase is active, its planning artifacts live under `.planning/phases/<NN>
 
 The root POC variant zoo (`cohost.py`, `cohost_v2.py`, `cohost_lk.py`, `cohost_v3.py`, `cohost_v4.py`, `cohost.streaming.py.bak`, plus `run*.sh`, `generate_bat.py`, `test_voice.py`) has been **pruned**. Their load-bearing intuition — mic gating, evidence-packet shape, event taxonomy, audible-deck heuristics, MIDI maps, the OpenRouter-primary TTS chain and tuned event cooldowns — was lifted wholesale into `src/vibemix/` over Phases 2-13 and beyond. The variants were deleted to end the recurring "which file is canonical?" confusion now that the package supersedes them.
 
-The retirement is enforced by `tests/repo/test_repo_scrub.py::test_retired_poc_files_stay_gone` (a stray `git add` cannot resurrect them). The v3/v4 design notes survive as research under `.planning/research/v3-shipped/`. If you need the historical source, it is in git history.
+The retirement is enforced by `tests/repo/test_repo_scrub.py::test_retired_poc_files_stay_gone` (a stray `git add` cannot resurrect them). The v3/v4 design notes survive as research under `.planning/archive/2026-05-27-stale-v2-v3-research/v3-shipped/`. If you need the historical source, it is in git history.
 
 `mascot.html` at root is **not** a POC — it is the live overlay wired into `vibemix.runtime.ws_bus` + CI (`mascot-audit`). Keep it.
 
 ## UI Mocks
 
-`mocks/` holds the design contracts referenced by UI phases — notably `vibemix-app-ui.html` (live session UI shape) and `vibemix-cinematic-storyboard.html` (hero demo storyboard). When working on Phases 11–14, treat these as the visual reference, lifted by the `frontend-enforcement` skill.
+`mocks/` holds the design contracts referenced by UI phases. The current canonical references are `vibemix-rebuild-session.html` (the settled "Deck Speaks" app shell) and `vibemix-direction-final.html` (visual language); component-level mocks (e.g. `vibemix-library-ui.html`, `vibemix-pill-hover.html`) and the older `vibemix-app-ui.html` / `vibemix-cinematic-storyboard.html` live alongside. Treat these as the visual contract, lifted by the `frontend-enforcement` skill.

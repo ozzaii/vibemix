@@ -191,7 +191,7 @@ body[data-mode="ingest"] .qecho{display:none}
   <div class="titlebar">
     <div class="brand"><span class="dot"></span><b>vibemix</b><span class="sub">vibe engine</span></div>
     <div class="spacer"></div>
-    <div class="keystat"><span class="led"></span>gemini-embedding-2 · 1536d · direct key</div>
+    <div class="keystat"><span class="led"></span>clap onnx · 512d · local</div>
   </div>
 
   <div class="frame">
@@ -245,7 +245,7 @@ body[data-mode="ingest"] .qecho{display:none}
         <div class="corpus">
           <div class="stat"><div class="k">Indexed</div><div class="v">142<small> / 1547</small></div></div>
           <div class="stat"><div class="k">Backend</div><div class="v" style="font-size:13px;letter-spacing:0">sqlite-vec</div></div>
-          <div class="stat"><div class="k">Spent</div><div class="v amber">€0.19</div></div>
+          <div class="stat"><div class="k">Spent</div><div class="v amber">€0.00</div></div>
           <div class="stat"><div class="k">Failed</div><div class="v">0</div></div>
         </div>
       </div>
@@ -265,7 +265,7 @@ body[data-mode="ingest"] .qecho{display:none}
         <!-- ingest progress -->
         <div class="ingest">
           <div>
-            <div class="proghead"><div class="n">120<small> / 128 · runnin over my body</small></div><div class="cost">~€0.19</div></div>
+            <div class="proghead"><div class="n">120<small> / 128 · runnin over my body</small></div><div class="cost">local</div></div>
             <div class="progress"><i style="width:93.7%"></i></div>
           </div>
           <div class="loglist" id="loglist"></div>
@@ -283,7 +283,7 @@ body[data-mode="ingest"] .qecho{display:none}
           <div class="ln"><span class="sw" style="background:var(--amber-pale)"></span>Near neighbour<span class="d">&lt; 0.30</span></div>
           <div class="ln"><span class="sw" style="background:var(--silk-40)"></span>Distant<span class="d">&gt; 0.60</span></div>
         </div>
-        <div class="scope-note">Distance is <b>vibe distance</b> in 1536-d space, mean-centered so the cone collapses and real separation shows. Closer rings mix cleaner.</div>
+        <div class="scope-note">Distance is <b>vibe distance</b> in 512-d CLAP space, mean-centered so the cone collapses and real separation shows. Closer rings mix cleaner.</div>
       </div>
     </aside>
 
@@ -291,17 +291,17 @@ body[data-mode="ingest"] .qecho{display:none}
 </div>
 
 <script>
-// ── real data from the 2026-05-25 subset run ───────────────────────
+// ── real data from the CLAP subset run ──────────────────────────────
 const DATA = {
   search: {
     label:"Vibe query", echo:"hard aggressive techno", run:"▸ Run search",
     rows:[
-      {t:"Raffertie — The Substance", m:"folder:23381471 · 1536d", s:0.764},
-      {t:"ARTLUS - i like the way you kiss me (Remix)", m:"folder:b8d4da96 · 1536d", s:0.758},
-      {t:"Quälgeist", m:"folder:911ea756 · 1536d", s:0.751},
-      {t:"FLKN - I Need Acid (Original mix)", m:"folder:a8f148f3 · 1536d", s:0.739},
-      {t:"Charli XCX - Guess (DJ Daddy Trance Edit)", m:"folder:7f9f9052 · 1536d", s:0.737},
-      {t:"Brutalismus 3000 - nur mein körper und die angst", m:"folder:a0b1a41b · 1536d", s:0.734},
+      {t:"Raffertie — The Substance", m:"folder:23381471 · 512d", s:0.764},
+      {t:"ARTLUS - i like the way you kiss me (Remix)", m:"folder:b8d4da96 · 512d", s:0.758},
+      {t:"Quälgeist", m:"folder:911ea756 · 512d", s:0.751},
+      {t:"FLKN - I Need Acid (Original mix)", m:"folder:a8f148f3 · 512d", s:0.739},
+      {t:"Charli XCX - Guess (DJ Daddy Trance Edit)", m:"folder:7f9f9052 · 512d", s:0.737},
+      {t:"Brutalismus 3000 - nur mein körper und die angst", m:"folder:a0b1a41b · 512d", s:0.734},
     ]},
   similar:{
     label:"Seed track", echo:"ygmf_Remix.wav", run:"▸ Find similar",
@@ -315,14 +315,14 @@ const DATA = {
     ]},
 };
 const LOG = [
-  ["ok","jecta — purrr (at the goth club).mp3","~€0.191"],
-  ["ok","Just Like You.mp3","~€0.190"],
+  ["ok","jecta — purrr (at the goth club).mp3","local"],
+  ["ok","Just Like You.mp3","local"],
   ["skip","Brutalismus 3000 - badthiings.mp3","cached"],
-  ["ok","Safeword [BABYNYMPH Remix].mp3","~€0.145"],
-  ["ok","FLKN - I Need Acid (Original mix).mp3","~€0.121"],
-  ["ok","Anti.mp3","~€0.121"],
-  ["ok","ARTLUS - i like the way you kiss me (Remix).mp3","~€0.011"],
-  ["ok","9mm.mp3","~€0.009"],
+  ["ok","Safeword [BABYNYMPH Remix].mp3","local"],
+  ["ok","FLKN - I Need Acid (Original mix).mp3","local"],
+  ["ok","Anti.mp3","local"],
+  ["ok","ARTLUS - i like the way you kiss me (Remix).mp3","local"],
+  ["ok","9mm.mp3","local"],
 ];
 
 function meter(score, mode){

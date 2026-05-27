@@ -2,14 +2,20 @@
 
 ## 1. What this doc is for
 
-Phases 1–7 ship a cross-platform Python package. Phase 11 (Tauri shell) and Phase 18 (PyInstaller + SignPath MSI) ship the real end-user installer. **This doc is for running vibemix on Windows from source today** — before the installer exists.
+This doc is for running vibemix on Windows from source. The end-user Windows
+release path is the SignPath-signed Inno EXE, `vibemix-installer.exe`; see
+`installer/windows/README.md` and `docs/release-process.md` for packaging,
+signing, release, and updater details.
 
 Audiences:
 
-1. Kaan's Phase 20 fresh-Windows-machine rehearsal.
-2. Early Windows DJ-friend testers running vibemix from source before Phase 18.
+1. Kaan's Phase 20 fresh-Windows-machine rehearsal and diagnostics.
+2. Early Windows DJ-friend testers running vibemix from source.
+3. Contributors who need a debuggable Windows environment without building
+   the installer.
 
-Out of scope: end-user installer, auto-update, signed binary. Those land in Phases 11 + 18.
+This page does not replace the installer runbooks. Use it when you need source
+checkout behavior, dependency debugging, or hardware/audio diagnostics.
 
 ## 2. Prerequisites
 
@@ -39,7 +45,7 @@ uv sync
 $pywin32Dir = uv run python -c "import os, win32api; print(os.path.dirname(os.path.dirname(win32api.__file__)))"
 uv run python "$pywin32Dir\pywin32_system32\pywin32_postinstall.py" -install
 
-# API key — get one from https://aistudio.google.com/apikey
+# Optional agent key for BYO-key testing. Local Library embeddings use CLAP ONNX.
 Set-Content .env "GEMINI_API_KEY=your_key_here"
 ```
 
@@ -83,10 +89,11 @@ Phase 9 expands this to a 10-controller library (DDJ-200, DDJ-400, DDJ-FLX6, Her
 - **`winsdk ImportError`** — `uv pip install winsdk` manually if the sys_platform marker didn't fire. Rare; report as an issue if it happens on a clean Windows install.
 - **SMTC returns no title** — expected for some DJ apps. Serato / Traktor / rekordbox / VirtualDJ all expose to SMTC differently; djay Pro on Windows is known to not expose to SMTC in all builds. This is a documented v1 limitation; `TrackWindows` gracefully returns `None` and the AI runs without track-title context (still works on audio + screen + MIDI).
 
-## 8. What's deferred to future phases
+## 8. Related release docs
 
-- **Tauri shell + auto-install**: Phase 11.
-- **MSI installer with SignPath OSS code signing**: Phase 18.
-- **CI matrix on `windows-latest`** (live tests run against real hardware): Phase 20.
-- **Hot-plug device re-binding** (default playback changes mid-session): post-v1.
-- **App-specific SMTC scrapers** for DJ apps that don't expose: Phase 9 / 11 if it becomes a real friction point.
+- **Windows installer**: `installer/windows/README.md` builds `vibemix-installer.exe`.
+- **Signing**: `docs/signing-windows.md` covers SignPath and Authenticode checks.
+- **Release and updater**: `docs/release-process.md` and `docs/updater.md` cover
+  release upload and updater artifacts.
+- **Install rehearsal**: `docs/install-rehearsal.md` is the stopwatch checklist
+  for clean Windows and macOS machines.
