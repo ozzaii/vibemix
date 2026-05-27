@@ -17,9 +17,7 @@
      green. When the real asset lands, swap the sentinel for the actual
      SHA256 (the §ASSETS-DEMO-CUT discharge does this). -->
 <p align="center">
-  <video src="docs/assets/demo.mp4" controls muted playsinline width="720" poster="docs/assets/demo-poster.png">
-    <img src="docs/assets/demo-poster.png" alt="vibemix co-host live over a DJ set — the live session UI (demo film coming soon)" width="720" />
-  </video>
+  <img src="docs/assets/demo-poster.png" alt="vibemix co-host live over a DJ set — the live session UI (demo film coming soon)" width="720" />
 </p>
 <!-- vibemix:hero-end -->
 
@@ -38,13 +36,13 @@ vibemix is a real DJ friend in your ear. It reacts to the actual audio coming ou
 
 Built by DJs. The reactions are tuned against real sessions on rekordbox, Serato, Traktor, and djay Pro — not against a benchmark. Cuts that land late, hallucinated track names, and small-talk filler all fail the grading bar before any release ships.
 
-Your audio doesn't leave your machine without you knowing. vibemix is open source under Apache 2.0 and runs on Mac + Windows. Live co-host calls go to Bravoh's Gemini proxy at `api.altidus.world` — analyzed in flight, never stored. Library embeddings/search run locally with CLAP; the optional Viber library agent can use your local Codex login. Recordings stay local under `recordings/<session>/` with a 7-day default retention you can change in Settings.
+Your audio doesn't leave your machine without you knowing. vibemix is open source under Apache 2.0; v0.1.0-rc1 ships for macOS (Apple Silicon) today, with the Windows build landing in v0.1.0 stable. Live co-host calls go to Bravoh's Gemini proxy at `api.altidus.world` — analyzed in flight, never stored. Library embeddings/search run locally with CLAP ONNX (one-time ~785 MB model download on first Library open; live co-host works without it); the optional Viber library agent can use your local Codex login. Recordings stay local under `recordings/<session>/` with a 7-day default retention you can change in Settings.
 
 <p align="center">
   <img alt="release" src="https://img.shields.io/github/v/release/bravoh-ai/vibemix?style=flat-square&color=ff8a3d" />
   <img alt="build" src="https://img.shields.io/github/actions/workflow/status/bravoh-ai/vibemix/release.yml?branch=main&style=flat-square" />
   <img alt="license" src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" />
-  <img alt="platforms" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey?style=flat-square" />
+  <img alt="platforms" src="https://img.shields.io/badge/platforms-macOS-lightgrey?style=flat-square" />
   <img alt="stars" src="https://img.shields.io/github/stars/bravoh-ai/vibemix?style=flat-square" />
 </p>
 
@@ -68,7 +66,7 @@ Your audio doesn't leave your machine without you knowing. vibemix is open sourc
 
 ## Works alongside whatever DJ app you already use
 
-vibemix doesn't care which DJ app you run — it listens to the master output, watches the screen, and reads your controller. Confirmed working with:
+vibemix doesn't care which DJ app you run — it listens to the master output, watches the screen, and reads your controller. App-agnostic by design; the grid below is the live-test target list — rekordbox + DDJ-FLX4 is what Kaan ear-passes daily, the rest expand as DJs sign off:
 
 <table>
   <tr>
@@ -83,7 +81,7 @@ vibemix doesn't care which DJ app you run — it listens to the master output, w
   </tr>
 </table>
 
-Don't see your app? vibemix listens to the audio coming out of your machine — anything routed through BlackHole (Mac) or WASAPI loopback (Windows) is fair game. The grounding stack (audio + screen + MIDI) is app-agnostic.
+Don't see your app? vibemix listens to the audio coming out of your machine — anything routed through BlackHole on Mac is fair game today (Windows WASAPI loopback ships with v0.1.0 stable). The grounding stack (audio + screen + MIDI) is app-agnostic.
 
 <!-- Logos are placeholder wordmarks per KAAN-ACTION-LEGAL.md §LAUNCH-03 — real trademark-compliant logos land via Kaan-discharge before public launch. -->
 
@@ -94,15 +92,15 @@ Don't see your app? vibemix listens to the audio coming out of your machine — 
 | OS | Download |
 |----|----------|
 | macOS (Apple Silicon) | [vibemix.dmg](https://github.com/bravoh-ai/vibemix/releases/latest) |
-| Windows 11 | [vibemix-installer.exe](https://github.com/bravoh-ai/vibemix/releases/latest) |
+| Windows 11 | coming in v0.1.0 stable (SignPath OSS-program signing in flight) |
 
 <!-- Launch note: install URLs go live with the first signed release. Verify the
      `bravoh-ai/vibemix` org/repo slug matches the final GitHub home before
      public launch. Install GIFs land in docs/assets/install/ with the first
      signed release cut. -->
 
-The v0.1.0 release gate requires Apple Developer ID signing + notarization on
-macOS and SignPath signing on Windows before these downloads are published.
+v0.1.0-rc1 ships signed + notarized for macOS Apple Silicon. The Windows build
+waits on SignPath OSS-program approval and ships with v0.1.0 stable.
 Auto-update is on by default for release builds; opt out in Settings.
 
 ---
@@ -223,7 +221,7 @@ Two ways to add it:
   <img src="docs/assets/architecture.svg" alt="vibemix architecture diagram" width="100%" />
 </p>
 
-vibemix runs on your machine. The live co-host streams audio + screen frames + MIDI events through Bravoh's proxy at `api.altidus.world`, which forwards to Google Gemini; nothing is stored on Bravoh's end. The reaction comes back as a Gemini-TTS-streamed voice into your headphones. Library embeddings/search are local CLAP ONNX, and the optional Viber library chat/build path can use your local Codex CLI account.
+vibemix runs on your machine. The live co-host streams audio + screen frames + MIDI events through Bravoh's proxy at `api.altidus.world`, which forwards to Google Gemini; nothing is stored on Bravoh's end. The reaction comes back as a Gemini-TTS-streamed voice into your headphones. Library embeddings/search are local CLAP ONNX (one-time ~785 MB weights download on first Library open), and the optional Viber library chat/build path can use your local Codex CLI account.
 
 ---
 
@@ -237,11 +235,11 @@ vibemix runs on your machine. The live co-host streams audio + screen frames + M
 
 ### 1. What is vibemix?
 
-An AI co-host for live DJ sets. It listens to your master output, watches your DJ software's screen, ingests your controller actions over MIDI, and talks back into your headphones — either as a hype-man during the set, or as a coach pointing out where you cut a beat early. Open source. Mac + Windows.
+An AI co-host for live DJ sets. It listens to your master output, watches your DJ software's screen, ingests your controller actions over MIDI, and talks back into your headphones — either as a hype-man during the set, or as a coach pointing out where you cut a beat early. Open source. macOS today; Windows ships with v0.1.0 stable.
 
 ### 2. Is my audio sent to the cloud?
 
-For the live co-host, yes. Audio chunks are streamed to Bravoh's proxy at `api.altidus.world`, which forwards to Google Gemini for analysis. **No raw audio is stored on Bravoh's servers.** Library file embeddings and cue analysis run locally; Codex-backed Viber library chat/build uses your local Codex CLI account when enabled. Your recordings (in `recordings/<session>/`) stay on your machine. Default retention is 7 days, configurable in Settings.
+For the live co-host, yes. Audio chunks are streamed to Bravoh's proxy at `api.altidus.world`, which forwards to Google Gemini for analysis. **No raw audio is stored on Bravoh's servers.** Library file embeddings and cue analysis run locally with CLAP ONNX (weights ~785 MB install on first Library open); Codex-backed Viber library chat/build uses your local Codex CLI account when enabled. Your recordings (in `recordings/<session>/`) stay on your machine. Default retention is 7 days, configurable in Settings.
 
 ### 3. Is this free?
 
@@ -253,15 +251,15 @@ Three reasons: djay Pro is Mac/Win only and that's our primary integration targe
 
 ### 5. Why Gemini and not GPT / Claude / Llama?
 
-The live co-host uses Bravoh's Gemini path for grounded reactions and TTS. Library search and set prep are separate: embeddings run locally with CLAP ONNX, and Viber uses the local Codex CLI backend.
+The live co-host uses Bravoh's Gemini path for grounded reactions and TTS. Library search and set prep are separate: embeddings run locally with CLAP ONNX (one-time ~785 MB weights download on first Library open), and Viber uses the local Codex CLI backend.
 
 ### 6. Is the AI actually listening to my music?
 
-Yes. It listens to your master output via virtual audio (BlackHole on Mac, WASAPI loopback on Windows), watches your DJ software's window via screen capture, and reads your MIDI controller. The "real friend" feel comes from grounding the reaction in all three sources simultaneously, not from clever prompting alone.
+Yes. It listens to your master output via virtual audio (BlackHole on Mac today; Windows WASAPI loopback ships with v0.1.0 stable), watches your DJ software's window via screen capture, and reads your MIDI controller. The "real friend" feel comes from grounding the reaction in all three sources simultaneously, not from clever prompting alone.
 
 ### 7. Can it hallucinate?
 
-Phase 16's hallucination verification gate enforces ≥95% grounded reactions before any release ships. The anti-slop stack — negative dictionary, describe-before-infer, past-tense framing, `<silence/>` short-circuit token, per-session anti-repetition ring — exists to keep the AI from making things up. The reaction-reel grading gate (Phase 17, ≥4.0 average with zero 1-2 ratings) is the human-judged final gate before any binary ships.
+Phase 16's hallucination verification gate must pass before any release ships — a Kaan ear-pass on a live DJ session, with ≥95% grounded reactions as the bar. The anti-slop stack — negative dictionary, describe-before-infer, past-tense framing, `<silence/>` short-circuit token, per-session anti-repetition ring — exists to keep the AI from making things up. The reaction-reel grading gate (Phase 17, ≥4.0 average with zero 1-2 ratings) is the human-judged final gate before v0.1.0 stable ships; for v0.1.0-rc1, rater grading is gathered against the rc binary itself.
 
 ### 8. What's open-source and what isn't?
 

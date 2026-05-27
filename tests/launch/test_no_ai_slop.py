@@ -88,7 +88,7 @@ def test_anchor_phrases_pinned() -> None:
     assert "built by DJs" in flat
     assert "your audio doesn't leave" in flat
     assert ("open source" in flat) or ("open-source" in flat)
-    assert "Mac + Windows" in flat
+    assert "macOS" in flat
 
 
 def test_launch_copy_files_pin_five_channels() -> None:
@@ -145,7 +145,7 @@ def _build_valid_corpus(target: Path) -> None:
     (target / "twitter.txt").write_text(
         "vibemix is live — free, open-source AI DJ co-host.\n"
         "Real DJ friend in your ear, not voice-assistant slop.\n"
-        "Mac + Windows. Your audio doesn't leave the machine.\n"
+        "macOS today; Windows next. Your audio doesn't leave the machine.\n"
         + footer,
         encoding="utf-8",
     )
@@ -169,7 +169,7 @@ def _build_valid_corpus(target: Path) -> None:
     )
     (target / "discord.txt").write_text(
         "vibemix is live — drop it in your rig.\n"
-        "Open source, Mac + Windows, github.com/bravoh-ai/vibemix\n"
+        "Open source, macOS today (Windows next), github.com/bravoh-ai/vibemix\n"
         + footer,
         encoding="utf-8",
     )

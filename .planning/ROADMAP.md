@@ -213,7 +213,7 @@ Plans:
 **Requirements:** PERCEIVE-01, PERCEIVE-02, PERCEIVE-03
 **Success Criteria** (what must be TRUE):
   1. Prompt evidence carries deltas + a calibrated confidence per fact (not raw absolute scalars) — Gemini reads "kick density rose 18%" rather than a bare number, and can abstain when confidence is low (PERCEIVE-01).
-  2. The prompt carries a multi-scale trajectory (phrase position / energy-arc / recent DJ moves) so a reaction can reference where the set has been and is going, not just the current bar (PERCEIVE-02).
+  2. The prompt carries a multi-scale trajectory (phase-chain position / energy-arc / recent DJ moves) so a reaction can reference where the set has been and is going, not just the current bar (PERCEIVE-02).
   3. `detected_genre` is driven by a mean-centered nearest-prototype cosine lookup over cached embeddings — written ONLY by the single-writer refresh loop, confidence-floored so a genre is never asserted the audio doesn't support (PERCEIVE-03).
   4. When trajectory/genre signal is cold or below the confidence floor, the prompt is byte-identical to the v8.0 baseline (additive-design invariant holds; the cold path adds nothing).
 **Plans:** 4 plans (3 waves)

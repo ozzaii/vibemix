@@ -2,7 +2,7 @@
 
 **Tag:** `{{ tag }}`
 **Released:** {{ release_date }}
-**Platforms:** macOS (Apple Silicon) · Windows 11
+**Platforms:** macOS (Apple Silicon) — Windows ships with v0.1.0 stable
 
 > The first public release candidate of vibemix — the open-source AI co-host for live DJ sets. Bravoh's first OSS warm-up cut.
 
@@ -11,7 +11,7 @@
 ## Highlights
 
 - **Real DJ friend in your ear, no AI slop.** Reactions are tied to real events via a Gemini-grounded evidence registry. The model has to cite what just happened (BPM jump, layer arrival, track change, MIDI move) before it speaks.
-- **Mac + Windows.** One-click install via signed `.dmg` (Apple-notarized) + `.exe` (SignPath OSS-foundation signed).
+- **macOS today.** One-click install via signed `.dmg` (Apple-notarized). The Windows `.exe` (SignPath OSS-foundation signed) ships with v0.1.0 stable.
 - **Hype-man or coach.** Two modes × three skill levels (Beginner / Intermediate / Pro). Coach is past-tense — it won't talk while you're working.
 - **Library intelligence.** Drag-drop import; local CLAP ONNX vibe search + "what's playing" grounding from YOUR library. 30-day staleness nudge keeps it fresh.
 - **Post-session debrief.** Chaptered review with 60–90s voiced TL;DR + 3 personalized drills + clickable timeline + cited critique.
@@ -60,7 +60,7 @@ Full Kaan/Francesco-action list: [`KAAN-ACTION-LEGAL.md`](KAAN-ACTION-LEGAL.md) 
 | OS | Download |
 |----|----------|
 | macOS (Apple Silicon) | `vibemix.dmg` (Apple Developer ID + notarized) |
-| Windows 11 | `vibemix-installer.exe` (SignPath Foundation OSS) |
+| Windows 11 | ships with v0.1.0 stable (SignPath Foundation OSS approval in flight) |
 
 After install, the calibration wizard runs once: TCC permissions (mic + screen recording + accessibility), BlackHole 2ch auto-detect (macOS), MIDI controller pairing.
 

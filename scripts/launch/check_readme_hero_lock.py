@@ -23,7 +23,7 @@ fails loud:
    - ``built by DJs``
    - ``your audio doesn't leave``
    - ``open source`` OR ``open-source``
-   - ``Mac + Windows``
+   - ``macOS``
 
 3. **AI-slop blocklist gate** — none of the tokens in
    :data:`_AI_SLOP_BLOCKLIST` may appear in README.md, and the regex
@@ -70,7 +70,7 @@ _ANCHOR_PHRASES: tuple[tuple[str, ...], ...] = (
     ("your audio doesn't leave",),
     # "open source" OR "open-source" — either spelling satisfies the anchor
     ("open source", "open-source"),
-    ("Mac + Windows",),
+    ("macOS",),
 )
 
 # ---------------------------------------------------------------------------

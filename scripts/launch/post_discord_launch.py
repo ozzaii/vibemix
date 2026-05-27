@@ -35,7 +35,7 @@ ANNOUNCEMENT_TEMPLATE = """\
 
 The open-source AI co-host for live DJ sets. Listens to your master output, watches your DJ software's screen, reads your MIDI controller, talks back into your headphones as hype-man or coach. Gemini-grounded — no AI slop.
 
-Mac + Windows. Free. Apache 2.0.
+macOS today (Windows ships with v0.1.0 stable). Free. Apache 2.0.
 
 {role_mention} thanks for being here Day-1. If vibemix clicks for you, a star on GitHub helps surface it to the rest of the DJ community: {release_url}
 

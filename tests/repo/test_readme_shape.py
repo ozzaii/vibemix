@@ -104,7 +104,11 @@ def test_readme_has_bravoh_footer_with_utm(readme_text: str) -> None:
 def test_readme_has_install_section(readme_text: str) -> None:
     assert "## Install" in readme_text
     assert "vibemix.dmg" in readme_text
-    assert "vibemix-installer.exe" in readme_text
+    # v0.1.0-rc1 ships macOS only. The Windows row carries a forward-looking
+    # placeholder ("ships with v0.1.0 stable") instead of an installer URL
+    # until SignPath OSS-program approval lands. v0.1.0 stable swaps the
+    # placeholder for the real vibemix-installer.exe link.
+    assert "v0.1.0 stable" in readme_text
 
 
 def test_readme_has_feature_matrix(readme_text: str) -> None:

@@ -88,7 +88,7 @@ _INLINE_ANCHOR_PHRASES: tuple[str, ...] = (
     "your audio doesn't leave",
     "open-source",
     "open source",
-    "Mac + Windows",
+    "macOS",
 )
 
 

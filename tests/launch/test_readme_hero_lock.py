@@ -97,7 +97,7 @@ _VALID_README_BODY = (
     "## No AI slop\n\n"
     "vibemix is a real DJ friend in your ear. Built by DJs. Your audio "
     "doesn't leave your machine without you knowing. Open source. "
-    "Mac + Windows.\n"
+    "macOS today; Windows next.\n"
 )
 
 

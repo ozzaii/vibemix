@@ -2,7 +2,7 @@
 
 vibemix is live — a free, open-source AI co-host that listens to your live DJ sets.
 
-real DJ friend in your ear, not voice-assistant slop. built by DJs, runs locally on Mac + Windows, and your audio doesn't leave your machine without you knowing.
+real DJ friend in your ear, not voice-assistant slop. built by DJs, runs locally on macOS today (Windows ships with v0.1.0 stable), and your audio doesn't leave your machine without you knowing.
 
 → listens to master output (BlackHole on mac, WASAPI loopback on win)
 → watches djay Pro / Rekordbox

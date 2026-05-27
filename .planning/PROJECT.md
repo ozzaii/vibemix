@@ -43,7 +43,7 @@ engineering gap.
 
 **Target features (6 categories → phases 77+):**
 - **WIRE** — connect the islands: Grounding→live agent · detectors→prompt+registry (✅ shipped `ccf4930`) · detected_genre→evidence (✅ shipped `a9979b8`) · persona/lens unify · memory ingest on live path · env-key override fix.
-- **PERCEIVE** — deeper, generalized ear: deltas + calibrated confidence · multi-scale trajectory/phrase contexting · genre-prototype from cached embeddings. *No new DSP, no MIR libs.*
+- **PERCEIVE** — deeper, generalized ear: deltas + calibrated confidence · multi-scale trajectory (phase-chain history + energy-arc + recent DJ moves) · genre-prototype from cached embeddings. *No new DSP, no MIR libs.*
 - **LENS** — three modes (hype / critique / tutor) as grounded lenses, shared across surfaces.
 - **GROUND** — Gemini as a secondary audio ear, hallucination-guarded; model choice decided by the bench.
 - **BENCH** — multi-dimensional validation instrument (model × grounding × prompting × contexting × lens × taste); **Kaan's ear = final judge**.

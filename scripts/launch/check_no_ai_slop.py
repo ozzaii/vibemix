@@ -103,7 +103,7 @@ ANCHOR_PHRASES: tuple[tuple[str, ...], ...] = (
     ("built by DJs",),
     ("your audio doesn't leave",),
     ("open source", "open-source"),
-    ("Mac + Windows",),
+    ("macOS",),
 )
 
 # Signature footer markers — both must appear (in any order) in every file.
