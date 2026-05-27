@@ -156,7 +156,7 @@ class DebriefWsServer:
                 wrapper.type,
                 len(raw),
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error("[debrief] enqueue failed: %s", e)
 
     # ---------------------------------------------------------------
@@ -172,7 +172,7 @@ class DebriefWsServer:
             await self._drain_queue(websocket)
             async for raw in websocket:
                 await self._dispatch_inbound(websocket, raw)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.info("[debrief] connection ended: %s", type(e).__name__)
         finally:
             self._connections.discard(websocket)
@@ -294,7 +294,7 @@ def _started_at_unix(session_dir) -> float:
             ts = data.get("started_at_unix")
             if isinstance(ts, (int, float)):
                 return float(ts)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 0.0
     return 0.0
 
@@ -310,5 +310,5 @@ def _estimate_mp3_duration(mp3_path) -> float:
         duration = float(container.duration) / 1_000_000.0 if container.duration else 75.0
         container.close()
         return max(duration, 1.0)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 75.0

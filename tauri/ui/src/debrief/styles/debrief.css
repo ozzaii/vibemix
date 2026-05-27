@@ -32,42 +32,139 @@
 /* === Root + titlebar =================================================== */
 
 .vmx-debrief-root {
+  position: relative;
+  isolation: isolate;
+  height: 100vh;
   min-height: 100vh;
   color: var(--silk);
   font-family: var(--type-body);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.45;
-  /* Body background comes from tokens.css :root cascade (cinematic
-   * vignette + rave washes + film grain). No override here — the debrief
-   * inherits the same atmospheric surface as every other window. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  background:
+    linear-gradient(180deg, rgba(17, 20, 28, 0.94) 0%, rgba(5, 7, 11, 0.98) 46%, rgba(1, 2, 5, 1) 100%),
+    repeating-linear-gradient(90deg, rgba(214, 207, 199, 0.022) 0 1px, transparent 1px 82px),
+    var(--void-1);
+}
+
+.vmx-debrief-root::before,
+.vmx-debrief-root::after {
+  content: "";
+  position: fixed;
+  inset: var(--titlebar-h) 0 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.vmx-debrief-root::before {
+  background:
+    radial-gradient(circle at 72% 18%, rgba(255, 138, 61, 0.06), transparent 28%),
+    linear-gradient(90deg, transparent 0%, rgba(255, 138, 61, 0.035) 50%, transparent 100%),
+    repeating-linear-gradient(0deg, transparent 0 10px, rgba(214, 207, 199, 0.018) 10px 11px);
+  opacity: 0.68;
+  mask-image: linear-gradient(180deg, transparent 0%, black 16%, black 88%, transparent 100%);
+}
+
+.vmx-debrief-root::after {
+  inset: auto 24px 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.24), transparent);
+  box-shadow: 0 0 18px rgba(255, 138, 61, 0.1);
 }
 
 .vmx-debrief-titlebar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: var(--sp-4);
   padding: 0 var(--sp-5);
   height: var(--titlebar-h);
-  background: rgba(0, 0, 0, 0.55);
+  background:
+    linear-gradient(180deg, rgba(18, 20, 28, 0.88), rgba(4, 5, 9, 0.82)),
+    rgba(0, 0, 0, 0.55);
   backdrop-filter: var(--blur-glass-light);
   -webkit-backdrop-filter: var(--blur-glass-light);
   border-bottom: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.74),
+    0 10px 26px rgba(0, 0, 0, 0.28);
   -webkit-app-region: drag;
   user-select: none;
 }
 
+.vmx-debrief-title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
 .vmx-debrief-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-family: var(--type-display);
   font-variation-settings: "wdth" 85, "wght" 700;
   font-size: 18px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--silk);
   line-height: 1;
+  text-shadow: 0 0 12px rgba(255, 138, 61, 0.12);
+}
+
+.vmx-debrief-title::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 12px rgba(255, 138, 61, 0.42);
+}
+
+.vmx-debrief-titlebar__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--silk-40);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vmx-debrief-titlebar__status span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid rgba(214, 207, 199, 0.1);
+  border-radius: var(--rad-sm);
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.58);
+}
+
+.vmx-debrief-titlebar__status span:first-child {
+  color: var(--amber-pale);
+  border-color: var(--amber-22);
+  background: rgba(255, 138, 61, 0.045);
 }
 
 .vmx-debrief-session {
+  min-width: 0;
+  max-width: 42vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--type-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -83,20 +180,67 @@
   letter-spacing: 0.22em;
   color: var(--silk-40);
   margin: 0 0 var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.vmx-debrief-section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  min-width: 24px;
+  background: linear-gradient(90deg, rgba(214, 207, 199, 0.16), transparent);
 }
 
 /* === Layout grid ======================================================= */
 
 .vmx-debrief-layout {
+  position: relative;
+  z-index: 1;
   display: grid;
-  grid-template-columns: 280px 1fr;
-  grid-template-rows: auto auto;
+  grid-template-columns: minmax(292px, 320px) minmax(0, 1fr);
+  grid-template-rows: minmax(220px, auto) minmax(320px, 1fr) auto auto;
   grid-template-areas:
-    "sidebar tldr"
     "sidebar main"
-    "drills drills";
-  gap: var(--sp-4);
+    "drills main"
+    "bravoh main"
+    "ear ear";
+  gap: var(--sp-5);
   padding: var(--sp-5);
+  max-width: 1440px;
+  margin: 0 auto;
+  min-height: calc(100vh - var(--titlebar-h));
+}
+
+.vmx-debrief-layout::before {
+  content: "";
+  position: absolute;
+  inset: var(--sp-5);
+  z-index: -1;
+  pointer-events: none;
+  border: 1px solid rgba(214, 207, 199, 0.035);
+  border-radius: var(--rad-md);
+  background:
+    radial-gradient(circle at 73% 36%, rgba(255, 138, 61, 0.055), transparent 18%),
+    linear-gradient(90deg, transparent 0 22%, rgba(255, 138, 61, 0.035) 22.1%, transparent 22.3% 100%);
+  opacity: 0.82;
+}
+
+.vmx-debrief-layout > * {
+  min-width: 0;
+}
+
+.vmx-debrief-main {
+  grid-area: main;
+  display: grid;
+  grid-template-rows: minmax(174px, auto) minmax(340px, 1fr);
+  gap: var(--sp-4);
+  min-width: 0;
+  height: calc(100vh - var(--titlebar-h) - (var(--sp-5) * 2));
+  position: sticky;
+  top: calc(var(--titlebar-h) + var(--sp-5));
+  align-self: start;
 }
 
 /* === Arrival orchestration — P1-a uplift 2 ============================
@@ -135,19 +279,43 @@
 
 .vmx-debrief-sidebar {
   grid-area: sidebar;
+  position: relative;
   padding: var(--sp-4);
-  /* Deck Speaks: a void region delineated by a hairline, not a glass card
-   * (dropped the --glass-2 fill + blur + inset bezel shadow). */
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-md);
-  max-height: 70vh;
-  overflow-y: auto;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.026), transparent 18%),
+    repeating-linear-gradient(90deg, rgba(214, 207, 199, 0.018) 0 1px, transparent 1px 62px),
+    linear-gradient(180deg, rgba(8, 10, 16, 0.42), rgba(2, 3, 6, 0.6));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.74),
+    0 18px 46px rgba(0, 0, 0, 0.2);
+  max-height: 56vh;
+  overflow: hidden auto;
+  scrollbar-color: rgba(255, 138, 61, 0.28) transparent;
 }
 
 .vmx-debrief-chapters {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.vmx-debrief-chapters:empty::before {
+  content: "";
+  display: block;
+  height: 162px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: var(--rad-sm);
+  background:
+    linear-gradient(90deg, rgba(255, 138, 61, 0.08), transparent 36%),
+    repeating-linear-gradient(0deg, rgba(214, 207, 199, 0.05) 0 1px, transparent 1px 18px),
+    rgba(0, 0, 0, 0.26);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.65);
+  opacity: 0.44;
 }
 
 .vmx-debrief-chapter {
@@ -157,22 +325,33 @@
 .vmx-debrief-chapter-btn {
   width: 100%;
   text-align: left;
-  background: transparent;
-  border: 1px solid transparent;
+  background:
+    linear-gradient(90deg, rgba(255, 138, 61, 0.035), transparent 34%),
+    rgba(0, 0, 0, 0.14);
+  border: 1px solid rgba(214, 207, 199, 0.045);
   color: var(--silk-65);
-  padding: var(--sp-2) var(--sp-3);
+  padding: 10px var(--sp-3);
   border-radius: var(--rad-sm);
   cursor: pointer;
   font-family: inherit;
   font-size: 13px;
   font-variation-settings: "wdth" 100, "wght" 400;
-  transition: color var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  transition:
+    color var(--motion-snap) ease-out,
+    border-color var(--motion-snap) ease-out,
+    background var(--motion-snap) ease-out,
+    transform var(--motion-snap) ease-out;
 }
 
 .vmx-debrief-chapter-btn:hover,
 .vmx-debrief-chapter-btn:focus-visible {
   color: var(--amber);
   border-color: var(--amber-40);
+  background:
+    linear-gradient(90deg, rgba(255, 138, 61, 0.085), transparent 42%),
+    rgba(0, 0, 0, 0.22);
+  transform: translateX(2px);
   outline: none;
 }
 
@@ -180,20 +359,55 @@
 
 .vmx-debrief-tldr,
 .vmx-debrief-timeline {
-  /* Deck Speaks: a void region delineated by a hairline, not a glass card
-   * (dropped the --glass-2 fill + blur + inset bezel shadow). */
+  position: relative;
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-md);
   padding: var(--sp-4);
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.026), transparent 18%),
+    repeating-linear-gradient(90deg, rgba(214, 207, 199, 0.016) 0 1px, transparent 1px 72px),
+    linear-gradient(180deg, rgba(8, 10, 16, 0.38), rgba(2, 3, 6, 0.56));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.74),
+    0 18px 46px rgba(0, 0, 0, 0.22);
+}
+
+.vmx-debrief-tldr::before,
+.vmx-debrief-timeline::before,
+.vmx-debrief-drills::before,
+.vmx-debrief-sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 10px 10px, rgba(214, 207, 199, 0.18) 0 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 10px) 10px, rgba(214, 207, 199, 0.1) 0 2px, transparent 2.5px),
+    linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.042), transparent);
+  opacity: 0.72;
+  mask-image: linear-gradient(180deg, black 0%, black 82%, transparent 100%);
 }
 
 .vmx-debrief-tldr {
-  grid-area: tldr;
+  display: grid;
+  grid-template-rows: auto auto minmax(64px, 1fr);
+  min-height: 174px;
 }
 
 .vmx-debrief-timeline {
-  grid-area: main;
-  min-height: 140px;
+  display: grid;
+  grid-template-rows: auto minmax(260px, 1fr);
+  min-height: 340px;
+}
+
+.vmx-debrief-tldr > *,
+.vmx-debrief-timeline > *,
+.vmx-debrief-sidebar > *,
+.vmx-debrief-drills > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* P1-a uplift 3 — the verdict line. ONE amber focal point on the whole
@@ -206,9 +420,9 @@
 .vmx-debrief-verdict {
   margin: 0 0 var(--sp-3);
   font-family: var(--type-mono);
-  font-size: 15px;
+  font-size: 18px;
   letter-spacing: 0.02em;
-  line-height: 1.25;
+  line-height: 1.12;
   color: var(--amber);
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 6px var(--amber-22);
@@ -219,15 +433,49 @@
   margin-top: var(--sp-2);
 }
 
+.vmx-debrief-tldr-player {
+  min-height: 48px;
+  display: grid;
+  align-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid rgba(214, 207, 199, 0.065);
+  border-radius: var(--rad-sm);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent),
+    rgba(0, 0, 0, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.66);
+}
+
 .vmx-debrief-tldr-meta {
   margin: 0;
   font-size: 12px;
   color: var(--silk-40);
 }
 
+.vmx-debrief-tldr-mock-rail {
+  display: grid;
+  grid-template-columns: repeat(32, minmax(2px, 1fr));
+  align-items: end;
+  gap: 3px;
+  height: 42px;
+}
+
+.vmx-debrief-tldr-mock-rail span {
+  display: block;
+  min-height: 5px;
+  height: calc(var(--vmx-tick, 3) * 5px);
+  border-radius: 1px;
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.52), rgba(255, 138, 61, 0.12));
+  box-shadow: 0 0 8px rgba(255, 138, 61, 0.12);
+}
+
 .vmx-debrief-timeline-placeholder {
   position: relative;
-  height: 96px;
+  min-height: 100%;
+  height: auto;
   width: 100%;
   /* P1-a uplift 1 — read the timeline as the master waveform on a
    * CDJ-3000 screen, not a flat box. A vertical LED-comb texture sits
@@ -250,12 +498,65 @@
   overflow: hidden;
 }
 
+.vmx-debrief-waveform {
+  position: relative;
+  min-height: 260px;
+  height: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: var(--rad-sm);
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(214, 207, 199, 0.025) 0px,
+      rgba(214, 207, 199, 0.06) 1px,
+      rgba(214, 207, 199, 0.025) 2px,
+      transparent 2px,
+      transparent 5px),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.46)),
+    var(--glass-3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.72);
+}
+
+.vmx-debrief-waveform:empty::before {
+  content: "";
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 50%;
+  height: 74px;
+  transform: translateY(-50%);
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.16), transparent),
+    repeating-linear-gradient(90deg, rgba(255, 138, 61, 0.16) 0 2px, transparent 2px 13px);
+  opacity: 0.24;
+  mask-image: radial-gradient(ellipse at center, black 0%, black 64%, transparent 100%);
+}
+
+.vmx-debrief-waveform:empty::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 138, 61, 0.34), transparent);
+  box-shadow: 0 0 18px rgba(255, 138, 61, 0.12);
+}
+
 .vmx-debrief-region {
   position: absolute;
-  top: 8px;
-  bottom: 8px;
-  background: var(--amber-22);
-  border: 1px solid var(--amber-40);
+  top: 31%;
+  bottom: 23%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(180deg, rgba(255, 138, 61, 0.2), rgba(255, 138, 61, 0.095)),
+    rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 138, 61, 0.34);
   border-radius: var(--rad-sm);
   cursor: pointer;
   color: var(--silk);
@@ -276,7 +577,9 @@
 
 .vmx-debrief-region:hover,
 .vmx-debrief-region:focus-visible {
-  background: var(--amber-40);
+  background:
+    linear-gradient(180deg, rgba(255, 138, 61, 0.34), rgba(255, 138, 61, 0.14)),
+    rgba(0, 0, 0, 0.2);
   border-color: var(--amber);
   box-shadow: var(--glow-soft);
   outline: none;
@@ -325,6 +628,17 @@
 
 .vmx-debrief-drills {
   grid-area: drills;
+  position: relative;
+  padding: var(--sp-4);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--rad-md);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.024), transparent 20%),
+    repeating-linear-gradient(90deg, rgba(214, 207, 199, 0.016) 0 1px, transparent 1px 58px),
+    linear-gradient(180deg, rgba(8, 10, 16, 0.32), rgba(2, 3, 6, 0.52));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.7);
 }
 
 .vmx-debrief-drills-list {
@@ -338,11 +652,29 @@
 }
 
 .vmx-drill {
-  /* Deck Speaks: a void region delineated by a hairline, not a glass card
-   * (dropped the --glass-2 fill + blur + inset bezel shadow). */
+  position: relative;
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-md);
   padding: var(--sp-4);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 28%),
+    radial-gradient(circle at 92% 18%, rgba(255, 138, 61, 0.055), transparent 20%),
+    rgba(0, 0, 0, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.68),
+    0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
+.vmx-drill::before {
+  content: "";
+  position: absolute;
+  inset: 8px 8px auto auto;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(214, 207, 199, 0.18);
+  box-shadow: 0 0 8px rgba(255, 138, 61, 0.12);
 }
 
 .vmx-drill-title {
@@ -409,30 +741,49 @@
 
 .vmx-debrief-skeleton {
   margin: 0;
-  color: var(--silk-22);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--silk-40);
   font-size: 12px;
-  font-style: italic;
+  font-style: normal;
+}
+
+.vmx-debrief-skeleton::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 138, 61, 0.5);
+  box-shadow: 0 0 10px rgba(255, 138, 61, 0.22);
 }
 
 .vmx-debrief-error-banner {
   position: fixed;
-  top: var(--sp-3);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--glass-2);
+  top: calc(var(--titlebar-h) + var(--sp-3));
+  right: var(--sp-5);
+  background:
+    linear-gradient(180deg, rgba(212, 65, 58, 0.1), rgba(0, 0, 0, 0.22)),
+    var(--glass-2);
   backdrop-filter: var(--blur-glass-light);
   -webkit-backdrop-filter: var(--blur-glass-light);
-  border: 1px solid var(--led-fault);
+  border: 1px solid rgba(212, 65, 58, 0.58);
   border-radius: var(--rad-md);
   padding: var(--sp-3) var(--sp-4);
   display: flex;
   gap: var(--sp-3);
   align-items: center;
-  max-width: 80vw;
+  max-width: min(520px, calc(100vw - 48px));
   z-index: 100;
   box-shadow:
-    inset 0 1px 0 var(--glass-top),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.7),
+    0 14px 34px rgba(0, 0, 0, 0.34);
+}
+
+.vmx-debrief-error-banner[hidden],
+.vmx-debrief-tooltip[hidden] {
+  display: none;
 }
 
 .vmx-debrief-error-text {
@@ -502,7 +853,7 @@
 /* === Ear-test sign-off (Plan 42-03) ==================================== */
 
 .vmx-debrief-ear-test {
-  grid-column: 1 / -1;
+  grid-area: ear;
   padding: 0 var(--sp-1);
   margin-top: var(--sp-3);
 }
@@ -552,13 +903,18 @@
 }
 
 .vmx-debrief-ear-test-form {
-  /* Deck Speaks: hairline region on void, not a glass card. */
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-md);
   padding: var(--sp-4);
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.024), transparent 20%),
+    rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.7);
 }
 
 .vmx-debrief-ear-test-field {
@@ -680,6 +1036,7 @@
  * so the row reads as ambient context, not a sales pitch. */
 
 .vmx-debrief-bravoh-host {
+  grid-area: bravoh;
   margin-top: var(--sp-4);
 }
 
@@ -688,10 +1045,14 @@
   flex-direction: column;
   gap: 6px;
   padding: var(--sp-3) var(--sp-4);
-  /* Deck Speaks: a void region delineated by a hairline, not a glass card
-   * (dropped the --glass-2 fill + blur + inset bezel shadow). */
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-md);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent),
+    rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.66);
   transition: border-color var(--motion-transition) ease-out, box-shadow var(--motion-transition) ease-out;
 }
 
@@ -784,4 +1145,132 @@
   color: var(--amber);
   border-bottom-color: var(--amber-40);
   outline: none;
+}
+
+/* === Responsive analyzer chassis ======================================= */
+
+@media (max-width: 1040px) {
+  .vmx-debrief-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas:
+      "main"
+      "sidebar"
+      "drills"
+      "bravoh"
+      "ear";
+    gap: var(--sp-4);
+    padding: var(--sp-4);
+    min-height: 0;
+  }
+
+  .vmx-debrief-layout::before {
+    inset: var(--sp-4);
+    background:
+      radial-gradient(circle at 50% 24%, rgba(255, 138, 61, 0.052), transparent 22%),
+      linear-gradient(180deg, transparent 0 18%, rgba(255, 138, 61, 0.035) 18.1%, transparent 18.3% 100%);
+  }
+
+  .vmx-debrief-main {
+    grid-template-rows: auto minmax(280px, auto);
+    height: auto;
+    position: relative;
+    top: auto;
+  }
+
+  .vmx-debrief-sidebar {
+    max-height: none;
+  }
+
+  .vmx-debrief-drills-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vmx-debrief-error-banner {
+    right: var(--sp-4);
+  }
+}
+
+@media (max-width: 680px) {
+  .vmx-debrief-titlebar {
+    padding: 0 var(--sp-3);
+  }
+
+  .vmx-debrief-titlebar__status {
+    display: none;
+  }
+
+  .vmx-debrief-title {
+    font-size: 16px;
+  }
+
+  .vmx-debrief-session {
+    max-width: 48vw;
+    font-size: 10px;
+  }
+
+  .vmx-debrief-layout {
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+  }
+
+  .vmx-debrief-layout::before {
+    inset: var(--sp-3);
+  }
+
+  .vmx-debrief-sidebar,
+  .vmx-debrief-tldr,
+  .vmx-debrief-timeline,
+  .vmx-debrief-drills,
+  .vmx-debrief-ear-test-form,
+  .vmx-bravoh-waitlist-row {
+    border-radius: var(--rad-sm);
+    padding: var(--sp-3);
+  }
+
+  .vmx-debrief-tldr {
+    min-height: 160px;
+  }
+
+  .vmx-debrief-timeline {
+    grid-template-rows: auto minmax(250px, auto);
+    min-height: 300px;
+  }
+
+  .vmx-debrief-waveform {
+    min-height: 250px;
+  }
+
+  .vmx-debrief-region {
+    top: 31%;
+    bottom: 23%;
+    min-width: 26px;
+    padding: 0 4px;
+    font-size: 10px;
+  }
+
+  .vmx-debrief-verdict {
+    font-size: 16px;
+  }
+
+  .vmx-debrief-drills-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vmx-drill {
+    padding: var(--sp-3);
+  }
+
+  .vmx-debrief-error-banner {
+    top: calc(var(--titlebar-h) + var(--sp-2));
+    left: var(--sp-3);
+    right: var(--sp-3);
+    max-width: none;
+    align-items: flex-start;
+  }
+
+  .vmx-debrief-error-dismiss {
+    flex-shrink: 0;
+  }
 }

@@ -3,7 +3,7 @@
 
 Two-stage pipeline:
 
-1. :func:`generate_tldr_text` — single Gemini 3 Flash call to compose
+1. :func:`generate_tldr_text` — single Gemini debrief-route call to compose
    60–90 second (150–220 word) narration. Output is then run through the
    :mod:`stripper` so every sentence carries a citation.
 2. :func:`synthesize_achird_mp3` — Gemini TTS call (Achird voice) →
@@ -13,9 +13,8 @@ Both stages are guarded by typed exceptions so the orchestrator (Plan
 29-02) can surface ``DebriefError(reason="tldr_generation_failed")``
 without crashing the sidecar.
 
-Wave 0 A1 verdict: the full preview id is required (bare name → 404).
-The exact id is resolved via :func:`vibemix.llm.model_router.resolve`
-under the ``"debrief"`` path (Plan 41-01).
+The exact model id is resolved via :func:`vibemix.llm.model_router.resolve`
+under the ``"debrief"`` path so SKU changes stay in one router file.
 Wave 0 A3 verdict: PyAV libmp3lame is in-process available; no system
 ffmpeg fallback required.
 """
@@ -37,15 +36,15 @@ __all__ = [
     "MIN_TLDR_WORDS",
     "DebriefGenerationError",
     "GeminiClientProtocol",
-    "generate_tldr_text",
     "generate_tldr_mp3",
+    "generate_tldr_text",
     "synthesize_achird_mp3",
 ]
 
 logger = logging.getLogger(__name__)
 
-# Wave 0 A1 verdict locked the preview ids; Plan 41-01 routes both through
-# vibemix.llm.model_router so a future SKU bump is a one-file edit.
+# Plan 41-01 routes both through vibemix.llm.model_router so a future SKU bump
+# is a one-file edit.
 DEBRIEF_TLDR_MODEL = resolve("debrief")[0]
 DEBRIEF_TTS_MODEL = resolve("debrief_tts")[0]
 ACHIRD_VOICE_NAME = "Achird"
@@ -121,7 +120,7 @@ def generate_tldr_text(
     prompt = _build_tldr_prompt(chapter_summaries, cited_critique)
     try:
         response = client.models.generate_content(model=model, contents=prompt)
-    except Exception as e:  # noqa: BLE001 — surface as typed error
+    except Exception as e:
         raise DebriefGenerationError(
             reason="tldr_generation_failed",
             message=f"Gemini call failed: {type(e).__name__}: {e}",
@@ -173,7 +172,7 @@ def synthesize_achird_mp3(
                 }
             },
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise DebriefGenerationError(
             reason="tldr_generation_failed",
             message=f"TTS call failed: {type(e).__name__}: {e}",
@@ -285,7 +284,6 @@ def _truncate_to_word_budget(text: str, max_words: int) -> str:
     if len(words) <= max_words:
         return text
     # Find a sentence-ending boundary within the first max_words tokens.
-    import re
 
     truncated = " ".join(words[:max_words])
     # Walk back to the last sentence terminator.

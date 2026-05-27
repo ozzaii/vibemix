@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -264,7 +263,7 @@ def run(
             from google import genai
 
             client = genai.Client()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             if serve:
                 _emit_error_and_exit(
                     port,
@@ -369,7 +368,7 @@ def _emit_error_and_exit(port: int, reason: str, message: str) -> None:
             await server.serve_for_seconds(2.0)
 
         asyncio.run(_one_shot())
-    except Exception as e:  # noqa: BLE001 — emit_error path can't crash
+    except Exception as e:
         logger.error("[debrief] failed to emit error: %s", e)
 
 

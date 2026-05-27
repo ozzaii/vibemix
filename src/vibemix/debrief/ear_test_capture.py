@@ -34,9 +34,9 @@ from typing import Any
 
 __all__ = [
     "EAR_TEST_LOG_DIR",
+    "GENRE_ENUM",
     "SCHEMA_PATH",
     "SLOP_FLAG_KEYS",
-    "GENRE_ENUM",
     "EarTestPayload",
     "validate_payload",
     "write_ear_test_log",

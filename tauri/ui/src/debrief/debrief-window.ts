@@ -38,8 +38,15 @@ export type { EarTestSubmission };
 // ---------------------------------------------------------------------------
 
 const params = new URLSearchParams(location.search);
-const sessionDir = decodeURIComponent(params.get("session") ?? "");
-const sessionId = sessionDir.split("/").pop() ?? "session";
+const rawSessionDir = params.get("session") ?? "";
+const isMockMode =
+  params.get("mock") === "1" ||
+  params.get("mock") === "true" ||
+  rawSessionDir === "mock";
+const sessionDir = isMockMode
+  ? "/tmp/vibemix-demo-session"
+  : decodeURIComponent(rawSessionDir);
+const sessionId = isMockMode ? "demo-session" : sessionDir.split("/").pop() ?? "session";
 
 // Surface the session id in the titlebar.
 const titleEl = document.getElementById("vmx-debrief-session");
@@ -60,7 +67,9 @@ const bravohWaitlistToggleEl = document.getElementById(
   "vmx-debrief-bravoh-waitlist-toggle",
 );
 
-if (!sessionDir) {
+if (isMockMode) {
+  mountMockDebrief();
+} else if (!sessionDir) {
   if (errorBanner) {
     showErrorBanner(errorBanner, "invalid_session_dir");
   }
@@ -234,6 +243,136 @@ if (!sessionDir) {
   client.connect();
 }
 
+function mountMockDebrief(): void {
+  if (errorBanner) errorBanner.hidden = true;
+
+  const totalDurationS = 47 * 60;
+  const chapters: ChapterPayload[] = [
+    {
+      id: "warm-pressure",
+      start: 0,
+      end: 420,
+      label: "00:00 warm pressure",
+      kind: "section",
+      citation_event_id: "mock:00:00",
+    },
+    {
+      id: "bass-handoff",
+      start: 420,
+      end: 980,
+      label: "07:40 bass handoff",
+      kind: "transition",
+      citation_event_id: "mock:07:40",
+    },
+    {
+      id: "vocal-drift",
+      start: 980,
+      end: 1650,
+      label: "18:12 vocal drift",
+      kind: "tension",
+      citation_event_id: "mock:18:12",
+    },
+    {
+      id: "peak-blend",
+      start: 1650,
+      end: 2310,
+      label: "27:55 peak blend",
+      kind: "peak",
+      citation_event_id: "mock:27:55",
+    },
+    {
+      id: "reset-window",
+      start: 2310,
+      end: totalDurationS,
+      label: "38:30 reset window",
+      kind: "release",
+      citation_event_id: "mock:38:30",
+    },
+  ];
+
+  if (chaptersEl) mountChapterList(chaptersEl, chapters);
+  if (waveformEl) {
+    mountTimelinePlaceholder(
+      waveformEl,
+      chapters.map((c) => ({
+        id: c.id,
+        start: c.start,
+        end: c.end,
+        label: c.label,
+        citation_event_id: c.citation_event_id,
+      })),
+      totalDurationS,
+    );
+  }
+  if (tldrPanelEl) {
+    renderVerdictLine(tldrPanelEl, buildVerdictText(chapters.length, totalDurationS));
+  }
+  mountMockTldrPlayer();
+  if (drillsEl) {
+    mountDrillsPanel(drillsEl, [
+      {
+        situation: "Bar 24 into the handoff",
+        behavior: "Bass swap lands three beats before the old groove releases.",
+        impact: "The floor feels the lift as compression instead of forward motion.",
+        action_recommended:
+          "Hold the new low until bar 33, then lift the filter across eight beats.",
+        citation: "mock:12:44",
+      },
+      {
+        situation: "Second blend, phrase overlap",
+        behavior: "Two lead vocal phrases sit on top of each other for a full bar.",
+        impact: "The hook loses front position and the transition reads less intentional.",
+        action_recommended:
+          "Kill incoming mids until the outgoing phrase clears, then reopen on the downbeat.",
+        citation: "mock:24:18",
+      },
+      {
+        situation: "Reset after the peak blend",
+        behavior: "The breakdown clears more bandwidth than the next track can refill.",
+        impact: "The room gets a stop signal when it needed a breath signal.",
+        action_recommended:
+          "Shorten the echo tail and return hats before the next downbeat.",
+        citation: "mock:36:02",
+      },
+    ]);
+  }
+  if (earTestToggleEl) {
+    mountEarTestToggle(
+      earTestToggleEl,
+      {
+        session_id: sessionId,
+        duration_s: totalDurationS,
+        genre: "techno",
+      },
+      {
+        errorBannerEl: errorBanner,
+        wsSink: { send: () => undefined },
+      },
+    );
+  }
+}
+
+function mountMockTldrPlayer(): void {
+  if (!tldrEl) return;
+  tldrEl.textContent = "";
+
+  const meta = document.createElement("p");
+  meta.className = "vmx-debrief-tldr-meta";
+  meta.textContent = "74s recap queued";
+
+  const rail = document.createElement("div");
+  rail.className = "vmx-debrief-tldr-mock-rail";
+  rail.setAttribute("aria-hidden", "true");
+
+  for (let i = 0; i < 32; i += 1) {
+    const tick = document.createElement("span");
+    tick.style.setProperty("--vmx-tick", String((i % 7) + 2));
+    rail.append(tick);
+  }
+
+  tldrEl.append(meta, rail);
+}
+
 // ---------------------------------------------------------------------------
 // Plan 44-04 / LAUNCH-05 — Bravoh waitlist toggle mount
 //
@@ -285,7 +424,7 @@ if (!sessionDir) {
         initialOptIn = value;
       }
     } catch {
-      // Command not yet wired on the Rust side — keep default OFF.
+      // Command unavailable on this Rust build — keep default OFF.
     }
   }
 

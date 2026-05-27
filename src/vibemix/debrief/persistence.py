@@ -22,9 +22,9 @@ from pathlib import Path
 from typing import Any
 
 __all__ = [
+    "DEBRIEF_JSON_FILENAME",
     "SCHEMA_VERSION",
     "TLDR_MP3_FILENAME",
-    "DEBRIEF_JSON_FILENAME",
     "read_debrief",
     "write_debrief",
 ]

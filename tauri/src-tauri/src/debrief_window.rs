@@ -29,6 +29,9 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
 use crate::recordings;
+use crate::sidecar::{
+    resolve_sidecar_invocation_for_command, SidecarInvocation, FORWARDED_ENV_KEYS,
+};
 
 pub const DEBRIEF_WINDOW_LABEL: &str = "debrief";
 
@@ -115,12 +118,9 @@ pub async fn open_debrief_window(
         return Ok(());
     }
 
-    // 3. Spawn the sidecar with --debrief <validated_path>.
-    let sidecar_cmd = app
-        .shell()
-        .sidecar("vibemix-core")
-        .map_err(|e| format!("sidecar resolve: {e}"))?
-        .args(["--debrief", &safe_str]);
+    // 3. Spawn the same resolved vibemix command as the main/library paths,
+    // then append --debrief <validated_path>.
+    let sidecar_cmd = build_debrief_sidecar_command(&app, &safe_str)?;
     let (mut rx, child) = sidecar_cmd
         .spawn()
         .map_err(|e| format!("sidecar spawn: {e}"))?;
@@ -152,18 +152,14 @@ pub async fn open_debrief_window(
         ),
         None => format!("debrief.html?session={url_encoded}"),
     };
-    let window = WebviewWindowBuilder::new(
-        &app,
-        DEBRIEF_WINDOW_LABEL,
-        WebviewUrl::App(url.into()),
-    )
-    .title(format!("Debrief — {session_label}"))
-    .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
-    .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
-    .resizable(true)
-    .decorations(true)
-    .build()
-    .map_err(|e| format!("window build: {e}"))?;
+    let window = WebviewWindowBuilder::new(&app, DEBRIEF_WINDOW_LABEL, WebviewUrl::App(url.into()))
+        .title(format!("Debrief — {session_label}"))
+        .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
+        .resizable(true)
+        .decorations(true)
+        .build()
+        .map_err(|e| format!("window build: {e}"))?;
 
     // 5. Close-handler → kill the sidecar child.
     let app_for_close = app.clone();
@@ -189,11 +185,8 @@ pub async fn open_debrief_window(
                             _ => "crashed",
                         },
                     });
-                    let _ = app_for_watch
-                        .emit("sidecar-debrief-crashed", payload_json);
-                    if let Some(w) =
-                        app_for_watch.get_webview_window(DEBRIEF_WINDOW_LABEL)
-                    {
+                    let _ = app_for_watch.emit("sidecar-debrief-crashed", payload_json);
+                    if let Some(w) = app_for_watch.get_webview_window(DEBRIEF_WINDOW_LABEL) {
                         let _ = w.close();
                     }
                     // Clear our state so a subsequent open_debrief_window
@@ -222,6 +215,49 @@ pub async fn open_debrief_window(
     });
 
     Ok(())
+}
+
+/// Build the debrief sidecar command from the shared dev-vs-bundled resolver.
+///
+/// This deliberately avoids Tauri's named sidecar API: the product ships
+/// PyInstaller onedir bundles through `bundle.resources`, and sidecar.rs
+/// resolves the resource path at runtime.
+fn build_debrief_sidecar_command(
+    app: &AppHandle,
+    safe_str: &str,
+) -> Result<tauri_plugin_shell::process::Command, String> {
+    let invocation = resolve_sidecar_invocation_for_command(app)?;
+
+    let mut cmd = match invocation {
+        SidecarInvocation::DevSource { program, args, cwd } => {
+            let args = debrief_cli_args(&args, safe_str);
+            app.shell().command(&program).args(args).current_dir(&cwd)
+        }
+        SidecarInvocation::Bundled(bin) => {
+            let mut c = app.shell().command(&bin);
+            if let Some(parent) = bin.parent() {
+                c = c.current_dir(parent);
+            }
+            c.args(["--debrief", safe_str])
+        }
+    };
+
+    for key in FORWARDED_ENV_KEYS {
+        if let Ok(val) = std::env::var(key) {
+            if !val.is_empty() {
+                cmd = cmd.env(key, val);
+            }
+        }
+    }
+
+    Ok(cmd)
+}
+
+fn debrief_cli_args(base_args: &[String], safe_str: &str) -> Vec<String> {
+    let mut args = base_args.to_vec();
+    args.push("--debrief".to_string());
+    args.push(safe_str.to_string());
+    args
 }
 
 /// Minimal percent-encoder for a filesystem path destined for a URL
@@ -276,10 +312,7 @@ mod tests {
 
     #[test]
     fn percent_encode_path_handles_query_delimiters() {
-        assert_eq!(
-            percent_encode_path("a?b=c&d=e#f"),
-            "a%3Fb%3Dc%26d%3De%23f"
-        );
+        assert_eq!(percent_encode_path("a?b=c&d=e#f"), "a%3Fb%3Dc%26d%3De%23f");
     }
 
     #[test]
@@ -314,5 +347,37 @@ mod tests {
         assert_eq!(DEBRIEF_WINDOW_LABEL, "debrief");
         assert!(DEBRIEF_WINDOW_LABEL.chars().all(|c| c.is_lowercase()));
         assert!(!DEBRIEF_WINDOW_LABEL.contains(' '));
+    }
+
+    #[test]
+    fn debrief_cli_args_append_after_uv_module_invocation() {
+        let base = vec![
+            "run".to_string(),
+            "python".to_string(),
+            "-m".to_string(),
+            "vibemix".to_string(),
+        ];
+
+        assert_eq!(
+            debrief_cli_args(&base, "/recordings/20260515-112139"),
+            vec![
+                "run",
+                "python",
+                "-m",
+                "vibemix",
+                "--debrief",
+                "/recordings/20260515-112139",
+            ]
+        );
+    }
+
+    #[test]
+    fn debrief_cli_args_append_after_custom_python_invocation() {
+        let base = vec!["-m".to_string(), "vibemix".to_string()];
+
+        assert_eq!(
+            debrief_cli_args(&base, "20260515-112139"),
+            vec!["-m", "vibemix", "--debrief", "20260515-112139"]
+        );
     }
 }

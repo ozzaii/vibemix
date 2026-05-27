@@ -160,7 +160,7 @@ def load_session(session_dir: Path) -> tuple[list[dict], dict[str, Any], VoiceWa
     if voice_path.exists() and voice_path.stat().st_size > 0:
         try:
             voice_meta = _read_voice_wav_meta(voice_path)
-        except Exception as e:  # noqa: BLE001 — degrade gracefully
+        except Exception as e:
             logger.warning("[debrief] voice.wav meta read failed: %s", e)
 
     return (events, evidence_snapshot, voice_meta)

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""DEBRIEF-06 — Gemini 3 Pro structured-output drill generation.
+"""DEBRIEF-06 — Gemini structured-output drill generation.
 
 Exactly 3 SBI/STAR-AR :class:`Drill` objects per session. Each drill
 has 5 string fields (situation / behavior / impact / action_recommended
@@ -16,7 +16,6 @@ serializes back to plain dicts before crossing any IPC boundary. The
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any, Protocol
 
 try:
@@ -38,8 +37,7 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-# Plan 41-01: shares the debrief router path with tldr — both run on
-# Flex 3-Pro per CONTEXT.md LAT-07.
+# Plan 41-01: shares the debrief router path with tldr.
 DEBRIEF_DRILLS_MODEL = resolve("debrief")[0]
 
 # How tight the citation→snapshot lookup is. Phase 20 ``mode="debrief"``
@@ -224,7 +222,7 @@ def generate_drills(
                     "response_schema": Drills,
                 },
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             last_error = f"Gemini call failed: {type(e).__name__}: {e}"
             logger.warning(
                 "[debrief] drills attempt %d/%d: %s",
@@ -242,7 +240,7 @@ def generate_drills(
             text = getattr(response, "text", "")
             try:
                 drills = Drills.model_validate_json(text)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 last_error = f"Pydantic validate failed: {e}"
                 logger.warning("[debrief] %s", last_error)
                 continue

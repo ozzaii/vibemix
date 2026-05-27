@@ -16,6 +16,7 @@ export interface TimelineChapter {
   end: number;
   label: string;
   citation_event_id: string;
+  kind?: string;
 }
 
 export interface TimelineSeekEvent extends CustomEvent {
@@ -29,6 +30,7 @@ export function mountTimelinePlaceholder(
 ): void {
   container.textContent = "";
   container.classList.add("vmx-debrief-timeline-placeholder");
+  container.style.setProperty("--vmx-region-count", String(chapters.length));
 
   if (chapters.length === 0 || totalDurationS <= 0) {
     const empty = document.createElement("p");
@@ -38,23 +40,88 @@ export function mountTimelinePlaceholder(
     return;
   }
 
-  for (const c of chapters) {
+  const signalBed = document.createElement("div");
+  signalBed.className = "vmx-debrief-signal-bed";
+  signalBed.setAttribute("aria-hidden", "true");
+  for (let i = 0; i < 96; i += 1) {
+    const bar = document.createElement("span");
+    const chapter = chapters[Math.floor((i / 96) * chapters.length)] ?? chapters[0];
+    const chapterSpan = Math.max(1, chapter.end - chapter.start);
+    const normalizedSpan = Math.min(1, chapterSpan / Math.max(1, totalDurationS));
+    const pulse =
+      Math.sin(i * 0.48) * 0.5 +
+      Math.cos(i * 0.17) * 0.32 +
+      Math.sin(i * 0.91) * 0.18;
+    const height = 22 + Math.round((pulse + 1) * 18 + normalizedSpan * 42);
+    bar.style.setProperty("--vmx-bar-h", `${Math.max(12, Math.min(84, height))}%`);
+    bar.style.setProperty("--vmx-bar-alpha", String(0.12 + (i % 5) * 0.025));
+    signalBed.append(bar);
+  }
+
+  const phaseRail = document.createElement("div");
+  phaseRail.className = "vmx-debrief-phase-rail";
+  phaseRail.setAttribute("aria-hidden", "true");
+  for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
+    const mark = document.createElement("span");
+    mark.textContent = formatTime(totalDurationS * fraction);
+    phaseRail.append(mark);
+  }
+
+  const regionLayer = document.createElement("div");
+  regionLayer.className = "vmx-debrief-region-layer";
+
+  const readout = document.createElement("div");
+  readout.className = "vmx-debrief-timeline-readout";
+  readout.setAttribute("aria-live", "polite");
+  renderReadout(readout, [
+    `${chapters.length} regions`,
+    `${formatTime(totalDurationS)} set`,
+    "ready",
+  ]);
+
+  container.append(signalBed, phaseRail, regionLayer, readout);
+
+  for (let i = 0; i < chapters.length; i += 1) {
+    const c = chapters[i];
     const region = document.createElement("button");
     region.type = "button";
     region.className = "vmx-debrief-region";
     region.dataset.chapterId = c.id;
     region.dataset.citationEventId = c.citation_event_id;
+    if (c.kind) region.dataset.kind = c.kind;
     const width = ((c.end - c.start) / totalDurationS) * 100;
     const left = (c.start / totalDurationS) * 100;
     region.style.left = `${left}%`;
     region.style.width = `${width}%`;
+    region.style.setProperty("--vmx-region-y", `${30 + (i % 3) * 9}%`);
+    region.style.setProperty(
+      "--vmx-region-h",
+      `${Math.max(18, Math.min(34, 18 + width * 0.45))}%`,
+    );
     region.title = c.label;
+    region.textContent = compactLabel(c.label);
     region.setAttribute(
       "aria-label",
       `Seek to ${c.label} at ${formatTime(c.start)}`,
     );
+    const inspect = (): void => {
+      for (const active of regionLayer.querySelectorAll<HTMLElement>(
+        ".vmx-debrief-region[data-active='true']",
+      )) {
+        delete active.dataset.active;
+      }
+      region.dataset.active = "true";
+      renderReadout(readout, [
+        c.kind ?? "region",
+        `${formatTime(c.start)} → ${formatTime(c.end)}`,
+        compactLabel(c.label),
+      ]);
+    };
+    region.addEventListener("mouseenter", inspect);
+    region.addEventListener("focus", inspect);
     region.addEventListener("click", (e) => {
       e.stopPropagation();
+      inspect();
       container.dispatchEvent(
         new CustomEvent("region-clicked", {
           detail: {
@@ -65,7 +132,7 @@ export function mountTimelinePlaceholder(
         }),
       );
     });
-    container.append(region);
+    regionLayer.append(region);
   }
 
   // P1-a uplift 1 — thin amber playhead. Appended once over the regions;
@@ -189,4 +256,17 @@ function formatTime(s: number): string {
     .toString()
     .padStart(2, "0");
   return `${m}:${sec}`;
+}
+
+function compactLabel(label: string): string {
+  return label.replace(/^\d{1,2}:\d{2}\s+/, "").trim() || label;
+}
+
+function renderReadout(container: HTMLElement, values: string[]): void {
+  container.textContent = "";
+  for (const value of values) {
+    const item = document.createElement("span");
+    item.textContent = value;
+    container.append(item);
+  }
 }

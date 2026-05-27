@@ -19,7 +19,14 @@
   <body>
     <div id="debrief-root" class="vmx-debrief-root">
       <header class="vmx-debrief-titlebar" data-tauri-drag-region>
-        <div class="vmx-debrief-title" data-tauri-drag-region>Debrief</div>
+        <div class="vmx-debrief-title-group" data-tauri-drag-region>
+          <div class="vmx-debrief-title" data-tauri-drag-region>Debrief</div>
+          <div class="vmx-debrief-titlebar__status" aria-hidden="true"
+               data-tauri-drag-region>
+            <span>Local analyzer</span>
+            <span>Evidence lock</span>
+          </div>
+        </div>
         <div class="vmx-debrief-session" id="vmx-debrief-session"
              data-tauri-drag-region></div>
       </header>
