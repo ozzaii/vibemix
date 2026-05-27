@@ -20,6 +20,7 @@ import numpy as np
 
 from vibemix.runtime.suggestion import (
     SuggestionService,
+    resolve_controller_mix_context,
     resolve_live_timing,
     resolve_seed,
     resolve_seed_context,
@@ -194,6 +195,24 @@ def test_resolve_live_timing_prefers_grounded_track_position():
     assert timing.source_position_s == 276.0
 
 
+def test_controller_mix_context_marks_open_target_deck_as_blend() -> None:
+    state = MusicState()
+    state.audible_deck = "A"
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_a = {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 72, "eq_low": 8, "eq_mid": 64, "eq_hi": 64, "filter": 92}
+
+    context = resolve_controller_mix_context(state, source_deck="A", target_deck="B")
+    timing = resolve_live_timing(state)
+
+    assert context["controller_blend_active"] is True
+    assert context["target_channel_open"] is True
+    assert context["target"]["low_cut"] is True
+    assert context["target"]["filter"] == "boost"
+    assert timing.blend_active is True
+
+
 def test_compute_from_state_no_op_when_unresolved():
     store = _FakeStore(["s"], [("s", 0.99)])
     svc = SuggestionService(store, _lib(["s"]))
@@ -293,6 +312,63 @@ def test_compute_from_state_threads_live_bar_timing_into_transition():
     assert payload["candidate_id"] == "tr_001"
     assert payload["cue_slot"] == "A"
     assert payload["timing_text"] == "in 13 bars"
+
+
+def test_controller_blend_keeps_transition_but_suppresses_select_decision():
+    from dataclasses import replace
+
+    from vibemix.library.rekordbox import CuePoint
+
+    store = _FakeStore(["s", "a"], [("s", 0.99), ("a", 0.9)])
+    lib = _lib(["s", "a"])
+    lib.tracks["s"] = replace(
+        lib.tracks["s"],
+        cues=(CuePoint(name="OUT", type="cue", start_s=224.0, end_s=None, number=5),),
+    )
+    lib.tracks["a"] = replace(
+        lib.tracks["a"],
+        key="9A",
+        cues=(CuePoint(name="IN", type="cue", start_s=0.0, end_s=None, number=0),),
+    )
+    svc = SuggestionService(store, lib)
+    state = MusicState()
+    state.audible_deck = "A"
+    state.controller_connected = True
+    state.xfader = 64
+    state.deck_a = {"vol": 110, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 80, "eq_low": 8, "eq_mid": 64, "eq_hi": 64, "filter": 92}
+    state.audible_track_position_s = 276.0
+    state.audible_track_position_confidence = 0.85
+    state.deck_state = DeckState(
+        decks={"A": DeckTrack(title="Source", track_id="s", camelot="8A", bpm=124.0)}
+    )
+
+    out = svc.compute_from_state(state)
+
+    assert out is not None
+    assert out["transition"] is not None
+    assert out["transition"]["cue_slot"] == "A"
+    assert out["transition"]["start_in_bars"] is None
+    assert out["transition"]["timing_basis"] is None
+    assert "blend_active" in out["transition"]["risk_flags"]
+
+    envelope = svc.context_for_state(state, packet_id="ctx_live_blend")
+    assert envelope is not None
+    assert envelope.current["blend_active"] is True
+    assert envelope.current["controller"]["controller_blend_active"] is True
+    assert envelope.current["controller"]["target"]["low_cut"] is True
+
+    payload = svc.decision_payload_for_state(
+        state,
+        packet_id="ctx_live_blend",
+        snapshot_id="snapshot_live_blend",
+        decision_id="dec_live_blend",
+        trace_id="trace_live_blend",
+    )
+
+    assert payload is not None
+    assert payload["action"] == "suppress"
+    assert payload["emitted"] is False
 
 
 def test_refresh_from_state_updates_transition_countdown_without_reranking():

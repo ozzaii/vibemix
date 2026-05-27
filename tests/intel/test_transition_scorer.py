@@ -272,6 +272,28 @@ def test_low_playhead_confidence_removes_start_in_bars() -> None:
     assert "timing_low_confidence" in slate[0].risk_flags
 
 
+def test_blend_active_keeps_candidate_but_removes_start_in_bars() -> None:
+    source = _section("t1#s000", "t1", "outro")
+    destination = _section("t2#s000", "t2", "intro")
+
+    slate = score_transition_slate(
+        TransitionScoringInput(
+            source=source,
+            destinations=(destination,),
+            mode="live",
+            live_position=LivePosition(
+                remaining_bars=16,
+                playhead_confidence=0.95,
+                blend_active=True,
+            ),
+        )
+    )
+
+    assert len(slate) == 1
+    assert slate[0].start_in_bars is None
+    assert "blend_active" in slate[0].risk_flags
+
+
 def test_high_playhead_confidence_allows_start_in_bars() -> None:
     source = _section("t1#s000", "t1", "outro")
     destination = _section("t2#s000", "t2", "intro")

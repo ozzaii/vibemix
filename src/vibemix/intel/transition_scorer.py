@@ -150,10 +150,6 @@ def score_transition_slate(
     """
     if max_candidates <= 0:
         return ()
-    if scoring_input.mode == "live" and scoring_input.live_position is not None:
-        if scoring_input.live_position.blend_active:
-            return ()
-
     drafts: list[TransitionCandidate] = []
     for destination in scoring_input.destinations:
         if _hard_filtered(scoring_input, destination):
@@ -224,6 +220,8 @@ def phrase_alignment_score(
     """Grade phrase cleanliness from beat/bar metadata."""
     flags: list[str] = []
     if mode == "live" and live_position is not None:
+        if live_position.blend_active:
+            flags.append("blend_active")
         if live_position.playhead_confidence < EXACT_TIMING_CONFIDENCE_FLOOR:
             flags.append("timing_low_confidence")
     if section.bar_count is not None and section.bar_count < 4:

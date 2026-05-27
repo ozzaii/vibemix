@@ -56,6 +56,8 @@ BAR_BOUNDARY_TOLERANCE = 0.10
 LIVE_REFRESH_INTERVAL_S = 0.75
 FULL_COMPUTE_RETRY_S = 5.0
 FULL_COMPUTE_DISPATCH_GUARD_S = 0.25
+CONTROLLER_TARGET_VOLUME_FLOOR = 16
+CONTROLLER_XFADER_FACTOR_FLOOR = 0.20
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,7 +135,10 @@ def resolve_live_timing(state: Any) -> LiveTimingHint:
     is weak or malformed we withhold exact bars and let the scorer expose only
     the destination cue.
     """
-    blend_active = getattr(state, "audible_deck", None) == "mix"
+    blend_active = bool(
+        getattr(state, "audible_deck", None) == "mix"
+        or resolve_controller_mix_context(state).get("controller_blend_active")
+    )
     source_position_s = _float_or(getattr(state, "audible_track_position_s", None), None)
     position_confidence = _clamp01(
         _float_or(getattr(state, "audible_track_position_confidence", 0.0), 0.0) or 0.0
@@ -155,6 +160,35 @@ def resolve_live_timing(state: Any) -> LiveTimingHint:
     distance_to_bar_boundary = min(phase, 1.0 - phase)
     remaining_bars = 0 if distance_to_bar_boundary <= BAR_BOUNDARY_TOLERANCE else 1
     return LiveTimingHint(remaining_bars, confidence, blend_active)
+
+
+def resolve_controller_mix_context(
+    state: Any,
+    *,
+    source_deck: str | None = None,
+    target_deck: str | None = None,
+) -> dict[str, Any]:
+    """Return a prompt-safe summary of controller mix posture."""
+    source = _deck_label(source_deck) or _deck_label(getattr(state, "audible_deck", None))
+    target = _deck_label(target_deck) or ("B" if source == "A" else "A" if source == "B" else None)
+    xfader = _int_0_127(getattr(state, "xfader", 64), 64)
+    connected = bool(getattr(state, "controller_connected", False))
+    source_state = _deck_controller_state(state, source)
+    target_state = _deck_controller_state(state, target)
+    target_channel_open = bool(
+        target
+        and target_state.get("volume_raw", 0) >= CONTROLLER_TARGET_VOLUME_FLOOR
+        and _xfader_factor(target, xfader) >= CONTROLLER_XFADER_FACTOR_FLOOR
+    )
+    controller_blend_active = bool(connected and source in {"A", "B"} and target_channel_open)
+    return {
+        "connected": connected,
+        "xfader": xfader,
+        "source": source_state,
+        "target": target_state,
+        "target_channel_open": target_channel_open,
+        "controller_blend_active": controller_blend_active,
+    }
 
 
 class SuggestionService:
@@ -368,6 +402,11 @@ class SuggestionService:
     ) -> Any | None:
         seed = resolve_seed_context(state)
         timing = resolve_live_timing(state)
+        controller = resolve_controller_mix_context(
+            state,
+            source_deck=seed.source_deck if seed is not None else None,
+            target_deck=seed.target_deck if seed is not None else None,
+        )
         current = {
             "active_track_id": seed.track_id if seed is not None else None,
             "source_deck": seed.source_deck if seed is not None else None,
@@ -375,6 +414,7 @@ class SuggestionService:
             "blend_active": timing.blend_active,
             "playhead_confidence": timing.playhead_confidence,
             "source_position_s": timing.source_position_s,
+            "controller": controller,
         }
         from vibemix.intel.context_compiler import compile_suggestion_context
 
@@ -901,6 +941,78 @@ def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
 
 
+def _deck_controller_state(state: Any, deck: str | None) -> dict[str, Any]:
+    if deck == "A":
+        raw = getattr(state, "deck_a", None)
+    elif deck == "B":
+        raw = getattr(state, "deck_b", None)
+    else:
+        raw = None
+    raw = raw if isinstance(raw, dict) else {}
+    eq_low = _int_0_127(raw.get("eq_low"), 64)
+    eq_mid = _int_0_127(raw.get("eq_mid"), 64)
+    eq_hi = _int_0_127(raw.get("eq_hi"), 64)
+    filter_value = _int_0_127(raw.get("filter"), 64)
+    return {
+        "deck": deck,
+        "volume_raw": _int_0_127(raw.get("vol"), 0),
+        "eq": {
+            "low": _knob_tier(eq_low),
+            "mid": _knob_tier(eq_mid),
+            "hi": _knob_tier(eq_hi),
+        },
+        "filter": _knob_tier(filter_value),
+        "low_cut": _knob_tier(eq_low) in {"killed", "deep_cut", "cut"},
+    }
+
+
+def _deck_label(deck: Any) -> str | None:
+    if not isinstance(deck, str):
+        return None
+    deck = deck.strip().upper()
+    return deck if deck in {"A", "B"} else None
+
+
+def _int_0_127(raw: Any, default: int) -> int:
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(127, value))
+
+
+def _knob_tier(value: int) -> str:
+    if value < 8:
+        return "killed"
+    if value < 30:
+        return "deep_cut"
+    if value < 55:
+        return "cut"
+    if value <= 73:
+        return "flat"
+    if value <= 100:
+        return "boost"
+    return "max"
+
+
+def _xfader_factor(side: str, xfader: int) -> float:
+    if side == "A":
+        if xfader >= 112:
+            return 0.0
+        if xfader >= 80:
+            return 0.3
+        if xfader >= 48:
+            return 0.7
+        return 1.0
+    if xfader < 16:
+        return 0.0
+    if xfader < 48:
+        return 0.3
+    if xfader <= 80:
+        return 0.7
+    return 1.0
+
+
 def _dict_or_none(value: Any) -> dict | None:
     return dict(value) if isinstance(value, dict) else None
 
@@ -932,6 +1044,7 @@ __all__ = [
     "LiveTimingHint",
     "ResolvedSeed",
     "SuggestionService",
+    "resolve_controller_mix_context",
     "resolve_live_timing",
     "resolve_seed",
     "resolve_seed_context",

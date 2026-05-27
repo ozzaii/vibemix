@@ -23,6 +23,7 @@ The grounding comes from structured evidence, not from asking a model to
 pretend it has perfect ears:
 
 - live deck and playhead state
+- controller mix posture, including deck volume, xfader, EQ-low, and filter state
 - track-level CLAP similarity
 - section-level vectors where available
 - section roles and phrase boundaries
@@ -63,6 +64,12 @@ MusicState
    confidence.
 8. `intel/claim_validator.py` validates the decision against the cited claims.
    Invalid decisions fail soft and are not emitted as trusted guidance.
+
+Controller posture is included as prompt-safe structured context, not as raw
+MIDI. When the target deck is already open through the channel fader/xfader, the
+runtime treats the booth as actively blending: the set-aware transition can
+still be kept as grounded context, but exact bar timing is withheld and the
+validated live decision suppresses rather than issuing a fresh `select`.
 
 ## Wire payload
 
@@ -173,6 +180,25 @@ component, not a hard override: it can nudge technically close transitions
 toward the DJ's accepted role pairs while leaving harmonic, tempo, phrase, cue,
 semantic, and confidence gates intact.
 
+### Controller posture
+
+The live context also includes a bounded `controller` object derived from
+`MusicState.deck_a`, `MusicState.deck_b`, and `MusicState.xfader`:
+
+- `connected`
+- `xfader`
+- source/target deck summaries
+- target channel-open status
+- target low-cut status
+- `controller_blend_active`
+
+Deck summaries use tier labels such as `killed`, `cut`, `flat`, and `boost`
+instead of raw prompt prose. This lets the decision runtime know when the DJ has
+already opened the target deck or prepared a low-cut/filter blend. In that
+state, transition candidates remain available for UI context, but
+`start_in_bars` is removed and the validated decision is suppressed so the pill
+does not bark a stale "load this now" instruction mid-blend.
+
 ### `decision`
 
 `decision` is the validator-checked action packet produced after the claim ledger
@@ -207,7 +233,8 @@ match, the cited claims must support those facts.
 - Model-facing context contains structured facts, not raw audio, local paths, or
   vectors.
 - Exact timing is emitted only when the playhead confidence policy allows it.
-- Live blend conditions suppress unsafe timing precision.
+- Live blend conditions suppress unsafe timing precision and validated select
+  actions, while preserving grounded transition context where possible.
 - Semantic dimension mismatches become unknown evidence, not fabricated matches.
 - Missing cue, BPM, Camelot, section, or vector data stays honest-null and must
   lower confidence or add risk flags instead of inventing values.
@@ -232,7 +259,7 @@ action path and the next frame reflects the pinned selected candidate.
 Focused backend and UI checks used for this slice:
 
 ```bash
-uv run pytest -q tests/intel/test_feedback.py tests/intel/test_taste_model.py tests/library/test_next_suggestion.py tests/runtime/test_suggestion.py tests/runtime/test_ws_bus.py tests/intel/test_context_compiler.py tests/intel/test_decision_runtime.py tests/intel/test_decision_validator.py
+uv run pytest -q tests/intel/test_feedback.py tests/intel/test_taste_model.py tests/intel/test_transition_scorer.py tests/library/test_next_suggestion.py tests/runtime/test_suggestion.py tests/runtime/test_ws_bus.py tests/intel/test_context_compiler.py tests/intel/test_decision_runtime.py tests/intel/test_decision_validator.py
 npm --prefix tauri/ui test -- next-suggestion
 npm --prefix tauri/ui test -- pill/index
 ```
